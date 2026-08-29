@@ -1,0 +1,16 @@
+.DS_Store
+Thumbs.db
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+node_modules/
+
+# Generated presentation work should not enter the skill package.
+build/
+dist/
+output/
+renders/
+*.tmp
+~$*.pptx
+

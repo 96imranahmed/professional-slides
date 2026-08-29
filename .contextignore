@@ -1,0 +1,6 @@
+# Paths and content sources Context Engine must not ingest
+.env
+.env.*
+**/secrets/**
+**/*.pem
+**/*.key

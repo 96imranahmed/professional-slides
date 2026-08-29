@@ -1,0 +1,37 @@
+{
+  "purpose": "Visual reference provenance only; source files are not included in this repository.",
+  "sources": [
+    {
+      "filename": "Slideworks_business_consulting_toolkit_SAMPLE.pptx",
+      "sha256": "94e4cc11c782f6374ae94a640e50c4a2f232732074ab66e12b8f0b6c57ce2997",
+      "bytes": 1356059,
+      "canvas": {"widthInches": 13.3333, "heightInches": 7.5, "aspectRatio": 1.7778},
+      "package": {
+        "slideCount": 28,
+        "masterCount": 1,
+        "layoutCount": 2,
+        "themeCount": 3,
+        "themeOverrideCount": 4,
+        "chartCount": 7,
+        "mediaCount": 28,
+        "notesCount": 12
+      }
+    },
+    {
+      "filename": "Umbrex PowerPoint Template for Consultants Third Edition.pptx",
+      "sha256": "9733f55be1905c79ae2894d3c6f1eed1d2b932076c8c3f18c06e58213854492c",
+      "bytes": 8004106,
+      "canvas": {"widthInches": 13.3333, "heightInches": 7.5, "aspectRatio": 1.7778},
+      "package": {
+        "slideCount": 230,
+        "masterCount": 7,
+        "layoutCount": 41,
+        "themeCount": 9,
+        "themeOverrideCount": 0,
+        "chartCount": 50,
+        "mediaCount": 95,
+        "notesCount": 44
+      }
+    }
+  ]
+}

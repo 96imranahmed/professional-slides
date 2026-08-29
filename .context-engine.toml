@@ -1,0 +1,50 @@
+schema_version = 1
+project_id = "01a04f86-d66d-7cc0-aeba-5d9531f6a297"
+profile = "coding"
+
+[policy]
+policy_version = 1
+
+[policy.hot]
+max_events = 1000
+max_tokens = 128000
+max_bytes = 33554432
+max_age_seconds = 172800
+on_limit = "compact"
+
+[policy.warm]
+max_events = 50000
+max_bytes = 536870912
+max_age_seconds = 7776000
+on_limit = "compact"
+
+[policy.durable]
+max_bytes = 4294967296
+on_limit = "compact"
+
+[policy.archive]
+max_bytes = 21474836480
+max_age_seconds = 63072000
+on_limit = "archive"
+
+[policy.maintenance]
+trigger_event_count = 1000
+trigger_interval_seconds = 86400
+structure_review_write_count = 5
+checkpoint_retention_seconds = 2592000
+purge_enabled = false
+
+[policy.query]
+allowed_strategies = [
+    "lexical",
+    "vector",
+    "graph",
+    "temporal",
+    "hybrid",
+]
+max_candidates = 2000
+max_graph_nodes = 10000
+max_graph_hops = 6
+max_result_tokens = 24000
+max_latency_ms = 8000
+max_provider_calls = 1

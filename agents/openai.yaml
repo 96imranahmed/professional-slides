@@ -1,0 +1,4 @@
+interface:
+  display_name: "Professional Slides"
+  short_description: "Build decision-ready consulting slide decks"
+  default_prompt: "Use $professional-slides to create an executive-grade, answer-first deck in PowerPoint or Google Slides."
