@@ -46,9 +46,9 @@ Write the communication job before storyboarding:
   reference, read [template intake](references/template-intake.md) before
   planning. Treat the supplied reference as authoritative within the user's
   reuse rights.
-- Read the [PowerPoint integration](references/powerpoint/index.md) for PPTX
+- Read the [PowerPoint integration](tools/powerpoint/index.md) for PPTX
   creation, editing, API selection, or rendering.
-- Read the [Google Slides integration](references/google-slides/index.md) for
+- Read the [Google Slides integration](tools/google-slides/index.md) for
   native Google Slides, import, API selection, or rendering.
 - Read [quality assurance](references/quality-assurance.md) before implementation
   and again before delivery.

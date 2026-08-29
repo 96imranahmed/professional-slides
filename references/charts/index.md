@@ -53,7 +53,7 @@ Google Slides adapters map those semantics to supported native chart APIs. If
 a native chart cannot preserve the intended result, prefer editable primitives;
 use a raster fallback only with explicit user approval and retain source data.
 
-Read [PowerPoint](../powerpoint/index.md) and [Google Slides](../google-slides/index.md)
+Read [PowerPoint](../../tools/powerpoint/index.md) and [Google Slides](../../tools/google-slides/index.md)
 for integration and rendering routes.
 
 ## Annotation grammar

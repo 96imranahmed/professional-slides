@@ -40,15 +40,6 @@ executive consulting communication.
 |   |   `-- <one file per chart family>
 |   |-- components.md
 |   |-- template-intake.md
-|   |-- powerpoint/
-|   |   |-- index.md
-|   |   |-- artifact-tool.md
-|   |   |-- office-js-and-graph.md
-|   |   `-- rendering.md
-|   |-- google-slides/
-|   |   |-- index.md
-|   |   |-- api-integration.md
-|   |   `-- rendering.md
 |   |-- quality-assurance.md
 |   |-- deck-blueprint.schema.json
 |   `-- theming/
@@ -58,6 +49,16 @@ executive consulting communication.
 |       |-- theme-spec.schema.json
 |       |-- theme-spec.example.json
 |       `-- source-manifest.json
+|-- tools/
+|   |-- powerpoint/
+|   |   |-- index.md
+|   |   |-- artifact-tool.md
+|   |   |-- office-js-and-graph.md
+|   |   `-- rendering.md
+|   `-- google-slides/
+|       |-- index.md
+|       |-- api-integration.md
+|       `-- rendering.md
 |-- examples/deck-blueprint.example.json
 |-- evals/
 |   |-- EVALS.md
