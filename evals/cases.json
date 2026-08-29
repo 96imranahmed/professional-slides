@@ -65,6 +65,14 @@
       "fixture": {"required": true, "role": "authorized_reference_deck"},
       "brief": "Using the authorized reference deck and supplied content, create a concise six-slide decision deck in PowerPoint and native Google Slides. Derive a reusable theme, select source exemplars by narrative role, remove sample content and branding, and document deliberate deviations.",
       "focus": ["template intake", "theming", "reference fidelity", "cross-platform conversion"]
+    },
+    {
+      "id": "acquisition-thesis-pptx",
+      "enabled": true,
+      "platform": "powerpoint",
+      "fixture": {"required": false, "role": "public_research"},
+      "brief": "Write an editable executive decision deck explaining why SpaceXAI should acquire Hugging Face. Treat the transaction as a strategic scenario rather than an announced deal; ground current company facts in traceable public sources; distinguish facts, hypotheses, and diligence questions; compare acquisition with partnership and organic build; address community, regulatory, licensing, and integration risks; and close with a clear recommendation and diligence gates. Do not invent valuation, synergy, or operating data.",
+      "focus": ["acquisition thesis", "current-source discipline", "options comparison", "risk and diligence", "PowerPoint rendering"]
     }
   ]
 }
