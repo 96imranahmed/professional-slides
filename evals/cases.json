@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "dimensions": [
+    "briefFidelity",
+    "narrativeLogic",
+    "slideDesign",
+    "chartIntegrity",
+    "platformCorrectness",
+    "editability",
+    "sourceIntegrity",
+    "qaEvidence"
+  ],
+  "criticalFailures": [
+    "corrupt_artifact",
+    "missing_deliverable",
+    "invented_evidence",
+    "misleading_chart",
+    "unreadable_render",
+    "wrong_platform",
+    "reference_fidelity_breach"
+  ],
+  "thresholds": {
+    "selfScoreMinimum": 80,
+    "treatmentScoreMinimum": 80,
+    "improvementMinimum": 8,
+    "maximumDimensionRegression": 0.25
+  },
+  "cases": [
+    {
+      "id": "executive-synthesis-pptx",
+      "enabled": true,
+      "platform": "powerpoint",
+      "fixture": {"required": false, "role": "none"},
+      "brief": "Create an editable five-slide PowerPoint pre-read for a COO deciding whether to consolidate three regional support teams. Use only the supplied operating metrics; distinguish facts from assumptions; end with an explicit decision and 90-day actions.",
+      "focus": ["answer-first storyline", "executive synthesis", "action plan", "PowerPoint rendering"]
+    },
+    {
+      "id": "quantitative-insight-google-slides",
+      "enabled": true,
+      "platform": "google_slides",
+      "fixture": {"required": false, "role": "none"},
+      "brief": "Create a native six-slide Google Slides deck for a pricing committee using the supplied quarterly volume, price, and margin data. Explain the margin change, select the right charts, label forecasts, and recommend one pricing action.",
+      "focus": ["chart selection", "waterfall reconciliation", "native Slides QA", "source integrity"]
+    },
+    {
+      "id": "options-comparison-pptx",
+      "enabled": true,
+      "platform": "powerpoint",
+      "fixture": {"required": false, "role": "none"},
+      "brief": "Create an editable four-slide PowerPoint comparing three vendor options against the supplied requirements, costs, and risk evidence. Make criteria and tradeoffs explicit and recommend an option without changing or inventing weights.",
+      "focus": ["comparison slide", "decision logic", "editable tables", "evidence discipline"]
+    },
+    {
+      "id": "implementation-roadmap-dual-format",
+      "enabled": true,
+      "platform": "both",
+      "fixture": {"required": false, "role": "none"},
+      "brief": "Create a five-slide implementation roadmap for an executive steering committee in both PowerPoint and native Google Slides. Show phases, workstreams, dependencies, gates, owners, and a decision ask; validate each format independently.",
+      "focus": ["process and roadmap", "cross-deck components", "dual-format parity", "render evidence"]
+    },
+    {
+      "id": "reference-theme-fidelity",
+      "enabled": true,
+      "platform": "both",
+      "fixture": {"required": true, "role": "authorized_reference_deck"},
+      "brief": "Using the authorized reference deck and supplied content, create a concise six-slide decision deck in PowerPoint and native Google Slides. Derive a reusable theme, select source exemplars by narrative role, remove sample content and branding, and document deliberate deviations.",
+      "focus": ["template intake", "theming", "reference fidelity", "cross-platform conversion"]
+    }
+  ]
+}

@@ -36,20 +36,25 @@ Write the communication job before storyboarding:
 - Always read [design foundations](references/design-foundations.md).
 - Always read the [theming system](references/theming/index.md) before defining
   or changing colors, typography, masters, or visual tone.
-- Read [slide archetypes](references/slide-archetypes.md) when storyboarding or
-  selecting a layout.
-- Read [charts](references/charts.md) for any quantitative exhibit.
+- Read the [slide-type router](references/slide-types/index.md) when
+  storyboarding, then read only the selected slide type's file.
+- Read the [chart router](references/charts/index.md) for any quantitative
+  exhibit, then read only the selected chart family's file.
 - Read [components](references/components.md) when setting the theme, master,
   navigation, sources, footers, or section behavior.
 - If a PPTX, PDF, screenshot set, or native deck is supplied as a visual
   reference, read [template intake](references/template-intake.md) before
   planning. Treat the supplied reference as authoritative within the user's
   reuse rights.
-- Read [PowerPoint](references/powerpoint.md) for PPTX creation or editing.
-- Read [Google Slides](references/google-slides.md) for native Google Slides or
-  cross-platform delivery.
+- Read the [PowerPoint integration](references/powerpoint/index.md) for PPTX
+  creation, editing, API selection, or rendering.
+- Read the [Google Slides integration](references/google-slides/index.md) for
+  native Google Slides, import, API selection, or rendering.
 - Read [quality assurance](references/quality-assurance.md) before implementation
   and again before delivery.
+- Use the [self-evaluation flow](evals/EVALS.md) for per-deck self-review. Run
+  the blind control-versus-skill evaluation suite before publishing material
+  changes to this skill.
 
 ## Build an answer-first storyline
 
