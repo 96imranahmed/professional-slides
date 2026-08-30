@@ -24,7 +24,7 @@ Before authoring, resolve or infer these six inputs:
 
 Ask only for missing inputs that would materially change the result. Do not
 block on cosmetic preferences; derive them from an approved reference deck or
-use the defaults in [design foundations](references/design-foundations.md).
+use the defaults in [design foundations](references/theming/design-foundations.md).
 
 Write the communication job before storyboarding:
 
@@ -33,24 +33,26 @@ Write the communication job before storyboarding:
 
 ## Route the work
 
-- Always read [design foundations](references/design-foundations.md).
+- Read the [skill pack overview](references/overview/index.md) when changing
+  the package structure or deciding where new guidance belongs.
+- Always read [design foundations](references/theming/design-foundations.md).
 - Always read the [theming system](references/theming/index.md) before defining
   or changing colors, typography, masters, or visual tone.
 - Read the [slide-type router](references/slide-types/index.md) when
   storyboarding, then read only the selected slide type's file.
 - Read the [chart router](references/charts/index.md) for any quantitative
   exhibit, then read only the selected chart family's file.
-- Read [components](references/components.md) when setting the theme, master,
+- Read [components](references/components/index.md) when setting the theme, master,
   navigation, sources, footers, or section behavior.
 - If a PPTX, PDF, screenshot set, or native deck is supplied as a visual
-  reference, read [template intake](references/template-intake.md) before
+  reference, read [template intake](references/theming/template-intake.md) before
   planning. Treat the supplied reference as authoritative within the user's
   reuse rights.
 - Read the [PowerPoint integration](tools/powerpoint/index.md) for PPTX
   creation, editing, API selection, or rendering.
 - Read the [Google Slides integration](tools/google-slides/index.md) for
   native Google Slides, import, API selection, or rendering.
-- Read [quality assurance](references/quality-assurance.md) before implementation
+- Read [quality assurance](evals/quality-assurance.md) before implementation
   and again before delivery.
 - Use the [self-evaluation flow](evals/EVALS.md) for per-deck self-review. Run
   the blind control-versus-skill evaluation suite before publishing material
@@ -127,7 +129,7 @@ iteration loop:
 4. Fix content, hierarchy, alignment, overflow, chart semantics, source, and
    platform-conversion defects.
 5. Re-render affected slides and repeat until all release gates in
-   [quality assurance](references/quality-assurance.md) pass.
+   [quality assurance](evals/quality-assurance.md) pass.
 
 Do not claim visual quality from source code or object-tree inspection alone.
 The final rendered artifact is the evidence.

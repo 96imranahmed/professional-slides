@@ -166,4 +166,3 @@ pseudo-logo or retain source-template branding.
 - master/layout components are not duplicated as slide-local overlays;
 - dark and light variants use the correct colors and contrast;
 - all placeholders are filled or removed intentionally.
-

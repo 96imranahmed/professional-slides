@@ -18,6 +18,12 @@ Run this before delivering any deck:
 5. Run `python evals/run_evals.py --mode self --results result.json`.
 6. Repair the artifact and repeat from a fresh final render until the gate passes.
 
+For a dual-format case, freeze and score both editable artifacts. Include the
+exact final PPTX, canonical native Google Slides URL and presentation ID,
+PowerPoint renders, native Google Slides renders, separate structural
+readbacks, and a parity ledger. A PPTX render cannot stand in for native Slides
+evidence, even when that PPTX was the import source.
+
 Self-review is a delivery safeguard. Do not report its score as causal evidence
 that the skill improves deck quality.
 

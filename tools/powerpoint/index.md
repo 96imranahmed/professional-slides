@@ -9,6 +9,8 @@ object editability, and notes.
 
 - [Artifact Tool](artifact-tool.md): Codex-native creation, import, inspection,
   editing, rendering, and PPTX export.
+- [PptxGenJS](pptxgenjs.md): portable JavaScript creation with explicit calls
+  for masters, editable text, shapes, tables, charts, notes, and file output.
 - [Office.js and Microsoft Graph](office-js-and-graph.md): editing inside a
   running PowerPoint client and storing/distributing files through OneDrive or
   SharePoint.
@@ -20,6 +22,7 @@ object editability, and notes.
 | Situation | Authoring surface | File transport | Rendering |
 | --- | --- | --- | --- |
 | Codex creates or edits a local PPTX | `@oai/artifact-tool` | Local filesystem | Artifact Tool PNG/layout plus final-PPTX render |
+| Codex Code or another Node host creates a new PPTX | `pptxgenjs` when available | Local filesystem or host upload | Render the exact saved PPTX; never infer quality from generation success |
 | Agent runs inside PowerPoint | Office.js PowerPoint API | Current open document | Export current document, then PowerPoint/PDF render |
 | Store or publish a finished PPTX | None; do not edit through Graph | Microsoft Graph DriveItem upload/download | Graph PDF conversion or downloaded-file renderer |
 | Existing reference/template | Import and edit inherited source objects | Local or cloud file provider | Before/after source-pattern comparison |
@@ -73,3 +76,8 @@ Check capabilities before authoring:
 
 If a required capability is missing, choose a supported adapter before editing.
 Do not discover the limitation after rebuilding the deck.
+
+Use one local authoring adapter for a candidate. Do not mix Artifact Tool and
+PptxGenJS mutations inside the same in-memory deck. Either route may generate a
+new editable PPTX; template-preserving edits require the adapter to demonstrate
+that it can retain the source theme, master/layout tree, object types, and notes.

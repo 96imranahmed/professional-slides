@@ -81,7 +81,7 @@ for each derived pattern.
 ## Derive the theme
 
 Create a theme specification using
-[`theming/theme-spec.schema.json`](theming/theme-spec.schema.json). When several
+[`theme-spec.schema.json`](theme-spec.schema.json). When several
 references are supplied, define one synthesized theme rather than alternating
 styles. Record which source informs each of these dimensions:
 
@@ -123,4 +123,3 @@ user explicitly authorizes inclusion in the repository. Keep each reference's
 derived audit and theme profile under `references/theming/` and avoid duplicate
 rules across files. When a newer source supersedes an older rule, update the
 theme profile and retain provenance rather than appending conflicting guidance.
-

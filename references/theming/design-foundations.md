@@ -210,4 +210,3 @@ Before visual QA, verify:
 - implications are explicit;
 - the close resolves the opening and makes the decision or next step clear;
 - the appendix contains supporting depth without hiding essential evidence.
-

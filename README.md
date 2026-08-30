@@ -31,19 +31,21 @@ executive consulting communication.
 |-- SKILL.md
 |-- agents/openai.yaml
 |-- references/
-|   |-- design-foundations.md
+|   |-- overview/
+|   |   |-- index.md
+|   |   `-- deck-blueprint.schema.json
 |   |-- slide-types/
 |   |   |-- index.md
 |   |   `-- <one file per slide type>
 |   |-- charts/
 |   |   |-- index.md
 |   |   `-- <one file per chart family>
-|   |-- components.md
-|   |-- template-intake.md
-|   |-- quality-assurance.md
-|   |-- deck-blueprint.schema.json
+|   |-- components/
+|   |   `-- index.md
 |   `-- theming/
 |       |-- index.md
+|       |-- design-foundations.md
+|       |-- template-intake.md
 |       |-- theme-system.md
 |       |-- reference-derived-patterns.md
 |       |-- theme-spec.schema.json
@@ -53,6 +55,7 @@ executive consulting communication.
 |   |-- powerpoint/
 |   |   |-- index.md
 |   |   |-- artifact-tool.md
+|   |   |-- pptxgenjs.md
 |   |   |-- office-js-and-graph.md
 |   |   `-- rendering.md
 |   `-- google-slides/
@@ -86,7 +89,7 @@ Reference decks are intentionally not committed. The two approved source decks
 used for this scaffold were inventoried by hash and package structure in
 `references/theming/source-manifest.json`; only generalized, reusable design
 observations are retained. For future sources, follow the inventory workflow in
-`references/template-intake.md` and encode only rules and assets the user is
+`references/theming/template-intake.md` and encode only rules and assets the user is
 authorized to reuse.
 
 Validate the skill package and example blueprint with:

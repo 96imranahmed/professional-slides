@@ -16,7 +16,7 @@ and master/layout mechanics are handled elsewhere.
 | Convert the answer into owners and action | [Recommendation and action plan](recommendation-action-plan.md) |
 
 Title, section-divider, agenda, and appendix-divider slides are cross-deck
-components; read [components](../components.md).
+components; read [components](../components/index.md).
 
 ## Universal slide contract
 

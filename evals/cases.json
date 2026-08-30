@@ -67,12 +67,12 @@
       "focus": ["template intake", "theming", "reference fidelity", "cross-platform conversion"]
     },
     {
-      "id": "acquisition-thesis-pptx",
+      "id": "acquisition-due-diligence-dual-format",
       "enabled": true,
-      "platform": "powerpoint",
+      "platform": "both",
       "fixture": {"required": false, "role": "public_research"},
-      "brief": "Write an editable executive decision deck explaining why SpaceXAI should acquire Hugging Face. Treat the transaction as a strategic scenario rather than an announced deal; ground current company facts in traceable public sources; distinguish facts, hypotheses, and diligence questions; compare acquisition with partnership and organic build; address community, regulatory, licensing, and integration risks; and close with a clear recommendation and diligence gates. Do not invent valuation, synergy, or operating data.",
-      "focus": ["acquisition thesis", "current-source discipline", "options comparison", "risk and diligence", "PowerPoint rendering"]
+      "brief": "Create an editable executive due-diligence pre-read for a SpaceXAI investment committee evaluating the hypothetical acquisition of Hugging Face, delivered as both PowerPoint and native Google Slides. Cover strategic fit, commercial model and revenue quality, product and technical architecture, security and compliance, open-source and community trust, legal and licensing exposure, regulatory and transaction risks, integration feasibility, value drivers, red flags, a prioritized data-room request, and explicit go/no-go diligence gates. Separate verified public facts from hypotheses and management questions; do not invent valuation, synergy, revenue, customer, or operating data. Render, inspect, and show both final platform outputs independently.",
+      "focus": ["acquisition due diligence", "verified-versus-unknown evidence", "red flags and data-room requests", "go-no-go gates", "dual-format native rendering"]
     }
   ]
 }

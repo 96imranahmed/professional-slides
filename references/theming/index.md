@@ -6,6 +6,11 @@ and component states; it is not merely a color palette.
 
 ## Files
 
+- [Design foundations](design-foundations.md): answer-first narrative,
+  hierarchy, density, typography, layout, and exhibit fundamentals shared by
+  every theme.
+- [Template intake](template-intake.md): safe inspection and adaptation of
+  user-authorized reference decks before deriving a theme.
 - [Theme specification](theme-system.md): how to define, implement, and test a
   theme across PowerPoint and Google Slides.
 - [Reference-derived patterns](reference-derived-patterns.md): reusable visual
