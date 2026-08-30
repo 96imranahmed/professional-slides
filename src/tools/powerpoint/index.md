@@ -47,9 +47,21 @@ Keep source reads and mutations separate. A successful API mutation is not a qua
 - Make charts, tables, text, and simple diagrams editable.
 - Keep recurring components in masters/layouts.
 - Preserve or explicitly replace speaker notes and source blocks.
-- Shorten copy or change layouts before shrinking text.
+- Apply the [`text-box` overflow contract](../../components/text-box.md#container-contract) without adding a PowerPoint-only exception.
 - Render every slide from the latest final PPTX.
 - Do not claim desktop PowerPoint behavior unless the file was opened there.
+
+## Geometry implementation
+
+Start from the named guide, typography, spacing, and component tokens defined by the source documents. Map them through one selected PowerPoint adapter; do not copy raw coordinates between Artifact Tool, PptxGenJS, and Office.js without an explicit conversion.
+
+- PptxGenJS positions and sizes objects in inches; keep the canonical inch values in a shared geometry object and derive column spans, regions, and component insets through helpers.
+- Artifact Tool candidates must use one declared slide-size coordinate system and reusable layout or component definitions. Keep that coordinate system isolated from inch- or point-based adapters.
+- Office.js edits should read the existing master, layout, placeholder, shape, and text properties before applying deltas. Preserve the host document's established geometry rather than rebuilding it from neutral defaults.
+- Put recurring titles, trackers, footers, page numbers, and confidentiality marks in masters or layouts when the adapter supports them.
+- After export, compare repeated anchor positions and text roles through available object metadata, then render the exact PPTX and inspect optical alignment.
+
+Read the selected adapter file for its concrete API calls and unit behavior.
 
 ## Capability detection
 
@@ -64,5 +76,3 @@ Check capabilities before authoring:
 - Can the storage API upload, download, or convert the final file?
 
 If a required capability is missing, choose a supported adapter before editing. Do not discover the limitation after rebuilding the deck.
-
-Use one local authoring adapter for a candidate. Do not mix Artifact Tool and PptxGenJS mutations inside the same in-memory deck. Either route may generate a new editable PPTX; template-preserving edits require the adapter to demonstrate that it can retain the source theme, master/layout tree, object types, and notes.

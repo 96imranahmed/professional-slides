@@ -41,6 +41,18 @@ The native adapter should expose equivalents of:
 - Complete structural changes before final ordering and rendering.
 - Render the latest final native state, not the pre-import PPTX.
 
+## Geometry implementation
+
+Keep the design system platform-neutral until the native adapter boundary. The Slides API represents element size and position through dimensions and affine transforms with point or EMU units; convert named design guides and spacing tokens once, use a single rounding policy, and reuse the resulting values throughout the mutation batch.
+
+- Preserve and reuse inspected master, layout, placeholder, and exemplar geometry for an existing native deck.
+- Use stable object IDs and groups for repeated structures; do not infer geometry targets from slide or element array positions.
+- Define text styles from the design typography roles and component contract, including font family, size, weight, line spacing, paragraph spacing, and alignment. The Slides REST API does not expose a general PowerPoint-style internal-margin property for shapes; preserve inspected template insets when possible or implement component padding through explicit outer and inner geometry.
+- Apply size, transform, shape, and text updates with narrow field masks so unrelated native properties survive.
+- Read back final transforms, sizes, text styles, slide order, and object IDs, then export and inspect the native render because equal numeric guides can still differ optically after import or font substitution.
+
+Read [API integration](api-integration.md) for request construction and [rendering](rendering.md) for native visual proof.
+
 ## Capability boundaries
 
 The Google Slides API reads and writes slide objects, while the Google Drive API handles file import, export, copy, location, and sharing. A connector may expose both behind higher-level actions. Confirm which operations are callable before planning the mutation.

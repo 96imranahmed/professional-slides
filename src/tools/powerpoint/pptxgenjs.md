@@ -37,6 +37,10 @@ pptx.theme = {
 
 Keep all dimensions in inches. Use the active theme specification for colors, type roles, margins, grid, and recurring components.
 
+Define the design geometry once before creating slides. Store named `canvas`, `region`, `column`, `space`, and `type` tokens; derive spans and component positions through helpers; and round only when passing final values to PptxGenJS. Do not repeat literal margin, title, footer, or spacing values across slide builders.
+
+Map the design roles directly to PptxGenJS options: point values to `fontSize`, role weight to `bold`, line height to `lineSpacing` or `lineSpacingMultiple`, paragraph rhythm to `paraSpaceBefore` and `paraSpaceAfter`, vertical alignment to `valign`, and component padding to `margin` or `inset` as supported by the selected object type. Preserve the library's native units for each option: geometry uses inches, while `fontSize`, `lineSpacing`, paragraph spacing, and `margin` use points. When PptxGenJS cannot express a design token exactly, use one documented fallback across every instance and verify the exported PPTX render.
+
 ## Define masters and placeholders
 
 Put recurring title rules, footer furniture, confidentiality text, and page numbers on a slide master instead of duplicating them on every slide:
@@ -67,11 +71,10 @@ slide.addText("The diligence case remains attractive but unproven", {
   color: "051C2C",
   margin: 0,
   breakLine: false,
-  fit: "shrink",
 });
 ```
 
-Do not rely on `fit: "shrink"` to rescue unsuitable copy. Shorten the action title or change the composition before allowing material font reduction.
+Use `fit` only under the overflow contract in [`text-box`](../../components/text-box.md#container-contract); generation code must not invent a platform-specific exception.
 
 ## Add editable objects
 
@@ -159,11 +162,11 @@ const bytes = await pptx.write({
 });
 ```
 
-Do not emit both forms unless the workflow needs both. The saved file becomes the candidate of record; compute its hash, render every slide from that file, run overflow checks, inspect full-size slides and the montage, repair the builder, and regenerate the complete candidate.
+Do not emit both forms unless the workflow needs both. The saved file becomes the candidate of record and must complete the [PowerPoint rendering path](rendering.md).
 
 ## Native Google Slides handoff
 
-For a dual-format new deck, first finish and verify the PPTX. Then import that exact file with native conversion enabled, read back the native presentation, export it to PDF, and inspect every Google-rendered page. Record font, wrap, table, line, chart, and source-note differences; fix material defects in the appropriate platform instead of assuming import parity.
+For a dual-format new deck, finish and verify the PPTX, then follow the [Google Slides import and native-verification route](../google-slides/index.md). Do not assume import parity.
 
 ## Official references
 

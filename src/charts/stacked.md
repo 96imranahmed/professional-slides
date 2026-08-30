@@ -4,6 +4,8 @@
 
 Composition across categories or time, contribution to a total, and share shifts with a stable category set.
 
+Use [percentage segments by user group](percentage-segment-by-group.md) for survey response distributions compared across respondent groups; that subtype owns the five-row cap, `Category A` ordering, calculated `Other`, segment emphasis, and adjacent insight extraction.
+
 ## Data contract
 
 Each stack must reconcile to its total. Declare absolute versus percentage mode, segment order, treatment of negative values, and the threshold for any grouped `Other` category.

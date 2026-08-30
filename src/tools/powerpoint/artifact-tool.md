@@ -87,17 +87,7 @@ The exported file becomes the candidate of record. Re-render that exact PPTX thr
 
 ## Source templates
 
-When the source PPTX supplies the design:
-
-- inspect every source slide and layout;
-- preserve theme parts and the master/layout hierarchy;
-- map every output slide to a source exemplar;
-- edit inherited objects by stable ID;
-- preserve mixed text-run and paragraph styles;
-- fill or delete every inherited placeholder intentionally;
-- compare the final render to the mapped source pattern.
-
-If the tool cannot preserve a required source structure, stop and report the specific unsupported operation. Do not silently replace the source with a theme-matched rebuild.
+Follow [`design` reference intake](../../design/index.md#reference-intake) and the [PowerPoint invariants](index.md#non-negotiable-invariants). Use the inspected stable IDs to edit inherited objects, preserve mixed text-run and paragraph styles, and resolve every inherited placeholder intentionally. If the tool cannot preserve a required source structure, report the unsupported operation instead of silently replacing the source with a theme-matched rebuild.
 
 ## Notes and provenance
 

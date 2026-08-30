@@ -4,7 +4,7 @@
 
 The deck must conclude with a decision, translate analysis into initiatives, or secure commitment on owners, timing, value, and risk.
 
-Use executive synthesis earlier in a deck when the goal is to summarize the answer rather than operationalize it.
+Use executive synthesis earlier in a deck when the goal is to summarize the answer rather than operationalize it. Use process and roadmap when the primary message is sequence or dependency and named accountability is secondary.
 
 ## Narrative contract
 
@@ -12,7 +12,6 @@ The audience should know what is recommended, why now, who owns each action, whe
 
 ## Content contract
 
-- action title stating the recommendation or approval required;
 - three to five initiatives or actions;
 - owner, timing, impact, and first milestone for each;
 - dependencies and risks only when they affect sequencing or approval;
@@ -21,7 +20,7 @@ The audience should know what is recommended, why now, who owns each action, whe
 
 ## Layout
 
-Choose a table for precise accountability, a roadmap for temporal dependency, or a recommendation/rationale/risk composition for a single decision. Order actions by sequence or value, not alphabetically. Keep the decision ask in a distinct closing zone integrated with the page.
+Choose a table for precise accountability, an initiative portfolio for value and ownership, or a recommendation/rationale/risk composition for a single decision. A subordinate timing strip may show when actions begin, but if temporal dependency becomes the dominant evidence structure, use the process-and-roadmap archetype. Order actions by sequence or value, not alphabetically. Keep the decision ask in a distinct closing zone integrated with the page and apply the canonical [`recommendation and decision panel`](../components/text-box.md#recommendation-and-decision-panels) alignment.
 
 ## Visual rules
 

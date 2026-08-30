@@ -79,4 +79,3 @@ The native URL is the primary deliverable. The PDF and PNGs are QA evidence, not
 
 - [Generate slide thumbnails](https://developers.google.com/workspace/slides/api/samples/slides#generate_a_thumbnail)
 - [Google Slides API pages](https://developers.google.com/workspace/slides/api/reference/rest/v1/presentations.pages)
-- [Drive export formats](https://developers.google.com/workspace/drive/api/guides/ref-export-formats)

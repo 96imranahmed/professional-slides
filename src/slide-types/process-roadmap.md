@@ -12,7 +12,6 @@ The audience should understand order, dependencies, ownership, milestones, and w
 
 ## Content contract
 
-- action title stating the implementation insight;
 - three to six phases in the main story;
 - objective, activities, output, and owner where decision-relevant;
 - explicit milestones, gates, or handoffs;
@@ -27,7 +26,6 @@ If distances encode duration, make them proportional and label the scale. If the
 
 ## Visual rules
 
-- Create connectors before nodes so lines remain behind content.
 - Use one milestone vocabulary and one connector style.
 - Accent the current phase, critical path, or decision gate.
 - Keep lane heights and phase boundaries aligned.
@@ -46,7 +44,6 @@ If distances encode duration, make them proportional and label the scale. If the
 ## Failure modes
 
 - false precision in dates, effort, or dependencies;
-- crossing connectors;
 - inconsistent milestone symbols;
 - process art with no outputs or ownership;
 - equal-width phases presented as a scaled timeline;

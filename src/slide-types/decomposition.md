@@ -6,7 +6,7 @@
 - showing an issue, hypothesis, value-driver, or capability tree;
 - explaining root causes, system layers, or decision branches.
 
-Use a comparison matrix instead when two independent dimensions define the space. Use a process when order, not hierarchy, is the primary meaning.
+Use comparison and options when the audience must evaluate peer alternatives or entities on common decision criteria. Use a process when order, not hierarchy, is the primary meaning. A matrix remains a decomposition only when its axes cross two taxonomies to explain the coverage or structure of one whole; it is not a prioritization device.
 
 ## Narrative contract
 
@@ -28,18 +28,15 @@ Document the decomposition rule. Siblings must not mix categories such as causes
 - left-to-right for causal or issue logic;
 - top-down for hierarchy;
 - layered stack for architecture or capability depth;
-- matrix only for genuine dual-axis decomposition.
+- cross-tab matrix only when two taxonomies jointly decompose one system or question.
 
 Maintain consistent spacing by depth and align siblings to the grid.
 
 ## Visual rules
 
-- Create connectors before nodes so edges remain behind shapes.
-- Use one direction of flow and one connector grammar.
 - Give sibling nodes equal visual weight.
 - Highlight the relevant branch with the accent and mute context.
 - Keep detailed definitions in notes or appendix.
-- Avoid crossing connectors and lines through labels.
 
 ## Variants
 
@@ -48,7 +45,7 @@ Maintain consistent spacing by depth and align siblings to the grid.
 - value-driver tree with quantified contributions;
 - capability stack;
 - organization/capability hierarchy;
-- 2x2 or 3x3 decomposition matrix.
+- 2x2 or 3x3 taxonomy cross-tab showing how one whole spans two categorical dimensions.
 
 ## Failure modes
 
@@ -56,6 +53,7 @@ Maintain consistent spacing by depth and align siblings to the grid.
 - non-MECE siblings;
 - decorative honeycombs without relationships;
 - mixed causal, temporal, and organizational semantics;
+- options or entities scored in a matrix that should use comparison and options;
 - unreadable exhaustive taxonomies.
 
 ## Acceptance test
