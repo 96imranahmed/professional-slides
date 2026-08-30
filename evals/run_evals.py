@@ -13,8 +13,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 CASES_PATH = ROOT / "cases.json"
-SCHEMA_PATH = ROOT / "result.schema.json"
-REQUIRED_FILES = (ROOT / "rubric.md", ROOT / "evaluator-prompt.md", ROOT / "index.md")
+INDEX_PATH = ROOT / "index.md"
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -279,15 +278,8 @@ def check_package() -> list[str]:
         errors.extend(validate_cases(cases))
     except ValueError as exc:
         errors.append(str(exc))
-    try:
-        schema = load_json(SCHEMA_PATH)
-        if schema.get("type") != "object" or "results" not in schema.get("required", []):
-            errors.append("result.schema.json does not define the required result object")
-    except ValueError as exc:
-        errors.append(str(exc))
-    for path in REQUIRED_FILES:
-        if not path.is_file() or not path.read_text(encoding="utf-8").strip():
-            errors.append(f"missing or empty evaluation file: {path}")
+    if not INDEX_PATH.is_file() or not INDEX_PATH.read_text(encoding="utf-8").strip():
+        errors.append(f"missing or empty evaluation index: {INDEX_PATH}")
     return errors
 
 

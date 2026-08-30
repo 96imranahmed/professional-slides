@@ -1,106 +1,202 @@
-# Evaluation Flow
+# Evaluation
 
-Use two related but distinct evaluation loops. A deck can pass self-review
-without proving the skill is effective; effectiveness requires a blinded
-control-versus-treatment comparison.
+This file is the sole human-facing evaluation guide. `cases.json` contains the
+editable evaluation cases and thresholds; `run_evals.py` validates result data
+and applies the gates. A deck passing self-review does not prove the skill is
+effective—effectiveness requires a blinded control-versus-treatment comparison.
 
-## 1. Per-deck self-review
+## Per-deck self-review
 
-Run this before delivering any deck:
+Run this loop before delivering any deck:
 
 1. Freeze the exact editable artifact and render every slide from that artifact.
-2. Collect the storyboard, source ledger, QA ledger, platform readback, individual
+2. Collect the storyboard, source ledger, QA ledger, platform readback, full-size
    slide renders, and deck montage.
-3. Give those materials and [`evaluator-prompt.md`](evaluator-prompt.md) to an
-   evaluator with `arm: "self"`.
-4. Score every dimension in [`rubric.md`](rubric.md), cite concrete slide-level
-   evidence, and record all critical failures.
-5. Run `python evals/run_evals.py --mode self --results result.json`.
-6. Repair the artifact and repeat from a fresh final render until the gate passes.
+3. Inspect every release gate below and repair all critical or major defects.
+4. Score the final artifact with the rubric in this file and cite at least one
+   concrete observation for every dimension.
+5. Record a result with `arm: "self"` and run:
 
-For a dual-format case, freeze and score both editable artifacts. Include the
-exact final PPTX, canonical native Google Slides URL and presentation ID,
-PowerPoint renders, native Google Slides renders, separate structural
-readbacks, and a parity ledger. A PPTX render cannot stand in for native Slides
-evidence, even when that PPTX was the import source.
+   ```bash
+   python evals/run_evals.py --mode self --results result.json
+   ```
 
-Self-review is a delivery safeguard. Do not report its score as causal evidence
+6. Regenerate and re-render after every material repair until the gate passes.
+
+For dual-format work, freeze and score the final PPTX and native Google Slides
+deck separately. Preserve the exact PPTX, canonical Slides URL and presentation
+ID, separate renders and readbacks, and a parity ledger. Evidence from one
+platform cannot stand in for the other.
+
+Self-review is a delivery safeguard. Never report its score as causal evidence
 that the skill improves deck quality.
 
-## 2. Skill effectiveness evaluation
+## Release gates
 
-Run this before publishing a material change to instructions, reference files,
-schemas, or generation workflow.
+All gates are required unless the user explicitly narrows the deliverable.
 
-### Generate the paired artifacts
+### Brief and story
 
-For every enabled case in [`cases.json`](cases.json):
+- audience, decision, governing thought, delivery mode, and output are resolved;
+- the story has a cumulative arc and an answer-first executive synthesis;
+- each slide has one narrative job, one claim, and one dominant exhibit;
+- action titles read as a coherent executive memo;
+- the close resolves the opening and names the decision or next action;
+- essential proof remains in the core story rather than being hidden in appendix.
 
-1. Create isolated control and treatment workspaces.
-2. Hold the model, runtime, prompt, fixtures, source access, time/token budget,
-   and platform route constant.
-3. In the control arm, make this skill unavailable. In the treatment arm, load
-   this skill normally.
-4. Start both arms from fresh context. Do not let either arm inspect the other's
-   outputs.
-5. Preserve the editable artifact, final renders, generation trace, storyboard,
-   source ledger, and QA evidence for each arm.
-6. Use exact PowerPoint export renders and native Google Slides renders, not
-   intermediate previews.
+### Evidence
 
-Cases with `fixture.required: true` must use an authorized fixture matching the
-declared role. Never replace a missing reference deck with an invented one;
-mark the case skipped with the reason and keep it out of the denominator.
+- claims are verified or explicitly marked illustrative or unresolved;
+- values reconcile with labels, units, periods, currencies, and populations;
+- actual, estimate, forecast, target, and scenario states are explicit;
+- sources and material transformations are traceable;
+- no facts, quotes, images, logos, people, citations, or calculations are invented.
 
-### Evaluate blind
+### Design and visual integrity
 
-Randomize artifact labels before evaluation so the evaluator cannot infer the
-arm. Give the evaluator the brief, approved fixtures, final artifacts/renders,
-and supporting evidence—but not the skill instructions, arm names, filenames,
-or generation commentary. Use a separate model call or human reviewer when
-possible. The generating agent's self-score is not a blind result.
+- one theme governs typography, color, spacing, shapes, charts, and components;
+- title, content, source, footer, and navigation anchors are consistent;
+- every full-size slide has a clear first read and evidence hierarchy;
+- there is no unintended overlap, clipping, overflow, broken wrapping, unreadable
+  label, unresolved placeholder, or production note;
+- charts, tables, image crops, connectors, contrast, and non-color semantics work;
+- the montage shows deliberate rhythm without sudden changes or repeated gimmicks;
+- template tutorials, construction grids, indexes, and sample branding are absent.
 
-After scoring, restore `control` and `treatment` arm labels in the result JSON
-and run:
+Investigate every overlap warning. Record rare intentional overlaps as explicit
+design decisions rather than suppressing them silently.
+
+### Platform and delivery
+
+- the requested editable deliverable exists, opens, and matches its final renders;
+- PowerPoint masters, layouts, charts, tables, and text remain safely editable;
+- Google Slides is native and has been checked after import for fonts, wraps,
+  crops, chart semantics, line weights, notes, and links;
+- dual-format outputs are validated independently;
+- filenames and versions are clear, only requested artifacts are delivered, and
+  limitations are concrete;
+- completion claims rely on the latest final artifact and render set.
+
+## Defect handling
+
+Track defects during the internal loop:
+
+| Slide | Gate | Defect | Severity | Fix | Re-rendered | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+
+- **Critical:** wrong conclusion or data, corrupt/missing artifact, unreadable
+  content, misleading chart, or inaccessible deliverable.
+- **Major:** clipping, overlap, broken hierarchy, font reflow, inconsistent
+  component, missing source, or material template deviation.
+- **Minor:** local spacing, alignment, or polish issue that does not affect meaning.
+
+Do not deliver with critical or major defects. A minor defect may remain only
+when it is tool-limited, does not change meaning, and is disclosed.
+
+## Skill-effectiveness evaluation
+
+Run the matched evaluation before publishing a material change to instructions,
+cases, platform routes, or generation behavior.
+
+For every enabled case in `cases.json`:
+
+1. create isolated control and treatment workspaces;
+2. hold model, runtime, prompt, fixtures, source access, budget, and platform
+   route constant;
+3. make this skill unavailable only in control and load it normally in treatment;
+4. start both arms from fresh context and prevent cross-arm inspection;
+5. preserve editable artifacts, final renders, generation traces, storyboards,
+   source ledgers, and QA evidence;
+6. use exact exported PowerPoint renders and native Google Slides renders.
+
+A case with `fixture.required: true` may be skipped only when the authorized
+fixture is unavailable. Record the reason and do not include it in the
+denominator; never invent a substitute reference.
+
+### Blind evaluation protocol
+
+Randomize artifact labels so the evaluator cannot infer the arm. Supply only the
+brief, authorized fixtures, final editable artifact or platform readback, final
+slide renders, montage, source ledger, and QA evidence. Do not reveal skill
+instructions, arm names, filenames, or generation commentary.
+
+The evaluator must:
+
+1. confirm the requested deliverable and final-artifact evidence;
+2. read action titles in order and summarize the argument;
+3. inspect every slide at full size and the montage;
+4. reconcile numbers, chart semantics, units, and sources;
+5. verify platform correctness and editability;
+6. score all dimensions below from 1 to 5;
+7. identify only allowed critical-failure codes;
+8. cite slide- or object-level evidence for every dimension and failure.
+
+Do not award points for extra slides, complexity, brand imitation, or claims of
+QA without current renders. Penalize decorative structure, vague titles,
+untraceable evidence, conversion defects, and polished work that does not enable
+the requested decision.
+
+After evaluation, restore `control` and `treatment` labels and run:
 
 ```bash
-python evals/run_evals.py --mode release --results path/to/results.json
+python evals/run_evals.py --mode release --results result.json
 ```
 
-The release gate passes only when:
+The release passes only when every runnable case has both arms, treatment meets
+the absolute and improvement thresholds, no treatment has a critical failure,
+and no dimension regresses beyond the configured tolerance.
 
-- every enabled, runnable case has both arms;
-- treatment mean is at least the configured absolute threshold;
-- treatment improvement over control meets the configured minimum;
-- no treatment result has a critical failure;
-- no rubric dimension regresses beyond the allowed tolerance;
-- every score includes observable evidence from the final artifact.
+## Scoring rubric
 
-## Result package
+Score whole numbers from 1 to 5 using only final-artifact evidence. The runner
+converts the mean to a 100-point score.
 
-Store each run outside the skill package unless it is a small, intentionally
-curated fixture. A result package contains:
+| Score | Meaning |
+| --- | --- |
+| 1 | Fails the brief or has material defects; extensive rework required |
+| 2 | Partially usable with major gaps or inconsistent execution |
+| 3 | Competent and usable with visible improvement opportunities |
+| 4 | Executive-ready and coherent with only minor issues |
+| 5 | Exceptional, persuasive, polished, and robust under inspection |
 
-```text
-run/
-|-- result.json
-|-- <case-id>/
-|   |-- control/<editable artifact, renders, evidence>
-|   `-- treatment/<editable artifact, renders, evidence>
-`-- randomized-label-map.json
-```
+| Dimension | What to judge |
+| --- | --- |
+| `briefFidelity` | Audience, decision, scope, format, and unsupported-content discipline |
+| `narrativeLogic` | Governing thought, chapter logic, action-title spine, slide jobs, and close |
+| `slideDesign` | Hierarchy, density, alignment, typography, contrast, composition, and rhythm |
+| `chartIntegrity` | Encoding choice, reconciliation, scales, units, states, annotations, and title proof |
+| `platformCorrectness` | Requested native deliverable, authoring route, openability, and render match |
+| `editability` | Safe editing of text, charts, tables, diagrams, masters, layouts, and groups |
+| `sourceIntegrity` | Traceability, periods, units, transformations, honest unknowns, and reference fidelity |
+| `qaEvidence` | Current renders, full-deck inspection, readback, defects, and evidence-backed claims |
 
-Validate `result.json` against [`result.schema.json`](result.schema.json). The
-runner also performs dependency-free structural validation so it can run in a
-minimal Python environment.
+Allowed critical failures are:
 
-## Interpreting results
+- `corrupt_artifact`
+- `missing_deliverable`
+- `invented_evidence`
+- `misleading_chart`
+- `unreadable_render`
+- `wrong_platform`
+- `reference_fidelity_breach`
 
-Use the aggregate score to decide whether the change improves the skill. Use
-dimension and case deltas to diagnose why. A higher visual score does not
-compensate for misleading data, a corrupt artifact, wrong platform, invented
-evidence, or a reference-fidelity breach.
+Apply a critical failure only when material; describe its location and impact.
 
-Do not tune only to these cases. Add a case when a recurring, generalizable
-failure mode is discovered; keep briefs varied enough to test transfer rather
-than memorization.
+## Result contract
+
+The result JSON contains `runId`, ISO-like `createdAt`, optional `skippedCases`,
+and a non-empty `results` array. Each result contains:
+
+- `caseId` matching an enabled case;
+- `arm`: `self`, `control`, or `treatment`;
+- non-empty `artifactPaths` and `renderPaths`;
+- `scores` containing exactly the eight configured dimensions, each from 1 to 5;
+- `criticalFailures` containing only configured codes;
+- `evidence` with at least one concrete observation per dimension;
+- optional `notes`.
+
+Store result packages outside the skill unless they are intentionally curated
+fixtures. Preserve randomized label mappings separately from evaluator inputs.
+Use aggregate and dimension deltas to diagnose change; visual polish never
+compensates for misleading data, a corrupt artifact, wrong platform, invented
+evidence, or reference-fidelity failure.

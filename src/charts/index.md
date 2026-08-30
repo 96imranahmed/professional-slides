@@ -41,7 +41,7 @@ data, labels, title, and source ledger must agree after rounding.
 3. Use one accent for decisive evidence and neutral colors for context.
 4. Direct-label when practical; remove redundant legends and decoration.
 5. Reduce gridlines, ticks, borders, decimals, and effects that do not aid use.
-6. Use the canonical [callout grammar](../components.md#callouts-and-annotations),
+6. Use the canonical [callout grammar](../components/index.md#callouts-and-annotations),
    keep annotations close to evidence, and avoid covering data marks.
 7. Preserve data and semantic chart properties in editable form when reliable.
 8. Render and inspect the final PowerPoint or native Google Slides state.

@@ -25,28 +25,24 @@ Ask only for missing inputs that would materially change the result.
 ## Route only what the task needs
 
 - Start with the [`src` guide](src/index.md), then always read
-  [storylining](src/storylining/index.md) and
-  [design foundations](src/design-foundations.md).
-- Read the single [theme source](src/theming/index.md) before defining or
-  changing the visual system, including when a reference deck, PDF, screenshot
-  set, or brand guide is supplied.
+  [storylining](src/storylining/index.md) and the single
+  [design system](src/design/index.md).
 - Read the [slide-type router](src/slide-types/index.md) when storyboarding,
   then only the selected archetype files.
 - Read the [chart router](src/charts/index.md) for quantitative exhibits, then
   only the selected chart-family files.
-- Read [components](src/components.md) when setting titles, navigation,
-  dividers, footers, sources, appendix behavior, or brand slots.
+- Read [components](src/components/index.md) when setting titles, trackers,
+  navigation, dividers, footers, sources, appendix behavior, or brand slots.
 - Read the [PowerPoint tools](src/tools/powerpoint/index.md) or
   [Google Slides tools](src/tools/google-slides/index.md) only for requested target
   platforms.
-- Read [quality assurance](evals/quality-assurance.md) before implementation
-  and delivery. Use [the evaluation flow](evals/index.md) for self-review and
-  skill-effectiveness testing.
+- Read the [evaluation index](evals/index.md) before implementation and
+  delivery for self-review, release QA, and skill-effectiveness testing.
 
-Each concept has one owner: narrative in storylining, composition in design
-foundations, visual tokens in theming, recurring furniture in components,
-slide jobs in slide types, quantitative encoding in charts, platform mechanics
-in tools, and release evidence in evals. Do not restate rules across boundaries.
+Each concept has one owner: narrative in storylining, composition and visual
+tokens in design, recurring furniture in components, slide jobs in slide
+types, quantitative encoding in charts, platform mechanics in tools, and
+release evidence in evals. Do not restate rules across boundaries.
 
 ## Build the deck
 
@@ -56,7 +52,7 @@ in tools, and release evidence in evals. Do not restate rules across boundaries.
    one evidence state, and one audience implication.
 3. Read all action titles as a memo; remove any slide that repeats a point or
    does not change the audience's understanding or decision.
-4. Define or derive one theme. Preserve an approved template's master,
+4. Define or derive one design system. Preserve an approved template's master,
    layouts, object hierarchy, and authorized assets rather than approximating
    them from screenshots.
 5. Author editable text, charts, tables, and simple diagrams through one

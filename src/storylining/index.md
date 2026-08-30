@@ -2,7 +2,7 @@
 
 Storylining turns a brief and evidence base into an answer-first argument before
 layout begins. It owns narrative logic; visual composition belongs to
-[`design-foundations.md`](../design-foundations.md).
+[`design/`](../design/index.md).
 
 ## Define the communication job
 

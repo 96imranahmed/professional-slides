@@ -7,15 +7,14 @@ owner so the guidance remains mutually exclusive and collectively complete.
 
 - [`storylining/`](storylining/index.md) owns the governing thought, argument
   structure, chapter sequence, storyboard, action-title spine, and narrative QA.
-- [`design-foundations.md`](design-foundations.md) owns platform-neutral visual
-  composition, hierarchy, density, and exhibit choice.
+- [`design/`](design/index.md) owns composition, hierarchy, visual tokens,
+  theme modes, reference intake, and cross-platform design fallbacks.
 - [`slide-types/`](slide-types/index.md) owns the narrative contract for each
   supported slide archetype.
 - [`charts/`](charts/index.md) owns quantitative encodings and chart-specific
   construction rules.
-- [`components.md`](components.md) owns recurring deck furniture such as titles,
-  navigation, footers, sources, and appendix behavior.
-- [`theming/`](theming/index.md) owns the visual system and reference intake.
+- [`components/`](components/index.md) owns recurring deck furniture such as
+  titles, navigation, footers, sources, and appendix behavior.
 - [`tools/`](tools/index.md) owns PowerPoint and Google Slides implementation and
   rendering mechanics.
 
@@ -24,10 +23,10 @@ Evaluation and release evidence live outside this document section under
 
 ## Reading order
 
-For a new or materially revised deck, read storylining and design foundations,
-then route only to the relevant slide types, charts, theme mode, components,
-and target-platform tools. For a narrow repair, read this index and only the
-owner of the affected behavior.
+For a new or materially revised deck, read storylining and design, then route
+only to the relevant slide types, charts, design mode, components, and
+target-platform tools. For a narrow repair, read this index and only the owner
+of the affected behavior.
 
 ## Maintenance rule
 

@@ -64,7 +64,7 @@
       "platform": "both",
       "fixture": {"required": true, "role": "authorized_reference_deck"},
       "brief": "Using the authorized reference deck and supplied content, create a concise six-slide decision deck in PowerPoint and native Google Slides. Derive a reusable theme, select source exemplars by narrative role, remove sample content and branding, and document deliberate deviations.",
-      "focus": ["template intake", "theming", "reference fidelity", "cross-platform conversion"]
+      "focus": ["template intake", "design system", "reference fidelity", "cross-platform conversion"]
     },
     {
       "id": "acquisition-due-diligence-dual-format",

@@ -1,9 +1,9 @@
-# Cross-Deck Components
+# Cross-Page Components
 
-This file owns recurring deck-wide furniture and its behavior. Visual tokens
-belong to [`theming/`](theming/index.md); tables and chart legends belong to
-[`charts/`](charts/index.md); slide-specific compositions belong to
-[`slide-types/`](slide-types/index.md).
+This directory owns recurring components that appear across slides. Visual
+tokens and layout anchors belong to [`design/`](../design/index.md); tables
+and chart legends belong to [`charts/`](../charts/index.md); slide-specific
+compositions belong to [`slide-types/`](../slide-types/index.md).
 
 Implement recurring components through themes, masters, and layouts instead of
 copying them slide by slide. They should remain secondary to the slide's claim.
@@ -16,9 +16,9 @@ slides. The title states the insight; do not add a redundant topic label.
 An optional kicker may identify the chapter. An optional subtitle may state
 metric, scope, unit, or period. Neither should compete with the conclusion.
 
-## Navigation
+## Trackers and navigation
 
-Use one navigation system for decks with three or more meaningful chapters:
+Use one tracker system for decks with three or more meaningful chapters:
 
 - **Top rail:** short chapter names; active chapter uses the accent.
 - **Progress line:** chapter stops on a thin line; current state is explicit.
@@ -28,6 +28,12 @@ Use one navigation system for decks with three or more meaningful chapters:
 Keep navigation outside the content zone, use stable chapter labels, and hide
 it on title or divider slides unless the approved theme keeps it. Never imply
 completion when the component only indicates position.
+
+The tracker is a cross-page state component. Define its chapter labels, order,
+active state, inactive state, completed state when genuinely meaningful, and
+visibility by slide type once. Bind every slide to the same chapter map rather
+than drawing or relabeling the tracker locally. Validate tracker state after
+slides or chapters are inserted, removed, or reordered.
 
 ## Section dividers and agenda
 
@@ -88,7 +94,7 @@ or retaining source-template branding.
 ## Acceptance checks
 
 - anchors and styles are consistent on every applicable slide;
-- navigation matches the actual chapter and page sequence;
+- trackers and navigation match the actual chapter and page sequence;
 - footer and source areas do not collide with content;
 - title, divider, and appendix visibility rules are respected;
 - master components are not duplicated as slide-local overlays;

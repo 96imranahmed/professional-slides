@@ -1,7 +1,7 @@
 # Tools
 
 This directory owns platform implementation and rendering mechanics. It does
-not redefine storylining, slide archetypes, charts, components, or theming.
+not redefine storylining, design, slide archetypes, charts, or components.
 
 ## Choose the route
 

@@ -2,7 +2,7 @@
 
 `professional-slides` is a portable agent skill for building executive-grade,
 answer-first consulting decks in PowerPoint and Google Slides. It combines
-storylining, design foundations, slide archetypes, chart standards, theming,
+storylining, design systems, slide archetypes, chart standards, components,
 platform implementation guidance, and rendered quality gates.
 
 The project is designed for Codex and other `SKILL.md`-compatible coding agents,
@@ -19,9 +19,10 @@ The repository is organized by responsibility rather than by workflow stage:
 |-- agents/
 |-- src/
 |   |-- storylining/
+|   |-- design/
+|   |-- components/
 |   |-- slide-types/
 |   |-- charts/
-|   |-- theming/
 |   `-- tools/
 |       |-- powerpoint/
 |       `-- google-slides/
@@ -30,14 +31,15 @@ The repository is organized by responsibility rather than by workflow stage:
 `-- tests/
 ```
 
-The `src/` root also contains shared design and cross-deck component guidance.
 Every directory under `src/` has an `index.md`: start with the root index, then
 read only the relevant subsystem indexes and specialized pages.
 
 - `storylining/` owns the argument, narrative arc, storyboard, and title spine.
+- `design/` owns composition, the visual system, and reference-intake rules.
+- `components/` owns cross-page titles, trackers, navigation, footers, and
+  sources.
 - `slide-types/` owns supported slide archetypes.
 - `charts/` owns quantitative exhibit selection and construction.
-- `theming/` owns the single visual theme source and reference-intake rules.
 - `tools/` owns PowerPoint and Google Slides implementation and rendering.
 - `evals/` owns self-review and blinded skill-effectiveness evaluation.
 - `scripts/` contains deterministic repository utilities.
