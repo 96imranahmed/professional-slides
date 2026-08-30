@@ -50,6 +50,12 @@ class BlueprintValidationTests(unittest.TestCase):
         errors, _ = blueprint_validator.validate(data, strict=True)
         self.assertTrue(any("placeholder" in error for error in errors))
 
+    def test_theme_references_canonical_spec(self):
+        data = copy.deepcopy(self.valid)
+        data["theme"].pop("spec")
+        errors, _ = blueprint_validator.validate(data)
+        self.assertTrue(any("theme.spec" in error for error in errors))
+
 
 class ThemeValidationTests(unittest.TestCase):
     def test_example_is_valid(self):

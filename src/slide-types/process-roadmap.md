@@ -50,13 +50,6 @@ the flow is schematic, say so. Put task-level workplans in the appendix.
 - rollout waves by geography, function, or product;
 - customer or employee journey.
 
-## Platform implementation
-
-Use grouped editable primitives, stable object identifiers, and theme-derived
-spacing. Avoid SmartArt or custom geometry that cannot be inspected or that
-degrades on Google Slides import. After export, verify connector routing,
-grouping, and the position of every milestone against the time axis.
-
 ## Failure modes
 
 - false precision in dates, effort, or dependencies;

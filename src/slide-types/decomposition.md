@@ -54,12 +54,6 @@ Maintain consistent spacing by depth and align siblings to the grid.
 - organization/capability hierarchy;
 - 2x2 or 3x3 decomposition matrix.
 
-## Platform implementation
-
-Use native shapes and connectors for simple trees. Preserve source connector
-types and object order. In Google Slides, use stable object IDs for nodes and
-lines; in PowerPoint, name shapes or use bindings when later refresh is needed.
-
 ## Failure modes
 
 - overlapping branches;

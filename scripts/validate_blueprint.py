@@ -37,7 +37,6 @@ OUTPUT_FORMATS = {"pptx", "google-slides", "pdf"}
 DELIVERY_MODES = {"live", "pre-read", "workshop", "analytical-pack"}
 EVIDENCE_STATES = {"verified", "illustrative", "unresolved"}
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 PLACEHOLDER = re.compile(r"(?:\blorem ipsum\b|\bxxx\b|\btbd\b|\[insert[^]]*\])", re.I)
 
 
@@ -77,12 +76,8 @@ def validate(data: Any, strict: bool = False) -> tuple[list[str], list[str]]:
     if not isinstance(theme, dict):
         errors.append("theme: must be an object")
         theme = {}
-    if theme.get("aspectRatio") not in {"16:9", "4:3", "custom"}:
-        errors.append("theme.aspectRatio: expected 16:9, 4:3, or custom")
-    if not _is_text(theme.get("fontFamily")):
-        errors.append("theme.fontFamily: must be non-empty text")
-    if not isinstance(theme.get("accentColor"), str) or not HEX.fullmatch(theme["accentColor"]):
-        errors.append("theme.accentColor: must be a six-digit hex color")
+    if not _is_text(theme.get("spec")):
+        errors.append("theme.spec: must be a non-empty theme-spec path")
     if "referenceDeck" not in theme or not isinstance(theme.get("referenceDeck"), (str, type(None))):
         errors.append("theme.referenceDeck: must be text or null")
 
@@ -204,4 +199,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -1,5 +1,5 @@
 {
-  "$schema": "../src/overview/deck-blueprint.schema.json",
+  "$schema": "../src/deck-blueprint.schema.json",
   "deck": {
     "title": "A focused service model can reduce resolution time by 30%",
     "audience": "Executive operating committee",
@@ -9,10 +9,8 @@
     "governingThought": "Routing high-frequency cases to specialized teams can reduce resolution time while protecting service quality."
   },
   "theme": {
-    "aspectRatio": "16:9",
-    "referenceDeck": null,
-    "fontFamily": "Arial",
-    "accentColor": "#0057B8"
+    "spec": "../src/theming/theme-spec.example.json",
+    "referenceDeck": null
   },
   "story": {
     "chapters": [

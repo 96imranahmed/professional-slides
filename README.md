@@ -31,37 +31,32 @@ executive consulting communication.
 |-- SKILL.md
 |-- agents/openai.yaml
 |-- src/
-|   |-- overview/
-|   |   |-- index.md
-|   |   `-- deck-blueprint.schema.json
+|   |-- design-foundations.md
+|   |-- components.md
+|   |-- deck-blueprint.schema.json
 |   |-- slide-types/
 |   |   |-- index.md
 |   |   `-- <one file per slide type>
 |   |-- charts/
 |   |   |-- index.md
 |   |   `-- <one file per chart family>
-|   |-- components/
-|   |   `-- index.md
-|   `-- theming/
-|       |-- index.md
-|       |-- design-foundations.md
-|       |-- template-intake.md
-|       |-- theme-system.md
-|       |-- reference-derived-patterns.md
-|       |-- theme-spec.schema.json
-|       |-- theme-spec.example.json
-|       `-- source-manifest.json
-|-- tools/
-|   |-- powerpoint/
+|   |-- theming/
 |   |   |-- index.md
-|   |   |-- artifact-tool.md
-|   |   |-- pptxgenjs.md
-|   |   |-- office-js-and-graph.md
-|   |   `-- rendering.md
-|   `-- google-slides/
-|       |-- index.md
-|       |-- api-integration.md
-|       `-- rendering.md
+|   |   |-- template-intake.md
+|   |   |-- theme-spec.schema.json
+|   |   |-- theme-spec.example.json
+|   |   `-- source-manifest.json
+|   `-- tools/
+|       |-- powerpoint/
+|       |   |-- index.md
+|       |   |-- artifact-tool.md
+|       |   |-- pptxgenjs.md
+|       |   |-- office-js-and-graph.md
+|       |   `-- rendering.md
+|       `-- google-slides/
+|           |-- index.md
+|           |-- api-integration.md
+|           `-- rendering.md
 |-- examples/deck-blueprint.example.json
 |-- evals/
 |   |-- EVALS.md

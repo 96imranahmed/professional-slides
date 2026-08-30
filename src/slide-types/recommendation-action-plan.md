@@ -46,13 +46,6 @@ distinct closing zone integrated with the page.
 - governance and decision-rights page;
 - pilot charter with scope, metrics, and exit criteria.
 
-## Platform implementation
-
-Keep each action as a stable group or row with separately addressable fields.
-Use theme tokens for status and recommendation emphasis. Read back owners,
-dates, and values from the final platform document and compare them with the
-approved blueprint before delivery.
-
 ## Failure modes
 
 - generic next steps with no owner or date;

@@ -52,13 +52,6 @@ independent continuous dimensions genuinely determine the choice.
 - scenario comparison with shared metrics;
 - weighted decision matrix with calculation detail in the appendix.
 
-## Platform implementation
-
-Build the grid from aligned shapes or a native table only when the target
-platform preserves its spacing reliably. Keep the recommendation highlight,
-cell text, and scores as separate editable objects. Re-render after PPTX import
-to Google Slides because table padding and line breaks can shift.
-
 ## Failure modes
 
 - criteria selected after the preferred answer;

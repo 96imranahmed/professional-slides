@@ -49,13 +49,6 @@ audience needs drivers, implications, or decision context.
 - chart plus metric/calculation bridge;
 - chart above a narrow implications strip.
 
-## Platform implementation
-
-Create native editable charts when reliable. Map blueprint chart fields to the
-platform adapter and read back series, categories, axes, labels, and formats.
-Render from the final exported/native state because chart serialization can
-change layout.
-
 ## Failure modes
 
 - a chart that merely repeats the title;

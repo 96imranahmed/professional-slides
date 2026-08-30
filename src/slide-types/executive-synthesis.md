@@ -50,12 +50,6 @@ unit widths equal unless one branch is explicitly dominant.
 - decision / rationale / risk / mitigation;
 - claim / proof / action chain.
 
-## Platform implementation
-
-Use native text and rules. Keep repeated branch geometry in one layout family.
-In Google Slides, duplicate a rich synthesis exemplar rather than reconstructing
-its text hierarchy. In PowerPoint, preserve mixed runs and master furniture.
-
 ## Failure modes
 
 - dense prose with no proof hierarchy;

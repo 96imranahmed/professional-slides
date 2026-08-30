@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/professional-slides/src/overview/deck-blueprint.schema.json",
+  "$id": "https://example.invalid/professional-slides/src/deck-blueprint.schema.json",
   "title": "Professional Slides Deck Blueprint",
   "type": "object",
   "required": ["deck", "theme", "story", "slides"],
@@ -26,12 +26,10 @@
     },
     "theme": {
       "type": "object",
-      "required": ["aspectRatio", "referenceDeck", "fontFamily", "accentColor"],
+      "required": ["spec", "referenceDeck"],
       "properties": {
-        "aspectRatio": {"enum": ["16:9", "4:3", "custom"]},
-        "referenceDeck": {"type": ["string", "null"]},
-        "fontFamily": {"type": "string", "minLength": 1},
-        "accentColor": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
+        "spec": {"type": "string", "minLength": 1},
+        "referenceDeck": {"type": ["string", "null"]}
       },
       "additionalProperties": false
     },

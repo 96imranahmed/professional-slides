@@ -16,7 +16,7 @@ and master/layout mechanics are handled elsewhere.
 | Convert the answer into owners and action | [Recommendation and action plan](recommendation-action-plan.md) |
 
 Title, section-divider, agenda, and appendix-divider slides are cross-deck
-components; read [components](../components/index.md).
+components; read [components](../components.md).
 
 ## Universal slide contract
 
@@ -34,17 +34,6 @@ Every analytical slide must define:
 The title, exhibit, and implication must form one vertical argument. If the
 slide needs two unrelated claims, split it.
 
-## Composition rules
-
-- Use the active theme's content frame and anchors.
-- Preserve a clear first read, second read, and quiet support layer.
-- Use one dominant composition rather than a dashboard of cards.
-- Keep the title within its designed line count.
-- Shorten copy or select another slide type before shrinking type.
-- Vary adjacent silhouettes only when the narrative role changes.
-- Keep all meaning-bearing content editable when the platform supports it.
-- Use a diagram only when spatial structure improves comprehension.
-
 ## Source-template adaptation
 
 Match a source exemplar by narrative role, evidence type, orientation, density,
@@ -53,11 +42,5 @@ delete. Do not choose a source slide because it has approximately the right
 number of boxes.
 
 If no exemplar can support the content without overlays or undersized text,
-choose another slide type or split the content.
-
-## Self-review
-
-Before implementation, state why the selected type is superior to the closest
-alternative. After rendering, score the slide with the release rubric in
-[`evals/rubric.md`](../../evals/rubric.md). A slide that fails its narrative
-contract must be reframed, not merely polished.
+choose another slide type or split the content. A slide that fails its
+narrative contract must be reframed, not merely polished.
