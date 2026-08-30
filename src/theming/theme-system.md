@@ -142,4 +142,3 @@ styling, footer placement, dark/light continuity, and platform parity.
 
 Theme QA is incomplete until the same representative set has been rendered in
 every requested final platform.
-

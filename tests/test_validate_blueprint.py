@@ -53,10 +53,9 @@ class BlueprintValidationTests(unittest.TestCase):
 
 class ThemeValidationTests(unittest.TestCase):
     def test_example_is_valid(self):
-        data = json.loads((ROOT / "references" / "theming" / "theme-spec.example.json").read_text())
+        data = json.loads((ROOT / "src" / "theming" / "theme-spec.example.json").read_text())
         self.assertEqual(theme_validator.validate(data), [])
 
 
 if __name__ == "__main__":
     unittest.main()
-

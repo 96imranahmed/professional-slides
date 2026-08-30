@@ -1,5 +1,5 @@
 {
-  "$schema": "../references/overview/deck-blueprint.schema.json",
+  "$schema": "../src/overview/deck-blueprint.schema.json",
   "deck": {
     "title": "A focused service model can reduce resolution time by 30%",
     "audience": "Executive operating committee",

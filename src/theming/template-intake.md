@@ -120,6 +120,6 @@ replace the reference with a visually similar fresh build.
 
 Store approved references under `assets/reference-decks/<name>/` only when the
 user explicitly authorizes inclusion in the repository. Keep each reference's
-derived audit and theme profile under `references/theming/` and avoid duplicate
+derived audit and theme profile under `src/theming/` and avoid duplicate
 rules across files. When a newer source supersedes an older rule, update the
 theme profile and retain provenance rather than appending conflicting guidance.

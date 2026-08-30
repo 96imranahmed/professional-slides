@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/professional-slides/references/overview/deck-blueprint.schema.json",
+  "$id": "https://example.invalid/professional-slides/src/overview/deck-blueprint.schema.json",
   "title": "Professional Slides Deck Blueprint",
   "type": "object",
   "required": ["deck", "theme", "story", "slides"],

@@ -30,7 +30,7 @@ executive consulting communication.
 .
 |-- SKILL.md
 |-- agents/openai.yaml
-|-- references/
+|-- src/
 |   |-- overview/
 |   |   |-- index.md
 |   |   `-- deck-blueprint.schema.json
@@ -87,9 +87,9 @@ decision, data, source material, output format, and any reference deck.
 
 Reference decks are intentionally not committed. The two approved source decks
 used for this scaffold were inventoried by hash and package structure in
-`references/theming/source-manifest.json`; only generalized, reusable design
+`src/theming/source-manifest.json`; only generalized, reusable design
 observations are retained. For future sources, follow the inventory workflow in
-`references/theming/template-intake.md` and encode only rules and assets the user is
+`src/theming/template-intake.md` and encode only rules and assets the user is
 authorized to reuse.
 
 Validate the skill package and example blueprint with:
@@ -97,7 +97,7 @@ Validate the skill package and example blueprint with:
 ```bash
 python /path/to/skill-creator/scripts/quick_validate.py .
 python scripts/validate_blueprint.py examples/deck-blueprint.example.json
-python scripts/validate_theme.py references/theming/theme-spec.example.json
+python scripts/validate_theme.py src/theming/theme-spec.example.json
 python evals/run_evals.py --check
 python -m unittest discover -s tests
 ```

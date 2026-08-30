@@ -24,7 +24,7 @@ Before authoring, resolve or infer these six inputs:
 
 Ask only for missing inputs that would materially change the result. Do not
 block on cosmetic preferences; derive them from an approved reference deck or
-use the defaults in [design foundations](references/theming/design-foundations.md).
+use the defaults in [design foundations](src/theming/design-foundations.md).
 
 Write the communication job before storyboarding:
 
@@ -33,19 +33,19 @@ Write the communication job before storyboarding:
 
 ## Route the work
 
-- Read the [skill pack overview](references/overview/index.md) when changing
+- Read the [skill pack overview](src/overview/index.md) when changing
   the package structure or deciding where new guidance belongs.
-- Always read [design foundations](references/theming/design-foundations.md).
-- Always read the [theming system](references/theming/index.md) before defining
+- Always read [design foundations](src/theming/design-foundations.md).
+- Always read the [theming system](src/theming/index.md) before defining
   or changing colors, typography, masters, or visual tone.
-- Read the [slide-type router](references/slide-types/index.md) when
+- Read the [slide-type router](src/slide-types/index.md) when
   storyboarding, then read only the selected slide type's file.
-- Read the [chart router](references/charts/index.md) for any quantitative
+- Read the [chart router](src/charts/index.md) for any quantitative
   exhibit, then read only the selected chart family's file.
-- Read [components](references/components/index.md) when setting the theme, master,
+- Read [components](src/components/index.md) when setting the theme, master,
   navigation, sources, footers, or section behavior.
 - If a PPTX, PDF, screenshot set, or native deck is supplied as a visual
-  reference, read [template intake](references/theming/template-intake.md) before
+  reference, read [template intake](src/theming/template-intake.md) before
   planning. Treat the supplied reference as authoritative within the user's
   reuse rights.
 - Read the [PowerPoint integration](tools/powerpoint/index.md) for PPTX
