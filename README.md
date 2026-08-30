@@ -76,8 +76,8 @@ then invoke `$professional-slides` with the deck brief, audience, desired
 decision, data, source material, output format, and any reference deck.
 
 Reference decks are intentionally not committed. The single
-`src/theming/index.md` records the approved sources' hashes, the reusable
-default theme, and the intake workflow without redistributing the originals.
+`src/theming/index.md` defines the reusable default theme and reference-intake
+workflow without redistributing source material.
 
 Validate the skill package and example blueprint with:
 

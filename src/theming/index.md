@@ -1,8 +1,8 @@
 # Theme
 
 This is the only theme source of truth. It owns visual tokens, masters and
-layouts, authorized-reference intake, reference provenance, and cross-platform
-fallbacks. Narrative principles live in
+layouts, authorized-reference intake, source-handling constraints, and
+cross-platform fallbacks. Narrative principles live in
 [`design-foundations.md`](../design-foundations.md), recurring furniture in
 [`components.md`](../components.md), and platform mechanics in
 [`tools/`](../tools/).
@@ -99,14 +99,6 @@ template, preserve the master -> layout -> slide hierarchy, duplicate the
 closest source slide, edit inherited objects in place, and shorten content or
 choose another layout before shrinking type. Report any fidelity limitation
 that the toolchain cannot preserve.
-
-Approved references used to derive the default are provenance only; the source
-files are not distributed with this repository:
-
-| Reference | SHA-256 | Structural evidence |
-| --- | --- | --- |
-| Slideworks business consulting toolkit sample | `94e4cc11c782f6374ae94a640e50c4a2f232732074ab66e12b8f0b6c57ce2997` | 28 slides; 1 master; 2 layouts; 7 charts |
-| Umbrex PowerPoint Template for Consultants, third edition | `9733f55be1905c79ae2894d3c6f1eed1d2b932076c8c3f18c06e58213854492c` | 230 slides; 7 masters; 41 layouts; 50 charts |
 
 ## Cross-platform fallbacks
 
