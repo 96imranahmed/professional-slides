@@ -1,59 +1,16 @@
 # Design Foundations
 
-This file owns platform-neutral narrative and composition principles. Theme
-tokens belong in [`theming/`](theming/index.md), recurring furniture in
-[`components.md`](components.md), exhibit-specific rules in
-[`charts/`](charts/index.md), and delivery checks in
-[`evals/quality-assurance.md`](../evals/quality-assurance.md).
+This file owns platform-neutral visual composition. Argument structure and
+wording belong in [`storylining/`](storylining/index.md), visual tokens in
+[`theming/`](theming/index.md), recurring furniture in
+[`components.md`](components.md), and delivery checks in
+[`evals/`](../evals/quality-assurance.md).
 
 Explicit user direction and an approved reference deck override these defaults.
 
-## Decision and governing thought
+## Choose the exhibit and archetype
 
-Define the communication job before storyboarding:
-
-> By the end, **[audience]** should **[outcome]** because **[governing thought]**.
-
-The governing thought is the shortest defensible answer to the central
-question. If the work is exploratory, state the exact questions the analysis
-will resolve instead of forcing a recommendation.
-
-Break the governing thought into three to five mutually distinct supporting
-claims that are collectively sufficient. Sequence them through an arc suited
-to the brief, such as:
-
-- context -> tension -> evidence -> recommendation -> action;
-- question -> analysis -> answer -> implication;
-- current state -> root causes -> future state -> transition;
-- options -> criteria -> evaluation -> recommendation.
-
-An agenda is navigation, not a storyline. Reading only chapter headlines and
-slide titles should reveal the argument.
-
-## Slide logic and action titles
-
-Give every analytical slide one narrative job, one primary claim, and one
-dominant exhibit. The title states the claim, the exhibit proves or explains
-it, and the implication tells the audience what follows. Split slides that
-retain two unrelated claims.
-
-Write action titles as complete audience-facing conclusions, not topics or
-visual descriptions. Keep them within the theme's designed title zone and use
-sentence case unless the approved reference establishes another convention.
-
-A title should answer at least one question:
-
-- What changed?
-- Why does it matter?
-- What explains it?
-- What choice follows?
-- What must happen next?
-
-Read all titles in sequence; they should function as a concise executive memo.
-
-## Exhibit and archetype choice
-
-Choose the composition from the narrative job using the
+Choose the composition from the slide's narrative job using the
 [slide-type router](slide-types/index.md). Use:
 
 - a chart for magnitude, trend, composition, change, or relationship;
@@ -64,10 +21,10 @@ Choose the composition from the narrative job using the
 - quotations only when stakeholder voice is evidence.
 
 Select quantitative encodings through the [chart router](charts/index.md).
-Do not convert a straightforward list into a decorative diagram, and do not
-add an exhibit that merely repeats the title.
+Do not turn a straightforward list into a decorative diagram or add an exhibit
+that merely repeats the title.
 
-## Hierarchy, density, and restraint
+## Establish hierarchy
 
 Create one obvious first read, one clear second read, and quiet supporting
 detail. Build hierarchy in this order:
@@ -78,26 +35,37 @@ detail. Build hierarchy in this order:
 4. color emphasis;
 5. rules, fills, or enclosures.
 
-Use one dominant visual rather than a dashboard of cards. Align objects to a
-small set of shared anchors. Keep live-presentation pages sparse, allow more
-evidence in executive pre-reads, and reserve dense methods or lookup material
-for the appendix. Change the composition or shorten copy before shrinking type.
+The action title and dominant exhibit should form one vertical argument. Keep
+annotations close to the evidence they explain and secondary metadata within
+the component safe zones.
 
-Default to flat, editable shapes and restrained color. Avoid decorative
-photos, pseudo-UI cards, 3D effects, gradients without meaning, ornamental
-icons, and diagrams that do not improve comprehension.
+## Control density
 
-## Writing and evidence
+Use one dominant visual rather than a dashboard of cards. Keep live-presentation
+pages sparse, allow more evidence in executive pre-reads, and reserve dense
+methods or lookup material for the appendix. Change the composition, split the
+slide, or shorten copy before shrinking type.
 
-- Lead with the conclusion and support it with specific evidence.
-- Keep bullet and column grammar parallel.
-- Use active verbs and nouns familiar to the audience.
-- Limit indentation to two levels; move paragraphs to notes or the appendix.
-- Never expose production instructions or template copy on slides.
-- Label actual, estimate, forecast, scenario, and illustrative values honestly.
-- State material units, periods, populations, exclusions, and calculations.
-- Never invent facts, quotes, sources, people, logos, or results.
+Limit indentation to two levels. Keep bullet, column, and label grammar
+parallel. Move paragraphs, production detail, and extended methodology to notes
+or the appendix.
 
-Use the canonical [source component](components.md#sources) for visible and
-notes-level provenance. Source integrity is verified by the evaluation gates,
-not redefined here.
+## Align and group
+
+Use a small set of shared horizontal and vertical anchors. Align related
+objects, maintain consistent internal padding, and use proximity before boxes
+or divider lines to express grouping. Preserve clear separation between the
+title, analytical canvas, and footer/source zones.
+
+Vary silhouettes when the narrative job changes, while keeping the underlying
+grid, title zone, and recurring components stable across the deck.
+
+## Preserve restraint and editability
+
+Default to flat, editable shapes and restrained color. Avoid pseudo-UI cards,
+3D effects, gradients without meaning, ornamental icons, decorative photos,
+and diagrams that do not improve comprehension.
+
+Keep text, charts, tables, and simple diagrams editable when the target
+platform can preserve them reliably. Use raster fallbacks only when fidelity
+requires them and the user accepts the editability tradeoff.

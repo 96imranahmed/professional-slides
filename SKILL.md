@@ -20,15 +20,13 @@ Resolve or infer:
 5. delivery context: pre-read, live, workshop, or analytical pack;
 6. output: PowerPoint, native Google Slides, or both.
 
-Ask only for missing inputs that would materially change the result. Write the
-communication job before storyboarding:
-
-> By the end, **[audience]** should **[decide / understand / approve / do]**
-> because **[governing answer]**.
+Ask only for missing inputs that would materially change the result.
 
 ## Route only what the task needs
 
-- Always read [design foundations](src/design-foundations.md).
+- Start with the [`src` guide](src/index.md), then always read
+  [storylining](src/storylining/index.md) and
+  [design foundations](src/design-foundations.md).
 - Read the single [theme source](src/theming/index.md) before defining or
   changing the visual system, including when a reference deck, PDF, screenshot
   set, or brand guide is supplied.
@@ -42,37 +40,29 @@ communication job before storyboarding:
   [Google Slides tools](src/tools/google-slides/index.md) only for requested target
   platforms.
 - Read [quality assurance](evals/quality-assurance.md) before implementation
-  and delivery. Use [the evaluation flow](evals/EVALS.md) for self-review and
+  and delivery. Use [the evaluation flow](evals/index.md) for self-review and
   skill-effectiveness testing.
 
-Each concept has one owner: narrative in foundations, visual tokens in
-theming, recurring furniture in components, slide jobs in slide types,
-quantitative encoding in charts, platform mechanics in tools, and release
-evidence in evals. Do not restate rules across those boundaries.
+Each concept has one owner: narrative in storylining, composition in design
+foundations, visual tokens in theming, recurring furniture in components,
+slide jobs in slide types, quantitative encoding in charts, platform mechanics
+in tools, and release evidence in evals. Do not restate rules across boundaries.
 
 ## Build the deck
 
-1. Form the governing thought and decompose it into mutually distinct,
-   collectively sufficient supporting claims.
-2. Give every slide one narrative job, one primary claim, one action title,
-   one dominant exhibit, and one audience implication.
+1. Follow the storylining workflow to form the governing thought, supporting
+   claims, narrative arc, action-title spine, and platform-neutral storyboard.
+2. Give every slide one narrative job, one primary claim, one dominant exhibit,
+   one evidence state, and one audience implication.
 3. Read all action titles as a memo; remove any slide that repeats a point or
    does not change the audience's understanding or decision.
-4. Encode the plan with
-   [`examples/deck-blueprint.example.json`](examples/deck-blueprint.example.json)
-   and validate it:
-
-   ```bash
-   python scripts/validate_blueprint.py path/to/deck-blueprint.json
-   ```
-
-5. Define or derive one theme. Preserve an approved template's master,
+4. Define or derive one theme. Preserve an approved template's master,
    layouts, object hierarchy, and authorized assets rather than approximating
    them from screenshots.
-6. Author editable text, charts, tables, and simple diagrams through one
+5. Author editable text, charts, tables, and simple diagrams through one
    supported adapter per candidate. Never invent facts, sources, benchmarks,
    quotes, people, or calculations.
-7. Put concise sources on-slide and fuller provenance in notes or a source
+6. Put concise sources on-slide and fuller provenance in notes or a source
    ledger when supported.
 
 ## Verify and deliver

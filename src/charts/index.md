@@ -48,7 +48,7 @@ data, labels, title, and source ledger must agree after rounding.
 
 ## Cross-platform adapter contract
 
-The blueprint should remain platform-neutral and provide chart type, plot data,
+The storyboard should remain platform-neutral and provide chart type, plot data,
 axis rules, labels, highlights, annotations, and source IDs. The PowerPoint and
 Google Slides adapters map those semantics to supported native chart APIs. If
 a native chart cannot preserve the intended result, prefer editable primitives;

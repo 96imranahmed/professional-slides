@@ -9,7 +9,7 @@ control-versus-treatment comparison.
 Run this before delivering any deck:
 
 1. Freeze the exact editable artifact and render every slide from that artifact.
-2. Collect the blueprint, source ledger, QA ledger, platform readback, individual
+2. Collect the storyboard, source ledger, QA ledger, platform readback, individual
    slide renders, and deck montage.
 3. Give those materials and [`evaluator-prompt.md`](evaluator-prompt.md) to an
    evaluator with `arm: "self"`.
@@ -43,7 +43,7 @@ For every enabled case in [`cases.json`](cases.json):
    this skill normally.
 4. Start both arms from fresh context. Do not let either arm inspect the other's
    outputs.
-5. Preserve the editable artifact, final renders, generation trace, blueprint,
+5. Preserve the editable artifact, final renders, generation trace, storyboard,
    source ledger, and QA evidence for each arm.
 6. Use exact PowerPoint export renders and native Google Slides renders, not
    intermediate previews.

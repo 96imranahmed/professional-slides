@@ -1,89 +1,54 @@
 # Professional Slides
 
 `professional-slides` is a portable agent skill for building executive-grade,
-answer-first consulting decks in PowerPoint and Google Slides. It packages the
-reasoning, design system, slide archetypes, chart standards, cross-deck
-components, and QA gates needed to produce decision-ready presentations with a
-consistent visual grammar.
+answer-first consulting decks in PowerPoint and Google Slides. It combines
+storylining, design foundations, slide archetypes, chart standards, theming,
+platform implementation guidance, and rendered quality gates.
 
 The project is designed for Codex and other `SKILL.md`-compatible coding agents,
-including Claude Code. It is independent and is not affiliated with, endorsed
-by, or derived from confidential materials belonging to McKinsey & Company.
-"McKinsey-style" describes the familiar category of concise, evidence-led,
-executive consulting communication.
+including Claude Code. It is independent and is not affiliated with or endorsed
+by McKinsey & Company. "McKinsey-style" describes the general category of
+concise, evidence-led executive consulting communication.
 
-## What is included
+## Structure
 
-- Answer-first storylining and deck architecture
-- Six extensible slide archetypes
-- Six decision-oriented chart families
-- Reusable titles, trackers, section rails, footers, sources, and appendix
-  components
-- PowerPoint and Google Slides implementation guidance
-- A workflow for learning from user-supplied reference decks
-- A machine-checkable deck blueprint and validation script
-- Render-based visual and editorial QA gates
-
-## Repository layout
+The repository is organized by responsibility rather than by workflow stage:
 
 ```text
 .
-|-- SKILL.md
-|-- agents/openai.yaml
+|-- agents/
 |-- src/
-|   |-- design-foundations.md
-|   |-- components.md
-|   |-- deck-blueprint.schema.json
+|   |-- storylining/
 |   |-- slide-types/
-|   |   |-- index.md
-|   |   `-- <one file per slide type>
 |   |-- charts/
-|   |   |-- index.md
-|   |   `-- <one file per chart family>
 |   |-- theming/
-|   |   `-- index.md
 |   `-- tools/
 |       |-- powerpoint/
-|       |   |-- index.md
-|       |   |-- artifact-tool.md
-|       |   |-- pptxgenjs.md
-|       |   |-- office-js-and-graph.md
-|       |   `-- rendering.md
 |       `-- google-slides/
-|           |-- index.md
-|           |-- api-integration.md
-|           `-- rendering.md
-|-- examples/deck-blueprint.example.json
 |-- evals/
-|   |-- EVALS.md
-|   |-- cases.json
-|   |-- rubric.md
-|   |-- evaluator-prompt.md
-|   |-- result.schema.json
-|   `-- run_evals.py
 |-- scripts/
-|   |-- validate_blueprint.py
-|   `-- inventory_pptx.py
 `-- tests/
-    |-- test_validate_blueprint.py
-    `-- test_run_evals.py
 ```
+
+The `src/` root also contains shared design and cross-deck component guidance.
+Every directory under `src/` has an `index.md`: start with the root index, then
+read only the relevant subsystem indexes and specialized pages.
+
+- `storylining/` owns the argument, narrative arc, storyboard, and title spine.
+- `slide-types/` owns supported slide archetypes.
+- `charts/` owns quantitative exhibit selection and construction.
+- `theming/` owns the single visual theme source and reference-intake rules.
+- `tools/` owns PowerPoint and Google Slides implementation and rendering.
+- `evals/` owns self-review and blinded skill-effectiveness evaluation.
+- `scripts/` contains deterministic repository utilities.
+- `tests/` verifies the maintained evaluation and utility behavior.
 
 ## Use
 
-Install or clone this directory into the skill location used by your agent,
-then invoke `$professional-slides` with the deck brief, audience, desired
-decision, data, source material, output format, and any reference deck.
+Install or clone the repository into the skill location used by your agent, then
+invoke `$professional-slides` with the audience, decision, evidence, source
+material, delivery context, output format, and any authorized reference deck.
 
-Reference decks are intentionally not committed. The single
-`src/theming/index.md` defines the reusable default theme and reference-intake
-workflow without redistributing source material.
-
-Validate the skill package and example blueprint with:
-
-```bash
-python /path/to/skill-creator/scripts/quick_validate.py .
-python scripts/validate_blueprint.py examples/deck-blueprint.example.json
-python evals/run_evals.py --check
-python -m unittest discover -s tests
-```
+Reference decks remain external and read-only unless the user explicitly
+authorizes inclusion. The skill retains generalized design guidance, not named
+template provenance or source files.

@@ -130,6 +130,6 @@ after every material change. Never base a completion claim on an earlier export
 or a prepared upload form.
 
 Record the result with the [evaluation rubric](rubric.md) and run the
-per-deck gate described in [the evaluation flow](EVALS.md). This
+per-deck gate described in [the evaluation flow](index.md). This
 self-review validates the deck; only the blind paired release suite evaluates
 whether the skill itself improves outcomes.

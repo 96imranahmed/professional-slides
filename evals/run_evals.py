@@ -14,7 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent
 CASES_PATH = ROOT / "cases.json"
 SCHEMA_PATH = ROOT / "result.schema.json"
-REQUIRED_FILES = (ROOT / "rubric.md", ROOT / "evaluator-prompt.md", ROOT / "EVALS.md")
+REQUIRED_FILES = (ROOT / "rubric.md", ROOT / "evaluator-prompt.md", ROOT / "index.md")
 
 
 def load_json(path: Path) -> dict[str, Any]:

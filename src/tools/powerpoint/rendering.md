@@ -54,7 +54,7 @@ Record:
 - overflow/overlap findings;
 - QA ledger status.
 
-Fail if the page count differs from the blueprint or if renders cannot be
+Fail if the page count differs from the storyboard or if renders cannot be
 unambiguously mapped to slide order.
 
 ## Visual inspection

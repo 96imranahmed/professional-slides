@@ -53,7 +53,7 @@ Build a deterministic ordered request list. Common request types include:
 - `deleteObject` for explicitly mapped stale objects.
 
 Specify object IDs when later requests in the same batch refer to newly created
-objects. Keep IDs stable in the blueprint/operation map. Do not infer target IDs
+objects. Keep IDs stable in the storyboard/operation map. Do not infer target IDs
 from page order after structural mutations.
 
 Use field masks for update requests so unrelated properties remain unchanged.
