@@ -36,6 +36,7 @@ CHART_TYPES = {
 OUTPUT_FORMATS = {"pptx", "google-slides", "pdf"}
 DELIVERY_MODES = {"live", "pre-read", "workshop", "analytical-pack"}
 EVIDENCE_STATES = {"verified", "illustrative", "unresolved"}
+THEME_MODES = {"default", "reference-derived", "brand-derived"}
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 PLACEHOLDER = re.compile(r"(?:\blorem ipsum\b|\bxxx\b|\btbd\b|\[insert[^]]*\])", re.I)
 
@@ -76,10 +77,12 @@ def validate(data: Any, strict: bool = False) -> tuple[list[str], list[str]]:
     if not isinstance(theme, dict):
         errors.append("theme: must be an object")
         theme = {}
-    if not _is_text(theme.get("spec")):
-        errors.append("theme.spec: must be a non-empty theme-spec path")
+    if theme.get("mode") not in THEME_MODES:
+        errors.append(f"theme.mode: expected one of {sorted(THEME_MODES)}")
     if "referenceDeck" not in theme or not isinstance(theme.get("referenceDeck"), (str, type(None))):
         errors.append("theme.referenceDeck: must be text or null")
+    elif theme.get("mode") == "reference-derived" and not _is_text(theme.get("referenceDeck")):
+        errors.append("theme.referenceDeck: reference-derived mode requires a deck path")
 
     story = data.get("story", {})
     if not isinstance(story, dict):

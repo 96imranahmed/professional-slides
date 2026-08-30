@@ -9,7 +9,7 @@
     "governingThought": "Routing high-frequency cases to specialized teams can reduce resolution time while protecting service quality."
   },
   "theme": {
-    "spec": "../src/theming/theme-spec.example.json",
+    "mode": "default",
     "referenceDeck": null
   },
   "story": {

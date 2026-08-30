@@ -26,11 +26,17 @@
     },
     "theme": {
       "type": "object",
-      "required": ["spec", "referenceDeck"],
+      "required": ["mode", "referenceDeck"],
       "properties": {
-        "spec": {"type": "string", "minLength": 1},
+        "mode": {"enum": ["default", "reference-derived", "brand-derived"]},
         "referenceDeck": {"type": ["string", "null"]}
       },
+      "allOf": [
+        {
+          "if": {"properties": {"mode": {"const": "reference-derived"}}},
+          "then": {"properties": {"referenceDeck": {"type": "string", "minLength": 1}}}
+        }
+      ],
       "additionalProperties": false
     },
     "story": {

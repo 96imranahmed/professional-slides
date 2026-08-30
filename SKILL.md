@@ -29,9 +29,9 @@ communication job before storyboarding:
 ## Route only what the task needs
 
 - Always read [design foundations](src/design-foundations.md).
-- Read [theming](src/theming/index.md) before defining or changing the visual
-  system. If a reference deck, PDF, or screenshot set is supplied, also read
-  [template intake](src/theming/template-intake.md).
+- Read the single [theme source](src/theming/index.md) before defining or
+  changing the visual system, including when a reference deck, PDF, screenshot
+  set, or brand guide is supplied.
 - Read the [slide-type router](src/slide-types/index.md) when storyboarding,
   then only the selected archetype files.
 - Read the [chart router](src/charts/index.md) for quantitative exhibits, then

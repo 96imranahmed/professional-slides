@@ -19,7 +19,6 @@ def load_module(name: str, path: Path):
 
 
 blueprint_validator = load_module("validate_blueprint", ROOT / "scripts" / "validate_blueprint.py")
-theme_validator = load_module("validate_theme", ROOT / "scripts" / "validate_theme.py")
 
 
 class BlueprintValidationTests(unittest.TestCase):
@@ -50,17 +49,17 @@ class BlueprintValidationTests(unittest.TestCase):
         errors, _ = blueprint_validator.validate(data, strict=True)
         self.assertTrue(any("placeholder" in error for error in errors))
 
-    def test_theme_references_canonical_spec(self):
+    def test_theme_requires_one_mode(self):
         data = copy.deepcopy(self.valid)
-        data["theme"].pop("spec")
+        data["theme"].pop("mode")
         errors, _ = blueprint_validator.validate(data)
-        self.assertTrue(any("theme.spec" in error for error in errors))
+        self.assertTrue(any("theme.mode" in error for error in errors))
 
-
-class ThemeValidationTests(unittest.TestCase):
-    def test_example_is_valid(self):
-        data = json.loads((ROOT / "src" / "theming" / "theme-spec.example.json").read_text())
-        self.assertEqual(theme_validator.validate(data), [])
+    def test_reference_theme_requires_reference_deck(self):
+        data = copy.deepcopy(self.valid)
+        data["theme"]["mode"] = "reference-derived"
+        errors, _ = blueprint_validator.validate(data)
+        self.assertTrue(any("requires a deck path" in error for error in errors))
 
 
 if __name__ == "__main__":
