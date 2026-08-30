@@ -2,16 +2,13 @@
 
 ## Use when
 
-The audience must compare alternatives, scenarios, vendors, segments, or
-current and future states using a common decision basis.
+The audience must compare alternatives, scenarios, vendors, segments, or current and future states using a common decision basis.
 
-Use a decomposition instead when the goal is to explain how one system breaks
-apart. Use a roadmap when sequence, rather than tradeoff, drives the decision.
+Use a decomposition instead when the goal is to explain how one system breaks apart. Use a roadmap when sequence, rather than tradeoff, drives the decision.
 
 ## Narrative contract
 
-The audience should understand the comparison basis, material differences,
-recommended option, and the tradeoff or risk that remains.
+The audience should understand the comparison basis, material differences, recommended option, and the tradeoff or risk that remains.
 
 ## Content contract
 
@@ -24,9 +21,7 @@ recommended option, and the tradeoff or risk that remains.
 
 ## Layout
 
-Use a table when exact comparison matters. Use equal-width narratives when
-each option has qualitatively different logic. Use a 2x2 only when two
-independent continuous dimensions genuinely determine the choice.
+Use a table when exact comparison matters. Use equal-width narratives when each option has qualitatively different logic. Use a 2x2 only when two independent continuous dimensions genuinely determine the choice.
 
 - keep option widths and criterion heights consistent;
 - reserve the first column for concise criterion labels;
@@ -63,5 +58,4 @@ independent continuous dimensions genuinely determine the choice.
 
 ## Acceptance test
 
-Hide the recommendation styling and ask whether the same option still wins
-from the visible evidence. If not, the slide is advocacy rather than analysis.
+Hide the recommendation styling and ask whether the same option still wins from the visible evidence. If not, the slide is advocacy rather than analysis.

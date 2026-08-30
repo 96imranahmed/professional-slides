@@ -1,21 +1,13 @@
 # PowerPoint Integration
 
-Read this folder for every PPTX deliverable. Choose the authoring surface first,
-then follow its rendering path. Do not mix APIs opportunistically inside one
-deck unless a documented round trip preserves the theme, master/layout tree,
-object editability, and notes.
+Read this folder for every PPTX deliverable. Choose the authoring surface first, then follow its rendering path. Do not mix APIs opportunistically inside one deck unless a documented round trip preserves the theme, master/layout tree, object editability, and notes.
 
 ## Files
 
-- [Artifact Tool](artifact-tool.md): Codex-native creation, import, inspection,
-  editing, rendering, and PPTX export.
-- [PptxGenJS](pptxgenjs.md): portable JavaScript creation with explicit calls
-  for masters, editable text, shapes, tables, charts, notes, and file output.
-- [Office.js and Microsoft Graph](office-js-and-graph.md): editing inside a
-  running PowerPoint client and storing/distributing files through OneDrive or
-  SharePoint.
-- [Rendering](rendering.md): native render, exported-file render, overflow
-  checks, contact sheets, and release evidence.
+- [Artifact Tool](artifact-tool.md): Codex-native creation, import, inspection, editing, rendering, and PPTX export.
+- [PptxGenJS](pptxgenjs.md): portable JavaScript creation with explicit calls for masters, editable text, shapes, tables, charts, notes, and file output.
+- [Office.js and Microsoft Graph](office-js-and-graph.md): editing inside a running PowerPoint client and storing/distributing files through OneDrive or SharePoint.
+- [Rendering](rendering.md): native render, exported-file render, overflow checks, contact sheets, and release evidence.
 
 ## Select the integration
 
@@ -27,9 +19,7 @@ object editability, and notes.
 | Store or publish a finished PPTX | None; do not edit through Graph | Microsoft Graph DriveItem upload/download | Graph PDF conversion or downloaded-file renderer |
 | Existing reference/template | Import and edit inherited source objects | Local or cloud file provider | Before/after source-pattern comparison |
 
-Microsoft Graph is a file/storage API for this workflow. Do not describe it as
-a shape-level PowerPoint authoring API. Office.js is the Microsoft API for
-interacting with slides and shapes in an open PowerPoint host.
+Microsoft Graph is a file/storage API for this workflow. Do not describe it as a shape-level PowerPoint authoring API. Office.js is the Microsoft API for interacting with slides and shapes in an open PowerPoint host.
 
 ## Common adapter contract
 
@@ -48,8 +38,7 @@ The platform adapter should expose the equivalent of:
 - `renderDeck`: produce one ordered image per final slide;
 - `publish`: upload only after the candidate passes QA.
 
-Keep source reads and mutations separate. A successful API mutation is not a
-quality result; only the rendered exported candidate is eligible for delivery.
+Keep source reads and mutations separate. A successful API mutation is not a quality result; only the rendered exported candidate is eligible for delivery.
 
 ## Non-negotiable invariants
 
@@ -74,10 +63,6 @@ Check capabilities before authoring:
 - Can the Office.js host satisfy the required PowerPoint API set?
 - Can the storage API upload, download, or convert the final file?
 
-If a required capability is missing, choose a supported adapter before editing.
-Do not discover the limitation after rebuilding the deck.
+If a required capability is missing, choose a supported adapter before editing. Do not discover the limitation after rebuilding the deck.
 
-Use one local authoring adapter for a candidate. Do not mix Artifact Tool and
-PptxGenJS mutations inside the same in-memory deck. Either route may generate a
-new editable PPTX; template-preserving edits require the adapter to demonstrate
-that it can retain the source theme, master/layout tree, object types, and notes.
+Use one local authoring adapter for a candidate. Do not mix Artifact Tool and PptxGenJS mutations inside the same in-memory deck. Either route may generate a new editable PPTX; template-preserving edits require the adapter to demonstrate that it can retain the source theme, master/layout tree, object types, and notes.

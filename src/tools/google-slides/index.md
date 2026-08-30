@@ -1,16 +1,11 @@
 # Google Slides Integration
 
-Read this folder for every native Google Slides deliverable. Select the route
-from the source state; do not treat all Google Slides requests as blank-deck API
-authoring.
+Read this folder for every native Google Slides deliverable. Select the route from the source state; do not treat all Google Slides requests as blank-deck API authoring.
 
 ## Files
 
-- [API integration](api-integration.md): native connector, Google Slides REST
-  API, Google Drive import/export, batching, object IDs, readback, and
-  capability boundaries.
-- [Rendering](rendering.md): PDF export, ordered PNG rendering, thumbnails,
-  structural checks, and parity QA.
+- [API integration](api-integration.md): native connector, Google Slides REST API, Google Drive import/export, batching, object IDs, readback, and capability boundaries.
+- [Rendering](rendering.md): PDF export, ordered PNG rendering, thumbnails, structural checks, and parity QA.
 
 ## Route the request
 
@@ -22,9 +17,7 @@ authoring.
 | Direct Slides API explicitly requested | Create/read with Slides API and mutate through `batchUpdate` |
 | Dual PPTX + Google Slides delivery | Verify PPTX, import, then separately verify the native deck |
 
-Do not round-trip an existing native deck through PPTX unless the user asks.
-Do not return an uploaded Office file or preview link as if it were a native
-Google Slides presentation.
+Do not round-trip an existing native deck through PPTX unless the user asks. Do not return an uploaded Office file or preview link as if it were a native Google Slides presentation.
 
 ## Common adapter contract
 
@@ -40,8 +33,7 @@ The native adapter should expose equivalents of:
 
 ## Native invariants
 
-- Preserve theme, masters, layouts, placeholder IDs, notes, links, and native
-  media where the API supports them.
+- Preserve theme, masters, layouts, placeholder IDs, notes, links, and native media where the API supports them.
 - Reuse rich native exemplars before building fresh slide-local structures.
 - Keep meaning-bearing text editable.
 - Map every retained/replaced/deleted object in a duplicated exemplar.
@@ -51,10 +43,6 @@ The native adapter should expose equivalents of:
 
 ## Capability boundaries
 
-The Google Slides API reads and writes slide objects, while the Google Drive API
-handles file import, export, copy, location, and sharing. A connector may expose
-both behind higher-level actions. Confirm which operations are callable before
-planning the mutation.
+The Google Slides API reads and writes slide objects, while the Google Drive API handles file import, export, copy, location, and sharing. A connector may expose both behind higher-level actions. Confirm which operations are callable before planning the mutation.
 
-If the native connector is unavailable for a requested native deliverable,
-report the missing integration. Do not silently substitute a local PPTX.
+If the native connector is unavailable for a requested native deliverable, report the missing integration. Do not silently substitute a local PPTX.

@@ -2,14 +2,11 @@
 
 ## Best for
 
-Relationships between two measures, segmentation, prioritization, and a third
-magnitude encoded by bubble area.
+Relationships between two measures, segmentation, prioritization, and a third magnitude encoded by bubble area.
 
 ## Data contract
 
-One observation per point, x and y measures with units, optional size measure,
-stable observation IDs, missing-value policy, and documented thresholds for any
-quadrants. Record transformations and the basis of any fitted line.
+One observation per point, x and y measures with units, optional size measure, stable observation IDs, missing-value policy, and documented thresholds for any quadrants. Record transformations and the basis of any fitted line.
 
 ## Construction
 
@@ -23,18 +20,12 @@ quadrants. Record transformations and the basis of any fitted line.
 
 ## Platform mapping
 
-Verify whether the target API interprets bubble size as area or diameter and
-normalize input accordingly. Preserve observation-to-label mapping during sort
-or filtering. Check axes, quadrants, bubble sizing, and highlighted labels in
-the final render.
+Verify whether the target API interprets bubble size as area or diameter and normalize input accordingly. Preserve observation-to-label mapping during sort or filtering. Check axes, quadrants, bubble sizing, and highlighted labels in the final render.
 
 ## Failure modes
 
-Decorative bubble sizes, unlabeled decisive outliers, arbitrary quadrants,
-occluded points, unsupported causal claims, and sizing behavior that differs
-between PowerPoint and Google Slides.
+Decorative bubble sizes, unlabeled decisive outliers, arbitrary quadrants, occluded points, unsupported causal claims, and sizing behavior that differs between PowerPoint and Google Slides.
 
 ## Acceptance test
 
-The highlighted relationship and outliers remain identifiable when labels are
-hidden, and every displayed label maps to the correct observation.
+The highlighted relationship and outliers remain identifiable when labels are hidden, and every displayed label maps to the correct observation.

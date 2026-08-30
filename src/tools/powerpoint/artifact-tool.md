@@ -1,20 +1,12 @@
 # Artifact Tool API
 
-Use `@oai/artifact-tool` when the Codex presentation runtime is available. It is
-the primary local PPTX authoring adapter because it can create editable objects,
-import existing files, inspect stable IDs, render slides, export layout data,
-and write PPTX.
+Use `@oai/artifact-tool` when the Codex presentation runtime is available. It is the primary local PPTX authoring adapter because it can create editable objects, import existing files, inspect stable IDs, render slides, export layout data, and write PPTX.
 
 ## Runtime setup
 
-Load the host-provided workspace dependencies. Use the returned absolute paths
-for Node, Node modules, and rendering binaries. Do not guess or install a second
-runtime. Put builders and intermediate artifacts in a task-specific temporary
-directory.
+Load the host-provided workspace dependencies. Use the returned absolute paths for Node, Node modules, and rendering binaries. Do not guess or install a second runtime. Put builders and intermediate artifacts in a task-specific temporary directory.
 
-For a standalone `.mjs` builder using a bare import, make the host-provided Node
-modules visible from that temporary directory without modifying the dependency
-bundle.
+For a standalone `.mjs` builder using a bare import, make the host-provided Node modules visible from that temporary directory without modifying the dependency bundle.
 
 ```js
 import fs from "node:fs/promises";
@@ -27,8 +19,7 @@ import {
 
 ## Create
 
-Create the presentation with an explicit slide size and implement theme tokens
-before adding slide-local content.
+Create the presentation with an explicit slide size and implement theme tokens before adding slide-local content.
 
 ```js
 const presentation = Presentation.create({
@@ -37,8 +28,7 @@ const presentation = Presentation.create({
 const slide = presentation.slides.add();
 ```
 
-Use native collections for shapes, text, images, tables, and charts. Use
-consistent object names for deterministic inspection and later repairs.
+Use native collections for shapes, text, images, tables, and charts. Use consistent object names for deterministic inspection and later repairs.
 
 ## Import and edit
 
@@ -59,9 +49,7 @@ const inventory = await presentation.inspect({
 });
 ```
 
-Resolve by inspected ID. For reference-template work, preserve masters/layouts,
-duplicate the nearest source slide, and edit inherited objects in place. Do not
-blank text broadly or add new overlays above unused placeholders.
+Resolve by inspected ID. For reference-template work, preserve masters/layouts, duplicate the nearest source slide, and edit inherited objects in place. Do not blank text broadly or add new overlays above unused placeholders.
 
 ## Render during authoring
 
@@ -95,9 +83,7 @@ const pptx = await PresentationFile.exportPptx(presentation);
 await pptx.save(finalPptx);
 ```
 
-The exported file becomes the candidate of record. Re-render that exact PPTX
-through the exported-file path in [rendering](rendering.md); the in-memory render
-does not prove that PPTX serialization preserved every element.
+The exported file becomes the candidate of record. Re-render that exact PPTX through the exported-file path in [rendering](rendering.md); the in-memory render does not prove that PPTX serialization preserved every element.
 
 ## Source templates
 
@@ -111,15 +97,11 @@ When the source PPTX supplies the design:
 - fill or delete every inherited placeholder intentionally;
 - compare the final render to the mapped source pattern.
 
-If the tool cannot preserve a required source structure, stop and report the
-specific unsupported operation. Do not silently replace the source with a
-theme-matched rebuild.
+If the tool cannot preserve a required source structure, stop and report the specific unsupported operation. Do not silently replace the source with a theme-matched rebuild.
 
 ## Notes and provenance
 
-Use the native speaker-notes API when supported. Maintain a `[Sources]` block
-for externally sourced claims and assets. Inspect the exported notes before
-delivery because import/export behavior can differ from visible-slide behavior.
+Use the native speaker-notes API when supported. Maintain a `[Sources]` block for externally sourced claims and assets. Inspect the exported notes before delivery because import/export behavior can differ from visible-slide behavior.
 
 ## Failure boundaries
 
@@ -131,7 +113,4 @@ delivery because import/export behavior can differ from visible-slide behavior.
 
 ## Local API source
 
-The authoritative implementation reference in Codex is the bundled
-Presentations skill's `artifact_tool_docs/API_QUICK_START.md` and
-`artifact_tool_docs/api/API_DOCS.md`. Load those current local files before
-writing a builder rather than relying on examples copied into this repository.
+The authoritative implementation reference in Codex is the bundled Presentations skill's `artifact_tool_docs/API_QUICK_START.md` and `artifact_tool_docs/api/API_DOCS.md`. Load those current local files before writing a builder rather than relying on examples copied into this repository.

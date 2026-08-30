@@ -2,14 +2,11 @@
 
 ## Best for
 
-Composition across categories or time, contribution to a total, and share
-shifts with a stable category set.
+Composition across categories or time, contribution to a total, and share shifts with a stable category set.
 
 ## Data contract
 
-Each stack must reconcile to its total. Declare absolute versus percentage
-mode, segment order, treatment of negative values, and the threshold for any
-grouped `Other` category.
+Each stack must reconcile to its total. Declare absolute versus percentage mode, segment order, treatment of negative values, and the threshold for any grouped `Other` category.
 
 ## Construction
 
@@ -23,17 +20,12 @@ grouped `Other` category.
 
 ## Platform mapping
 
-Map series order and stack mode explicitly; do not trust application defaults.
-Read back totals and category order. Verify that percentage charts normalize
-correctly and that labels do not disappear or move after conversion.
+Map series order and stack mode explicitly; do not trust application defaults. Read back totals and category order. Verify that percentage charts normalize correctly and that labels do not disappear or move after conversion.
 
 ## Failure modes
 
-Comparing many middle segments, inconsistent series order, irregular time in an
-area chart, too many colors, narrow segments with unreadable labels, and totals
-that do not reconcile.
+Comparing many middle segments, inconsistent series order, irregular time in an area chart, too many colors, narrow segments with unreadable labels, and totals that do not reconcile.
 
 ## Acceptance test
 
-Each total or 100% stack reconciles after rounding, and the composition change
-supporting the title can be found without consulting a legend repeatedly.
+Each total or 100% stack reconciles after rounding, and the composition change supporting the title can be found without consulting a legend repeatedly.

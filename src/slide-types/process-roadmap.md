@@ -2,17 +2,13 @@
 
 ## Use when
 
-The claim depends on sequence, phases, workstreams, handoffs, milestones, or an
-operating flow.
+The claim depends on sequence, phases, workstreams, handoffs, milestones, or an operating flow.
 
-Use an action plan when named accountability and near-term commitments are the
-main message. Use decomposition when the relationship is hierarchical rather
-than temporal.
+Use an action plan when named accountability and near-term commitments are the main message. Use decomposition when the relationship is hierarchical rather than temporal.
 
 ## Narrative contract
 
-The audience should understand order, dependencies, ownership, milestones,
-and what changes between stages.
+The audience should understand order, dependencies, ownership, milestones, and what changes between stages.
 
 ## Content contract
 
@@ -25,12 +21,9 @@ and what changes between stages.
 
 ## Layout
 
-Use horizontal flow for time and sequence. Use vertical lanes for governance,
-ownership, or parallel workstreams. Align gates to the time axis and keep a
-single direction of travel.
+Use horizontal flow for time and sequence. Use vertical lanes for governance, ownership, or parallel workstreams. Align gates to the time axis and keep a single direction of travel.
 
-If distances encode duration, make them proportional and label the scale. If
-the flow is schematic, say so. Put task-level workplans in the appendix.
+If distances encode duration, make them proportional and label the scale. If the flow is schematic, say so. Put task-level workplans in the appendix.
 
 ## Visual rules
 
@@ -61,5 +54,4 @@ the flow is schematic, say so. Put task-level workplans in the appendix.
 
 ## Acceptance test
 
-Trace the flow without reading body copy. The order, current state, material
-handoffs, and final outcome should remain clear.
+Trace the flow without reading body copy. The order, current state, material handoffs, and final outcome should remain clear.

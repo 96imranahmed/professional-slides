@@ -2,16 +2,13 @@
 
 ## Use when
 
-A quantitative pattern is the strongest proof of the slide's claim: magnitude,
-trend, composition, change, distribution, or relationship.
+A quantitative pattern is the strongest proof of the slide's claim: magnitude, trend, composition, change, distribution, or relationship.
 
-Do not use a chart when exact lookup, ordered steps, or a qualitative causal
-structure is the real task.
+Do not use a chart when exact lookup, ordered steps, or a qualitative causal structure is the real task.
 
 ## Narrative contract
 
-The audience should see the pattern quickly, understand measure and scope, and
-know why it changes the decision.
+The audience should see the pattern quickly, understand measure and scope, and know why it changes the decision.
 
 ## Content contract
 
@@ -29,8 +26,7 @@ know why it changes the decision.
 - source sits in the consistent footer zone;
 - legends and annotations stay inside defined chart bounds.
 
-Use full width when the chart is self-explanatory. Use a takeaway rail when the
-audience needs drivers, implications, or decision context.
+Use full width when the chart is self-explanatory. Use a takeaway rail when the audience needs drivers, implications, or decision context.
 
 ## Visual rules
 
@@ -60,6 +56,4 @@ audience needs drivers, implications, or decision context.
 
 ## Acceptance test
 
-Cover the title: the visual pattern should be visible. Cover the chart: the
-title should state the conclusion. Reveal both: they should prove the same
-claim.
+Cover the title: the visual pattern should be visible. Cover the chart: the title should state the conclusion. Reveal both: they should prove the same claim.

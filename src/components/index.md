@@ -1,20 +1,14 @@
 # Cross-Page Components
 
-This directory owns recurring components that appear across slides. Visual
-tokens and layout anchors belong to [`design/`](../design/index.md); tables
-and chart legends belong to [`charts/`](../charts/index.md); slide-specific
-compositions belong to [`slide-types/`](../slide-types/index.md).
+This directory owns recurring components that appear across slides. Visual tokens and layout anchors belong to [`design/`](../design/index.md); tables and chart legends belong to [`charts/`](../charts/index.md); slide-specific compositions belong to [`slide-types/`](../slide-types/index.md).
 
-Implement recurring components through themes, masters, and layouts instead of
-copying them slide by slide. They should remain secondary to the slide's claim.
+Implement recurring components through themes, masters, and layouts instead of copying them slide by slide. They should remain secondary to the slide's claim.
 
 ## Action-title block
 
-Use a fixed anchor, maximum width, line count, and text role across analytical
-slides. The title states the insight; do not add a redundant topic label.
+Use a fixed anchor, maximum width, line count, and text role across analytical slides. The title states the insight; do not add a redundant topic label.
 
-An optional kicker may identify the chapter. An optional subtitle may state
-metric, scope, unit, or period. Neither should compete with the conclusion.
+An optional kicker may identify the chapter. An optional subtitle may state metric, scope, unit, or period. Neither should compete with the conclusion.
 
 ## Trackers and navigation
 
@@ -25,30 +19,19 @@ Use one tracker system for decks with three or more meaningful chapters:
 - **Section tab:** compact fixed-corner label for long chapter names.
 - **Numbered tracker:** chapter numbers when numbering aids comprehension.
 
-Keep navigation outside the content zone, use stable chapter labels, and hide
-it on title or divider slides unless the approved theme keeps it. Never imply
-completion when the component only indicates position.
+Keep navigation outside the content zone, use stable chapter labels, and hide it on title or divider slides unless the approved theme keeps it. Never imply completion when the component only indicates position.
 
-The tracker is a cross-page state component. Define its chapter labels, order,
-active state, inactive state, completed state when genuinely meaningful, and
-visibility by slide type once. Bind every slide to the same chapter map rather
-than drawing or relabeling the tracker locally. Validate tracker state after
-slides or chapters are inserted, removed, or reordered.
+The tracker is a cross-page state component. Define its chapter labels, order, active state, inactive state, completed state when genuinely meaningful, and visibility by slide type once. Bind every slide to the same chapter map rather than drawing or relabeling the tracker locally. Validate tracker state after slides or chapters are inserted, removed, or reordered.
 
 ## Section dividers and agenda
 
-A divider marks a real chapter boundary with the same number and label used by
-navigation. Keep it sparse: chapter title plus at most one setup sentence.
+A divider marks a real chapter boundary with the same number and label used by navigation. Keep it sparse: chapter title plus at most one setup sentence.
 
-Use an agenda only when deck length or delivery context makes navigation
-valuable. Limit it to the real narrative chapters; never preserve template
-indexes, unused sections, or authoring instructions.
+Use an agenda only when deck length or delivery context makes navigation valuable. Limit it to the real narrative chapters; never preserve template indexes, unused sections, or authoring instructions.
 
 ## Footer and page metadata
 
-Define fixed positions and visibility rules for page number, confidentiality,
-date/version, project label, and source. Keep them visually secondary and omit
-empty placeholders. Do not repeat the deck title unless it adds navigation.
+Define fixed positions and visibility rules for page number, confidentiality, date/version, project label, and source. Keep them visually secondary and omit empty placeholders. Do not repeat the deck title unless it adds navigation.
 
 ## Sources
 
@@ -56,8 +39,7 @@ Show a concise readable source line in the footer safe zone:
 
 > Source: Organization; dataset or report; period. Note: material caveat.
 
-Use semicolon-separated entries or numbered markers for multiple sources.
-Speaker notes or the source ledger should retain:
+Use semicolon-separated entries or numbered markers for multiple sources. Speaker notes or the source ledger should retain:
 
 - full citation and URL or file;
 - retrieval date;
@@ -77,19 +59,13 @@ Use one grammar across the deck:
 - decision: approval or choice required;
 - milestone: dated or gated event.
 
-Prefer proximity and a short leader line to heavy boxes. Do not use detached
-labels, speech bubbles, or decorative stickers unless required by the source
-theme.
+Prefer proximity and a short leader line to heavy boxes. Do not use detached labels, speech bubbles, or decorative stickers unless required by the source theme.
 
 ## Appendix and brand slots
 
-Appendix pages continue the numbering system or use an explicit appendix
-scheme, preserve sources, and use descriptive titles. Cross-reference them from
-the main story, but do not move essential proof out of the core deck.
+Appendix pages continue the numbering system or use an explicit appendix scheme, preserve sources, and use descriptive titles. Cross-reference them from the main story, but do not move essential proof out of the core deck.
 
-Define logo and organization-name slots in the master. Use only authorized
-assets. Leave an unavailable logo slot empty rather than creating a pseudo-logo
-or retaining source-template branding.
+Define logo and organization-name slots in the master. Use only authorized assets. Leave an unavailable logo slot empty rather than creating a pseudo-logo or retaining source-template branding.
 
 ## Acceptance checks
 

@@ -2,16 +2,13 @@
 
 ## Use when
 
-The deck must conclude with a decision, translate analysis into initiatives,
-or secure commitment on owners, timing, value, and risk.
+The deck must conclude with a decision, translate analysis into initiatives, or secure commitment on owners, timing, value, and risk.
 
-Use executive synthesis earlier in a deck when the goal is to summarize the
-answer rather than operationalize it.
+Use executive synthesis earlier in a deck when the goal is to summarize the answer rather than operationalize it.
 
 ## Narrative contract
 
-The audience should know what is recommended, why now, who owns each action,
-when it happens, what value it creates, and what decision is required.
+The audience should know what is recommended, why now, who owns each action, when it happens, what value it creates, and what decision is required.
 
 ## Content contract
 
@@ -24,10 +21,7 @@ when it happens, what value it creates, and what decision is required.
 
 ## Layout
 
-Choose a table for precise accountability, a roadmap for temporal dependency,
-or a recommendation/rationale/risk composition for a single decision. Order
-actions by sequence or value, not alphabetically. Keep the decision ask in a
-distinct closing zone integrated with the page.
+Choose a table for precise accountability, a roadmap for temporal dependency, or a recommendation/rationale/risk composition for a single decision. Order actions by sequence or value, not alphabetically. Keep the decision ask in a distinct closing zone integrated with the page.
 
 ## Visual rules
 
@@ -57,5 +51,4 @@ distinct closing zone integrated with the page.
 
 ## Acceptance test
 
-Ask a decision-maker to state the approval, owner, first milestone, and timing
-after a ten-second scan. Any missing answer is a content failure.
+Ask a decision-maker to state the approval, owner, first milestone, and timing after a ten-second scan. Any missing answer is a content failure.

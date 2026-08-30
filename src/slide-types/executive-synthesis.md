@@ -10,8 +10,7 @@ Do not use it as an agenda or a collection of titles copied from later slides.
 
 ## Narrative contract
 
-The audience should understand the answer, the two to four reasons it is true,
-and the action or implication without reading the rest of the deck.
+The audience should understand the answer, the two to four reasons it is true, and the action or implication without reading the rest of the deck.
 
 ## Content contract
 
@@ -21,8 +20,7 @@ and the action or implication without reading the rest of the deck.
 - implication or decision for each branch when useful;
 - one explicit overall decision or next step.
 
-If the support branches are not collectively sufficient, the page is not an
-executive synthesis.
+If the support branches are not collectively sufficient, the page is not an executive synthesis.
 
 ## Layout
 
@@ -31,8 +29,7 @@ executive synthesis.
 - two to four aligned rows or columns in the body;
 - decision/next-step statement at the bottom or right.
 
-Use rows for sequential or causal logic and columns for parallel branches. Keep
-unit widths equal unless one branch is explicitly dominant.
+Use rows for sequential or causal logic and columns for parallel branches. Keep unit widths equal unless one branch is explicitly dominant.
 
 ## Visual rules
 
@@ -60,5 +57,4 @@ unit widths equal unless one branch is explicitly dominant.
 
 ## Acceptance test
 
-Hide the rest of the deck. A decision-maker should be able to state the answer,
-reasons, and action from this page alone.
+Hide the rest of the deck. A decision-maker should be able to state the answer, reasons, and action from this page alone.

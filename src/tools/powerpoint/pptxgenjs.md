@@ -1,32 +1,22 @@
 # PptxGenJS API
 
-Use [`pptxgenjs`](https://www.npmjs.com/package/pptxgenjs) for portable
-JavaScript creation of a new PowerPoint when the host exposes the package and
-does not require the Codex-native Artifact Tool route. The npm package name is
-`pptxgenjs`; do not use the misspelled `pptxgenjse` package name.
+Use [`pptxgenjs`](https://www.npmjs.com/package/pptxgenjs) for portable JavaScript creation of a new PowerPoint when the host exposes the package and does not require the Codex-native Artifact Tool route. The npm package name is `pptxgenjs`; do not use the misspelled `pptxgenjse` package name.
 
-PptxGenJS is a generation adapter, not a visual validator. A successful
-`writeFile` call proves only that bytes were written. Render and inspect the
-exact saved PPTX through [the PowerPoint QA path](rendering.md).
+PptxGenJS is a generation adapter, not a visual validator. A successful `writeFile` call proves only that bytes were written. Render and inspect the exact saved PPTX through [the PowerPoint QA path](rendering.md).
 
 ## Capability gate
 
-Resolve the host-provided Node runtime and dependency location before coding.
-Do not silently install a different package version during a deck run. Confirm:
+Resolve the host-provided Node runtime and dependency location before coding. Do not silently install a different package version during a deck run. Confirm:
 
 ```bash
 "$RUNTIME_NODE" -e "const p=require('pptxgenjs/package.json'); console.log(p.name, p.version)"
 ```
 
-Use this route for new decks. Do not claim fidelity when editing an existing
-template unless the available PptxGenJS workflow demonstrably preserves its
-theme, masters, layouts, notes, charts, links, and object editability. Prefer an
-import-aware adapter for template surgery.
+Use this route for new decks. Do not claim fidelity when editing an existing template unless the available PptxGenJS workflow demonstrably preserves its theme, masters, layouts, notes, charts, links, and object editability. Prefer an import-aware adapter for template surgery.
 
 ## Create the presentation
 
-Create a fresh instance per deck, select 16:9 explicitly, set document
-metadata, and centralize theme tokens before adding slides:
+Create a fresh instance per deck, select 16:9 explicitly, set document metadata, and centralize theme tokens before adding slides:
 
 ```js
 import PptxGenJS from "pptxgenjs";
@@ -45,13 +35,11 @@ pptx.theme = {
 };
 ```
 
-Keep all dimensions in inches. Use the active theme specification for colors,
-type roles, margins, grid, and recurring components.
+Keep all dimensions in inches. Use the active theme specification for colors, type roles, margins, grid, and recurring components.
 
 ## Define masters and placeholders
 
-Put recurring title rules, footer furniture, confidentiality text, and page
-numbers on a slide master instead of duplicating them on every slide:
+Put recurring title rules, footer furniture, confidentiality text, and page numbers on a slide master instead of duplicating them on every slide:
 
 ```js
 pptx.defineSlideMaster({
@@ -83,8 +71,7 @@ slide.addText("The diligence case remains attractive but unproven", {
 });
 ```
 
-Do not rely on `fit: "shrink"` to rescue unsuitable copy. Shorten the action
-title or change the composition before allowing material font reduction.
+Do not rely on `fit: "shrink"` to rescue unsuitable copy. Shorten the action title or change the composition before allowing material font reduction.
 
 ## Add editable objects
 
@@ -116,8 +103,7 @@ slide.addTable(
 );
 ```
 
-Use `addChart` only with reconciled data that satisfies the selected chart
-contract. Keep units, period, scale, labels, forecast state, and source aligned:
+Use `addChart` only with reconciled data that satisfies the selected chart contract. Keep units, period, scale, labels, forecast state, and source aligned:
 
 ```js
 const adoption = diligenceEvidence.productAdoption;
@@ -138,13 +124,11 @@ slide.addChart(
 );
 ```
 
-The chart adapter must also render `adoption.unit`, period, and
-`adoption.source` in the chart furniture or slide source block.
+The chart adapter must also render `adoption.unit`, period, and `adoption.source` in the chart furniture or slide source block.
 
 ## Add source notes
 
-Put a concise source line on the slide and a complete `[Sources]` block in
-speaker notes:
+Put a concise source line on the slide and a complete `[Sources]` block in speaker notes:
 
 ```js
 slide.addText("Source: Hugging Face Hub documentation; retrieved 2026-08-29", {
@@ -161,9 +145,7 @@ Verified public fact. Transaction implications are analytical hypotheses.`);
 
 ## Write the candidate
 
-Await the file write and record the returned filename. Use `write` instead
-when the host needs an in-memory `nodebuffer`, `uint8array`, or other supported
-transport:
+Await the file write and record the returned filename. Use `write` instead when the host needs an in-memory `nodebuffer`, `uint8array`, or other supported transport:
 
 ```js
 const written = await pptx.writeFile({
@@ -177,18 +159,11 @@ const bytes = await pptx.write({
 });
 ```
 
-Do not emit both forms unless the workflow needs both. The saved file becomes
-the candidate of record; compute its hash, render every slide from that file,
-run overflow checks, inspect full-size slides and the montage, repair the
-builder, and regenerate the complete candidate.
+Do not emit both forms unless the workflow needs both. The saved file becomes the candidate of record; compute its hash, render every slide from that file, run overflow checks, inspect full-size slides and the montage, repair the builder, and regenerate the complete candidate.
 
 ## Native Google Slides handoff
 
-For a dual-format new deck, first finish and verify the PPTX. Then import that
-exact file with native conversion enabled, read back the native presentation,
-export it to PDF, and inspect every Google-rendered page. Record font, wrap,
-table, line, chart, and source-note differences; fix material defects in the
-appropriate platform instead of assuming import parity.
+For a dual-format new deck, first finish and verify the PPTX. Then import that exact file with native conversion enabled, read back the native presentation, export it to PDF, and inspect every Google-rendered page. Record font, wrap, table, line, chart, and source-note differences; fix material defects in the appropriate platform instead of assuming import parity.
 
 ## Official references
 

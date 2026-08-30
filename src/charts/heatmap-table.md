@@ -2,13 +2,11 @@
 
 ## Best for
 
-Patterns across two categorical dimensions, assessments, capability gaps,
-risks, priorities, schedule intensity, and exact values with selective emphasis.
+Patterns across two categorical dimensions, assessments, capability gaps, risks, priorities, schedule intensity, and exact values with selective emphasis.
 
 ## Data contract
 
-Row and column categories, numeric or ordinal cell values, missing-value state,
-scale domain, midpoint if meaningful, sort order, units, and label precision.
+Row and column categories, numeric or ordinal cell values, missing-value state, scale domain, midpoint if meaningful, sort order, units, and label precision.
 
 ## Construction
 
@@ -22,18 +20,12 @@ scale domain, midpoint if meaningful, sort order, units, and label precision.
 
 ## Platform mapping
 
-Prefer editable cell shapes or tables with tokenized fills when native heatmap
-support is weak. Generate colors from the declared domain, not row-relative
-defaults. Render in both targets to verify contrast, text color, cell padding,
-and missing-value treatment.
+Prefer editable cell shapes or tables with tokenized fills when native heatmap support is weak. Generate colors from the declared domain, not row-relative defaults. Render in both targets to verify contrast, text color, cell padding, and missing-value treatment.
 
 ## Failure modes
 
-Rainbow scales, red/green-only meaning, an arbitrary midpoint, row-relative
-coloring presented as absolute, excessive precision, and differences too subtle
-for projection or export.
+Rainbow scales, red/green-only meaning, an arbitrary midpoint, row-relative coloring presented as absolute, excessive precision, and differences too subtle for projection or export.
 
 ## Acceptance test
 
-The same high/low pattern remains visible in grayscale or with redundant
-labels, and the legend reproduces every cell color from its value.
+The same high/low pattern remains visible in grayscale or with redundant labels, and the legend reproduces every cell color from its value.

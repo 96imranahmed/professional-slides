@@ -6,14 +6,11 @@
 - showing an issue, hypothesis, value-driver, or capability tree;
 - explaining root causes, system layers, or decision branches.
 
-Use a comparison matrix instead when two independent dimensions define the
-space. Use a process when order, not hierarchy, is the primary meaning.
+Use a comparison matrix instead when two independent dimensions define the space. Use a process when order, not hierarchy, is the primary meaning.
 
 ## Narrative contract
 
-The audience should see how the whole breaks into parts, why the highlighted
-branch matters, and whether the structure is exhaustive or intentionally
-partial.
+The audience should see how the whole breaks into parts, why the highlighted branch matters, and whether the structure is exhaustive or intentionally partial.
 
 ## Content contract
 
@@ -24,8 +21,7 @@ partial.
 - evidence or status adjacent to relevant branches;
 - an explicit highlighted path tied to the title.
 
-Document the decomposition rule. Siblings must not mix categories such as
-causes, actions, and owners.
+Document the decomposition rule. Siblings must not mix categories such as causes, actions, and owners.
 
 ## Layout
 
@@ -64,5 +60,4 @@ Maintain consistent spacing by depth and align siblings to the grid.
 
 ## Acceptance test
 
-Remove the visual styling and read the labels. The logic should remain coherent,
-and the highlighted branch should directly support the action title.
+Remove the visual styling and read the labels. The logic should remain coherent, and the highlighted branch should directly support the action title.
