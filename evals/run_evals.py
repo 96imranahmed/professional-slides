@@ -13,7 +13,14 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 CASES_PATH = ROOT / "cases.json"
-INDEX_PATH = ROOT / "index.md"
+INDEX_PATH = (
+    ROOT.parent
+    / "skills"
+    / "professional-slides"
+    / "references"
+    / "evaluation"
+    / "index.md"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -24,6 +31,35 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{path}: top-level value must be an object")
     return value
+
+
+def resolve_contained_path(root: Path, raw_path: Any, label: str, errors: list[str]) -> Path | None:
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        errors.append(f"{label} must be a non-empty relative path")
+        return None
+    relative = Path(raw_path)
+    if relative.is_absolute():
+        errors.append(f"{label} must be relative")
+        return None
+    root = root.resolve()
+    candidate = (root / relative).resolve()
+    if candidate != root and root not in candidate.parents:
+        errors.append(f"{label} escapes its allowed root")
+        return None
+    return candidate
+
+
+def require_material_file(root: Path, raw_path: Any, label: str, errors: list[str]) -> Path | None:
+    candidate = resolve_contained_path(root, raw_path, label, errors)
+    if candidate is None:
+        return None
+    if not candidate.is_file():
+        errors.append(f"{label} does not exist as a file: {raw_path}")
+        return None
+    if candidate.stat().st_size < 1:
+        errors.append(f"{label} is empty: {raw_path}")
+        return None
+    return candidate
 
 
 def validate_cases(document: dict[str, Any]) -> list[str]:
@@ -288,7 +324,73 @@ def unresolved_slop_findings(result: dict[str, Any]) -> list[str]:
     return findings
 
 
-def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], mode: str) -> tuple[list[str], dict[str, Any]]:
+def validate_evidence_files(results_document: dict[str, Any], repo_root: Path) -> list[str]:
+    """Verify that declared evidence exists inside the fresh evaluation workspace."""
+
+    errors: list[str] = []
+    preparation = results_document.get("runPreparation")
+    if not isinstance(preparation, dict):
+        return errors
+    workspace = resolve_contained_path(
+        repo_root, preparation.get("workspacePath"), "runPreparation.workspacePath", errors
+    )
+    if workspace is None:
+        return errors
+    if not workspace.is_dir():
+        errors.append("runPreparation.workspacePath does not exist as a directory")
+        return errors
+
+    manifest_path = require_material_file(
+        repo_root, preparation.get("manifestPath"), "runPreparation.manifestPath", errors
+    )
+    if manifest_path is None:
+        return errors
+    if manifest_path.parent != workspace:
+        errors.append("runPreparation.manifestPath must be directly inside the run workspace")
+    try:
+        manifest = load_json(manifest_path)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return errors
+
+    for key in ("runId", "workspacePath", "outputPath", "outputResetComplete", "priorEvalArtifactsReused"):
+        expected = results_document.get("runId") if key == "runId" else preparation.get(key)
+        if manifest.get(key) != expected:
+            errors.append(f"run manifest {key} does not match the result document")
+    package_hash = manifest.get("inputHashes", {}).get("skillPackage")
+    if not isinstance(package_hash, str) or len(package_hash) != 64:
+        errors.append("run manifest inputHashes.skillPackage must be a SHA-256 hex digest")
+
+    results = results_document.get("results")
+    if not isinstance(results, list):
+        return errors
+    for index, result in enumerate(results):
+        if not isinstance(result, dict):
+            continue
+        label = f"results[{index}]"
+        for key in ("artifactPaths", "renderPaths"):
+            values = result.get(key)
+            if isinstance(values, list):
+                for path_index, raw_path in enumerate(values):
+                    require_material_file(workspace, raw_path, f"{label}.{key}[{path_index}]", errors)
+        if result.get("arm") not in {"self", "treatment"}:
+            continue
+        pre_authoring = result.get("preAuthoringReview")
+        if isinstance(pre_authoring, dict):
+            for key in ("contractPath", "validatorOutputPath"):
+                require_material_file(
+                    workspace, pre_authoring.get(key), f"{label}.preAuthoringReview.{key}", errors
+                )
+    return errors
+
+
+def evaluate(
+    cases_document: dict[str, Any],
+    results_document: dict[str, Any],
+    mode: str,
+    *,
+    evidence_root: Path | None = None,
+) -> tuple[list[str], dict[str, Any]]:
     errors = validate_cases(cases_document)
     if errors:
         return errors, {"passed": False}
@@ -306,6 +408,17 @@ def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], m
         errors.append("runId must be a non-empty string")
     if not isinstance(results_document.get("createdAt"), str) or not results_document["createdAt"].strip():
         errors.append("createdAt must be a non-empty date-time string")
+    run_preparation = results_document.get("runPreparation")
+    if not isinstance(run_preparation, dict):
+        errors.append("runPreparation must be an object")
+    else:
+        for key in ("manifestPath", "workspacePath", "outputPath"):
+            if not isinstance(run_preparation.get(key), str) or not run_preparation[key].strip():
+                errors.append(f"runPreparation.{key} must be a non-empty string")
+        if run_preparation.get("outputResetComplete") is not True:
+            errors.append("runPreparation.outputResetComplete must be true")
+        if run_preparation.get("priorEvalArtifactsReused") is not False:
+            errors.append("runPreparation.priorEvalArtifactsReused must be false")
     skipped_items = results_document.get("skippedCases", [])
     skipped_ids: set[str] = set()
     if not isinstance(skipped_items, list):
@@ -334,6 +447,8 @@ def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], m
             errors.append(f"results[{index}] must be an object")
         else:
             errors.extend(validate_result(result, dimensions, allowed_failures, allowed_major_defects, enabled_ids))
+    if evidence_root is not None:
+        errors.extend(validate_evidence_files(results_document, evidence_root))
     if errors:
         return errors, {"passed": False}
 
@@ -525,7 +640,7 @@ def main() -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
-    errors, report = evaluate(cases, results, args.mode)
+    errors, report = evaluate(cases, results, args.mode, evidence_root=ROOT.parent)
     if errors:
         report["errors"] = errors
     output = json.dumps(report, indent=2, sort_keys=True)
