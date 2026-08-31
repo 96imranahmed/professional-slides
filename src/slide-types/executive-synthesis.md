@@ -10,6 +10,8 @@ Do not use it as an agenda or a collection of titles copied from later slides.
 
 For every multi-chapter decision deck, create one standalone executive synthesis immediately after the cover and before the contents tracker. Do not imply the summary through a recommendation on another page, distribute it across chapter conclusions, or omit it because the action titles appear answer-first.
 
+The rendered page must identify itself with the visible structural label **Executive summary** or an explicitly approved local-language equivalent. A strong answer-first title, filename, speaker note, or storyboard label does not make the page visibly discoverable as the executive summary. Keep this structural label quiet but persistent at the registered section-label anchor.
+
 ## Narrative contract
 
 The audience should understand the answer, the two to four reasons it is true, and the action or implication without reading the rest of the deck.
@@ -80,10 +82,10 @@ The following HTML is a structural guide for the default answer-spine design. It
 .exec-summary__row h2, .exec-summary__row p { margin: 0; }
 .exec-summary__row h2 { font: var(--type-section-heading); }
 .exec-summary__row p { font: var(--type-body); }
-.exec-summary__decision { display: grid; place-items: center; padding: var(--space-3) var(--space-4); background: var(--surface-callout); border-inline-start: var(--rule-accent); font: var(--type-callout); text-align: center; }
+.exec-summary__decision { display: grid; place-items: center; padding: var(--space-3) var(--space-4); background: var(--surface-action); border: 0; font: var(--type-callout); text-align: center; }
 ```
 
-If the active slide family does not use a filled decision strip, substitute its named rule-separated, edge-accented, or typographic implication treatment. The hierarchy and geometry remain the same.
+If the active slide family does not use a filled decision strip, substitute its named rule-separated or typographic action treatment. The hierarchy and geometry remain the same. Never add a left-hand stripe, edge marker, or tab to the decision surface.
 
 ## Visual rules
 
@@ -116,4 +118,4 @@ Do not combine the variants. A page with a headline strip, four boxed branches, 
 
 ## Acceptance test
 
-Hide the rest of the deck. A decision-maker should be able to identify this as the standalone early executive summary and state the answer, the two to four sufficient reasons, the proof behind each reason, and the required action from this page alone. Then remove each branch in turn: every retained branch must weaken the governing answer when removed, and no branch may merely preview a later slide title.
+Hide the rest of the deck. A decision-maker should be able to identify this as the standalone early executive summary from the rendered page itself and state the answer, the two to four sufficient reasons, the proof behind each reason, and the required action from this page alone. Then remove each branch in turn: every retained branch must weaken the governing answer when removed, and no branch may merely preview a later slide title.

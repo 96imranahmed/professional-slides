@@ -10,6 +10,10 @@ Implement recurring components through themes, masters, and layouts instead of c
 - Read [`text-box.md`](text-box.md) for text-container geometry, margins, wrapping, bullets, overflow, and platform-neutral container QA.
 - Read [`guidelines.md`](guidelines.md) for boxing, open layouts, highlighted section headers, component lines, panels, action sections, and named treatment variants.
 - Read [`trackers/`](trackers/index.md) for tracker-system selection, contents and heading pages, subsection states, running labels, visual guides, and navigation QA.
+- Read [`metric-fields.md`](metric-fields.md) for open and banded one-to-three-metric compositions.
+- Read [`icons-and-logos.md`](icons-and-logos.md) for entity logos, inline icons, category systems, and fallback marks.
+- Read [`comparison-indicators.md`](comparison-indicators.md) for progress circles, completeness markers, and one-to-five score cells.
+- Read [`chart-callouts.md`](chart-callouts.md) for growth-rate, threshold, outlier, and key-observation annotations attached to quantitative evidence.
 - Continue in this index for cover and title slides, action-title blocks, sequential reveals, footers, sources, annotations, appendix behavior, and brand slots.
 
 ## Cover and title slide
@@ -27,6 +31,8 @@ Omit the tracker, page number, source line, continuation marker, and analytical 
 ## Action-title block
 
 Bind every analytical action-title block to the exact deck-level title anchor defined by [`design`](../design/index.md#canvas-guides-and-grid), with the same top-left starting point on every slide. One-line and two-line states start at identical coordinates; never shift an individual title to balance the content below it. Apply one maximum width, approved line-count variants, and one text role across analytical slides, then follow the action-title wording contract in [`copy`](copy.md#action-title-wording).
+
+Implement the analytical header as one named slide-family template, master, layout, or reusable grouped component rather than creating tracker labels and titles as independent slide-local text boxes. The untracked template requires the `action-title` slot. The tracked analytical-header template requires both a `tracker-label` slot populated from the active tracker record and an `action-title` slot populated from the approved title spine; [`design`](../design/index.md#canvas-guides-and-grid) owns their exact anchors and [`trackers`](trackers/index.md#shared-tracker-contract) owns the label value. Declare the first and last governed slide before authoring, then instantiate both required fields on every ordinary analytical slide in that range. Cover, contents, full-state transition, sparse chapter, closing, and appendix variants may use separate named header templates with explicit visibility rules; they must not create silent one-slide omissions inside the analytical range.
 
 Prefer the approved one-line state and keep the registered title font size unchanged. When the title cannot remain faithful and readable on one line, use the approved two-line state: preserve the title's type role and top anchor, increase the block height, then move the title separator and every dependent content-top anchor down by the same resolved amount. Do not let the second line collide with a fixed guideline or analytical canvas.
 
@@ -63,6 +69,8 @@ Use at most one visually distinct callout region on a slide. This single budget 
 
 In an executive due-diligence pre-read, do not reduce the callout to a sparse slogan that repeats the title. Use the available region to connect the finding to the decision: state the governing conclusion and the material condition, evidence gap, stop trigger, or next test that follows from it. One or two compact sentences are normally sufficient. Keep the region concise enough to remain subordinate to the evidence, but complete enough to stand alone when an investment committee scans the page.
 
+Begin the callout or terminal-action surface with its substantive sentence. Do not prepend `IC conclusion`, `recommendation`, `implication`, `decision`, `key takeaway`, `important observation`, or another role label, and do not reserve a decorative label column for it. Retain a small label only when it identifies an indispensable data, navigation, scenario, timing, or accountability field that the audience must distinguish from a peer field.
+
 A call to action, recommendation, or decision strip uses the deck's shared action surface without a left-hand stripe, edge marker, tab, or ornamental accent. Emphasis comes from the continuous field, centered statement, contrast, and spacing. An edge-accented treatment may remain available for a theme-defined implication or annotation, but it must not be reused on the action component.
 
 Use one grammar across the deck:
@@ -86,6 +94,7 @@ Define logo and organization-name slots in the master. Use only authorized asset
 - specialized copy, text-box, section-treatment, and tracker components pass the acceptance check in their linked owner exactly once;
 - the cover contains only necessary document-identification content and has no analytical panel, decorative strapline, ornamental divider, repeated metadata, or default tracker;
 - each slide has no more than one visually distinct callout region, no more than one terminal action surface, and does not stack implication, recommendation, decision, call-to-action, caveat, warning, next-step, or data-request treatments;
+- no callout or terminal-action surface carries a redundant role label, eyebrow, kicker, badge, tab, colon prefix, or reserved label column;
 - sequential-reveal slides preserve fixed anchors and use coherent continuation states;
 - footer and source areas do not collide with content;
 - title and appendix visibility rules are respected; every analytical action title starts at the same deck-level top-left anchor, keeps the registered font size, avoids orphaned second-line words, and moves only the separator and dependent content anchors when the approved two-line state is required;

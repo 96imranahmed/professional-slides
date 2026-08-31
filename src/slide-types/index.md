@@ -32,6 +32,19 @@ Choose exactly one of these after selecting the narrative archetype:
 
 A section may be decomposed once into comparable child panels under the [nested-section contract](evidence-compositions.md#nested-section-decomposition). Do not create a new archetype for a chart count, grid, rail, map, table, or source-template silhouette.
 
+## Specialized composition profiles
+
+These profiles provide additional geometry for recurring page forms without creating overlapping narrative archetypes. Select the parent archetype first, then read the profile only when its visual job applies.
+
+| Recurring page form | Profile | Parent archetype boundary |
+| --- | --- | --- |
+| one to three headline values | [Metric page](metric-page.md) | normally `chart-led insight`; use `executive synthesis` only when the values summarize several branches |
+| three to five icon-led categories | [Category overview](category-overview.md) | inherits `decomposition` when the categories are parts of one whole or `comparison and options` when they are peers being evaluated |
+| entity map with logos, bubbles, or capability bands | [Market landscape](market-landscape.md) | inherits `chart-led insight`, `comparison and options`, or `decomposition` according to the analytical question |
+| milestone, workstream, completeness, and risk status | [Project status](project-status.md) | inherits `process and roadmap`, `comparison and options`, or `recommendation and action plan` according to whether sequence, assessment, or accountability dominates |
+
+Do not treat a specialized profile as permission to add a second action title, second callout, decorative card grid, or unowned colour system. Its complete page still follows one parent narrative contract and one evidence composition.
+
 ## MECE selection tests
 
 - If the exhibit remains the argument after explanatory prose is removed, select `chart-led insight`; if the prose supplies a mechanism or qualification without which the exhibit is incomplete, select `argument with chart`.

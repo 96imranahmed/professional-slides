@@ -30,6 +30,7 @@ def validate_cases(document: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     dimensions = document.get("dimensions")
     failures = document.get("criticalFailures")
+    major_defects = document.get("majorDefects")
     thresholds = document.get("thresholds")
     cases = document.get("cases")
 
@@ -37,6 +38,8 @@ def validate_cases(document: dict[str, Any]) -> list[str]:
         errors.append("dimensions must be a non-empty unique list")
     if not isinstance(failures, list) or len(failures) < 1 or len(set(failures)) != len(failures):
         errors.append("criticalFailures must be a non-empty unique list")
+    if not isinstance(major_defects, list) or len(major_defects) < 1 or len(set(major_defects)) != len(major_defects):
+        errors.append("majorDefects must be a non-empty unique list")
     if not isinstance(thresholds, dict):
         errors.append("thresholds must be an object")
     else:
@@ -46,6 +49,12 @@ def validate_cases(document: dict[str, Any]) -> list[str]:
         regression = thresholds.get("maximumDimensionRegression")
         if not isinstance(regression, (int, float)) or regression < 0:
             errors.append("thresholds.maximumDimensionRegression must be non-negative")
+        minimum_dimension = thresholds.get("minimumDimensionScore")
+        if not isinstance(minimum_dimension, (int, float)) or not 1 <= minimum_dimension <= 5:
+            errors.append("thresholds.minimumDimensionScore must be numeric from 1 to 5")
+        maximum_minor = thresholds.get("maximumMinorDefects")
+        if isinstance(maximum_minor, bool) or not isinstance(maximum_minor, int) or maximum_minor < 0:
+            errors.append("thresholds.maximumMinorDefects must be a non-negative integer")
 
     if not isinstance(cases, list) or not cases:
         errors.append("cases must be a non-empty list")
@@ -82,6 +91,7 @@ def validate_result(
     result: dict[str, Any],
     dimensions: list[str],
     allowed_failures: set[str],
+    allowed_major_defects: set[str],
     valid_case_ids: set[str],
 ) -> list[str]:
     errors: list[str] = []
@@ -90,10 +100,42 @@ def validate_result(
         errors.append(f"unknown caseId: {case_id!r}")
     if result.get("arm") not in {"self", "control", "treatment"}:
         errors.append(f"{case_id}: arm must be self, control, or treatment")
+    arm = result.get("arm")
     for key in ("artifactPaths", "renderPaths"):
         value = result.get(key)
         if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
             errors.append(f"{case_id}: {key} must contain at least one path")
+    pre_authoring = result.get("preAuthoringReview")
+    if arm in {"self", "treatment"}:
+        if not isinstance(pre_authoring, dict):
+            errors.append(f"{case_id}: preAuthoringReview must be an object for {arm}")
+        else:
+            workflow_mode = pre_authoring.get("workflowMode")
+            if workflow_mode not in {"new_deck", "existing_deck_revision"}:
+                errors.append(f"{case_id}: preAuthoringReview.workflowMode is invalid")
+            for key in ("contractPath", "validatorOutputPath"):
+                if not isinstance(pre_authoring.get(key), str) or not pre_authoring[key].strip():
+                    errors.append(f"{case_id}: preAuthoringReview.{key} must be non-empty")
+            if pre_authoring.get("contractValidated") is not True:
+                errors.append(f"{case_id}: preAuthoringReview.contractValidated must be true")
+            if pre_authoring.get("dotDashCoverageVerified") is not True:
+                errors.append(f"{case_id}: preAuthoringReview.dotDashCoverageVerified must be true")
+            expected_stage = {
+                "new_deck": "before_slide_document_creation",
+                "existing_deck_revision": "before_first_mutation",
+            }.get(workflow_mode)
+            if expected_stage is not None and pre_authoring.get("validationStage") != expected_stage:
+                errors.append(
+                    f"{case_id}: preAuthoringReview.validationStage must be {expected_stage} for {workflow_mode}"
+                )
+            disposition = pre_authoring.get("executiveSummaryDisposition")
+            allowed_dispositions = (
+                {"required_present", "present", "not_required"}
+                if workflow_mode == "new_deck"
+                else {"present", "missing_recommended"}
+            )
+            if workflow_mode in {"new_deck", "existing_deck_revision"} and disposition not in allowed_dispositions:
+                errors.append(f"{case_id}: preAuthoringReview.executiveSummaryDisposition is invalid for {workflow_mode}")
     scores = result.get("scores")
     if not isinstance(scores, dict):
         errors.append(f"{case_id}: scores must be an object")
@@ -102,11 +144,127 @@ def validate_result(
             errors.append(f"{case_id}: scores must contain exactly the configured dimensions")
         for dimension in dimensions:
             score = scores.get(dimension)
-            if isinstance(score, bool) or not isinstance(score, int) or not 1 <= score <= 5:
-                errors.append(f"{case_id}: scores.{dimension} must be an integer from 1 to 5")
+            if (
+                isinstance(score, bool)
+                or not isinstance(score, (int, float))
+                or not 1 <= score <= 5
+                or abs(score * 10 - round(score * 10)) > 1e-9
+            ):
+                errors.append(f"{case_id}: scores.{dimension} must be from 1 to 5 in increments of 0.1")
     critical = result.get("criticalFailures")
     if not isinstance(critical, list) or any(item not in allowed_failures for item in critical):
         errors.append(f"{case_id}: criticalFailures contains an invalid value")
+    major = result.get("majorDefects")
+    if not isinstance(major, list) or any(item not in allowed_major_defects for item in major):
+        errors.append(f"{case_id}: majorDefects contains an invalid value")
+    minor = result.get("minorDefects")
+    if not isinstance(minor, list) or not all(isinstance(item, str) and item.strip() for item in minor):
+        errors.append(f"{case_id}: minorDefects must be a list of non-empty strings")
+    anti_slop = result.get("antiSlopReview")
+    if not isinstance(anti_slop, dict):
+        errors.append(f"{case_id}: antiSlopReview must be an object")
+    else:
+        if anti_slop.get("renderedTextInspected") is not True:
+            errors.append(f"{case_id}: antiSlopReview.renderedTextInspected must be true")
+        if anti_slop.get("fullDeckMontageInspected") is not True:
+            errors.append(f"{case_id}: antiSlopReview.fullDeckMontageInspected must be true")
+        expected_slide_count = anti_slop.get("expectedSlideCount")
+        if (
+            isinstance(expected_slide_count, bool)
+            or not isinstance(expected_slide_count, int)
+            or expected_slide_count < 1
+        ):
+            errors.append(f"{case_id}: antiSlopReview.expectedSlideCount must be a positive integer")
+            expected_slide_count = None
+        slide_audits = anti_slop.get("slideAudits")
+        if not isinstance(slide_audits, list):
+            errors.append(f"{case_id}: antiSlopReview.slideAudits must be a list")
+        else:
+            audited_slides: list[int] = []
+            for index, item in enumerate(slide_audits):
+                location = f"{case_id}: antiSlopReview.slideAudits[{index}]"
+                if not isinstance(item, dict):
+                    errors.append(f"{location} must be an object")
+                    continue
+                slide = item.get("slide")
+                if isinstance(slide, bool) or not isinstance(slide, int) or slide < 1:
+                    errors.append(f"{location}.slide must be a positive integer")
+                else:
+                    audited_slides.append(slide)
+                if not isinstance(item.get("narrativeJob"), str) or not item["narrativeJob"].strip():
+                    errors.append(f"{location}.narrativeJob must be non-empty")
+                for key in (
+                    "inspectedAtFullSize",
+                    "deletionTestPassed",
+                    "specificityTestPassed",
+                    "compositionFitPassed",
+                    "visualFinishPassed",
+                ):
+                    if item.get(key) is not True:
+                        errors.append(f"{location}.{key} must be true")
+                observations = item.get("observations")
+                if (
+                    not isinstance(observations, list)
+                    or len(observations) < 2
+                    or not all(isinstance(value, str) and value.strip() for value in observations)
+                ):
+                    errors.append(f"{location}.observations must contain at least two non-empty strings")
+                unresolved = item.get("unresolvedFindings")
+                if not isinstance(unresolved, list) or not all(
+                    isinstance(value, str) and value.strip() for value in unresolved
+                ):
+                    errors.append(f"{location}.unresolvedFindings must be a list of non-empty strings")
+            if expected_slide_count is not None:
+                expected_slides = list(range(1, expected_slide_count + 1))
+                if sorted(audited_slides) != expected_slides:
+                    errors.append(
+                        f"{case_id}: antiSlopReview.slideAudits must cover every slide exactly once "
+                        f"from 1 to expectedSlideCount"
+                    )
+        comparisons = anti_slop.get("benchmarkComparisons")
+        if not isinstance(comparisons, list) or len(comparisons) < 3:
+            errors.append(f"{case_id}: antiSlopReview.benchmarkComparisons must contain at least three comparisons")
+        else:
+            allowed_dimensions = {
+                "navigation",
+                "hierarchy",
+                "exhibit_finish",
+                "table_finish",
+                "density",
+                "typography",
+                "implication_placement",
+            }
+            allowed_dispositions = {"repaired", "no_material_gap"}
+            for index, item in enumerate(comparisons):
+                location = f"{case_id}: antiSlopReview.benchmarkComparisons[{index}]"
+                if not isinstance(item, dict):
+                    errors.append(f"{location} must be an object")
+                    continue
+                if isinstance(item.get("candidateSlide"), bool) or not isinstance(item.get("candidateSlide"), int):
+                    errors.append(f"{location}.candidateSlide must be an integer")
+                for key in ("reference", "observedGap"):
+                    if not isinstance(item.get(key), str) or not item[key].strip():
+                        errors.append(f"{location}.{key} must be non-empty")
+                if item.get("dimension") not in allowed_dimensions:
+                    errors.append(f"{location}.dimension is invalid")
+                if item.get("disposition") not in allowed_dispositions:
+                    errors.append(f"{location}.disposition is invalid")
+        unexplained = anti_slop.get("unexplainedRoleLabels")
+        if not isinstance(unexplained, list) or not all(isinstance(item, str) and item.strip() for item in unexplained):
+            errors.append(f"{case_id}: antiSlopReview.unexplainedRoleLabels must be a list of non-empty strings")
+        retained = anti_slop.get("retainedLabels")
+        if not isinstance(retained, list):
+            errors.append(f"{case_id}: antiSlopReview.retainedLabels must be a list")
+        else:
+            for index, item in enumerate(retained):
+                if not isinstance(item, dict):
+                    errors.append(f"{case_id}: antiSlopReview.retainedLabels[{index}] must be an object")
+                    continue
+                if not isinstance(item.get("slide"), (int, str)) or isinstance(item.get("slide"), bool):
+                    errors.append(f"{case_id}: antiSlopReview.retainedLabels[{index}].slide must identify a slide")
+                for key in ("text", "role", "indispensableDistinction"):
+                    if not isinstance(item.get(key), str) or not item[key].strip():
+                        errors.append(f"{case_id}: antiSlopReview.retainedLabels[{index}].{key} must be non-empty")
     evidence = result.get("evidence")
     if not isinstance(evidence, list) or len(evidence) < len(dimensions):
         errors.append(f"{case_id}: evidence must include at least one observation per dimension")
@@ -123,6 +281,13 @@ def mean(values: list[float]) -> float:
     return sum(values) / len(values)
 
 
+def unresolved_slop_findings(result: dict[str, Any]) -> list[str]:
+    findings: list[str] = []
+    for audit in result["antiSlopReview"]["slideAudits"]:
+        findings.extend(f"Slide {audit['slide']}: {item}" for item in audit["unresolvedFindings"])
+    return findings
+
+
 def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], mode: str) -> tuple[list[str], dict[str, Any]]:
     errors = validate_cases(cases_document)
     if errors:
@@ -130,6 +295,7 @@ def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], m
 
     dimensions = cases_document["dimensions"]
     allowed_failures = set(cases_document["criticalFailures"])
+    allowed_major_defects = set(cases_document["majorDefects"])
     enabled_ids = {case["id"] for case in cases_document["cases"] if case["enabled"]}
     required_fixture_ids = {
         case["id"]
@@ -167,7 +333,7 @@ def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], m
         if not isinstance(result, dict):
             errors.append(f"results[{index}] must be an object")
         else:
-            errors.extend(validate_result(result, dimensions, allowed_failures, enabled_ids))
+            errors.extend(validate_result(result, dimensions, allowed_failures, allowed_major_defects, enabled_ids))
     if errors:
         return errors, {"passed": False}
 
@@ -195,10 +361,29 @@ def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], m
             errors.append("self mode accepts only self results")
         for result in self_results:
             result_score = score(result, dimensions)
-            passed = result_score >= thresholds["selfScoreMinimum"] and not result["criticalFailures"]
+            slop_findings = unresolved_slop_findings(result)
+            dimension_floor_failures = [
+                dimension
+                for dimension in dimensions
+                if result["scores"][dimension] < thresholds["minimumDimensionScore"]
+            ]
+            passed = (
+                result_score >= thresholds["selfScoreMinimum"]
+                and not result["criticalFailures"]
+                and not result["majorDefects"]
+                and len(result["minorDefects"]) <= thresholds["maximumMinorDefects"]
+                and not dimension_floor_failures
+                and not result["antiSlopReview"]["unexplainedRoleLabels"]
+                and not slop_findings
+            )
             report["cases"][result["caseId"]] = {
                 "score": round(result_score, 2),
                 "criticalFailures": result["criticalFailures"],
+                "majorDefects": result["majorDefects"],
+                "minorDefects": result["minorDefects"],
+                "dimensionFloorFailures": dimension_floor_failures,
+                "unexplainedRoleLabels": result["antiSlopReview"]["unexplainedRoleLabels"],
+                "unresolvedSlopFindings": slop_findings,
                 "passed": passed,
             }
         report["passed"] = not errors and bool(self_results) and all(item["passed"] for item in report["cases"].values())
@@ -215,6 +400,11 @@ def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], m
     dimension_control: dict[str, list[float]] = defaultdict(list)
     dimension_treatment: dict[str, list[float]] = defaultdict(list)
     treatment_critical: list[str] = []
+    treatment_major: list[str] = []
+    treatment_minor: list[str] = []
+    treatment_floor_failures: list[str] = []
+    treatment_unexplained_role_labels: list[str] = []
+    treatment_unresolved_slop_findings: list[str] = []
 
     for case_id in sorted(runnable_ids):
         arms = grouped[case_id]
@@ -228,6 +418,19 @@ def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], m
         control_scores.append(control_score)
         treatment_scores.append(treatment_score)
         treatment_critical.extend(f"{case_id}:{failure}" for failure in treatment["criticalFailures"])
+        treatment_major.extend(f"{case_id}:{defect}" for defect in treatment["majorDefects"])
+        treatment_minor.extend(f"{case_id}:{defect}" for defect in treatment["minorDefects"])
+        treatment_floor_failures.extend(
+            f"{case_id}:{dimension}"
+            for dimension in dimensions
+            if treatment["scores"][dimension] < thresholds["minimumDimensionScore"]
+        )
+        treatment_unexplained_role_labels.extend(
+            f"{case_id}:{label}" for label in treatment["antiSlopReview"]["unexplainedRoleLabels"]
+        )
+        treatment_unresolved_slop_findings.extend(
+            f"{case_id}:{finding}" for finding in unresolved_slop_findings(treatment)
+        )
         for dimension in dimensions:
             dimension_control[dimension].append(control["scores"][dimension])
             dimension_treatment[dimension].append(treatment["scores"][dimension])
@@ -236,6 +439,10 @@ def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], m
             "treatment": round(treatment_score, 2),
             "delta": round(treatment_score - control_score, 2),
             "treatmentCriticalFailures": treatment["criticalFailures"],
+            "treatmentMajorDefects": treatment["majorDefects"],
+            "treatmentMinorDefects": treatment["minorDefects"],
+            "treatmentUnexplainedRoleLabels": treatment["antiSlopReview"]["unexplainedRoleLabels"],
+            "treatmentUnresolvedSlopFindings": unresolved_slop_findings(treatment),
         }
 
     if not control_scores or errors:
@@ -259,11 +466,21 @@ def evaluate(cases_document: dict[str, Any], results_document: dict[str, Any], m
         "delta": round(improvement, 2),
         "dimensionDeltas": {key: round(value, 2) for key, value in dimension_deltas.items()},
         "treatmentCriticalFailures": treatment_critical,
+        "treatmentMajorDefects": treatment_major,
+        "treatmentMinorDefects": treatment_minor,
+        "treatmentDimensionFloorFailures": treatment_floor_failures,
+        "treatmentUnexplainedRoleLabels": treatment_unexplained_role_labels,
+        "treatmentUnresolvedSlopFindings": treatment_unresolved_slop_findings,
     }
     report["passed"] = (
         treatment_mean >= thresholds["treatmentScoreMinimum"]
         and improvement >= thresholds["improvementMinimum"]
         and not treatment_critical
+        and not treatment_major
+        and len(treatment_minor) <= thresholds["maximumMinorDefects"] * len(control_scores)
+        and not treatment_floor_failures
+        and not treatment_unexplained_role_labels
+        and not treatment_unresolved_slop_findings
         and not regressions
     )
     if regressions:

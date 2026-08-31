@@ -10,6 +10,7 @@ This file owns the composition variants used when an analytical slide contains o
 | Two to four peer exhibits answer the same question at the same level | Parallel evidence field | comparable trends, segments, geographies, cohorts, scenarios, or small multiples |
 | Two to four peer exhibits establish the pattern and a distinct region synthesizes the decision consequence | Parallel evidence with synthesis | coordinated charts plus an implication or investment-insight rail |
 | Two or three non-peer sections build the proof through a deliberate sequence or change of analytical resolution | Progressive evidence path | mechanism to benchmark to geographic detail, market to segment to customer evidence, or category pattern to local deep dive |
+| One to three values carry the quantitative claim without a meaningful trend or distribution | Single evidence field using the [metric-page profile](metric-page.md) | scale, threshold, stage, or compact progress evidence |
 
 These modes are mutually exclusive at page level. A page cannot be both parallel and progressive: peer sections are interchangeable in reading order, while progressive sections lose meaning when reordered. A synthesis region changes a parallel field into `parallel evidence with synthesis` only when it interprets evidence already shown; if the region introduces another necessary evidence function, use a progressive path. Do not describe either composition as a second archetype.
 

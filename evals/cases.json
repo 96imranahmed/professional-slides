@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 4,
   "dimensions": [
     "briefFidelity",
     "narrativeLogic",
@@ -19,9 +19,29 @@
     "wrong_platform",
     "reference_fidelity_breach"
   ],
+  "majorDefects": [
+    "wrong_navigation_system",
+    "mixed_header_grammar",
+    "misplaced_implication_surface",
+    "under_resolved_exhibit",
+    "raw_grid_table",
+    "under_composed_canvas",
+    "inconsistent_component",
+    "reference_quality_gap",
+    "redundant_role_label",
+    "missing_required_structure",
+    "header_field_omission",
+    "broken_asset_render",
+    "pre_authoring_gate_bypassed",
+    "typography_or_spacing_drift",
+    "generic_or_redundant_copy",
+    "decorative_component"
+  ],
   "thresholds": {
-    "selfScoreMinimum": 80,
-    "treatmentScoreMinimum": 80,
+    "selfScoreMinimum": 98,
+    "treatmentScoreMinimum": 98,
+    "minimumDimensionScore": 4.9,
+    "maximumMinorDefects": 0,
     "improvementMinimum": 8,
     "maximumDimensionRegression": 0.25
   },
@@ -71,8 +91,24 @@
       "enabled": true,
       "platform": "both",
       "fixture": {"required": false, "role": "public_research"},
-      "brief": "Create an editable executive due-diligence pre-read for a SpaceXAI investment committee evaluating the hypothetical acquisition of Hugging Face, delivered as both PowerPoint and native Google Slides. Cover strategic fit, commercial model and revenue quality, product and technical architecture, security and compliance, open-source and community trust, legal and licensing exposure, regulatory and transaction risks, integration feasibility, value drivers, red flags, a prioritized data-room request, and explicit go/no-go diligence gates. Separate verified public facts from hypotheses and management questions; do not invent valuation, synergy, revenue, customer, or operating data. Render, inspect, and show both final platform outputs independently.",
-      "focus": ["acquisition due diligence", "verified-versus-unknown evidence", "red flags and data-room requests", "go-no-go gates", "dual-format native rendering"]
+      "brief": "Create an editable retrospective public-source commercial-diligence pre-read for an NVIDIA investment committee evaluating whether an investment in Hugging Face would have been strategically and commercially attractive at the stated historical cutoff, delivered as both PowerPoint and native Google Slides. Apply the full commercial-DD question architecture, state where public evidence cannot complete a branch, and do not present a preliminary screen as transaction-grade diligence. Cover market attractiveness, customer quality, competitive position, commercial engine, plan and downside, strategic fit, independence and ecosystem trust, value drivers, red flags, prioritized confirmatory diligence, and explicit invest, condition, pause, or decline gates. Separate verified historical facts from estimates, retrospective inference, and unresolved management questions; do not invent valuation, revenue, customer, retention, margin, or operating data. Use a standalone executive synthesis, a contents page and segmented chapter-transition tracker appropriate to the deck length, question-appropriate charts and tables, bottom-anchored implication surfaces, one semantic colour system, and separate rendered QA for both platforms.",
+      "focus": ["retrospective investment due diligence", "commercial-DD template coverage", "visible executive-summary structure", "deck-length-appropriate segmented navigation", "bottom-anchored implication surfaces", "rendered logo integrity", "pre-read evidence density", "verified-versus-inferred evidence", "chart and table composition", "dual-format native rendering"]
+    },
+    {
+      "id": "startup-pitch-live-pptx",
+      "enabled": true,
+      "platform": "powerpoint",
+      "fixture": {"required": false, "role": "historical_public_research"},
+      "brief": "Create an editable 12-slide live investor pitch that retrospectively presents Uber at an early funding stage using only historical public evidence available by the stated cutoff. Build one causal investment thesis across problem and timing, solution and advantage, demand proof, scale model, and team and raise. Use large live-pitch typography, one to three open metrics when appropriate, a restrained market or city landscape with authorized logos only when useful, and a milestone-based use of funds. Clearly label retrospective reconstruction and do not invent early-stage metrics.",
+      "focus": ["startup pitch template", "live-pitch density", "metric fields", "market landscape", "historical source integrity"]
+    },
+    {
+      "id": "project-progress-update-pptx",
+      "enabled": true,
+      "platform": "powerpoint",
+      "fixture": {"required": false, "role": "historical_public_research"},
+      "brief": "Create an editable 15-slide executive progress update for the Elizabeth line at a clearly stated historical reporting cutoff. Show the programme baseline, delivered progress, current critical path, risk and readiness, latest forecast, and sponsor decisions. Use a standalone executive synthesis, contents and transition tracker states, a milestone timeline, workstream table with defined completion or one-to-five indicators, consistent status semantics, and one terminal action surface per slide. Distinguish actual, forecast, target, and retrospective context and use only public evidence.",
+      "focus": ["project progress template", "milestone and status evidence", "comparison indicators", "multi-page tracker", "public-sector source integrity"]
     }
   ]
 }

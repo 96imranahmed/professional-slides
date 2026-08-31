@@ -116,6 +116,22 @@ Reference: use the attached deck as visual evidence while preserving authorized 
 
 Use `/professional-slides` instead of `$professional-slides` in Claude Code. Attach source files in the agent interface or provide readable local paths. Reference decks remain external and read-only unless inclusion is explicitly authorized.
 
+### 7. Understand rendering and verification
+
+`professional-slides` is an instruction skill, not a rendering plugin. Installing it makes the guide discoverable; the active agent still uses its own PowerPoint or Google Slides authoring and rendering tools to create the deck. Verify the output from the produced evidence, not from the skill merely appearing in `/skills`.
+
+A complete deck request should produce:
+
+- an editable `.pptx`, a native Google Slides URL, or both, according to the brief;
+- a full render of every slide made from the final editable artifact;
+- a montage for reviewing story and visual rhythm;
+- a slide-by-slide inspection or QA ledger that records and repairs major defects;
+- a concise note describing any platform, font, image, or editability limitation.
+
+Ask the agent to open representative full-size renders and confirm title alignment, text wrapping, chart labels, sources, trackers, colours, and recommendation components. For dual-format work, require separate PowerPoint and native Google Slides renders because one platform's preview does not prove the other is correct.
+
+The HTML examples inside the guide are structural specimens only. They help the model understand layout geometry and component state; they are not inserted into the deck, rendered as screenshots, or shown as PNG previews in Markdown.
+
 ## Troubleshooting
 
 - If the skill is missing, verify that the installed path ends exactly in `professional-slides/SKILL.md`, then restart the agent once.

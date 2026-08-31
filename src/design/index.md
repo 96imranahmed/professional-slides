@@ -1,6 +1,6 @@
 # Design System
 
-This is the sole source for platform-neutral composition, visual tokens, theme modes, authorized-reference intake, and cross-platform design fallbacks. Story logic belongs to [`storylining/`](../storylining/index.md), recurring furniture to [`components/`](../components/index.md), and implementation mechanics to [`tools/`](../tools/index.md).
+This is the sole source for platform-neutral composition, visual tokens, theme modes, authorized-reference intake, and cross-platform design fallbacks. Story logic belongs to [`storylining/`](../storylining/index.md), recurring furniture to [`components/`](../components/index.md), and implementation mechanics to [`tools/`](../tools/index.md). Read [`html-specimens.md`](html-specimens.md) whenever an owner provides structural HTML grounding.
 
 ## Select one design mode
 
@@ -28,6 +28,23 @@ Use a small set of shared anchors. Align related objects, maintain consistent in
 
 Default to flat, editable shapes and restrained color. Avoid pseudo-UI cards, 3D effects, gradients without meaning, ornamental icons, decorative photos, and diagrams that do not improve comprehension. Use raster fallbacks only when fidelity requires them and the user accepts the editability tradeoff.
 
+## Select an evidence-density mode
+
+Choose one primary density mode from the delivery context, then allow named slide-family exceptions only when the audience's reading task changes. Density is the amount of decision-relevant evidence per usable area, not the number of boxes or words.
+
+| Mode | Typical use | Default typography behavior | Page behavior |
+| --- | --- | --- | --- |
+| Live pitch | startup pitch, keynote, short board update | `display` and `h1` dominate; body normally `18-24 pt` | one message, one proof, little lookup detail, high contrast, generous whitespace |
+| Executive presentation | live strategy review, steering committee, workshop | body normally `15-18 pt` | one dominant exhibit with concise mechanism or implication; details in notes or appendix |
+| Executive pre-read | board pre-read, investment memo, commercial due diligence | body commonly `12-15 pt`; tables may use `10-12 pt` when the structure remains readable | evidence-rich pages, direct labels, compact tables, explicit caveats, sources, and decision context |
+| Analytical appendix | methods, schedules, evidence ledger, model detail | body and table text may use `9-11 pt`; sources may use `8 pt` | dense lookup material with stable row rhythm, repeated headers, and strict reconciliation |
+
+Do not apply a universal minimum font size across these modes. A `12 pt` body or table role is normal in a diligence pre-read when the page is meant to be read at a desk, while the same size is usually inappropriate for a live pitch. Never shrink a live-presentation page into pre-read density or enlarge a pre-read until it omits the evidence needed for an investment decision.
+
+For a core commercial due-diligence pre-read, most content-bearing pages should use the full analytical width and most of the vertical content zone through two to four mutually supporting evidence regions: for example, exhibit plus investment question, scorecard plus red flags, metrics plus underwriting tests, or model plus decision implication. This is a content requirement, not a fill-rate target: do not add decorative boxes or repeat text to occupy space. A page with a small central exhibit and large unused analytical zones is under-composed when the missing space could carry necessary scope, evidence quality, unresolved tests, or decision consequence.
+
+Changing the density mode does not change the title anchor, semantic colour system, tracker system, or action-component grammar. If a page still overflows at the compact role permitted by its mode, shorten, restructure, paginate, or move lookup detail to the appendix.
+
 ## Default design contract
 
 Every implementation must resolve these dimensions. Values shown are the default when no reference or brand system has priority.
@@ -40,7 +57,10 @@ Every implementation must resolve these dimensions. Values shown are the default
 | Typography | use the role-based type scale below |
 | Spacing | use the `space-*` token scale below |
 | Title anchor | x 0.67, y 0.38, w 12.0, h 0.80 in |
+| Tracked analytical header | tracker label x 0.67, y 0.28, w 12.0, h 0.18 in; action title x 0.67, y 0.60, w 12.0, h 0.80 in |
 | Footer anchor | y 7.15, h 0.18 in |
+
+Choose the tracked or untracked analytical-header template at slide-family level before authoring and keep that choice fixed across its declared slide range. The tracked variant has two independent absolute slots: the tracker label and the action title. The tracker label must never push, pull, or otherwise calculate the title position through flow layout, margins, or content-dependent spacing; both slots resolve directly from the registered template geometry.
 
 ## Colour system
 
@@ -191,10 +211,15 @@ Use three guide levels:
 | primary left | `x = 0.67` | title, content, chart, table, and source start |
 | primary right | `x = 12.67` | principal content-system end |
 | canvas right | `x = 13.333` | physical edge; backgrounds may bleed to it |
+| tracked header label top | `y = 0.28` | compact tracker-label slot when the tracked analytical-header template is active |
 | title top | `y = 0.38` | action-title block start |
+| tracked title top | `y = 0.60` | action-title start when the tracked analytical-header template is active |
 | title bottom | `y = 1.18` | default title-block end |
+| tracked title bottom | `y = 1.40` | default one-line tracked title-block end |
 | title separator | `y = 1.25` | analytical-page lower title-zone reference; show a rule only when a named slide-family treatment requires it |
+| tracked title separator | `y = 1.47` | one-line tracked-header separator reference |
 | content top | `y = 1.45` | typical analytical-canvas start |
+| tracked content top | `y = 1.67` | typical analytical-canvas start under the one-line tracked header |
 | content bottom | `y = 6.80` | typical meaning-bearing-content end |
 | source baseline | `y = 6.92` | typical source or note position |
 | footer top | `y = 7.15` | page number and footer metadata start |
@@ -256,6 +281,8 @@ Align the edge the audience perceives. Align nearby copy to a chart's plot area 
 
 Every ordinary analytical action title in a deck must begin at the exact same deck-level `x` and `y` anchor, regardless of title length or whether the approved block uses one or two lines. Do not vertically center, lower, raise, or horizontally nudge an individual title to balance the slide. A cover, sparse chapter statement, or other named title component may use a different registered anchor only when its approved layout defines that variant.
 
+When a slide family uses the tracked analytical-header template, both the tracker-label slot and the action-title slot must begin at their exact registered anchors on every governed analytical slide. Treat the pair as one template-level state: do not recreate either field slide by slide, position the title by adding a margin after the tracker label, omit one field while retaining the other, or allow label length to alter the gap. One-line and two-line title states share the same tracked-title top anchor; only the separator and dependent content anchors move for the resolved second line.
+
 Repeated slide families should share content tops, dominant exhibit boundaries, implication-panel edges, source baselines, and footer anchors. Deliberate variation should follow a change in narrative job, emphasis, chapter, or approved layout—not accidental coordinate drift.
 
 For each slide:
@@ -281,6 +308,21 @@ Use these neutral tolerances unless an approved reference or platform requires s
 | raster or SVG optical correction | smallest visible correction | document and reuse the offset for the asset family |
 
 Reject local nudges without named guides, manual spaces or tabs for alignment, multiple nearly identical edges, indiscriminate centering, and mathematically even layouts that remain optically unbalanced after rendering.
+
+### Benchmark-informed finishing loop
+
+For a deck that claims executive consulting quality, compare the candidate with recent public professional-services work of the same delivery type and analytical density. Use only lawful public references and do not copy brand assets, masters, or proprietary content. Inspect the reference at full-slide scale and as a montage, then record transferable design observations about title geometry, tracker cadence, evidence density, chart annotation, table construction, colour restraint, source treatment, and chapter rhythm.
+
+Run the comparison as a repair loop rather than a mood-board exercise:
+
+1. render the complete candidate and the selected public references at comparable aspect ratio;
+2. compare the candidate's title spine, structure ledger, palette inventory, exhibit mix, page silhouettes, and source zone against the observed standard;
+3. identify the three highest-impact gaps in hierarchy, evidence communication, or consistency;
+4. repair the owning definition or reusable component before fixing isolated pages;
+5. regenerate the complete deck, inspect every slide at full size, and compare the montage again;
+6. stop only when no critical or major defect remains and additional changes would be preference rather than a clear improvement.
+
+Do not imitate a firm's logo, proprietary typography, distinctive master, or decorative signature. Match the professional standard through disciplined evidence architecture, semantic consistency, native editability, and finish.
 
 ## Reference intake
 

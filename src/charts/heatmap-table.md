@@ -17,6 +17,7 @@ Row and column categories, numeric or ordinal cell values, missing-value state, 
 - Sort to reveal structure when no natural order exists.
 - Use a highlight table when exact values matter more than color pattern.
 - Add symbols or values where accessibility requires redundant encoding.
+- Use progress circles only for true `0-100%` completion and use one-to-five score cells only for an anchored reproducible rubric. Follow [`comparison indicators`](../components/comparison-indicators.md) for the mark construction and missing-value treatment.
 
 ## Platform mapping
 
@@ -40,10 +41,20 @@ A table may use one secondary neutral header level only for a real nested hierar
 - When two tables share a page, align their header baselines, comparable column boundaries, row rhythm, and bottom edge when practical. If row counts differ materially, top-align them and do not stretch one table merely to equalize height.
 - Use the [`design` spacing tokens](../design/index.md#spacing-system) and the `body-compact`, `label`, or `micro` typography roles rather than local cell font sizes or padding.
 
+## Table composition quality
+
+Treat the table as an analytical exhibit, not a spreadsheet pasted onto a slide. Establish one dominant reading direction, use whitespace and selective horizontal rules before boxes, group related columns, emphasize only the row, threshold, score, or consequence that carries the argument, and reserve filled cells for real semantic status. Avoid enclosing every cell with equal dark borders, combining a saturated header with dense gridlines, or giving every row identical weight; those treatments flatten the hierarchy and remain raw-grid defects even when alignment is correct.
+
+For a qualitative diligence matrix, a strong default is an open table with a thin header rule, subtle alternating row bands only when they improve tracking, a narrow bold row-label column, one decisive evidence column, and one consequence column. Use a bottom implication surface outside the table rather than a final slogan row styled as another table cell.
+
+## Structural HTML reference
+
+Use the table, progress-circle, and one-to-five score specimen in [`comparison-indicators`](../components/comparison-indicators.md#structural-html-reference). For a pure heatmap, retain the same table geometry, replace only the indicator cells with accessible sequential fills, and keep the printed value or symbol visible.
+
 ## Failure modes
 
 Rainbow scales, red/green-only meaning, an arbitrary midpoint, row-relative coloring presented as absolute, excessive precision, and differences too subtle for projection or export.
 
 ## Acceptance test
 
-The same high/low pattern remains visible in grayscale or with redundant labels, the legend reproduces every cell color from its value, table headers use the registered deck-wide treatment without per-column colour variation, and headers, values, column boundaries, and padding remain aligned in the final render.
+The same high/low pattern remains visible in grayscale or with redundant labels, the legend reproduces every cell color from its value, table headers use the registered deck-wide treatment without per-column colour variation, and headers, values, column boundaries, and padding remain aligned in the final render. At montage scale the table must still expose its hierarchy and highlighted conclusion; if it reads as one uniform grid, it is unfinished.

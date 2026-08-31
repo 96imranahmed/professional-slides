@@ -30,6 +30,12 @@ Every chart must define:
 
 Compute and reconcile the result before designing the visual. The visible data, labels, title, and source ledger must agree after rounding.
 
+## Exhibit-resolution gate
+
+A chart is not complete because marks, axes, and labels exist. Before styling, write the one visual comparison the audience should verify and identify the exact datum, endpoint, gap, benchmark, threshold, distribution, or inflection that proves it. The final plot must make that comparison visible without relying on the action title or a detached takeaway box.
+
+Reject a chart as under-resolved when it is a default chart frame, an isolated bar or metric dressed as a plot, a set of small multiples with inconsistent scales or geometry, a decorative mix of encodings, or a large empty plot with too little evidence to justify the chart form. When the evidence is only one or two endpoint facts, use a metric field, slope, indexed comparison, or annotated range instead of pretending a fuller time series exists.
+
 ## Construction rules
 
 1. Match the encoding to the comparison task and use an honest scale.
@@ -37,7 +43,7 @@ Compute and reconcile the result before designing the visual. The visible data, 
 3. Resolve every series, highlight, plot band, and legend key through the theme's [colour system](../design/index.md#colour-system). Use the chart palette only for data-required series, use the light neutral chart-segment role for inactive or comparator segments, and keep all non-chart emphasis on the single structural primary. Never recolour a peer merely because of its order or position.
 4. Direct-label when practical; retain a visible legend when hue encodes categories or series unless every mark is labelled unambiguously, and remove legends that merely repeat labels.
 5. Reduce gridlines, ticks, borders, decimals, and effects that do not aid use.
-6. Use the canonical [callout grammar](../components/index.md#callouts-and-annotations), keep annotations close to evidence, and avoid covering data marks.
+6. Use the canonical [chart-callout grammar](../components/chart-callouts.md), keep growth, threshold, gap, and observation annotations attached to evidence, and avoid covering data marks.
 7. Bind chart and small-multiple headers to the deck's selected [`section treatment`](../components/guidelines.md); use the preferred open underlined treatment unless the registered slide family requires another mode.
 8. Preserve data and semantic chart properties in editable form when reliable.
 9. Render and inspect the final PowerPoint or native Google Slides state.
@@ -59,6 +65,8 @@ Read [PowerPoint](../tools/powerpoint/index.md) and [Google Slides](../tools/goo
 - Use the [`design` grid and spacing tokens](../design/index.md#canvas-guides-and-grid) for the chart container and the [`component` callout grammar](../components/index.md#callouts-and-annotations) for annotations.
 - Render the chart in every final platform and inspect both the object frame and the visible plot, because native chart padding can differ after conversion.
 
+Use the structural HTML specimen in each chart-family owner when it exists. It demonstrates plot, label, annotation, and legend geometry only; the chart's data contract and the active design tokens remain authoritative.
+
 ## Universal acceptance test
 
-Check source values, calculations, sort order, scale, labels, series, legend, annotations, plot-area alignment, and comparable baselines in the final rendered artifact. Then cover the title: the pattern should still be visible. Cover the chart: the title should state that same pattern.
+Check source values, calculations, sort order, scale, labels, series, legend, annotations, plot-area alignment, and comparable baselines in the final rendered artifact. Then cover the title: the pattern should still be visible. Cover the chart: the title should state that same pattern. Compare the rendered exhibit against recent reference pages of the same analytical job; if the candidate still looks like chart scaffolding, a metric dashboard, or a default office chart, it does not pass even when technically correct.

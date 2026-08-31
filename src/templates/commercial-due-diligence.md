@@ -15,6 +15,7 @@ Classify the engagement before building the hypothesis tree. Use exactly one mod
 - **Full commercial due diligence:** the default whenever the user asks for a standard, complete, or unqualified commercial DD. It must reach evidence-backed conclusions across all five analytical tests, build an independent commercial base case and decision-relevant downside, and reconcile those findings into the transaction recommendation.
 - **Red-flag commercial due diligence:** a deliberately compressed stop, reprice, or condition screen. Retain only the hypotheses that can change the decision, but still trace each retained risk to evidence, an affected commercial driver, a test, a threshold, and a transaction consequence. Label the work as red-flag CDD; do not present it as a complete commercial DD.
 - **Preliminary public-source commercial screen:** a bounded pre-diligence assessment using secondary evidence before management data or primary research is available. Separate demonstrated facts from hypotheses and missing evidence, but do not substitute missing-data lists for market, customer, competitive, commercial-engine, or plan analysis. Label the work as a preliminary public-source screen; do not call it full commercial DD and do not issue an unconditional underwrite or bid recommendation.
+- **Retrospective commercial diligence:** a reconstruction of a past investment or transaction decision that separates evidence available at the decision date from later validation or disconfirmation. Freeze one decision cutoff date, label every later fact as retrospective evidence, and do not let hindsight repair an unsupported original underwrite. The recommendation must answer what a reasonable decision maker could have concluded at the time; later evidence tests that decision logic rather than replacing it.
 
 When the requested mode is full commercial due diligence but the evidence base cannot support it, stop before finished-slide authoring and surface the gap. Either obtain the required management data and primary research, or explicitly agree a red-flag or preliminary-screen scope. Never silently downgrade a full CDD into a public-evidence risk screen while retaining the full-CDD title.
 
@@ -51,9 +52,13 @@ Commercial due diligence does not replace financial, legal, tax, technical, cybe
 
 Use these chapter labels by default: **Market attractiveness**, **Customer quality**, **Competitive position**, **Commercial engine**, **Plan and downside**, and **Decision and value creation**.
 
-Place a standalone executive synthesis immediately after the cover and a full contents tracker immediately after the synthesis. Repeat the same full-state tracker at material chapter transitions with the current chapter emphasized. Analytical pages omit tracker furniture by default; use a compact chapter label only when orientation genuinely requires it. Follow [`../components/trackers/index.md`](../components/trackers/index.md) for tracker state and geometry.
+For a new commercial due-diligence deck, place a visibly labelled standalone executive synthesis immediately after the cover and a full contents tracker immediately after the synthesis; the pre-authoring contract rejects another opening sequence. For an existing-deck revision, enumerate the current pages in the as-is dot-dash and do not force-add either page outside the authorized scope; record a missing executive synthesis as a recommendation. For a long commercial due-diligence pre-read, use one horizontal segmented tracker on the contents page and repeat the same component at material chapter transitions with the current segment emphasized. Keep ordinary analytical pages free of the complete tracker so the action title and evidence retain the full canvas; use one restrained running chapter or subsection label only when orientation needs it. A persistent top rail is an exception for a shallow deck, not the default for a three-to-five-chapter diligence deck. Follow [`../components/trackers/index.md`](../components/trackers/index.md) for tracker state and geometry.
 
-The default sequence is:
+The six default analytical tests do not automatically require six full-page transitions. In a compressed retrospective or public-source case, keep every test explicit in the hypothesis tree, coverage ledger, and contents map, but group adjacent tests into fewer audience-facing chapters when a branch contains only one or two analytical pages. Use the compact chapter label for the finer test state and preserve full-state transitions for genuine shifts in the investment question.
+
+Treat core CDD pages as desk-read analytical surfaces. Most should combine two to four mutually supporting evidence regions across the full analytical width and vertical content zone, such as exhibit plus investment question, scorecard plus red flags, metrics plus underwriting tests, or model plus decision implication. Do not add decorative panels to increase occupancy, but do not leave large unused zones when required evidence quality, caveats, thresholds, or transaction consequence is missing.
+
+The default sequence for a new deck is:
 
 1. cover, executive synthesis, and contents;
 2. optional mandate, method, evidence base, and target baseline;
@@ -246,6 +251,7 @@ Use one supported base case and only the downside or upside cases that could cha
 - **Red-flag commercial due diligence:** retain only the hypotheses and pages that can stop, reprice, or condition the decision; show unresolved tests and confidence prominently.
 - **Lender commercial due diligence:** emphasize revenue resilience, concentration, churn, cyclicality, downside liquidity implications, covenant headroom, and financing sensitivity while keeping the analysis commercial rather than duplicating financial diligence.
 - **Growth-equity commercial due diligence:** emphasize category expansion, product-market fit by segment, repeatability of acquisition, retention and expansion, capital efficiency, leadership capacity, and the evidence supporting the next stage of scale.
+- **Retrospective commercial diligence:** preserve two evidence ledgers: one for facts available at the original decision date and one for subsequent validation. Use later outcomes to test whether the original hypotheses, conditions, and decision gates were well specified; never present later scale, profitability, or market structure as if it had been knowable at the original decision date.
 
 ## Tailoring and compression rules
 
@@ -254,7 +260,7 @@ Use one supported base case and only the downside or upside cases that could cha
 - Split a page when it contains two independent conclusions, two unrelated evidence systems, or an exhibit that becomes unreadable at presentation scale.
 - Keep detailed calculations, account lists, interview records, and model schedules in the appendix; keep the core page that states the decision-relevant conclusion.
 - Do not create empty customer, supplier, technology, ESG, or operations chapters merely because a generic report outline names them.
-- Keep the executive synthesis, chapter conclusions, independent plan, final recommendation, and close semantically aligned after every sequence change.
+- Keep the executive synthesis when required or present, chapter conclusions, independent plan, final recommendation, and close semantically aligned after every sequence change.
 
 ## Design requirements for the complete deck
 
@@ -262,8 +268,13 @@ Use one supported base case and only the downside or upside cases that could cha
 - Use action titles on analytical pages; title the conclusion, not the topic or exhibit type.
 - Give every analytical page one dominant visual field and enough evidence, scope, comparison, and decision context to work as an executive pre-read without narration.
 - Prefer direct labels, aligned comparison structures, visible units, and explicit sources over legends, decorative icons, large empty regions, or repeated metric cards.
+- Build an evidence-composition ledger before authoring. Across the core story, use the encoding that matches each analytical question: trend or growth charts for market and plan trajectory, distributions or cohort views for customer quality, logo maps or quantified position charts for competitive structure, funnel or unit-economics bridges for the commercial engine, and waterfalls, scenarios, sensitivities, or driver trees for plan and downside. A table-only core deck is a major design and analysis defect unless every retained question is genuinely exact-lookup work.
+- Use coordinated multi-chart pages when the same question must be answered across segments, cohorts, geographies, periods, or scenarios. Hold scales, legends, plot geometry, series mapping, and section-header treatment constant, and add one synthesis region only when the page requires a decision consequence that the action title and annotations cannot carry.
+- Use authorized logos only when entity recognition improves a market landscape, competitor map, ecosystem, or capability comparison. Use progress circles and one-to-five heatmap scores only for defined completion or scoring domains. Use chart-attached growth, gap, threshold, and outlier callouts instead of detached generic insight labels.
+- Treat `12 pt` body and table text as a normal pre-read role when the analytical page needs dense evidence, but do not shrink below the active density mode to preserve a crowded composition. Maintain stable title roles and move lookup detail to the appendix when necessary.
 - Use color only for stable semantic roles, data-required categories, or status. Comparable chart, table, timeline, metric, and panel items share one base role unless a direct label names the exception.
 - Reserve one implication or action region per page. State the action and the condition, evidence gap, or stop trigger governing it; do not repeat the action title as a slogan or add a second callout bar.
+- Anchor the one implication or action region below the core exhibit by default so the audience reads proof before consequence. Do not place a full-width recommendation band directly under the title unless an approved source template or explicit reveal sequence requires that order.
 - Keep analytical headers, table headers, and implication regions consistent. Follow [`../components/guidelines.md`](../components/guidelines.md), [`../components/copy.md`](../components/copy.md), and [`../design/index.md`](../design/index.md).
 
 ## Failure checks
@@ -272,7 +283,7 @@ Use one supported base case and only the downside or upside cases that could cha
 - a standard or unqualified commercial-DD request is silently delivered as a red-flag review or preliminary public-source screen;
 - the document claims to be full commercial DD without evidence-backed conclusions across all five analytical tests, an independent base case, decision-relevant downside, and an integrated recommendation;
 - the template-coverage ledger is missing, or a core job is marked complete by a missing-data statement rather than its required analysis;
-- the deck lacks a standalone executive synthesis, full contents tracker, material chapter-transition states, branch conclusions, or an evidence-backed close;
+- a new deck or approved structural target lacks its required standalone executive synthesis, full contents tracker, material chapter-transition states, branch conclusions, or evidence-backed close; an existing-deck revision instead fails this check when the as-is dot-dash is incomplete or a missing synthesis is hidden rather than recommended;
 - an analytical slide does not map to a hypothesis, dot, title, evidence package, archetype, and composition;
 - market, customer, competitor, commercial-engine, and forecast pages sit beside each other without a causal bridge;
 - the market thesis depends on total market growth without a defined reachable segment or plausible capture mechanism;
@@ -285,6 +296,7 @@ Use one supported base case and only the downside or upside cases that could cha
 - buyer synergies compensate for a weak standalone commercial case;
 - risks are listed but do not change the valuation, terms, financing, remaining diligence, ownership, timing, or decision;
 - the close introduces a condition, claim, or action that was not established earlier;
+- a retrospective deck mixes later evidence into the original decision case or uses hindsight as if it were contemporaneous proof;
 - a page is visually sparse because evidence, scope, unresolved tests, or decision context were omitted;
 - a page is visually dense because multiple communication jobs were forced into one slide;
 - decorative maps, funnels, ecosystems, scorecards, logos, gauges, or dashboards substitute for evidence; or

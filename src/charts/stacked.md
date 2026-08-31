@@ -20,6 +20,22 @@ Each stack must reconcile to its total. Declare absolute versus percentage mode,
 - Prefer bars to areas when exact category comparison matters.
 - Use direct segment labels only where space and contrast support them.
 
+## Structural HTML reference
+
+```html
+<figure class="stacked-chart" data-role="chart-field"><div class="stack-row"><span>Group A</span><div class="stack"><i style="--share:48%;--series:var(--chart-series-1)">48%</i><i style="--share:32%;--series:var(--chart-series-2)">32%</i><i style="--share:20%;--series:var(--chart-segment)">20%</i></div></div><div class="stack-row"><span>Group B</span><div class="stack"><i style="--share:35%;--series:var(--chart-series-1)">35%</i><i style="--share:39%;--series:var(--chart-series-2)">39%</i><i style="--share:26%;--series:var(--chart-segment)">26%</i></div></div><figcaption>Share of respondents; segment order fixed across groups</figcaption></figure>
+```
+
+```css
+.stacked-chart { display: grid; gap: var(--space-4); margin: 0; }
+.stack-row { display: grid; grid-template-columns: 120px 1fr; gap: var(--space-3); align-items: center; }
+.stack { display: flex; height: 34px; overflow: hidden; }
+.stack i { width: var(--share); display: grid; place-items: center; background: var(--series); font: var(--type-chart-label); font-style: normal; }
+.stacked-chart figcaption { font: var(--type-label); color: var(--text-secondary); }
+```
+
+Choose accessible text colour for each resolved segment fill and suppress an internal label when the segment is too narrow; retain the value through a direct label or legend.
+
 ## Platform mapping
 
 Map series order and stack mode explicitly; do not trust application defaults. Read back totals and category order. Verify that percentage charts normalize correctly and that labels do not disappear or move after conversion.
