@@ -8,9 +8,11 @@ Components are reusable slide elements. Use them only when they perform a clear 
 - [Text boxes](text-box.md): text-container geometry and overflow.
 - [Trackers](trackers/index.md): navigation.
 - [Guidelines](guidelines.md): rules, borders, and section treatments.
+- [Arrows](arrows.md): inference, transfer, handoff, and transition marks.
 - [Icons and logos](icons-and-logos.md): semantic icons and brand marks.
 - [Chart callouts](chart-callouts.md): evidence-linked annotations and leaders.
 - [Comparison indicators](comparison-indicators.md): scores and state indicators.
+- [Item indicators](item-indicators.md): numbered or lettered row and category markers.
 - [Metric fields](metric-fields.md): large numeric evidence.
 
 Read only the owner needed for the component being used.

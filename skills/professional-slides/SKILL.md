@@ -62,6 +62,7 @@ Preserve the existing design unless the user asks for a redesign. Recommend miss
 - Match the exhibit to the evidence. Do not force a card grid or table.
 - Use one accent colour plus neutrals unless the data needs more.
 - Resolve visual values through the active theme. Do not tune individual slides with local literals.
+- Prefer one variant for each recurring component or semantic relationship across the deck. This is a consistency default, not a hard constraint: change variants when the content, hierarchy, or deliberate emphasis justifies it.
 - Use trackers only for navigation. Omit them when the title sequence is enough.
 - Delete labels, boxes, strips, icons, and copy that do not add meaning.
 - Never invent evidence or hide uncertainty.

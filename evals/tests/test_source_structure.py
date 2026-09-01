@@ -68,6 +68,8 @@ class SourceStructureTests(unittest.TestCase):
             self.assertIn(target, skill)
         self.assertIn("before creating any slide document", skill)
         self.assertIn("edit only the requested slides", skill)
+        self.assertIn("prefer one variant for each recurring component or semantic relationship across the deck", skill)
+        self.assertIn("a consistency default, not a hard constraint", skill)
 
     def test_core_guides_have_simple_language_budgets(self):
         limits = {
@@ -131,11 +133,15 @@ class SourceStructureTests(unittest.TestCase):
         for component in (
             "action-title block",
             "terminal action surface",
+            "| description slide |",
+            "description with implication",
+            "| arrow |",
             "metric field",
             "data table",
             "chart plot",
             "chart callout",
             "comparison indicator",
+            "| item indicator |",
             "diagram node",
             "semantic icon",
             "logo backing",
@@ -208,6 +214,144 @@ class SourceStructureTests(unittest.TestCase):
         ):
             self.assertIn(phrase, executive)
         self.assertIn("do not add a tracker", executive)
+
+    def test_description_slide_owns_variable_detail_and_embedded_indicator_variants(self):
+        index = read(f"{SKILL_ROOT}/references/slide-types/index.md").lower()
+        description = read(f"{SKILL_ROOT}/references/slide-types/description.md").lower()
+
+        self.assertIn("[description slide](description.md)", index)
+        self.assertIn("base slide type", description)
+        self.assertIn("description ledger", description)
+        self.assertIn("## structural html reference", description)
+        self.assertIn("var(--type-column-heading)", description)
+        self.assertIn("same size and line height as compact body text", description)
+        self.assertNotIn("--description-slide-heading-font: var(--type-section-heading)", description)
+        for variant in (
+            "trend-with-examples",
+            "icon-label-narrative",
+            "label-only-narrative",
+            "embedded-indicator-narrative",
+        ):
+            self.assertIn(f'data-variant="{variant}"', description)
+        for family in ("executive-light", "executive-dark", "warm-editorial"):
+            self.assertIn(f'data-theme="{family}"', description)
+        for count in ("1", "2", "3"):
+            self.assertIn(f'data-detail-columns="{count}"', description)
+        self.assertIn('data-content-density="dense"', description)
+        self.assertIn('data-placement="embedded-start"', description)
+        self.assertIn("never changes `.action-title`", description)
+        self.assertIn(".description-slide__row:last-of-type { border-bottom: 0; }", description)
+        self.assertIn("the final row has no bottom divider", description)
+        self.assertIn("every row shares one vertical centerline", description)
+        self.assertIn("align-items: center", description)
+        self.assertIn("padding-block: var(--description-slide-row-padding)", description)
+        self.assertIn("align-self: stretch", description)
+        self.assertEqual(description.count('<main class="deck"'), 4)
+        self.assertFalse((ROOT / SKILL_ROOT / "references/slide-types/description-slide.md").exists())
+        self.assertFalse((ROOT / SKILL_ROOT / "references/slide-types/category-overview.md").exists())
+        self.assertNotIn("diagnostic-to-impact", description)
+        self.assertNotRegex(description, r"#[0-9a-f]{3,8}\\b")
+        self.assertNotIn("—", description)
+
+    def test_description_with_implication_inherits_description_slide_and_owns_specimens(self):
+        index = read(f"{SKILL_ROOT}/references/slide-types/index.md").lower()
+        owner = read(f"{SKILL_ROOT}/references/slide-types/description-with-implication.md").lower()
+
+        self.assertIn("description-with-implication.md", index)
+        for phrase in (
+            "explicitly inherits from [`description slide`](description.md)",
+            "## inheritance contract",
+            "start with a valid description slide row",
+            "adds one mandatory inference arrow",
+            "text-led implication",
+            "process and roadmap",
+            "the default treatment is `open`",
+            "very light gray",
+        ):
+            self.assertIn(phrase, owner)
+        for variant in (
+            "labeled-findings-to-implication",
+            "numbered-description-to-implication",
+            "embedded-indicator-description-to-implication",
+        ):
+            self.assertIn(f'data-variant="{variant}"', owner)
+        for treatment in ("open", "subtle"):
+            self.assertIn(f'data-implication-treatment="{treatment}"', owner)
+        self.assertIn('class="description-slide description-implication"', owner)
+        self.assertIn('class="description-slide__row description-implication__row"', owner)
+        self.assertIn('class="arrow description-implication__arrow-slot"', owner)
+        self.assertIn('class="item-indicator description-implication__indicator-slot"', owner)
+        self.assertIn('data-placement="column"', owner)
+        self.assertIn('data-placement="embedded-start"', owner)
+        self.assertIn('data-detail-columns="2"', owner)
+        self.assertIn('data-content-density="dense"', owner)
+        self.assertIn(".description-implication__head span:empty", owner)
+        self.assertIn("border-bottom: 0", owner)
+        self.assertIn(".description-implication__row:last-of-type { border-bottom: 0; }", owner)
+        self.assertIn("the final row has no bottom divider", owner)
+        self.assertIn("inherit the base row centerline", owner)
+        self.assertIn("padding-block: var(--description-implication-row-padding)", owner)
+        self.assertNotIn("padding-bottom: var(--description-implication-row-padding)", owner)
+        self.assertIn("var(--surface-1)", owner)
+        self.assertIn("var(--description-slide-gap)", owner)
+        self.assertEqual(owner.count('<main class="deck"'), 3)
+        self.assertFalse((ROOT / SKILL_ROOT / "references/slide-types/description-with-implication-specimens.md").exists())
+        self.assertNotIn("var(--surface-action)", owner)
+        self.assertNotIn("var(--component-primary-tint)", owner)
+        self.assertNotRegex(owner, r"#[0-9a-f]{3,8}\\b")
+        self.assertNotIn("—", owner)
+
+    def test_arrows_are_a_reusable_component_with_four_registered_variants(self):
+        components = read(f"{SKILL_ROOT}/references/components/index.md").lower()
+        arrows = read(f"{SKILL_ROOT}/references/components/arrows.md").lower()
+        implication = read(f"{SKILL_ROOT}/references/slide-types/description-with-implication.md").lower()
+
+        self.assertIn("[arrows](arrows.md)", components)
+        for variant in ("line", "wedge", "disc-chevron", "disc-multi-chevron"):
+            self.assertIn(f'data-variant="{variant}"', arrows)
+        self.assertEqual(arrows.count('<svg class="arrow"'), 4)
+        self.assertIn("empty arrow header slots have no visible rule", arrows)
+        self.assertEqual(implication.count('data-variant="disc-chevron"'), 14)
+        self.assertNotIn('data-variant="line"', implication)
+        self.assertIn("use `disc-chevron` by default", arrows)
+        self.assertIn("--arrow-emphasis-size: var(--icon-md)", arrows)
+        self.assertIn("--arrow-wide-size: var(--space-6)", arrows)
+        self.assertIn("roughly one-third", arrows)
+        self.assertNotIn("--description-implication-arrow-", implication)
+        self.assertNotRegex(arrows, r"#[0-9a-f]{3,8}\\b")
+        self.assertNotIn("—", arrows)
+
+    def test_item_indicators_are_reusable_identity_marks_with_two_placements(self):
+        components = read(f"{SKILL_ROOT}/references/components/index.md").lower()
+        indicators = read(f"{SKILL_ROOT}/references/components/item-indicators.md").lower()
+        description = read(f"{SKILL_ROOT}/references/slide-types/description.md").lower()
+        implication = read(f"{SKILL_ROOT}/references/slide-types/description-with-implication.md").lower()
+
+        self.assertIn("[item indicators](item-indicators.md)", components)
+        for shape in ("square", "circle"):
+            self.assertIn(f'data-shape="{shape}"', indicators)
+        for placement in ("column", "embedded-start"):
+            self.assertIn(f'data-placement="{placement}"', indicators)
+        for contrast in ("accent-fill", "inverse-keyline"):
+            self.assertIn(f'data-contrast="{contrast}"', indicators)
+        self.assertRegex(indicators, r">(?:01|2|3)</span>")
+        self.assertIn(">a</span>", indicators)
+        self.assertIn("center it horizontally", indicators)
+        self.assertIn("center it vertically", indicators)
+        self.assertIn("line-height: 1", indicators)
+        self.assertIn("text-align: center", indicators)
+        self.assertIn("center the text box horizontally and vertically inside the shape", indicators)
+        self.assertIn("comparison indicators", indicators)
+        self.assertIn("arrows", indicators)
+        self.assertIn('--item-indicator-accent-bg: var(--component-primary)', indicators)
+        self.assertIn('--item-indicator-keyline: var(--line-hairline) solid var(--on-inverse)', indicators)
+        self.assertEqual(description.count('data-placement="embedded-start" data-contrast="inverse-keyline"'), 4)
+        self.assertNotIn('data-placement="embedded-start" data-contrast="accent-fill"', description)
+        self.assertIn("preferred embedded number or letter treatment", indicators)
+        self.assertEqual(implication.count('data-placement="embedded-start" data-contrast="inverse-keyline"'), 4)
+        self.assertIn('data-placement="column"', implication)
+        self.assertNotRegex(indicators, r"#[0-9a-f]{3,8}\\b")
+        self.assertNotIn("—", indicators)
 
     def test_trackers_are_optional_navigation_only(self):
         trackers = read(f"{SKILL_ROOT}/references/components/trackers/index.md").lower()

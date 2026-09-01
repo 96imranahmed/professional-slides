@@ -31,6 +31,10 @@ Every reusable component exposes namespaced custom properties. Its Markdown owne
 | neutral panel | `--panel-bg`, `--panel-color`, `--panel-border`, `--panel-radius`, `--panel-shadow`, `--panel-padding` | surface-1, `ink`, quiet rule, component radius, component shadow, `space-4` |
 | highlighted header | `--section-header-bg`, `--section-header-color`, `--section-header-font`, `--section-header-padding`, `--section-header-rule` | primary tint, `ink`, section-heading role, `space-3`, no extra rule |
 | terminal action surface | `--action-surface-bg`, `--action-surface-color`, `--action-surface-font`, `--action-surface-padding-x`, `--action-surface-padding-y`, `--action-surface-border`, `--action-surface-radius` | primary tint, `ink`, callout role, `space-5`, `space-4`, none, component radius |
+| description slide | `--description-slide-gap`, `--description-slide-row-gap`, `--description-slide-row-rule`, `--description-slide-row-padding`, `--description-slide-columns`, `--description-slide-heading-font`, `--description-slide-heading-color`, `--description-slide-heading-rule`, `--description-slide-heading-gap`, `--description-slide-label-bg`, `--description-slide-label-color`, `--description-slide-label-font`, `--description-slide-label-padding`, `--description-slide-label-gap`, `--description-slide-label-embedded-padding`, `--description-slide-body-font`, `--description-slide-body-color`, `--description-slide-body-gap`, `--description-slide-list-indent`, `--description-slide-side-bg`, `--description-slide-side-color`, `--description-slide-side-font`, `--description-slide-side-padding`, `--description-slide-icon-color`, `--description-slide-icon-size`, `--description-slide-icon-stroke`, `--description-slide-dense-font` | density grid gutter, `space-2`, quiet rule, symmetric `space-1`, named layout variant, body-sized column-heading role, `ink`, page rule, `space-2`, inverse surface, on-inverse text, section-heading role, `space-4`, `space-3`, `space-6`, compact body role, `ink`, `space-2`, `space-5`, transparent, `ink`, compact body role, `space-4`, component primary, icon-lg, standard line, compact body role |
+| description with implication extension | `--description-implication-columns`, `--description-implication-implication-bg`, `--description-implication-implication-subtle-bg`, `--description-implication-implication-color`, `--description-implication-implication-font`, `--description-implication-implication-padding` plus inherited `--description-slide-*` aliases | named extension grid, transparent, `surface-1`, `ink`, callout role, `space-0`, Description Slide bindings |
+| arrow | `--arrow-color`, `--arrow-surface`, `--arrow-on-surface`, `--arrow-connector`, `--arrow-size`, `--arrow-emphasis-size`, `--arrow-wide-size`, `--arrow-stroke`, `--arrow-connector-stroke` | component primary, component primary, on-primary text, page guideline, icon-lg, icon-md, `space-6`, standard line, hairline |
+| item indicator | `--item-indicator-bg`, `--item-indicator-color`, `--item-indicator-border`, `--item-indicator-accent-bg`, `--item-indicator-accent-color`, `--item-indicator-keyline`, `--item-indicator-size`, `--item-indicator-font`, `--item-indicator-radius-square`, `--item-indicator-radius-circle` | inverse surface, on-inverse text, none, component primary, on-primary text, hairline in on-inverse, icon-lg, label role, square radius, round radius |
 
 ## Evidence components
 
@@ -72,6 +76,13 @@ Use this pattern at the component root. The block is a binding example, not a se
   --action-title-width: var(--title-width);
 }
 
+.source-line {
+  --source-font: var(--type-source);
+  --source-color: var(--text-secondary);
+  --source-rule: var(--rule-quiet);
+  --source-gap: var(--space-1);
+}
+
 .panel {
   --panel-bg: var(--surface-1);
   --panel-color: var(--ink);
@@ -89,6 +100,88 @@ Use this pattern at the component root. The block is a binding example, not a se
   --action-surface-padding-y: var(--space-4);
   --action-surface-border: 0;
   --action-surface-radius: var(--component-radius);
+}
+
+.description-slide {
+  --description-slide-gap: var(--grid-gutter);
+  --description-slide-row-gap: var(--space-2);
+  --description-slide-row-rule: var(--rule-quiet);
+  --description-slide-row-padding: var(--space-1);
+  --description-slide-columns: 3fr 9fr;
+  --description-slide-heading-font: var(--type-column-heading);
+  --description-slide-heading-color: var(--ink);
+  --description-slide-heading-rule: var(--rule-page);
+  --description-slide-heading-gap: var(--space-2);
+  --description-slide-label-bg: var(--surface-inverse);
+  --description-slide-label-color: var(--on-inverse);
+  --description-slide-label-font: var(--type-section-heading);
+  --description-slide-label-padding: var(--space-4);
+  --description-slide-label-gap: var(--space-3);
+  --description-slide-label-embedded-padding: var(--space-6);
+  --description-slide-body-font: var(--type-body-compact);
+  --description-slide-body-color: var(--ink);
+  --description-slide-body-gap: var(--space-2);
+  --description-slide-list-indent: var(--space-5);
+  --description-slide-side-bg: transparent;
+  --description-slide-side-color: var(--ink);
+  --description-slide-side-font: var(--type-body-compact);
+  --description-slide-side-padding: var(--space-4);
+  --description-slide-icon-color: var(--component-primary);
+  --description-slide-icon-size: var(--icon-lg);
+  --description-slide-icon-stroke: var(--line-standard);
+  --description-slide-dense-font: var(--type-body-compact);
+}
+
+.description-implication {
+  --description-implication-gap: var(--description-slide-gap);
+  --description-implication-row-gap: var(--description-slide-row-gap);
+  --description-implication-row-rule: var(--description-slide-row-rule);
+  --description-implication-row-padding: var(--description-slide-row-padding);
+  --description-implication-columns: 2fr 5fr 1fr 4fr;
+  --description-implication-heading-font: var(--description-slide-heading-font);
+  --description-implication-heading-color: var(--description-slide-heading-color);
+  --description-implication-heading-rule: var(--description-slide-heading-rule);
+  --description-implication-heading-gap: var(--description-slide-heading-gap);
+  --description-implication-label-bg: var(--description-slide-label-bg);
+  --description-implication-label-color: var(--description-slide-label-color);
+  --description-implication-label-font: var(--description-slide-label-font);
+  --description-implication-label-padding: var(--description-slide-label-padding);
+  --description-implication-label-embedded-padding: var(--description-slide-label-embedded-padding);
+  --description-implication-body-font: var(--description-slide-body-font);
+  --description-implication-body-color: var(--description-slide-body-color);
+  --description-implication-body-gap: var(--description-slide-body-gap);
+  --description-implication-list-indent: var(--description-slide-list-indent);
+  --description-implication-implication-bg: transparent;
+  --description-implication-implication-subtle-bg: var(--surface-1);
+  --description-implication-implication-color: var(--ink);
+  --description-implication-implication-font: var(--type-callout);
+  --description-implication-implication-padding: var(--space-0);
+  --description-implication-dense-font: var(--description-slide-dense-font);
+}
+
+.arrow {
+  --arrow-color: var(--component-primary);
+  --arrow-surface: var(--component-primary);
+  --arrow-on-surface: var(--on-primary);
+  --arrow-connector: var(--page-guideline);
+  --arrow-size: var(--icon-lg);
+  --arrow-emphasis-size: var(--icon-md);
+  --arrow-wide-size: var(--space-6);
+  --arrow-stroke: var(--line-standard);
+  --arrow-connector-stroke: var(--line-hairline);
+}
+
+.item-indicator {
+  --item-indicator-bg: var(--surface-inverse);
+  --item-indicator-color: var(--on-inverse);
+  --item-indicator-border: 0;
+  --item-indicator-accent-bg: var(--component-primary);
+  --item-indicator-accent-color: var(--on-primary);
+  --item-indicator-keyline: var(--line-hairline) solid var(--on-inverse);
+  --item-indicator-size: var(--icon-lg);
+  --item-indicator-font: var(--type-label);
+  --item-indicator-radius-square: var(--radius-0);
+  --item-indicator-radius-circle: var(--radius-round);
 }
 
 .metric {
@@ -140,4 +233,3 @@ Use this pattern at the component root. The block is a binding example, not a se
 ## Semantic states
 
 `active`, `selected`, `positive`, `caution`, `negative`, `forecast`, and `missing` are the only shared state names. A component may define a narrower domain. Each state must document its threshold or trigger and its non-colour cue. Do not create colour-only states such as `blue`, `green`, `highlight`, or `special`.
-

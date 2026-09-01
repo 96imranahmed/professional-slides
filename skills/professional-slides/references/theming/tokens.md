@@ -56,6 +56,7 @@ Do not preserve browser pixels literally after translation. Preserve the named t
   --type-action-title: var(--weight-bold) var(--size-action-title) / var(--line-action-title) var(--font-display);
   --type-section-title: var(--weight-bold) var(--size-section-title) / var(--line-section-title) var(--font-display);
   --type-section-heading: var(--weight-bold) var(--size-section-heading) / var(--line-section-heading) var(--font-sans);
+  --type-column-heading: var(--weight-bold) var(--size-body-compact) / var(--line-body-compact) var(--font-sans);
   --type-body: var(--weight-regular) var(--size-body) / var(--line-body) var(--font-sans);
   --type-body-compact: var(--weight-regular) var(--size-body-compact) / var(--line-body-compact) var(--font-sans);
   --type-callout: var(--weight-medium) var(--size-callout) / var(--line-callout) var(--font-sans);
@@ -389,4 +390,3 @@ A `reference-derived` theme must declare every semantic colour token used by the
 - Status tokens require a declared threshold and a text, symbol, or pattern cue.
 - Chart-series tokens are ordered encodings, not a decoration palette.
 - Literal colours, font sizes, gaps, margins, radii, and shadows are permitted only inside this registry or an authorized reference-derived registry.
-

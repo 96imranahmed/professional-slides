@@ -37,7 +37,7 @@ Keep a row icon inside the label cell rather than adding a decorative icon colum
 ## Structural HTML reference
 
 ```html
-<section class="category-row" data-role="category-overview">
+<section class="category-row" data-role="description-slide">
   <article class="category" data-state="peer">
     <svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="chart-no-axes-column-increasing" aria-hidden="true"><path d="M5 21v-6"/><path d="M12 21V9"/><path d="M19 21V3"/></svg>
     <h2>Demand</h2><p>Size the reachable need and growth drivers.</p>

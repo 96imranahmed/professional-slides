@@ -10,8 +10,10 @@ Theme tokens, component treatments, platform APIs, and master/layout mechanics a
 | --- | --- | --- |
 | Understand the whole answer and its sufficient supporting logic | [Executive synthesis](executive-synthesis.md) | summarizes the answer; it does not operationalize owners and timing |
 | Understand how one problem, outcome, or system breaks into parts | [Decomposition](decomposition.md) | organizes a whole; it does not compare alternatives or encode sequence |
+| Understand several parallel items through repeated labels and one or more descriptive detail fields | [Description Slide](description.md) | describes repeated items; it does not derive a separate consequence from every row |
 | Verify a conclusion from quantitative evidence that remains interpretable with minimal prose | [Chart-led insight](chart-led-insight.md) | the exhibit system carries the proof; media count is only a composition choice |
-| Follow qualitative reasoning and see its distinct consequence | [Text-led implication](text-led-implication.md) | no quantitative exhibit is required to establish the reasoning |
+| Follow one qualitative reasoning chain and see its page-level consequence | [Text-led implication](text-led-implication.md) | one terminal implication completes the page-level argument |
+| Trace several descriptions or finding clusters to their separate consequences | [Description with Implication Slide](description-with-implication.md) | inherits Description Slide and adds one real inference, semantic arrow, and implication to every row |
 | Understand a verbal mechanism or qualification that is necessary before quantitative evidence can be interpreted | [Argument with chart](argument-with-chart.md) | the argument and evidence are jointly necessary; the chart cannot carry the page alone |
 | Choose among alternatives, scenarios, entities, or states on a common basis | [Comparison and options](comparison-options.md) | evaluates peers; it does not decompose one whole or show a time sequence |
 | Understand order, phases, dependencies, handoffs, or operating flow | [Process and roadmap](process-roadmap.md) | sequence is primary; named accountability and approval are not the main message |
@@ -39,7 +41,6 @@ These profiles provide additional geometry for recurring page forms without crea
 | Recurring page form | Profile | Parent archetype boundary |
 | --- | --- | --- |
 | one to three headline values | [Metric page](metric-page.md) | normally `chart-led insight`; use `executive synthesis` only when the values summarize several branches |
-| three to five icon-led categories | [Category overview](category-overview.md) | inherits `decomposition` when the categories are parts of one whole or `comparison and options` when they are peers being evaluated |
 | entity map with logos, bubbles, or capability bands | [Market landscape](market-landscape.md) | inherits `chart-led insight`, `comparison and options`, or `decomposition` according to the analytical question |
 | milestone, workstream, completeness, and risk status | [Project status](project-status.md) | inherits `process and roadmap`, `comparison and options`, or `recommendation and action plan` according to whether sequence, assessment, or accountability dominates |
 
@@ -50,7 +51,8 @@ Do not treat a specialized profile as permission to add a second action title, s
 - If the exhibit remains the argument after explanatory prose is removed, select `chart-led insight`; if the prose supplies a mechanism or qualification without which the exhibit is incomplete, select `argument with chart`.
 - If the slide classifies parts of one whole, select `decomposition`; if it evaluates peers against common criteria, select `comparison and options`.
 - If time or dependency is the primary relationship, select `process and roadmap`; if the primary requirement is who will do what by when and what approval is needed, select `recommendation and action plan`.
-- If the page states the complete answer and sufficient reasons, select `executive synthesis`; if it develops one reasoning chain and isolates a consequence, select `text-led implication`.
+- If the page states the complete answer and sufficient reasons, select `executive synthesis`; if it develops one reasoning chain and isolates one page-level consequence, select `text-led implication`.
+- If several repeated rows explain parallel items without deriving a separate consequence, select `Description Slide`. If each row maps that description through an arrow to a distinct consequence, select `Description with Implication Slide`, which inherits the base Description Slide.
 - If two descriptions still appear valid, identify what the audience must be able to do after a ten-second scan and choose the archetype that owns that action. Do not combine two archetype contracts on one page.
 
 ## Universal slide contract
