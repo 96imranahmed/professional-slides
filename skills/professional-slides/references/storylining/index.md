@@ -36,7 +36,7 @@ Use the simplest arc that fits:
 
 Use [dot-dash.md](dot-dash.md).
 
-For a new multi-chapter deck, group dots under the same parent and chapter IDs used by navigation. The [grounded worked example](dot-dash-example.md) shows the complete parallel structure from cover through close.
+For a new multi-chapter deck, group dots under the same parent and chapter IDs used by navigation. The [grounded worked example](dot-dash.md#grounded-worked-example) shows the complete parallel structure from cover through close.
 
 For a new deck, represent every planned slide in production order and obtain owner approval before any slide document is created.
 

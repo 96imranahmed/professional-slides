@@ -1,6 +1,6 @@
 # Slide Types
 
-Choose a slide in two passes. First select exactly one narrative archetype from the job the audience must perform. Then select exactly one composition variant from [evidence compositions](evidence-compositions.md), using `single evidence field` as the default when no sectioning is needed. Media count does not define a slide type: a page with two charts, four charts, or a chart and map still inherits one narrative archetype.
+Choose a slide in two semantic passes. First select exactly one narrative archetype from the job the audience must perform. Then select exactly one composition variant from [evidence compositions](evidence-compositions.md), using `single evidence field` as the default when no sectioning is needed. After those decisions, select a [slide layout](../design/slide-layouts.md) for the page geometry. Media count and layout do not define a slide type: a page with two charts, four charts, or a chart and map still inherits one narrative archetype.
 
 Theme tokens, component treatments, platform APIs, and master/layout mechanics are handled elsewhere. The archetypes below are mutually exclusive narrative contracts, not rigid visual templates.
 

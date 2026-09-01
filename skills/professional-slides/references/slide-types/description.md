@@ -11,12 +11,14 @@ The audience must understand a small taxonomy or repeated set before later pages
 - three to five parallel items whose relationship is clear from the action title and column headings;
 - one concise label plus one, two, three, or more aligned detail fields that perform the same jobs for every item;
 - an optional number or letter from [`item indicators`](../components/item-indicators.md) when explicit ordering or stable cross-reference improves scanning;
-- one consistent icon or logo treatment from [`icons-and-logos`](../components/icons-and-logos.md) when icons materially improve scanning;
+- one consistent category visual treatment from [`icons, category images, and logos`](../components/icons-and-logos.md): `icon-only`, `image-only`, or `icon-image` when the visuals materially improve scanning or recognition;
 - one action title explaining why the repeated set matters.
 
 ## Layout
 
 Use one row for three or four compact categories, two rows for four or five categories with more evidence, or aligned category rows when every category needs a description and one consistent secondary field. Use one left-hand parent field plus aligned child rows when hierarchy matters. Use open fields with top rules or whitespace before boxed cards. Keep peers equal unless the narrative explicitly names one as dominant.
+
+For a one-row category composition, use icons, images, or both. Icons provide a compact semantic cue; images make a category, example, product, place, or use context concrete. A combined treatment is valid only when the icon and image perform distinct jobs. Apply the selected treatment to every peer, keep peer image crops and icon geometry consistent, and retain the category label and description rather than asking either visual to carry the argument alone.
 
 Aligned rows form one **description ledger**, not a data table, when the row labels identify the repeated items and the remaining fields explain them rather than provide comparable measurements. A ledger may use one, two, three, or more detail columns. Define each detail field's semantic job before allocating columns, and repeat the same fields and geometry in every row. Use one of four named constructions:
 
@@ -35,7 +37,7 @@ Do not add an implication arrow merely to restate left-to-right reading order. U
 
 ## Structural references
 
-Use the inline-SVG description-row specimen in [`icons-and-logos.md`](../components/icons-and-logos.md#structural-html-reference) for a horizontal icon-led field. The four theme-bound description-ledger HTML specimens are owned below. For the hierarchical variant, place the parent statement in the first three grid columns and the repeated description field in the remaining nine columns.
+Use the category visual-row specimen in [`icons, category images, and logos`](../components/icons-and-logos.md#structural-html-reference) for `icon-only`, `image-only`, and combined `icon-image` category fields. The four theme-bound description-ledger HTML specimens are owned below. For the hierarchical variant, place the parent statement in the first three grid columns and the repeated description field in the remaining nine columns.
 
 ## Theme contract
 
@@ -386,7 +388,7 @@ No shared semantic state is demonstrated. Add `data-state` only when a category 
 
 ## Native translation
 
-Translate each row into one editable native group aligned to the resolved 12-column grid. Materialize the selected visual family and density through builder constants or native theme values. Keep label, narrative, and every detail field on stable column guides, and keep every peer row on one repeated internal grid. Align the vertical center of every content block to the row center, including multi-line text treated as one block. A filled label surface may span the row's content height, but center its text and icon within that surface. Build item indicators as editable native shapes and text. Center a dedicated indicator in both its column and row; for an embedded indicator, center the marker on the label field's leading boundary so it juts out consistently. Use editable SVG or native icon geometry. Do not flatten the ledger to an image.
+Translate each row or category column into one editable native group aligned to the resolved 12-column grid. Materialize the selected visual family and density through builder constants or native theme values. Keep label, narrative, and every detail field on stable column guides, and keep every peer on one repeated internal grid. Align the vertical center of every content block to the row center, including multi-line text treated as one block. A filled label surface may span the row's content height, but center its text and icon within that surface. Build item indicators as editable native shapes and text. Center a dedicated indicator in both its column and row; for an embedded indicator, center the marker on the label field's leading boundary so it juts out consistently. Use editable SVG or native icon geometry. Keep each category image as a replaceable native image object with a deliberate crop, and keep labels, icons, and descriptions editable rather than flattening the composition.
 
 ## Specimen acceptance check
 
@@ -401,13 +403,14 @@ Translate each row into one editable native group aligned to the resolved 12-col
 - Changing only `data-theme` preserves structure and meaning.
 - Changing only `data-density` preserves construction and uses registered type and spacing scales.
 - Secondary fields do not repeat the action title or masquerade as implications.
+- Category visuals use one registered `icon-only`, `image-only`, or `icon-image` treatment across every peer; images share one crop grammar and combined visuals perform distinct jobs.
 - Icons, when used, come from one registered library and are present for every peer.
 - All copy, sources, and fields remain editable in the native slide artifact.
 
 ## Failure modes
 
-Overlapping categories, generic icons, different accent colours for peers, slogans without scope, five categories that do not cover the parent question, decorative category cards that consume more space than their evidence, implication arrows attached to descriptions that make no inference, and table styling applied to prose that is not comparative data.
+Overlapping categories, generic icons, decorative stock images, inconsistent peer crops, redundant icon-image pairs, different accent colours for peers, slogans without scope, five categories that do not cover the parent question, decorative category cards that consume more space than their evidence, implication arrows attached to descriptions that make no inference, and table styling applied to prose that is not comparative data.
 
 ## Acceptance test
 
-Removing any category creates a real gap, merging any two loses a decision-relevant distinction, optional icons accelerate scanning without carrying unsupported meaning, every secondary field performs the same semantic job, and the labels recur consistently in later pages when the taxonomy becomes navigation.
+Removing any category creates a real gap, merging any two loses a decision-relevant distinction, the selected `icon-only`, `image-only`, or `icon-image` treatment improves scanning or recognition without carrying unsupported meaning, every secondary field performs the same semantic job, and the labels recur consistently in later pages when the taxonomy becomes navigation.

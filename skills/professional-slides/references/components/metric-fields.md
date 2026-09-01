@@ -41,7 +41,7 @@ Every metric includes a value, unit or basis, period or population when material
 .metric p { font: var(--type-body); color: var(--text-secondary); }
 ```
 
-For the hero-plus-peers variant, change only the grid proportion and the hero value role. For the decision-band variant, add one uninterrupted `action-surface` after the row and consume the slide's single terminal-action budget. Do not wrap the metrics in cards or add a left edge to the action surface.
+For the hero-plus-peers variant, change only the grid proportion and the hero value role. For the decision-band variant, add one reusable [`Insight Box`](insight-box.md) after the row and consume the slide's single detached-callout budget. Do not wrap the metrics in cards or add an edge accent to the insight box.
 
 ### Hero plus peers
 
@@ -68,17 +68,18 @@ For the hero-plus-peers variant, change only the grid proportion and the hero va
     <article class="metric" data-state="peer"><strong>1.8×</strong><span class="metric__rule"></span><h2>demand versus plan</h2><p>First ninety days</p></article>
     <article class="metric" data-state="peer"><strong>42%</strong><span class="metric__rule"></span><h2>week-eight retention</h2><p>Below the 55% follow-on threshold</p></article>
   </main>
-  <aside class="action-surface" data-role="action-surface">Fund the next market only after week-eight retention reaches the stated gate.</aside>
+  <aside class="insight-box" data-role="insight-box" data-variant="tonal">Fund the next market only after week-eight retention reaches the stated gate.</aside>
 </section>
 ```
 
 ```css
 .metric-slide--decision { width: 1280px; height: 720px; padding: var(--slide-margin-y) var(--slide-margin-x); display: grid; grid-template-rows: auto 1fr auto; gap: var(--space-4); }
 .metric-slide--decision > header { font: var(--type-action-title); border-bottom: var(--rule-page); padding-bottom: var(--space-3); }
-.metric-slide--decision .action-surface { display: grid; place-items: center; min-height: 72px; padding: var(--space-3) var(--space-5); background: var(--surface-action); border: 0; font: var(--type-callout); text-align: center; }
 ```
 
-The compact score-strip variant uses the same open-row geometry at the `label` and `body-compact` roles inside the executive-synthesis grid. It does not add a second title, card frame, or action surface.
+The `insight-box` geometry and theme values come from its component owner; the metric slide supplies only its position in the page grid.
+
+The compact score-strip variant uses the same open-row geometry at the `label` and `body-compact` roles inside the executive-synthesis grid. It does not add a second title, card frame, or insight box.
 
 ## Acceptance check
 

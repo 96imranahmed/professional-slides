@@ -25,7 +25,7 @@ Align the two regions to shared content-top and content-bottom guides. Start the
 
 ## Visual rules
 
-- Apply the active registered [`terminal action-surface variant`](../theming/component-bindings.md#terminal-action-surface); this archetype does not define a second container style.
+- Apply the active registered [`Insight Box`](../components/insight-box.md) variant; this archetype does not define a second container style.
 - Apply the [`visible label gate`](../components/copy.md#visible-label-gate); the implication region must not rely on a generic micro-heading to announce its purpose.
 - Use headings, short paragraphs, or genuine bullets to expose the reasoning structure; do not fill the main region with one uninterrupted wall of prose.
 - Use selective emphasis only for decisive mechanisms or qualifications, following the [`copy` guide](../components/copy.md).

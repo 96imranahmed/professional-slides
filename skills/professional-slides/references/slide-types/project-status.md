@@ -27,7 +27,7 @@ Use one of three variants: a milestone timeline with current state and forecast;
     <div class="status-page__milestones" data-role="timeline"><span>Design complete</span><span aria-current="step">Integration test</span><span>Trial operations</span><span>Opening</span></div>
     <table data-role="workstream-status"><thead><tr><th>Workstream</th><th>Complete</th><th>Forecast</th><th>Critical dependency</th></tr></thead><tbody><tr><th>Systems</th><td>68%</td><td>Watch</td><td>End-to-end test pass</td></tr><tr><th>Stations</th><td>91%</td><td>On plan</td><td>Final assurance closeout</td></tr></tbody></table>
   </main>
-  <aside class="status-page__action" data-role="action-surface">Protect the trial window by resolving the integration test owner and recovery plan this month.</aside>
+  <aside class="insight-box" data-role="insight-box" data-variant="tonal">Protect the trial window by resolving the integration test owner and recovery plan this month.</aside>
 </section>
 ```
 
@@ -40,14 +40,13 @@ Use one of three variants: a milestone timeline with current state and forecast;
 .status-page__milestones [aria-current="step"] { color: var(--component-primary); font-weight: 700; }
 .status-page table { width: 100%; border-collapse: collapse; font: var(--type-body-compact); }
 .status-page th, .status-page td { padding: var(--space-3); border-bottom: var(--rule-quiet); text-align: left; }
-.status-page__action { display: grid; place-items: center; padding: var(--space-3) var(--space-5); background: var(--surface-action); text-align: center; font: var(--type-callout); }
 ```
 
-Use the indicators from [`comparison-indicators`](../components/comparison-indicators.md) when a table encodes completion or one-to-five scores. The action surface has no left edge and consumes the slide's single terminal-action budget.
+Use the indicators from [`comparison-indicators`](../components/comparison-indicators.md) when a table encodes completion or one-to-five scores. The reusable [`Insight Box`](../components/insight-box.md) supplies its own borderless surface and consumes the slide's single detached-callout budget.
 
 ## Failure modes
 
-Traffic lights without thresholds, percent-complete values with no baseline, every workstream marked green, a decorative timeline with no timing semantics, several action boxes, and status copy that does not identify the decision or dependency.
+Traffic lights without thresholds or a same-slide legend, heatmaps without named anchors or a same-slide legend, percent-complete values with no baseline, every workstream marked green, a decorative timeline with no timing semantics, several action boxes, and status copy that does not identify the decision or dependency.
 
 ## Acceptance test
 

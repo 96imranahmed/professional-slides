@@ -49,7 +49,7 @@ Every visible component line must have exactly one job: boundary, separator, lea
 
 Store each selected treatment as a named theme or component variant containing its surface, outline, separator, header, padding, and text-style bindings. The component definition may bind to different tokens in light, dark, compact, or reference-derived modes, but each variant must have an explicit applicability rule. Platform adapters materialize the resolved values only when native master, layout, or theme inheritance cannot preserve them.
 
-Implication regions inherit the active [`terminal action-surface variant`](../theming/component-bindings.md#terminal-action-surface). Action sections and semantic states inherit their named component variant. Do not reinterpret either locally as a generic box or highlighted header.
+Detached implication regions use the active [`Insight Box`](insight-box.md) variant. Action sections and semantic states inherit their named component variant. Do not reinterpret either locally as a generic box or highlighted header.
 
 ## Acceptance check
 

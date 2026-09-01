@@ -27,6 +27,8 @@
     "raw_grid_table",
     "under_composed_canvas",
     "inconsistent_component",
+    "palette_or_colour_drift",
+    "tracker_continuity_gap",
     "reference_quality_gap",
     "redundant_role_label",
     "missing_required_structure",

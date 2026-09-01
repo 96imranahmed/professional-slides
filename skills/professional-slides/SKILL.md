@@ -29,7 +29,7 @@ For every mode, read the relevant Design, Theming, Components, and Slide types g
 
 - [Templates](references/templates/index.md): deck-specific decision structure and the extension contract.
 - [Storylining](references/storylining/index.md): hypothesis tree, governing thought, dot-dash, storyboard, and titles.
-- [Design](references/design/index.md): visual system and page composition.
+- [Design](references/design/index.md): visual system and page composition. Read [Slide layouts](references/design/slide-layouts.md) when the canvas needs one or more named content regions or an existing design must morph between region structures.
 - [Theming](references/theming/index.md): palettes, typography, spacing, component bindings, variants, and HTML/CSS variables.
 - [Components](references/components/index.md): copy, titles, trackers, sources, and recurring elements.
 - [Slide types](references/slide-types/index.md): narrative page archetypes.
@@ -43,7 +43,7 @@ Do not repeat an owner's rules in another file. A structural HTML specimen is op
 
 1. Select one matching template when available.
 2. Build the hypothesis tree and explain its logic.
-3. Write the complete dot-dash in production order, with one supported dot per planned slide. Include the cover, executive summary when required, navigation pages when used, close, and authored appendix pages.
+3. Write the complete dot-dash as Markdown in production order. Each planned slide has one supported dot, and that dot is the exact proposed audience-facing slide title or structural heading. Include the cover, executive summary when required, navigation pages when used, close, and authored appendix pages.
 4. Show the dot-dash to the owner and obtain approval before creating any slide document.
 5. Compile and validate the [pre-authoring contract](references/storylining/pre-authoring-contract.md).
 6. Choose the simplest design, components, slide types, charts, and platform tools that prove the approved story.
@@ -66,6 +66,14 @@ Preserve the existing design unless the user asks for a redesign. Recommend miss
 - Use trackers only for navigation. Omit them when the title sequence is enough.
 - Delete labels, boxes, strips, icons, and copy that do not add meaning.
 - Never invent evidence or hide uncertainty.
+
+## Lock deck-wide consistency
+
+Before authoring, create one deck treatment ledger from the approved theme manifest and tracker contract. Map every slide or contiguous slide range to its visual family, density profile, analytical-header template, tracker state, layout, repeated component variants, and semantic colour roles. Build recurring values from shared theme or builder constants; do not recreate them slide by slide.
+
+When navigation is used, the tracker map defines the complete approved item set, exact IDs, labels, order, ranges, selected items, and shared constructions. Follow the [tracker owner](references/components/trackers/index.md): show every planned section page, bias circular numbers, keep split-content left fields title-only, and vertically center the list in a full-height right backdrop. Apply the declared compact state continuously.
+
+After rendering, compare the full montage and every slide against the treatment ledger. Verify title and content anchors, typography, spacing, component variants, semantic colour use, tracker completeness, and tracker continuity. Record and justify intentional exceptions; repair every unexplained drift before release.
 
 ## Verify and deliver
 

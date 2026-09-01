@@ -6,12 +6,14 @@ Components are reusable slide elements. Use them only when they perform a clear 
 
 - [Copy](copy.md): titles, labels, body text, and copy QA.
 - [Text boxes](text-box.md): text-container geometry and overflow.
+- [Insight boxes](insight-box.md): reusable slide-level insights, implications, recommendations, decisions, and actions.
+- [Quote clusters](quote-cluster.md): one to five sourced statements in full-field or sectional placements.
 - [Trackers](trackers/index.md): navigation.
 - [Guidelines](guidelines.md): rules, borders, and section treatments.
 - [Arrows](arrows.md): inference, transfer, handoff, and transition marks.
-- [Icons and logos](icons-and-logos.md): semantic icons and brand marks.
+- [Icons, category images, and logos](icons-and-logos.md): semantic icons, category imagery, and brand marks.
 - [Chart callouts](chart-callouts.md): evidence-linked annotations and leaders.
-- [Comparison indicators](comparison-indicators.md): scores and state indicators.
+- [Table cell status and comparison indicators](comparison-indicators.md): completion spinners, traffic-light cells, heatmap cells, and their required legends.
 - [Item indicators](item-indicators.md): numbered or lettered row and category markers.
 - [Metric fields](metric-fields.md): large numeric evidence.
 
@@ -27,9 +29,9 @@ The untracked analytical-header template contains an action-title slot. A tracke
 
 ## Callouts and annotations
 
-Use a callout only when it adds evidence, interpretation, or a decision that the exhibit does not already communicate.
+Use a callout only when it adds evidence, interpretation, or a decision that the exhibit does not already communicate. Use the reusable [`insight box`](insight-box.md) for a detached slide-level synthesis surface.
 
-A slide may have no more than one terminal action surface. Recommendation, implication, decision, next action, and data request are alternative states of that same component.
+A section may have no more than one insight box or terminal action surface. In an ordinary analytical slide, use one page-level instance in total and never repeat it once per column, branch, row, paragraph, metric, or chart. If several sections appear to need their own boxes, consolidate them into one governing synthesis or separate the page. Recommendation, implication, decision, next action, and data request are alternative states of that same component.
 
 Do not prepend labels such as `IC conclusion`, `Recommendation`, or `Key takeaway` when the statement already explains its role.
 

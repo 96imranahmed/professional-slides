@@ -52,11 +52,15 @@ Release only when all apply:
 ### Design
 
 - One identical component-primary swatch governs structural emphasis.
+- The exact final editable artifacts pass the declared colour ledger with no undeclared editable-object colours or unexplained role-to-swatch drift.
 - Additional colours encode real data, not decoration or status.
+- Every traffic-light table and heatmap includes a readable same-slide legend with the exact states, thresholds, anchors, and palette used in the exhibit.
 - Trackers communicate navigation only and are omitted when unnecessary.
 - Analytical headers and tracker labels are consistent across their declared ranges.
+- Every full tracker page shows the complete approved numbered and labelled item set; every tracked analytical page carries the correct selected compact state without gaps.
 - Copy has no redundant role label or reserved label column.
 - A terminal action, implication, recommendation, or call to action is used only when it adds distinct meaning. These are mutually exclusive states of the same component.
+- Every section contains at most one insight box or terminal action surface, and ordinary analytical slides do not repeat the component across rows, columns, branches, metrics, or charts.
 - The layout fits the evidence and is not a repeated card, column, or process template.
 - No under-composed core analytical canvas remains.
 - Every slide passes the full-size anti-slop audit.
@@ -104,6 +108,7 @@ Each result records:
 - dimension scores;
 - critical, major, and minor defects;
 - anti-slop review with one audit record per slide;
+- deck-consistency review with material theme-manifest and audit paths, full-deck comparison, palette-role verification, tracker-map verification, repeated-component verification, and zero unresolved findings;
 - reference comparison when required;
 - fresh-run preparation evidence;
 - reviewer notes.

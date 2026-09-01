@@ -83,7 +83,7 @@ Use an inline `style` attribute only for content data such as `style="--value: 7
 Use `data-variant` for a registered construction and `data-state` for a semantic state:
 
 ```html
-<aside class="action-surface" data-variant="tonal" data-state="active">
+<aside class="insight-box" data-variant="tonal" data-state="active">
   Proceed if the next cohort sustains retention above the agreed threshold.
 </aside>
 ```
@@ -113,4 +113,3 @@ Do not flatten the specimen to an image. Recalculate native coordinates from the
 - Changing only `data-density` preserves semantics and component construction while changing registered scale and guides.
 - Repeated components share identical alias bindings unless a named variant or semantic state applies.
 - The native artifact remains editable and its rendered result matches the intended hierarchy.
-

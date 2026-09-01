@@ -1,6 +1,6 @@
 # Chart Callouts
 
-Chart callouts attach interpretation to a specific mark, interval, gap, threshold, or outlier. They are part of the quantitative evidence field and do not automatically consume the slide's separate terminal-action surface. A detached insight box that summarizes the entire page does consume the slide's single visually distinct callout budget.
+Chart callouts attach interpretation to a specific mark, interval, gap, threshold, or outlier. They are part of the quantitative evidence field and do not automatically consume the slide's separate terminal-action surface. A detached [`Insight Box`](insight-box.md) that summarizes the entire page does consume the slide's single visually distinct callout budget.
 
 ## Growth-rate callout
 

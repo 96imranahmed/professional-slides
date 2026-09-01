@@ -81,7 +81,7 @@ class SourceStructureTests(unittest.TestCase):
             f"{SKILL_ROOT}/references/components/copy.md": 900,
             f"{SKILL_ROOT}/references/slide-types/executive-synthesis.md": 650,
             f"{SKILL_ROOT}/references/storylining/index.md": 900,
-            f"{SKILL_ROOT}/references/storylining/dot-dash.md": 800,
+            f"{SKILL_ROOT}/references/storylining/dot-dash.md": 1800,
             f"{SKILL_ROOT}/references/storylining/pre-authoring-contract.md": 650,
             f"{SKILL_ROOT}/references/evaluation/index.md": 1600,
         }
@@ -100,6 +100,36 @@ class SourceStructureTests(unittest.TestCase):
         self.assertIn("exact same deck-level", design)
         self.assertIn("one-line and two-line titles start at the same point", design)
         self.assertIn("do not impose the same card grid", design)
+
+    def test_slide_layouts_are_a_separate_registered_design_axis(self):
+        skill = read(f"{SKILL_ROOT}/SKILL.md").lower()
+        design = read(f"{SKILL_ROOT}/references/design/index.md").lower()
+        slide_types = read(f"{SKILL_ROOT}/references/slide-types/index.md").lower()
+        layouts = read(f"{SKILL_ROOT}/references/design/slide-layouts.md").lower()
+        bindings = read(f"{SKILL_ROOT}/references/theming/component-bindings.md").lower()
+
+        self.assertIn("[slide layouts](references/design/slide-layouts.md)", skill)
+        self.assertIn("[slide-layout router](slide-layouts.md)", design)
+        self.assertIn("[slide layout](../design/slide-layouts.md)", slide_types)
+        self.assertIn("layouts own page-level region geometry only", design)
+        self.assertIn("they do not define the narrative job", layouts)
+        self.assertIn("if the two halves contain genuinely unrelated claims, they belong on separate slides", layouts)
+        self.assertEqual(layouts.count('<main class="deck"'), 6)
+        for variant in (
+            "cover-split-50-50",
+            "section-split-50-50",
+            "context-detail-20-80",
+            "soft-split-50-50",
+            "full-field",
+            "implication-split",
+        ):
+            self.assertIn(f'data-layout="{variant}"', layouts)
+        for slot in ("primary", "secondary", "context", "evidence", "inference", "implication"):
+            self.assertIn(f'data-slot="{slot}"', layouts)
+        self.assertIn("| slide layout frame |", bindings)
+        self.assertIn("--slide-layout-region-padding", bindings)
+        self.assertNotRegex(layouts, r"#[0-9a-f]{3,8}\\b")
+        self.assertNotIn("—", layouts)
 
     def test_theming_contract_covers_families_density_and_component_variables(self):
         theming_root = ROOT / SKILL_ROOT / "references" / "theming"
@@ -179,10 +209,12 @@ class SourceStructureTests(unittest.TestCase):
             "chart-segment",
             "status-positive",
             "status-positive-tint",
+            "on-status-positive",
             "status-caution",
             "status-caution-tint",
             "status-negative",
             "status-negative-tint",
+            "on-status-negative",
             "status-info",
             "status-info-tint",
             "chart-series-1",
@@ -200,6 +232,34 @@ class SourceStructureTests(unittest.TestCase):
             for foreground in ("ink", "text-secondary", "muted-ink"):
                 self.assertGreaterEqual(contrast_ratio(palette[foreground], palette["canvas"]), 4.5)
             self.assertGreaterEqual(contrast_ratio(palette["on-primary"], palette["component-primary"]), 4.5)
+            self.assertGreaterEqual(contrast_ratio(palette["on-status-positive"], palette["status-positive"]), 4.5)
+            self.assertGreaterEqual(contrast_ratio(palette["on-status-negative"], palette["status-negative"]), 4.5)
+
+    def test_table_cell_status_components_define_palettes_and_mandatory_legends(self):
+        components = read(f"{SKILL_ROOT}/references/components/index.md").lower()
+        indicators = read(f"{SKILL_ROOT}/references/components/comparison-indicators.md").lower()
+        bindings = read(f"{SKILL_ROOT}/references/theming/component-bindings.md").lower()
+        tokens = read(f"{SKILL_ROOT}/references/theming/tokens.md").lower()
+        evaluation = read(f"{SKILL_ROOT}/references/evaluation/index.md").lower()
+
+        self.assertIn("table cell status and comparison indicators", components)
+        for variant in ("completion", "traffic-light", "heatmap"):
+            self.assertIn(f'data-variant="{variant}"', indicators)
+        for palette in ("theme-sequential", "theme-status", "red-white-green", "red-white"):
+            self.assertIn(f'data-palette="{palette}"', indicators)
+        self.assertIn('class="table-cell-status__spinner"', indicators)
+        self.assertGreaterEqual(indicators.count('class="table-cell-status__legend"'), 2)
+        self.assertGreaterEqual(indicators.count("same-slide legend"), 3)
+        self.assertIn("aria-describedby=\"forecast-status-legend\"", indicators)
+        self.assertIn("aria-describedby=\"evidence-score-legend\"", indicators)
+        self.assertIn("the legend is mandatory", indicators)
+        self.assertIn("--table-cell-heat-1", bindings)
+        self.assertIn("--table-cell-legend-rule", bindings)
+        for level in range(1, 6):
+            self.assertIn(f"--heatmap-primary-{level}", tokens)
+        self.assertIn("every traffic-light table and heatmap includes a readable same-slide legend", evaluation)
+        self.assertNotRegex(indicators, r"#[0-9a-f]{3,8}\\b")
+        self.assertNotIn("—", indicators)
 
     def test_executive_summary_is_a_distinct_synthesis_type(self):
         executive = read(f"{SKILL_ROOT}/references/slide-types/executive-synthesis.md").lower()
@@ -214,10 +274,91 @@ class SourceStructureTests(unittest.TestCase):
         ):
             self.assertIn(phrase, executive)
         self.assertIn("do not add a tracker", executive)
+        self.assertIn("do not add a subtitle", executive)
+        self.assertNotIn('class="subtitle"', executive)
+        self.assertEqual(executive.count('<main class="deck"'), 3)
+        for variant in ("one-column", "two-column", "three-column"):
+            self.assertIn(f'data-variant="{variant}"', executive)
+        self.assertEqual(executive.count("<h1>executive summary</h1>"), 3)
+        self.assertIn("--executive-synthesis-columns", executive)
+        self.assertIn('data-heading-style="text"', executive)
+        self.assertIn('data-heading-style="underline"', executive)
+        self.assertIn("branches are open, borderless, and backgroundless", executive)
+        self.assertNotIn("border-top:var(--executive-synthesis-heading-rule)", executive)
+        self.assertNotIn("executive-synthesis__action", executive)
+        self.assertEqual(executive.count('class="insight-box"'), 3)
+        bindings = read(f"{SKILL_ROOT}/references/theming/component-bindings.md").lower()
+        self.assertIn("| executive synthesis |", bindings)
+
+    def test_insight_box_is_shared_and_exposes_orthogonal_variants(self):
+        index = read(f"{SKILL_ROOT}/references/components/index.md").lower()
+        insight = read(f"{SKILL_ROOT}/references/components/insight-box.md").lower()
+        executive = read(f"{SKILL_ROOT}/references/slide-types/executive-synthesis.md").lower()
+        metrics = read(f"{SKILL_ROOT}/references/components/metric-fields.md").lower()
+        status = read(f"{SKILL_ROOT}/references/slide-types/project-status.md").lower()
+
+        self.assertIn("[insight boxes](insight-box.md)", index)
+        self.assertIn("a section may have no more than one insight box", index)
+        self.assertIn("use at most one insight box per section", insight)
+        self.assertIn("never repeat the component once per column", insight)
+        self.assertIn("consolidate them into one governing synthesis or split the page", insight)
+        self.assertIn("text is centered horizontally and vertically by default", insight)
+        self.assertIn("full-width box may use left-aligned text", insight)
+        self.assertIn("--insight-box-border:0", insight)
+        self.assertIn("filled variants have no border", insight)
+        self.assertIn("body copy uses regular font weight", insight)
+        self.assertIn("--insight-box-font:var(--weight-regular)", insight)
+        self.assertIn("--insight-box-padding-y-multi", insight)
+        self.assertIn('data-content="multi-paragraph"', insight)
+        self.assertIn('data-divider="between-sections"', insight)
+        self.assertIn('class="insight-box__header"', insight)
+        self.assertIn("--insight-box-dotted-border", insight)
+        self.assertEqual(insight.count('<main class="deck"'), 5)
+        for variant in ("tonal", "neutral", "dotted", "primary"):
+            self.assertIn(f'data-variant="{variant}"', executive + insight)
+        for consumer in (executive, metrics, status):
+            self.assertIn('class="insight-box"', consumer)
+
+    def test_quote_cluster_supports_counts_and_sectional_placement(self):
+        components = read(f"{SKILL_ROOT}/references/components/index.md").lower()
+        quotes = read(f"{SKILL_ROOT}/references/components/quote-cluster.md").lower()
+        bindings = read(f"{SKILL_ROOT}/references/theming/component-bindings.md").lower()
+
+        self.assertIn("[quote clusters](quote-cluster.md)", components)
+        self.assertIn("it is an evidence component, not a narrative archetype or a slide layout", quotes)
+        self.assertEqual(quotes.count('<main class="deck"'), 5)
+        for variant in ("one-up", "two-up", "three-up", "four-up", "five-up"):
+            self.assertIn(f'data-variant="{variant}"', quotes)
+        for placement in ("full-field", "section"):
+            self.assertIn(f'data-placement="{placement}"', quotes)
+        self.assertIn('data-layout="soft-split-50-50"', quotes)
+        self.assertIn('data-variant="two-up" data-placement="section"', quotes)
+        self.assertIn("six equal internal tracks", quotes)
+        for treatment in ("callout", "contained"):
+            self.assertIn(f'data-treatment="{treatment}"', quotes)
+        self.assertNotIn('data-treatment="open"', quotes)
+        self.assertNotIn("border-top: var(--quote-item-border)", quotes)
+        self.assertIn('data-attribution-align="left"', quotes)
+        self.assertIn('data-avatar="true"', quotes)
+        self.assertEqual(quotes.count('class="quote-cluster__avatar"'), 5)
+        self.assertEqual(quotes.count("quote-cluster__mark quote-cluster__mark--close"), 15)
+        self.assertIn("align-content: center", quotes)
+        self.assertNotIn("margin-top: auto", quotes)
+        self.assertIn("blockquote::after", quotes)
+        self.assertIn("rounded enclosure containing the quote body and attribution", bindings)
+        self.assertIn("| quote cluster |", bindings)
+        self.assertIn("--quote-cluster-columns", bindings)
+        self.assertIn("--quote-caret-size", bindings)
+        self.assertIn("--quote-caret-angle", bindings)
+        self.assertIn("--quote-avatar-size", bindings)
+        self.assertIn("the line-only quote treatment is not registered", bindings)
+        self.assertNotRegex(quotes, r"#[0-9a-f]{3,8}\b")
+        self.assertNotIn("—", quotes)
 
     def test_description_slide_owns_variable_detail_and_embedded_indicator_variants(self):
         index = read(f"{SKILL_ROOT}/references/slide-types/index.md").lower()
         description = read(f"{SKILL_ROOT}/references/slide-types/description.md").lower()
+        category_visuals = read(f"{SKILL_ROOT}/references/components/icons-and-logos.md").lower()
 
         self.assertIn("[description slide](description.md)", index)
         self.assertIn("base slide type", description)
@@ -242,6 +383,13 @@ class SourceStructureTests(unittest.TestCase):
         self.assertIn("never changes `.action-title`", description)
         self.assertIn(".description-slide__row:last-of-type { border-bottom: 0; }", description)
         self.assertIn("the final row has no bottom divider", description)
+        for treatment in ("icon-only", "image-only", "icon-image"):
+            self.assertIn(treatment, description)
+            self.assertIn(treatment, category_visuals)
+        self.assertIn('data-visual-treatment="icon-image"', category_visuals)
+        self.assertIn('class="category__image"', category_visuals)
+        self.assertIn("perform distinct jobs", category_visuals)
+        self.assertIn("replaceable native image object", description)
         self.assertIn("every row shares one vertical centerline", description)
         self.assertIn("align-items: center", description)
         self.assertIn("padding-block: var(--description-slide-row-padding)", description)
@@ -252,6 +400,7 @@ class SourceStructureTests(unittest.TestCase):
         self.assertNotIn("diagnostic-to-impact", description)
         self.assertNotRegex(description, r"#[0-9a-f]{3,8}\\b")
         self.assertNotIn("—", description)
+        self.assertNotIn("—", category_visuals)
 
     def test_description_with_implication_inherits_description_slide_and_owns_specimens(self):
         index = read(f"{SKILL_ROOT}/references/slide-types/index.md").lower()
@@ -355,6 +504,7 @@ class SourceStructureTests(unittest.TestCase):
 
     def test_trackers_are_optional_navigation_only(self):
         trackers = read(f"{SKILL_ROOT}/references/components/trackers/index.md").lower()
+        specimens = read(f"{SKILL_ROOT}/references/components/trackers/specimens.md").lower()
         self.assertIn("where are we in the deck", trackers)
         self.assertIn("never an executive summary", trackers)
         self.assertIn("default to no visible tracker", trackers)
@@ -364,6 +514,56 @@ class SourceStructureTests(unittest.TestCase):
         self.assertIn("parent and chapter hierarchy", trackers)
         self.assertIn("parent ids equal section ids", trackers)
         self.assertIn("chapter-item ids equal analytical subgroup ids", trackers)
+        self.assertIn("contents progress pages", trackers)
+        self.assertIn("hierarchical numbers such as `8.1` through `8.8`", trackers)
+        self.assertIn("a longer list is a density state", trackers)
+        self.assertIn("show the full tracker at every major section change", trackers)
+        self.assertIn("left field contains the section title only", trackers)
+        self.assertIn("bias numbered tracker markers to circles", trackers)
+        self.assertIn("vertically center the complete contents list", trackers)
+        self.assertEqual(specimens.count('<main class="deck"'), 5)
+        for variant in (
+            "sequential-circles",
+            "split-contents",
+            "compact-label",
+            "compact-number-strip",
+            "numbered-section-break",
+        ):
+            self.assertIn(f'data-variant="{variant}"', specimens)
+        self.assertIn('data-state="selected" aria-current="step"', specimens)
+        self.assertIn(">8.7</span><strong>ipo readiness</strong>", specimens)
+        self.assertIn("--tracker-section-number-font: var(--type-section-number)", specimens)
+        self.assertIn('.tracker-page[data-variant="sequential-circles"]', specimens)
+        self.assertIn('.tracker-page[data-variant="split-contents"] {\n  padding: 0 0 0 var(--slide-margin-inline);', specimens)
+        self.assertIn('min-height: var(--slide-height);\n  width: 100%;', specimens)
+        self.assertIn("align-self: center", specimens)
+        self.assertNotIn("margin-top: var(--space-10)", specimens)
+        self.assertNotIn('li[data-state="selected"] {\n  padding:', specimens)
+        self.assertNotIn('.tracker--compact-label .tracker__current {\n  color: var(--tracker-active);\n  border-bottom:', specimens)
+        self.assertIn('.tracker--compact-number-strip li[data-state="selected"] {\n  color: var(--tracker-active);\n  border-bottom: var(--tracker-rule);', specimens)
+        self.assertIn('li[data-state="selected"] .tracker__marker {\n  border: var(--tracker-rule);', specimens)
+        self.assertIn('--tracker-list-width: 72%;', specimens)
+        self.assertIn('.tracker--split-contents ol {\n  display: grid;\n  gap: var(--tracker-list-gap);\n  width: var(--tracker-list-width);\n  max-width: 100%;', specimens)
+        self.assertIn('gap: var(--tracker-gap);\n  width: 100%;\n  padding: var(--tracker-gap);\n  font: var(--tracker-item-font);', specimens)
+        self.assertIn('with generous space after short labels', specimens)
+        self.assertIn('normally around three quarters', trackers)
+        self.assertNotRegex(specimens, r"#[0-9a-f]{3,8}\\b")
+        self.assertNotIn("—", specimens)
+
+    def test_deck_consistency_contract_covers_trackers_and_colour_roles(self):
+        skill = read(f"{SKILL_ROOT}/SKILL.md").lower()
+        design = read(f"{SKILL_ROOT}/references/design/index.md").lower()
+        theming = read(f"{SKILL_ROOT}/references/theming/index.md").lower()
+        trackers = read(f"{SKILL_ROOT}/references/components/trackers/index.md").lower()
+        evaluation = read(f"{SKILL_ROOT}/references/evaluation/index.md").lower()
+
+        self.assertIn("one deck treatment ledger", skill)
+        self.assertIn("complete approved item set", skill)
+        self.assertIn("reconcile the rendered deck against the treatment ledger slide by slide", design)
+        self.assertIn("include a colour ledger", theming)
+        self.assertIn("no undeclared editable-object colour", theming)
+        self.assertIn("complete item set shown on every full tracker page", trackers)
+        self.assertIn("deck-consistency review", evaluation)
 
     def test_copy_is_direct_and_forbids_em_dashes(self):
         copy = read(f"{SKILL_ROOT}/references/components/copy.md").lower()
@@ -377,19 +577,26 @@ class SourceStructureTests(unittest.TestCase):
     def test_dot_dash_is_complete_and_approved(self):
         dot_dash = read(f"{SKILL_ROOT}/references/storylining/dot-dash.md").lower()
         storylining = read(f"{SKILL_ROOT}/references/storylining/index.md").lower()
-        example = read(f"{SKILL_ROOT}/references/storylining/dot-dash-example.md").lower()
+        worked_example = dot_dash.split("## grounded worked example", maxsplit=1)[1]
         self.assertIn("represent every planned slide in production order with exactly one dot", dot_dash)
         self.assertIn("every dot must contain at least one substantive dash", dot_dash)
+        self.assertIn("write the review artifact as markdown", dot_dash)
+        self.assertIn("the exact proposed audience-facing title of one slide", dot_dash)
+        self.assertIn("it is the underlying title that should appear on the authored slide", dot_dash)
+        self.assertIn("do not add a separate `slide title` field", dot_dash)
+        self.assertIn("copy each dot verbatim", dot_dash)
         self.assertIn("tracker and section map", dot_dash)
         self.assertIn("until the owner explicitly approves it", dot_dash)
         self.assertIn("before any slide document is created", storylining)
-        self.assertIn("slide-by-slide model", dot_dash)
+        self.assertIn("## grounded worked example", dot_dash)
         self.assertIn("parent tracker", storylining)
         self.assertIn("chapter tracker", storylining)
-        self.assertIn("slidescience.co/storytelling-in-powerpoint", example)
-        self.assertIn("## complete dot-dash", example)
-        self.assertEqual(example.count("**dot:**"), 16)
-        self.assertIn("parent tracker order equals dot-dash section order", example)
+        self.assertIn("slidescience.co/storytelling-in-powerpoint", worked_example)
+        self.assertIn("### complete dot-dash", worked_example)
+        self.assertEqual(worked_example.count("**dot:**"), 16)
+        self.assertNotIn("**slide title:**", worked_example)
+        self.assertIn("parent tracker order equals dot-dash section order", worked_example)
+        self.assertFalse((ROOT / SKILL_ROOT / "references/storylining/dot-dash-example.md").exists())
 
     def test_contract_supports_untracked_and_existing_decks(self):
         contract = read(f"{SKILL_ROOT}/references/storylining/pre-authoring-contract.md").lower()

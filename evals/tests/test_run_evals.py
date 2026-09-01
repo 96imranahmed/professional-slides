@@ -47,6 +47,15 @@ class EvalRunnerTests(unittest.TestCase):
             "criticalFailures": failures or [],
             "majorDefects": [],
             "minorDefects": [],
+            "deckConsistencyReview": {
+                "themeManifestPath": f"{case_id}/{arm}/theme-manifest.json",
+                "auditPath": f"{case_id}/{arm}/deck-consistency-audit.json",
+                "fullDeckCompared": True,
+                "paletteRolesVerified": True,
+                "trackerMapVerified": True,
+                "repeatedComponentsVerified": True,
+                "unresolvedFindings": [],
+            },
             "antiSlopReview": {
                 "renderedTextInspected": True,
                 "fullDeckMontageInspected": True,
@@ -137,6 +146,8 @@ class EvalRunnerTests(unittest.TestCase):
                 (result["renderPaths"][0], "render"),
                 (result["preAuthoringReview"]["contractPath"], "{}"),
                 (result["preAuthoringReview"]["validatorOutputPath"], "valid"),
+                (result["deckConsistencyReview"]["themeManifestPath"], "{}"),
+                (result["deckConsistencyReview"]["auditPath"], "{}"),
             ):
                 path = workspace / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -215,6 +226,20 @@ class EvalRunnerTests(unittest.TestCase):
         result["minorDefects"] = ["Slide 2 spacing"]
         errors, report = eval_runner.evaluate(self.cases, self.document([result]), "self")
         self.assertEqual(errors, [])
+        self.assertFalse(report["passed"])
+
+    def test_self_result_requires_deck_consistency_review(self):
+        result = self.result(self.case_ids[0], "self", 5)
+        del result["deckConsistencyReview"]
+        errors, report = eval_runner.evaluate(self.cases, self.document([result]), "self")
+        self.assertTrue(any("deckConsistencyReview must be an object" in error for error in errors))
+        self.assertFalse(report["passed"])
+
+    def test_unresolved_deck_consistency_finding_blocks_result(self):
+        result = self.result(self.case_ids[0], "self", 5)
+        result["deckConsistencyReview"]["unresolvedFindings"] = ["Slide 4 uses an undeclared blue"]
+        errors, report = eval_runner.evaluate(self.cases, self.document([result]), "self")
+        self.assertTrue(any("unresolvedFindings must be empty" in error for error in errors))
         self.assertFalse(report["passed"])
 
     def test_unexplained_role_label_blocks_release(self):

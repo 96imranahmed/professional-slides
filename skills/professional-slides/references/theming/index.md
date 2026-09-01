@@ -69,6 +69,8 @@ Before authoring a new deck or redesigning an existing one, record:
 - authorized reference-derived overrides;
 - any platform fallback that must materialize inherited values.
 
+Include a colour ledger that resolves each semantic role to one exact swatch for the deck and identifies the slide or component families allowed to consume it. The same semantic role must resolve identically in PowerPoint and Google Slides. Images may contain their source colours, but editable text, shapes, lines, tables, trackers, callouts, and non-data chart decoration may use only declared roles. Chart-series and status colours remain limited to their declared evidence semantics.
+
 This may be a concise authoring note, builder object, or theme section in the deck contract. It is not a second token registry.
 
 ## Reference-derived themes
@@ -86,4 +88,4 @@ Reference-derived themes must still provide the complete required token set, rea
 - Radius and shadow default to restrained or absent. A reference-derived construction may use more only when it is consistent and intentional.
 - Every repeated component resolves to one named binding and variant.
 - PowerPoint and Google Slides adapters materialize the same resolved values and are rendered separately.
-
+- A final object-level colour audit finds no undeclared editable-object colour and no semantic role resolving to multiple swatches without an authorized platform fallback.

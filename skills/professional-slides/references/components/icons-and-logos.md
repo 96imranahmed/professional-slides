@@ -1,6 +1,6 @@
-# Icons and Logos
+# Icons, Category Images, and Logos
 
-Icons and logos identify a real entity, category, capability, operating step, or repeated state. They may also reduce repeated copy and create restrained visual rhythm when that materially improves scanability or composition; icon density is not a goal. Use only authorized logos and one consistent icon library for the complete deck. When no approved brand or reference icon library is specified, prefer Lucide as the neutral source rather than drawing icons from memory or mixing arbitrary SVGs; another coherent library is valid when it offers a materially better semantic match or the approved visual system requires it.
+Icons and logos identify a real entity, category, capability, operating step, or repeated state. Category images may add concrete recognition, context, or visual evidence when a picture communicates more than an abstract mark. These visuals may also reduce repeated copy and create restrained visual rhythm when that materially improves scanability or composition; visual density is not a goal. Use only authorized assets and one consistent icon library for the complete deck. When no approved brand or reference icon library is specified, prefer Lucide as the neutral source rather than drawing icons from memory or mixing arbitrary SVGs; another coherent library is valid when it offers a materially better semantic match or the approved visual system requires it.
 
 ## Select and register the icon system
 
@@ -22,11 +22,19 @@ In hub-and-spoke or partnership diagrams, group peers by a named role before dra
 
 When an authorized logo is unavailable, use the organization name in the deck's label role. Do not invent a pseudo-logo, scrape a low-resolution mark, or substitute a generic icon that could be mistaken for the entity.
 
-## Category icons
+## Category icons and images
 
-When icons materially improve differentiation in a category composition, use one icon per mutually exclusive category, normally three to five categories. Icon-led category profiles require an icon for every peer rather than leaving arbitrary gaps. Keep the icon box, stroke width, optical size, baseline, label depth, and accent role identical across peers. The category label and evidence must carry the meaning; the icon should allow faster scanning, add compositional polish, and never encode a second taxonomy.
+Choose one registered visual treatment for a category composition, normally three to five mutually exclusive peers:
 
-Do not mix filled and outline icon families, photographic cutouts, emoji, and logos in one peer set. Do not put each icon in a different accent colour unless hue is a declared category encoding used consistently elsewhere.
+- `icon-only` uses one semantic icon per category when a compact abstract cue improves differentiation;
+- `image-only` uses one relevant image per category when concrete subject matter, place, product, or use context is more informative than an icon;
+- `icon-image` uses one image plus one semantic icon per category when they perform distinct jobs, such as the image showing the concrete example while the icon reinforces the stable taxonomy.
+
+Apply the selected treatment to every peer. An icon-led treatment requires an icon for every category; an image-led treatment requires an image for every category. Keep icon boxes, stroke width, optical size, baseline, label depth, and accent role identical across peers. Keep image frames, crop ratios, displayed heights, focal treatment, and visual weight consistent across peers. Omit an absent image or icon slot entirely rather than leaving a blank frame or placeholder.
+
+The category label and evidence must carry the meaning. Icons should accelerate scanning and images should make the category more concrete. Use `icon-image` only when each visual contributes independent meaning; do not overlay or pair a generic icon with a photograph that already communicates the same idea. Retain source traceability for every image, preserve its aspect ratio, and use deliberate crops that remain recognizable in the exact final render. Do not use decorative stock imagery merely to fill the row.
+
+Within one visual role, do not mix filled and outline icon families, photographic cutouts, emoji, and logos. A coordinated `icon-image` treatment may pair one consistent icon family with one consistent image treatment across all peers. Do not put each icon in a different accent colour unless hue is a declared category encoding used consistently elsewhere.
 
 ## Row and cell icons
 
@@ -37,25 +45,33 @@ Keep a row icon inside the label cell rather than adding a decorative icon colum
 ## Structural HTML reference
 
 ```html
-<section class="category-row" data-role="description-slide">
+<section class="category-row" data-role="description-slide" data-visual-treatment="icon-image">
   <article class="category" data-state="peer">
-    <svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="chart-no-axes-column-increasing" aria-hidden="true"><path d="M5 21v-6"/><path d="M12 21V9"/><path d="M19 21V3"/></svg>
-    <h2>Demand</h2><p>Size the reachable need and growth drivers.</p>
+    <figure class="category__image-frame"><img class="category__image" src="assets/demand.jpg" alt="Customer demand visible through a digital ordering interface"></figure>
+    <div class="category__heading"><svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="chart-no-axes-column-increasing" aria-hidden="true"><path d="M5 21v-6"/><path d="M12 21V9"/><path d="M19 21V3"/></svg><h2>Demand</h2></div>
+    <p>Size the reachable need and growth drivers.</p>
   </article>
   <article class="category" data-state="peer">
-    <svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="users-round" aria-hidden="true"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg>
-    <h2>Customers</h2><p>Test retention, concentration, and willingness to pay.</p>
+    <figure class="category__image-frame"><img class="category__image" src="assets/customers.jpg" alt="Customers using the service in a real operating context"></figure>
+    <div class="category__heading"><svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="users-round" aria-hidden="true"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg><h2>Customers</h2></div>
+    <p>Test retention, concentration, and willingness to pay.</p>
   </article>
   <article class="category" data-state="peer">
-    <svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="swords" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 0 1 3 5.172V3h2.172a2 2 0 0 1 1.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0 1 18.828 3H21v2.172a2 2 0 0 1-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>
-    <h2>Competition</h2><p>Explain choice, differentiation, and durable advantage.</p>
+    <figure class="category__image-frame"><img class="category__image" src="assets/competition.jpg" alt="Competing products presented side by side"></figure>
+    <div class="category__heading"><svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="swords" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 0 1 3 5.172V3h2.172a2 2 0 0 1 1.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0 1 18.828 3H21v2.172a2 2 0 0 1-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg><h2>Competition</h2></div>
+    <p>Explain choice, differentiation, and durable advantage.</p>
   </article>
 </section>
 ```
 
+This specimen shows the combined treatment. For `image-only`, set `data-visual-treatment="image-only"` and remove each `category__icon` element. For `icon-only`, set `data-visual-treatment="icon-only"` and remove each `category__image-frame` element. The absent slot collapses; do not preserve empty space.
+
 ```css
 .category-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6); }
-.category { display: grid; grid-template-rows: auto auto 1fr; gap: var(--space-3); align-content: start; border-top: var(--rule-page); padding-top: var(--space-4); }
+.category { display: grid; grid-auto-rows: auto; gap: var(--space-3); align-content: start; border-top: var(--rule-page); padding-top: var(--space-4); }
+.category__image-frame { width: 100%; aspect-ratio: 4 / 3; margin: 0; overflow: hidden; }
+.category__image { display: block; width: 100%; height: 100%; object-fit: cover; }
+.category__heading { display: flex; align-items: center; gap: var(--space-2); }
 .category__icon { width: var(--icon-lg); height: var(--icon-lg); fill: none; stroke: var(--component-primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .category h2, .category p { margin: 0; }
 .category h2 { font: var(--type-section-heading); }
@@ -64,4 +80,4 @@ Keep a row icon inside the label cell rather than adding a decorative icon colum
 
 ## Acceptance check
 
-Every visual mark has a declared semantic or compositional purpose, candidate category and table regions were considered for icon-led treatment, and each retained icon materially improves differentiation, readability, density, balance, or scan rhythm. All peer icons come from one registered system and share one treatment; Lucide marks use actual library vectors rather than approximations; icon-only cells remain unambiguous; logos remain authorized, recognizable, and non-blank in the exact final render; missing marks fall back through one declared peer treatment; and connectors never cross labels or unrelated nodes.
+Every visual mark has a declared semantic or compositional purpose, and candidate category regions were considered for `icon-only`, `image-only`, or `icon-image` treatment. Each retained icon or image materially improves differentiation, recognition, readability, balance, or scan rhythm. All peers use the same declared treatment; peer images share one frame and crop grammar; combined icons and images perform distinct jobs; all peer icons come from one registered system; Lucide marks use actual library vectors rather than approximations; icon-only cells remain unambiguous; logos remain authorized, recognizable, and non-blank in the exact final render; missing marks fall back through one declared peer treatment; and connectors never cross labels or unrelated nodes.

@@ -196,6 +196,31 @@ def validate_result(
     minor = result.get("minorDefects")
     if not isinstance(minor, list) or not all(isinstance(item, str) and item.strip() for item in minor):
         errors.append(f"{case_id}: minorDefects must be a list of non-empty strings")
+    consistency = result.get("deckConsistencyReview")
+    if arm in {"self", "treatment"}:
+        if not isinstance(consistency, dict):
+            errors.append(f"{case_id}: deckConsistencyReview must be an object for {arm}")
+        else:
+            for key in ("themeManifestPath", "auditPath"):
+                if not isinstance(consistency.get(key), str) or not consistency[key].strip():
+                    errors.append(f"{case_id}: deckConsistencyReview.{key} must be non-empty")
+            for key in (
+                "fullDeckCompared",
+                "paletteRolesVerified",
+                "trackerMapVerified",
+                "repeatedComponentsVerified",
+            ):
+                if consistency.get(key) is not True:
+                    errors.append(f"{case_id}: deckConsistencyReview.{key} must be true")
+            unresolved_consistency = consistency.get("unresolvedFindings")
+            if not isinstance(unresolved_consistency, list) or not all(
+                isinstance(item, str) and item.strip() for item in unresolved_consistency
+            ):
+                errors.append(
+                    f"{case_id}: deckConsistencyReview.unresolvedFindings must be a list of non-empty strings"
+                )
+            elif unresolved_consistency:
+                errors.append(f"{case_id}: deckConsistencyReview.unresolvedFindings must be empty")
     anti_slop = result.get("antiSlopReview")
     if not isinstance(anti_slop, dict):
         errors.append(f"{case_id}: antiSlopReview must be an object")
@@ -380,6 +405,12 @@ def validate_evidence_files(results_document: dict[str, Any], repo_root: Path) -
             for key in ("contractPath", "validatorOutputPath"):
                 require_material_file(
                     workspace, pre_authoring.get(key), f"{label}.preAuthoringReview.{key}", errors
+                )
+        consistency = result.get("deckConsistencyReview")
+        if isinstance(consistency, dict):
+            for key in ("themeManifestPath", "auditPath"):
+                require_material_file(
+                    workspace, consistency.get(key), f"{label}.deckConsistencyReview.{key}", errors
                 )
     return errors
 

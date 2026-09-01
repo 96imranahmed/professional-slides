@@ -55,6 +55,7 @@ Do not preserve browser pixels literally after translation. Preserve the named t
   --type-cover-title: var(--weight-bold) var(--size-cover-title) / var(--line-cover-title) var(--font-display);
   --type-action-title: var(--weight-bold) var(--size-action-title) / var(--line-action-title) var(--font-display);
   --type-section-title: var(--weight-bold) var(--size-section-title) / var(--line-section-title) var(--font-display);
+  --type-section-number: var(--weight-regular) var(--size-section-number) / var(--line-section-number) var(--font-display);
   --type-section-heading: var(--weight-bold) var(--size-section-heading) / var(--line-section-heading) var(--font-sans);
   --type-column-heading: var(--weight-bold) var(--size-body-compact) / var(--line-body-compact) var(--font-sans);
   --type-body: var(--weight-regular) var(--size-body) / var(--line-body) var(--font-sans);
@@ -80,6 +81,11 @@ Do not preserve browser pixels literally after translation. Preserve the named t
   --chart-category-a-muted: var(--chart-segment);
   --chart-category-b: var(--chart-series-2);
   --chart-category-c: var(--chart-series-3);
+  --heatmap-primary-1: color-mix(in srgb, var(--component-primary) 12%, var(--canvas));
+  --heatmap-primary-2: color-mix(in srgb, var(--component-primary) 28%, var(--canvas));
+  --heatmap-primary-3: color-mix(in srgb, var(--component-primary) 48%, var(--canvas));
+  --heatmap-primary-4: color-mix(in srgb, var(--component-primary) 60%, var(--canvas));
+  --heatmap-primary-5: var(--component-primary);
   --icon-sm: 16px;
   --icon-md: 24px;
   --icon-lg: 36px;
@@ -113,6 +119,8 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-action-title: 42px;
   --size-section-title: 32px;
   --line-section-title: 38px;
+  --size-section-number: 280px;
+  --line-section-number: 280px;
   --size-section-heading: 24px;
   --line-section-heading: 29px;
   --size-body: 21px;
@@ -156,6 +164,8 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-action-title: 38px;
   --size-section-title: 28px;
   --line-section-title: 34px;
+  --size-section-number: 240px;
+  --line-section-number: 240px;
   --size-section-heading: 21px;
   --line-section-heading: 26px;
   --size-body: 18px;
@@ -199,6 +209,8 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-action-title: 34px;
   --size-section-title: 25px;
   --line-section-title: 30px;
+  --size-section-number: 220px;
+  --line-section-number: 220px;
   --size-section-heading: 19px;
   --line-section-heading: 23px;
   --size-body: 16px;
@@ -242,6 +254,8 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-action-title: 30px;
   --size-section-title: 22px;
   --line-section-title: 27px;
+  --size-section-number: 200px;
+  --line-section-number: 200px;
   --size-section-heading: 17px;
   --line-section-heading: 21px;
   --size-body: 14px;
@@ -288,10 +302,12 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --chart-segment: #a9b4be;
   --status-positive: #2f7244;
   --status-positive-tint: #dcecdf;
+  --on-status-positive: #ffffff;
   --status-caution: #986000;
   --status-caution-tint: #f5e8c8;
   --status-negative: #a83b3b;
   --status-negative-tint: #f3dddd;
+  --on-status-negative: #ffffff;
   --status-info: #1f5a85;
   --status-info-tint: #dceaf4;
   --chart-series-1: #1f5a85;
@@ -325,10 +341,12 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --chart-segment: #72818d;
   --status-positive: #69c787;
   --status-positive-tint: #193d2a;
+  --on-status-positive: #07131b;
   --status-caution: #efb44f;
   --status-caution-tint: #493719;
   --status-negative: #ed8585;
   --status-negative-tint: #4b2528;
+  --on-status-negative: #07131b;
   --status-info: #68b5df;
   --status-info-tint: #173d52;
   --chart-series-1: #68b5df;
@@ -362,10 +380,12 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --chart-segment: #aa9e91;
   --status-positive: #4f714b;
   --status-positive-tint: #e1eadc;
+  --on-status-positive: #ffffff;
   --status-caution: #956115;
   --status-caution-tint: #f3e6c8;
   --status-negative: #a2443e;
   --status-negative-tint: #f1dcda;
+  --on-status-negative: #ffffff;
   --status-info: #486c7a;
   --status-info-tint: #dce8eb;
   --chart-series-1: #934b34;

@@ -15,6 +15,8 @@ Then resolve one [visual family and density profile](../theming/index.md#resolve
 
 Start with the claim and evidence, then choose the layout.
 
+Select the narrative archetype and evidence composition first. Then use the [slide-layout router](slide-layouts.md) to allocate the content field. Layouts own page-level region geometry only; they do not redefine the audience job, evidence relationship, chart, or component.
+
 - Trend: chart.
 - Sequence: timeline or process.
 - Comparison: table, chart, or parallel fields.
@@ -47,13 +49,13 @@ Use one identical component-primary swatch across titles, tracker emphasis, stru
 
 ### Semantic treatment registry
 
-Before authoring, record the [theme manifest](../theming/index.md#theme-manifest) and name the treatment for titles, analytical headers, tables, callouts, trackers, sources, and charts. Reuse it. Create a new variant only when the meaning changes.
+Before authoring, record the [theme manifest](../theming/index.md#theme-manifest) and create one deck treatment ledger. For every slide or contiguous slide range, name the visual family, density, analytical-header template, tracker state, page layout, tables, callouts, sources, charts, and repeated component variants. Reuse those treatments. Create a new variant only when the meaning changes, and record the semantic reason as an explicit exception rather than tuning one slide locally.
 
 ## Implication emphasis system
 
 Use a separate implication or action region only when it adds a distinct conclusion, condition, owner, or action that is not already clear from the title and exhibit.
 
-Choose one registered [terminal action-surface variant](../theming/component-bindings.md#terminal-action-surface), such as a rule, a light tonal area, or stronger type. Do not stack an implication box and a recommendation box. If deletion changes nothing, remove the region.
+Choose one registered [`insight-box`](../components/insight-box.md) variant, normally a light tonal or neutral surface, or the dotted no-fill treatment when a filled block would be too heavy. Reserve the primary surface for a decisive action or stage moment. Do not stack an implication box and a recommendation box. If deletion changes nothing, remove the region.
 
 ## Typography system
 
@@ -106,6 +108,8 @@ Do not copy source content or assets unless authorized. Do not claim fidelity wi
 
 Review the montage first, then every slide at full size.
 
+Reconcile the rendered deck against the treatment ledger slide by slide. A consistency audit must identify the shared definition used for every repeated title, header, tracker, table, callout, source, chart role, and semantic colour. It must also list each intentional exception with its slide, role, and content reason. An unexplained exception is drift, not variety.
+
 Check:
 
 - title and content anchors;
@@ -115,6 +119,9 @@ Check:
 - repeated component states;
 - visual variety driven by evidence;
 - clipping, overlap, broken assets, and dead space.
+- full tracker pages contain the complete approved item set with numbers and labels;
+- compact tracker states remain present and selected correctly on every slide in each governed range;
+- editable object fills, lines, and text colours resolve to declared semantic roles rather than slide-local literals.
 
 Repair the owning rule when the same defect appears more than once. Keep intentional exceptions only when the content requires them.
 
