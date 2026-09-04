@@ -6,7 +6,7 @@ This file owns the problem hypothesis tree and 80/20 analytical prioritization. 
 
 Start with the problem in question, not a proposed page list. Write one precise root question whose answer would enable the communication job. Decompose it into mutually exclusive and collectively sufficient branches, then state each branch as a testable provisional answer. An issue tree asks what must be investigated; a hypothesis tree records what is currently believed and what evidence would confirm, refine, or reject it.
 
-The hypothesis tree is a problem-solving control artifact even when it never appears in the deck. If the audience must see the tree, use the [`decomposition` slide type](../slide-types/decomposition.md) to present only the decision-relevant levels; do not let the visual archetype redefine the analytical branches.
+The hypothesis tree is a problem-solving control artifact even when it never appears in the deck. If the audience must see the tree, use the registered [tree relationship component](../components/relationships.md) inside the open [composition model](../composition/index.md) and present only the decision-relevant levels; do not let the visual form redefine the analytical branches.
 
 Assign stable IDs such as `H1`, `H1.1`, and `H1.2` so the tree remains traceable as the story changes. For every terminal hypothesis, record:
 
@@ -19,9 +19,9 @@ Assign stable IDs such as `H1`, `H1.1`, and `H1.2` so the tree remains traceable
 
 ## Explain and visualize the logic
 
-Do not present only branch names. The review artifact must explain the root question, the decomposition logic used at the first level, and how the branch answers combine into the decision. For each first-level branch, state the provisional answer, why it matters, what becomes true for the decision if the branch is confirmed or rejected, the decisive confirming and disconfirming tests, the current evidence state, and the mapped core-story or unresolved disposition. Explain material child nodes whenever the parent answer would otherwise hide a different risk, mechanism, customer group, or decision gate.
+Do not present branch names alone. Explain the root question, first-level decomposition, and how branch answers combine into the decision. For each first-level branch, state its provisional answer, relevance, decision consequence, confirming and disconfirming tests, evidence state, and story disposition. Explain child nodes when the parent would hide a distinct risk, mechanism, customer group, or decision gate.
 
-For a complex investment, diligence, transformation, programme, or multi-branch strategy decision, render the tree as a decision map in the review artifact. The map should show the root question, stable node IDs, first-level branch hypotheses, material child tests, evidence state, and convergence into the governing thought or decision gates. It supplements rather than replaces the written explanation and traceability table. Use the [`decomposition` slide type](../slide-types/decomposition.md) for a planned audience-facing hypothesis-map page only when seeing the analytical logic materially improves comprehension; do not insert a generic workplan or methodology page merely because a tree exists.
+For a complex investment, diligence, transformation, programme, or multi-branch strategy decision, render the tree as a decision map in the review artifact. Show the root question, stable node IDs, first-level hypotheses, material child tests, evidence state, and convergence into the governing thought or decision gates. The map supplements the written explanation and traceability table. Put it in the audience deck only when it materially improves comprehension. Never add a generic workplan or methodology page only because a tree exists.
 
 ## Apply 80/20 prioritization
 

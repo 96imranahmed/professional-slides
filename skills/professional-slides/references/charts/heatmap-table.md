@@ -21,11 +21,11 @@ Row and column categories, numeric or ordinal cell values, missing-value state, 
 
 ## Platform mapping
 
-Prefer editable cell shapes or tables with tokenized fills when native heatmap support is weak. Generate colors from the declared domain, not row-relative defaults. Render in both targets to verify contrast, text color, cell padding, and missing-value treatment.
+Generate editable cell fills from the declared domain, not row-relative application defaults. Bind text contrast, padding, and missing-value treatment to each resolved scale stop before serialization.
 
 ## Table header contract
 
-Use one deck-wide header treatment for every analytical table: one fill role, one text role, one rule treatment, one row height, and one internal padding system. Bind it to the table-header entry in the design system's semantic treatment registry and reuse it without slide-local recolouring.
+Use one deck-wide header treatment for every analytical table: one fill role, one text role, one rule treatment, one row height, and one internal padding system. Bind it to the exact [`tableHeader` record](../design/index.md#semantic-treatment-registry) in the deck treatment ledger and reuse its `variantId` without slide-local recolouring.
 
 Do not give peer column headers different colours, colour the first header differently merely because it contains row labels, or use chart-series hues to make a header row appear more designed. Distinguish columns through width, alignment, wording, grouping, and data in the body. If colour is the data encoding, place that encoding in the body cells, marks, direct labels, or legend rather than in decorative header fills.
 
@@ -38,14 +38,14 @@ A table may use one secondary neutral header level only for a real nested hierar
 - Keep headers aligned with their columns and apply the same internal padding token to every cell in the same role. Do not use spaces, tabs, or manual line breaks to force values into position.
 - Align row labels and values to a consistent baseline. Increase row height for necessary wrapping rather than compressing the type role.
 - Align subtotal and total rules across the full relevant comparison span. Use indentation, weight, whitespace, and fill consistently to show hierarchy.
-- When two tables share a page, align their header baselines, comparable column boundaries, row rhythm, and bottom edge when practical. If row counts differ materially, top-align them and do not stretch one table merely to equalize height.
+- When two tables share a page, align their header baselines, comparable column boundaries, row rhythm, and bottom edge. Permit different bottom edges only when row counts differ materially, equal height would narrow a decisive column, or equal height would add avoidable wrapping; in those cases, top-align the tables.
 - Use the [`theming` spacing and typography tokens](../theming/tokens.md) rather than local cell font sizes or padding.
 
 ## Table composition quality
 
-Treat the table as an analytical exhibit, not a spreadsheet pasted onto a slide. Establish one dominant reading direction, use whitespace and selective horizontal rules before boxes, group related columns, emphasize only the row, threshold, score, or consequence that carries the argument, and reserve filled cells for real semantic status. Avoid enclosing every cell with equal dark borders, combining a saturated header with dense gridlines, or giving every row identical weight; those treatments flatten the hierarchy and remain raw-grid defects even when alignment is correct.
+Treat the table as an analytical exhibit, not a pasted spreadsheet. Set one reading direction. Prefer whitespace and selective horizontal rules to boxes. Group related columns. Emphasize only the evidence that carries the argument. Reserve filled cells for semantic status. Avoid equal dark borders, saturated headers with dense gridlines, and uniform row weight. These treatments flatten hierarchy even when alignment is correct.
 
-For a qualitative diligence matrix, a strong default is an open table with a thin header rule, subtle alternating row bands only when they improve tracking, a narrow bold row-label column, one decisive evidence column, and one consequence column. Use a bottom implication surface outside the table rather than a final slogan row styled as another table cell.
+For a qualitative diligence matrix, use an open table with a thin header rule. Add row bands only when they improve tracking. Keep one narrow label column, one decisive evidence column, and one consequence column. Place the implication below the table, not in a slogan row.
 
 ## Structural HTML reference
 
@@ -57,4 +57,4 @@ Rainbow scales, red/green-only meaning, an arbitrary midpoint, row-relative colo
 
 ## Acceptance test
 
-The same high/low pattern remains visible in grayscale or with redundant labels, the legend reproduces every cell color from its value, table headers use the registered deck-wide treatment without per-column colour variation, and headers, values, column boundaries, and padding remain aligned in the final render. At montage scale the table must still expose its hierarchy and highlighted conclusion; if it reads as one uniform grid, it is unfinished.
+The high/low pattern survives grayscale through redundant labels. The legend reproduces each value colour. Headers use the deck-wide treatment without per-column variation. Headers, values, boundaries, and padding align in the final render. The montage must preserve hierarchy and the highlighted conclusion.

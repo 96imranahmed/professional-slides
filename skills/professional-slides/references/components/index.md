@@ -11,8 +11,13 @@ Components are reusable slide elements. Use them only when they perform a clear 
 - [Trackers](trackers/index.md): navigation.
 - [Guidelines](guidelines.md): rules, borders, and section treatments.
 - [Arrows](arrows.md): inference, transfer, handoff, and transition marks.
+- [Relationship components](relationships.md): processes, roadmaps, timelines, journeys, trees, organizations, matrices, maps, funnels, and connectors.
 - [Icons, category images, and logos](icons-and-logos.md): semantic icons, category imagery, and brand marks.
 - [Chart callouts](chart-callouts.md): evidence-linked annotations and leaders.
+- [Chart titles](#chart-titles): shared graph headings, unit rows, and measured title bands.
+- [Chart legends](chart-legends.md): shared series, category, status, and actual/forecast keys.
+- [Chart groups](chart-legends.md#coordinated-chart-groups): two or three charts with shared category mapping and one legend.
+- [Analytical tables](../charts/heatmap-table.md): shared table headers, alignment, composition, and native translation.
 - [Table cell status and comparison indicators](comparison-indicators.md): completion spinners, traffic-light cells, heatmap cells, and their required legends.
 - [Item indicators](item-indicators.md): numbered or lettered row and category markers.
 - [Metric fields](metric-fields.md): large numeric evidence.
@@ -23,21 +28,40 @@ When adding or revising an inline specimen, include its variables, HTML, and CSS
 
 ## Action-title block
 
-Every analytical slide uses the same title anchor, width, and type role. One-line and two-line titles share the same top-left starting point. When a title wraps, move the title separator and every dependent content-top anchor down together.
+Use the canonical [title anchor and wrap rules](../design/index.md#typography-system).
 
 The untracked analytical-header template contains an action-title slot. A tracked analytical-header template contains both a tracker-label slot and an action-title slot. Apply the selected template across its full declared range.
+
+Titles default to `without-line`. Select `with-line` only when the design calls for a separator; place it `space-2` below the measured last text line, not the bottom of the allocated title box. Both variants retain the same text, type, colour, anchor, and allocated space. Keep the choice consistent within a slide family, and record deliberate exceptions in the treatment ledger. Neither variant adds a subtitle or metadata label.
+
+Use `props.variant` on `action-title` or `section-title`, `chrome.titleVariant` for built-in slide titles, and `titleVariant` in content plans. A deck plan supplies the default, which an individual slide may explicitly override. All routes consume the same title renderer. Unknown variants and conflicting legacy `rule` values are rejected; every registered variant has an isolated HTML/PPTX fixture.
+
+## Chart titles
+
+`chart-title` is registered in [`runtime/registry.mjs`](../../runtime/registry.mjs). It reuses the section-heading renderer, so graph headings share its font, colour, level, and measured wrapping. Inputs are `heading`, optional `unit`, and optional `variant`; `headerBandHeight` aligns wrapped peers in a coordinated group.
+
+- `underlined` is the default: the rule sits `space.2` below the measured heading band.
+- `unit` requires nonempty unit text: show one regular, light-grey row below the heading with `space.1` clearance and no rule. Supplying `unit` selects this variant automatically.
+
+The component consumes the section-heading tokens plus `type.compact`, `color.chartUnit`, and `space.1`. It rejects conflicting variants, multi-line units, or an allocated frame shorter than its measured content. Charts with `heading`/`unit` props and chart groups invoke this same owner; neither creates a local header or automatic period/status label. Both variants have isolated golden fixtures, plus paired wrapped-heading and unit examples, in HTML and PowerPoint.
 
 ## Callouts and annotations
 
 Use a callout only when it adds evidence, interpretation, or a decision that the exhibit does not already communicate. Use the reusable [`insight box`](insight-box.md) for a detached slide-level synthesis surface.
 
-A section may have no more than one insight box or terminal action surface. In an ordinary analytical slide, use one page-level instance in total and never repeat it once per column, branch, row, paragraph, metric, or chart. If several sections appear to need their own boxes, consolidate them into one governing synthesis or separate the page. Recommendation, implication, decision, next action, and data request are alternative states of that same component.
+The [`insight box`](insight-box.md#check) owns the one-per-slide detached-synthesis limit and permitted states; consumers link to that check.
 
-Do not prepend labels such as `IC conclusion`, `Recommendation`, or `Key takeaway` when the statement already explains its role.
+Apply the canonical [rhetorical-role label rule](copy.md#labels) to every callout.
 
 ## Sources and footers
 
-Keep page numbers, sources, confidentiality marks, and approved brand elements in stable positions. Sources must be readable in the final render and traceable to the claim.
+Page furniture belongs to the deck's page template, implemented by [`page-template.mjs`](../../runtime/page-template.mjs) and consumed by slide chrome and the content planner. Default to no header or footer rule. The `bottom` variant adds a rule above the footer; `top-and-bottom` also adds a top-page rule. These choices are independent of title and chart-heading underlines.
+
+Place sources at bottom left on the same baseline as the page number. Place the company name immediately left of the bottom-right number, or use the top-right brand slot with an [authorized logo component](icons-and-logos.md#entity-logos). Reserve the logo's width before measuring the title. Never repeat the company in both slots automatically or fabricate a logo when only a name is available.
+
+Measure the left citation slot after reserving the company and number. Wrapped sources extend upward; notes sit above them, and the body frame contracts accordingly. Never overlap, shrink, or silently truncate footer copy. Keep a separate source row only for an explicitly selected reference treatment. The standalone source component also defaults to no rule. Runtime settings and inheritance are documented under [page templates](../../runtime/README.md#page-templates).
+
+Keep page numbers, sources, confidentiality marks, and approved brand elements in stable positions. The visible source line names the publisher or company, document or dataset, and relevant date or period. Give every material claim, chart series, quotation, and calculation a stable source ID in the authoring source; map derived values to their input IDs and label them `analyst calculation`. Put full URLs, document identifiers, page or table references, access dates, and calculation notes in speaker notes or a source appendix. The rendered footer must remain readable, while the editable artifact must preserve the complete claim-to-source mapping.
 
 Do not use the footer as a second title, implication strip, or decorative rail.
 

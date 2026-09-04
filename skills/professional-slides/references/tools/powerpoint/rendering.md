@@ -60,6 +60,41 @@ Inspect every slide for:
 
 After any structural repair, render the entire deck again. After a local repair, at minimum re-render the affected slide and the full montage; before delivery, the final complete deck must have one consistent render set.
 
+## Hard acceptance loop
+
+After rendering the exported candidate, run [PowerPoint hard acceptance](acceptance.md) against that exact file. Its owner defines rejection and repair. Keep only the accepted candidate hash in the release evidence.
+
+## Independent visual reports
+
+Run the per-slide visual judge against every exact render, the generation script, deck contract, theme manifest, and treatment ledger:
+
+```bash
+python3 evals/scripts/validate_pptx.py visual path/to/candidate.pptx \
+  --render-dir path/to/rendered-slides \
+  --contract path/to/deck-contract.json \
+  --theme-manifest path/to/theme-manifest.json \
+  --treatment-ledger path/to/treatment-ledger.json \
+  --generation-script path/to/build-deck.cjs \
+  --model gpt-5.6-terra \
+  --report path/to/visual-review.json
+```
+
+Then run the cross-slide judge with a different approved model:
+
+```bash
+python3 evals/scripts/validate_pptx.py consistency path/to/candidate.pptx \
+  --render-dir path/to/rendered-slides \
+  --contract path/to/deck-contract.json \
+  --theme-manifest path/to/theme-manifest.json \
+  --treatment-ledger path/to/treatment-ledger.json \
+  --generation-script path/to/build-deck.cjs \
+  --model gpt-5.6-luna \
+  --different-from-model gpt-5.6-terra \
+  --report path/to/cross-slide-consistency-review.json
+```
+
+The first judge checks message-to-component fit, hierarchy, completeness, density, exhibit finish, navigation, and polish on every full-size slide. The second compares repeated roles, title and grid anchors, tracker continuity, component variants, chart legends, semantic colours, and density rhythm across the complete deck. A rejection blocks release; repair the owning source, export and render a fresh candidate, and rerun all reports required by the changed hash.
+
 ## Rendering boundaries
 
 - PDF is a QA derivative, not the editable deliverable unless requested.

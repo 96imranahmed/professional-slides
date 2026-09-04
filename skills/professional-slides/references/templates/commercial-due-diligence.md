@@ -59,7 +59,11 @@ A full pre-read usually contains:
 
 Use [storylining](../storylining/index.md) to turn this logic into the assignment-specific hypothesis tree and dot-dash. Use the [pre-authoring contract](../storylining/pre-authoring-contract.md) before production.
 
-The executive summary follows the registered [executive-synthesis](../slide-types/executive-synthesis.md) slide type. It is not a status dashboard.
+The executive summary uses a concise answer spine composed from registered titles, metrics, panels, and at most one insight box. It is not a status dashboard.
+
+## Navigation
+
+For a full pre-read, seed one flat tracker map with these analytical chapter labels: `Market attractiveness`, `Customer quality`, `Competitive position`, `Commercial engine`, `Plan and downside`, and `Decision and value creation`. Use `sequential-circles` for the full state and `compact-number-strip` for governed analytical slides. Use `hierarchical-segmented` only if the approved dot-dash separately defines parent chapters, child analytical subgroup IDs, labels, order, and slide ranges as required by the [tracker owner](../components/trackers/index.md#parent-and-chapter-hierarchy). Approved replacements become exact under the [template instantiation contract](index.md#instantiation-contract). For a red-flag review, preliminary screen, or short deck whose title spine is sufficient, record `tracker.system: none`; do not invent a reduced tracker.
 
 ## Analytical jobs
 
@@ -115,11 +119,11 @@ Do not invent revenue, customers, retention, margin, market share, valuation, or
 
 ## Page composition
 
-Choose the slide type and evidence composition from [the registered library](../slide-types/index.md). A table-only core deck is a major design and analysis defect.
+Choose registered components and an open composition from [the composition owner](../composition/index.md). A table-only core deck is a major design and analysis defect.
 
 Use charts for trends, distributions, positions, funnels, bridges, scenarios, and sensitivities when the data supports them. Use diagrams for causal logic. Use tables for compact comparison or decision records.
 
-Core analytical pages should have one dominant exhibit or two to four mutually supporting evidence regions. Do not repeat the same card grid across the deck.
+Core analytical pages should have one dominant exhibit or two to four mutually supporting analytical items. Do not repeat the same card grid across the deck.
 
 ## Compression
 

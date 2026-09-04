@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 import unittest
 from copy import deepcopy
 from pathlib import Path
@@ -13,18 +14,19 @@ def load_module(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
 
 validator = load_module(
-    "validate_deck_contract",
-    ROOT / "evals" / "scripts" / "validate_deck_contract.py",
+    "validate_pptx_contract",
+    ROOT / "evals" / "scripts" / "validate_pptx.py",
 )
 
 
 def slide(number, page_type, chapter_id=None, header="structural", tracker_label=None, regions=1):
-    return {
+    record = {
         "slide": number,
         "dotId": f"D{number:02d}",
         "pageType": page_type,
@@ -34,7 +36,7 @@ def slide(number, page_type, chapter_id=None, header="structural", tracker_label
         "hypothesisIds": ["NAV"] if page_type in {"cover", "contents_tracker", "chapter_transition"} else ["H1"],
         "dashes": ["Provide page-specific support"],
         "evidenceRegions": regions,
-        "terminalSurfacePosition": "bottom" if page_type == "analytical" else "none",
+        "terminalSurfacePosition": "bottom" if page_type in {"analytical", "executive_synthesis"} else "none",
         "headerVariant": header,
         "trackerLabel": tracker_label,
         "trackerParentId": None,
@@ -42,6 +44,36 @@ def slide(number, page_type, chapter_id=None, header="structural", tracker_label
         "trackerParentLabel": None,
         "trackerChapterLabel": None,
     }
+    if page_type == "executive_synthesis":
+        record["title"] = "Executive summary"
+        record["executiveSynthesis"] = {
+            "answer": "Approve the focused option",
+            "branches": [
+                {
+                    "heading": "Demand is sufficient",
+                    "proof": "Qualified demand exceeds the threshold.",
+                    "consequence": "The case can proceed to implementation planning.",
+                },
+                {
+                    "heading": "Execution risk is bounded",
+                    "proof": "The required capabilities already exist.",
+                    "consequence": "The first phase can use the current team.",
+                },
+            ],
+            "overallAction": "Approve the first phase with measured gates.",
+        }
+    elif page_type == "analytical":
+        record["evidenceComposition"] = (
+            "single_evidence_field" if regions == 1 else "parallel_evidence_field"
+        )
+        record["layout"] = "single-dominant-exhibit" if regions == 1 else "parallel-exhibits"
+        record["primaryEvidenceType"] = "metric-field"
+        if regions == 1:
+            record["dominantEvidencePlan"] = {
+                "canvasShareTarget": 72,
+                "completenessElements": ["comparison", "interpretation"],
+            }
+    return record
 
 
 class DeckContractTests(unittest.TestCase):
@@ -51,16 +83,19 @@ class DeckContractTests(unittest.TestCase):
             "workflowMode": "new_deck",
             "templateId": "commercial-due-diligence",
             "deliveryMode": "executive_pre_read",
+            "visualSystem": {"mode": "clean-native-standard", "designSystem": "codex-grid"},
             "plannedSlideCount": 4,
             "chapters": [{"id": "market", "label": "Market attractiveness"}],
             "executiveSummaryDecision": {"status": "required_present", "rationale": "The committee needs the answer first."},
             "structuralRecommendations": [],
             "tracker": {
-                "system": "segmented_full_state",
+                "system": "standard-chapter",
                 "contentsSlide": 3,
                 "transitionSlides": [],
                 "analyticalHeader": {
                     "variant": "tracked",
+                    "fullStateVariant": "sequential-circles",
+                    "compactStateVariant": "compact-number-strip",
                     "governedSlides": [4],
                     "requiredFields": ["tracker-label", "action-title"],
                 },
@@ -73,6 +108,23 @@ class DeckContractTests(unittest.TestCase):
                 slide(4, "analytical", "market", "tracked", "Market attractiveness", 3),
             ],
         }
+
+    def test_executive_summary_navigation_map_must_follow_chapter_order(self):
+        contract = self.new_dd()
+        summary = next(slide for slide in contract["slides"] if slide["pageType"] == "executive_synthesis")
+        contract["executiveSummaryToNavigation"] = [{
+            "chapterId": "market",
+            "navigationLabel": "Market attractiveness",
+            "summarySource": "branch",
+            "branchIndex": 1,
+            "summaryClaim": summary["executiveSynthesis"]["branches"][0]["heading"],
+        }]
+        self.assertEqual(validator.validate_contract(contract), [])
+        contract["executiveSummaryToNavigation"][0]["navigationLabel"] = "Different taxonomy"
+        self.assertTrue(any(
+            "navigationLabel must equal the exact chapter label" in error
+            for error in validator.validate_contract(contract)
+        ))
 
     def existing_without_summary(self):
         return {
@@ -108,6 +160,38 @@ class DeckContractTests(unittest.TestCase):
         errors = validator.validate_contract(contract)
         self.assertTrue(any("slide 2 to be executive_synthesis" in error for error in errors))
 
+    def test_executive_synthesis_requires_substantive_branch_contract(self):
+        contract = self.new_dd()
+        contract["slides"][1]["executiveSynthesis"]["branches"][0]["heading"] = "Operating proof"
+        errors = validator.validate_contract(contract)
+        self.assertTrue(any("heading must state a substantive conclusion" in error for error in errors))
+
+    def test_executive_synthesis_requires_proof_and_consequence(self):
+        contract = self.new_dd()
+        del contract["slides"][1]["executiveSynthesis"]["branches"][0]["consequence"]
+        errors = validator.validate_contract(contract)
+        self.assertTrue(any("consequence must be a non-empty string" in error for error in errors))
+
+    def test_single_evidence_synthesis_requires_a_bullet_field(self):
+        contract = self.new_dd()
+        contract["slides"][3]["evidenceComposition"] = "single_evidence_with_synthesis"
+        contract["slides"][3]["synthesisMode"] = "heading_and_body"
+        errors = validator.validate_contract(contract)
+        self.assertTrue(any("synthesisMode must be bullet_field" in error for error in errors))
+
+    def test_analytical_slide_requires_an_explicit_evidence_composition(self):
+        contract = self.new_dd()
+        del contract["slides"][3]["evidenceComposition"]
+        errors = validator.validate_contract(contract)
+        self.assertTrue(any("evidenceComposition is required" in error for error in errors))
+
+    def test_evidence_with_synthesis_requires_approved_bullets(self):
+        contract = self.new_dd()
+        contract["slides"][3]["evidenceComposition"] = "single_evidence_with_synthesis"
+        contract["slides"][3]["synthesisMode"] = "bullet_field"
+        errors = validator.validate_contract(contract)
+        self.assertTrue(any("synthesisBullets must contain one to three" in error for error in errors))
+
     def test_new_due_diligence_can_omit_visible_tracker(self):
         contract = self.new_dd()
         contract["plannedSlideCount"] = 3
@@ -117,6 +201,8 @@ class DeckContractTests(unittest.TestCase):
             "transitionSlides": [],
             "analyticalHeader": {
                 "variant": "untracked",
+                "fullStateVariant": "none",
+                "compactStateVariant": "none",
                 "governedSlides": [3],
                 "requiredFields": ["action-title"],
             },
@@ -158,6 +244,8 @@ class DeckContractTests(unittest.TestCase):
             }],
             "analyticalHeader": {
                 "variant": "tracked",
+                "fullStateVariant": "split-contents",
+                "compactStateVariant": "compact-label",
                 "governedSlides": [4],
                 "requiredFields": ["parent-tracker-label", "chapter-tracker-label", "action-title"],
             },
@@ -190,6 +278,8 @@ class DeckContractTests(unittest.TestCase):
             }],
             "analyticalHeader": {
                 "variant": "tracked",
+                "fullStateVariant": "split-contents",
+                "compactStateVariant": "compact-label",
                 "governedSlides": [4],
                 "requiredFields": ["parent-tracker-label", "chapter-tracker-label", "action-title"],
             },
@@ -235,13 +325,63 @@ class DeckContractTests(unittest.TestCase):
             "executiveSummaryDecision": {"status": "not_required", "rationale": "The live opening states the thesis directly."},
         })
         contract["tracker"] = {
-            "system": "compact_running_label",
+            "system": "none",
             "contentsSlide": None,
             "transitionSlides": [],
-            "analyticalHeader": {"variant": "untracked", "governedSlides": [2], "requiredFields": ["action-title"]},
+            "analyticalHeader": {
+                "variant": "untracked",
+                "fullStateVariant": "none",
+                "compactStateVariant": "none",
+                "governedSlides": [2],
+                "requiredFields": ["action-title"],
+            },
         }
         contract["slides"] = [slide(1, "cover", regions=0), slide(2, "analytical", "thesis", "untracked", None, 1)]
         self.assertEqual(validator.validate_contract(contract), [])
+
+    def test_new_deck_rejects_custom_template_escape_hatch(self):
+        contract = self.new_dd()
+        contract["templateId"] = "custom"
+        errors = validator.validate_contract(contract)
+        self.assertIn("new_deck templateId must name a registered template", errors)
+
+    def test_custom_visual_mode_requires_approval_evidence(self):
+        contract = self.new_dd()
+        contract["visualSystem"] = {"mode": "custom-user-directed"}
+        errors = validator.validate_contract(contract)
+        self.assertIn(
+            "custom-user-directed visualSystem.approvalEvidence must be a non-empty string",
+            errors,
+        )
+
+    def test_chart_requires_underlined_heading_and_canonical_legend(self):
+        contract = self.new_dd()
+        analytical = contract["slides"][3]
+        analytical["primaryEvidenceType"] = "chart"
+        analytical["exhibitHeadingVariant"] = "plain"
+        analytical["legendTreatment"] = "office-auto"
+        errors = validator.validate_contract(contract)
+        self.assertIn("slides[3].exhibitHeadingVariant must equal open-underlined for charts", errors)
+        self.assertIn("slides[3].legendTreatment must use the canonical legend grammar", errors)
+
+    def test_single_region_pre_read_requires_material_density_plan(self):
+        contract = self.new_dd()
+        analytical = contract["slides"][3]
+        analytical["evidenceRegions"] = 1
+        analytical["evidenceComposition"] = "single_evidence_field"
+        analytical["layout"] = "single-dominant-exhibit"
+        analytical.pop("dominantEvidencePlan", None)
+        errors = validator.validate_contract(contract)
+        self.assertIn("slide 4 must use two to four evidence regions or define dominantEvidencePlan", errors)
+
+    def test_nonstandard_tracker_system_is_rejected_for_new_decks(self):
+        contract = self.new_dd()
+        contract["tracker"]["system"] = "segmented_full_state"
+        errors = validator.validate_contract(contract)
+        self.assertIn(
+            "new_deck tracker.system must be none, standard-chapter, or hierarchical-segmented",
+            errors,
+        )
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ native presentation
 
 This is more efficient and internally consistent than requesting one thumbnail per slide. Use a fresh output directory and refuse to overwrite prior evidence from another candidate.
 
-The Codex Google Slides integration provides a host helper that exports the presentation as PDF, materializes it safely in the workspace, renders through the bundled `pdftoppm`, and checks page count against the parsed design system. Use the installed current helper rather than copying its implementation here.
+Locate bundled rendering tools through [runtime discovery](../codex-generation.md#load-the-active-runtime-guidance). Check the exported page count against the approved storyboard or pre-authoring contract.
 
 ## Thumbnail API
 

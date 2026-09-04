@@ -2,7 +2,7 @@
 
 This file owns text-container geometry and behavior. [`Theming`](../theming/index.md) owns typography and spacing tokens, [`design`](../design/index.md) owns composition, and [`copy`](copy.md) owns the words placed inside each container. Every text box inherits its visual and paragraph defaults from the active slide theme, including the applicable master, layout, placeholder, and component definition; this file does not create a parallel text style.
 
-Every text box must have a declared typography role, parent region, internal margins, alignment, wrapping policy, maximum line expectation, and overflow response. Resolve those properties through theme inheritance first. A slide-local override is permitted only when the content has a distinct semantic role that the theme does not represent, and the exception must be named and reused rather than tuned by eye.
+Declare each text box's typography role, parent region, margins, alignment, wrapping, line limit, and overflow response. Resolve these through theme inheritance. Allow a slide-local override only for an unrepresented semantic role. Name and reuse the exception; never tune it by eye.
 
 ## Container contract
 
@@ -12,7 +12,8 @@ Every text box must have a declared typography role, parent region, internal mar
 - Use top vertical alignment for most analytical text. Use middle alignment only for compact labels, values, buttons, or symmetric callouts whose height is intentionally fixed.
 - Set line height and paragraph spacing from the design system. Do not use blank lines to simulate paragraph or group spacing.
 - Define wrapping deliberately. A wrapped bullet aligns to the start of its text, not the bullet glyph; a wrapped heading keeps the same role and line height rather than shrinking locally.
-- Keep action titles to the approved line-count variant without changing the registered title font size. First edit the title and use its full approved width to preserve one line. If a faithful title still requires two lines, wrap at a meaningful phrase boundary and slightly earlier when that prevents a lone orphaned word; never leave a single short word stranded on the second line merely because the box can technically fit it. Set a content limit appropriate to each body component instead of relying on autofit to compress unlimited text.
+- Measure headings with the resolved font before layout and pass explicit line breaks to both adapters. Reject unavailable fonts and unbreakable words that exceed the allocated width. Downstream rules and content follow the measured height, not a fixed single-line offset.
+- Keep action titles within the approved line count and registered font size. Edit first and use the full approved width. If two lines remain necessary, wrap at a phrase boundary. Wrap earlier to avoid one short orphaned word. Set body limits by component; never use autofit to compress unlimited text.
 - Treat clipping, autofit, and shrink-to-fit as diagnostic signals rather than default solutions. Shorten the copy, enlarge the valid region, select another component, or split the slide.
 - Inspect text after final font substitution and native rendering because equal box coordinates do not guarantee equal visible baselines.
 
@@ -40,7 +41,8 @@ Use the reusable [`Insight Box`](insight-box.md) for a detached recommendation, 
 - Keep bullet indent, hanging indent, bullet-to-text gap, nesting depth, and paragraph spacing consistent within a component family.
 - Use one bullet level whenever possible. A second level is acceptable only for a real subordinate relationship; move deeper detail to the appendix.
 - Use theme spacing tokens between bullets and larger tokens between groups. Do not insert blank bullets as spacers.
-- If a list requires a smaller type role or more than two nesting levels to fit, rewrite it, split the slide, or choose another slide type.
+- Size each bullet row from its wrapped line count and use the registered compact gap between rows. Do not distribute ordinary bullets across the full height of a text box; leave unused space after the final item.
+- If a list requires a smaller type role or more than two nesting levels to fit, rewrite it, split the slide, or select a more suitable registered component and composition.
 - Apply the parallel-language and sentence-contribution rules in [`copy`](copy.md); do not solve a copy problem through indentation or compression.
 
 ## Platform boundary
@@ -49,4 +51,4 @@ Use native theme, master, layout, placeholder, and component inheritance whereve
 
 ## Acceptance check
 
-Compare the inherited theme source, declared container properties, final-platform readback, and rendering. Reject any unexplained local override or mutation in role, font, color, fill, border, guide, margin, alignment, line or paragraph spacing, wrap, indent, baseline, overflow, or autofit behavior. Confirm that any [`Insight Box`](insight-box.md) uses the registered component behavior and that its text wraps without clipping or autofit.
+Compare the inherited theme source, declared container properties, final-platform readback, and rendering. Reject any unexplained local override or mutation in role, font, color, fill, border, guide, margin, alignment, line or paragraph spacing, wrap, indent, baseline, overflow, or autofit behavior. Confirm that ordinary list rows are content-driven rather than vertically distributed. Confirm that any [`Insight Box`](insight-box.md) uses the registered component behavior and that its text wraps without clipping or autofit.

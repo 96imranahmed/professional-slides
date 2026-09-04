@@ -13,18 +13,20 @@ Item indicators identify or order repeated categories, rows, or sections. They c
 
 Use one shape, content pattern, size, placement mode, and contrast treatment for every peer in the component. Embedded circles use `inverse-keyline` by default. Use `accent-fill` only when the theme provides a clearly distinct primary and the category hierarchy benefits from the extra contrast. An indicator supplements the category label; it does not replace meaningful label text.
 
+Display ordinary ordinal numbers as natural integers without leading zeros. Use `1`, `2`, and `3`, not `01`, `02`, and `03`. Preserve meaningful hierarchical numbers and exact source-required identifiers.
+
 ## Theme contract
 
-| Component | Consumed custom properties | Default binding |
+| Component | Consumed custom properties | Canonical source |
 | --- | --- | --- |
-| item indicator | `--item-indicator-bg`, `--item-indicator-color`, `--item-indicator-border`, `--item-indicator-accent-bg`, `--item-indicator-accent-color`, `--item-indicator-keyline`, `--item-indicator-size`, `--item-indicator-font`, `--item-indicator-radius-square`, `--item-indicator-radius-circle` | inverse surface, on-inverse text, no border, component primary, on-primary text, hairline in on-inverse, icon-lg, label role, square radius, round radius |
+| item indicator | `--item-indicator-bg`, `--item-indicator-color`, `--item-indicator-border`, `--item-indicator-accent-bg`, `--item-indicator-accent-color`, `--item-indicator-keyline`, `--item-indicator-size`, `--item-indicator-font`, `--item-indicator-radius-square`, `--item-indicator-radius-circle` | [component bindings](../theming/component-bindings.md#text-and-section-components) |
 
 ## Structural HTML reference
 
 ~~~html
 <div class="deck" data-theme="executive-light" data-density="executive">
   <div class="item-indicator-gallery" aria-label="Item indicator variants">
-    <span class="item-indicator" data-shape="square" data-placement="column">01</span>
+    <span class="item-indicator" data-shape="square" data-placement="column">1</span>
     <span class="item-indicator" data-shape="circle" data-placement="column">2</span>
     <span class="item-indicator" data-shape="circle" data-placement="column">A</span>
     <div class="item-indicator-field">
@@ -124,4 +126,4 @@ Build every indicator as editable native shape plus editable text. Center the te
 
 ## Acceptance check
 
-Every mark identifies or orders a peer rather than encoding a score, each number or letter is horizontally and vertically centered within its shape, dedicated-column indicators are horizontally and vertically centered, embedded indicators overlap the leading edge consistently without clipping, the preferred embedded treatment is the inverse fill with an on-inverse keyline, the accent-fill alternative remains visibly distinct from its backing field, every peer uses one construction, and deleting the indicator does not remove the category's semantic label.
+Verify each mark identifies or orders a peer instead of scoring it. Centre every glyph within its shape and every dedicated indicator within its column. Embedded indicators overlap the leading edge consistently without clipping. Prefer inverse fill with an on-inverse keyline. Keep accent-fill alternatives distinct from their backing field. Peers use one construction. Deleting an indicator must not remove the semantic label.

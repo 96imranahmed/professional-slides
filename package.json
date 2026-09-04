@@ -1,0 +1,23 @@
+{
+  "name": "professional-slides",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "python3 -m unittest discover -s evals/tests -p 'test_*.py'",
+    "validate:runtime": "node evals/scripts/generate_golden_set.mjs",
+    "golden": "node evals/scripts/generate_golden_set.mjs",
+    "golden:check": "node evals/scripts/generate_golden_set.mjs --check",
+    "validate:components": "node evals/scripts/validate_component_runtime.mjs",
+    "validate:fidelity": "node evals/scripts/validate_reference_fidelity.mjs",
+    "inventory:toolkit": "node evals/scripts/import_consulting_toolkit.mjs"
+  },
+  "peerDependencies": {
+    "@napi-rs/canvas": ">=0.1.80",
+    "@oai/artifact-tool": ">=2.8.52",
+    "pixelmatch": ">=7.1.0",
+    "playwright": ">=1.55.0",
+    "pngjs": ">=7.0.0",
+    "pptxgenjs": ">=4.0.0",
+    "sharp": ">=0.34.0"
+  }
+}

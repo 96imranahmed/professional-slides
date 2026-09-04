@@ -1,6 +1,6 @@
 # Table Cell Status and Comparison Indicators
 
-This component owns compact completion, traffic-light status, and bounded heatmap scores inside tables. It keeps the indicator subordinate to the row evidence, preserves an explicit value or label, and resolves every colour through the active theme.
+This component owns compact completion, binary confirmation, traffic-light status, bounded heatmap scores, and ordinal fill discs inside tables. It keeps the indicator subordinate to the row evidence, preserves an explicit value or label, and resolves every colour through the active theme.
 
 Use the semantic row and cell icon contract in [`icons-and-logos`](icons-and-logos.md#row-and-cell-icons) when a compact library icon improves scanning or replaces a repeated low-information word. Use this component when the cell encodes measured completion, a threshold-based status, or an ordered score.
 
@@ -18,6 +18,10 @@ Use a traffic-light cell only when positive, caution, negative, or missing state
 
 A traffic-light table must include one visible legend on the same slide. The legend repeats every state used in the table and states the threshold or trigger. Do not rely on a legend from an earlier slide.
 
+### Binary confirmation
+
+Use a check and `Supported` label for a defined positive state and a cross and `Not supported` label for a defined negative state. The symbol is the primary non-colour cue; colour may reinforce it through the existing positive and negative theme roles. Use `Not assessed` or `Missing` explicitly rather than leaving a blank cell. Define the confirmation test in the column heading or note, and do not use a check merely to signal preference.
+
 ### One-to-five heatmap cell
 
 Use a one-to-five heatmap only when the domain has named anchors and a reproducible scoring rule. Print the score in every cell. The complete cell may receive the fill when this improves scanning; the number remains the non-colour cue.
@@ -30,14 +34,21 @@ Choose one palette for the complete table:
 
 The legend is mandatory, sits on the same slide, uses the same palette, and names the anchors. Use `N/A` for non-applicable and `Not available` for unavailable evidence. Missing cells use the registered missing treatment and never inherit a score colour.
 
+### Ordinal fill disc
+
+Use the ordinal fill disc, sometimes called a Harvey ball, for a compact bounded rating whose anchors are explicitly defined. The standard domain is `0` through `4`, rendered as empty, quarter, half, three-quarter, and full. Print the score or named level beside the disc and provide one same-slide legend that defines the anchors. The filled sector uses component-primary and the track uses the neutral chart segment.
+
+Do not use an ordinal disc for percentages, confidence, or measured completion. Use a spinner for a true `0%` to `100%` share. Use a heatmap for table-wide scanning. Use checks or crosses only for defined binary states.
+
 ## Theme contract
 
-| Component | Consumed custom properties | Default binding |
+| Component | Consumed custom properties | Canonical source |
 | --- | --- | --- |
-| completion spinner | `--table-cell-completion-fill`, `--table-cell-completion-track`, `--table-cell-completion-size`, `--table-cell-completion-gap`, `--table-cell-completion-font` | component primary, chart segment, registered icon size, `space-2`, label role |
-| traffic-light cell | `--table-cell-status-positive`, `--table-cell-status-caution`, `--table-cell-status-negative`, `--table-cell-status-missing`, `--table-cell-status-marker-size`, `--table-cell-status-gap`, `--table-cell-status-font` | semantic status roles, chart segment, icon size, `space-2`, compact body role |
-| heatmap cell | `--table-cell-heat-1` through `--table-cell-heat-5`, `--table-cell-heat-on-low`, `--table-cell-heat-on-high`, `--table-cell-heat-missing`, `--table-cell-heat-missing-color`, `--table-cell-heat-font`, `--table-cell-heat-min-size`, `--table-cell-heat-padding` | registered theme heatmap scale, ink, on-primary, surface-1, muted ink, label role, density row height, `space-2` |
-| indicator legend | `--table-cell-legend-font`, `--table-cell-legend-color`, `--table-cell-legend-gap`, `--table-cell-legend-item-gap`, `--table-cell-legend-swatch-size`, `--table-cell-legend-rule` | compact body role, ink, `space-3`, `space-2`, icon size, quiet rule |
+| completion spinner | `--table-cell-completion-fill`, `--table-cell-completion-track`, `--table-cell-completion-size`, `--table-cell-completion-gap`, `--table-cell-completion-font` | [component bindings](../theming/component-bindings.md#evidence-components) |
+| traffic-light cell | `--table-cell-status-positive`, `--table-cell-status-caution`, `--table-cell-status-negative`, `--table-cell-status-missing`, `--table-cell-status-marker-size`, `--table-cell-status-gap`, `--table-cell-status-font` | [component bindings](../theming/component-bindings.md#evidence-components) |
+| heatmap cell | `--table-cell-heat-1` through `--table-cell-heat-5`, `--table-cell-heat-on-low`, `--table-cell-heat-on-high`, `--table-cell-heat-missing`, `--table-cell-heat-missing-color`, `--table-cell-heat-font`, `--table-cell-heat-min-size`, `--table-cell-heat-padding` | [component bindings](../theming/component-bindings.md#evidence-components) |
+| ordinal fill disc | `--table-cell-rating-fill`, `--table-cell-rating-track`, `--table-cell-rating-size`, `--table-cell-rating-gap`, `--table-cell-rating-font` | [component bindings](../theming/component-bindings.md#evidence-components) |
+| indicator legend | `--table-cell-legend-font`, `--table-cell-legend-color`, `--table-cell-legend-gap`, `--table-cell-legend-item-gap`, `--table-cell-legend-swatch-size`, `--table-cell-legend-rule` | [component bindings](../theming/component-bindings.md#evidence-components) |
 
 ## Structural HTML reference
 
@@ -70,11 +81,21 @@ The legend is mandatory, sits on the same slide, uses the same palette, and name
       </table>
       <aside class="table-cell-status__legend" id="forecast-status-legend" aria-label="Forecast status legend">
         <ul>
-          <li data-state="positive"><span class="table-cell-status__dot" aria-hidden="true"></span><span><strong>On track</strong>: forecast meets the approved date</span></li>
-          <li data-state="caution"><span class="table-cell-status__dot" aria-hidden="true"></span><span><strong>Watch</strong>: recovery is required within the current window</span></li>
-          <li data-state="negative"><span class="table-cell-status__dot" aria-hidden="true"></span><span><strong>Off track</strong>: approved date is forecast to be missed</span></li>
+          <li data-state="positive"><span class="table-cell-status__dot" aria-hidden="true"></span><span>On track: forecast meets the approved date</span></li>
+          <li data-state="caution"><span class="table-cell-status__dot" aria-hidden="true"></span><span>Watch: recovery is required within the current window</span></li>
+          <li data-state="negative"><span class="table-cell-status__dot" aria-hidden="true"></span><span>Off track: approved date is forecast to be missed</span></li>
         </ul>
       </aside>
+    </figure>
+
+    <figure class="table-cell-status-set" data-palette="theme-status">
+      <table class="data-table" aria-label="Evidence confirmation">
+        <thead><tr><th>Statement</th><th>Confirmation</th></tr></thead>
+        <tbody>
+          <tr><th>Demand exceeds the threshold</th><td class="table-cell-status" data-variant="binary" data-state="positive"><span class="table-cell-status__binary" aria-hidden="true">✓</span><span>Supported</span></td></tr>
+          <tr><th>Supply remains constrained</th><td class="table-cell-status" data-variant="binary" data-state="negative"><span class="table-cell-status__binary" aria-hidden="true">×</span><span>Not supported</span></td></tr>
+        </tbody>
+      </table>
     </figure>
 
     <figure class="table-cell-status-set" data-palette="red-white-green">
@@ -93,6 +114,30 @@ The legend is mandatory, sits on the same slide, uses the same palette, and name
           <li data-score="3"><span class="table-cell-status__swatch">3</span><span>Mixed</span></li>
           <li data-score="4"><span class="table-cell-status__swatch">4</span><span>Good</span></li>
           <li data-score="5"><span class="table-cell-status__swatch">5</span><span>Strong</span></li>
+        </ol>
+      </aside>
+    </figure>
+
+    <figure class="table-cell-status-set" data-palette="theme-sequential">
+      <table class="data-table" aria-label="Option fit rating" aria-describedby="option-fit-legend">
+        <thead><tr><th>Option</th><th>Strategic fit</th></tr></thead>
+        <tbody>
+          <tr>
+            <th>Option A</th>
+            <td class="table-cell-status" data-variant="ordinal-disc">
+              <span class="table-cell-status__rating" style="--rating:3" role="img" aria-label="3 of 4, strong fit"></span>
+              <span class="table-cell-status__value">3 of 4, strong</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <aside class="table-cell-status__legend" id="option-fit-legend" aria-label="Strategic fit scale">
+        <ol class="table-cell-status__scale">
+          <li><span>0</span><span>None</span></li>
+          <li><span>1</span><span>Limited</span></li>
+          <li><span>2</span><span>Mixed</span></li>
+          <li><span>3</span><span>Strong</span></li>
+          <li><span>4</span><span>Complete</span></li>
         </ol>
       </aside>
     </figure>
@@ -126,6 +171,11 @@ The legend is mandatory, sits on the same slide, uses the same palette, and name
   --table-cell-heat-font: var(--type-label);
   --table-cell-heat-min-size: var(--chart-row-height);
   --table-cell-heat-padding: var(--space-2);
+  --table-cell-rating-fill: var(--component-primary);
+  --table-cell-rating-track: var(--chart-segment);
+  --table-cell-rating-size: var(--icon-lg);
+  --table-cell-rating-gap: var(--space-2);
+  --table-cell-rating-font: var(--type-label);
   --table-cell-legend-font: var(--type-body-compact);
   --table-cell-legend-color: var(--ink);
   --table-cell-legend-gap: var(--space-3);
@@ -163,6 +213,24 @@ The legend is mandatory, sits on the same slide, uses the same palette, and name
   font: var(--table-cell-status-font);
 }
 
+.table-cell-status[data-variant="binary"] {
+  display: flex;
+  align-items: center;
+  gap: var(--table-cell-status-gap);
+  font: var(--table-cell-status-font);
+}
+
+.table-cell-status__binary {
+  display: inline-grid;
+  place-items: center;
+  width: var(--table-cell-status-marker-size);
+  color: var(--table-cell-status-missing);
+  font: var(--table-cell-status-font);
+}
+
+[data-variant="binary"][data-state="positive"] > .table-cell-status__binary { color: var(--table-cell-status-positive); }
+[data-variant="binary"][data-state="negative"] > .table-cell-status__binary { color: var(--table-cell-status-negative); }
+
 .table-cell-status__spinner {
   --value: 0;
   width: var(--table-cell-completion-size);
@@ -175,6 +243,22 @@ The legend is mandatory, sits on the same slide, uses the same palette, and name
 .table-cell-status__value {
   font: var(--table-cell-completion-font);
   font-variant-numeric: tabular-nums;
+}
+
+.table-cell-status[data-variant="ordinal-disc"] {
+  display: flex;
+  align-items: center;
+  gap: var(--table-cell-rating-gap);
+  font: var(--table-cell-rating-font);
+}
+
+.table-cell-status__rating {
+  --rating: 0;
+  width: var(--table-cell-rating-size);
+  aspect-ratio: 1;
+  flex: none;
+  border-radius: var(--radius-round);
+  background: conic-gradient(var(--table-cell-rating-fill) calc(var(--rating) * 25%), var(--table-cell-rating-track) 0);
 }
 
 .table-cell-status[data-variant="completion"][data-state="positive"] { --table-cell-completion-fill: var(--table-cell-status-positive); }
@@ -262,18 +346,20 @@ The legend is mandatory, sits on the same slide, uses the same palette, and name
 }
 ```
 
-The HTML exposes one component class with three registered variants. `data-palette` belongs on the table-and-legend set so the cells and legend cannot resolve different scales. The completion `--value` is content data. A presentation adapter calculates the sector geometry and the registered heatmap swatches before creating native objects.
+The HTML exposes one component class with five registered variants. `data-palette` belongs on the table-and-legend set so the cells and legend cannot resolve different scales. Completion `--value` and ordinal `--rating` are content data. A presentation adapter calculates sector geometry and registered heatmap swatches before creating native objects.
 
 ## Variants and states
 
 - `completion` accepts `--value` from `0` to `100`. Its default palette is component-primary plus the neutral track. `data-state` may rebind the fill only when a written threshold exists.
 - `traffic-light` accepts `positive`, `caution`, `negative`, or `missing`. Every cell includes a visible label and every table includes a same-slide legend.
+- `binary` accepts `positive`, `negative`, or `missing`. It uses a check, cross, or explicit missing mark plus visible text and a written confirmation test.
 - `heatmap` accepts scores `1` through `5` and `missing`. A different bounded domain is allowed only when the score labels, scale anchors, and legend are changed together.
+- `ordinal-disc` accepts ratings `0` through `4` and `missing`. Every disc prints a score or named level and the table includes one same-slide legend defining the anchors.
 - `theme-sequential`, `red-white-green`, and `red-white` are the registered heatmap palettes. Palette names describe the scale construction, while the actual swatches resolve through the active theme.
 
 ## Native translation
 
-Build the completion spinner as one editable neutral circle plus one editable filled sector, with the value in a separate text box. Build traffic lights as editable circles and adjacent text. Build a heatmap as editable table-cell fills plus editable centered values. Resolve every fill and text colour from the active theme before creating the native objects.
+Build completion and ordinal discs as one editable neutral circle plus one editable filled sector, with the value or level in a separate text box. Build traffic lights as editable circles and adjacent text. Build binary confirmation as an editable check, cross, or missing mark plus adjacent text. Build a heatmap as editable table-cell fills plus editable centered values. Resolve every fill and text colour from the active theme before creating the native objects.
 
 Group each legend with its table, not with page furniture. Preserve the legend in PowerPoint and Google Slides as editable shapes and text. Keep the table's accessible description, cell labels, and legend wording in speaker notes or object metadata when the platform cannot retain HTML relationships.
 
@@ -281,7 +367,9 @@ Group each legend with its table, not with page furniture. Preserve the legend i
 
 - Every spinner maps to a declared `0%` to `100%` quantity and prints the value.
 - Every traffic-light state has a written trigger, a visible text label, and a same-slide legend.
+- Every binary state has a written confirmation test, an explicit symbol, and visible text; blanks are never interpreted as negative.
 - Every heatmap has named scale anchors, a printed value in each cell, and a same-slide legend using the exact same palette.
+- Every ordinal disc maps to a declared bounded scale, prints a score or named level, and has a same-slide legend; it never represents a percentage or probabilistic confidence.
 - `red-white-green` has a real neutral midpoint; `red-white` does not use white for missing data.
 - Missing and non-applicable values are explicit and never scored as zero.
 - Peer marks use one construction, palette, size, and threshold contract.

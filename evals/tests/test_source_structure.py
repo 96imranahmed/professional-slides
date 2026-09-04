@@ -1,704 +1,637 @@
-from __future__ import annotations
-
 import json
+import os
 import re
+import shutil
 import subprocess
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_ROOT = "."
-SKILL_ROOT = "skills/professional-slides"
+SKILL = ROOT / "skills" / "professional-slides"
+RUNTIME = SKILL / "runtime"
+REFERENCES = SKILL / "references"
+NODE = os.environ.get("RUNTIME_NODE") or shutil.which("node")
 
 
-def read(relative: str) -> str:
-    return (ROOT / relative).read_text(encoding="utf-8")
+def read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
 
 
-def relative_luminance(hex_colour: str) -> float:
-    channels = [int(hex_colour[index : index + 2], 16) / 255 for index in (1, 3, 5)]
-    linear = [channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4 for channel in channels]
-    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
-
-
-def contrast_ratio(first: str, second: str) -> float:
-    light, dark = sorted((relative_luminance(first), relative_luminance(second)), reverse=True)
-    return (light + 0.05) / (dark + 0.05)
+def run_node(source: str) -> dict:
+    if not NODE:
+        raise unittest.SkipTest("Node.js is not available")
+    result = subprocess.run(
+        [NODE, "--input-type=module", "--eval", source],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "RUNTIME_NODE_MODULES": os.environ.get("RUNTIME_NODE_MODULES", str(Path(NODE).resolve().parents[1] / "node_modules"))},
+    )
+    return json.loads(result.stdout)
 
 
 class SourceStructureTests(unittest.TestCase):
-    def test_repository_eval_harness_has_one_top_level_owner(self):
-        self.assertFalse((ROOT / "scripts").exists())
-        self.assertFalse((ROOT / "tests").exists())
-        self.assertTrue((ROOT / "evals" / "scripts" / "prepare_eval_run.py").is_file())
-        self.assertTrue((ROOT / "evals" / "tests" / "test_run_evals.py").is_file())
-
-    def test_every_source_directory_has_an_index(self):
-        missing = [
-            path.relative_to(ROOT).as_posix()
-            for path in (ROOT / SKILL_ROOT / "references").rglob("*")
-            if path.is_dir() and not (path / "index.md").is_file()
-        ]
-        self.assertEqual(missing, [])
-
-    def test_plugin_manifest_exposes_the_canonical_skill(self):
-        manifest = json.loads(read(f"{PLUGIN_ROOT}/.codex-plugin/plugin.json"))
+    def test_plugin_and_skill_have_one_canonical_owner(self):
+        manifest = json.loads(read(ROOT / ".codex-plugin" / "plugin.json"))
         self.assertEqual(manifest["name"], "professional-slides")
         self.assertEqual(manifest["skills"], "./skills/")
-        self.assertTrue((ROOT / SKILL_ROOT / "SKILL.md").is_file())
-        self.assertEqual(list(ROOT.glob("SKILL.md")), [])
+        self.assertTrue((SKILL / "SKILL.md").is_file())
+        self.assertFalse((ROOT / "plugins" / "professional-slides").exists())
 
-    def test_entrypoint_is_short_and_routes_to_owners(self):
-        skill = read(f"{SKILL_ROOT}/SKILL.md").lower()
-        self.assertLess(len(skill.split()), 1000)
-        for mode in ("new_deck", "existing_deck_revision", "slide_revision"):
-            self.assertIn(mode, skill)
-        for target in (
-            "references/templates/index.md",
-            "references/storylining/index.md",
-            "references/design/index.md",
-            "references/theming/index.md",
-            "references/components/index.md",
-            "references/slide-types/index.md",
-            "references/charts/index.md",
-            "references/tools/index.md",
-            "references/evaluation/index.md",
-        ):
-            self.assertIn(target, skill)
-        self.assertIn("before creating any slide document", skill)
-        self.assertIn("edit only the requested slides", skill)
-        self.assertIn("prefer one variant for each recurring component or semantic relationship across the deck", skill)
-        self.assertIn("a consistency default, not a hard constraint", skill)
+    def test_skill_routes_to_open_composition_and_executable_runtime(self):
+        source = read(SKILL / "SKILL.md")
+        self.assertIn("references/composition/index.md", source)
+        self.assertIn("runtime/README.md#content-planning", source)
+        self.assertIn("PptxGenJS adapter", source)
+        self.assertIn("Artifact Tool", source)
+        self.assertNotIn("references/slide-types", source)
+        self.assertFalse((REFERENCES / "slide-types").exists())
 
-    def test_core_guides_have_simple_language_budgets(self):
-        limits = {
-            f"{SKILL_ROOT}/references/design/index.md": 1800,
-            f"{SKILL_ROOT}/references/templates/commercial-due-diligence.md": 2200,
-            f"{SKILL_ROOT}/references/templates/project-progress-update.md": 1400,
-            f"{SKILL_ROOT}/references/templates/startup-pitch-deck.md": 1400,
-            f"{SKILL_ROOT}/references/components/trackers/index.md": 900,
-            f"{SKILL_ROOT}/references/components/copy.md": 900,
-            f"{SKILL_ROOT}/references/slide-types/executive-synthesis.md": 650,
-            f"{SKILL_ROOT}/references/storylining/index.md": 900,
-            f"{SKILL_ROOT}/references/storylining/dot-dash.md": 1800,
-            f"{SKILL_ROOT}/references/storylining/pre-authoring-contract.md": 650,
-            f"{SKILL_ROOT}/references/evaluation/index.md": 1600,
-        }
-        over = {
-            path: len(read(path).split())
-            for path, limit in limits.items()
-            if len(read(path).split()) > limit
-        }
-        self.assertEqual(over, {})
+    def test_all_local_markdown_links_resolve(self):
+        link_pattern = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+        missing = []
+        for markdown in REFERENCES.rglob("*.md"):
+            for raw in link_pattern.findall(read(markdown)):
+                target = raw.strip().strip("<>").split("#", 1)[0]
+                if not target or re.match(r"^[a-z][a-z0-9+.-]*:", target, re.I):
+                    continue
+                if not (markdown.parent / target).resolve().exists():
+                    missing.append(f"{markdown.relative_to(ROOT)} -> {raw}")
+        self.assertEqual(missing, [])
 
-    def test_design_delegates_values_and_keeps_stable_titles(self):
-        design = read(f"{SKILL_ROOT}/references/design/index.md").lower()
-        self.assertIn("../theming/index.md", design)
-        self.assertIn("../theming/tokens.md", design)
-        self.assertIn("one identical component-primary swatch", design)
-        self.assertIn("exact same deck-level", design)
-        self.assertIn("one-line and two-line titles start at the same point", design)
-        self.assertIn("do not impose the same card grid", design)
+    def test_runtime_registry_fixtures_and_token_provenance_compile(self):
+        result = run_node(
+            """
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { CHART_IDS } from './skills/professional-slides/runtime/charts.mjs';
+import { buildFixtureDeck } from './skills/professional-slides/runtime/fixtures.mjs';
+const { deck, fixtures } = buildFixtureDeck();
+const visual = new Set(['fill','stroke','color','fontFamily','fontSize','lineWidth','radius']);
+const missing = deck.slides.flatMap(slide => slide.nodes.flatMap(node => Object.entries(node.style || {})
+  .filter(([key, value]) => visual.has(key) && value !== null && value !== 'none' && (!value || !value.tokenId || value.value === undefined))
+  .map(([key]) => `${slide.id}:${node.id}:${key}`)));
+console.log(JSON.stringify({
+  registry: REGISTRY.size,
+  components: [...REGISTRY.values()].filter(item => item.category !== 'chart').length,
+  charts: CHART_IDS.length,
+  fixtures: fixtures.length,
+  layoutFixtures: fixtures.filter(item => item.kind === 'layout').length,
+  variantFixtures: fixtures.filter(item => item.kind === 'variant').length,
+  slideCount: deck.slides.length,
+  nodeCount: deck.slides.reduce((sum, slide) => sum + slide.nodes.length, 0),
+  missing
+}));
+"""
+        )
+        self.assertEqual(result["registry"], 56)
+        self.assertEqual(result["components"], 44)
+        self.assertEqual(result["charts"], 12)
+        self.assertEqual(result["fixtures"], 135)
+        self.assertEqual(result["layoutFixtures"], 18)
+        self.assertEqual(result["variantFixtures"], 61)
+        self.assertEqual(result["slideCount"], 135)
+        self.assertGreater(result["nodeCount"], 800)
+        self.assertEqual(result["missing"], [])
 
-    def test_slide_layouts_are_a_separate_registered_design_axis(self):
-        skill = read(f"{SKILL_ROOT}/SKILL.md").lower()
-        design = read(f"{SKILL_ROOT}/references/design/index.md").lower()
-        slide_types = read(f"{SKILL_ROOT}/references/slide-types/index.md").lower()
-        layouts = read(f"{SKILL_ROOT}/references/design/slide-layouts.md").lower()
-        bindings = read(f"{SKILL_ROOT}/references/theming/component-bindings.md").lower()
+    def test_golden_fixtures_cover_source_families_without_raster_or_fixed_page_taxonomy(self):
+        result = run_node(
+            """
+import { buildGoldenDeck } from './skills/professional-slides/runtime/golden-fixtures.mjs';
+const { deck, fixtures } = buildGoldenDeck();
+const analytical = fixtures.filter(item => !['cover','section-divider'].includes(item.visualFamily));
+const chrome = analytical.map(item => {
+  const slide = deck.slides[item.slide - 1];
+  const title = slide.nodes.find(node => node.role === 'title-rule');
+  const text = slide.nodes.find(node => node.role === 'action-title');
+  const footer = slide.nodes.find(node => node.role === 'footer-rule');
+  return {title: title?.frame, textBottom: text.frame.y + text.data.textLayout.height, footer: footer?.frame};
+});
+console.log(JSON.stringify({
+  slides: deck.slides.length,
+  nodes: deck.slides.reduce((sum, slide) => sum + slide.nodes.length, 0),
+  families: new Set(fixtures.map(item => item.visualFamily)).size,
+  sources: fixtures.map(item => item.sourceSlide),
+  allCapabilities: fixtures.every(item => item.capabilities.length > 0),
+  imageNodes: deck.slides.flatMap(slide => slide.nodes).filter(node => node.type === 'image').length,
+  fixedTaxonomy: JSON.stringify({deck, fixtures}).toLowerCase().includes('archetype'),
+  chrome
+}));
+"""
+        )
+        self.assertEqual(result["slides"], 18)
+        self.assertGreater(result["nodes"], 700)
+        self.assertEqual(result["families"], 18)
+        self.assertEqual(len(result["sources"]), len(set(result["sources"])))
+        self.assertTrue(result["allCapabilities"])
+        self.assertEqual(result["imageNodes"], 0)
+        self.assertFalse(result["fixedTaxonomy"])
+        for chrome in result["chrome"]:
+            self.assertEqual(chrome["title"], {"x": 60, "y": chrome["textBottom"] + 8, "width": 1160, "height": 0})
+            self.assertEqual(chrome["footer"], {"x": 60, "y": 680, "width": 1160, "height": 0})
 
-        self.assertIn("[slide layouts](references/design/slide-layouts.md)", skill)
-        self.assertIn("[slide-layout router](slide-layouts.md)", design)
-        self.assertIn("[slide layout](../design/slide-layouts.md)", slide_types)
-        self.assertIn("layouts own page-level region geometry only", design)
-        self.assertIn("they do not define the narrative job", layouts)
-        self.assertIn("if the two halves contain genuinely unrelated claims, they belong on separate slides", layouts)
-        self.assertEqual(layouts.count('<main class="deck"'), 6)
-        for variant in (
-            "cover-split-50-50",
-            "section-split-50-50",
-            "context-detail-20-80",
-            "soft-split-50-50",
-            "full-field",
-            "implication-split",
-        ):
-            self.assertIn(f'data-layout="{variant}"', layouts)
-        for slot in ("primary", "secondary", "context", "evidence", "inference", "implication"):
-            self.assertIn(f'data-slot="{slot}"', layouts)
-        self.assertIn("| slide layout frame |", bindings)
-        self.assertIn("--slide-layout-region-padding", bindings)
-        self.assertNotRegex(layouts, r"#[0-9a-f]{3,8}\\b")
-        self.assertNotIn("—", layouts)
+    def test_planner_selects_relationships_and_rejects_unprepared_content(self):
+        result = run_node(
+            """
+import { planSlide } from './skills/professional-slides/runtime/planner.mjs';
+const item = index => ({ id: `item-${index}`, job: `job ${index}`, component: 'paragraph', props: { text: `Point ${index}` } });
+const layout = count => planSlide({ id: `slide-${count}`, title: 'The evidence supports action', items: Array.from({length: count}, (_, index) => item(index)) }).decision.layout;
+const sequence = planSlide({ id: 'sequence', title: 'The work advances in order', items: [0,1,2].map(index => ({...item(index), relationship: 'sequence'})) }).decision.layout;
+const overlay = planSlide({ id: 'overlay', title: 'The annotation explains the exhibit', items: [{...item(0), relationship: 'layer'}] }).decision.layout;
+const absolute = planSlide({ id: 'absolute', title: 'The geometry carries the meaning', items: [{...item(0), frame: {x: 0, y: 0, width: 100, height: 100}}] }).decision.layout;
+let genericLabelRejected = false;
+let genericSectionHeadingRejected = false;
+let missingJobRejected = false;
+try { planSlide({ id: 'bad-label', title: 'A title', items: [{...item(0), props: {title: 'Insight', text: 'Value'}}] }); } catch { genericLabelRejected = true; }
+try { planSlide({ id: 'bad-heading', title: 'A title', items: [{...item(0), heading: 'Implication'}] }); } catch { genericSectionHeadingRejected = true; }
+try { planSlide({ id: 'bad-job', title: 'A title', items: [{id: 'x', component: 'paragraph', props: {text: 'Value'}}] }); } catch { missingJobRejected = true; }
+console.log(JSON.stringify({one: layout(1), two: layout(2), four: layout(4), sequence, overlay, absolute, genericLabelRejected, genericSectionHeadingRejected, missingJobRejected}));
+"""
+        )
+        self.assertEqual(result["one"], "flow.column")
+        self.assertEqual(result["two"], "flow.row")
+        self.assertEqual(result["four"], "grid")
+        self.assertEqual(result["sequence"], "flow.row")
+        self.assertEqual(result["overlay"], "overlay")
+        self.assertEqual(result["absolute"], "absolute")
+        self.assertTrue(result["genericLabelRejected"])
+        self.assertTrue(result["genericSectionHeadingRejected"])
+        self.assertTrue(result["missingJobRejected"])
 
-    def test_theming_contract_covers_families_density_and_component_variables(self):
-        theming_root = ROOT / SKILL_ROOT / "references" / "theming"
-        index = (theming_root / "index.md").read_text(encoding="utf-8").lower()
-        tokens = (theming_root / "tokens.md").read_text(encoding="utf-8").lower()
-        bindings = (theming_root / "component-bindings.md").read_text(encoding="utf-8").lower()
-        html_contract = (theming_root / "html-css-contract.md").read_text(encoding="utf-8").lower()
+    def test_preprocessor_resolves_all_size_modes_and_rejects_overflow(self):
+        result = run_node(
+            """
+import { component, flow, absolute, grid, resolveLayout, section } from './skills/professional-slides/runtime/core.mjs';
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const sized = flow({id: 'sized', direction: 'row', gap: 16, children: [
+  component({id: 'fixed', component: 'metric', size: {width: 100, height: 'fill'}}),
+  component({id: 'hug', component: 'panel', size: {width: 'hug', height: 'fill'}}),
+  component({id: 'percent', component: 'paragraph', size: {width: {percent: 0.2}, height: 'fill'}}),
+  component({id: 'fraction', component: 'metric', size: {width: {fr: 1}, height: 'fill'}})
+]});
+const placements = resolveLayout(sized, {x: 0, y: 0, width: 1000, height: 300}, REGISTRY);
+const nested = flow({id: 'outer', direction: 'row', gap: 16, children: [
+  flow({id: 'intrinsic', direction: 'row', gap: 16, size: {width: 'hug', height: 'fill'}, children: [
+    component({id: 'a', component: 'metric'}), component({id: 'b', component: 'metric'})
+  ]}),
+  component({id: 'remainder', component: 'paragraph', size: {width: 'fill', height: 'fill'}})
+]});
+const nestedPlacements = resolveLayout(nested, {x: 0, y: 0, width: 900, height: 300}, REGISTRY);
+const sectionRoot = flow({id: 'section-row', direction: 'row', children: [section({id: 'section', heading: 'Constraint', size: {width: 'hug', height: 'fill'}, children: [component({id: 'copy', component: 'paragraph'})]}), component({id: 'rest', component: 'paragraph', size: {width: 'fill', height: 'fill'}})]});
+const sectionPlacements = resolveLayout(sectionRoot, {x: 0, y: 0, width: 900, height: 300}, REGISTRY);
+const gridRoot = flow({id: 'grid-row', direction: 'row', children: [grid({id: 'intrinsic-grid', columns:['hug','hug'], rows:['hug'], size:{width:'hug',height:'fill'}, children:[component({id:'grid-panel',component:'panel',cell:{column:0,row:0}}),component({id:'grid-metric',component:'metric',cell:{column:1,row:0}})]}), component({id:'grid-rest',component:'paragraph',size:{width:'fill',height:'fill'}})]});
+const gridPlacements = resolveLayout(gridRoot, {x:0,y:0,width:900,height:300}, REGISTRY);
+let overflowRejected = false;
+let absoluteOverflowRejected = false;
+let invalidSpanRejected = false;
+try { resolveLayout(flow({id: 'overflow', children: [component({id: 'a', component: 'metric', size: {width: 600}}), component({id: 'b', component: 'metric', size: {width: 600}})]}), {x:0,y:0,width:1000,height:300}, REGISTRY); } catch { overflowRejected = true; }
+try { resolveLayout(absolute({id: 'absolute', children: [component({id: 'a', component: 'metric', frame: {x:900,y:0,width:200,height:100}})]}), {x:0,y:0,width:1000,height:300}, REGISTRY); } catch { absoluteOverflowRejected = true; }
+try { resolveLayout(grid({id: 'grid', columns:[{fr:1}], rows:[{fr:1}], children:[component({id:'a',component:'metric',cell:{column:0,row:0,columnSpan:2}})]}), {x:0,y:0,width:1000,height:300}, REGISTRY); } catch { invalidSpanRejected = true; }
+console.log(JSON.stringify({
+  widths: Object.fromEntries(placements.map(item => [item.node.id, item.frame.width])),
+  widthTotal: placements.reduce((sum, item) => sum + item.frame.width, 0) + 48,
+  nestedFirst: nestedPlacements.find(item => item.node.id === 'a').frame.width + nestedPlacements.find(item => item.node.id === 'b').frame.width + 16,
+  sectionWidth: sectionPlacements.find(item => item.node.id === 'section').frame.width,
+  gridWidth: gridPlacements.find(item => item.node.id === 'grid-panel').frame.width + gridPlacements.find(item => item.node.id === 'grid-metric').frame.width + 16,
+  overflowRejected, absoluteOverflowRejected, invalidSpanRejected
+}));
+"""
+        )
+        self.assertAlmostEqual(result["widths"]["fixed"], 100)
+        self.assertAlmostEqual(result["widths"]["hug"], 400)
+        self.assertAlmostEqual(result["widths"]["percent"], 190.4)
+        self.assertAlmostEqual(result["widths"]["fraction"], 261.6)
+        self.assertAlmostEqual(result["widthTotal"], 1000)
+        self.assertAlmostEqual(result["nestedFirst"], 496)
+        self.assertAlmostEqual(result["sectionWidth"], 552)
+        self.assertAlmostEqual(result["gridWidth"], 656)
+        self.assertTrue(result["overflowRejected"])
+        self.assertTrue(result["absoluteOverflowRejected"])
+        self.assertTrue(result["invalidSpanRejected"])
 
-        for family in ("executive-light", "executive-dark", "warm-editorial", "reference-derived"):
-            self.assertIn(family, index)
-            self.assertIn(family, tokens)
-        for density in ("live-pitch", "executive", "pre-read", "appendix"):
-            self.assertIn(density, index)
-            self.assertIn(f'data-density="{density}"', tokens)
-        for token in (
-            "--component-primary",
-            "--component-primary-tint",
-            "--page-guideline",
-            "--divider-rule",
-            "--status-positive",
-            "--status-caution",
-            "--status-negative",
-            "--chart-series-1",
-            "--chart-series-6",
-            "--type-action-title",
-            "--space-10",
-            "--component-radius",
-            "--component-shadow",
-        ):
-            self.assertIn(token, tokens)
-        for component in (
-            "action-title block",
-            "terminal action surface",
-            "| description slide |",
-            "description with implication",
-            "| arrow |",
-            "metric field",
-            "data table",
-            "chart plot",
-            "chart callout",
-            "comparison indicator",
-            "| item indicator |",
-            "diagram node",
-            "semantic icon",
-            "logo backing",
-            "image frame",
-        ):
-            self.assertIn(component, bindings)
-        self.assertIn("namespaced aliases are the component api", html_contract)
-        self.assertIn("component css may not contain", html_contract)
+    def test_multiseries_analytical_charts_use_horizontal_top_legends(self):
+        result = run_node(
+            """
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const frame = {x: 0, y: 0, width: 760, height: 420};
+const ids = ['chart.column','chart.bar','chart.stacked-column','chart.stacked-bar','chart.line','chart.area','chart.combo'];
+const props = {
+  categories: ['A','B','C'],
+  series: [{name: 'Actual', values: [2,3,5]}, {name: 'Plan', values: [3,4,6]}],
+  annotations: [],
+  highlights: [],
+  referenceLines: []
+};
+const results = ids.map(id => {
+  const nodes = REGISTRY.get(id).render({id, frame, props}).nodes;
+  const swatches = nodes.filter(node => node.role === 'legend-swatch');
+  const labels = nodes.filter(node => node.role === 'legend-label');
+  const plotNodes = nodes.filter(node => ['chart-gridline','chart-mark','chart-line'].includes(node.role));
+  const legendRows = new Set(swatches.map(node => Math.round(node.frame.y)));
+  const top = Math.min(...swatches.map(node => node.frame.y));
+  const plotTop = Math.min(...plotNodes.map(node => node.frame.y));
+  return {id, swatches: swatches.length, labels: labels.length, rows: legendRows.size, top, plotTop};
+});
+const donut = REGISTRY.get('chart.donut').render({id: 'donut', frame, props: {labels: ['Category 1','Category 2','Category 3'], values: [40,35,25]}}).nodes;
+const donutSwatches = donut.filter(node => node.role === 'legend-swatch');
+const donutSegments = donut.filter(node => node.role === 'chart-segment');
+console.log(JSON.stringify({
+  results,
+  donutLegend: {
+    rows: new Set(donutSwatches.map(node => Math.round(node.frame.y))).size,
+    types: [...new Set(donutSwatches.map(node => node.type))],
+    left: Math.min(...donutSwatches.map(node => node.frame.x)),
+    right: Math.max(...donut.filter(node => node.role === 'legend-label').map(node => node.frame.x + node.frame.width)),
+    top: Math.min(...donutSwatches.map(node => node.frame.y)),
+    chartTop: Math.min(...donutSegments.map(node => node.frame.y))
+  }
+}));
+"""
+        )
+        for chart in result["results"]:
+            self.assertEqual(chart["swatches"], 2, chart["id"])
+            self.assertEqual(chart["labels"], 2, chart["id"])
+            self.assertEqual(chart["rows"], 1, chart["id"])
+            self.assertLess(chart["top"], chart["plotTop"], chart["id"])
+        self.assertEqual(result["donutLegend"]["rows"], 1)
+        self.assertEqual(result["donutLegend"]["types"], ["rect"])
+        self.assertGreater(result["donutLegend"]["left"], 400)
+        self.assertAlmostEqual(result["donutLegend"]["right"], 744)
+        self.assertLess(result["donutLegend"]["top"], result["donutLegend"]["chartTop"])
 
-        theming_sources = "\n".join(path.read_text(encoding="utf-8") for path in theming_root.glob("*.md"))
-        declared = set(re.findall(r"(--[a-z0-9-]+)\s*:", theming_sources))
-        consumed = set()
-        for path in (ROOT / SKILL_ROOT / "references").rglob("*.md"):
-            consumed.update(re.findall(r"var\((--[a-z0-9-]+)", path.read_text(encoding="utf-8")))
-        instance_variables = {"--bottom", "--height", "--series", "--share", "--size", "--value", "--x", "--y"}
-        self.assertEqual(consumed - declared - instance_variables, set())
+    def test_title_variants_share_text_geometry_tokens_and_registry_contract(self):
+        result = run_node(
+            """
+import assert from 'node:assert/strict';
+import { REGISTRY, registryManifest } from './skills/professional-slides/runtime/registry.mjs';
+import { compileDeck, component } from './skills/professional-slides/runtime/core.mjs';
+import { componentVariantFixtureSpecs } from './skills/professional-slides/runtime/fixtures.mjs';
+const results = [];
+for (const id of ['action-title','section-title','slide-chrome']) {
+  const definition = REGISTRY.get(id), chrome = id === 'slide-chrome';
+  const variantProp = chrome ? 'titleVariant' : 'variant', ruleProp = chrome ? 'titleRule' : 'rule';
+  const frame = {x:0,y:0,...definition.preferredSize};
+  const render = props => definition.render({id:'title',frame,props:{...definition.sample,...props}}).nodes;
+  const withLine = render({[variantProp]:'with-line'}), withoutLine = render({[variantProp]:'without-line'});
+  const title = withLine.find(n=>n.role==='action-title' || n.role==='section-title');
+  assert.equal(title.style.lineHeight,title.data.textLayout.lineHeight);
+  assert.equal(title.style.wrap,false);
+  assert.deepEqual(render({}), withoutLine);
+  assert.deepEqual(render({[ruleProp]:true}), withLine);
+  assert.deepEqual(render({[ruleProp]:false}), withoutLine);
+  const line = withLine.find(n=>n.role==='title-rule');
+  assert.equal(line.frame.y - title.frame.y - title.data.textLayout.height, 8);
+  const normalize = nodes => nodes.filter(n=>n.role!=='title-rule').map(({data,...node})=>node);
+  assert.deepEqual(normalize(withLine), normalize(withoutLine));
+  const spec = {id:'test',frame,composition:component({id:'title',component:id,props:{...definition.sample,[variantProp]:'without-line'},frame})};
+  const deck = compileDeck({slides:[spec]}, REGISTRY);
+  assert.equal(deck.manifest.slides[0].componentInstances[0].variant,'without-line');
+  results.push({id,withLine:withLine.filter(n=>n.role==='title-rule').length,withoutLine:withoutLine.filter(n=>n.role==='title-rule').length});
+}
+const manifest = registryManifest().components.filter(c=>['action-title','section-title','slide-chrome'].includes(c.id));
+const fixtures = componentVariantFixtureSpecs().filter(c=>manifest.some(m=>m.id===c.target));
+assert.deepEqual(fixtures.map(f=>`${f.target}:${f.variant}`).sort(), manifest.flatMap(c=>Object.keys(c.variants).map(v=>`${c.id}:${v}`)).sort());
+console.log(JSON.stringify({results,variantCount:fixtures.length,defaults:manifest.map(c=>c.defaultVariant)}));
+"""
+        )
+        for item in result["results"]:
+            self.assertEqual(item["withLine"], 1)
+            self.assertEqual(item["withoutLine"], 0)
+        self.assertEqual(result["variantCount"], 6)
+        self.assertEqual(result["defaults"], ["without-line"] * 3)
 
-    def test_native_theme_palettes_are_complete_and_readable(self):
-        tokens = read(f"{SKILL_ROOT}/references/theming/tokens.md").lower()
-        required = {
-            "canvas",
-            "surface-1",
-            "surface-2",
-            "surface-inverse",
-            "ink",
-            "text-secondary",
-            "muted-ink",
-            "on-primary",
-            "on-inverse",
-            "component-primary",
-            "component-primary-tint",
-            "page-guideline",
-            "divider-rule",
-            "chart-gridline",
-            "chart-segment",
-            "status-positive",
-            "status-positive-tint",
-            "on-status-positive",
-            "status-caution",
-            "status-caution-tint",
-            "status-negative",
-            "status-negative-tint",
-            "on-status-negative",
-            "status-info",
-            "status-info-tint",
-            "chart-series-1",
-            "chart-series-2",
-            "chart-series-3",
-            "chart-series-4",
-            "chart-series-5",
-            "chart-series-6",
-        }
-        for theme in ("executive-light", "executive-dark", "warm-editorial"):
-            match = re.search(rf'\.deck\[data-theme="{theme}"\]\s*\{{(.*?)\n\}}', tokens, re.DOTALL)
-            self.assertIsNotNone(match)
-            palette = dict(re.findall(r"--([a-z0-9-]+):\s*(#[0-9a-f]{6})", match.group(1)))
-            self.assertEqual(required - set(palette), set())
-            for foreground in ("ink", "text-secondary", "muted-ink"):
-                self.assertGreaterEqual(contrast_ratio(palette[foreground], palette["canvas"]), 4.5)
-            self.assertGreaterEqual(contrast_ratio(palette["on-primary"], palette["component-primary"]), 4.5)
-            self.assertGreaterEqual(contrast_ratio(palette["on-status-positive"], palette["status-positive"]), 4.5)
-            self.assertGreaterEqual(contrast_ratio(palette["on-status-negative"], palette["status-negative"]), 4.5)
+    def test_title_variant_planning_inheritance_chrome_and_invalid_inputs(self):
+        result = run_node(
+            """
+import assert from 'node:assert/strict';
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { resolveTitleVariant, compileDeck, absolute } from './skills/professional-slides/runtime/core.mjs';
+import { planDeck, validateSlidePlan } from './skills/professional-slides/runtime/planner.mjs';
+for (const variant of ['unknown','',null,3,['with-line']]) assert.throws(()=>resolveTitleVariant({variant}), /Unknown title variant/);
+for (const rule of ['false',null,0]) assert.throws(()=>resolveTitleVariant({rule}), /must be a boolean/);
+assert.throws(()=>resolveTitleVariant({variant:'with-line',rule:false}), /conflicts/);
+assert.throws(()=>resolveTitleVariant({variant:'without-line',rule:true}), /conflicts/);
+assert.equal(resolveTitleVariant(),'without-line');
+const titleDefinition = REGISTRY.get('action-title');
+const multiline = titleDefinition.render({id:'wrapped',frame:{x:0,y:0,width:1000,height:128},props:{text:'Capacity limits growth\\nInvestment unlocks the next phase',variant:'without-line'}}).nodes[0];
+assert.equal(multiline.data.textLayout.lines.length,2);
+assert.equal(multiline.style.lineHeight,45);
+const nearWidthLimit = REGISTRY.get('slide-chrome').render({id:'near-limit',frame:{x:0,y:0,width:1280,height:720},props:{title:'[Columns chart with split growth and takeaways / insert action title]'}}).nodes.find(n=>n.role==='action-title');
+assert.equal(nearWidthLimit.data.textLayout.lines.length,1);
+assert.ok(nearWidthLimit.data.textLayout.width <= nearWidthLimit.frame.width);
+assert.throws(()=>titleDefinition.render({id:'overflow',frame:{x:0,y:0,width:1000,height:20},props:{text:'Capacity limits growth'}}), /exceeds its allocated height/);
+const plan = {id:'one',title:'Capacity limits growth',items:[{id:'copy',job:'Explain the constraint',component:'paragraph',props:{text:'Capacity limits growth'}}]};
+assert.equal(planDeck({id:'default',slides:[plan]}).decisions[0].titleVariant,'without-line');
+assert.throws(()=>validateSlidePlan({...plan,titleVariant:'unknown'}), /Unknown title variant/);
+const {deck,decisions} = planDeck({id:'planned',titleVariant:'without-line',slides:[plan,{...plan,id:'two',titleVariant:'with-line'}]});
+const counts = deck.slides.map(s=>s.nodes.filter(n=>n.role==='title-rule').length);
+// Selecting the title variant must not move any body component.
+assert.deepEqual(deck.slides[0].componentInstances.find(c=>c.id==='copy').frame,deck.slides[1].componentInstances.find(c=>c.id==='copy').frame);
+const chrome = compileDeck({slides:[{id:'chrome',chrome:{title:'Capacity limits growth'},composition:absolute({id:'empty',children:[]})}]},REGISTRY);
+const title = chrome.slides[0].nodes.find(n=>n.role==='action-title');
+assert.equal(chrome.manifest.slides[0].componentInstances[0].variant,'without-line');
+console.log(JSON.stringify({counts,decisions:decisions.map(d=>d.titleVariant),chromeRules:chrome.slides[0].nodes.filter(n=>n.role==='title-rule').length,footerRules:chrome.slides[0].nodes.filter(n=>n.role==='footer-rule').length,titleAnchor:[title.frame.x,title.frame.y]}));
+"""
+        )
+        self.assertEqual(result["counts"], [0, 1])
+        self.assertEqual(result["decisions"], ["without-line", "with-line"])
+        self.assertEqual(result["chromeRules"], 0)
+        self.assertEqual(result["footerRules"], 0)
+        self.assertEqual(result["titleAnchor"], [60, 48])
 
-    def test_table_cell_status_components_define_palettes_and_mandatory_legends(self):
-        components = read(f"{SKILL_ROOT}/references/components/index.md").lower()
-        indicators = read(f"{SKILL_ROOT}/references/components/comparison-indicators.md").lower()
-        bindings = read(f"{SKILL_ROOT}/references/theming/component-bindings.md").lower()
-        tokens = read(f"{SKILL_ROOT}/references/theming/tokens.md").lower()
-        evaluation = read(f"{SKILL_ROOT}/references/evaluation/index.md").lower()
+    def test_title_rule_follows_measured_text_not_allocated_box(self):
+        result = run_node(
+            """
+import assert from 'node:assert/strict';
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const results = [];
+for (const componentId of ['action-title','section-title']) {
+  for (const text of ['Capacity limits growth','Capacity limits growth\\nInvest in delivery']) {
+    const render = height => REGISTRY.get(componentId).render({id:'title',frame:{x:60,y:80,width:540,height},props:{text,variant:'with-line'}}).nodes;
+    const nodes = render(140), enlarged = render(220);
+    const title = nodes.find(n=>n.type==='text'), rule = nodes.find(n=>n.role==='title-rule');
+    assert.equal(rule.frame.y,enlarged.find(n=>n.role==='title-rule').frame.y);
+    assert.equal(rule.frame.y-title.frame.y-title.data.textLayout.height,8);
+    assert.ok(rule.frame.y < 80+140);
+    results.push(title.data.textLayout.lines.length);
+  }
+}
+console.log(JSON.stringify(results));
+"""
+        )
+        self.assertEqual(result, [1, 2, 1, 2])
 
-        self.assertIn("table cell status and comparison indicators", components)
-        for variant in ("completion", "traffic-light", "heatmap"):
-            self.assertIn(f'data-variant="{variant}"', indicators)
-        for palette in ("theme-sequential", "theme-status", "red-white-green", "red-white"):
-            self.assertIn(f'data-palette="{palette}"', indicators)
-        self.assertIn('class="table-cell-status__spinner"', indicators)
-        self.assertGreaterEqual(indicators.count('class="table-cell-status__legend"'), 2)
-        self.assertGreaterEqual(indicators.count("same-slide legend"), 3)
-        self.assertIn("aria-describedby=\"forecast-status-legend\"", indicators)
-        self.assertIn("aria-describedby=\"evidence-score-legend\"", indicators)
-        self.assertIn("the legend is mandatory", indicators)
-        self.assertIn("--table-cell-heat-1", bindings)
-        self.assertIn("--table-cell-legend-rule", bindings)
-        for level in range(1, 6):
-            self.assertIn(f"--heatmap-primary-{level}", tokens)
-        self.assertIn("every traffic-light table and heatmap includes a readable same-slide legend", evaluation)
-        self.assertNotRegex(indicators, r"#[0-9a-f]{3,8}\\b")
-        self.assertNotIn("—", indicators)
+    def test_section_heading_rejects_subtitle_at_every_entrypoint(self):
+        result = run_node(
+            """
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { section, component, compileDeck } from './skills/professional-slides/runtime/core.mjs';
+import { validateSlidePlan } from './skills/professional-slides/runtime/planner.mjs';
+const errors = [];
+const rejects = fn => { try { fn(); return false; } catch (error) { errors.push(error.message); return /do not support subtitle/.test(error.message); } };
+const frame = {x:60,y:100,width:600,height:400};
+const compile = composition => compileDeck({id:'test',slides:[{id:'one',frame,composition}]}, REGISTRY);
+const leaf = {id:'copy',job:'Explain the constraint',component:'paragraph',props:{text:'Capacity limits growth'}};
+const cases = [];
+for (const subtitle of ['FY2026\\nActual', 'Other metadata', '', null, undefined]) {
+  for (const componentId of ['section-heading', 'section', 'content-rail']) {
+    // Reject even without heading text: no measurement or empty-render bypass.
+    for (const heading of ['Description', undefined]) {
+      const props = {heading,subtitle,items:['Capacity limits growth']};
+      const definition = REGISTRY.get(componentId);
+      cases.push(rejects(() => definition.render({id:'test',frame,props})));
+      cases.push(rejects(() => definition.measureHeader({frame,props})));
+      cases.push(rejects(() => compile(component({id:'test',component:componentId,props}))));
+      cases.push(rejects(() => validateSlidePlan({id:'test',title:'Capacity limits growth',items:[{id:'test',job:'Group content',component:componentId,props}]})));
+    }
+  }
+  cases.push(rejects(() => section({id:'group',subtitle})));
+  cases.push(rejects(() => compile({...section({id:'group'}),subtitle})));
+  cases.push(rejects(() => validateSlidePlan({id:'test',title:'Capacity limits growth',items:[{id:'group',job:'Group content',subtitle,items:[leaf]}]})));
+}
+console.log(JSON.stringify({total:cases.length,rejected:cases.filter(Boolean).length,errors}));
+"""
+        )
+        self.assertEqual(result["total"], 135)
+        self.assertEqual(result["rejected"], result["total"], result["errors"])
 
-    def test_executive_summary_is_a_distinct_synthesis_type(self):
-        executive = read(f"{SKILL_ROOT}/references/slide-types/executive-synthesis.md").lower()
-        for phrase in (
-            "distinct slide type",
-            "not an agenda",
-            "two to four supporting branches",
-            "proof for each branch",
-            "decision consequence",
-            "one overall action",
-            "visible structural label **executive summary**",
-        ):
-            self.assertIn(phrase, executive)
-        self.assertIn("do not add a tracker", executive)
-        self.assertIn("do not add a subtitle", executive)
-        self.assertNotIn('class="subtitle"', executive)
-        self.assertEqual(executive.count('<main class="deck"'), 3)
-        for variant in ("one-column", "two-column", "three-column"):
-            self.assertIn(f'data-variant="{variant}"', executive)
-        self.assertEqual(executive.count("<h1>executive summary</h1>"), 3)
-        self.assertIn("--executive-synthesis-columns", executive)
-        self.assertIn('data-heading-style="text"', executive)
-        self.assertIn('data-heading-style="underline"', executive)
-        self.assertIn("branches are open, borderless, and backgroundless", executive)
-        self.assertNotIn("border-top:var(--executive-synthesis-heading-rule)", executive)
-        self.assertNotIn("executive-synthesis__action", executive)
-        self.assertEqual(executive.count('class="insight-box"'), 3)
-        bindings = read(f"{SKILL_ROOT}/references/theming/component-bindings.md").lower()
-        self.assertIn("| executive synthesis |", bindings)
+    def test_section_heading_has_only_full_width_text_and_optional_rule(self):
+        result = run_node(
+            """
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { buildFixtureDeck } from './skills/professional-slides/runtime/fixtures.mjs';
+const frame = {x:60,y:100,width:720,height:100};
+const definition = REGISTRY.get('section-heading');
+const render = rule => definition.render({id:'test',frame,props:{...definition.sample,rule}}).nodes;
+const ruled = render(true), plain = render(false);
+const deck = buildFixtureDeck().deck;
+console.log(JSON.stringify({
+  ruled:ruled.map(n=>n.role),plain:plain.map(n=>n.role),width:ruled[0].frame.width,
+  subtitleNodes:deck.slides.flatMap(s=>s.nodes).filter(n=>n.role==='section-subtitle').length,
+  cover:deck.slides.flatMap(s=>s.nodes).find(n=>n.role==='cover-subtitle')?.text
+}));
+"""
+        )
+        self.assertEqual(result["ruled"], ["section-heading", "section-heading-rule"])
+        self.assertEqual(result["plain"], ["section-heading"])
+        self.assertEqual(result["width"], 720)
+        self.assertEqual(result["subtitleNodes"], 0)
+        self.assertTrue(result["cover"])
 
-    def test_insight_box_is_shared_and_exposes_orthogonal_variants(self):
-        index = read(f"{SKILL_ROOT}/references/components/index.md").lower()
-        insight = read(f"{SKILL_ROOT}/references/components/insight-box.md").lower()
-        executive = read(f"{SKILL_ROOT}/references/slide-types/executive-synthesis.md").lower()
-        metrics = read(f"{SKILL_ROOT}/references/components/metric-fields.md").lower()
-        status = read(f"{SKILL_ROOT}/references/slide-types/project-status.md").lower()
+    def test_section_and_open_rail_share_one_heading_contract(self):
+        result = run_node(
+            """
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const section = REGISTRY.get('section').render({
+  id: 'description',
+  frame: {x: 60, y: 188, width: 770, height: 52},
+  props: {heading: 'Description', padding: 0, treatment: 'open'}
+}).nodes;
+const rail = REGISTRY.get('content-rail').render({
+  id: 'takeaways',
+  frame: {x: 840, y: 170, width: 380, height: 460},
+  props: {heading: 'Key takeaways', treatment: 'open', dividerLeft: true, items: ['One', 'Two']}
+}).nodes;
+const select = nodes => ({
+  heading: nodes.find(node => node.role === 'section-heading'),
+  rule: nodes.find(node => node.role === 'section-heading-rule')
+});
+console.log(JSON.stringify({section: select(section), rail: select(rail)}));
+"""
+        )
+        section = result["section"]
+        rail = result["rail"]
+        self.assertEqual(section["heading"]["frame"]["y"], rail["heading"]["frame"]["y"])
+        self.assertEqual(section["heading"]["style"]["fontSize"], rail["heading"]["style"]["fontSize"])
+        self.assertEqual(section["heading"]["style"]["color"], rail["heading"]["style"]["color"])
+        self.assertEqual(section["rule"]["frame"]["y"], rail["rule"]["frame"]["y"])
+        self.assertEqual(section["rule"]["style"]["stroke"], rail["rule"]["style"]["stroke"])
 
-        self.assertIn("[insight boxes](insight-box.md)", index)
-        self.assertIn("a section may have no more than one insight box", index)
-        self.assertIn("use at most one insight box per section", insight)
-        self.assertIn("never repeat the component once per column", insight)
-        self.assertIn("consolidate them into one governing synthesis or split the page", insight)
-        self.assertIn("text is centered horizontally and vertically by default", insight)
-        self.assertIn("full-width box may use left-aligned text", insight)
-        self.assertIn("--insight-box-border:0", insight)
-        self.assertIn("filled variants have no border", insight)
-        self.assertIn("body copy uses regular font weight", insight)
-        self.assertIn("--insight-box-font:var(--weight-regular)", insight)
-        self.assertIn("--insight-box-padding-y-multi", insight)
-        self.assertIn('data-content="multi-paragraph"', insight)
-        self.assertIn('data-divider="between-sections"', insight)
-        self.assertIn('class="insight-box__header"', insight)
-        self.assertIn("--insight-box-dotted-border", insight)
-        self.assertEqual(insight.count('<main class="deck"'), 5)
-        for variant in ("tonal", "neutral", "dotted", "primary"):
-            self.assertIn(f'data-variant="{variant}"', executive + insight)
-        for consumer in (executive, metrics, status):
-            self.assertIn('class="insight-box"', consumer)
+    def test_insight_rail_has_text_only_header_and_compact_content_driven_list(self):
+        result = run_node(
+            """
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const frame = {x: 952, y: 184, width: 268, height: 420};
+const props = {
+  heading: 'Key takeaway',
+  items: [
+    'Short description and read-out takeaway',
+    'Short description and read-out takeaway',
+    'Short description and read-out takeaway'
+  ]
+};
+const nodes = REGISTRY.get('content-rail').render({id: 'insight', frame, props}).nodes;
+const items = nodes.filter(node => node.role === 'rail-item');
+console.log(JSON.stringify({
+  headingRules: nodes.filter(node => node.role === 'section-heading-rule').length,
+  heading: nodes.find(node => node.role === 'section-heading'),
+  itemYs: items.map(node => node.frame.y),
+  itemHeights: items.map(node => node.frame.height),
+  finalBottom: items.at(-1).frame.y + items.at(-1).frame.height,
+  frameBottom: frame.y + frame.height
+}));
+"""
+        )
+        self.assertEqual(result["headingRules"], 0)
+        self.assertEqual(result["heading"]["text"], "Key takeaway")
+        self.assertEqual(result["itemHeights"], [40, 40, 40])
+        self.assertEqual(
+            [result["itemYs"][index + 1] - result["itemYs"][index] for index in range(2)],
+            [52, 52],
+        )
+        self.assertGreater(result["frameBottom"] - result["finalBottom"], 100)
 
-    def test_quote_cluster_supports_counts_and_sectional_placement(self):
-        components = read(f"{SKILL_ROOT}/references/components/index.md").lower()
-        quotes = read(f"{SKILL_ROOT}/references/components/quote-cluster.md").lower()
-        bindings = read(f"{SKILL_ROOT}/references/theming/component-bindings.md").lower()
+    def test_wrapped_headings_share_bottom_guide_and_rule_gap(self):
+        result = run_node("""
+import { buildFixtureDeck } from './skills/professional-slides/runtime/fixtures.mjs';
+const slide = buildFixtureDeck().deck.slides.find(s => s.id === 'fixture-layout-wrapped-headings');
+const headings = slide.nodes.filter(n => n.role === 'section-heading');
+const rules = slide.nodes.filter(n => n.role === 'section-heading-rule');
+console.log(JSON.stringify({counts: headings.map(n => n.data.textLayout.lines.length), bottoms: headings.map(n => n.frame.y+n.frame.height), gaps: headings.map((n,i) => rules[i].frame.y-n.frame.y-n.frame.height), sizes: headings.map(n => n.style.fontSize.value), wraps: headings.map(n => n.style.wrap)}));
+""")
+        self.assertEqual(result["counts"], [1, 2, 3])
+        self.assertEqual(len(set(result["bottoms"])), 1)
+        self.assertEqual(result["gaps"], [8, 8, 8])
+        self.assertEqual(result["sizes"], [16, 16, 16])
+        self.assertEqual(result["wraps"], [False, False, False])
 
-        self.assertIn("[quote clusters](quote-cluster.md)", components)
-        self.assertIn("it is an evidence component, not a narrative archetype or a slide layout", quotes)
-        self.assertEqual(quotes.count('<main class="deck"'), 5)
-        for variant in ("one-up", "two-up", "three-up", "four-up", "five-up"):
-            self.assertIn(f'data-variant="{variant}"', quotes)
-        for placement in ("full-field", "section"):
-            self.assertIn(f'data-placement="{placement}"', quotes)
-        self.assertIn('data-layout="soft-split-50-50"', quotes)
-        self.assertIn('data-variant="two-up" data-placement="section"', quotes)
-        self.assertIn("six equal internal tracks", quotes)
-        for treatment in ("callout", "contained"):
-            self.assertIn(f'data-treatment="{treatment}"', quotes)
-        self.assertNotIn('data-treatment="open"', quotes)
-        self.assertNotIn("border-top: var(--quote-item-border)", quotes)
-        self.assertIn('data-attribution-align="left"', quotes)
-        self.assertIn('data-avatar="true"', quotes)
-        self.assertEqual(quotes.count('class="quote-cluster__avatar"'), 5)
-        self.assertEqual(quotes.count("quote-cluster__mark quote-cluster__mark--close"), 15)
-        self.assertIn("align-content: center", quotes)
-        self.assertNotIn("margin-top: auto", quotes)
-        self.assertIn("blockquote::after", quotes)
-        self.assertIn("rounded enclosure containing the quote body and attribution", bindings)
-        self.assertIn("| quote cluster |", bindings)
-        self.assertIn("--quote-cluster-columns", bindings)
-        self.assertIn("--quote-caret-size", bindings)
-        self.assertIn("--quote-caret-angle", bindings)
-        self.assertIn("--quote-avatar-size", bindings)
-        self.assertIn("the line-only quote treatment is not registered", bindings)
-        self.assertNotRegex(quotes, r"#[0-9a-f]{3,8}\b")
-        self.assertNotIn("—", quotes)
+    def test_reference_chart_and_open_rail_headers_remain_peers(self):
+        result = run_node("""
+import { buildGoldenDeck } from './skills/professional-slides/runtime/golden-fixtures.mjs';
+const { deck } = buildGoldenDeck();
+const peers = deck.slides.filter(s => s.componentInstances.some(c => c.component === 'content-rail') && s.nodes.filter(n => n.role === 'section-heading-rule').length === 2);
+console.log(JSON.stringify(peers.map(s => ({id:s.id,ruleYs:[...new Set(s.nodes.filter(n=>n.role==='section-heading-rule').map(n=>n.frame.y))]}))));
+""")
+        self.assertEqual(len(result), 4)
+        for slide in result:
+            self.assertEqual(len(slide["ruleYs"]), 1, slide["id"])
 
-    def test_description_slide_owns_variable_detail_and_embedded_indicator_variants(self):
-        index = read(f"{SKILL_ROOT}/references/slide-types/index.md").lower()
-        description = read(f"{SKILL_ROOT}/references/slide-types/description.md").lower()
-        category_visuals = read(f"{SKILL_ROOT}/references/components/icons-and-logos.md").lower()
+    def test_unbreakable_heading_and_insufficient_annotation_space_reject(self):
+        result = run_node("""
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+let heading=false, chart=false;
+try { REGISTRY.get('section-heading').render({id:'heading',frame:{x:0,y:0,width:30,height:52},props:{heading:'Unbreakable'}}); } catch {heading=true;}
+try { REGISTRY.get('chart.column').render({id:'chart',frame:{x:0,y:0,width:500,height:180},props:REGISTRY.get('chart.column').sample}); } catch {chart=true;}
+console.log(JSON.stringify({heading,chart}));
+""")
+        self.assertEqual(result, {"heading": True, "chart": True})
 
-        self.assertIn("[description slide](description.md)", index)
-        self.assertIn("base slide type", description)
-        self.assertIn("description ledger", description)
-        self.assertIn("## structural html reference", description)
-        self.assertIn("var(--type-column-heading)", description)
-        self.assertIn("same size and line height as compact body text", description)
-        self.assertNotIn("--description-slide-heading-font: var(--type-section-heading)", description)
-        for variant in (
-            "trend-with-examples",
-            "icon-label-narrative",
-            "label-only-narrative",
-            "embedded-indicator-narrative",
-        ):
-            self.assertIn(f'data-variant="{variant}"', description)
-        for family in ("executive-light", "executive-dark", "warm-editorial"):
-            self.assertIn(f'data-theme="{family}"', description)
-        for count in ("1", "2", "3"):
-            self.assertIn(f'data-detail-columns="{count}"', description)
-        self.assertIn('data-content-density="dense"', description)
-        self.assertIn('data-placement="embedded-start"', description)
-        self.assertIn("never changes `.action-title`", description)
-        self.assertIn(".description-slide__row:last-of-type { border-bottom: 0; }", description)
-        self.assertIn("the final row has no bottom divider", description)
-        for treatment in ("icon-only", "image-only", "icon-image"):
-            self.assertIn(treatment, description)
-            self.assertIn(treatment, category_visuals)
-        self.assertIn('data-visual-treatment="icon-image"', category_visuals)
-        self.assertIn('class="category__image"', category_visuals)
-        self.assertIn("perform distinct jobs", category_visuals)
-        self.assertIn("replaceable native image object", description)
-        self.assertIn("every row shares one vertical centerline", description)
-        self.assertIn("align-items: center", description)
-        self.assertIn("padding-block: var(--description-slide-row-padding)", description)
-        self.assertIn("align-self: stretch", description)
-        self.assertEqual(description.count('<main class="deck"'), 4)
-        self.assertFalse((ROOT / SKILL_ROOT / "references/slide-types/description-slide.md").exists())
-        self.assertFalse((ROOT / SKILL_ROOT / "references/slide-types/category-overview.md").exists())
-        self.assertNotIn("diagnostic-to-impact", description)
-        self.assertNotRegex(description, r"#[0-9a-f]{3,8}\\b")
-        self.assertNotIn("—", description)
-        self.assertNotIn("—", category_visuals)
+    def test_part_to_whole_labels_and_legends_share_segment_order(self):
+        result = run_node(
+            """
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const props = {labels: ['Core', 'Growth', 'New'], values: [52, 31, 17]};
+const nodes = REGISTRY.get('chart.donut').render({
+  id: 'donut', frame: {x: 0, y: 0, width: 760, height: 420}, props
+}).nodes;
+const segments = nodes.filter(node => node.role === 'chart-segment');
+const swatches = nodes.filter(node => node.role === 'legend-swatch');
+const labels = nodes.filter(node => node.role === 'data-label');
+const circle = segments[0].frame;
+const cx = circle.x + circle.width / 2;
+const cy = circle.y + circle.height / 2;
+const distanceRatios = labels.map(node => {
+  const x = node.frame.x + node.frame.width / 2;
+  const y = node.frame.y + node.frame.height / 2;
+  return Math.hypot(x - cx, y - cy) / circle.width;
+});
+const angleErrors = labels.map((node, index) => {
+  const x = node.frame.x + node.frame.width / 2;
+  const y = node.frame.y + node.frame.height / 2;
+  const actual = Math.atan2(y - cy, x - cx) * 180 / Math.PI;
+  const expected = (segments[index].data.startAngle + segments[index].data.endAngle) / 2;
+  return Math.abs(((actual - expected + 540) % 360) - 180);
+});
+console.log(JSON.stringify({
+  paletteAligned: segments.every((node, index) => JSON.stringify(node.style.fill) === JSON.stringify(swatches[index].style.fill)),
+  dataValues: segments.map(node => node.data.value),
+  labelTexts: labels.map(node => node.text),
+  distanceRatios,
+  angleErrors
+}));
+"""
+        )
+        self.assertTrue(result["paletteAligned"])
+        self.assertEqual(result["dataValues"], [52, 31, 17])
+        self.assertEqual(result["labelTexts"], ["52%", "31%", "17%"])
+        self.assertTrue(all(0.35 <= value <= 0.38 for value in result["distanceRatios"]))
+        self.assertTrue(all(value < 0.001 for value in result["angleErrors"]))
 
-    def test_description_with_implication_inherits_description_slide_and_owns_specimens(self):
-        index = read(f"{SKILL_ROOT}/references/slide-types/index.md").lower()
-        owner = read(f"{SKILL_ROOT}/references/slide-types/description-with-implication.md").lower()
+    def test_combo_chart_has_one_axis_and_category_system(self):
+        result = run_node(
+            """
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const nodes = REGISTRY.get('chart.combo').render({
+  id: 'combo',
+  frame: {x: 0, y: 0, width: 760, height: 420},
+  props: {
+    categories: ['A','B','C'],
+    series: [{name: 'Actual', values: [20,30,40]}, {name: 'Plan', values: [22,32,42]}],
+    annotations: [], highlights: [], referenceLines: []
+  }
+}).nodes;
+const count = role => nodes.filter(node => node.role === role).length;
+console.log(JSON.stringify({categories: count('category-label'), axes: count('chart-axis'), bars: count('chart-mark'), lines: count('chart-line'), markers: count('chart-marker')}));
+"""
+        )
+        self.assertEqual(result, {"categories": 3, "axes": 2, "bars": 3, "lines": 2, "markers": 3})
 
-        self.assertIn("description-with-implication.md", index)
-        for phrase in (
-            "explicitly inherits from [`description slide`](description.md)",
-            "## inheritance contract",
-            "start with a valid description slide row",
-            "adds one mandatory inference arrow",
-            "text-led implication",
-            "process and roadmap",
-            "the default treatment is `open`",
-            "very light gray",
-        ):
-            self.assertIn(phrase, owner)
-        for variant in (
-            "labeled-findings-to-implication",
-            "numbered-description-to-implication",
-            "embedded-indicator-description-to-implication",
-        ):
-            self.assertIn(f'data-variant="{variant}"', owner)
-        for treatment in ("open", "subtle"):
-            self.assertIn(f'data-implication-treatment="{treatment}"', owner)
-        self.assertIn('class="description-slide description-implication"', owner)
-        self.assertIn('class="description-slide__row description-implication__row"', owner)
-        self.assertIn('class="arrow description-implication__arrow-slot"', owner)
-        self.assertIn('class="item-indicator description-implication__indicator-slot"', owner)
-        self.assertIn('data-placement="column"', owner)
-        self.assertIn('data-placement="embedded-start"', owner)
-        self.assertIn('data-detail-columns="2"', owner)
-        self.assertIn('data-content-density="dense"', owner)
-        self.assertIn(".description-implication__head span:empty", owner)
-        self.assertIn("border-bottom: 0", owner)
-        self.assertIn(".description-implication__row:last-of-type { border-bottom: 0; }", owner)
-        self.assertIn("the final row has no bottom divider", owner)
-        self.assertIn("inherit the base row centerline", owner)
-        self.assertIn("padding-block: var(--description-implication-row-padding)", owner)
-        self.assertNotIn("padding-bottom: var(--description-implication-row-padding)", owner)
-        self.assertIn("var(--surface-1)", owner)
-        self.assertIn("var(--description-slide-gap)", owner)
-        self.assertEqual(owner.count('<main class="deck"'), 3)
-        self.assertFalse((ROOT / SKILL_ROOT / "references/slide-types/description-with-implication-specimens.md").exists())
-        self.assertNotIn("var(--surface-action)", owner)
-        self.assertNotIn("var(--component-primary-tint)", owner)
-        self.assertNotRegex(owner, r"#[0-9a-f]{3,8}\\b")
-        self.assertNotIn("—", owner)
+    def test_chart_annotations_are_attached_without_covering_the_target(self):
+        result = run_node(
+            """
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const frame = {x: 0, y: 0, width: 760, height: 420};
+const results = ['chart.line','chart.combo'].map(id => {
+  const definition = REGISTRY.get(id);
+  const nodes = definition.render({id, frame, props: definition.sample}).nodes;
+  const surface = nodes.find(node => node.role === 'annotation-surface');
+  const target = nodes.filter(node => node.role === 'chart-marker').sort((a,b) => b.frame.x - a.frame.x)[0];
+  const point = {x: target.frame.x + target.frame.width / 2, y: target.frame.y + target.frame.height / 2};
+  const covered = point.x >= surface.frame.x && point.x <= surface.frame.x + surface.frame.width && point.y >= surface.frame.y && point.y <= surface.frame.y + surface.frame.height;
+  const overlay = nodes.indexOf(surface) > Math.max(...nodes.map((node, index) => ['chart-mark','chart-line','chart-marker'].includes(node.role) ? index : -1));
+  return {id, covered, overlay};
+});
+const columnNodes = REGISTRY.get('chart.column').render({id: 'column', frame, props: REGISTRY.get('chart.column').sample}).nodes;
+const referenceLabel = columnNodes.find(node => node.role === 'chart-reference-label');
+const annotationSurface = columnNodes.find(node => node.role === 'annotation-surface');
+const referenceOverlapsAnnotation = !(
+  referenceLabel.frame.x + referenceLabel.frame.width <= annotationSurface.frame.x
+  || annotationSurface.frame.x + annotationSurface.frame.width <= referenceLabel.frame.x
+  || referenceLabel.frame.y + referenceLabel.frame.height <= annotationSurface.frame.y
+  || annotationSurface.frame.y + annotationSurface.frame.height <= referenceLabel.frame.y
+);
+console.log(JSON.stringify({results, referenceOverlapsAnnotation}));
+"""
+        )
+        for chart in result["results"]:
+            self.assertFalse(chart["covered"], chart["id"])
+            self.assertTrue(chart["overlay"], chart["id"])
+        self.assertFalse(result["referenceOverlapsAnnotation"])
 
-    def test_arrows_are_a_reusable_component_with_four_registered_variants(self):
-        components = read(f"{SKILL_ROOT}/references/components/index.md").lower()
-        arrows = read(f"{SKILL_ROOT}/references/components/arrows.md").lower()
-        implication = read(f"{SKILL_ROOT}/references/slide-types/description-with-implication.md").lower()
+    def test_toolkit_importer_and_validators_use_the_new_model(self):
+        importer = read(ROOT / "evals" / "scripts" / "import_consulting_toolkit.mjs")
+        pptx_validator = read(ROOT / "evals" / "scripts" / "validate_pptx.py")
+        template_validator = read(ROOT / "evals" / "scripts" / "validate_template_registry.py")
+        self.assertIn("source-gallery-title", importer)
+        self.assertIn("professional-slides.reference-coverage/v1", importer)
+        self.assertIn("references/composition/index.md", pptx_validator)
+        self.assertIn("../composition/index.md", template_validator)
+        self.assertNotIn("references/slide-types", pptx_validator)
+        self.assertNotIn("../slide-types", template_validator)
 
-        self.assertIn("[arrows](arrows.md)", components)
-        for variant in ("line", "wedge", "disc-chevron", "disc-multi-chevron"):
-            self.assertIn(f'data-variant="{variant}"', arrows)
-        self.assertEqual(arrows.count('<svg class="arrow"'), 4)
-        self.assertIn("empty arrow header slots have no visible rule", arrows)
-        self.assertEqual(implication.count('data-variant="disc-chevron"'), 14)
-        self.assertNotIn('data-variant="line"', implication)
-        self.assertIn("use `disc-chevron` by default", arrows)
-        self.assertIn("--arrow-emphasis-size: var(--icon-md)", arrows)
-        self.assertIn("--arrow-wide-size: var(--space-6)", arrows)
-        self.assertIn("roughly one-third", arrows)
-        self.assertNotIn("--description-implication-arrow-", implication)
-        self.assertNotRegex(arrows, r"#[0-9a-f]{3,8}\\b")
-        self.assertNotIn("—", arrows)
-
-    def test_item_indicators_are_reusable_identity_marks_with_two_placements(self):
-        components = read(f"{SKILL_ROOT}/references/components/index.md").lower()
-        indicators = read(f"{SKILL_ROOT}/references/components/item-indicators.md").lower()
-        description = read(f"{SKILL_ROOT}/references/slide-types/description.md").lower()
-        implication = read(f"{SKILL_ROOT}/references/slide-types/description-with-implication.md").lower()
-
-        self.assertIn("[item indicators](item-indicators.md)", components)
-        for shape in ("square", "circle"):
-            self.assertIn(f'data-shape="{shape}"', indicators)
-        for placement in ("column", "embedded-start"):
-            self.assertIn(f'data-placement="{placement}"', indicators)
-        for contrast in ("accent-fill", "inverse-keyline"):
-            self.assertIn(f'data-contrast="{contrast}"', indicators)
-        self.assertRegex(indicators, r">(?:01|2|3)</span>")
-        self.assertIn(">a</span>", indicators)
-        self.assertIn("center it horizontally", indicators)
-        self.assertIn("center it vertically", indicators)
-        self.assertIn("line-height: 1", indicators)
-        self.assertIn("text-align: center", indicators)
-        self.assertIn("center the text box horizontally and vertically inside the shape", indicators)
-        self.assertIn("comparison indicators", indicators)
-        self.assertIn("arrows", indicators)
-        self.assertIn('--item-indicator-accent-bg: var(--component-primary)', indicators)
-        self.assertIn('--item-indicator-keyline: var(--line-hairline) solid var(--on-inverse)', indicators)
-        self.assertEqual(description.count('data-placement="embedded-start" data-contrast="inverse-keyline"'), 4)
-        self.assertNotIn('data-placement="embedded-start" data-contrast="accent-fill"', description)
-        self.assertIn("preferred embedded number or letter treatment", indicators)
-        self.assertEqual(implication.count('data-placement="embedded-start" data-contrast="inverse-keyline"'), 4)
-        self.assertIn('data-placement="column"', implication)
-        self.assertNotRegex(indicators, r"#[0-9a-f]{3,8}\\b")
-        self.assertNotIn("—", indicators)
-
-    def test_trackers_are_optional_navigation_only(self):
-        trackers = read(f"{SKILL_ROOT}/references/components/trackers/index.md").lower()
-        specimens = read(f"{SKILL_ROOT}/references/components/trackers/specimens.md").lower()
-        self.assertIn("where are we in the deck", trackers)
-        self.assertIn("never an executive summary", trackers)
-        self.assertIn("default to no visible tracker", trackers)
-        self.assertIn("never place a tracker on the executive-summary slide", trackers)
-        self.assertIn("label-bearing variant cannot appear intermittently", trackers)
-        self.assertIn("do not use chart-series colours", trackers)
-        self.assertIn("parent and chapter hierarchy", trackers)
-        self.assertIn("parent ids equal section ids", trackers)
-        self.assertIn("chapter-item ids equal analytical subgroup ids", trackers)
-        self.assertIn("contents progress pages", trackers)
-        self.assertIn("hierarchical numbers such as `8.1` through `8.8`", trackers)
-        self.assertIn("a longer list is a density state", trackers)
-        self.assertIn("show the full tracker at every major section change", trackers)
-        self.assertIn("left field contains the section title only", trackers)
-        self.assertIn("bias numbered tracker markers to circles", trackers)
-        self.assertIn("vertically center the complete contents list", trackers)
-        self.assertEqual(specimens.count('<main class="deck"'), 5)
-        for variant in (
-            "sequential-circles",
-            "split-contents",
-            "compact-label",
-            "compact-number-strip",
-            "numbered-section-break",
-        ):
-            self.assertIn(f'data-variant="{variant}"', specimens)
-        self.assertIn('data-state="selected" aria-current="step"', specimens)
-        self.assertIn(">8.7</span><strong>ipo readiness</strong>", specimens)
-        self.assertIn("--tracker-section-number-font: var(--type-section-number)", specimens)
-        self.assertIn('.tracker-page[data-variant="sequential-circles"]', specimens)
-        self.assertIn('.tracker-page[data-variant="split-contents"] {\n  padding: 0 0 0 var(--slide-margin-inline);', specimens)
-        self.assertIn('min-height: var(--slide-height);\n  width: 100%;', specimens)
-        self.assertIn("align-self: center", specimens)
-        self.assertNotIn("margin-top: var(--space-10)", specimens)
-        self.assertNotIn('li[data-state="selected"] {\n  padding:', specimens)
-        self.assertNotIn('.tracker--compact-label .tracker__current {\n  color: var(--tracker-active);\n  border-bottom:', specimens)
-        self.assertIn('.tracker--compact-number-strip li[data-state="selected"] {\n  color: var(--tracker-active);\n  border-bottom: var(--tracker-rule);', specimens)
-        self.assertIn('li[data-state="selected"] .tracker__marker {\n  border: var(--tracker-rule);', specimens)
-        self.assertIn('--tracker-list-width: 72%;', specimens)
-        self.assertIn('.tracker--split-contents ol {\n  display: grid;\n  gap: var(--tracker-list-gap);\n  width: var(--tracker-list-width);\n  max-width: 100%;', specimens)
-        self.assertIn('gap: var(--tracker-gap);\n  width: 100%;\n  padding: var(--tracker-gap);\n  font: var(--tracker-item-font);', specimens)
-        self.assertIn('with generous space after short labels', specimens)
-        self.assertIn('normally around three quarters', trackers)
-        self.assertNotRegex(specimens, r"#[0-9a-f]{3,8}\\b")
-        self.assertNotIn("—", specimens)
-
-    def test_deck_consistency_contract_covers_trackers_and_colour_roles(self):
-        skill = read(f"{SKILL_ROOT}/SKILL.md").lower()
-        design = read(f"{SKILL_ROOT}/references/design/index.md").lower()
-        theming = read(f"{SKILL_ROOT}/references/theming/index.md").lower()
-        trackers = read(f"{SKILL_ROOT}/references/components/trackers/index.md").lower()
-        evaluation = read(f"{SKILL_ROOT}/references/evaluation/index.md").lower()
-
-        self.assertIn("one deck treatment ledger", skill)
-        self.assertIn("complete approved item set", skill)
-        self.assertIn("reconcile the rendered deck against the treatment ledger slide by slide", design)
-        self.assertIn("include a colour ledger", theming)
-        self.assertIn("no undeclared editable-object colour", theming)
-        self.assertIn("complete item set shown on every full tracker page", trackers)
-        self.assertIn("deck-consistency review", evaluation)
-
-    def test_copy_is_direct_and_forbids_em_dashes(self):
-        copy = read(f"{SKILL_ROOT}/references/components/copy.md").lower()
-        self.assertIn("state the answer, not the topic", copy)
-        self.assertIn("most decision-relevant supported comparison", copy)
-        self.assertIn("role label on a callout or terminal action surface is presumptively slop", copy)
-        self.assertIn("audience-facing copy must contain zero em dashes", copy)
-        self.assertIn("no quotation, official-name, source-wording, or parenthetical exceptions", copy)
-        self.assertIn("repeat the scan until it returns zero matches", copy)
-
-    def test_dot_dash_is_complete_and_approved(self):
-        dot_dash = read(f"{SKILL_ROOT}/references/storylining/dot-dash.md").lower()
-        storylining = read(f"{SKILL_ROOT}/references/storylining/index.md").lower()
-        worked_example = dot_dash.split("## grounded worked example", maxsplit=1)[1]
-        self.assertIn("represent every planned slide in production order with exactly one dot", dot_dash)
-        self.assertIn("every dot must contain at least one substantive dash", dot_dash)
-        self.assertIn("write the review artifact as markdown", dot_dash)
-        self.assertIn("the exact proposed audience-facing title of one slide", dot_dash)
-        self.assertIn("it is the underlying title that should appear on the authored slide", dot_dash)
-        self.assertIn("do not add a separate `slide title` field", dot_dash)
-        self.assertIn("copy each dot verbatim", dot_dash)
-        self.assertIn("tracker and section map", dot_dash)
-        self.assertIn("until the owner explicitly approves it", dot_dash)
-        self.assertIn("before any slide document is created", storylining)
-        self.assertIn("## grounded worked example", dot_dash)
-        self.assertIn("parent tracker", storylining)
-        self.assertIn("chapter tracker", storylining)
-        self.assertIn("slidescience.co/storytelling-in-powerpoint", worked_example)
-        self.assertIn("### complete dot-dash", worked_example)
-        self.assertEqual(worked_example.count("**dot:**"), 16)
-        self.assertNotIn("**slide title:**", worked_example)
-        self.assertIn("parent tracker order equals dot-dash section order", worked_example)
-        self.assertFalse((ROOT / SKILL_ROOT / "references/storylining/dot-dash-example.md").exists())
-
-    def test_contract_supports_untracked_and_existing_decks(self):
-        contract = read(f"{SKILL_ROOT}/references/storylining/pre-authoring-contract.md").lower()
-        for phrase in (
-            "tracker.system none",
-            "sourceslidecount",
-            "recommended_not_forced",
-            "do not force a new executive summary",
-            "validate before any slide document is created",
-            "hierarchical-segmented",
-            "parent-tracker-label",
-            "chapter-tracker-label",
-        ):
-            self.assertIn(phrase, contract)
-
-    def test_commercial_dd_preserves_the_decision_architecture(self):
-        template = read(f"{SKILL_ROOT}/references/templates/commercial-due-diligence.md").lower()
-        for phrase in (
-            "full commercial due diligence",
-            "red-flag commercial due diligence",
-            "preliminary public-source commercial screen",
-            "never silently downgrade",
-            "market attractiveness",
-            "customer quality",
-            "competitive position",
-            "commercial engine",
-            "plan and downside",
-            "template-coverage ledger",
-            "decision cutoff date",
-            "later validation",
-            "hindsight",
-        ):
-            self.assertIn(phrase, template)
-
-    def test_specialized_templates_use_shared_owners(self):
-        for relative in (
-            f"{SKILL_ROOT}/references/templates/commercial-due-diligence.md",
-            f"{SKILL_ROOT}/references/templates/project-progress-update.md",
-            f"{SKILL_ROOT}/references/templates/startup-pitch-deck.md",
-        ):
-            source = read(relative)
-            self.assertIn("../slide-types/index.md", source)
-            self.assertIn("../storylining/pre-authoring-contract.md", source)
-
-    def test_evaluation_keeps_fresh_run_and_non_compensating_gates(self):
-        evals = read(f"{SKILL_ROOT}/references/evaluation/index.md").lower()
-        self.assertIn("completely clearing only", evals)
-        self.assertIn("never copy, seed, patch, or resume", evals)
-        self.assertIn("prior generated eval materials are not inputs", evals)
-        self.assertIn("every slide passes the full-size anti-slop audit", evals)
-        self.assertIn("one major defect blocks release", evals)
-        self.assertIn("the mean cannot compensate for a weak dimension", evals)
-        self.assertIn("release-blocking defect with no exceptions", evals)
-
-    def test_tmp_is_root_ignored_and_untracked(self):
-        patterns = {
-            line.strip()
-            for line in read(".gitignore").splitlines()
-            if line.strip() and not line.lstrip().startswith("#")
-        }
-        self.assertIn("/tmp/", patterns)
-
-        if (ROOT / ".git").exists():
-            tracked = subprocess.run(
-                ["git", "ls-files", "tmp", "tmp/**"],
-                cwd=ROOT,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
-            self.assertEqual(tracked, "")
-
-            ignored = subprocess.run(
-                ["git", "check-ignore", "-q", "tmp/probe.txt"],
-                cwd=ROOT,
-                check=False,
-            )
-            self.assertEqual(ignored.returncode, 0)
-
-    def test_eval_thresholds_remain_strict(self):
-        cases = json.loads(read("evals/cases.json"))
-        self.assertEqual(cases["thresholds"]["selfScoreMinimum"], 98)
-        self.assertEqual(cases["thresholds"]["treatmentScoreMinimum"], 98)
-        self.assertEqual(cases["thresholds"]["minimumDimensionScore"], 4.9)
-        self.assertEqual(cases["thresholds"]["maximumMinorDefects"], 0)
-
-    def test_template_registry_covers_every_template(self):
-        templates_root = ROOT / SKILL_ROOT / "references" / "templates"
-        registry = json.loads((templates_root / "registry.json").read_text(encoding="utf-8"))
-        registered = {entry["file"] for entry in registry["templates"]}
-        files = {
-            path.name
-            for path in templates_root.glob("*.md")
-            if path.name not in {"index.md", "authoring.md"}
-        }
-        self.assertEqual(registered, files)
-        self.assertEqual(len(registered), len(registry["templates"]))
-
-    def test_runtime_skill_contains_only_instructions_and_references(self):
-        skill_root = ROOT / SKILL_ROOT
-        self.assertFalse((skill_root / "scripts").exists())
-        self.assertNotIn("scripts/", (skill_root / "SKILL.md").read_text(encoding="utf-8"))
+    def test_runtime_contract_documents_adapter_direction_and_rendered_parity(self):
+        runtime = read(RUNTIME / "README.md").lower()
+        composition = read(REFERENCES / "composition" / "index.md").lower()
+        legends = read(REFERENCES / "components" / "chart-legends.md").lower()
+        self.assertIn("pptxgenjs", runtime)
+        self.assertIn("artifact tool", runtime)
+        self.assertIn("downstream", runtime)
+        self.assertIn("html", runtime)
+        self.assertIn("image parity", runtime)
+        self.assertIn("open tree", composition)
+        self.assertIn("horizontal", legends)
+        self.assertIn("top", legends)
 
 
 if __name__ == "__main__":

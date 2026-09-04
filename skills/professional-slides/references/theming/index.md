@@ -1,6 +1,18 @@
 # Theming
 
-Theming owns every reusable visual value and every binding between a visual value and a slide component. Design owns composition. Components own semantic jobs and geometry. Slide types own page-level arrangements. No component or slide may invent a local palette, type scale, spacing scale, line grammar, radius, or shadow.
+Theming owns every reusable visual value and every binding between a visual value and a slide component. The open composition model owns page-level arrangement. Components own semantic jobs and internal geometry. No component or slide may invent a local palette, type scale, spacing scale, line grammar, radius, or shadow.
+
+## Runtime palette presets
+
+Set `palette` once on the deck specification: `mckinsey` (default), `bcg`, or `bain`. These are brand-inspired presentation-role mappings, not official firm templates. Palette selection changes colour tokens, never component geometry, spacing, or type sizes. The reference-fidelity benchmark retains `consulting-toolkit` explicitly.
+
+- `mckinsey`: navy, electric blue, and cyan from the [published 2020 design system](https://cdn.mckinsey.com/assets/sketch/McK_DS_core_Artboards.pdf).
+- `bcg`: green and warm neutrals from the [public BCG site](https://www.bcg.com/about/corporate-newsroom).
+- `bain`: red and grey from a [joint Bain publication](https://www.baincapital.com/news/embedded-financial-services-what-it-takes-prosper-new-value-chain), not a brand-guide claim.
+
+`runtime/palettes.mjs` records provenance and maps each preset into the canonical token names. The compiler resolves a fresh token map per deck. HTML custom properties, scene styles, native theme slots, and Artifact Tool readback must agree. A token may use a native theme slot only when its resolved value matches that slot. Pie-label foregrounds are selected against the resolved slice colour. Reject unknown or slide-local palette overrides.
+
+Company typography is independent of palette. Deck-level `typography` supplies body, display, serif, and an explicit semibold native-face mapping. `weight.semibold` requests 600 for direct annotations. Record an unavailable-weight fallback in the manifest; the Arial default explicitly resolves to its native bold face. Resolve the chosen family before measuring text, and validate its face, size, and weight in both adapters. See [`runtime/README.md`](../../runtime/README.md#palette-and-company-fonts) for configuration.
 
 ## Resolve one active theme
 
@@ -26,7 +38,7 @@ Read:
 | `executive-light` | no approved reference exists; default for consulting analysis, diligence, strategy, and programme work | white canvas, cool neutrals, navy-blue primary, restrained analytical colour | an approved source or brand system must be followed |
 | `executive-dark` | stage presentation, keynote, or screen-first executive delivery benefits from a dark field | deep blue-black canvas, pale type, bright but controlled cyan-blue primary | dense pre-reads, print-heavy review, or mixed light and dark slides without a declared transition |
 | `warm-editorial` | founder narrative, customer story, culture, or strategy communication benefits from a less institutional voice | warm paper canvas, charcoal type, terracotta primary, optional serif display role | risk, status, or data colour would be confused with the warm accent |
-| `reference-derived` | an approved source deck, corporate template, or brand system is authoritative | derived from inspected masters, layouts, placeholders, and recurring components | the source is merely inspirational, incomplete, or not authorized for reuse |
+| `reference-derived` | a source deck, corporate template, or brand system admitted by the [asset authorization record](../components/icons-and-logos.md#asset-authorization-record) is authoritative | derived from inspected masters, layouts, placeholders, and recurring components | the source is merely inspirational, incomplete, or absent from the authorization record |
 
 Use one family across a deck. A cover or chapter transition may use the family's inverse surface, but that is a registered layout variant, not a second theme. Do not mix named families for variety.
 
@@ -55,6 +67,8 @@ Use this precedence, from lowest to highest:
 
 An override is valid only when it has a semantic name and applies to every matching instance. Reject slide-local values such as a one-off hex colour, `17px` padding, locally smaller title, unique border, or hand-tuned text inset.
 
+Every executable component must declare its consumed token IDs. Scene compilation rejects undeclared use before HTML or PowerPoint serialization.
+
 ## Theme manifest
 
 Before authoring a new deck or redesigning an existing one, record:
@@ -68,6 +82,8 @@ Before authoring a new deck or redesigning an existing one, record:
 - semantic-state thresholds and their non-colour cues;
 - authorized reference-derived overrides;
 - any platform fallback that must materialize inherited values.
+
+For PowerPoint, also compile these values into the machine-readable [PowerPoint acceptance manifest](../tools/powerpoint/acceptance.md). Enumerate allowed fonts, colours, scheme-colour roles, font sizes, slide dimensions, copy ceilings, and repeated-role rules before export. Do not expand the allowlist to bless accidental output.
 
 Include a colour ledger that resolves each semantic role to one exact swatch for the deck and identifies the slide or component families allowed to consume it. The same semantic role must resolve identically in PowerPoint and Google Slides. Images may contain their source colours, but editable text, shapes, lines, tables, trackers, callouts, and non-data chart decoration may use only declared roles. Chart-series and status colours remain limited to their declared evidence semantics.
 

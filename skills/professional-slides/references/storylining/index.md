@@ -66,6 +66,8 @@ When navigation materially improves orientation, model it as one hierarchy rathe
 3. The contents page shows the full parent tracker. A chapter transition repeats that parent state and may preview only its own chapter tracker. Analytical pages keep the parent label and the active chapter item visible through one consistent header variant.
 4. Cover, executive summary, and close remain untracked unless an authorized reference requires otherwise.
 
+When an executive summary and tracker both exist, map each summary proof branch to the corresponding chapter in the same semantic order and map the overall action to the decision chapter. Branch headings remain evidence-led conclusions, while tracker labels remain short navigation labels; any wording difference must preserve an obvious one-to-one bridge. Do not move from `Operating momentum` in the summary to an unexplained `Growth quality` chapter in the body.
+
 Do not create a parent or chapter tracker that has no matching dot-dash group. Do not rename, reorder, skip, or intermittently display an approved tracker item during authoring. If the title spine already provides sufficient orientation, declare `tracker.system` as `none` instead.
 
 ## Write the title spine

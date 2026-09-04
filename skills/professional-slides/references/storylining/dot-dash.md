@@ -9,7 +9,7 @@ The dot-dash is the slide-by-slide story before design work begins.
 
 Represent every planned slide in production order with exactly one dot. The dot is not a separate summary, hidden planning label, or description of the slide's job: it is the underlying title that should appear on the authored slide. Every dot must contain at least one substantive dash.
 
-For an analytical slide, use the complete proposed action title as the dot. It should state the supported conclusion or action, not merely name a topic. For a structural slide, use the exact visible heading, such as `Executive summary`, `Contents`, or `01 Financial context`. For a cover, use the exact proposed deck title.
+For an analytical slide, use the complete proposed action title as the dot. It should state the supported conclusion or action, not merely name a topic. For a structural slide, use the exact visible heading, such as `Executive summary`, `Contents`, or `1 Financial context`. For a cover, use the exact proposed deck title. Format structural ordinals through the canonical [item-indicator owner](../components/item-indicators.md).
 
 ## Planning grammar
 
@@ -50,7 +50,7 @@ When the user approves a structural change, write the target dot-dash and revali
 
 ## Approval gate
 
-Use the available feedback mechanism to gather feedback. Revise the plan until the owner explicitly approves it. Do not create a slide document, ghost deck, or production file before approval.
+For a net-new deck or any target-story or structural change, use the available feedback mechanism to gather feedback. Retain dated owner confirmation linked to the exact approved dot-dash version or hash in the pre-authoring contract's `approvalEvidence` field. Revise until approved, and do not create a slide document, ghost deck, or production file before that record exists. A faithful authorized revision to an existing deck may proceed from the as-is dot-dash without new approval when titles, order, and structure remain unchanged; any change to those fields returns to this approval gate.
 
 If the story or any proposed slide title changes after approval, update the affected dots and obtain approval again.
 
@@ -67,109 +67,49 @@ If the story or any proposed slide title changes after approval, update the affe
 
 ## Grounded worked example
 
-This worked example shows a complete slide sequence before authoring. It is a paraphrased teaching adaptation of the public Australia Post cost-recovery example in [SlideScience's dot-dash guide](https://slidescience.co/storytelling-in-powerpoint/). The public description of the method in [Working With McKinsey](https://workingwithmckinsey.blogspot.com/2013/07/McKinsey-storyline-dot-dash.html) independently confirms that dots are top-level storyline statements and dashes are their supporting facts or exhibits.
-
-The published figures below are used only to demonstrate the grammar. Slides 1 to 4, 8, and 12 are structural additions. Slides 13 to 15 are explicitly open analyses and decision tests, not sourced conclusions. This is not a current view of Australia Post.
+This compact teaching example adapts public figures from [SlideScience's dot-dash guide](https://slidescience.co/storytelling-in-powerpoint/). [Working With McKinsey](https://workingwithmckinsey.blogspot.com/2013/07/McKinsey-storyline-dot-dash.html) also describes dots as storyline statements and dashes as their support. The figures demonstrate grammar only; they are not a current view of Australia Post.
 
 ### Decision setup
 
-- Communication job: decide whether a postal operator's recovery plan can rely on further cost reduction or needs a revenue programme.
-- Governing answer: cost action has improved productivity but appears close to its practical limit, so management should quantify and gate revenue options before approving the recovery plan.
-- Narrative arc: answer, financial context, diagnosis, decision.
+- Communication job: decide whether further cost reduction can restore profitability.
+- Governing answer: productivity improved near its stated limits, so management must quantify revenue options before approving the recovery plan.
+- Tracker decision: use the canonical compact-number-strip on governed analytical slides 3 to 5 because the plan has three named sections and consecutive evidence pages; omit it from the cover, executive summary, and close.
 
-### Tracker and section map
+### Section map
 
-| Parent tracker | Slide range | Chapter tracker items | Analytical slides |
-| --- | --- | --- | --- |
-| `P1` Financial context | 4 to 7 | `P1.1` Profit gap; `P1.2` Cost concentration; `P1.3` Management response | 5, 6, 7 |
-| `P2` Cost diagnosis | 8 to 11 | `P2.1` Workforce limit; `P2.2` Unit-cost proof; `P2.3` Residual gap | 9, 10, 11 |
-| `P3` Recovery decision | 12 to 15 | `P3.1` Revenue need; `P3.2` Option screen; `P3.3` Approval gate | 13, 14, 15 |
-
-The contents page shows all parent items. Each chapter transition repeats the same parent tracker with one active parent and previews that parent's chapter items. Each analytical slide keeps the parent label visible and marks exactly one chapter item active. Cover, executive summary, and close are untracked.
+| Section | Slides | Purpose |
+| --- | --- | --- |
+| Answer | 1 to 2 | Frame the decision and answer. |
+| Evidence | 3 to 5 | Establish the gap and test cost headroom. |
+| Action | 6 | Set the next decision gate. |
 
 ### Complete dot-dash
 
 1. **Dot:** Postal operator profitability recovery
-   - **Dash:** Cover with decision context, audience, and reporting period.
-   - **Dash:** Navigation state: none.
+   - **Dash:** Cover with audience and reporting period.
 
 2. **Dot:** Executive summary
-   - **Dash:** Governing answer: further cost action is unlikely to close the gap alone, so approve a revenue work programme before the recovery plan.
-   - **Dash:** Synthesize the financial gap, cost-diagnosis evidence, decision consequence, and overall action.
-   - **Dash:** Navigation state: none; an executive summary is not a tracker.
+   - **Dash:** Further cost action is unlikely to close the gap alone; quantify revenue options before approving the plan.
 
-3. **Dot:** Contents
-   - **Dash:** Frame the decision through three tests: financial context, cost diagnosis, and recovery decision.
-   - **Dash:** Show parent tracker items `P1`, `P2`, and `P3` in the same order as the dot-dash sections.
-   - **Dash:** Navigation state: parent tracker full state; no chapter item active.
-
-4. **Dot:** 01 Financial context
-   - **Dash:** Establish the gap and management's response.
-   - **Dash:** Chapter transition with `P1` active and `P1.1` to `P1.3` previewed.
-   - **Dash:** Navigation state: parent full state, active `P1`.
-
-5. **Dot:** Costs grew materially faster than revenue, moving annual profit into loss between 2015 and 2022
+3. **Dot:** Costs grew materially faster than revenue, moving annual profit into loss between 2015 and 2022
    - **Dash:** Compare published annual revenue growth of 5% with cost growth of 9%.
    - **Dash:** Show the published movement from positive 10 billion to negative 13 billion in annual profit or loss.
-   - **Dash:** Navigation state: parent `P1`; chapter item `P1.1` active.
 
-6. **Dot:** Employee and operating expenses accounted for most of the cost increase
-   - **Dash:** Show the published 78% contribution of those two pools to 2015 to 2022 cost growth.
-   - **Dash:** Use a part-to-whole exhibit and retain the residual 22% as a neutral comparator.
-   - **Dash:** Navigation state: parent `P1`; chapter item `P1.2` active.
-
-7. **Dot:** Management targeted the dominant cost pools, but remaining headroom still requires testing
-   - **Dash:** Map workforce and operating-productivity actions to the cost pools identified on slide 6.
-   - **Dash:** Mark this causal interpretation as an inference from the published example, not a quantified result.
-   - **Dash:** Navigation state: parent `P1`; chapter item `P1.3` active.
-
-8. **Dot:** 02 Cost diagnosis
-   - **Dash:** Test whether labor and unit-cost actions can go further.
-   - **Dash:** Chapter transition with `P2` active and `P2.1` to `P2.3` previewed.
-   - **Dash:** Navigation state: parent full state, active `P2`.
-
-9. **Dot:** Workforce reduction lifted output per employee close to the stated operating ceiling
+4. **Dot:** Workforce reduction lifted output per employee close to the stated operating ceiling
    - **Dash:** Show workforce falling from 26,000 to 22,000 between 2019 and 2022.
    - **Dash:** Show mail per employee rising from 265,000 to 325,000 against a stated 330,000 ceiling.
-   - **Dash:** Navigation state: parent `P2`; chapter item `P2.1` active.
 
-10. **Dot:** Processing and delivery unit costs improved beyond the cited industry benchmarks
+5. **Dot:** Processing and delivery unit costs improved beyond the cited industry benchmarks
     - **Dash:** Compare processing cost per piece falling from 0.70 to 0.63.
     - **Dash:** Compare delivery cost per piece falling from 0.34 to 0.29.
-    - **Dash:** Navigation state: parent `P2`; chapter item `P2.2` active.
 
-11. **Dot:** The residual profitability gap persists despite substantial productivity gains
-    - **Dash:** Synthesize slides 9 and 10 against the loss shown on slide 5.
-    - **Dash:** State that the public example does not provide a complete bridge from savings to the remaining gap.
-    - **Dash:** Navigation state: parent `P2`; chapter item `P2.3` active.
-
-12. **Dot:** 03 Recovery decision
-    - **Dash:** Quantify revenue options and set an approval gate.
-    - **Dash:** Chapter transition with `P3` active and `P3.1` to `P3.3` previewed.
-    - **Dash:** Navigation state: parent full state, active `P3`.
-
-13. **Dot:** Revenue measures are required because demonstrated cost actions do not close the gap
-    - **Dash:** Carry forward the residual-gap conclusion from slide 11.
-    - **Dash:** Label the size and timing of the revenue need as unresolved analysis.
-    - **Dash:** Navigation state: parent `P3`; chapter item `P3.1` active.
-
-14. **Dot:** Screen revenue options on contribution, feasibility, service impact, and time to value
-    - **Dash:** Compare candidate options only after management supplies quantified economics and operational constraints.
-    - **Dash:** Mark the option ranking as an open work product, not a current conclusion.
-    - **Dash:** Navigation state: parent `P3`; chapter item `P3.2` active.
-
-15. **Dot:** Approve only a recovery plan that closes the quantified gap without breaching service constraints
-    - **Dash:** Decision gate: quantified contribution, named owner, timing, downside case, and service threshold.
-    - **Dash:** Pause if the evidence cannot reconcile the plan to the residual gap.
-    - **Dash:** Navigation state: parent `P3`; chapter item `P3.3` active.
-
-16. **Dot:** Launch the revenue work programme and return with an evidence-backed recovery decision
-    - **Dash:** Close with the decision, immediate owner, required evidence, and next review point.
-    - **Dash:** Navigation state: none.
+6. **Dot:** Quantify revenue options before approving the recovery plan
+   - **Dash:** Require contribution, feasibility, service impact, timing, owner, and downside case.
+   - **Dash:** Pause if the options do not reconcile to the residual gap.
 
 ### Parallelism check
 
-- Parent tracker order equals dot-dash section order: `P1`, `P2`, `P3`.
-- Every chapter item maps to one or more contiguous analytical dots and no analytical dot belongs to two chapter items.
-- Structural tracker slides are dots in their own right; they are not silently inserted during authoring.
-- The dots are the proposed slide titles, and their sequence still reads coherently when all tracker labels are removed.
+- Each slide has one dot and substantive support.
+- The title spine moves from answer to evidence to action.
+- The section map matches the dot-dash sequence.
+- The explicit compact-number-strip decision matches the short story.

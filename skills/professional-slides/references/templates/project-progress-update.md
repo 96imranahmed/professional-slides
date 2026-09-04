@@ -44,6 +44,10 @@ A full update usually contains:
 
 The executive summary must state the overall answer, proof, decision consequences, and sponsor action. It is not a status dashboard.
 
+## Navigation
+
+Default to `tracker.system: none` for live updates and simple two-part reviews. For an executive pre-read or recovery review with at least three analytical chapters, use `sequential-circles` as the full state and `compact-number-strip` on governed slides. Seed the approved tracker map with `Baseline and progress`, `Critical path`, `Risk and readiness`, `Forecast and downside`, and `Actions and decisions`; approved replacements become exact under the [template instantiation contract](index.md#instantiation-contract). Omit any unused chapter from both the dot-dash and tracker map; never rename a retained tracker label locally.
+
 ## Analytical jobs
 
 ### Baseline and progress
@@ -78,7 +82,7 @@ Do not infer unnamed owners or unpublished status.
 
 ## Page composition
 
-Use the [registered slide types](../slide-types/index.md). Match the exhibit to the job: timeline for forecast movement, dependency diagram for critical path, table for owned actions, and chart for measurable performance.
+Use the [open composition model](../composition/index.md). Match the exhibit to the job: timeline for forecast movement, dependency diagram for critical path, table for owned actions, and chart for measurable performance.
 
 Do not repeat a status-card grid across the deck. Use one accent colour plus neutrals unless a defined metric needs more.
 

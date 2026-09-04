@@ -1,103 +1,65 @@
 # Professional Slides
 
-`professional-slides` is a Codex plugin for building and revising executive, answer-first decks in PowerPoint and Google Slides. It keeps the full workflow in one distributable product: storylining, approval gates, design, components, slide types, charts, platform-specific implementation, deck templates, and rendered QA.
+A single Codex plugin for planning, building, and checking editable consulting presentations. Approved content flows through reusable components and an open composition tree into one resolved scene. HTML and PptxGenJS consume that scene; Artifact Tool imports the saved PowerPoint to verify names, geometry, and theme inheritance.
 
-The project is independent and is not affiliated with or endorsed by McKinsey & Company. “McKinsey-style” describes concise, evidence-led executive consulting communication.
+The McKinsey, BCG, and Bain palettes are independent, brand-inspired presets, not official firm templates or endorsements. Company fonts are configured separately.
 
-## Plugin structure
+## Structure
 
-```text
-.
-|-- .codex-plugin/plugin.json
-|-- skills/
-|   `-- professional-slides/
-|       |-- SKILL.md
-|       |-- agents/openai.yaml
-|       `-- references/
-`-- evals/
-    |-- cases.json
-    |-- run_evals.py
-    |-- scripts/
-    `-- tests/
-```
+- `skills/professional-slides/SKILL.md` routes new decks, structural revisions, and bounded slide edits.
+- `skills/professional-slides/references/` owns storylining, design, component semantics, charts, deck templates, platform guidance, and QA.
+- `skills/professional-slides/runtime/` owns executable composition, tokens, component geometry, and adapters. Start with its [runtime guide](skills/professional-slides/runtime/README.md).
+- `evals/` owns validators, fixtures, scenario briefs, and regression tests.
+- `.codex-plugin/plugin.json` exposes the one canonical skill.
 
-The plugin contains one canonical `professional-slides` skill. `SKILL.md` selects `new_deck`, `existing_deck_revision`, or `slide_revision`, then routes directly to the relevant owner files. The distributable skill contains instructions and references only. Deterministic validators, evaluation tooling, and tests stay under the repository's `evals/` boundary.
+## Use
 
-## Validate the plugin
+Invoke `$professional-slides` with the audience, decision, evidence limits, delivery context, output platform, and any authorized reference. New decks require an approved storyline before authoring. Existing-deck and bounded-slide requests preserve the unaffected content and design.
 
-From the repository root:
+The runtime currently produces editable PowerPoint primitives, including charts. Charts are not native workbook-backed chart objects. Google Slides remains a downstream import or separately validated platform workflow; PowerPoint parity does not prove Google Slides fidelity. The built-in media fixtures demonstrate placement, not a library of corporate logos or photographs.
 
-```bash
-python /path/to/plugin-creator/scripts/validate_plugin.py .
-python evals/scripts/validate_template_registry.py
-python -m unittest discover -s evals/tests -v
-```
+## Extend
 
-The plugin validator checks the Codex manifest and skill metadata. The template validator checks registration, filenames, required decision sections, and owner links. The test suite checks the full source architecture and deterministic contracts.
+Use the [component contract](skills/professional-slides/runtime/README.md#component-contract) for geometry and variants, the [composition model](skills/professional-slides/references/composition/index.md) for relationships, and the [template authoring contract](skills/professional-slides/references/templates/authoring.md) for recurring audience decisions. Keep each semantic rule in its canonical owner.
 
-## Use the skill
+Register every rendering variant with representative props and size. New registrations enter the golden set automatically. Components consume declared theme tokens; HTML serializes them as CSS variables, while PowerPoint materializes the same values and native theme. CSS is not a second layout engine.
 
-Use an explicit invocation for the first task:
+## Development checks
 
-```text
-$professional-slides Explain which guidance you would load for a 10-slide market-entry deck. Do not create files yet.
-```
-
-For a deck request, state the audience, decision, evidence limits, delivery context, output platform, and any authorized reference deck. For example:
-
-```text
-$professional-slides Create a due-diligence deck evaluating whether Company A should acquire Company B.
-
-Audience: investment committee
-Decision: proceed, pause, or reject
-Evidence: attached materials only; label unresolved diligence questions
-Delivery: executive pre-read
-Output: editable PowerPoint and native Google Slides, rendered and checked separately
-```
-
-The skill is an authoring and verification system, not a renderer. The active agent still uses the available PowerPoint or Google Slides tools. A completed task must be supported by the final editable artifact, full-deck renders, montage review, slide-level inspection, and any stated platform limitations.
-
-## Extend themes and components
-
-The canonical theming specification lives under `skills/professional-slides/references/theming/`. It separates visual families, density profiles, component variants, and semantic states; defines the complete CSS-variable token registry; and assigns a namespaced variable interface to each reusable slide component.
-
-When a component gains raw HTML and CSS guidance, keep that specimen in the component's existing Markdown owner. List the variables it consumes, bind its namespaced aliases to the canonical registry, and translate the specimen into editable native objects. Do not copy palettes or spacing scales into each component file.
-
-## Extend deck templates
-
-Templates are a first-class extension point under `skills/professional-slides/references/templates/`:
-
-- `registry.json` is the machine-readable canonical catalogue;
-- `authoring.md` defines the admission, structure, ownership, and validation contract;
-- each registered Markdown file owns one recurring audience decision architecture;
-- shared storylining, design, components, charts, slide types, tools, and QA remain canonical and are linked rather than copied.
-
-To add a template, create its Markdown contract, register it, run the registry validator, add source-structure coverage, and add an evaluation case before claiming mature support. This allows the catalogue to grow without turning `SKILL.md` into a large prompt or creating conflicting rules.
-
-## Portable skill use
-
-The directory `skills/professional-slides/` remains a self-contained `SKILL.md` package. Agents that support compatible local skills can link or copy that directory into their own skill location. Plugin metadata, installation, and discovery are Codex-specific; the slide guidance itself remains portable.
-
-## Development evaluation
-
-Every evaluation run starts with a new workspace and a complete reset of only this repository's `output/` directory:
+Use the bundled workspace dependencies returned by Codex's `load_workspace_dependencies`: set `RUNTIME_NODE`, `RUNTIME_NODE_MODULES`, `RUNTIME_PYTHON`, `RUNTIME_BIN_DIR`, and `PRESENTATION_SKILL_DIR`. Set `PLAYWRIGHT_BROWSER_PATH` if using a browser outside Playwright's installation. The Python environment needs PyYAML. Do not alter the bundled libraries.
 
 ```bash
-python evals/scripts/prepare_eval_run.py --run-id <unique-run-id>
+"$RUNTIME_PYTHON" -m unittest discover -s evals/tests -p 'test_*.py'
+"$RUNTIME_PYTHON" evals/scripts/validate_template_registry.py
+"$RUNTIME_NODE" evals/scripts/generate_golden_set.mjs
+"$RUNTIME_NODE" evals/scripts/generate_golden_set.mjs --check
+"$RUNTIME_NODE" evals/scripts/validate_reference_fidelity.mjs --source-root /path/to/consulting-toolkit
+"$RUNTIME_PYTHON" evals/scripts/validate_reference_copy.py --model gpt-5.6-terra
+"$RUNTIME_PYTHON" evals/run_evals.py --check
 ```
 
-The run manifest hashes the complete plugin manifest, skill package, template registry, and evaluation cases. Generated storylines, contracts, builders, artifacts, renders, and QA packages must stay inside that run workspace and may not be copied from prior runs.
+Also run the installed plugin-creator's `validate_plugin.py` against this repository and skill-creator's `quick_validate.py` against the skill directory. After source changes, reinstall `professional-slides@personal` and compare the installed manifest, skill, and eval files with the source.
 
-Validate a result package with:
+### Golden component evaluation
+
+Every golden run generates three palette decks containing all components, registered variants, layout fixtures, and standard compositions. Gates check coverage, text fit, overlaps, package structure, Artifact Tool readback, theme binding, and HTML-to-PPTX image parity. Inspect the paired renders and lowest-scoring fixtures as well as the reports.
+
+Accepted runs remain under `output/golden/runs/`. `output/golden/index.html` points to the latest accepted set. A failed run cannot replace it; `golden:check` rejects evidence from changed sources. Do not reset `output/` for a golden rerun.
+
+The source-fidelity gate additionally requires the authorized consulting-toolkit directory, including its inventory and both source-image sets. Those external reference assets are not distributed in this repository. Promote its newly accepted `reference-fidelity-report.json` to `evals/reference-fidelity-eval.json`; the release check rejects stale or incomplete evidence. Capability inventory is a separate check:
 
 ```bash
-python evals/run_evals.py --mode self --results path/to/results.json
+"$RUNTIME_NODE" evals/scripts/import_consulting_toolkit.mjs --source /path/to/consulting-toolkit/index.html
 ```
 
-Passing schema checks does not replace reviewing the actual editable artifact and renders.
+### End-to-end scenario evaluation
 
-## Hooks
+`evals/cases.json` contains authoring scenarios, not pre-generated results. Running tests or golden decks does not execute those scenarios. Supply the case's evidence and cutoff, generate its requested artifacts, and record per-case results before claiming scenario coverage.
 
-The plugin deliberately does not bundle lifecycle hooks. Plugin hooks load whenever the plugin is enabled, not only when this skill is active, and changed hooks require a new trust review. The slide gates also depend on task-specific state such as owner approval, artifact type, and requested scope, so a global hook would either be noisy or require another transcript-parsing script.
+For a user-authorized fresh scenario reset, `prepare_eval_run.py --run-id <unique-id>` clears this repository's generated `output/` directory and creates an isolated workspace. This also removes retained golden output, so preserve any golden set the user still needs elsewhere first. Do not reuse generated storylines, builders, renders, or QA from a previous scenario run. Validate completed results with:
 
-Add a hook only when a future check is deterministic, fast, safe for every enabled-plugin session, and cannot be expressed as skill guidance or repository evaluation. Follow the [official OpenAI hooks documentation](https://learn.chatgpt.com/docs/hooks) and use the default `hooks/hooks.json` plugin location when that standard is met.
+```bash
+"$RUNTIME_PYTHON" evals/run_evals.py --mode self --results /path/to/results.json
+```
+
+Automated checks do not establish sound writing, factual accuracy, or native PowerPoint/Google Slides behavior. Report the actual renderer used and any platform checks not performed.

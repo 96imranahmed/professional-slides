@@ -1,10 +1,12 @@
 # Lines and Section Treatments
 
-This file owns the component-level grammar for enclosing, separating, or heading content regions. [`Theming`](../theming/index.md) owns colour, rule, spacing, typography, shape tokens, and component bindings; [`design`](../design/index.md) owns composition; [`text-box`](text-box.md) owns text-container geometry; slide types own page composition. Use the modes here to express an actual grouping or hierarchy, never to decorate an otherwise unstructured page.
+This file owns the component-level grammar for enclosing, separating, or heading content regions. [`Theming`](../theming/index.md) owns colour, rule, spacing, typography, shape tokens, and component bindings; [`composition`](../composition/index.md) owns page structure; [`text-box`](text-box.md) owns text-container geometry. Use the modes here to express an actual grouping or hierarchy, never to decorate an otherwise unstructured page.
 
 ## Choose one section treatment
 
 Assign one primary treatment to each repeated slide family before authoring its pages. Peer regions at the same hierarchical level must use the same treatment, and comparable chart, table, diagram, and comparison headers must use one deck-wide analytical-header treatment. Prefer the open treatment with a quiet underline because it scales across exhibits without consuming analytical space. Different semantic roles may coexist—for example, an open analytical canvas beside a theme-defined implication rail—but do not alternate treatments among equivalent regions merely for variety.
+
+Use the shared `section-heading` component for every peer analytical-region heading. A chart-side description and an analytical takeaway rail (`content-rail` with `treatment="open"`) share typography, colour, and one header band. Measure wrapping before layout; size the band to the tallest peer and bottom-align the text. Place each rule `space.2` below the text box, so one-line and multiline headings retain equal clearance. Reserve `space.3` after the rule before section content. An insight rail (`content-rail` with `treatment="muted"`) keeps the shared typography without an underline.
 
 | Mode | Use when | Construction | Do not use when |
 | --- | --- | --- | --- |
@@ -24,7 +26,7 @@ Inside a box, align headings, values, bullets, icons, and dividers to the compon
 
 `None` means no visible section enclosure, not no structure. Establish the grouping through shared starts and ends, consistent content tops, proximity, whitespace intervals, typography roles, and a clear dominant exhibit. Keep backgrounds continuous and avoid faint rectangles that function as undeclared boxes. For repeated chart, table, diagram, and comparison headers, default to one quiet underline aligned to the full region width and use that construction consistently across the deck.
 
-Thin rules may still perform necessary deck-level jobs such as separating the title zone, source zone, footer, or selected open analytical header, but they must not be added around the analytical content to compensate for weak alignment. Use the open underlined mode by default when a chart or diagram already provides strong internal structure.
+Thin rules may separate the title, source, footer, or an open analytical header. Do not frame analytical content to compensate for weak alignment. Use open underlined mode when a chart or diagram already provides structure.
 
 ### Highlighted section headers
 
@@ -34,15 +36,18 @@ Resolve the band from component-primary, its registered low-chroma tint, or a ne
 
 Place explanatory subtitles, diagrams, charts, or lists below the band on the region's normal canvas. Do not wrap the body in an additional border unless a separately named semantic state requires boxing; a highlighted header plus a generic box usually states the same boundary twice.
 
+The shared section heading owns heading text and its optional rule only. It has no subtitle, period, status, or right-aligned metadata slot. This applies to standalone headings, sections, and content rails; the runtime rejects `subtitle` inputs.
+
 ## Component line grammar
 
-Every visible component line must have exactly one job: boundary, separator, leader, or state accent. Chart axes and gridlines belong to [`charts`](../charts/index.md); diagram connectors belong to the relevant [`slide type`](../slide-types/index.md); this file governs only lines that structure reusable components and content regions.
+Every visible component line must have exactly one job: boundary, separator, leader, or state accent. Chart axes and gridlines belong to [`charts`](../charts/index.md); diagram connectors belong to [relationship components](relationships.md); this file governs only lines that structure reusable components and content regions.
 
 - Resolve line colour, weight, dash, and cap from the active theme; do not create slide-local line values.
 - Use continuous quiet rules for ordinary boundaries and separators. Reserve an accent line for a named state or theme-defined emphasis treatment.
 - Start and end a separator on the parent component's guides. Do not leave almost-aligned rules, arbitrary overhangs, or gaps that look accidental.
 - Use one boundary mechanism at a time. Fill, whitespace, header band, or rule should carry the grouping; stacking all four makes the hierarchy noisy.
 - Do not add short decorative strokes beneath headings. An underline is valid only as the selected open analytical-header treatment, spans the region width, and repeats for comparable chart, table, diagram, and comparison headers.
+- Do not underline an insight-rail heading. Use `content-rail` with `treatment="muted"`; an internal divider may appear only between distinct content sections.
 - Keep the same line meaning across the deck. A colour or dash used for a separator must not become a forecast, connector, or status encoding elsewhere.
 
 ## Theme inheritance and named variants
@@ -56,6 +61,9 @@ Detached implication regions use the active [`Insight Box`](insight-box.md) vari
 - each visible line, box, fill, or highlighted header expresses a named grouping, hierarchy, or state;
 - peer regions use one treatment and one resolved variant;
 - comparable analytical headers use one deck-wide treatment, with the open underlined form preferred unless an approved theme or semantic boundary requires another mode;
+- chart-side descriptions and analytical takeaway rails with `treatment="open"` use the same `section-heading` geometry, type, colour, and rule;
+- insight rails with `treatment="muted"` use the same heading type without a rule;
+- wrapped peer headings share a bottom guide and equal text-to-rule clearance in both rendered outputs;
 - the action title remains the first read and the dominant evidence remains clear;
 - boundaries terminate on valid component or slide-family guides;
 - fills, outlines, headers, padding, and text roles match the active theme after final rendering;

@@ -4,17 +4,18 @@ Read this folder for every PPTX deliverable. Choose the authoring surface first,
 
 ## Files
 
-- [Artifact Tool](artifact-tool.md): Codex-native creation, import, inspection, editing, rendering, and PPTX export.
-- [PptxGenJS](pptxgenjs.md): portable JavaScript creation with explicit calls for masters, editable text, shapes, tables, charts, notes, and file output.
+- [PptxGenJS](pptxgenjs.md): the production writer for the canonical scene, with explicit calls for masters, editable text, shapes, tables, chart primitives, notes, and file output.
+- [Artifact Tool](artifact-tool.md): the required downstream adapter and observer for import, inspection, rendering, and compatibility proof. It remains available for bounded edits when import preservation is the primary need.
 - [Office.js and Microsoft Graph](office-js-and-graph.md): editing inside a running PowerPoint client and storing/distributing files through OneDrive or SharePoint.
 - [Rendering](rendering.md): native render, exported-file render, overflow checks, contact sheets, and release evidence.
+- [Hard acceptance](acceptance.md): exported-PPTX package, copy-budget, theme-variable, and repeated-role validation.
 
 ## Select the integration
 
 | Situation | Authoring surface | File transport | Rendering |
 | --- | --- | --- | --- |
-| Codex creates or edits a local PPTX | `@oai/artifact-tool` | Local filesystem | Artifact Tool PNG/layout plus final-PPTX render |
-| Codex Code or another Node host creates a new PPTX | `pptxgenjs` when available | Local filesystem or host upload | Render the exact saved PPTX; never infer quality from generation success |
+| Codex creates a new local PPTX | canonical scene -> PptxGenJS | Local filesystem | Artifact Tool import plus exact saved-PPTX render and HTML parity |
+| Codex performs a bounded imported-deck edit | Artifact Tool when it preserves the source hierarchy | Local filesystem | Artifact Tool PNG/layout plus final-PPTX render |
 | Agent runs inside PowerPoint | Office.js PowerPoint API | Current open document | Export current document, then PowerPoint/PDF render |
 | Store or publish a finished PPTX | None; do not edit through Graph | Microsoft Graph DriveItem upload/download | Graph PDF conversion or downloaded-file renderer |
 | Existing reference/template | Import and edit inherited source objects | Local or cloud file provider | Before/after source-pattern comparison |
@@ -23,45 +24,15 @@ Microsoft Graph is a file/storage API for this workflow. Do not describe it as a
 
 ## Common adapter contract
 
-Whatever host implements the skill, keep these stages explicit:
+Use the [platform contract](../index.md) and [scene-to-native mapping](../css-to-native-mapper.md). The selected adapter owns its concrete API calls and unit conversion. [Rendering](rendering.md) and [hard acceptance](acceptance.md) determine delivery eligibility.
 
-```text
-read(source?) -> inspect -> plan -> author/edit -> export -> render -> inspect -> revise -> publish
-```
-
-The platform adapter should expose the equivalent of:
-
-- `readDeck`: obtain the full presentation or import the PPTX;
-- `inspectDeck`: return stable slide/object/layout identifiers and properties;
-- `applyOperations`: create or mutate editable objects;
-- `exportPptx`: write the exact candidate deliverable;
-- `renderDeck`: produce one ordered image per final slide;
-- `publish`: upload only after the candidate passes QA.
-
-Keep source reads and mutations separate. A successful API mutation is not a quality result; only the rendered exported candidate is eligible for delivery.
-
-## Non-negotiable invariants
+## PowerPoint-specific boundaries
 
 - Preserve the source master -> layout -> slide hierarchy for template work.
-- Use stable object IDs or names; do not target objects only by visual order.
-- Make charts, tables, text, and simple diagrams editable.
-- Keep recurring components in masters/layouts.
+- Put only static repeated furniture and inherited placeholders in masters or layouts. Build data-bearing repeated components from one shared component definition.
 - Preserve or explicitly replace speaker notes and source blocks.
-- Apply the [`text-box` overflow contract](../../components/text-box.md#container-contract) without adding a PowerPoint-only exception.
-- Render every slide from the latest final PPTX.
 - Do not claim desktop PowerPoint behavior unless the file was opened there.
-
-## Geometry implementation
-
-Start from the named guide, typography, spacing, and component tokens defined by the source documents. Map them through one selected PowerPoint adapter; do not copy raw coordinates between Artifact Tool, PptxGenJS, and Office.js without an explicit conversion.
-
-- PptxGenJS positions and sizes objects in inches; keep the canonical inch values in a shared geometry object and derive column spans, regions, and component insets through helpers.
-- Artifact Tool candidates must use one declared slide-size coordinate system and reusable layout or component definitions. Keep that coordinate system isolated from inch- or point-based adapters.
-- Office.js edits should read the existing master, layout, placeholder, shape, and text properties before applying deltas. Preserve the host document's established geometry rather than rebuilding it from neutral defaults.
-- Put recurring titles, trackers, footers, page numbers, and confidentiality marks in masters or layouts when the adapter supports them.
-- After export, compare repeated anchor positions and text roles through available object metadata, then render the exact PPTX and inspect optical alignment.
-
-Read the selected adapter file for its concrete API calls and unit behavior.
+- Office.js reads the existing master, layout, placeholder, shape, and text properties before applying deltas; it preserves the host geometry rather than rebuilding from neutral defaults.
 
 ## Capability detection
 
@@ -70,7 +41,7 @@ Check capabilities before authoring:
 - Can the runtime import and export PPTX?
 - Can it preserve themes, masters, layouts, and notes?
 - Can it render slides and return object/layout metadata?
-- Can it create native charts and tables?
+- Can it create editable chart primitives and native tables while preserving the scene contract?
 - Can it access the required fonts?
 - Can the Office.js host satisfy the required PowerPoint API set?
 - Can the storage API upload, download, or convert the final file?

@@ -12,8 +12,8 @@ A consistently spaced temporal or ordered x-axis, numeric measures, explicit uni
 
 - Preserve chronological order and honest interval spacing.
 - Emphasize no more than four series; use small multiples for more.
-- Label endpoints when crossings do not create ambiguity.
-- Show forecast with a dashed line, lighter tone, or band and a labeled boundary.
+- Apply the shared [direct-label gate](index.md#direct-label-gate) to endpoints and crossings; retain the legend when identity remains ambiguous.
+- Show forecast with a dashed line or an explicit boundary or band. A lighter tone may supplement, never replace, the non-colour cue.
 - Annotate only decisive peaks, troughs, crossings, or external events.
 - Use shared scales for small multiples intended for comparison.
 - Do not smooth in a way that changes the apparent data.
@@ -21,7 +21,7 @@ A consistently spaced temporal or ordered x-axis, numeric measures, explicit uni
 ## Structural HTML reference
 
 ```html
-<figure class="line-chart" data-role="chart-field"><svg viewBox="0 0 900 420" role="img"><path class="grid" d="M80 80H840M80 190H840M80 300H840"/><path class="series series--actual" d="M80 310L270 265L460 230L650 145"/><path class="series series--forecast" d="M650 145L840 95"/><path class="forecast-boundary" d="M650 60V330"/><text x="665" y="78">Forecast</text></svg><figcaption>Metric, unit, period, and actual/forecast boundary</figcaption></figure>
+<figure class="line-chart" data-role="chart-field"><svg viewBox="0 0 900 420" role="img"><path class="grid" d="M80 80H840M80 190H840M80 300H840"/><path class="series series--actual" d="M80 310L270 265L460 230L650 145"/><path class="series series--forecast" d="M650 145L840 95"/><path class="forecast-boundary" d="M650 60V330"/><text x="665" y="78">Forecast begins</text><text x="80" y="360">2023</text><text x="620" y="360">2025A</text><text x="810" y="360">2026F</text></svg><figcaption>Revenue, $m, UK enterprise accounts, FY2023 to FY2026F</figcaption></figure>
 ```
 
 ```css
@@ -40,7 +40,7 @@ For small multiples, repeat the same plot height, time anchors, direct-label rul
 
 ## Platform mapping
 
-Map forecast styling, missing values, markers, line width, and axis dates explicitly because defaults vary. Verify series order and forecast boundary in the exported/rendered artifact. Prefer shapes for a short, highly annotated sparkline only when native chart behavior is unstable.
+Normalize date intervals, missing-value gaps, series order, forecast boundaries, markers, and dash semantics in the scene because application defaults vary.
 
 ## Failure modes
 

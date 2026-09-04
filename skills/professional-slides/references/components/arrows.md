@@ -11,7 +11,7 @@ Choose the preferred relationship treatment unless density or semantics require 
 - `wedge`: a filled triangular mark without a container. Use for a stronger compact transfer when a line arrow would disappear, but avoid it when it could be mistaken for media playback.
 - `disc-multi-chevron`: repeated chevrons inside a filled disc with a through-line. Reserve for a major transition, acceleration, or boundary crossing. Do not repeat it in every row of a dense ledger.
 
-Use one arrow variant for one semantic relationship across a slide family. Do not mix variants merely for visual variety. For [`description with implication`](../slide-types/description-with-implication.md), use `disc-chevron` by default. Use `line` only as a controlled compact exception when the repeated row geometry cannot support the disc at a readable size.
+Use one arrow variant for one semantic relationship across a slide family. Do not mix variants merely for visual variety. Use `disc-chevron` for a repeated description-to-consequence row by default. Use `line` only as a controlled compact exception when the repeated row geometry cannot support the disc at a readable size.
 
 ## Geometry and placement
 
@@ -25,9 +25,9 @@ Use one arrow variant for one semantic relationship across a slide family. Do no
 
 ## Theme contract
 
-| Component | Consumed custom properties | Default binding |
+| Component | Consumed custom properties | Canonical source |
 | --- | --- | --- |
-| arrow | `--arrow-color`, `--arrow-surface`, `--arrow-on-surface`, `--arrow-connector`, `--arrow-size`, `--arrow-emphasis-size`, `--arrow-wide-size`, `--arrow-stroke`, `--arrow-connector-stroke` | component primary, component primary, on-primary text, page guideline, icon-lg, icon-md, `space-6`, standard line, hairline |
+| arrow | `--arrow-color`, `--arrow-surface`, `--arrow-on-surface`, `--arrow-connector`, `--arrow-size`, `--arrow-emphasis-size`, `--arrow-wide-size`, `--arrow-stroke`, `--arrow-connector-stroke` | [component bindings](../theming/component-bindings.md#text-and-section-components) |
 
 ## Structural HTML reference
 
@@ -74,8 +74,8 @@ Use one arrow variant for one semantic relationship across a slide family. Do no
   --arrow-surface: var(--component-primary);
   --arrow-on-surface: var(--on-primary);
   --arrow-connector: var(--page-guideline);
-  --arrow-size: var(--icon-lg);
-  --arrow-emphasis-size: var(--icon-md);
+  --arrow-size: var(--icon-md);
+  --arrow-emphasis-size: var(--icon-lg);
   --arrow-wide-size: var(--space-6);
   --arrow-stroke: var(--line-standard);
   --arrow-connector-stroke: var(--line-hairline);

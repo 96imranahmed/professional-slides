@@ -1,0 +1,99 @@
+{
+  "accepted": true,
+  "filesExpected": 54,
+  "judgement": {
+    "aggregateScore": 94,
+    "dimensions": {
+      "actionability": {
+        "rationale": "Authors receive concrete selection rules, contracts, rejection conditions, and verification checks.",
+        "score": 95
+      },
+      "concision": {
+        "rationale": "Dense guidance is generally necessary operational detail, with cross-links preventing most repetition.",
+        "score": 92
+      },
+      "nonRedundancy": {
+        "rationale": "Canonical owners and explicit cross-links keep shared rules centralized; local restatement is usually scoped to implementation risk.",
+        "score": 94
+      },
+      "specificity": {
+        "rationale": "Rules consistently name required data, limits, exceptions, ownership, and failure conditions.",
+        "score": 95
+      }
+    },
+    "filesReviewed": [
+      "charts/bar-column.md",
+      "charts/heatmap-table.md",
+      "charts/index.md",
+      "charts/line.md",
+      "charts/percentage-segment-by-group.md",
+      "charts/pie-donut.md",
+      "charts/scatter-bubble.md",
+      "charts/stacked.md",
+      "charts/waterfall.md",
+      "components/arrows.md",
+      "components/chart-callouts.md",
+      "components/chart-legends.md",
+      "components/comparison-indicators.md",
+      "components/copy.md",
+      "components/guidelines.md",
+      "components/icons-and-logos.md",
+      "components/index.md",
+      "components/insight-box.md",
+      "components/item-indicators.md",
+      "components/metric-fields.md",
+      "components/quote-cluster.md",
+      "components/relationships.md",
+      "components/text-box.md",
+      "components/trackers/index.md",
+      "components/trackers/specimens.md",
+      "composition/index.md",
+      "design/index.md",
+      "design/slide-layouts.md",
+      "evaluation/index.md",
+      "storylining/dot-dash.md",
+      "storylining/hypothesis-tree.md",
+      "storylining/index.md",
+      "storylining/pre-authoring-contract.md",
+      "templates/authoring.md",
+      "templates/commercial-due-diligence.md",
+      "templates/index.md",
+      "templates/project-progress-update.md",
+      "templates/startup-pitch-deck.md",
+      "theming/component-bindings.md",
+      "theming/html-css-contract.md",
+      "theming/index.md",
+      "theming/tokens.md",
+      "tools/codex-generation.md",
+      "tools/css-to-native-mapper.md",
+      "tools/google-slides/api-integration.md",
+      "tools/google-slides/index.md",
+      "tools/google-slides/rendering.md",
+      "tools/index.md",
+      "tools/powerpoint/acceptance.md",
+      "tools/powerpoint/artifact-tool.md",
+      "tools/powerpoint/index.md",
+      "tools/powerpoint/office-js-and-graph.md",
+      "tools/powerpoint/pptxgenjs.md",
+      "tools/powerpoint/rendering.md"
+    ],
+    "findings": [
+      {
+        "excerpt": "rasterize every PDF page locally at a fixed DPI",
+        "file": "tools/google-slides/rendering.md",
+        "location": "## Preferred complete-deck render",
+        "reason": "The required render resolution is left to the author, which can make visual-QA evidence inconsistent between runs.",
+        "recommendedChange": "Name one default DPI and permit an explicit recorded override when a task requires another resolution.",
+        "severity": "minor"
+      }
+    ],
+    "rubricVersion": "2",
+    "summary": "Accepted. The guidance is highly specific, consistently owned, and directly usable; the single minor issue does not undermine the overall contract.",
+    "verdict": "accept"
+  },
+  "model": "gpt-5.6-terra",
+  "referenceHash": "272f00806eb3425d4eda92f2a7b66fac2fd16fd32a0dcfc9c2e4edc7561a6d75",
+  "rubricVersion": "2",
+  "schemaVersion": 1,
+  "validationErrors": []
+}

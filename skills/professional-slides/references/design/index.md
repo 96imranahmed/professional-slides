@@ -1,32 +1,24 @@
 # Design System
 
-Design should make the argument easier to see. Use the fewest visual rules needed for a coherent deck. [`Theming`](../theming/index.md) owns reusable values and component bindings; this file owns visual decisions and composition.
+Design should make the argument easier to see. Use the fewest visual rules needed for a coherent deck. [`Theming`](../theming/index.md) owns reusable values and component bindings; this file owns the visual decisions applied to the resolved composition.
 
 ## Select one design mode
 
 Choose one:
 
-- **Reference-led:** follow an approved source deck or template.
-- **Clean native:** use a restrained consulting system when no reference exists.
+- **Reference-led:** follow a source deck or template admitted by the [asset authorization record](../components/icons-and-logos.md#asset-authorization-record).
+- **Clean native standard:** default when no approved reference or explicit custom direction exists. Use the Codex Grid layout, registered components, and standard tracker, chart-heading, and legend variants.
+- **Custom user-directed:** use only when the owner explicitly approves a distinct visual direction and record that approval in the deck contract.
 
 Then resolve one [visual family and density profile](../theming/index.md#resolve-one-active-theme). Do not mix reference styles with a new house style.
 
 ## Compose the page
 
-Start with the claim and evidence, then choose the layout.
+Use the [composition model](../composition/index.md) for the content-item contract, relationship-based layout selection, and nesting rules. Design begins after that tree resolves: select the visual family, density, guides, treatment, and hierarchy that make the declared relationships visible. [Slide layouts](slide-layouts.md) owns the corresponding page-geometry guidance.
 
-Select the narrative archetype and evidence composition first. Then use the [slide-layout router](slide-layouts.md) to allocate the content field. Layouts own page-level region geometry only; they do not redefine the audience job, evidence relationship, chart, or component.
+Do not impose the same card grid, three-column layout, process rail, or footer strip on most slides. Give each slide one dominant exhibit; route any detached synthesis or terminal action through the canonical [`Insight Box`](../components/insight-box.md). Evidence-attached chart annotations follow [`chart callouts`](../components/chart-callouts.md).
 
-- Trend: chart.
-- Sequence: timeline or process.
-- Comparison: table, chart, or parallel fields.
-- Causal logic: diagram.
-- Synthesis: executive answer spine.
-- Decision: conditions, actions, or gates.
-
-Do not impose the same card grid, three-column layout, process rail, or footer strip on most slides. One slide should have one dominant exhibit and no more than one distinct callout or terminal action surface.
-
-Whitespace must support hierarchy. It must not conceal missing evidence or undersized content.
+Whitespace must support hierarchy. It must not conceal missing evidence or undersized content. On an executive pre-read, one dominant analytical item should normally occupy 60% to 90% of the usable content field and include at least two completeness elements such as a comparison, qualifier, definition, period, or attached interpretation. This is a planning check, not a reason to add filler.
 
 ## Select an evidence-density mode
 
@@ -50,6 +42,8 @@ Use one identical component-primary swatch across titles, tracker emphasis, stru
 ### Semantic treatment registry
 
 Before authoring, record the [theme manifest](../theming/index.md#theme-manifest) and create one deck treatment ledger. For every slide or contiguous slide range, name the visual family, density, analytical-header template, tracker state, page layout, tables, callouts, sources, charts, and repeated component variants. Reuse those treatments. Create a new variant only when the meaning changes, and record the semantic reason as an explicit exception rather than tuning one slide locally.
+
+The ledger owns one `tableHeader` record with `variantId`, `fillRole`, `textRole`, `ruleRole`, `rowHeightToken`, `paddingXToken`, and `paddingYToken`. Every analytical table references that record by `variantId`; no slide carries a parallel header definition.
 
 ## Implication emphasis system
 
@@ -79,8 +73,8 @@ Use a 16:9 canvas unless the source specifies otherwise. Resolve the exact value
 
 - outer page margins;
 - the analytical title anchor;
-- the title separator and content start;
-- the footer and source zone;
+- the optional title separator and content start;
+- the shared footer/source row and content boundary, following the [page-template owner](../components/index.md#sources-and-footers);
 - a simple 12-column analytical grid.
 
 The grid is a guide, not a requirement to fill every column. Give the dominant exhibit most of the canvas. Set diagram nodes before drawing connectors. Keep recurring objects on exact shared anchors.

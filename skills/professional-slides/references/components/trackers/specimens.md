@@ -4,33 +4,7 @@ These specimens show the distinct navigation constructions owned by [Trackers an
 
 ## Theme contract
 
-| Property | Default binding |
-| --- | --- |
-| `--tracker-font` | label role |
-| `--tracker-heading-font` | section-title role |
-| `--tracker-item-font` | body role |
-| `--tracker-item-strong-font` | callout role |
-| `--tracker-number-font` | section-heading role |
-| `--tracker-section-number-font` | section-number role |
-| `--tracker-active` | component primary |
-| `--tracker-active-text` | on-primary text |
-| `--tracker-inactive` | muted ink |
-| `--tracker-ink` | ink |
-| `--tracker-canvas` | canvas |
-| `--tracker-surface` | surface-1 |
-| `--tracker-tint` | component-primary tint |
-| `--tracker-rule` | quiet rule |
-| `--tracker-page-rule` | page rule |
-| `--tracker-emphasis-rule` | emphasis rule |
-| `--tracker-gap` | `space-2` |
-| `--tracker-item-gap` | `space-5` |
-| `--tracker-list-gap` | `space-3` |
-| `--tracker-list-width` | `72%` of the available split-content field |
-| `--tracker-padding` | `space-4` |
-| `--tracker-marker-size` | `space-9` |
-| `--tracker-compact-marker-size` | `icon-md` |
-| `--tracker-radius` | round radius |
-| `--tracker-edge-share` | content-driven half-item share |
+Consume the tracker variables and defaults registered in [component bindings](../../theming/component-bindings.md#canvas-and-repeated-furniture). This specimen does not redefine those bindings.
 
 ## Structural HTML reference
 
@@ -48,24 +22,24 @@ Use for three to six short peer sections. A contents overview may omit `data-sta
       <span class="tracker__sequence-rule" style="--tracker-edge-share: 12.5%" aria-hidden="true"></span>
       <ol>
         <li>
-          <span class="tracker__marker">01</span>
+          <span class="tracker__marker">1</span>
           <h2>Context</h2>
-          <p>Why the decision matters</p>
+          <p>Field teams lose two days per quote</p>
         </li>
         <li>
-          <span class="tracker__marker">02</span>
+          <span class="tracker__marker">2</span>
           <h2>Evidence</h2>
-          <p>What the analysis shows</p>
+          <p>Manual pricing drives 62% of delay</p>
         </li>
         <li data-state="selected" aria-current="step">
-          <span class="tracker__marker">03</span>
+          <span class="tracker__marker">3</span>
           <h2>Options</h2>
-          <p>Where the choices differ</p>
+          <p>Automation gives the fastest payback</p>
         </li>
         <li>
-          <span class="tracker__marker">04</span>
+          <span class="tracker__marker">4</span>
           <h2>Decision</h2>
-          <p>What must happen next</p>
+          <p>Pilot in enterprise sales this quarter</p>
         </li>
       </ol>
     </nav>
@@ -75,7 +49,7 @@ Use for three to six short peer sections. A contents overview may omit `data-sta
 
 ### Split contents full state and in-section progress state
 
-Use the left field for the parent section title only. Do not add a subtitle, kicker, description, or framing paragraph. Use the right field for the child items. Its backdrop runs the full slide height and reaches the outer right edge; vertically center the complete list within that field. Use circular number markers by default. A long child list uses `data-list-density="long"` while retaining the same construction. Hierarchical numbers remain editable text.
+This specimen materializes the canonical [`split-contents`](index.md#choose-one-full-state-and-one-compact-state) geometry. The parent occupies the left field; the child list is vertically centered in a full-height right backdrop. `data-list-density="long"` changes only the registered density tokens.
 
 ```html
 <main class="deck" data-theme="executive-light" data-density="pre-read">
@@ -130,10 +104,10 @@ Use when stable numbers provide sufficient orientation. Keep full labels in the 
     <header class="tracker-analytical-header" data-variant="compact-number-strip">
       <nav class="tracker tracker--compact-number-strip" aria-label="Deck sections">
         <ol>
-          <li aria-label="Context">01</li>
-          <li aria-label="Evidence">02</li>
-          <li data-state="selected" aria-current="step" aria-label="Options">03</li>
-          <li aria-label="Decision">04</li>
+          <li aria-label="Context">1</li>
+          <li aria-label="Evidence">2</li>
+          <li data-state="selected" aria-current="step" aria-label="Options">3</li>
+          <li aria-label="Decision">4</li>
         </ol>
       </nav>
       <h1>Two options preserve value while limiting execution risk</h1>
@@ -148,10 +122,10 @@ Use only at a material chapter change. The title stays on the left and the large
 
 ```html
 <main class="deck" data-theme="executive-light" data-density="executive">
-  <section class="slide tracker tracker-section-break" data-variant="numbered-section-break" aria-label="Section 02, Background and context">
+  <section class="slide tracker tracker-section-break" data-variant="numbered-section-break" aria-label="Section 2, Background and context">
     <div class="tracker-section-break__body">
       <h1>Background and context</h1>
-      <div class="tracker-section-break__number" aria-hidden="true">02</div>
+      <div class="tracker-section-break__number" aria-hidden="true">2</div>
     </div>
   </section>
 </main>
@@ -372,9 +346,13 @@ Use only at a material chapter change. The title stays on the left and the large
 }
 
 .tracker--compact-label {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: var(--tracker-gap);
+  justify-content: flex-start;
+  width: max-content;
+  max-width: 100%;
+  white-space: nowrap;
   font: var(--tracker-font);
 }
 
@@ -433,31 +411,21 @@ Use only at a material chapter change. The title stays on the left and the large
 
 ## Variants and states
 
-- `sequential-circles` is the full horizontal map. `selected` changes the marker fill, keyline, label weight, and current-item metadata.
-- `split-contents` is the full two-field map. `data-list-density="long"` tightens only the registered gap and type role. It does not create another layout.
-- `compact-label` carries exact parent and child names in the analytical header.
-- `compact-number-strip` carries the same ordered IDs in a quieter analytical header.
-- `numbered-section-break` is a transition state, not an analytical page and not a second contents system.
+Variant semantics and permitted pairings are owned by the [tracker router](index.md#choose-one-full-state-and-one-compact-state). This specimen only demonstrates their editable geometry and CSS state hooks.
 
 ## Native translation
 
 - Translate each list item into one editable group containing its marker and text.
 - Translate `aria-current="step"` and `data-state="selected"` into the builder's selected state and preserve the non-colour cue.
+- Prefer one editable native text box with inline runs for a compact-label breadcrumb. If styles differ, group content-hugging text boxes; do not reproduce CSS spans as fixed remote columns.
+- The split-contents list leaves generous space after short labels so its backdrop remains calm.
 - Keep the parent field, child list, compact header, and section-break number on registered page guides.
 - Materialize every rule as an editable native line. Do not rely on browser pseudo-elements.
 - Preserve hierarchical numbers as text so structural edits can recalculate them.
+- Follow the ordinal format owned by [Item Indicators](../item-indicators.md); preserve meaningful hierarchical identifiers.
 
 ## Acceptance check
 
-- The contents overview has zero selected items or a progress page has exactly one.
-- Every tracked transition and analytical page has exactly one selected item.
-- The selected item is visible without colour through fill, keyline, weight, or underline.
-- Selection never changes an item's inset, baseline, marker size, or rule thickness.
-- In split contents, every row shares the same padding and the selected highlight uses a balanced portion of the available field, with generous space after short labels; it neither hugs the text nor fills the field by default.
-- The compact breadcrumb keeps parent and current labels on one typographic level and uses no underline.
-- The sequential circle rail is vertically centered in the available content field below the heading.
-- The full and compact states share identical IDs, labels, order, and current item.
-- A long list remains a split-contents density state.
-- The compact tracker sits above the action title and never replaces it.
-- The numbered section break uses the active section ID and exact approved title.
-- Every object remains editable in PowerPoint or Google Slides.
+- Apply the canonical [tracker check](index.md#check) for semantics, placement, completeness, and continuity.
+- Confirm the selected state changes styling without shifting peer geometry.
+- Confirm the final platform preserves editable markers, labels, rules, and hierarchy.

@@ -4,20 +4,24 @@ Inline HTML and CSS are structural guidance for native slide creation. They show
 
 ## Required Markdown structure
 
-When a component owner includes a specimen, use this order:
+When a reusable owner under `components/` includes a specimen, it must contain these elements in the order that makes the owner easiest to use:
 
-1. component purpose and semantic rules;
-2. `## Theme contract` listing every consumed custom property and its default binding;
-3. `## Structural HTML reference` with one minimal semantic HTML example;
-4. one CSS block containing component aliases and geometry;
-5. `## Variants and states` for only the demonstrated differences;
-6. native translation and acceptance notes.
+- component purpose and semantic rules;
+- a `Theme contract` listing every consumed custom property and linking its canonical default in [component bindings](component-bindings.md);
+- a `Structural HTML reference` with one minimal semantic HTML example;
+- one CSS block containing component aliases and geometry;
+- registered variant and state rules, which may live in `Selection`, `Registered variants`, or `Variants and states` when that section states the complete demonstrated differences;
+- native translation and acceptance notes.
 
-The component file lists the variables it consumes. Exact global values remain in the [token registry](tokens.md), so a component file does not copy an entire palette or density profile.
+Section names and order may vary to keep selection guidance beside the component contract. Content coverage is mandatory; a second variants section is not.
+
+The component file lists the variables it consumes. [Component bindings](component-bindings.md) owns canonical defaults; the [token registry](tokens.md) owns exact global values.
+
+Chart-family owners under `charts/` are the explicit exception. Their structural HTML and local geometry CSS inherit the canonical `chart-field` bindings declared in [component bindings](component-bindings.md). They omit a separate theme-contract table and consume only canonical global tokens or registered component aliases.
 
 ## Root declaration
 
-Every specimen starts from one themed deck root:
+A standalone specimen starts from one themed deck root. A component fragment may inherit the root from its surrounding slide specimen, but must state that it is embedded.
 
 ```html
 <main class="deck" data-theme="executive-light" data-density="executive">
@@ -41,14 +45,18 @@ The visual family and density are examples. The authoring task substitutes the r
 .action-title {
   --action-title-font: var(--type-action-title);
   --action-title-color: var(--ink);
-  --action-title-rule: var(--rule-page);
-  --action-title-gap: var(--title-separator-gap);
+  --action-title-rule: 0;
+  --action-title-gap: var(--space-2);
   --action-title-width: var(--title-width);
 
   width: var(--action-title-width);
   color: var(--action-title-color);
   border-bottom: var(--action-title-rule);
   padding-bottom: var(--action-title-gap);
+}
+
+.action-title[data-variant="with-line"] {
+  --action-title-rule: var(--rule-page);
 }
 
 .action-title h1 {
@@ -107,7 +115,7 @@ Do not flatten the specimen to an image. Recalculate native coordinates from the
 
 ## Acceptance check
 
-- Every consumed custom property appears in the component's theme-contract table.
+- Every consumed custom property appears in the component's theme-contract table and resolves through [component bindings](component-bindings.md).
 - Every custom property resolves through the canonical registry or an authorized reference-derived theme.
 - Changing only `data-theme` preserves semantics and geometry while changing visual family values.
 - Changing only `data-density` preserves semantics and component construction while changing registered scale and guides.

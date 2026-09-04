@@ -1,6 +1,6 @@
 # PptxGenJS API
 
-Use [`pptxgenjs`](https://www.npmjs.com/package/pptxgenjs) for portable JavaScript creation of a new PowerPoint when the host exposes the package and does not require the Codex-native Artifact Tool route. The npm package name is `pptxgenjs`; do not use the misspelled `pptxgenjse` package name.
+Use [`pptxgenjs`](https://www.npmjs.com/package/pptxgenjs) as the production writer for net-new Professional Slides PowerPoint files. It consumes the resolved canonical scene; components do not call PptxGenJS directly. Artifact Tool imports and renders the exact saved output as the downstream compatibility adapter. The npm package name is `pptxgenjs`.
 
 PptxGenJS is a generation adapter, not a visual validator. A successful `writeFile` call proves only that bytes were written. Render and inspect the exact saved PPTX through [the PowerPoint QA path](rendering.md).
 
@@ -35,22 +35,21 @@ pptx.theme = {
 };
 ```
 
-Keep all dimensions in inches. Use the active [theme specification](../../theming/index.md) for colors, type roles, margins, grid, and recurring components.
+Keep canonical scene geometry in pixels and convert it to inches only inside `runtime/adapters/pptxgenjs.mjs`. Use the active [theme specification](../../theming/index.md) for colors, type roles, margins, grid, and recurring components.
 
-Define the design geometry once before creating slides. Store named `canvas`, `region`, `column`, `space`, and `type` tokens; derive spans and component positions through helpers; and round only when passing final values to PptxGenJS. Do not repeat literal margin, title, footer, or spacing values across slide builders.
+Define the design geometry once in the canonical scene. Store named `canvas`, `region`, `column`, `space`, and `type` tokens; derive spans and component positions through the composition resolver; and round only when passing final values to PptxGenJS. Do not repeat literal margin, title, footer, or spacing values across slide builders.
 
-Map the design roles directly to PptxGenJS options: point values to `fontSize`, role weight to `bold`, line height to `lineSpacing` or `lineSpacingMultiple`, paragraph rhythm to `paraSpaceBefore` and `paraSpaceAfter`, vertical alignment to `valign`, and component padding to `margin` or `inset` as supported by the selected object type. Preserve the library's native units for each option: geometry uses inches, while `fontSize`, `lineSpacing`, paragraph spacing, and `margin` use points. When PptxGenJS cannot express a design token exactly, use one documented fallback across every instance and verify the exported PPTX render.
+Map design roles directly to PptxGenJS: size to `fontSize`, weight to `bold`, leading to `lineSpacing` or `lineSpacingMultiple`, paragraph rhythm to `paraSpaceBefore` and `paraSpaceAfter`, alignment to `valign`, and padding to `margin` or `inset`. Preserve native units: geometry uses inches; type and spacing use points. When a token cannot map exactly, use one documented fallback for every instance and verify the exported render.
 
 ## Define masters and placeholders
 
-Put recurring title rules, footer furniture, confidentiality text, and page numbers on a slide master instead of duplicating them on every slide:
+Put fixed footer furniture, confidentiality text, and page numbers on a slide master. Titles follow the shared [title variant contract](../../components/index.md#action-title-block); an optional rule follows measured title text rather than a fixed master coordinate:
 
 ```js
 pptx.defineSlideMaster({
   title: "ANALYTICAL",
   background: { color: "FFFFFF" },
   objects: [
-    { line: { x: 0.67, y: 1.25, w: 12.0, h: 0, line: { color: "051C2C", width: 1 } } },
     {
       placeholder: {
         options: { name: "actionTitle", type: "title", x: 0.67, y: 0.38, w: 12.0, h: 0.72 },
@@ -106,7 +105,7 @@ slide.addTable(
 );
 ```
 
-Use `addChart` only with reconciled data that satisfies the selected chart contract. Keep units, period, scale, labels, forecast state, and source aligned:
+The canonical [scene-to-native chart mapping](../css-to-native-mapper.md#chart-mapping) owns the chart implementation rule. Keep units, period, scale, labels, forecast state, and source aligned:
 
 ```js
 const adoption = diligenceEvidence.productAdoption;
@@ -114,20 +113,18 @@ if (!adoption?.source || !adoption?.unit || adoption.labels.length !== adoption.
   throw new Error("Chart data requires a source, unit, and aligned labels and values");
 }
 
-slide.addChart(
-  pptx.ChartType.bar,
-  [{ name: adoption.seriesName, labels: adoption.labels, values: adoption.values }],
-  {
-    x: 0.67, y: 2.0, w: 7.4, h: 4.5,
-    barDir: "bar", showLegend: false, showValue: true,
-    valAxisMinVal: 0,
-    chartColors: ["19D3C5"],
-    showTitle: false,
+const chartItem = {
+  id: "product-adoption",
+  job: "compare adoption by segment",
+  component: "chart.bar",
+  props: {
+    categories: adoption.labels,
+    series: [{ name: adoption.seriesName, values: adoption.values }],
   },
-);
+};
 ```
 
-The chart adapter must also render `adoption.unit`, period, and `adoption.source` in the chart furniture or slide source block.
+Pass `chartItem` to the scene planner. The adapter must also render `adoption.unit`, period, and `adoption.source` in the chart furniture or slide source block.
 
 ## Add source notes
 

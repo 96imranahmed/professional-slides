@@ -105,7 +105,7 @@ def validate_registry(
         source = template_path.read_text(encoding="utf-8")
         for required_link in (
             "../storylining/pre-authoring-contract.md",
-            "../slide-types/index.md",
+            "../composition/index.md",
         ):
             if required_link not in source:
                 errors.append(f"{filename} must link to {required_link}")

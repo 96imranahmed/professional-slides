@@ -1,6 +1,10 @@
 # Icons, Category Images, and Logos
 
-Icons and logos identify a real entity, category, capability, operating step, or repeated state. Category images may add concrete recognition, context, or visual evidence when a picture communicates more than an abstract mark. These visuals may also reduce repeated copy and create restrained visual rhythm when that materially improves scanability or composition; visual density is not a goal. Use only authorized assets and one consistent icon library for the complete deck. When no approved brand or reference icon library is specified, prefer Lucide as the neutral source rather than drawing icons from memory or mixing arbitrary SVGs; another coherent library is valid when it offers a materially better semantic match or the approved visual system requires it.
+Icons and logos identify real entities, categories, capabilities, steps, or repeated states. Images may add recognition, context, or evidence when they communicate more than an abstract mark. Use visuals to reduce repeated copy or improve scanning, never to add density. Use assets admitted by the [asset authorization record](#asset-authorization-record) and one registered icon library per deck. Without a registered library, default to Lucide. Use another coherent library only when it supplies a clearer named icon for a registered semantic slot that Lucide cannot represent at slide scale, or when the asset record requires that visual system.
+
+## Asset authorization record
+
+Before reuse, register each external image, logo, icon library, visual system, or source deck in `assetAuthorizationRecord` in the [pre-authoring deck contract](../storylining/pre-authoring-contract.md). For a bounded revision without that contract, use the same field in the revision's acceptance manifest. Record its source URL or repository path, rights or user-approval reference, permitted use, required attribution, canonical stored asset path, and fallback when reuse is not permitted. The user message, brand guideline, licence, or asset-owner approval that establishes permission is the authoritative evidence. Missing evidence means use a labelled placeholder, text fallback, or no asset; do not infer permission. Later references to an `approved` or `authorized` visual mean an entry in this record.
 
 ## Select and register the icon system
 
@@ -20,7 +24,7 @@ Asset validity is a rendered-output gate. Inspect every logo at full size in the
 
 In hub-and-spoke or partnership diagrams, group peers by a named role before drawing connectors. Use no connectors when proximity and a central label already establish membership; otherwise use short orthogonal or deliberately routed connectors that terminate at node boundaries. Crossing radial lines, lines through labels, and decorative network spaghetti are release defects.
 
-When an authorized logo is unavailable, use the organization name in the deck's label role. Do not invent a pseudo-logo, scrape a low-resolution mark, or substitute a generic icon that could be mistaken for the entity.
+When a logo is absent from the [asset authorization record](#asset-authorization-record), use the organization name in the deck's label role. Do not invent a pseudo-logo, scrape a low-resolution mark, or substitute a generic icon that could be mistaken for the entity.
 
 ## Category icons and images
 
@@ -38,25 +42,36 @@ Within one visual role, do not mix filled and outline icon families, photographi
 
 ## Row and cell icons
 
-Use compact icons in tables, scorecards, comparison grids, or action lists when they make repeated rows or cells faster to scan and visually lighter. Suitable uses include an inline category icon before a row label, or a stable mark for a repeated binary, directional, completeness, risk, or availability state. Prefer an icon-plus-label when the state is nuanced or appears only a few times; a standalone icon may replace repeated words such as `included`, `not included`, `up`, or `down` only when the header or legend defines the mapping and the icon does not hide an exact value.
+Use compact icons when they make repeated rows or cells faster to scan. Suitable roles include category, binary, direction, completeness, risk, and availability. Pair icons with labels for nuanced or infrequent states. A standalone icon may replace repeated words only when a header or legend defines it and no exact value is hidden.
 
 Keep a row icon inside the label cell rather than adding a decorative icon column. Center state icons within comparable cells and keep their box, optical size, stroke, baseline, and text gap consistent. Do not replace exact values, dates, owners, evidence qualifiers, or materially different status language with icons, and do not use several near-synonymous icons merely for variety. Route progress circles and one-to-five rubric marks through [`comparison-indicators`](comparison-indicators.md); semantic row and cell icons still follow the library and registry rules here.
 
+## Theme contract
+
+| Component | Consumed custom properties | Canonical source |
+| --- | --- | --- |
+| semantic icon | `--icon-color`, `--icon-size`, `--icon-stroke`, `--icon-bg` | [component bindings](../theming/component-bindings.md#media-and-identity-components) |
+| logo backing | `--logo-bg`, `--logo-border`, `--logo-padding`, `--logo-radius` | [component bindings](../theming/component-bindings.md#media-and-identity-components) |
+| image frame | `--image-bg`, `--image-border`, `--image-radius`, `--image-caption-font`, `--image-caption-color`, `--image-caption-gap` | [component bindings](../theming/component-bindings.md#media-and-identity-components) |
+| category composition | `--category-row-gap`, `--category-item-gap`, `--category-heading-gap`, `--category-rule`, `--category-padding-top`, `--category-image-ratio`, `--category-heading-font`, `--category-body-font`, `--category-body-color` | [component bindings](../theming/component-bindings.md#media-and-identity-components) |
+
 ## Structural HTML reference
 
+This fragment inherits the themed deck root from its slide.
+
 ```html
-<section class="category-row" data-role="description-slide" data-visual-treatment="icon-image">
-  <article class="category" data-state="peer">
+<section class="category-row" data-role="category-comparison" data-visual-treatment="icon-image">
+  <article class="category">
     <figure class="category__image-frame"><img class="category__image" src="assets/demand.jpg" alt="Customer demand visible through a digital ordering interface"></figure>
     <div class="category__heading"><svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="chart-no-axes-column-increasing" aria-hidden="true"><path d="M5 21v-6"/><path d="M12 21V9"/><path d="M19 21V3"/></svg><h2>Demand</h2></div>
     <p>Size the reachable need and growth drivers.</p>
   </article>
-  <article class="category" data-state="peer">
+  <article class="category">
     <figure class="category__image-frame"><img class="category__image" src="assets/customers.jpg" alt="Customers using the service in a real operating context"></figure>
     <div class="category__heading"><svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="users-round" aria-hidden="true"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg><h2>Customers</h2></div>
     <p>Test retention, concentration, and willingness to pay.</p>
   </article>
-  <article class="category" data-state="peer">
+  <article class="category">
     <figure class="category__image-frame"><img class="category__image" src="assets/competition.jpg" alt="Competing products presented side by side"></figure>
     <div class="category__heading"><svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="swords" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 0 1 3 5.172V3h2.172a2 2 0 0 1 1.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0 1 18.828 3H21v2.172a2 2 0 0 1-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg><h2>Competition</h2></div>
     <p>Explain choice, differentiation, and durable advantage.</p>
@@ -67,17 +82,17 @@ Keep a row icon inside the label cell rather than adding a decorative icon colum
 This specimen shows the combined treatment. For `image-only`, set `data-visual-treatment="image-only"` and remove each `category__icon` element. For `icon-only`, set `data-visual-treatment="icon-only"` and remove each `category__image-frame` element. The absent slot collapses; do not preserve empty space.
 
 ```css
-.category-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6); }
-.category { display: grid; grid-auto-rows: auto; gap: var(--space-3); align-content: start; border-top: var(--rule-page); padding-top: var(--space-4); }
-.category__image-frame { width: 100%; aspect-ratio: 4 / 3; margin: 0; overflow: hidden; }
+.category-row { --category-row-gap: var(--space-6); --category-item-gap: var(--space-3); --category-heading-gap: var(--space-2); --category-rule: var(--rule-page); --category-padding-top: var(--space-4); --category-image-ratio: 4 / 3; --category-heading-font: var(--type-section-heading); --category-body-font: var(--type-body); --category-body-color: var(--text-secondary); display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--category-row-gap); }
+.category { display: grid; grid-auto-rows: auto; gap: var(--category-item-gap); align-content: start; border-top: var(--category-rule); padding-top: var(--category-padding-top); }
+.category__image-frame { width: 100%; aspect-ratio: var(--category-image-ratio); margin: 0; overflow: hidden; }
 .category__image { display: block; width: 100%; height: 100%; object-fit: cover; }
-.category__heading { display: flex; align-items: center; gap: var(--space-2); }
-.category__icon { width: var(--icon-lg); height: var(--icon-lg); fill: none; stroke: var(--component-primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.category__heading { display: flex; align-items: center; gap: var(--category-heading-gap); }
+.category__icon { width: var(--icon-size); height: var(--icon-size); fill: none; stroke: var(--icon-color); stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
 .category h2, .category p { margin: 0; }
-.category h2 { font: var(--type-section-heading); }
-.category p { font: var(--type-body); color: var(--text-secondary); }
+.category h2 { font: var(--category-heading-font); }
+.category p { font: var(--category-body-font); color: var(--category-body-color); }
 ```
 
 ## Acceptance check
 
-Every visual mark has a declared semantic or compositional purpose, and candidate category regions were considered for `icon-only`, `image-only`, or `icon-image` treatment. Each retained icon or image materially improves differentiation, recognition, readability, balance, or scan rhythm. All peers use the same declared treatment; peer images share one frame and crop grammar; combined icons and images perform distinct jobs; all peer icons come from one registered system; Lucide marks use actual library vectors rather than approximations; icon-only cells remain unambiguous; logos remain authorized, recognizable, and non-blank in the exact final render; missing marks fall back through one declared peer treatment; and connectors never cross labels or unrelated nodes.
+Give every mark a semantic or compositional purpose. Consider `icon-only`, `image-only`, and `icon-image` treatments. Retain visuals only when they improve differentiation, recognition, readability, balance, or scanning. Peers share one treatment, crop grammar, and registered icon system. Combined icons and images perform different jobs. Use actual Lucide vectors. Keep icon-only cells clear. Logos must be authorized, recognizable, and visible in the final render. Apply one fallback treatment for missing marks. Keep connectors clear of labels and unrelated nodes.

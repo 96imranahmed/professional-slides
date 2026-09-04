@@ -1,6 +1,6 @@
 # Google Slides API Integration
 
-Use the highest-level trusted connector available. Use direct Google REST APIs when the host exposes them or the user explicitly requests that route.
+Use the workspace-configured native connector when it supports the required read, mutation, readback, and export operations. Use direct Google REST APIs only when the host exposes them or the user explicitly requests that route.
 
 ## Codex connector route
 
@@ -15,7 +15,7 @@ For an existing native presentation:
 7. Apply consolidated native mutations.
 8. Read back the final structure once, finalize order, and remove unused source slides last.
 
-For net-new native delivery in Codex, create and verify a local PPTX with the PowerPoint integration, then call the Google Drive presentation-import action with native conversion enabled. The imported Google Slides deck is the primary deliverable; re-render it natively before delivery.
+For net-new native delivery, use the route selected in the [Google Slides route table](index.md#route-the-request). This file owns only the import mechanics below.
 
 ## Google Slides REST API
 
@@ -53,7 +53,7 @@ Translate the named design guides, [theme roles and spacing tokens](../../themin
 - Use element size and `updatePageElementTransform` operations for position and scale. Preserve existing rotation and shear unless the requested design changes them.
 - Use `updateShapeProperties` for fills, outlines, shadows, and shape-level text-container behavior; use narrow field masks.
 - Use `updateTextStyle`, `updateParagraphStyle`, bullet requests, and text-range operations to apply design roles without flattening mixed text runs.
-- Derive panel padding, continuation labels, trackers, and footer positions from component definitions rather than from slide-local literals. Because the Slides REST API does not expose a general internal-margin setting for text-bearing shapes, preserve an inspected native template's text geometry or represent padding with a separately positioned inner text box inside the outer component bounds.
+- Derive panel padding, continuation labels, trackers, and footers from component definitions, not local literals. The Slides REST API lacks a general internal-margin setting. Preserve inspected template geometry or place a separate inner text box within the component bounds.
 - Group objects only when the group represents a reusable or jointly moving component, and only when the object types support grouping; tables, placeholders, and videos cannot be grouped. Do not group unrelated objects merely to simplify selection.
 - Read back the final size, transform, text runs, paragraph styles, and object IDs after mutation. Then render the native deck to catch font reflow, crop changes, chart padding, and optical drift that structural readback cannot prove.
 

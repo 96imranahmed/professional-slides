@@ -1,106 +1,61 @@
-# Artifact Tool API
+# Artifact Tool adapter
 
-Use `@oai/artifact-tool` when the Codex presentation runtime is available. It is the primary local PPTX authoring adapter because it can create editable objects, import existing files, inspect stable IDs, render slides, export layout data, and write PPTX.
+For net-new Professional Slides output, PptxGenJS writes the canonical scene and `@oai/artifact-tool` is the required downstream adapter and observer. The saved PPTX is acceptable only when Artifact Tool can import, inspect, and render it without losing scene identity or theme semantics.
+
+Artifact Tool may still be the authoring surface for a bounded existing-deck edit when its import/export path best preserves the inherited master, layout, and object tree. Do not mix both writers inside one candidate.
 
 ## Runtime setup
 
-Load the host-provided workspace dependencies. Use the returned absolute paths for Node, Node modules, and rendering binaries. Do not guess or install a second runtime. Put builders and intermediate artifacts in a task-specific temporary directory.
+Load the host-provided workspace dependencies and read the package-exported references before use:
 
-For a standalone `.mjs` builder using a bare import, make the host-provided Node modules visible from that temporary directory without modifying the dependency bundle.
+- `@oai/artifact-tool/docs/presentations/API_QUICK_START.md`
+- `@oai/artifact-tool/docs/presentations/api/API_DOCS.md`
 
-```js
-import fs from "node:fs/promises";
-import {
-  FileBlob,
-  Presentation,
-  PresentationFile,
-} from "@oai/artifact-tool";
-```
+Use the returned Node, module, Python, and rendering paths. Do not install or guess a second runtime.
 
-## Create
+## Downstream adapter contract
 
-Create the presentation with an explicit slide size and implement theme tokens before adding slide-local content.
-
-```js
-const presentation = Presentation.create({
-  slideSize: { width: 1280, height: 720 },
-});
-const slide = presentation.slides.add();
-```
-
-Use native collections for shapes, text, images, tables, and charts. Use consistent object names for deterministic inspection and later repairs.
-
-## Import and edit
-
-Import an existing PPTX rather than recreating it:
+Import the exact saved file:
 
 ```js
 const presentation = await PresentationFile.importPptx(
-  await FileBlob.load(sourcePptx),
+  await FileBlob.load(candidatePptx),
 );
 ```
 
-Inspect before resolving targets:
+Then collect:
 
-```js
-const inventory = await presentation.inspect({
-  kind: "slide,textbox,shape,image,table,chart,notes,layout",
-  maxChars: 12000,
-});
-```
+- deck, slide, shape, textbox, chart, table, image, notes, and layout inspection records;
+- one layout export per slide;
+- the presentation proto for theme colors and fonts;
+- one PNG per slide from the exact imported candidate.
 
-Resolve by inspected ID. For reference-template work, preserve masters/layouts, duplicate the nearest source slide, and edit inherited objects in place. Do not blank text broadly or add new overlays above unused placeholders.
+Normalize these outputs into `professional-slides.observed-deck/v1`. Strip only the `ps:` namespace when comparing object names; retain the complete name in raw inspection evidence.
 
-## Render during authoring
+## Required interpretation proof
 
-Render an affected slide plus its layout metadata:
+For a canonical-scene candidate, require all of the following:
 
-```js
-const png = await presentation.export({
-  slide,
-  format: "png",
-  scale: 1,
-});
-const layout = await slide.export({ format: "layout" });
-```
+- imported slide count equals scene slide count;
+- every scene node has one recovered named object;
+- every recovered object frame is within one pixel of its canonical scene frame;
+- the color scheme and font scheme are named `Professional Slides`;
+- every native palette slot equals the canonical token binding;
+- slide size equals the canonical canvas conversion;
+- the package contains no rasterized component media or native chart parts;
+- the imported render passes parity against the HTML serialization.
 
-Render the full presentation as a montage for deck-level rhythm:
+The implementation lives at [`skills/professional-slides/runtime/adapters/artifact-tool.mjs`](../../../runtime/adapters/artifact-tool.mjs). The isolated gate is [`evals/scripts/validate_component_runtime.mjs`](../../../../../evals/scripts/validate_component_runtime.mjs), and the source-mapped gate is [`evals/scripts/validate_reference_fidelity.mjs`](../../../../../evals/scripts/validate_reference_fidelity.mjs). These repository-relative links are checked by the source-structure test.
 
-```js
-const montage = await presentation.export({
-  format: "webp",
-  montage: true,
-  scale: 1,
-});
-```
+## Existing-deck edits
 
-The montage is supplementary. Inspect each full-size slide render separately.
-
-## Export the candidate
-
-```js
-const pptx = await PresentationFile.exportPptx(presentation);
-await pptx.save(finalPptx);
-```
-
-The exported file becomes the candidate of record. Re-render that exact PPTX through the exported-file path in [rendering](rendering.md); the in-memory render does not prove that PPTX serialization preserved every element.
-
-## Source templates
-
-Follow [`design` reference intake](../../design/index.md#reference-intake) and the [PowerPoint invariants](index.md#non-negotiable-invariants). Use the inspected stable IDs to edit inherited objects, preserve mixed text-run and paragraph styles, and resolve every inherited placeholder intentionally. If the tool cannot preserve a required source structure, report the unsupported operation instead of silently replacing the source with a theme-matched rebuild.
-
-## Notes and provenance
-
-Use the native speaker-notes API when supported. Maintain a `[Sources]` block for externally sourced claims and assets. Inspect the exported notes before delivery because import/export behavior can differ from visible-slide behavior.
+When Artifact Tool authors a bounded imported-deck change, inspect before resolving targets and use stable IDs. Preserve inherited masters, layouts, objects, mixed text runs, and notes, then follow [PowerPoint rendering and QA](rendering.md). If the API cannot preserve a required source structure, report that boundary instead of silently rebuilding the slide.
 
 ## Failure boundaries
 
-- Do not use a successful `exportPptx` call as visual proof.
-- Do not ignore connector-routing, overflow, or overlap warnings.
-- Do not use direct OOXML mutation as a routine authoring path.
-- Do not use a rasterized slide as the editable deliverable.
-- Do not mix a source template with a second layout library.
-
-## Local API source
-
-The authoritative implementation reference in Codex is the bundled Presentations skill's `artifact_tool_docs/API_QUICK_START.md` and `artifact_tool_docs/api/API_DOCS.md`. Load those current local files before writing a builder rather than relying on examples copied into this repository.
+- Import success is not compatibility proof.
+- An in-memory render is not saved-file proof.
+- Object count without stable-name parity is insufficient.
+- A correct theme palette does not prove that slide objects reference the intended color-map roles.
+- Full-slide similarity alone is insufficient for sparse slides; use foreground comparison.
+- Do not accept a PPTX whose charts, wedges, annotations, or legends visibly differ from the HTML fixture.

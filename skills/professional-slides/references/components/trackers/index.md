@@ -1,14 +1,16 @@
 # Trackers and Navigation
 
-A tracker answers one question: where are we in the deck? It is never an executive summary, scorecard, progress report, risk view, or status dashboard.
+A tracker answers: where are we in the deck? It is never an executive summary, scorecard, progress report, risk view, or status dashboard.
 
 ## When to omit it
 
-Default to no visible tracker for short decks and simple two-part stories. Never place a tracker on the executive-summary slide. Use one only when the audience would lose its place. A full page marks a governing-question change and normally precedes three analytical slides.
+Default to no visible tracker for decks with no more than two named sections or fewer than three governed analytical slides. Never place a tracker on the executive-summary slide. Use a compact tracker when the deck has at least three named sections and any section contains at least two consecutive governed analytical slides. Use a full tracker page for a governing-question change introducing at least three analytical slides.
 
-## Choose one full state and one compact state
+## Choose one full state and, if needed, one compact state
 
-Use one system. Full and compact states share IDs, labels, order, and active item.
+Use one system. Full and compact states share the same label map: IDs, order, and active state remain exact. `compact-label` displays the active labels; `compact-number-strip` may omit labels visually but retains their underlying IDs and order.
+
+The native standard pairs `sequential-circles` full states with `compact-number-strip` analytical states. Use `split-contents` or `compact-label` only when hierarchy or recognition requires them. Never improvise a tracker.
 
 | Construction | Use when |
 | --- | --- |
@@ -17,6 +19,7 @@ Use one system. Full and compact states share IDs, labels, order, and active ite
 | `compact-label` analytical state | Parent and active-child labels above the action title. |
 | `compact-number-strip` analytical state | Stable section numbers in one quiet strip. |
 | `numbered-section-break` transition state | Full-canvas pause with title left and large number right. |
+| `hierarchical-segmented` system | Pair `split-contents` as the full parent-and-child state, `compact-label` as the governed analytical state, and `numbered-section-break` as the parent transition. Use the same parent and child IDs in every state. |
 
 See the [structural specimens](specimens.md).
 
@@ -32,7 +35,7 @@ For a hierarchy, keep the parent left and only its children right. Allow hierarc
 
 Selection needs a non-colour cue. Preserve peer inset, baseline, marker size, and rule thickness. Do not imply completion.
 
-Give every split-content row equal padding. Its optical list width is normally around three quarters of the right field, with generous space after short labels. The backdrop still fills height and reaches the right edge.
+Give split-content rows equal padding. Its optical list width is normally around three quarters of the right field, with generous space after short labels. The backdrop fills height to the right edge.
 
 ## Parent and chapter hierarchy
 
@@ -43,13 +46,13 @@ A hierarchical tracker has two levels:
 
 Match the dot-dash: parent IDs equal section IDs; chapter-item IDs equal analytical subgroup IDs; labels, order, and ranges remain exact. Cover, executive summary, and close are untracked. See the [example](../../storylining/dot-dash.md#grounded-worked-example).
 
-Use `hierarchical-segmented` only when both levels help.
+Use `hierarchical-segmented` only when both levels help. Apply the construction selected in the router above and the linked [structural specimens](specimens.md).
 
 ## Analytical-page placement
 
-Place compact trackers above the action title. `compact-label` keeps parent and child separate on one level. `compact-number-strip` uses stable numbers. Selection never changes baseline or rule thickness.
+Place compact trackers above the action title. `compact-label` keeps parent and child semantically separate within one tight inline cluster. Prefer one editable text box with inline runs. If styles require separate objects, size them to rendered content and use one small theme gap around the separator. Never use distant anchors, stretch the cluster across the title, or leave label-dependent gaps. `compact-number-strip` uses stable numbers. Selection never changes baseline or rule thickness.
 
-Do not repeat the full contents construction on analytical pages.
+Do not repeat the contents construction on analytical pages.
 
 ## Tracker contract
 
@@ -70,17 +73,18 @@ Use one accent plus neutrals. Do not use chart-series colours, RAG colours, or p
 
 Bias numbered tracker markers to circles. Squares require an explicit source exception.
 
+Apply the canonical [item-indicator ordinal format](../item-indicators.md) to tracker markers. Preserve approved hierarchical or source-required identifiers.
+
 Keep number treatment, label hierarchy, and selection grammar consistent.
 
 ## Check
 
 - The tracker communicates navigation only.
 - It is absent when it adds no orientation value.
-- Labels, hierarchical numbers, order, selected state, and ranges are consistent.
-- Every full tracker page contains the complete approved item set rather than a partial or slide-local summary.
+- The rendered deck matches the IDs, labels, order, selected states, ranges, constructions, and visibility rules declared in the tracker contract.
 - Every approved major section change contains its planned tracker page; the montage has no isolated late-section tracker.
 - Split contents pages use a title-only left field, circular number markers, a full-height right-hand backdrop through the right edge, and a vertically centered contents list.
-- The selected item has a non-colour cue.
-- Every analytical page in the declared range carries the chosen compact state.
+- Displayed ordinal markers and numbered section headings pass the [item-indicator ordinal check](../item-indicators.md).
+- Every compact-label breadcrumb reads as one tight inline phrase; the separator never floats in a fixed remote column.
 - Structural edits update tracker ranges, page numbers, and cross-references.
 - The montage shows no stale, skipped, duplicated, or intermittently missing state.

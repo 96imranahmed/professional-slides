@@ -35,6 +35,10 @@ A full pitch usually covers:
 
 Merge jobs when the story is short. Do not preserve template pages that add no proof.
 
+## Navigation
+
+Record `tracker.system: none` for a live pitch or short teaser. For an investor pre-read with three to six retained analytical chapters, use `sequential-circles` as the full state and `compact-number-strip` on governed slides. With seven or more retained chapters, use `split-contents` as the full state and `compact-label` on governed slides. Seed the approved tracker map with `Problem and product`, `Demand proof`, `Market and competition`, `Business model and go-to-market`, `Scale and risk`, `Team`, and `Round and milestones`; approved replacements become exact under the [template instantiation contract](index.md#instantiation-contract). Omit unused chapters from both the dot-dash and tracker map; do not add a tracker only to imitate a longer deck.
+
 ## Analytical jobs
 
 ### Problem and product
@@ -73,7 +77,7 @@ Separate fact, company claim, estimate, and inference. Cite public or supplied e
 
 ## Page composition
 
-Use the [registered slide types](../slide-types/index.md). Prefer one large proof per page. Use a chart when the evidence is quantitative, a product flow when the experience matters, and a simple causal diagram when the mechanism matters.
+Use the [open composition model](../composition/index.md). Prefer one large proof per page. Use a chart when the evidence is quantitative, a product flow when the experience matters, and a simple causal diagram when the mechanism matters.
 
 Avoid repeated cards, tiny text, decorative screenshots, and unnecessary section dividers.
 
