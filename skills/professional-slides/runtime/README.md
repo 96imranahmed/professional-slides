@@ -11,6 +11,8 @@ This runtime is the executable owner for slide composition. It separates content
 5. `adapters/pptxgenjs.mjs` emits editable PowerPoint primitives through PptxGenJS, adds deterministic object names, and materializes the canonical native theme.
 6. `adapters/artifact-tool.mjs` imports the saved PPTX as a downstream adapter and observer. It verifies that Artifact Tool can interpret the PptxGenJS output without losing slides, objects, names, geometry, theme colors, or fonts.
 
+`generation.mjs` is the shared production entrypoint. `writeCanonicalDeckPlan()` runs the complete pipeline above and writes the scene, design manifest, registry, planning decisions, HTML observer pages, editable PPTX, Artifact Tool observation, and a canonical generation receipt. Golden validation calls the same exporter with its exhaustive compiled fixture deck. Deck-specific scripts may supply content and composition inputs only; they must not instantiate PptxGenJS or redraw registered components directly.
+
 ## Composition model
 
 The root can be any nested combination of:

@@ -1719,6 +1719,254 @@ def hard_cli() -> int:
     return 0 if report["accepted"] else 1
 
 
+# --- Canonical generation provenance gate ---
+CANONICAL_GENERATION_SCHEMA = "professional-slides.canonical-generation/v1"
+CANONICAL_GENERATION_PIPELINE = [
+    "planDeck",
+    "compileDeck",
+    "renderSlideHtml",
+    "writePptx",
+    "observePptx",
+]
+CANONICAL_RUNTIME_ROOT = ROOT / "skills" / "professional-slides" / "runtime"
+CANONICAL_SCRIPT_BYPASSES = (
+    "pptxgenjs",
+    ".addText(",
+    ".addShape(",
+    ".addChart(",
+    "new PptxGenJS",
+)
+
+
+def canonical_runtime_source_state() -> dict[str, Any]:
+    files = {
+        str(path.relative_to(ROOT)).replace("\\", "/"): file_sha256(path)
+        for path in sorted(CANONICAL_RUNTIME_ROOT.rglob("*.mjs"))
+    }
+    encoded = json.dumps(files, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return {"files": files, "sha256": hashlib.sha256(encoded).hexdigest()}
+
+
+def _canonical_artifact(
+    receipt: dict[str, Any],
+    key: str,
+    findings: list[Finding],
+    *,
+    receipt_directory: Path,
+) -> Path | None:
+    value = receipt.get(key)
+    if not isinstance(value, dict):
+        findings.append(Finding("generation.artifact", f"{key} must be an object"))
+        return None
+    raw_path, expected_hash = value.get("path"), value.get("sha256")
+    if not isinstance(raw_path, str) or not raw_path.strip() or not isinstance(expected_hash, str):
+        findings.append(Finding("generation.artifact", f"{key} must contain path and sha256"))
+        return None
+    path = Path(raw_path).resolve()
+    if path != receipt_directory and receipt_directory not in path.parents:
+        findings.append(Finding("generation.artifact_scope", f"{key} must remain beside the canonical receipt"))
+        return None
+    if not path.is_file():
+        findings.append(Finding("generation.artifact_missing", f"{key} does not exist: {path}"))
+        return None
+    if file_sha256(path) != expected_hash.lower():
+        findings.append(Finding("generation.artifact_hash", f"{key} hash does not match the receipt"))
+        return None
+    return path
+
+
+def validate_canonical_generation(
+    pptx_path: Path,
+    receipt_path: Path,
+    authoring_script_path: Path | None = None,
+    *,
+    require_planning: bool = False,
+) -> dict[str, Any]:
+    findings: list[Finding] = []
+    try:
+        receipt = read_json(receipt_path)
+    except ValueError as exc:
+        receipt = {}
+        findings.append(Finding("generation.receipt_invalid", str(exc)))
+
+    if receipt.get("schema") != CANONICAL_GENERATION_SCHEMA:
+        findings.append(Finding("generation.schema", f"schema must equal {CANONICAL_GENERATION_SCHEMA}"))
+    if receipt.get("accepted") is not True or receipt.get("mechanism") != "canonical-scene":
+        findings.append(Finding("generation.mechanism", "receipt must accept the canonical-scene mechanism"))
+    if receipt.get("pipeline") != CANONICAL_GENERATION_PIPELINE:
+        findings.append(Finding("generation.pipeline", "receipt must record the complete canonical generation pipeline"))
+
+    candidate = receipt.get("candidate")
+    actual_candidate_hash = file_sha256(pptx_path) if pptx_path.is_file() else None
+    if not isinstance(candidate, dict) or candidate.get("sha256") != actual_candidate_hash:
+        findings.append(Finding("generation.candidate_hash", "receipt candidate hash does not match the exact PPTX"))
+
+    current_runtime = canonical_runtime_source_state()
+    runtime = receipt.get("runtime")
+    if not isinstance(runtime, dict) or runtime.get("sourceFiles") != current_runtime["files"] or runtime.get("sha256") != current_runtime["sha256"]:
+        findings.append(Finding("generation.runtime_hash", "receipt runtime sources do not match the current canonical runtime"))
+
+    receipt_directory = receipt_path.resolve().parent
+    design_manifest_path = _canonical_artifact(receipt, "designManifest", findings, receipt_directory=receipt_directory)
+    scene_path = _canonical_artifact(receipt, "scene", findings, receipt_directory=receipt_directory)
+    registry_path = _canonical_artifact(receipt, "registry", findings, receipt_directory=receipt_directory)
+    planning_path = _canonical_artifact(receipt, "planning", findings, receipt_directory=receipt_directory)
+    observation_path = _canonical_artifact(receipt, "observation", findings, receipt_directory=receipt_directory)
+
+    script_record = receipt.get("authoringScript")
+    script_path = authoring_script_path.resolve() if authoring_script_path else None
+    if not isinstance(script_record, dict) or not isinstance(script_record.get("sha256"), str):
+        findings.append(Finding("generation.authoring_script", "receipt must bind the authoring script"))
+    elif script_path is None or not script_path.is_file() or file_sha256(script_path) != script_record["sha256"]:
+        findings.append(Finding("generation.authoring_script_hash", "authoring script hash does not match the receipt"))
+    else:
+        script = script_path.read_text(encoding="utf-8")
+        required_entrypoint = "writeCanonicalDeckPlan" if require_planning else "writeCanonicalDeck"
+        if "runtime/generation.mjs" not in script or required_entrypoint not in script:
+            findings.append(Finding("generation.authoring_entrypoint", "authoring script must import the canonical generation entrypoint"))
+        for bypass in CANONICAL_SCRIPT_BYPASSES:
+            if bypass in script:
+                findings.append(Finding("generation.direct_adapter_bypass", f"authoring script bypasses the canonical runtime with {bypass!r}"))
+
+    design_manifest: dict[str, Any] = {}
+    if design_manifest_path:
+        try:
+            design_manifest = read_json(design_manifest_path)
+        except ValueError as exc:
+            findings.append(Finding("generation.design_manifest", str(exc)))
+        else:
+            manifest_without_hash = dict(design_manifest)
+            recorded_design_hash = manifest_without_hash.pop("designHash", None)
+            computed_design_hash = hashlib.sha256(json.dumps(manifest_without_hash, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+            deck_record = receipt.get("deck", {})
+            if recorded_design_hash != computed_design_hash or not isinstance(deck_record, dict) or deck_record.get("designHash") != recorded_design_hash:
+                findings.append(Finding("generation.design_hash", "design manifest hash does not reconcile with the receipt"))
+            if isinstance(deck_record, dict) and deck_record.get("slideCount") != len(design_manifest.get("slides", [])):
+                findings.append(Finding("generation.deck_slide_count", "receipt deck slide count does not match the design manifest"))
+
+    html_records = receipt.get("html")
+    expected_slide_count = len(design_manifest.get("slides", [])) if isinstance(design_manifest.get("slides"), list) else 0
+    if not isinstance(html_records, list) or len(html_records) != expected_slide_count:
+        findings.append(Finding("generation.html_count", "receipt must bind one HTML observer page per slide"))
+    else:
+        for index, record in enumerate(html_records, start=1):
+            if not isinstance(record, dict) or not isinstance(record.get("path"), str) or not isinstance(record.get("sha256"), str):
+                findings.append(Finding("generation.html_artifact", f"HTML observer record {index} must contain path and sha256"))
+                continue
+            html_path = Path(record["path"]).resolve()
+            expected_name = f"slide-{index:03d}.html"
+            if html_path.parent != receipt_directory / "html" or html_path.name != expected_name:
+                findings.append(Finding("generation.html_scope", f"HTML observer record {index} must be {expected_name} in the receipt html directory"))
+            elif not html_path.is_file():
+                findings.append(Finding("generation.html_missing", f"HTML observer page does not exist: {html_path}"))
+            elif file_sha256(html_path) != record["sha256"].lower():
+                findings.append(Finding("generation.html_hash", f"HTML observer page {index} hash does not match the receipt"))
+
+    if observation_path:
+        try:
+            observation = read_json(observation_path)
+        except ValueError as exc:
+            findings.append(Finding("generation.observation", str(exc)))
+        else:
+            if not isinstance(observation.get("slides"), list) or len(observation["slides"]) != expected_slide_count:
+                findings.append(Finding("generation.observation_count", "Artifact Tool observation must contain one record per slide"))
+
+    if scene_path and design_manifest_path:
+        try:
+            scene = read_json(scene_path)
+        except ValueError as exc:
+            findings.append(Finding("generation.scene", str(exc)))
+        else:
+            if scene.get("manifest") != design_manifest:
+                findings.append(Finding("generation.scene_manifest", "scene and design manifest disagree"))
+
+    if registry_path:
+        try:
+            registry = read_json(registry_path)
+        except ValueError as exc:
+            findings.append(Finding("generation.registry", str(exc)))
+        else:
+            if registry.get("schema") != "professional-slides.component-registry/v1" or not registry.get("components"):
+                findings.append(Finding("generation.registry", "registry artifact is not the canonical component registry"))
+
+    if planning_path:
+        try:
+            planning = json.loads(planning_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            findings.append(Finding("generation.planning", str(exc)))
+        else:
+            slide_count = len(design_manifest.get("slides", [])) if isinstance(design_manifest.get("slides"), list) else 0
+            if require_planning and (not isinstance(planning, list) or len(planning) != slide_count):
+                findings.append(Finding("generation.planning_bypassed", "ordinary deck generation requires one canonical planning decision per slide"))
+
+    if pptx_path.is_file() and design_manifest:
+        slides = design_manifest.get("slides")
+        if not isinstance(slides, list):
+            findings.append(Finding("generation.design_slides", "design manifest slides must be a list"))
+        else:
+            try:
+                with zipfile.ZipFile(pptx_path) as archive:
+                    slide_parts = sorted(
+                        (name for name in archive.namelist() if re.fullmatch(r"ppt/slides/slide[1-9][0-9]*\.xml", name)),
+                        key=lambda name: int(re.search(r"([0-9]+)\.xml$", name).group(1)),
+                    )
+                    if len(slide_parts) != len(slides):
+                        findings.append(Finding("generation.slide_count", "PPTX and design manifest slide counts disagree"))
+                    for index, slide in enumerate(slides):
+                        if index >= len(slide_parts):
+                            break
+                        xml = ET.fromstring(archive.read(slide_parts[index]))
+                        actual_names = {
+                            node.attrib.get("name")
+                            for node in xml.findall(".//p:cNvPr", NS)
+                            if node.attrib.get("name")
+                        }
+                        expected_names = {f"ps:{node.get('id')}" for node in slide.get("nodes", []) if isinstance(node, dict) and node.get("id")}
+                        if expected_names != actual_names:
+                            missing = sorted(expected_names - actual_names)
+                            unexpected = sorted(actual_names - expected_names)
+                            findings.append(Finding("generation.scene_objects", f"slide {index + 1} scene object names disagree; missing={missing[:5]}, unexpected={unexpected[:5]}", slide=index + 1))
+            except (OSError, zipfile.BadZipFile, ET.ParseError) as exc:
+                findings.append(Finding("generation.pptx", str(exc)))
+
+    unique = []
+    seen = set()
+    for finding in findings:
+        key = (finding.code, finding.message, finding.slide)
+        if key not in seen:
+            seen.add(key)
+            unique.append(finding)
+    accepted = not unique
+    return {
+        "schemaVersion": 1,
+        "status": "accepted" if accepted else "rejected",
+        "accepted": accepted,
+        "candidate": {"path": str(pptx_path), "sha256": actual_candidate_hash},
+        "receipt": {"path": str(receipt_path), "sha256": file_sha256(receipt_path) if receipt_path.is_file() else None},
+        "summary": {"findingCount": len(unique), "findingCodes": sorted({finding.code for finding in unique})},
+        "findings": [finding.as_dict() for finding in unique],
+    }
+
+
+def provenance_cli() -> int:
+    parser = argparse.ArgumentParser(description="Verify that a PPTX used the canonical Professional Slides generation pipeline.")
+    parser.add_argument("pptx", type=Path)
+    parser.add_argument("--receipt", required=True, type=Path)
+    parser.add_argument("--generation-script", required=True, type=Path)
+    parser.add_argument("--require-planning", action="store_true")
+    parser.add_argument("--report", type=Path)
+    args = parser.parse_args()
+    report = validate_canonical_generation(
+        args.pptx.resolve(), args.receipt.resolve(), args.generation_script.resolve(), require_planning=args.require_planning
+    )
+    encoded = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(encoded, encoding="utf-8")
+    print(encoded, end="")
+    return 0 if report["accepted"] else 1
+
+
 
 # --- Deterministic semantic gate ---
 DRAWING_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -2770,6 +3018,7 @@ def main() -> int:
     commands = {
         "contract": contract_cli,
         "hard": hard_cli,
+        "provenance": provenance_cli,
         "semantics": semantic_cli,
         "visual": visual_cli,
         "consistency": consistency_cli,

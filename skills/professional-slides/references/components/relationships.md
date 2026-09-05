@@ -88,7 +88,18 @@ For `roadmap`, use equal-width bands for ordinal or maturity stages; use proport
 
 ## Theme and adapter contract
 
-The executable token list, preferred size, fixture content, and native geometry live in [`runtime/registry.mjs`](../../runtime/registry.mjs). Resolve fills, rules, state accents, type, spacing, and radii through the canonical [theme bindings](../theming/component-bindings.md). The [scene-to-native mapper](../tools/css-to-native-mapper.md) owns platform translation.
+The relationship owners consume these complete theme interfaces; do not add local colours, type sizes, rules, or radii.
+
+| Component family | Consumed custom properties |
+| --- | --- |
+| `process`, `timeline`, `journey` | `--component-primary`, `--surface-1`, `--on-primary`, `--ink`, `--text-secondary`, `--font-body`, `--type-compact`, `--type-label`, `--line-standard`, `--line-hairline`, `--radius-round` |
+| `roadmap` | the process properties plus `--component-primary-tint`, `--surface-2`, `--rule`, `--type-heading`, `--radius-small` |
+| `tree`, `organization` | `--component-primary`, `--component-primary-tint`, `--surface-1`, `--surface-2`, `--rule`, `--on-primary`, `--ink`, `--text-secondary`, `--font-body`, `--type-compact`, `--line-hairline`, `--line-standard`, `--radius-none`, `--radius-small` |
+| `matrix` | `--component-primary`, `--chart-series-2`, `--surface-1`, `--rule`, `--ink`, `--status-positive`, `--status-caution`, `--status-negative`, `--on-primary`, `--font-body`, `--type-label`, `--line-hairline`, `--line-standard`, `--radius-none`, `--radius-round` |
+| `funnel` | `--component-primary`, `--chart-series-2`, `--chart-series-3`, `--chart-series-4`, `--on-primary`, `--ink`, `--font-body`, `--type-compact`, `--line-hairline`, `--radius-small` |
+| `connector` | `--component-primary`, `--on-primary`, `--font-body`, `--type-label`, `--line-standard`, `--line-hairline`, `--icon-md`, `--radius-round` |
+
+The executable token declarations, preferred sizes, fixture content, and native geometry live in [`runtime/registry.mjs`](../../runtime/registry.mjs); canonical defaults live in [theme bindings](../theming/component-bindings.md). The [scene-to-native mapper](../tools/css-to-native-mapper.md) owns platform translation.
 
 ## Acceptance check
 

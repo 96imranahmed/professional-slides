@@ -82,7 +82,9 @@ def shape(shape_id: int, name: str, text: str, *, x: int, y: int, width: int, he
 
 
 def slide_xml(title: str, body: str, *, title_x: int = 1000, title_font: str = "Arial",
-              title_color: str = "111111") -> str:
+              title_color: str = "111111", canonical_names: bool = False) -> str:
+    title_name = "ps:action-title" if canonical_names else "action-title"
+    body_name = "ps:body" if canonical_names else "body"
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" '
@@ -90,11 +92,11 @@ def slide_xml(title: str, body: str, *, title_x: int = 1000, title_font: str = "
         '<p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/>'
         '</p:nvGrpSpPr><p:grpSpPr><a:xfrm/></p:grpSpPr>'
         + shape(
-            2, "action-title", title, x=title_x, y=1000, width=8000, height=700,
+            2, title_name, title, x=title_x, y=1000, width=8000, height=700,
             size=3200, bold=True, font=title_font, color=title_color,
         )
         + shape(
-            3, "body", body, x=1000, y=2000, width=8000, height=2400,
+            3, body_name, body, x=1000, y=2000, width=8000, height=2400,
             size=1800, bold=False,
         )
         + '</p:spTree></p:cSld></p:sld>'
@@ -106,6 +108,7 @@ def build_pptx(
     slides: list[dict[str, object]],
     *,
     omit_layout: bool = False,
+    canonical_names: bool = False,
 ) -> None:
     slide_ids = "".join(
         f'<p:sldId id="{255 + number}" r:id="rId{number}"/>'
@@ -179,6 +182,7 @@ def build_pptx(
                     title_x=int(values.get("title_x", 1000)),
                     title_font=str(values.get("title_font", "Arial")),
                     title_color=str(values.get("title_color", "111111")),
+                    canonical_names=canonical_names,
                 ),
             )
             archive.writestr(

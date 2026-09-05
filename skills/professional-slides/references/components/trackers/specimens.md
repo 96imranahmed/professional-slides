@@ -4,7 +4,16 @@ These specimens show the distinct navigation constructions owned by [Trackers an
 
 ## Theme contract
 
-Consume the tracker variables and defaults registered in [component bindings](../../theming/component-bindings.md#canvas-and-repeated-furniture). This specimen does not redefine those bindings.
+The CSS declaration below consumes the complete tracker interface. Its property groups are:
+
+| Role | Consumed custom properties |
+| --- | --- |
+| Type | `--tracker-font`, `--tracker-heading-font`, `--tracker-item-font`, `--tracker-item-strong-font`, `--tracker-number-font`, `--tracker-section-number-font` |
+| State and colour | `--tracker-active`, `--tracker-active-text`, `--tracker-selected-surface`, `--tracker-selected-text`, `--tracker-inactive`, `--tracker-ink`, `--tracker-canvas`, `--tracker-surface`, `--tracker-tint` |
+| Rules | `--tracker-selected-marker-rule`, `--tracker-rule`, `--tracker-page-rule`, `--tracker-emphasis-rule` |
+| Spacing and geometry | `--tracker-gap`, `--tracker-item-gap`, `--tracker-list-gap`, `--tracker-list-width`, `--tracker-padding`, `--tracker-marker-size`, `--tracker-compact-marker-size`, `--tracker-radius`, `--tracker-edge-share` |
+
+Use the defaults registered in [component bindings](../../theming/component-bindings.md#canvas-and-repeated-furniture); the specimen only maps those properties to tracker geometry and states.
 
 ## Structural HTML reference
 

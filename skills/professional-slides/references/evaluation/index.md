@@ -73,11 +73,14 @@ All PowerPoint contract, semantic, exported-file, per-slide visual, and cross-sl
 
 Every final PowerPoint candidate requires three reports bound to the same exact PPTX hash and governing inputs:
 
+- an accepted canonical generation receipt proving that the deck used the shared planner, scene, registry, theme tokens, HTML observer, PptxGenJS adapter, and Artifact Tool observer rather than a parallel builder;
 - an accepted deterministic hard report from [PowerPoint hard acceptance](../tools/powerpoint/acceptance.md);
 - an accepted per-slide visual report from [PowerPoint rendering and QA](../tools/powerpoint/rendering.md#independent-visual-reports);
 - an accepted cross-slide consistency report from the same rendering owner, using a different approved judge model.
 
 Every slide and deck dimension must score at least 90, every comparison group must accept, and no blocker or major finding may remain. The platform owners define commands, inspection scope, and rejection handling; this evaluation owner defines the release requirement.
+
+Run `python evals/scripts/validate_pptx.py provenance <deck.pptx> --receipt <canonical-generation-receipt.json> --generation-script <builder.mjs> --require-planning` for ordinary net-new decks. The gate recomputes the canonical runtime hash, reconciles the scene and design manifest, matches every scene node to the exact native PowerPoint object, binds the authoring script, and rejects direct PptxGenJS calls. Visual similarity cannot substitute for this proof.
 
 ## Consulting-toolkit source coverage
 

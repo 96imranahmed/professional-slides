@@ -8,9 +8,7 @@ import { buildFixtureDeck } from "../../skills/professional-slides/runtime/fixtu
 import { buildGoldenSetDeck, auditGoldenCoverage } from "../../skills/professional-slides/runtime/golden-set.mjs";
 import { registryManifest } from "../../skills/professional-slides/runtime/registry.mjs";
 import { SLIDE, THEME_SLOT_TOKENS, TOKENS } from "../../skills/professional-slides/runtime/core.mjs";
-import { renderSlideHtml } from "../../skills/professional-slides/runtime/adapters/html.mjs";
-import { writePptx } from "../../skills/professional-slides/runtime/adapters/pptxgenjs.mjs";
-import { normalizeObservedDeck, observePptx } from "../../skills/professional-slides/runtime/adapters/artifact-tool.mjs";
+import { writeCanonicalDeck } from "../../skills/professional-slides/runtime/generation.mjs";
 import { auditSlideOverlaps, auditObservedOverlaps, summarizeOverlapAudits } from "../../skills/professional-slides/runtime/validate-overlap.mjs";
 
 const require = createRequire(import.meta.url);
@@ -264,15 +262,14 @@ async function main() {
   const golden = args.includes("--golden");
   const { deck, fixtures } = (golden ? buildGoldenSetDeck : buildFixtureDeck)({ palette: argValue("--palette", "mckinsey") });
   const coverage = golden ? auditGoldenCoverage(fixtures) : { accepted: true };
-  const pptxPath = path.join(outputDirectory, "component-validation.pptx");
+  const generated = await writeCanonicalDeck({
+    deck,
+    outputDirectory,
+    fileStem: "component-validation",
+    authoringScriptPath: fileURLToPath(import.meta.url)
+  });
+  const pptxPath = generated.pptxPath;
   const registry = registryManifest();
-  await fs.writeFile(path.join(outputDirectory, "scene.json"), JSON.stringify(deck, null, 2));
-  await fs.writeFile(path.join(outputDirectory, "registry.json"), JSON.stringify(registry, null, 2));
-  await fs.writeFile(path.join(outputDirectory, "design-manifest.json"), JSON.stringify(deck.manifest, null, 2));
-
-  for (const [index, slide] of deck.slides.entries()) {
-    await fs.writeFile(path.join(htmlDirectory, `${fileName(index)}.html`), renderSlideHtml(slide));
-  }
 
   const browser = await chromium.launch({ headless: true, executablePath: browserPath, args: ["--no-sandbox"] });
   const page = await browser.newPage({ viewport: { width: SLIDE.width, height: SLIDE.height }, deviceScaleFactor: 1 });
@@ -292,7 +289,6 @@ async function main() {
   }
   const overlapAudit = summarizeOverlapAudits(overlapAudits);
 
-  const pptx = await writePptx(deck, pptxPath);
   await run(runtimePython, [
     path.join(presentationSkillDirectory, "container_tools", "render_slides.py"),
     pptxPath,
@@ -311,11 +307,10 @@ async function main() {
     overflowAudit = { accepted: false, error: String(error.message || error) };
   }
 
-  const observed = normalizeObservedDeck(await observePptx(pptxPath));
+  const observed = generated.observation;
   overlapAudit.nativeGeometry = await auditObservedOverlaps(page, deck, observed);
   overlapAudit.accepted &&= overlapAudit.nativeGeometry.accepted;
   await browser.close();
-  await fs.writeFile(path.join(outputDirectory, "artifact-observation.json"), JSON.stringify(observed, null, 2));
   const packageAudit = await inspectPackage(pptxPath, deck);
   const artifactGeometry = auditArtifactGeometry(deck, observed);
 
@@ -392,7 +387,8 @@ async function main() {
       componentCoverageCount: fixtures.flatMap((item) => item.coverage || []).length,
       sceneNodeCount: deck.slides.reduce((sum, slide) => sum + slide.nodes.length, 0),
       designHash: deck.manifest.designHash,
-      pptxSha256: pptx.sha256
+      pptxSha256: generated.candidateSha256,
+      canonicalGenerationReceipt: path.relative(outputDirectory, generated.receiptPath)
     },
     gates: {
       coverage,

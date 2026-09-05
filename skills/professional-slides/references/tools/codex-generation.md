@@ -1,6 +1,6 @@
 # Codex Generation
 
-Use this guide when Codex creates or edits a presentation with its bundled presentation runtime. It owns runtime discovery and the generation loop. The canonical scene and PptxGenJS writer create net-new PowerPoint; Artifact Tool imports the exact saved file as the downstream observer. The [scene-to-native mapper](css-to-native-mapper.md) owns the shared adapter contract.
+Use this guide when Codex creates or edits a presentation with its bundled presentation runtime. It owns runtime discovery and the generation loop. For net-new PowerPoint, `runtime/generation.mjs` is the production entrypoint: `writeCanonicalDeckPlan()` resolves the approved content plan through the same canonical scene, registry, theme tokens, HTML observer, PptxGenJS writer, and Artifact Tool observer used by the golden set. The [scene-to-native mapper](css-to-native-mapper.md) owns the shared adapter contract.
 
 ## Load the active runtime guidance
 
@@ -24,6 +24,8 @@ If the source is an existing deck, render and inspect the editable source before
 ## Choose the closest editable construction
 
 Follow the canonical [scene-to-native mapper pipeline](css-to-native-mapper.md#mapping-pipeline) for scene primitives, composition, editable evidence, token resolution, HTML serialization, PowerPoint writing, and Artifact Tool observation. Use the inspected reference measurements and semantic relationships as mapper inputs. Do not translate DOM elements one for one or replace editable evidence with a screenshot.
+
+Do not author a separate raw PptxGenJS deck builder, even when it can pass output-only visual review. Import `writeCanonicalDeckPlan()` from `runtime/generation.mjs`, supply the approved deck plan, output directory, file stem, and the current authoring script path, and retain `canonical-generation-receipt.json`. The receipt binds the exact PPTX to the design manifest, scene, registry, runtime source hash, planning decisions, HTML observer, Artifact Tool observation, and authoring script. A missing, stale, or rejected receipt blocks the deck.
 
 ## Compare, repair, and export
 

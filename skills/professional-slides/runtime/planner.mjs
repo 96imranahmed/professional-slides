@@ -1,4 +1,5 @@
 import {
+  SLIDE,
   absolute,
   assertSectionHeadingProps,
   compileDeck,
@@ -239,6 +240,22 @@ function makeComposition(plan, items) {
   throw new Error(`${plan.id}.layout is unsupported: ${kind}`);
 }
 
+function planCover(plan) {
+  if (!plan?.id) throw new Error("Cover plan id is required");
+  if (!plan.title || !String(plan.title).trim()) throw new Error(`${plan.id}.title is required`);
+  if (String(plan.title).includes("—") || String(plan.subtitle || "").includes("—")) throw new Error(`${plan.id} contains a Unicode em dash`);
+  if (plan.items !== undefined || plan.chrome !== undefined || plan.source !== undefined || plan.note !== undefined || plan.tracker !== undefined) {
+    throw new Error(`${plan.id} cover content belongs in title and subtitle only`);
+  }
+  const spec = {
+    id: plan.id,
+    density: plan.density ?? "executive",
+    frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
+    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
+  };
+  return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, required: "live-pitch", resolved: spec.density, reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
+}
+
 export function planSlide(plan) {
   const content = validateSlidePlan(plan);
   const titleVariant = resolveTitleVariant({ variant: plan.titleVariant });
@@ -305,7 +322,9 @@ export function instantiateSlideTemplate({ id, template, instances }) {
 export function planDeck(deckPlan, registry = REGISTRY) {
   if (!deckPlan?.id || !Array.isArray(deckPlan.slides)) throw new Error("Deck plan requires id and slides");
   const defaultTitleVariant = resolveTitleVariant({ variant: deckPlan.titleVariant });
-  const planned = deckPlan.slides.map((slide) => planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? defaultTitleVariant : slide.titleVariant }));
+  const planned = deckPlan.slides.map((slide) => slide.kind === "cover"
+    ? planCover(slide)
+    : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? defaultTitleVariant : slide.titleVariant }));
   return {
     deck: compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, slides: planned.map((item) => item.spec) }, registry),
     decisions: planned.map((item) => item.decision)

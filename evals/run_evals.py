@@ -60,6 +60,7 @@ REFERENCE_FIDELITY_SOURCE_PATHS = {
     "skills/professional-slides/runtime/adapters/html.mjs",
     "skills/professional-slides/runtime/adapters/pptxgenjs.mjs",
     "skills/professional-slides/runtime/adapters/artifact-tool.mjs",
+    "skills/professional-slides/runtime/generation.mjs",
     "evals/run_evals.py",
     "evals/scripts/validate_component_runtime.mjs",
     "evals/scripts/validate_reference_fidelity.mjs",
@@ -389,7 +390,7 @@ def validate_result(
         if not isinstance(acceptance, dict):
             errors.append(f"{case_id}: powerpointAcceptanceReview must be an object for {arm} PPTX output")
         else:
-            for key in ("manifestPath", "reportPath"):
+            for key in ("manifestPath", "reportPath", "canonicalGenerationReceiptPath"):
                 if not isinstance(acceptance.get(key), str) or not acceptance[key].strip():
                     errors.append(f"{case_id}: powerpointAcceptanceReview.{key} must be non-empty")
             candidate_hash = acceptance.get("candidateSha256")
@@ -760,6 +761,15 @@ def validate_evidence_files(results_document: dict[str, Any], repo_root: Path) -
         visual_review = result.get("visualReview")
         visual_report_path = None
         generation_script_path = None
+        canonical_generation_receipt_path = None
+        acceptance = result.get("powerpointAcceptanceReview")
+        if isinstance(acceptance, dict):
+            canonical_generation_receipt_path = require_material_file(
+                workspace,
+                acceptance.get("canonicalGenerationReceiptPath"),
+                f"{label}.powerpointAcceptanceReview.canonicalGenerationReceiptPath",
+                errors,
+            )
         if isinstance(visual_review, dict):
             visual_report_path = require_material_file(
                 workspace,
@@ -773,6 +783,16 @@ def validate_evidence_files(results_document: dict[str, Any], repo_root: Path) -
                 f"{label}.visualReview.generationScriptPath",
                 errors,
             )
+        if canonical_generation_receipt_path is not None and generation_script_path is not None and pptx_artifacts:
+            canonical_generation_report = PPTX_VALIDATOR.validate_canonical_generation(
+                pptx_artifacts[0],
+                canonical_generation_receipt_path,
+                generation_script_path,
+                require_planning=True,
+            )
+            if canonical_generation_report.get("accepted") is not True:
+                codes = canonical_generation_report.get("summary", {}).get("findingCodes", [])
+                errors.append(f"{label}.powerpointAcceptanceReview canonical generation rejected artifact: {codes}")
         render_paths: list[Path] = []
         for path_index, raw_path in enumerate(result.get("renderPaths", [])):
             resolved = resolve_contained_path(

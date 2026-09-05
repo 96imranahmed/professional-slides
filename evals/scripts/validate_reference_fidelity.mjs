@@ -66,6 +66,7 @@ const RUNTIME_SOURCE_PATHS = Object.freeze([
   "skills/professional-slides/runtime/adapters/html.mjs",
   "skills/professional-slides/runtime/adapters/pptxgenjs.mjs",
   "skills/professional-slides/runtime/adapters/artifact-tool.mjs",
+  "skills/professional-slides/runtime/generation.mjs",
   "evals/run_evals.py",
   "evals/scripts/validate_component_runtime.mjs",
   "evals/scripts/validate_reference_fidelity.mjs",

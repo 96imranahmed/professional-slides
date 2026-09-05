@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import tempfile
 import unittest
@@ -21,6 +22,54 @@ def load_module(name: str, path: Path):
 
 
 eval_runner = load_module("run_evals", ROOT / "evals" / "run_evals.py")
+
+
+def write_json(path: Path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    return {"path": str(path), "sha256": eval_runner.file_sha256(path)}
+
+
+def write_canonical_receipt(workspace: Path, result: dict, artifact: Path, generation_script: Path):
+    design_manifest = {
+        "schema": "professional-slides.design-provenance/v1",
+        "designSystemVersion": "2.0.0",
+        "sceneSchema": "professional-slides.scene/v1",
+        "slideSize": {"width": 1280, "height": 720},
+        "slides": [{"id": "slide-1", "number": 1, "nodes": [{"id": "action-title"}, {"id": "body"}]}],
+    }
+    design_manifest["designHash"] = hashlib.sha256(
+        json.dumps(design_manifest, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    output = artifact.parent
+    design = write_json(output / "design-manifest.json", design_manifest)
+    scene = write_json(output / "scene.json", {"schema": "professional-slides.scene/v1", "manifest": design_manifest})
+    registry = write_json(output / "registry.json", {"schema": "professional-slides.component-registry/v1", "components": [{"id": "fixture"}]})
+    planning = write_json(output / "planning-decisions.json", [{"layout": "structural"}])
+    observation = write_json(output / "artifact-observation.json", {"slides": [{"number": 1}]})
+    html_path = output / "html" / "slide-001.html"
+    html_path.parent.mkdir(parents=True, exist_ok=True)
+    html_path.write_text("<!doctype html><title>Slide 1</title>\n", encoding="utf-8")
+    html = [{"path": str(html_path), "sha256": eval_runner.file_sha256(html_path)}]
+    runtime = eval_runner.PPTX_VALIDATOR.canonical_runtime_source_state()
+    receipt_path = workspace / result["powerpointAcceptanceReview"]["canonicalGenerationReceiptPath"]
+    receipt = {
+        "schema": eval_runner.PPTX_VALIDATOR.CANONICAL_GENERATION_SCHEMA,
+        "accepted": True,
+        "mechanism": "canonical-scene",
+        "pipeline": eval_runner.PPTX_VALIDATOR.CANONICAL_GENERATION_PIPELINE,
+        "candidate": {"path": str(artifact), "sha256": eval_runner.file_sha256(artifact)},
+        "deck": {"id": "fixture", "slideCount": 1, "palette": "mckinsey", "designHash": design_manifest["designHash"]},
+        "runtime": {"sourceFiles": runtime["files"], "sha256": runtime["sha256"]},
+        "designManifest": design,
+        "scene": scene,
+        "registry": registry,
+        "planning": planning,
+        "html": html,
+        "observation": observation,
+        "authoringScript": {"path": str(generation_script), "sha256": eval_runner.file_sha256(generation_script)},
+    }
+    write_json(receipt_path, receipt)
 
 
 def accepted_visual_judgement(slide_count: int):
@@ -130,6 +179,7 @@ class EvalRunnerTests(unittest.TestCase):
             result["powerpointAcceptanceReview"] = {
                 "manifestPath": f"{case_id}/{arm}/powerpoint-acceptance.json",
                 "reportPath": f"{case_id}/{arm}/powerpoint-acceptance-report.json",
+                "canonicalGenerationReceiptPath": f"{case_id}/{arm}/canonical-generation-receipt.json",
                 "candidateSha256": "a" * 64,
                 "accepted": True,
                 "iterationCount": 1,
@@ -249,6 +299,7 @@ class EvalRunnerTests(unittest.TestCase):
             build_pptx(
                 artifact,
                 [{"title": "Slide 1 advances the decision", "body": "One short proof."}],
+                canonical_names=True,
             )
             contract = {
                 "schemaVersion": 1,
@@ -303,17 +354,20 @@ class EvalRunnerTests(unittest.TestCase):
             contract_path.write_text(json.dumps(contract), encoding="utf-8")
             acceptance_manifest_path = workspace / result["powerpointAcceptanceReview"]["manifestPath"]
             acceptance_manifest_path.parent.mkdir(parents=True, exist_ok=True)
-            acceptance_manifest_path.write_text(
-                json.dumps(pptx_manifest(["Slide 1 advances the decision"])),
-                encoding="utf-8",
-            )
+            acceptance_manifest = pptx_manifest(["Slide 1 advances the decision"])
+            acceptance_manifest["roles"][0]["shapeNamePattern"] = "^ps:action-title$"
+            acceptance_manifest_path.write_text(json.dumps(acceptance_manifest), encoding="utf-8")
             acceptance_report = pptx_validator.validate(artifact, acceptance_manifest_path)
             self.assertTrue(acceptance_report["accepted"], acceptance_report["findings"])
             acceptance_report_path = workspace / result["powerpointAcceptanceReview"]["reportPath"]
             acceptance_report_path.write_text(json.dumps(acceptance_report), encoding="utf-8")
             result["powerpointAcceptanceReview"]["candidateSha256"] = acceptance_report["candidate"]["sha256"]
             generation_script_path = workspace / result["visualReview"]["generationScriptPath"]
-            generation_script_path.write_text("// generated deck fixture", encoding="utf-8")
+            generation_script_path.write_text(
+                'import { writeCanonicalDeckPlan } from "./skills/professional-slides/runtime/generation.mjs";\nvoid writeCanonicalDeckPlan;\n',
+                encoding="utf-8",
+            )
+            write_canonical_receipt(workspace, result, artifact, generation_script_path)
             visual_report = eval_runner.PPTX_VISUAL_VALIDATOR.build_visual_report(
                 accepted_visual_judgement(1),
                 artifact,

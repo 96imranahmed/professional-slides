@@ -1,6 +1,6 @@
 {
   "schema": "professional-slides.reference-fidelity/v1",
-  "generatedAt": "2026-09-05T08:45:32.420Z",
+  "generatedAt": "2026-09-05T12:16:54.087Z",
   "accepted": true,
   "inputs": {
     "runtimeSources": {
@@ -28,15 +28,16 @@
       "skills/professional-slides/runtime/design-context.mjs": "3a1aae41aba9afc32890b09ce0fee410354ee272a82c9b4b6654dadd73089ff7",
       "skills/professional-slides/runtime/golden-set.mjs": "1f4b98fd8f8dc0364159fea6bb40f80d71f8e6bf65bb92e02b08549b74b85bde",
       "evals/scripts/generate_golden_set.mjs": "3c97315d3340feb129174d1ccf47e941a642a49ad56b782accebc507694e31df",
-      "skills/professional-slides/runtime/planner.mjs": "73916079c7f99e9871d10620d1e64a1ecfe26bc32632fc2ec0b258f64372cc06",
+      "skills/professional-slides/runtime/planner.mjs": "a80dbfb068e785a670f3f72fe5841c8622a8108f21a0020fa397b6f952b95a88",
       "skills/professional-slides/runtime/fixtures.mjs": "8f21c6b00001049d2d7d0246b96430240cfcaac2bb170350c78f26e581005162",
       "skills/professional-slides/runtime/golden-fixtures.mjs": "b13174b048dbeed0cfe9df20a574b577fa2c6cf0b5a44f85d28078dd7e491bf2",
       "skills/professional-slides/runtime/adapters/html.mjs": "6918eb478c3bd07a2456960f6d668ba857885517290dfc2da9ff38659818b879",
       "skills/professional-slides/runtime/adapters/pptxgenjs.mjs": "6aef06a706703f2eb2f7d3c21bce72c4236091a2025d2a991af39a73d72e515f",
       "skills/professional-slides/runtime/adapters/artifact-tool.mjs": "6c43f2142ff0da57773a759f1f5a88b8374c6b55ff094b17121f41c7d39e537a",
-      "evals/run_evals.py": "aa35968e634b7bdc1121b73b068736598003624f5c1f94896064856b996088a1",
-      "evals/scripts/validate_component_runtime.mjs": "9fdae931ed82e3ec4dd760c7c1c67f2d6b79ce13a179a8d719e9004a0986b520",
-      "evals/scripts/validate_reference_fidelity.mjs": "a59f3338fb650bf592cf935aeee2a55d7920608a0a8e11f8d851031c6b2b907c",
+      "skills/professional-slides/runtime/generation.mjs": "1ebdc10b62a0f89866bd6296df8bc35e31319eb6a0ee791b050d0db693731ddc",
+      "evals/run_evals.py": "110c43d4516e189c8199fdbf12eb96561e898f43c29d3f7d32707032df9a9a07",
+      "evals/scripts/validate_component_runtime.mjs": "eb29ddd0d47c025fb2a73ee8b2405b1493514cda566071f88ca3b8575849fa91",
+      "evals/scripts/validate_reference_fidelity.mjs": "a75f8395b1816281519f170a0d28ce5f47b75033c3f410a7a9b7dd713397603e",
       "package.json": "d753dca2f2124f5fba659b4c6ab16036a394c717ff2df801755f1fd876655298"
     },
     "sourceIndexSha256": "e0c6e8bf14ddd9f31943711a4ccf3e9fbfe2a0561b36116ac5b962d35a7919f8"
@@ -52,8 +53,8 @@
     "sceneNodeCount": 884,
     "designSystemVersion": "2.0.0",
     "designHash": "01fe8200afb527966edd5c5ed36ec8e0a9692b1db347a378cee5151b9ba93adb",
-    "pptxPath": "/Users/imran/Desktop/Side Projects/professional-slides/tmp/reference-fidelity-validation-final-review-2/consulting-toolkit-golden.pptx",
-    "pptxSha256": "6ba8dbee1fca8ef0be998ee74a3e3250562ab2517abcafe6960deda2f39093dc"
+    "pptxPath": "/Users/imran/Desktop/Side Projects/professional-slides/tmp/reference-fidelity-validation/consulting-toolkit-golden.pptx",
+    "pptxSha256": "32b643c05ad3de620e687c25fbb1a76ef7e7bdb6c8a829b326beef30b6cfe4dc"
   },
   "thresholds": {
     "parity": {
@@ -805,8 +806,8 @@
     },
     "visual": {
       "accepted": true,
-      "minimumHtmlPptxSimilarity": 0.98596,
-      "minimumNormalizedFullFrameSimilarity": 0.910856,
+      "minimumHtmlPptxSimilarity": 0.98592,
+      "minimumNormalizedFullFrameSimilarity": 0.910829,
       "minimumNormalizedBlurredStructureSimilarity": 0.913418,
       "minimumNormalizedBlockSsim": 0.642428,
       "minimumRestoredBlurredSimilarity": 0.901216,
@@ -836,23 +837,23 @@
         "sha256": "3d6033437f2510a4a0ebacbd40db23fae00cd328cabb3fe6beac6dfce5dca25a"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.994224,
-        "materialMismatchRatio": 0.012205,
-        "blurredStructureSimilarity": 0.997488,
-        "blockSsim": 0.97507,
-        "rowProjectionCorrelation": 0.986419,
-        "columnProjectionCorrelation": 0.998349,
-        "edgeDensityDelta": 0.002899,
+        "fullFrameSimilarity": 0.994206,
+        "materialMismatchRatio": 0.012266,
+        "blurredStructureSimilarity": 0.997461,
+        "blockSsim": 0.975041,
+        "rowProjectionCorrelation": 0.986388,
+        "columnProjectionCorrelation": 0.998372,
+        "edgeDensityDelta": 0.002843,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.904138,
-        "materialMismatchRatio": 0.145087,
-        "blurredStructureSimilarity": 0.92487,
-        "blockSsim": 0.614634,
-        "rowProjectionCorrelation": 0.140805,
-        "columnProjectionCorrelation": 0.386718,
-        "edgeDensityDelta": 0.047287,
+        "fullFrameSimilarity": 0.904112,
+        "materialMismatchRatio": 0.145043,
+        "blurredStructureSimilarity": 0.924874,
+        "blockSsim": 0.614544,
+        "rowProjectionCorrelation": 0.140863,
+        "columnProjectionCorrelation": 0.387082,
+        "edgeDensityDelta": 0.047344,
         "titleRuleDelta": 0.011111,
         "footerRuleDelta": 0.033333,
         "accepted": true
@@ -870,13 +871,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.901109,
-        "materialMismatchRatio": 0.169258,
-        "blurredStructureSimilarity": 0.91642,
-        "blockSsim": 0.595548,
-        "rowProjectionCorrelation": -0.013413,
-        "columnProjectionCorrelation": 0.393886,
-        "edgeDensityDelta": 0.053815,
+        "fullFrameSimilarity": 0.901082,
+        "materialMismatchRatio": 0.169284,
+        "blurredStructureSimilarity": 0.916424,
+        "blockSsim": 0.595416,
+        "rowProjectionCorrelation": -0.013201,
+        "columnProjectionCorrelation": 0.394208,
+        "edgeDensityDelta": 0.053872,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0,
         "accepted": true
@@ -909,9 +910,9 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.984305,
-          "blurredStructureSimilarity": 0.970257,
-          "blockSsim": 1.054433
+          "fullFrameSimilarity": 0.984276,
+          "blurredStructureSimilarity": 0.970261,
+          "blockSsim": 1.054199
         }
       },
       "accepted": true
@@ -937,23 +938,23 @@
         "sha256": "37255be0b0feca955e83b9c41452a18c02ae8d10e16aa84eadb52de1a6c4f3a7"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.993365,
+        "fullFrameSimilarity": 0.993336,
         "materialMismatchRatio": 0.013433,
-        "blurredStructureSimilarity": 0.997575,
-        "blockSsim": 0.972162,
-        "rowProjectionCorrelation": 0.989371,
-        "columnProjectionCorrelation": 0.994594,
-        "edgeDensityDelta": 0.002144,
+        "blurredStructureSimilarity": 0.997542,
+        "blockSsim": 0.972121,
+        "rowProjectionCorrelation": 0.989295,
+        "columnProjectionCorrelation": 0.994463,
+        "edgeDensityDelta": 0.002088,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.893853,
-        "materialMismatchRatio": 0.167491,
-        "blurredStructureSimilarity": 0.908604,
-        "blockSsim": 0.638886,
-        "rowProjectionCorrelation": 0.453528,
-        "columnProjectionCorrelation": 0.556764,
-        "edgeDensityDelta": 0.018932,
+        "fullFrameSimilarity": 0.893833,
+        "materialMismatchRatio": 0.167405,
+        "blurredStructureSimilarity": 0.908597,
+        "blockSsim": 0.638879,
+        "rowProjectionCorrelation": 0.454065,
+        "columnProjectionCorrelation": 0.557383,
+        "edgeDensityDelta": 0.018989,
         "titleRuleDelta": 0,
         "footerRuleDelta": 0.019444,
         "accepted": true
@@ -971,13 +972,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.901978,
-        "materialMismatchRatio": 0.169054,
-        "blurredStructureSimilarity": 0.914713,
-        "blockSsim": 0.675355,
-        "rowProjectionCorrelation": 0.224022,
-        "columnProjectionCorrelation": 0.593893,
-        "edgeDensityDelta": 0.008134,
+        "fullFrameSimilarity": 0.901947,
+        "materialMismatchRatio": 0.169063,
+        "blurredStructureSimilarity": 0.914702,
+        "blockSsim": 0.67529,
+        "rowProjectionCorrelation": 0.224561,
+        "columnProjectionCorrelation": 0.594052,
+        "edgeDensityDelta": 0.00819,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.061111,
         "accepted": true
@@ -1010,9 +1011,9 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.928367,
-          "blurredStructureSimilarity": 0.926523,
-          "blockSsim": 0.768042
+          "fullFrameSimilarity": 0.928346,
+          "blurredStructureSimilarity": 0.926516,
+          "blockSsim": 0.768034
         }
       },
       "accepted": true
@@ -1038,23 +1039,23 @@
         "sha256": "47fbbe99d321e5e9aca639a9656eadfcf6d22f55cbbeba5a8fd73eac53fcd7c3"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.990707,
-        "materialMismatchRatio": 0.018993,
-        "blurredStructureSimilarity": 0.997069,
-        "blockSsim": 0.957939,
-        "rowProjectionCorrelation": 0.951674,
-        "columnProjectionCorrelation": 0.994203,
-        "edgeDensityDelta": 0.002682,
+        "fullFrameSimilarity": 0.990697,
+        "materialMismatchRatio": 0.019019,
+        "blurredStructureSimilarity": 0.99707,
+        "blockSsim": 0.957931,
+        "rowProjectionCorrelation": 0.95111,
+        "columnProjectionCorrelation": 0.994134,
+        "edgeDensityDelta": 0.002656,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.926787,
-        "materialMismatchRatio": 0.123125,
-        "blurredStructureSimilarity": 0.939549,
-        "blockSsim": 0.610493,
-        "rowProjectionCorrelation": 0.163507,
-        "columnProjectionCorrelation": 0.625545,
-        "edgeDensityDelta": 0.005417,
+        "fullFrameSimilarity": 0.926916,
+        "materialMismatchRatio": 0.123021,
+        "blurredStructureSimilarity": 0.939693,
+        "blockSsim": 0.610588,
+        "rowProjectionCorrelation": 0.163464,
+        "columnProjectionCorrelation": 0.62496,
+        "edgeDensityDelta": 0.005443,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.011111,
         "accepted": true
@@ -1072,13 +1073,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.932686,
-        "materialMismatchRatio": 0.129145,
-        "blurredStructureSimilarity": 0.939863,
-        "blockSsim": 0.625156,
-        "rowProjectionCorrelation": -0.014772,
-        "columnProjectionCorrelation": 0.512609,
-        "edgeDensityDelta": 0.005534,
+        "fullFrameSimilarity": 0.932821,
+        "materialMismatchRatio": 0.129019,
+        "blurredStructureSimilarity": 0.940013,
+        "blockSsim": 0.625248,
+        "rowProjectionCorrelation": -0.014862,
+        "columnProjectionCorrelation": 0.511035,
+        "edgeDensityDelta": 0.005508,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0,
         "accepted": true
@@ -1111,9 +1112,9 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.974342,
-          "blurredStructureSimilarity": 0.960488,
-          "blockSsim": 0.895248
+          "fullFrameSimilarity": 0.974477,
+          "blurredStructureSimilarity": 0.960635,
+          "blockSsim": 0.895387
         }
       },
       "accepted": true
@@ -1138,23 +1139,23 @@
         "sha256": "214d817120dabc90b8ee18febc552a599befb8e006663d37f8fb00d9f232d9f7"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.993743,
-        "materialMismatchRatio": 0.014553,
-        "blurredStructureSimilarity": 0.997363,
-        "blockSsim": 0.972227,
-        "rowProjectionCorrelation": 0.989423,
-        "columnProjectionCorrelation": 0.996682,
-        "edgeDensityDelta": 0.00237,
+        "fullFrameSimilarity": 0.993737,
+        "materialMismatchRatio": 0.014618,
+        "blurredStructureSimilarity": 0.997386,
+        "blockSsim": 0.972185,
+        "rowProjectionCorrelation": 0.989326,
+        "columnProjectionCorrelation": 0.996716,
+        "edgeDensityDelta": 0.002279,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.950713,
-        "materialMismatchRatio": 0.092687,
-        "blurredStructureSimilarity": 0.957029,
-        "blockSsim": 0.613358,
-        "rowProjectionCorrelation": 0.28236,
-        "columnProjectionCorrelation": 0.602195,
-        "edgeDensityDelta": 0.03174,
+        "fullFrameSimilarity": 0.950749,
+        "materialMismatchRatio": 0.09253,
+        "blurredStructureSimilarity": 0.957071,
+        "blockSsim": 0.613376,
+        "rowProjectionCorrelation": 0.282561,
+        "columnProjectionCorrelation": 0.602384,
+        "edgeDensityDelta": 0.031832,
         "titleRuleDelta": 0.047222,
         "footerRuleDelta": 0.005556,
         "accepted": true
@@ -1172,13 +1173,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.958485,
-        "materialMismatchRatio": 0.089232,
-        "blurredStructureSimilarity": 0.967355,
-        "blockSsim": 0.700272,
-        "rowProjectionCorrelation": 0.094449,
-        "columnProjectionCorrelation": 0.426149,
-        "edgeDensityDelta": 0.004067,
+        "fullFrameSimilarity": 0.95851,
+        "materialMismatchRatio": 0.089175,
+        "blurredStructureSimilarity": 0.967409,
+        "blockSsim": 0.700205,
+        "rowProjectionCorrelation": 0.09444,
+        "columnProjectionCorrelation": 0.426412,
+        "edgeDensityDelta": 0.004158,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.061111,
         "accepted": true
@@ -1211,9 +1212,9 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.980484,
-          "blurredStructureSimilarity": 0.971809,
-          "blockSsim": 0.780244
+          "fullFrameSimilarity": 0.980522,
+          "blurredStructureSimilarity": 0.971852,
+          "blockSsim": 0.780266
         }
       },
       "accepted": true
@@ -1237,23 +1238,23 @@
         "sha256": "4f989b57e99fac14ffa61f78d38fb90a7d46d84efdf476b23aa4df3199c25fc0"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.99532,
-        "materialMismatchRatio": 0.009701,
-        "blurredStructureSimilarity": 0.996615,
-        "blockSsim": 0.992218,
-        "rowProjectionCorrelation": 0.998242,
-        "columnProjectionCorrelation": 0.989454,
-        "edgeDensityDelta": 0.002843,
+        "fullFrameSimilarity": 0.995277,
+        "materialMismatchRatio": 0.009813,
+        "blurredStructureSimilarity": 0.996563,
+        "blockSsim": 0.992181,
+        "rowProjectionCorrelation": 0.998239,
+        "columnProjectionCorrelation": 0.98949,
+        "edgeDensityDelta": 0.002847,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.899168,
-        "materialMismatchRatio": 0.174991,
-        "blurredStructureSimilarity": 0.916963,
-        "blockSsim": 0.585023,
-        "rowProjectionCorrelation": 0.161615,
-        "columnProjectionCorrelation": 0.642602,
-        "edgeDensityDelta": 0.047791,
+        "fullFrameSimilarity": 0.899138,
+        "materialMismatchRatio": 0.175022,
+        "blurredStructureSimilarity": 0.91696,
+        "blockSsim": 0.584964,
+        "rowProjectionCorrelation": 0.161837,
+        "columnProjectionCorrelation": 0.642943,
+        "edgeDensityDelta": 0.047786,
         "titleRuleDelta": 0.044444,
         "footerRuleDelta": 0.019444,
         "accepted": true
@@ -1271,13 +1272,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.914962,
-        "materialMismatchRatio": 0.176636,
-        "blurredStructureSimilarity": 0.92915,
-        "blockSsim": 0.611063,
-        "rowProjectionCorrelation": 0.049465,
-        "columnProjectionCorrelation": 0.608273,
-        "edgeDensityDelta": 0.029232,
+        "fullFrameSimilarity": 0.914924,
+        "materialMismatchRatio": 0.176649,
+        "blurredStructureSimilarity": 0.929141,
+        "blockSsim": 0.610943,
+        "rowProjectionCorrelation": 0.049516,
+        "columnProjectionCorrelation": 0.60862,
+        "edgeDensityDelta": 0.029227,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -1310,9 +1311,9 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.942003,
-          "blurredStructureSimilarity": 0.934271,
-          "blockSsim": 0.756749
+          "fullFrameSimilarity": 0.941971,
+          "blurredStructureSimilarity": 0.934268,
+          "blockSsim": 0.756673
         }
       },
       "accepted": true
@@ -1336,23 +1337,23 @@
         "sha256": "00901547497101ca022b1e17f4363cd5b9e3f4f1c8c16bc0998215bf3c2df6ab"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.989204,
-        "materialMismatchRatio": 0.023303,
-        "blurredStructureSimilarity": 0.996007,
-        "blockSsim": 0.959626,
-        "rowProjectionCorrelation": 0.949492,
-        "columnProjectionCorrelation": 0.995595,
-        "edgeDensityDelta": 0.002721,
+        "fullFrameSimilarity": 0.988944,
+        "materialMismatchRatio": 0.023286,
+        "blurredStructureSimilarity": 0.995842,
+        "blockSsim": 0.959399,
+        "rowProjectionCorrelation": 0.949481,
+        "columnProjectionCorrelation": 0.995548,
+        "edgeDensityDelta": 0.002765,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.916777,
-        "materialMismatchRatio": 0.126727,
-        "blurredStructureSimilarity": 0.941258,
-        "blockSsim": 0.680917,
-        "rowProjectionCorrelation": 0.344442,
-        "columnProjectionCorrelation": 0.787515,
-        "edgeDensityDelta": 0.026806,
+        "fullFrameSimilarity": 0.916866,
+        "materialMismatchRatio": 0.126788,
+        "blurredStructureSimilarity": 0.94139,
+        "blockSsim": 0.681086,
+        "rowProjectionCorrelation": 0.344462,
+        "columnProjectionCorrelation": 0.789151,
+        "edgeDensityDelta": 0.026762,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.019444,
         "accepted": true
@@ -1370,13 +1371,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.923866,
-        "materialMismatchRatio": 0.142708,
-        "blurredStructureSimilarity": 0.947804,
-        "blockSsim": 0.677991,
-        "rowProjectionCorrelation": 0.276065,
-        "columnProjectionCorrelation": 0.778531,
-        "edgeDensityDelta": 0.049049,
+        "fullFrameSimilarity": 0.923927,
+        "materialMismatchRatio": 0.142765,
+        "blurredStructureSimilarity": 0.947928,
+        "blockSsim": 0.677988,
+        "rowProjectionCorrelation": 0.276063,
+        "columnProjectionCorrelation": 0.780063,
+        "edgeDensityDelta": 0.049006,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -1409,8 +1410,8 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.951204,
-          "blurredStructureSimilarity": 0.95192,
+          "fullFrameSimilarity": 0.951296,
+          "blurredStructureSimilarity": 0.952054,
           "blockSsim": 0.813673
         }
       },
@@ -1435,23 +1436,23 @@
         "sha256": "b1f07ec00f2b46190c25d977ca964a28605bdc0d7018329eb46e92fae6921601"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.995189,
-        "materialMismatchRatio": 0.010022,
-        "blurredStructureSimilarity": 0.997887,
-        "blockSsim": 0.978996,
-        "rowProjectionCorrelation": 0.986234,
-        "columnProjectionCorrelation": 0.997477,
-        "edgeDensityDelta": 0.002135,
+        "fullFrameSimilarity": 0.995164,
+        "materialMismatchRatio": 0.010039,
+        "blurredStructureSimilarity": 0.997865,
+        "blockSsim": 0.978985,
+        "rowProjectionCorrelation": 0.986215,
+        "columnProjectionCorrelation": 0.997445,
+        "edgeDensityDelta": 0.002122,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.879542,
+        "fullFrameSimilarity": 0.879516,
         "materialMismatchRatio": 0.222921,
-        "blurredStructureSimilarity": 0.901352,
-        "blockSsim": 0.503392,
-        "rowProjectionCorrelation": 0.095501,
-        "columnProjectionCorrelation": 0.351243,
-        "edgeDensityDelta": 0.070378,
+        "blurredStructureSimilarity": 0.901351,
+        "blockSsim": 0.50336,
+        "rowProjectionCorrelation": 0.09571,
+        "columnProjectionCorrelation": 0.351032,
+        "edgeDensityDelta": 0.070391,
         "titleRuleDelta": 0,
         "footerRuleDelta": 0.005556,
         "accepted": true
@@ -1469,13 +1470,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.88824,
-        "materialMismatchRatio": 0.214505,
-        "blurredStructureSimilarity": 0.908231,
-        "blockSsim": 0.570934,
-        "rowProjectionCorrelation": 0.125251,
-        "columnProjectionCorrelation": 0.661169,
-        "edgeDensityDelta": 0.026354,
+        "fullFrameSimilarity": 0.888213,
+        "materialMismatchRatio": 0.2148,
+        "blurredStructureSimilarity": 0.908227,
+        "blockSsim": 0.570916,
+        "rowProjectionCorrelation": 0.125486,
+        "columnProjectionCorrelation": 0.661181,
+        "edgeDensityDelta": 0.026367,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -1508,7 +1509,7 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.910856,
+          "fullFrameSimilarity": 0.910829,
           "blurredStructureSimilarity": 0.913418,
           "blockSsim": 0.642428
         }
@@ -1534,23 +1535,23 @@
         "sha256": "5f39db625f2eabbf5cdda370fc4f5bba1d613239b432374a894d6635174e3ffd"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.997125,
-        "materialMismatchRatio": 0.003602,
-        "blurredStructureSimilarity": 0.997733,
-        "blockSsim": 0.995439,
-        "rowProjectionCorrelation": 0.998575,
-        "columnProjectionCorrelation": 0.997344,
-        "edgeDensityDelta": 0.0023,
+        "fullFrameSimilarity": 0.997089,
+        "materialMismatchRatio": 0.003611,
+        "blurredStructureSimilarity": 0.997695,
+        "blockSsim": 0.995421,
+        "rowProjectionCorrelation": 0.998567,
+        "columnProjectionCorrelation": 0.997352,
+        "edgeDensityDelta": 0.002309,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.897832,
-        "materialMismatchRatio": 0.147422,
-        "blurredStructureSimilarity": 0.903846,
-        "blockSsim": 0.570325,
-        "rowProjectionCorrelation": 0.20964,
-        "columnProjectionCorrelation": 0.335504,
-        "edgeDensityDelta": 0.071098,
+        "fullFrameSimilarity": 0.89782,
+        "materialMismatchRatio": 0.147461,
+        "blurredStructureSimilarity": 0.90386,
+        "blockSsim": 0.570304,
+        "rowProjectionCorrelation": 0.209945,
+        "columnProjectionCorrelation": 0.336813,
+        "edgeDensityDelta": 0.071089,
         "titleRuleDelta": 0.069444,
         "footerRuleDelta": 0.036111,
         "accepted": true
@@ -1568,13 +1569,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.904739,
-        "materialMismatchRatio": 0.154666,
-        "blurredStructureSimilarity": 0.910265,
-        "blockSsim": 0.569327,
-        "rowProjectionCorrelation": 0.148912,
-        "columnProjectionCorrelation": 0.371491,
-        "edgeDensityDelta": 0.070612,
+        "fullFrameSimilarity": 0.904723,
+        "materialMismatchRatio": 0.154865,
+        "blurredStructureSimilarity": 0.910279,
+        "blockSsim": 0.569244,
+        "rowProjectionCorrelation": 0.149053,
+        "columnProjectionCorrelation": 0.369364,
+        "edgeDensityDelta": 0.070603,
         "titleRuleDelta": 0.080556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -1607,9 +1608,9 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.938265,
+          "fullFrameSimilarity": 0.938252,
           "blurredStructureSimilarity": 0.917389,
-          "blockSsim": 0.774957
+          "blockSsim": 0.774844
         }
       },
       "accepted": true
@@ -1633,23 +1634,23 @@
         "sha256": "b7e71e6b8fc183cd90e25391db180f0b1c1e8bf84ba84c42cc0e35854de24f4a"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.988635,
-        "materialMismatchRatio": 0.026298,
-        "blurredStructureSimilarity": 0.996122,
-        "blockSsim": 0.954862,
-        "rowProjectionCorrelation": 0.969651,
-        "columnProjectionCorrelation": 0.995912,
-        "edgeDensityDelta": 0.004249,
+        "fullFrameSimilarity": 0.988384,
+        "materialMismatchRatio": 0.026293,
+        "blurredStructureSimilarity": 0.995897,
+        "blockSsim": 0.954693,
+        "rowProjectionCorrelation": 0.969505,
+        "columnProjectionCorrelation": 0.995943,
+        "edgeDensityDelta": 0.004232,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.875075,
-        "materialMismatchRatio": 0.184392,
-        "blurredStructureSimilarity": 0.919845,
-        "blockSsim": 0.551328,
-        "rowProjectionCorrelation": 0.34872,
-        "columnProjectionCorrelation": 0.686211,
-        "edgeDensityDelta": 0.034063,
+        "fullFrameSimilarity": 0.874982,
+        "materialMismatchRatio": 0.184523,
+        "blurredStructureSimilarity": 0.919715,
+        "blockSsim": 0.55119,
+        "rowProjectionCorrelation": 0.348723,
+        "columnProjectionCorrelation": 0.685672,
+        "edgeDensityDelta": 0.03408,
         "titleRuleDelta": 0.011111,
         "footerRuleDelta": 0.061111,
         "accepted": true
@@ -1667,13 +1668,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.853902,
-        "materialMismatchRatio": 0.242999,
-        "blurredStructureSimilarity": 0.9088,
-        "blockSsim": 0.428178,
-        "rowProjectionCorrelation": 0.061316,
-        "columnProjectionCorrelation": 0.678587,
-        "edgeDensityDelta": 0.065668,
+        "fullFrameSimilarity": 0.853789,
+        "materialMismatchRatio": 0.243203,
+        "blurredStructureSimilarity": 0.90869,
+        "blockSsim": 0.427934,
+        "rowProjectionCorrelation": 0.061307,
+        "columnProjectionCorrelation": 0.676023,
+        "edgeDensityDelta": 0.065686,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.061111,
         "accepted": true
@@ -1706,8 +1707,8 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.92678,
-          "blurredStructureSimilarity": 0.942728,
+          "fullFrameSimilarity": 0.926658,
+          "blurredStructureSimilarity": 0.942614,
           "blockSsim": 0.664146
         }
       },
@@ -1733,23 +1734,23 @@
         "sha256": "483ef79df9eab3395d91cf369da04347e2a28d9286e7d355a0a2e76b4a2435b9"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.991538,
-        "materialMismatchRatio": 0.02112,
-        "blurredStructureSimilarity": 0.996952,
-        "blockSsim": 0.951797,
-        "rowProjectionCorrelation": 0.967331,
-        "columnProjectionCorrelation": 0.990971,
-        "edgeDensityDelta": 0.003099,
+        "fullFrameSimilarity": 0.991517,
+        "materialMismatchRatio": 0.021159,
+        "blurredStructureSimilarity": 0.996918,
+        "blockSsim": 0.951785,
+        "rowProjectionCorrelation": 0.967324,
+        "columnProjectionCorrelation": 0.991344,
+        "edgeDensityDelta": 0.003016,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.941673,
-        "materialMismatchRatio": 0.10635,
-        "blurredStructureSimilarity": 0.951762,
-        "blockSsim": 0.668542,
-        "rowProjectionCorrelation": 0.387723,
-        "columnProjectionCorrelation": 0.743281,
-        "edgeDensityDelta": 0.090312,
+        "fullFrameSimilarity": 0.941656,
+        "materialMismatchRatio": 0.106345,
+        "blurredStructureSimilarity": 0.951776,
+        "blockSsim": 0.668531,
+        "rowProjectionCorrelation": 0.387569,
+        "columnProjectionCorrelation": 0.744391,
+        "edgeDensityDelta": 0.090395,
         "titleRuleDelta": 0.047222,
         "footerRuleDelta": 0.025,
         "accepted": true
@@ -1767,13 +1768,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.951543,
-        "materialMismatchRatio": 0.118559,
-        "blurredStructureSimilarity": 0.960004,
-        "blockSsim": 0.693465,
-        "rowProjectionCorrelation": 0.238868,
-        "columnProjectionCorrelation": 0.750143,
-        "edgeDensityDelta": 0.073194,
+        "fullFrameSimilarity": 0.951518,
+        "materialMismatchRatio": 0.118589,
+        "blurredStructureSimilarity": 0.960016,
+        "blockSsim": 0.693414,
+        "rowProjectionCorrelation": 0.238555,
+        "columnProjectionCorrelation": 0.750034,
+        "edgeDensityDelta": 0.073277,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -1806,7 +1807,7 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.983367,
+          "fullFrameSimilarity": 0.983349,
           "blurredStructureSimilarity": 0.964183,
           "blockSsim": 0.849169
         }
@@ -1833,23 +1834,23 @@
         "sha256": "9f29bf1fffcec7be7fe1da6bdcee39907a68343adf19e7f5a5742261d25a932a"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.99699,
-        "materialMismatchRatio": 0.006623,
-        "blurredStructureSimilarity": 0.998542,
-        "blockSsim": 0.98856,
-        "rowProjectionCorrelation": 0.99141,
-        "columnProjectionCorrelation": 0.997063,
-        "edgeDensityDelta": 0.000469,
+        "fullFrameSimilarity": 0.996964,
+        "materialMismatchRatio": 0.006628,
+        "blurredStructureSimilarity": 0.99854,
+        "blockSsim": 0.98848,
+        "rowProjectionCorrelation": 0.991363,
+        "columnProjectionCorrelation": 0.996977,
+        "edgeDensityDelta": 0.000278,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.896628,
-        "materialMismatchRatio": 0.200647,
-        "blurredStructureSimilarity": 0.909919,
-        "blockSsim": 0.648007,
-        "rowProjectionCorrelation": 0.297656,
-        "columnProjectionCorrelation": 0.291092,
-        "edgeDensityDelta": 0.036406,
+        "fullFrameSimilarity": 0.896632,
+        "materialMismatchRatio": 0.200712,
+        "blurredStructureSimilarity": 0.909918,
+        "blockSsim": 0.648167,
+        "rowProjectionCorrelation": 0.297691,
+        "columnProjectionCorrelation": 0.290302,
+        "edgeDensityDelta": 0.036597,
         "titleRuleDelta": 0.041667,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -1867,13 +1868,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.902865,
-        "materialMismatchRatio": 0.208047,
-        "blurredStructureSimilarity": 0.914717,
-        "blockSsim": 0.645943,
-        "rowProjectionCorrelation": 0.109779,
-        "columnProjectionCorrelation": 0.394442,
-        "edgeDensityDelta": 0.020534,
+        "fullFrameSimilarity": 0.902866,
+        "materialMismatchRatio": 0.20809,
+        "blurredStructureSimilarity": 0.914719,
+        "blockSsim": 0.646105,
+        "rowProjectionCorrelation": 0.109881,
+        "columnProjectionCorrelation": 0.394149,
+        "edgeDensityDelta": 0.020725,
         "titleRuleDelta": 0.083333,
         "footerRuleDelta": 0,
         "accepted": true
@@ -1906,8 +1907,8 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.925778,
-          "blurredStructureSimilarity": 0.92166,
+          "fullFrameSimilarity": 0.925782,
+          "blurredStructureSimilarity": 0.921659,
           "blockSsim": 0.777051
         }
       },
@@ -1932,23 +1933,23 @@
         "sha256": "cfa2150df8e42bb3bf3d4029e517f9fd70e58b89f585fb15982ba5dd5116704b"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.997169,
-        "materialMismatchRatio": 0.00599,
-        "blurredStructureSimilarity": 0.998639,
-        "blockSsim": 0.989486,
-        "rowProjectionCorrelation": 0.994398,
-        "columnProjectionCorrelation": 0.997034,
-        "edgeDensityDelta": 0.002005,
+        "fullFrameSimilarity": 0.997152,
+        "materialMismatchRatio": 0.005998,
+        "blurredStructureSimilarity": 0.998627,
+        "blockSsim": 0.989481,
+        "rowProjectionCorrelation": 0.994356,
+        "columnProjectionCorrelation": 0.995835,
+        "edgeDensityDelta": 0.001823,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.937322,
-        "materialMismatchRatio": 0.118407,
-        "blurredStructureSimilarity": 0.945882,
-        "blockSsim": 0.713567,
-        "rowProjectionCorrelation": 0.211852,
-        "columnProjectionCorrelation": 0.352522,
-        "edgeDensityDelta": 0.018911,
+        "fullFrameSimilarity": 0.937316,
+        "materialMismatchRatio": 0.118416,
+        "blurredStructureSimilarity": 0.945895,
+        "blockSsim": 0.713588,
+        "rowProjectionCorrelation": 0.212284,
+        "columnProjectionCorrelation": 0.35162,
+        "edgeDensityDelta": 0.019093,
         "titleRuleDelta": 0.016667,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -1966,13 +1967,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.942182,
-        "materialMismatchRatio": 0.123069,
-        "blurredStructureSimilarity": 0.949971,
-        "blockSsim": 0.72512,
-        "rowProjectionCorrelation": -0.007634,
-        "columnProjectionCorrelation": 0.384321,
-        "edgeDensityDelta": 0.016111,
+        "fullFrameSimilarity": 0.94217,
+        "materialMismatchRatio": 0.123056,
+        "blurredStructureSimilarity": 0.949984,
+        "blockSsim": 0.725111,
+        "rowProjectionCorrelation": -0.007288,
+        "columnProjectionCorrelation": 0.383403,
+        "edgeDensityDelta": 0.016293,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0,
         "accepted": true
@@ -2005,9 +2006,9 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.960433,
-          "blurredStructureSimilarity": 0.955518,
-          "blockSsim": 0.834091
+          "fullFrameSimilarity": 0.960427,
+          "blurredStructureSimilarity": 0.955532,
+          "blockSsim": 0.834115
         }
       },
       "accepted": true
@@ -2032,23 +2033,23 @@
         "sha256": "9dfb3e21e92ebe33f5855ba6555831dc03c8327a5822125ee092a0b3d3635133"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.994416,
-        "materialMismatchRatio": 0.012908,
-        "blurredStructureSimilarity": 0.997611,
-        "blockSsim": 0.978517,
-        "rowProjectionCorrelation": 0.985598,
-        "columnProjectionCorrelation": 0.996223,
-        "edgeDensityDelta": 0.002756,
+        "fullFrameSimilarity": 0.994211,
+        "materialMismatchRatio": 0.012969,
+        "blurredStructureSimilarity": 0.997446,
+        "blockSsim": 0.977946,
+        "rowProjectionCorrelation": 0.985023,
+        "columnProjectionCorrelation": 0.996194,
+        "edgeDensityDelta": 0.003082,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.935024,
-        "materialMismatchRatio": 0.138346,
-        "blurredStructureSimilarity": 0.950425,
-        "blockSsim": 0.694645,
-        "rowProjectionCorrelation": 0.150056,
-        "columnProjectionCorrelation": 0.531782,
-        "edgeDensityDelta": 0.016411,
+        "fullFrameSimilarity": 0.934971,
+        "materialMismatchRatio": 0.138407,
+        "blurredStructureSimilarity": 0.950453,
+        "blockSsim": 0.694491,
+        "rowProjectionCorrelation": 0.149094,
+        "columnProjectionCorrelation": 0.532332,
+        "edgeDensityDelta": 0.016085,
         "titleRuleDelta": 0.013889,
         "footerRuleDelta": 0.005556,
         "accepted": true
@@ -2066,13 +2067,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.945606,
-        "materialMismatchRatio": 0.132318,
-        "blurredStructureSimilarity": 0.956165,
-        "blockSsim": 0.72722,
-        "rowProjectionCorrelation": 0.041975,
-        "columnProjectionCorrelation": 0.336566,
-        "edgeDensityDelta": 0.000929,
+        "fullFrameSimilarity": 0.945517,
+        "materialMismatchRatio": 0.132674,
+        "blurredStructureSimilarity": 0.956184,
+        "blockSsim": 0.727575,
+        "rowProjectionCorrelation": 0.044477,
+        "columnProjectionCorrelation": 0.339908,
+        "edgeDensityDelta": 0.001254,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -2105,9 +2106,9 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.976928,
-          "blurredStructureSimilarity": 0.96998,
-          "blockSsim": 0.948585
+          "fullFrameSimilarity": 0.976873,
+          "blurredStructureSimilarity": 0.970008,
+          "blockSsim": 0.948375
         }
       },
       "accepted": true
@@ -2132,23 +2133,23 @@
         "sha256": "73bb45804c5c75e55e7ae8d2ece40cd18761ef005c01d5d3c24ee33f13f71fc5"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.994636,
-        "materialMismatchRatio": 0.012383,
-        "blurredStructureSimilarity": 0.997608,
-        "blockSsim": 0.9805,
-        "rowProjectionCorrelation": 0.985887,
-        "columnProjectionCorrelation": 0.995945,
-        "edgeDensityDelta": 0.002912,
+        "fullFrameSimilarity": 0.994524,
+        "materialMismatchRatio": 0.012448,
+        "blurredStructureSimilarity": 0.997524,
+        "blockSsim": 0.98024,
+        "rowProjectionCorrelation": 0.985766,
+        "columnProjectionCorrelation": 0.99601,
+        "edgeDensityDelta": 0.003056,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.936638,
-        "materialMismatchRatio": 0.119531,
-        "blurredStructureSimilarity": 0.948726,
-        "blockSsim": 0.720416,
-        "rowProjectionCorrelation": 0.278901,
-        "columnProjectionCorrelation": 0.426968,
-        "edgeDensityDelta": 0.012214,
+        "fullFrameSimilarity": 0.936623,
+        "materialMismatchRatio": 0.119436,
+        "blurredStructureSimilarity": 0.94874,
+        "blockSsim": 0.720607,
+        "rowProjectionCorrelation": 0.280106,
+        "columnProjectionCorrelation": 0.42803,
+        "edgeDensityDelta": 0.01207,
         "titleRuleDelta": 0.016667,
         "footerRuleDelta": 0.005556,
         "accepted": true
@@ -2166,13 +2167,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.945853,
-        "materialMismatchRatio": 0.125043,
-        "blurredStructureSimilarity": 0.955618,
-        "blockSsim": 0.726609,
-        "rowProjectionCorrelation": 0.027555,
-        "columnProjectionCorrelation": 0.370831,
-        "edgeDensityDelta": 0.002878,
+        "fullFrameSimilarity": 0.945793,
+        "materialMismatchRatio": 0.125195,
+        "blurredStructureSimilarity": 0.955622,
+        "blockSsim": 0.726703,
+        "rowProjectionCorrelation": 0.027964,
+        "columnProjectionCorrelation": 0.372421,
+        "edgeDensityDelta": 0.002734,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -2205,8 +2206,8 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.969547,
-          "blurredStructureSimilarity": 0.963882,
+          "fullFrameSimilarity": 0.969532,
+          "blurredStructureSimilarity": 0.963896,
           "blockSsim": 0.865554
         }
       },
@@ -2232,23 +2233,23 @@
         "sha256": "0808572bd360d96661d0b72394a50b4154edbdd1063fafdddc319331f0a23e7a"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.99593,
+        "fullFrameSimilarity": 0.995857,
         "materialMismatchRatio": 0.008859,
-        "blurredStructureSimilarity": 0.998404,
-        "blockSsim": 0.984357,
-        "rowProjectionCorrelation": 0.988077,
-        "columnProjectionCorrelation": 0.994334,
-        "edgeDensityDelta": 0.00138,
+        "blurredStructureSimilarity": 0.998311,
+        "blockSsim": 0.98409,
+        "rowProjectionCorrelation": 0.987788,
+        "columnProjectionCorrelation": 0.994237,
+        "edgeDensityDelta": 0.001198,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.949667,
-        "materialMismatchRatio": 0.057161,
-        "blurredStructureSimilarity": 0.961211,
-        "blockSsim": 0.732583,
-        "rowProjectionCorrelation": 0.446046,
-        "columnProjectionCorrelation": 0.652947,
-        "edgeDensityDelta": 0.030699,
+        "fullFrameSimilarity": 0.949733,
+        "materialMismatchRatio": 0.057083,
+        "blurredStructureSimilarity": 0.961297,
+        "blockSsim": 0.732902,
+        "rowProjectionCorrelation": 0.4466,
+        "columnProjectionCorrelation": 0.651823,
+        "edgeDensityDelta": 0.030881,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -2266,13 +2267,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.951195,
-        "materialMismatchRatio": 0.06306,
-        "blurredStructureSimilarity": 0.961871,
-        "blockSsim": 0.73513,
-        "rowProjectionCorrelation": 0.169635,
-        "columnProjectionCorrelation": 0.646803,
-        "edgeDensityDelta": 0.013832,
+        "fullFrameSimilarity": 0.951248,
+        "materialMismatchRatio": 0.062921,
+        "blurredStructureSimilarity": 0.961926,
+        "blockSsim": 0.7354,
+        "rowProjectionCorrelation": 0.169935,
+        "columnProjectionCorrelation": 0.645701,
+        "edgeDensityDelta": 0.014015,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -2305,8 +2306,8 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.976921,
-          "blurredStructureSimilarity": 0.973091,
+          "fullFrameSimilarity": 0.976989,
+          "blurredStructureSimilarity": 0.973179,
           "blockSsim": 0.844825
         }
       },
@@ -2331,23 +2332,23 @@
         "sha256": "60cadef84bb2dfdfcaa6b4d0d65297c495ce7cdbd121a9f642b8410a6fbb5644"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.98596,
-        "materialMismatchRatio": 0.032622,
-        "blurredStructureSimilarity": 0.994767,
-        "blockSsim": 0.938535,
-        "rowProjectionCorrelation": 0.909505,
-        "columnProjectionCorrelation": 0.993697,
-        "edgeDensityDelta": 0.003533,
+        "fullFrameSimilarity": 0.98592,
+        "materialMismatchRatio": 0.032713,
+        "blurredStructureSimilarity": 0.994716,
+        "blockSsim": 0.938512,
+        "rowProjectionCorrelation": 0.909572,
+        "columnProjectionCorrelation": 0.994329,
+        "edgeDensityDelta": 0.003602,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.934708,
-        "materialMismatchRatio": 0.129913,
-        "blurredStructureSimilarity": 0.957795,
-        "blockSsim": 0.617448,
-        "rowProjectionCorrelation": 0.271856,
-        "columnProjectionCorrelation": 0.707711,
-        "edgeDensityDelta": 0.03487,
+        "fullFrameSimilarity": 0.934707,
+        "materialMismatchRatio": 0.12987,
+        "blurredStructureSimilarity": 0.957827,
+        "blockSsim": 0.617628,
+        "rowProjectionCorrelation": 0.272582,
+        "columnProjectionCorrelation": 0.708368,
+        "edgeDensityDelta": 0.0348,
         "titleRuleDelta": 0.013889,
         "footerRuleDelta": 0.005556,
         "accepted": true
@@ -2365,13 +2366,13 @@
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.947684,
-        "materialMismatchRatio": 0.118954,
-        "blurredStructureSimilarity": 0.96732,
-        "blockSsim": 0.659612,
-        "rowProjectionCorrelation": 0.24432,
-        "columnProjectionCorrelation": 0.832201,
-        "edgeDensityDelta": 0.006966,
+        "fullFrameSimilarity": 0.947677,
+        "materialMismatchRatio": 0.118945,
+        "blurredStructureSimilarity": 0.967346,
+        "blockSsim": 0.659743,
+        "rowProjectionCorrelation": 0.244977,
+        "columnProjectionCorrelation": 0.832598,
+        "edgeDensityDelta": 0.006897,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -2404,9 +2405,9 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.971145,
+          "fullFrameSimilarity": 0.971144,
           "blurredStructureSimilarity": 0.973137,
-          "blockSsim": 0.792862
+          "blockSsim": 0.793094
         }
       },
       "accepted": true
