@@ -4,6 +4,12 @@
 
 Relationships between two measures, segmentation, prioritization, and a third magnitude encoded by bubble area.
 
+## Guidance note
+
+- Use when relationships, clusters, or outliers across two measures matter; use bubble area only for a necessary third quantitative measure.
+- Why: position reveals association and separation without implying causality, while area adds scale.
+- Action title: state the observed relationship, cluster, or outlier and explain its decision relevance.
+
 ## Data contract
 
 One observation per point, x and y measures with units, optional size measure, stable observation IDs, missing-value policy, and documented thresholds for any quadrants. Record transformations and the basis of any fitted line.
@@ -15,11 +21,12 @@ One observation per point, x and y measures with units, optional size measure, s
 - Add quadrant lines only when thresholds are meaningful.
 - Label highlighted points and provide a key or appendix for the rest.
 - Use transparency or disclosed jitter only to reveal overlap.
-- Add a trend line only with an appropriate method.
+- Add a trend line only when the data type and sample support the named fitting method; report its basis or diagnostic and otherwise omit the line.
 - Use association language unless the analysis supports causality.
 - Use logos admitted by the [asset authorization record](../components/icons-and-logos.md#asset-authorization-record) inside points when entity recognition materially improves a market map or competitor landscape. Preserve the analytical position and bubble area; the logo does not become the mark's size encoding.
 - Give every logo equal clear-space rules and a neutral backing when needed. Fall back to a short text label when the logo is absent from that record.
 - When all bubbles are equal size, state that position alone is the encoding. Do not vary diameter decoratively.
+- Put multi-series marker legends in one horizontal row at the plot's top right. When bubble area carries a third measure, optionally append one neutral light-gray circle labelled with the size meaning; omit it when the size is already self-evident or directly labelled.
 
 Apply the shared [direct-label gate](index.md#direct-label-gate) to point labels. Use the shared [chart legend](../components/chart-legends.md) for category, scenario, marker, or highlight semantics that are not directly labelled. Use the shared [chart callout grammar](../components/chart-callouts.md) for thresholds, outliers, focal regions, and evidence leaders.
 
@@ -31,11 +38,17 @@ This is the core encoding. Position encodes x and y, marker area is constant, an
 
 ### Quadrant or segmented scatter
 
-Add vertical and horizontal thresholds only when both cut points have a documented decision basis. Label each region with the implication of being there, not merely `high` or `low`. Use one quiet background or edge treatment and keep points above every region fill.
+Add vertical and horizontal thresholds only when both cut points have a documented decision basis. Label each region with the implication of being there, not merely `high` or `low`. Choose one theme-bound treatment: `threshold-lines` for the lightest segmentation, `alternating-tint` for two opposed neutral regions, or `focus-tint` for one decision-critical quadrant. Keep points and labels above every region fill.
 
 ### Bubble scatter
 
 Add a third magnitude through marker area. Declare the size measure and legend, calculate area rather than diameter, and keep minimum and maximum bubbles legible without occluding decisive peers.
+
+The executable owner accepts `sizeLegend: { label, markerSize }`. The marker is a neutral light-gray circle with a quiet rule, while coloured circles continue to identify series. `markerSize` is an optional visual key size from 8 to 20 pixels; it does not rescale the data bubbles.
+
+### Executable quadrant contract
+
+Use `quadrants: { x, y, style, titles, focus }`. Both thresholds must sit strictly inside the declared x and y bounds. `titles` may name `topLeft`, `topRight`, `bottomLeft`, and `bottomRight`; omitted titles collapse. `focus` is required only to override the default top-right focus for `focus-tint`. Unsupported styles, title keys, or out-of-range thresholds fail before export. Point names must be unique, series identity is either present on every point or on none, and all coordinates must fit the declared bounds.
 
 ### Concentric distance bands
 
@@ -117,12 +130,12 @@ Start from the [labelled-scatter specimen](#structural-html-reference) and follo
 
 ## Platform mapping
 
-Normalize bubble size to area before layout when a target API accepts diameter or radius. Preserve observation-to-label mapping through sorting and filtering.
+Normalize bubble size to area before layout when a target API accepts diameter or radius. Preserve observation-to-label mapping through sorting and filtering. Render quadrant fills first, then threshold lines, axes, points, and labels. Keep the optional size key inside the shared top-right marker legend rather than creating a second floating legend.
 
 ## Failure modes
 
-Reject decorative bubble sizes, unauthorized or distorted logos, logos that replace area encoding, unlabeled decisive outliers, arbitrary quadrants, occluded points, unsupported causal claims, or platform-specific sizing.
+Reject decorative bubble sizes, unauthorized or distorted logos, logos that replace area encoding, unlabeled decisive outliers, arbitrary quadrants, multiple competing quadrant treatments, occluded points, unsupported causal claims, or platform-specific sizing. Bubble data controls area through a bounded square-root scale; labels clamp to the plot frame rather than the outer chart frame.
 
 ## Acceptance test
 
-Verify the relationship and outliers remain clear when logos become text labels. Every label maps to the correct observation. Every bubble area and position reconciles to the declared measures.
+Verify the relationship and outliers remain clear when logos become text labels. Every label maps to the correct observation. Every bubble area and position reconciles to the declared measures. When present, the size legend is neutral, named, and top-right; quadrant titles remain readable without becoming a substitute for the action title.

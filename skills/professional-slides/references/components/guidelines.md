@@ -6,7 +6,9 @@ This file owns the component-level grammar for enclosing, separating, or heading
 
 Assign one primary treatment to each repeated slide family before authoring its pages. Peer regions at the same hierarchical level must use the same treatment, and comparable chart, table, diagram, and comparison headers must use one deck-wide analytical-header treatment. Prefer the open treatment with a quiet underline because it scales across exhibits without consuming analytical space. Different semantic roles may coexist—for example, an open analytical canvas beside a theme-defined implication rail—but do not alternate treatments among equivalent regions merely for variety.
 
-Use the shared `section-heading` component for every peer analytical-region heading. A chart-side description and an analytical takeaway rail (`content-rail` with `treatment="open"`) share typography, colour, and one header band. Measure wrapping before layout; size the band to the tallest peer and bottom-align the text. Place each rule `space.2` below the text box, so one-line and multiline headings retain equal clearance. Reserve `space.3` after the rule before section content. An insight rail (`content-rail` with `treatment="muted"`) keeps the shared typography without an underline.
+Use the shared `section-heading` component for every peer analytical-region heading. A chart-side description and an analytical takeaway rail (`content-rail` with `treatment="open"`) share typography, colour, and one header band. Measure wrapping before layout; size the band to the tallest peer and bottom-align the text. Place each rule `space-2` below the text box, so one-line and multiline headings retain equal clearance. Reserve `space-3` after the rule before section content. The runtime token IDs are `space.2` and `space.3`. An insight rail (`content-rail` with `treatment="muted"`) keeps the shared typography without an underline.
+
+The executable `content-rail` contract accepts `heading`, an `items` string array, `treatment` set to `open` or `muted`, and optional `dividerLeft`. The executable `section-boundary` contract accepts only `variant`: `inference`, `related`, or `subsection`. Their registered geometry and token declarations live in [`runtime/registry.mjs`](../../runtime/registry.mjs); this file owns when each variant is valid.
 
 | Mode | Use when | Construction | Do not use when |
 | --- | --- | --- | --- |
@@ -24,9 +26,7 @@ Inside a box, align headings, values, bullets, icons, and dividers to the compon
 
 ### None / open
 
-`None` means no visible section enclosure, not no structure. Establish the grouping through shared starts and ends, consistent content tops, proximity, whitespace intervals, typography roles, and a clear dominant exhibit. Keep backgrounds continuous and avoid faint rectangles that function as undeclared boxes. For repeated chart, table, diagram, and comparison headers, default to one quiet underline aligned to the full region width and use that construction consistently across the deck.
-
-Thin rules may separate the title, source, footer, or an open analytical header. Do not frame analytical content to compensate for weak alignment. Use open underlined mode when a chart or diagram already provides structure.
+`None` means no visible enclosure. Use shared starts and ends, content tops, whitespace and typography to establish grouping. Keep the background continuous; faint rectangles still count as boxes. Analytical header rules follow [the shared treatment](#choose-one-section-treatment); title and footer rules follow the page template.
 
 ### Highlighted section headers
 
@@ -40,14 +40,24 @@ The shared section heading owns heading text and its optional rule only. It has 
 
 ## Component line grammar
 
+### Split-section relationships
+
+For a left exhibit and right-hand interpretation, record the relationship in the plan and treatment ledger before selecting a boundary:
+
+- **Supported inference:** use `section-boundary` with `variant="inference"`: a quiet vertical divider interrupted by a compact right-pointing disc-chevron. The left must support the right-hand conclusion; position alone does not imply causation.
+- **Related context:** use `variant="related"`, a simple dashed vertical divider, or one light-grey `section` with `treatment="muted"`. Do not add an arrow for assumptions, caveats, or adjacent commentary that the exhibit does not establish.
+- **Sections inside a grey panel:** reuse `section-heading` without a rule and ordinary body-text components. Put a `variant="subsection"` horizontal separator only between cohesive groups. All section and subsection headings share one heading size; all body copy shares one body size. Use spacing and separators, not shrinking fonts, to distinguish groups.
+
+Reserve the boundary inside the inter-section gap, from the content top to the content bottom, excluding the title and footer. Divider segments stop clear of the inference marker. Use either the dashed divider or grey enclosure for context, not both. Keep the same boundary meaning across comparable slides. Arbitrary nested sections remain valid; no evidence/synthesis slot taxonomy is required.
+
+### Line construction
+
 Every visible component line must have exactly one job: boundary, separator, leader, or state accent. Chart axes and gridlines belong to [`charts`](../charts/index.md); diagram connectors belong to [relationship components](relationships.md); this file governs only lines that structure reusable components and content regions.
 
 - Resolve line colour, weight, dash, and cap from the active theme; do not create slide-local line values.
-- Use continuous quiet rules for ordinary boundaries and separators. Reserve an accent line for a named state or theme-defined emphasis treatment.
+- Use continuous quiet rules for ordinary separators; split-section context uses the dashed variant above. Reserve an accent line for a named state or theme-defined emphasis treatment.
 - Start and end a separator on the parent component's guides. Do not leave almost-aligned rules, arbitrary overhangs, or gaps that look accidental.
-- Use one boundary mechanism at a time. Fill, whitespace, header band, or rule should carry the grouping; stacking all four makes the hierarchy noisy.
-- Do not add short decorative strokes beneath headings. An underline is valid only as the selected open analytical-header treatment, spans the region width, and repeats for comparable chart, table, diagram, and comparison headers.
-- Do not underline an insight-rail heading. Use `content-rail` with `treatment="muted"`; an internal divider may appear only between distinct content sections.
+- Follow the selected section treatment; header rules span the region width, and muted insight rails have no heading rule.
 - Keep the same line meaning across the deck. A colour or dash used for a separator must not become a forecast, connector, or status encoding elsewhere.
 
 ## Theme inheritance and named variants
@@ -61,11 +71,9 @@ Detached implication regions use the active [`Insight Box`](insight-box.md) vari
 - each visible line, box, fill, or highlighted header expresses a named grouping, hierarchy, or state;
 - peer regions use one treatment and one resolved variant;
 - comparable analytical headers use one deck-wide treatment, with the open underlined form preferred unless an approved theme or semantic boundary requires another mode;
-- chart-side descriptions and analytical takeaway rails with `treatment="open"` use the same `section-heading` geometry, type, colour, and rule;
-- insight rails with `treatment="muted"` use the same heading type without a rule;
-- wrapped peer headings share a bottom guide and equal text-to-rule clearance in both rendered outputs;
+- peer headings pass the shared treatment and measured-clearance contract above in both rendered outputs;
 - the action title remains the first read and the dominant evidence remains clear;
 - boundaries terminate on valid component or slide-family guides;
+- split-section arrows express supported inferences; related context has a dashed divider or grey panel, and nested panel headings/body retain their shared sizes;
 - fills, outlines, headers, padding, and text roles match the active theme after final rendering;
-- removing decorative lines or boxes does not reduce comprehension because no decorative lines or boxes remain;
 - no region is double-framed by a header band, fill, border, and shadow without an approved inherited reason.

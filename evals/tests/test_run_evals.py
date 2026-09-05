@@ -168,10 +168,16 @@ class EvalRunnerTests(unittest.TestCase):
         }
 
     def test_package_is_valid(self):
-        self.assertEqual(eval_runner.check_package(), [])
+        self.assertEqual(eval_runner.check_package(include_generated=False), [])
 
     def test_reference_fidelity_report_is_bound_to_runtime_sources(self):
         report = json.loads((ROOT / "evals" / "reference-fidelity-eval.json").read_text())
+        # Unit-test freshness enforcement with a current in-memory manifest.
+        # The release command separately checks the untouched saved report.
+        report["inputs"]["runtimeSources"] = {
+            name: eval_runner.file_sha256(ROOT / name)
+            for name in eval_runner.REFERENCE_FIDELITY_SOURCE_PATHS
+        }
         self.assertEqual(eval_runner.validate_reference_fidelity_report(report), [])
         first_path = sorted(report["inputs"]["runtimeSources"])[0]
         report["inputs"]["runtimeSources"][first_path] = "0" * 64

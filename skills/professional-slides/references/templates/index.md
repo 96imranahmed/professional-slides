@@ -14,11 +14,17 @@ If no template matches, do not force one. Use [`storylining`](../storylining/ind
 
 Add or revise templates through the [`template authoring contract`](authoring.md). A template is available only after its file is registered and the registry validator passes.
 
+## Specimen copy and guidance notes
+
+Reusable slide specimens use neutral parenthetical prompts such as `(Insert action title)`, `(Insert section title)`, `(Insert chart title)`, and `(Insert supporting point)`. Do not use square-bracket placeholders or client-, toolkit-, industry-, or company-specific claims as default copy. When a template includes a reusable executive-summary specimen, include three prompt bullets under each titled theme. Include at least two prompt bullets in every row or rail that advertises a developed list; other specimens follow the selected density profile.
+
+Every advertised standard slide specimen and chart specimen carries a short speaker note with three fields: `Use when`, `Why`, and `Action title`. The note explains the decision context for the form, the analytical reason it fits, and the kind of evidence-backed conclusion the action title should state. Keep this instruction out of the visible slide body. Covers, dividers, and tracker pages may state that an action title is not applicable and specify the appropriate navigation title instead.
+
 ## Instantiation contract
 
 For a new deck, use the selected template to seed a problem-specific hypothesis tree and dot-dash. Before layout, resolve the actual audience and decision, root question, one-sentence governing thought, branch-specific evidence states, exact chapter labels, tracker system, chapter-to-dot mapping, and closing decision. Preserve this instantiated architecture with the storyboard, source ledger, and validated pre-authoring contract. For an existing-deck revision, inventory the current architecture slide-for-slide before editing and treat template gaps as recommendations unless the requested scope or owner approval authorizes a structural rebuild.
 
-Template branches and chapter labels are seeds, not mandatory page titles or a canned slide count. Merge, split, rename, or omit them before approval when the brief and evidence justify the change and the final structure remains MECE. The approved tracker map then freezes the resulting labels; every tracker occurrence uses those exact approved replacements. Do not copy placeholder claims, invent proof to fill a branch, or treat the template as permission to bypass [`hypothesis-tree`](../storylining/hypothesis-tree.md) and [`dot-dash`](../storylining/dot-dash.md) acceptance.
+Template branches and chapter labels are seeds, not mandatory page titles or a canned slide count. Merge, split, rename, or omit them before approval when the brief and evidence justify the change and the final structure remains MECE. Template-specific mandatory branches and evidence gates remain binding unless that template explicitly permits an exception. The approved tracker map then freezes the resulting labels; every tracker occurrence uses those exact approved replacements. Do not copy placeholder claims, invent proof to fill a branch, or treat the template as permission to bypass [`hypothesis-tree`](../storylining/hypothesis-tree.md) and [`dot-dash`](../storylining/dot-dash.md) acceptance.
 
 ## Ownership boundary
 

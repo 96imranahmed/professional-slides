@@ -1,6 +1,6 @@
 # Table Cell Status and Comparison Indicators
 
-This component owns compact completion, binary confirmation, traffic-light status, bounded heatmap scores, and ordinal fill discs inside tables. It keeps the indicator subordinate to the row evidence, preserves an explicit value or label, and resolves every colour through the active theme.
+This component owns compact completion, binary confirmation, traffic-light status, bounded heatmap scores, and ordinal fill discs inside tables. It keeps the indicator subordinate to the row evidence, preserves an explicit value, registered symbol, or label, and resolves every colour through the active theme.
 
 Use the semantic row and cell icon contract in [`icons-and-logos`](icons-and-logos.md#row-and-cell-icons) when a compact library icon improves scanning or replaces a repeated low-information word. Use this component when the cell encodes measured completion, a threshold-based status, or an ordered score.
 
@@ -20,7 +20,9 @@ A traffic-light table must include one visible legend on the same slide. The leg
 
 ### Binary confirmation
 
-Use a check and `Supported` label for a defined positive state and a cross and `Not supported` label for a defined negative state. The symbol is the primary non-colour cue; colour may reinforce it through the existing positive and negative theme roles. Use `Not assessed` or `Missing` explicitly rather than leaving a blank cell. Define the confirmation test in the column heading or note, and do not use a check merely to signal preference.
+Use a compact check for a defined positive state, a compact cross for a defined negative state, and a short horizontal mark for not assessed. The symbol-only `none` label display is the default because a repeated state word usually adds clutter. Use `labelDisplay: "state"` only when the audience may not recognize the symbols or when the cells are read outside the table context. The marker binds to `icon.small`, uses a hairline stroke, and stays close to the compact body-text scale.
+
+The symbol is the primary non-colour cue; colour may reinforce it through the existing positive and negative theme roles. Never leave a missing state blank. Define the confirmation test in the column heading, a concise same-slide note, or accessible metadata, and do not use a check merely to signal preference.
 
 ### One-to-five heatmap cell
 
@@ -45,7 +47,7 @@ Do not use an ordinal disc for percentages, confidence, or measured completion. 
 | Component | Consumed custom properties | Canonical source |
 | --- | --- | --- |
 | completion spinner | `--table-cell-completion-fill`, `--table-cell-completion-track`, `--table-cell-completion-size`, `--table-cell-completion-gap`, `--table-cell-completion-font` | [component bindings](../theming/component-bindings.md#evidence-components) |
-| traffic-light cell | `--table-cell-status-positive`, `--table-cell-status-caution`, `--table-cell-status-negative`, `--table-cell-status-missing`, `--table-cell-status-marker-size`, `--table-cell-status-gap`, `--table-cell-status-font` | [component bindings](../theming/component-bindings.md#evidence-components) |
+| traffic-light and binary cell | `--table-cell-status-positive`, `--table-cell-status-caution`, `--table-cell-status-negative`, `--table-cell-status-missing`, `--table-cell-status-marker-size`, `--table-cell-status-gap`, `--table-cell-status-font`, `--table-cell-binary-line` | [component bindings](../theming/component-bindings.md#evidence-components) |
 | heatmap cell | `--table-cell-heat-1` through `--table-cell-heat-5`, `--table-cell-heat-on-low`, `--table-cell-heat-on-high`, `--table-cell-heat-missing`, `--table-cell-heat-missing-color`, `--table-cell-heat-font`, `--table-cell-heat-min-size`, `--table-cell-heat-padding` | [component bindings](../theming/component-bindings.md#evidence-components) |
 | ordinal fill disc | `--table-cell-rating-fill`, `--table-cell-rating-track`, `--table-cell-rating-size`, `--table-cell-rating-gap`, `--table-cell-rating-font` | [component bindings](../theming/component-bindings.md#evidence-components) |
 | indicator legend | `--table-cell-legend-font`, `--table-cell-legend-color`, `--table-cell-legend-gap`, `--table-cell-legend-item-gap`, `--table-cell-legend-swatch-size`, `--table-cell-legend-rule` | [component bindings](../theming/component-bindings.md#evidence-components) |
@@ -92,8 +94,8 @@ Do not use an ordinal disc for percentages, confidence, or measured completion. 
       <table class="data-table" aria-label="Evidence confirmation">
         <thead><tr><th>Statement</th><th>Confirmation</th></tr></thead>
         <tbody>
-          <tr><th>Demand exceeds the threshold</th><td class="table-cell-status" data-variant="binary" data-state="positive"><span class="table-cell-status__binary" aria-hidden="true">✓</span><span>Supported</span></td></tr>
-          <tr><th>Supply remains constrained</th><td class="table-cell-status" data-variant="binary" data-state="negative"><span class="table-cell-status__binary" aria-hidden="true">×</span><span>Not supported</span></td></tr>
+          <tr><th>Demand exceeds the threshold</th><td class="table-cell-status" data-variant="binary" data-state="positive" data-label-display="none" aria-label="Supported"><span class="table-cell-status__binary" aria-hidden="true">✓</span></td></tr>
+          <tr><th>Supply remains constrained</th><td class="table-cell-status" data-variant="binary" data-state="negative" data-label-display="none" aria-label="Not supported"><span class="table-cell-status__binary" aria-hidden="true">×</span></td></tr>
         </tbody>
       </table>
     </figure>
@@ -226,6 +228,7 @@ Do not use an ordinal disc for percentages, confidence, or measured completion. 
   width: var(--table-cell-status-marker-size);
   color: var(--table-cell-status-missing);
   font: var(--table-cell-status-font);
+  stroke-width: var(--table-cell-binary-line);
 }
 
 [data-variant="binary"][data-state="positive"] > .table-cell-status__binary { color: var(--table-cell-status-positive); }
@@ -352,14 +355,14 @@ The HTML exposes one component class with five registered variants. `data-palett
 
 - `completion` accepts `--value` from `0` to `100`. Its default palette is component-primary plus the neutral track. `data-state` may rebind the fill only when a written threshold exists.
 - `traffic-light` accepts `positive`, `caution`, `negative`, or `missing`. Every cell includes a visible label and every table includes a same-slide legend.
-- `binary` accepts `positive`, `negative`, or `missing`. It uses a check, cross, or explicit missing mark plus visible text and a written confirmation test.
+- `binary` accepts `positive`, `negative`, or `missing`. `labelDisplay: "none"` is the compact default and centers the check, cross, or missing mark in the cell. `labelDisplay: "state"` places the registered state wording beside the same mark. Both variants retain a written confirmation test in the table contract.
 - `heatmap` accepts scores `1` through `5` and `missing`. A different bounded domain is allowed only when the score labels, scale anchors, and legend are changed together.
 - `ordinal-disc` accepts ratings `0` through `4` and `missing`. Every disc prints a score or named level and the table includes one same-slide legend defining the anchors.
 - `theme-sequential`, `red-white-green`, and `red-white` are the registered heatmap palettes. Palette names describe the scale construction, while the actual swatches resolve through the active theme.
 
 ## Native translation
 
-Build completion and ordinal discs as one editable neutral circle plus one editable filled sector, with the value or level in a separate text box. Build traffic lights as editable circles and adjacent text. Build binary confirmation as an editable check, cross, or missing mark plus adjacent text. Build a heatmap as editable table-cell fills plus editable centered values. Resolve every fill and text colour from the active theme before creating the native objects.
+Build completion and ordinal discs as one editable neutral circle plus one editable filled sector, with the value or level in a separate text box. Build traffic lights as editable circles and adjacent text. Build binary confirmation from two editable hairline strokes for a check or cross and one for the missing mark. Add the adjacent state text only for the labelled variant. Build a heatmap as editable table-cell fills plus editable centered values. Resolve every fill and text colour from the active theme before creating the native objects.
 
 Group each legend with its table, not with page furniture. Preserve the legend in PowerPoint and Google Slides as editable shapes and text. Keep the table's accessible description, cell labels, and legend wording in speaker notes or object metadata when the platform cannot retain HTML relationships.
 
@@ -367,7 +370,7 @@ Group each legend with its table, not with page furniture. Preserve the legend i
 
 - Every spinner maps to a declared `0%` to `100%` quantity and prints the value.
 - Every traffic-light state has a written trigger, a visible text label, and a same-slide legend.
-- Every binary state has a written confirmation test, an explicit symbol, and visible text; blanks are never interpreted as negative.
+- Every binary state has a written confirmation test and an explicit compact symbol; the labelled variant also shows the registered state text. Blanks are never interpreted as negative.
 - Every heatmap has named scale anchors, a printed value in each cell, and a same-slide legend using the exact same palette.
 - Every ordinal disc maps to a declared bounded scale, prints a score or named level, and has a same-slide legend; it never represents a percentage or probabilistic confidence.
 - `red-white-green` has a real neutral midpoint; `red-white` does not use white for missing data.

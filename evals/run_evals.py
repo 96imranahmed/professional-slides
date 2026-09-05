@@ -37,8 +37,17 @@ REFERENCE_FIDELITY_SOURCE_PATHS = {
     "skills/professional-slides/runtime/overlap-policy.mjs",
     "skills/professional-slides/runtime/validate-overlap.mjs",
     "skills/professional-slides/runtime/registry.mjs",
+    "skills/professional-slides/runtime/trackers.mjs",
+    "skills/professional-slides/runtime/insight-tree-table.mjs",
+    "skills/professional-slides/runtime/quote-cluster.mjs",
+    "skills/professional-slides/runtime/maps.mjs",
+    "skills/professional-slides/runtime/natural-earth-map-data.mjs",
+    "skills/professional-slides/runtime/tables.mjs",
+    "skills/professional-slides/runtime/table-fixtures.mjs",
     "skills/professional-slides/runtime/charts.mjs",
+    "skills/professional-slides/runtime/chart-annotations.mjs",
     "skills/professional-slides/runtime/chart-group.mjs",
+    "skills/professional-slides/runtime/guidance.mjs",
     "skills/professional-slides/runtime/legends.mjs",
     "skills/professional-slides/runtime/palettes.mjs",
     "skills/professional-slides/runtime/typography.mjs",
@@ -134,8 +143,8 @@ def validate_reference_fidelity_report(report: dict[str, Any]) -> list[str]:
         errors.append(f"{label}: source gallery index hash is invalid")
 
     fixtures = report.get("fixtures")
-    if not isinstance(fixtures, list) or len(fixtures) != 18:
-        errors.append(f"{label}: exactly 18 golden fixtures are required")
+    if not isinstance(fixtures, list) or len(fixtures) != 16:
+        errors.append(f"{label}: exactly 16 source-mapped fixtures are required; replacement covers and dividers are checked in the golden set")
         fixtures = []
     source_slides: set[int] = set()
     for index, fixture in enumerate(fixtures):
@@ -1088,7 +1097,7 @@ def evaluate(
     return errors, report
 
 
-def check_package() -> list[str]:
+def check_package(*, include_generated: bool = True) -> list[str]:
     errors: list[str] = []
     try:
         cases = load_json(CASES_PATH)
@@ -1104,6 +1113,8 @@ def check_package() -> list[str]:
     ):
         if not path.is_file() or not path.read_text(encoding="utf-8").strip():
             errors.append(f"missing or empty evaluation validator: {path}")
+    if not include_generated:
+        return errors
     if not REFERENCE_COPY_REPORT_PATH.is_file():
         errors.append(f"missing reference-copy model report: {REFERENCE_COPY_REPORT_PATH}")
     else:

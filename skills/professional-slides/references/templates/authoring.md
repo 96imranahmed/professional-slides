@@ -16,8 +16,8 @@ Create one kebab-case Markdown file with these sections:
 - `Story structure`: chapter spine and sequencing logic, without fixed page counts;
 - `Analytical jobs`: evidence obligations routed to registered component, chart, and composition owners;
 - `Evidence`: source, uncertainty, cutoff, and missing-data rules;
-- `Navigation`: exact chapter labels and recommended tracker behavior, or an explicit `none` decision when navigation is not warranted;
-- `Page composition`: only template-specific composition needs;
+- `Navigation`: default chapter-label seeds and recommended tracker behavior, or an explicit `none` decision when navigation is not warranted. State how the seeds may be merged, renamed, or omitted under the [`instantiation contract`](index.md#instantiation-contract);
+- `Page composition`: only template-specific needs, with direct links to the canonical composition, chart, component and design owners instead of restating their rules;
 - `Failure checks`: ways the template can create a misleading or incomplete deck;
 - `Acceptance check`: observable completeness tests.
 
@@ -46,4 +46,4 @@ Run:
 python evals/scripts/validate_template_registry.py
 ~~~
 
-Then add a source-structure test for the template's distinct decision architecture and an evaluation case when the template is mature enough to claim support. Registration proves structural validity, not deck quality.
+Add the architecture assertion to `evals/tests/test_source_structure.py`: verify the file is registered, every required section is present, and one template-specific decision-architecture invariant holds. Run it with `python -m unittest discover -s evals/tests -p 'test_source_structure.py'`. Add an evaluation case when the template is mature enough to claim support. Registration proves structural validity, not deck quality.

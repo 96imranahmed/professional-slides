@@ -60,15 +60,24 @@ Preserve the design unless a redesign is requested. Recommend missing new-deck s
 
 - One slide, one main claim, one dominant exhibit.
 - A dominant exhibit must use its allocated canvas and include the comparison, qualifier, labels, and attached interpretation needed to prove the title. Whitespace is not evidence; do not leave an executive pre-read under-composed.
-- Use the fewest words that preserve the decision. Draft to roughly half the applicable copy ceiling.
+- Use enough substantive interpretation to make the decision clear. Remove repetition, not the reasoning that connects evidence to consequence; follow the [copy owner](references/components/copy.md).
+- Executive summaries need multiple substantive bullets under each titled section, not one compressed point per theme. Apply the [executive-summary completeness contract](references/components/copy.md#executive-summary-narrative), keep shared body type, and close with one recommendation and change condition.
+- Place detached bottom conclusions in the [shared insight box](references/components/insight-box.md): normally one complete sentence, without a separate title or arrow. Use its theme-bound tonal or primary surface, not a local text-strip design.
+- Use the [shared Quote Cluster](references/components/quote-cluster.md) for sourced voices. Keep quote count, full-field or sectional placement, enclosure, attribution alignment, and optional avatars as component inputs rather than slide-local drawings.
 - Use the action title to state the answer.
 - Match the exhibit to the evidence. Do not force a card grid or table.
+- On analytical table pages, put the exhibit before its insight and develop the row reasoning. Use the [typed table owner](references/charts/heatmap-table.md) for arbitrary columns, grouped rows, indicators and in-cell charts; do not build a topic-specific table template.
 - Select layout from the content items and their relationship. Do not classify a topic into a fixed page template.
 - Use one accent colour plus neutrals unless the data needs more.
 - Resolve visual values through the active theme. Do not tune individual slides with local literals.
 - Prefer one variant for each recurring component or semantic relationship across the deck. This is a consistency default, not a hard constraint: change variants when the content, hierarchy, or deliberate emphasis justifies it.
-- Use trackers only for navigation. Omit them when the title sequence is enough. When used, reserve the full sequential-circles state for contents or transition pages and use only the declared compact tracker on analytical pages.
+- Use trackers only for navigation. Omit them when the title sequence is enough. When used, compile the registered full tracker page and its associated compact analytical header from the same exact item map and selected id; do not hand-build either state.
+- Use the shared [map component](references/components/maps.md) for geographic evidence. Select an authorized standard geography or explicit country crop; do not approximate continents with generic shapes.
 - Use the shared chart-title component: underline the heading, or show a light-grey unit below it without a rule. Use the shared legend or direct-label grammar unless the approved contract records a justified exception.
+- Use one declared chart highlight: one primary bar against neutral peers, one primary region outline, or one light-neutral region tint. Exactly two unstacked marks should use a strongly contrasting pair from the active chart palette unless an explicit series mapping applies. Two peer charts may use one quiet gutter divider when whitespace alone does not separate them.
+- Use shared chart change annotations when the comparison needs them: an arrow for directional A-to-B movement, a bracket for a meaningful interval, a construction for a reconciled start-to-end bridge, or one aligned rail below period labels. Bind every endpoint to exact category and series keys.
+- Keep simple plot fields blank. Gridlines are off by default and should be enabled only when a dense or multiseries chart requires intermediate scale reading.
+- In reusable template specimens, use neutral parenthetical prompts such as `(Insert action title)` or `(Insert section title)`. Never use square-bracket placeholder copy. Put brief guidance on when to use the slide or chart, why the form is appropriate, and what the action title should reflect in speaker notes rather than on the canvas.
 - Delete labels, boxes, strips, icons, and copy that do not add meaning.
 - Never invent evidence or hide uncertainty.
 
@@ -84,7 +93,7 @@ After rendering, compare the full montage and every slide against the treatment 
 
 Apply the deletion test: remove anything whose absence does not weaken the argument, evidence, decision, navigation, or provenance.
 
-For net-new PowerPoint, compile the canonical scene and design manifest, render the HTML observer, generate editable native objects with the PptxGenJS adapter, and re-import the exact PPTX through Artifact Tool. Run `npm run validate:runtime` whenever the runtime, tokens, components, charts, or adapters change. This regenerates the [golden set](references/composition/index.md#golden-component-set) in all three palettes; a single-component probe is not release evidence.
+For net-new PowerPoint, compile the canonical scene and design manifest, render the HTML observer, generate editable native objects with the PptxGenJS adapter, and re-import the exact PPTX through Artifact Tool. Finish the complete implementation batch before running `npm run validate:runtime`; do not restart the expensive render-and-readback suite after each intermediate edit. The final run regenerates the [golden set](references/composition/index.md#golden-component-set) in the canonical McKinsey palette; fast contract tests retain coverage of other supported palette inputs. A single-component probe is not release evidence.
 
 Run the [evaluation guide](references/evaluation/index.md) on the exact final artifact. Render every slide, review the full montage, inspect every slide at full size, check overflow and sources, and verify the editable file itself. For PowerPoint, compile the hard acceptance manifest, run the exported-PPTX validator, then run the independent visual validator with every exact slide render and the exact generation script. A rejection from any structural, adapter, component, or visual gate requires a source repair, fresh export, fresh render, and another review. Repeat until the exact candidate is accepted. For dual-format work, validate PowerPoint and Google Slides separately.
 

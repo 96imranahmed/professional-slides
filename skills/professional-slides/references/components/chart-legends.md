@@ -19,12 +19,16 @@ Use a legend when hue, pattern, line style, or symbol carries meaning that is no
 
 - `swatch`: filled square or short bar for categorical or stacked series. Default for bars, columns, pies, and areas.
 - `line`: short line sample with the plotted stroke, dash, and optional marker. Default for line and combo charts.
-- `marker`: point symbol for scatter or bubble categories when the shapes differ or hue requires decoding.
+- `marker`: point symbol for scatter or bubble categories when the shapes differ or hue requires decoding. An optional neutral light-gray circle may describe bubble-area magnitude in the same row; its marker size is a legend key only and does not alter the data scale.
 - `state`: explicit actual, forecast, target, scenario, or missing key with both text and a non-colour cue.
 
-Placement is independent of variant. Use a horizontal `top` legend by default for multi-series analytical charts so series decoding precedes the plot and related slides preserve a stable plot width. Use horizontal `top-right` for a pie or donut beside a takeaway rail: render one row of square swatches and labels above the plot, size items from their labels, and align the row to the chart region's right guide. Use `right` only when the plot stays wide enough. Use `inline` beside a local section heading only when peer plot geometry remains unchanged.
+Placement is independent of variant. Use a horizontal `top-right` legend by default for multi-series analytical charts so series decoding precedes the plot, the row ends on the chart region's right guide, and related slides preserve a stable plot width. Use the same horizontal `top-right` placement for a pie or donut: render one row of square swatches and labels above the plot. Use `top` only when a nearby left-aligned chart heading or explicit reference geometry makes that alignment more coherent. Use `right` only when the plot stays wide enough. Use `inline` beside a local section heading only when peer plot geometry remains unchanged.
 
-For multiple coordinated charts, use `bottom-center`: one horizontal row centred across their combined width, without a surrounding highlight box. Use the [chart-group contract](#coordinated-chart-groups) below. A legend must fit at its declared font size; fail instead of shrinking or distributing labels across arbitrary equal-width cells. The golden set covers all four key variants in all five placements.
+For multiple coordinated charts, use `bottom-center`: one horizontal row centred across their combined width, without a surrounding highlight box. Use the [chart-group contract](#coordinated-chart-groups) below. A legend must fit at its declared font size; fail instead of shrinking or distributing labels across arbitrary equal-width cells.
+
+Legend labels use the chart-label role at the active body size. Keep them regular even when direct labels or annotations use semibold. If a body-sized row does not fit, shorten the labels, widen the chart region, use direct labels, or select another encoding; do not introduce a smaller local legend size.
+
+The standalone legend primitive permits all twenty combinations of its four key variants and five placements; the golden set tests that capability matrix. The chart-situation router above selects the appropriate combination for an actual exhibit. Isolation coverage does not authorize ignoring that router or require displaying every combination in a deck.
 
 ## Coordinated chart groups
 
@@ -99,4 +103,4 @@ Use the canonical [scene-to-native chart mapping](../tools/css-to-native-mapper.
 
 ## Acceptance check
 
-Verify each key maps to one visible encoding and follows chart order. Actual and forecast remain distinct without colour. Peer exhibits share one mapping. Legends do not shift comparable plots. A `top-right` pie or donut legend remains one row of square keys above the plot and ends on the chart region's right guide. Every label is readable in the final render.
+Verify each key maps to one visible encoding and follows chart order. Actual and forecast remain distinct without colour. Peer exhibits share one mapping. Legends do not shift comparable plots. A default `top-right` legend remains one row above the plot and ends on the chart region's right guide. Every label is readable in the final render.

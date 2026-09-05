@@ -57,13 +57,13 @@ A full pre-read usually contains:
 6. decision, conditions, and value creation;
 7. appendix and source record.
 
-Use [storylining](../storylining/index.md) to turn this logic into the assignment-specific hypothesis tree and dot-dash. Use the [pre-authoring contract](../storylining/pre-authoring-contract.md) before production.
+Convert these tests into assignment-specific hypotheses; preserve the retrospective cutoff and coverage ledger as explicit gates in the [pre-authoring contract](../storylining/pre-authoring-contract.md).
 
-The executive summary uses a concise answer spine composed from registered titles, metrics, panels, and at most one insight box. It is not a status dashboard.
+Follow the [executive-summary narrative contract](../components/copy.md#executive-summary-narrative). This template supplies the commercial proof themes, not an alternative summary construction.
 
 ## Navigation
 
-For a full pre-read, seed one flat tracker map with these analytical chapter labels: `Market attractiveness`, `Customer quality`, `Competitive position`, `Commercial engine`, `Plan and downside`, and `Decision and value creation`. Use `sequential-circles` for the full state and `compact-number-strip` for governed analytical slides. Use `hierarchical-segmented` only if the approved dot-dash separately defines parent chapters, child analytical subgroup IDs, labels, order, and slide ranges as required by the [tracker owner](../components/trackers/index.md#parent-and-chapter-hierarchy). Approved replacements become exact under the [template instantiation contract](index.md#instantiation-contract). For a red-flag review, preliminary screen, or short deck whose title spine is sufficient, record `tracker.system: none`; do not invent a reduced tracker.
+Use the [tracker router](../components/trackers/index.md). For an eligible full pre-read, seed the label map with `Market attractiveness`, `Customer quality`, `Competitive position`, `Commercial engine`, `Plan and downside`, and `Decision and value creation`. Approved replacements become exact under the [template instantiation contract](index.md#instantiation-contract). The title spine may provide sufficient orientation without a tracker.
 
 ## Analytical jobs
 
@@ -113,7 +113,7 @@ Separate:
 - retrospective inference;
 - unresolved question.
 
-Cite every slide. State sample size, date, geography, and material bias for primary research. Triangulate important claims when possible.
+Cite every slide. State sample size, date, geography, and material bias for primary research. Claims supporting the recommendation, valuation, or downside case require two independent sources or an explicit single-source limitation.
 
 Do not invent revenue, customers, retention, margin, market share, valuation, or forecast data.
 

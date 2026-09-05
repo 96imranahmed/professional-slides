@@ -56,6 +56,8 @@ Do not preserve browser pixels literally after translation. Preserve the named t
   --type-action-title: var(--weight-bold) var(--size-action-title) / var(--line-action-title) var(--font-display);
   --type-section-title: var(--weight-bold) var(--size-section-title) / var(--line-section-title) var(--font-display);
   --type-section-number: var(--weight-regular) var(--size-section-number) / var(--line-section-number) var(--font-display);
+  --type-quote-mark: var(--weight-bold) var(--size-quote-mark) / var(--line-quote-mark) var(--font-display);
+  --type-quote-mark-hero: var(--weight-bold) var(--size-quote-mark-hero) / var(--line-quote-mark-hero) var(--font-display);
   --type-section-heading: var(--weight-bold) var(--size-section-heading) / var(--line-section-heading) var(--font-sans);
   --type-column-heading: var(--weight-bold) var(--size-body-compact) / var(--line-body-compact) var(--font-sans);
   --type-body: var(--weight-regular) var(--size-body) / var(--line-body) var(--font-sans);
@@ -94,6 +96,12 @@ Do not preserve browser pixels literally after translation. Preserve the named t
 
 The aliases at the end preserve existing specimen vocabulary. New component specimens should use the namespaced bindings in [component bindings](component-bindings.md).
 
+### Resolved table heat scales
+
+The runtime materializes `color.heat.<palette>.<stop>` (CSS `--heat-<palette>-<stop>`) for stops 0–10. `theme-sequential` interpolates canvas to component-primary, `red-white` interpolates negative to canvas, and `red-white-green` interpolates negative through canvas at stop 5 to positive. These are derived theme tokens, not cell-local colours. A declared score domain maps consistently to the nearest stop; cells and legend consume the identical token. Text uses the contrasting ink or on-primary role. Missing evidence uses the neutral missing treatment rather than a scale endpoint.
+
+`color.componentPrimary` (`--component-primary`) resolves to `#051C2C` dark navy for McKinsey, `#197A56` green for BCG, and `#CB2027` red for Bain. Primary surfaces, category cells and inference markers share this role. McKinsey's primary tint is `#E6E8EA`; its bright blue remains available as a distinct chart-series colour, not a structural primary. Company themes override the palette tokens, not individual components.
+
 ## Density profiles
 
 The pixel values below are structural coordinates on the canonical specimen canvas.
@@ -121,6 +129,10 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-section-title: 38px;
   --size-section-number: 280px;
   --line-section-number: 280px;
+  --size-quote-mark: 72px;
+  --line-quote-mark: 72px;
+  --size-quote-mark-hero: 112px;
+  --line-quote-mark-hero: 112px;
   --size-section-heading: 24px;
   --line-section-heading: 29px;
   --size-body: 21px;
@@ -137,10 +149,10 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-metric: 48px;
   --size-metric-hero: 64px;
   --line-metric-hero: 68px;
-  --size-chart-label: 14px;
-  --line-chart-label: 18px;
-  --size-chart-annotation: 16px;
-  --line-chart-annotation: 20px;
+  --size-chart-label: var(--size-body);
+  --line-chart-label: var(--line-body);
+  --size-chart-annotation: var(--size-body);
+  --line-chart-annotation: var(--line-body);
   --chart-row-height: 44px;
 }
 
@@ -166,6 +178,10 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-section-title: 34px;
   --size-section-number: 240px;
   --line-section-number: 240px;
+  --size-quote-mark: 64px;
+  --line-quote-mark: 64px;
+  --size-quote-mark-hero: 96px;
+  --line-quote-mark-hero: 96px;
   --size-section-heading: 21px;
   --line-section-heading: 26px;
   --size-body: 18px;
@@ -182,10 +198,10 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-metric: 42px;
   --size-metric-hero: 56px;
   --line-metric-hero: 60px;
-  --size-chart-label: 12px;
-  --line-chart-label: 16px;
-  --size-chart-annotation: 14px;
-  --line-chart-annotation: 18px;
+  --size-chart-label: var(--size-body);
+  --line-chart-label: var(--line-body);
+  --size-chart-annotation: var(--size-body);
+  --line-chart-annotation: var(--line-body);
   --chart-row-height: 38px;
 }
 
@@ -211,6 +227,10 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-section-title: 30px;
   --size-section-number: 220px;
   --line-section-number: 220px;
+  --size-quote-mark: 56px;
+  --line-quote-mark: 56px;
+  --size-quote-mark-hero: 84px;
+  --line-quote-mark-hero: 84px;
   --size-section-heading: 19px;
   --line-section-heading: 23px;
   --size-body: 16px;
@@ -227,10 +247,10 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-metric: 38px;
   --size-metric-hero: 48px;
   --line-metric-hero: 52px;
-  --size-chart-label: 11px;
-  --line-chart-label: 14px;
-  --size-chart-annotation: 13px;
-  --line-chart-annotation: 17px;
+  --size-chart-label: var(--size-body);
+  --line-chart-label: var(--line-body);
+  --size-chart-annotation: var(--size-body);
+  --line-chart-annotation: var(--line-body);
   --chart-row-height: 34px;
 }
 
@@ -256,6 +276,10 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-section-title: 27px;
   --size-section-number: 200px;
   --line-section-number: 200px;
+  --size-quote-mark: 48px;
+  --line-quote-mark: 48px;
+  --size-quote-mark-hero: 72px;
+  --line-quote-mark-hero: 72px;
   --size-section-heading: 17px;
   --line-section-heading: 21px;
   --size-body: 14px;
@@ -272,13 +296,15 @@ The pixel values below are structural coordinates on the canonical specimen canv
   --line-metric: 34px;
   --size-metric-hero: 42px;
   --line-metric-hero: 46px;
-  --size-chart-label: 10px;
-  --line-chart-label: 13px;
-  --size-chart-annotation: 11px;
-  --line-chart-annotation: 14px;
+  --size-chart-label: var(--size-body);
+  --line-chart-label: var(--line-body);
+  --size-chart-annotation: var(--size-body);
+  --line-chart-annotation: var(--line-body);
   --chart-row-height: 30px;
 }
 ```
+
+`chart-label` and `chart-annotation` remain distinct semantic roles so legends, direct values, and interpretation can retain their correct weight and native metadata. Their size and line height resolve to the active body role in every density profile. The same default applies to title subtitles and chart unit rows. When an extensible exhibit crosses a registered capacity threshold, the planner promotes the whole page to `pre-read` or `appendix`; all page type roles step down together. Do not shrink one legend, datapoint, cell, or annotation locally to solve ordinary crowding. If the promoted page still does not fit, shorten copy, enlarge the exhibit, select another encoding, or split the slide. A verified source-design constraint or other major fit issue may justify one documented reference-derived exception, but it must remain legible and appear in the treatment ledger rather than as an unrecorded local override.
 
 ## Executive light palette
 

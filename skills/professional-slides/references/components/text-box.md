@@ -13,7 +13,7 @@ Declare each text box's typography role, parent region, margins, alignment, wrap
 - Set line height and paragraph spacing from the design system. Do not use blank lines to simulate paragraph or group spacing.
 - Define wrapping deliberately. A wrapped bullet aligns to the start of its text, not the bullet glyph; a wrapped heading keeps the same role and line height rather than shrinking locally.
 - Measure headings with the resolved font before layout and pass explicit line breaks to both adapters. Reject unavailable fonts and unbreakable words that exceed the allocated width. Downstream rules and content follow the measured height, not a fixed single-line offset.
-- Keep action titles within the approved line count and registered font size. Edit first and use the full approved width. If two lines remain necessary, wrap at a phrase boundary. Wrap earlier to avoid one short orphaned word. Set body limits by component; never use autofit to compress unlimited text.
+- Apply the canonical [title anchor and wrapping contract](index.md#action-title-block) to action titles. Set body limits by component; never use autofit to compress unlimited text.
 - Treat clipping, autofit, and shrink-to-fit as diagnostic signals rather than default solutions. Shorten the copy, enlarge the valid region, select another component, or split the slide.
 - Inspect text after final font substitution and native rendering because equal box coordinates do not guarantee equal visible baselines.
 

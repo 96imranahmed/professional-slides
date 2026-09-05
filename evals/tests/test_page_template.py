@@ -25,7 +25,7 @@ const separate=chrome.render({id:'page',frame,props:{...props,pageTemplate:{sour
 assert.ok(plain.contentFrame.height>separate.contentFrame.height);
 assert.equal(plain.contentFrame.height,518);
 assert.ok(!REGISTRY.get('source').render({id:'source',frame:{x:0,y:0,width:500,height:26},props:{text:'Source: Company data'}}).nodes.some(n=>n.type==='line'));
-const divider=REGISTRY.get('section-divider').render({id:'divider',frame,props:{number:'1',title:'Operating model'}}).nodes;
+const divider=REGISTRY.get('section-divider').render({id:'divider',frame,props:{title:'Section A'}}).nodes;
 assert.ok(!divider.some(n=>n.type==='line'));
 for(const node of divider.filter(n=>n.type==='text')) assert.equal(node.style.lineHeight,node.data.textLayout.lineHeight);
 console.log(JSON.stringify({accepted:true}));
@@ -86,9 +86,10 @@ console.log(JSON.stringify({accepted:true}));
         result = run_node("""
 import assert from 'node:assert/strict';
 import {buildGoldenSetDeck} from './skills/professional-slides/runtime/golden-set.mjs';
-import {componentVariantFixtureSpecs} from './skills/professional-slides/runtime/fixtures.mjs';
+import {componentFixtureSpecs,componentVariantFixtureSpecs} from './skills/professional-slides/runtime/fixtures.mjs';
 import {buildGoldenDeck} from './skills/professional-slides/runtime/golden-fixtures.mjs';
-const variants=componentVariantFixtureSpecs().filter(n=>n.target==='page-template');assert.equal(variants.length,9);
+const variants=[...componentFixtureSpecs(),...componentVariantFixtureSpecs()].filter(n=>n.target==='page-template');assert.equal(variants.length,9);
+assert.equal(variants.filter(n=>n.defaultVariant).length,1);
 const {deck}=buildGoldenSetDeck();
 for(const s of deck.slides.filter(s=>s.id.startsWith('golden-'))) {
  assert.ok(!s.nodes.some(n=>['footer-rule','header-rule','title-rule','divider-rule'].includes(n.role)),s.id);

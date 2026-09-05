@@ -43,8 +43,17 @@ const RUNTIME_SOURCE_PATHS = Object.freeze([
   "skills/professional-slides/runtime/overlap-policy.mjs",
   "skills/professional-slides/runtime/validate-overlap.mjs",
   "skills/professional-slides/runtime/registry.mjs",
+  "skills/professional-slides/runtime/trackers.mjs",
+  "skills/professional-slides/runtime/insight-tree-table.mjs",
+  "skills/professional-slides/runtime/quote-cluster.mjs",
+  "skills/professional-slides/runtime/maps.mjs",
+  "skills/professional-slides/runtime/natural-earth-map-data.mjs",
+  "skills/professional-slides/runtime/tables.mjs",
+  "skills/professional-slides/runtime/table-fixtures.mjs",
   "skills/professional-slides/runtime/charts.mjs",
+  "skills/professional-slides/runtime/chart-annotations.mjs",
   "skills/professional-slides/runtime/chart-group.mjs",
+  "skills/professional-slides/runtime/guidance.mjs",
   "skills/professional-slides/runtime/legends.mjs",
   "skills/professional-slides/runtime/palettes.mjs",
   "skills/professional-slides/runtime/typography.mjs",
@@ -380,7 +389,7 @@ async function main() {
   const pptxRenderDirectory = path.join(outputDirectory, "pptx-renders");
   await Promise.all([htmlDirectory, htmlRenderDirectory, pptxRenderDirectory].map((directory) => fs.mkdir(directory, { recursive: true })));
 
-  const { deck, fixtures } = buildGoldenDeck();
+  const { deck, fixtures } = buildGoldenDeck({ referenceOnly: true });
   const pptxPath = path.join(outputDirectory, "consulting-toolkit-golden.pptx");
   await fs.writeFile(path.join(outputDirectory, "scene.json"), JSON.stringify(deck, null, 2));
   await fs.writeFile(path.join(outputDirectory, "design-manifest.json"), JSON.stringify(deck.manifest, null, 2));
@@ -523,11 +532,19 @@ async function main() {
     fixtures: comparisons
   };
   await fs.writeFile(path.join(outputDirectory, "reference-fidelity-report.json"), JSON.stringify(report, null, 2));
-  process.stdout.write(`${JSON.stringify({ accepted: report.accepted, report: path.join(outputDirectory, "reference-fidelity-report.json"), deck: report.deck, gates: report.gates }, null, 2)}\n`);
+  await new Promise((resolve, reject) => {
+    process.stdout.write(
+      `${JSON.stringify({ accepted: report.accepted, report: path.join(outputDirectory, "reference-fidelity-report.json"), deck: report.deck, gates: report.gates }, null, 2)}\n`,
+      (error) => error ? reject(error) : resolve()
+    );
+  });
   if (!report.accepted) process.exitCode = 1;
 }
 
-main().catch((error) => {
-  console.error(error.stack || error);
-  process.exitCode = 1;
-});
+main().then(
+  () => process.exit(process.exitCode || 0),
+  (error) => {
+    console.error(error.stack || error);
+    process.exit(1);
+  }
+);

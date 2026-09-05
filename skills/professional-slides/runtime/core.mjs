@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { resolvePalette } from "./palettes.mjs";
+import { resolvePalette, heatScaleTokens } from "./palettes.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
 
@@ -38,6 +38,7 @@ const point = (cssVar, value) => ({ kind: "fontSizePt", cssVar, value });
 const font = (cssVar, value) => ({ kind: "fontFamily", cssVar, value });
 
 export const TOKENS = Object.freeze({
+  ...heatScaleTokens({'color.canvas':'#FFFFFF','color.componentPrimary':'#00A6E6','color.negative':'#C53030','color.positive':'#198754'}),
   "color.canvas": colour("--canvas", "#FFFFFF"),
   "color.surface": colour("--surface-1", "#FFFFFF", "lt1"),
   "color.surfaceMuted": colour("--surface-2", "#EEF0F2", "lt2"),
@@ -68,8 +69,15 @@ export const TOKENS = Object.freeze({
   "type.actionTitle": point("--type-action-title", 30),
   "type.actionTitleLong": point("--type-action-title-long", 27),
   "type.sectionTitle": point("--type-section-title", 24),
+  "type.sectionNumber": point("--type-section-number", 170),
+  "type.quoteMark": point("--type-quote-mark", 48),
+  "type.quoteMarkHero": point("--type-quote-mark-hero", 76),
   "type.heading": point("--type-heading", 16),
   "type.body": point("--type-body", 14),
+  // Chart text keeps semantic roles so adapters can preserve purpose and
+  // weight, while its default size stays aligned to ordinary body copy.
+  "type.chartLabel": point("--type-chart-label", 14),
+  "type.chartAnnotation": point("--type-chart-annotation", 14),
   "type.compact": point("--type-compact", 12),
   "type.label": point("--type-label", 10),
   "type.source": point("--type-source", 8),
@@ -81,12 +89,32 @@ export const TOKENS = Object.freeze({
   "space.5": length("--space-5", 24),
   "space.6": length("--space-6", 32),
   "space.8": length("--space-8", 48),
+  "icon.small": length("--icon-sm", 16),
+  "icon.medium": length("--icon-md", 24),
   "line.hairline": length("--line-hairline", 1),
   "line.standard": length("--line-standard", 2),
   "radius.none": length("--radius-none", 0),
   "radius.small": length("--radius-small", 4),
   "radius.round": length("--radius-round", 999)
 });
+
+export const DENSITY_PROFILES = Object.freeze({
+  "live-pitch": Object.freeze({ typeScale: 1.15 }),
+  executive: Object.freeze({ typeScale: 1 }),
+  "pre-read": Object.freeze({ typeScale: 0.9 }),
+  appendix: Object.freeze({ typeScale: 0.8 })
+});
+
+export function resolveDensityTokens(baseTokens, density = "executive") {
+  if (typeof density !== "string" || !Object.hasOwn(DENSITY_PROFILES, density)) throw new Error(`Unknown density profile: ${density}`);
+  const scale = DENSITY_PROFILES[density].typeScale;
+  return Object.fromEntries(Object.entries(baseTokens).map(([tokenId, definition]) => [
+    tokenId,
+    tokenId.startsWith("type.")
+      ? { ...definition, value: Number((definition.value * scale).toFixed(2)) }
+      : { ...definition }
+  ]));
+}
 
 export const THEME_SLOT_TOKENS = Object.freeze({
   dk1: "color.ink",
@@ -210,6 +238,14 @@ export function ellipsePrimitive({ id, role = "marker", frame, style = {}, data 
   return primitive({ type: "ellipse", id, role, frame, style, data, tokens });
 }
 
+export function portraitPrimitive({ id, frame, portrait, data = {} }) {
+  if (!portrait || typeof portrait.dataUri !== "string" || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(portrait.dataUri)) throw new Error("Portrait requires an embedded PNG data URI");
+  if (typeof portrait.alt !== "string" || !portrait.alt.trim() || typeof portrait.authorization !== "string" || !portrait.authorization.trim()) throw new Error("Portrait requires alt text and an asset authorization record");
+  const bytes = Buffer.from(portrait.dataUri.split(",")[1], "base64");
+  if (bytes.length < 24 || bytes.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a" || bytes.readUInt32BE(16) < 1 || bytes.readUInt32BE(16) !== bytes.readUInt32BE(20)) throw new Error("Portrait PNG must be square; crop the authorized source before embedding");
+  return primitive({ type: "image", id, role: "quote-avatar", frame, data: { ...data, ...portrait, circular: true } });
+}
+
 export function linePrimitive({ id, role = "rule", x1, y1, x2, y2, style = {}, data = {}, tokens = [] }) {
   return primitive({
     type: "line",
@@ -256,8 +292,8 @@ export function assertSectionHeadingProps(props = {}) {
 
 export function section(options) {
   assertSectionHeadingProps(options);
-  const { id, treatment = "open", heading = null, padding = token("space.4"), children = [], composition = null, size = {}, cell = null, frame = null } = options;
-  return { nodeType: "section", id, treatment, heading, padding, children, composition, size, cell, frame };
+  const { id, treatment = "open", edge = "contained", heading = null, padding = token("space.4"), children = [], composition = null, size = {}, cell = null, frame = null } = options;
+  return { nodeType: "section", id, treatment, edge, heading, padding, children, composition, size, cell, frame };
 }
 
 function resolveLength(value, available, preferred = 0) {
@@ -497,10 +533,13 @@ export function buildManifest(deck) {
     palette: deck.palette,
     typography: deck.typography,
     pageTemplate: deck.pageTemplate,
+    templateSequences: deck.templateSequences || [],
     tokens: deck.tokens || TOKENS,
     slides: deck.slides.map((slide, index) => ({
       id: slide.id,
       number: index + 1,
+      density: slide.density,
+      template: slide.template,
       componentInstances: slide.componentInstances,
       pageTemplate: slide.pageTemplate,
       contentFrame: slide.contentFrame,
@@ -527,6 +566,10 @@ export function compileDeck(deckSpec, registry) {
   const pageTemplate = registry.get("page-template")?.resolveTemplate(deckSpec.pageTemplate);
   return withDesignTokens(designTokens, () => {
   const slides = deckSpec.slides.map((slideSpec, slideIndex) => {
+    const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
+    const density = slideSpec.density ?? "executive";
+    const slideTokens = resolveDensityTokens(designTokens, density);
+    return withDesignTokens(slideTokens, () => {
     if (slideSpec.palette !== undefined) throw new Error("Palette belongs to the deck, not individual slides");
     if (slideSpec.typography !== undefined) throw new Error("Typography belongs to the deck, not individual slides");
     const nodes = [];
@@ -537,22 +580,23 @@ export function compileDeck(deckSpec, registry) {
     if (slideSpec.chrome) {
       const chromeDefinition = registry.get("slide-chrome");
       if (!chromeDefinition) throw new Error("The component registry must define slide-chrome");
-      const chromeId = stableId(slideSpec.id || `slide-${slideIndex + 1}`, "chrome");
+      const chromeId = stableId(slideId, "chrome");
       const chromeProps = { ...slideSpec.chrome, pageTemplate: { ...pageTemplate, ...slideSpec.chrome.pageTemplate }, pageNumber: slideSpec.chrome.pageNumber ?? slideIndex + 1 };
       const rendered = chromeDefinition.render({
         id: chromeId,
-        tokens: designTokens,
+        tokens: slideTokens,
         frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
         props: chromeProps
       });
       contentFrame = rendered.contentFrame;
       resolvedPageTemplate = rendered.pageTemplate;
-      templatePlacements.push(...(rendered.placements || []));
+      templatePlacements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [chromeId] })));
       assertDeclaredComponentTokens(chromeDefinition, rendered.nodes, chromeId);
       rendered.nodes.forEach((item) => { item.data.componentInstance = chromeId; });
       nodes.push(...rendered.nodes);
       componentInstances.push({
         id: "chrome",
+        instanceId: chromeId,
         component: "slide-chrome",
         version: chromeDefinition.version,
         category: chromeDefinition.category,
@@ -566,7 +610,7 @@ export function compileDeck(deckSpec, registry) {
     const placementProps = (node) => {
       if (node.nodeType !== "section") return node.props || {};
       assertSectionHeadingProps(node);
-      return { treatment: node.treatment, heading: node.heading, padding: node.padding };
+      return { treatment: node.treatment, edge: node.edge, heading: node.heading, padding: node.padding };
     };
     const headerBandHeight = (placement) => {
       const measure = ({ node, frame }) => registry.get(node.nodeType === "section" ? "section" : node.component)?.measureHeader?.({ frame, props: placementProps(node) });
@@ -577,21 +621,26 @@ export function compileDeck(deckSpec, registry) {
       const peers = own.ruled ? placements.map(measure).filter((peer) => peer?.ruled && Math.abs(peer.top - own.top) < 0.01) : [own];
       return Math.max(own.height, ...peers.map((peer) => peer.height));
     };
-    for (const { node, frame } of placements) {
+    for (const { node, frame, ancestors = [] } of placements) {
       if (node.nodeType === "section") {
         const sectionDefinition = registry.get("section");
         if (!sectionDefinition) throw new Error("The component registry must define section");
+        const instanceId = stableId(slideId, node.id);
         const rendered = sectionDefinition.render({
-          id: stableId(slideSpec.id || `slide-${slideIndex + 1}`, node.id),
-          tokens: designTokens,
+          id: instanceId,
+          tokens: slideTokens,
           frame,
           props: { ...placementProps(node), headerBandHeight: headerBandHeight({ node, frame }) }
         });
         assertDeclaredComponentTokens(sectionDefinition, rendered.nodes, node.id);
-        rendered.nodes.forEach((item) => { item.data.componentInstance = stableId(slideSpec.id || `slide-${slideIndex + 1}`, node.id); });
+        rendered.nodes.forEach((item) => {
+          item.data.componentInstance = instanceId;
+          item.data.componentAncestors = [...ancestors];
+        });
         nodes.push(...rendered.nodes);
         componentInstances.push({
           id: node.id,
+          instanceId,
           component: "section",
           version: sectionDefinition.version,
           variant: sectionDefinition.resolveVariant?.(placementProps(node)),
@@ -607,22 +656,26 @@ export function compileDeck(deckSpec, registry) {
             children: node.children
           });
           const nestedPlacements = resolveLayout(nestedRoot, rendered.contentFrame, registry);
-          placements.push(...nestedPlacements);
+          placements.push(...nestedPlacements.map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
         }
         continue;
       }
       const definition = registry.get(node.component);
       if (!definition) throw new Error(`Unknown component: ${node.component}`);
-      const instanceId = stableId(slideSpec.id || `slide-${slideIndex + 1}`, node.id || node.component);
+      const instanceId = stableId(slideId, node.id || node.component);
       const props = { ...node.props, headerBandHeight: headerBandHeight({ node, frame }) };
       if (["page-template", "slide-chrome", "section-divider"].includes(node.component)) props.pageTemplate = { ...pageTemplate, ...node.props?.pageTemplate };
-      const rendered = definition.render({ id: instanceId, frame, tokens: designTokens, props });
-      placements.push(...(rendered.placements || []));
+      const rendered = definition.render({ id: instanceId, frame, tokens: slideTokens, props });
+      placements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
       assertDeclaredComponentTokens(definition, rendered.nodes, instanceId);
-      rendered.nodes.forEach((item) => { item.data.componentInstance = instanceId; });
+      rendered.nodes.forEach((item) => {
+        item.data.componentInstance = instanceId;
+        item.data.componentAncestors = [...ancestors];
+      });
       nodes.push(...rendered.nodes);
       componentInstances.push({
         id: node.id || instanceId,
+        instanceId,
         component: definition.id,
         version: definition.version,
         category: definition.category,
@@ -635,13 +688,50 @@ export function compileDeck(deckSpec, registry) {
     assertUniqueIds(nodes);
     for (const node of nodes) {
       node.style = Object.fromEntries(Object.entries(node.style).map(([key, value]) => [key,
-        isTokenReference(value) ? { tokenId: value.tokenId, ...designTokens[value.tokenId] } : value]));
+        isTokenReference(value) ? { tokenId: value.tokenId, ...slideTokens[value.tokenId] } : value]));
     }
     assertStyleProvenance(nodes);
     assertSceneBounds(nodes);
-    return { id: slideSpec.id || `slide-${slideIndex + 1}`, nodes, componentInstances, tokens: designTokens, palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+    return { id: slideId, notes: slideSpec.notes || "", nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+    });
   });
-  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, tokens: designTokens };
+  const templateSequences = [];
+  const closed = new Set();
+  let active = null;
+  for (const [position, slide] of slides.entries()) {
+    const reference = slide.template;
+    if (!reference) {
+      if (active) { closed.add(active.id); active = null; }
+      continue;
+    }
+    if (!reference || typeof reference.id !== "string" || !reference.id.trim() || !Number.isInteger(reference.index) || !Number.isInteger(reference.total) || reference.index < 1 || reference.total < 2 || reference.index > reference.total) throw new Error(`Slide ${slide.id} has invalid template sequence metadata`);
+    if (!active || active.id !== reference.id) {
+      if (active) closed.add(active.id);
+      if (closed.has(reference.id)) throw new Error(`Template sequence ${reference.id} must remain contiguous`);
+      active = { id: reference.id, total: reference.total, slides: [], positions: [], signature: null };
+      templateSequences.push(active);
+    }
+    if (reference.total !== active.total || reference.index !== active.slides.length + 1) throw new Error(`Template sequence ${reference.id} has inconsistent index or total`);
+    const structure = {
+      density: slide.density,
+      contentFrame: slide.contentFrame,
+      pageTemplate: slide.pageTemplate,
+      // A sequence signature describes reusable structure. Instance IDs are
+      // intentionally slide-scoped provenance, so including them would make
+      // two structurally identical sequence slides compare as different.
+      components: slide.componentInstances.map(instance => ({ id: instance.id, component: instance.component, variant: instance.variant ?? null, role: instance.role, frame: instance.frame }))
+    };
+    const signature = hashJson(structure);
+    if (active.signature && active.signature !== signature) throw new Error(`Template sequence ${reference.id} changed layout, component frames or variants on slide ${slide.id}`);
+    active.signature = signature;
+    active.slides.push(slide.id);
+    active.positions.push(position + 1);
+    slide.template = { ...reference, structuralHash: signature };
+  }
+  for (const sequence of templateSequences) {
+    if (sequence.slides.length !== sequence.total) throw new Error(`Template sequence ${sequence.id} declares ${sequence.total} slides but contains ${sequence.slides.length}`);
+  }
+  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, tokens: designTokens, templateSequences };
   deck.manifest = buildManifest(deck);
   return deck;
   });

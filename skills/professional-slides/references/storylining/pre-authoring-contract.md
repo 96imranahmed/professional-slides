@@ -23,13 +23,13 @@ Record:
 - each slide's title, job, hypothesis branch, source role, and arbitrary ordered `items`;
 - each item's stable ID, semantic job, registered component, content props, relationship to peers, and optional weight, frame, layer, or cell placement;
 - each slide's open composition tree, or `auto` when the deterministic planner should select row, column, grid, overlay, or absolute composition from item relationships;
-- each chart slide's `exhibitHeadingVariant`, defaulting to `open-underlined`; an alternative must name a registered analytical-header family rule or an approved-reference exception. Also record canonical `legendTreatment`, including `direct-labelled` or `none-not-needed` when applicable;
+- each chart slide's `exhibitHeadingVariant`, using the registered `chart-title` value `underlined` when no unit is shown or `unit` when a light-grey unit row replaces the rule. Pass this value to `chart-title.props.variant`; `open-underlined` is a legacy contract alias for `underlined`, not a runtime variant. Also record canonical `legendTreatment`, including `direct-labelled` or `none-not-needed` when applicable;
 - a `dominantContentPlan` with 60% to 90% target canvas share and at least two completeness elements when a new executive pre-read has one dominant analytical item;
-- for every slide whose job is executive synthesis, the governing answer, two to four substantive section items with a heading, proof, and consequence, and one overall action or condition;
+- for every slide whose job is executive synthesis, an `executiveSynthesis` record containing the governing answer, ordered section items, and optional overall action or condition; its content must satisfy [executive-summary narrative](../components/copy.md#executive-summary-narrative);
 - tracker system, contents slide, transition slides, labels, and analytical-header range;
 - for a hierarchical tracker, parent items, chapter trackers, governed slides, and each analytical slide's parent and chapter item IDs;
 - required opening and closing states;
-- theme manifest and deck treatment ledger paths;
+- canonical [theme manifest](../theming/index.md#theme-manifest) and deck treatment ledger paths;
 - `assetAuthorizationRecord`: source, permission evidence, permitted use, attribution, stored path, and fallback for each external visual, following [asset authorization](../components/icons-and-logos.md#asset-authorization-record); use an empty array when no external visuals are reused;
 - PowerPoint acceptance-manifest path when PPTX is an output;
 - approval evidence;
@@ -57,8 +57,8 @@ Validate before the first mutation and after an approved structural change.
 
 Before production, verify all required fields and reconcile slide counts. Each approved dot maps to one slide record. Tracker labels, ranges, and full states are consistent. The theme manifest and treatment ledger cover every slide. Reserve the PowerPoint acceptance manifest when required. Match executive-summary disposition to the workflow. Link approval evidence to the reviewed dot-dash.
 
-An executive synthesis uses the same open item and composition contract as any other slide. Each synthesis section item contains a substantive heading, proof, and consequence; the optional overall action is one registered `insight` item. Generic rhetorical headings such as `Answer`, `Operating proof`, `What holds back a buy`, or `Action` do not satisfy the section contract.
+An executive synthesis uses the same open item and composition contract as any other slide. Validate its serialized fields against [executive-summary narrative](../components/copy.md#executive-summary-narrative) and the [Insight Box owner](../components/insight-box.md).
 
-Each analytical slide declares arbitrary items inside one open composition tree. Evidence, interpretation, implication, action, navigation, and source elements are semantic jobs, not fixed regions. Any item may be absent, repeated when the argument requires it, or nested inside a substantive section. Detached slide-level synthesis uses at most one registered `insight` component; attached interpretation uses a chart annotation, label, or another registered component with a declared job. Metrics belong only where their values carry the proof.
+Each analytical slide declares arbitrary items inside one open composition tree. Evidence, interpretation, implication, action, navigation, and source elements are semantic jobs, not fixed regions. Any item may be absent, repeated when the argument requires it, or nested inside a substantive section. Record each detached or attached interpretation with its registered component and declared job.
 
 Do not begin production while any check fails. Preserve the approved dot-dash and the completed contract with the run evidence. Repository evaluations may additionally run a deterministic validator, but normal skill use does not require a packaged script.

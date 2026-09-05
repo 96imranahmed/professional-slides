@@ -8,7 +8,7 @@ Before reuse, register each external image, logo, icon library, visual system, o
 
 ## Select and register the icon system
 
-Before authoring, identify the semantic slots that may benefit from icons: category fields, concise section headings, capability or step markers, row labels, and repeated table-cell states. Use an icon when it makes peers easier to distinguish, replaces repeated low-information copy, lightens a dense row or cell, or improves the page's visual balance and scan path. Do not add icons merely to occupy whitespace, decorate every heading, or make a weak composition look finished.
+Before authoring, identify the semantic slots that may benefit from icons: category fields, concise section headings, capability or step markers, row labels, and repeated table-cell states. Admit an icon only after naming its semantic slot and either the repeated label it replaces or the recognition task it accelerates, then verify that peers remain distinct at the final rendered size. Otherwise omit it. Do not add icons merely to occupy whitespace, decorate every heading, or make a weak composition look finished.
 
 Record each selected icon's meaning, library, exact icon name, size, stroke or fill treatment, colour role, and label behavior in the deck's semantic treatment registry. Reuse the same icon for the same meaning across the deck and do not reuse it for a different meaning. Use an icon with text until the mapping is obvious; use an icon alone only when a column heading, nearby legend, or repeated convention makes the meaning unambiguous.
 
@@ -30,7 +30,7 @@ When a logo is absent from the [asset authorization record](#asset-authorization
 
 Choose one registered visual treatment for a category composition, normally three to five mutually exclusive peers:
 
-- `icon-only` uses one semantic icon per category when a compact abstract cue improves differentiation;
+- `icon-only` uses one semantic icon per category when every peer remains distinguishable at final rendered size without using its label to decode the icon;
 - `image-only` uses one relevant image per category when concrete subject matter, place, product, or use context is more informative than an icon;
 - `icon-image` uses one image plus one semantic icon per category when they perform distinct jobs, such as the image showing the concrete example while the icon reinforces the stable taxonomy.
 

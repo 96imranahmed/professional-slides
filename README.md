@@ -26,6 +26,12 @@ Register every rendering variant with representative props and size. New registr
 
 ## Development checks
 
+`npm run check` runs syntax/whitespace checks and fast tests. `check:syntax` is not a semantic linter. These tests do not require regenerating cached visual reports after each edit. `npm run check:release` still requires current accepted reference reports and a hash-verified golden set, including both render images for every fixture.
+
+Rendering dependencies are pinned in `package.json` and their resolved transitive manifests in `evals/runtime-lock.json`. The lock records the Codex bundle, Node version and platform used for acceptance, including private packages unavailable through public npm. Run `"$RUNTIME_NODE" evals/scripts/runtime_lock.mjs` before rendering. A different bundle/platform requires a reviewed lock refresh and new visual acceptance, not a silent upgrade. Never modify bundled dependencies.
+
+The table compiler uses Prettier 3.6.2 formatting; keep normalization, measurement and rendering in separate named helpers.
+
 Use the bundled workspace dependencies returned by Codex's `load_workspace_dependencies`: set `RUNTIME_NODE`, `RUNTIME_NODE_MODULES`, `RUNTIME_PYTHON`, `RUNTIME_BIN_DIR`, and `PRESENTATION_SKILL_DIR`. Set `PLAYWRIGHT_BROWSER_PATH` if using a browser outside Playwright's installation. The Python environment needs PyYAML. Do not alter the bundled libraries.
 
 ```bash
@@ -42,7 +48,7 @@ Also run the installed plugin-creator's `validate_plugin.py` against this reposi
 
 ### Golden component evaluation
 
-Every golden run generates three palette decks containing all components, registered variants, layout fixtures, and standard compositions. Gates check coverage, text fit, overlaps, package structure, Artifact Tool readback, theme binding, and HTML-to-PPTX image parity. Inspect the paired renders and lowest-scoring fixtures as well as the reports.
+Every golden run generates one canonical McKinsey deck containing all components, registered variants, layout fixtures, and standard compositions. Compatible variants share paginated review boards, with explicit instance-level coverage retained for every branch. Gates check coverage, text fit, overlaps, package structure, Artifact Tool readback, theme binding, and HTML-to-PPTX image parity. Inspect the paired renders and lowest-scoring fixtures as well as the reports.
 
 Accepted runs remain under `output/golden/runs/`. `output/golden/index.html` points to the latest accepted set. A failed run cannot replace it; `golden:check` rejects evidence from changed sources. Do not reset `output/` for a golden rerun.
 

@@ -10,7 +10,7 @@ Use this template when founders must convince investors that a problem, product,
 
 ## Delivery mode
 
-Choose live pitch, investor pre-read, or short teaser. Live decks use larger type and fewer ideas per page. Pre-reads may carry more evidence and sources.
+Choose live pitch, investor pre-read, or short teaser, then apply the matching [registered density profile](../theming/index.md#resolve-one-active-theme).
 
 A live pitch normally omits a visible tracker and may omit a standalone executive summary when the opening sequence already makes the investment case clear.
 
@@ -37,7 +37,7 @@ Merge jobs when the story is short. Do not preserve template pages that add no p
 
 ## Navigation
 
-Record `tracker.system: none` for a live pitch or short teaser. For an investor pre-read with three to six retained analytical chapters, use `sequential-circles` as the full state and `compact-number-strip` on governed slides. With seven or more retained chapters, use `split-contents` as the full state and `compact-label` on governed slides. Seed the approved tracker map with `Problem and product`, `Demand proof`, `Market and competition`, `Business model and go-to-market`, `Scale and risk`, `Team`, and `Round and milestones`; approved replacements become exact under the [template instantiation contract](index.md#instantiation-contract). Omit unused chapters from both the dot-dash and tracker map; do not add a tracker only to imitate a longer deck.
+Record `tracker.system: none` for a live pitch or short teaser; for an investor pre-read, use the [tracker router](../components/trackers/index.md). Seed an eligible tracker map with `Problem and product`, `Demand proof`, `Market and competition`, `Business model and go-to-market`, `Scale and risk`, `Team`, and `Round and milestones`; approved replacements become exact under the [template instantiation contract](index.md#instantiation-contract). Omit unused chapters from both the dot-dash and tracker map; do not add a tracker only to imitate a longer deck.
 
 ## Analytical jobs
 

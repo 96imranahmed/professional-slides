@@ -51,7 +51,7 @@ Use one family across a deck. A cover or chapter transition may use the family's
 | `pre-read` | evidence-led document read without narration | compact but readable type and tighter analytical rhythm |
 | `appendix` | source-rich analytical support | smallest approved type and tightest grid; never a way to compress a main-story slide |
 
-Choose density per coherent slide family, not per individual slide. A deck may have an `executive` main story and an `appendix` appendix. It may not switch density because one page is overcrowded.
+Choose density per coherent slide family by default. A deck may have an `executive` main story and a `pre-read` or `appendix` analytical family. Extensible charts, tables, and relationship components also declare capacity thresholds: when valid added branches, rows, columns, categories, or points cross a threshold, promote the complete page to the required denser profile. That promotion changes every semantic type role on the page together, including the action title, headers, body, legends, datapoints, and annotations. It must not shrink only the crowded label. Record the promotion in the slide decision; if the denser profile still fails fit or legibility, widen, simplify, or split the exhibit.
 
 ## Cascade and inheritance
 
@@ -70,6 +70,8 @@ An override is valid only when it has a semantic name and applies to every match
 Every executable component must declare its consumed token IDs. Scene compilation rejects undeclared use before HTML or PowerPoint serialization.
 
 ## Theme manifest
+
+This section is the canonical theme-manifest schema. Other contracts require its path and any contract-specific fields; they do not restate these contents.
 
 Before authoring a new deck or redesigning an existing one, record:
 

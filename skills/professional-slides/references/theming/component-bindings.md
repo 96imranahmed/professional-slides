@@ -20,7 +20,7 @@ Every reusable component exposes namespaced custom properties. Its Markdown owne
 | action-title block | `--action-title-font`, `--action-title-color`, `--action-title-rule`, `--action-title-gap`, `--action-title-width` | action-title role, `ink`, no rule (`with-line`: page rule), `space-2`, density title width |
 | section title | `--section-title-font`, `--section-title-color`, `--section-title-rule`, `--section-title-gap` | section-title role, `ink`, no rule (`with-line`: quiet rule), `space-2` |
 | source and footer | `--source-font`, `--source-color`, `--source-rule`, `--source-gap` | source role, secondary text, no rule by default, `space-1` |
-| tracker | `--tracker-font`, `--tracker-heading-font`, `--tracker-item-font`, `--tracker-item-strong-font`, `--tracker-number-font`, `--tracker-section-number-font`, `--tracker-active`, `--tracker-active-text`, `--tracker-inactive`, `--tracker-ink`, `--tracker-canvas`, `--tracker-surface`, `--tracker-tint`, `--tracker-rule`, `--tracker-page-rule`, `--tracker-emphasis-rule`, `--tracker-gap`, `--tracker-item-gap`, `--tracker-list-gap`, `--tracker-list-width`, `--tracker-padding`, `--tracker-marker-size`, `--tracker-compact-marker-size`, `--tracker-radius`, `--tracker-edge-share` | label, section-title, body, callout, section-heading, and section-number roles; component primary and on-primary; muted ink and ink; canvas, surface-1, and primary tint; quiet, page, and emphasis rules; registered spacing; a bounded optical list measure; round radius; content-driven half-item share |
+| tracker | All properties in the `.tracker` declaration in the [canonical alias layer](#canonical-alias-layer) | That declaration is the exact property-to-default mapping, including all typography, colour, rule, gap, padding, marker, width, radius, and edge-share values. Do not derive defaults from the navigation variant's name. |
 
 ## Text and section components
 
@@ -41,13 +41,15 @@ Every reusable component exposes namespaced custom properties. Its Markdown owne
 | Component | Required custom properties | Default binding |
 | --- | --- | --- |
 | metric field | `--metric-font`, `--metric-hero-font`, `--metric-color`, `--metric-label-font`, `--metric-label-color`, `--metric-divider`, `--metric-gap` | metric roles, component-primary, label role, secondary text, quiet rule, `space-3` |
-| [data table](../charts/heatmap-table.md#table-header-contract) | `--table-font`, `--table-compact-font`, `--table-header-bg`, `--table-header-color`, `--table-row-rule`, `--table-cell-padding-x`, `--table-cell-padding-y` | body roles, surface-2, text-primary, quiet rule, `space-3`, `space-2` |
+| [data table](../charts/heatmap-table.md#table-header-contract) | `--table-font`, `--table-compact-font`, `--table-header-bg`, `--table-header-color`, `--table-row-rule`, `--table-cell-padding-x`, `--table-cell-padding-y`, `--table-cell-number-bg`, `--table-cell-number-color`, `--table-cell-number-font`, `--table-cell-number-min-size`, `--table-cell-number-padding` | body roles, surface-2, text-primary, quiet rule, `space-3`, `space-2`, component primary, on-primary, body, icon-md, `space-1` |
 | chart plot | `--chart-bg`, `--chart-axis`, `--chart-grid`, `--chart-label-font`, `--chart-label-color`, `--chart-series-1` through `--chart-series-6`, `--chart-neutral` | canvas, page guideline, chart gridline, chart-label role, secondary text, semantic series, chart segment |
 | chart callout | `--chart-callout-font`, `--chart-callout-color`, `--chart-callout-bg`, `--chart-callout-border`, `--chart-callout-leader`, `--chart-callout-padding`, `--chart-callout-series`, `--chart-callout-highlight`, `--chart-callout-muted-region`, `--chart-callout-forecast-region`, `--chart-callout-forecast-border`, `--chart-callout-line-width`, `--chart-callout-emphasis-width`, `--chart-callout-label-radius` | chart-annotation role, `ink`, canvas, quiet rule, page guideline, `space-2`, chart series 1, component primary, surface-1, primary tint, emphasis rule, registered line widths, round radius |
-| chart legend | `--chart-legend-font`, `--chart-legend-color`, `--chart-legend-gap`, `--chart-legend-item-gap`, `--chart-legend-key-size`, `--chart-legend-line-length`, `--chart-legend-series-1` through `--chart-legend-series-6`, `--chart-legend-neutral`, `--chart-legend-forecast-border` | chart-label role, `ink`, registered spacing, icon size, semantic chart series, chart segment, page rule |
-| quote cluster | `--quote-cluster-columns`, `--quote-cluster-gap`, `--quote-item-gap`, `--quote-mark-gap`, `--quote-item-padding-x`, `--quote-item-padding-y`, `--quote-item-bg`, `--quote-item-color`, `--quote-item-border`, `--quote-item-radius`, `--quote-item-shadow`, `--quote-mark-font`, `--quote-mark-color`, `--quote-body-bg`, `--quote-body-border`, `--quote-body-radius`, `--quote-body-padding-x`, `--quote-body-padding-y`, `--quote-caret-size`, `--quote-caret-inline-position`, `--quote-caret-angle`, `--quote-text-font`, `--quote-text-color`, `--quote-attribution-gap`, `--quote-attribution-font`, `--quote-attribution-color`, `--quote-detail-font`, `--quote-detail-color`, `--quote-attribution-inline-offset`, `--quote-avatar-size`, `--quote-avatar-gap`, `--quote-avatar-bg`, `--quote-avatar-border`, `--quote-avatar-radius` | named count grid, density gutter, compact item and mark rhythm, zero outer inset and boundary before treatment rebinding, `ink`, component radius and shadow, section-title role, component primary, surface-1 enclosed body, quiet body border, component radius, registered body inset, `space-3` caret centered at `45deg`, body role, `ink`, `space-1`, label role, `ink`, source role, secondary text, `space-4` left-attribution inset, icon-lg circular avatar on surface-2 with quiet boundary |
-| table-cell status and comparison indicator | `--table-cell-completion-fill`, `--table-cell-completion-track`, `--table-cell-completion-size`, `--table-cell-completion-gap`, `--table-cell-completion-font`, `--table-cell-status-positive`, `--table-cell-status-caution`, `--table-cell-status-negative`, `--table-cell-status-missing`, `--table-cell-status-marker-size`, `--table-cell-status-gap`, `--table-cell-status-font`, `--table-cell-heat-1` through `--table-cell-heat-5`, `--table-cell-heat-on-low`, `--table-cell-heat-on-high`, `--table-cell-heat-missing`, `--table-cell-heat-missing-color`, `--table-cell-heat-font`, `--table-cell-heat-min-size`, `--table-cell-heat-padding`, `--table-cell-rating-fill`, `--table-cell-rating-track`, `--table-cell-rating-size`, `--table-cell-rating-gap`, `--table-cell-rating-font`, `--table-cell-legend-font`, `--table-cell-legend-color`, `--table-cell-legend-gap`, `--table-cell-legend-item-gap`, `--table-cell-legend-swatch-size`, `--table-cell-legend-rule` | component primary, chart segment, semantic status roles, registered heatmap scale, readable text roles, density row height, registered icon and spacing scales, quiet rule |
+| chart legend | All properties in `.chart-legend` in the [canonical alias layer](#canonical-alias-layer) | That declaration gives the exact property-to-token mapping for font, colour, gaps, key size, line length, series, neutral key, and forecast border. |
+| quote cluster | `--quote-cluster-columns`, `--quote-cluster-gap`, `--quote-stagger-inline-offset`, `--quote-stagger-block-gap`, `--quote-item-gap`, `--quote-mark-gap`, `--quote-item-padding-x`, `--quote-item-padding-y`, `--quote-item-bg`, `--quote-item-color`, `--quote-item-border`, `--quote-item-radius`, `--quote-item-shadow`, `--quote-mark-font`, `--quote-mark-color`, `--quote-body-bg`, `--quote-body-border`, `--quote-body-radius`, `--quote-body-padding-x`, `--quote-body-padding-y`, `--quote-caret-size`, `--quote-caret-inline-position`, `--quote-caret-angle`, `--quote-snip-size`, `--quote-text-font`, `--quote-text-color`, `--quote-attribution-gap`, `--quote-attribution-font`, `--quote-attribution-color`, `--quote-detail-font`, `--quote-detail-color`, `--quote-attribution-inline-offset`, `--quote-avatar-size`, `--quote-avatar-gap`, `--quote-avatar-bg`, `--quote-avatar-border`, `--quote-avatar-radius` | named count grid, density gutter, `space-8` inline stagger, `space-4` block stagger, compact item and mark rhythm, zero outer inset and boundary before treatment rebinding, `ink`, component radius and shadow, quote-mark roles, component primary, surface-1 enclosed body, quiet body border, component radius, registered body inset, `space-3` caret centered at `45deg`, `space-5` snip, body role, `ink`, `space-1`, label role, `ink`, source role, secondary text, `space-4` left-attribution inset, icon-lg circular avatar on surface-2 with quiet boundary |
+| table-cell status and comparison indicator | All properties in `.table-cell-status-set` in the [canonical alias layer](#canonical-alias-layer) | That declaration gives the exact property-to-token mapping for completion, status, heatmap, rating, and legend typography, colours, dimensions, and spacing. |
 | diagram node | `--node-bg`, `--node-color`, `--node-border`, `--node-font`, `--node-padding`, `--node-radius`, `--connector-color`, `--connector-width` | canvas, `ink`, quiet rule, body role, `space-3`, component radius, page guideline, hairline |
+| tree-based insight and implication table | `--insight-tree-node-bg`, `--insight-tree-node-color`, `--insight-tree-connector`, `--insight-tree-row-bg`, `--insight-tree-row-color`, `--insight-tree-gap`, `--insight-tree-node-padding`, `--insight-tree-arrow-size`, `--insight-tree-rule`, `--insight-tree-arrow-rule` | component primary, on-primary, quiet rule, surface-2, ink, `space-2`, `space-3`, icon-md, hairline, standard line |
+| [map](../components/maps.md) | `--map-land`, `--map-highlight`, `--map-boundary`, `--map-label-font`, `--map-label-color`, `--map-marker-bg`, `--map-marker-color`, `--map-marker-line` | surface-1, component primary, canvas, label role, secondary text, canvas, ink, hairline |
 
 ## Media and identity components
 
@@ -106,6 +108,9 @@ Use this pattern at the component root. The block is a binding example, not a se
   --tracker-section-number-font: var(--type-section-number);
   --tracker-active: var(--component-primary);
   --tracker-active-text: var(--on-primary);
+  --tracker-selected-surface: var(--component-primary-tint);
+  --tracker-selected-text: var(--ink);
+  --tracker-selected-marker-rule: var(--line-standard) solid var(--tracker-active);
   --tracker-inactive: var(--muted-ink);
   --tracker-ink: var(--ink);
   --tracker-canvas: var(--canvas);
@@ -123,6 +128,16 @@ Use this pattern at the component root. The block is a binding example, not a se
   --tracker-compact-marker-size: var(--icon-md);
   --tracker-radius: var(--radius-round);
   --tracker-edge-share: 0;
+}
+
+.tracker--split-contents[data-selection-treatment="inverse"] {
+  --tracker-selected-surface: var(--tracker-active);
+  --tracker-selected-text: var(--tracker-active-text);
+  --tracker-selected-marker-rule: var(--line-standard) solid var(--tracker-active-text);
+}
+
+.tracker--split-contents[data-mode="dark"][data-selection-treatment="tint"] {
+  --tracker-selected-surface: var(--surface-1);
 }
 
 .source-line {
@@ -254,6 +269,8 @@ Use this pattern at the component root. The block is a binding example, not a se
 .quote-cluster {
   --quote-cluster-columns: 1fr;
   --quote-cluster-gap: var(--grid-gutter);
+  --quote-stagger-inline-offset: var(--space-8);
+  --quote-stagger-block-gap: var(--space-4);
   --quote-item-gap: var(--space-2);
   --quote-mark-gap: var(--space-1);
   --quote-item-padding-x: var(--space-0);
@@ -263,7 +280,7 @@ Use this pattern at the component root. The block is a binding example, not a se
   --quote-item-border: 0;
   --quote-item-radius: var(--component-radius);
   --quote-item-shadow: var(--component-shadow);
-  --quote-mark-font: var(--type-section-title);
+  --quote-mark-font: var(--type-quote-mark);
   --quote-mark-color: var(--component-primary);
   --quote-body-bg: var(--surface-1);
   --quote-body-border: var(--rule-quiet);
@@ -273,6 +290,7 @@ Use this pattern at the component root. The block is a binding example, not a se
   --quote-caret-size: var(--space-3);
   --quote-caret-inline-position: 50%;
   --quote-caret-angle: 45deg;
+  --quote-snip-size: var(--space-5);
   --quote-text-font: var(--type-body);
   --quote-text-color: var(--ink);
   --quote-attribution-gap: var(--space-1);
@@ -320,6 +338,7 @@ Use this pattern at the component root. The block is a binding example, not a se
   --table-cell-status-marker-size: var(--icon-sm);
   --table-cell-status-gap: var(--space-2);
   --table-cell-status-font: var(--type-body-compact);
+  --table-cell-binary-line: var(--line-hairline);
   --table-cell-heat-1: var(--heatmap-primary-1);
   --table-cell-heat-2: var(--heatmap-primary-2);
   --table-cell-heat-3: var(--heatmap-primary-3);
@@ -337,6 +356,11 @@ Use this pattern at the component root. The block is a binding example, not a se
   --table-cell-rating-size: var(--icon-lg);
   --table-cell-rating-gap: var(--space-2);
   --table-cell-rating-font: var(--type-label);
+  --table-cell-number-bg: var(--component-primary);
+  --table-cell-number-color: var(--on-primary);
+  --table-cell-number-font: var(--type-body);
+  --table-cell-number-min-size: var(--icon-md);
+  --table-cell-number-padding: var(--space-1);
   --table-cell-legend-font: var(--type-body-compact);
   --table-cell-legend-color: var(--ink);
   --table-cell-legend-gap: var(--space-3);
@@ -388,6 +412,17 @@ Use this pattern at the component root. The block is a binding example, not a se
   --node-radius: var(--component-radius);
   --connector-color: var(--page-guideline);
   --connector-width: var(--line-hairline);
+}
+
+.map-geography {
+  --map-land: var(--surface-1);
+  --map-highlight: var(--component-primary);
+  --map-boundary: var(--canvas);
+  --map-label-font: var(--type-label);
+  --map-label-color: var(--text-secondary);
+  --map-marker-bg: var(--canvas);
+  --map-marker-color: var(--ink);
+  --map-marker-line: var(--line-hairline);
 }
 
 .semantic-icon {

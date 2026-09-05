@@ -20,6 +20,8 @@ A section may contain any other composition, including more sections. It does no
 
 ## Selection
 
+For exhibit/interpretation splits, declare whether the right follows from the left or supplies related context. Apply the [split-section boundary grammar](../components/guidelines.md#split-section-relationships); the layout does not infer a causal arrow from reading order.
+
 Use `auto` when the relationship can be inferred safely:
 
 - one item becomes a column flow;
@@ -38,6 +40,8 @@ Override the selection when reading order, density, or a reference design requir
 Titles, sources, footnotes, page numbers, dividers, trackers, and other recurring objects are components in the same registry. Deck code reuses their component IDs and canonical tokens. The renderer never recreates these objects with slide-local values.
 
 Data-driven components accept arbitrary-length collections. Trend rows, initiative rollouts, organization levels, wave roadmaps, tables, and content rails derive their internal tracks from the supplied items; they do not encode fixed evidence or synthesis regions.
+
+For an [executive-summary narrative](../components/copy.md#executive-summary-narrative), select a column reading order explicitly. Stack shared headings and developed body text, then the overall action; do not let item count auto-select a grid or comparison table for a connected argument.
 
 ## Content preparation
 
@@ -59,8 +63,8 @@ Both HTML and PowerPoint consume the same resolved scene. HTML serializes canoni
 
 ## Golden component set
 
-`npm run golden` (also `npm run validate:runtime`) regenerates a PowerPoint for each of `mckinsey`, `bcg`, and `bain`. Every run includes each registered component, every registered variant, layout stress fixtures, and all standard reference compositions. Registry additions enter the set automatically. Variants declare representative props, preferred fixture size, and any required backdrop; do not hide a new rendering branch outside that contract.
+`npm run golden` (also `npm run validate:runtime`) regenerates one canonical McKinsey PowerPoint. Every run includes each registered component, every registered variant, layout stress fixtures, and all standard reference compositions. Compatible variants share paginated grid boards; dense or full-frame variants stay isolated. Coverage remains instance-level, so combining slides cannot hide a missing default or non-default branch. Registry additions enter the set automatically. Variants declare representative props, preferred fixture size, and any required backdrop; do not hide a new rendering branch outside that contract.
 
 Each slide is rendered independently as HTML and from the saved editable PPTX. Acceptance requires token/theme agreement, Artifact Tool import and geometry readback, no unexpected overlaps or text overflow, and image-parity thresholds. Component and chart thresholds also apply to their variant fixtures. Standard compositions exercise the same components in context.
 
-Accepted runs are retained under `output/golden/runs/`. `output/golden/index.html` pairs the HTML and PowerPoint images and links the three decks. Its manifest binds source hashes, complete coverage, candidate hashes, and report hashes. `npm run golden:check` rejects stale or altered evidence. A failed run does not replace the previous accepted set. Never claim that an older accepted set validates changed sources.
+Accepted runs are retained under `output/golden/runs/`. `output/golden/index.html` orders the review from standard compositions through layout examples to component families, pairs the HTML and PowerPoint images, and links the McKinsey deck. Its manifest binds source hashes, complete coverage, candidate hashes, and report hashes. `npm run golden:check` rejects stale or altered evidence. A failed run does not replace the previous accepted set. Never claim that an older accepted set validates changed sources.

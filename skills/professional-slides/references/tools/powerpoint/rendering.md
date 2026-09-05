@@ -1,6 +1,6 @@
 # PowerPoint Rendering and QA
 
-Use two rendering layers when possible: an authoring-time render for fast iteration and a render of the exact exported PPTX for release evidence.
+An authoring-time render is optional and accelerates iteration. A render of the exact saved PPTX is mandatory release evidence.
 
 ## Pipeline
 
@@ -62,11 +62,11 @@ After any structural repair, render the entire deck again. After a local repair,
 
 ## Hard acceptance loop
 
-After rendering the exported candidate, run [PowerPoint hard acceptance](acceptance.md) against that exact file. Its owner defines rejection and repair. Keep only the accepted candidate hash in the release evidence.
+Use [PowerPoint hard acceptance](acceptance.md) for the validator and repair loop; the [evaluation owner](../../evaluation/index.md#powerpoint-reports) controls release evidence.
 
 ## Independent visual reports
 
-Run the per-slide visual judge against every exact render, the generation script, deck contract, theme manifest, and treatment ledger:
+When the evaluation owner requires independent PowerPoint reports, use these commands for the exact render set.
 
 ```bash
 python3 evals/scripts/validate_pptx.py visual path/to/candidate.pptx \
@@ -93,12 +93,10 @@ python3 evals/scripts/validate_pptx.py consistency path/to/candidate.pptx \
   --report path/to/cross-slide-consistency-review.json
 ```
 
-The first judge checks message-to-component fit, hierarchy, completeness, density, exhibit finish, navigation, and polish on every full-size slide. The second compares repeated roles, title and grid anchors, tracker continuity, component variants, chart legends, semantic colours, and density rhythm across the complete deck. A rejection blocks release; repair the owning source, export and render a fresh candidate, and rerun all reports required by the changed hash.
+The [evaluation owner](../../evaluation/index.md#powerpoint-reports) defines report scope, acceptance, and rerun requirements.
 
 ## Rendering boundaries
 
 - PDF is a QA derivative, not the editable deliverable unless requested.
 - A thumbnail is insufficient for typography and source-note QA.
 - A screenshot of the editor is not a stable final render.
-- Do not compare renders from different candidate hashes.
-- Do not publish the file before the candidate of record passes QA.

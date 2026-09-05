@@ -46,7 +46,7 @@ def judgement(score: int = 95, verdict: str = "accept"):
 
 
 class PptxVisualTests(unittest.TestCase):
-    def test_prompt_uses_skill_rules_and_rejects_parallel_narrative_rails(self):
+    def test_prompt_routes_to_canonical_owners_without_banning_valid_variants(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             inputs = [root / name for name in ("contract.json", "theme.json", "ledger.json", "build.cjs")]
@@ -56,7 +56,14 @@ class PptxVisualTests(unittest.TestCase):
                 root / "deck.pptx", [root / "slide-1.png"], *inputs
             )
         self.assertIn("professional_slides_skill_references", prompt)
-        self.assertIn("secondary rail restates chart values", prompt)
+        self.assertIn("secondary rail merely repeats chart values", prompt)
+        self.assertIn("without an underline", prompt)
+        self.assertIn("open compositions are valid", prompt)
+        self.assertIn("non-additive balances", prompt)
+        self.assertIn("insight-versus-speaker-notes test", prompt)
+        self.assertIn("executive-summary standalone narrative test", prompt)
+        self.assertIn("not word count or table presence alone", prompt)
+        self.assertNotIn("Mandatory calibration", prompt)
 
     def test_every_slide_must_be_enumerated_exactly_once(self):
         value = judgement()

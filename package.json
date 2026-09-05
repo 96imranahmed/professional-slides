@@ -3,21 +3,26 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "python3 -m unittest discover -s evals/tests -p 'test_*.py'",
+    "check:syntax": "node evals/scripts/check_source_quality.mjs",
+    "test": "node evals/scripts/run_tests.mjs",
+    "check": "npm run check:syntax && npm test",
+    "check:release": "node evals/scripts/run_tests.mjs --release",
+    "check:dependencies": "node evals/scripts/run_tests.mjs --dependencies",
     "validate:runtime": "node evals/scripts/generate_golden_set.mjs",
     "golden": "node evals/scripts/generate_golden_set.mjs",
     "golden:check": "node evals/scripts/generate_golden_set.mjs --check",
     "validate:components": "node evals/scripts/validate_component_runtime.mjs",
     "validate:fidelity": "node evals/scripts/validate_reference_fidelity.mjs",
-    "inventory:toolkit": "node evals/scripts/import_consulting_toolkit.mjs"
+    "inventory:toolkit": "node evals/scripts/import_consulting_toolkit.mjs",
+    "import:maps": "node evals/scripts/import_natural_earth_maps.mjs"
   },
   "peerDependencies": {
-    "@napi-rs/canvas": ">=0.1.80",
-    "@oai/artifact-tool": ">=2.8.52",
-    "pixelmatch": ">=7.1.0",
-    "playwright": ">=1.55.0",
-    "pngjs": ">=7.0.0",
-    "pptxgenjs": ">=4.0.0",
-    "sharp": ">=0.34.0"
+    "@napi-rs/canvas": "0.1.100",
+    "@oai/artifact-tool": "2.8.59",
+    "pixelmatch": "7.2.0",
+    "playwright": "1.62.1",
+    "pngjs": "7.0.0",
+    "pptxgenjs": "4.0.1",
+    "sharp": "0.35.4"
   }
 }

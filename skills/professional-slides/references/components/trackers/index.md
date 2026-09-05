@@ -15,7 +15,7 @@ The native standard pairs `sequential-circles` full states with `compact-number-
 | Construction | Use when |
 | --- | --- |
 | `sequential-circles` full state | Default for three to six short peer sections. Center the rail vertically. |
-| `split-contents` full state | Parent title left; three to eleven items right. A longer list is a density state. Use circular numbers unless the source requires otherwise. |
+| `split-contents` full state | Parent title left; three to eleven items right. A longer list is a density state. Use circular numbers unless the source requires otherwise. The selected row defaults to a light tonal highlight; use the inverse treatment only for deliberate stronger emphasis. |
 | `compact-label` analytical state | Parent and active-child labels above the action title. |
 | `compact-number-strip` analytical state | Stable section numbers in one quiet strip. |
 | `numbered-section-break` transition state | Full-canvas pause with title left and large number right. |
@@ -33,7 +33,7 @@ On `split-contents`, the left field contains the section title only: no subtitle
 
 For a hierarchy, keep the parent left and only its children right. Allow hierarchical numbers such as `8.1` through `8.8`.
 
-Selection needs a non-colour cue. Preserve peer inset, baseline, marker size, and rule thickness. Do not imply completion.
+Selection needs a non-colour cue. Preserve peer inset, baseline, marker size, and rule thickness. Default to a light tonal row highlight so the label remains dark-on-light. The optional inverse treatment uses the primary surface with on-primary label text; invert the circular marker outline as well so its boundary remains visible. Do not imply completion.
 
 Give split-content rows equal padding. Its optical list width is normally around three quarters of the right field, with generous space after short labels. The backdrop fills height to the right edge.
 
@@ -56,16 +56,7 @@ Do not repeat the contents construction on analytical pages.
 
 ## Tracker contract
 
-Define once:
-
-- stable item IDs, labels, order, and slide ranges;
-- the complete item set shown on every full tracker page, including each approved number and label;
-- one selected item per tracked progress, transition, or analytical page;
-- one full construction and, if needed, one compact construction;
-- one selected-state grammar shared by every occurrence;
-- clear visibility rules for cover, contents, transition, analytical, close, and appendix pages.
-
-For `hierarchical-segmented`, define parent and chapter IDs on every governed slide. A label-bearing variant cannot appear intermittently. Never append the page topic.
+Serialize the tracker once through the canonical [pre-authoring tracker fields](../../storylining/pre-authoring-contract.md#required-fields). This component owner adds three rendering invariants: every full state shows the complete approved item set, every tracked page resolves exactly one permitted active state, and every occurrence uses the declared full or compact construction plus one shared selected-state grammar. A label-bearing variant cannot appear intermittently. Never append the page topic.
 
 ## Visual rules
 
@@ -84,6 +75,7 @@ Keep number treatment, label hierarchy, and selection grammar consistent.
 - The rendered deck matches the IDs, labels, order, selected states, ranges, constructions, and visibility rules declared in the tracker contract.
 - Every approved major section change contains its planned tracker page; the montage has no isolated late-section tracker.
 - Split contents pages use a title-only left field, circular number markers, a full-height right-hand backdrop through the right edge, and a vertically centered contents list.
+- Every circular marker remains visibly bounded. An inverted selected row uses an on-primary marker outline rather than allowing the circle to disappear into the row surface.
 - Displayed ordinal markers and numbered section headings pass the [item-indicator ordinal check](../item-indicators.md).
 - Every compact-label breadcrumb reads as one tight inline phrase; the separator never floats in a fixed remote column.
 - Structural edits update tracker ranges, page numbers, and cross-references.

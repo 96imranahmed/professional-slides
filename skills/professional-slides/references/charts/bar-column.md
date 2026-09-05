@@ -4,9 +4,15 @@
 
 Category comparison, ranking, discrete periods, and paired actual-versus-benchmark comparisons.
 
+## Guidance note
+
+- Use when discrete categories, ranks, or a short period sequence must be compared on one quantitative baseline.
+- Why: bar length makes relative magnitude and distance easy to verify.
+- Action title: state the leading, lagging, changing, or threshold-crossing category and quantify the decision-relevant gap when possible.
+
 ## Data contract
 
-One categorical dimension, one or a small number of numeric series, explicit units, and a declared order. Record whether the order is value, chronological, natural, or strategic.
+One categorical dimension, one or a small number of numeric series, explicit units, and a declared order. Every series must contain exactly one finite value per category; mismatched arrays fail before layout. Record whether the order is value, chronological, natural, or strategic. Explicit bounds must contain every value and zero.
 
 ## Selection and construction
 
@@ -14,10 +20,14 @@ One categorical dimension, one or a small number of numeric series, explicit uni
 - Use vertical columns for up to eight ordered periods. Exceed eight only when labels are unusually short and spacing remains readable.
 - Sort by value unless another order carries meaning.
 - Start the quantitative axis at zero unless a truncated scale is essential, clearly signaled, and does not overstate differences.
+- Plot signed values from the zero baseline: negatives extend left or down, and their labels sit beyond the negative endpoint rather than inside a positive sliver.
 - Keep gaps consistent and narrower than bars.
 - Use direct labels only when they pass the shared [direct-label gate](index.md#direct-label-gate) and remove the need for an axis.
 - Highlight one bar or group and keep the rest neutral.
 - Use clustered bars only when within-category comparison is central.
+- Keep the plot field blank by default. Add gridlines only when intermediate scale reading is necessary.
+- Apply the shared [two-mark contrast and focus rule](index.md#construction-rules); preserve labels or category positions as the non-colour cue.
+- Use `bar` to focus one mark in a one-series chart. Use `region-box` or `region-tint` to focus a complete category across grouped bars; the box uses the theme primary and the tint uses the light neutral surface. Give either region treatment symmetric breathing room beyond the marks and plot rails, then keep the category label clear of its lower edge.
 
 ## Registered variants
 
@@ -39,7 +49,11 @@ Use when columns show the primary measure and one line supplies a meaningful ben
 
 ### Endpoint growth
 
-Use when the chart's decision point is the change between two declared endpoints. Keep the underlying bars or columns as the evidence and add one shared [endpoint change](../components/chart-callouts.md#shared-highlight-and-change-grammar) arrow or bracket with the period and basis. Do not add a growth pill when the title or endpoint labels already make the change obvious.
+Use when the chart's decision point is the change between two declared endpoints. Keep the underlying bars or columns as the evidence and add one shared [endpoint change](../components/chart-callouts.md#shared-highlight-and-change-grammar) arrow or bracket with the period and basis. An arrow suits a directional A-to-B comparison; a bracket suits a longer interval. In clustered columns, the same bracket construction may repeat across categories when each compares the same two series. Do not add a growth label when the title or endpoint labels already make the change obvious.
+
+### Annotation rail
+
+Use one aligned row below chronological category labels when a secondary period-by-period change, such as year-on-year growth, materially changes interpretation. Bind every rail item to an exact category key and keep its unit separate from the plotted measure. Omit the rail when it only repeats the bar labels.
 
 ## Structural HTML reference
 
@@ -56,7 +70,7 @@ Use when the chart's decision point is the change between two declared endpoints
 .bar-chart figcaption { font: var(--type-label); color: var(--text-secondary); }
 ```
 
-The specimen shows one declared highlight. When the title does not explain an exception, render every row with the peer series role.
+The specimen shows one declared highlight. When the title does not explain an exception, render every row with the peer series role. Do not combine a selected bar, region box, and region tint on one chart.
 
 ### Variant HTML slots
 
@@ -98,4 +112,4 @@ Too many categories, rotated labels, non-zero baselines that exaggerate gaps, de
 
 ## Acceptance test
 
-The rank or comparison should be clear before reading labels, and every visible value must match the source after rounding.
+The rank or comparison should be clear before reading labels, every visible value must match the source after rounding, and horizontal charts expose the same numeric ticks and optional gridlines as vertical charts.

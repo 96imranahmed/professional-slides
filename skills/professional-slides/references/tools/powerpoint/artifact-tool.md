@@ -6,12 +6,7 @@ Artifact Tool may still be the authoring surface for a bounded existing-deck edi
 
 ## Runtime setup
 
-Load the host-provided workspace dependencies and read the package-exported references before use:
-
-- `@oai/artifact-tool/docs/presentations/API_QUICK_START.md`
-- `@oai/artifact-tool/docs/presentations/api/API_DOCS.md`
-
-Use the returned Node, module, Python, and rendering paths. Do not install or guess a second runtime.
+Follow [Load the active runtime guidance](../codex-generation.md#load-the-active-runtime-guidance), including its package-exported Artifact Tool references.
 
 ## Downstream adapter contract
 
@@ -42,7 +37,7 @@ For a canonical-scene candidate, require all of the following:
 - the color scheme and font scheme are named `Professional Slides`;
 - every native palette slot equals the canonical token binding;
 - slide size equals the canonical canvas conversion;
-- the package contains no rasterized component media or native chart parts;
+- generated components and chart marks remain editable vector primitives, with no native chart parts; authorized image and logo assets, plus documented verified-SVG raster fallbacks, may remain embedded media;
 - the imported render passes parity against the HTML serialization.
 
 The implementation lives at [`skills/professional-slides/runtime/adapters/artifact-tool.mjs`](../../../runtime/adapters/artifact-tool.mjs). The isolated gate is [`evals/scripts/validate_component_runtime.mjs`](../../../../../evals/scripts/validate_component_runtime.mjs), and the source-mapped gate is [`evals/scripts/validate_reference_fidelity.mjs`](../../../../../evals/scripts/validate_reference_fidelity.mjs). These repository-relative links are checked by the source-structure test.

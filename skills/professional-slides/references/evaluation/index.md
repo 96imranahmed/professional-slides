@@ -37,7 +37,7 @@ Release only when all apply:
 - The deck answers the brief and has one governing thought.
 - The title spine reads as a clear executive memo.
 - Each slide has one narrative job and one dominant exhibit.
-- The executive summary, when required, preserves the approved governing branches and overall action.
+- The executive summary, when required, preserves the approved governing branches and overall action and passes the [standalone narrative test](../components/copy.md#executive-summary-narrative).
 - The close follows from the evidence.
 - Missing data is explicit; a missing-data statement never counts as completed analysis.
 
@@ -91,13 +91,13 @@ The validator ignores the obsolete hand-picked section before `Source slide gall
 
 ## Component-runtime gate
 
-After changing layout, tokens, components, charts, or adapters, run `evals/scripts/validate_component_runtime.mjs` with the bundled workspace runtime paths. It creates one isolated slide per registered component and named variant plus composition/planner fixtures, renders the HTML observer and exact saved PPTX, imports the PPTX with Artifact Tool, and rejects missing names, theme drift, or visual disagreement. Review both contact sheets and the lowest-scoring individual fixtures before accepting the report.
+After changing layout, tokens, components, charts, or adapters, run `npm run check` and then the golden runtime gate with the bundled workspace paths. The golden deck places compatible variants of one component on paginated grid boards, keeps dense or full-frame variants isolated, and includes a curated non-duplicative composition set. The exhaustive layout suite remains in regression tests. The report records every default and non-default component instance as an explicit coverage key, independent of slide count, and rejects duplicate visual branches that differ only by a variant name. Release validation uses the canonical McKinsey palette; other supported palette inputs remain fast contract checks rather than duplicate visual decks. The validator renders the HTML observer and exact saved PPTX, imports the PPTX with Artifact Tool, and rejects missing names, theme drift, or visual disagreement. Review both contact sheets and the lowest-scoring individual fixtures before accepting the report.
 
 Require the overlap gate in both component and reference-fidelity reports. It checks rendered HTML line boxes and visible SVG geometry, then checks imported PPTX frames, paint order, recovered text, and explicit line counts. Reject text clipping, accidental text/text, text/rule, shape/shape, and connector collisions, and unequal peer heading clearances. A text backing must precede its text in native paint order. The imported-frame check does not replace exact-PPTX image review. Intentional containment and masking must match `runtime/overlap-policy.mjs`; a shared component, chart, or overlay alone never exempts a collision. Keep per-slide coverage and named violations, and test the gate with deliberately broken fixtures.
 
 ## Reference-fidelity gate
 
-After changing the consulting-toolkit runtime, run `npm run validate:fidelity`. The gate generates eighteen source-mapped composition families, renders the HTML observer and exact native-only PPTX at 3840 by 2160, and compares both outputs against both source-image sets. It rejects package media, native chart parts, undeclared token use, missing Artifact Tool names, frame drift above one pixel, or any visual metric below its calibrated floor. Keep the accepted `evals/reference-fidelity-eval.json`; `evals/run_evals.py --check` rejects a stale source hash or incomplete fixture set.
+After changing the consulting-toolkit runtime, run `npm run validate:fidelity`. The gate generates sixteen source-mapped composition families, renders the HTML observer and exact native-only PPTX at 3840 by 2160, and compares both outputs against both source-image sets. The replacement [plain deck cover](../components/index.md#deck-cover) and [single-title dividers](../components/index.md#section-dividers) are checked in the golden set instead of against retired decorative or labelled artwork. The fidelity gate rejects package media, native chart parts, undeclared token use, missing Artifact Tool names, frame drift above one pixel, or any visual metric below its calibrated floor. Keep the accepted `evals/reference-fidelity-eval.json`; `evals/run_evals.py --check` rejects a stale source hash or incomplete fixture set.
 
 ## Reference-copy gate
 
@@ -144,9 +144,7 @@ Each result records:
 - critical, major, and minor defects;
 - anti-slop review with one audit record per slide;
 - deck-consistency review with material theme-manifest, treatment-ledger, and audit paths, full-deck comparison, palette-role verification, tracker-map verification, repeated-component verification, and zero unresolved findings;
-- PowerPoint acceptance review with material manifest and report paths, the exact candidate hash, and `accepted: true` for every self or treatment PPTX;
-- independent visual review with its material report path, approved judge model, exact candidate hash, iteration count, and `accepted: true` for every self or treatment PPTX;
-- cross-slide consistency review with a material report path, a different approved judge model, the exact candidate hash, iteration count, and `accepted: true`;
+- the three [PowerPoint reports](#powerpoint-reports) for every self or treatment PPTX, with material paths, the same exact candidate hash, approved distinct judge models for visual and consistency review, iteration counts, and `accepted: true`;
 - reference comparison when required;
 - fresh-run preparation evidence;
 - reviewer notes.
@@ -154,7 +152,7 @@ Each result records:
 Validate results with:
 
 ~~~bash
-python evals/run_evals.py validate-result path/to/result.json
+python evals/run_evals.py --mode self --results path/to/result.json
 ~~~
 
 The CLI requires every declared artifact, render, contract, validator output, and run manifest to exist as a non-empty file inside the fresh run workspace. Use the validator output as evidence. Do not claim a pass from a narrative summary alone.

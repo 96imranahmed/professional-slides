@@ -77,6 +77,22 @@ def slide(number, page_type, chapter_id=None, header="structural", tracker_label
 
 
 class DeckContractTests(unittest.TestCase):
+    def test_direct_storyline_and_open_composition_accept_arbitrary_items(self):
+        contract = self.new_dd()
+        contract["templateId"] = "none"
+        analytical = contract["slides"][-1]
+        for key in ("evidenceRegions", "evidenceComposition", "layout"):
+            analytical.pop(key, None)
+        analytical.update({
+            "items": [{"id": "cash", "job": "reconcile free cash flow", "component": "chart.waterfall", "props": {}}],
+            "composition": "auto",
+            "dominantContentPlan": {"canvasShareTarget": 80, "completenessElements": ["signed bridge", "source reconciliation"]},
+            "primaryEvidenceType": "chart", "exhibitHeadingVariant": "unit", "legendTreatment": "direct-labelled",
+        })
+        self.assertEqual(validator.validate_contract(contract), [])
+        analytical["items"][0].pop("job")
+        self.assertTrue(any("job is required" in error for error in validator.validate_contract(contract)))
+
     def new_dd(self):
         return {
             "schemaVersion": 1,
@@ -343,7 +359,7 @@ class DeckContractTests(unittest.TestCase):
         contract = self.new_dd()
         contract["templateId"] = "custom"
         errors = validator.validate_contract(contract)
-        self.assertIn("new_deck templateId must name a registered template", errors)
+        self.assertIn("new_deck templateId must name a registered template or none for direct storylining", errors)
 
     def test_custom_visual_mode_requires_approval_evidence(self):
         contract = self.new_dd()
@@ -361,7 +377,7 @@ class DeckContractTests(unittest.TestCase):
         analytical["exhibitHeadingVariant"] = "plain"
         analytical["legendTreatment"] = "office-auto"
         errors = validator.validate_contract(contract)
-        self.assertIn("slides[3].exhibitHeadingVariant must equal open-underlined for charts", errors)
+        self.assertIn("slides[3].exhibitHeadingVariant must name the underlined or unit chart-title variant", errors)
         self.assertIn("slides[3].legendTreatment must use the canonical legend grammar", errors)
 
     def test_single_region_pre_read_requires_material_density_plan(self):

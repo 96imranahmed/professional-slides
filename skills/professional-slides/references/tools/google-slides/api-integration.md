@@ -55,7 +55,7 @@ Translate the named design guides, [theme roles and spacing tokens](../../themin
 - Use `updateTextStyle`, `updateParagraphStyle`, bullet requests, and text-range operations to apply design roles without flattening mixed text runs.
 - Derive panel padding, continuation labels, trackers, and footers from component definitions, not local literals. The Slides REST API lacks a general internal-margin setting. Preserve inspected template geometry or place a separate inner text box within the component bounds.
 - Group objects only when the group represents a reusable or jointly moving component, and only when the object types support grouping; tables, placeholders, and videos cannot be grouped. Do not group unrelated objects merely to simplify selection.
-- Read back the final size, transform, text runs, paragraph styles, and object IDs after mutation. Then render the native deck to catch font reflow, crop changes, chart padding, and optical drift that structural readback cannot prove.
+- Read back the final size, transform, text runs, paragraph styles, and object IDs after mutation. Then follow the canonical [Google Slides rendering and QA procedure](rendering.md).
 
 ## Template and exemplar operations
 
@@ -74,12 +74,11 @@ media mimeType: application/vnd.openxmlformats-officedocument.presentationml.pre
 
 Check `about.importFormats` because supported conversions are dynamic. Import creates a native presentation; updating an existing native file with converted media replaces its full content, so do not use it as a patch operation.
 
-After import:
+After import, complete the API-specific checks below, then use the canonical [rendering and QA procedure](rendering.md):
 
 - capture the native file ID and canonical URL;
 - read back the native presentation;
 - verify slide count and order;
-- render all slides;
 - repair conversion defects natively.
 
 ## Google Drive export

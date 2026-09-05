@@ -28,11 +28,10 @@ export async function auditSlideOverlaps(page, slide) {
     }).filter(Boolean);
     const rawHit = (entry, x, y) => {
       if (entry.type === "text") return entry.boxes.some((r) => x > r.x + 0.5 && x < r.x + r.width - 0.5 && y > r.y + 0.5 && y < r.y + r.height - 0.5);
-      if (entry.type !== "line" && (x <= entry.frame.x + 0.5 || x >= entry.frame.x + entry.frame.width - 0.5 || y <= entry.frame.y + 0.5 || y >= entry.frame.y + entry.frame.height - 0.5)) return false;
       const p = new DOMPoint(x, y);
-      return (value(entry.style.fill) !== "none" && entry.el.isPointInFill?.(p)) || (entry.type === "line" && entry.el.isPointInStroke?.(p));
+      return (value(entry.style.fill) !== "none" && entry.el.isPointInFill?.(p)) || (value(entry.style.stroke) !== "none" && entry.el.isPointInStroke?.(p));
     };
-    const maskRoles = { "cover-line": ["cover-panel"], "process-rail": ["process-marker"], "chart-gridline": ["chart-mark", "chart-area", "chart-point-highlight", "chart-label-surface"], "chart-line": ["chart-point-highlight"], "image-placeholder-line": ["image-label-surface", "annotation-surface"] };
+    const maskRoles = { "cover-line": ["cover-panel"], "process-rail": ["process-marker"], "tracker-rail": ["tracker-marker"], "tracker-compact-rail": ["tracker-compact-marker"], "chart-gridline": ["chart-mark", "chart-area", "chart-point-highlight", "chart-label-surface"], "chart-line": ["chart-point-highlight"], "image-placeholder-line": ["image-label-surface", "annotation-surface"] };
     const hit = (entry, x, y) => rawHit(entry, x, y) && !(maskRoles[entry.role] || []).some((role) => entries.some((mask) => mask.role === role && (value(mask.style.opacity) ?? 1) === 1 && rawHit(mask, x, y)));
     const collide = (a, b) => {
       if (a.type === "line" || b.type === "line") {
@@ -56,22 +55,35 @@ export async function auditSlideOverlaps(page, slide) {
       return false;
     };
     const own = (a, b) => a.data.componentInstance && a.data.componentInstance === b.data.componentInstance;
+    const descendant = (surface, child) => surface.data.componentInstance && Array.isArray(child.data.componentAncestors) && child.data.componentAncestors.includes(surface.data.componentInstance);
     const allowed = (a, b) => {
       if (a.type === "text" && b.type === "text") return null;
       // A legitimate text backing must precede its text in the native paint
       // order. Otherwise it hides that text, even if an HTML preview looks fine.
       for (const [text, shape] of [[a, b], [b, a]]) if (text.type === "text" && shape.type !== "text" && shape.type !== "line" && value(shape.style.fill) !== "none" && shape.data.paintOrder > text.data.paintOrder) return null;
       for (const [surface, child] of [[a, b], [b, a]]) {
-        if (policy.surfaces.includes(surface.role) && inside(surface.frame, child.frame)) return `contained by ${surface.role}`;
-        if (!own(surface, child)) continue;
+        const related = own(surface, child) || descendant(surface, child);
+        if (policy.surfaces.includes(surface.role) && related && inside(surface.frame, child.frame)) return `contained by ${surface.role}`;
+        if (["tracker-page-surface", "tracker-backdrop"].includes(surface.role) && ["source-text", "footnote-text", "footer-left", "footer-right", "page-number", "footer-rule", "header-rule"].includes(child.role) && (surface.data.paintOrder ?? entries.indexOf(surface)) < (child.data.paintOrder ?? entries.indexOf(child))) return "page furniture above tracker page field";
+        if (!related) continue;
+        if (["tracker-page-surface", "tracker-backdrop"].includes(surface.role) && inside(surface.frame, child.frame) && (surface.data.paintOrder ?? entries.indexOf(surface)) < (child.data.paintOrder ?? entries.indexOf(child))) return `tracker child inside its ${surface.role}`;
+        if (surface.role === "tracker-selection" && surface.data.sectionId === child.data.sectionId && child.boxes.every(box => inside(surface.frame, box)) && (surface.data.paintOrder ?? entries.indexOf(surface)) < (child.data.paintOrder ?? entries.indexOf(child))) return "selected tracker item inside its exact row highlight";
+        if (surface.role === "table-cell" && policy.containedCellMarks.includes(child.role) && surface.data.row === child.data.row && surface.data.column === child.data.column && inside(surface.frame, child.frame) && (surface.data.paintOrder ?? entries.indexOf(surface)) < (child.data.paintOrder ?? entries.indexOf(child))) return "mark inside its own table cell";
         if (surface.role === "chart-label-surface" && surface.data.forNode === child.id) return "gridline knockout behind its exact data label";
         if (policy.containedLabels[surface.role] === child.role && child.boxes.every((r) => inside(surface.frame, r)) && rawHit(surface, child.frame.x + child.frame.width / 2, child.frame.y + child.frame.height / 2)) return `label inside its ${surface.role}`;
         if (surface.role === "chart-highlight" && child.role.startsWith("chart-") && child.type !== "text") return "chart category highlight under plot geometry";
         if (surface.role === "chart-highlight" && child.role === "data-label") return "data label over category highlight";
         if (surface.role === "chart-highlight" && child.role === "annotation-leader") return "annotation leader over category highlight";
+        if (surface.role === "chart-quadrant" && child.role === "chart-quadrant-title" && surface.data.quadrant === child.data.quadrant) return "quadrant title over its background treatment";
+        if (surface.role === "chart-quadrant" && (policy.chartGeometry.includes(child.role) || child.role === "data-label")) return "quadrant background under plot geometry";
         if (surface.role === "annotation-leader" && policy.chartGeometry.includes(child.role)) return "annotation leader anchored to plot geometry";
       }
       if (!own(a, b)) return null;
+      if (a.role === "annotation-leader" && b.role === "annotation-leader" && a.data.annotationKey && a.data.annotationKey === b.data.annotationKey) return "line junction within one change annotation";
+      if(a.role==='table-implication'&&b.role==='table-implication'&&a.data.row===b.data.row&&a.data.column===b.data.column){
+        const disc=a.type==='ellipse'?a:b.type==='ellipse'?b:null,mark=disc===a?b:a;
+        if(!disc||(inside(disc.frame,mark.frame)&&(disc.data.paintOrder??entries.indexOf(disc))<(mark.data.paintOrder??entries.indexOf(mark))))return 'geometry within one implication arrow';
+      }
       if (policy.chartGeometry.includes(a.role) && policy.chartGeometry.includes(b.role) && a.type !== "text" && b.type !== "text") {
         if (a.role === "chart-mark" && b.role === "chart-mark") return null;
         return "plot geometry intersection";

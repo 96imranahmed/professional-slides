@@ -45,7 +45,7 @@ function lineOptions(style, data = {}) {
     color: colorValue(style.stroke),
     width: style.lineWidth ? points(styleValue(style.lineWidth)) : 0,
     dashType: styleType,
-    ...(data.endArrow ? { endArrowType: "triangle" } : {})
+    ...(data.endArrow ? { endArrowType: data.endArrowType || "triangle" } : {})
   };
 }
 
@@ -59,12 +59,57 @@ function shapeOptions(node) {
     h: inch(frame.height),
     objectName: `ps:${node.id}`,
     fill: style.fill === "none" ? { color: "FFFFFF", transparency: 100 } : { color: colorValue(style.fill), transparency },
-    line: style.stroke === "none" ? { color: "FFFFFF", transparency: 100, width: 0 } : lineOptions(style)
+    line: style.stroke === "none" ? { color: "FFFFFF", transparency: 100, width: 0 } : lineOptions(style),
+    ...(style.rotate ? { rotate: Number(style.rotate) } : {}),
+    ...(style.flipH ? { flipH: true } : {}),
+    ...(style.flipV ? { flipV: true } : {})
   };
+}
+
+function quoteCalloutPoints(node) {
+  const { frame, data } = node;
+  const width = frame.width;
+  const bodyHeight = frame.height * data.bodyRatio;
+  const caretCenter = width * data.caretCenterRatio;
+  const caretHalf = width * data.caretWidthRatio / 2;
+  const radius = Math.max(0, Math.min(frame.width, frame.height) * data.cornerRadiusRatio);
+  const point = (x, y, extra = {}) => ({ x: inch(x), y: inch(y), ...extra });
+  const curve = (x, y, x1, y1) => ({ x: inch(x), y: inch(y), curve: { type: "quadratic", x1: inch(x1), y1: inch(y1) } });
+  return [
+    point(radius, 0, { moveTo: true }),
+    point(width - radius, 0),
+    curve(width, radius, width, 0),
+    point(width, bodyHeight - radius),
+    curve(width - radius, bodyHeight, width, bodyHeight),
+    point(caretCenter + caretHalf, bodyHeight),
+    point(caretCenter, frame.height),
+    point(caretCenter - caretHalf, bodyHeight),
+    point(radius, bodyHeight),
+    curve(0, bodyHeight - radius, 0, bodyHeight),
+    point(0, radius),
+    curve(radius, 0, 0, 0),
+    { close: true }
+  ];
+}
+
+function customPolygonPoints(node) {
+  const { frame, data } = node;
+  if (!Array.isArray(data.paths) || !data.paths.length) throw new Error("Custom polygon requires one or more paths");
+  return data.paths.flatMap((path) => {
+    if (!Array.isArray(path) || path.length < 3) throw new Error("Custom polygon paths require at least three points");
+    return [
+      ...path.map(([x, y], index) => ({ x: inch(Number(x) * frame.width), y: inch(Number(y) * frame.height), ...(index === 0 ? { moveTo: true } : {}) })),
+      { close: true }
+    ];
+  });
 }
 
 function addNode(slide, node, pptx) {
   const { frame, style, data } = node;
+  if (node.type === "image") {
+    slide.addImage({ data: data.dataUri, x: inch(frame.x), y: inch(frame.y), w: inch(frame.width), h: inch(frame.height), rounding: true, altText: data.alt, objectName: `ps:${node.id}` });
+    return;
+  }
   if (node.type === "text") {
     slide.addText(node.text, {
       x: inch(frame.x), y: inch(frame.y), w: inch(frame.width), h: inch(frame.height),
@@ -116,6 +161,14 @@ function addNode(slide, node, pptx) {
     return;
   }
   if (node.type === "shape") {
+    if (data.geometry === "quoteCallout") {
+      slide.addShape(pptx.ShapeType.custGeom, { ...shapeOptions(node), points: quoteCalloutPoints(node) });
+      return;
+    }
+    if (data.geometry === "customPolygon") {
+      slide.addShape(pptx.ShapeType.custGeom, { ...shapeOptions(node), points: customPolygonPoints(node) });
+      return;
+    }
     const shapeType = pptx.ShapeType[data.geometry];
     if (!shapeType) throw new Error(`Unsupported PptxGenJS scene geometry: ${data.geometry}`);
     slide.addShape(shapeType, shapeOptions(node));
@@ -153,6 +206,16 @@ async function applyTheme(pptxPath, tokens) {
     }
     zip.file(name, xml);
   }
+  // Materialize inherited text defaults as well as explicitly positioned text.
+  // PptxGenJS otherwise supplies a fixed 44/32/28/20/18 pt Office ladder.
+  for (const name of Object.keys(zip.files).filter(name => /^ppt\/slideMasters\/slideMaster\d+\.xml$/.test(name))) {
+    let xml = await zip.file(name).async("string");
+    for (const [role, tokenId] of [["titleStyle", "type.actionTitle"], ["bodyStyle", "type.body"], ["otherStyle", "type.body"]]) {
+      xml = xml.replace(new RegExp(`<p:${role}>[\\s\\S]*?<\\/p:${role}>`, "g"), block => block.replace(/(<a:defRPr\b[^>]*\bsz=")[0-9]+/g, `$1${Math.round(tokens[tokenId].value * 100)}`));
+    }
+    xml = xml.replace(/(<a:buFont\b[^>]*typeface=")[^"]+/g, (_, before) => before + tokens["font.body"].value);
+    zip.file(name, xml);
+  }
   // PptxGenJS 4 emits one master but declares one master content type per
   // slide. Remove only these known phantom declarations, never real parts.
   const types = await zip.file("[Content_Types].xml").async("string");
@@ -183,7 +246,7 @@ export async function writePptx(deck, pptxPath) {
     const slide = pptx.addSlide("PS_BASE");
     slide.background = { color: hex(tokens["color.canvas"].value) };
     sceneSlide.nodes.forEach((node) => addNode(slide, node, pptx));
-    slide.addNotes(`Professional Slides scene ${sceneSlide.id}\nPalette ${deck.palette.id}\nDesign hash ${deck.manifest.designHash}\n[Sources]\n${deck.palette.source || deck.palette.basis}\n[/Sources]`);
+    slide.addNotes(`${sceneSlide.notes ? `${sceneSlide.notes}\n\n` : ""}Professional Slides scene ${sceneSlide.id}\nPalette ${deck.palette.id}\nDesign hash ${deck.manifest.designHash}\nDesign source: ${deck.palette.source || deck.palette.basis}`);
   });
   await fs.mkdir(path.dirname(pptxPath), { recursive: true });
   await pptx.writeFile({ fileName: pptxPath });

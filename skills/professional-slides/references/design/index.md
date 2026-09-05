@@ -18,7 +18,7 @@ Use the [composition model](../composition/index.md) for the content-item contra
 
 Do not impose the same card grid, three-column layout, process rail, or footer strip on most slides. Give each slide one dominant exhibit; route any detached synthesis or terminal action through the canonical [`Insight Box`](../components/insight-box.md). Evidence-attached chart annotations follow [`chart callouts`](../components/chart-callouts.md).
 
-Whitespace must support hierarchy. It must not conceal missing evidence or undersized content. On an executive pre-read, one dominant analytical item should normally occupy 60% to 90% of the usable content field and include at least two completeness elements such as a comparison, qualifier, definition, period, or attached interpretation. This is a planning check, not a reason to add filler.
+Whitespace must support hierarchy. It must not conceal missing evidence or undersized content. On an executive pre-read, one dominant analytical item should normally occupy 60% to 90% of the usable content field. The examples of comparison, qualifier, definition, period, and attached interpretation are non-scored planning prompts; the [copy owner](../components/copy.md) defines completeness.
 
 ## Select an evidence-density mode
 

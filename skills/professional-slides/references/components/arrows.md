@@ -11,14 +11,16 @@ Choose the preferred relationship treatment unless density or semantics require 
 - `wedge`: a filled triangular mark without a container. Use for a stronger compact transfer when a line arrow would disappear, but avoid it when it could be mistaken for media playback.
 - `disc-multi-chevron`: repeated chevrons inside a filled disc with a through-line. Reserve for a major transition, acceleration, or boundary crossing. Do not repeat it in every row of a dense ledger.
 
+The native runtime exposes the first three common implication treatments through the shared `connector` component. Use `variant="disc-chevron"` for an unlabelled narrative implication, `variant="line"` for a compact native line with a triangular end arrowhead, and `variant="labelled-line"` only when the relationship label adds meaning.
+
 Use one arrow variant for one semantic relationship across a slide family. Do not mix variants merely for visual variety. Use `disc-chevron` for a repeated description-to-consequence row by default. Use `line` only as a controlled compact exception when the repeated row geometry cannot support the disc at a readable size.
 
 ## Geometry and placement
 
 - Align the arrow to the centers of the two fields it connects.
-- Keep disc arrows compact. Bind the standard disc diameter to `icon-md`, roughly one-third of a large emphasis disc, so it sits near the body-text line height rather than dominating the row.
+- Keep disc arrows compact. Bind the standard disc diameter to `icon-md`; this token is the sole normative size rule.
 - Keep repeated arrows on one axis and use one optical size, stroke, and arrowhead.
-- Reserve whitespace for the arrow. Do not place it over a rule, heading, label, or body copy.
+- Reserve whitespace for the arrow. Do not place it over a heading, label, or body copy. A [split-section inference divider](guidelines.md#split-section-relationships) may terminate above and below a disc-chevron; never run the divider through its marker.
 - Connector lines terminate at object boundaries. They do not run through text or unrelated nodes.
 - Never draw a heading rule over an empty arrow slot. An unlabeled arrow column has no header line.
 - Use editable native geometry or inline SVG. Do not use a text glyph, emoji, raster screenshot, or improvised symbol font.
@@ -161,7 +163,7 @@ Build each arrow from editable native line and shape geometry, preserving the re
 - The arrow expresses a named relationship that is not already obvious from proximity.
 - One relationship uses one registered variant throughout its slide family.
 - The preferred implication treatment is the filled `disc-chevron` with an on-primary chevron; `line` is a compact fallback rather than the ordinary default.
-- Disc arrows remain compact at approximately the body-text line height and never become a competing focal object in a repeated row.
+- Disc arrows use the resolved `icon-md` size and never become a competing focal object in a repeated row.
 - Repeated arrows share one axis, size, stroke, and alignment.
 - The selected variant has enough emphasis for its job without competing with the evidence.
 - Empty arrow header slots have no visible rule.

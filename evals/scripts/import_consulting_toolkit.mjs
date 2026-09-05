@@ -50,9 +50,10 @@ function selectCapabilities(slide) {
   if (/process|drop-down|deep-dive|lifecycle|life cycle/.test(text)) components.push("process");
   if (/map|geograph|country|countries/.test(text) && !/roadmap/.test(text)) components.push("map");
   if (/funnel|pipeline/.test(text)) components.push("funnel");
-  if (/strategy house|7-s|framework|growth-share matrix|portfolio matrix/.test(text)) components.push("matrix");
+  if (/strategy house|7-s|framework|growth-share matrix|portfolio matrix/.test(text) && !/horizon/.test(text)) components.push("matrix");
 
-  if (/waterfall/.test(text) || semantic === "waterfall") components.push("chart.waterfall");
+  if (/three horizons|horizon model|growth horizons/.test(text)) components.push("chart.horizons");
+  else if (/waterfall/.test(text) || semantic === "waterfall") components.push("chart.waterfall");
   else if (/bubble/.test(text)) components.push("chart.bubble");
   else if (/scatter/.test(text) || semantic === "scatter") components.push("chart.scatter");
   else if (/donut|doughnut/.test(text) || semantic === "donut") components.push("chart.donut");
@@ -68,7 +69,7 @@ function selectCapabilities(slide) {
   if (/heatmap|scorecard|evaluation|criteria|comparison|scenario|pros|issues/.test(text)) components.push(/heatmap|scorecard/.test(text) ? "heatmap" : "comparison-table");
   else if (semantic === "table" || /table|target list|balanced scorecard/.test(text)) components.push("table");
 
-  if (/quote|interview/.test(text)) components.push("quote");
+  if (/quote|interview/.test(text)) components.push("quote-cluster");
   if (/logo/.test(text)) components.push("logo");
   if (/picture|image|photo/.test(text)) components.push("image-frame");
   if (/key trend|key point|takeaway|insight|conclusion/.test(text)) components.push("insight");
@@ -106,7 +107,6 @@ async function main() {
     const selected = selectCapabilities(slide);
     return {
       slide: slide.slide,
-      title: slide.derived_title || slide.working_title,
       sourceImage: slide.hq_image,
       sourceHtml: slide.fidelity_html || slide.html,
       sourceClassification: slide.ai_semantic_component || slide.semantic_component,

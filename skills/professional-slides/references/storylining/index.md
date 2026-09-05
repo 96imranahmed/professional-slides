@@ -20,17 +20,17 @@ Then define the main question and governing answer. If the answer is not yet sup
 
 Use the [hypothesis tree](hypothesis-tree.md) to split the main question into distinct tests. Explain why each branch matters and how the branches combine into the decision.
 
-Keep only branches that could change the conclusion.
+Prioritize branches that could change the conclusion. Retain every other material branch with an explicit disposition such as appendix, parked, or unresolved.
 
 ## Choose the narrative arc
 
-Use the simplest arc that fits:
+Choose the arc from the governing decision:
 
-- answer, proof, decision;
-- situation, complication, resolution;
-- problem, solution, evidence, ask;
-- baseline, variance, cause, action;
-- question, tests, synthesis, recommendation.
+- answer, proof, decision for a short, already-framed decision;
+- situation, complication, resolution when a changed condition creates the need to act;
+- problem, solution, evidence, ask for a proposal or funding request;
+- baseline, variance, cause, action for performance diagnosis;
+- question, tests, synthesis, recommendation for hypothesis-led analysis.
 
 ## Write and approve the dot-dash
 
@@ -59,16 +59,11 @@ Do not prescribe decorative layout details here.
 
 ## Keep hierarchical trackers parallel
 
-When navigation materially improves orientation, model it as one hierarchy rather than unrelated tracker pages:
-
-1. The parent tracker is the deck-level chapter map. Its IDs, labels, and order equal the dot-dash section groups.
-2. Each parent may own one chapter tracker containing the analytical subgroups inside that chapter. Its IDs, labels, order, and governed slide ranges equal the dot-dash subgroups.
-3. The contents page shows the full parent tracker. A chapter transition repeats that parent state and may preview only its own chapter tracker. Analytical pages keep the parent label and the active chapter item visible through one consistent header variant.
-4. Cover, executive summary, and close remain untracked unless an authorized reference requires otherwise.
+When navigation materially improves orientation, map parent tracker IDs, labels, and order to the dot-dash section groups, then map chapter-item IDs, labels, order, and governed slide ranges to their analytical subgroups. The [tracker owner](../components/trackers/index.md) controls eligibility, hierarchy, variants, placement, and visibility.
 
 When an executive summary and tracker both exist, map each summary proof branch to the corresponding chapter in the same semantic order and map the overall action to the decision chapter. Branch headings remain evidence-led conclusions, while tracker labels remain short navigation labels; any wording difference must preserve an obvious one-to-one bridge. Do not move from `Operating momentum` in the summary to an unexplained `Growth quality` chapter in the body.
 
-Do not create a parent or chapter tracker that has no matching dot-dash group. Do not rename, reorder, skip, or intermittently display an approved tracker item during authoring. If the title spine already provides sufficient orientation, declare `tracker.system` as `none` instead.
+Do not create a tracker item without a matching dot-dash group. Do not rename or reorder an approved item during authoring.
 
 ## Write the title spine
 

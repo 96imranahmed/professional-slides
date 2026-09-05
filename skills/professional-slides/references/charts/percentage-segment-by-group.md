@@ -6,6 +6,12 @@ Survey results or other mutually exclusive response distributions where the audi
 
 Use [general stacked bars](stacked.md) for ordinary part-to-whole analysis that does not require the group cap, focal-category sorting, calculated `Other` row, or adjacent insight extraction defined here. Use [bar and column](bar-column.md) instead when respondents may select multiple answers and the categories therefore do not sum to 100%.
 
+## Guidance note
+
+- Use when mutually exclusive response distributions must be compared across a small number of user groups.
+- Why: equal-length 100 percent bars isolate composition differences while stable segment order preserves comparability.
+- Action title: state which groups over- or under-index on the focal response and why that difference matters.
+
 ## Analytical contract
 
 Define one focal response as `Category A` before sorting. It should be the response most relevant to the action title, not whichever category happens to produce the most dramatic order. The chart answers: which user groups report more or less of `Category A`, and how does the remaining response mix explain that difference?
@@ -55,7 +61,7 @@ If the response scale itself contains more than five categories, collapse only s
 
 Resolve all segment colours from the active [theme token registry](../theming/tokens.md). Bind each response category to one stable palette role or derived tint and preserve that mapping across every group, related slide, and target platform. A legend is required unless every segment is directly labelled with its category.
 
-`Category A` should normally receive `chart-series-1`, which usually resolves to the deck's primary colour because it controls the row order. Assign the remaining response categories to the minimum additional chart-series colours required by the data; use the light neutral chart-segment role for a residual, inactive, or intentionally subdued response. Do not reuse chart-series hues on the insight region, row labels, headings, or other structural components. Any palette extension remains subject to the design system's chart-palette contract.
+Assign `Category A` to `chart-series-1`, the deck's primary chart colour, because it controls the row order. Change that mapping only to preserve an existing cross-slide category encoding or resolve a documented contrast failure, and record the exception in the treatment ledger. Assign the remaining response categories to the minimum additional chart-series colours required by the data; use the light neutral chart-segment role for a residual, inactive, or intentionally subdued response. Do not reuse chart-series hues on the insight region, row labels, headings, or other structural components. Any palette extension remains subject to the design system's chart-palette contract.
 
 When one segment needs emphasis, preserve its category meaning. Use its full-strength palette value, subdue peers with approved tints or opacity, and annotate it directly. Never recolour it to another category's hue. Use a row tint, edge marker, or label weight only when the whole group is the evidence.
 
@@ -63,7 +69,7 @@ When one segment needs emphasis, preserve its category meaning. Use its full-str
 
 An optional side section may hold one to three decision-relevant statements. When used, all statements sit inside the slide's single [`Insight Box`](../components/insight-box.md). Each statement names the compared groups or category, states the observed pattern, and explains its relevance. Do not narrate every value or repeat the title.
 
-Keep the plot at least eight grid columns wide and the insight section no wider than four columns. Bind the single box to the active [component section treatment](../components/guidelines.md), including its surface, spacing, typography, and padding. Use the same treatment across the slide family. If the prose becomes coequal with the chart or requires a causal argument, give it an explicit content job and compose a weighted row rather than compressing the plot.
+Keep the plot at least eight grid columns wide and the insight section no wider than four columns. Apply the selected treatment from the [Insight Box owner](../components/insight-box.md). If the prose becomes coequal with the chart or requires a causal argument, give it an explicit content job and compose a weighted row rather than compressing the plot.
 
 Link each insight to its evidence with the same category colour, a short leader, or a shared numbered marker. Use one of these mechanisms consistently; do not combine a saturated rail, multiple highlighted rows, coloured outlines, and several leaders.
 

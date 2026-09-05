@@ -58,7 +58,7 @@ This specimen materializes the canonical [`split-contents`](index.md#choose-one-
       <header class="tracker-page__parent">
         <h1>8. Conclusion</h1>
       </header>
-      <nav class="tracker tracker--split-contents" data-list-density="long" aria-label="Conclusion subsections">
+      <nav class="tracker tracker--split-contents" data-list-density="long" data-mode="light" data-selection-treatment="tint" aria-label="Conclusion subsections">
         <ol>
           <li><span class="tracker__marker">8.1</span><span>Growth model overview</span></li>
           <li><span class="tracker__marker">8.2</span><span>Target description</span></li>
@@ -141,6 +141,9 @@ Use only at a material chapter change. The title stays on the left and the large
   --tracker-section-number-font: var(--type-section-number);
   --tracker-active: var(--component-primary);
   --tracker-active-text: var(--on-primary);
+  --tracker-selected-surface: var(--component-primary-tint);
+  --tracker-selected-text: var(--ink);
+  --tracker-selected-marker-rule: var(--line-standard) solid var(--tracker-active);
   --tracker-inactive: var(--muted-ink);
   --tracker-ink: var(--ink);
   --tracker-canvas: var(--canvas);
@@ -324,13 +327,24 @@ Use only at a material chapter change. The title stays on the left and the large
 }
 
 .tracker--split-contents li[data-state="selected"] {
-  background: var(--tracker-tint);
+  color: var(--tracker-selected-text);
+  background: var(--tracker-selected-surface);
 }
 
 .tracker--split-contents li[data-state="selected"] .tracker__marker {
-  border: var(--tracker-rule);
+  border: var(--tracker-selected-marker-rule);
   background: var(--tracker-active);
   color: var(--tracker-active-text);
+}
+
+.tracker--split-contents[data-selection-treatment="inverse"] {
+  --tracker-selected-surface: var(--tracker-active);
+  --tracker-selected-text: var(--tracker-active-text);
+  --tracker-selected-marker-rule: var(--line-standard) solid var(--tracker-active-text);
+}
+
+.tracker--split-contents[data-mode="dark"][data-selection-treatment="tint"] {
+  --tracker-selected-surface: var(--surface-1);
 }
 
 .tracker-analytical-header {

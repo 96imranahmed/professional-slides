@@ -3,6 +3,104 @@ from test_source_structure import run_node
 
 
 class GoldenSetTests(unittest.TestCase):
+    def test_gallery_groups_related_layers_without_hiding_fixtures(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import { goldenSetSpecs, goldenGalleryGroups } from './skills/professional-slides/runtime/golden-set.mjs';
+const specs=goldenSetSpecs(),groups=goldenGalleryGroups(specs);
+const ids=groups.flatMap(g=>g.fixtures.map(f=>f.id));
+assert.deepEqual([...ids].sort(),specs.map(f=>f.id).sort());
+assert.equal(new Set(ids).size,specs.length);
+for(const [id,targets] of [['page-shell',['slide-chrome','page-template']],['section-container',['section','section-heading']],['titles',['action-title','section-title']]]) {
+ const group=groups.find(g=>g.id===id);
+ assert.ok(group.description);
+ assert.deepEqual([...new Set(group.fixtures.map(f=>f.target))].sort(),targets.sort());
+ for(const target of targets) assert.ok(group.fixtures.some(f=>f.target===target&&(f.coverage||[]).some(item=>item.target===target)));
+}
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_section_divider_modes_rule_variants_and_generic_copy(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import { compileDeck, component } from './skills/professional-slides/runtime/core.mjs';
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { buildGoldenSetDeck } from './skills/professional-slides/runtime/golden-set.mjs';
+import { contrastRatio } from './skills/professional-slides/runtime/palettes.mjs';
+const definition=REGISTRY.get('section-divider'),frame={x:0,y:0,width:1280,height:720};
+assert.equal(Object.keys(definition.variants).length,12);
+assert.equal(definition.defaultVariant,'plain-dark-none');
+for(const palette of ['mckinsey']) {
+ const {deck,fixtures}=buildGoldenSetDeck({palette});
+ const variants=fixtures.filter(f=>f.target==='section-divider').map(f=>({fixture:f,slide:deck.slides[f.slide-1]}));
+ assert.equal(variants.length,12);
+ const textFrames={};
+ for(const {fixture,slide} of variants) {
+  const title=slide.nodes.find(n=>n.role==='divider-title'), number=slide.nodes.find(n=>n.role==='divider-number');
+  assert.equal(title.text,'(Insert section title)');
+  assert.equal(title.style.fontFamily.tokenId,'font.display');
+  assert.equal(title.style.fontSize.tokenId,'type.deckTitle');
+  assert.equal(title.frame.y+title.frame.height/2,360);
+  const style=fixture.variant.startsWith('numbered-')?'numbered':'plain';
+  const dark=fixture.variant.includes('-dark-');
+  if(textFrames[style]) assert.deepEqual(title.frame,textFrames[style]);textFrames[style]=title.frame;
+  assert.equal(Boolean(number),style==='numbered');
+  if(number){assert.equal(number.text,'1');assert.equal(number.style.fontSize.tokenId,'type.sectionNumber');assert.equal(number.style.color.tokenId,dark?'color.onPrimary':'color.componentPrimary');}
+  const surface=slide.nodes.find(n=>n.role==='divider-surface');
+  assert.ok(contrastRatio(title.style.color.value,surface.style.fill.value)>=4.5);
+  assert.equal(title.style.color.tokenId,dark?'color.onPrimary':'color.ink');
+  assert.equal(surface.style.fill.tokenId,dark?'color.ink':'color.canvas');
+  assert.equal(slide.nodes.filter(n=>n.type==='line').length,fixture.variant.endsWith('-none')?0:fixture.variant.includes('-top-and-bottom')?2:1);
+ }
+ const standard=deck.slides.find(s=>s.id==='golden-divider');
+ assert.deepEqual(standard.nodes.filter(n=>n.role==='divider-title').map(n=>n.text),['(Insert section title)']);
+ assert.ok(!standard.nodes.some(n=>['divider-number','divider-orientation'].includes(n.role)));
+}
+for(const props of [{title:''},{title:42},{title:'A',mode:'sepia'},{title:'A',style:'numbered'},{title:'A',style:'poster'},{title:'A',subtitle:'B'},{title:'A',number:'1'},{title:'A',orientation:'B'},{title:'A',dividerRule:true},{title:'A',pageTemplate:{rules:'sometimes'}},{title:'A\\nB\\nC'}]) assert.throws(()=>definition.render({id:'bad',frame,props}));
+const company=compileDeck({palette:'bain',typography:{display:'Georgia'},pageTemplate:{rules:'bottom'},slides:[{id:'divider',frame,composition:component({id:'divider',component:'section-divider',frame,props:{title:'Section A',mode:'light',companyName:'Company',pageNumber:2}})}]},REGISTRY);
+assert.equal(company.slides[0].nodes.find(n=>n.role==='divider-title').style.fontFamily.value,'Georgia');
+assert.equal(company.slides[0].nodes.filter(n=>n.role==='footer-rule').length,1);
+const furniture=company.slides[0].nodes.filter(n=>['footer-right','page-number'].includes(n.role));
+assert.equal(furniture.length,2);assert.equal(furniture[0].frame.y,furniture[1].frame.y);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_template_copy_and_guidance_contract(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import { buildGoldenSetDeck, goldenSetSpecs } from './skills/professional-slides/runtime/golden-set.mjs';
+import { REGISTRY, registryManifest } from './skills/professional-slides/runtime/registry.mjs';
+const specs=goldenSetSpecs(), {deck}=buildGoldenSetDeck();
+const hasGuidance=spec=>['Guidance','Use when:','Why:','Action title:'].every(label=>(spec.notes||'').includes(label));
+const standards=specs.filter(spec=>spec.kind==='standard');
+const chartFixtures=specs.filter(spec=>['chart','variant','board'].includes(spec.kind)&&REGISTRY.get(spec.target)?.category==='chart');
+const guidedExamples=specs.filter(spec=>spec.example&&(REGISTRY.get(spec.target)?.category==='chart'||spec.target==='chart-group'));
+const hasSquare=text=>String(text||'').includes(String.fromCharCode(91))||String(text||'').includes(String.fromCharCode(93));
+assert.equal(standards.length,25);
+assert.ok(guidedExamples.length>=10);
+assert.ok(standards.every(hasGuidance));
+assert.ok(chartFixtures.every(hasGuidance));
+assert.ok(guidedExamples.every(hasGuidance));
+for(const slide of deck.slides) {
+  assert.equal(hasSquare(slide.notes),false);
+  for(const node of slide.nodes||[]) if(typeof node.text==='string') assert.equal(hasSquare(node.text),false);
+}
+const textFor=id=>deck.slides.find(slide=>slide.id===id).nodes.map(node=>node.text).filter(Boolean);
+assert.ok(textFor('golden-divider').includes('(Insert section title)'));
+assert.ok(textFor('golden-rollout').includes('(We plan to roll-out across Y years)'));
+assert.ok(textFor('golden-text').includes('(Insert section title)'));
+const manifestCharts=registryManifest().components.filter(component=>component.category==='chart');
+assert.ok(chartFixtures.length<manifestCharts.reduce((count,component)=>count+Math.max(1,Object.keys(component.variants||{}).length),0));
+assert.ok(manifestCharts.every(component=>component.guidance?.useWhen&&component.guidance?.why&&component.guidance?.actionTitle));
+const group=registryManifest().components.find(component=>component.id==='chart-group');
+assert.ok(group.guidance?.useWhen&&group.guidance?.why&&group.guidance?.actionTitle);
+console.log(JSON.stringify({accepted:true,slides:deck.slides.length,standards:standards.length,chartFixtures:chartFixtures.length,guidedExamples:guidedExamples.length,manifestCharts:manifestCharts.length}));
+""")
+        self.assertTrue(result["accepted"])
+        self.assertEqual(result["standards"], 25)
+
     def test_pptx_package_has_no_phantom_masters_and_preserves_font_roles(self):
         result = run_node("""
 import assert from 'node:assert/strict';
@@ -34,6 +132,7 @@ try {
         result = run_node("""
 import assert from 'node:assert/strict';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { TOKENS } from './skills/professional-slides/runtime/core.mjs';
 const title=REGISTRY.get('chart-title'),frame={x:60,y:180,width:500,height:90};
 const plain=title.render({id:'title',frame,props:{heading:'Current mix'}}).nodes;
 const unit=title.render({id:'title',frame,props:{heading:'Current mix',unit:'Revenue share, %'}}).nodes;
@@ -41,6 +140,9 @@ assert.equal(plain.filter(n=>n.role==='section-heading-rule').length,1);
 assert.equal(unit.filter(n=>n.role==='section-heading-rule').length,0);
 assert.equal(unit.find(n=>n.role==='chart-unit').style.color.tokenId,'color.chartUnit');
 assert.equal(unit.find(n=>n.role==='chart-unit').style.bold,false);
+assert.equal(unit.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.body');
+assert.equal(TOKENS['type.chartLabel'].value,TOKENS['type.body'].value);
+assert.equal(TOKENS['type.chartAnnotation'].value,TOKENS['type.body'].value);
 assert.deepEqual(plain[0].style,unit[0].style);
 assert.deepEqual(plain[0].frame,unit[0].frame);
 assert.throws(()=>title.render({id:'title',frame,props:{heading:'Mix',variant:'unit'}}),/unit/);
@@ -75,6 +177,7 @@ assert.equal(TOKENS['font.body'].value,'Arial');
 assert.throws(()=>compileDeck({typography:{body:'Georgia'},slides:[spec]},REGISTRY),/semibold/);
 const legend=REGISTRY.get('legend').render({id:'key',frame:{x:0,y:0,width:300,height:40},props:{items:['A','B']}}).nodes.filter(n=>n.role==='legend-label');
 assert.ok(legend.every(n=>!n.style.fontWeight&&!n.style.bold));
+assert.ok(legend.every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
@@ -94,44 +197,57 @@ console.log(JSON.stringify({accepted:true}));
         result = run_node("""
 import assert from 'node:assert/strict';
 import { buildGoldenSetDeck } from './skills/professional-slides/runtime/golden-set.mjs';
-import { TOKENS, THEME_SLOT_TOKENS, compileDeck } from './skills/professional-slides/runtime/core.mjs';
+import { GOLDEN_PALETTES } from './skills/professional-slides/runtime/palettes.mjs';
+import { TOKENS, THEME_SLOT_TOKENS, compileDeck, component } from './skills/professional-slides/runtime/core.mjs';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 import { renderSlideHtml } from './skills/professional-slides/runtime/adapters/html.mjs';
-const original=JSON.stringify(TOKENS), decks=['mckinsey','bcg','bain'].map(palette=>buildGoldenSetDeck({palette}).deck);
+const original=JSON.stringify(TOKENS), definition=REGISTRY.get('table');
+const spec={id:'palette-probe',frame:{x:0,y:0,width:1280,height:720},composition:component({id:'table',component:'table',frame:{x:60,y:150,width:1160,height:420},props:definition.sample})};
+const decks=['mckinsey','bcg','bain'].map(palette=>compileDeck({id:`probe-${palette}`,palette,slides:[spec]},REGISTRY));
 assert.equal(JSON.stringify(TOKENS),original);
 assert.equal(new Set(decks.map(d=>d.manifest.tokens['color.componentPrimary'].value)).size,3);
 assert.equal(new Set(decks.map(d=>d.manifest.designHash)).size,3);
 for(const deck of decks) for(const slide of deck.slides) {
   const html=renderSlideHtml(slide);
-  for(const token of Object.values(deck.manifest.tokens)) assert.ok(html.includes(`${token.cssVar}:${token.value}`));
-  for(const node of slide.nodes) for(const style of Object.values(node.style)) if(style?.tokenId) assert.equal(style.value,deck.manifest.tokens[style.tokenId].value);
-  for(const token of Object.values(deck.manifest.tokens)) if(token.themeSlot) assert.equal(token.value,deck.manifest.tokens[THEME_SLOT_TOKENS[token.themeSlot]].value);
+  for(const token of Object.values(slide.tokens)) assert.ok(html.includes(`${token.cssVar}:${token.value}`));
+  for(const node of slide.nodes) for(const style of Object.values(node.style)) if(style?.tokenId) assert.equal(style.value,slide.tokens[style.tokenId].value);
+  for(const token of Object.values(slide.tokens)) if(token.themeSlot) assert.equal(token.value,slide.tokens[THEME_SLOT_TOKENS[token.themeSlot]].value);
 }
 assert.throws(()=>compileDeck({palette:'unknown',slides:[]},REGISTRY),/Unknown palette/);
 assert.throws(()=>compileDeck({slides:[{palette:'bain'}]},REGISTRY),/palette/i);
-console.log(JSON.stringify({palettes:decks.map(d=>d.palette.id),slides:decks[0].slides.length}));
+assert.deepEqual(GOLDEN_PALETTES,['mckinsey']);
+const golden=buildGoldenSetDeck();
+console.log(JSON.stringify({palettes:decks.map(d=>d.palette.id),goldenPalettes:GOLDEN_PALETTES,slides:golden.deck.slides.length}));
 """)
-        self.assertEqual(result, {"palettes": ["mckinsey", "bcg", "bain"], "slides": 153})
+        self.assertEqual(result["palettes"], ["mckinsey", "bcg", "bain"])
+        self.assertEqual(result["goldenPalettes"], ["mckinsey"])
 
     def test_registry_drives_complete_nonduplicated_golden_coverage(self):
         result = run_node("""
 import assert from 'node:assert/strict';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 import { goldenSetSpecs, auditGoldenCoverage } from './skills/professional-slides/runtime/golden-set.mjs';
+import { componentVariantFixtureSpecs } from './skills/professional-slides/runtime/fixtures.mjs';
 const specs=goldenSetSpecs(), audit=auditGoldenCoverage(specs);
 assert.ok(audit.accepted);
 assert.ok(!auditGoldenCoverage(specs.slice(1)).accepted);
 assert.ok(!auditGoldenCoverage([...specs,specs[0]]).accepted);
 assert.ok(!auditGoldenCoverage([...specs,{id:'unknown'}]).accepted);
+const coverage=specs.flatMap(spec=>spec.coverage||[]);
 for(const definition of REGISTRY.values()) {
-  assert.equal(specs.filter(f=>f.target===definition.id&&['component','chart'].includes(f.kind)).length,1);
-  for(const variant of Object.keys(definition.variants||{})) assert.equal(specs.filter(f=>f.target===definition.id&&f.variant===variant).length,1);
+  const variants=Object.keys(definition.variants||{});
+  if(!variants.length) assert.equal(coverage.filter(item=>item.target===definition.id&&item.variant===null).length,1);
+  for(const variant of variants) assert.equal(coverage.filter(item=>item.target===definition.id&&item.variant===variant).length,1);
 }
+assert.ok(componentVariantFixtureSpecs().every(f=>!f.defaultVariant));
+assert.equal(audit.variants,audit.variantSlides+audit.omittedDefaultDuplicates);
+assert.ok(audit.componentSlides<audit.components+audit.variantSlides);
+assert.deepEqual(audit.duplicateVisualBranches,[]);
+assert.ok(audit.slides<=180);
 console.log(JSON.stringify(audit));
 """)
-        self.assertEqual(result["components"], 56)
-        self.assertEqual(result["variants"], 61)
-        self.assertEqual(result["standards"], 18)
+        self.assertEqual(result["components"], 60)
+        self.assertEqual(result["standards"], 25)
 
     def test_pie_variants_are_centered_and_category_labels_do_not_duplicate_legend(self):
         result = run_node("""
@@ -184,6 +300,27 @@ assert.ok(legend.every(n=>n.frame.y>=frame.y+frame.height-32));
 const segments=nodes.filter(n=>n.role==='chart-segment');
 for(const key of ['Core','Growth','New']) assert.equal(new Set(segments.filter(n=>n.data.categoryKey===key).map(n=>n.style.fill.tokenId)).size,1);
 assert.throws(()=>d.render({id:'bad',frame,props:{...d.sample,categoryKeys:['Core','Growth','Unused']}}),/Shared legend/);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_paired_chart_group_can_use_one_quiet_divider(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const definition=REGISTRY.get('chart-group'),frame={x:60,y:180,width:1160,height:460};
+const plain=definition.render({id:'plain',frame,props:definition.sample}).nodes;
+assert.equal(plain.filter(n=>n.role==='chart-group-divider').length,0);
+const nodes=definition.render({id:'divided',frame,props:{...definition.sample,divider:true}}).nodes;
+const divider=nodes.find(n=>n.role==='chart-group-divider');
+assert.ok(divider);
+assert.equal(divider.frame.x,frame.x+frame.width/2);
+assert.equal(divider.frame.width,0);
+assert.equal(divider.style.stroke.tokenId,'color.rule');
+assert.equal(divider.style.lineWidth.tokenId,'line.hairline');
+assert.ok(divider.frame.y>frame.y&&divider.frame.y+divider.frame.height<frame.y+frame.height-32);
+assert.throws(()=>definition.render({id:'bad',frame,props:{...definition.variants.triple.props,divider:true}}),/paired chart group/);
+assert.throws(()=>definition.render({id:'bad',frame,props:{...definition.sample,divider:'yes'}}),/boolean/);
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

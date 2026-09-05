@@ -6,7 +6,7 @@ PptxGenJS is a generation adapter, not a visual validator. A successful `writeFi
 
 ## Capability gate
 
-Resolve the host-provided Node runtime and dependency location before coding. Do not silently install a different package version during a deck run. Confirm:
+Follow [Load the active runtime guidance](../codex-generation.md#load-the-active-runtime-guidance), then confirm the resolved PptxGenJS package:
 
 ```bash
 "$RUNTIME_NODE" -e "const p=require('pptxgenjs/package.json'); console.log(p.name, p.version)"
@@ -128,7 +128,7 @@ Pass `chartItem` to the scene planner. The adapter must also render `adoption.un
 
 ## Add source notes
 
-Put a concise source line on the slide and a complete `[Sources]` block in speaker notes:
+Put a concise source line on the slide and a complete `Sources:` block in speaker notes:
 
 ```js
 slide.addText("Source: Hugging Face Hub documentation; retrieved 2026-08-29", {
@@ -136,9 +136,8 @@ slide.addText("Source: Hugging Face Hub documentation; retrieved 2026-08-29", {
   fontFace: "Arial", fontSize: 8, color: "5D6678", margin: 0,
 });
 
-slide.addNotes(`[Sources]
+slide.addNotes(`Sources:
 - https://huggingface.co/docs/hub/index
-[/Sources]
 
 Verified public fact. Transaction implications are analytical hypotheses.`);
 ```

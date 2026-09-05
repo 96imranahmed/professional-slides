@@ -4,6 +4,12 @@
 
 Bridges from start to finish, including price-volume-mix, margin, cash, headcount, and variance drivers.
 
+## Guidance note
+
+- Use when an opening value must reconcile to a closing value through signed drivers.
+- Why: the bridge makes every positive and negative contribution auditable.
+- Action title: state the net movement and name the largest driver or offset.
+
 ## Data contract
 
 Opening total, ordered positive and negative contributions, optional subtotals, closing total, one unit system, rounding rule, and a residual policy. The bridge must reconcile exactly before rendering.
@@ -16,6 +22,7 @@ Opening total, ordered positive and negative contributions, optional subtotals, 
 - Label each contribution and the closing total.
 - Keep connector lines quiet and consistent.
 - Surface an unexplained residual rather than hiding it in `Other`.
+- Keep the plot field blank. Waterfall connectors already provide the construction logic, so add gridlines only when intermediate scale lookup is necessary.
 
 Apply the shared [direct-label gate](index.md#direct-label-gate). Use the shared [chart legend](../components/chart-legends.md) only when positive, negative, subtotal, total, actual, forecast, or scenario states remain ambiguous after eligible labels and consistent non-colour cues. Use the shared [chart callout](../components/chart-callouts.md) for one decisive driver, interval, or focal span rather than drawing a chart-specific annotation system.
 
@@ -23,7 +30,7 @@ Apply the shared [direct-label gate](index.md#direct-label-gate). Use the shared
 
 ### Standard bridge
 
-This is the core encoding: one opening total, ordered contributions, optional subtotals, and one closing total. It owns the arithmetic and connector geometry.
+This is the core encoding: one opening total, ordered contributions, optional subtotals, and one closing total. It owns the arithmetic and connector geometry. When the net start-to-end movement is the decision point, add one shared construction above the bridge: a horizontal span, a start drop, an arrow to the closing endpoint, and one calculated label. Omit it when the opening, drivers, closing label, and action title already make the net movement obvious.
 
 ### Contribution bridge without an opening total
 

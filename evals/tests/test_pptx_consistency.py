@@ -55,6 +55,7 @@ class PptxConsistencyTests(unittest.TestCase):
             )
         self.assertIn("executive-summary-to-navigation", prompt)
         self.assertIn("professional_slides_skill_references", prompt)
+        self.assertIn("Every comparison group must span at least two distinct slides", prompt)
 
     def test_multislide_deck_requires_a_comparison_group(self):
         value = judgement()

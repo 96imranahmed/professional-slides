@@ -19,16 +19,22 @@ import {
   wedgePrimitive
 } from "./core.mjs";
 import { registerCharts } from "./charts.mjs";
+import { renderTable, measureTable, TABLE_TOKENS } from "./tables.mjs";
+import { TABLE_VARIANTS } from "./table-fixtures.mjs";
 import { measureText } from "./text-layout.mjs";
 import { routeConnector } from "./routing.mjs";
 import { legendNodes, LEGEND_TOKENS, LEGEND_VARIANTS, LEGEND_PLACEMENTS } from "./legends.mjs";
 import { registerChartGroup } from "./chart-group.mjs";
 import { contrastRatio } from "./palettes.mjs";
+import { renderChartCallout } from "./chart-annotations.mjs";
 import { PAGE_RULES, PAGE_BRANDING, PAGE_TEMPLATE_TOKENS, pageTemplateLayout, renderPageTemplate, resolvePageTemplate } from "./page-template.mjs";
+import { TRACKER_TOKENS, registerTrackers, trackerLabelNodes } from "./trackers.mjs";
+import { registerQuoteCluster } from "./quote-cluster.mjs";
+import { MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
+import { registerInsightTreeTable } from "./insight-tree-table.mjs";
 
 const FONT = token("font.body");
 const DISPLAY = token("font.display");
-const SERIF = token("font.serif");
 const INK = token("color.ink");
 const SECONDARY = token("color.textSecondary");
 const PRIMARY = token("color.componentPrimary");
@@ -73,7 +79,7 @@ const openLine = (id, x1, y1, x2, y2, role = "rule", stroke = RULE, lineWidth = 
   data
 });
 
-const component = ({ id, category, role = category, tokens, preferredSize, sample, render }) => ({
+const component = ({ id, category, role = category, tokens, preferredSize, sample, variants, defaultVariant, render }) => ({
   id,
   version: "2.0.0",
   category,
@@ -81,6 +87,7 @@ const component = ({ id, category, role = category, tokens, preferredSize, sampl
   tokens: [...new Set(tokens)].sort(),
   preferredSize,
   sample,
+  ...(variants ? { variants, defaultVariant } : {}),
   render
 });
 
@@ -90,12 +97,57 @@ function measuredTextNode(input) {
   return textPrimitive({ ...input, text: textLayout.text, style: { ...input.style, lineHeight: textLayout.lineHeight, wrap: false }, data: { ...input.data, textLayout } });
 }
 
+function insightLayout(frame, props) {
+  if (typeof props.text !== "string" || !props.text.trim()) throw new Error("Insight requires a nonempty synthesis sentence");
+  if (props.align !== undefined && !["left", "center"].includes(props.align)) throw new Error("Insight alignment must be left or center");
+  const paddingX = tokenValue(token("space.5")), paddingY = tokenValue(token(props.text.includes("\n\n") ? "space.6" : "space.4"));
+  const width = frame.width - 2 * paddingX;
+  if (width <= 0) throw new Error("Insight width cannot contain its theme padding");
+  const options = { fontFamily: tokenValue(FONT), wrapWidthRatio: 1 };
+  const body = measureText(props.text, width, { ...options, fontSize: tokenValue(BODY), bold: false });
+  const heading = props.heading ? measureText(props.heading, width, { ...options, fontSize: tokenValue(token("type.heading")), bold: true }) : null;
+  const gap = heading ? tokenValue(token("space.2")) : 0;
+  const contentHeight = body.height + (heading?.height ?? 0) + gap;
+  return { body, heading, width, paddingX, paddingY, gap, contentHeight, height: contentHeight + 2 * paddingY };
+}
+
+function insightNodes({ id, frame, props }) {
+  const layout = insightLayout(frame, props), variant = props.variant ?? "tonal";
+  if (layout.height > frame.height) throw new Error("Insight exceeds its frame; enlarge the box or edit the sentence, never shrink type");
+  const fill = variant === "primary" ? PRIMARY : variant === "neutral" ? MUTED_SURFACE : variant === "dotted" ? "none" : PRIMARY_TINT;
+  const foreground = variant === "primary" ? WHITE : INK;
+  const nodes = [rectPrimitive({ id: stableId(id, "surface"), role: "insight-surface", frame, style: boxStyle(fill, "none", HAIRLINE, SMALL_RADIUS) })];
+  if (variant === "dotted") {
+    // Native renderers collapse hairline dash presets into solid borders.
+    // Resolve editable dots once so every adapter receives identical geometry.
+    const diameter = tokenValue(HAIRLINE), gap = tokenValue(token("space.2")), seen = new Set();
+    for (const [x, y, dx, dy, length] of [[frame.x, frame.y, 1, 0, frame.width], [frame.x, frame.y + frame.height - diameter, 1, 0, frame.width], [frame.x, frame.y, 0, 1, frame.height], [frame.x + frame.width - diameter, frame.y, 0, 1, frame.height]]) {
+      const count = Math.max(1, Math.floor((length - diameter) / gap));
+      for (let i = 0; i <= count; i++) {
+        const dotX = x + dx * i * (length - diameter) / count, dotY = y + dy * i * (length - diameter) / count;
+        const key = `${dotX.toFixed(5)}:${dotY.toFixed(5)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        nodes.push(ellipsePrimitive({ id: stableId(id, "border-dot", seen.size), role: "insight-border-dot", frame: { x: dotX, y: dotY, width: diameter, height: diameter }, style: boxStyle(RULE, "none", HAIRLINE, SMALL_RADIUS) }));
+      }
+    }
+  }
+  let y = frame.y + (frame.height - layout.contentHeight) / 2;
+  for (const [part, measured] of [["heading", layout.heading], ["body", layout.body]]) {
+    if (!measured) continue;
+    nodes.push(textPrimitive({ id: stableId(id, part), role: `insight-${part}`, frame: { x: frame.x + layout.paddingX, y, width: layout.width, height: measured.height }, text: measured.text,
+      style: { ...textStyle(part === "heading" ? token("type.heading") : BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, part === "heading", props.align ?? "center", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
+    y += measured.height + layout.gap;
+  }
+  return nodes;
+}
+
 function titleNodes({ id, frame, props, section = false, chrome = false }) {
   const variant = resolveTitleVariant(props);
   const ruleGap = tokenValue(token("space.2"));
   const size = section ? token("type.sectionTitle") : token(chrome && String(props.text || "").length > 55 ? "type.actionTitleLong" : "type.actionTitle");
   const textFrame = chrome
-    ? { x: frame.x + CHROME.left, y: frame.y + CHROME.titleTop, width: props.availableTitleWidth ?? frame.width - CHROME.left - CHROME.right, height: CHROME.titleHeight }
+    ? { x: frame.x + CHROME.left, y: frame.y + (props.titleTop ?? CHROME.titleTop), width: props.availableTitleWidth ?? frame.width - CHROME.left - CHROME.right, height: CHROME.titleHeight }
     : { x: frame.x, y: frame.y, width: frame.width, height: frame.height - ruleGap };
   const textLayout = measureText(props.text, textFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(size), bold: true, wrapWidthRatio: 1 });
   const ruleY = textFrame.y + textLayout.height + ruleGap;
@@ -149,7 +201,7 @@ function resolveChartTitleVariant(props = {}) {
 function chartTitleLayout(frame, props) {
   const variant = resolveChartTitleVariant(props);
   const layout = headingLayout(frame, { ...props, rule: variant === "underlined" });
-  const unit = variant === "unit" ? measureText(props.unit, frame.width, { fontSize: tokenValue(COMPACT), wrapWidthRatio: 1 }) : null;
+  const unit = variant === "unit" ? measureText(props.unit, frame.width, { fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
   if (unit && unit.lines.length !== 1) throw new Error("Chart unit must fit on one line");
   const height = layout.bandHeight + (unit ? tokenValue(token("space.1")) + unit.height : layout.ruleGap) + tokenValue(token("space.3"));
   return { ...layout, variant, unit, height };
@@ -159,13 +211,35 @@ function chartTitleNodes({ id, frame, props }) {
   if (layout.height > frame.height) throw new Error("Chart title exceeds its allocated height");
   const nodes = sectionHeadingNodes({ id, frame, props: { ...props, variant: "standard", rule: layout.variant === "underlined" } });
   nodes.forEach(node => { node.data.chartTitleVariant = layout.variant; });
-  if (layout.unit) nodes.push(textPrimitive({ id: stableId(id, "unit"), role: "chart-unit", frame: { x: frame.x, y: frame.y + layout.bandHeight + tokenValue(token("space.1")), width: frame.width, height: layout.unit.height }, text: props.unit, style: { ...textStyle(COMPACT, token("color.chartUnit"), false, "left", "top"), lineHeight: layout.unit.lineHeight, wrap: false }, data: { textLayout: layout.unit } }));
+  if (layout.unit) nodes.push(textPrimitive({ id: stableId(id, "unit"), role: "chart-unit", frame: { x: frame.x, y: frame.y + layout.bandHeight + tokenValue(token("space.1")), width: frame.width, height: layout.unit.height }, text: props.unit, style: { ...textStyle(BODY, token("color.chartUnit"), false, "left", "top"), lineHeight: layout.unit.lineHeight, wrap: false }, data: { textLayout: layout.unit } }));
   return nodes;
 }
 
 function estimatedLines(text, width) {
   const charactersPerLine = Math.max(12, Math.floor(width / 7));
   return String(text).split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0);
+}
+
+function bodyListLayout(frame, items) {
+  if (!Array.isArray(items) || !items.length || items.some(item => typeof item !== "string" || !item.trim())) throw new Error("Body bullet list needs nonempty text items");
+  const offset = tokenValue(token("space.4")), gap = tokenValue(token("space.2")), markerSize = tokenValue(token("space.1"));
+  if (frame.width <= offset) throw new Error("Body bullet list has no text width");
+  const measured = items.map(text => measureText(text, frame.width - offset, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }));
+  return { offset, gap, markerSize, measured, height: measured.reduce((sum, text) => sum + text.height, 0) + gap * (items.length - 1) };
+}
+
+function bodyListNodes({ id, frame, props }) {
+  const layout = bodyListLayout(frame, props.items);
+  if (layout.height > frame.height) throw new Error(`${id} body bullets exceed the allocated height; allocate space or edit copy, never shrink type`);
+  let y = frame.y;
+  return layout.measured.flatMap((text, index) => {
+    const nodes = [
+      rectPrimitive({ id: stableId(id, "marker", index), role: "list-marker", frame: { x: frame.x, y: y + (text.lineHeight - layout.markerSize) / 2, width: layout.markerSize, height: layout.markerSize }, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) }),
+      textPrimitive({ id: stableId(id, "item", index), role: "list-item", frame: { x: frame.x + layout.offset, y, width: frame.width - layout.offset, height: text.height }, text: text.text, style: { ...textStyle(BODY, INK, false, "left", "top"), lineHeight: text.lineHeight, wrap: false }, data: { textLayout: text } })
+    ];
+    y += text.height + layout.gap;
+    return nodes;
+  });
 }
 
 function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY, marker = "square", distribute = false, rolePrefix = "list" }) {
@@ -207,39 +281,6 @@ function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY,
   return nodes;
 }
 
-function tableNodes({ id, frame, props, heatmap = false, comparison = false }) {
-  const rows = props.rows;
-  const columns = props.columns;
-  const rowCount = rows.length + 1;
-  const columnCount = columns.length;
-  const rowHeight = frame.height / rowCount;
-  const declaredWidths = props.columnWidths;
-  const firstWidth = frame.width * (comparison ? 0.34 : 0.28);
-  const otherWidth = (frame.width - firstWidth) / Math.max(1, columnCount - 1);
-  const widths = declaredWidths
-    ? declaredWidths.map((value) => value * frame.width)
-    : columns.map((_, index) => index === 0 ? firstWidth : otherWidth);
-  const xs = widths.map((_, index) => frame.x + widths.slice(0, index).reduce((sum, value) => sum + value, 0));
-  const nodes = [];
-  columns.forEach((label, column) => {
-    const headerFill = props.headerTone === "dark" || column === 0 ? token("color.ink") : PRIMARY;
-    nodes.push(rectPrimitive({ id: stableId(id, "header-cell", column), role: "table-header-cell", frame: { x: xs[column], y: frame.y, width: widths[column], height: rowHeight }, style: boxStyle(headerFill, headerFill, HAIRLINE, token("radius.none")) }));
-    nodes.push(textPrimitive({ id: stableId(id, "header-text", column), role: "table-header-text", frame: { x: xs[column] + 8, y: frame.y + 4, width: widths[column] - 16, height: rowHeight - 8 }, text: label, style: textStyle(LABEL, WHITE, true, column === 0 ? "left" : "center") }));
-  });
-  rows.forEach((row, rowIndex) => {
-    row.forEach((value, column) => {
-      let fill = props.alternating === false ? SURFACE : rowIndex % 2 ? MUTED_SURFACE : SURFACE;
-      if (heatmap && column > 0) {
-        const palette = [token("color.surfaceMuted"), token("color.componentPrimaryTint"), token("color.chartSeries1"), token("color.chartSeries2"), token("color.ink")];
-        fill = palette[Math.max(0, Math.min(4, Number(value) - 1))];
-      }
-      if (comparison && column > 0 && props.selectedColumn === column) fill = PRIMARY_TINT;
-      nodes.push(rectPrimitive({ id: stableId(id, "cell", rowIndex, column), role: "table-cell", frame: { x: xs[column], y: frame.y + (rowIndex + 1) * rowHeight, width: widths[column], height: rowHeight }, style: boxStyle(fill, RULE, HAIRLINE, token("radius.none")), data: { row: rowIndex, column } }));
-      nodes.push(textPrimitive({ id: stableId(id, "cell-text", rowIndex, column), role: "table-cell-text", frame: { x: xs[column] + 8, y: frame.y + (rowIndex + 1) * rowHeight + 4, width: widths[column] - 16, height: rowHeight - 8 }, text: String(value), style: textStyle(LABEL, heatmap && column > 0 && Number(value) > 3 ? WHITE : INK, column === 0, column === 0 ? "left" : "center") }));
-    });
-  });
-  return nodes;
-}
 
 function processNodes({ id, frame, props, roadmap = false, journey = false }) {
   const items = props.items;
@@ -304,29 +345,6 @@ function treeNodes({ id, frame, props, organization = false }) {
   return nodes;
 }
 
-function trendRowNodes({ id, frame, props }) {
-  const columns = props.columns || ["Trend", "Description", "Examples"];
-  const widths = [frame.width * 0.13, frame.width * 0.52, frame.width * 0.35];
-  const xs = [frame.x, frame.x + widths[0] + 20, frame.x + widths[0] + widths[1] + 40];
-  const nodes = [];
-  const headerBandHeight = Math.max(...columns.map((heading, index) => headingLayout({ ...frame, width: widths[index] - 8 }, { heading }).bandHeight));
-  columns.forEach((label, index) => {
-    nodes.push(...sectionHeadingNodes({ id: stableId(id, "column", index), frame: { x: xs[index], y: frame.y, width: widths[index] - 8, height: frame.height }, props: { heading: label, headerBandHeight } }));
-  });
-  const headerHeight = headerBandHeight + tokenValue(token("space.2")) + tokenValue(token("space.3"));
-  const rowTop = frame.y + headerHeight;
-  const rowHeight = (frame.height - headerHeight) / props.rows.length;
-  props.rows.forEach((row, index) => {
-    const y = rowTop + index * rowHeight;
-    const block = { x: xs[0], y: y + 4, width: widths[0] - 8, height: rowHeight - 14 };
-    nodes.push(rectPrimitive({ id: stableId(id, "trend", index), role: "trend-label-surface", frame: block, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) }));
-    nodes.push(textPrimitive({ id: stableId(id, "trend-label", index), role: "trend-label", frame: insetFrame(block, 10), text: row[0], style: textStyle(token("type.heading"), WHITE, true, "left") }));
-    nodes.push(textPrimitive({ id: stableId(id, "description", index), role: "trend-description", frame: { x: xs[1], y: y + 4, width: widths[1] - 16, height: rowHeight - 14 }, text: row[1], style: textStyle(COMPACT, INK, false, "left", "top") }));
-    nodes.push(textPrimitive({ id: stableId(id, "examples", index), role: "trend-examples", frame: { x: xs[2], y: y + 4, width: widths[2] - 8, height: rowHeight - 14 }, text: row[2], style: textStyle(COMPACT, INK, false, "left", "top") }));
-    if (index < props.rows.length - 1) nodes.push(openLine(stableId(id, "row-rule", index), frame.x, y + rowHeight - 2, frame.x + frame.width, y + rowHeight - 2, "table-row-rule", RULE, HAIRLINE));
-  });
-  return nodes;
-}
 
 function initiativeRolloutNodes({ id, frame, props }) {
   const years = props.years || ["20xx", "20xx", "20xx"];
@@ -369,7 +387,7 @@ function waveRoadmapNodes({ id, frame, props }) {
   items.forEach((item, index) => {
     const x = frame.x + index * span;
     const center = x + span / 2;
-    nodes.push(textPrimitive({ id: stableId(id, "range", index), role: "roadmap-range", frame: { x: x + 8, y: frame.y, width: span - 16, height: 28 }, text: item.range || "[MONTH RANGE]", style: textStyle(COMPACT, SECONDARY, true, "center") }));
+    nodes.push(textPrimitive({ id: stableId(id, "range", index), role: "roadmap-range", frame: { x: x + 8, y: frame.y, width: span - 16, height: 28 }, text: item.range || "(Insert time range)", style: textStyle(COMPACT, SECONDARY, true, "center") }));
     const heading = measureText(item.heading || item.label || `Wave ${index + 1}`, span - 16, { fontSize: tokenValue(token("type.heading")), bold: true });
     if (frame.y + 42 + heading.height > railY - 20) throw new Error("Roadmap heading exceeds its band; enlarge the component or shorten the copy");
     nodes.push(textPrimitive({ id: stableId(id, "heading", index), role: "roadmap-heading", frame: { x: x + 8, y: frame.y + 42, width: span - 16, height: heading.height }, text: heading.text, style: { ...textStyle(token("type.heading"), INK, true, "center", "top"), lineHeight: heading.lineHeight, wrap: false }, data: { textLayout: heading } }));
@@ -390,7 +408,7 @@ function highlightStripNodes({ id, frame, props }) {
     nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: "highlight-marker", frame: { x: x + span / 2 - size / 2, y: frame.y, width: size, height: size }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }));
     nodes.push(textPrimitive({ id: stableId(id, "number", index), role: "highlight-number", frame: { x: x + span / 2 - size / 2, y: frame.y, width: size, height: size }, text: item.number || String(index + 1), style: textStyle(token("type.heading"), WHITE, false, "center") }));
     nodes.push(textPrimitive({ id: stableId(id, "heading", index), role: "highlight-heading", frame: { x: x + 6, y: frame.y + 48, width: span - 12, height: 28 }, text: item.heading || "Start highlight", style: textStyle(token("type.heading"), INK, true, "center") }));
-    nodes.push(textPrimitive({ id: stableId(id, "description", index), role: "highlight-description", frame: { x: x + 6, y: frame.y + 80, width: span - 12, height: frame.height - 80 }, text: item.description || "[Insert description]", style: textStyle(COMPACT, INK, false, "center", "top") }));
+    nodes.push(textPrimitive({ id: stableId(id, "description", index), role: "highlight-description", frame: { x: x + 6, y: frame.y + 80, width: span - 12, height: frame.height - 80 }, text: item.description || "(Insert description)", style: textStyle(COMPACT, INK, false, "center", "top") }));
   });
   return nodes;
 }
@@ -415,139 +433,145 @@ function matrixNodes({ id, frame, props }) {
   return nodes;
 }
 
-function mapNodes({ id, frame, props }) {
-  const nodes = [];
-  const continentSpecs = [
-    ["north-america", "trapezoid", 0.05, 0.18, 0.27, 0.3],
-    ["south-america", "parallelogram", 0.24, 0.49, 0.13, 0.36],
-    ["greenland", "pentagon", 0.27, 0.08, 0.1, 0.13],
-    ["europe", "hexagon", 0.45, 0.22, 0.15, 0.12],
-    ["africa", "pentagon", 0.46, 0.36, 0.16, 0.35],
-    ["asia", "trapezoid", 0.56, 0.17, 0.34, 0.34],
-    ["india", "triangle", 0.67, 0.45, 0.08, 0.17],
-    ["australia", "pentagon", 0.78, 0.68, 0.15, 0.15],
-    ["japan", "ellipse", 0.88, 0.36, 0.025, 0.09]
-  ];
-  for (const [name, geometry, x, y, width, height] of continentSpecs) {
-    const primitiveFrame = { x: frame.x + x * frame.width, y: frame.y + y * frame.height, width: width * frame.width, height: height * frame.height };
-    nodes.push(geometry === "ellipse"
-      ? ellipsePrimitive({ id: stableId(id, "land", name), role: "map-land", frame: primitiveFrame, style: boxStyle(MUTED_SURFACE, MUTED_SURFACE, HAIRLINE, token("radius.round")) })
-      : shapePrimitive({ id: stableId(id, "land", name), role: "map-land", geometry, frame: primitiveFrame, style: boxStyle(MUTED_SURFACE, MUTED_SURFACE, HAIRLINE, token("radius.none")) }));
-  }
-  for (const [index, marker] of (props.markers || []).entries()) {
-    const size = marker.size || 34;
-    const markerFrame = { x: frame.x + marker.x * frame.width - size / 2, y: frame.y + marker.y * frame.height - size / 2, width: size, height: size };
-    nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: boxStyle(SURFACE, INK, HAIRLINE, token("radius.round")) }));
-    const fraction = Math.max(0, Math.min(1, marker.fraction ?? 1));
-    if (fraction >= 0.999) nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: markerFrame, style: boxStyle(INK, INK, HAIRLINE, token("radius.round")) }));
-    else if (fraction > 0) nodes.push(wedgePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: markerFrame, startAngle: -90, endAngle: -90 + fraction * 360, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) }));
-    if (marker.label) nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: { x: markerFrame.x + size + 4, y: markerFrame.y - 2, width: 90, height: size + 4 }, text: marker.label, style: textStyle(LABEL, SECONDARY, true, "left") }));
-  }
-  return nodes;
-}
-
 function registerCore(registry) {
   const definitions = [
     component({
+      id: "section-boundary", category: "relationship", role: "section-boundary",
+      tokens: ["color.rule", "color.componentPrimary", "color.onPrimary", "line.hairline", "line.standard", "space.1", "icon.medium", "radius.round"],
+      preferredSize: { width: 54, height: 400 }, sample: { variant: "related" },
+      render: ({ id, frame, props }) => {
+        const variant = props.variant ?? "related", x = frame.x + frame.width / 2, y = frame.y + frame.height / 2;
+        if (variant === "subsection") return { nodes: [openLine(stableId(id, "separator"), frame.x, y, frame.x + frame.width, y, "subsection-rule")] };
+        if (variant === "related") return { nodes: [linePrimitive({ id: stableId(id, "separator"), role: "section-separator", x1: x, y1: frame.y, x2: x, y2: frame.y + frame.height, style: { stroke: RULE, lineWidth: HAIRLINE, dash: "dash" } })] };
+        const diameter = tokenValue(token("icon.medium")), clearance = tokenValue(token("space.1"));
+        if (frame.width < diameter + clearance * 2 || frame.height < diameter + clearance * 4) throw new Error("Inference boundary needs room for its marker and clear divider segments");
+        const radius = diameter / 2;
+        return { nodes: [
+          openLine(stableId(id, "before"), x, frame.y, x, y - radius - clearance, "section-separator"),
+          openLine(stableId(id, "after"), x, y + radius + clearance, x, frame.y + frame.height, "section-separator"),
+          ellipsePrimitive({ id: stableId(id, "disc"), role: "relationship-disc", frame: { x: x - radius, y: y - radius, width: diameter, height: diameter }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }),
+          openLine(stableId(id, "chevron-top"), x - diameter / 8, y - diameter / 4, x + diameter / 8, y, "relationship-chevron", WHITE, STANDARD),
+          openLine(stableId(id, "chevron-bottom"), x + diameter / 8, y, x - diameter / 8, y + diameter / 4, "relationship-chevron", WHITE, STANDARD)
+        ] };
+      }
+    }),
+    component({
       id: "slide-chrome", category: "shared", role: "slide-chrome",
-      tokens: ["color.canvas", "color.ink", "font.display", "type.actionTitle", "type.actionTitleLong", ...PAGE_TEMPLATE_TOKENS],
+      tokens: ["color.canvas", "color.ink", "font.display", "type.actionTitle", "type.actionTitleLong", ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
       preferredSize: { width: SLIDE.width, height: SLIDE.height },
-      sample: { title: "Growth is concentrated in two priority segments", source: "Source: Company data; team analysis", footerRight: "Company Name", pageNumber: 7 },
+      sample: { title: "(Insert action title)", source: "Source: (Insert source)", footerRight: "(Insert company name)", pageNumber: 7 },
       render: ({ id, frame, props }) => {
         const page = renderPageTemplate({ id, frame, props });
-        return { ...page, nodes: [...titleNodes({ id, frame, props: { text: props.title, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth }, chrome: true }), ...page.nodes] };
+        const tracker = props.tracker ? trackerLabelNodes({ id: stableId(id, "tracker"), frame: { x: frame.x + CHROME.left, y: frame.y + 30, width: page.titleWidth, height: 20 }, props: props.tracker }) : [];
+        return { ...page, nodes: [...tracker, ...titleNodes({ id, frame, props: { text: props.title, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker ? 58 : CHROME.titleTop }, chrome: true }), ...page.nodes] };
       }
     }),
     component({ id: "page-template", category: "shared", role: "page-template", tokens: PAGE_TEMPLATE_TOKENS,
-      preferredSize: { ...SLIDE }, sample: { source: "Source: Company data; team analysis", companyName: "Company Name", pageNumber: 7 }, render: renderPageTemplate }),
+      preferredSize: { ...SLIDE }, sample: { source: "Source: (Insert source)", companyName: "(Insert company name)", pageNumber: 7 }, render: renderPageTemplate }),
     component({
-      id: "section", category: "structure", role: "section", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "space.4", "space.5", "line.standard", "radius.small", ...SECTION_HEADING_TOKENS], preferredSize: { width: 520, height: 300 }, sample: { treatment: "open", heading: "Operating constraints" },
+      id: "section", category: "structure", role: "section", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "space.4", "space.5", "line.standard", "radius.none", "radius.small", ...SECTION_HEADING_TOKENS], preferredSize: { width: 520, height: 300 }, sample: { treatment: "open", heading: "(Insert section heading)" },
       render: ({ id, frame, props }) => {
         const treatment = props.treatment || "open";
+        const edge = props.edge || "contained";
+        if(!["contained","full-bleed"].includes(edge))throw new Error("Unknown section edge treatment");
         const padding = normalizeInsets(props.padding ?? token("space.4"));
         const fill = treatment === "muted" ? MUTED_SURFACE : treatment === "primary" ? PRIMARY : SURFACE;
         const stroke = treatment === "open" ? RULE : fill;
         const nodes = [];
-        if (treatment !== "open") nodes.push(rectPrimitive({ id: stableId(id, "surface"), role: "section-surface", frame, style: boxStyle(fill, stroke, treatment === "primary" ? STANDARD : HAIRLINE, SMALL_RADIUS) }));
         const headerFrame = { x: frame.x + padding.left, y: frame.y + padding.top, width: frame.width - padding.left - padding.right, height: frame.height };
         const headerProps = { ...props, variant: treatment === "primary" ? "inverse" : "standard", rule: treatment !== "muted" };
         if (props.heading) nodes.push(...sectionHeadingNodes({ id: stableId(id, "header"), frame: headerFrame, props: headerProps }));
         const top = padding.top + (props.heading ? headingLayout(headerFrame, headerProps).height : 0);
-        return { nodes, contentFrame: { x: frame.x + padding.left, y: frame.y + top, width: frame.width - padding.left - padding.right, height: frame.height - top - padding.bottom } };
+        const contentFrame = { x: frame.x + padding.left, y: frame.y + top, width: frame.width - padding.left - padding.right, height: frame.height - top - padding.bottom };
+        if (treatment !== "open") nodes.unshift(rectPrimitive({ id: stableId(id, "surface"), role: "section-surface", frame, style: boxStyle(fill, stroke, treatment === "primary" ? STANDARD : HAIRLINE, edge === "full-bleed" ? token("radius.none") : SMALL_RADIUS), data: { edge, contentFrame } }));
+        return { nodes, contentFrame };
       }
     }),
-    component({ id: "section-heading", category: "shared", role: "section-heading", tokens: SECTION_HEADING_TOKENS, preferredSize: { width: 720, height: 52 }, sample: { heading: "Description", rule: true }, render: ({ id, frame, props }) => ({ nodes: sectionHeadingNodes({ id, frame, props }) }) }),
-    component({ id: "action-title", category: "shared", role: "title", tokens: ["font.display", "type.actionTitle", "color.ink", "color.rule", "line.hairline", "space.2"], preferredSize: { width: 1136, height: 86 }, sample: { text: "Growth is concentrated in two priority segments" }, render: ({ id, frame, props }) => ({ nodes: titleNodes({ id, frame, props }) }) }),
-    component({ id: "section-title", category: "shared", role: "title", tokens: ["font.display", "type.sectionTitle", "color.ink", "color.rule", "line.hairline", "space.2"], preferredSize: { width: 720, height: 64 }, sample: { text: "Operating model" }, render: ({ id, frame, props }) => ({ nodes: titleNodes({ id, frame, props, section: true }) }) }),
-    component({ id: "cover", category: "navigation", role: "cover", tokens: ["color.ink", "color.componentPrimary", "color.surface", "color.onPrimary", "color.chartSeries2", "color.chartSeries3", "font.serif", "font.body", "type.deckTitle", "type.body", "type.heading", "line.hairline", "line.standard", "radius.none"], preferredSize: { width: 1280, height: 720 }, sample: { title: "Business & Consulting\nToolkit", subtitle: "Powerful templates with a library of best-practice slide layouts,\nchart examples, frameworks and more", brand: "Slideworks" }, render: ({ id, frame, props }) => {
-      const panel = { x: frame.x + frame.width * 0.1, y: frame.y, width: frame.width * 0.8, height: frame.height * 0.825 };
-      const nodes = [rectPrimitive({ id: stableId(id, "backdrop"), role: "cover-backdrop", frame, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) })];
-      const lineColours = [PRIMARY, token("color.chartSeries2"), token("color.chartSeries3")];
-      for (let index = 0; index < 18; index += 1) {
-        const left = index % 2 === 0;
-        const x1 = left ? frame.x : frame.x + frame.width - 250 + index * 5;
-        const x2 = left ? frame.x + 250 + index * 4 : frame.x + frame.width;
-        const y1 = frame.y + 30 + index * 33;
-        const y2 = Math.min(frame.y + frame.height, y1 + 150 + index * 4);
-        nodes.push(openLine(stableId(id, "energy-line", index), x1, y1, x2, y2, "cover-line", lineColours[index % lineColours.length], index % 3 === 0 ? STANDARD : HAIRLINE));
-      }
-      nodes.push(rectPrimitive({ id: stableId(id, "panel"), role: "cover-panel", frame: panel, style: boxStyle(SURFACE, SURFACE, HAIRLINE, token("radius.none")) }));
-      nodes.push(textPrimitive({ id: stableId(id, "title"), role: "cover-title", frame: { x: panel.x + 52, y: panel.y + 76, width: panel.width - 104, height: 142 }, text: props.title, style: { ...textStyle(token("type.deckTitle"), INK, true, "left", "top"), fontFamily: SERIF } }));
-      nodes.push(textPrimitive({ id: stableId(id, "subtitle"), role: "cover-subtitle", frame: { x: panel.x + 54, y: panel.y + 248, width: panel.width - 108, height: 88 }, text: props.subtitle || "", style: textStyle(BODY, INK, false, "left", "top") }));
-      nodes.push(textPrimitive({ id: stableId(id, "brand"), role: "cover-brand", frame: { x: panel.x + 54, y: panel.y + panel.height - 74, width: 260, height: 42 }, text: props.brand || "", style: textStyle(token("type.heading"), INK, true, "left", "mid") }));
+    component({ id: "section-heading", category: "shared", role: "section-heading", tokens: SECTION_HEADING_TOKENS, preferredSize: { width: 720, height: 52 }, sample: { heading: "(Insert section heading)", rule: true }, render: ({ id, frame, props }) => ({ nodes: sectionHeadingNodes({ id, frame, props }) }) }),
+    component({ id: "action-title", category: "shared", role: "title", tokens: ["font.display", "type.actionTitle", "color.ink", "color.rule", "line.hairline", "space.2"], preferredSize: { width: 1136, height: 86 }, sample: { text: "(Insert action title)" }, render: ({ id, frame, props }) => ({ nodes: titleNodes({ id, frame, props }) }) }),
+    component({ id: "section-title", category: "shared", role: "title", tokens: ["font.display", "type.sectionTitle", "color.ink", "color.rule", "line.hairline", "space.2"], preferredSize: { width: 720, height: 64 }, sample: { text: "(Insert section title)" }, render: ({ id, frame, props }) => ({ nodes: titleNodes({ id, frame, props, section: true }) }) }),
+    component({ id: "cover", category: "navigation", role: "cover", tokens: ["color.ink", "color.textSecondary", "font.display", "font.body", "type.deckTitle", "type.body", "space.5"], preferredSize: { width: 1280, height: 720 }, sample: { title: "(Insert presentation title)", subtitle: "(Insert subtitle)" }, render: ({ id, frame, props }) => {
+      if (typeof props.title !== "string" || !props.title.trim()) throw new Error("Cover requires a deck title");
+      if (props.subtitle !== undefined && typeof props.subtitle !== "string") throw new Error("Cover subtitle must be text");
+      // The compiler supplies headerBandHeight to every component as layout metadata.
+      if (Object.keys(props).some(key => !["title", "subtitle", "headerBandHeight"].includes(key))) throw new Error("Cover supports only title and subtitle; use the page template for other furniture");
+      const width = frame.width - CHROME.left - CHROME.right;
+      const title = measureText(props.title, width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")), bold: true, wrapWidthRatio: 1 });
+      const subtitle = props.subtitle?.trim() ? measureText(props.subtitle, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
+      const gap = subtitle ? tokenValue(token("space.5")) : 0, height = title.height + gap + (subtitle?.height || 0);
+      if (title.lines.length > 2 || subtitle?.lines.length > 2 || height > frame.height - 2 * CHROME.left) throw new Error("Cover text exceeds its allocated space; shorten the title or subtitle");
+      const x = frame.x + CHROME.left, y = frame.y + (frame.height - height) / 2;
+      const nodes = [textPrimitive({ id: stableId(id, "title"), role: "cover-title", frame: { x, y, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.deckTitle"), INK, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } })];
+      if (subtitle) nodes.push(textPrimitive({ id: stableId(id, "subtitle"), role: "cover-subtitle", frame: { x, y: y + title.height + gap, width, height: subtitle.height }, text: subtitle.text, style: { ...textStyle(BODY, SECONDARY, false, "left", "top"), lineHeight: subtitle.lineHeight, wrap: false }, data: { textLayout: subtitle } }));
       return { nodes };
     } }),
-    component({ id: "section-divider", category: "navigation", role: "divider", tokens: ["color.ink", "color.componentPrimary", "color.onPrimary", "color.rule", "font.serif", "font.body", "type.deckTitle", "type.heading", "type.source", "line.hairline", "radius.none"], preferredSize: { width: 1280, height: 720 }, sample: { number: "Appendix A", title: "Common frameworks and tools used in\nmanagement consulting", orientation: "" }, render: ({ id, frame, props }) => ({ nodes: [
-      rectPrimitive({ id: stableId(id, "surface"), role: "divider-surface", frame, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) }),
-      ...(props.dividerRule ? [openLine(stableId(id, "top-rule"), frame.x + 60, frame.y + 130, frame.x + frame.width - 60, frame.y + 130, "divider-rule", RULE, HAIRLINE)] : []),
-      measuredTextNode({ id: stableId(id, "number"), role: "divider-number", frame: { x: frame.x + 70, y: frame.y + 278, width: 260, height: 38 }, text: props.number, style: textStyle(token("type.heading"), PRIMARY, true, "left") }),
-      measuredTextNode({ id: stableId(id, "title"), role: "divider-title", frame: { x: frame.x + 70, y: frame.y + 326, width: frame.width - 140, height: 128 }, text: props.title, style: { ...textStyle(token("type.deckTitle"), WHITE, true, "left", "top"), fontFamily: SERIF } }),
-      ...(props.orientation ? [textPrimitive({ id: stableId(id, "orientation"), role: "divider-orientation", frame: { x: frame.x + 70, y: frame.y + 470, width: frame.width - 140, height: 42 }, text: props.orientation, style: textStyle(token("type.heading"), WHITE, false, "left") })] : []),
-      ...renderPageTemplate({ id: stableId(id, "page"), frame, props: { ...props, inverse: true } }).nodes
-    ] }) }),
-    component({ id: "source", category: "shared", role: "source", tokens: ["font.body", "type.source", "color.textSecondary", "color.rule", "line.hairline"], preferredSize: { width: 920, height: 26 }, sample: { text: "Source: Company data; team analysis" }, render: ({ id, frame, props }) => {
+    component({ id: "section-divider", category: "navigation", role: "divider", tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.onPrimary", "font.display", "type.deckTitle", "type.sectionNumber", "line.hairline", "radius.none", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { title: "(Insert section title)" }, render: ({ id, frame, props }) => {
+      if (typeof props.title !== "string" || !props.title.trim()) throw new Error("Section divider requires a section title");
+      for (const key of Object.keys(props)) if (!["title", "sectionId", "style", "mode", "pageTemplate", "source", "note", "companyName", "pageNumber", "footerLeft", "footerRight", "headerBandHeight"].includes(key)) throw new Error(`Unknown section-divider setting: ${key}; dividers have one title, an optional section id, and page furniture`);
+      const inverse = (props.mode ?? "dark") === "dark";
+      const dividerStyle = props.style ?? "plain";
+      if (!["plain", "numbered"].includes(dividerStyle)) throw new Error(`Unknown section-divider style: ${dividerStyle}`);
+      if (dividerStyle === "numbered" && !String(props.sectionId ?? "").trim()) throw new Error("Numbered section divider requires sectionId");
+      const page = renderPageTemplate({ id: stableId(id, "page"), frame, props: { ...props, inverse } });
+      const width = dividerStyle === "numbered" ? frame.width * 0.58 - CHROME.left : frame.width - CHROME.left - CHROME.right;
+      const title = measureText(props.title, width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")), bold: true, wrapWidthRatio: 1 });
+      if (title.lines.length > 2 || title.height > frame.height - 2 * CHROME.bodyTop) throw new Error("Section divider title exceeds its allocated space");
+      const background = inverse ? INK : token("color.canvas"), foreground = inverse ? WHITE : INK;
+      if (contrastRatio(tokenValue(background), tokenValue(foreground)) < 4.5) throw new Error("Section divider title contrast must be at least 4.5:1");
+      return { ...page, nodes: [
+        rectPrimitive({ id: stableId(id, "surface"), role: "divider-surface", frame, style: boxStyle(background, background, HAIRLINE, token("radius.none")) }),
+        textPrimitive({ id: stableId(id, "title"), role: "divider-title", frame: { x: frame.x + CHROME.left, y: frame.y + (frame.height - title.height) / 2, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.deckTitle"), foreground, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } }),
+        ...(dividerStyle === "numbered" ? [textPrimitive({ id: stableId(id, "number"), role: "divider-number", frame: { x: frame.x + frame.width * 0.67, y: frame.y + 110, width: frame.width * 0.25, height: frame.height - 220 }, text: String(props.sectionId), style: { ...textStyle(token("type.sectionNumber"), inverse ? WHITE : PRIMARY, true, "center", "mid"), fontFamily: DISPLAY }, data: { sectionId: String(props.sectionId), dividerStyle } })] : []),
+        ...page.nodes
+      ] };
+    } }),
+    component({ id: "source", category: "shared", role: "source", tokens: ["font.body", "type.source", "color.textSecondary", "color.rule", "line.hairline"], preferredSize: { width: 920, height: 26 }, sample: { text: "Source: (Insert source)" }, render: ({ id, frame, props }) => {
       const variant = resolveTitleVariant(props);
       return { nodes: [...(variant === "with-line" ? [openLine(stableId(id, "rule"), frame.x, frame.y, frame.x + frame.width, frame.y, "source-rule", RULE, HAIRLINE)] : []), textPrimitive({ id: stableId(id, "text"), role: "source-text", frame: { x: frame.x, y: frame.y + 4, width: frame.width, height: frame.height - 4 }, text: props.text, style: textStyle(SOURCE, SECONDARY, false, "left") })] };
     } }),
-    component({ id: "footnote", category: "shared", role: "footnote", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 600, height: 34 }, sample: { text: "Note: Figures may not sum due to rounding." }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "footnote-text", frame, text: props.text, style: textStyle(SOURCE, SECONDARY, false, "left", "top") })] }) }),
+    component({ id: "footnote", category: "shared", role: "footnote", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 600, height: 34 }, sample: { text: "Note: (Insert note)" }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "footnote-text", frame, text: props.text, style: textStyle(SOURCE, SECONDARY, false, "left", "top") })] }) }),
     component({ id: "page-number", category: "shared", role: "page-number", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 48, height: 24 }, sample: { value: 7 }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "page-number", frame, text: String(props.value), style: textStyle(SOURCE, SECONDARY, false, "right") })] }) }),
-    component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "color.ink"], preferredSize: { width: 520, height: 180 }, sample: { text: "A concise explanatory paragraph gives the evidence enough context to support the decision." }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "paragraph", frame, text: props.text, style: textStyle(BODY, INK, false, props.align || "left", "top") })] }) }),
-    component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.componentPrimary", "color.onPrimary", "space.1", "space.3", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["Prioritize the largest source of value", "Protect the critical dependency", "Confirm ownership before launch"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "square" }) }) }),
-    component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.4", "line.standard", "radius.small"], preferredSize: { width: 360, height: 220 }, sample: { heading: "Concentrate capacity", text: "Focus the next wave on the two segments where adoption and economics reinforce each other." }, render: ({ id, frame, props }) => {
-      const hasHeading = Boolean(props.heading);
-      return { nodes: [
-        rectPrimitive({ id: stableId(id, "surface"), role: "insight-surface", frame, style: boxStyle(PRIMARY_TINT, PRIMARY, STANDARD, SMALL_RADIUS) }),
-        ...(hasHeading ? [textPrimitive({ id: stableId(id, "heading"), role: "insight-heading", frame: { x: frame.x + 20, y: frame.y + 18, width: frame.width - 40, height: 34 }, text: props.heading, style: textStyle(token("type.heading"), PRIMARY, true) })] : []),
-        textPrimitive({ id: stableId(id, "body"), role: "insight-body", frame: { x: frame.x + 20, y: frame.y + (hasHeading ? 60 : 20), width: frame.width - 40, height: frame.height - (hasHeading ? 80 : 40) }, text: props.text, style: textStyle(BODY, INK, false, "left", hasHeading ? "top" : "mid") })
-      ] };
-    } }),
-    component({ id: "panel", category: "section", role: "panel", tokens: ["color.surface", "color.surfaceMuted", "color.componentPrimary", "color.rule", "color.ink", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "radius.none"], preferredSize: { width: 400, height: 240 }, sample: { heading: "Enterprise segment", text: "Demand growth and delivery readiness support the next commercial wave." }, render: ({ id, frame, props }) => {
+    component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "color.ink"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => ({ nodes: [measuredTextNode({ id: stableId(id, "text"), role: "paragraph", frame, text: props.text, style: textStyle(BODY, INK, false, props.align || "left", "top") })] }) }),
+    component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.componentPrimary", "color.onPrimary", "space.1", "space.3", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "square" }) }) }),
+    component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.4", "space.5", "space.6", "line.hairline", "radius.small"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
+    component({ id: "panel", category: "section", role: "panel", tokens: ["color.surface", "color.surfaceMuted", "color.componentPrimary", "color.rule", "color.ink", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "radius.none", ...[1, 2, 3, 4, 5, 6].map(index => `color.chartSeries${index}`)], preferredSize: { width: 400, height: 240 }, sample: { heading: "(Insert panel heading)", text: "(Insert panel description)" }, render: ({ id, frame, props, tokens = TOKENS }) => {
       const tone = props.tone || "open";
-      const fill = tone === "primary" ? PRIMARY : tone === "dark" ? INK : tone === "muted" ? MUTED_SURFACE : SURFACE;
-      const foreground = tone === "primary" || tone === "dark" ? WHITE : INK;
-      return { nodes: [rectPrimitive({ id: stableId(id, "surface"), role: "panel-surface", frame, style: boxStyle(fill, tone === "open" ? RULE : fill, HAIRLINE, token("radius.none")) }), textPrimitive({ id: stableId(id, "heading"), role: "panel-heading", frame: { x: frame.x + 10, y: frame.y + 10, width: frame.width - 20, height: 30 }, text: props.heading, style: textStyle(token("type.heading"), foreground, true) }), textPrimitive({ id: stableId(id, "body"), role: "panel-body", frame: { x: frame.x + 10, y: frame.y + 44, width: frame.width - 20, height: frame.height - 54 }, text: props.text, style: textStyle(COMPACT, foreground, false, "left", "top") })] };
+      const seriesColorIndex = props.seriesColorIndex;
+      if (seriesColorIndex !== undefined && (!Number.isInteger(seriesColorIndex) || seriesColorIndex < 0 || seriesColorIndex > 5)) throw new Error("Panel seriesColorIndex must be an integer from zero to five");
+      const fill = seriesColorIndex !== undefined ? token(`color.chartSeries${seriesColorIndex + 1}`) : tone === "primary" ? PRIMARY : tone === "dark" ? INK : tone === "muted" ? MUTED_SURFACE : SURFACE;
+      const foreground = seriesColorIndex !== undefined
+        ? (contrastRatio(tokens[fill.tokenId].value, tokens[WHITE.tokenId].value) >= contrastRatio(tokens[fill.tokenId].value, tokens[INK.tokenId].value) ? WHITE : INK)
+        : tone === "primary" || tone === "dark" ? WHITE : INK;
+      const data = seriesColorIndex === undefined ? {} : { seriesKey: props.seriesKey ?? props.heading, colorIndex: seriesColorIndex };
+      return { nodes: [rectPrimitive({ id: stableId(id, "surface"), role: "panel-surface", frame, style: boxStyle(fill, tone === "open" && seriesColorIndex === undefined ? RULE : fill, HAIRLINE, token("radius.none")), data }), textPrimitive({ id: stableId(id, "heading"), role: "panel-heading", frame: { x: frame.x + 10, y: frame.y + 10, width: frame.width - 20, height: 30 }, text: props.heading, style: textStyle(token("type.heading"), foreground, true), data }), textPrimitive({ id: stableId(id, "body"), role: "panel-body", frame: { x: frame.x + 10, y: frame.y + 44, width: frame.width - 20, height: frame.height - 54 }, text: props.text, style: textStyle(COMPACT, foreground, false, "left", "top"), data })] };
     } }),
-    component({ id: "quote", category: "section", role: "quote", tokens: ["color.surfaceMuted", "color.componentPrimary", "color.ink", "color.textSecondary", "font.display", "font.body", "type.sectionTitle", "type.body", "type.label", "line.hairline", "radius.small"], preferredSize: { width: 560, height: 250 }, sample: { quote: "The operating model must make the right action easier, not merely document it.", attribution: "Programme lead" }, render: ({ id, frame, props }) => ({ nodes: [rectPrimitive({ id: stableId(id, "surface"), role: "quote-surface", frame, style: boxStyle(MUTED_SURFACE, MUTED_SURFACE, HAIRLINE, SMALL_RADIUS) }), textPrimitive({ id: stableId(id, "mark"), role: "quote-mark", frame: { x: frame.x + 20, y: frame.y + 12, width: 52, height: 56 }, text: "“", style: { ...textStyle(token("type.sectionTitle"), PRIMARY, true), fontFamily: DISPLAY } }), textPrimitive({ id: stableId(id, "body"), role: "quote-body", frame: { x: frame.x + 74, y: frame.y + 34, width: frame.width - 98, height: frame.height - 92 }, text: props.quote, style: textStyle(BODY, INK, false, "left", "top") }), textPrimitive({ id: stableId(id, "attribution"), role: "quote-attribution", frame: { x: frame.x + 74, y: frame.y + frame.height - 48, width: frame.width - 98, height: 28 }, text: props.attribution, style: textStyle(LABEL, SECONDARY, true, "left") })] }) }),
-    component({ id: "metric", category: "data", role: "metric", tokens: ["color.componentPrimary", "color.textSecondary", "font.display", "font.body", "type.metric", "type.label"], preferredSize: { width: 240, height: 140 }, sample: { value: "74%", label: "Customers retained", delta: "+8 pts" }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x, y: frame.y + 6, width: frame.width, height: frame.height * 0.48 }, text: props.value, style: { ...textStyle(token("type.metric"), PRIMARY, true, "center"), fontFamily: DISPLAY } }), textPrimitive({ id: stableId(id, "label"), role: "metric-label", frame: { x: frame.x + 8, y: frame.y + frame.height * 0.52, width: frame.width - 16, height: 28 }, text: props.label, style: textStyle(LABEL, SECONDARY, false, "center") }), textPrimitive({ id: stableId(id, "delta"), role: "metric-delta", frame: { x: frame.x + 8, y: frame.y + frame.height - 30, width: frame.width - 16, height: 24 }, text: props.delta || "", style: textStyle(LABEL, PRIMARY, true, "center") })] }) }),
+    component({ id: "metric", category: "data", role: "metric", tokens: ["color.componentPrimary", "color.textSecondary", "font.display", "font.body", "type.metric", "type.label"], preferredSize: { width: 240, height: 140 }, sample: { value: "74%", label: "(Insert metric label)", delta: "+8 pts" }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x, y: frame.y + 6, width: frame.width, height: frame.height * 0.48 }, text: props.value, style: { ...textStyle(token("type.metric"), PRIMARY, true, "center"), fontFamily: DISPLAY } }), textPrimitive({ id: stableId(id, "label"), role: "metric-label", frame: { x: frame.x + 8, y: frame.y + frame.height * 0.52, width: frame.width - 16, height: 28 }, text: props.label, style: textStyle(LABEL, SECONDARY, false, "center") }), textPrimitive({ id: stableId(id, "delta"), role: "metric-delta", frame: { x: frame.x + 8, y: frame.y + frame.height - 30, width: frame.width - 16, height: 24 }, text: props.delta || "", style: textStyle(LABEL, PRIMARY, true, "center") })] }) }),
     component({ id: "legend", category: "data", role: "legend", tokens: LEGEND_TOKENS, preferredSize: { width: 420, height: 44 }, sample: { items: ["Actual", "Forecast", "Target"] }, render: input => ({ nodes: legendNodes(input) }) }),
-    component({ id: "chart-callout", category: "data", role: "annotation", tokens: ["color.surface", "color.componentPrimary", "color.ink", "font.body", "type.label", "line.hairline", "radius.small"], preferredSize: { width: 260, height: 90 }, sample: { text: "+13 points since 2025", direction: "down" }, render: ({ id, frame, props }) => ({ nodes: [openLine(stableId(id, "leader"), frame.x + frame.width / 2, frame.y + frame.height, frame.x + frame.width / 2, frame.y + frame.height + 24, "annotation-leader", PRIMARY, HAIRLINE), rectPrimitive({ id: stableId(id, "surface"), role: "annotation-surface", frame, style: boxStyle(SURFACE, PRIMARY, HAIRLINE, SMALL_RADIUS) }), textPrimitive({ id: stableId(id, "text"), role: "annotation-text", frame: insetFrame(frame, 12), text: props.text, style: textStyle(LABEL, INK, true, "center") })] }) }),
-    component({ id: "table", category: "data", role: "table", tokens: ["color.ink", "color.componentPrimary", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "font.body", "type.label", "line.hairline", "radius.none"], preferredSize: { width: 760, height: 320 }, sample: { columns: ["Metric", "2025", "2026"], rows: [["Revenue", "$42m", "$55m"], ["Margin", "24%", "29%"], ["Customers", "180", "236"]] }, render: ({ id, frame, props }) => ({ nodes: tableNodes({ id, frame, props }) }) }),
-    component({ id: "trend-rows", category: "data", role: "trend-rows", tokens: ["color.ink", "color.surface", "color.rule", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "line.standard", "radius.none"], preferredSize: { width: 1160, height: 440 }, sample: { columns: ["Trend", "Description", "Examples"], rows: [["Trend 1", "• Short description\n• Short description", "• Select examples"], ["Trend 2", "• Short description", "• Select examples"], ["Trend 3", "• Short description", "• Select examples"]] }, render: ({ id, frame, props }) => ({ nodes: trendRowNodes({ id, frame, props }) }) }),
-    component({ id: "comparison-table", category: "data", role: "comparison", tokens: ["color.ink", "color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "font.body", "type.label", "line.hairline", "radius.none"], preferredSize: { width: 820, height: 340 }, sample: { columns: ["Criterion", "Option A", "Option B", "Option C"], rows: [["Strategic fit", "Medium", "High", "High"], ["Delivery risk", "Low", "Medium", "Low"], ["Economics", "Medium", "Medium", "High"]], selectedColumn: 3 }, render: ({ id, frame, props }) => ({ nodes: tableNodes({ id, frame, props, comparison: true }) }) }),
-    component({ id: "heatmap", category: "data", role: "heatmap", tokens: ["color.ink", "color.componentPrimary", "color.componentPrimaryTint", "color.chartSeries1", "color.chartSeries2", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "font.body", "type.label", "line.hairline", "radius.none"], preferredSize: { width: 760, height: 320 }, sample: { columns: ["Capability", "A", "B", "C", "D"], rows: [["Coverage", 2, 4, 5, 3], ["Maturity", 3, 3, 4, 2], ["Readiness", 1, 4, 5, 2]] }, render: ({ id, frame, props }) => ({ nodes: tableNodes({ id, frame, props, heatmap: true }) }) }),
-    component({ id: "status-list", category: "data", role: "status", tokens: ["color.positive", "color.caution", "color.negative", "color.onPrimary", "color.ink", "font.body", "type.compact", "type.label", "line.hairline", "radius.round"], preferredSize: { width: 600, height: 260 }, sample: { items: [{ label: "Commercial case", status: "positive" }, { label: "Data migration", status: "caution" }, { label: "Contracting", status: "negative" }] }, render: ({ id, frame, props }) => ({ nodes: props.items.flatMap((item, index) => {
+    component({
+      id: "chart-callout", category: "data", role: "annotation",
+      tokens: ["color.surface", "color.componentPrimary", "color.ink", "font.body", "font.bodySemibold", "weight.semibold", "type.chartAnnotation", "line.hairline", "radius.none"],
+      preferredSize: { width: 260, height: 90 },
+      sample: { text: "(Insert evidence annotation)", direction: "down" },
+      variants: { bordered: {}, borderless: { props: { border: false } } },
+      defaultVariant: "bordered", render: renderChartCallout
+    }),
+    component({ id: "table", category: "data", role: "table", tokens: ["color.ink", "color.componentPrimary", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "font.body", "type.label", "line.hairline", "radius.none"], preferredSize: { width: 760, height: 320 }, sample: { columns: ["Metric", "Period A", "Period B"], rows: [["Metric 1", "42", "55"], ["Metric 2", "24%", "29%"], ["Metric 3", "180", "236"]] }, render: renderTable }),
+    component({ id: "trend-rows", category: "data", role: "trend-rows", tokens: ["color.ink", "color.surface", "color.rule", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "line.standard", "radius.none"], preferredSize: { width: 1160, height: 440 }, sample: { columns: ["Trend", "Description", "Examples"], rows: [["(Insert trend 1)", "• (Insert supporting point 1)\n• (Insert supporting point 2)", "• (Insert example)"], ["(Insert trend 2)", "• (Insert supporting point 1)", "• (Insert example)"], ["(Insert trend 3)", "• (Insert supporting point 1)", "• (Insert example)"]] }, render: renderTable }),
+    component({ id: "comparison-table", category: "data", role: "comparison", tokens: ["color.ink", "color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "font.body", "type.label", "line.hairline", "radius.none"], preferredSize: { width: 820, height: 340 }, sample: { columns: ["Criterion", "Option A", "Option B", "Option C"], rows: [["Criterion 1", "Medium", "High", "High"], ["Criterion 2", "Low", "Medium", "Low"], ["Criterion 3", "Medium", "Medium", "High"]], selectedColumn: 3 }, render: renderTable }),
+    component({ id: "heatmap", category: "data", role: "heatmap", tokens: ["color.ink", "color.componentPrimary", "color.componentPrimaryTint", "color.chartSeries1", "color.chartSeries2", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "font.body", "type.label", "line.hairline", "radius.none"], preferredSize: { width: 760, height: 320 }, sample: { columns: ["Capability", "A", "B", "C", "D"], rows: [["Capability 1", 2, 4, 5, 3], ["Capability 2", 3, 3, 4, 2], ["Capability 3", 1, 4, 5, 2]] }, render: renderTable }),
+    component({ id: "status-list", category: "data", role: "status", tokens: ["color.positive", "color.caution", "color.negative", "color.onPrimary", "color.ink", "font.body", "type.compact", "type.label", "line.hairline", "radius.round"], preferredSize: { width: 600, height: 260 }, sample: { items: [{ label: "(Insert item 1)", status: "positive" }, { label: "(Insert item 2)", status: "caution" }, { label: "(Insert item 3)", status: "negative" }] }, render: ({ id, frame, props }) => ({ nodes: props.items.flatMap((item, index) => {
       const height = frame.height / props.items.length;
       const fill = item.status === "positive" ? token("color.positive") : item.status === "negative" ? token("color.negative") : token("color.caution");
       return [ellipsePrimitive({ id: stableId(id, "status", index), role: "status-marker", frame: { x: frame.x, y: frame.y + index * height + (height - 20) / 2, width: 20, height: 20 }, style: boxStyle(fill, fill, HAIRLINE, token("radius.round")) }), textPrimitive({ id: stableId(id, "status-cue", index), role: "status-cue", frame: { x: frame.x, y: frame.y + index * height + (height - 20) / 2, width: 20, height: 20 }, text: item.status === "positive" ? "✓" : item.status === "negative" ? "×" : "!", style: textStyle(LABEL, WHITE, true, "center") }), textPrimitive({ id: stableId(id, "label", index), role: "status-label", frame: { x: frame.x + 34, y: frame.y + index * height, width: frame.width - 34, height }, text: item.label, style: textStyle(COMPACT, INK, false, "left") })];
     }) }) }),
-    component({ id: "image-frame", category: "media", role: "image", tokens: ["color.surfaceMuted", "color.rule", "color.textSecondary", "font.body", "type.label", "line.hairline", "radius.small"], preferredSize: { width: 520, height: 300 }, sample: { alt: "Product or market image" }, render: ({ id, frame, props }) => ({ nodes: [rectPrimitive({ id: stableId(id, "frame"), role: "image-frame", frame, style: boxStyle(MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS), data: { alt: props.alt } }), textPrimitive({ id: stableId(id, "alt"), role: "image-alt", frame: { x: frame.x + 24, y: frame.y + frame.height / 2 - 18, width: frame.width - 48, height: 36 }, text: props.alt, style: textStyle(LABEL, SECONDARY, true, "center") })] }) }),
-    component({ id: "icon", category: "media", role: "icon", tokens: ["color.componentPrimary", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.label", "line.hairline", "radius.round"], preferredSize: { width: 90, height: 90 }, sample: { symbol: "✓", label: "Confirmed" }, render: ({ id, frame, props }) => {
+    component({ id: "image-frame", category: "media", role: "image", tokens: ["color.surfaceMuted", "color.rule", "color.textSecondary", "font.body", "type.label", "line.hairline", "radius.small"], preferredSize: { width: 520, height: 300 }, sample: { alt: "(Insert image)" }, render: ({ id, frame, props }) => ({ nodes: [rectPrimitive({ id: stableId(id, "frame"), role: "image-frame", frame, style: boxStyle(MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS), data: { alt: props.alt } }), textPrimitive({ id: stableId(id, "alt"), role: "image-alt", frame: { x: frame.x + 24, y: frame.y + frame.height / 2 - 18, width: frame.width - 48, height: 36 }, text: props.alt, style: textStyle(LABEL, SECONDARY, true, "center") })] }) }),
+    component({ id: "icon", category: "media", role: "icon", tokens: ["color.componentPrimary", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.label", "line.hairline", "radius.round"], preferredSize: { width: 90, height: 90 }, sample: { symbol: "✓", label: "(Insert label)" }, render: ({ id, frame, props }) => {
       const size = Math.min(frame.width, frame.height * 0.62);
       return { nodes: [ellipsePrimitive({ id: stableId(id, "surface"), role: "icon-surface", frame: { x: frame.x + (frame.width - size) / 2, y: frame.y, width: size, height: size }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }), textPrimitive({ id: stableId(id, "symbol"), role: "icon-symbol", frame: { x: frame.x + (frame.width - size) / 2, y: frame.y, width: size, height: size }, text: props.symbol, style: textStyle(token("type.heading"), WHITE, true, "center") }), textPrimitive({ id: stableId(id, "label"), role: "icon-label", frame: { x: frame.x, y: frame.y + size + 8, width: frame.width, height: frame.height - size - 8 }, text: props.label, style: textStyle(LABEL, INK, true, "center", "top") })] };
     } }),
-    component({ id: "logo", category: "media", role: "logo", tokens: ["color.surface", "color.rule", "color.ink", "font.display", "type.heading", "line.hairline", "radius.small"], preferredSize: { width: 220, height: 90 }, sample: { text: "COMPANY" }, render: ({ id, frame, props }) => ({ nodes: [rectPrimitive({ id: stableId(id, "backing"), role: "logo-backing", frame, style: boxStyle() }), textPrimitive({ id: stableId(id, "text"), role: "logo-text", frame: insetFrame(frame, 12), text: props.text, style: { ...textStyle(token("type.heading"), INK, true, "center"), fontFamily: DISPLAY } })] }) }),
-    component({ id: "process", category: "relationship", role: "process", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 900, height: 280 }, sample: { items: ["Diagnose", "Design", "Pilot", "Scale"], active: 2 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props: { ...props, items: props.items.map((label) => typeof label === "string" ? { label } : label) } }) }) }),
-    component({ id: "chevron-process", category: "relationship", role: "process", tokens: ["color.ink", "color.componentPrimary", "color.surface", "color.surfaceMuted", "color.onPrimary", "font.body", "type.heading", "type.compact", "type.label", "line.hairline", "radius.none"], preferredSize: { width: 1160, height: 360 }, sample: { items: [{ heading: "Phase 1", label: "Diagnose", details: ["Frame the question", "Confirm the baseline"] }, { heading: "Phase 2", label: "Design", details: ["Test the options", "Select the model"] }, { heading: "Phase 3", label: "Scale", details: ["Mobilize delivery", "Track outcomes"] }] }, render: ({ id, frame, props }) => {
+    component({ id: "logo", category: "media", role: "logo", tokens: ["color.surface", "color.rule", "color.ink", "font.display", "type.heading", "line.hairline", "radius.small"], preferredSize: { width: 220, height: 90 }, sample: { text: "(Insert logo)" }, render: ({ id, frame, props }) => ({ nodes: [rectPrimitive({ id: stableId(id, "backing"), role: "logo-backing", frame, style: boxStyle() }), textPrimitive({ id: stableId(id, "text"), role: "logo-text", frame: insetFrame(frame, 12), text: props.text, style: { ...textStyle(token("type.heading"), INK, true, "center"), fontFamily: DISPLAY } })] }) }),
+    component({ id: "process", category: "relationship", role: "process", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 900, height: 280 }, sample: { items: ["(Insert step 1)", "(Insert step 2)", "(Insert step 3)", "(Insert step 4)"], active: 2 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props: { ...props, items: props.items.map((label) => typeof label === "string" ? { label } : label) } }) }) }),
+    component({ id: "chevron-process", category: "relationship", role: "process", tokens: ["color.ink", "color.componentPrimary", "color.surface", "color.surfaceMuted", "color.onPrimary", "font.body", "type.heading", "type.compact", "type.label", "line.hairline", "radius.none"], preferredSize: { width: 1160, height: 360 }, sample: { items: [{ heading: "Phase 1", label: "(Insert phase 1)", details: ["(Insert activity 1)", "(Insert activity 2)"] }, { heading: "Phase 2", label: "(Insert phase 2)", details: ["(Insert activity 1)", "(Insert activity 2)"] }, { heading: "Phase 3", label: "(Insert phase 3)", details: ["(Insert activity 1)", "(Insert activity 2)"] }] }, render: ({ id, frame, props }) => {
       const items = props.items;
       const span = frame.width / items.length;
       const nodes = [];
@@ -563,15 +587,15 @@ function registerCore(registry) {
       });
       return { nodes };
     } }),
-    component({ id: "initiative-rollout", category: "relationship", role: "initiative-rollout", tokens: ["color.ink", "color.componentPrimary", "color.chartSeries2", "color.surfaceMuted", "color.surface", "color.onPrimary", "font.body", "type.heading", "type.compact", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 1160, height: 450 }, sample: { years: ["2025", "2026", "2027"], rows: [{ label: "A", phases: ["Build", "Scale", "Embed"] }, { label: "B", phases: ["Design", "Pilot", "Roll out"] }] }, render: ({ id, frame, props }) => ({ nodes: initiativeRolloutNodes({ id, frame, props }) }) }),
-    component({ id: "highlight-strip", category: "relationship", role: "highlight-strip", tokens: ["color.componentPrimary", "color.ink", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "radius.round"], preferredSize: { width: 1160, height: 126 }, sample: { items: [{ number: "1", heading: "Start highlight", description: "[Insert description]" }, { number: "2", heading: "Start highlight", description: "[Insert description]" }, { number: "3", heading: "Start highlight", description: "[Insert description]" }] }, render: ({ id, frame, props }) => ({ nodes: highlightStripNodes({ id, frame, props }) }) }),
-    component({ id: "roadmap", category: "relationship", role: "roadmap", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.heading", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round", "radius.small"], preferredSize: { width: 980, height: 360 }, sample: { items: ["Mobilize", "Build", "Launch", "Stabilize"], active: 1 }, render: ({ id, frame, props }) => ({ nodes: props.variant === "wave-columns" ? waveRoadmapNodes({ id, frame, props }) : processNodes({ id, frame, props: { ...props, items: props.items.map((label) => typeof label === "string" ? { label } : label) }, roadmap: true }) }) }),
+    component({ id: "initiative-rollout", category: "relationship", role: "initiative-rollout", tokens: ["color.ink", "color.componentPrimary", "color.chartSeries2", "color.surfaceMuted", "color.surface", "color.onPrimary", "font.body", "type.heading", "type.compact", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 1160, height: 450 }, sample: { years: ["Year 1", "Year 2", "Year 3"], rows: [{ label: "A", phases: ["(Insert phase 1)", "(Insert phase 2)", "(Insert phase 3)"] }, { label: "B", phases: ["(Insert phase 1)", "(Insert phase 2)", "(Insert phase 3)"] }] }, render: ({ id, frame, props }) => ({ nodes: initiativeRolloutNodes({ id, frame, props }) }) }),
+    component({ id: "highlight-strip", category: "relationship", role: "highlight-strip", tokens: ["color.componentPrimary", "color.ink", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "radius.round"], preferredSize: { width: 1160, height: 126 }, sample: { items: [{ number: "1", heading: "(Insert highlight)", description: "(Insert description)" }, { number: "2", heading: "(Insert highlight)", description: "(Insert description)" }, { number: "3", heading: "(Insert highlight)", description: "(Insert description)" }] }, render: ({ id, frame, props }) => ({ nodes: highlightStripNodes({ id, frame, props }) }) }),
+    component({ id: "roadmap", category: "relationship", role: "roadmap", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.heading", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round", "radius.small"], preferredSize: { width: 980, height: 360 }, sample: { items: ["(Insert stage 1)", "(Insert stage 2)", "(Insert stage 3)", "(Insert stage 4)"], active: 1 }, render: ({ id, frame, props }) => ({ nodes: props.variant === "wave-columns" ? waveRoadmapNodes({ id, frame, props }) : processNodes({ id, frame, props: { ...props, items: props.items.map((label) => typeof label === "string" ? { label } : label) }, roadmap: true }) }) }),
     component({ id: "timeline", category: "relationship", role: "timeline", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 920, height: 250 }, sample: { items: ["Q1", "Q2", "Q3", "Q4"], active: 2 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props: { ...props, items: props.items.map((label) => ({ label })) } }) }) }),
-    component({ id: "journey", category: "relationship", role: "journey", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 960, height: 300 }, sample: { items: [{ label: "Discover", touchpoint: "Search" }, { label: "Evaluate", touchpoint: "Demo" }, { label: "Buy", touchpoint: "Checkout" }, { label: "Adopt", touchpoint: "Onboarding" }], active: 3 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props, journey: true }) }) }),
-    component({ id: "tree", category: "relationship", role: "tree", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "Decision", children: ["Market", "Customer", "Economics", "Execution"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props }) }) }),
-    component({ id: "organization", category: "relationship", role: "organization", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.none", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "Executive sponsor", children: ["Product", "Operations", "Technology", "Finance"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props, organization: true }) }) }),
+    component({ id: "journey", category: "relationship", role: "journey", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 960, height: 300 }, sample: { items: [{ label: "(Insert stage 1)", touchpoint: "(Insert touchpoint 1)" }, { label: "(Insert stage 2)", touchpoint: "(Insert touchpoint 2)" }, { label: "(Insert stage 3)", touchpoint: "(Insert touchpoint 3)" }, { label: "(Insert stage 4)", touchpoint: "(Insert touchpoint 4)" }], active: 3 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props, journey: true }) }) }),
+    component({ id: "tree", category: "relationship", role: "tree", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert root question)", children: ["(Insert branch 1)", "(Insert branch 2)", "(Insert branch 3)", "(Insert branch 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props }) }) }),
+    component({ id: "organization", category: "relationship", role: "organization", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.none", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert parent role)", children: ["(Insert role 1)", "(Insert role 2)", "(Insert role 3)", "(Insert role 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props, organization: true }) }) }),
     component({ id: "matrix", category: "relationship", role: "matrix", tokens: ["color.componentPrimary", "color.chartSeries2", "color.surface", "color.rule", "color.ink", "color.positive", "color.caution", "color.negative", "color.onPrimary", "font.body", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 720, height: 410 }, sample: { points: [{ label: "A", x: 0.24, y: 0.35 }, { label: "B", x: 0.56, y: 0.62 }, { label: "C", x: 0.76, y: 0.82 }], highlight: 2 }, render: ({ id, frame, props }) => ({ nodes: matrixNodes({ id, frame, props }) }) }),
-    component({ id: "map", category: "relationship", role: "map", tokens: ["color.surface", "color.surfaceMuted", "color.ink", "color.textSecondary", "font.body", "type.label", "line.hairline", "radius.round", "radius.none"], preferredSize: { width: 820, height: 400 }, sample: { markers: [{ label: "Americas", x: 0.2, y: 0.45, fraction: 0.75 }, { label: "Europe", x: 0.5, y: 0.34, fraction: 0.5 }, { label: "Asia", x: 0.77, y: 0.44, fraction: 0.25 }] }, render: ({ id, frame, props }) => ({ nodes: mapNodes({ id, frame, props }) }) }),
+    component({ id: "map", category: "relationship", role: "map", tokens: MAP_TOKENS, preferredSize: { width: 920, height: 440 }, sample: { geography: "world", markers: [{ label: "Americas", x: 0.2, y: 0.45, fraction: 0.75 }, { label: "Europe", x: 0.5, y: 0.34, fraction: 0.5 }, { label: "Asia", x: 0.77, y: 0.44, fraction: 0.25 }] }, render: ({ id, frame, props }) => ({ nodes: mapNodes({ id, frame, props }) }) }),
     component({ id: "funnel", category: "relationship", role: "funnel", tokens: ["color.componentPrimary", "color.chartSeries2", "color.chartSeries3", "color.chartSeries4", "color.onPrimary", "color.ink", "font.body", "type.compact", "line.hairline", "radius.small"], preferredSize: { width: 700, height: 360 }, sample: { stages: [{ label: "Market", value: 100 }, { label: "Qualified", value: 62 }, { label: "Engaged", value: 38 }, { label: "Won", value: 18 }] }, render: ({ id, frame, props, tokens = TOKENS }) => {
       const colors = [PRIMARY, token("color.chartSeries2"), token("color.chartSeries3"), token("color.chartSeries4")];
       const max = props.stages[0].value;
@@ -583,8 +607,21 @@ function registerCore(registry) {
         return [rectPrimitive({ id: stableId(id, "stage", index), role: "funnel-stage", frame: { x, y: frame.y + index * height + 3, width, height: height - 6 }, style: boxStyle(fill, fill, HAIRLINE, SMALL_RADIUS) }), textPrimitive({ id: stableId(id, "label", index), role: "funnel-label", frame: { x: x + 12, y: frame.y + index * height + 3, width: width - 24, height: height - 6 }, text: `${stage.label}  ${stage.value}`, style: textStyle(COMPACT, foreground, true, "center") })];
       }) };
     } }),
-    component({ id: "connector", category: "relationship", role: "connector", tokens: ["color.componentPrimary", "font.body", "type.label", "line.standard"], preferredSize: { width: 360, height: 90 }, sample: { label: "therefore" }, render: ({ id, frame, props }) => ({ nodes: [openLine(stableId(id, "line"), frame.x, frame.y + frame.height / 2, frame.x + frame.width - 18, frame.y + frame.height / 2, "connector-line", PRIMARY, STANDARD, { endArrow: true }), textPrimitive({ id: stableId(id, "label"), role: "connector-label", frame: { x: frame.x + frame.width * 0.28, y: frame.y, width: frame.width * 0.44, height: frame.height / 2 - 4 }, text: props.label, style: textStyle(LABEL, PRIMARY, true, "center") })] }) }),
-    component({ id: "content-rail", category: "section", role: "rail", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "type.compact", "space.1", "space.3", "radius.none", ...SECTION_HEADING_TOKENS], preferredSize: { width: 330, height: 360 }, sample: { heading: "Commercial consequence", items: ["Value is concentrated", "Execution remains feasible", "One dependency needs action"] }, render: ({ id, frame, props }) => {
+    component({ id: "connector", category: "relationship", role: "connector", tokens: ["color.componentPrimary", "color.onPrimary", "font.body", "type.label", "line.standard", "line.hairline", "icon.medium", "radius.round"], preferredSize: { width: 360, height: 90 }, sample: { label: "therefore", variant: "labelled-line" }, render: ({ id, frame, props }) => {
+      const variant = props.variant ?? (props.label ? "labelled-line" : "disc-chevron"), centerY = frame.y + frame.height / 2;
+      if (variant === "disc-chevron") {
+        const diameter = tokenValue(token("icon.medium")), centerX = frame.x + frame.width / 2;
+        return { nodes: [
+          ellipsePrimitive({ id: stableId(id, "disc"), role: "relationship-disc", frame: { x: centerX - diameter / 2, y: centerY - diameter / 2, width: diameter, height: diameter }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")), data: { relation: "implies", arrowVariant: variant, arrowPart: 0 } }),
+          openLine(stableId(id, "chevron-top"), centerX - diameter / 8, centerY - diameter / 4, centerX + diameter / 8, centerY, "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 1 }),
+          openLine(stableId(id, "chevron-bottom"), centerX + diameter / 8, centerY, centerX - diameter / 8, centerY + diameter / 4, "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 2 })
+        ] };
+      }
+      const line = openLine(stableId(id, "line"), frame.x, centerY, frame.x + frame.width - 2, centerY, "relationship-arrow", PRIMARY, STANDARD, { relation: "implies", arrowVariant: "line", endArrow: true, endArrowType: "triangle" });
+      if (variant === "line") return { nodes: [line] };
+      return { nodes: [line, textPrimitive({ id: stableId(id, "label"), role: "connector-label", frame: { x: frame.x + frame.width * 0.28, y: frame.y, width: frame.width * 0.44, height: frame.height / 2 - 4 }, text: props.label, style: textStyle(LABEL, PRIMARY, true, "center") })] };
+    } }),
+    component({ id: "content-rail", category: "section", role: "rail", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "type.compact", "space.1", "space.3", "radius.none", ...SECTION_HEADING_TOKENS], preferredSize: { width: 330, height: 360 }, sample: { heading: "(Insert takeaway heading)", items: ["(Insert evidence-backed takeaway 1)", "(Insert evidence-backed takeaway 2)", "(Insert evidence-backed takeaway 3)"] }, render: ({ id, frame, props }) => {
       const treatment = props.treatment || "muted";
       const inset = treatment === "open" ? 18 : 18;
       const nodes = [];
@@ -597,10 +634,43 @@ function registerCore(registry) {
       nodes.push(...simpleList({ id: stableId(id, "list"), frame: { x: frame.x + inset, y: listTop, width: frame.width - inset * 2, height: frame.y + frame.height - listTop - 12 }, items: props.items, marker: "square", rolePrefix: "rail" }));
       return { nodes };
     } }),
-    component({ id: "contents", category: "navigation", role: "contents", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "font.body", "type.compact", "type.label", "space.1", "space.3", "line.hairline", "radius.round"], preferredSize: { width: 840, height: 420 }, sample: { items: ["Context and objective", "Evidence and options", "Recommendation", "Implementation"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: true, distribute: true }) }) })
   ];
   for (const definition of definitions) {
+    if (["table", "comparison-table", "heatmap", "trend-rows"].includes(definition.id)) {
+      definition.tokens = TABLE_TOKENS;
+      const normalize = props => {
+        if (definition.id === "heatmap") return { ...props, columns: props.columns.map((label,index)=>({label,type:index?'heatmap':'text',scale:index?'score':undefined})), rows: props.rows.map(row=>row.map((value,index)=>index?{value}:value)), scales: {score:{type:'heatmap',label:'Assessment',min:1,max:5,anchors:{1:'Low',3:'Medium',5:'High'}}} };
+        if (definition.id === "trend-rows") return { ...props, columns: props.columns.map((label,index)=>({label,type:index?'text':'category',width:[.18,.52,.3][index]})) };
+        if (definition.id === "comparison-table") {
+          if (props.selectedColumn !== undefined && (!Number.isInteger(props.selectedColumn) || props.selectedColumn < 0 || props.selectedColumn >= props.columns.length)) throw new Error("Invalid comparison selectedColumn");
+          return { ...props, rows: props.rows.map(row => {
+            const cells = (Array.isArray(row) ? row : row.cells).map((value, index) => {
+              if (index !== props.selectedColumn || value === null) return value;
+              return typeof value === "object" && !Array.isArray(value)
+                ? { ...value, highlight: true }
+                : { text: String(value), value, highlight: true };
+            });
+            return Array.isArray(row) ? cells : { ...row, cells };
+          }) };
+        }
+        return props;
+      };
+      definition.render = input => renderTable({...input,props:normalize(input.props)});
+      definition.measureContent = input => measureTable({...input,props:normalize(input.props)});
+      if (definition.id === "table") {
+        definition.variants = TABLE_VARIANTS;
+        definition.defaultVariant = "open";
+        definition.variantProp = "variant";
+        definition.resolveVariant = props => props.variant ?? (props.treatment === "standard" ? "standard" : "open");
+        const render=definition.render;
+        definition.render=input=>{if(!Object.hasOwn(TABLE_VARIANTS,definition.resolveVariant(input.props)))throw new Error('Unknown table variant');return render(input);};
+      }
+    }
     const axes = { section: ["treatment", ["open", "muted", "primary"]], panel: ["tone", ["open", "muted", "primary", "dark"]], "content-rail": ["treatment", ["muted", "open"]], roadmap: ["variant", ["process", "wave-columns"]], "section-heading": ["variant", ["standard", "accent", "inverse"]] };
+    axes["section-boundary"] = ["variant", ["related", "inference", "subsection"]];
+    axes.connector = ["variant", ["disc-chevron", "line", "labelled-line"]];
+    axes["bullet-list"] = ["variant", ["compact", "body"]];
+    axes.insight = ["variant", ["tonal", "neutral", "dotted", "primary"]];
     if (axes[definition.id]) {
       const [prop, choices] = axes[definition.id];
       definition.variants = Object.fromEntries(choices.map(choice => [choice, {}]));
@@ -614,10 +684,36 @@ function registerCore(registry) {
       const render = definition.render;
       definition.render = input => { definition.resolveVariant(input.props); return render(input); };
     }
-    if (definition.id === "roadmap") definition.variants["wave-columns"] = { preferredSize: { width: 1160, height: 480 }, props: { items: ["Diagnose", "Design", "Scale"].map((heading, index) => ({ heading, range: `Quarter ${index + 1}`, activities: ["Confirm priorities"], deliverables: ["Agreed plan"] })) } };
+    if (definition.id === "roadmap") definition.variants["wave-columns"] = { preferredSize: { width: 1160, height: 480 }, props: { items: [1, 2, 3].map((index) => ({ heading: `(Insert wave ${index} heading)`, range: `(Insert time range ${index})`, activities: ["(Insert activity)"], deliverables: ["(Insert deliverable)"] })) } };
+    if (definition.id === "bullet-list") {
+      definition.tokens.push("type.body", "space.2", "space.4");
+      const render = definition.render;
+      definition.render = input => definition.resolveVariant(input.props) === "body" ? { nodes: bodyListNodes(input) } : render(input);
+      definition.measureContent = ({ frame, props }) => {
+        if (definition.resolveVariant(props) !== "body") throw new Error("Content measurement requires the body bullet-list variant");
+        return bodyListLayout(frame, props.items);
+      };
+    }
     if (definition.id === "section-heading") definition.variants.inverse = { backdrop: "primary" };
+    if (definition.id === "insight") definition.measureContent = ({ frame, props }) => { definition.resolveVariant(props); return insightLayout(frame, props); };
+    if (definition.id === "section-boundary") definition.variants.subsection = { preferredSize: { width: 520, height: 24 } };
+    if (definition.id === "map") {
+      definition.version = "3.0.0";
+      definition.variants = Object.fromEntries(MAP_PRESET_IDS.map((geography) => [geography, { props: { geography, markers: [] } }]));
+      definition.defaultVariant = "world";
+      definition.variantProp = "geography";
+      definition.resolveVariant = (props = {}) => resolveGeography(props.geography ?? "world").id;
+      definition.guidance = MAP_GUIDANCE;
+      const render = definition.render;
+      definition.render = input => { definition.resolveVariant(input.props); return render(input); };
+      definition.examples = {
+        "world-country-highlight": { props: { geography: "world", markers: [], highlightCountries: ["USA", "DEU", "CHN"] } },
+        "country-marker-anchor": { props: { geography: "europe", markers: [{ country: "GBR", label: "United Kingdom", fraction: 1 }] } }
+      };
+    }
     if (definition.id === "legend") {
-      definition.variants = Object.fromEntries(Object.keys(LEGEND_VARIANTS).flatMap(mark => LEGEND_PLACEMENTS.map(placement => [`${mark}-${placement}`, { props: { variant: mark, placement, items: [{ label: "Actual", state: "actual" }, { label: "Forecast", state: "forecast" }, { label: "Target", state: "actual" }] }, preferredSize: { width: 540, height: placement === "right" ? 120 : 44 } }])));
+      const visuallyDistinctPlacements = LEGEND_PLACEMENTS.filter(placement => placement !== "inline");
+      definition.variants = Object.fromEntries(Object.keys(LEGEND_VARIANTS).flatMap(mark => visuallyDistinctPlacements.map(placement => [`${mark}-${placement}`, { props: { variant: mark, placement, items: [{ label: "Actual", state: "actual" }, { label: "Forecast", state: "forecast" }, { label: "Target", state: "actual" }] }, preferredSize: { width: 540, height: placement === "right" ? 120 : 44 } }])));
       definition.defaultVariant = "swatch-top";
       definition.resolveVariant = (props = {}) => `${props.variant ?? "swatch"}-${props.placement ?? "top"}`;
     }
@@ -647,9 +743,17 @@ function registerCore(registry) {
       };
     }
     if (definition.id === "section-divider") {
-      definition.tokens = [...new Set([...definition.tokens, ...PAGE_TEMPLATE_TOKENS])].sort();
+      definition.variants = Object.fromEntries(["plain", "numbered"].flatMap(style => ["dark", "light"].flatMap(mode => PAGE_RULES.map(rules => [`${style}-${mode}-${rules}`, { props: { style, mode, ...(style === "numbered" ? { sectionId: "1" } : {}), pageTemplate: { rules } } }]))));
+      definition.defaultVariant = "plain-dark-none";
+      definition.resolveVariant = (props = {}) => {
+        const mode = props.mode ?? "dark";
+        const style = props.style ?? "plain";
+        if (!["light", "dark"].includes(mode)) throw new Error(`Unknown section-divider mode: ${mode}`);
+        if (!["plain", "numbered"].includes(style)) throw new Error(`Unknown section-divider style: ${style}`);
+        return `${style}-${mode}-${resolvePageTemplate(props.pageTemplate).rules}`;
+      };
       const render = definition.render;
-      definition.render = input => ({ ...render(input), placements: renderPageTemplate({ ...input, props: { ...input.props, inverse: true } }).placements });
+      definition.render = input => { definition.resolveVariant(input.props); return render(input); };
     }
     if (definition.id === "trend-rows") definition.tokens = [...new Set([...definition.tokens, ...SECTION_HEADING_TOKENS])].sort();
     if (["section", "section-heading", "content-rail"].includes(definition.id)) {
@@ -672,8 +776,8 @@ function registerCore(registry) {
   }
   registry.set("chart-title", {
     id: "chart-title", version: "2.0.0", category: "shared", role: "chart-title",
-    tokens: [...SECTION_HEADING_TOKENS, "type.compact", "color.chartUnit", "space.1"],
-    preferredSize: { width: 540, height: 76 }, sample: { heading: "Current mix" },
+    tokens: [...SECTION_HEADING_TOKENS, "type.body", "color.chartUnit", "space.1"],
+    preferredSize: { width: 540, height: 76 }, sample: { heading: "(Insert chart title)" },
     variants: { underlined: {}, unit: { props: { unit: "Revenue share, %" } } }, defaultVariant: "underlined", variantProp: "variant", resolveVariant: resolveChartTitleVariant,
     measureContent: ({ frame, props }) => chartTitleLayout(frame, props),
     measureHeader: ({ frame, props }) => ({ top: frame.y, ruled: resolveChartTitleVariant(props) === "underlined", height: headingLayout(frame, props).heading.height }),
@@ -683,7 +787,7 @@ function registerCore(registry) {
 }
 
 export function createRegistry() {
-  return registerChartGroup(registerCharts(registerCore(new Map())));
+  return registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map()))))));
 }
 
 export const REGISTRY = createRegistry();
@@ -702,7 +806,8 @@ export function registryManifest() {
       ...(definition.examples ? { examples: definition.examples } : {}),
       tokens: definition.tokens,
       preferredSize: definition.preferredSize,
-      sample: definition.sample
+      sample: definition.sample,
+      ...(definition.guidance ? { guidance: definition.guidance } : {})
     }))
   };
 }

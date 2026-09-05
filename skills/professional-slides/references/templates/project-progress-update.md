@@ -46,7 +46,7 @@ The executive summary must state the overall answer, proof, decision consequence
 
 ## Navigation
 
-Default to `tracker.system: none` for live updates and simple two-part reviews. For an executive pre-read or recovery review with at least three analytical chapters, use `sequential-circles` as the full state and `compact-number-strip` on governed slides. Seed the approved tracker map with `Baseline and progress`, `Critical path`, `Risk and readiness`, `Forecast and downside`, and `Actions and decisions`; approved replacements become exact under the [template instantiation contract](index.md#instantiation-contract). Omit any unused chapter from both the dot-dash and tracker map; never rename a retained tracker label locally.
+Default to `tracker.system: none` for live updates and simple two-part reviews; otherwise use the [tracker router](../components/trackers/index.md). Seed an eligible tracker map with `Baseline and progress`, `Critical path`, `Risk and readiness`, `Forecast and downside`, and `Actions and decisions`; approved replacements become exact under the [template instantiation contract](index.md#instantiation-contract). Omit unused chapters from both the dot-dash and tracker map; never rename a retained tracker label locally.
 
 ## Analytical jobs
 

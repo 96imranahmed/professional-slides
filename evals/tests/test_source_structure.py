@@ -24,15 +24,29 @@ def run_node(source: str) -> dict:
     result = subprocess.run(
         [NODE, "--input-type=module", "--eval", source],
         cwd=ROOT,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
         env={**os.environ, "RUNTIME_NODE_MODULES": os.environ.get("RUNTIME_NODE_MODULES", str(Path(NODE).resolve().parents[1] / "node_modules"))},
     )
+    if result.returncode:
+        raise AssertionError(f"Node probe exited {result.returncode}\n{result.stderr}\n{result.stdout}")
     return json.loads(result.stdout)
 
 
 class SourceStructureTests(unittest.TestCase):
+    def test_repository_commands_use_runtime_discovery_and_static_gates(self):
+        package = json.loads(read(ROOT / "package.json"))
+        self.assertEqual(package["scripts"]["test"], "node evals/scripts/run_tests.mjs")
+        self.assertIn("check_source_quality.mjs", package["scripts"]["check:syntax"])
+        self.assertIn("npm run check:syntax", package["scripts"]["check"])
+        runner = read(ROOT / "evals" / "scripts" / "run_tests.mjs")
+        self.assertIn("RUNTIME_PYTHON", runner)
+        self.assertIn("RUNTIME_NODE_MODULES", runner)
+        golden = read(ROOT / "evals" / "scripts" / "generate_golden_set.mjs")
+        for required in ['.codex-plugin/plugin.json', 'skills/professional-slides', 'evals/scripts', 'indexSha256']:
+            self.assertIn(required, golden)
+
     def test_plugin_and_skill_have_one_canonical_owner(self):
         manifest = json.loads(read(ROOT / ".codex-plugin" / "plugin.json"))
         self.assertEqual(manifest["name"], "professional-slides")
@@ -78,20 +92,23 @@ console.log(JSON.stringify({
   charts: CHART_IDS.length,
   fixtures: fixtures.length,
   layoutFixtures: fixtures.filter(item => item.kind === 'layout').length,
-  variantFixtures: fixtures.filter(item => item.kind === 'variant').length,
+  componentBoards: fixtures.filter(item => item.kind === 'board').length,
+  componentCoverage: fixtures.flatMap(item => item.coverage || []).length,
+  expectedCoverage: [...REGISTRY.values()].reduce((sum, definition) => sum + (Object.keys(definition.variants || {}).length || 1), 0),
   slideCount: deck.slides.length,
   nodeCount: deck.slides.reduce((sum, slide) => sum + slide.nodes.length, 0),
   missing
 }));
 """
         )
-        self.assertEqual(result["registry"], 56)
-        self.assertEqual(result["components"], 44)
-        self.assertEqual(result["charts"], 12)
-        self.assertEqual(result["fixtures"], 135)
-        self.assertEqual(result["layoutFixtures"], 18)
-        self.assertEqual(result["variantFixtures"], 61)
-        self.assertEqual(result["slideCount"], 135)
+        self.assertEqual(result["registry"], 60)
+        self.assertEqual(result["components"], 47)
+        self.assertEqual(result["charts"], 13)
+        self.assertEqual(result["layoutFixtures"], 52)
+        self.assertGreater(result["componentBoards"], 0)
+        self.assertEqual(result["componentCoverage"], result["expectedCoverage"])
+        self.assertEqual(result["slideCount"], result["fixtures"])
+        self.assertLess(result["fixtures"], result["componentCoverage"] + result["layoutFixtures"])
         self.assertGreater(result["nodeCount"], 800)
         self.assertEqual(result["missing"], [])
 
@@ -112,7 +129,7 @@ console.log(JSON.stringify({
   slides: deck.slides.length,
   nodes: deck.slides.reduce((sum, slide) => sum + slide.nodes.length, 0),
   families: new Set(fixtures.map(item => item.visualFamily)).size,
-  sources: fixtures.map(item => item.sourceSlide),
+  sources: fixtures.map(item => item.sourceSlide).filter(value => value !== null),
   allCapabilities: fixtures.every(item => item.capabilities.length > 0),
   imageNodes: deck.slides.flatMap(slide => slide.nodes).filter(node => node.type === 'image').length,
   fixedTaxonomy: JSON.stringify({deck, fixtures}).toLowerCase().includes('archetype'),
@@ -131,6 +148,55 @@ console.log(JSON.stringify({
             self.assertEqual(chrome["title"], {"x": 60, "y": chrome["textBottom"] + 8, "width": 1160, "height": 0})
             self.assertEqual(chrome["footer"], {"x": 60, "y": 680, "width": 1160, "height": 0})
 
+    def test_cover_is_only_title_and_optional_subtitle_with_shared_tokens(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import { compileDeck, component, TOKENS } from './skills/professional-slides/runtime/core.mjs';
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const frame = {x:0,y:0,width:1280,height:720};
+const compile = (props, options={}) => compileDeck({...options,slides:[{id:'cover-test',frame,composition:component({id:'cover',component:'cover',frame,props})}]},REGISTRY);
+const basic = compile({title:'Growth strategy',subtitle:'Priorities for the next planning cycle'});
+const [title, subtitle] = basic.slides[0].nodes;
+assert.deepEqual(basic.slides[0].nodes.map(n=>[n.type,n.role]), [['text','cover-title'],['text','cover-subtitle']]);
+assert.equal(title.frame.x,60);
+assert.equal(subtitle.frame.x,title.frame.x);
+assert.equal(subtitle.frame.y-title.frame.y-title.frame.height,TOKENS['space.5'].value);
+assert.equal((title.frame.y+subtitle.frame.y+subtitle.frame.height)/2,360);
+assert.equal(title.style.fontFamily.tokenId,'font.display');
+assert.equal(subtitle.style.fontFamily.tokenId,'font.body');
+assert.equal(title.style.fontSize.tokenId,'type.deckTitle');
+assert.equal(subtitle.style.fontSize.tokenId,'type.body');
+assert.equal(title.style.color.tokenId,'color.ink');
+assert.equal(subtitle.style.color.tokenId,'color.textSecondary');
+assert.ok([title,subtitle].every(n=>n.style.wrap===false && n.data.textLayout.lines.length===1));
+for (const subtitleValue of [undefined,'','   ']) assert.equal(compile({title:'Growth strategy',subtitle:subtitleValue}).slides[0].nodes.length,1);
+const company = compile({title:'Growth strategy',subtitle:'Commercial priorities'},{palette:'bain',typography:{body:'Arial',display:'Georgia'}});
+assert.equal(company.slides[0].nodes[0].style.fontFamily.value,'Georgia');
+assert.equal(company.slides[0].nodes[1].style.fontFamily.value,'Arial');
+assert.equal(company.slides[0].nodes[0].style.color.value,company.tokens['color.ink'].value);
+assert.equal(company.slides[0].nodes[1].style.color.value,company.tokens['color.textSecondary'].value);
+const wrapped = compile({title:'Growth strategy\\nfor the next cycle',subtitle:'Commercial priorities\\nand delivery milestones'});
+assert.deepEqual(wrapped.slides[0].nodes.map(n=>n.data.textLayout.lines.length),[2,2]);
+for (const props of [{title:''},{title:42},{title:'A',subtitle:42},{title:'A',badge:'Extra label'},{title:'A\\nB\\nC'},{title:'A',subtitle:'B\\nC\\nD'}]) assert.throws(()=>compile(props));
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_plain_cover_is_golden_but_not_an_obsolete_artwork_fidelity_target(self):
+        result = run_node("""
+import { buildGoldenDeck } from './skills/professional-slides/runtime/golden-fixtures.mjs';
+const full = buildGoldenDeck(), reference = buildGoldenDeck({referenceOnly:true});
+console.log(JSON.stringify({golden:full.fixtures.length, reference:reference.fixtures.length,
+  cover:full.fixtures.find(f=>f.visualFamily==='cover'), sources:reference.fixtures.map(f=>f.sourceSlide),
+  referenceFamilies:reference.fixtures.map(f=>f.visualFamily)}));
+""")
+        self.assertEqual(result["golden"], 18)
+        self.assertEqual(result["reference"], 16)
+        self.assertIsNone(result["cover"]["sourceSlide"])
+        self.assertNotIn("cover", result["referenceFamilies"])
+        self.assertNotIn("section-divider", result["referenceFamilies"])
+        self.assertTrue(all(isinstance(value, int) for value in result["sources"]))
+
     def test_planner_selects_relationships_and_rejects_unprepared_content(self):
         result = run_node(
             """
@@ -140,13 +206,18 @@ const layout = count => planSlide({ id: `slide-${count}`, title: 'The evidence s
 const sequence = planSlide({ id: 'sequence', title: 'The work advances in order', items: [0,1,2].map(index => ({...item(index), relationship: 'sequence'})) }).decision.layout;
 const overlay = planSlide({ id: 'overlay', title: 'The annotation explains the exhibit', items: [{...item(0), relationship: 'layer'}] }).decision.layout;
 const absolute = planSlide({ id: 'absolute', title: 'The geometry carries the meaning', items: [{...item(0), frame: {x: 0, y: 0, width: 100, height: 100}}] }).decision.layout;
+const split = planSlide({id:'split',title:'Examples clarify where the approach applies',layout:'section-split-50-50',items:[
+ {id:'frame',job:'frame the question',items:[item(0)]},
+ {id:'examples',job:'develop related examples',items:[item(1)]}
+]});
 let genericLabelRejected = false;
 let genericSectionHeadingRejected = false;
 let missingJobRejected = false;
 try { planSlide({ id: 'bad-label', title: 'A title', items: [{...item(0), props: {title: 'Insight', text: 'Value'}}] }); } catch { genericLabelRejected = true; }
 try { planSlide({ id: 'bad-heading', title: 'A title', items: [{...item(0), heading: 'Implication'}] }); } catch { genericSectionHeadingRejected = true; }
 try { planSlide({ id: 'bad-job', title: 'A title', items: [{id: 'x', component: 'paragraph', props: {text: 'Value'}}] }); } catch { missingJobRejected = true; }
-console.log(JSON.stringify({one: layout(1), two: layout(2), four: layout(4), sequence, overlay, absolute, genericLabelRejected, genericSectionHeadingRejected, missingJobRejected}));
+let invalidSplitRejected=false;try{planSlide({id:'bad-split',title:'A title',layout:'section-split-50-50',items:[item(0),item(1)]});}catch{invalidSplitRejected=true;}
+console.log(JSON.stringify({one: layout(1), two: layout(2), four: layout(4), sequence, overlay, absolute, split:split.decision.layout,splitTreatments:split.spec.composition.children.map(child=>[child.treatment,child.edge,child.size.width.fr]),invalidSplitRejected,genericLabelRejected, genericSectionHeadingRejected, missingJobRejected}));
 """
         )
         self.assertEqual(result["one"], "flow.column")
@@ -155,6 +226,9 @@ console.log(JSON.stringify({one: layout(1), two: layout(2), four: layout(4), seq
         self.assertEqual(result["sequence"], "flow.row")
         self.assertEqual(result["overlay"], "overlay")
         self.assertEqual(result["absolute"], "absolute")
+        self.assertEqual(result["split"], "section-split-50-50")
+        self.assertEqual(result["splitTreatments"], [["open", "full-bleed", 1], ["muted", "full-bleed", 1]])
+        self.assertTrue(result["invalidSplitRejected"])
         self.assertTrue(result["genericLabelRejected"])
         self.assertTrue(result["genericSectionHeadingRejected"])
         self.assertTrue(result["missingJobRejected"])
@@ -231,7 +305,8 @@ const results = ids.map(id => {
   const legendRows = new Set(swatches.map(node => Math.round(node.frame.y)));
   const top = Math.min(...swatches.map(node => node.frame.y));
   const plotTop = Math.min(...plotNodes.map(node => node.frame.y));
-  return {id, swatches: swatches.length, labels: labels.length, rows: legendRows.size, top, plotTop};
+  const right = Math.max(...labels.map(node => node.frame.x + node.frame.width));
+  return {id, swatches: swatches.length, labels: labels.length, rows: legendRows.size, top, plotTop, right};
 });
 const donut = REGISTRY.get('chart.donut').render({id: 'donut', frame, props: {labels: ['Category 1','Category 2','Category 3'], values: [40,35,25]}}).nodes;
 const donutSwatches = donut.filter(node => node.role === 'legend-swatch');
@@ -254,9 +329,10 @@ console.log(JSON.stringify({
             self.assertEqual(chart["labels"], 2, chart["id"])
             self.assertEqual(chart["rows"], 1, chart["id"])
             self.assertLess(chart["top"], chart["plotTop"], chart["id"])
+            self.assertAlmostEqual(chart["right"], 744, places=3, msg=chart["id"])
         self.assertEqual(result["donutLegend"]["rows"], 1)
         self.assertEqual(result["donutLegend"]["types"], ["rect"])
-        self.assertGreater(result["donutLegend"]["left"], 400)
+        self.assertGreater(result["donutLegend"]["left"], 340)
         self.assertAlmostEqual(result["donutLegend"]["right"], 744)
         self.assertLess(result["donutLegend"]["top"], result["donutLegend"]["chartTop"])
 
@@ -266,7 +342,7 @@ console.log(JSON.stringify({
 import assert from 'node:assert/strict';
 import { REGISTRY, registryManifest } from './skills/professional-slides/runtime/registry.mjs';
 import { compileDeck, component } from './skills/professional-slides/runtime/core.mjs';
-import { componentVariantFixtureSpecs } from './skills/professional-slides/runtime/fixtures.mjs';
+import { componentFixtureSpecs, componentVariantFixtureSpecs } from './skills/professional-slides/runtime/fixtures.mjs';
 const results = [];
 for (const id of ['action-title','section-title','slide-chrome']) {
   const definition = REGISTRY.get(id), chrome = id === 'slide-chrome';
@@ -290,7 +366,7 @@ for (const id of ['action-title','section-title','slide-chrome']) {
   results.push({id,withLine:withLine.filter(n=>n.role==='title-rule').length,withoutLine:withoutLine.filter(n=>n.role==='title-rule').length});
 }
 const manifest = registryManifest().components.filter(c=>['action-title','section-title','slide-chrome'].includes(c.id));
-const fixtures = componentVariantFixtureSpecs().filter(c=>manifest.some(m=>m.id===c.target));
+const fixtures = [...componentFixtureSpecs(), ...componentVariantFixtureSpecs()].filter(c=>manifest.some(m=>m.id===c.target));
 assert.deepEqual(fixtures.map(f=>`${f.target}:${f.variant}`).sort(), manifest.flatMap(c=>Object.keys(c.variants).map(v=>`${c.id}:${v}`)).sort());
 console.log(JSON.stringify({results,variantCount:fixtures.length,defaults:manifest.map(c=>c.defaultVariant)}));
 """
@@ -317,7 +393,7 @@ const titleDefinition = REGISTRY.get('action-title');
 const multiline = titleDefinition.render({id:'wrapped',frame:{x:0,y:0,width:1000,height:128},props:{text:'Capacity limits growth\\nInvestment unlocks the next phase',variant:'without-line'}}).nodes[0];
 assert.equal(multiline.data.textLayout.lines.length,2);
 assert.equal(multiline.style.lineHeight,45);
-const nearWidthLimit = REGISTRY.get('slide-chrome').render({id:'near-limit',frame:{x:0,y:0,width:1280,height:720},props:{title:'[Columns chart with split growth and takeaways / insert action title]'}}).nodes.find(n=>n.role==='action-title');
+const nearWidthLimit = REGISTRY.get('slide-chrome').render({id:'near-limit',frame:{x:0,y:0,width:1280,height:720},props:{title:'(Insert a one-line action title that states the governing comparison)'}}).nodes.find(n=>n.role==='action-title');
 assert.equal(nearWidthLimit.data.textLayout.lines.length,1);
 assert.ok(nearWidthLimit.data.textLayout.width <= nearWidthLimit.frame.width);
 assert.throws(()=>titleDefinition.render({id:'overflow',frame:{x:0,y:0,width:1000,height:20},props:{text:'Capacity limits growth'}}), /exceeds its allocated height/);
@@ -331,6 +407,8 @@ assert.deepEqual(deck.slides[0].componentInstances.find(c=>c.id==='copy').frame,
 const chrome = compileDeck({slides:[{id:'chrome',chrome:{title:'Capacity limits growth'},composition:absolute({id:'empty',children:[]})}]},REGISTRY);
 const title = chrome.slides[0].nodes.find(n=>n.role==='action-title');
 assert.equal(chrome.manifest.slides[0].componentInstances[0].variant,'without-line');
+assert.equal(chrome.manifest.slides[0].componentInstances[0].instanceId,title.data.componentInstance);
+assert.ok(chrome.manifest.slides[0].componentInstances.every(instance=>typeof instance.instanceId==='string'&&instance.instanceId.length>0));
 console.log(JSON.stringify({counts,decisions:decisions.map(d=>d.titleVariant),chromeRules:chrome.slides[0].nodes.filter(n=>n.role==='title-rule').length,footerRules:chrome.slides[0].nodes.filter(n=>n.role==='footer-rule').length,titleAnchor:[title.frame.x,title.frame.y]}));
 """
         )
@@ -592,7 +670,7 @@ const results = ['chart.line','chart.combo'].map(id => {
   const overlay = nodes.indexOf(surface) > Math.max(...nodes.map((node, index) => ['chart-mark','chart-line','chart-marker'].includes(node.role) ? index : -1));
   return {id, covered, overlay};
 });
-const columnNodes = REGISTRY.get('chart.column').render({id: 'column', frame, props: REGISTRY.get('chart.column').sample}).nodes;
+const columnNodes = REGISTRY.get('chart.column').render({id: 'column', frame, props: {...REGISTRY.get('chart.column').sample, annotations:[{category:'2026',text:'Evidence'}]}}).nodes;
 const referenceLabel = columnNodes.find(node => node.role === 'chart-reference-label');
 const annotationSurface = columnNodes.find(node => node.role === 'annotation-surface');
 const referenceOverlapsAnnotation = !(

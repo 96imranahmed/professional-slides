@@ -116,8 +116,13 @@ async function compareImages(referencePath, candidatePath) {
     ) > 12;
     if (referenceForeground || candidateForeground) {
       foregroundPixels += 1;
-      foregroundDifference += difference;
-      if (difference > 40) foregroundMaterialPixels += 1;
+      const foregroundPixelDifference = (
+        Math.abs(referenceBlurred[offset] - candidateBlurred[offset])
+        + Math.abs(referenceBlurred[offset + 1] - candidateBlurred[offset + 1])
+        + Math.abs(referenceBlurred[offset + 2] - candidateBlurred[offset + 2])
+      ) / 3;
+      foregroundDifference += foregroundPixelDifference;
+      if (foregroundPixelDifference > 40) foregroundMaterialPixels += 1;
     }
   }
   const pixels = width * height;
@@ -383,6 +388,8 @@ async function main() {
       chartCount: registry.components.filter((item) => item.category === "chart").length,
       layoutFixtureCount: fixtures.filter((item) => item.kind === "layout").length,
       variantFixtureCount: fixtures.filter((item) => item.kind === "variant").length,
+      componentBoardCount: fixtures.filter((item) => item.kind === "board").length,
+      componentCoverageCount: fixtures.flatMap((item) => item.coverage || []).length,
       sceneNodeCount: deck.slides.reduce((sum, slide) => sum + slide.nodes.length, 0),
       designHash: deck.manifest.designHash,
       pptxSha256: pptx.sha256
@@ -418,11 +425,19 @@ async function main() {
     fixtures: visualResults
   };
   await fs.writeFile(path.join(outputDirectory, "validation-report.json"), JSON.stringify(report, null, 2));
-  process.stdout.write(`${JSON.stringify({ accepted: report.accepted, report: path.join(outputDirectory, "validation-report.json"), ...report.deck, gates: report.gates }, null, 2)}\n`);
+  await new Promise((resolve, reject) => {
+    process.stdout.write(
+      `${JSON.stringify({ accepted: report.accepted, report: path.join(outputDirectory, "validation-report.json"), ...report.deck, gates: report.gates }, null, 2)}\n`,
+      (error) => error ? reject(error) : resolve()
+    );
+  });
   if (!report.accepted) process.exitCode = 1;
 }
 
-main().catch((error) => {
-  console.error(error.stack || error);
-  process.exitCode = 1;
-});
+main().then(
+  () => process.exit(process.exitCode || 0),
+  (error) => {
+    console.error(error.stack || error);
+    process.exit(1);
+  }
+);

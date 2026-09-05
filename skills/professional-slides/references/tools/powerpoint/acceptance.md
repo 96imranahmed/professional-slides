@@ -13,7 +13,7 @@ Treat these as ceilings, not targets:
 | `pre-read` | 12 | 85 | 28 | 5 |
 | `appendix` | 14 | 130 | 40 | 6 |
 
-Draft to roughly half the relevant ceiling. Use a slide override only when a real evidence or provenance need requires it. Do not use an override to preserve avoidable prose. Source, footer, and page-number shapes may be excluded from word budgets by a declared shape-name pattern, but every visible string remains subject to forbidden-character checks.
+Do not target a fraction of the ceiling: preserve the evidence and interpretation needed for the decision. Use a slide override only for a real evidence, provenance or [executive-summary narrative](../../components/copy.md#executive-summary-narrative) need. Declare its rationale and value in the content plan before authoring; carry that value into `copy.slideOverrides`, without changing the other slides' limits or shrinking body type. Do not use an override to preserve avoidable prose. Source, footer, and page-number shapes may be excluded from word budgets by a declared shape-name pattern, but every visible string remains subject to forbidden-character checks.
 
 ## Acceptance manifest
 

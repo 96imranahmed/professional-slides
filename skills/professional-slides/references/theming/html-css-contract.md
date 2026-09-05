@@ -9,7 +9,7 @@ When a reusable owner under `components/` includes a specimen, it must contain t
 - component purpose and semantic rules;
 - a `Theme contract` listing every consumed custom property and linking its canonical default in [component bindings](component-bindings.md);
 - a `Structural HTML reference` with one minimal semantic HTML example;
-- one CSS block containing component aliases and geometry;
+- CSS containing the component aliases and geometry, split into readable blocks when useful;
 - registered variant and state rules, which may live in `Selection`, `Registered variants`, or `Variants and states` when that section states the complete demonstrated differences;
 - native translation and acceptance notes.
 

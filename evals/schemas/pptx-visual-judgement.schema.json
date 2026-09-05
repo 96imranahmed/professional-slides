@@ -4,7 +4,7 @@
   "additionalProperties": false,
   "required": ["rubricVersion", "verdict", "summary", "deckScores", "slides", "findings"],
   "properties": {
-    "rubricVersion": {"type": "string", "const": "2"},
+    "rubricVersion": {"type": "string", "const": "6"},
     "verdict": {"type": "string", "enum": ["accept", "reject"]},
     "summary": {"type": "string", "minLength": 1},
     "deckScores": {"$ref": "#/$defs/scores"},

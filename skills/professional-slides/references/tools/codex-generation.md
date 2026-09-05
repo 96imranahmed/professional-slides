@@ -23,25 +23,8 @@ If the source is an existing deck, render and inspect the editable source before
 
 ## Choose the closest editable construction
 
-Map the rendered design to the canonical scene:
-
-- Use row/column flow, grid, overlay, absolute, and nested section nodes for composition.
-- Use positioned scene primitives for fixed page chrome, exact regions, and geometry that is not flow-driven.
-- Use editable text boxes or paragraphs with runs for text. Preserve hierarchy, wrapping, and alignment before chasing minor optical differences.
-- Use registered editable tables and chart primitives when the evidence is tabular or quantitative. Do not replace editable evidence with a screenshot.
-- Use verified source images and vectors for visual assets. Preserve crop, focal treatment, and provenance.
-- Resolve deck theme roles into shared runtime constants or supported token strings. Do not invent a second palette or scatter local values through the builder.
-
-Do not translate HTML elements one for one. Translate the visual and semantic relationships. HTML is generated from the resolved scene only after composition; it does not control PowerPoint.
+Follow the canonical [scene-to-native mapper pipeline](css-to-native-mapper.md#mapping-pipeline) for scene primitives, composition, editable evidence, token resolution, HTML serialization, PowerPoint writing, and Artifact Tool observation. Use the inspected reference measurements and semantic relationships as mapper inputs. Do not translate DOM elements one for one or replace editable evidence with a screenshot.
 
 ## Compare, repair, and export
 
-Use short render loops while authoring:
-
-1. Render the HTML/CSS or source-deck reference.
-2. Build one representative scene component or composition family.
-3. Render its HTML serialization and exact PptxGenJS output, then compare them at full size and foreground level.
-4. Repair the mapping through shared geometry, theme, or component definitions rather than isolated slide nudges.
-5. Repeat for every materially different slide family.
-
-After the complete deck is built, export through PptxGenJS, run the [Artifact Tool compatibility proof](powerpoint/artifact-tool.md#required-interpretation-proof), and follow the canonical [PowerPoint rendering](powerpoint/rendering.md), [hard acceptance](powerpoint/acceptance.md), and [evaluation](../evaluation/index.md) owners. For consulting-toolkit changes, `npm run validate:runtime` and `npm run validate:fidelity` must both pass. Generation success is not release evidence.
+Run the mapper's verification stage in short build, render, compare, and shared-repair loops for every materially different slide family. After the complete deck is built, hand off to the canonical [PowerPoint integration and release owner](powerpoint/index.md). Consulting-toolkit changes must also pass `npm run validate:runtime` and `npm run validate:fidelity`; generation success alone is not release evidence.

@@ -13,7 +13,7 @@ Do not create a separate box for each value by default. Peers share the same val
 
 ## Content contract
 
-Every metric includes a value, unit or basis, period or population when material, concise label, and one interpretation or definition when the value could be misunderstood. Use comparable units and periods across peers or make the difference explicit.
+Every metric includes a value, unit or basis, period or population when material, and a concise label. Add one interpretation or definition when the metric is a ratio, proxy, threshold result, nonstandard unit, or otherwise lacks a self-evident denominator. Use comparable units and periods across peers or make the difference explicit.
 
 ## Theme contract
 

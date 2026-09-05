@@ -1,29 +1,30 @@
 {
   "accepted": true,
-  "filesExpected": 54,
+  "filesExpected": 56,
   "judgement": {
-    "aggregateScore": 94,
+    "aggregateScore": 95,
     "dimensions": {
       "actionability": {
-        "rationale": "Authors receive concrete selection rules, contracts, rejection conditions, and verification checks.",
-        "score": 95
+        "rationale": "An author can generally select, construct, validate, and reject each treatment using concrete conditions and platform instructions.",
+        "score": 97
       },
       "concision": {
-        "rationale": "Dense guidance is generally necessary operational detail, with cross-links preventing most repetition.",
-        "score": 92
+        "rationale": "The material is dense but usually earns its detail through executable constraints, explicit ownership, or acceptance criteria. A few local rules are repeated after already being established.",
+        "score": 93
       },
       "nonRedundancy": {
-        "rationale": "Canonical owners and explicit cross-links keep shared rules centralized; local restatement is usually scoped to implementation risk.",
+        "rationale": "Ownership and links are unusually disciplined. A small number of repeated local restatements can be removed without losing usable context.",
         "score": 94
       },
       "specificity": {
-        "rationale": "Rules consistently name required data, limits, exceptions, ownership, and failure conditions.",
-        "score": 95
+        "rationale": "Guidance consistently names inputs, states, fit gates, fallbacks, and rejection conditions. One statistical-admission rule remains underspecified.",
+        "score": 96
       }
     },
     "filesReviewed": [
       "charts/bar-column.md",
       "charts/heatmap-table.md",
+      "charts/horizons.md",
       "charts/index.md",
       "charts/line.md",
       "charts/percentage-segment-by-group.md",
@@ -41,6 +42,7 @@
       "components/index.md",
       "components/insight-box.md",
       "components/item-indicators.md",
+      "components/maps.md",
       "components/metric-fields.md",
       "components/quote-cluster.md",
       "components/relationships.md",
@@ -79,20 +81,44 @@
     ],
     "findings": [
       {
-        "excerpt": "rasterize every PDF page locally at a fixed DPI",
-        "file": "tools/google-slides/rendering.md",
-        "location": "## Preferred complete-deck render",
-        "reason": "The required render resolution is left to the author, which can make visual-QA evidence inconsistent between runs.",
-        "recommendedChange": "Name one default DPI and permit an explicit recorded override when a task requires another resolution.",
+        "excerpt": "Use `disc-chevron` for a repeated description-to-consequence row by default... The preferred implication treatment is the filled `disc-chevron`...",
+        "file": "components/arrows.md",
+        "location": "Selection; Acceptance check",
+        "reason": "The preferred-default rule is stated twice with nearly identical meaning in the same owner.",
+        "recommendedChange": "Keep the selection rule as canonical and shorten the acceptance bullet to verification that the selected registered variant is used consistently.",
+        "severity": "minor"
+      },
+      {
+        "excerpt": "Show at most five group rows... Reject more than five rows... Show at most five rows.",
+        "file": "charts/percentage-segment-by-group.md",
+        "location": "Group selection and ordering; Failure modes; Acceptance test",
+        "reason": "The five-row cap is repeated three times in one chart owner without adding a distinct exception or verification detail.",
+        "recommendedChange": "Retain the construction rule and the acceptance verification; remove the duplicate failure-mode repetition.",
+        "severity": "minor"
+      },
+      {
+        "excerpt": "Add a trend line only when the data type and sample support the named fitting method; report its basis or diagnostic...",
+        "file": "charts/scatter-bubble.md",
+        "location": "Construction",
+        "reason": "The required diagnostic is named but no admissible criterion is required, leaving authors to guess when a fitted line is sufficiently supported.",
+        "recommendedChange": "Require the plan to declare the fitting method and its acceptance basis, such as a pre-specified analytical rationale, sample threshold, or diagnostic criterion, before rendering the line.",
+        "severity": "minor"
+      },
+      {
+        "excerpt": "Add one interpretation or definition when the metric is a ratio, proxy, threshold result, nonstandard unit, or otherwise lacks a self-evident denominator.",
+        "file": "components/metric-fields.md",
+        "location": "Content contract",
+        "reason": "\u201cSelf-evident denominator\u201d is subjective and can lead to inconsistent omission of material bases across otherwise comparable metric fields.",
+        "recommendedChange": "Replace the catch-all with a testable rule: include the denominator or basis unless it is printed in the value, label, subtitle, or shared exhibit note.",
         "severity": "minor"
       }
     ],
     "rubricVersion": "2",
-    "summary": "Accepted. The guidance is highly specific, consistently owned, and directly usable; the single minor issue does not undermine the overall contract.",
+    "summary": "All manifest files were reviewed. The guidance is highly specific, operational, and consistently owned; the four findings are small copy refinements only.",
     "verdict": "accept"
   },
   "model": "gpt-5.6-terra",
-  "referenceHash": "272f00806eb3425d4eda92f2a7b66fac2fd16fd32a0dcfc9c2e4edc7561a6d75",
+  "referenceHash": "05c0b07ad7e8f3c54b597299c63b4fb8ab5981911f76a9a3e33bcfa43a3d1bf4",
   "rubricVersion": "2",
   "schemaVersion": 1,
   "validationErrors": []

@@ -1,34 +1,43 @@
 {
   "schema": "professional-slides.reference-fidelity/v1",
-  "generatedAt": "2026-09-04T02:48:19.952Z",
+  "generatedAt": "2026-09-05T08:45:32.420Z",
   "accepted": true,
   "inputs": {
     "runtimeSources": {
-      "skills/professional-slides/runtime/core.mjs": "5091539fe6b3ad0cb885e820d23babd36a7b8571875825cf0d9dcb4153a07b0d",
+      "skills/professional-slides/runtime/core.mjs": "3b2031b34f0f5eef21031435b16ec0275be51b0f0f09b1acb565fa943fd45596",
       "skills/professional-slides/runtime/page-template.mjs": "81d98ec89ea00cc9452df4a1a2df760c3279e6b3f978a790ef7904ed35bec793",
       "skills/professional-slides/runtime/text-layout.mjs": "5ce60d8e77f790ff84b55191e2b4609e2170e706cf95e0f462ba9725595bf139",
       "skills/professional-slides/runtime/routing.mjs": "17e58ba61a79947670fae46adcc470560bfb7e66c5e2e785f5046dda4b04b686",
-      "skills/professional-slides/runtime/overlap-policy.mjs": "10256b5838df7a0b12e0ba70affe3331ec71ba21d369708c82ee582206c84b59",
-      "skills/professional-slides/runtime/validate-overlap.mjs": "2a08d8ca0261a348888588bf700e97a77b1ad7cf590aaedbfe0bdf683068f653",
-      "skills/professional-slides/runtime/registry.mjs": "478f21e95f763086fd76222fe065d24b3f769b341d9956e7e396404b24e5bbe2",
-      "skills/professional-slides/runtime/charts.mjs": "82fa3eebaaf4f2a27f8bc6ee2d4a7d6009362d182afc9f9bfd78a704216e4ff8",
-      "skills/professional-slides/runtime/chart-group.mjs": "b1689a4f850e9e4acdf5647025dadf6a999bec228f2c6df96d10ed8a5b0301a3",
-      "skills/professional-slides/runtime/legends.mjs": "c4df33203d4eab4a0659ed88c8229f012a61945c8e92714bdfd7fcbd298207c4",
-      "skills/professional-slides/runtime/palettes.mjs": "fd113c7c3308550a0c61e0bb9b3414753e20d3141b81feec49645b228ecf7cbf",
+      "skills/professional-slides/runtime/overlap-policy.mjs": "dd6a27c6562803c86ac39f49489d6a8200e8baa503b6be997ce7cb6fa64b0e5f",
+      "skills/professional-slides/runtime/validate-overlap.mjs": "3d1b59744f222a995d7adb9763d0ebd6790c07bdbc533327aa4e200dc75f9d49",
+      "skills/professional-slides/runtime/registry.mjs": "46e6960cce38d509e22734a1186aaaeeb40ccd573167e0bf6984c4cedca10e03",
+      "skills/professional-slides/runtime/trackers.mjs": "edaad1c0285b0173fd84108dd45a3e17ef5e33ed54311f917f3ecbfca40938fb",
+      "skills/professional-slides/runtime/insight-tree-table.mjs": "ec8eb857614a047a95158145c89bcdb2eeb1fe8a8ff2f4c6c2d573a9720a39d5",
+      "skills/professional-slides/runtime/quote-cluster.mjs": "a7e995784831d89e18b01621780142f8a1ff1ee4a50e817e889ac09b2c4407b0",
+      "skills/professional-slides/runtime/maps.mjs": "4f14a6ca1f0bed341b2d4db5adcf7311fea71bc098ed560a2640daa005457c3d",
+      "skills/professional-slides/runtime/natural-earth-map-data.mjs": "cace7426469902a742fa54c27eef3c7d67891662a9faf82a9e7544202485c7cf",
+      "skills/professional-slides/runtime/tables.mjs": "f1bbb232268fcbd826fa10fb433845c929cfddb1fc625fd9d40d4288771c0d5e",
+      "skills/professional-slides/runtime/table-fixtures.mjs": "9acc67be4ac577e4967cab1aa0d0cad446ab5cc1cf35efb6c6fd5f36533d865b",
+      "skills/professional-slides/runtime/charts.mjs": "4191d1b1ee8779b0469418c3fafe2787ce5c49d4b882ef11e07cad35d410a9f4",
+      "skills/professional-slides/runtime/chart-annotations.mjs": "d76dbeb6fe96b0bcf5ee4c165ab280f2ea8e2a151ede2e4f53f2e8829a440fec",
+      "skills/professional-slides/runtime/chart-group.mjs": "c6420adfd5b81e7b8202e1c89aa73247d33f2647cc18ef59a5e6ca2ccc3e6a8d",
+      "skills/professional-slides/runtime/guidance.mjs": "029b0308ce4812ff366fdd690e55d8904e6f3dd800b303610838d4e53e474aa3",
+      "skills/professional-slides/runtime/legends.mjs": "88a5a5f6b1eff91cd1c9742ff96cfa6d2c8a0c66a958fcd5b410992dc6c96de4",
+      "skills/professional-slides/runtime/palettes.mjs": "65022cf1debcad9aa8d067ff7a05295f3eebb8ac86fbeb1f04387d36492b7901",
       "skills/professional-slides/runtime/typography.mjs": "24571dcdebcf045e9179f1180263b5d48808a23583ccad02ecc777927483aa54",
       "skills/professional-slides/runtime/design-context.mjs": "3a1aae41aba9afc32890b09ce0fee410354ee272a82c9b4b6654dadd73089ff7",
-      "skills/professional-slides/runtime/golden-set.mjs": "a4e693d62ac45eca2adb2cdbdc6871c8e9aa77e29b9b7323474fb2d7a4ada3c8",
-      "evals/scripts/generate_golden_set.mjs": "35b13d1a8051c1b9997f3286e8eb5accb74e955627753faec84f3e38b222dac4",
-      "skills/professional-slides/runtime/planner.mjs": "de79a6f9ab9d821a08a1d737cd1f27663452c826106e4714bcece43dac43d509",
-      "skills/professional-slides/runtime/fixtures.mjs": "e9e32cda2593d2aff4e3b27b2b2fa2c63fd2a87ec6ece0e30154e6e503f50de8",
-      "skills/professional-slides/runtime/golden-fixtures.mjs": "6264bfd1e4d2c88210a9f41c8de1f908ff0a45360c87384d81aef5209d8bc452",
-      "skills/professional-slides/runtime/adapters/html.mjs": "632d9eb52b63f050f42908d06149c46e9531e40c66862d3deae3d7c84fc8a73d",
-      "skills/professional-slides/runtime/adapters/pptxgenjs.mjs": "95b0c54b86466eecb014671fcf5cd88d73b411f485aca0d3122df514ae420c3f",
+      "skills/professional-slides/runtime/golden-set.mjs": "1f4b98fd8f8dc0364159fea6bb40f80d71f8e6bf65bb92e02b08549b74b85bde",
+      "evals/scripts/generate_golden_set.mjs": "3c97315d3340feb129174d1ccf47e941a642a49ad56b782accebc507694e31df",
+      "skills/professional-slides/runtime/planner.mjs": "73916079c7f99e9871d10620d1e64a1ecfe26bc32632fc2ec0b258f64372cc06",
+      "skills/professional-slides/runtime/fixtures.mjs": "8f21c6b00001049d2d7d0246b96430240cfcaac2bb170350c78f26e581005162",
+      "skills/professional-slides/runtime/golden-fixtures.mjs": "b13174b048dbeed0cfe9df20a574b577fa2c6cf0b5a44f85d28078dd7e491bf2",
+      "skills/professional-slides/runtime/adapters/html.mjs": "6918eb478c3bd07a2456960f6d668ba857885517290dfc2da9ff38659818b879",
+      "skills/professional-slides/runtime/adapters/pptxgenjs.mjs": "6aef06a706703f2eb2f7d3c21bce72c4236091a2025d2a991af39a73d72e515f",
       "skills/professional-slides/runtime/adapters/artifact-tool.mjs": "6c43f2142ff0da57773a759f1f5a88b8374c6b55ff094b17121f41c7d39e537a",
-      "evals/run_evals.py": "ef3e8be9229989ce0eb07d1881c535332b6c3cfa5778a86c0fba2ea8a91216c6",
-      "evals/scripts/validate_component_runtime.mjs": "3b0ae6f1a2ca9370dd8e23bfc42e498fccb6f2cce37617ff32365cf199d1e3e5",
-      "evals/scripts/validate_reference_fidelity.mjs": "f66b6589e22d8f021bed09cd31b5799b7ea44ee58d5704f5c157acbc6d69fa10",
-      "package.json": "10c0522c8f0944791be1dfc693ce21f05ff277465950ab2a1d3f881b9f356022"
+      "evals/run_evals.py": "aa35968e634b7bdc1121b73b068736598003624f5c1f94896064856b996088a1",
+      "evals/scripts/validate_component_runtime.mjs": "9fdae931ed82e3ec4dd760c7c1c67f2d6b79ce13a179a8d719e9004a0986b520",
+      "evals/scripts/validate_reference_fidelity.mjs": "a59f3338fb650bf592cf935aeee2a55d7920608a0a8e11f8d851031c6b2b907c",
+      "package.json": "d753dca2f2124f5fba659b4c6ab16036a394c717ff2df801755f1fd876655298"
     },
     "sourceIndexSha256": "e0c6e8bf14ddd9f31943711a4ccf3e9fbfe2a0561b36116ac5b962d35a7919f8"
   },
@@ -36,15 +45,15 @@
     "root": "/Users/imran/Desktop/Side Projects/professional-slides-tmp/consulting-toolkit",
     "restoredSet": "slides-ai",
     "upscaledSet": "slides-hq",
-    "referenceCount": 18
+    "referenceCount": 16
   },
   "deck": {
-    "slideCount": 18,
-    "sceneNodeCount": 780,
+    "slideCount": 16,
+    "sceneNodeCount": 884,
     "designSystemVersion": "2.0.0",
-    "designHash": "801f0e707e1540ff9dbfa0ff3d40ff34e45d87be641f7c7829f3f772edbb0f80",
-    "pptxPath": "/Users/imran/Desktop/Side Projects/professional-slides/tmp/final-pr-fit-reference-fidelity-validation/consulting-toolkit-golden.pptx",
-    "pptxSha256": "d98d6f426e800a33d586e85a8afee43b2679f845aa546f327c17cabbf691558b"
+    "designHash": "01fe8200afb527966edd5c5ed36ec8e0a9692b1db347a378cee5151b9ba93adb",
+    "pptxPath": "/Users/imran/Desktop/Side Projects/professional-slides/tmp/reference-fidelity-validation-final-review-2/consulting-toolkit-golden.pptx",
+    "pptxSha256": "6ba8dbee1fca8ef0be998ee74a3e3250562ab2517abcafe6960deda2f39093dc"
   },
   "thresholds": {
     "parity": {
@@ -85,30 +94,14 @@
     },
     "overlap": {
       "accepted": true,
-      "checkedSlideCount": 18,
+      "checkedSlideCount": 16,
       "unexpectedCount": 0,
       "textOverflowCount": 0,
       "slides": [
         {
-          "slide": "golden-cover",
-          "accepted": true,
-          "checkedNodeCount": 23,
-          "missingNodes": [],
-          "textOverflow": [],
-          "unexpected": [],
-          "headings": [],
-          "headingGapErrors": [],
-          "intentionalCount": 26,
-          "intentionalReasons": {
-            "contained by cover-backdrop": 22,
-            "cover pattern intersections": 1,
-            "contained by cover-panel": 3
-          }
-        },
-        {
           "slide": "golden-chart-rail",
           "accepted": true,
-          "checkedNodeCount": 60,
+          "checkedNodeCount": 52,
           "missingNodes": [],
           "textOverflow": [],
           "unexpected": [],
@@ -125,31 +118,33 @@
               "id": "golden-chart-rail-rail-header:heading",
               "headerTop": 174,
               "expectedRuleGap": 8,
-              "lineCount": 2,
+              "lineCount": 1,
               "ruleGap": 8,
               "renderedRuleGap": 8
             }
           ],
           "headingGapErrors": [],
-          "intentionalCount": 2,
+          "intentionalCount": 9,
           "intentionalReasons": {
-            "plot geometry intersection": 1,
-            "gridline knockout behind its exact data label": 1
+            "plot geometry intersection": 9
           }
         },
         {
           "slide": "golden-stacked-and-narrative",
           "accepted": true,
-          "checkedNodeCount": 73,
+          "checkedNodeCount": 69,
           "missingNodes": [],
           "textOverflow": [],
           "unexpected": [],
           "headings": [],
           "headingGapErrors": [],
-          "intentionalCount": 16,
+          "intentionalCount": 28,
           "intentionalReasons": {
             "contained by panel-surface": 6,
-            "plot geometry intersection": 1,
+            "chevron inside its own inference marker": 2,
+            "inference chevron joint": 1,
+            "plot geometry intersection": 5,
+            "external data label leader terminates at its own mark": 5,
             "label inside its chart-mark": 9
           }
         },
@@ -160,19 +155,28 @@
           "missingNodes": [],
           "textOverflow": [],
           "unexpected": [],
-          "headings": [],
+          "headings": [
+            {
+              "id": "golden-line-annotations-description:heading",
+              "headerTop": 166,
+              "expectedRuleGap": 8,
+              "lineCount": 1,
+              "ruleGap": 8,
+              "renderedRuleGap": 8
+            }
+          ],
           "headingGapErrors": [],
-          "intentionalCount": 44,
+          "intentionalCount": 33,
           "intentionalReasons": {
-            "label inside its highlight-marker": 5,
-            "plot geometry intersection": 29,
-            "selected point label": 10
+            "plot geometry intersection": 18,
+            "selected point label": 10,
+            "label inside its highlight-marker": 5
           }
         },
         {
           "slide": "golden-scatter-rail",
           "accepted": true,
-          "checkedNodeCount": 55,
+          "checkedNodeCount": 45,
           "missingNodes": [],
           "textOverflow": [],
           "unexpected": [],
@@ -195,49 +199,21 @@
             }
           ],
           "headingGapErrors": [],
-          "intentionalCount": 8,
-          "intentionalReasons": {
-            "plot geometry intersection": 5,
-            "gridline knockout behind its exact data label": 3
-          }
+          "intentionalCount": 0,
+          "intentionalReasons": {}
         },
         {
           "slide": "golden-structured-rows",
           "accepted": true,
-          "checkedNodeCount": 27,
+          "checkedNodeCount": 31,
           "missingNodes": [],
           "textOverflow": [],
           "unexpected": [],
-          "headings": [
-            {
-              "id": "golden-structured-rows-rows-column-0:heading",
-              "headerTop": 174,
-              "expectedRuleGap": 8,
-              "lineCount": 1,
-              "ruleGap": 8,
-              "renderedRuleGap": 8
-            },
-            {
-              "id": "golden-structured-rows-rows-column-1:heading",
-              "headerTop": 174,
-              "expectedRuleGap": 8,
-              "lineCount": 1,
-              "ruleGap": 8,
-              "renderedRuleGap": 8
-            },
-            {
-              "id": "golden-structured-rows-rows-column-2:heading",
-              "headerTop": 174,
-              "expectedRuleGap": 8,
-              "lineCount": 1,
-              "ruleGap": 8,
-              "renderedRuleGap": 8
-            }
-          ],
+          "headings": [],
           "headingGapErrors": [],
           "intentionalCount": 3,
           "intentionalReasons": {
-            "label inside its trend-label-surface": 3
+            "label inside its table-cell": 3
           }
         },
         {
@@ -263,26 +239,24 @@
           "unexpected": [],
           "headings": [],
           "headingGapErrors": [],
-          "intentionalCount": 40,
+          "intentionalCount": 62,
           "intentionalReasons": {
             "organization branch junctions": 22,
+            "organization connector terminates at its own node": 22,
             "label inside its organization-node": 18
           }
         },
         {
           "slide": "golden-table",
           "accepted": true,
-          "checkedNodeCount": 78,
+          "checkedNodeCount": 71,
           "missingNodes": [],
           "textOverflow": [],
           "unexpected": [],
           "headings": [],
           "headingGapErrors": [],
-          "intentionalCount": 35,
-          "intentionalReasons": {
-            "label inside its table-header-cell": 7,
-            "label inside its table-cell": 28
-          }
+          "intentionalCount": 0,
+          "intentionalReasons": {}
         },
         {
           "slide": "golden-rollout",
@@ -297,20 +271,6 @@
           "intentionalReasons": {
             "label inside its rollout-row-marker": 4,
             "label inside its rollout-phase": 12
-          }
-        },
-        {
-          "slide": "golden-divider",
-          "accepted": true,
-          "checkedNodeCount": 6,
-          "missingNodes": [],
-          "textOverflow": [],
-          "unexpected": [],
-          "headings": [],
-          "headingGapErrors": [],
-          "intentionalCount": 5,
-          "intentionalReasons": {
-            "contained by divider-surface": 5
           }
         },
         {
@@ -334,8 +294,9 @@
           "unexpected": [],
           "headings": [],
           "headingGapErrors": [],
-          "intentionalCount": 19,
+          "intentionalCount": 21,
           "intentionalReasons": {
+            "highlighted quadrant": 2,
             "point is in the highlighted quadrant": 3,
             "label in highlighted quadrant": 2,
             "matrix origin": 1,
@@ -347,22 +308,21 @@
         {
           "slide": "golden-waterfall",
           "accepted": true,
-          "checkedNodeCount": 51,
+          "checkedNodeCount": 45,
           "missingNodes": [],
           "textOverflow": [],
           "unexpected": [],
           "headings": [],
           "headingGapErrors": [],
-          "intentionalCount": 3,
+          "intentionalCount": 2,
           "intentionalReasons": {
-            "plot geometry intersection": 2,
-            "gridline knockout behind its exact data label": 1
+            "plot geometry intersection": 2
           }
         },
         {
           "slide": "golden-pie",
           "accepted": true,
-          "checkedNodeCount": 36,
+          "checkedNodeCount": 34,
           "missingNodes": [],
           "textOverflow": [],
           "unexpected": [],
@@ -385,15 +345,16 @@
             }
           ],
           "headingGapErrors": [],
-          "intentionalCount": 4,
+          "intentionalCount": 10,
           "intentionalReasons": {
+            "adjacent segments share one chart origin and boundary": 6,
             "label inside its chart-segment": 4
           }
         },
         {
           "slide": "golden-donut",
           "accepted": true,
-          "checkedNodeCount": 37,
+          "checkedNodeCount": 35,
           "missingNodes": [],
           "textOverflow": [],
           "unexpected": [],
@@ -416,8 +377,9 @@
             }
           ],
           "headingGapErrors": [],
-          "intentionalCount": 8,
+          "intentionalCount": 14,
           "intentionalReasons": {
+            "adjacent segments share one chart origin and boundary": 6,
             "donut hole masks the segment center": 4,
             "label inside its chart-segment": 4
           }
@@ -425,7 +387,7 @@
         {
           "slide": "golden-map",
           "accepted": true,
-          "checkedNodeCount": 38,
+          "checkedNodeCount": 206,
           "missingNodes": [],
           "textOverflow": [],
           "unexpected": [],
@@ -434,16 +396,16 @@
               "id": "golden-map-rail-header:heading",
               "headerTop": 202,
               "expectedRuleGap": 8,
-              "lineCount": 1,
+              "lineCount": 2,
               "ruleGap": null,
               "renderedRuleGap": null
             }
           ],
           "headingGapErrors": [],
-          "intentionalCount": 31,
+          "intentionalCount": 300,
           "intentionalReasons": {
-            "map marker anchored to geography": 14,
-            "contiguous map land mass": 3,
+            "contiguous map land mass": 253,
+            "map marker anchored to geography": 33,
             "fraction overlays its own map marker": 7,
             "contained by rail-surface": 7
           }
@@ -465,30 +427,14 @@
       ],
       "nativeGeometry": {
         "accepted": true,
-        "checkedSlideCount": 18,
+        "checkedSlideCount": 16,
         "unexpectedCount": 0,
         "textOverflowCount": 0,
         "slides": [
           {
-            "slide": "golden-cover",
-            "accepted": true,
-            "checkedNodeCount": 23,
-            "missingNodes": [],
-            "textOverflow": [],
-            "unexpected": [],
-            "headings": [],
-            "headingGapErrors": [],
-            "intentionalCount": 26,
-            "intentionalReasons": {
-              "contained by cover-backdrop": 22,
-              "cover pattern intersections": 1,
-              "contained by cover-panel": 3
-            }
-          },
-          {
             "slide": "golden-chart-rail",
             "accepted": true,
-            "checkedNodeCount": 60,
+            "checkedNodeCount": 52,
             "missingNodes": [],
             "textOverflow": [],
             "unexpected": [],
@@ -505,31 +451,33 @@
                 "id": "golden-chart-rail-rail-header:heading",
                 "headerTop": 174,
                 "expectedRuleGap": 8,
-                "lineCount": 2,
+                "lineCount": 1,
                 "ruleGap": 8,
                 "renderedRuleGap": 8
               }
             ],
             "headingGapErrors": [],
-            "intentionalCount": 2,
+            "intentionalCount": 9,
             "intentionalReasons": {
-              "plot geometry intersection": 1,
-              "gridline knockout behind its exact data label": 1
+              "plot geometry intersection": 9
             }
           },
           {
             "slide": "golden-stacked-and-narrative",
             "accepted": true,
-            "checkedNodeCount": 73,
+            "checkedNodeCount": 69,
             "missingNodes": [],
             "textOverflow": [],
             "unexpected": [],
             "headings": [],
             "headingGapErrors": [],
-            "intentionalCount": 16,
+            "intentionalCount": 28,
             "intentionalReasons": {
               "contained by panel-surface": 6,
-              "plot geometry intersection": 1,
+              "chevron inside its own inference marker": 2,
+              "inference chevron joint": 1,
+              "plot geometry intersection": 5,
+              "external data label leader terminates at its own mark": 5,
               "label inside its chart-mark": 9
             }
           },
@@ -540,19 +488,28 @@
             "missingNodes": [],
             "textOverflow": [],
             "unexpected": [],
-            "headings": [],
+            "headings": [
+              {
+                "id": "golden-line-annotations-description:heading",
+                "headerTop": 166,
+                "expectedRuleGap": 8,
+                "lineCount": 1,
+                "ruleGap": 8,
+                "renderedRuleGap": 8
+              }
+            ],
             "headingGapErrors": [],
-            "intentionalCount": 44,
+            "intentionalCount": 33,
             "intentionalReasons": {
-              "label inside its highlight-marker": 5,
-              "plot geometry intersection": 29,
-              "selected point label": 10
+              "plot geometry intersection": 18,
+              "selected point label": 10,
+              "label inside its highlight-marker": 5
             }
           },
           {
             "slide": "golden-scatter-rail",
             "accepted": true,
-            "checkedNodeCount": 55,
+            "checkedNodeCount": 45,
             "missingNodes": [],
             "textOverflow": [],
             "unexpected": [],
@@ -575,49 +532,21 @@
               }
             ],
             "headingGapErrors": [],
-            "intentionalCount": 8,
-            "intentionalReasons": {
-              "plot geometry intersection": 5,
-              "gridline knockout behind its exact data label": 3
-            }
+            "intentionalCount": 0,
+            "intentionalReasons": {}
           },
           {
             "slide": "golden-structured-rows",
             "accepted": true,
-            "checkedNodeCount": 27,
+            "checkedNodeCount": 31,
             "missingNodes": [],
             "textOverflow": [],
             "unexpected": [],
-            "headings": [
-              {
-                "id": "golden-structured-rows-rows-column-0:heading",
-                "headerTop": 174,
-                "expectedRuleGap": 8,
-                "lineCount": 1,
-                "ruleGap": 8,
-                "renderedRuleGap": 8
-              },
-              {
-                "id": "golden-structured-rows-rows-column-1:heading",
-                "headerTop": 174,
-                "expectedRuleGap": 8,
-                "lineCount": 1,
-                "ruleGap": 8,
-                "renderedRuleGap": 8
-              },
-              {
-                "id": "golden-structured-rows-rows-column-2:heading",
-                "headerTop": 174,
-                "expectedRuleGap": 8,
-                "lineCount": 1,
-                "ruleGap": 8,
-                "renderedRuleGap": 8
-              }
-            ],
+            "headings": [],
             "headingGapErrors": [],
             "intentionalCount": 3,
             "intentionalReasons": {
-              "label inside its trend-label-surface": 3
+              "label inside its table-cell": 3
             }
           },
           {
@@ -643,26 +572,24 @@
             "unexpected": [],
             "headings": [],
             "headingGapErrors": [],
-            "intentionalCount": 40,
+            "intentionalCount": 62,
             "intentionalReasons": {
               "organization branch junctions": 22,
+              "organization connector terminates at its own node": 22,
               "label inside its organization-node": 18
             }
           },
           {
             "slide": "golden-table",
             "accepted": true,
-            "checkedNodeCount": 78,
+            "checkedNodeCount": 71,
             "missingNodes": [],
             "textOverflow": [],
             "unexpected": [],
             "headings": [],
             "headingGapErrors": [],
-            "intentionalCount": 35,
-            "intentionalReasons": {
-              "label inside its table-header-cell": 7,
-              "label inside its table-cell": 28
-            }
+            "intentionalCount": 0,
+            "intentionalReasons": {}
           },
           {
             "slide": "golden-rollout",
@@ -677,20 +604,6 @@
             "intentionalReasons": {
               "label inside its rollout-row-marker": 4,
               "label inside its rollout-phase": 12
-            }
-          },
-          {
-            "slide": "golden-divider",
-            "accepted": true,
-            "checkedNodeCount": 6,
-            "missingNodes": [],
-            "textOverflow": [],
-            "unexpected": [],
-            "headings": [],
-            "headingGapErrors": [],
-            "intentionalCount": 5,
-            "intentionalReasons": {
-              "contained by divider-surface": 5
             }
           },
           {
@@ -714,8 +627,9 @@
             "unexpected": [],
             "headings": [],
             "headingGapErrors": [],
-            "intentionalCount": 19,
+            "intentionalCount": 21,
             "intentionalReasons": {
+              "highlighted quadrant": 2,
               "point is in the highlighted quadrant": 3,
               "label in highlighted quadrant": 2,
               "matrix origin": 1,
@@ -727,22 +641,21 @@
           {
             "slide": "golden-waterfall",
             "accepted": true,
-            "checkedNodeCount": 51,
+            "checkedNodeCount": 45,
             "missingNodes": [],
             "textOverflow": [],
             "unexpected": [],
             "headings": [],
             "headingGapErrors": [],
-            "intentionalCount": 3,
+            "intentionalCount": 2,
             "intentionalReasons": {
-              "plot geometry intersection": 2,
-              "gridline knockout behind its exact data label": 1
+              "plot geometry intersection": 2
             }
           },
           {
             "slide": "golden-pie",
             "accepted": true,
-            "checkedNodeCount": 36,
+            "checkedNodeCount": 34,
             "missingNodes": [],
             "textOverflow": [],
             "unexpected": [],
@@ -765,15 +678,16 @@
               }
             ],
             "headingGapErrors": [],
-            "intentionalCount": 4,
+            "intentionalCount": 10,
             "intentionalReasons": {
+              "adjacent segments share one chart origin and boundary": 6,
               "label inside its chart-segment": 4
             }
           },
           {
             "slide": "golden-donut",
             "accepted": true,
-            "checkedNodeCount": 37,
+            "checkedNodeCount": 35,
             "missingNodes": [],
             "textOverflow": [],
             "unexpected": [],
@@ -796,8 +710,9 @@
               }
             ],
             "headingGapErrors": [],
-            "intentionalCount": 8,
+            "intentionalCount": 14,
             "intentionalReasons": {
+              "adjacent segments share one chart origin and boundary": 6,
               "donut hole masks the segment center": 4,
               "label inside its chart-segment": 4
             }
@@ -805,7 +720,7 @@
           {
             "slide": "golden-map",
             "accepted": true,
-            "checkedNodeCount": 38,
+            "checkedNodeCount": 206,
             "missingNodes": [],
             "textOverflow": [],
             "unexpected": [],
@@ -814,16 +729,16 @@
                 "id": "golden-map-rail-header:heading",
                 "headerTop": 202,
                 "expectedRuleGap": 8,
-                "lineCount": 1,
+                "lineCount": 2,
                 "ruleGap": null,
                 "renderedRuleGap": null
               }
             ],
             "headingGapErrors": [],
-            "intentionalCount": 31,
+            "intentionalCount": 300,
             "intentionalReasons": {
-              "map marker anchored to geography": 14,
-              "contiguous map land mass": 3,
+              "contiguous map land mass": 253,
+              "map marker anchored to geography": 33,
               "fraction overlays its own map marker": 7,
               "contained by rail-surface": 7
             }
@@ -857,9 +772,9 @@
     },
     "artifactTool": {
       "accepted": true,
-      "slideCount": 18,
-      "objectCount": 780,
-      "expectedObjectCount": 780,
+      "slideCount": 16,
+      "objectCount": 884,
+      "expectedObjectCount": 884,
       "missingNamedObjects": [],
       "geometry": {
         "accepted": true,
@@ -890,108 +805,20 @@
     },
     "visual": {
       "accepted": true,
-      "minimumHtmlPptxSimilarity": 0.979421,
-      "minimumNormalizedFullFrameSimilarity": 0.90582,
-      "minimumNormalizedBlurredStructureSimilarity": 0.911082,
-      "minimumNormalizedBlockSsim": 0.621578,
-      "minimumRestoredBlurredSimilarity": 0.898911,
-      "minimumUpscaledBlurredSimilarity": 0.905422,
-      "minimumRestoredBlockSsim": 0.486061,
-      "minimumUpscaledBlockSsim": 0.395677
+      "minimumHtmlPptxSimilarity": 0.98596,
+      "minimumNormalizedFullFrameSimilarity": 0.910856,
+      "minimumNormalizedBlurredStructureSimilarity": 0.913418,
+      "minimumNormalizedBlockSsim": 0.642428,
+      "minimumRestoredBlurredSimilarity": 0.901216,
+      "minimumUpscaledBlurredSimilarity": 0.90815,
+      "minimumRestoredBlockSsim": 0.502365,
+      "minimumUpscaledBlockSsim": 0.421312
     }
   },
   "fixtures": [
     {
-      "id": "golden-cover",
-      "slide": 1,
-      "sourceSlide": 1,
-      "visualFamily": "cover",
-      "capabilities": [
-        "cover"
-      ],
-      "anchorsRequired": false,
-      "restoredReference": {
-        "path": "slides-ai/slide-001.png",
-        "sha256": "a86f2f6cc18428742228de4b48f1b98d023b6f17c7e148c99e2e389c0fc725d6"
-      },
-      "upscaledReference": {
-        "path": "slides-hq/slide-001.png",
-        "sha256": "0e4052609fd223c4d737f7d7bf4e469d026ac5b6136dca140577a1bcf482e1b4"
-      },
-      "htmlVsPptx": {
-        "fullFrameSimilarity": 0.98548,
-        "materialMismatchRatio": 0.025191,
-        "blurredStructureSimilarity": 0.994723,
-        "blockSsim": 0.942856,
-        "rowProjectionCorrelation": 0.862722,
-        "columnProjectionCorrelation": 0.997557,
-        "edgeDensityDelta": 0.000556,
-        "accepted": true
-      },
-      "htmlVsRestored": {
-        "fullFrameSimilarity": 0.933954,
-        "materialMismatchRatio": 0.095812,
-        "blurredStructureSimilarity": 0.954849,
-        "blockSsim": 0.668767,
-        "rowProjectionCorrelation": 0.616724,
-        "columnProjectionCorrelation": 0.571373,
-        "edgeDensityDelta": 0.06046,
-        "accepted": true
-      },
-      "pptxVsRestored": {
-        "fullFrameSimilarity": 0.937583,
-        "materialMismatchRatio": 0.091615,
-        "blurredStructureSimilarity": 0.95645,
-        "blockSsim": 0.675785,
-        "rowProjectionCorrelation": 0.737038,
-        "columnProjectionCorrelation": 0.572041,
-        "edgeDensityDelta": 0.061016,
-        "accepted": true
-      },
-      "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.942817,
-        "materialMismatchRatio": 0.103108,
-        "blurredStructureSimilarity": 0.960352,
-        "blockSsim": 0.714909,
-        "rowProjectionCorrelation": 0.720093,
-        "columnProjectionCorrelation": 0.65402,
-        "edgeDensityDelta": 0.052674,
-        "accepted": true
-      },
-      "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.945865,
-        "materialMismatchRatio": 0.098524,
-        "blurredStructureSimilarity": 0.961167,
-        "blockSsim": 0.719212,
-        "rowProjectionCorrelation": 0.764768,
-        "columnProjectionCorrelation": 0.654517,
-        "edgeDensityDelta": 0.053229,
-        "accepted": true
-      },
-      "referenceAgreement": {
-        "fullFrameSimilarity": 0.961282,
-        "materialMismatchRatio": 0.080291,
-        "blurredStructureSimilarity": 0.989584,
-        "blockSsim": 0.80837,
-        "rowProjectionCorrelation": 0.809171,
-        "columnProjectionCorrelation": 0.649308,
-        "edgeDensityDelta": 0.007786
-      },
-      "normalizedReferenceFidelity": {
-        "accepted": true,
-        "rawAccepted": true,
-        "normalizedAccepted": true,
-        "ratios": {
-          "fullFrameSimilarity": 0.971571,
-          "blurredStructureSimilarity": 0.964899,
-          "blockSsim": 0.827303
-        }
-      },
-      "accepted": true
-    },
-    {
       "id": "golden-chart-rail",
-      "slide": 2,
+      "slide": 1,
       "sourceSlide": 2,
       "visualFamily": "chart-and-takeaway-rail",
       "capabilities": [
@@ -1009,59 +836,59 @@
         "sha256": "3d6033437f2510a4a0ebacbd40db23fae00cd328cabb3fe6beac6dfce5dca25a"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.993303,
-        "materialMismatchRatio": 0.01424,
-        "blurredStructureSimilarity": 0.996569,
-        "blockSsim": 0.965662,
-        "rowProjectionCorrelation": 0.980284,
-        "columnProjectionCorrelation": 0.998477,
-        "edgeDensityDelta": 0.00401,
+        "fullFrameSimilarity": 0.994224,
+        "materialMismatchRatio": 0.012205,
+        "blurredStructureSimilarity": 0.997488,
+        "blockSsim": 0.97507,
+        "rowProjectionCorrelation": 0.986419,
+        "columnProjectionCorrelation": 0.998349,
+        "edgeDensityDelta": 0.002899,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.904786,
-        "materialMismatchRatio": 0.148715,
-        "blurredStructureSimilarity": 0.933552,
-        "blockSsim": 0.605299,
-        "rowProjectionCorrelation": 0.292359,
-        "columnProjectionCorrelation": 0.389911,
-        "edgeDensityDelta": 0.030703,
+        "fullFrameSimilarity": 0.904138,
+        "materialMismatchRatio": 0.145087,
+        "blurredStructureSimilarity": 0.92487,
+        "blockSsim": 0.614634,
+        "rowProjectionCorrelation": 0.140805,
+        "columnProjectionCorrelation": 0.386718,
+        "edgeDensityDelta": 0.047287,
         "titleRuleDelta": 0.011111,
         "footerRuleDelta": 0.033333,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.905269,
-        "materialMismatchRatio": 0.146428,
-        "blurredStructureSimilarity": 0.93283,
-        "blockSsim": 0.602173,
-        "rowProjectionCorrelation": 0.267878,
-        "columnProjectionCorrelation": 0.385287,
-        "edgeDensityDelta": 0.034714,
+        "fullFrameSimilarity": 0.905502,
+        "materialMismatchRatio": 0.141554,
+        "blurredStructureSimilarity": 0.924901,
+        "blockSsim": 0.616547,
+        "rowProjectionCorrelation": 0.150627,
+        "columnProjectionCorrelation": 0.380256,
+        "edgeDensityDelta": 0.050187,
         "titleRuleDelta": 0.011111,
         "footerRuleDelta": 0.033333,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.895096,
-        "materialMismatchRatio": 0.175226,
-        "blurredStructureSimilarity": 0.914446,
-        "blockSsim": 0.570436,
-        "rowProjectionCorrelation": -0.025401,
-        "columnProjectionCorrelation": 0.379947,
-        "edgeDensityDelta": 0.037231,
+        "fullFrameSimilarity": 0.901109,
+        "materialMismatchRatio": 0.169258,
+        "blurredStructureSimilarity": 0.91642,
+        "blockSsim": 0.595548,
+        "rowProjectionCorrelation": -0.013413,
+        "columnProjectionCorrelation": 0.393886,
+        "edgeDensityDelta": 0.053815,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.897671,
-        "materialMismatchRatio": 0.170703,
-        "blurredStructureSimilarity": 0.915527,
-        "blockSsim": 0.575481,
-        "rowProjectionCorrelation": -0.02264,
-        "columnProjectionCorrelation": 0.381581,
-        "edgeDensityDelta": 0.041241,
+        "fullFrameSimilarity": 0.902842,
+        "materialMismatchRatio": 0.165998,
+        "blurredStructureSimilarity": 0.917057,
+        "blockSsim": 0.598896,
+        "rowProjectionCorrelation": -0.016104,
+        "columnProjectionCorrelation": 0.393578,
+        "edgeDensityDelta": 0.056714,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0,
         "accepted": true
@@ -1082,21 +909,22 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.977737,
-          "blurredStructureSimilarity": 0.968167,
-          "blockSsim": 1.009972
+          "fullFrameSimilarity": 0.984305,
+          "blurredStructureSimilarity": 0.970257,
+          "blockSsim": 1.054433
         }
       },
       "accepted": true
     },
     {
       "id": "golden-stacked-and-narrative",
-      "slide": 3,
+      "slide": 2,
       "sourceSlide": 3,
       "visualFamily": "narrative-and-stacked-chart",
       "capabilities": [
         "slide-chrome",
         "panel",
+        "connector",
         "chart.stacked-column"
       ],
       "anchorsRequired": true,
@@ -1109,59 +937,59 @@
         "sha256": "37255be0b0feca955e83b9c41452a18c02ae8d10e16aa84eadb52de1a6c4f3a7"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.98961,
-        "materialMismatchRatio": 0.021645,
-        "blurredStructureSimilarity": 0.996707,
-        "blockSsim": 0.958658,
-        "rowProjectionCorrelation": 0.988486,
-        "columnProjectionCorrelation": 0.992147,
-        "edgeDensityDelta": 0.002057,
+        "fullFrameSimilarity": 0.993365,
+        "materialMismatchRatio": 0.013433,
+        "blurredStructureSimilarity": 0.997575,
+        "blockSsim": 0.972162,
+        "rowProjectionCorrelation": 0.989371,
+        "columnProjectionCorrelation": 0.994594,
+        "edgeDensityDelta": 0.002144,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.910466,
-        "materialMismatchRatio": 0.139353,
-        "blurredStructureSimilarity": 0.928568,
-        "blockSsim": 0.638941,
-        "rowProjectionCorrelation": 0.363301,
-        "columnProjectionCorrelation": 0.565205,
-        "edgeDensityDelta": 0.014019,
+        "fullFrameSimilarity": 0.893853,
+        "materialMismatchRatio": 0.167491,
+        "blurredStructureSimilarity": 0.908604,
+        "blockSsim": 0.638886,
+        "rowProjectionCorrelation": 0.453528,
+        "columnProjectionCorrelation": 0.556764,
+        "edgeDensityDelta": 0.018932,
         "titleRuleDelta": 0,
         "footerRuleDelta": 0.019444,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.911674,
-        "materialMismatchRatio": 0.138194,
-        "blurredStructureSimilarity": 0.929125,
-        "blockSsim": 0.634973,
-        "rowProjectionCorrelation": 0.35445,
-        "columnProjectionCorrelation": 0.549807,
-        "edgeDensityDelta": 0.016076,
+        "fullFrameSimilarity": 0.895091,
+        "materialMismatchRatio": 0.166484,
+        "blurredStructureSimilarity": 0.908688,
+        "blockSsim": 0.64135,
+        "rowProjectionCorrelation": 0.444511,
+        "columnProjectionCorrelation": 0.542653,
+        "edgeDensityDelta": 0.021076,
         "titleRuleDelta": 0,
         "footerRuleDelta": 0.019444,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.918672,
-        "materialMismatchRatio": 0.140417,
-        "blurredStructureSimilarity": 0.934356,
-        "blockSsim": 0.67883,
-        "rowProjectionCorrelation": 0.166973,
-        "columnProjectionCorrelation": 0.523315,
-        "edgeDensityDelta": 0.00322,
+        "fullFrameSimilarity": 0.901978,
+        "materialMismatchRatio": 0.169054,
+        "blurredStructureSimilarity": 0.914713,
+        "blockSsim": 0.675355,
+        "rowProjectionCorrelation": 0.224022,
+        "columnProjectionCorrelation": 0.593893,
+        "edgeDensityDelta": 0.008134,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.061111,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.919874,
-        "materialMismatchRatio": 0.139227,
-        "blurredStructureSimilarity": 0.935014,
-        "blockSsim": 0.674202,
-        "rowProjectionCorrelation": 0.156519,
-        "columnProjectionCorrelation": 0.506093,
-        "edgeDensityDelta": 0.005278,
+        "fullFrameSimilarity": 0.903044,
+        "materialMismatchRatio": 0.168655,
+        "blurredStructureSimilarity": 0.914798,
+        "blockSsim": 0.679292,
+        "rowProjectionCorrelation": 0.214953,
+        "columnProjectionCorrelation": 0.577172,
+        "edgeDensityDelta": 0.010278,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.061111,
         "accepted": true
@@ -1182,21 +1010,23 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.945621,
-          "blurredStructureSimilarity": 0.946881,
-          "blockSsim": 0.763338
+          "fullFrameSimilarity": 0.928367,
+          "blurredStructureSimilarity": 0.926523,
+          "blockSsim": 0.768042
         }
       },
       "accepted": true
     },
     {
       "id": "golden-line-annotations",
-      "slide": 4,
+      "slide": 3,
       "sourceSlide": 4,
-      "visualFamily": "line-with-top-annotations",
+      "visualFamily": "line-with-bottom-highlights",
       "capabilities": [
         "slide-chrome",
-        "chart.line"
+        "chart-title",
+        "chart.line",
+        "highlight-strip"
       ],
       "anchorsRequired": true,
       "restoredReference": {
@@ -1208,59 +1038,59 @@
         "sha256": "47fbbe99d321e5e9aca639a9656eadfcf6d22f55cbbeba5a8fd73eac53fcd7c3"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.988917,
-        "materialMismatchRatio": 0.022556,
-        "blurredStructureSimilarity": 0.996786,
-        "blockSsim": 0.96425,
-        "rowProjectionCorrelation": 0.959601,
-        "columnProjectionCorrelation": 0.989858,
-        "edgeDensityDelta": 0.002626,
+        "fullFrameSimilarity": 0.990707,
+        "materialMismatchRatio": 0.018993,
+        "blurredStructureSimilarity": 0.997069,
+        "blockSsim": 0.957939,
+        "rowProjectionCorrelation": 0.951674,
+        "columnProjectionCorrelation": 0.994203,
+        "edgeDensityDelta": 0.002682,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.931082,
-        "materialMismatchRatio": 0.111306,
-        "blurredStructureSimilarity": 0.955508,
-        "blockSsim": 0.623632,
-        "rowProjectionCorrelation": 0.168263,
-        "columnProjectionCorrelation": 0.70217,
-        "edgeDensityDelta": 0.008459,
+        "fullFrameSimilarity": 0.926787,
+        "materialMismatchRatio": 0.123125,
+        "blurredStructureSimilarity": 0.939549,
+        "blockSsim": 0.610493,
+        "rowProjectionCorrelation": 0.163507,
+        "columnProjectionCorrelation": 0.625545,
+        "edgeDensityDelta": 0.005417,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.011111,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.934577,
-        "materialMismatchRatio": 0.106233,
-        "blurredStructureSimilarity": 0.956794,
-        "blockSsim": 0.626743,
-        "rowProjectionCorrelation": 0.199365,
-        "columnProjectionCorrelation": 0.684708,
-        "edgeDensityDelta": 0.011085,
+        "fullFrameSimilarity": 0.929154,
+        "materialMismatchRatio": 0.119987,
+        "blurredStructureSimilarity": 0.941322,
+        "blockSsim": 0.613078,
+        "rowProjectionCorrelation": 0.180663,
+        "columnProjectionCorrelation": 0.623198,
+        "edgeDensityDelta": 0.008099,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.011111,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.935862,
-        "materialMismatchRatio": 0.117079,
-        "blurredStructureSimilarity": 0.951597,
-        "blockSsim": 0.628133,
-        "rowProjectionCorrelation": 0.06646,
-        "columnProjectionCorrelation": 0.662007,
-        "edgeDensityDelta": 0.002491,
+        "fullFrameSimilarity": 0.932686,
+        "materialMismatchRatio": 0.129145,
+        "blurredStructureSimilarity": 0.939863,
+        "blockSsim": 0.625156,
+        "rowProjectionCorrelation": -0.014772,
+        "columnProjectionCorrelation": 0.512609,
+        "edgeDensityDelta": 0.005534,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.937655,
-        "materialMismatchRatio": 0.115247,
-        "blurredStructureSimilarity": 0.953036,
-        "blockSsim": 0.622672,
-        "rowProjectionCorrelation": 0.074532,
-        "columnProjectionCorrelation": 0.651052,
-        "edgeDensityDelta": 0.000135,
+        "fullFrameSimilarity": 0.934868,
+        "materialMismatchRatio": 0.126042,
+        "blurredStructureSimilarity": 0.941812,
+        "blockSsim": 0.625063,
+        "rowProjectionCorrelation": -0.018435,
+        "columnProjectionCorrelation": 0.516078,
+        "edgeDensityDelta": 0.002852,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0,
         "accepted": true
@@ -1281,16 +1111,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.978857,
-          "blurredStructureSimilarity": 0.972804,
-          "blockSsim": 0.913108
+          "fullFrameSimilarity": 0.974342,
+          "blurredStructureSimilarity": 0.960488,
+          "blockSsim": 0.895248
         }
       },
       "accepted": true
     },
     {
       "id": "golden-scatter-rail",
-      "slide": 5,
+      "slide": 4,
       "sourceSlide": 5,
       "visualFamily": "scatter-and-takeaway-rail",
       "capabilities": [
@@ -1308,59 +1138,59 @@
         "sha256": "214d817120dabc90b8ee18febc552a599befb8e006663d37f8fb00d9f232d9f7"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.991209,
-        "materialMismatchRatio": 0.019479,
-        "blurredStructureSimilarity": 0.99662,
-        "blockSsim": 0.967032,
-        "rowProjectionCorrelation": 0.989122,
-        "columnProjectionCorrelation": 0.994562,
-        "edgeDensityDelta": 0.002973,
+        "fullFrameSimilarity": 0.993743,
+        "materialMismatchRatio": 0.014553,
+        "blurredStructureSimilarity": 0.997363,
+        "blockSsim": 0.972227,
+        "rowProjectionCorrelation": 0.989423,
+        "columnProjectionCorrelation": 0.996682,
+        "edgeDensityDelta": 0.00237,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.945762,
-        "materialMismatchRatio": 0.099071,
-        "blurredStructureSimilarity": 0.954905,
-        "blockSsim": 0.588962,
-        "rowProjectionCorrelation": 0.23144,
-        "columnProjectionCorrelation": 0.566019,
-        "edgeDensityDelta": 0.01997,
+        "fullFrameSimilarity": 0.950713,
+        "materialMismatchRatio": 0.092687,
+        "blurredStructureSimilarity": 0.957029,
+        "blockSsim": 0.613358,
+        "rowProjectionCorrelation": 0.28236,
+        "columnProjectionCorrelation": 0.602195,
+        "edgeDensityDelta": 0.03174,
         "titleRuleDelta": 0.047222,
         "footerRuleDelta": 0.005556,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.948529,
-        "materialMismatchRatio": 0.096029,
-        "blurredStructureSimilarity": 0.956146,
-        "blockSsim": 0.590052,
-        "rowProjectionCorrelation": 0.226682,
-        "columnProjectionCorrelation": 0.563581,
-        "edgeDensityDelta": 0.022943,
+        "fullFrameSimilarity": 0.952999,
+        "materialMismatchRatio": 0.089852,
+        "blurredStructureSimilarity": 0.958233,
+        "blockSsim": 0.615661,
+        "rowProjectionCorrelation": 0.277259,
+        "columnProjectionCorrelation": 0.599849,
+        "edgeDensityDelta": 0.03411,
         "titleRuleDelta": 0.047222,
         "footerRuleDelta": 0.005556,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.953967,
-        "materialMismatchRatio": 0.093841,
-        "blurredStructureSimilarity": 0.96476,
-        "blockSsim": 0.676607,
-        "rowProjectionCorrelation": 0.062963,
-        "columnProjectionCorrelation": 0.413259,
-        "edgeDensityDelta": 0.007704,
+        "fullFrameSimilarity": 0.958485,
+        "materialMismatchRatio": 0.089232,
+        "blurredStructureSimilarity": 0.967355,
+        "blockSsim": 0.700272,
+        "rowProjectionCorrelation": 0.094449,
+        "columnProjectionCorrelation": 0.426149,
+        "edgeDensityDelta": 0.004067,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.061111,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.95663,
-        "materialMismatchRatio": 0.090443,
-        "blurredStructureSimilarity": 0.966032,
-        "blockSsim": 0.677107,
-        "rowProjectionCorrelation": 0.049584,
-        "columnProjectionCorrelation": 0.391923,
-        "edgeDensityDelta": 0.004731,
+        "fullFrameSimilarity": 0.960938,
+        "materialMismatchRatio": 0.085352,
+        "blurredStructureSimilarity": 0.968686,
+        "blockSsim": 0.704045,
+        "rowProjectionCorrelation": 0.08225,
+        "columnProjectionCorrelation": 0.411268,
+        "edgeDensityDelta": 0.006437,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.061111,
         "accepted": true
@@ -1381,16 +1211,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.975378,
-          "blurredStructureSimilarity": 0.969652,
-          "blockSsim": 0.74921
+          "fullFrameSimilarity": 0.980484,
+          "blurredStructureSimilarity": 0.971809,
+          "blockSsim": 0.780244
         }
       },
       "accepted": true
     },
     {
       "id": "golden-structured-rows",
-      "slide": 6,
+      "slide": 5,
       "sourceSlide": 6,
       "visualFamily": "structured-rows",
       "capabilities": [
@@ -1407,59 +1237,59 @@
         "sha256": "4f989b57e99fac14ffa61f78d38fb90a7d46d84efdf476b23aa4df3199c25fc0"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.982771,
-        "materialMismatchRatio": 0.039171,
-        "blurredStructureSimilarity": 0.994562,
-        "blockSsim": 0.927835,
-        "rowProjectionCorrelation": 0.9607,
-        "columnProjectionCorrelation": 0.992486,
-        "edgeDensityDelta": 0.002969,
+        "fullFrameSimilarity": 0.99532,
+        "materialMismatchRatio": 0.009701,
+        "blurredStructureSimilarity": 0.996615,
+        "blockSsim": 0.992218,
+        "rowProjectionCorrelation": 0.998242,
+        "columnProjectionCorrelation": 0.989454,
+        "edgeDensityDelta": 0.002843,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.922999,
-        "materialMismatchRatio": 0.127582,
-        "blurredStructureSimilarity": 0.948928,
-        "blockSsim": 0.627641,
-        "rowProjectionCorrelation": 0.178127,
-        "columnProjectionCorrelation": 0.839313,
-        "edgeDensityDelta": 0.019605,
+        "fullFrameSimilarity": 0.899168,
+        "materialMismatchRatio": 0.174991,
+        "blurredStructureSimilarity": 0.916963,
+        "blockSsim": 0.585023,
+        "rowProjectionCorrelation": 0.161615,
+        "columnProjectionCorrelation": 0.642602,
+        "edgeDensityDelta": 0.047791,
         "titleRuleDelta": 0.044444,
         "footerRuleDelta": 0.019444,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.925533,
-        "materialMismatchRatio": 0.125751,
-        "blurredStructureSimilarity": 0.951076,
-        "blockSsim": 0.62489,
-        "rowProjectionCorrelation": 0.17007,
-        "columnProjectionCorrelation": 0.838205,
-        "edgeDensityDelta": 0.022574,
+        "fullFrameSimilarity": 0.901657,
+        "materialMismatchRatio": 0.172257,
+        "blurredStructureSimilarity": 0.917958,
+        "blockSsim": 0.586095,
+        "rowProjectionCorrelation": 0.161537,
+        "columnProjectionCorrelation": 0.63605,
+        "edgeDensityDelta": 0.050634,
         "titleRuleDelta": 0.044444,
         "footerRuleDelta": 0.019444,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.938266,
-        "materialMismatchRatio": 0.12852,
-        "blurredStructureSimilarity": 0.959598,
-        "blockSsim": 0.650512,
-        "rowProjectionCorrelation": 0.12927,
-        "columnProjectionCorrelation": 0.803834,
-        "edgeDensityDelta": 0.001046,
+        "fullFrameSimilarity": 0.914962,
+        "materialMismatchRatio": 0.176636,
+        "blurredStructureSimilarity": 0.92915,
+        "blockSsim": 0.611063,
+        "rowProjectionCorrelation": 0.049465,
+        "columnProjectionCorrelation": 0.608273,
+        "edgeDensityDelta": 0.029232,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.942108,
-        "materialMismatchRatio": 0.123346,
-        "blurredStructureSimilarity": 0.962887,
-        "blockSsim": 0.651752,
-        "rowProjectionCorrelation": 0.127954,
-        "columnProjectionCorrelation": 0.803861,
-        "edgeDensityDelta": 0.004015,
+        "fullFrameSimilarity": 0.917697,
+        "materialMismatchRatio": 0.173229,
+        "blurredStructureSimilarity": 0.930679,
+        "blockSsim": 0.612536,
+        "rowProjectionCorrelation": 0.048269,
+        "columnProjectionCorrelation": 0.60447,
+        "edgeDensityDelta": 0.032075,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -1480,16 +1310,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.966969,
-          "blurredStructureSimilarity": 0.96684,
-          "blockSsim": 0.808318
+          "fullFrameSimilarity": 0.942003,
+          "blurredStructureSimilarity": 0.934271,
+          "blockSsim": 0.756749
         }
       },
       "accepted": true
     },
     {
       "id": "golden-process",
-      "slide": 7,
+      "slide": 6,
       "sourceSlide": 99,
       "visualFamily": "chevron-process",
       "capabilities": [
@@ -1506,59 +1336,59 @@
         "sha256": "00901547497101ca022b1e17f4363cd5b9e3f4f1c8c16bc0998215bf3c2df6ab"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.979421,
-        "materialMismatchRatio": 0.047526,
-        "blurredStructureSimilarity": 0.993537,
-        "blockSsim": 0.907633,
-        "rowProjectionCorrelation": 0.907815,
-        "columnProjectionCorrelation": 0.993174,
-        "edgeDensityDelta": 0.003481,
+        "fullFrameSimilarity": 0.989204,
+        "materialMismatchRatio": 0.023303,
+        "blurredStructureSimilarity": 0.996007,
+        "blockSsim": 0.959626,
+        "rowProjectionCorrelation": 0.949492,
+        "columnProjectionCorrelation": 0.995595,
+        "edgeDensityDelta": 0.002721,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.908779,
-        "materialMismatchRatio": 0.14247,
-        "blurredStructureSimilarity": 0.939508,
-        "blockSsim": 0.660082,
-        "rowProjectionCorrelation": 0.342534,
-        "columnProjectionCorrelation": 0.75315,
-        "edgeDensityDelta": 0.007405,
+        "fullFrameSimilarity": 0.916777,
+        "materialMismatchRatio": 0.126727,
+        "blurredStructureSimilarity": 0.941258,
+        "blockSsim": 0.680917,
+        "rowProjectionCorrelation": 0.344442,
+        "columnProjectionCorrelation": 0.787515,
+        "edgeDensityDelta": 0.026806,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.019444,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.912785,
-        "materialMismatchRatio": 0.137808,
-        "blurredStructureSimilarity": 0.943956,
-        "blockSsim": 0.656892,
-        "rowProjectionCorrelation": 0.331749,
-        "columnProjectionCorrelation": 0.740414,
-        "edgeDensityDelta": 0.003924,
+        "fullFrameSimilarity": 0.919869,
+        "materialMismatchRatio": 0.123238,
+        "blurredStructureSimilarity": 0.943436,
+        "blockSsim": 0.682043,
+        "rowProjectionCorrelation": 0.336616,
+        "columnProjectionCorrelation": 0.786545,
+        "edgeDensityDelta": 0.029527,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.019444,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.91607,
-        "materialMismatchRatio": 0.156636,
-        "blurredStructureSimilarity": 0.945491,
-        "blockSsim": 0.654325,
-        "rowProjectionCorrelation": 0.268465,
-        "columnProjectionCorrelation": 0.761228,
-        "edgeDensityDelta": 0.014839,
+        "fullFrameSimilarity": 0.923866,
+        "materialMismatchRatio": 0.142708,
+        "blurredStructureSimilarity": 0.947804,
+        "blockSsim": 0.677991,
+        "rowProjectionCorrelation": 0.276065,
+        "columnProjectionCorrelation": 0.778531,
+        "edgeDensityDelta": 0.049049,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.919838,
-        "materialMismatchRatio": 0.152609,
-        "blurredStructureSimilarity": 0.950004,
-        "blockSsim": 0.648778,
-        "rowProjectionCorrelation": 0.250456,
-        "columnProjectionCorrelation": 0.747096,
-        "edgeDensityDelta": 0.01832,
+        "fullFrameSimilarity": 0.926466,
+        "materialMismatchRatio": 0.139683,
+        "blurredStructureSimilarity": 0.950151,
+        "blockSsim": 0.675898,
+        "rowProjectionCorrelation": 0.256013,
+        "columnProjectionCorrelation": 0.778998,
+        "edgeDensityDelta": 0.051771,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -1579,16 +1409,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.942906,
-          "blurredStructureSimilarity": 0.950151,
-          "blockSsim": 0.781025
+          "fullFrameSimilarity": 0.951204,
+          "blurredStructureSimilarity": 0.95192,
+          "blockSsim": 0.813673
         }
       },
       "accepted": true
     },
     {
       "id": "golden-organization",
-      "slide": 8,
+      "slide": 7,
       "sourceSlide": 8,
       "visualFamily": "organization-network",
       "capabilities": [
@@ -1605,59 +1435,59 @@
         "sha256": "b1f07ec00f2b46190c25d977ca964a28605bdc0d7018329eb46e92fae6921601"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.99214,
-        "materialMismatchRatio": 0.017148,
-        "blurredStructureSimilarity": 0.99711,
-        "blockSsim": 0.969488,
-        "rowProjectionCorrelation": 0.983278,
-        "columnProjectionCorrelation": 0.995236,
-        "edgeDensityDelta": 0.002001,
+        "fullFrameSimilarity": 0.995189,
+        "materialMismatchRatio": 0.010022,
+        "blurredStructureSimilarity": 0.997887,
+        "blockSsim": 0.978996,
+        "rowProjectionCorrelation": 0.986234,
+        "columnProjectionCorrelation": 0.997477,
+        "edgeDensityDelta": 0.002135,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.874679,
-        "materialMismatchRatio": 0.230095,
-        "blurredStructureSimilarity": 0.898911,
-        "blockSsim": 0.487756,
-        "rowProjectionCorrelation": 0.052336,
-        "columnProjectionCorrelation": 0.369694,
-        "edgeDensityDelta": 0.057886,
+        "fullFrameSimilarity": 0.879542,
+        "materialMismatchRatio": 0.222921,
+        "blurredStructureSimilarity": 0.901352,
+        "blockSsim": 0.503392,
+        "rowProjectionCorrelation": 0.095501,
+        "columnProjectionCorrelation": 0.351243,
+        "edgeDensityDelta": 0.070378,
         "titleRuleDelta": 0,
         "footerRuleDelta": 0.005556,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.876264,
-        "materialMismatchRatio": 0.228433,
-        "blurredStructureSimilarity": 0.899118,
-        "blockSsim": 0.486061,
-        "rowProjectionCorrelation": 0.056016,
-        "columnProjectionCorrelation": 0.362976,
-        "edgeDensityDelta": 0.059887,
+        "fullFrameSimilarity": 0.880454,
+        "materialMismatchRatio": 0.221797,
+        "blurredStructureSimilarity": 0.901216,
+        "blockSsim": 0.502365,
+        "rowProjectionCorrelation": 0.098419,
+        "columnProjectionCorrelation": 0.344946,
+        "edgeDensityDelta": 0.072513,
         "titleRuleDelta": 0,
         "footerRuleDelta": 0.005556,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.883361,
-        "materialMismatchRatio": 0.221424,
-        "blurredStructureSimilarity": 0.905422,
-        "blockSsim": 0.55522,
-        "rowProjectionCorrelation": 0.084624,
-        "columnProjectionCorrelation": 0.644698,
-        "edgeDensityDelta": 0.013863,
+        "fullFrameSimilarity": 0.88824,
+        "materialMismatchRatio": 0.214505,
+        "blurredStructureSimilarity": 0.908231,
+        "blockSsim": 0.570934,
+        "rowProjectionCorrelation": 0.125251,
+        "columnProjectionCorrelation": 0.661169,
+        "edgeDensityDelta": 0.026354,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.884913,
-        "materialMismatchRatio": 0.219466,
-        "blurredStructureSimilarity": 0.905661,
-        "blockSsim": 0.553411,
-        "rowProjectionCorrelation": 0.08233,
-        "columnProjectionCorrelation": 0.635712,
-        "edgeDensityDelta": 0.015864,
+        "fullFrameSimilarity": 0.889169,
+        "materialMismatchRatio": 0.212938,
+        "blurredStructureSimilarity": 0.90815,
+        "blockSsim": 0.570051,
+        "rowProjectionCorrelation": 0.123127,
+        "columnProjectionCorrelation": 0.653625,
+        "edgeDensityDelta": 0.02849,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -1678,16 +1508,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.90582,
-          "blurredStructureSimilarity": 0.911082,
-          "blockSsim": 0.621578
+          "fullFrameSimilarity": 0.910856,
+          "blurredStructureSimilarity": 0.913418,
+          "blockSsim": 0.642428
         }
       },
       "accepted": true
     },
     {
       "id": "golden-table",
-      "slide": 9,
+      "slide": 8,
       "sourceSlide": 10,
       "visualFamily": "dense-table",
       "capabilities": [
@@ -1704,60 +1534,60 @@
         "sha256": "5f39db625f2eabbf5cdda370fc4f5bba1d613239b432374a894d6635174e3ffd"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.99097,
-        "materialMismatchRatio": 0.019058,
-        "blurredStructureSimilarity": 0.996735,
-        "blockSsim": 0.95985,
-        "rowProjectionCorrelation": 0.988613,
-        "columnProjectionCorrelation": 0.997804,
-        "edgeDensityDelta": 0.001563,
+        "fullFrameSimilarity": 0.997125,
+        "materialMismatchRatio": 0.003602,
+        "blurredStructureSimilarity": 0.997733,
+        "blockSsim": 0.995439,
+        "rowProjectionCorrelation": 0.998575,
+        "columnProjectionCorrelation": 0.997344,
+        "edgeDensityDelta": 0.0023,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.895615,
-        "materialMismatchRatio": 0.148438,
-        "blurredStructureSimilarity": 0.91779,
-        "blockSsim": 0.529795,
-        "rowProjectionCorrelation": 0.190248,
-        "columnProjectionCorrelation": 0.325468,
-        "edgeDensityDelta": 0.026628,
-        "titleRuleDelta": 0.066667,
+        "fullFrameSimilarity": 0.897832,
+        "materialMismatchRatio": 0.147422,
+        "blurredStructureSimilarity": 0.903846,
+        "blockSsim": 0.570325,
+        "rowProjectionCorrelation": 0.20964,
+        "columnProjectionCorrelation": 0.335504,
+        "edgeDensityDelta": 0.071098,
+        "titleRuleDelta": 0.069444,
         "footerRuleDelta": 0.036111,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.898221,
-        "materialMismatchRatio": 0.143793,
-        "blurredStructureSimilarity": 0.917695,
-        "blockSsim": 0.533718,
-        "rowProjectionCorrelation": 0.205254,
-        "columnProjectionCorrelation": 0.324937,
-        "edgeDensityDelta": 0.02819,
-        "titleRuleDelta": 0.072222,
+        "fullFrameSimilarity": 0.898771,
+        "materialMismatchRatio": 0.14579,
+        "blurredStructureSimilarity": 0.903717,
+        "blockSsim": 0.571395,
+        "rowProjectionCorrelation": 0.209589,
+        "columnProjectionCorrelation": 0.332392,
+        "edgeDensityDelta": 0.073398,
+        "titleRuleDelta": 0.069444,
         "footerRuleDelta": 0.036111,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.901367,
-        "materialMismatchRatio": 0.159167,
-        "blurredStructureSimilarity": 0.921571,
-        "blockSsim": 0.501317,
-        "rowProjectionCorrelation": 0.006898,
-        "columnProjectionCorrelation": 0.3436,
-        "edgeDensityDelta": 0.026141,
-        "titleRuleDelta": 0.077778,
+        "fullFrameSimilarity": 0.904739,
+        "materialMismatchRatio": 0.154666,
+        "blurredStructureSimilarity": 0.910265,
+        "blockSsim": 0.569327,
+        "rowProjectionCorrelation": 0.148912,
+        "columnProjectionCorrelation": 0.371491,
+        "edgeDensityDelta": 0.070612,
+        "titleRuleDelta": 0.080556,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.903879,
-        "materialMismatchRatio": 0.155213,
-        "blurredStructureSimilarity": 0.921571,
-        "blockSsim": 0.50616,
-        "rowProjectionCorrelation": 0.018999,
-        "columnProjectionCorrelation": 0.342984,
-        "edgeDensityDelta": 0.027704,
-        "titleRuleDelta": 0.083333,
+        "fullFrameSimilarity": 0.905583,
+        "materialMismatchRatio": 0.152956,
+        "blurredStructureSimilarity": 0.910148,
+        "blockSsim": 0.570173,
+        "rowProjectionCorrelation": 0.146656,
+        "columnProjectionCorrelation": 0.369941,
+        "edgeDensityDelta": 0.072912,
+        "titleRuleDelta": 0.080556,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
@@ -1777,16 +1607,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.935948,
-          "blurredStructureSimilarity": 0.931578,
-          "blockSsim": 0.682383
+          "fullFrameSimilarity": 0.938265,
+          "blurredStructureSimilarity": 0.917389,
+          "blockSsim": 0.774957
         }
       },
       "accepted": true
     },
     {
       "id": "golden-rollout",
-      "slide": 10,
+      "slide": 9,
       "sourceSlide": 11,
       "visualFamily": "phased-rollout",
       "capabilities": [
@@ -1803,59 +1633,59 @@
         "sha256": "b7e71e6b8fc183cd90e25391db180f0b1c1e8bf84ba84c42cc0e35854de24f4a"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.988383,
-        "materialMismatchRatio": 0.02753,
-        "blurredStructureSimilarity": 0.995414,
-        "blockSsim": 0.945316,
-        "rowProjectionCorrelation": 0.968811,
-        "columnProjectionCorrelation": 0.995411,
-        "edgeDensityDelta": 0.004757,
+        "fullFrameSimilarity": 0.988635,
+        "materialMismatchRatio": 0.026298,
+        "blurredStructureSimilarity": 0.996122,
+        "blockSsim": 0.954862,
+        "rowProjectionCorrelation": 0.969651,
+        "columnProjectionCorrelation": 0.995912,
+        "edgeDensityDelta": 0.004249,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.870239,
-        "materialMismatchRatio": 0.19306,
-        "blurredStructureSimilarity": 0.918848,
-        "blockSsim": 0.531339,
-        "rowProjectionCorrelation": 0.272901,
-        "columnProjectionCorrelation": 0.715881,
-        "edgeDensityDelta": 0.019714,
+        "fullFrameSimilarity": 0.875075,
+        "materialMismatchRatio": 0.184392,
+        "blurredStructureSimilarity": 0.919845,
+        "blockSsim": 0.551328,
+        "rowProjectionCorrelation": 0.34872,
+        "columnProjectionCorrelation": 0.686211,
+        "edgeDensityDelta": 0.034063,
         "titleRuleDelta": 0.011111,
         "footerRuleDelta": 0.061111,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.87361,
-        "materialMismatchRatio": 0.188824,
-        "blurredStructureSimilarity": 0.919703,
-        "blockSsim": 0.533872,
-        "rowProjectionCorrelation": 0.279595,
-        "columnProjectionCorrelation": 0.71581,
-        "edgeDensityDelta": 0.02447,
+        "fullFrameSimilarity": 0.877517,
+        "materialMismatchRatio": 0.181519,
+        "blurredStructureSimilarity": 0.920518,
+        "blockSsim": 0.55174,
+        "rowProjectionCorrelation": 0.342077,
+        "columnProjectionCorrelation": 0.688233,
+        "edgeDensityDelta": 0.038312,
         "titleRuleDelta": 0.011111,
         "footerRuleDelta": 0.061111,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.848346,
-        "materialMismatchRatio": 0.25444,
-        "blurredStructureSimilarity": 0.907203,
-        "blockSsim": 0.398114,
-        "rowProjectionCorrelation": 0.00735,
-        "columnProjectionCorrelation": 0.701606,
-        "edgeDensityDelta": 0.051319,
+        "fullFrameSimilarity": 0.853902,
+        "materialMismatchRatio": 0.242999,
+        "blurredStructureSimilarity": 0.9088,
+        "blockSsim": 0.428178,
+        "rowProjectionCorrelation": 0.061316,
+        "columnProjectionCorrelation": 0.678587,
+        "edgeDensityDelta": 0.065668,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.061111,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.85193,
-        "materialMismatchRatio": 0.249336,
-        "blurredStructureSimilarity": 0.907615,
-        "blockSsim": 0.395677,
-        "rowProjectionCorrelation": 0.014018,
-        "columnProjectionCorrelation": 0.703556,
-        "edgeDensityDelta": 0.056076,
+        "fullFrameSimilarity": 0.856235,
+        "materialMismatchRatio": 0.240356,
+        "blurredStructureSimilarity": 0.909084,
+        "blockSsim": 0.421312,
+        "rowProjectionCorrelation": 0.058087,
+        "columnProjectionCorrelation": 0.681431,
+        "edgeDensityDelta": 0.069918,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.061111,
         "accepted": true
@@ -1876,104 +1706,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.92075,
-          "blurredStructureSimilarity": 0.941071,
-          "blockSsim": 0.623735
-        }
-      },
-      "accepted": true
-    },
-    {
-      "id": "golden-divider",
-      "slide": 11,
-      "sourceSlide": 12,
-      "visualFamily": "section-divider",
-      "capabilities": [
-        "section-divider"
-      ],
-      "anchorsRequired": false,
-      "restoredReference": {
-        "path": "slides-ai/slide-012.png",
-        "sha256": "6ecab5d95d1c03ddd918305158c2ad5f1bdc6d2b54bfdacb22b67b5486053191"
-      },
-      "upscaledReference": {
-        "path": "slides-hq/slide-012.png",
-        "sha256": "1165f5d9e6ae54653343f930f717617f91b089a1923671e0d8118f65e16b956f"
-      },
-      "htmlVsPptx": {
-        "fullFrameSimilarity": 0.99534,
-        "materialMismatchRatio": 0.009674,
-        "blurredStructureSimilarity": 0.996929,
-        "blockSsim": 0.993729,
-        "rowProjectionCorrelation": 0.994203,
-        "columnProjectionCorrelation": 0.979792,
-        "edgeDensityDelta": 0.00069,
-        "accepted": true
-      },
-      "htmlVsRestored": {
-        "fullFrameSimilarity": 0.956333,
-        "materialMismatchRatio": 0.04451,
-        "blurredStructureSimilarity": 0.976435,
-        "blockSsim": 0.88002,
-        "rowProjectionCorrelation": 0.763909,
-        "columnProjectionCorrelation": 0.77988,
-        "edgeDensityDelta": 0.011046,
-        "accepted": true
-      },
-      "pptxVsRestored": {
-        "fullFrameSimilarity": 0.956399,
-        "materialMismatchRatio": 0.044891,
-        "blurredStructureSimilarity": 0.978542,
-        "blockSsim": 0.877267,
-        "rowProjectionCorrelation": 0.753813,
-        "columnProjectionCorrelation": 0.769634,
-        "edgeDensityDelta": 0.010356,
-        "accepted": true
-      },
-      "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.955702,
-        "materialMismatchRatio": 0.048385,
-        "blurredStructureSimilarity": 0.973737,
-        "blockSsim": 0.864348,
-        "rowProjectionCorrelation": 0.653612,
-        "columnProjectionCorrelation": 0.778113,
-        "edgeDensityDelta": 0.00885,
-        "accepted": true
-      },
-      "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.956474,
-        "materialMismatchRatio": 0.047561,
-        "blurredStructureSimilarity": 0.975597,
-        "blockSsim": 0.863563,
-        "rowProjectionCorrelation": 0.644527,
-        "columnProjectionCorrelation": 0.768111,
-        "edgeDensityDelta": 0.00816,
-        "accepted": true
-      },
-      "referenceAgreement": {
-        "fullFrameSimilarity": 0.981447,
-        "materialMismatchRatio": 0.040616,
-        "blurredStructureSimilarity": 0.995299,
-        "blockSsim": 0.918911,
-        "rowProjectionCorrelation": 0.746962,
-        "columnProjectionCorrelation": 0.933125,
-        "edgeDensityDelta": 0.002196
-      },
-      "normalizedReferenceFidelity": {
-        "accepted": true,
-        "rawAccepted": true,
-        "normalizedAccepted": true,
-        "ratios": {
-          "fullFrameSimilarity": 0.973768,
-          "blurredStructureSimilarity": 0.978336,
-          "blockSsim": 0.939768
+          "fullFrameSimilarity": 0.92678,
+          "blurredStructureSimilarity": 0.942728,
+          "blockSsim": 0.664146
         }
       },
       "accepted": true
     },
     {
       "id": "golden-text",
-      "slide": 12,
+      "slide": 10,
       "sourceSlide": 14,
       "visualFamily": "text-led-list",
       "capabilities": [
@@ -1991,59 +1733,59 @@
         "sha256": "483ef79df9eab3395d91cf369da04347e2a28d9286e7d355a0a2e76b4a2435b9"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.988922,
-        "materialMismatchRatio": 0.026037,
-        "blurredStructureSimilarity": 0.996489,
-        "blockSsim": 0.93899,
-        "rowProjectionCorrelation": 0.912643,
-        "columnProjectionCorrelation": 0.992749,
-        "edgeDensityDelta": 0.001328,
+        "fullFrameSimilarity": 0.991538,
+        "materialMismatchRatio": 0.02112,
+        "blurredStructureSimilarity": 0.996952,
+        "blockSsim": 0.951797,
+        "rowProjectionCorrelation": 0.967331,
+        "columnProjectionCorrelation": 0.990971,
+        "edgeDensityDelta": 0.003099,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.940661,
-        "materialMismatchRatio": 0.106862,
-        "blurredStructureSimilarity": 0.95201,
-        "blockSsim": 0.67535,
-        "rowProjectionCorrelation": 0.376416,
-        "columnProjectionCorrelation": 0.775711,
-        "edgeDensityDelta": 0.088641,
+        "fullFrameSimilarity": 0.941673,
+        "materialMismatchRatio": 0.10635,
+        "blurredStructureSimilarity": 0.951762,
+        "blockSsim": 0.668542,
+        "rowProjectionCorrelation": 0.387723,
+        "columnProjectionCorrelation": 0.743281,
+        "edgeDensityDelta": 0.090312,
         "titleRuleDelta": 0.047222,
         "footerRuleDelta": 0.025,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.942372,
-        "materialMismatchRatio": 0.105508,
-        "blurredStructureSimilarity": 0.95135,
-        "blockSsim": 0.666031,
-        "rowProjectionCorrelation": 0.371305,
-        "columnProjectionCorrelation": 0.7788,
-        "edgeDensityDelta": 0.08997,
+        "fullFrameSimilarity": 0.943693,
+        "materialMismatchRatio": 0.103689,
+        "blurredStructureSimilarity": 0.951211,
+        "blockSsim": 0.663217,
+        "rowProjectionCorrelation": 0.392388,
+        "columnProjectionCorrelation": 0.744151,
+        "edgeDensityDelta": 0.093411,
         "titleRuleDelta": 0.047222,
         "footerRuleDelta": 0.025,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.950708,
-        "materialMismatchRatio": 0.119405,
-        "blurredStructureSimilarity": 0.960191,
-        "blockSsim": 0.700603,
-        "rowProjectionCorrelation": 0.247332,
-        "columnProjectionCorrelation": 0.785157,
-        "edgeDensityDelta": 0.071523,
+        "fullFrameSimilarity": 0.951543,
+        "materialMismatchRatio": 0.118559,
+        "blurredStructureSimilarity": 0.960004,
+        "blockSsim": 0.693465,
+        "rowProjectionCorrelation": 0.238868,
+        "columnProjectionCorrelation": 0.750143,
+        "edgeDensityDelta": 0.073194,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.952627,
-        "materialMismatchRatio": 0.116671,
-        "blurredStructureSimilarity": 0.959883,
-        "blockSsim": 0.691092,
-        "rowProjectionCorrelation": 0.248391,
-        "columnProjectionCorrelation": 0.785423,
-        "edgeDensityDelta": 0.072852,
+        "fullFrameSimilarity": 0.953852,
+        "materialMismatchRatio": 0.11408,
+        "blurredStructureSimilarity": 0.959889,
+        "blockSsim": 0.689,
+        "rowProjectionCorrelation": 0.252911,
+        "columnProjectionCorrelation": 0.752448,
+        "edgeDensityDelta": 0.076293,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -2064,16 +1806,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.98231,
-          "blurredStructureSimilarity": 0.964324,
-          "blockSsim": 0.852772
+          "fullFrameSimilarity": 0.983367,
+          "blurredStructureSimilarity": 0.964183,
+          "blockSsim": 0.849169
         }
       },
       "accepted": true
     },
     {
       "id": "golden-matrix",
-      "slide": 13,
+      "slide": 11,
       "sourceSlide": 160,
       "visualFamily": "prioritization-matrix",
       "capabilities": [
@@ -2091,59 +1833,59 @@
         "sha256": "9f29bf1fffcec7be7fe1da6bdcee39907a68343adf19e7f5a5742261d25a932a"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.99642,
-        "materialMismatchRatio": 0.007925,
-        "blurredStructureSimilarity": 0.998047,
-        "blockSsim": 0.982497,
-        "rowProjectionCorrelation": 0.985117,
-        "columnProjectionCorrelation": 0.997585,
-        "edgeDensityDelta": 0.002118,
+        "fullFrameSimilarity": 0.99699,
+        "materialMismatchRatio": 0.006623,
+        "blurredStructureSimilarity": 0.998542,
+        "blockSsim": 0.98856,
+        "rowProjectionCorrelation": 0.99141,
+        "columnProjectionCorrelation": 0.997063,
+        "edgeDensityDelta": 0.000469,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.892026,
-        "materialMismatchRatio": 0.206858,
-        "blurredStructureSimilarity": 0.906664,
-        "blockSsim": 0.632616,
-        "rowProjectionCorrelation": 0.207842,
-        "columnProjectionCorrelation": 0.292248,
-        "edgeDensityDelta": 0.02737,
+        "fullFrameSimilarity": 0.896628,
+        "materialMismatchRatio": 0.200647,
+        "blurredStructureSimilarity": 0.909919,
+        "blockSsim": 0.648007,
+        "rowProjectionCorrelation": 0.297656,
+        "columnProjectionCorrelation": 0.291092,
+        "edgeDensityDelta": 0.036406,
         "titleRuleDelta": 0.041667,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.893407,
-        "materialMismatchRatio": 0.205525,
-        "blurredStructureSimilarity": 0.90725,
-        "blockSsim": 0.633792,
-        "rowProjectionCorrelation": 0.203028,
-        "columnProjectionCorrelation": 0.286947,
-        "edgeDensityDelta": 0.029488,
+        "fullFrameSimilarity": 0.897469,
+        "materialMismatchRatio": 0.200082,
+        "blurredStructureSimilarity": 0.910267,
+        "blockSsim": 0.648626,
+        "rowProjectionCorrelation": 0.29249,
+        "columnProjectionCorrelation": 0.285535,
+        "edgeDensityDelta": 0.036875,
         "titleRuleDelta": 0.041667,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.898111,
-        "materialMismatchRatio": 0.214245,
-        "blurredStructureSimilarity": 0.910938,
-        "blockSsim": 0.626777,
-        "rowProjectionCorrelation": 0.033767,
-        "columnProjectionCorrelation": 0.412625,
-        "edgeDensityDelta": 0.011497,
+        "fullFrameSimilarity": 0.902865,
+        "materialMismatchRatio": 0.208047,
+        "blurredStructureSimilarity": 0.914717,
+        "blockSsim": 0.645943,
+        "rowProjectionCorrelation": 0.109779,
+        "columnProjectionCorrelation": 0.394442,
+        "edgeDensityDelta": 0.020534,
         "titleRuleDelta": 0.083333,
         "footerRuleDelta": 0,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.899525,
-        "materialMismatchRatio": 0.21283,
-        "blurredStructureSimilarity": 0.911545,
-        "blockSsim": 0.629261,
-        "rowProjectionCorrelation": 0.028037,
-        "columnProjectionCorrelation": 0.407951,
-        "edgeDensityDelta": 0.013615,
+        "fullFrameSimilarity": 0.903768,
+        "materialMismatchRatio": 0.207357,
+        "blurredStructureSimilarity": 0.915091,
+        "blockSsim": 0.64568,
+        "rowProjectionCorrelation": 0.104169,
+        "columnProjectionCorrelation": 0.389037,
+        "edgeDensityDelta": 0.021003,
         "titleRuleDelta": 0.083333,
         "footerRuleDelta": 0,
         "accepted": true
@@ -2164,16 +1906,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.921026,
-          "blurredStructureSimilarity": 0.918363,
-          "blockSsim": 0.754302
+          "fullFrameSimilarity": 0.925778,
+          "blurredStructureSimilarity": 0.92166,
+          "blockSsim": 0.777051
         }
       },
       "accepted": true
     },
     {
       "id": "golden-waterfall",
-      "slide": 14,
+      "slide": 12,
       "sourceSlide": 43,
       "visualFamily": "waterfall",
       "capabilities": [
@@ -2190,59 +1932,59 @@
         "sha256": "cfa2150df8e42bb3bf3d4029e517f9fd70e58b89f585fb15982ba5dd5116704b"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.996124,
-        "materialMismatchRatio": 0.008255,
-        "blurredStructureSimilarity": 0.998226,
-        "blockSsim": 0.988304,
-        "rowProjectionCorrelation": 0.995605,
-        "columnProjectionCorrelation": 0.996142,
-        "edgeDensityDelta": 0.00201,
+        "fullFrameSimilarity": 0.997169,
+        "materialMismatchRatio": 0.00599,
+        "blurredStructureSimilarity": 0.998639,
+        "blockSsim": 0.989486,
+        "rowProjectionCorrelation": 0.994398,
+        "columnProjectionCorrelation": 0.997034,
+        "edgeDensityDelta": 0.002005,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.933737,
-        "materialMismatchRatio": 0.1223,
-        "blurredStructureSimilarity": 0.944856,
-        "blockSsim": 0.687053,
-        "rowProjectionCorrelation": 0.179838,
-        "columnProjectionCorrelation": 0.362937,
-        "edgeDensityDelta": 0.013728,
+        "fullFrameSimilarity": 0.937322,
+        "materialMismatchRatio": 0.118407,
+        "blurredStructureSimilarity": 0.945882,
+        "blockSsim": 0.713567,
+        "rowProjectionCorrelation": 0.211852,
+        "columnProjectionCorrelation": 0.352522,
+        "edgeDensityDelta": 0.018911,
         "titleRuleDelta": 0.016667,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.935163,
-        "materialMismatchRatio": 0.120317,
-        "blurredStructureSimilarity": 0.945509,
-        "blockSsim": 0.689661,
-        "rowProjectionCorrelation": 0.183524,
-        "columnProjectionCorrelation": 0.349238,
-        "edgeDensityDelta": 0.015738,
+        "fullFrameSimilarity": 0.938254,
+        "materialMismatchRatio": 0.116944,
+        "blurredStructureSimilarity": 0.946316,
+        "blockSsim": 0.714244,
+        "rowProjectionCorrelation": 0.215161,
+        "columnProjectionCorrelation": 0.337982,
+        "edgeDensityDelta": 0.020916,
         "titleRuleDelta": 0.016667,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.938481,
-        "materialMismatchRatio": 0.12681,
-        "blurredStructureSimilarity": 0.947576,
-        "blockSsim": 0.697199,
-        "rowProjectionCorrelation": -0.025415,
-        "columnProjectionCorrelation": 0.391628,
-        "edgeDensityDelta": 0.010929,
+        "fullFrameSimilarity": 0.942182,
+        "materialMismatchRatio": 0.123069,
+        "blurredStructureSimilarity": 0.949971,
+        "blockSsim": 0.72512,
+        "rowProjectionCorrelation": -0.007634,
+        "columnProjectionCorrelation": 0.384321,
+        "edgeDensityDelta": 0.016111,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.939879,
-        "materialMismatchRatio": 0.124939,
-        "blurredStructureSimilarity": 0.948344,
-        "blockSsim": 0.700049,
-        "rowProjectionCorrelation": -0.024333,
-        "columnProjectionCorrelation": 0.383851,
-        "edgeDensityDelta": 0.012938,
+        "fullFrameSimilarity": 0.943142,
+        "materialMismatchRatio": 0.121523,
+        "blurredStructureSimilarity": 0.95051,
+        "blockSsim": 0.726092,
+        "rowProjectionCorrelation": -0.00618,
+        "columnProjectionCorrelation": 0.375217,
+        "edgeDensityDelta": 0.018116,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0,
         "accepted": true
@@ -2263,16 +2005,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.95676,
-          "blurredStructureSimilarity": 0.954482,
-          "blockSsim": 0.803098
+          "fullFrameSimilarity": 0.960433,
+          "blurredStructureSimilarity": 0.955518,
+          "blockSsim": 0.834091
         }
       },
       "accepted": true
     },
     {
       "id": "golden-pie",
-      "slide": 15,
+      "slide": 13,
       "sourceSlide": 70,
       "visualFamily": "pie-and-takeaways",
       "capabilities": [
@@ -2290,59 +2032,59 @@
         "sha256": "9dfb3e21e92ebe33f5855ba6555831dc03c8327a5822125ee092a0b3d3635133"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.992273,
-        "materialMismatchRatio": 0.017036,
-        "blurredStructureSimilarity": 0.997062,
-        "blockSsim": 0.971331,
-        "rowProjectionCorrelation": 0.987246,
-        "columnProjectionCorrelation": 0.994064,
-        "edgeDensityDelta": 0.002656,
+        "fullFrameSimilarity": 0.994416,
+        "materialMismatchRatio": 0.012908,
+        "blurredStructureSimilarity": 0.997611,
+        "blockSsim": 0.978517,
+        "rowProjectionCorrelation": 0.985598,
+        "columnProjectionCorrelation": 0.996223,
+        "edgeDensityDelta": 0.002756,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.932429,
-        "materialMismatchRatio": 0.141684,
-        "blurredStructureSimilarity": 0.949621,
-        "blockSsim": 0.687112,
-        "rowProjectionCorrelation": 0.136319,
-        "columnProjectionCorrelation": 0.547322,
-        "edgeDensityDelta": 0.007183,
+        "fullFrameSimilarity": 0.935024,
+        "materialMismatchRatio": 0.138346,
+        "blurredStructureSimilarity": 0.950425,
+        "blockSsim": 0.694645,
+        "rowProjectionCorrelation": 0.150056,
+        "columnProjectionCorrelation": 0.531782,
+        "edgeDensityDelta": 0.016411,
         "titleRuleDelta": 0.013889,
         "footerRuleDelta": 0.005556,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.934688,
-        "materialMismatchRatio": 0.138967,
-        "blurredStructureSimilarity": 0.950591,
-        "blockSsim": 0.68728,
-        "rowProjectionCorrelation": 0.139716,
-        "columnProjectionCorrelation": 0.540347,
-        "edgeDensityDelta": 0.009839,
+        "fullFrameSimilarity": 0.937049,
+        "materialMismatchRatio": 0.135447,
+        "blurredStructureSimilarity": 0.951347,
+        "blockSsim": 0.696317,
+        "rowProjectionCorrelation": 0.155171,
+        "columnProjectionCorrelation": 0.52862,
+        "edgeDensityDelta": 0.019167,
         "titleRuleDelta": 0.013889,
         "footerRuleDelta": 0.005556,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.942221,
-        "materialMismatchRatio": 0.136823,
-        "blurredStructureSimilarity": 0.954634,
-        "blockSsim": 0.713169,
-        "rowProjectionCorrelation": 0.041617,
-        "columnProjectionCorrelation": 0.348023,
-        "edgeDensityDelta": 0.010156,
+        "fullFrameSimilarity": 0.945606,
+        "materialMismatchRatio": 0.132318,
+        "blurredStructureSimilarity": 0.956165,
+        "blockSsim": 0.72722,
+        "rowProjectionCorrelation": 0.041975,
+        "columnProjectionCorrelation": 0.336566,
+        "edgeDensityDelta": 0.000929,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.94424,
-        "materialMismatchRatio": 0.134414,
-        "blurredStructureSimilarity": 0.955691,
-        "blockSsim": 0.709467,
-        "rowProjectionCorrelation": 0.037205,
-        "columnProjectionCorrelation": 0.337945,
-        "edgeDensityDelta": 0.0075,
+        "fullFrameSimilarity": 0.947441,
+        "materialMismatchRatio": 0.129427,
+        "blurredStructureSimilarity": 0.957234,
+        "blockSsim": 0.72559,
+        "rowProjectionCorrelation": 0.040849,
+        "columnProjectionCorrelation": 0.328433,
+        "edgeDensityDelta": 0.001827,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -2363,16 +2105,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.974217,
-          "blurredStructureSimilarity": 0.969159,
-          "blockSsim": 0.938298
+          "fullFrameSimilarity": 0.976928,
+          "blurredStructureSimilarity": 0.96998,
+          "blockSsim": 0.948585
         }
       },
       "accepted": true
     },
     {
       "id": "golden-donut",
-      "slide": 16,
+      "slide": 14,
       "sourceSlide": 96,
       "visualFamily": "donut-and-takeaways",
       "capabilities": [
@@ -2390,59 +2132,59 @@
         "sha256": "73bb45804c5c75e55e7ae8d2ece40cd18761ef005c01d5d3c24ee33f13f71fc5"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.991938,
-        "materialMismatchRatio": 0.018012,
-        "blurredStructureSimilarity": 0.997031,
-        "blockSsim": 0.971185,
-        "rowProjectionCorrelation": 0.985769,
-        "columnProjectionCorrelation": 0.993002,
-        "edgeDensityDelta": 0.002921,
+        "fullFrameSimilarity": 0.994636,
+        "materialMismatchRatio": 0.012383,
+        "blurredStructureSimilarity": 0.997608,
+        "blockSsim": 0.9805,
+        "rowProjectionCorrelation": 0.985887,
+        "columnProjectionCorrelation": 0.995945,
+        "edgeDensityDelta": 0.002912,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.93219,
-        "materialMismatchRatio": 0.12579,
-        "blurredStructureSimilarity": 0.946963,
-        "blockSsim": 0.706005,
-        "rowProjectionCorrelation": 0.235659,
-        "columnProjectionCorrelation": 0.350157,
-        "edgeDensityDelta": 0.002305,
+        "fullFrameSimilarity": 0.936638,
+        "materialMismatchRatio": 0.119531,
+        "blurredStructureSimilarity": 0.948726,
+        "blockSsim": 0.720416,
+        "rowProjectionCorrelation": 0.278901,
+        "columnProjectionCorrelation": 0.426968,
+        "edgeDensityDelta": 0.012214,
         "titleRuleDelta": 0.016667,
         "footerRuleDelta": 0.005556,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.934525,
-        "materialMismatchRatio": 0.122982,
-        "blurredStructureSimilarity": 0.948209,
-        "blockSsim": 0.703394,
-        "rowProjectionCorrelation": 0.21598,
-        "columnProjectionCorrelation": 0.341268,
-        "edgeDensityDelta": 0.005226,
+        "fullFrameSimilarity": 0.938463,
+        "materialMismatchRatio": 0.116923,
+        "blurredStructureSimilarity": 0.949745,
+        "blockSsim": 0.718599,
+        "rowProjectionCorrelation": 0.252258,
+        "columnProjectionCorrelation": 0.420955,
+        "edgeDensityDelta": 0.015126,
         "titleRuleDelta": 0.016667,
         "footerRuleDelta": 0.005556,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.941376,
-        "materialMismatchRatio": 0.13099,
-        "blurredStructureSimilarity": 0.952908,
-        "blockSsim": 0.712116,
-        "rowProjectionCorrelation": 0.020259,
-        "columnProjectionCorrelation": 0.250763,
-        "edgeDensityDelta": 0.007031,
+        "fullFrameSimilarity": 0.945853,
+        "materialMismatchRatio": 0.125043,
+        "blurredStructureSimilarity": 0.955618,
+        "blockSsim": 0.726609,
+        "rowProjectionCorrelation": 0.027555,
+        "columnProjectionCorrelation": 0.370831,
+        "edgeDensityDelta": 0.002878,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.943651,
-        "materialMismatchRatio": 0.12793,
-        "blurredStructureSimilarity": 0.954305,
-        "blockSsim": 0.709125,
-        "rowProjectionCorrelation": 0.020581,
-        "columnProjectionCorrelation": 0.238327,
-        "edgeDensityDelta": 0.00411,
+        "fullFrameSimilarity": 0.947665,
+        "materialMismatchRatio": 0.122079,
+        "blurredStructureSimilarity": 0.956735,
+        "blockSsim": 0.724872,
+        "rowProjectionCorrelation": 0.027071,
+        "columnProjectionCorrelation": 0.361333,
+        "edgeDensityDelta": 0.00579,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -2463,16 +2205,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.964943,
-          "blurredStructureSimilarity": 0.962091,
-          "blockSsim": 0.847239
+          "fullFrameSimilarity": 0.969547,
+          "blurredStructureSimilarity": 0.963882,
+          "blockSsim": 0.865554
         }
       },
       "accepted": true
     },
     {
       "id": "golden-map",
-      "slide": 17,
+      "slide": 15,
       "sourceSlide": 174,
       "visualFamily": "map-and-takeaways",
       "capabilities": [
@@ -2490,59 +2232,59 @@
         "sha256": "0808572bd360d96661d0b72394a50b4154edbdd1063fafdddc319331f0a23e7a"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.992461,
-        "materialMismatchRatio": 0.016419,
-        "blurredStructureSimilarity": 0.996811,
-        "blockSsim": 0.966923,
-        "rowProjectionCorrelation": 0.988782,
-        "columnProjectionCorrelation": 0.925974,
-        "edgeDensityDelta": 0.001801,
+        "fullFrameSimilarity": 0.99593,
+        "materialMismatchRatio": 0.008859,
+        "blurredStructureSimilarity": 0.998404,
+        "blockSsim": 0.984357,
+        "rowProjectionCorrelation": 0.988077,
+        "columnProjectionCorrelation": 0.994334,
+        "edgeDensityDelta": 0.00138,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.944432,
-        "materialMismatchRatio": 0.065929,
-        "blurredStructureSimilarity": 0.957774,
-        "blockSsim": 0.719749,
-        "rowProjectionCorrelation": 0.287549,
-        "columnProjectionCorrelation": 0.700569,
-        "edgeDensityDelta": 0.018025,
+        "fullFrameSimilarity": 0.949667,
+        "materialMismatchRatio": 0.057161,
+        "blurredStructureSimilarity": 0.961211,
+        "blockSsim": 0.732583,
+        "rowProjectionCorrelation": 0.446046,
+        "columnProjectionCorrelation": 0.652947,
+        "edgeDensityDelta": 0.030699,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.946597,
-        "materialMismatchRatio": 0.063082,
-        "blurredStructureSimilarity": 0.959069,
-        "blockSsim": 0.721346,
-        "rowProjectionCorrelation": 0.298601,
-        "columnProjectionCorrelation": 0.681314,
-        "edgeDensityDelta": 0.019826,
+        "fullFrameSimilarity": 0.95056,
+        "materialMismatchRatio": 0.056237,
+        "blurredStructureSimilarity": 0.961418,
+        "blockSsim": 0.731633,
+        "rowProjectionCorrelation": 0.43479,
+        "columnProjectionCorrelation": 0.648828,
+        "edgeDensityDelta": 0.032079,
         "titleRuleDelta": 0.002778,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.946336,
-        "materialMismatchRatio": 0.070447,
-        "blurredStructureSimilarity": 0.958591,
-        "blockSsim": 0.728436,
-        "rowProjectionCorrelation": 0.090239,
-        "columnProjectionCorrelation": 0.686656,
-        "edgeDensityDelta": 0.001159,
+        "fullFrameSimilarity": 0.951195,
+        "materialMismatchRatio": 0.06306,
+        "blurredStructureSimilarity": 0.961871,
+        "blockSsim": 0.73513,
+        "rowProjectionCorrelation": 0.169635,
+        "columnProjectionCorrelation": 0.646803,
+        "edgeDensityDelta": 0.013832,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.948457,
-        "materialMismatchRatio": 0.067799,
-        "blurredStructureSimilarity": 0.960025,
-        "blockSsim": 0.728156,
-        "rowProjectionCorrelation": 0.102294,
-        "columnProjectionCorrelation": 0.696495,
-        "edgeDensityDelta": 0.00296,
+        "fullFrameSimilarity": 0.952593,
+        "materialMismatchRatio": 0.060829,
+        "blurredStructureSimilarity": 0.962087,
+        "blockSsim": 0.736307,
+        "rowProjectionCorrelation": 0.1535,
+        "columnProjectionCorrelation": 0.645949,
+        "edgeDensityDelta": 0.015213,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -2563,16 +2305,16 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.971536,
-          "blurredStructureSimilarity": 0.969612,
-          "blockSsim": 0.831103
+          "fullFrameSimilarity": 0.976921,
+          "blurredStructureSimilarity": 0.973091,
+          "blockSsim": 0.844825
         }
       },
       "accepted": true
     },
     {
       "id": "golden-roadmap",
-      "slide": 18,
+      "slide": 16,
       "sourceSlide": 140,
       "visualFamily": "wave-roadmap",
       "capabilities": [
@@ -2589,59 +2331,59 @@
         "sha256": "60cadef84bb2dfdfcaa6b4d0d65297c495ce7cdbd121a9f642b8410a6fbb5644"
       },
       "htmlVsPptx": {
-        "fullFrameSimilarity": 0.980953,
-        "materialMismatchRatio": 0.043524,
-        "blurredStructureSimilarity": 0.993269,
-        "blockSsim": 0.92231,
-        "rowProjectionCorrelation": 0.889521,
-        "columnProjectionCorrelation": 0.995023,
-        "edgeDensityDelta": 0.005716,
+        "fullFrameSimilarity": 0.98596,
+        "materialMismatchRatio": 0.032622,
+        "blurredStructureSimilarity": 0.994767,
+        "blockSsim": 0.938535,
+        "rowProjectionCorrelation": 0.909505,
+        "columnProjectionCorrelation": 0.993697,
+        "edgeDensityDelta": 0.003533,
         "accepted": true
       },
       "htmlVsRestored": {
-        "fullFrameSimilarity": 0.927063,
-        "materialMismatchRatio": 0.141389,
-        "blurredStructureSimilarity": 0.956255,
-        "blockSsim": 0.586079,
-        "rowProjectionCorrelation": 0.242206,
-        "columnProjectionCorrelation": 0.736183,
-        "edgeDensityDelta": 0.009266,
+        "fullFrameSimilarity": 0.934708,
+        "materialMismatchRatio": 0.129913,
+        "blurredStructureSimilarity": 0.957795,
+        "blockSsim": 0.617448,
+        "rowProjectionCorrelation": 0.271856,
+        "columnProjectionCorrelation": 0.707711,
+        "edgeDensityDelta": 0.03487,
         "titleRuleDelta": 0.013889,
         "footerRuleDelta": 0.005556,
         "accepted": true
       },
       "pptxVsRestored": {
-        "fullFrameSimilarity": 0.932259,
-        "materialMismatchRatio": 0.13454,
-        "blurredStructureSimilarity": 0.955941,
-        "blockSsim": 0.592417,
-        "rowProjectionCorrelation": 0.218538,
-        "columnProjectionCorrelation": 0.739232,
-        "edgeDensityDelta": 0.014983,
+        "fullFrameSimilarity": 0.939209,
+        "materialMismatchRatio": 0.122999,
+        "blurredStructureSimilarity": 0.957212,
+        "blockSsim": 0.62058,
+        "rowProjectionCorrelation": 0.28055,
+        "columnProjectionCorrelation": 0.70765,
+        "edgeDensityDelta": 0.038403,
         "titleRuleDelta": 0.013889,
         "footerRuleDelta": 0.005556,
         "accepted": true
       },
       "htmlVsUpscaled": {
-        "fullFrameSimilarity": 0.941793,
-        "materialMismatchRatio": 0.125651,
-        "blurredStructureSimilarity": 0.965364,
-        "blockSsim": 0.650576,
-        "rowProjectionCorrelation": 0.263776,
-        "columnProjectionCorrelation": 0.8746,
-        "edgeDensityDelta": 0.018637,
+        "fullFrameSimilarity": 0.947684,
+        "materialMismatchRatio": 0.118954,
+        "blurredStructureSimilarity": 0.96732,
+        "blockSsim": 0.659612,
+        "rowProjectionCorrelation": 0.24432,
+        "columnProjectionCorrelation": 0.832201,
+        "edgeDensityDelta": 0.006966,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
       },
       "pptxVsUpscaled": {
-        "fullFrameSimilarity": 0.944023,
-        "materialMismatchRatio": 0.126272,
-        "blurredStructureSimilarity": 0.965767,
-        "blockSsim": 0.634725,
-        "rowProjectionCorrelation": 0.252135,
-        "columnProjectionCorrelation": 0.875287,
-        "edgeDensityDelta": 0.012921,
+        "fullFrameSimilarity": 0.950089,
+        "materialMismatchRatio": 0.117435,
+        "blurredStructureSimilarity": 0.967433,
+        "blockSsim": 0.648398,
+        "rowProjectionCorrelation": 0.255384,
+        "columnProjectionCorrelation": 0.832446,
+        "edgeDensityDelta": 0.010499,
         "titleRuleDelta": 0.005556,
         "footerRuleDelta": 0.002778,
         "accepted": true
@@ -2662,9 +2404,9 @@
         "rawAccepted": true,
         "normalizedAccepted": true,
         "ratios": {
-          "fullFrameSimilarity": 0.963202,
-          "blurredStructureSimilarity": 0.971845,
-          "blockSsim": 0.752582
+          "fullFrameSimilarity": 0.971145,
+          "blurredStructureSimilarity": 0.973137,
+          "blockSsim": 0.792862
         }
       },
       "accepted": true
