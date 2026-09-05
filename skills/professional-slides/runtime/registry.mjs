@@ -194,25 +194,50 @@ function sectionHeadingNodes({ id, frame, props = {} }) {
 }
 
 function resolveChartTitleVariant(props = {}) {
-  const variant = props.variant ?? (props.unit ? "unit" : "underlined");
+  if (props.unit !== undefined && (typeof props.unit !== "string" || !props.unit.trim())) throw new Error("Chart title unit must be nonempty text");
+  const variant = props.variant ?? "underlined";
   if (!["underlined", "unit"].includes(variant)) throw new Error(`Unknown chart-title variant: ${variant}`);
-  if (variant === "unit" && (typeof props.unit !== "string" || !props.unit.trim()) || variant === "underlined" && props.unit) throw new Error("Chart title unit conflicts with its variant");
+  if (variant === "unit" && (typeof props.unit !== "string" || !props.unit.trim())) throw new Error("Chart title unit variant requires a unit");
   return variant;
 }
 function chartTitleLayout(frame, props) {
   const variant = resolveChartTitleVariant(props);
   const layout = headingLayout(frame, { ...props, rule: variant === "underlined" });
-  const unit = variant === "unit" ? measureText(props.unit, frame.width, { fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
+  const unit = props.unit ? measureText(props.unit, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
   if (unit && unit.lines.length !== 1) throw new Error("Chart unit must fit on one line");
-  const height = layout.bandHeight + (unit ? tokenValue(token("space.1")) + unit.height : layout.ruleGap) + tokenValue(token("space.3"));
-  return { ...layout, variant, unit, height };
+  const inlineHeading = unit && layout.heading.lines.length === 1 ? measureText(`${layout.heading.text},`, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: 1 }) : null;
+  const inlineUnit = unit ? measureText(` ${props.unit}`, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
+  const inlineHeadingWidth = inlineHeading ? Math.ceil(inlineHeading.width) : layout.heading.width;
+  const unitPlacement = unit && layout.heading.lines.length === 1 && inlineHeadingWidth + inlineUnit.width <= frame.width * 0.97 ? "inline" : unit ? "stacked" : "none";
+  const unitGap = unitPlacement === "stacked" ? tokenValue(token("space.1")) : 0;
+  const contentHeight = layout.bandHeight + (unitPlacement === "stacked" ? unitGap + unit.height : 0);
+  const ruled = variant === "underlined";
+  const height = contentHeight + (ruled ? layout.ruleGap : 0) + tokenValue(token("space.3"));
+  return { ...layout, variant, unit, inlineHeading, inlineUnit, inlineHeadingWidth, unitPlacement, unitGap, contentHeight, ruled, height };
 }
 function chartTitleNodes({ id, frame, props }) {
   const layout = chartTitleLayout(frame, props);
   if (layout.height > frame.height) throw new Error("Chart title exceeds its allocated height");
-  const nodes = sectionHeadingNodes({ id, frame, props: { ...props, variant: "standard", rule: layout.variant === "underlined" } });
-  nodes.forEach(node => { node.data.chartTitleVariant = layout.variant; });
-  if (layout.unit) nodes.push(textPrimitive({ id: stableId(id, "unit"), role: "chart-unit", frame: { x: frame.x, y: frame.y + layout.bandHeight + tokenValue(token("space.1")), width: frame.width, height: layout.unit.height }, text: props.unit, style: { ...textStyle(BODY, token("color.chartUnit"), false, "left", "top"), lineHeight: layout.unit.lineHeight, wrap: false }, data: { textLayout: layout.unit } }));
+  const inline = layout.unitPlacement === "inline";
+  const nodes = [textPrimitive({
+    id: stableId(id, "heading"),
+    role: "section-heading",
+    frame: { x: frame.x, y: frame.y + layout.bandHeight - layout.heading.height, width: inline ? layout.inlineHeadingWidth : frame.width, height: layout.heading.height },
+    text: inline ? layout.inlineHeading.text : layout.heading.text,
+    style: { ...textStyle(token("type.heading"), INK, true, "left", "top"), lineHeight: layout.heading.lineHeight, wrap: false },
+    data: { textLayout: inline ? layout.inlineHeading : layout.heading, headerTop: frame.y, headerBandHeight: layout.bandHeight, ruleGap: layout.ruleGap, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }
+  })];
+  if (layout.unit) nodes.push(textPrimitive({
+    id: stableId(id, "unit"),
+    role: "chart-unit",
+    frame: inline
+      ? { x: frame.x + layout.inlineHeadingWidth, y: frame.y + layout.bandHeight - layout.inlineUnit.height, width: frame.width - layout.inlineHeadingWidth, height: layout.inlineUnit.height }
+      : { x: frame.x, y: frame.y + layout.bandHeight + layout.unitGap, width: frame.width, height: layout.unit.height },
+    text: inline ? ` ${props.unit}` : props.unit,
+    style: { ...textStyle(BODY, token("color.chartUnit"), false, "left", "top"), lineHeight: (inline ? layout.inlineUnit : layout.unit).lineHeight, wrap: false },
+    data: { textLayout: inline ? layout.inlineUnit : layout.unit, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }
+  }));
+  if (layout.ruled) nodes.push(openLine(stableId(id, "rule"), frame.x, frame.y + layout.contentHeight + layout.ruleGap, frame.x + frame.width, frame.y + layout.contentHeight + layout.ruleGap, "section-heading-rule", INK, HAIRLINE, { chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }));
   return nodes;
 }
 
@@ -783,12 +808,15 @@ function registerCore(registry) {
     registry.set(definition.id, definition);
   }
   registry.set("chart-title", {
-    id: "chart-title", version: "2.0.0", category: "shared", role: "chart-title",
+    id: "chart-title", version: "2.1.0", category: "shared", role: "chart-title",
     tokens: [...SECTION_HEADING_TOKENS, "type.body", "color.chartUnit", "space.1"],
-    preferredSize: { width: 540, height: 76 }, sample: { heading: "(Insert chart title)" },
+    preferredSize: { width: 540, height: 76 }, sample: { heading: "(Insert chart title)", unit: "(Insert unit)" },
     variants: { underlined: {}, unit: { props: { unit: "Revenue share, %" } } }, defaultVariant: "underlined", variantProp: "variant", resolveVariant: resolveChartTitleVariant,
     measureContent: ({ frame, props }) => chartTitleLayout(frame, props),
-    measureHeader: ({ frame, props }) => ({ top: frame.y, ruled: resolveChartTitleVariant(props) === "underlined", height: headingLayout(frame, props).heading.height }),
+    measureHeader: ({ frame, props }) => {
+      const layout = chartTitleLayout(frame, props);
+      return { top: frame.y, ruled: layout.ruled, height: layout.contentHeight };
+    },
     render: input => ({ nodes: chartTitleNodes(input) })
   });
   return registry;

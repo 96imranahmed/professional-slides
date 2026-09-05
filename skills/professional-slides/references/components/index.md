@@ -17,7 +17,7 @@ Components are reusable slide elements. Use them only when they perform a clear 
 - [Maps](maps.md): sourced editable world, regional, and country geographies with highlights and location-bound markers.
 - [Icons, category images, and logos](icons-and-logos.md): semantic icons, category imagery, and brand marks.
 - [Chart callouts](chart-callouts.md): evidence-linked annotations and leaders.
-- [Chart titles](#chart-titles): shared graph headings, unit rows, and measured title bands.
+- [Chart titles](#chart-titles): shared graph headings, two-level units, rules, and measured title bands.
 - [Chart legends](chart-legends.md): shared series, category, status, and actual/forecast keys.
 - [Chart groups](chart-legends.md#coordinated-chart-groups): two or three charts with shared category mapping and one legend.
 - [Analytical tables](../charts/heatmap-table.md): shared table headers, alignment, composition, and native translation.
@@ -55,12 +55,14 @@ Set `mode` to `dark` (default: ink background, on-primary text) or `light` (canv
 
 ## Chart titles
 
-`chart-title` is registered in [`runtime/registry.mjs`](../../runtime/registry.mjs). It reuses the section-heading renderer, so graph headings share its font, colour, level, and measured wrapping. Inputs are `heading`, optional `unit`, and optional `variant`; `headerBandHeight` aligns wrapped peers in a coordinated group.
+`chart-title` is registered in [`runtime/registry.mjs`](../../runtime/registry.mjs). Graph headings share the section-heading font, colour, level, rule spacing, and measured wrapping. Inputs are `heading`, optional `unit`, and optional `variant`; `headerBandHeight` aligns wrapped peers in a coordinated group.
 
-- `underlined` is the default: the rule sits `space.2` below the measured heading band.
-- `unit` requires nonempty unit or subtitle text: show one regular, light-grey body-sized row below the heading with `space.1` clearance and no rule. Supplying `unit` selects this variant automatically.
+- `underlined` is the default. Its rule sits `space.2` below the complete measured title band. Use it for a chart beside an open underlined analytical rail so both peer regions share the same boundary.
+- `unit` is the explicit borderless alternative and requires nonempty unit text. Use it only when the chart's peer regions are also borderless.
 
-The component consumes the section-heading tokens plus `type.body`, `color.chartUnit`, and `space.1`. It rejects conflicting variants, multi-line units, or an allocated frame shorter than its measured content. Charts with `heading`/`unit` props and chart groups invoke this same owner; neither creates a local header or automatic period/status label. Both variants have isolated golden fixtures, plus paired wrapped-heading and unit examples, in HTML and PowerPoint.
+Keep a short unit such as `$B`, `%`, or `index` on the same line as the heading, preceded by a comma. The unit remains a separate editable text object in regular body type and `color.chartUnit`, so the two typographic levels remain visible even when they share a baseline. Shorten the heading first. Only when the measured heading and unit still cannot fit does the component place the unit on a second line with `space.1` clearance. Put a material period or population in the heading when it remains concise, for example `Q2 2026 reported-to-normalized income bridge, $B`; do not overload the unit with `$B, Q2 2026`.
+
+The component consumes the section-heading tokens plus `type.body`, `color.chartUnit`, and `space.1`. It rejects empty or multi-line units and an allocated frame shorter than its measured content. Charts with `heading`/`unit` props and chart groups invoke this same owner; neither creates a local header or automatic period/status label. Both variants have isolated golden fixtures, including inline-unit and measured stacked-fallback coverage, in HTML and PowerPoint.
 
 ## Callouts and annotations
 

@@ -55,13 +55,13 @@ Reject default chart frames, isolated metrics dressed as plots, inconsistent sma
 ## Construction rules
 
 1. Match the encoding to the comparison task and use an honest scale.
-2. Put metric, unit, population, and period in the exhibit subtitle or labels.
+2. Bias the exhibit header to one line: put a material period in a concise chart heading and append the short unit through the shared two-level title treatment. Keep the unit in its secondary colour. Use the measured second-line fallback only after shortening the heading; place population or longer basis text in labels when it would make the header unwieldy.
 3. Resolve every series, highlight, plot band, and legend key through the [theme token registry](../theming/tokens.md). Use the chart palette only for data-required series, use the light neutral chart-segment role for inactive or comparator segments, and keep all non-chart emphasis on the single structural primary. Never recolour a peer merely because of its order or position.
    For exactly two unstacked bars or columns, or two series repeated across grouped categories, use a strongly contrasting pair from the active chart palette when no explicit series mapping exists. Keep legend colours identical to the marks. For focus, choose one mechanism: a primary single-bar highlight, a theme-primary region outline, or a light-neutral region tint. Both region treatments need visible padding around the marks on all sides, with category labels clear of the highlighted region.
 4. Apply the [direct-label gate](#direct-label-gate); otherwise use the shared [chart legend](../components/chart-legends.md). Its owner defines placement, variants, exceptions, and the non-colour state cues.
 5. Default to a blank plot field without gridlines. Enable quiet gridlines only when a dense scale or several series require intermediate value lookup; never add them as generic chart furniture. When a chart contains fewer than eight plotted values and every value is shown directly, omit the quantitative axis and its ticks by default. Retain the category axis and labels. An explicit scale-reading requirement may retain the value axis, but must not leave redundant value labels and gridlines as generic furniture.
 6. Use the canonical [chart-callout grammar](../components/chart-callouts.md), keep growth, threshold, gap, and observation annotations attached to exact evidence, and avoid covering data marks or labels.
-7. Use the shared [chart-title component](../components/index.md#chart-titles) for graph and small-multiple headings; its owner defines underlines, units, peer alignment, and fit checks.
+7. Use the shared [chart-title component](../components/index.md#chart-titles) for graph and small-multiple headings; its owner defines inline units, stacked fallback, underlines, peer alignment, and fit checks. Match the rule state across peer analytical headers: if the right-hand rail is underlined, the chart title is underlined too.
 8. Preserve data and semantic chart properties in editable form when reliable.
 
 ## Direct-label gate

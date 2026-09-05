@@ -2366,7 +2366,7 @@ Reject a slide for any major visual or semantic defect, including:
 - an incomplete component such as a metric without its registered divider/label grammar or a callout without a visible attachment;
 - sparse or under-composed evidence that leaves material dead space, undersizes the dominant exhibit, or reads like an unfinished draft for its delivery mode;
 - a component or composition that fails its canonical owner contract; open compositions are valid when their relationships, jobs and geometry are explicit;
-- a chart without a complete exhibit heading, necessary units/period, readable labels, or canonical legend/direct-label treatment. The standardized unit-heading variant places a light-grey unit below the heading without an underline; the no-unit variant normally uses an underline;
+- a chart without a complete exhibit heading, necessary units/period, readable labels, or canonical legend/direct-label treatment. The standard chart title keeps a short unit inline in a secondary colour, moves a material period into the concise heading, and falls back to a second unit line only when measured fit requires it. Peer analytical headers use the same underline state;
 - an automatic/default Office legend whose placement, keys, spacing, or plot reservation visibly departs from the shared legend grammar;
 - a tracker that is unnecessary, uses a nonregistered state, repeats a full-state construction on analytical pages, or competes with the title;
 - weak hierarchy, awkward alignment, inconsistent spacing, gratuitous UI-like panels, clipping, wrapping, overlap, or unfinished polish;

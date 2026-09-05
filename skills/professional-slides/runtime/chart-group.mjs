@@ -26,8 +26,9 @@ export function registerChartGroup(registry) {
       if (keys.length > 6 || new Set(keys).size !== keys.length || keys.length !== used.length || used.some(key => !keys.includes(key))) throw new Error("Shared legend must contain each used category exactly once, with at most six categories");
       const gap = 32, span = (frame.width - gap * (charts.length - 1)) / charts.length;
       const title = registry.get("chart-title");
-      const headerBandHeight = Math.max(0, ...charts.filter(chart => chart.heading).map(chart => title.measureContent({ frame: { width: span }, props: chart }).bandHeight));
-      const headingHeight = Math.max(0, ...charts.filter(chart => chart.heading).map(chart => title.measureContent({ frame: { width: span }, props: { ...chart, headerBandHeight } }).height));
+      const titleProps = chart => ({ heading: chart.heading, unit: chart.unit, variant: chart.titleVariant });
+      const headerBandHeight = Math.max(0, ...charts.filter(chart => chart.heading).map(chart => title.measureContent({ frame: { width: span }, props: titleProps(chart) }).bandHeight));
+      const headingHeight = Math.max(0, ...charts.filter(chart => chart.heading).map(chart => title.measureContent({ frame: { width: span }, props: { ...titleProps(chart), headerBandHeight } }).height));
       const nodes = [];
       if (props.divider) {
         const x = frame.x + span + gap / 2;
@@ -44,7 +45,7 @@ export function registerChartGroup(registry) {
       }
       charts.forEach((chart, index) => {
         const childId = stableId(id, "chart", index), x = frame.x + index * (span + gap);
-        if (chart.heading) nodes.push(...title.render({ id: `${childId}-heading`, frame: { x, y: frame.y, width: span, height: headingHeight }, props: { heading: chart.heading, unit: chart.unit, headerBandHeight }, tokens }).nodes);
+        if (chart.heading) nodes.push(...title.render({ id: `${childId}-heading`, frame: { x, y: frame.y, width: span, height: headingHeight }, props: { ...titleProps(chart), headerBandHeight }, tokens }).nodes);
         const part = ["chart.pie", "chart.donut"].includes(chart.component);
         const localKeys = keysFor(chart);
         const rendered = registry.get(chart.component).render({ id: childId, frame: { x, y: frame.y + headingHeight, width: span, height: frame.height - headingHeight - 48 }, props: { ...chart.props, legend: false, ...(part ? { variant: "shared-legend", outsideLabels: false, categoryKeys: keys } : { colorIndices: localKeys.map(key => keys.indexOf(key)) }) }, tokens });

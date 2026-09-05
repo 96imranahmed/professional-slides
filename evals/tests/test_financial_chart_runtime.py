@@ -24,6 +24,9 @@ assert.ok(change.filter(n=>n.role==='data-label').every(n=>n.style.fontSize.toke
 assert.ok(change.filter(n=>n.role==='annotation-text').every(n=>n.style.fontSize.tokenId==='type.chartAnnotation'));
 const title=REGISTRY.get('chart-title').render({id:'title',frame:{x:60,y:60,width:800,height:90},props:{heading:'Performance',unit:'USD millions, 2026'}}).nodes;
 assert.equal(title.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.body');
+assert.equal(title.find(n=>n.role==='chart-unit').style.color.tokenId,'color.chartUnit');
+assert.equal(title.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
+assert.equal(title.filter(n=>n.role==='section-heading-rule').length,1);
 const cover=REGISTRY.get('cover').render({id:'cover',frame:{x:0,y:0,width:1280,height:720},props:{title:'Strategy',subtitle:'Priorities for the planning cycle'}}).nodes;
 assert.equal(cover.find(n=>n.role==='cover-subtitle').style.fontSize.tokenId,'type.body');
 console.log(JSON.stringify({accepted:true}));

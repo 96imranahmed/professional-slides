@@ -1095,7 +1095,7 @@ export function registerCharts(registry) {
       // targets or data into a production chart with partially supplied props.
       render: ({ id, frame, props = {}, tokens }) => {
         if (!props.heading) return { nodes: chart.render({ id, frame, tokens, props }) };
-        const title = registry.get("chart-title"), titleProps = { heading: props.heading, unit: props.unit };
+        const title = registry.get("chart-title"), titleProps = { heading: props.heading, unit: props.unit, variant: props.titleVariant };
         const height = title.measureContent({ frame, props: titleProps }).height;
         return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...chart.render({ id, frame: { ...frame, y: frame.y + height, height: frame.height - height }, tokens, props })] };
       }
