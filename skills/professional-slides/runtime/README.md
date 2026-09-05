@@ -111,7 +111,7 @@ Compilation rejects any component that consumes a token absent from its declarat
 
 `action-title` and `section-title` accept `props.variant: "with-line" | "without-line"`. Built-in slide titles use `chrome.titleVariant`. `planSlide()` accepts `titleVariant`; `planDeck()` also accepts a deck-level default, overridden only by an explicit slide value. The default is `without-line`.
 
-The registry exposes each title's variants, default, and property name. The scene and design manifest record the resolved selection. The optional separator sits `space.2` (8 px) below the measured text block, including wrapped titles. Both variants use the same title geometry and tokens; omitting the separator does not shift the text or content. Legacy `rule: true | false` remains an alias for standalone titles (`titleRule` for chrome); conflicting or unknown inputs fail. See the [title owner](../references/components/index.md#action-title-block) for selection guidance.
+The registry exposes each title's variants, default, and property name. The scene and design manifest record the resolved selection. The optional separator sits `space.2` (8 px) below the measured text block, including wrapped titles. Slide chrome then places content at the greater of the base body anchor and the measured title bottom plus `layout.titleContentGap` (56 px). Both variants use the same title geometry and content frame; the separator occupies the reserved gap, so omitting it does not shift the text or content. Legacy `rule: true | false` remains an alias for standalone titles (`titleRule` for chrome); conflicting or unknown inputs fail. See the [title owner](../references/components/index.md#action-title-block) for selection guidance.
 
 ### Section dividers
 

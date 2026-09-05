@@ -3,6 +3,28 @@ from test_source_structure import run_node
 
 
 class PageTemplateTests(unittest.TestCase):
+    def test_wrapped_titles_preserve_the_title_to_content_gap(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {token,tokenValue} from './skills/professional-slides/runtime/core.mjs';
+const chrome=REGISTRY.get('slide-chrome'),frame={x:0,y:0,width:1280,height:720};
+const render=title=>chrome.render({id:'page',frame,props:{title,source:'Source: Company data'}});
+const single=render('Revenue growth accelerated');
+const wrappedWithout=render('Revenue growth translated into faster operating income\\ngrowth');
+const wrappedWith=chrome.render({id:'page',frame,props:{title:'Revenue growth translated into faster operating income\\ngrowth',titleVariant:'with-line',source:'Source: Company data'}});
+const title=wrappedWithout.nodes.find(node=>node.role==='action-title');
+const actualGap=wrappedWithout.contentFrame.y-title.frame.y-title.data.textLayout.height;
+assert.equal(title.data.textLayout.lines.length,2);
+assert.equal(actualGap,tokenValue(token('layout.titleContentGap')));
+assert.ok(wrappedWithout.contentFrame.y>single.contentFrame.y);
+assert.deepEqual(wrappedWithout.contentFrame,wrappedWith.contentFrame);
+console.log(JSON.stringify({accepted:true,actualGap,singleTop:single.contentFrame.y,wrappedTop:wrappedWithout.contentFrame.y}));
+""")
+        self.assertTrue(result["accepted"])
+        self.assertEqual(result["actualGap"], 56)
+        self.assertGreater(result["wrappedTop"], result["singleTop"])
+
     def test_footer_defaults_and_rule_variants_share_baseline(self):
         result = run_node("""
 import assert from 'node:assert/strict';

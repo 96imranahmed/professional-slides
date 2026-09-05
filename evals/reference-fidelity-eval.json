@@ -1,16 +1,16 @@
 {
   "schema": "professional-slides.reference-fidelity/v1",
-  "generatedAt": "2026-09-05T12:16:54.087Z",
+  "generatedAt": "2026-09-05T12:51:41.640Z",
   "accepted": true,
   "inputs": {
     "runtimeSources": {
-      "skills/professional-slides/runtime/core.mjs": "3b2031b34f0f5eef21031435b16ec0275be51b0f0f09b1acb565fa943fd45596",
+      "skills/professional-slides/runtime/core.mjs": "1e961ae780ffcced1f805908f5e38f7a6aef43923de60c7d05d2407672168f7f",
       "skills/professional-slides/runtime/page-template.mjs": "81d98ec89ea00cc9452df4a1a2df760c3279e6b3f978a790ef7904ed35bec793",
       "skills/professional-slides/runtime/text-layout.mjs": "5ce60d8e77f790ff84b55191e2b4609e2170e706cf95e0f462ba9725595bf139",
       "skills/professional-slides/runtime/routing.mjs": "17e58ba61a79947670fae46adcc470560bfb7e66c5e2e785f5046dda4b04b686",
       "skills/professional-slides/runtime/overlap-policy.mjs": "dd6a27c6562803c86ac39f49489d6a8200e8baa503b6be997ce7cb6fa64b0e5f",
       "skills/professional-slides/runtime/validate-overlap.mjs": "3d1b59744f222a995d7adb9763d0ebd6790c07bdbc533327aa4e200dc75f9d49",
-      "skills/professional-slides/runtime/registry.mjs": "46e6960cce38d509e22734a1186aaaeeb40ccd573167e0bf6984c4cedca10e03",
+      "skills/professional-slides/runtime/registry.mjs": "156b69aa6b9f191260da8728a235c3f30e9e428607c5471f3dc57964d93dcad5",
       "skills/professional-slides/runtime/trackers.mjs": "edaad1c0285b0173fd84108dd45a3e17ef5e33ed54311f917f3ecbfca40938fb",
       "skills/professional-slides/runtime/insight-tree-table.mjs": "ec8eb857614a047a95158145c89bcdb2eeb1fe8a8ff2f4c6c2d573a9720a39d5",
       "skills/professional-slides/runtime/quote-cluster.mjs": "a7e995784831d89e18b01621780142f8a1ff1ee4a50e817e889ac09b2c4407b0",
@@ -52,9 +52,9 @@
     "slideCount": 16,
     "sceneNodeCount": 884,
     "designSystemVersion": "2.0.0",
-    "designHash": "01fe8200afb527966edd5c5ed36ec8e0a9692b1db347a378cee5151b9ba93adb",
-    "pptxPath": "/Users/imran/Desktop/Side Projects/professional-slides/tmp/reference-fidelity-validation/consulting-toolkit-golden.pptx",
-    "pptxSha256": "32b643c05ad3de620e687c25fbb1a76ef7e7bdb6c8a829b326beef30b6cfe4dc"
+    "designHash": "3e4bbfa3ea1f6b94afb1ffa8f685d75d3d6f708f7f7601a389b32f9677067882",
+    "pptxPath": "/Users/imran/Desktop/Side Projects/professional-slides/tmp/reference-fidelity-validation-title-gap/consulting-toolkit-golden.pptx",
+    "pptxSha256": "a9a3be59a53c61e1f5dacf101f4bb81dffb8e7357d061e0fce3f1d2a1f573488"
   },
   "thresholds": {
     "parity": {

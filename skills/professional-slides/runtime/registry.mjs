@@ -146,12 +146,13 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
   const variant = resolveTitleVariant(props);
   const ruleGap = tokenValue(token("space.2"));
   const size = section ? token("type.sectionTitle") : token(chrome && String(props.text || "").length > 55 ? "type.actionTitleLong" : "type.actionTitle");
-  const textFrame = chrome
+  const baseTextFrame = chrome
     ? { x: frame.x + CHROME.left, y: frame.y + (props.titleTop ?? CHROME.titleTop), width: props.availableTitleWidth ?? frame.width - CHROME.left - CHROME.right, height: CHROME.titleHeight }
     : { x: frame.x, y: frame.y, width: frame.width, height: frame.height - ruleGap };
-  const textLayout = measureText(props.text, textFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(size), bold: true, wrapWidthRatio: 1 });
+  const textLayout = measureText(props.text, baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(size), bold: true, wrapWidthRatio: 1 });
+  const textFrame = chrome ? { ...baseTextFrame, height: Math.max(baseTextFrame.height, textLayout.height) } : baseTextFrame;
   const ruleY = textFrame.y + textLayout.height + ruleGap;
-  if (textLayout.height > textFrame.height) throw new Error(`Title ${id} exceeds its allocated height; shorten it or allocate more space`);
+  if (!chrome && textLayout.height > textFrame.height) throw new Error(`Title ${id} exceeds its allocated height; shorten it or allocate more space`);
   const nodes = [textPrimitive({
     id: stableId(id, chrome ? "title" : "text"),
     role: section ? "section-title" : "action-title",
@@ -457,13 +458,20 @@ function registerCore(registry) {
     }),
     component({
       id: "slide-chrome", category: "shared", role: "slide-chrome",
-      tokens: ["color.canvas", "color.ink", "font.display", "type.actionTitle", "type.actionTitleLong", ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
+      tokens: ["color.canvas", "color.ink", "font.display", "type.actionTitle", "type.actionTitleLong", "layout.titleContentGap", ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
       preferredSize: { width: SLIDE.width, height: SLIDE.height },
       sample: { title: "(Insert action title)", source: "Source: (Insert source)", footerRight: "(Insert company name)", pageNumber: 7 },
       render: ({ id, frame, props }) => {
         const page = renderPageTemplate({ id, frame, props });
         const tracker = props.tracker ? trackerLabelNodes({ id: stableId(id, "tracker"), frame: { x: frame.x + CHROME.left, y: frame.y + 30, width: page.titleWidth, height: 20 }, props: props.tracker }) : [];
-        return { ...page, nodes: [...tracker, ...titleNodes({ id, frame, props: { text: props.title, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker ? 58 : CHROME.titleTop }, chrome: true }), ...page.nodes] };
+        const titles = titleNodes({ id, frame, props: { text: props.title, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker ? 58 : CHROME.titleTop }, chrome: true });
+        const title = titles.find((node) => node.role === "action-title");
+        const titleBottom = title.frame.y + title.data.textLayout.height;
+        const baseBottom = page.contentFrame.y + page.contentFrame.height;
+        const contentTop = Math.max(page.contentFrame.y, titleBottom + tokenValue(token("layout.titleContentGap")));
+        const contentFrame = { ...page.contentFrame, y: contentTop, height: baseBottom - contentTop };
+        if (contentFrame.height <= 0) throw new Error("Action title leaves no room for slide content; shorten the title or split the slide");
+        return { ...page, contentFrame, nodes: [...tracker, ...titles, ...page.nodes] };
       }
     }),
     component({ id: "page-template", category: "shared", role: "page-template", tokens: PAGE_TEMPLATE_TOKENS,

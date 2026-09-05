@@ -89,6 +89,7 @@ export const TOKENS = Object.freeze({
   "space.5": length("--space-5", 24),
   "space.6": length("--space-6", 32),
   "space.8": length("--space-8", 48),
+  "layout.titleContentGap": length("--title-content-gap", 56),
   "icon.small": length("--icon-sm", 16),
   "icon.medium": length("--icon-md", 24),
   "line.hairline": length("--line-hairline", 1),
