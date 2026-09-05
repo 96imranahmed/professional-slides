@@ -17,6 +17,7 @@ const nodes=column.render({id:'column',frame,props}).nodes;
 assert.ok(nodes.filter(n=>n.role==='data-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 assert.ok(nodes.filter(n=>n.role==='legend-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 assert.ok(nodes.filter(n=>n.role==='annotation-text').every(n=>n.style.fontSize.tokenId==='type.chartAnnotation'));
+assert.ok(nodes.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.body'));
 const waterfall=REGISTRY.get('chart.waterfall');
 const change=waterfall.render({id:'waterfall',frame,props:{...waterfall.sample,...waterfall.examples['end-to-end-construction'].props}}).nodes;
 assert.ok(change.filter(n=>n.role==='data-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
@@ -25,6 +26,35 @@ const title=REGISTRY.get('chart-title').render({id:'title',frame:{x:60,y:60,widt
 assert.equal(title.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.body');
 const cover=REGISTRY.get('cover').render({id:'cover',frame:{x:0,y:0,width:1280,height:720},props:{title:'Strategy',subtitle:'Priorities for the planning cycle'}}).nodes;
 assert.equal(cover.find(n=>n.role==='cover-subtitle').style.fontSize.tokenId,'type.body');
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_sparse_directly_labelled_charts_omit_value_axes_and_keep_body_sized_category_ticks(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const frame={x:60,y:150,width:1000,height:500};
+const column=REGISTRY.get('chart.column');
+const sparse=column.render({id:'sparse',frame,props:{categories:['Revenue','Operating income'],series:[{name:'Q2 2025',values:[100,100]},{name:'Q2 2026',values:[124,130]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
+assert.equal(sparse.filter(n=>n.role==='axis-label').length,0);
+assert.equal(sparse.filter(n=>n.id.endsWith('y-axis')).length,0);
+assert.equal(sparse.filter(n=>n.id.endsWith('x-axis')).length,1);
+assert.ok(sparse.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.body'));
+const threshold=column.render({id:'threshold',frame,props:{categories:['A','B','C','D'],series:[{name:'Actual',values:[1,2,3,4]},{name:'Plan',values:[2,3,4,5]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
+assert.equal(threshold.filter(n=>n.role==='axis-label').length,5);
+assert.ok(threshold.filter(n=>n.role==='axis-label').every(n=>n.style.fontSize.tokenId==='type.body'));
+const forced=column.render({id:'forced',frame,props:{categories:['A','B'],series:[{name:'Value',values:[1,2]}],dataLabels:true,showValueAxis:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
+assert.equal(forced.filter(n=>n.role==='axis-label').length,5);
+const horizontal=REGISTRY.get('chart.bar').render({id:'horizontal',frame,props:{categories:['A','B'],series:[{name:'Value',values:[1,2]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
+assert.equal(horizontal.filter(n=>n.role==='axis-label').length,0);
+assert.equal(horizontal.filter(n=>n.id.endsWith('x-axis')).length,0);
+assert.equal(horizontal.filter(n=>n.id.endsWith('y-axis')).length,1);
+const line=REGISTRY.get('chart.line').render({id:'line',frame,props:{categories:['Q1','Q2','Q3'],series:[{name:'Value',values:[1,2,3]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
+assert.equal(line.filter(n=>n.role==='axis-label').length,0);
+const waterfall=REGISTRY.get('chart.waterfall').render({id:'waterfall',frame,props:{categories:['Start','Change','End'],values:[10,5,15],totals:[0,2],annotations:[],highlights:[],referenceLines:[]}}).nodes;
+assert.equal(waterfall.filter(n=>n.role==='axis-label').length,0);
+assert.throws(()=>column.render({id:'bad',frame,props:{categories:['A'],series:[{name:'Value',values:[1]}],showValueAxis:false,gridlines:true}}),/gridlines require a visible value axis/);
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
@@ -258,7 +288,7 @@ console.log(JSON.stringify({accepted:true}));
 import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-const deck=compileDeck({slides:[{id:'fractional',composition:component({id:'chart',component:'chart.column',frame:{x:60,y:160,width:1160,height:480},props:{categories:['2025','2026'],series:[{name:'Revenue',values:[13.624,24.768]}],yMax:30}})}]},REGISTRY);
+const deck=compileDeck({slides:[{id:'fractional',composition:component({id:'chart',component:'chart.column',frame:{x:60,y:160,width:1160,height:480},props:{categories:['2025','2026'],series:[{name:'Revenue',values:[13.624,24.768]}],yMax:30,showValueAxis:true}})}]},REGISTRY);
 assert.deepEqual(deck.slides[0].nodes.filter(n=>n.role==='axis-label').map(n=>n.text),['0','7.5','15','22.5','30']);
 console.log(JSON.stringify({accepted:true}));
 """)

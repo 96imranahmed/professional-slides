@@ -22,7 +22,7 @@ One categorical dimension, one or a small number of numeric series, explicit uni
 - Start the quantitative axis at zero unless a truncated scale is essential, clearly signaled, and does not overstate differences.
 - Plot signed values from the zero baseline: negatives extend left or down, and their labels sit beyond the negative endpoint rather than inside a positive sliver.
 - Keep gaps consistent and narrower than bars.
-- Use direct labels only when they pass the shared [direct-label gate](index.md#direct-label-gate) and remove the need for an axis.
+- Use direct labels only when they pass the shared [direct-label gate](index.md#direct-label-gate). Fewer than eight directly labelled values remove the quantitative axis by default; keep the category axis and its body-sized labels.
 - Highlight one bar or group and keep the rest neutral.
 - Use clustered bars only when within-category comparison is central.
 - Keep the plot field blank by default. Add gridlines only when intermediate scale reading is necessary.
@@ -112,4 +112,4 @@ Too many categories, rotated labels, non-zero baselines that exaggerate gaps, de
 
 ## Acceptance test
 
-The rank or comparison should be clear before reading labels, every visible value must match the source after rounding, and horizontal charts expose the same numeric ticks and optional gridlines as vertical charts.
+The rank or comparison should be clear before reading labels, every visible value must match the source after rounding, and horizontal charts follow the same value-axis suppression and optional-gridline contract as vertical charts. Every visible numeric or category tick uses the active body size.

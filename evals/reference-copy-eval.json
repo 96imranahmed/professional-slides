@@ -2,22 +2,22 @@
   "accepted": true,
   "filesExpected": 56,
   "judgement": {
-    "aggregateScore": 95.75,
+    "aggregateScore": 96,
     "dimensions": {
       "actionability": {
-        "rationale": "Instructions state what to create, preserve, reject, and verify across authoring and platform paths.",
-        "score": 98
+        "rationale": "Authors can select constructions, provide required data, handle exceptions, and apply observable acceptance checks without material guesswork.",
+        "score": 99
       },
       "concision": {
-        "rationale": "The guidance is dense but generally earns its detail through executable constraints, thresholds, and exception handling.",
+        "rationale": "The guidance is dense but predominantly constraint-bearing. Cross-references and local exceptions avoid needless setup.",
         "score": 93
       },
       "nonRedundancy": {
-        "rationale": "Canonical ownership and cross-links are strong; one specimen file restates an owner-level routing rule.",
+        "rationale": "Canonical owners are clear and dependent files generally link rather than redefine them; limited local restatement supplies necessary context.",
         "score": 94
       },
       "specificity": {
-        "rationale": "Owners consistently define decisions, data contracts, failure states, and verifiable acceptance conditions.",
+        "rationale": "Rules consistently name inputs, thresholds, rejection conditions, ownership boundaries, and verification criteria.",
         "score": 98
       }
     },
@@ -79,22 +79,13 @@
       "tools/powerpoint/pptxgenjs.md",
       "tools/powerpoint/rendering.md"
     ],
-    "findings": [
-      {
-        "excerpt": "Use one full state and, only when needed, one compact state for a deck.",
-        "file": "components/trackers/specimens.md",
-        "location": "Introduction",
-        "reason": "This repeats the tracker-router selection rule already owned by `components/trackers/index.md`; the specimen file otherwise correctly delegates variant semantics to that owner.",
-        "recommendedChange": "Remove this sentence and retain the existing link to the tracker owner.",
-        "severity": "minor"
-      }
-    ],
+    "findings": [],
     "rubricVersion": "2",
-    "summary": "Accepted. All manifest files were reviewed; no blocker or major copy-quality findings were identified.",
+    "summary": "All manifest files were reviewed. The guidance and visible specimen copy meet the acceptance threshold with no blocker, major, or minor findings.",
     "verdict": "accept"
   },
   "model": "gpt-5.6-terra",
-  "referenceHash": "afb45cb9caeb3de4332fd5bb8046b663b77b6f6cd72193c374c3f6a6aaf494ba",
+  "referenceHash": "cff47378b2550d63f35e52659dd786448c6e3461cac4b3890fbd92d727e133c4",
   "rubricVersion": "2",
   "schemaVersion": 1,
   "validationErrors": []
