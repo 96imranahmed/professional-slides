@@ -1,76 +1,71 @@
 # Professional Slides
 
-`professional-slides` is a portable agent skill for building executive-grade,
-answer-first consulting decks in PowerPoint and Google Slides. It packages the
-reasoning, design system, slide archetypes, chart standards, cross-deck
-components, and QA gates needed to produce decision-ready presentations with a
-consistent visual grammar.
+A single Codex plugin for planning, building, and checking editable consulting presentations. Approved content flows through reusable components and an open composition tree into one resolved scene. HTML and PptxGenJS consume that scene; Artifact Tool imports the saved PowerPoint to verify names, geometry, and theme inheritance.
 
-The project is designed for Codex and other `SKILL.md`-compatible coding agents,
-including Claude Code. It is independent and is not affiliated with, endorsed
-by, or derived from confidential materials belonging to McKinsey & Company.
-"McKinsey-style" describes the familiar category of concise, evidence-led,
-executive consulting communication.
+The McKinsey, BCG, and Bain palettes are independent, brand-inspired presets, not official firm templates or endorsements. Company fonts are configured separately.
 
-## What is included
+## Structure
 
-- Answer-first storylining and deck architecture
-- Six extensible slide archetypes
-- Six decision-oriented chart families
-- Reusable titles, trackers, section rails, footers, sources, and appendix
-  components
-- PowerPoint and Google Slides implementation guidance
-- A workflow for learning from user-supplied reference decks
-- A machine-checkable deck blueprint and validation script
-- Render-based visual and editorial QA gates
-
-## Repository layout
-
-```text
-.
-|-- SKILL.md
-|-- agents/openai.yaml
-|-- references/
-|   |-- design-foundations.md
-|   |-- slide-archetypes.md
-|   |-- charts.md
-|   |-- components.md
-|   |-- template-intake.md
-|   |-- powerpoint.md
-|   |-- google-slides.md
-|   |-- quality-assurance.md
-|   |-- deck-blueprint.schema.json
-|   `-- theming/
-|       |-- index.md
-|       |-- theme-system.md
-|       |-- reference-derived-patterns.md
-|       |-- theme-spec.schema.json
-|       |-- theme-spec.example.json
-|       `-- source-manifest.json
-|-- examples/deck-blueprint.example.json
-|-- scripts/
-|   |-- validate_blueprint.py
-|   |-- validate_theme.py
-|   `-- inventory_pptx.py
-`-- tests/test_validate_blueprint.py
-```
+- `skills/professional-slides/SKILL.md` routes new decks, structural revisions, and bounded slide edits.
+- `skills/professional-slides/references/` owns storylining, design, component semantics, charts, deck templates, platform guidance, and QA.
+- `skills/professional-slides/runtime/` owns executable composition, tokens, component geometry, and adapters. Start with its [runtime guide](skills/professional-slides/runtime/README.md).
+- `evals/` owns validators, fixtures, scenario briefs, and regression tests.
+- `.codex-plugin/plugin.json` exposes the one canonical skill.
 
 ## Use
 
-Install or clone this directory into the skill location used by your agent,
-then invoke `$professional-slides` with the deck brief, audience, desired
-decision, data, source material, output format, and any reference deck.
+Invoke `$professional-slides` with the audience, decision, evidence limits, delivery context, output platform, and any authorized reference. New decks require an approved storyline before authoring. Existing-deck and bounded-slide requests preserve the unaffected content and design.
 
-Reference decks are intentionally not committed yet. When they are supplied,
-add each approved source under `assets/reference-decks/<reference-name>/`, run
-the inventory workflow in `references/template-intake.md`, and encode only the
-reusable design rules and assets the user is authorized to reuse.
+The runtime currently produces editable PowerPoint primitives, including charts. Charts are not native workbook-backed chart objects. Google Slides remains a downstream import or separately validated platform workflow; PowerPoint parity does not prove Google Slides fidelity. The built-in media fixtures demonstrate placement, not a library of corporate logos or photographs.
 
-Validate the skill package and example blueprint with:
+## Extend
+
+Use the [component contract](skills/professional-slides/runtime/README.md#component-contract) for geometry and variants, the [composition model](skills/professional-slides/references/composition/index.md) for relationships, and the [template authoring contract](skills/professional-slides/references/templates/authoring.md) for recurring audience decisions. Keep each semantic rule in its canonical owner.
+
+Register every rendering variant with representative props and size. New registrations enter the golden set automatically. Components consume declared theme tokens; HTML serializes them as CSS variables, while PowerPoint materializes the same values and native theme. CSS is not a second layout engine.
+
+## Development checks
+
+`npm run check` runs syntax/whitespace checks and fast tests. `check:syntax` is not a semantic linter. These tests do not require regenerating cached visual reports after each edit. `npm run check:release` still requires current accepted reference reports and a hash-verified golden set, including both render images for every fixture.
+
+Rendering dependencies are pinned in `package.json` and their resolved transitive manifests in `evals/runtime-lock.json`. The lock records the Codex bundle, Node version and platform used for acceptance, including private packages unavailable through public npm. Run `"$RUNTIME_NODE" evals/scripts/runtime_lock.mjs` before rendering. A different bundle/platform requires a reviewed lock refresh and new visual acceptance, not a silent upgrade. Never modify bundled dependencies.
+
+The table compiler uses Prettier 3.6.2 formatting; keep normalization, measurement and rendering in separate named helpers.
+
+Use the bundled workspace dependencies returned by Codex's `load_workspace_dependencies`: set `RUNTIME_NODE`, `RUNTIME_NODE_MODULES`, `RUNTIME_PYTHON`, `RUNTIME_BIN_DIR`, and `PRESENTATION_SKILL_DIR`. Set `PLAYWRIGHT_BROWSER_PATH` if using a browser outside Playwright's installation. The Python environment needs PyYAML. Do not alter the bundled libraries.
 
 ```bash
-python /path/to/skill-creator/scripts/quick_validate.py .
-python scripts/validate_blueprint.py examples/deck-blueprint.example.json
-python scripts/validate_theme.py references/theming/theme-spec.example.json
-python -m unittest discover -s tests
+"$RUNTIME_PYTHON" -m unittest discover -s evals/tests -p 'test_*.py'
+"$RUNTIME_PYTHON" evals/scripts/validate_template_registry.py
+"$RUNTIME_NODE" evals/scripts/generate_golden_set.mjs
+"$RUNTIME_NODE" evals/scripts/generate_golden_set.mjs --check
+"$RUNTIME_NODE" evals/scripts/validate_reference_fidelity.mjs --source-root /path/to/consulting-toolkit
+"$RUNTIME_PYTHON" evals/scripts/validate_reference_copy.py --model gpt-5.6-terra
+"$RUNTIME_PYTHON" evals/run_evals.py --check
 ```
+
+Also run the installed plugin-creator's `validate_plugin.py` against this repository and skill-creator's `quick_validate.py` against the skill directory. After source changes, reinstall `professional-slides@personal` and compare the installed manifest, skill, and eval files with the source.
+
+### Golden component evaluation
+
+Every golden run generates one canonical McKinsey deck containing all components, registered variants, layout fixtures, and standard compositions. Compatible variants share paginated review boards, with explicit instance-level coverage retained for every branch. Gates check coverage, text fit, overlaps, package structure, Artifact Tool readback, theme binding, and HTML-to-PPTX image parity. Inspect the paired renders and lowest-scoring fixtures as well as the reports.
+
+Accepted runs remain under `output/golden/runs/`. `output/golden/index.html` points to the latest accepted set. A failed run cannot replace it; `golden:check` rejects evidence from changed sources. Do not reset `output/` for a golden rerun.
+
+The source-fidelity gate additionally requires the authorized consulting-toolkit directory, including its inventory and both source-image sets. Those external reference assets are not distributed in this repository. Promote its newly accepted `reference-fidelity-report.json` to `evals/reference-fidelity-eval.json`; the release check rejects stale or incomplete evidence. Capability inventory is a separate check:
+
+```bash
+"$RUNTIME_NODE" evals/scripts/import_consulting_toolkit.mjs --source /path/to/consulting-toolkit/index.html
+```
+
+### End-to-end scenario evaluation
+
+`evals/cases.json` contains authoring scenarios, not pre-generated results. Running tests or golden decks does not execute those scenarios. Supply the case's evidence and cutoff, generate its requested artifacts, and record per-case results before claiming scenario coverage.
+
+For a user-authorized fresh scenario reset, `prepare_eval_run.py --run-id <unique-id>` clears this repository's generated `output/` directory and creates an isolated workspace. This also removes retained golden output, so preserve any golden set the user still needs elsewhere first. Do not reuse generated storylines, builders, renders, or QA from a previous scenario run. Validate completed results with:
+
+```bash
+"$RUNTIME_PYTHON" evals/run_evals.py --mode self --results /path/to/results.json
+```
+
+Automated checks do not establish sound writing, factual accuracy, or native PowerPoint/Google Slides behavior. Report the actual renderer used and any platform checks not performed.

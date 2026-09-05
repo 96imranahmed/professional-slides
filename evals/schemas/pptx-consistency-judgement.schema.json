@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["rubricVersion", "verdict", "summary", "deckScores", "slideCoverage", "comparisonGroups", "findings"],
+  "properties": {
+    "rubricVersion": {"type": "string"},
+    "verdict": {"type": "string", "enum": ["accept", "reject"]},
+    "summary": {"type": "string", "minLength": 1},
+    "deckScores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visualSystemCoherence", "componentVariantContinuity", "trackerContinuity", "titleAndGridContinuity", "legendAndExhibitConsistency", "densityRhythm", "semanticColourConsistency"],
+      "properties": {
+        "visualSystemCoherence": {"type": "number", "minimum": 0, "maximum": 100},
+        "componentVariantContinuity": {"type": "number", "minimum": 0, "maximum": 100},
+        "trackerContinuity": {"type": "number", "minimum": 0, "maximum": 100},
+        "titleAndGridContinuity": {"type": "number", "minimum": 0, "maximum": 100},
+        "legendAndExhibitConsistency": {"type": "number", "minimum": 0, "maximum": 100},
+        "densityRhythm": {"type": "number", "minimum": 0, "maximum": 100},
+        "semanticColourConsistency": {"type": "number", "minimum": 0, "maximum": 100}
+      }
+    },
+    "slideCoverage": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 1}
+    },
+    "comparisonGroups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "slides", "role", "verdict", "observation"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "slides": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+          "role": {"type": "string", "minLength": 1},
+          "verdict": {"type": "string", "enum": ["accept", "reject"]},
+          "observation": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "code", "slides", "observation", "reason", "recommendedChange"],
+        "properties": {
+          "severity": {"type": "string", "enum": ["blocker", "major", "minor"]},
+          "code": {"type": "string", "minLength": 1},
+          "slides": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+          "observation": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "recommendedChange": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

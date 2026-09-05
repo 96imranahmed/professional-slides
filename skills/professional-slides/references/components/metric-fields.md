@@ -1,0 +1,94 @@
+# Metric Fields
+
+Metric fields present one to three headline values whose comparison or implication is central to the slide. Use them when the values themselves are the evidence; use a chart when trend, distribution, relationship, or composition matters.
+
+## Variant selection
+
+- **Open metric row:** default for two or three peer metrics. Use value, short divider, label, and one explanatory line without enclosing cards.
+- **Hero plus peers:** use when one metric is explicitly dominant and two smaller values qualify it. The action title or adjacent copy must explain the hierarchy.
+- **Metric with decision band:** use when one to three metrics support one terminal action or implication. The band is the slide's single callout or terminal-action surface.
+- **Compact score strip:** use inside an executive synthesis or comparison slide when the values summarize previously established evidence rather than create a new analytical job.
+
+Do not create a separate box for each value by default. Peers share the same value role, divider length, label grammar, description depth, and base colour. Emphasize one metric only when the title or a direct annotation explains why it is exceptional.
+
+## Content contract
+
+Every metric includes a value, unit or basis, period or population when material, and a concise label. Add one interpretation or definition when the metric is a ratio, proxy, threshold result, nonstandard unit, or otherwise lacks a self-evident denominator. Use comparable units and periods across peers or make the difference explicit.
+
+## Theme contract
+
+| Component | Consumed custom properties | Canonical source |
+| --- | --- | --- |
+| metric field | `--metric-font`, `--metric-hero-font`, `--metric-color`, `--metric-label-font`, `--metric-label-color`, `--metric-divider`, `--metric-gap` | [component bindings](../theming/component-bindings.md#evidence-components) |
+
+## Structural HTML reference
+
+This fragment inherits the themed deck root from its slide.
+
+```html
+<section class="metric-slide" data-role="metric-field">
+  <header class="metric-slide__title" data-role="action-title">The 2026 pilot cleared adoption and speed gates but missed retention</header>
+  <main class="metric-row metric-row--open">
+    <article class="metric"><strong>74%</strong><span class="metric__rule"></span><h2>weekly active teams</h2><p>Above the 70% adoption gate</p></article>
+    <article class="metric"><strong>11 days</strong><span class="metric__rule"></span><h2>time to first workflow</h2><p>Below the 14-day speed gate</p></article>
+    <article class="metric"><strong>42%</strong><span class="metric__rule"></span><h2>week-eight retention</h2><p>Below the 55% scale gate</p></article>
+  </main>
+  <footer data-role="source">Source: Illustrative pilot dataset, January to June 2026.</footer>
+</section>
+```
+
+```css
+.metric-slide { width: 1280px; height: 720px; padding: var(--slide-margin-y) var(--slide-margin-x); display: grid; grid-template-rows: auto 1fr auto; background: var(--canvas); color: var(--ink); }
+.metric-slide__title { font: var(--type-action-title); border-bottom: var(--rule-page); padding-bottom: var(--space-3); }
+.metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6); align-items: center; }
+.metric { display: grid; grid-template-rows: auto auto auto auto; gap: var(--space-2); align-content: center; }
+.metric strong { font: var(--type-metric); color: var(--component-primary); }
+.metric__rule { width: 44%; border-top: var(--rule-quiet); }
+.metric h2, .metric p { margin: 0; }
+.metric h2 { font: var(--type-section-heading); }
+.metric p { font: var(--type-body); color: var(--text-secondary); }
+```
+
+For the hero-plus-peers variant, change only the grid proportion and the hero value role. For the decision-band variant, route the post-row decision through the reusable [`Insight Box`](insight-box.md). Do not wrap the metrics in cards or add an edge accent to the insight box.
+
+### Hero plus peers
+
+```html
+<main class="metric-row metric-row--hero-plus-peers" data-role="metric-field">
+  <article class="metric metric--hero"><strong>68%</strong><span class="metric__rule"></span><h2>weekly active teams</h2><p>The retained cohort that drives the decision</p></article>
+  <article class="metric"><strong>24%</strong><span class="metric__rule"></span><h2>paid conversion</h2><p>Qualified enterprise workspaces</p></article>
+  <article class="metric"><strong>4.2×</strong><span class="metric__rule"></span><h2>expansion</h2><p>Usage growth among retained teams</p></article>
+</main>
+```
+
+```css
+.metric-row--hero-plus-peers { display: grid; grid-template-columns: 1.8fr 1fr 1fr; gap: var(--space-6); align-items: end; }
+.metric--hero strong { font: var(--type-metric-hero); }
+.metric--hero { padding-right: var(--space-6); border-right: var(--rule-quiet); }
+```
+
+### Metrics with decision band
+
+```html
+<section class="metric-slide metric-slide--decision" data-role="metric-page">
+  <header data-role="action-title">The launch clears the demand gate but not the retention gate</header>
+  <main class="metric-row metric-row--open" data-role="metric-field">
+    <article class="metric"><strong>1.8×</strong><span class="metric__rule"></span><h2>demand versus plan</h2><p>First ninety days</p></article>
+    <article class="metric"><strong>42%</strong><span class="metric__rule"></span><h2>week-eight retention</h2><p>Below the 55% follow-on threshold</p></article>
+  </main>
+  <aside class="insight-box" data-role="insight-box" data-variant="tonal">Fund the next market only after week-eight retention reaches the stated gate.</aside>
+</section>
+```
+
+```css
+.metric-slide--decision { width: 1280px; height: 720px; padding: var(--slide-margin-y) var(--slide-margin-x); display: grid; grid-template-rows: auto 1fr auto; gap: var(--space-4); }
+.metric-slide--decision > header { font: var(--type-action-title); border-bottom: var(--rule-page); padding-bottom: var(--space-3); }
+```
+
+The `insight-box` geometry and theme values come from its component owner; the metric slide supplies only its position in the page grid.
+
+The compact score-strip variant uses the same open-row geometry at the `label` and `body-compact` roles inside its parent grid. It does not add a second title, card frame, or insight box.
+
+## Acceptance check
+
+Verify values are comparable or qualified. Keep peer styling identical. Explain every highlighted metric. Descriptions add interpretation instead of repeating labels. The composition remains clear without cards.

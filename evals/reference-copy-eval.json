@@ -1,0 +1,92 @@
+{
+  "accepted": true,
+  "filesExpected": 56,
+  "judgement": {
+    "aggregateScore": 96,
+    "dimensions": {
+      "actionability": {
+        "rationale": "Authors can select constructions, provide required data, handle exceptions, and apply observable acceptance checks without material guesswork.",
+        "score": 99
+      },
+      "concision": {
+        "rationale": "The guidance is dense but predominantly constraint-bearing. Cross-references and local exceptions avoid needless setup.",
+        "score": 93
+      },
+      "nonRedundancy": {
+        "rationale": "Canonical owners are clear and dependent files generally link rather than redefine them; limited local restatement supplies necessary context.",
+        "score": 94
+      },
+      "specificity": {
+        "rationale": "Rules consistently name inputs, thresholds, rejection conditions, ownership boundaries, and verification criteria.",
+        "score": 98
+      }
+    },
+    "filesReviewed": [
+      "charts/bar-column.md",
+      "charts/heatmap-table.md",
+      "charts/horizons.md",
+      "charts/index.md",
+      "charts/line.md",
+      "charts/percentage-segment-by-group.md",
+      "charts/pie-donut.md",
+      "charts/scatter-bubble.md",
+      "charts/stacked.md",
+      "charts/waterfall.md",
+      "components/arrows.md",
+      "components/chart-callouts.md",
+      "components/chart-legends.md",
+      "components/comparison-indicators.md",
+      "components/copy.md",
+      "components/guidelines.md",
+      "components/icons-and-logos.md",
+      "components/index.md",
+      "components/insight-box.md",
+      "components/item-indicators.md",
+      "components/maps.md",
+      "components/metric-fields.md",
+      "components/quote-cluster.md",
+      "components/relationships.md",
+      "components/text-box.md",
+      "components/trackers/index.md",
+      "components/trackers/specimens.md",
+      "composition/index.md",
+      "design/index.md",
+      "design/slide-layouts.md",
+      "evaluation/index.md",
+      "storylining/dot-dash.md",
+      "storylining/hypothesis-tree.md",
+      "storylining/index.md",
+      "storylining/pre-authoring-contract.md",
+      "templates/authoring.md",
+      "templates/commercial-due-diligence.md",
+      "templates/index.md",
+      "templates/project-progress-update.md",
+      "templates/startup-pitch-deck.md",
+      "theming/component-bindings.md",
+      "theming/html-css-contract.md",
+      "theming/index.md",
+      "theming/tokens.md",
+      "tools/codex-generation.md",
+      "tools/css-to-native-mapper.md",
+      "tools/google-slides/api-integration.md",
+      "tools/google-slides/index.md",
+      "tools/google-slides/rendering.md",
+      "tools/index.md",
+      "tools/powerpoint/acceptance.md",
+      "tools/powerpoint/artifact-tool.md",
+      "tools/powerpoint/index.md",
+      "tools/powerpoint/office-js-and-graph.md",
+      "tools/powerpoint/pptxgenjs.md",
+      "tools/powerpoint/rendering.md"
+    ],
+    "findings": [],
+    "rubricVersion": "2",
+    "summary": "All manifest files were reviewed. The guidance and visible specimen copy meet the acceptance threshold with no blocker, major, or minor findings.",
+    "verdict": "accept"
+  },
+  "model": "gpt-5.6-terra",
+  "referenceHash": "cff47378b2550d63f35e52659dd786448c6e3461cac4b3890fbd92d727e133c4",
+  "rubricVersion": "2",
+  "schemaVersion": 1,
+  "validationErrors": []
+}

@@ -1,0 +1,124 @@
+{
+  "version": 5,
+  "dimensions": [
+    "briefFidelity",
+    "narrativeLogic",
+    "slideDesign",
+    "chartIntegrity",
+    "platformCorrectness",
+    "editability",
+    "sourceIntegrity",
+    "qaEvidence"
+  ],
+  "criticalFailures": [
+    "corrupt_artifact",
+    "missing_deliverable",
+    "invented_evidence",
+    "misleading_chart",
+    "unreadable_render",
+    "wrong_platform",
+    "reference_fidelity_breach"
+  ],
+  "majorDefects": [
+    "wrong_navigation_system",
+    "mixed_header_grammar",
+    "misplaced_implication_surface",
+    "under_resolved_exhibit",
+    "raw_grid_table",
+    "under_composed_canvas",
+    "inconsistent_component",
+    "palette_or_colour_drift",
+    "tracker_continuity_gap",
+    "reference_quality_gap",
+    "redundant_role_label",
+    "missing_required_structure",
+    "header_field_omission",
+    "broken_asset_render",
+    "pre_authoring_gate_bypassed",
+    "typography_or_spacing_drift",
+    "generic_or_redundant_copy",
+    "decorative_component"
+  ],
+  "thresholds": {
+    "selfScoreMinimum": 98,
+    "treatmentScoreMinimum": 98,
+    "minimumDimensionScore": 4.9,
+    "maximumMinorDefects": 0,
+    "improvementMinimum": 8,
+    "maximumDimensionRegression": 0.25
+  },
+  "cases": [
+    {
+      "id": "executive-synthesis-pptx",
+      "enabled": true,
+      "platform": "powerpoint",
+      "fixture": {"required": false, "role": "none"},
+      "brief": "Create an editable five-slide PowerPoint pre-read for a COO deciding whether to consolidate three regional support teams. Use only the supplied operating metrics; distinguish facts from assumptions; end with an explicit decision and 90-day actions.",
+      "focus": ["answer-first storyline", "executive synthesis", "action plan", "PowerPoint rendering"]
+    },
+    {
+      "id": "quantitative-insight-google-slides",
+      "enabled": true,
+      "platform": "google_slides",
+      "fixture": {"required": false, "role": "none"},
+      "brief": "Create a native six-slide Google Slides deck for a pricing committee using the supplied quarterly volume, price, and margin data. Explain the margin change, select the right charts, label forecasts, and recommend one pricing action.",
+      "focus": ["chart selection", "waterfall reconciliation", "native Slides QA", "source integrity"]
+    },
+    {
+      "id": "options-comparison-pptx",
+      "enabled": true,
+      "platform": "powerpoint",
+      "fixture": {"required": false, "role": "none"},
+      "brief": "Create an editable four-slide PowerPoint comparing three vendor options against the supplied requirements, costs, and risk evidence. Make criteria and tradeoffs explicit and recommend an option without changing or inventing weights.",
+      "focus": ["comparison slide", "decision logic", "editable tables", "evidence discipline"]
+    },
+    {
+      "id": "implementation-roadmap-dual-format",
+      "enabled": true,
+      "platform": "both",
+      "fixture": {"required": false, "role": "none"},
+      "brief": "Create a five-slide implementation roadmap for an executive steering committee in both PowerPoint and native Google Slides. Show phases, workstreams, dependencies, gates, owners, and a decision ask; validate each format independently.",
+      "focus": ["process and roadmap", "cross-deck components", "dual-format parity", "render evidence"]
+    },
+    {
+      "id": "reference-theme-fidelity",
+      "enabled": true,
+      "platform": "both",
+      "fixture": {"required": true, "role": "authorized_reference_deck"},
+      "brief": "Using the authorized reference deck and supplied content, create a concise six-slide decision deck in PowerPoint and native Google Slides. Derive a reusable theme, select source exemplars by narrative role, remove sample content and branding, and document deliberate deviations.",
+      "focus": ["template intake", "design system", "reference fidelity", "cross-platform conversion"]
+    },
+    {
+      "id": "acquisition-due-diligence-dual-format",
+      "enabled": true,
+      "platform": "both",
+      "fixture": {"required": false, "role": "public_research"},
+      "brief": "Create an editable retrospective public-source commercial-diligence pre-read for an NVIDIA investment committee evaluating whether an investment in Hugging Face would have been strategically and commercially attractive at the stated historical cutoff, delivered as both PowerPoint and native Google Slides. Apply the full commercial-DD question architecture, state where public evidence cannot complete a branch, and do not present a preliminary screen as transaction-grade diligence. Cover market attractiveness, customer quality, competitive position, commercial engine, plan and downside, strategic fit, independence and ecosystem trust, value drivers, red flags, prioritized confirmatory diligence, and explicit invest, condition, pause, or decline gates. Separate verified historical facts from estimates, retrospective inference, and unresolved management questions; do not invent valuation, revenue, customer, retention, margin, or operating data. Build the executive synthesis from registered components and explicit content relationships. Use question-appropriate charts and tables, one restrained semantic colour system, and separate rendered QA for both platforms. Render visible chapter navigation only when it materially improves orientation; any tracker must encode navigation only, remain continuous across its declared range, and never become a status dashboard. Use a terminal implication surface only when it adds a distinct decision, action, owner, or condition not already carried by the title and exhibit.",
+      "focus": ["retrospective investment due diligence", "commercial-DD template coverage", "registered executive-synthesis structure", "navigation-only tracker selection", "non-redundant implication surfaces", "rendered logo integrity", "pre-read evidence density", "verified-versus-inferred evidence", "chart and table composition", "dual-format native rendering"]
+    },
+    {
+      "id": "public-equity-investment-thesis-pptx",
+      "enabled": true,
+      "platform": "powerpoint",
+      "fixture": {"required": false, "role": "public_research"},
+      "brief": "Build an editable public-equity investment-thesis deck for an investment committee evaluating Alphabet Class A stock after the Q2 2026 earnings report. Use the 22 July 2026 earnings release and 30 June 2026 Form 10-Q as the operating-evidence cutoff, plus a clearly timestamped 1 September 2026 market-price snapshot for valuation. Separate reported results from analyst normalization and scenarios. Test growth quality, Search durability, Cloud acceleration and profitability, operating leverage, AI capital intensity, free-cash-flow conversion, earnings quality, balance-sheet capacity, valuation, catalysts, disconfirming evidence, and an explicit buy, hold, or avoid conclusion. Use native editable charts, including a revenue-growth contribution bridge, a Cloud revenue-and-margin view, a cash-flow bridge, and a valuation scenario comparison. Do not treat unrealized investment gains as recurring operating earnings, and do not invent company guidance or consensus estimates.",
+      "focus": ["public-equity investment thesis", "Q2 earnings analysis", "native financial charts", "earnings normalization", "free-cash-flow conversion", "scenario valuation", "source integrity", "PowerPoint rendering"]
+    },
+    {
+      "id": "startup-pitch-live-pptx",
+      "enabled": true,
+      "platform": "powerpoint",
+      "fixture": {"required": false, "role": "historical_public_research"},
+      "brief": "Create an editable 12-slide live investor pitch that retrospectively presents Uber at an early funding stage using only historical public evidence available by the stated cutoff. Build one causal investment thesis across problem and timing, solution and advantage, demand proof, scale model, and team and raise. Use large live-pitch typography, one to three open metrics when appropriate, a restrained market or city landscape with authorized logos only when useful, and a milestone-based use of funds. Clearly label retrospective reconstruction and do not invent early-stage metrics.",
+      "focus": ["startup pitch template", "live-pitch density", "metric fields", "market landscape", "historical source integrity"]
+    },
+    {
+      "id": "project-progress-update-pptx",
+      "enabled": true,
+      "platform": "powerpoint",
+      "fixture": {"required": false, "role": "historical_public_research"},
+      "brief": "Create an editable 15-slide executive progress update for the Elizabeth line at a clearly stated historical reporting cutoff. Show the programme baseline, delivered progress, current critical path, risk and readiness, latest forecast, and sponsor decisions. Build the executive synthesis from registered components and explicit content relationships. Include a milestone timeline, a workstream table with explicitly defined indicators, and clear actual, forecast, target, and retrospective states. Omit visible navigation when the action-title sequence already provides sufficient orientation; any retained tracker must encode navigation only and never workstream status. Use a terminal action surface only when it adds a distinct sponsor action, owner, trigger, or condition not already carried by the title and exhibit. Use only public evidence.",
+      "focus": ["project progress template", "milestone and readiness evidence", "comparison indicators", "navigation-only tracker selection", "public-sector source integrity"]
+    }
+  ]
+}
