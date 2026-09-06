@@ -612,7 +612,7 @@ function registerCore(registry) {
     component({ id: "legend", category: "data", role: "legend", tokens: LEGEND_TOKENS, preferredSize: { width: 420, height: 44 }, sample: { items: ["Actual", "Forecast", "Target"] }, render: input => ({ nodes: legendNodes(input) }) }),
     component({
       id: "chart-callout", category: "data", role: "annotation",
-      tokens: ["color.surface", "color.componentPrimary", "color.ink", "font.body", "font.bodySemibold", "weight.semibold", "type.chartAnnotation", "line.hairline", "radius.none"],
+      tokens: ["color.surface", "color.rule", "color.componentPrimary", "color.ink", "font.body", "font.bodySemibold", "weight.semibold", "type.chartAnnotation", "line.hairline", "line.standard", "radius.none"],
       preferredSize: { width: 260, height: 90 },
       sample: { text: "(Insert evidence annotation)", direction: "down" },
       variants: { bordered: {}, borderless: { props: { border: false } } },

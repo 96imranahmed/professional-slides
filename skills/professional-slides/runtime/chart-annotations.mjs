@@ -234,14 +234,14 @@ function evidenceNodes(id, placement) {
       id: stableId(id, "annotation-leader", index),
       role: "annotation-leader",
       ...leader,
-      style: { stroke: callout ? PRIMARY : RULE, lineWidth: HAIRLINE, dash: "solid" },
+      style: { stroke: callout ? PRIMARY : RULE, lineWidth: callout ? STANDARD : HAIRLINE, dash: "solid" },
       data: { ...data, endArrow: callout, ...(callout ? { endArrowType: "triangle" } : {}), endpoint: dotEnded ? "dot" : "arrow" }
     }),
     rectPrimitive({
       id: stableId(id, "annotation-box", index),
       role: "annotation-surface",
       frame,
-      style: { fill: callout ? SURFACE : PRIMARY_TINT, stroke: annotation.border === false ? "none" : callout ? PRIMARY : RULE, lineWidth: HAIRLINE, radius: NONE_RADIUS, opacity: 1 },
+      style: { fill: callout ? SURFACE : PRIMARY_TINT, stroke: annotation.border === false ? "none" : RULE, lineWidth: HAIRLINE, radius: NONE_RADIUS, opacity: 1 },
       data
     }),
     textPrimitive({

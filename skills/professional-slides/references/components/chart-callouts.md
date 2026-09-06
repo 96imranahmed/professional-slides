@@ -35,7 +35,7 @@ Use one short sentence placed beside the decisive mark, with a leader line that 
 
 Choose one supported treatment:
 
-- `callout` is the default: a canvas surface with a primary outline and a defined arrowhead. Set `border: false` for the borderless variant; retain the same text, spacing, and connector. Prefer a straight horizontal or vertical connector, using a diagonal only when the available space requires it.
+- `callout` is the default: a canvas surface with a light rule-colour outline and a clearly visible triangular arrowhead. Set `border: false` for the borderless variant; retain the same text, spacing, and connector. Use the standard leader width so the native arrowhead remains legible; the box border stays hairline. Prefer a straight horizontal or vertical connector, using a diagonal only when the available space requires it.
 - The former tinted `takeaway-box` treatment is retired. Legacy inputs resolve to `callout`; new specimens use the retained callout construction.
 - `orthogonal-dot` uses a horizontal or vertical leader with no arrowhead and a small primary endpoint dot on the exact evidence. Prefer it when the plot provides a clear straight corridor. If the box or corridor would cover a mark, marker, point highlight, data label, reference label, or peer annotation, reject the treatment and use another orientation or `callout`; do not bend or diagonalize it silently. It also accepts `border: false`.
 
