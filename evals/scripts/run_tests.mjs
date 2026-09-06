@@ -37,7 +37,6 @@ function run(command, args) {
 }
 
 if (process.argv.includes("--release")) {
-  await run(runtimePython, ["evals/run_evals.py", "--check"]);
   await run(runtimeNode, ["evals/scripts/generate_golden_set.mjs", "--check"]);
 } else if (process.argv.includes("--dependencies")) {
   await run(runtimeNode, ["evals/scripts/runtime_lock.mjs"]);

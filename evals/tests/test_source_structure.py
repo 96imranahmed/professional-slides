@@ -687,12 +687,9 @@ console.log(JSON.stringify({results, referenceOverlapsAnnotation}));
             self.assertTrue(chart["overlay"], chart["id"])
         self.assertFalse(result["referenceOverlapsAnnotation"])
 
-    def test_toolkit_importer_and_validators_use_the_new_model(self):
-        importer = read(ROOT / "evals" / "scripts" / "import_consulting_toolkit.mjs")
+    def test_validators_use_the_new_model(self):
         pptx_validator = read(ROOT / "evals" / "scripts" / "validate_pptx.py")
         template_validator = read(ROOT / "evals" / "scripts" / "validate_template_registry.py")
-        self.assertIn("source-gallery-title", importer)
-        self.assertIn("professional-slides.reference-coverage/v1", importer)
         self.assertIn("references/composition/index.md", pptx_validator)
         self.assertIn("../composition/index.md", template_validator)
         self.assertNotIn("references/slide-types", pptx_validator)

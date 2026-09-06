@@ -14,3 +14,7 @@ renders/
 /tmp/
 *.tmp
 ~$*.pptx
+
+/deliverables/
+# Evaluation reports belong with ignored generated output.
+/evals/*-eval.json

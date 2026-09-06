@@ -13,7 +13,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const destination = path.join(root, "output/golden");
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 async function sourceState() {
-  const files = ["package.json", ".codex-plugin/plugin.json", "evals/cases.json", "evals/runtime-lock.json"];
+  const files = ["package.json", ".codex-plugin/plugin.json", "evals/runtime-lock.json"];
   async function walk(directory) {
     for (const entry of await fs.readdir(path.join(root, directory), { withFileTypes: true })) {
       const name = `${directory}/${entry.name}`;

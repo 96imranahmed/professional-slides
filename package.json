@@ -12,8 +12,6 @@
     "golden": "node evals/scripts/generate_golden_set.mjs",
     "golden:check": "node evals/scripts/generate_golden_set.mjs --check",
     "validate:components": "node evals/scripts/validate_component_runtime.mjs",
-    "validate:fidelity": "node evals/scripts/validate_reference_fidelity.mjs",
-    "inventory:toolkit": "node evals/scripts/import_consulting_toolkit.mjs",
     "import:maps": "node evals/scripts/import_natural_earth_maps.mjs"
   },
   "peerDependencies": {

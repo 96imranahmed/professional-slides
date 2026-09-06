@@ -40,7 +40,7 @@ For a canonical-scene candidate, require all of the following:
 - generated components and chart marks remain editable vector primitives, with no native chart parts; authorized image and logo assets, plus documented verified-SVG raster fallbacks, may remain embedded media;
 - the imported render passes parity against the HTML serialization.
 
-The implementation lives at [`skills/professional-slides/runtime/adapters/artifact-tool.mjs`](../../../runtime/adapters/artifact-tool.mjs). The isolated gate is [`evals/scripts/validate_component_runtime.mjs`](../../../../../evals/scripts/validate_component_runtime.mjs), and the source-mapped gate is [`evals/scripts/validate_reference_fidelity.mjs`](../../../../../evals/scripts/validate_reference_fidelity.mjs). These repository-relative links are checked by the source-structure test.
+The implementation lives at [`skills/professional-slides/runtime/adapters/artifact-tool.mjs`](../../../runtime/adapters/artifact-tool.mjs). The isolated gate is [`evals/scripts/validate_component_runtime.mjs`](../../../../../evals/scripts/validate_component_runtime.mjs). These repository-relative links are checked by the source-structure test.
 
 ## Existing-deck edits
 

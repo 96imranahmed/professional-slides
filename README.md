@@ -9,7 +9,7 @@ The McKinsey, BCG, and Bain palettes are independent, brand-inspired presets, no
 - `skills/professional-slides/SKILL.md` routes new decks, structural revisions, and bounded slide edits.
 - `skills/professional-slides/references/` owns storylining, design, component semantics, charts, deck templates, platform guidance, and QA.
 - `skills/professional-slides/runtime/` owns executable composition, tokens, component geometry, and adapters. Start with its [runtime guide](skills/professional-slides/runtime/README.md).
-- `evals/` owns validators, fixtures, scenario briefs, and regression tests.
+- `evals/` owns reusable validators and regression tests. Generated decks and evaluation reports belong in ignored `output/` or `deliverables/` directories.
 - `.codex-plugin/plugin.json` exposes the one canonical skill.
 
 ## Use
@@ -26,7 +26,7 @@ Register every rendering variant with representative props and size. New registr
 
 ## Development checks
 
-`npm run check` runs syntax/whitespace checks and fast tests. `check:syntax` is not a semantic linter. These tests do not require regenerating cached visual reports after each edit. `npm run check:release` still requires current accepted reference reports and a hash-verified golden set, including both render images for every fixture.
+`npm run check` runs syntax/whitespace checks and fast tests. `check:syntax` is not a semantic linter. These tests do not require regenerating cached visual reports after each edit. `npm run check:release` still requires a hash-verified golden set, including both render images for every fixture.
 
 Rendering dependencies are pinned in `package.json` and their resolved transitive manifests in `evals/runtime-lock.json`. The lock records the Codex bundle, Node version and platform used for acceptance, including private packages unavailable through public npm. Run `"$RUNTIME_NODE" evals/scripts/runtime_lock.mjs` before rendering. A different bundle/platform requires a reviewed lock refresh and new visual acceptance, not a silent upgrade. Never modify bundled dependencies.
 
@@ -39,9 +39,6 @@ Use the bundled workspace dependencies returned by Codex's `load_workspace_depen
 "$RUNTIME_PYTHON" evals/scripts/validate_template_registry.py
 "$RUNTIME_NODE" evals/scripts/generate_golden_set.mjs
 "$RUNTIME_NODE" evals/scripts/generate_golden_set.mjs --check
-"$RUNTIME_NODE" evals/scripts/validate_reference_fidelity.mjs --source-root /path/to/consulting-toolkit
-"$RUNTIME_PYTHON" evals/scripts/validate_reference_copy.py --model gpt-5.6-terra
-"$RUNTIME_PYTHON" evals/run_evals.py --check
 ```
 
 Also run the installed plugin-creator's `validate_plugin.py` against this repository and skill-creator's `quick_validate.py` against the skill directory. After source changes, reinstall `professional-slides@personal` and compare the installed manifest, skill, and eval files with the source.
@@ -51,21 +48,5 @@ Also run the installed plugin-creator's `validate_plugin.py` against this reposi
 Every golden run generates one canonical McKinsey deck containing all components, registered variants, layout fixtures, and standard compositions. Compatible variants share paginated review boards, with explicit instance-level coverage retained for every branch. Gates check coverage, text fit, overlaps, package structure, Artifact Tool readback, theme binding, and HTML-to-PPTX image parity. Inspect the paired renders and lowest-scoring fixtures as well as the reports.
 
 Accepted runs remain under `output/golden/runs/`. `output/golden/index.html` points to the latest accepted set. A failed run cannot replace it; `golden:check` rejects evidence from changed sources. Do not reset `output/` for a golden rerun.
-
-The source-fidelity gate additionally requires the authorized consulting-toolkit directory, including its inventory and both source-image sets. Those external reference assets are not distributed in this repository. Promote its newly accepted `reference-fidelity-report.json` to `evals/reference-fidelity-eval.json`; the release check rejects stale or incomplete evidence. Capability inventory is a separate check:
-
-```bash
-"$RUNTIME_NODE" evals/scripts/import_consulting_toolkit.mjs --source /path/to/consulting-toolkit/index.html
-```
-
-### End-to-end scenario evaluation
-
-`evals/cases.json` contains authoring scenarios, not pre-generated results. Running tests or golden decks does not execute those scenarios. Supply the case's evidence and cutoff, generate its requested artifacts, and record per-case results before claiming scenario coverage.
-
-For a user-authorized fresh scenario reset, `prepare_eval_run.py --run-id <unique-id>` clears this repository's generated `output/` directory and creates an isolated workspace. This also removes retained golden output, so preserve any golden set the user still needs elsewhere first. Do not reuse generated storylines, builders, renders, or QA from a previous scenario run. Validate completed results with:
-
-```bash
-"$RUNTIME_PYTHON" evals/run_evals.py --mode self --results /path/to/results.json
-```
 
 Automated checks do not establish sound writing, factual accuracy, or native PowerPoint/Google Slides behavior. Report the actual renderer used and any platform checks not performed.

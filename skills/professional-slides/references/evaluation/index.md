@@ -1,18 +1,8 @@
 # Evaluation
 
-Use this guide to decide whether a deck is ready. The plugin repository's `evals/cases.json` defines the development cases, defect names, dimensions, and thresholds. `evals/run_evals.py` validates result files.
+Use this guide to decide whether a deck is ready. Keep generated decks, renders, plans, and review reports in ignored `output/` or `deliverables/` directories, never in committed source.
 
-## Fresh-run isolation
-
-Every evaluation starts by completely clearing only the repository's exact output directory and creating a new workspace under tmp/eval-runs:
-
-~~~bash
-python evals/scripts/prepare_eval_run.py --run-id <unique-run-id>
-~~~
-
-Never copy, seed, patch, or resume generated material from an earlier run. Prior generated eval materials are not inputs. Reference decks, fixtures, sources, skills, and runtimes may remain fixed.
-
-Keep the run manifest with the evidence package. Control and treatment use separate subdirectories and may not inspect each other's outputs.
+For an evaluation, create a fresh output subdirectory and preserve the inputs and review evidence there. Keep control and treatment independent.
 
 ## Per-deck self-review
 
@@ -89,35 +79,11 @@ Every slide and deck dimension must score at least 90, every comparison group mu
 
 Run `python evals/scripts/validate_pptx.py provenance <deck.pptx> --receipt <canonical-generation-receipt.json> --generation-script <builder.mjs> --require-planning` for ordinary net-new decks. The gate recomputes the canonical runtime hash, reconciles the scene and design manifest, matches every scene node to the exact native PowerPoint object, binds the authoring script, and rejects direct PptxGenJS calls. Visual similarity cannot substitute for this proof.
 
-## Consulting-toolkit source coverage
-
-When the deliverable includes the consulting-toolkit HTML gallery, validate the exact file before visual review:
-
-```bash
-node evals/scripts/import_consulting_toolkit.mjs --source <consulting-toolkit/index.html>
-```
-
-The validator ignores the obsolete hand-picked section before `Source slide gallery`, verifies all 205 source cards against `slide-inventory.json`, and maps every source slide to registered components plus an open composition primitive. It rejects unknown components, unknown compositions, missing cards, extra cards, and uncovered slides. This inventory mapping measures capability coverage; it does not select layouts for production slides. Production selection begins from item jobs and content relationships.
-
 ## Component-runtime gate
 
 After changing layout, tokens, components, charts, or adapters, run `npm run check` and then the golden runtime gate with the bundled workspace paths. The golden deck places compatible variants of one component on paginated grid boards, keeps dense or full-frame variants isolated, and includes a curated non-duplicative composition set. The exhaustive layout suite remains in regression tests. The report records every default and non-default component instance as an explicit coverage key, independent of slide count, and rejects duplicate visual branches that differ only by a variant name. Release validation uses the canonical McKinsey palette; other supported palette inputs remain fast contract checks rather than duplicate visual decks. The validator renders the HTML observer and exact saved PPTX, imports the PPTX with Artifact Tool, and rejects missing names, theme drift, or visual disagreement. Review both contact sheets and the lowest-scoring individual fixtures before accepting the report.
 
-Require the overlap gate in both component and reference-fidelity reports. It checks rendered HTML line boxes and visible SVG geometry, then checks imported PPTX frames, paint order, recovered text, and explicit line counts. Reject text clipping, accidental text/text, text/rule, shape/shape, and connector collisions, and unequal peer heading clearances. A text backing must precede its text in native paint order. The imported-frame check does not replace exact-PPTX image review. Intentional containment and masking must match `runtime/overlap-policy.mjs`; a shared component, chart, or overlay alone never exempts a collision. Keep per-slide coverage and named violations, and test the gate with deliberately broken fixtures.
-
-## Reference-fidelity gate
-
-After changing the consulting-toolkit runtime, run `npm run validate:fidelity`. The gate generates sixteen source-mapped composition families, renders the HTML observer and exact native-only PPTX at 3840 by 2160, and compares both outputs against both source-image sets. The replacement [plain deck cover](../components/index.md#deck-cover) and [single-title dividers](../components/index.md#section-dividers) are checked in the golden set instead of against retired decorative or labelled artwork. The fidelity gate rejects package media, native chart parts, undeclared token use, missing Artifact Tool names, frame drift above one pixel, or any visual metric below its calibrated floor. Keep the accepted `evals/reference-fidelity-eval.json`; `evals/run_evals.py --check` rejects a stale source hash or incomplete fixture set.
-
-## Reference-copy gate
-
-After editing skill guidance or specimens, use Luna or Terra as an independent judge. Choose a model different from the authoring model:
-
-```bash
-python3 evals/scripts/validate_reference_copy.py --model gpt-5.6-terra
-```
-
-The judge reviews every reference file for concision, specificity, non-redundancy, and actionability. The script reviews Markdown guidance and omits fenced implementation examples. Its JSON schema, exact file manifest, current reference hash, score threshold, and blocker rules are deterministic. Every dimension must score at least 90, with no blocker or major findings. `evals/run_evals.py --check` rejects missing, stale, malformed, or failed reports.
+Require the overlap gate in component reports. It checks rendered HTML line boxes and visible SVG geometry, then checks imported PPTX frames, paint order, recovered text, and explicit line counts. Reject text clipping, accidental text/text, text/rule, shape/shape, and connector collisions, and unequal peer heading clearances. A text backing must precede its text in native paint order. The imported-frame check does not replace exact-PPTX image review. Intentional containment and masking must match `runtime/overlap-policy.mjs`; a shared component, chart, or overlay alone never exempts a collision. Keep per-slide coverage and named violations, and test the gate with deliberately broken fixtures.
 
 ## Defects
 
@@ -139,7 +105,7 @@ For a release comparison:
 4. score the configured dimensions;
 5. record critical, major, and minor defects;
 6. compare overall and per-dimension results;
-7. require every threshold in cases.json.
+7. declare acceptance thresholds before reviewing results.
 
 The treatment passes only when it clears the absolute threshold, improves by the required amount, and does not create a material dimension regression.
 
@@ -159,10 +125,4 @@ Each result records:
 - fresh-run preparation evidence;
 - reviewer notes.
 
-Validate results with:
-
-~~~bash
-python evals/run_evals.py --mode self --results path/to/result.json
-~~~
-
-The CLI requires every declared artifact, render, contract, validator output, and run manifest to exist as a non-empty file inside the fresh run workspace. Use the validator output as evidence. Do not claim a pass from a narrative summary alone.
+Keep the exact candidate, renders, governing inputs, and validator reports together. Do not claim acceptance from a narrative summary alone.
