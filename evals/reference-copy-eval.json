@@ -1,24 +1,24 @@
 {
   "accepted": true,
-  "filesExpected": 56,
+  "filesExpected": 54,
   "judgement": {
-    "aggregateScore": 95,
+    "aggregateScore": 96,
     "dimensions": {
       "actionability": {
-        "rationale": "Authors receive clear selection rules, data contracts, construction steps, and acceptance checks.",
+        "rationale": "Authors receive clear selection rules, construction constraints, rejection conditions, and verification steps.",
         "score": 96
       },
       "concision": {
-        "rationale": "Dense technical guidance is generally justified by concrete failure prevention; a few repeated cross-platform reminders remain.",
-        "score": 93
-      },
-      "nonRedundancy": {
-        "rationale": "Ownership boundaries and links are strong; limited overlap remains around shared contracts.",
+        "rationale": "The packet is necessarily detailed but generally avoids padding; constraints and exceptions prevent concrete authoring errors.",
         "score": 94
       },
-      "specificity": {
-        "rationale": "Rules usually name exact states, thresholds, owners, variants, evidence, and rejection paths.",
+      "nonRedundancy": {
+        "rationale": "Rules have clear canonical owners and downstream files normally link to them rather than restating them.",
         "score": 97
+      },
+      "specificity": {
+        "rationale": "Guidance consistently specifies ownership, valid variants, thresholds, inputs, exceptions, and acceptance checks.",
+        "score": 98
       }
     },
     "filesReviewed": [
@@ -48,7 +48,6 @@
       "components/relationships.md",
       "components/text-box.md",
       "components/trackers/index.md",
-      "components/trackers/specimens.md",
       "composition/index.md",
       "design/index.md",
       "design/slide-layouts.md",
@@ -63,7 +62,6 @@
       "templates/project-progress-update.md",
       "templates/startup-pitch-deck.md",
       "theming/component-bindings.md",
-      "theming/html-css-contract.md",
       "theming/index.md",
       "theming/tokens.md",
       "tools/codex-generation.md",
@@ -81,29 +79,21 @@
     ],
     "findings": [
       {
-        "excerpt": "\u201cA consistently spaced temporal or ordered x-axis\u201d",
-        "file": "charts/line.md",
-        "location": "Data contract",
-        "reason": "This can be read as requiring regular time intervals, while later guidance correctly requires truthful spacing for irregular periods.",
-        "recommendedChange": "Replace with \u201cA temporal axis spaced proportionally to declared intervals, or an ordered categorical axis with declared spacing.\u201d",
-        "severity": "minor"
-      },
-      {
-        "excerpt": "\u201cdata-variant selects the internal quote count\u201d and \u201cSerialize the router through `quotes`...\u201d",
-        "file": "components/quote-cluster.md",
-        "location": "Count and placement router; Runtime contract",
-        "reason": "The runtime contract does not state whether quote count derives from `quotes.length` or is separately supplied and validated against the variant.",
-        "recommendedChange": "State that count derives from `quotes.length`, or require an explicit count variant and reject any mismatch.",
+        "excerpt": "Apply the canonical [title anchor and wrapping contract](index.md#action-title-block) to action titles.",
+        "file": "components/text-box.md",
+        "location": "line 16",
+        "reason": "The linked component section delegates the canonical anchor and wrapping rules to the design owner, making this route indirect for an instruction presented as canonical.",
+        "recommendedChange": "Call this the action-title-block contract, or add a direct link to the design typography/anchor rule alongside the existing component link.",
         "severity": "minor"
       }
     ],
-    "rubricVersion": "2",
-    "summary": "All 56 manifest files were reviewed. The guidance is specific, operational, and consistently owner-linked; the two minor clarifications do not undermine release readiness.",
+    "rubricVersion": "3",
+    "summary": "All 54 manifest files were reviewed. The guidance is accepted: it is specific, operational, and consistently routed to canonical owners; the one minor routing clarification does not undermine use.",
     "verdict": "accept"
   },
   "model": "gpt-5.6-terra",
-  "referenceHash": "09a2a4c4a25410c0bde68898078f07bd091b626cbf1154cc6e5c38f03be3cf9d",
-  "rubricVersion": "2",
+  "referenceHash": "ffe36d511e8753b89901f5358f34aa0448aa218ed4a10c697fbf9aff6ceb8ab4",
+  "rubricVersion": "3",
   "schemaVersion": 1,
   "validationErrors": []
 }

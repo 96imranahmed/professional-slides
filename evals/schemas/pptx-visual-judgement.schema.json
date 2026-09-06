@@ -4,7 +4,7 @@
   "additionalProperties": false,
   "required": ["rubricVersion", "verdict", "summary", "deckScores", "slides", "findings"],
   "properties": {
-    "rubricVersion": {"type": "string", "const": "6"},
+    "rubricVersion": {"type": "string", "const": "7"},
     "verdict": {"type": "string", "enum": ["accept", "reject"]},
     "summary": {"type": "string", "minLength": 1},
     "deckScores": {"$ref": "#/$defs/scores"},
@@ -14,12 +14,13 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["slide", "verdict", "summary", "scores", "findings"],
+        "required": ["slide", "verdict", "summary", "scores", "findings", "copyAudit"],
         "properties": {
           "slide": {"type": "integer", "minimum": 1},
           "verdict": {"type": "string", "enum": ["accept", "reject"]},
           "summary": {"type": "string", "minLength": 1},
           "scores": {"$ref": "#/$defs/scores"},
+          "copyAudit": {"$ref": "#/$defs/copyAudit"},
           "findings": {
             "type": "array",
             "items": {"$ref": "#/$defs/finding"}
@@ -33,6 +34,30 @@
     }
   },
   "$defs": {
+    "copyAudit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["noRecap", "recapEvidence", "insightCount", "insights"],
+      "properties": {
+        "noRecap": {"type": "boolean"},
+        "recapEvidence": {"type": "string", "minLength": 1},
+        "insightCount": {"type": "integer", "minimum": 0},
+        "insights": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text", "premises", "addedDeduction", "classification"],
+            "properties": {
+              "text": {"type": "string", "minLength": 1},
+              "premises": {"type": "string", "minLength": 1},
+              "addedDeduction": {"type": "string", "minLength": 1},
+              "classification": {"type": "string", "enum": ["supported_deduction", "recap", "unsupported"]}
+            }
+          }
+        }
+      }
+    },
     "scores": {
       "type": "object",
       "additionalProperties": false,

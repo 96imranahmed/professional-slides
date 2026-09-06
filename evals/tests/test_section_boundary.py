@@ -25,7 +25,7 @@ assert.equal(disc.frame.x+disc.frame.width/2,787);assert.equal(disc.frame.y+disc
 assert.ok(inference[0].frame.y+inference[0].frame.height<disc.frame.y);
 assert.ok(inference[1].frame.y>disc.frame.y+disc.frame.height);
 const specs=[...componentFixtureSpecs(),...componentVariantFixtureSpecs()].filter(s=>s.target==='section-boundary');
-assert.equal(specs.length,3);
+assert.equal(specs.length,4);
 assert.equal(specs.filter(s=>s.defaultVariant).length,1);
 for(const palette of ['mckinsey','bcg','bain']) {
  const d=compileDeck({id:'boundary',palette,slides:specs},REGISTRY);
@@ -40,6 +40,35 @@ assert.equal(body.length,3);assert.equal(new Set(body.map(n=>n.style.fontSize.va
 assert.equal(body[0].style.fontSize.value,d.manifest.tokens['type.body'].value);
 assert.equal(nodes.filter(n=>n.role==='subsection-rule').length,2);
 assert.equal(nodes.filter(n=>n.role==='section-heading-rule').length,0);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+    def test_light_chevron_and_dashed_boundary_share_optical_geometry(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {TOKENS} from './skills/professional-slides/runtime/core.mjs';
+const frame={x:700,y:220,width:60,height:180};
+const connector=REGISTRY.get('connector');
+const nodes=connector.render({id:'light',frame,props:{variant:'chevron'}}).nodes;
+assert.equal(nodes.length,1);
+const mark=nodes[0];
+assert.equal(mark.data.geometry,'chevron');
+assert.equal(mark.style.stroke,'none');
+assert.equal(mark.style.fill.tokenId,'color.componentPrimary');
+assert.equal(mark.frame.height,TOKENS['icon.medium'].value);
+assert.equal(mark.frame.width,mark.frame.height*0.75);
+assert.equal(mark.frame.x+mark.frame.width/2,730);
+assert.equal(mark.frame.y+mark.frame.height/2,310);
+assert.throws(()=>connector.render({id:'small',frame:{...frame,height:10},props:{variant:'chevron'}}),/needs room/);
+const split=REGISTRY.get('section-boundary').render({id:'split',frame,props:{variant:'inference-chevron'}}).nodes;
+assert.equal(split.length,3);
+assert.deepEqual(split[2].frame,mark.frame);
+assert.ok(split.slice(0,2).every(n=>n.style.dash==='dash'));
+assert.ok(split[0].frame.y+split[0].frame.height<mark.frame.y);
+assert.ok(split[1].frame.y>mark.frame.y+mark.frame.height);
+assert.ok(split.every(n=>n.role!=='relationship-disc'&&n.type!=='text'));
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])

@@ -37,7 +37,7 @@ class ReferenceCopyTests(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "beta.md").write_text(
-            "# Beta\n\n~~~html\n<h1>Short title</h1><p>Visible example copy.</p>\n~~~\n",
+            "# Beta\n\nShort title. Visible example copy.\n\n```js\nconst hidden = true;\n```\n",
             encoding="utf-8",
         )
         return root
@@ -51,6 +51,7 @@ class ReferenceCopyTests(unittest.TestCase):
         self.assertIn("Short title", packet)
         self.assertIn("Visible example copy.", packet)
         self.assertNotIn(".long", packet)
+        self.assertNotIn("const hidden", packet)
 
     def test_acceptance_requires_full_coverage_and_scores(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -108,6 +109,14 @@ class ReferenceCopyTests(unittest.TestCase):
         self.assertEqual(files, ["alpha.md", "beta.md"])
         self.assertIn("Coverage is enforced deterministically", prompt)
         self.assertIn("never `Manifest`", prompt)
+
+    def test_prompt_preserves_template_placeholders(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = self.make_reference_root(temp_dir)
+            prompt, _ = VALIDATOR.build_prompt(root)
+        self.assertIn("omits fenced implementation examples", prompt)
+        self.assertIn("Neutral parenthetical insertion prompts are intentional", prompt)
+        self.assertIn("zero blocker or major findings", prompt)
 
 
 if __name__ == "__main__":

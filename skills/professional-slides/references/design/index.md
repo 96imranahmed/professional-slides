@@ -20,6 +20,14 @@ Do not impose the same card grid, three-column layout, process rail, or footer s
 
 Whitespace must support hierarchy. It must not conceal missing evidence or undersized content. On an executive pre-read, one dominant analytical item should normally occupy 60% to 90% of the usable content field. The examples of comparison, qualifier, definition, period, and attached interpretation are non-scored planning prompts; the [copy owner](../components/copy.md) defines completeness.
 
+## Deck rhythm
+
+Keep palette, type, anchors, and component grammar consistent while choosing page structures for different analytical questions. Compare the planned sequence and final montage for runs of the same chart-and-rail silhouette. Repetition is useful for comparable markets, periods, or options; retain it when a shared scale and structure help the audience compare. Otherwise, test whether the pages repeat one finding, omit a driver or trade-off, or inherited a layout before their argument was developed.
+
+For a repetitive run, use the [analytical substance check](../components/copy.md#analytical-substance) to decide whether to consolidate overlapping pages or develop distinct proof. A bridge can explain drivers, a trend can test persistence when comparable periods exist, and a scenario comparison can expose sensitivity when its assumptions are supported. Keep a bar chart when magnitude is the question. Swapping chart types, adding decoration, or changing colours solely for variety fails this check.
+
+Match container height to useful content. A few sentences at the top of tall cards leave an unfinished page even when the cards occupy most of the canvas. An executive pre-read close should connect the recommendation to its decisive evidence and explain what changes the decision; use [decision-close guidance](../components/copy.md#decision-close). Prefer compact open sections or a decision table when those relationships warrant them. A deliberately sparse stage close remains valid for a narrated presentation.
+
 ## Select an evidence-density mode
 
 Use one mode for each slide family:
@@ -37,7 +45,7 @@ Use colour for meaning, not decoration.
 
 Resolve the complete palette from the [theme token registry](../theming/tokens.md). It includes `component-primary`, its `text-accent` alias, neutral surfaces, text roles, structural rules, status roles, and `chart-series-1` to `chart-series-6`.
 
-Use one identical component-primary swatch across titles, tracker emphasis, structural highlights, and primary actions. Do not use chart colours for non-chart decoration. Do not use RAG colours unless they encode a defined measure and also have a non-colour cue.
+Use one identical component-primary swatch across tracker emphasis, structural highlights, and primary actions. Titles use their registered text-colour binding, normally ink, unless an approved title variant specifies otherwise. Do not use chart colours for non-chart decoration. Do not use RAG colours unless they encode a defined measure and also have a non-colour cue.
 
 ### Semantic treatment registry
 
@@ -111,7 +119,8 @@ Check:
 - colour roles;
 - table and chart grammar;
 - repeated component states;
-- visual variety driven by evidence;
+- repeated structures retained for comparable measures or jobs, and structural changes justified by a different evidence relationship, reading order or density;
+- [deck rhythm](#deck-rhythm), including repetitive runs and oversized empty containers;
 - clipping, overlap, broken assets, and dead space.
 - full tracker pages contain the complete approved item set with numbers and labels;
 - compact tracker states remain present and selected correctly on every slide in each governed range;

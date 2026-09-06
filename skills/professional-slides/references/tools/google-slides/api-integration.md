@@ -24,7 +24,7 @@ The service endpoint is `https://slides.googleapis.com`. Core methods:
 - `POST /v1/presentations` creates a blank presentation;
 - `GET /v1/presentations/{presentationId}` returns current structure;
 - `POST /v1/presentations/{presentationId}:batchUpdate` applies mutations;
-- `GET /v1/presentations/{presentationId}/pages/{pageObjectId}` reads a page;
+- [`GET /v1/presentations/{presentationId}/pages/{pageObjectId}`](https://developers.google.com/workspace/slides/api/reference/rest/v1/presentations.pages/get) reads a page;
 - `GET /v1/presentations/{presentationId}/pages/{pageObjectId}/thumbnail` generates a slide thumbnail.
 
 Use Google client libraries when available. Authenticate with the least scope that supports the requested operation; separate file-sharing authorization from content-edit authorization.

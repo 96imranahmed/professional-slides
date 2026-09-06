@@ -55,43 +55,9 @@ Keep a row icon inside the label cell rather than adding a decorative icon colum
 | image frame | `--image-bg`, `--image-border`, `--image-radius`, `--image-caption-font`, `--image-caption-color`, `--image-caption-gap` | [component bindings](../theming/component-bindings.md#media-and-identity-components) |
 | category composition | `--category-row-gap`, `--category-item-gap`, `--category-heading-gap`, `--category-rule`, `--category-padding-top`, `--category-image-ratio`, `--category-heading-font`, `--category-body-font`, `--category-body-color` | [component bindings](../theming/component-bindings.md#media-and-identity-components) |
 
-## Structural HTML reference
+## Construction details
 
-This fragment inherits the themed deck root from its slide.
-
-```html
-<section class="category-row" data-role="category-comparison" data-visual-treatment="icon-image">
-  <article class="category">
-    <figure class="category__image-frame"><img class="category__image" src="assets/demand.jpg" alt="Customer demand visible through a digital ordering interface"></figure>
-    <div class="category__heading"><svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="chart-no-axes-column-increasing" aria-hidden="true"><path d="M5 21v-6"/><path d="M12 21V9"/><path d="M19 21V3"/></svg><h2>Demand</h2></div>
-    <p>Size the reachable need and growth drivers.</p>
-  </article>
-  <article class="category">
-    <figure class="category__image-frame"><img class="category__image" src="assets/customers.jpg" alt="Customers using the service in a real operating context"></figure>
-    <div class="category__heading"><svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="users-round" aria-hidden="true"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg><h2>Customers</h2></div>
-    <p>Test retention, concentration, and willingness to pay.</p>
-  </article>
-  <article class="category">
-    <figure class="category__image-frame"><img class="category__image" src="assets/competition.jpg" alt="Competing products presented side by side"></figure>
-    <div class="category__heading"><svg class="category__icon" viewBox="0 0 24 24" data-icon-library="lucide" data-icon-name="swords" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 0 1 3 5.172V3h2.172a2 2 0 0 1 1.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0 1 18.828 3H21v2.172a2 2 0 0 1-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg><h2>Competition</h2></div>
-    <p>Explain choice, differentiation, and durable advantage.</p>
-  </article>
-</section>
-```
-
-This specimen shows the combined treatment. For `image-only`, set `data-visual-treatment="image-only"` and remove each `category__icon` element. For `icon-only`, set `data-visual-treatment="icon-only"` and remove each `category__image-frame` element. The absent slot collapses; do not preserve empty space.
-
-```css
-.category-row { --category-row-gap: var(--space-6); --category-item-gap: var(--space-3); --category-heading-gap: var(--space-2); --category-rule: var(--rule-page); --category-padding-top: var(--space-4); --category-image-ratio: 4 / 3; --category-heading-font: var(--type-section-heading); --category-body-font: var(--type-body); --category-body-color: var(--text-secondary); display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--category-row-gap); }
-.category { display: grid; grid-auto-rows: auto; gap: var(--category-item-gap); align-content: start; border-top: var(--category-rule); padding-top: var(--category-padding-top); }
-.category__image-frame { width: 100%; aspect-ratio: var(--category-image-ratio); margin: 0; overflow: hidden; }
-.category__image { display: block; width: 100%; height: 100%; object-fit: cover; }
-.category__heading { display: flex; align-items: center; gap: var(--category-heading-gap); }
-.category__icon { width: var(--icon-size); height: var(--icon-size); fill: none; stroke: var(--icon-color); stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
-.category h2, .category p { margin: 0; }
-.category h2 { font: var(--category-heading-font); }
-.category p { font: var(--category-body-font); color: var(--category-body-color); }
-```
+For `image-only`, omit the icon slot. For `icon-only`, omit the image slot. Collapse the absent slot instead of preserving empty space.
 
 ## Acceptance check
 

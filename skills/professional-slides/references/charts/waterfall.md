@@ -44,45 +44,15 @@ Use for grouped drivers whose intermediate reconciled totals matter. Anchor ever
 
 Use when one compact category-level measure materially qualifies each contribution, such as margin beneath business-unit profit. Align one [metric field](../components/metric-fields.md) to every column center, label its separate unit once, and bind its selected or total state through the theme. The rail never participates in the waterfall arithmetic, never shares its axis, and should be omitted when it merely restates a contribution.
 
-## Structural HTML reference
+## Construction details
 
-```html
-<figure class="waterfall" data-role="chart-field"><div class="waterfall__plot"><div class="wf-col wf-col--total" style="--bottom:0%;--height:56%"><b>100</b><span>Opening</span></div><div class="wf-col wf-col--positive" style="--bottom:56%;--height:18%"><b>+32</b><span>Volume</span></div><div class="wf-col wf-col--negative" style="--bottom:42%;--height:14%"><b>-25</b><span>Price</span></div><div class="wf-col wf-col--total" style="--bottom:0%;--height:60%"><b>107</b><span>Closing</span></div></div><figcaption>Annual recurring revenue, $m, UK enterprise segment, FY2025 to FY2026F; 100 + 32 - 25 = 107</figcaption></figure>
-```
+Add one quiet connector between adjacent contribution endpoints and use positive or negative only because sign is the encoded semantic state.
 
-```css
-.waterfall { margin: 0; display: grid; grid-template-rows: 1fr auto; gap: var(--space-2); }
-.waterfall__plot { display: grid; grid-template-columns: repeat(4, 1fr); align-items: end; gap: var(--space-5); min-height: 420px; border-bottom: var(--rule-page); }
-.wf-col { position: relative; bottom: var(--bottom); height: var(--height); min-height: 10px; background: var(--chart-segment); }
-.wf-col--total { background: var(--page-guideline); }
-.wf-col--positive { background: var(--positive); }
-.wf-col--negative { background: var(--negative); }
-.wf-col b { position: absolute; bottom: calc(100% + var(--space-1)); width: 100%; text-align: center; font: var(--type-chart-label); }
-.wf-col span { position: absolute; top: calc(100% + var(--space-2)); width: 100%; text-align: center; font: var(--type-label); }
-.waterfall figcaption { font: var(--type-label); color: var(--text-secondary); }
-```
+### State and annotation geometry
 
-The specimen omits connector lines for brevity; production waterfalls add one quiet connector between adjacent contribution endpoints and use positive or negative only because sign is the encoded semantic state.
+An auxiliary metric rail is a separate aligned component below the reconciled bridge.
 
-### Variant HTML slots
-
-An auxiliary metric rail is a separate aligned component below the reconciled bridge:
-
-```html
-<figure class="waterfall" data-role="chart-field" data-variant="contribution-bridge-with-metric-rail">
-  <ol class="waterfall__plot" data-opening="none" data-closing="200" aria-label="Business-unit contributions to total value">
-    <li data-kind="contribution" data-value="120"><span>BU 1</span><b>120</b></li>
-    <li data-kind="contribution" data-value="20"><span>BU 2</span><b>20</b></li>
-    <li data-kind="contribution" data-value="60"><span>BU 3</span><b>60</b></li>
-    <li data-kind="total" data-value="200"><span>Total</span><b>200</b></li>
-  </ol>
-  <div class="metric-rail" data-component="metric-field" aria-label="Profit margin by business unit">
-    <span data-for="BU 1"><b>12%</b></span><span data-for="BU 2"><b>8%</b></span><span data-for="BU 3"><b>15%</b></span><span data-for="Total" data-state="selected"><b>13%</b></span>
-  </div>
-</figure>
-```
-
-`data-for` must resolve to the exact plotted category ID after sorting or filtering. The adapter lays the rail on the same category centers as the waterfall columns, but validates its values, unit, and selected state independently from the bridge arithmetic.
+Each rail entry must resolve to the exact plotted category ID after sorting or filtering. The adapter lays the rail on the same category centers as the waterfall columns, but validates its values, unit, and selected state independently from the bridge arithmetic.
 
 ## Platform mapping
 

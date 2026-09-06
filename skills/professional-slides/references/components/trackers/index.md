@@ -21,8 +21,6 @@ The native standard pairs `sequential-circles` full states with `compact-number-
 | `numbered-section-break` transition state | Full-canvas pause with title left and large number right. |
 | `hierarchical-segmented` system | Pair `split-contents` as the full parent-and-child state, `compact-label` as the governed analytical state, and `numbered-section-break` as the parent transition. Use the same parent and child IDs in every state. |
 
-See the [structural specimens](specimens.md).
-
 ## Contents progress pages
 
 A contents overview may have no selection. A progress page marks exactly one item with circle or row emphasis.
@@ -46,7 +44,7 @@ A hierarchical tracker has two levels:
 
 Match the dot-dash: parent IDs equal section IDs; chapter-item IDs equal analytical subgroup IDs; labels, order, and ranges remain exact. Cover, executive summary, and close are untracked. See the [example](../../storylining/dot-dash.md#grounded-worked-example).
 
-Use `hierarchical-segmented` only when both levels help. Apply the construction selected in the router above and the linked [structural specimens](specimens.md).
+Use `hierarchical-segmented` only when both levels help. Apply the construction selected in the router above and the native construction rules below.
 
 ## Analytical-page placement
 
@@ -67,6 +65,10 @@ Bias numbered tracker markers to circles. Squares require an explicit source exc
 Apply the canonical [item-indicator ordinal format](../item-indicators.md) to tracker markers. Preserve approved hierarchical or source-required identifiers.
 
 Keep number treatment, label hierarchy, and selection grammar consistent.
+
+## Native construction
+
+Use editable markers, text, and native lines on the registered page guides. Preserve hierarchical numbers as text so structural edits can recalculate them. Compact number strips retain full labels in the contents state, notes, or an approved nearby legend. The runtime owns token bindings and selected-state styling; selection must not shift peer geometry.
 
 ## Check
 

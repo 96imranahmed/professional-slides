@@ -4,7 +4,19 @@ This component owns compact completion, binary confirmation, traffic-light statu
 
 Use the semantic row and cell icon contract in [`icons-and-logos`](icons-and-logos.md#row-and-cell-icons) when a compact library icon improves scanning or replaces a repeated low-information word. Use this component when the cell encodes measured completion, a threshold-based status, or an ordered score.
 
+The shared component's five variants below are not all typed-table cell types. For current `table` serialization, use `binary`, `harvey`, or `heatmap` with the [table owner's scale contract](../charts/heatmap-table.md#typed-table-model). Completion spinners and traffic-light dots have no typed-table cell adapter yet: use a plain percentage `number` or a `bars` cell for completion, and explicit state `text` for traffic lights. Preserve their measurement or trigger definitions. If literal spinner/dot cells are required, extend and test the canonical table adapter; do not invent unsupported props or overlay marks manually.
+
 ## Select the encoding
+
+Prefer a compact comparative encoding when rows share a meaningful criterion and the evidence supports consistent assessment. Choose the measure before the mark: exact values for measured differences, Harvey balls for bounded ordinal assessments, 1–5 scores for anchored ratings, and checks/crosses for a defined feasibility or confirmation test. Keep enough adjacent evidence to explain the assessment. Do not manufacture scores, erase caveats, or treat unavailable evidence as failure.
+
+Distinguish rating from rank. A 1–5 rating applies the same anchored rubric to every item; a rank orders a declared comparison set, with direction and ties stated. Render rank as an ordinary number, not as a maturity score or completion disc. Label analyst assessments as judgments and retain their criterion-level basis.
+
+### Graded alignment and multi-ticks
+
+Use repeated ticks only for a defined ordinal alignment scale, such as one/two/three ticks for limited/partial/full alignment. Define every level and its evidence test in a same-slide legend; more ticks mean a higher assessed level, not greater certainty or several binary approvals. Keep not assessed and non-applicable distinct from the lowest level. If ticks instead count met requirements, show the denominator and use the same requirement set for every row.
+
+Do not overload a binary cell with repeated check characters. The current typed-table runtime supports `binary`, `harvey`, and `heatmap`, but has no multi-tick variant. Use an equivalent anchored Harvey/score encoding unless literal multi-ticks are requested; then extend the canonical indicator owner and test native rendering before use. Separate binary criteria may use separate check/cross columns when that exposes which requirements align better than a composite score.
 
 ### Completion spinner
 
@@ -52,308 +64,13 @@ Do not use an ordinal disc for percentages, confidence, or measured completion. 
 | ordinal fill disc | `--table-cell-rating-fill`, `--table-cell-rating-track`, `--table-cell-rating-size`, `--table-cell-rating-gap`, `--table-cell-rating-font` | [component bindings](../theming/component-bindings.md#evidence-components) |
 | indicator legend | `--table-cell-legend-font`, `--table-cell-legend-color`, `--table-cell-legend-gap`, `--table-cell-legend-item-gap`, `--table-cell-legend-swatch-size`, `--table-cell-legend-rule` | [component bindings](../theming/component-bindings.md#evidence-components) |
 
-## Structural HTML reference
+## Construction details
 
-```html
-<main class="deck" data-theme="executive-light" data-density="executive">
-  <section class="slide" aria-label="Table cell status component examples">
-    <figure class="table-cell-status-set" data-palette="theme-sequential">
-      <table class="data-table" aria-label="Completion by workstream">
-        <thead><tr><th>Workstream</th><th>Complete</th></tr></thead>
-        <tbody>
-          <tr>
-            <th>Systems testing</th>
-            <td class="table-cell-status" data-variant="completion">
-              <span class="table-cell-status__spinner" style="--value: 72" role="img" aria-label="72 percent complete"></span>
-              <span class="table-cell-status__value">72%</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </figure>
-
-    <figure class="table-cell-status-set" data-palette="theme-status">
-      <table class="data-table" aria-label="Forecast by workstream" aria-describedby="forecast-status-legend">
-        <thead><tr><th>Workstream</th><th>Forecast</th></tr></thead>
-        <tbody>
-          <tr><th>Stations</th><td class="table-cell-status" data-variant="traffic-light" data-state="positive"><span class="table-cell-status__dot" aria-hidden="true"></span><span>On track</span></td></tr>
-          <tr><th>Systems</th><td class="table-cell-status" data-variant="traffic-light" data-state="caution"><span class="table-cell-status__dot" aria-hidden="true"></span><span>Watch</span></td></tr>
-          <tr><th>Assurance</th><td class="table-cell-status" data-variant="traffic-light" data-state="negative"><span class="table-cell-status__dot" aria-hidden="true"></span><span>Off track</span></td></tr>
-        </tbody>
-      </table>
-      <aside class="table-cell-status__legend" id="forecast-status-legend" aria-label="Forecast status legend">
-        <ul>
-          <li data-state="positive"><span class="table-cell-status__dot" aria-hidden="true"></span><span>On track: forecast meets the approved date</span></li>
-          <li data-state="caution"><span class="table-cell-status__dot" aria-hidden="true"></span><span>Watch: recovery is required within the current window</span></li>
-          <li data-state="negative"><span class="table-cell-status__dot" aria-hidden="true"></span><span>Off track: approved date is forecast to be missed</span></li>
-        </ul>
-      </aside>
-    </figure>
-
-    <figure class="table-cell-status-set" data-palette="theme-status">
-      <table class="data-table" aria-label="Evidence confirmation">
-        <thead><tr><th>Statement</th><th>Confirmation</th></tr></thead>
-        <tbody>
-          <tr><th>Demand exceeds the threshold</th><td class="table-cell-status" data-variant="binary" data-state="positive" data-label-display="none" aria-label="Supported"><span class="table-cell-status__binary" aria-hidden="true">✓</span></td></tr>
-          <tr><th>Supply remains constrained</th><td class="table-cell-status" data-variant="binary" data-state="negative" data-label-display="none" aria-label="Not supported"><span class="table-cell-status__binary" aria-hidden="true">×</span></td></tr>
-        </tbody>
-      </table>
-    </figure>
-
-    <figure class="table-cell-status-set" data-palette="red-white-green">
-      <table class="data-table" aria-label="Evidence score by workstream" aria-describedby="evidence-score-legend">
-        <thead><tr><th>Workstream</th><th>Evidence score</th></tr></thead>
-        <tbody>
-          <tr><th>Operations</th><td class="table-cell-status" data-variant="heatmap" data-score="5"><span>5</span></td></tr>
-          <tr><th>Commercial</th><td class="table-cell-status" data-variant="heatmap" data-score="3"><span>3</span></td></tr>
-          <tr><th>Technology</th><td class="table-cell-status" data-variant="heatmap" data-score="1"><span>1</span></td></tr>
-        </tbody>
-      </table>
-      <aside class="table-cell-status__legend" id="evidence-score-legend" aria-label="Evidence score legend">
-        <ol class="table-cell-status__scale">
-          <li data-score="1"><span class="table-cell-status__swatch">1</span><span>Insufficient</span></li>
-          <li data-score="2"><span class="table-cell-status__swatch">2</span><span>Weak</span></li>
-          <li data-score="3"><span class="table-cell-status__swatch">3</span><span>Mixed</span></li>
-          <li data-score="4"><span class="table-cell-status__swatch">4</span><span>Good</span></li>
-          <li data-score="5"><span class="table-cell-status__swatch">5</span><span>Strong</span></li>
-        </ol>
-      </aside>
-    </figure>
-
-    <figure class="table-cell-status-set" data-palette="theme-sequential">
-      <table class="data-table" aria-label="Option fit rating" aria-describedby="option-fit-legend">
-        <thead><tr><th>Option</th><th>Strategic fit</th></tr></thead>
-        <tbody>
-          <tr>
-            <th>Option A</th>
-            <td class="table-cell-status" data-variant="ordinal-disc">
-              <span class="table-cell-status__rating" style="--rating:3" role="img" aria-label="3 of 4, strong fit"></span>
-              <span class="table-cell-status__value">3 of 4, strong</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <aside class="table-cell-status__legend" id="option-fit-legend" aria-label="Strategic fit scale">
-        <ol class="table-cell-status__scale">
-          <li><span>0</span><span>None</span></li>
-          <li><span>1</span><span>Limited</span></li>
-          <li><span>2</span><span>Mixed</span></li>
-          <li><span>3</span><span>Strong</span></li>
-          <li><span>4</span><span>Complete</span></li>
-        </ol>
-      </aside>
-    </figure>
-  </section>
-</main>
-```
-
-```css
-.table-cell-status-set {
-  --table-cell-completion-fill: var(--component-primary);
-  --table-cell-completion-track: var(--chart-segment);
-  --table-cell-completion-size: var(--icon-lg);
-  --table-cell-completion-gap: var(--space-2);
-  --table-cell-completion-font: var(--type-label);
-  --table-cell-status-positive: var(--status-positive);
-  --table-cell-status-caution: var(--status-caution);
-  --table-cell-status-negative: var(--status-negative);
-  --table-cell-status-missing: var(--chart-segment);
-  --table-cell-status-marker-size: var(--icon-sm);
-  --table-cell-status-gap: var(--space-2);
-  --table-cell-status-font: var(--type-body-compact);
-  --table-cell-heat-1: var(--heatmap-primary-1);
-  --table-cell-heat-2: var(--heatmap-primary-2);
-  --table-cell-heat-3: var(--heatmap-primary-3);
-  --table-cell-heat-4: var(--heatmap-primary-4);
-  --table-cell-heat-5: var(--heatmap-primary-5);
-  --table-cell-heat-on-low: var(--ink);
-  --table-cell-heat-on-high: var(--on-primary);
-  --table-cell-heat-missing: var(--surface-1);
-  --table-cell-heat-missing-color: var(--muted-ink);
-  --table-cell-heat-font: var(--type-label);
-  --table-cell-heat-min-size: var(--chart-row-height);
-  --table-cell-heat-padding: var(--space-2);
-  --table-cell-rating-fill: var(--component-primary);
-  --table-cell-rating-track: var(--chart-segment);
-  --table-cell-rating-size: var(--icon-lg);
-  --table-cell-rating-gap: var(--space-2);
-  --table-cell-rating-font: var(--type-label);
-  --table-cell-legend-font: var(--type-body-compact);
-  --table-cell-legend-color: var(--ink);
-  --table-cell-legend-gap: var(--space-3);
-  --table-cell-legend-item-gap: var(--space-2);
-  --table-cell-legend-swatch-size: var(--icon-md);
-  --table-cell-legend-rule: var(--rule-quiet);
-}
-
-.table-cell-status-set[data-palette="red-white-green"] {
-  --table-cell-heat-1: var(--status-negative);
-  --table-cell-heat-2: var(--status-negative-tint);
-  --table-cell-heat-3: var(--canvas);
-  --table-cell-heat-4: var(--status-positive-tint);
-  --table-cell-heat-5: var(--status-positive);
-}
-
-.table-cell-status-set[data-palette="red-white"] {
-  --table-cell-heat-1: var(--status-negative);
-  --table-cell-heat-2: var(--status-negative-tint);
-  --table-cell-heat-3: var(--surface-2);
-  --table-cell-heat-4: var(--surface-1);
-  --table-cell-heat-5: var(--canvas);
-}
-
-.table-cell-status[data-variant="completion"] {
-  display: flex;
-  align-items: center;
-  gap: var(--table-cell-completion-gap);
-}
-
-.table-cell-status[data-variant="traffic-light"] {
-  display: flex;
-  align-items: center;
-  gap: var(--table-cell-status-gap);
-  font: var(--table-cell-status-font);
-}
-
-.table-cell-status[data-variant="binary"] {
-  display: flex;
-  align-items: center;
-  gap: var(--table-cell-status-gap);
-  font: var(--table-cell-status-font);
-}
-
-.table-cell-status__binary {
-  display: inline-grid;
-  place-items: center;
-  width: var(--table-cell-status-marker-size);
-  color: var(--table-cell-status-missing);
-  font: var(--table-cell-status-font);
-  stroke-width: var(--table-cell-binary-line);
-}
-
-[data-variant="binary"][data-state="positive"] > .table-cell-status__binary { color: var(--table-cell-status-positive); }
-[data-variant="binary"][data-state="negative"] > .table-cell-status__binary { color: var(--table-cell-status-negative); }
-
-.table-cell-status__spinner {
-  --value: 0;
-  width: var(--table-cell-completion-size);
-  aspect-ratio: 1;
-  flex: none;
-  border-radius: var(--radius-round);
-  background: conic-gradient(var(--table-cell-completion-fill) calc(var(--value) * 1%), var(--table-cell-completion-track) 0);
-}
-
-.table-cell-status__value {
-  font: var(--table-cell-completion-font);
-  font-variant-numeric: tabular-nums;
-}
-
-.table-cell-status[data-variant="ordinal-disc"] {
-  display: flex;
-  align-items: center;
-  gap: var(--table-cell-rating-gap);
-  font: var(--table-cell-rating-font);
-}
-
-.table-cell-status__rating {
-  --rating: 0;
-  width: var(--table-cell-rating-size);
-  aspect-ratio: 1;
-  flex: none;
-  border-radius: var(--radius-round);
-  background: conic-gradient(var(--table-cell-rating-fill) calc(var(--rating) * 25%), var(--table-cell-rating-track) 0);
-}
-
-.table-cell-status[data-variant="completion"][data-state="positive"] { --table-cell-completion-fill: var(--table-cell-status-positive); }
-.table-cell-status[data-variant="completion"][data-state="caution"] { --table-cell-completion-fill: var(--table-cell-status-caution); }
-.table-cell-status[data-variant="completion"][data-state="negative"] { --table-cell-completion-fill: var(--table-cell-status-negative); }
-
-.table-cell-status__dot {
-  width: var(--table-cell-status-marker-size);
-  aspect-ratio: 1;
-  flex: none;
-  border-radius: var(--radius-round);
-  background: var(--table-cell-status-missing);
-}
-
-[data-state="positive"] > .table-cell-status__dot { background: var(--table-cell-status-positive); }
-[data-state="caution"] > .table-cell-status__dot { background: var(--table-cell-status-caution); }
-[data-state="negative"] > .table-cell-status__dot { background: var(--table-cell-status-negative); }
-
-.table-cell-status[data-variant="heatmap"] {
-  min-width: var(--table-cell-heat-min-size);
-  min-height: var(--table-cell-heat-min-size);
-  padding: var(--table-cell-heat-padding);
-  text-align: center;
-  font: var(--table-cell-heat-font);
-  font-variant-numeric: tabular-nums;
-  color: var(--table-cell-heat-on-low);
-}
-
-.table-cell-status-set [data-score="1"] { background: var(--table-cell-heat-1); }
-.table-cell-status-set [data-score="2"] { background: var(--table-cell-heat-2); }
-.table-cell-status-set [data-score="3"] { background: var(--table-cell-heat-3); }
-.table-cell-status-set [data-score="4"] { background: var(--table-cell-heat-4); }
-.table-cell-status-set [data-score="5"] { background: var(--table-cell-heat-5); color: var(--table-cell-heat-on-high); }
-.table-cell-status-set [data-score="missing"] { background: var(--table-cell-heat-missing); color: var(--table-cell-heat-missing-color); }
-
-.table-cell-status-set[data-palette="red-white-green"] [data-score="1"],
-.table-cell-status-set[data-palette="red-white"] [data-score="1"] {
-  color: var(--on-status-negative);
-}
-
-.table-cell-status-set[data-palette="red-white"] [data-score="5"] {
-  color: var(--table-cell-heat-on-low);
-}
-
-.table-cell-status-set[data-palette="red-white-green"] [data-score="5"] {
-  color: var(--on-status-positive);
-}
-
-.table-cell-status__legend {
-  margin-top: var(--table-cell-legend-gap);
-  padding-top: var(--table-cell-legend-gap);
-  border-top: var(--table-cell-legend-rule);
-  color: var(--table-cell-legend-color);
-  font: var(--table-cell-legend-font);
-}
-
-.table-cell-status__legend ul,
-.table-cell-status__legend ol {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--table-cell-legend-gap);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.table-cell-status__legend li {
-  display: flex;
-  align-items: center;
-  gap: var(--table-cell-legend-item-gap);
-}
-
-.table-cell-status__scale {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-}
-
-.table-cell-status__swatch {
-  width: var(--table-cell-legend-swatch-size);
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  flex: none;
-  font: var(--table-cell-heat-font);
-}
-```
-
-The HTML exposes one component class with five registered variants. `data-palette` belongs on the table-and-legend set so the cells and legend cannot resolve different scales. Completion `--value` and ordinal `--rating` are content data. A presentation adapter calculates sector geometry and registered heatmap swatches before creating native objects.
+Cells and their legend share one declared scale and palette. Completion values and ordinal ratings are content data. The runtime calculates sector geometry and registered heatmap swatches before creating native objects.
 
 ## Variants and states
 
-- `completion` accepts `--value` from `0` to `100`. Its default palette is component-primary plus the neutral track. `data-state` may rebind the fill only when a written threshold exists.
+- `completion` accepts a value from `0` to `100`. Its default palette is component-primary plus the neutral track. A semantic state may rebind the fill only when a written threshold exists.
 - `traffic-light` accepts `positive`, `caution`, `negative`, or `missing`. Every cell includes a visible label and every table includes a same-slide legend.
 - `binary` accepts `positive`, `negative`, or `missing`. `labelDisplay: "none"` is the compact default and centers the check, cross, or missing mark in the cell. `labelDisplay: "state"` places the registered state wording beside the same mark. Both variants retain a written confirmation test in the table contract.
 - `heatmap` accepts scores `1` through `5` and `missing`. A different bounded domain is allowed only when the score labels, scale anchors, and legend are changed together.
@@ -364,7 +81,7 @@ The HTML exposes one component class with five registered variants. `data-palett
 
 Build completion and ordinal discs as one editable neutral circle plus one editable filled sector, with the value or level in a separate text box. Build traffic lights as editable circles and adjacent text. Build binary confirmation from two editable hairline strokes for a check or cross and one for the missing mark. Add the adjacent state text only for the labelled variant. Build a heatmap as editable table-cell fills plus editable centered values. Resolve every fill and text colour from the active theme before creating the native objects.
 
-Group each legend with its table, not with page furniture. Preserve the legend in PowerPoint and Google Slides as editable shapes and text. Keep the table's accessible description, cell labels, and legend wording in speaker notes or object metadata when the platform cannot retain HTML relationships.
+Group each legend with its table, not with page furniture. Preserve the legend in PowerPoint and Google Slides as editable shapes and text. Keep the table's accessible description, cell labels, and legend wording in speaker notes or object metadata when the platform cannot retain those relationships.
 
 ## Acceptance check
 

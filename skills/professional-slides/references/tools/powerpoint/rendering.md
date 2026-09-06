@@ -60,6 +60,8 @@ Inspect every slide for:
 
 After any structural repair, render the entire deck again. After a local repair, at minimum re-render the affected slide and the full montage; before delivery, the final complete deck must have one consistent render set.
 
+The last pass is a visual overlap and object-order audit of that exact saved-file render, after all copy and layout changes. Inspect wrapped reference labels, rules crossing text, bubbles, legends, connector endpoints, and source furniture at full size. Use measured text bounds rather than one-line placeholder boxes. Reposition or reflow collisions; change object order only when it restores the intended layering without hiding evidence. Then re-export, re-render, and repeat the pass. A geometry report or successful export alone does not satisfy this gate.
+
 ## Hard acceptance loop
 
 Use [PowerPoint hard acceptance](acceptance.md) for the validator and repair loop; the [evaluation owner](../../evaluation/index.md#powerpoint-reports) controls release evidence.

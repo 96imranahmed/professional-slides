@@ -45,12 +45,14 @@ For an [executive-summary narrative](../components/copy.md#executive-summary-nar
 
 ## Content preparation
 
+Pass the [analytical substance check](../components/copy.md#analytical-substance) before allocating regions. Size the exhibit and interpretation from the supported argument; a preset chart-and-rail split must not determine how much reasoning the author supplies.
+
 Before composition, verify that:
 
 - the action title states the answer;
 - every item has one explicit job;
 - the selected component matches the item’s content and comparison;
-- annotations identify stable data keys;
+- the [annotation decision](../components/chart-callouts.md#authoring-decision) is serialized in chart props with stable data keys;
 - generic labels and decorative containers have been removed;
 - copy fits the declared delivery density;
 - required provenance has a source component.

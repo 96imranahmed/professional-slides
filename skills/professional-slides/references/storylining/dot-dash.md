@@ -11,6 +11,8 @@ Represent every planned slide in production order with exactly one dot. The dot 
 
 For an analytical slide, use the complete proposed action title as the dot. It should state the supported conclusion or action, not merely name a topic. For a structural slide, use the exact visible heading, such as `Executive summary`, `Contents`, or `1 Financial context`. For a cover, use the exact proposed deck title. Format structural ordinals through the canonical [item-indicator owner](../components/item-indicators.md).
 
+For explanatory pages, use the [storylining title rule](index.md#write-the-title-spine): a precise mechanism or distinction heading is valid when the page teaches rather than recommends.
+
 ## Planning grammar
 
 Write the review artifact as Markdown in this form:
@@ -28,11 +30,11 @@ When the approved story is compiled into the pre-authoring contract, copy each d
 
 Present the plan in this order:
 
-1. decision setup;
-2. explained hypothesis logic, with a rendered decision map when useful;
+1. communication setup and audience objective;
+2. explained hypothesis logic or concept dependencies, with a map when useful and within the requested output scope;
 3. tracker and section map, including none when no visible tracker is needed;
 4. complete dot-dash grouped by section;
-5. coverage of hypothesis branches and template jobs.
+5. coverage of the problem branches or concepts and any selected template jobs.
 
 Do not present a flat slide list when section logic matters.
 
@@ -54,12 +56,16 @@ For a net-new deck or any target-story or structural change, use the available f
 
 If the story or any proposed slide title changes after approval, update the affected dots and obtain approval again.
 
+Explicit standing auto-approval satisfies the approval gate within its stated scope. Record that user instruction, its date, and each approved plan version or hash; do not fabricate a separate user review or repeatedly request confirmation. Approval does not waive evidence or quality checks.
+
+Keep literal user requirements separate from author interpretations and implementation choices in briefs, addenda and review packets. Auto-approval authorizes the scoped work; it does not turn an analyst-selected threshold, assumption or design application into a user-specified requirement. Label superseded author choices as history, not current constraints.
+
 ## Check
 
 - Every planned slide has one dot containing the exact proposed visible title or heading and at least one real dash.
 - Analytical dots are supported action titles; structural dots are exact visible headings.
 - The sequence answers the main question.
-- The hypothesis branches map to the story.
+- The problem branches or concept dependencies map to the story.
 - The dots form a coherent title spine when read alone.
 - Navigation pages are explicit and necessary.
 - Every contract title and authored slide title remains verbatim-traceable to its approved dot.

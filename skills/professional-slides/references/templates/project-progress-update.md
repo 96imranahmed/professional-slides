@@ -74,6 +74,8 @@ State the latest forecast and its basis. Show the consequence of slippage, faile
 
 Every material action needs an owner, timing, completion evidence, and the decision it enables. Keep management actions separate from sponsor decisions.
 
+When accountability is not supplied, record the gap and require a governance-confirmed assignment before execution; this is valid planning evidence, not an execution-ready action. Do not assume which body has appointment authority.
+
 ## Evidence
 
 Use dated, attributable programme evidence. Cite every slide. Reconcile numbers across milestones, workstreams, risks, and forecast views.
@@ -95,7 +97,7 @@ Reject the deck when:
 - risk is listed without residual consequence;
 - forecast and target are mixed;
 - traffic-light colours substitute for evidence;
-- actions lack owners or completion evidence;
+- execution-ready actions lack owners or completion evidence, or unresolved accountability has no resolution path;
 - the executive summary is a tracker;
 - the same generic layout is used for most pages;
 - sources are missing.

@@ -14,7 +14,7 @@ import {
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { legendNodes, LEGEND_TOKENS } from "./legends.mjs";
-import { contrastRatio, strongestContrastIndex as contrastIndex } from "./palettes.mjs";
+import { contrastRatio } from "./palettes.mjs";
 import { CHART_GUIDANCE } from "./guidance.mjs";
 import {
   HORIZONS_SAMPLE,
@@ -50,11 +50,12 @@ const SERIES = [
   token("color.chartSeries6")
 ];
 
-function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54 } = {}) {
+function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
+  leftInset = Math.max(leftInset, bands.left);
   const top = (topLegend ? 52 : 28) + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top;
   const bottom = 68 + bands.bottom;
-  const rightInset = endLabels ? 186 : 16;
+  const rightInset = endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16;
   if (frame.height - bottom - top < 100) throw new Error("Chart annotation bands leave insufficient plot height; enlarge or split the exhibit");
   return {
     x: frame.x + leftInset,
@@ -159,10 +160,6 @@ function normalizedHighlights(props, { categories = [], series = [], allowBar = 
     }
     return { ...highlight, style };
   });
-}
-
-function strongestContrastIndex(tokens) {
-  return contrastIndex(SERIES.map(series => tokens[series.tokenId].value));
 }
 
 function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true } = {}) {
@@ -286,21 +283,25 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
         y2: y,
         style: lineStyle(token("color.componentPrimary"), token("line.standard"), "dash")
       }));
-      const labelWidth = 126;
+      const text = reference.label || String(reference.value);
+      const measured = measureText(text, Math.min(240, plot.width * 0.45), { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(CHART_ANNOTATION), bold: true, wrapWidthRatio: 1 });
+      const labelWidth = Math.ceil(measured.width) + 2;
+      const labelHeight = measured.height;
       const labelCandidates = [
-        { x: plot.x + plot.width - labelWidth - 4, y: y - 28, width: labelWidth, height: 24, align: "right" },
-        { x: plot.x + 8, y: y - 28, width: labelWidth, height: 24, align: "left" },
-        { x: plot.x + plot.width - labelWidth - 4, y: y + 4, width: labelWidth, height: 24, align: "right" },
-        { x: plot.x + 8, y: y + 4, width: labelWidth, height: 24, align: "left" }
+        { x: plot.x + plot.width - labelWidth - 4, y: y - labelHeight - 8, width: labelWidth, height: labelHeight, align: "right" },
+        { x: plot.x + 8, y: y - labelHeight - 8, width: labelWidth, height: labelHeight, align: "left" },
+        { x: plot.x + plot.width - labelWidth - 4, y: y + 8, width: labelWidth, height: labelHeight, align: "right" },
+        { x: plot.x + 8, y: y + 8, width: labelWidth, height: labelHeight, align: "left" }
       ];
-      const labelFrame = labelCandidates.find((candidate) => annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && obstacles.filter((node) => ["chart-mark", "data-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)));
+      const labelFrame = labelCandidates.find((candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (props.referenceLines || []).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4));
       if (!labelFrame) throw new Error("No collision-free reference-line label position; revise the chart composition");
       overlay.push(textPrimitive({
         id: stableId(id, "reference-label", index),
         role: "chart-reference-label",
         frame: { x: labelFrame.x, y: labelFrame.y, width: labelFrame.width, height: labelFrame.height },
-        text: reference.label || String(reference.value),
-        style: textStyle(CHART_ANNOTATION, token("color.componentPrimary"), true, labelFrame.align)
+        text: measured.text,
+        style: { ...textStyle(CHART_ANNOTATION, token("color.componentPrimary"), true, labelFrame.align), lineHeight: measured.lineHeight, wrap: false },
+        data: { textLayout: measured }
       }));
     }
   }
@@ -331,8 +332,16 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const highlights = normalizedHighlights(props, { categories, series, allowBar: !stacked });
   const barHighlight = highlights.find(highlight => highlight.style === "bar");
   const regionHighlight = highlights.find(highlight => highlight.style === "region-box" || highlight.style === "region-tint");
+  if (props.focusSeries !== undefined) {
+    if (stacked || series.length !== 2) throw new Error("focusSeries requires two unstacked series; preserve distinct colours for multiple peer series");
+    if (!series.some(item => item.name === props.focusSeries)) throw new Error("focusSeries must name an exact chart series");
+    if (props.colorIndices !== undefined) throw new Error("focusSeries conflicts with an explicit colour-index mapping");
+  }
   const chartProps = { ...props, highlights };
   const showLegend = props.legend !== false && series.length > 1;
+  const values = series.flatMap((item) => item.values);
+  const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && series.length === 1);
+  const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   const horizontalCategoryLabelWidth = horizontal
     ? Math.min(180, Math.max(72, Math.ceil(Math.max(...categories.map(category => measureText(category, 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width))) + 12))
     : 0;
@@ -341,11 +350,9 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
-    leftInset: horizontal ? horizontalCategoryLabelWidth + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54
+    leftInset: horizontal ? horizontalCategoryLabelWidth + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54,
+    centerPlot: !horizontal && !showValueAxis
   });
-  const values = series.flatMap((item) => item.values);
-  const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && series.length === 1);
-  const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   const stackExtents = categories.flatMap((_, categoryIndex) => {
     if (!stacked) return series.map(item => item.values[categoryIndex]);
     const categoryValues = series.map(item => item.values[categoryIndex]);
@@ -357,16 +364,23 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const bounds = numericBounds(stacked ? stackExtents : values, { min: props.yMin, max: props.yMax, axis: horizontal ? "x" : "y", includeZero: true });
   const twoMarkContrast = !stacked && !barHighlight && props.colorIndices === undefined && categories.length * series.length === 2;
   const twoSeriesContrast = !stacked && !barHighlight && props.colorIndices === undefined && series.length === 2;
-  const contrastPair = twoMarkContrast || twoSeriesContrast ? [0, strongestContrastIndex(tokens)] : null;
   const colorIndexFor = (seriesIndex, categoryIndex) => {
     const explicit = props.colorIndices?.[seriesIndex];
     if (explicit !== undefined) {
       if (!Number.isInteger(explicit) || explicit < 0 || explicit >= SERIES.length) throw new Error("Chart colour index must be between zero and five");
       return explicit;
     }
-    return contrastPair ? contrastPair[twoSeriesContrast ? seriesIndex : categoryIndex * series.length + seriesIndex] : seriesIndex % SERIES.length;
+    return seriesIndex % SERIES.length;
   };
-  const legendItems = series.map((item, seriesIndex) => ({ label: item.name, colorIndex: colorIndexFor(seriesIndex, 0) }));
+  const colorFor = (seriesIndex, categoryIndex) => {
+    const primary = token("color.componentPrimary"), comparator = token("color.chartComparator");
+    if (barHighlight) return categories[categoryIndex] === barHighlight.category ? primary : comparator;
+    if (props.colorIndices !== undefined || stacked) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
+    if (twoSeriesContrast) return series[seriesIndex].name === (props.focusSeries ?? series[0].name) ? primary : comparator;
+    if (twoMarkContrast) return categoryIndex === 0 ? primary : comparator;
+    return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
+  };
+  const legendItems = series.map((item, seriesIndex) => ({ label: item.name, colorIndex: colorIndexFor(seriesIndex, 0), color: colorFor(seriesIndex, 0) }));
   const nodes = showLegend ? topLegend({ id, frame, items: legendItems }) : [];
   const pointMap = new Map();
   const categoryMap = new Map();
@@ -397,7 +411,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       const value = item.values[categoryIndex];
       const selected = barHighlight?.category === category;
       const colorIndex = colorIndexFor(seriesIndex, categoryIndex);
-      const markColor = barHighlight ? (selected ? token("color.componentPrimary") : token("color.textSecondary")) : SERIES[colorIndex];
+      const markColor = colorFor(seriesIndex, categoryIndex);
       const start = stacked ? (value >= 0 ? positiveCumulative : negativeCumulative) : 0;
       const end = start + value;
       let bar;
@@ -626,10 +640,12 @@ function waterfall({ id, frame, props }) {
   if (!Array.isArray(props.categories) || !props.categories.length || props.categories.some(category => typeof category !== "string" || !category.trim()) || new Set(props.categories).size !== props.categories.length) throw new Error("Waterfall charts require unique non-empty categories");
   if (!Array.isArray(props.values) || props.values.length !== props.categories.length || props.values.some(value => !Number.isFinite(value))) throw new Error("Waterfall values must contain one finite value per category");
   if (props.totals !== undefined && (!Array.isArray(props.totals) || props.totals.some(index => !Number.isInteger(index) || index < 0 || index >= props.categories.length) || new Set(props.totals).size !== props.totals.length)) throw new Error("Waterfall totals must contain unique valid category indices");
+  const showValueAxis = resolveValueAxis(props, { valueCount: props.values.length, dataLabelsVisible: true });
   const plot = chartFrame(frame, {
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
-    annotationRail: props.annotationRail
+    annotationRail: props.annotationRail,
+    centerPlot: !showValueAxis
   });
   const running = [];
   let total = 0;
@@ -640,7 +656,6 @@ function waterfall({ id, frame, props }) {
   });
   const bounds = numericBounds([0, ...running], { min: props.yMin, max: props.yMax, axis: "y", includeZero: true });
   const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
-  const showValueAxis = resolveValueAxis(props, { valueCount: props.values.length, dataLabelsVisible: true });
   const nodes = axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis });
   if (bounds.min < 0 && bounds.max > 0) nodes.push(linePrimitive({ id: stableId(id, "zero-baseline"), role: "chart-axis", x1: plot.x, y1: yScale(0), x2: plot.x + plot.width, y2: yScale(0), style: lineStyle(INK) }));
   const pointMap = new Map();
@@ -1023,12 +1038,15 @@ function chartExamples(id) {
       "single-bar-highlight": { props: { categories: ["Category A", "Category B", "Category C"], series: [{ name: "Measure", values: [48, 72, 56] }], highlights: [{ category: "Category B", style: "bar" }], annotations: [], referenceLines: [] } },
       "region-box-highlight": { props: { categories: ["Category A", "Category B", "Category C"], series: [{ name: "Measure A", values: [52, 68, 74] }, { name: "Measure B", values: [44, 61, 63] }], highlights: [{ category: "Category C", style: "region-box" }], annotations: [], referenceLines: [] } },
       "region-tint-highlight": { props: { categories: ["Category A", "Category B", "Category C"], series: [{ name: "Measure A", values: [52, 68, 74] }, { name: "Measure B", values: [44, 61, 63] }], highlights: [{ category: "Category C", style: "region-tint" }], annotations: [], referenceLines: [] } },
-      "two-mark-contrast": { props: { categories: ["Current", "Future"], series: [{ name: "Measure", values: [80, 150] }], highlights: [], annotations: [], referenceLines: [] } }
+      "two-mark-contrast": { props: { categories: ["Current", "Future"], series: [{ name: "Measure", values: [80, 150] }], highlights: [], annotations: [], referenceLines: [] } },
+      "focal-series": { props: { categories: ["Area 1", "Area 2"], series: [{ name: "Baseline", values: [40, 55] }, { name: "Actual", values: [60, 70] }], focusSeries: "Actual", legend: true, dataLabels: true, highlights: [], annotations: [], referenceLines: [] } }
     };
     if (id === "chart.column") {
       Object.assign(examples, {
-        "a-vs-b-change": { props: { categories: ["Current", "Future"], series: [{ name: "Measure", values: [80, 150] }], dataLabels: true, highlights: [], annotations: [], changeAnnotations: [{ start: "Current", end: "Future", style: "arrow", text: "+87.5%" }], referenceLines: [] } },
-        "grouped-series-change": { props: { categories: ["Area 1", "Area 2", "Area 3"], series: [{ name: "Baseline", values: [24, 22, 35] }, { name: "Future", values: [47, 58, 40] }], dataLabels: true, highlights: [], annotations: [], changeAnnotations: [
+        "multi-row-annotation-rail": { props: { categories: ["Case A", "Case B", "Case C"], series: [{ name: "Value", values: [230,338,459] }], dataLabels: true, annotationRail: { rows: [{ label: "EPS, $", items: [{ category: "Case A", text: "10.48" }, { category: "Case B", text: "12.52" }, { category: "Case C", text: "14.34" }] }, { label: "P/E", items: [{ category: "Case A", text: "22x" }, { category: "Case B", text: "27x" }, { category: "Case C", text: "32x" }] }] }, highlights: [], annotations: [], referenceLines: [] } },
+        "wrapped-reference-label": { props: { categories: ["Case A", "Case B", "Case C"], series: [{ name: "Value", values: [231,338,459] }], dataLabels: true, yMax:520, annotations: [], highlights: [], referenceLines: [{ value:335.02, label:"Reference close\n$335.02" }] } },
+        "a-vs-b-change": { props: { categories: ["Current", "Future"], series: [{ name: "Measure", values: [80, 150] }], dataLabels: true, highlights: [{ category: "Future", style: "bar" }], annotations: [], changeAnnotations: [{ start: "Current", end: "Future", style: "arrow", text: "+87.5%" }], referenceLines: [] } },
+        "grouped-series-change": { props: { categories: ["Area 1", "Area 2", "Area 3"], series: [{ name: "Baseline", values: [24, 22, 35] }, { name: "Future", values: [47, 58, 40] }], focusSeries: "Future", dataLabels: true, highlights: [], annotations: [], changeAnnotations: [
           { start: { category: "Area 1", series: "Baseline" }, end: { category: "Area 1", series: "Future" }, style: "bracket", text: "+23" },
           { start: { category: "Area 2", series: "Baseline" }, end: { category: "Area 2", series: "Future" }, style: "bracket", text: "+36" },
           { start: { category: "Area 3", series: "Baseline" }, end: { category: "Area 3", series: "Future" }, style: "bracket", text: "+5" }
@@ -1042,17 +1060,17 @@ function chartExamples(id) {
     const examples = {
       "legend-top-right": { props: { categories: ["2023", "2024", "2025", "2026"], series: [{ name: "Core", values: [34, 38, 43, 48] }, { name: "Recurring", values: [18, 24, 31, 39] }, { name: "New", values: [6, 8, 11, 15] }], legend: true, dataLabels: true, annotations: [], highlights: [], referenceLines: [] } }
     };
-    if (id === "chart.stacked-column") examples["total-construction"] = { props: { categories: ["Current", "Future"], series: [{ name: "Core", values: [40, 46] }, { name: "Growth", values: [22, 38] }, { name: "New", values: [8, 20] }], dataLabels: true, annotations: [], changeAnnotations: [{ start: "Current", end: "Future", style: "construction", text: "+34 total" }], highlights: [], referenceLines: [] } };
+    if (id === "chart.stacked-column") examples["total-construction"] = { props: { categories: ["Current", "Future"], series: [{ name: "Core", values: [40, 46] }, { name: "Growth", values: [22, 38] }, { name: "New", values: [8, 20] }], dataLabels: true, annotations: [], changeAnnotations: [{ start: "Current", end: "Future", style: "construction", text: "+34" }], highlights: [], referenceLines: [] } };
     return examples;
   }
   if (id === "chart.waterfall") return {
-    "end-to-end-construction": { props: { categories: ["Opening", "Cost", "Mix", "Capacity", "Closing"], values: [70, -20, -15, -10, 25], totals: [0, 4], yMax: 80, annotations: [], changeAnnotations: [{ start: "Opening", end: "Closing", style: "construction", text: "-45 total" }], highlights: [], referenceLines: [] } }
+    "end-to-end-construction": { props: { categories: ["Opening", "Cost", "Mix", "Capacity", "Closing"], values: [70, -20, -15, -10, 25], totals: [0, 4], yMax: 80, annotations: [], changeAnnotations: [{ start: "Opening", end: "Closing", style: "construction", text: "-45" }], highlights: [], referenceLines: [] } }
   };
   if (id === "chart.line") return {
     "callout-borderless": { props: { categories: ["2021", "2022", "2023", "2024", "2025"], series: [{ name: "Measure", values: [0.8, 1.5, 2.2, 2.6, 3.1] }], yMax: 4, dataLabels: false, legend: false, annotations: [{ category: "2024", text: "Adoption accelerates after launch", treatment: "callout", border: false }], highlights: [], referenceLines: [] } },
     "orthogonal-dot-vertical": { props: { categories: ["Q1", "Q2", "Q3", "Q4"], series: [{ name: "Measure", values: [22, 31, 48, 55] }], yMax: 60, dataLabels: false, legend: false, annotations: [{ category: "Q3", text: "The launch creates a clear inflection", treatment: "orthogonal-dot", orientation: "vertical" }], highlights: [], referenceLines: [] } },
     "long-range-growth": { props: { categories: ["2021", "2022", "2023", "2024", "2025"], series: [{ name: "Measure", values: [0.8, 1.5, 2.2, 2.6, 3.1] }], yMax: 4, dataLabels: true, legend: false, annotations: [], changeAnnotations: [{ start: "2021", end: "2025", style: "bracket", text: "+288%" }], highlights: [], referenceLines: [] } },
-    "annotation-rail": { props: { categories: ["2021", "2022", "2023", "2024", "2025"], series: [{ name: "Measure", values: [0.8, 1.5, 2.2, 2.6, 3.1] }], yMax: 4, dataLabels: true, legend: false, annotations: [], annotationRail: { items: [{ category: "2021", text: "Base" }, { category: "2022", text: "+88%" }, { category: "2023", text: "+47%" }, { category: "2024", text: "+18%" }, { category: "2025", text: "+19%" }] }, highlights: [], referenceLines: [] } },
+    "annotation-rail": { props: { categories: ["2021", "2022", "2023", "2024", "2025"], series: [{ name: "Measure", values: [0.8, 1.5, 2.2, 2.6, 3.1] }], yMax: 4, dataLabels: true, legend: false, annotations: [], annotationRail: { items: [{ category: "2021", text: "N/A" }, { category: "2022", text: "+88%" }, { category: "2023", text: "+47%" }, { category: "2024", text: "+18%" }, { category: "2025", text: "+19%" }] }, highlights: [], referenceLines: [] } },
     "gridlines-for-dense-scale": { props: { categories: ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6"], series: [{ name: "Actual", values: [18, 29, 34, 46, 53, 68] }, { name: "Plan", values: [22, 27, 38, 44, 58, 64] }], yMax: 80, gridlines: true, annotations: [], highlights: [], referenceLines: [] } }
   };
   if (id === "chart.scatter") return {
@@ -1073,7 +1091,7 @@ export function registerCharts(registry) {
     const tokens = [
       "font.body", "type.heading", "type.body", "type.chartLabel", "type.chartAnnotation", "type.compact", "type.label", "type.source", "color.ink", "color.textSecondary",
       "font.bodySemibold", "weight.semibold",
-      "color.chartGrid", "color.componentPrimary", "color.componentPrimaryTint", "color.rule",
+      "color.chartGrid", "color.chartComparator", "color.componentPrimary", "color.componentPrimaryTint", "color.rule",
       "color.canvas", "color.surface", "color.surfaceMuted", "color.onPrimary", "color.negative", "line.hairline", "line.standard", "radius.none",
       ...SERIES.map((item) => item.tokenId), ...LEGEND_TOKENS, ...(chart.tokens || [])
     ];

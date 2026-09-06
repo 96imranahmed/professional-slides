@@ -1692,6 +1692,24 @@ def validate(pptx_path: Path, manifest_path: Path) -> dict[str, Any]:
     }
 
 
+def manifest_cli() -> int:
+    parser = argparse.ArgumentParser(description="Validate a hard-acceptance manifest before creating a PPTX.")
+    parser.add_argument("manifest", type=Path)
+    parser.add_argument("--report", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        findings = [finding.as_dict() for finding in validate_manifest(read_json(args.manifest))]
+    except ValueError as exc:
+        findings = [{"code": "input.invalid", "message": str(exc)}]
+    report = {"schemaVersion": 1, "accepted": not findings,
+              "scope": "manifest-schema-only", "manifest": {"path": str(args.manifest),
+              "sha256": sha256(args.manifest) if args.manifest.is_file() else None}, "findings": findings}
+    args.report.parent.mkdir(parents=True, exist_ok=True)
+    args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(report, indent=2))
+    return 0 if report["accepted"] else 1
+
+
 def hard_cli() -> int:
     parser = argparse.ArgumentParser(
         description="Accept or reject an exported PPTX against its hard acceptance manifest."
@@ -2073,6 +2091,10 @@ def semantic_title_metric_repetitions(title: str, blocks: list[str]) -> list[str
         if semantic_normalize_text(block) == semantic_normalize_text(title):
             continue
         match = METRIC_RE.match(block.strip())
+        # A bare value can be a required chart data label. Text-only extraction
+        # cannot prove that it is a detached metric; visual QA owns that case.
+        if match and not block.strip()[match.end():].strip():
+            continue
         if match and semantic_normalize_metric(match.group(0)) in title_metrics:
             repeated_blocks.append(block)
     return repeated_blocks
@@ -2283,7 +2305,7 @@ def semantic_cli() -> int:
 VISUAL_SCHEMA_PATH = ROOT / "evals" / "schemas" / "pptx-visual-judgement.schema.json"
 VISUAL_ALLOWED_MODELS = ("gpt-5.6-luna", "gpt-5.6-terra")
 VISUAL_DEFAULT_MODEL = "gpt-5.6-terra"
-VISUAL_RUBRIC_VERSION = "6"
+VISUAL_RUBRIC_VERSION = "7"
 VISUAL_MINIMUM_SCORE = 90
 VISUAL_SCORE_NAMES = (
     "compositionCompleteness",
@@ -2366,7 +2388,7 @@ Reject a slide for any major visual or semantic defect, including:
 - an incomplete component such as a metric without its registered divider/label grammar or a callout without a visible attachment;
 - sparse or under-composed evidence that leaves material dead space, undersizes the dominant exhibit, or reads like an unfinished draft for its delivery mode;
 - a component or composition that fails its canonical owner contract; open compositions are valid when their relationships, jobs and geometry are explicit;
-- a chart without a complete exhibit heading, necessary units/period, readable labels, or canonical legend/direct-label treatment. The standard chart title keeps a short unit inline in a secondary colour, moves a material period into the concise heading, and falls back to a second unit line only when measured fit requires it. Peer analytical headers use the same underline state;
+- a chart without a complete exhibit heading, necessary units/period, readable labels, or canonical legend/direct-label treatment. The standard chart title keeps a short unit inline in a secondary colour, moves a material period into the concise heading, and falls back to a second unit line only when measured fit requires it. Peer analytical headers use the same top anchor and underline baseline;
 - an automatic/default Office legend whose placement, keys, spacing, or plot reservation visibly departs from the shared legend grammar;
 - a tracker that is unnecessary, uses a nonregistered state, repeats a full-state construction on analytical pages, or competes with the title;
 - weak hierarchy, awkward alignment, inconsistent spacing, gratuitous UI-like panels, clipping, wrapping, overlap, or unfinished polish;
@@ -2375,6 +2397,7 @@ Reject a slide for any major visual or semantic defect, including:
 - metric-strip wallpaper: evenly spaced standalone values with tiny labels and notes when the values should form one equation, bridge, scale comparison, or chart;
 - redundant hierarchy: an action title plus a generic exhibit label plus per-metric labels plus a methodology label plus a separate takeaway. Reject generic labels such as "current snapshot", "calculation boundary", "read-through", or "company definition" when they add no decision meaning;
 - multiple detached takeaways. One slide has one governing conclusion, normally carried by the action title; material qualifiers must be readable alongside the relevant evidence, while provenance belongs in the source note;
+- dangling analytical paragraphs below charts or tables. Hard requirement: use the shared insight box for detached synthesis, or a deliberate adjacent bullet-list section for developed interpretation. A nested table-plus-insight half-page composite is valid; do not require every insight to be full-width. Reject substantive text dangling below a terminal insight. Dense, well-written, consistently grouped text is acceptable; noise is inconsistent treatment, weak grouping or unclear fragments, not density alone;
 - tiny supporting copy that conceals a material assumption, weak data ink, or insufficiently developed evidence for the declared delivery mode;
 - a split analytical page whose secondary rail merely repeats chart values or argues an unrelated conclusion. A complementary interpretation rail, coordinated small multiples, or open comparison table is valid when it advances the same governing claim.
 - a split exhibit/interpretation page that violates the guideline owner's boundary grammar: unsupported inference arrows, an absent context boundary, or smaller subsection typography in a grey panel.
@@ -2385,6 +2408,10 @@ Evaluate financial relationships as defined by their sources. Do not demand an e
 Do not reward minimalism merely for having whitespace. For an executive pre-read, expect a substantively occupied analytical canvas with a dominant exhibit plus the labels, comparison, qualifier, or attached synthesis needed to make the claim complete. Also do not reward density created by filler.
 
 Apply the copy owner's executive-summary standalone narrative test. Each titled theme needs multiple distinct, developed bullets, not one compressed point or paragraph; another format requires an explicit user/reference-directed exception. A clean table with one fact and one terse consequence per theme can still fail if the governing argument, counterargument or change condition remains implicit. Judge the developed reasoning, not word count or table presence alone. A declared, justified summary copy-budget override does not authorize smaller type or filler.
+
+Hard semantic copy gate: never accept a recap of content already shown on the same slide, especially graph or table narration, in ANY paragraph, bullet, caption or box. Necessary chart labels, units, legends and compact comparison annotations decode the exhibit; they are not redundant prose. An insight must add a supported new deduction beyond the visible evidence AND title. A numerical restatement, new calculation alone, summary, or methodology note is not insight. Adding 'therefore', moving prose into bullets, or enclosing it does not fix it. Do not demand a box if no defensible deduction exists.
+
+For EVERY slide, return copyAudit with noRecap (boolean), recapEvidence (specific explanation of the inspected supporting copy, quoting any recap), insightCount (number of visible insight surfaces or claimed insight statements), and insights (one record per insight). Each record must quote the exact insight text, identify its on-slide premises, state what new deduction it adds, and classify it as supported_deduction, recap, or unsupported. Use an empty insights array only when there are no insights; still inspect other supporting copy. Reject any recap or non-deductive insight as a major COPY_RECAP or INSIGHT_NOT_DEDUCTION finding and reject the slide/deck. Missing copyAudit, incomplete insight coverage, or a failed copy decision blocks acceptance regardless of scores. Judge meaning, not shared-word counts; do not invent reasoning absent from the actual statement or premises.
 
 Score every slide and the deck from 0 to 100 on exactly these dimensions:
 - compositionCompleteness
@@ -2453,6 +2480,40 @@ def validate_visual_findings(value: Any, label: str) -> list[str]:
     return errors
 
 
+def validate_visual_copy_audit(value: Any, label: str) -> list[str]:
+    if not isinstance(value, dict):
+        return [f"{label} is required for every slide"]
+    errors: list[str] = []
+    if type(value.get("noRecap")) is not bool:
+        errors.append(f"{label}.noRecap must be a boolean")
+    if not non_empty_string(value.get("recapEvidence")):
+        errors.append(f"{label}.recapEvidence must explain the inspected copy")
+    count, insights = value.get("insightCount"), value.get("insights")
+    if type(count) is not int or count < 0:
+        errors.append(f"{label}.insightCount must be a nonnegative integer")
+    if not isinstance(insights, list):
+        return errors + [f"{label}.insights must be an array"]
+    if count != len(insights):
+        errors.append(f"{label}.insights must cover every declared insight")
+    for index, insight in enumerate(insights):
+        location = f"{label}.insights[{index}]"
+        if not isinstance(insight, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        for key in ("text", "premises", "addedDeduction"):
+            if not non_empty_string(insight.get(key)):
+                errors.append(f"{location}.{key} must be non-empty (explain absence on rejection)")
+        if insight.get("classification") not in {"supported_deduction", "recap", "unsupported"}:
+            errors.append(f"{location}.classification is invalid")
+    return errors
+
+
+def visual_copy_audit_passes(value: Any) -> bool:
+    return (not validate_visual_copy_audit(value, "copyAudit")
+            and value["noRecap"] is True
+            and all(item["classification"] == "supported_deduction" for item in value["insights"]))
+
+
 def validate_visual_judgement(judgement: Any, expected_count: int) -> list[str]:
     errors: list[str] = []
     if not isinstance(judgement, dict):
@@ -2486,6 +2547,7 @@ def validate_visual_judgement(judgement: Any, expected_count: int) -> list[str]:
             errors.append(f"{location}.summary must be non-empty")
         errors.extend(validate_visual_scores(slide.get("scores"), f"{location}.scores"))
         errors.extend(validate_visual_findings(slide.get("findings"), f"{location}.findings"))
+        errors.extend(validate_visual_copy_audit(slide.get("copyAudit"), f"{location}.copyAudit"))
     if numbers != list(range(1, expected_count + 1)):
         errors.append(f"slides must cover 1 through {expected_count} exactly once in order")
     return errors
@@ -2498,6 +2560,8 @@ def derive_visual_acceptance(judgement: dict[str, Any], errors: list[str]) -> bo
         return False
     all_findings = list(judgement.get("findings", []))
     for slide in judgement.get("slides", []):
+        if not visual_copy_audit_passes(slide.get("copyAudit")):
+            return False
         if slide.get("verdict") != "accept":
             return False
         if any(slide.get("scores", {}).get(name, 0) < VISUAL_MINIMUM_SCORE for name in VISUAL_SCORE_NAMES):
@@ -3017,6 +3081,7 @@ validate_metric_component_shape_names = semantic_validate_metric_component_shape
 def main() -> int:
     commands = {
         "contract": contract_cli,
+        "manifest": manifest_cli,
         "hard": hard_cli,
         "provenance": provenance_cli,
         "semantics": semantic_cli,

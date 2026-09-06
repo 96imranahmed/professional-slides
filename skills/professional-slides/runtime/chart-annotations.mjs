@@ -35,6 +35,7 @@ const EVIDENCE_BOX_HEIGHT = 56;
 const ORTHOGONAL_GAP = 28;
 const ENDPOINT_DIAMETER = 8;
 const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label"]);
+const SCALAR_BUBBLE = /^(?:[+−\-£$€¥]{0,2}\s*\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|pp|bps|x|×|bn|mn|[kKmMbBtT])?|N\/A)$/;
 
 function textStyle(size, color, bold = false, align = "center") {
   return {
@@ -320,6 +321,7 @@ export function normalizeChangeAnnotations(props = {}) {
     if (!annotation || typeof annotation.text !== "string" || !annotation.text.trim()) {
       throw new Error(`Chart change annotation ${index + 1} needs concise text`);
     }
+    if (!SCALAR_BUBBLE.test(annotation.text.trim()) || annotation.text.trim() === "N/A") throw new Error("Chart change bubbles require one numeric value; put the measure and period outside the bubble");
     const style = annotation.style || "arrow";
     if (!CHANGE_ANNOTATION_STYLES.includes(style)) throw new Error(`Unknown chart change annotation style: ${style}`);
     return {
@@ -332,16 +334,34 @@ export function normalizeChangeAnnotations(props = {}) {
 }
 
 export function normalizeAnnotationRail(props = {}) {
-  if (!props.annotationRail) return { items: [] };
+  if (!props.annotationRail) return { rows: [] };
   const rail = Array.isArray(props.annotationRail) ? { items: props.annotationRail } : props.annotationRail;
-  if (!rail || !Array.isArray(rail.items)) throw new Error("Chart annotationRail must contain an items array");
-  if (rail.items.length > 12) throw new Error("Use no more than twelve entries in one chart annotation rail");
-  const items = rail.items.map((item, index) => {
-    if (!item || typeof item.category !== "string" || !item.category.trim()) throw new Error(`Chart annotation rail item ${index + 1} must name a category`);
-    if (typeof item.text !== "string" || !item.text.trim()) throw new Error(`Chart annotation rail item ${index + 1} needs concise text`);
-    return { ...item };
-  });
-  return { ...rail, items };
+  if (!rail || typeof rail !== "object" || (rail.rows !== undefined && rail.items !== undefined)) throw new Error("Chart annotationRail needs items or rows, not both");
+  const rows = rail.rows === undefined ? [rail] : rail.rows;
+  if (!Array.isArray(rows)) throw new Error("Chart annotationRail rows must be an array");
+  const labels = new Set();
+  return { rows: rows.map((row, rowIndex) => {
+    if (!row || !Array.isArray(row.items)) throw new Error("Chart annotationRail must contain an items array per row");
+    if (row.items.length > 12) throw new Error("Use no more than twelve entries in one chart annotation rail");
+    if (rail.rows !== undefined && (typeof row.label !== "string" || !row.label.trim())) throw new Error("Each annotation rail row requires a left-hand measure label");
+    let labelWidth = 0;
+    if (row.label !== undefined) {
+      if (typeof row.label !== "string" || !row.label.trim() || labels.has(row.label)) throw new Error("Annotation rail measure labels must be non-empty and unique");
+      labels.add(row.label);
+      const measured = measureText(row.label, 160, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+      if (measured.height > 30) throw new Error("Shorten the annotation rail measure label to one line");
+      labelWidth = Math.ceil(measured.width) + 4;
+    }
+    const categories = new Set();
+    const items = row.items.map((item, index) => {
+      if (!item || typeof item.category !== "string" || !item.category.trim() || categories.has(item.category)) throw new Error(`Chart annotation rail row ${rowIndex + 1} item ${index + 1} must name a unique category`);
+      categories.add(item.category);
+      // A bubble carries one scalar, never a metric name or an expression.
+      if (typeof item.text !== "string" || !SCALAR_BUBBLE.test(item.text.trim())) throw new Error("Annotation rail bubbles require one numeric value (or N/A); move metric names to row labels and separate multiple metrics into rows");
+      return { ...item, text: item.text.trim() };
+    });
+    return { ...row, labelWidth, items };
+  }).filter(row => row.items.length) };
 }
 
 export function chartAnnotationBands(props = {}) {
@@ -349,7 +369,8 @@ export function chartAnnotationBands(props = {}) {
   const rail = normalizeAnnotationRail(props);
   return {
     top: changes.length ? CHANGE_ANNOTATION_BAND : 0,
-    bottom: rail.items.length ? ANNOTATION_RAIL_BAND : 0
+    bottom: rail.rows.length * ANNOTATION_RAIL_BAND,
+    left: Math.max(0, ...rail.rows.map(row => row.labelWidth ? row.labelWidth + 12 : 0))
   };
 }
 
@@ -490,11 +511,13 @@ export function renderChangeAnnotations({ id, plot, props, pointMap }) {
 
 export function renderAnnotationRail({ id, plot, props, categoryMap, allow = true }) {
   const rail = normalizeAnnotationRail(props);
-  if (!rail.items.length) return [];
+  if (!rail.rows.length) return [];
   if (!allow) throw new Error("A bottom annotation rail requires a horizontal category axis");
   const nodes = [];
-  const y = plot.y + plot.height + 40;
-  rail.items.forEach((item, index) => {
+  rail.rows.forEach((row, rowIndex) => {
+  const railId = rowIndex ? stableId(id, "rail-row", rowIndex) : id;
+  const y = plot.y + plot.height + 40 + rowIndex * ANNOTATION_RAIL_BAND;
+  row.items.forEach((item, index) => {
     const category = categoryMap.get(item.category);
     if (!category) throw new Error(`${id} annotation rail references unknown category ${item.category}`);
     const center = category.x + category.width / 2;
@@ -508,14 +531,14 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
     if (width < 48 || measured.height > 24) throw new Error(`Annotation rail text for ${item.category} does not fit its category span`);
     const frame = { x: center - width / 2, y, width, height: 30 };
     nodes.push(ellipsePrimitive({
-      id: stableId(id, "annotation-rail-surface", index),
+      id: stableId(railId, "annotation-rail-surface", index),
       role: "annotation-surface",
       frame,
       style: { fill: PRIMARY, stroke: PRIMARY, lineWidth: HAIRLINE, opacity: 1 },
       data: { category: item.category, annotationStyle: "rail" }
     }));
     nodes.push(textPrimitive({
-      id: stableId(id, "annotation-rail-text", index),
+      id: stableId(railId, "annotation-rail-text", index),
       role: "annotation-text",
       frame: { x: frame.x + 8, y: frame.y + 3, width: frame.width - 16, height: frame.height - 6 },
       text: item.text,
@@ -523,15 +546,16 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
       data: { category: item.category, annotationStyle: "rail" }
     }));
   });
-  if (rail.label) {
+  if (row.label) {
     nodes.push(textPrimitive({
-      id: stableId(id, "annotation-rail-label"),
+      id: stableId(railId, "annotation-rail-label"),
       role: "annotation-text",
-      frame: { x: plot.x - 88, y, width: 78, height: 30 },
-      text: rail.label,
+      frame: { x: plot.x - row.labelWidth - 12, y, width: row.labelWidth, height: 30 },
+      text: row.label,
       style: textStyle(ANNOTATION, INK, true, "right"),
       data: { annotationStyle: "rail-label" }
     }));
   }
+  });
   return nodes;
 }

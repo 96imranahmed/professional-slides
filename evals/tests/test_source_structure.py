@@ -104,7 +104,7 @@ console.log(JSON.stringify({
         self.assertEqual(result["registry"], 60)
         self.assertEqual(result["components"], 47)
         self.assertEqual(result["charts"], 13)
-        self.assertEqual(result["layoutFixtures"], 52)
+        self.assertEqual(result["layoutFixtures"], 56)
         self.assertGreater(result["componentBoards"], 0)
         self.assertEqual(result["componentCoverage"], result["expectedCoverage"])
         self.assertEqual(result["slideCount"], result["fixtures"])
@@ -393,7 +393,7 @@ const titleDefinition = REGISTRY.get('action-title');
 const multiline = titleDefinition.render({id:'wrapped',frame:{x:0,y:0,width:1000,height:128},props:{text:'Capacity limits growth\\nInvestment unlocks the next phase',variant:'without-line'}}).nodes[0];
 assert.equal(multiline.data.textLayout.lines.length,2);
 assert.equal(multiline.style.lineHeight,45);
-const nearWidthLimit = REGISTRY.get('slide-chrome').render({id:'near-limit',frame:{x:0,y:0,width:1280,height:720},props:{title:'(Insert a one-line action title that states the governing comparison)'}}).nodes.find(n=>n.role==='action-title');
+const nearWidthLimit = REGISTRY.get('slide-chrome').render({id:'near-limit',frame:{x:0,y:0,width:1280,height:720},props:{title:'(Insert an action title stating the governing comparison)'}}).nodes.find(n=>n.role==='action-title');
 assert.equal(nearWidthLimit.data.textLayout.lines.length,1);
 assert.ok(nearWidthLimit.data.textLayout.width <= nearWidthLimit.frame.width);
 assert.throws(()=>titleDefinition.render({id:'overflow',frame:{x:0,y:0,width:1000,height:20},props:{text:'Capacity limits growth'}}), /exceeds its allocated height/);
@@ -497,28 +497,28 @@ console.log(JSON.stringify({
         self.assertEqual(result["subtitleNodes"], 0)
         self.assertTrue(result["cover"])
 
-    def test_section_and_open_rail_share_one_heading_contract(self):
+    def test_chart_title_and_open_rail_share_one_heading_contract(self):
         result = run_node(
             """
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-const section = REGISTRY.get('section').render({
-  id: 'description',
-  frame: {x: 60, y: 188, width: 770, height: 52},
-  props: {heading: 'Description', padding: 0, treatment: 'open'}
+const chart = REGISTRY.get('chart-title').render({
+  id: 'chart-heading',
+  frame: {x: 60, y: 188, width: 770, height: 76},
+  props: {heading: 'Q2 2026 year-over-year Search growth', unit: '%'}
 }).nodes;
 const rail = REGISTRY.get('content-rail').render({
   id: 'takeaways',
-  frame: {x: 840, y: 170, width: 380, height: 460},
+  frame: {x: 840, y: 188, width: 380, height: 442},
   props: {heading: 'Key takeaways', treatment: 'open', dividerLeft: true, items: ['One', 'Two']}
 }).nodes;
 const select = nodes => ({
   heading: nodes.find(node => node.role === 'section-heading'),
   rule: nodes.find(node => node.role === 'section-heading-rule')
 });
-console.log(JSON.stringify({section: select(section), rail: select(rail)}));
+console.log(JSON.stringify({chart: select(chart), rail: select(rail)}));
 """
         )
-        section = result["section"]
+        section = result["chart"]
         rail = result["rail"]
         self.assertEqual(section["heading"]["frame"]["y"], rail["heading"]["frame"]["y"])
         self.assertEqual(section["heading"]["style"]["fontSize"], rail["heading"]["style"]["fontSize"])

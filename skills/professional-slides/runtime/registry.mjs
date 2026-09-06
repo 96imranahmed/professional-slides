@@ -145,7 +145,7 @@ function insightNodes({ id, frame, props }) {
 function titleNodes({ id, frame, props, section = false, chrome = false }) {
   const variant = resolveTitleVariant(props);
   const ruleGap = tokenValue(token("space.2"));
-  const size = section ? token("type.sectionTitle") : token(chrome && String(props.text || "").length > 55 ? "type.actionTitleLong" : "type.actionTitle");
+  const size = section ? token("type.sectionTitle") : token("type.actionTitle");
   const baseTextFrame = chrome
     ? { x: frame.x + CHROME.left, y: frame.y + (props.titleTop ?? CHROME.titleTop), width: props.availableTitleWidth ?? frame.width - CHROME.left - CHROME.right, height: CHROME.titleHeight }
     : { x: frame.x, y: frame.y, width: frame.width, height: frame.height - ruleGap };
@@ -193,6 +193,12 @@ function sectionHeadingNodes({ id, frame, props = {} }) {
   return nodes;
 }
 
+function contentRailInsets(props = {}) {
+  return props.treatment === "open"
+    ? { top: 0, right: 18, bottom: 18, left: 18 }
+    : 18;
+}
+
 function resolveChartTitleVariant(props = {}) {
   if (props.unit !== undefined && (typeof props.unit !== "string" || !props.unit.trim())) throw new Error("Chart title unit must be nonempty text");
   const variant = props.variant ?? "underlined";
@@ -203,10 +209,10 @@ function resolveChartTitleVariant(props = {}) {
 function chartTitleLayout(frame, props) {
   const variant = resolveChartTitleVariant(props);
   const layout = headingLayout(frame, { ...props, rule: variant === "underlined" });
-  const unit = props.unit ? measureText(props.unit, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
+  const unit = props.unit ? measureText(props.unit, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), wrapWidthRatio: 1 }) : null;
   if (unit && unit.lines.length !== 1) throw new Error("Chart unit must fit on one line");
   const inlineHeading = unit && layout.heading.lines.length === 1 ? measureText(`${layout.heading.text},`, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: 1 }) : null;
-  const inlineUnit = unit ? measureText(` ${props.unit}`, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
+  const inlineUnit = unit ? measureText(` ${props.unit}`, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), wrapWidthRatio: 1 }) : null;
   const inlineHeadingWidth = inlineHeading ? Math.ceil(inlineHeading.width) : layout.heading.width;
   const unitPlacement = unit && layout.heading.lines.length === 1 && inlineHeadingWidth + inlineUnit.width <= frame.width * 0.97 ? "inline" : unit ? "stacked" : "none";
   const unitGap = unitPlacement === "stacked" ? tokenValue(token("space.1")) : 0;
@@ -234,7 +240,7 @@ function chartTitleNodes({ id, frame, props }) {
       ? { x: frame.x + layout.inlineHeadingWidth, y: frame.y + layout.bandHeight - layout.inlineUnit.height, width: frame.width - layout.inlineHeadingWidth, height: layout.inlineUnit.height }
       : { x: frame.x, y: frame.y + layout.bandHeight + layout.unitGap, width: frame.width, height: layout.unit.height },
     text: inline ? ` ${props.unit}` : props.unit,
-    style: { ...textStyle(BODY, token("color.chartUnit"), false, "left", "top"), lineHeight: (inline ? layout.inlineUnit : layout.unit).lineHeight, wrap: false },
+    style: { ...textStyle(token("type.heading"), token("color.chartUnit"), false, "left", "top"), lineHeight: (inline ? layout.inlineUnit : layout.unit).lineHeight, wrap: false },
     data: { textLayout: inline ? layout.inlineUnit : layout.unit, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }
   }));
   if (layout.ruled) nodes.push(openLine(stableId(id, "rule"), frame.x, frame.y + layout.contentHeight + layout.ruleGap, frame.x + frame.width, frame.y + layout.contentHeight + layout.ruleGap, "section-heading-rule", INK, HAIRLINE, { chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }));
@@ -459,6 +465,12 @@ function matrixNodes({ id, frame, props }) {
   return nodes;
 }
 
+function lightChevronNode(id, frame) {
+  const height = tokenValue(token("icon.medium")), width = height * 0.75;
+  if (frame.width < width || frame.height < height) throw new Error("Chevron needs room for its canonical optical size");
+  return shapePrimitive({ id: stableId(id, "chevron"), role: "relationship-chevron", geometry: "chevron", frame: { x: frame.x + (frame.width - width) / 2, y: frame.y + (frame.height - height) / 2, width, height }, style: { fill: PRIMARY, stroke: "none", lineWidth: HAIRLINE }, data: { relation: "implies", arrowVariant: "chevron" } });
+}
+
 function registerCore(registry) {
   const definitions = [
     component({
@@ -472,6 +484,11 @@ function registerCore(registry) {
         const diameter = tokenValue(token("icon.medium")), clearance = tokenValue(token("space.1"));
         if (frame.width < diameter + clearance * 2 || frame.height < diameter + clearance * 4) throw new Error("Inference boundary needs room for its marker and clear divider segments");
         const radius = diameter / 2;
+        if (variant === "inference-chevron") return { nodes: [
+          linePrimitive({ id: stableId(id, "before"), role: "section-separator", x1: x, y1: frame.y, x2: x, y2: y - radius - clearance, style: { stroke: RULE, lineWidth: HAIRLINE, dash: "dash" } }),
+          linePrimitive({ id: stableId(id, "after"), role: "section-separator", x1: x, y1: y + radius + clearance, x2: x, y2: frame.y + frame.height, style: { stroke: RULE, lineWidth: HAIRLINE, dash: "dash" } }),
+          lightChevronNode(id, frame)
+        ] };
         return { nodes: [
           openLine(stableId(id, "before"), x, frame.y, x, y - radius - clearance, "section-separator"),
           openLine(stableId(id, "after"), x, y + radius + clearance, x, frame.y + frame.height, "section-separator"),
@@ -564,7 +581,10 @@ function registerCore(registry) {
     } }),
     component({ id: "footnote", category: "shared", role: "footnote", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 600, height: 34 }, sample: { text: "Note: (Insert note)" }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "footnote-text", frame, text: props.text, style: textStyle(SOURCE, SECONDARY, false, "left", "top") })] }) }),
     component({ id: "page-number", category: "shared", role: "page-number", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 48, height: 24 }, sample: { value: 7 }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "page-number", frame, text: String(props.value), style: textStyle(SOURCE, SECONDARY, false, "right") })] }) }),
-    component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "color.ink"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => ({ nodes: [measuredTextNode({ id: stableId(id, "text"), role: "paragraph", frame, text: props.text, style: textStyle(BODY, INK, false, props.align || "left", "top") })] }) }),
+    component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "color.ink"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => {
+      if (typeof props.text !== "string" || !props.text.trim()) throw new Error(`paragraph ${id} requires a non-empty text string; keep geometry in the component frame`);
+      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: "paragraph", frame, text: props.text, style: textStyle(BODY, INK, false, props.align || "left", "top") })] };
+    } }),
     component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.componentPrimary", "color.onPrimary", "space.1", "space.3", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "square" }) }) }),
     component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.4", "space.5", "space.6", "line.hairline", "radius.small"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
     component({ id: "panel", category: "section", role: "panel", tokens: ["color.surface", "color.surfaceMuted", "color.componentPrimary", "color.rule", "color.ink", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "radius.none", ...[1, 2, 3, 4, 5, 6].map(index => `color.chartSeries${index}`)], preferredSize: { width: 400, height: 240 }, sample: { heading: "(Insert panel heading)", text: "(Insert panel description)" }, render: ({ id, frame, props, tokens = TOKENS }) => {
@@ -642,6 +662,7 @@ function registerCore(registry) {
     } }),
     component({ id: "connector", category: "relationship", role: "connector", tokens: ["color.componentPrimary", "color.onPrimary", "font.body", "type.label", "line.standard", "line.hairline", "icon.medium", "radius.round"], preferredSize: { width: 360, height: 90 }, sample: { label: "therefore", variant: "labelled-line" }, render: ({ id, frame, props }) => {
       const variant = props.variant ?? (props.label ? "labelled-line" : "disc-chevron"), centerY = frame.y + frame.height / 2;
+      if (variant === "chevron") return { nodes: [lightChevronNode(id, frame)] };
       if (variant === "disc-chevron") {
         const diameter = tokenValue(token("icon.medium")), centerX = frame.x + frame.width / 2;
         return { nodes: [
@@ -656,15 +677,15 @@ function registerCore(registry) {
     } }),
     component({ id: "content-rail", category: "section", role: "rail", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "type.compact", "space.1", "space.3", "radius.none", ...SECTION_HEADING_TOKENS], preferredSize: { width: 330, height: 360 }, sample: { heading: "(Insert takeaway heading)", items: ["(Insert evidence-backed takeaway 1)", "(Insert evidence-backed takeaway 2)", "(Insert evidence-backed takeaway 3)"] }, render: ({ id, frame, props }) => {
       const treatment = props.treatment || "muted";
-      const inset = treatment === "open" ? 18 : 18;
+      const inset = normalizeInsets(contentRailInsets(props));
       const nodes = [];
       if (treatment === "muted") nodes.push(rectPrimitive({ id: stableId(id, "surface"), role: "rail-surface", frame, style: boxStyle(MUTED_SURFACE, MUTED_SURFACE, HAIRLINE, token("radius.none")) }));
       if (props.dividerLeft) nodes.push(openLine(stableId(id, "divider"), frame.x, frame.y, frame.x, frame.y + frame.height, "rail-divider", RULE, HAIRLINE));
-      const headerFrame = { x: frame.x + inset, y: frame.y + 18, width: frame.width - inset * 2, height: 52 };
+      const headerFrame = { x: frame.x + inset.left, y: frame.y + inset.top, width: frame.width - inset.left - inset.right, height: 52 };
       const headerProps = { ...props, variant: treatment === "muted" ? "accent" : "standard", rule: treatment === "open" };
       nodes.push(...sectionHeadingNodes({ id: stableId(id, "header"), frame: headerFrame, props: headerProps }));
       const listTop = headerFrame.y + headingLayout(headerFrame, headerProps).height + tokenValue(token("space.2"));
-      nodes.push(...simpleList({ id: stableId(id, "list"), frame: { x: frame.x + inset, y: listTop, width: frame.width - inset * 2, height: frame.y + frame.height - listTop - 12 }, items: props.items, marker: "square", rolePrefix: "rail" }));
+      nodes.push(...simpleList({ id: stableId(id, "list"), frame: { x: frame.x + inset.left, y: listTop, width: frame.width - inset.left - inset.right, height: frame.y + frame.height - listTop - 12 }, items: props.items, marker: "square", rolePrefix: "rail" }));
       return { nodes };
     } }),
   ];
@@ -700,8 +721,8 @@ function registerCore(registry) {
       }
     }
     const axes = { section: ["treatment", ["open", "muted", "primary"]], panel: ["tone", ["open", "muted", "primary", "dark"]], "content-rail": ["treatment", ["muted", "open"]], roadmap: ["variant", ["process", "wave-columns"]], "section-heading": ["variant", ["standard", "accent", "inverse"]] };
-    axes["section-boundary"] = ["variant", ["related", "inference", "subsection"]];
-    axes.connector = ["variant", ["disc-chevron", "line", "labelled-line"]];
+    axes["section-boundary"] = ["variant", ["related", "inference", "inference-chevron", "subsection"]];
+    axes.connector = ["variant", ["disc-chevron", "chevron", "line", "labelled-line"]];
     axes["bullet-list"] = ["variant", ["compact", "body"]];
     axes.insight = ["variant", ["tonal", "neutral", "dotted", "primary"]];
     if (axes[definition.id]) {
@@ -790,6 +811,7 @@ function registerCore(registry) {
     }
     if (definition.id === "trend-rows") definition.tokens = [...new Set([...definition.tokens, ...SECTION_HEADING_TOKENS])].sort();
     if (["section", "section-heading", "content-rail"].includes(definition.id)) {
+      if (definition.id === "content-rail") definition.version = "2.1.0";
       const render = definition.render;
       definition.render = (input) => {
         assertSectionHeadingProps(input.props);
@@ -799,7 +821,7 @@ function registerCore(registry) {
         assertSectionHeadingProps(props);
         if (!(props.heading || props.text)) return null;
         const rail = definition.id === "content-rail";
-        const padding = normalizeInsets(rail ? 18 : definition.id === "section" ? props.padding ?? token("space.4") : 0);
+        const padding = normalizeInsets(rail ? contentRailInsets(props) : definition.id === "section" ? props.padding ?? token("space.4") : 0);
         const headerFrame = insetFrame(frame, padding);
         const ruled = rail ? props.treatment === "open" : props.rule !== false && props.treatment !== "muted";
         return { top: headerFrame.y, ruled, height: headingLayout(headerFrame, { ...props, rule: ruled }).bandHeight };
@@ -809,7 +831,7 @@ function registerCore(registry) {
   }
   registry.set("chart-title", {
     id: "chart-title", version: "2.1.0", category: "shared", role: "chart-title",
-    tokens: [...SECTION_HEADING_TOKENS, "type.body", "color.chartUnit", "space.1"],
+    tokens: [...SECTION_HEADING_TOKENS, "color.chartUnit", "space.1"],
     preferredSize: { width: 540, height: 76 }, sample: { heading: "(Insert chart title)", unit: "(Insert unit)" },
     variants: { underlined: {}, unit: { props: { unit: "Revenue share, %" } } }, defaultVariant: "underlined", variantProp: "variant", resolveVariant: resolveChartTitleVariant,
     measureContent: ({ frame, props }) => chartTitleLayout(frame, props),

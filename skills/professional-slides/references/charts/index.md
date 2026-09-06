@@ -55,14 +55,23 @@ Reject default chart frames, isolated metrics dressed as plots, inconsistent sma
 ## Construction rules
 
 1. Match the encoding to the comparison task and use an honest scale.
-2. Bias the exhibit header to one line: put a material period in a concise chart heading and append the short unit through the shared two-level title treatment. Keep the unit in its secondary colour. Use the measured second-line fallback only after shortening the heading; place population or longer basis text in labels when it would make the header unwieldy.
-3. Resolve every series, highlight, plot band, and legend key through the [theme token registry](../theming/tokens.md). Use the chart palette only for data-required series, use the light neutral chart-segment role for inactive or comparator segments, and keep all non-chart emphasis on the single structural primary. Never recolour a peer merely because of its order or position.
-   For exactly two unstacked bars or columns, or two series repeated across grouped categories, use a strongly contrasting pair from the active chart palette when no explicit series mapping exists. Keep legend colours identical to the marks. For focus, choose one mechanism: a primary single-bar highlight, a theme-primary region outline, or a light-neutral region tint. Both region treatments need visible padding around the marks on all sides, with category labels clear of the highlighted region.
+2. Bias the exhibit header to one line: put a material period in a concise chart heading and append the short unit through the shared same-size heading-and-unit treatment. Keep the unit in its secondary colour. Use the measured second-line fallback only after shortening the heading; place population or longer basis text in labels when it would make the header unwieldy.
+3. Apply [focus and comparator colours](#focus-and-comparator-colours) and resolve every series, highlight, plot band, and legend key through the [theme token registry](../theming/tokens.md).
 4. Apply the [direct-label gate](#direct-label-gate); otherwise use the shared [chart legend](../components/chart-legends.md). Its owner defines placement, variants, exceptions, and the non-colour state cues.
 5. Default to a blank plot field without gridlines. Enable quiet gridlines only when a dense scale or several series require intermediate value lookup; never add them as generic chart furniture. When a chart contains fewer than eight plotted values and every value is shown directly, omit the quantitative axis and its ticks by default. Retain the category axis and labels. An explicit scale-reading requirement may retain the value axis, but must not leave redundant value labels and gridlines as generic furniture.
-6. Use the canonical [chart-callout grammar](../components/chart-callouts.md), keep growth, threshold, gap, and observation annotations attached to exact evidence, and avoid covering data marks or labels.
+6. Complete the [annotation decision](../components/chart-callouts.md#authoring-decision); attach the selected growth, gap, threshold, or observation to exact evidence and reserve its geometry before plotting.
 7. Use the shared [chart-title component](../components/index.md#chart-titles) for graph and small-multiple headings; its owner defines inline units, stacked fallback, underlines, peer alignment, and fit checks. Match the rule state across peer analytical headers: if the right-hand rail is underlined, the chart title is underlined too.
 8. Preserve data and semantic chart properties in editable form when reliable.
+
+## Focus and comparator colours
+
+For a focal measure versus a baseline, prior period, benchmark, or peer set, use the deck's `component-primary` for focus and `chart-comparator` for light-grey comparators. Choose the focal category or series from the argument and retain its exact-key mapping across slides, even when arrays are reordered. Do not use dark text grey as the comparator or select two neighbouring brand shades merely because both are in the palette.
+
+In unstacked one-series bars or columns, request `highlights: [{ category: "Current", style: "bar" }]`. For a focal series repeated across grouped bars, request `focusSeries: "Actual"`; its legend must use the same primary/grey mapping. A neutral comparator is background evidence, not a second accent. Use a region outline or tint when the focus is an entire category and existing series identities must remain intact.
+
+Preserve an explicit semantic series mapping when several coequal categories, status meanings, or an authorized reference require it. Use the minimum additional distinguishable colours; a multi-series chart must not collapse different identities into one grey. Record the exception in the treatment ledger. Palette membership alone does not prove contrast.
+
+Check focus against comparator at normal rendered size and in greyscale. Target at least `3:1` luminance contrast between their fills. If the theme or thin marks prevent clear separation, use a theme-bound outline, marker, or direct label and record the exception. Check text against its actual background separately under the [direct-label gate](#direct-label-gate). Never make a pale bar disappear into the canvas to increase its contrast with the focus.
 
 ## Direct-label gate
 
@@ -85,7 +94,7 @@ The chart owner supplies the platform-neutral semantic model. The [scene-to-nati
 - Apply the [`design` grid](../design/index.md#canvas-guides-and-grid) to the chart container and the [`chart-callout` grammar](../components/chart-callouts.md) to annotations.
 - Keep the chart's declared plot frame separate from its outer component frame so adapter-specific font metrics cannot silently change the analytical alignment.
 
-Use the structural HTML specimen in each chart-family owner when it exists. It demonstrates plot, label, annotation, and legend geometry only; the chart's data contract and the active theme tokens remain authoritative.
+Use the registered chart runtime and its generated previews for geometry. Chart-family guides own data contracts and construction rules; runtime components resolve geometry through the active theme tokens.
 
 ## Analytical acceptance test
 

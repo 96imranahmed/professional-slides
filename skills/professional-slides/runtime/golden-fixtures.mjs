@@ -58,7 +58,7 @@ export function goldenFixtureSpecs() {
           highlights: [],
           referenceLines: []
         }),
-        at("rail", "content-rail", { x: 842, y: 156, width: 378, height: 480 }, {
+        at("rail", "content-rail", { x: 842, y: 174, width: 378, height: 462 }, {
           treatment: "open",
           dividerLeft: true,
           heading: "(Insert takeaway heading)",
@@ -132,7 +132,7 @@ export function goldenFixtureSpecs() {
           yMax: 3000,
           annotations: []
         }),
-        at("rail", "content-rail", { x: 840, y: 166, width: 380, height: 456 }, { treatment: "open", dividerLeft: true, heading: "(Insert takeaway heading)", items: ["(Insert evidence-backed takeaway 1)", "(Insert evidence-backed takeaway 2)", "(Insert evidence-backed takeaway 3)"] })
+        at("rail", "content-rail", { x: 840, y: 184, width: 380, height: 438 }, { treatment: "open", dividerLeft: true, heading: "(Insert takeaway heading)", items: ["(Insert evidence-backed takeaway 1)", "(Insert evidence-backed takeaway 2)", "(Insert evidence-backed takeaway 3)"] })
       ]
     }),
     analytical({
@@ -312,7 +312,7 @@ export function goldenFixtureSpecs() {
       children: [
         at("description", "chart-title", { x: 60, y: 188, width: 770, height: 52 }, { heading: "(Insert chart title)" }),
         at("pie", "chart.pie", { x: 60, y: 230, width: 770, height: 390 }, { labels: ["Category 1", "Category 2", "Category 3", "Category 4"], values: [25, 25, 25, 25], legend: true }),
-        at("rail", "content-rail", { x: 840, y: 170, width: 380, height: 460 }, { treatment: "open", dividerLeft: true, heading: "(Insert takeaway heading)", items: ["(Insert evidence-backed takeaway 1)", "(Insert evidence-backed takeaway 2)", "(Insert evidence-backed takeaway 3)"] })
+        at("rail", "content-rail", { x: 840, y: 188, width: 380, height: 442 }, { treatment: "open", dividerLeft: true, heading: "(Insert takeaway heading)", items: ["(Insert evidence-backed takeaway 1)", "(Insert evidence-backed takeaway 2)", "(Insert evidence-backed takeaway 3)"] })
       ]
     }),
     analytical({
@@ -325,7 +325,7 @@ export function goldenFixtureSpecs() {
       children: [
         at("description", "chart-title", { x: 60, y: 188, width: 770, height: 52 }, { heading: "(Insert chart title)" }),
         at("donut", "chart.donut", { x: 60, y: 230, width: 770, height: 390 }, { labels: ["Category 1", "Category 2", "Category 3", "Category 4"], values: [25, 25, 25, 25], legend: true }),
-        at("rail", "content-rail", { x: 840, y: 170, width: 380, height: 460 }, { treatment: "open", dividerLeft: true, heading: "(Insert takeaway heading)", items: ["(Insert evidence-backed takeaway 1)", "(Insert evidence-backed takeaway 2)", "(Insert evidence-backed takeaway 3)"] })
+        at("rail", "content-rail", { x: 840, y: 188, width: 380, height: 442 }, { treatment: "open", dividerLeft: true, heading: "(Insert takeaway heading)", items: ["(Insert evidence-backed takeaway 1)", "(Insert evidence-backed takeaway 2)", "(Insert evidence-backed takeaway 3)"] })
       ]
     }),
     analytical({

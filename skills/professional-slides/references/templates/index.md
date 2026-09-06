@@ -1,6 +1,6 @@
 # Deck-Type Templates
 
-This directory owns reusable decision architecture for named deck types. [`registry.json`](registry.json) is the machine-readable catalogue. A template defines the audience decision, governing question, default hypothesis branches, chapter spine, required chapter labels, recommended navigation behavior, evidence obligations, and type-specific completeness tests. It does not own final wording, story proof, slide layouts, visual tokens, components, charts, or platform mechanics. The [tracker owner](../components/trackers/index.md) defines tracker construction and QA.
+This directory owns reusable decision architecture for named deck types. [`registry.json`](registry.json) is the machine-readable catalogue. A template defines the audience decision, governing question, default hypothesis branches, chapter spine, default chapter-label seeds, recommended navigation behavior, evidence obligations, and type-specific completeness tests. It does not own final wording, story proof, slide layouts, visual tokens, components, charts, or platform mechanics. The [tracker owner](../components/trackers/index.md) defines tracker construction and QA.
 
 ## Select by the primary decision
 

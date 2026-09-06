@@ -12,7 +12,7 @@
     "summary"
   ],
   "properties": {
-    "rubricVersion": {"type": "string", "const": "2"},
+    "rubricVersion": {"type": "string", "const": "3"},
     "verdict": {"type": "string", "enum": ["accept", "reject"]},
     "filesReviewed": {
       "type": "array",

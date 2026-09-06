@@ -49,6 +49,7 @@ export const TOKENS = Object.freeze({
   "color.componentPrimaryTint": colour("--component-primary-tint", "#DCEEF8"),
   "color.rule": colour("--rule", "#929BA3"),
   "color.chartGrid": colour("--chart-gridline", "#D4D8DC"),
+  "color.chartComparator": colour("--chart-comparator", "#D9DDE0"),
   "color.chartSeries1": colour("--chart-series-1", "#06233B", "dk1"),
   "color.chartSeries2": colour("--chart-series-2", "#0B4F7D", "accent2"),
   "color.chartSeries3": colour("--chart-series-3", "#00A6E6", "accent3"),

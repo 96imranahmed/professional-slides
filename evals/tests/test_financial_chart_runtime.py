@@ -3,6 +3,61 @@ from test_source_structure import run_node
 
 
 class FinancialChartRuntimeTests(unittest.TestCase):
+    def test_sparse_plot_center_matches_its_section_without_unused_axis_gutter(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const frame={x:60,y:150,width:560,height:430};
+for(const [component,props] of [
+ ['chart.column',{categories:['A','B','C'],series:[{name:'Measure',values:[120,80,40]}],dataLabels:true}],
+ ['chart.waterfall',{categories:['Opening','Change','Closing'],values:[120,-80,40],totals:[0,2]}]
+]) {
+ const nodes=REGISTRY.get(component).render({id:'center',frame,props}).nodes;
+ const baseline=nodes.find(n=>n.id.endsWith('x-axis'));
+ assert.ok(baseline);
+ assert.equal(baseline.frame.x+baseline.frame.width/2,frame.x+frame.width/2);
+ assert.equal(nodes.filter(n=>n.role==='axis-label').length,0);
+}
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result['accepted'])
+
+    def test_metric_rails_have_one_value_per_bubble_and_reserved_label_rows(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const frame={x:60,y:150,width:1000,height:500};
+const base={categories:['A','B'],series:[{name:'Value',values:[120,180]}],dataLabels:true};
+const render=annotationRail=>REGISTRY.get('chart.column').render({id:'rail',frame,props:{...base,annotationRail}}).nodes;
+const nodes=render({rows:[{label:'EPS, $',items:[{category:'A',text:'10.48'},{category:'B',text:'12.52'}]},{label:'P/E',items:[{category:'A',text:'22x'},{category:'B',text:'27x'}]}]});
+const labels=nodes.filter(n=>n.data?.annotationStyle==='rail-label');
+assert.deepEqual(labels.map(n=>n.text),['EPS, $','P/E']);
+assert.ok(labels.every(n=>n.frame.x>=frame.x));
+assert.ok(labels[1].frame.y>labels[0].frame.y+labels[0].frame.height);
+const values=nodes.filter(n=>n.data?.annotationStyle==='rail'&&n.type==='text');
+assert.deepEqual(values.map(n=>n.text),['10.48','12.52','22x','27x']);
+assert.ok(values.every(n=>n.frame.y+n.frame.height<=frame.y+frame.height));
+for(const text of ['EPS 10.48 × 22x','10.48 / 22','Base','growing strongly']) assert.throws(()=>render({items:[{category:'A',text}]}),/one numeric value/);
+assert.throws(()=>render({rows:[{items:[{category:'A',text:'10'}]}]}),/left-hand measure label/);
+assert.throws(()=>render({items:[{category:'A',text:'10'},{category:'A',text:'11'}]}),/unique category/);
+assert.doesNotThrow(()=>render({label:'Change',items:[{category:'A',text:'N/A'},{category:'B',text:'-1.5pp'}]}));
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result['accepted'])
+
+    def test_wrapped_reference_labels_use_measured_height_and_clear_lines(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const nodes=REGISTRY.get('chart.column').render({id:'reference',frame:{x:60,y:150,width:1000,height:500},props:{categories:['A','B','C'],series:[{name:'Value',values:[231,338,459]}],dataLabels:true,yMax:520,referenceLines:[{value:335.02,label:'1 Sep close\\n$335.02'}]}}).nodes;
+const label=nodes.find(n=>n.role==='chart-reference-label');
+assert.equal(label.data.textLayout.lines.length,2);
+assert.equal(label.frame.height,label.data.textLayout.height);
+for(const line of nodes.filter(n=>n.role==='chart-reference-line')) assert.ok(line.frame.y<label.frame.y || line.frame.y>label.frame.y+label.frame.height);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result['accepted'])
+
     def test_chart_labels_annotations_legends_and_title_subtitles_use_body_size(self):
         result = run_node("""
 import assert from 'node:assert/strict';
@@ -23,7 +78,7 @@ const change=waterfall.render({id:'waterfall',frame,props:{...waterfall.sample,.
 assert.ok(change.filter(n=>n.role==='data-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 assert.ok(change.filter(n=>n.role==='annotation-text').every(n=>n.style.fontSize.tokenId==='type.chartAnnotation'));
 const title=REGISTRY.get('chart-title').render({id:'title',frame:{x:60,y:60,width:800,height:90},props:{heading:'Performance',unit:'USD millions, 2026'}}).nodes;
-assert.equal(title.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.body');
+assert.equal(title.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.heading');
 assert.equal(title.find(n=>n.role==='chart-unit').style.color.tokenId,'color.chartUnit');
 assert.equal(title.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
 assert.equal(title.filter(n=>n.role==='section-heading-rule').length,1);
@@ -150,7 +205,7 @@ const clean=column.render({id:'clean',frame,props:base}).nodes;
 const ruled=column.render({id:'ruled',frame,props:{...base,gridlines:true}}).nodes;
 assert.equal(clean.filter(n=>n.role==='chart-gridline').length,0);
 assert.equal(ruled.filter(n=>n.role==='chart-gridline').length,5);
-const rail=column.render({id:'rail',frame,props:{...base,annotationRail:{items:[{category:'2022',text:'Base'},{category:'2023',text:'+31%'},{category:'2024',text:'+29%'}]}}}).nodes;
+const rail=column.render({id:'rail',frame,props:{...base,annotationRail:{items:[{category:'2022',text:'N/A'},{category:'2023',text:'+31%'},{category:'2024',text:'+29%'}]}}}).nodes;
 const categoryLabels=rail.filter(n=>n.role==='category-label');
 const railSurfaces=rail.filter(n=>n.role==='annotation-surface'&&n.data.annotationStyle==='rail');
 assert.equal(railSurfaces.length,3);
@@ -159,7 +214,7 @@ for(const surface of railSurfaces){
   assert.ok(surface.frame.y>label.frame.y+label.frame.height);
   assert.ok(Math.abs((surface.frame.x+surface.frame.width/2)-(label.frame.x+label.frame.width/2))<0.001);
 }
-assert.throws(()=>REGISTRY.get('chart.bar').render({id:'bar',frame,props:{...base,annotationRail:{items:[{category:'2022',text:'Base'}]}}}),/horizontal category axis/);
+assert.throws(()=>REGISTRY.get('chart.bar').render({id:'bar',frame,props:{...base,annotationRail:{items:[{category:'2022',text:'N/A'}]}}}),/horizontal category axis/);
 assert.throws(()=>REGISTRY.get('chart.pie').render({id:'pie',frame,props:{labels:['A','B'],values:[60,40],changeAnnotations:[{start:'A',end:'B',text:'+20'}]}}),/do not support ordered change annotations/);
 console.log(JSON.stringify({accepted:true}));
 """)
@@ -225,17 +280,49 @@ for(const palette of ['mckinsey','bcg','bain']) {
   const deck=compileDeck({palette,slides:[slide({categories:['Current','Future'],series:[{name:'Measure',values:[80,150]}]})]},REGISTRY);
   const marks=deck.slides[0].nodes.filter(n=>n.role==='chart-mark');
   assert.equal(marks.length,2);
-  assert.equal(marks[0].style.fill.tokenId,'color.chartSeries1');
-  const candidates=Array.from({length:5},(_,index)=>index+2);
-  const expected=candidates.sort((a,b)=>contrastRatio(deck.tokens['color.chartSeries1'].value,deck.tokens[`color.chartSeries${b}`].value)-contrastRatio(deck.tokens['color.chartSeries1'].value,deck.tokens[`color.chartSeries${a}`].value))[0];
-  assert.equal(marks[1].style.fill.tokenId,`color.chartSeries${expected}`);
-  assert.notEqual(marks[0].style.fill.value,marks[1].style.fill.value);
+  assert.equal(marks[0].style.fill.tokenId,'color.componentPrimary');
+  assert.equal(marks[1].style.fill.tokenId,'color.chartComparator');
+  assert.ok(contrastRatio(marks[0].style.fill.value,marks[1].style.fill.value)>=3);
 }
 const explicit=compileDeck({slides:[slide({categories:['Current','Future'],series:[{name:'Measure',values:[80,150]}],colorIndices:[1]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
 assert.deepEqual(explicit.map(n=>n.style.fill.tokenId),['color.chartSeries2','color.chartSeries2']);
 const focused=compileDeck({palette:'bain',slides:[slide({categories:['A','B','C'],series:[{name:'Measure',values:[40,70,55]}],highlights:[{category:'B',style:'bar'}]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
-assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.textSecondary','color.componentPrimary','color.textSecondary']);
+assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartComparator','color.componentPrimary','color.chartComparator']);
 assert.deepEqual(focused.map(n=>n.data.highlighted),[false,true,false]);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_focal_series_and_legend_keep_meaning_when_inputs_reorder(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
+const frame={x:60,y:160,width:900,height:460};
+const base={categories:['A','B'],series:[{name:'Baseline',values:[40,50]},{name:'Actual',values:[55,70]}],focusSeries:'Actual',dataLabels:true};
+const render=(kind,props,palette='mckinsey')=>compileDeck({palette,slides:[{id:'focus',composition:component({id:'focus',component:kind,frame,props})}]},REGISTRY).slides[0].nodes;
+for(const palette of ['mckinsey','bcg','bain']) for(const kind of ['chart.column','chart.bar']) for(const reversed of [false,true]) {
+  const props=reversed?{...base,categories:[...base.categories].reverse(),series:[...base.series].reverse().map(s=>({...s,values:[...s.values].reverse()}))}:base;
+  const nodes=render(kind,props,palette),marks=nodes.filter(n=>n.role==='chart-mark'),swatches=nodes.filter(n=>n.role==='legend-swatch');
+  for(const mark of marks) {
+    assert.equal(mark.style.fill.tokenId,mark.data.series==='Actual'?'color.componentPrimary':'color.chartComparator');
+    const swatch=swatches.find(n=>n.data.categoryKey===mark.data.series);
+    assert.equal(swatch.style.fill.value,mark.style.fill.value);
+  }
+  assert.ok(contrastRatio(swatches[0].style.fill.value,swatches[1].style.fill.value)>=3);
+}
+for(const categories of [['A','B'],['B','A']]) {
+  const marks=render('chart.column',{categories,series:[{name:'Value',values:[40,70]}],highlights:[{category:'B',style:'bar'}]}).filter(n=>n.role==='chart-mark');
+  assert.equal(marks.find(n=>n.data.category==='B').style.fill.tokenId,'color.componentPrimary');
+  assert.equal(marks.find(n=>n.data.category==='A').style.fill.tokenId,'color.chartComparator');
+}
+assert.throws(()=>render('chart.column',{...base,focusSeries:'Unknown'}),/exact chart series/);
+assert.throws(()=>render('chart.column',{...base,colorIndices:[0,1]}),/conflicts/);
+assert.throws(()=>render('chart.stacked-column',base),/two unstacked series/);
+assert.throws(()=>render('chart.column',{...base,series:[...base.series,{name:'Third',values:[20,30]}]}),/two unstacked series/);
+const explicit=render('chart.column',{...base,focusSeries:undefined,colorIndices:[2,4]}).filter(n=>n.role==='chart-mark');
+assert.deepEqual([...new Set(explicit.map(n=>n.style.fill.tokenId))],['color.chartSeries3','color.chartSeries5']);
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

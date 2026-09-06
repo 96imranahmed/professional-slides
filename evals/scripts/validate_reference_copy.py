@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-from html.parser import HTMLParser
 import json
 from pathlib import Path
 import re
@@ -21,23 +20,10 @@ DEFAULT_REPORT_PATH = ROOT / "evals" / "reference-copy-eval.json"
 SCHEMA_PATH = ROOT / "evals" / "schemas" / "reference-copy-eval.schema.json"
 ALLOWED_MODELS = ("gpt-5.6-luna", "gpt-5.6-terra")
 DEFAULT_MODEL = "gpt-5.6-terra"
-RUBRIC_VERSION = "2"
+RUBRIC_VERSION = "3"
 MINIMUM_SCORE = 90
 DIMENSIONS = ("concision", "specificity", "nonRedundancy", "actionability")
 FENCE_RE = re.compile(r"^(`{3,}|~{3,})([^\s]*)\s*$")
-
-
-class _VisibleHtmlParser(HTMLParser):
-    """Extract visible specimen copy without exposing implementation markup."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.text: list[str] = []
-
-    def handle_data(self, data: str) -> None:
-        value = " ".join(data.split())
-        if value:
-            self.text.append(value)
 
 
 def reference_files(reference_root: Path) -> list[Path]:
@@ -55,41 +41,21 @@ def reference_hash(reference_root: Path) -> str:
     return digest.hexdigest()
 
 
-def _visible_html(block: list[str]) -> str:
-    parser = _VisibleHtmlParser()
-    parser.feed("\n".join(block))
-    return "\n".join(parser.text)
-
-
 def review_text(path: Path) -> str:
-    """Keep guidance and visible HTML copy; omit executable specimens."""
-
+    """Keep guidance and omit fenced implementation examples."""
     output: list[str] = []
     fence_marker: str | None = None
-    fence_language = ""
-    fenced: list[str] = []
     for raw in path.read_text(encoding="utf-8").splitlines():
         match = FENCE_RE.match(raw.strip())
         if match:
             marker = match.group(1)[0]
             if fence_marker is None:
                 fence_marker = marker
-                fence_language = match.group(2).lower()
-                fenced = []
+                output.append("[code example omitted]")
             elif fence_marker == marker:
-                if fence_language == "html":
-                    visible = _visible_html(fenced)
-                    if visible:
-                        output.extend(("[visible HTML specimen copy]", visible))
-                else:
-                    output.append(f"[{fence_language or 'code'} specimen omitted]")
                 fence_marker = None
-                fence_language = ""
-                fenced = []
             continue
-        if fence_marker is not None:
-            fenced.append(raw)
-        else:
+        if fence_marker is None:
             output.append(raw)
     return "\n".join(output).strip()
 
@@ -116,6 +82,8 @@ Rubric:
 - Specificity: instructions name the decision, action, evidence, threshold, exception, or failure clearly. Penalize vague advice and portable platitudes.
 - Non-redundancy: one canonical owner states each rule; other files link or add local detail instead of restating it.
 - Actionability: an author can apply each instruction without guessing what to create, preserve, reject, or verify.
+
+This packet omits fenced implementation examples. Judge the guidance in its surrounding prose, not the completeness of omitted code. Neutral parenthetical insertion prompts are intentional reusable-template copy, not missing business evidence. Do not require fabricated worked data to replace them; still reject contradictory examples, vague instructions, broken routing, or absent required contracts. Repeated application checks may link back to a canonical rule without being a second owner.
 
 Score each dimension from 0 to 100. Accept only when every dimension and the aggregate score are at least {MINIMUM_SCORE}, every manifest file was reviewed, and there are zero blocker or major findings. A minor finding is a concrete improvement that does not undermine the overall guidance. Cite exact files and line numbers when available. Recommend the smallest change that fixes each finding.
 

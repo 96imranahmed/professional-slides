@@ -140,7 +140,7 @@ assert.equal(plain.filter(n=>n.role==='section-heading-rule').length,1);
 assert.equal(unit.filter(n=>n.role==='section-heading-rule').length,1);
 assert.equal(unit.find(n=>n.role==='chart-unit').style.color.tokenId,'color.chartUnit');
 assert.equal(unit.find(n=>n.role==='chart-unit').style.bold,false);
-assert.equal(unit.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.body');
+assert.equal(unit.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.heading');
 assert.equal(unit.find(n=>n.role==='section-heading').text,'Current mix,');
 assert.equal(unit.find(n=>n.role==='chart-unit').text,' Revenue share, %');
 assert.equal(unit.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
@@ -252,7 +252,7 @@ assert.ok(componentVariantFixtureSpecs().every(f=>!f.defaultVariant));
 assert.equal(audit.variants,audit.variantSlides+audit.omittedDefaultDuplicates);
 assert.ok(audit.componentSlides<audit.components+audit.variantSlides);
 assert.deepEqual(audit.duplicateVisualBranches,[]);
-assert.ok(audit.slides<=180);
+assert.ok(audit.slides<=190);
 console.log(JSON.stringify(audit));
 """)
         self.assertEqual(result["components"], 60)

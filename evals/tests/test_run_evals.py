@@ -88,6 +88,7 @@ def accepted_visual_judgement(slide_count: int):
                 "summary": "The slide is complete, legible, and compositionally finished.",
                 "scores": scores,
                 "findings": [],
+                "copyAudit": {"noRecap": True, "recapEvidence": "No supporting prose recaps the exhibit.", "insightCount": 0, "insights": []},
             }
             for number in range(1, slide_count + 1)
         ],

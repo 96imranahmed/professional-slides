@@ -67,7 +67,11 @@ Compile one JSON manifest from the approved deck contract, theme manifest, and t
 
 List every materialized font, six-digit RGB value, scheme-colour role, and font-size token used by slides, charts, layouts, masters, and themes. Do not declare a value after the validator discovers it. Fix the builder or theme when an undeclared value appears.
 
+For the canonical runtime, compile allowances from the resolved deck-level tokens as well as each slide's density tokens. Scene nodes alone omit inherited master defaults: `type.actionTitle` and `type.body` are materialized in points from the deck-level tokens, while positioned scene text uses the adapter's pixel-to-point conversion. Include the adapter's transparent white and Office theme black defaults alongside the resolved palette. These are known package values, not permission for arbitrary slide-local styling.
+
 Use role rules for repeated semantic objects such as action titles, analytical headers, trackers, footers, page numbers, and recurring callouts. Select shapes through stable names or placeholder types. State exact values when the theme fixes them. Use `consistentAcrossSlides` when a role should inherit one construction across its declared range.
+
+Before export, run `python3 evals/scripts/validate_pptx.py manifest path/to/powerpoint-acceptance.json --report path/to/manifest-check.json`. This schema-only check catches invalid metadata before a candidate exists; it does not replace the exported-file check. In particular, copy-budget rationales stay in the content plan, while `copy.slideOverrides` contains only supported numeric limits. Scope geometry and type consistency to genuinely comparable families rather than demanding identical text-box tops across different density roles.
 
 ## Deterministic command
 

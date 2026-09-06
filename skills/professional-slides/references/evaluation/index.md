@@ -16,6 +16,10 @@ Keep the run manifest with the evidence package. Control and treatment use separ
 
 ## Per-deck self-review
 
+For skill-development tests, independently review the story before judging rendering. `evals/scripts/validate_story_plan.py` takes the original brief, proposed plan, and all supporting evidence/assumption ledgers via `--support`. It requires at least 90 in each of six story dimensions and no major or blocker finding. Preserve exact input hashes and adjudicate findings against the complete packet; a missing judge input is a harness defect, not an author failure.
+
+Test reusable changes with fresh-context authors on materially different communication jobs. Give them only the brief, raw evidence, and frozen skill, not earlier answers or reviewer repairs. Keep the first candidate and all review results; distinguish first-pass acceptance from later repaired delivery. Passing a small holdout set supports those tested cases, not a universal quality claim.
+
 Review the exact final editable artifact, not only the source code or an intermediate render.
 
 1. Render every slide.
@@ -24,7 +28,7 @@ Review the exact final editable artifact, not only the source code or an interme
 4. Check titles, evidence, sources, and uncertainty.
 5. Check clipping, overlap, broken assets, and unreadable text.
 6. Apply the deletion test.
-7. For PowerPoint, require the three accepted reports in [PowerPoint reports](#powerpoint-reports); follow the linked platform owners for commands and repair loops.
+7. For PowerPoint, require the four accepted artifacts in [PowerPoint reports](#powerpoint-reports); follow the linked platform owners for commands and repair loops.
 
 Every planned slide maps to exactly one sequenced dot. New decks and structural revisions require a validated pre-authoring contract. A missing executive summary is not a defect by itself in an existing deck when the revision did not authorize adding one.
 
@@ -35,7 +39,7 @@ Release only when all apply:
 ### Story
 
 - The deck answers the brief and has one governing thought.
-- The title spine reads as a clear executive memo.
+- The title spine fulfils the [communication job](../storylining/index.md#write-the-title-spine): a clear executive memo for a decision, or a coherent explanatory progression for teaching.
 - Each slide has one narrative job and one dominant exhibit.
 - The executive summary, when required, preserves the approved governing branches and overall action and passes the [standalone narrative test](../components/copy.md#executive-summary-narrative).
 - The close follows from the evidence.
@@ -44,8 +48,10 @@ Release only when all apply:
 ### Evidence
 
 - Claims reconcile with their exhibits and sources.
+- Every page passes the [no-recap and new-deduction gate](../components/copy.md#no-recap-and-new-deduction-gate). Graph/table narration in any supporting copy and non-deductive insight boxes are release-blocking defects, not minor copy suggestions. The final review records explicit per-slide copy evidence.
 - Facts, estimates, claims, and inferences are distinguishable.
 - Charts use the correct scale, units, labels, and series.
+- The final render contains each requested [change, gap, or threshold annotation](../components/chart-callouts.md#authoring-decision), and focal marks pass the [primary/comparator contrast check](../charts/index.md#focus-and-comparator-colours).
 - Tables are composed exhibits rather than raw spreadsheet grids.
 - No evidence is invented.
 
@@ -55,6 +61,7 @@ Release only when all apply:
 - Status tables and heatmaps pass [comparison indicators](../components/comparison-indicators.md); navigation passes [trackers](../components/trackers/index.md).
 - Audience text passes [copy](../components/copy.md), and detached synthesis passes the [insight-box](../components/insight-box.md) cardinality and treatment checks.
 - The chosen [composition](../composition/index.md) fits the evidence, keeps one dominant exhibit, and leaves no under-composed analytical canvas.
+- [Deck rhythm](../design/index.md#deck-rhythm) passes separately from style consistency; repetitive chart runs and empty closing cards need an analytical reason, not a matching palette.
 - Every slide passes the full-size anti-slop audit with no unexplained object, label, treatment, or inconsistency.
 
 ### Platform
@@ -71,7 +78,7 @@ All PowerPoint contract, semantic, exported-file, per-slide visual, and cross-sl
 
 ## PowerPoint reports
 
-Every final PowerPoint candidate requires three reports bound to the same exact PPTX hash and governing inputs:
+Every final PowerPoint candidate requires four acceptance artifacts bound to the same exact PPTX hash and governing inputs:
 
 - an accepted canonical generation receipt proving that the deck used the shared planner, scene, registry, theme tokens, HTML observer, PptxGenJS adapter, and Artifact Tool observer rather than a parallel builder;
 - an accepted deterministic hard report from [PowerPoint hard acceptance](../tools/powerpoint/acceptance.md);
@@ -110,7 +117,7 @@ After editing skill guidance or specimens, use Luna or Terra as an independent j
 python3 evals/scripts/validate_reference_copy.py --model gpt-5.6-terra
 ```
 
-The judge reviews every reference file for concision, specificity, non-redundancy, and actionability. The script omits executable code but includes visible HTML specimen copy. Its JSON schema, exact file manifest, current reference hash, score threshold, and blocker rules are deterministic. Every dimension must score at least 90, with no blocker or major findings. `evals/run_evals.py --check` rejects missing, stale, malformed, or failed reports.
+The judge reviews every reference file for concision, specificity, non-redundancy, and actionability. The script reviews Markdown guidance and omits fenced implementation examples. Its JSON schema, exact file manifest, current reference hash, score threshold, and blocker rules are deterministic. Every dimension must score at least 90, with no blocker or major findings. `evals/run_evals.py --check` rejects missing, stale, malformed, or failed reports.
 
 ## Defects
 
@@ -147,7 +154,7 @@ Each result records:
 - critical, major, and minor defects;
 - anti-slop review with one audit record per slide;
 - deck-consistency review with material theme-manifest, treatment-ledger, and audit paths, full-deck comparison, palette-role verification, tracker-map verification, repeated-component verification, and zero unresolved findings;
-- the three [PowerPoint reports](#powerpoint-reports) for every self or treatment PPTX, with material paths, the same exact candidate hash, approved distinct judge models for visual and consistency review, iteration counts, and `accepted: true`;
+- the four [PowerPoint acceptance artifacts](#powerpoint-reports) for every self or treatment PPTX, with material paths, the same exact candidate hash, approved distinct judge models for visual and consistency review, iteration counts, and `accepted: true`;
 - reference comparison when required;
 - fresh-run preparation evidence;
 - reviewer notes.

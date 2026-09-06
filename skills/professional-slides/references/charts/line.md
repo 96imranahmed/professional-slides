@@ -12,7 +12,7 @@ Trends, inflection points, trajectory comparisons, and actual-versus-forecast ov
 
 ## Data contract
 
-A consistently spaced temporal or ordered x-axis, numeric measures, explicit units, a missing-value policy, and status boundaries for forecast or target. Every series must contain exactly one finite value per category; mismatched arrays fail before layout, and explicit bounds must contain all values.
+A consistently spaced temporal or ordered x-axis, numeric measures, explicit units, and status boundaries for forecast or target. The current runtime rejects missing observations: every series must contain exactly one finite value per category; nulls, mismatched arrays, and bounds excluding values fail before layout. Do not replace missing data with zero, interpolate silently, or drop a period and connect across it. If gaps are material, extend the canonical chart owner with an explicit gap policy before authoring or choose an exhibit that preserves the unavailable observations.
 
 ## Construction
 
@@ -24,22 +24,9 @@ A consistently spaced temporal or ordered x-axis, numeric measures, explicit uni
 - Use shared scales for small multiples intended for comparison.
 - Do not smooth in a way that changes the apparent data.
 - A filled area is one closed polygon following the series and baseline, not a stack of overlapping rectangles or independent point fills.
-- Keep the plot field blank by default. Add quiet gridlines only when several trajectories or a dense numeric scale require intermediate lookup.
+- Apply the [shared plot-field rule](index.md); trajectory lookup may justify quiet gridlines.
 
-## Structural HTML reference
-
-```html
-<figure class="line-chart" data-role="chart-field"><svg viewBox="0 0 900 420" role="img"><path class="series series--actual" d="M80 310L270 265L460 230L650 145"/><path class="series series--forecast" d="M650 145L840 95"/><path class="forecast-boundary" d="M650 60V330"/><text x="665" y="78">Forecast begins</text><text x="80" y="360">2023</text><text x="620" y="360">2025A</text><text x="810" y="360">2026F</text></svg><figcaption>Revenue, $m, UK enterprise accounts, FY2023 to FY2026F</figcaption></figure>
-```
-
-```css
-.line-chart { margin: 0; display: grid; grid-template-rows: 1fr auto; gap: var(--space-2); }
-.line-chart svg { width: 100%; height: 100%; }
-.series { fill: none; stroke: var(--chart-series-1); stroke-width: 4; }
-.series--forecast { stroke-dasharray: 10 8; }
-.forecast-boundary { stroke: var(--page-guideline); stroke-width: 1.5; }
-.line-chart text, .line-chart figcaption { font: var(--type-label); color: var(--text-secondary); }
-```
+## Construction details
 
 Attach supported growth, inflection, or threshold annotations through [`chart callouts`](../components/chart-callouts.md) rather than a detached generic insight box.
 
@@ -49,7 +36,7 @@ For small multiples, repeat the same plot height, time anchors, direct-label rul
 
 ## Platform mapping
 
-Normalize date intervals, missing-value gaps, series order, forecast boundaries, markers, and dash semantics in the scene because application defaults vary.
+Normalize date intervals, series order, forecast boundaries, markers, and dash semantics in the scene because application defaults vary. Apply the missing-observation restriction above before platform conversion.
 
 ## Failure modes
 

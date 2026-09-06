@@ -59,45 +59,13 @@ Use chronological absolute stacks when both total growth and component contribut
 
 Use only when one compact metric per stack materially changes interpretation, such as margin beneath revenue mix. Align one [metric field](../components/metric-fields.md) to every stack center, keep a separate label and unit for the auxiliary measure, and preserve one metric grammar across all categories. The rail does not share the stack axis, does not replace source data, and should be removed when it merely repeats a segment or total.
 
-## Structural HTML reference
-
-```html
-<figure class="stacked-chart" data-role="chart-field"><ul class="chart-legend" data-component="chart-legend" data-variant="swatch" data-placement="top-right" aria-label="Purchase priorities"><li><span class="chart-legend__key" data-series="1"></span>Reliability</li><li><span class="chart-legend__key" data-series="2"></span>Ease of use</li><li><span class="chart-legend__key" data-series="3"></span>Price</li></ul><div class="stack-row"><span>Enterprise</span><div class="stack"><i style="--share:48%;--series:var(--chart-series-1)">48%</i><i style="--share:32%;--series:var(--chart-series-2)">32%</i><i style="--share:20%;--series:var(--chart-segment)">20%</i></div></div><div class="stack-row"><span>Mid-market</span><div class="stack"><i style="--share:35%;--series:var(--chart-series-1)">35%</i><i style="--share:39%;--series:var(--chart-series-2)">39%</i><i style="--share:26%;--series:var(--chart-segment)">26%</i></div></div><figcaption>Purchase priority, % of UK software buyers, Q2 2026, n = 420</figcaption></figure>
-```
-
-```css
-.stacked-chart { display: grid; gap: var(--space-4); margin: 0; }
-.stack-row { display: grid; grid-template-columns: 120px 1fr; gap: var(--space-3); align-items: center; }
-.stack { display: flex; height: 34px; overflow: hidden; }
-.stack i { width: var(--share); display: grid; place-items: center; background: var(--series); font: var(--type-chart-label); font-style: normal; }
-.stacked-chart figcaption { font: var(--type-label); color: var(--text-secondary); }
-```
+## Construction details
 
 Choose accessible text colour for each resolved segment fill and apply the shared [direct-label gate](index.md#direct-label-gate); retain a failed internal label through an eligible external label or the legend.
 
-### Variant HTML slots
+### State and annotation geometry
 
-The cumulative and two-period variants reuse one segment order and one shared legend. Connector and endpoint geometry are calculated attachments, not new data series:
-
-```html
-<figure class="stacked-chart" data-role="chart-field" data-variant="cumulative-stacked-progression">
-  <ul class="chart-legend" data-component="chart-legend" data-variant="swatch" aria-label="Components"></ul>
-  <ol class="stacked-progression" aria-label="Component progression by year">
-    <li data-period="year-1" data-total="17"><span data-series="base" data-value="9">9</span><span data-series="expansion" data-value="4">4</span><span data-series="new" data-value="4">4</span></li>
-    <li data-period="year-2" data-total="34"><span data-series="base" data-value="12">12</span><span data-series="expansion" data-value="12">12</span><span data-series="new" data-value="10">10</span></li>
-    <li data-period="year-3" data-total="67"><span data-series="base" data-value="21">21</span><span data-series="expansion" data-value="27">27</span><span data-series="new" data-value="19">19</span></li>
-  </ol>
-  <svg class="stack-boundary-connectors" data-component="boundary-connectors" aria-hidden="true"></svg>
-</figure>
-
-<figure class="stacked-chart" data-role="chart-field" data-variant="two-period-mix-shift">
-  <ol class="stacked-endpoints">
-    <li data-period="current" data-total="80"><span data-series="core" data-value="40">40</span><span data-series="growth" data-value="40">40</span></li>
-    <li data-period="future" data-total="85"><span data-series="core" data-value="40">40</span><span data-series="growth" data-value="45">45</span></li>
-  </ol>
-  <div class="chart-callout" data-component="chart-callout" data-variant="endpoint-change" data-start="current" data-end="future"><span>+5 total; growth share rises from 50% to 53%</span></div>
-</figure>
-```
+The cumulative and two-period variants reuse one segment order and one shared legend. Connector and endpoint geometry are calculated attachments, not new data series.
 
 The adapter draws connector segments only through the gaps between peer columns, one line per stable boundary. It derives total and share labels independently so a change in magnitude never silently changes the stated mix.
 

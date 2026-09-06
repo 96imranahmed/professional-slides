@@ -25,7 +25,8 @@ Use five analytical tests, followed by the decision:
 3. Competitive position
 4. Commercial engine
 5. Plan and downside
-6. Decision and value creation
+
+Follow these with **Decision and value creation**, the sixth section rather than a sixth analytical test.
 
 Keep all five analytical tests explicit in retrospective public-source commercial diligence. A missing-data statement does not count as the analysis itself.
 
@@ -59,7 +60,7 @@ A full pre-read usually contains:
 
 Convert these tests into assignment-specific hypotheses; preserve the retrospective cutoff and coverage ledger as explicit gates in the [pre-authoring contract](../storylining/pre-authoring-contract.md).
 
-Follow the [executive-summary narrative contract](../components/copy.md#executive-summary-narrative). This template supplies the commercial proof themes, not an alternative summary construction.
+Use the [executive-summary narrative contract](../components/copy.md#executive-summary-narrative) to synthesize the five tests and transaction decision.
 
 ## Navigation
 
@@ -119,27 +120,21 @@ Do not invent revenue, customers, retention, margin, market share, valuation, or
 
 ## Page composition
 
-Choose registered components and an open composition from [the composition owner](../composition/index.md). A table-only core deck is a major design and analysis defect.
-
-Use charts for trends, distributions, positions, funnels, bridges, scenarios, and sensitivities when the data supports them. Use diagrams for causal logic. Use tables for compact comparison or decision records.
-
-Core analytical pages should have one dominant exhibit or two to four mutually supporting analytical items. Do not repeat the same card grid across the deck.
+Apply [composition](../composition/index.md), [chart selection](../charts/index.md), and [deck rhythm](../design/index.md#deck-rhythm) to the five analytical jobs above.
 
 ## Compression
 
-A shorter deck may merge related jobs, but it may not hide a failed test. Keep the five-test architecture visible in the hypothesis tree, coverage ledger, or section structure. Omit visible navigation when the title spine already provides enough orientation.
+A shorter deck may merge related jobs, but it may not hide a failed test. Keep the five-test architecture visible in the hypothesis tree, coverage ledger, or section structure.
 
 ## Failure checks
 
 Reject the deck when:
 
 - the engagement mode is unclear;
-- the executive summary is a tracker or status dashboard;
 - public evidence is presented as transaction-grade proof;
 - customer, commercial-engine, or plan branches are replaced by generic missing-data cards;
 - the independent plan is absent;
 - the recommendation is stronger than the evidence;
-- the core deck is table-only or uses one repeated layout;
 - later evidence is mixed with the decision-date record;
 - sources or uncertainty states are missing.
 

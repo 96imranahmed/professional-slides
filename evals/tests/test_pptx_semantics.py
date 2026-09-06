@@ -119,6 +119,10 @@ class PptxSemanticTests(unittest.TestCase):
         errors = validator.validate_semantics(blocks, contract)
         self.assertTrue(any("repeat headline values" in error for error in errors))
 
+    def test_bare_chart_values_may_match_the_title(self):
+        contract = {"slides": [{"slide": 1, "pageType": "analytical", "title": "Margin reaches 35.6%"}]}
+        self.assertEqual(validator.validate_semantics({1: ["Margin reaches 35.6%", "35.6%", "Prior period", "Current period"]}, contract), [])
+
     def test_tracker_number_may_repeat_its_numbered_section_heading(self):
         contract = {
             "slides": [

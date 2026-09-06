@@ -6,6 +6,29 @@ Chart callouts attach interpretation to a specific mark, interval, gap, threshol
 
 Use a bracket, interval line, arrow, or endpoint label to show a supported absolute change, percentage-point change, CAGR, or index movement. Name the period and basis. Distinguish `%` from percentage points and do not calculate CAGR across inconsistent periods.
 
+## Authoring decision
+
+For each chart, identify the comparison the reader must verify before allocating the plot. When the claim depends on growth, a gap, margin expansion, or a threshold crossing, request the corresponding annotation in the chart's content props. Endpoint values and a claim in the title do not show the calculated change on the exhibit. Omit the extra annotation when the plotted measure already is that change, such as directly labelled year-over-year growth bars, or when the same comparison is already encoded clearly; record that reason in the storyboard.
+
+Use `changeAnnotations` for a supported A-to-B change or gap, `referenceLines` for a decision threshold, and `annotations` for an evidence-linked observation. These inputs have different jobs. An empty `annotations: []` does not request growth arrows, and the renderer does not infer them from prose. Bind endpoints to exact category and series keys, reconcile the displayed calculation with source precision, and reserve the shared annotation band before sizing marks. For example:
+
+```js
+// Column-chart props: values are 80 and 100 for the same measure.
+{
+  categories: ["Prior", "Current"],
+  series: [{ name: "Revenue", values: [80, 100] }],
+  dataLabels: true,
+  highlights: [{ category: "Current", style: "bar" }],
+  changeAnnotations: [{
+    start: { category: "Prior", series: "Revenue" },
+    end: { category: "Current", series: "Revenue" },
+    style: "arrow", text: "+25%"
+  }]
+}
+```
+
+For grouped comparisons, name both series at the same category; for margin changes use percentage points. Axis-based bar, column, stacked, line, waterfall, scatter, bubble, and combo charts accept keyed observations and supported A-to-B changes. Chronological vertical columns, stacked columns, lines, waterfalls, and combo charts may also carry an annotation rail. Horizontal bars, scatter, bubble, pie, and donut charts do not accept an annotation rail; pie and donut charts use direct segment labels and reject ordered change annotations. Reflow or change the encoding if the keyed annotation cannot fit; do not silently drop the proof. Verify the requested label and connector in the final render, not only in the source or scene.
+
 ## Key-observation callout
 
 Use one short sentence placed beside the decisive mark, with a leader line that terminates at the exact evidence. State the pattern and its implication only when the action title does not already make both obvious. Avoid generic headings such as “Key takeaway,” “What it means,” or “Read the outliers.”
@@ -29,89 +52,28 @@ Use these constructions across chart families rather than redrawing one-off trea
 - `endpoint arrow`: a directional line with an explicit native triangular end arrowhead connects exact A and B evidence. Put the calculated absolute, percentage-point, percentage, CAGR, or index change in one compact label centered on the line. It may span two bars, two line points, or two declared series within one category.
 - `interval bracket`: a quiet span and two drops connect exact endpoints when the selected range matters more than direction. It may cover a long time range or repeat across grouped categories when every bracket compares the same series pair.
 - `start-to-end construction`: a quiet horizontal span, start drop, and terminal line with an explicit native triangular end arrowhead connect an opening state to a reconciled closing state. Use it for a waterfall or total stack bridge, not as a decorative roof over unrelated categories.
-- `annotation rail`: one aligned row below chronological category labels carries a necessary period-level secondary measure. Bind each entry to an exact category key, label the separate unit once, and omit the rail when it repeats plotted values.
+- `annotation rail`: aligned rows below category labels carry necessary secondary measures. Each bubble contains one numeric value, optionally with its unit, or an explicit `N/A` state. Put the measure name and shared unit at the left of the row; use separate rows for separate measures, never a sentence or expression inside one bubble. Bind entries to exact category keys and omit rows that repeat plotted values.
 - `forecast band`: one open plot region marks the complete estimate or forecast interval. Bind its boundary and tint to the forecast state, label it once, and keep the underlying marks in the same series mapping as history unless scenario identity changes.
 - `focal span`: one theme-primary outline or light-neutral tint identifies a decision-relevant period, category, or group while leaving every mark and label readable. Give the span symmetric cross-axis breathing room and keep labels clear of its edge. Use the outline when the boundary matters and the tint when the whole region matters. The span must name the selection basis and must not recolour peers into false categories.
 - `segment emphasis`: retain the segment's category hue, strengthen only its approved intensity or outline, and mute peer segments through theme bindings. Use when one segment, rather than the whole row or column, proves the title.
 - `evidence leader`: one short leader terminates at the exact mark, boundary, or gap. Use for outliers, thresholds, and decisive values, not for decorative arrows that merely point toward a chart.
-- `orthogonal evidence leader`: one straight horizontal or vertical leader leaves a light takeaway box and ends in a small dot at the exact keyed mark. Use it only when a clear corridor exists; it never carries an arrowhead and never changes into a diagonal leader as a fallback.
+- `orthogonal evidence leader`: one straight horizontal or vertical leader uses the `orthogonal-dot` treatment above and ends at the exact keyed mark.
 
 Choose one primary highlight mechanism. A forecast band may coexist with one evidence leader because forecast is a data state. Do not surround one fact with several competing marks.
 
+For multiple measures use `annotationRail: { rows: [{ label: "EPS, $", items: [{ category: "Base", text: "12.5" }] }, { label: "P/E", items: [{ category: "Base", text: "27x" }] }] }`. These are illustrative values, not evidence. The single-row `{ label, items }` form remains supported. The renderer reserves each row and its left label before sizing the plot; if the plot cannot fit, recompose instead of compressing the bubbles.
+
 Change labels use the active theme's component primary and on-primary text; leaders use the quiet rule role. Never introduce a bright local colour. Change lines must stop clear of data labels and terminate at their exact keyed evidence.
+
+Change bubbles also contain one numeric value, such as `+18%` or `+4.2pp`. Put the metric, basis and period in the exhibit heading or adjacent labels, not inside the bubble. Sentence-length evidence callouts remain a separate treatment.
 
 Typography, contrast, clearance, and fit follow the canonical [direct-label gate](../charts/index.md#direct-label-gate). This owner adds only callout geometry: surfaces, leaders, endpoint binding, and the highlight or change mechanism.
 
-For an unstacked bar or column chart with exactly one series, a single-bar highlight may instead set the selected bar to `component-primary` and all peer bars to the chart-neutral role. Use a region outline or tint for grouped bars so the series mapping and legend remain intact. Bind every selection to an exact category key; never infer the focus from position alone.
+Apply the shared [focus and comparator colours](../charts/index.md#focus-and-comparator-colours) when selecting a category, series, or region highlight.
 
 ## Theme contract
 
 The component consumes `--chart-callout-font`, `--chart-callout-color`, `--chart-callout-bg`, `--chart-callout-border`, `--chart-callout-leader`, `--chart-callout-padding`, `--chart-callout-series`, `--chart-callout-highlight`, `--chart-callout-muted-region`, `--chart-callout-forecast-region`, `--chart-callout-forecast-border`, `--chart-callout-line-width`, `--chart-callout-emphasis-width`, and `--chart-callout-label-radius`. [Component bindings](../theming/component-bindings.md#evidence-components) owns every resolved default.
-
-## Structural HTML reference
-
-```html
-<figure class="chart-with-callout" data-role="chart-field">
-  <div class="plot" aria-label="Illustrative line chart">
-    <svg viewBox="0 0 900 420" role="img">
-      <path class="series" d="M80 330 L250 280 L420 245 L590 160 L760 105"/>
-      <rect class="forecast-region" x="570" y="36" width="220" height="322"/>
-      <path class="growth-bracket" d="M590 145 V90 H760 V90"/>
-      <text class="growth-label" x="675" y="72" text-anchor="middle">+18% CAGR, 2022-25</text>
-      <circle class="highlight" cx="760" cy="105" r="7"/>
-      <path class="leader" d="M755 112 L700 170"/>
-      <text class="observation" x="690" y="194" text-anchor="end">Growth accelerates after enterprise launch</text>
-    </svg>
-  </div>
-  <figcaption>Revenue, $m, UK enterprise accounts, FY2022 to FY2025</figcaption>
-</figure>
-```
-
-```html
-<aside class="chart-callout" data-component="chart-callout" data-variant="borderless" data-target="2025">
-  <p>Adoption accelerates after launch</p>
-  <span class="leader" aria-hidden="true"></span>
-</aside>
-
-<aside class="chart-callout orthogonal-dot" data-component="chart-callout" data-variant="orthogonal-dot" data-orientation="horizontal" data-side="left" data-target="priority">
-  <p>Scale the proven priority</p>
-  <span class="leader"><i class="endpoint-dot" aria-hidden="true"></i></span>
-</aside>
-```
-
-```css
-.chart-with-callout {
-  --chart-callout-font: var(--type-chart-annotation);
-  --chart-callout-color: var(--ink);
-  --chart-callout-bg: var(--canvas);
-  --chart-callout-border: var(--rule-quiet);
-  --chart-callout-leader: var(--page-guideline);
-  --chart-callout-padding: var(--space-2);
-  --chart-callout-series: var(--chart-series-1);
-  --chart-callout-highlight: var(--component-primary);
-  --chart-callout-muted-region: var(--surface-2);
-  --chart-callout-forecast-region: var(--component-primary-tint);
-  --chart-callout-forecast-border: var(--rule-emphasis);
-  --chart-callout-line-width: var(--line-hairline);
-  --chart-callout-emphasis-width: var(--line-standard);
-  --chart-callout-label-radius: var(--radius-round);
-  margin: 0;
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: var(--space-2);
-}
-.plot svg { width: 100%; height: 100%; overflow: visible; }
-.forecast-region { fill: var(--chart-callout-forecast-region); stroke: var(--chart-callout-highlight); stroke-width: var(--chart-callout-line-width); }
-.series { fill: none; stroke: var(--chart-callout-series); stroke-width: var(--chart-callout-emphasis-width); }
-.growth-bracket, .leader { fill: none; stroke: var(--chart-callout-leader); stroke-width: var(--chart-callout-line-width); }
-.growth-label, .observation { font: var(--chart-callout-font); fill: var(--chart-callout-color); }
-.highlight { fill: var(--chart-callout-highlight); }
-.orthogonal-dot { background: var(--chart-callout-forecast-region); border: var(--chart-callout-line-width) solid var(--chart-callout-border); color: var(--chart-callout-color); padding: var(--chart-callout-padding); }
-.chart-callout[data-variant="borderless"] { border: none; }
-.orthogonal-dot .leader { border-color: var(--chart-callout-leader); border-style: solid; border-width: 0 0 var(--chart-callout-line-width); }
-.orthogonal-dot .endpoint-dot { background: var(--chart-callout-highlight); border-radius: 50%; display: block; inline-size: 0.5rem; block-size: 0.5rem; }
-.chart-with-callout figcaption { font: var(--type-label); color: var(--text-secondary); }
-```
 
 ## Acceptance check
 

@@ -29,7 +29,7 @@ Read:
 
 - [Token registry](tokens.md) for the complete variable contract and exact native defaults.
 - [Component bindings](component-bindings.md) for the variables each component consumes.
-- [HTML and CSS contract](html-css-contract.md) when adding or revising an inline structural specimen.
+- [Runtime component contract](../../runtime/README.md#component-contract) when implementing geometry or adding a generated preview.
 
 ## Visual families
 

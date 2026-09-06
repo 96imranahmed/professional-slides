@@ -41,6 +41,7 @@ def judgement(score: int = 95, verdict: str = "accept"):
             "summary": "The slide is complete and visually finished.",
             "scores": scores,
             "findings": [],
+            "copyAudit": {"noRecap": True, "recapEvidence": "The exhibit has necessary labels and no supporting recap.", "insightCount": 0, "insights": []},
         }],
     }
 
@@ -58,7 +59,7 @@ class PptxVisualTests(unittest.TestCase):
         self.assertIn("professional_slides_skill_references", prompt)
         self.assertIn("secondary rail merely repeats chart values", prompt)
         self.assertIn("keeps a short unit inline in a secondary colour", prompt)
-        self.assertIn("same underline state", prompt)
+        self.assertIn("same top anchor and underline baseline", prompt)
         self.assertIn("open compositions are valid", prompt)
         self.assertIn("non-additive balances", prompt)
         self.assertIn("insight-versus-speaker-notes test", prompt)
@@ -87,6 +88,37 @@ class PptxVisualTests(unittest.TestCase):
             "recommendedChange": "Rebuild it as the canonical metric field.",
         }]
         self.assertFalse(validator.derive_visual_acceptance(value, []))
+
+    def test_copy_gate_cannot_be_averaged_away_or_omitted(self):
+        value = judgement(score=100)
+        self.assertTrue(validator.derive_visual_acceptance(value, []))
+        value["slides"][0]["copyAudit"]["noRecap"] = False
+        self.assertFalse(validator.derive_visual_acceptance(value, []))
+        del value["slides"][0]["copyAudit"]
+        self.assertTrue(validator.validate_visual_judgement(value, 1))
+        self.assertFalse(validator.derive_visual_acceptance(value, []))
+
+    def test_insight_semantics_and_review_coverage_are_mandatory(self):
+        value = judgement(score=100)
+        audit = value["slides"][0]["copyAudit"]
+        audit["insightCount"] = 1
+        self.assertFalse(validator.derive_visual_acceptance(value, []))
+        audit["insights"] = [{"text": "Additional promotion will increase backlog unless throughput improves.",
+                              "premises": "Demand exceeds capacity and capacity is fixed this quarter.",
+                              "addedDeduction": "Demand stimulation worsens the queue under the stated constraint.",
+                              "classification": "supported_deduction"}]
+        self.assertTrue(validator.derive_visual_acceptance(value, []))
+        for invalid in ("recap", "unsupported"):
+            audit["insights"][0]["classification"] = invalid
+            self.assertFalse(validator.derive_visual_acceptance(value, []))
+        audit["insights"][0]["classification"] = "supported_deduction"
+        audit["insights"][0]["addedDeduction"] = ""
+        self.assertFalse(validator.derive_visual_acceptance(value, []))
+
+    def test_earlier_visual_rubric_without_copy_gate_is_stale(self):
+        value = judgement()
+        value["rubricVersion"] = "6"
+        self.assertTrue(validator.validate_visual_judgement(value, 1))
 
     def test_cached_report_is_bound_to_exact_candidate_render_and_inputs(self):
         with tempfile.TemporaryDirectory() as directory:

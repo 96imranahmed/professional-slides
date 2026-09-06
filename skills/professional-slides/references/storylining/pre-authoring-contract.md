@@ -20,7 +20,8 @@ Record:
 - visual-system mode: clean-native-standard, reference-led, or custom-user-directed, with approval evidence for the latter two;
 - main question and governing answer;
 - slide count and ordered slide records;
-- each slide's title, job, hypothesis branch, source role, and arbitrary ordered `items`;
+- each slide's title, job, hypothesis branch or concept dependency, source role, and arbitrary ordered `items`;
+- the decisive inference and any assumption or qualification the reader must see, mapped to its visible content item rather than left only in notes;
 - each item's stable ID, semantic job, registered component, content props, relationship to peers, and optional weight, frame, layer, or cell placement;
 - each slide's open composition tree, or `auto` when the deterministic planner should select row, column, grid, overlay, or absolute composition from item relationships;
 - each chart slide's `exhibitHeadingVariant`, using the registered `chart-title` value `underlined` by default, including for inline or stacked units, or `unit` for the explicit borderless unit treatment. Pass this value to `chart-title.props.variant`; chart components use `titleVariant`, and `open-underlined` is a legacy contract alias for `underlined`, not a runtime variant. Also record canonical `legendTreatment`, including `direct-labelled` or `none-not-needed` when applicable;
@@ -62,3 +63,7 @@ An executive synthesis uses the same open item and composition contract as any o
 Each analytical slide declares arbitrary items inside one open composition tree. Evidence, interpretation, implication, action, navigation, and source elements are semantic jobs, not fixed regions. Any item may be absent, repeated when the argument requires it, or nested inside a substantive section. Record each detached or attached interpretation with its registered component and declared job.
 
 Do not begin production while any check fails. Preserve the approved dot-dash and the completed contract with the run evidence. Repository evaluations may additionally run a deterministic validator, but normal skill use does not require a packaged script.
+
+Before export, reconcile the resolved scene's text and exhibits to those visible-content commitments. Check the rendered content bounds, not merely the allocated frames: a short table inside a full-height frame is still a short table. Resolve missing reasoning, oversized gaps, and redundant conclusion surfaces before treating the handoff as implemented.
+
+Read every claim-bearing label against its source, including chart categories and abbreviated annotations. Preserve the source's population, classification, comparator and causal limits; a footnote cannot excuse a stronger visible label. Check the exhibit's arithmetic relationship too: independent comparisons, additive contributions and multiplicative drivers require different constructions.

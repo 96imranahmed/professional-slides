@@ -21,23 +21,53 @@ Outside the executive-summary structure above, choose copy length for decision c
 
 ## Body copy
 
-Keep the reasoning needed to understand the exhibit and its consequence. Per supporting text box, default to one sentence or at most three bullets; the [PowerPoint hard-acceptance ceiling](../tools/powerpoint/acceptance.md) remains the upper bound. Use plain words, short sentences, and explicit uncertainty. Prefer `Public evidence does not show retention` over `Further work may be required`.
+Per supporting text box, default to one sentence or at most three bullets; the [PowerPoint hard-acceptance ceiling](../tools/powerpoint/acceptance.md) remains the upper bound. Use plain words, short sentences, and explicit uncertainty. Prefer `Public evidence does not show retention` over `Further work may be required`.
 
 Concise does not mean telegraphic. Insight and recommendation copy uses natural, complete sentences with the connective words needed to explain the reason, implication or condition. Prefer `We recommend holding the position until cash generation improves.` over `Hold. Wait for cash recovery.` Reserve short phrases for headings, labels and parallel inventories; do not pad a sentence merely to make it longer.
 
 Keep neighboring bullets parallel in both meaning and grammar. Preserve only the connective words needed to avoid ambiguity. Prefer `Make accelerated training easier to adopt` over `Simplify accelerated training` when adoption is the claim.
 
-Use the density ceilings in [PowerPoint hard acceptance](../tools/powerpoint/acceptance.md) for PPTX work. A page that reaches the limit should trigger a deletion or slide-split review, not automatic acceptance.
-
 Do not expose planning language such as `Slide job`, `Exhibit logic`, `So what`, `Hypothesis`, or `Decision relevance` unless the deck is teaching that method.
+
+## Analytical substance
+
+Before layout, write the reasoning for each analytical slide in the storyboard: what comparison matters, what it implies for this audience's decision, what evidence supports that inference, and what material uncertainty or condition could change it. These are planning notes, not mandatory on-slide headings or four required text boxes. Structural pages and faithful edits to supplied copy do not need an invented analytical argument.
+
+Treat the chart as evidence, not the finished analysis. Test a relevant baseline, driver, segment, trade-off, or counterexample when it could change the conclusion. Separate an observed pattern from an inferred cause; source the inference or qualify it. If the evidence supports only description, narrow the claim and name the unresolved decision rather than inventing a mechanism.
+
+Apply the [no-recap and new-deduction gate](#no-recap-and-new-deduction-gate). Also reject commentary that would still work after replacing the subject and numbers. “Growth remains strong, but risks remain” adds no decision logic. An operating threshold needs a reason it changes the decision; an arbitrary number is not analysis.
+
+Let this reasoning determine visual capacity: a driver decomposition, comparable periods, sensitivity range, or evidence-and-consequence table may develop the proof. Add only the forms the argument needs. Larger bars, extra bullets, repeated metrics, and taller cards do not supply missing substance. If there is no distinct implication, merge or remove the page within the authorized narrative scope; otherwise flag it for the owner.
+
+## No-recap and new-deduction gate
+
+Never add a recap of information already visible on the same slide, especially graph or table content. This applies to paragraphs, bullets, captions, annotation prose and boxes. A different format or synonyms do not add meaning. Necessary data labels, units, legends and concise comparison annotations decode the exhibit; they do not license an accompanying prose retelling.
+
+An insight is a supported **new deduction** from the evidence: a consequence, dependency, trade-off, constraint, or decision that is not simply a description of what the exhibit displays. A recommendation qualifies only when the stated reason or condition makes that inferential step explicit. A new calculation alone is additional evidence, not automatically insight. A title may state the governing claim, but a second takeaway must not repeat it.
+
+For each proposed insight, record in authoring/review evidence, not on the slide: the exact sentence, the premises visible on the page, and what the reader can now conclude beyond those premises. Reject it if that last step is empty, repeats the title, merely narrates the data, or depends on an unsupported causal claim. Words such as “therefore” or “suggests” do not prove a deduction.
+
+For example, after a chart already shows demand above capacity, “Demand exceeds capacity” is a recap. “Additional promotion will increase the backlog unless throughput improves” is a deduction only when the page also establishes that capacity cannot expand in the relevant period. Without that premise, qualify the claim or omit it. Do not invent insight to fill a box.
+
+Audit all remaining supporting copy for information gain. Delete repeated evidence; retain genuinely additional evidence or needed explanation in the appropriate exhibit or adjacent bullet section. Put incidental calculation/source notes in provenance furniture or notes, not the insight. Reformatting rejected insight as bullet points is not a repair if it remains a recap.
+
+This is a release-blocking semantic copy check, not a style preference or a word-overlap heuristic. The independent final review must explicitly record the no-recap decision and each insight's premises, added deduction and verdict. Missing review evidence, any recap, or any non-deductive/unsupported insight fails even when layout and all numerical scores pass. Recheck the exact exported text after repairs.
+
+## Decision close
+
+For an executive pre-read, synthesize the current recommendation, decisive evidence, strongest counterargument, and change conditions. Apply [analytical substance](#analytical-substance) to those conditions. Name the relevant review event or accountable owner when known, and leave missing inputs explicit. Synthesize previously developed thresholds rather than copying their inventory into cards. Follow [deck rhythm](../design/index.md#deck-rhythm) when allocating space.
+
+Separate what the audience must decide now from later approvals or management deliverables. Use concise trigger language for conditions already proved in the body. Reject a close that stacks an approval list, paragraph-heavy action table, repeated risk inventory, and restated takeaway; combine duplicate commitments and move supporting detail back to its analytical page. Keep the authority boundary and decisive caveat visible, and show unknown owners only where that gap prevents the next action.
 
 ## Insight versus speaker notes
 
-Reserve the slide body for evidence and genuine interpretation: explain a cause, consequence, trade-off, risk, or decision condition that the chart alone does not communicate. Put routine arithmetic, familiar metric definitions, and full derivations in speaker notes or an explicitly requested methodology appendix. Reusable authoring instructions belong in the skill, never on a slide.
+Keep the [analytical argument](#analytical-substance) on the slide. Put routine arithmetic, familiar metric definitions, and full derivations in speaker notes or an explicitly requested methodology appendix. Reusable authoring instructions belong in the skill, never on a slide.
+
+When explaining a calculation, definition, or method is the communication job, that material is the exhibit and belongs on the slide. Show the steps needed for the audience to follow it and label assumptions; the notes rule removes incidental derivation, not requested teaching content.
 
 Keep only the qualifiers needed to prevent a misleading reading beside the relevant data, such as an assumed tax rate, forecast state, or excluded asset class. Put the full derivation in notes. Do not generate a default explanatory sentence along the bottom of every page.
 
-For a pre-read, sparse charts with one-line captions are unfinished when the decision logic remains implicit. Add source-grounded interpretation with a substantive heading and complete reasoning; do not fill space with data rehash or generic commentary. Judge completeness by whether the reader can understand the implication without narration, not by a low word count.
+For a pre-read, test the slide without narration; speaker notes cannot supply reasoning the reader needs to follow the decision.
 
 ## Labels
 
@@ -54,13 +84,13 @@ Avoid repeated rhetorical or ornamental colons, semicolons, ellipses, and parent
 
 ## Avoid generic AI copy
 
-Delete inflated or portable phrasing that could fit any deck, including repeated `not just X, but Y` constructions, false contrasts, rhetorical questions, and empty claims such as `transformative`, `best in class`, or `significant opportunity` without proof.
+Apply the [portability test](#analytical-substance). Watch for repeated `not just X, but Y` constructions, false contrasts, rhetorical questions, and unsupported claims such as `transformative` or `best in class`.
 
 ## Copy QA
 
 1. Check every sentence against the relevance rule at the top of this file and every text box against the linked [PowerPoint density ceiling](../tools/powerpoint/acceptance.md).
 2. Check that titles are supported by the exhibit.
 3. Remove redundant labels and repeated framing.
-4. Check that every interpretation adds meaning beyond the title and plotted values; move methodology and calculation walkthroughs to notes.
+4. Apply the [no-recap and new-deduction gate](#no-recap-and-new-deduction-gate) to every rendered page, then reapply [analytical substance](#analytical-substance) with its title and detached conclusion hidden. Use the [notes rule](#insight-versus-speaker-notes) for supporting derivations.
 5. Read insight and recommendation copy aloud: complete sentences must sound natural, not clipped or padded.
 6. Scan the exact final artifact for the Unicode em dash character and repeat until there are zero matches.

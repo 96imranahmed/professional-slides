@@ -44,59 +44,6 @@ The group allocates equal-width children, a common measured [chart-title band](i
 | --- | --- | --- |
 | chart legend | `--chart-legend-font`, `--chart-legend-color`, `--chart-legend-gap`, `--chart-legend-item-gap`, `--chart-legend-key-size`, `--chart-legend-line-length`, `--chart-legend-series-1` through `--chart-legend-series-6`, `--chart-legend-neutral`, `--chart-legend-forecast-border` | [component bindings](../theming/component-bindings.md#evidence-components) |
 
-## Structural HTML reference
-
-This fragment inherits the themed deck root from its chart slide.
-
-```html
-<ul class="chart-legend" data-variant="swatch" data-placement="top-right" aria-label="Chart series">
-  <li><span class="chart-legend__key" data-series="1" aria-hidden="true"></span><span>Current mix</span></li>
-  <li><span class="chart-legend__key" data-series="2" aria-hidden="true"></span><span>Growth segment</span></li>
-  <li data-state="forecast"><span class="chart-legend__key" data-state="forecast" aria-hidden="true"></span><span>Forecast</span></li>
-</ul>
-```
-
-```css
-.chart-legend {
-  --chart-legend-font: var(--type-chart-label);
-  --chart-legend-color: var(--ink);
-  --chart-legend-gap: var(--space-4);
-  --chart-legend-item-gap: var(--space-2);
-  --chart-legend-key-size: var(--icon-sm);
-  --chart-legend-line-length: var(--space-7);
-  --chart-legend-series-1: var(--chart-series-1);
-  --chart-legend-series-2: var(--chart-series-2);
-  --chart-legend-series-3: var(--chart-series-3);
-  --chart-legend-series-4: var(--chart-series-4);
-  --chart-legend-series-5: var(--chart-series-5);
-  --chart-legend-series-6: var(--chart-series-6);
-  --chart-legend-neutral: var(--chart-segment);
-  --chart-legend-forecast-border: var(--rule-page);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--chart-legend-gap);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--chart-legend-color);
-  font: var(--chart-legend-font);
-}
-.chart-legend[data-placement="top-right"] { justify-content: flex-end; flex-wrap: nowrap; }
-.chart-legend[data-placement="bottom-center"] { justify-content: center; flex-wrap: nowrap; }
-.chart-legend li { display: inline-flex; align-items: center; gap: var(--chart-legend-item-gap); }
-.chart-legend__key { inline-size: var(--chart-legend-key-size); block-size: var(--chart-legend-key-size); flex: none; background: var(--chart-legend-neutral); }
-.chart-legend__key[data-series="1"] { background: var(--chart-legend-series-1); }
-.chart-legend__key[data-series="2"] { background: var(--chart-legend-series-2); }
-.chart-legend__key[data-series="3"] { background: var(--chart-legend-series-3); }
-.chart-legend__key[data-series="4"] { background: var(--chart-legend-series-4); }
-.chart-legend__key[data-series="5"] { background: var(--chart-legend-series-5); }
-.chart-legend__key[data-series="6"] { background: var(--chart-legend-series-6); }
-.chart-legend__key[data-state="forecast"] { background: transparent; border: var(--chart-legend-forecast-border); border-style: dashed; }
-.chart-legend[data-variant="line"] .chart-legend__key { inline-size: var(--chart-legend-line-length); block-size: var(--line-standard); }
-.chart-legend[data-variant="marker"] .chart-legend__key { border-radius: var(--radius-round); }
-```
-
 ## Native translation
 
 Use the canonical [scene-to-native chart mapping](../tools/css-to-native-mapper.md#chart-mapping). Group the legend with the chart or coordinated exhibit, never with page furniture.

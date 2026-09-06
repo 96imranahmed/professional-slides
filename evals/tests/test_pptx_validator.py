@@ -238,6 +238,22 @@ def manifest(titles: list[str]) -> dict[str, object]:
 
 
 class PptxValidatorTests(unittest.TestCase):
+    def test_manifest_cli_checks_schema_without_a_pptx(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            path, report = directory / 'manifest.json', directory / 'report.json'
+            value = manifest(['A supported conclusion'])
+            path.write_text(json.dumps(value))
+            command = [sys.executable, str(VALIDATOR_PATH), 'manifest', str(path), '--report', str(report)]
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(report.read_text())['scope'], 'manifest-schema-only')
+            value['copy']['slideOverrides'] = {'1': {'maxWordsPerSlide': 100, 'rationale': 'Planning metadata'}}
+            path.write_text(json.dumps(value))
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 1)
+            self.assertFalse(json.loads(report.read_text())['accepted'])
+
     def validate(self, slides: list[dict[str, object]], *, manifest_value=None, omit_layout=False):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
