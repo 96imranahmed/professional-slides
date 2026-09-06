@@ -18,9 +18,9 @@ Record:
 - version and workflow mode;
 - template ID: registered ID, or `none` for direct storylining;
 - visual-system mode: clean-native-standard, reference-led, or custom-user-directed, with approval evidence for the latter two;
-- main question and governing answer;
+- `mainQuestion` and `governingAnswer`;
 - slide count and ordered slide records;
-- each slide's title, job, hypothesis branch or concept dependency, source role, and arbitrary ordered `items`;
+- each slide's title, job, hypothesis branch or concept dependency, `sourceRole`, and arbitrary ordered `items`;
 - the decisive inference and any assumption or qualification the reader must see, mapped to its visible content item rather than left only in notes;
 - each item's stable ID, semantic job, registered component, content props, relationship to peers, and optional weight, frame, layer, or cell placement;
 - each slide's open composition tree, or `auto` when the deterministic planner should select row, column, grid, overlay, or absolute composition from item relationships;
@@ -30,7 +30,7 @@ Record:
 - tracker system, contents slide, transition slides, labels, and analytical-header range;
 - for a hierarchical tracker, parent items, chapter trackers, governed slides, and each analytical slide's parent and chapter item IDs;
 - required opening and closing states;
-- canonical [theme manifest](../theming/index.md#theme-manifest) and deck treatment ledger paths;
+- canonical `themeManifestPath` and `treatmentLedgerPath`, following the [theme manifest](../theming/index.md#theme-manifest);
 - `assetAuthorizationRecord`: source, permission evidence, permitted use, attribution, stored path, and fallback for each external visual, following [asset authorization](../components/icons-and-logos.md#asset-authorization-record); use an empty array when no external visuals are reused;
 - PowerPoint acceptance-manifest path when PPTX is an output;
 - approval evidence;
@@ -50,7 +50,7 @@ The contract must cover every approved dot and all required structural pages. It
 
 ## Existing deck
 
-The contract must include sourceSlideCount and one record for every source slide. Record a missing executive summary as recommended_not_forced. Do not force a new executive summary, contents page, or tracker outside the authorized scope.
+The initial inventory includes `sourceSlideCount` and one record for every source slide. After an approved structural change, preserve `sourceSlideCount` and record every target slide under `plannedSlideCount`; differing counts require `approval.dotDashApproved: true`. Record a missing executive summary as recommended_not_forced. Do not force a new executive summary, contents page, or tracker outside the authorized scope.
 
 Validate before the first mutation and after an approved structural change.
 

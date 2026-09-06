@@ -110,19 +110,19 @@ function trackerAudienceCopy(tracker) {
   };
 }
 
-function validateItem(item, path) {
+function validateItem(item, path, registry) {
   if (!item?.id) throw new Error(`${path}.id is required`);
   if (!item.job || !String(item.job).trim()) throw new Error(`${path}.job must state why the item is on the slide`);
-  if (item.component && !REGISTRY.has(item.component)) throw new Error(`${path}.component is not registered: ${item.component}`);
-  if (!item.component && !item.items) throw new Error(`${path} needs a component or nested items`);
+  if (item.component && !registry.has(item.component)) throw new Error(`${path}.component is not registered: ${item.component}`);
+  if ((!item.component && (!Array.isArray(item.items) || !item.items.length)) || (item.items !== undefined && (!Array.isArray(item.items) || !item.items.length))) throw new Error(`${path} needs a component or nested items`);
   if (item.items) assertSectionHeadingProps(item);
   if (["section", "section-heading", "content-rail"].includes(item.component)) assertSectionHeadingProps(item.props);
   validateContentValue({ heading: item.heading }, path);
   validateContentValue(item.props || {}, `${path}.props`);
-  (item.items || []).forEach((child, index) => validateItem(child, `${path}.items[${index}]`));
+  (item.items || []).forEach((child, index) => validateItem(child, `${path}.items[${index}]`, registry));
 }
 
-export function validateSlidePlan(plan) {
+export function validateSlidePlan(plan, registry = REGISTRY) {
   if (!plan?.id) throw new Error("Slide plan id is required");
   resolveTitleVariant({ variant: plan.titleVariant });
   if (!plan.title || !String(plan.title).trim()) throw new Error(`${plan.id}.title is required`);
@@ -137,7 +137,7 @@ export function validateSlidePlan(plan) {
       throw new Error(`${plan.id}.template requires id, index and total for a repeated sequence`);
     }
   }
-  plan.items.forEach((item, index) => validateItem(item, `${plan.id}.items[${index}]`));
+  plan.items.forEach((item, index) => validateItem(item, `${plan.id}.items[${index}]`, registry));
   const density = resolveSlideDensity(plan);
   const defaultBudget = density.resolved === "appendix" ? 130 : density.resolved === "pre-read" ? 85 : density.resolved === "live-pitch" ? 30 : 55;
   const override = plan.copyBudget;
@@ -256,8 +256,8 @@ function planCover(plan) {
   return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, required: "live-pitch", resolved: spec.density, reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
 }
 
-export function planSlide(plan) {
-  const content = validateSlidePlan(plan);
+export function planSlide(plan, registry = REGISTRY) {
+  const content = validateSlidePlan(plan, registry);
   const titleVariant = resolveTitleVariant({ variant: plan.titleVariant });
   const body = makeComposition(plan, plan.items);
   return {
@@ -324,7 +324,7 @@ export function planDeck(deckPlan, registry = REGISTRY) {
   const defaultTitleVariant = resolveTitleVariant({ variant: deckPlan.titleVariant });
   const planned = deckPlan.slides.map((slide) => slide.kind === "cover"
     ? planCover(slide)
-    : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? defaultTitleVariant : slide.titleVariant }));
+    : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? defaultTitleVariant : slide.titleVariant }, registry));
   return {
     deck: compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, slides: planned.map((item) => item.spec) }, registry),
     decisions: planned.map((item) => item.decision)

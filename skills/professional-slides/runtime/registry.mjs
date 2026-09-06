@@ -446,9 +446,19 @@ function highlightStripNodes({ id, frame, props }) {
 }
 
 function matrixNodes({ id, frame, props }) {
+  for (const axis of ["xAxis", "yAxis"]) {
+    if (!["label", "minLabel", "maxLabel"].every(key => typeof props[axis]?.[key] === "string" && props[axis][key].trim())) throw new Error(`Matrix ${axis} requires label, minLabel, and maxLabel`);
+  }
   const nodes = [];
+  const axisText = (axis, direction) => `${axis.label}: ${axis.minLabel} to ${axis.maxLabel} (${direction})`;
+  for (const [axis, y, direction] of [[props.yAxis, frame.y, "bottom to top"], [props.xAxis, frame.y + frame.height - 32, "left to right"]]) {
+    const text = axisText(axis, direction);
+    const measured = measureText(text, frame.width, { fontSize: tokenValue(LABEL) });
+    if (measured.height > 32) throw new Error("Matrix axis label needs more space");
+    nodes.push(textPrimitive({ id: stableId(id, direction, "label"), role: "matrix-axis-label", frame: { x: frame.x, y, width: frame.width, height: 32 }, text, style: textStyle(LABEL, INK, false, "center") }));
+  }
   const plotInset = 54;
-  const plot = { x: frame.x + plotInset, y: frame.y + 18, width: frame.width - plotInset - 28, height: frame.height - 68 };
+  const plot = { x: frame.x + plotInset, y: frame.y + 50, width: frame.width - plotInset - 28, height: frame.height - 100 };
   if (props.highlightQuadrant === "topRight") nodes.push(rectPrimitive({ id: stableId(id, "quadrant-highlight"), role: "matrix-highlight", frame: { x: plot.x + plot.width / 2, y: plot.y, width: plot.width / 2, height: plot.height / 2 }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.none")) }));
   nodes.push(openLine(stableId(id, "x-axis"), plot.x, plot.y + plot.height, plot.x + plot.width, plot.y + plot.height, "matrix-axis", INK, STANDARD));
   nodes.push(openLine(stableId(id, "y-axis"), plot.x, plot.y, plot.x, plot.y + plot.height, "matrix-axis", INK, STANDARD));
@@ -647,17 +657,18 @@ function registerCore(registry) {
     component({ id: "journey", category: "relationship", role: "journey", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 960, height: 300 }, sample: { items: [{ label: "(Insert stage 1)", touchpoint: "(Insert touchpoint 1)" }, { label: "(Insert stage 2)", touchpoint: "(Insert touchpoint 2)" }, { label: "(Insert stage 3)", touchpoint: "(Insert touchpoint 3)" }, { label: "(Insert stage 4)", touchpoint: "(Insert touchpoint 4)" }], active: 3 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props, journey: true }) }) }),
     component({ id: "tree", category: "relationship", role: "tree", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert root question)", children: ["(Insert branch 1)", "(Insert branch 2)", "(Insert branch 3)", "(Insert branch 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props }) }) }),
     component({ id: "organization", category: "relationship", role: "organization", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.none", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert parent role)", children: ["(Insert role 1)", "(Insert role 2)", "(Insert role 3)", "(Insert role 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props, organization: true }) }) }),
-    component({ id: "matrix", category: "relationship", role: "matrix", tokens: ["color.componentPrimary", "color.chartSeries2", "color.surface", "color.rule", "color.ink", "color.positive", "color.caution", "color.negative", "color.onPrimary", "font.body", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 720, height: 410 }, sample: { points: [{ label: "A", x: 0.24, y: 0.35 }, { label: "B", x: 0.56, y: 0.62 }, { label: "C", x: 0.76, y: 0.82 }], highlight: 2 }, render: ({ id, frame, props }) => ({ nodes: matrixNodes({ id, frame, props }) }) }),
+    component({ id: "matrix", category: "relationship", role: "matrix", tokens: ["color.componentPrimary", "color.chartSeries2", "color.surface", "color.rule", "color.ink", "color.positive", "color.caution", "color.negative", "color.onPrimary", "font.body", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 720, height: 410 }, sample: { xAxis: { label: "Effort", minLabel: "Low", maxLabel: "High" }, yAxis: { label: "Impact", minLabel: "Low", maxLabel: "High" }, points: [{ label: "A", x: 0.24, y: 0.35 }, { label: "B", x: 0.56, y: 0.62 }, { label: "C", x: 0.76, y: 0.82 }], highlight: 2 }, render: ({ id, frame, props }) => ({ nodes: matrixNodes({ id, frame, props }) }) }),
     component({ id: "map", category: "relationship", role: "map", tokens: MAP_TOKENS, preferredSize: { width: 920, height: 440 }, sample: { geography: "world", markers: [{ label: "Americas", x: 0.2, y: 0.45, fraction: 0.75 }, { label: "Europe", x: 0.5, y: 0.34, fraction: 0.5 }, { label: "Asia", x: 0.77, y: 0.44, fraction: 0.25 }] }, render: ({ id, frame, props }) => ({ nodes: mapNodes({ id, frame, props }) }) }),
     component({ id: "funnel", category: "relationship", role: "funnel", tokens: ["color.componentPrimary", "color.chartSeries2", "color.chartSeries3", "color.chartSeries4", "color.onPrimary", "color.ink", "font.body", "type.compact", "line.hairline", "radius.small"], preferredSize: { width: 700, height: 360 }, sample: { stages: [{ label: "Market", value: 100 }, { label: "Qualified", value: 62 }, { label: "Engaged", value: 38 }, { label: "Won", value: 18 }] }, render: ({ id, frame, props, tokens = TOKENS }) => {
       const colors = [PRIMARY, token("color.chartSeries2"), token("color.chartSeries3"), token("color.chartSeries4")];
+      if (!Array.isArray(props.stages) || !props.stages.length || !(props.stages[0].value > 0) || props.stages.some(stage => !Number.isFinite(stage.value) || stage.value < 0 || stage.value > props.stages[0].value)) throw new Error("Funnel stages require non-negative values within a positive denominator");
       const max = props.stages[0].value;
       const height = frame.height / props.stages.length;
       return { nodes: props.stages.flatMap((stage, index) => {
-        const width = frame.width * (0.38 + 0.62 * stage.value / max), x = frame.x + (frame.width - width) / 2;
-        const fill = colors[index % colors.length], background = tokens[fill.tokenId].value;
-        const foreground = contrastRatio(background, tokens["color.onPrimary"].value) >= contrastRatio(background, tokens["color.ink"].value) ? WHITE : INK;
-        return [rectPrimitive({ id: stableId(id, "stage", index), role: "funnel-stage", frame: { x, y: frame.y + index * height + 3, width, height: height - 6 }, style: boxStyle(fill, fill, HAIRLINE, SMALL_RADIUS) }), textPrimitive({ id: stableId(id, "label", index), role: "funnel-label", frame: { x: x + 12, y: frame.y + index * height + 3, width: width - 24, height: height - 6 }, text: `${stage.label}  ${stage.value}`, style: textStyle(COMPACT, foreground, true, "center") })];
+        const plotWidth = frame.width * 0.6;
+        const width = plotWidth * stage.value / max, x = frame.x + (plotWidth - width) / 2;
+        const fill = colors[index % colors.length];
+        return [...(width > 0 ? [rectPrimitive({ id: stableId(id, "stage", index), role: "funnel-stage", frame: { x, y: frame.y + index * height + 3, width, height: height - 6 }, style: boxStyle(fill, fill, HAIRLINE, SMALL_RADIUS) })] : []), textPrimitive({ id: stableId(id, "label", index), role: "funnel-label", frame: { x: frame.x + plotWidth + 12, y: frame.y + index * height + 3, width: frame.width - plotWidth - 12, height: height - 6 }, text: `${stage.label}  ${stage.value}`, style: textStyle(COMPACT, INK, true, "left") })];
       }) };
     } }),
     component({ id: "connector", category: "relationship", role: "connector", tokens: ["color.componentPrimary", "color.onPrimary", "font.body", "type.label", "line.standard", "line.hairline", "icon.medium", "radius.round"], preferredSize: { width: 360, height: 90 }, sample: { label: "therefore", variant: "labelled-line" }, render: ({ id, frame, props }) => {
@@ -767,7 +778,7 @@ function registerCore(registry) {
     }
     if (definition.id === "legend") {
       const visuallyDistinctPlacements = LEGEND_PLACEMENTS.filter(placement => placement !== "inline");
-      definition.variants = Object.fromEntries(Object.keys(LEGEND_VARIANTS).flatMap(mark => visuallyDistinctPlacements.map(placement => [`${mark}-${placement}`, { props: { variant: mark, placement, items: [{ label: "Actual", state: "actual" }, { label: "Forecast", state: "forecast" }, { label: "Target", state: "actual" }] }, preferredSize: { width: 540, height: placement === "right" ? 120 : 44 } }])));
+      definition.variants = Object.fromEntries(Object.keys(LEGEND_VARIANTS).flatMap(mark => visuallyDistinctPlacements.map(placement => [`${mark}-${placement}`, { props: { variant: mark, placement, items: [{ label: "Actual", state: "actual" }, { label: "Forecast", state: "forecast" }, { label: "Target", state: "target" }] }, preferredSize: { width: 540, height: placement === "right" ? 120 : 44 } }])));
       definition.defaultVariant = "swatch-top";
       definition.resolveVariant = (props = {}) => `${props.variant ?? "swatch"}-${props.placement ?? "top"}`;
     }

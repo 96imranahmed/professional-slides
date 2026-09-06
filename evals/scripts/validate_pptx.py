@@ -160,7 +160,7 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
     if workflow_mode not in WORKFLOW_MODES:
         errors.append("workflowMode must be new_deck or existing_deck_revision")
 
-    for field in ("templateId", "deliveryMode"):
+    for field in ("templateId", "deliveryMode", "mainQuestion", "governingAnswer", "themeManifestPath", "treatmentLedgerPath"):
         if not non_empty_string(contract.get(field)):
             errors.append(f"{field} must be a non-empty string")
 
@@ -309,6 +309,8 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
             check_items(slide.get("items"), f"{location}.items")
             if slide.get("composition") != "auto" and not isinstance(slide.get("composition"), dict):
                 errors.append(f"{location}.composition must be auto or an open composition tree")
+        if not non_empty_string(slide.get("sourceRole")):
+            errors.append(f"{location}.sourceRole must be a non-empty string")
         evidence_regions = slide.get("evidenceRegions")
         if not open_composition and (isinstance(evidence_regions, bool) or not isinstance(evidence_regions, int) or evidence_regions < 0):
             errors.append(f"{location}.evidenceRegions must be a non-negative integer")
@@ -397,8 +399,8 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         source_count = contract.get("sourceSlideCount")
         if isinstance(source_count, bool) or not isinstance(source_count, int) or source_count < 1:
             errors.append("existing_deck_revision sourceSlideCount must be a positive integer")
-        elif planned_count is not None and source_count != planned_count:
-            errors.append("existing_deck_revision sourceSlideCount must equal plannedSlideCount")
+        elif planned_count is not None and source_count != planned_count and (not isinstance(approval, dict) or approval.get("dotDashApproved") is not True):
+            errors.append("existing_deck_revision page-count changes require approval.dotDashApproved")
 
     page_types = {number: slide.get("pageType") for number, slide in slide_by_number.items()}
     has_summary = "executive_synthesis" in page_types.values()
@@ -433,6 +435,7 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
     tracker = contract.get("tracker")
     governed_slides: set[int] = set()
     tracked_contract = False
+    mixed_inventory = False
     tracker_system = None
     parent_by_slide: dict[int, tuple[str, str, str]] = {}
     chapter_by_slide: dict[int, tuple[str, str]] = {}
@@ -469,6 +472,7 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
             if variant not in allowed_variants:
                 errors.append("tracker.analyticalHeader.variant is invalid for the workflow mode")
             tracked_contract = variant == "tracked"
+            mixed_inventory = variant == "mixed_as_is"
             full_state_variant = analytical_header.get("fullStateVariant")
             analytical_variant = analytical_header.get("compactStateVariant")
             if workflow_mode == "new_deck":
@@ -621,7 +625,7 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         slide = slide_by_number[number]
         location = f"slide {number}"
         header_variant = slide.get("headerVariant")
-        if workflow_mode == "existing_deck_revision":
+        if workflow_mode == "existing_deck_revision" and mixed_inventory:
             continue
         if tracked_contract:
             if header_variant != "tracked":

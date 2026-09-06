@@ -11,6 +11,8 @@ export function legendNodes({ id, frame, props }) {
   if (!LEGEND_PLACEMENTS.includes(placement)) throw new Error(`Unknown legend placement: ${placement}`);
   if (!Array.isArray(props.items) || !props.items.length) throw new Error("Legend requires at least one item");
   const items = props.items.map((item, index) => typeof item === "string" ? { label: item, colorIndex: index } : item);
+  const states = { actual: { fill: true, dash: "solid" }, forecast: { fill: false, dash: "dash" }, target: { fill: false, dash: "solid" }, scenario: { fill: false, dash: "dot" }, missing: { fill: false, dash: "solid" } };
+  if (variant === "state" && items.some(item => !Object.hasOwn(states, item.state))) throw new Error("State legend requires actual, forecast, target, scenario, or missing");
   const defaultKeyWidth = variant === "line" ? 24 : 12, keyGap = tokenValue(token("space.2")), itemGap = tokenValue(token("space.4"));
   const height = 24;
   const keyWidths = items.map((item) => {
@@ -32,12 +34,14 @@ export function legendNodes({ id, frame, props }) {
     if (!Number.isInteger(colorIndex) || colorIndex < 0 || colorIndex >= 6) throw new Error("Legend colour index must be between zero and five");
     const color = item.color ?? token(`color.chartSeries${colorIndex + 1}`);
     const stroke = item.stroke ?? color;
-    const forecast = variant === "state" && item.state === "forecast";
-    const style = { fill: forecast ? "none" : color, stroke, lineWidth: token("line.hairline"), ...(forecast ? { dash: "dash" } : {}) };
+    const state = variant === "state" ? states[item.state] : null;
+    const style = { fill: state && !state.fill ? "none" : color, stroke, lineWidth: token("line.hairline"), dash: state?.dash ?? "solid" };
     const data = { categoryKey: item.key ?? item.label, colorIndex, legendVariant: variant, placement };
-    const mark = variant === "line"
+    const mark = variant === "state" && item.state === "missing"
+      ? linePrimitive({ id: stableId(id, "key", index), role: "legend-swatch", x1: x, y1: y + height / 2, x2: x + keyWidth, y2: y + height / 2, style: { stroke, lineWidth: token("line.standard") }, data })
+      : variant === "line"
       ? linePrimitive({ id: stableId(id, "key", index), role: "legend-swatch", x1: x, y1: y + height / 2, x2: x + keyWidth, y2: y + height / 2, style: { stroke: color, lineWidth: token("line.standard"), dash: item.state === "forecast" ? "dash" : "solid" }, data })
-      : (variant === "marker" ? ellipsePrimitive : rectPrimitive)({ id: stableId(id, "key", index), role: "legend-swatch", frame: { x: x + (keyWidth - markerSize) / 2, y: y + (height - markerSize) / 2, width: markerSize, height: markerSize }, style, data: { ...data, markerSize } });
+      : (variant === "marker" || (variant === "state" && item.state === "scenario") ? ellipsePrimitive : rectPrimitive)({ id: stableId(id, "key", index), role: "legend-swatch", frame: { x: x + (keyWidth - markerSize) / 2, y: y + (height - markerSize) / 2, width: markerSize, height: markerSize }, style, data: { ...data, markerSize } });
     const label = textPrimitive({ id: stableId(id, "label", index), role: "legend-label", frame: { x: x + keyWidth + keyGap, y, width: widths[index] - keyWidth - keyGap, height }, text: item.label,
       style: { fontFamily: token("font.body"), fontSize: token("type.chartLabel"), color: token("color.ink"), align: "left", valign: "mid", wrap: false }, data: { ...data, textLayout: { lines: [item.label] } } });
     if (vertical) y += height + keyGap; else x += widths[index] + itemGap;

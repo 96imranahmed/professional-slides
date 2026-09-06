@@ -57,10 +57,11 @@ function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotati
   const bottom = 68 + bands.bottom;
   const rightInset = endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16;
   if (frame.height - bottom - top < 100) throw new Error("Chart annotation bands leave insufficient plot height; enlarge or split the exhibit");
+  if (frame.width - leftInset - rightInset < 120) throw new Error("Chart has insufficient plot width; enlarge or split the exhibit");
   return {
     x: frame.x + leftInset,
     y: frame.y + top,
-    width: Math.max(120, frame.width - leftInset - rightInset),
+    width: frame.width - leftInset - rightInset,
     height: Math.max(100, frame.height - bottom - top)
   };
 }
@@ -90,9 +91,13 @@ function topLegend({ id, frame, items, align = "right", variant = "swatch" }) {
   return legendNodes({ id, frame: { x: frame.x + 54, y: frame.y + 7, width: frame.width - 70, height: 28 }, props: { items, placement: align === "right" ? "top-right" : "top", variant } });
 }
 
-function range(values) {
-  const min = Math.min(0, ...values);
-  const max = Math.max(1, ...values);
+function range(values, includeZero) {
+  let min = Math.min(...values), max = Math.max(...values);
+  if (includeZero) { min = Math.min(0, min); max = Math.max(0, max); }
+  if (min === max) {
+    const padding = Math.abs(min) * 0.05 || 1;
+    min -= padding; max += padding;
+  }
   return { min, max, span: max - min || 1 };
 }
 
@@ -130,7 +135,7 @@ function normalizedCategoricalData(props, { seriesCount = null } = {}) {
 
 function numericBounds(values, { min, max, axis = "y", includeZero = false } = {}) {
   if (!Array.isArray(values) || !values.length || values.some(value => !Number.isFinite(value))) throw new Error(`${axis}-axis values must be finite`);
-  const computed = range(values);
+  const computed = range(values, includeZero);
   const bounds = { min: min ?? computed.min, max: max ?? computed.max };
   if (!Number.isFinite(bounds.min) || !Number.isFinite(bounds.max) || bounds.max <= bounds.min) throw new Error(`${axis}-axis maximum must be greater than its minimum`);
   if (includeZero && (bounds.min > 0 || bounds.max < 0)) throw new Error(`${axis}-axis bounds for bars must include zero`);
@@ -162,7 +167,15 @@ function normalizedHighlights(props, { categories = [], series = [], allowBar = 
   });
 }
 
-function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true } = {}) {
+function axisTickText(min, max, index, steps = 4) {
+  return String(Number((min + (max - min) * index / steps).toPrecision(6)));
+}
+
+function axisLabelWidth(bounds) {
+  return Math.max(48, ...Array.from({ length: 5 }, (_, index) => Math.ceil(measureText(axisTickText(bounds.min, bounds.max, index), 1000, { fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width)));
+}
+
+function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48 } = {}) {
   const nodes = [];
   if (showValueAxis) {
     for (let index = 0; index <= steps; index += 1) {
@@ -181,9 +194,9 @@ function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxi
       nodes.push(textPrimitive({
         id: stableId(id, "axis-label", index),
         role: "axis-label",
-        frame: { x: plot.x - 56, y: y - 12, width: 48, height: 24 },
+        frame: { x: plot.x - labelWidth - 8, y: y - 12, width: labelWidth, height: 24 },
         // Labels describe the actual tick, not a rounded neighbouring value.
-        text: String(Number((yMin + (yMax - yMin) * index / steps).toPrecision(6))),
+        text: axisTickText(yMin, yMax, index, steps),
         style: textStyle(AXIS_LABEL, SECONDARY, false, "right")
       }));
     }
@@ -449,7 +462,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
           : stacked
             ? { x: bar.x + 2, y: bar.y + (bar.height - 24) / 2, width: bar.width - 4, height: 24 }
             : value >= 0
-              ? { x: bar.x - 10, y: bar.y - 26, width: bar.width + 20, height: 24 }
+              ? { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }
               : { x: bar.x - 10, y: Math.min(plot.y + plot.height - 24, bar.y + bar.height + 2), width: bar.width + 20, height: 24 };
         nodes.push(textPrimitive({
           id: stableId(id, "value-label", item.name, category),
@@ -530,21 +543,23 @@ function lineChart({ id, frame, props, area = false }) {
   if (area && categories.length < 2) throw new Error("Area charts require at least two categories");
   const endLabels = props.directLabels === "end";
   const showLegend = !endLabels && props.legend !== false && series.length > 1;
+  const values = series.flatMap((item) => item.values);
+  const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: props.dataLabels === true });
+  const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y" });
+  const labelWidth = axisLabelWidth(bounds);
   const plot = chartFrame(frame, {
+    leftInset: showValueAxis ? labelWidth + 8 : 54,
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
     endLabels
   });
-  const values = series.flatMap((item) => item.values);
-  const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: props.dataLabels === true });
-  const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y" });
   const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
   const xScale = (index) => plot.x + (categories.length === 1 ? plot.width / 2 : plot.width * index / (categories.length - 1));
   const nodes = [
-    ...(showLegend ? topLegend({ id, frame, items: series.map((item) => item.name) }) : []),
-    ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })
+    ...(showLegend ? topLegend({ id, frame, items: series.map((item, index) => ({ label: item.name, colorIndex: props.colorIndices?.[index] ?? index })) }) : []),
+    ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth })
   ];
   const pointMap = new Map();
   const categoryMap = new Map();
@@ -647,6 +662,9 @@ function waterfall({ id, frame, props }) {
     annotationRail: props.annotationRail,
     centerPlot: !showValueAxis
   });
+  // Reserve a label row below negative endpoints, above category labels.
+  plot.height -= 30;
+  if (plot.height < 100) throw new Error("Waterfall needs room for endpoint labels");
   const running = [];
   let total = 0;
   props.values.forEach((value, index) => {
@@ -672,13 +690,13 @@ function waterfall({ id, frame, props }) {
     const bar = { x: plot.x + index * span + span * 0.2, y: yScale(top), width: span * 0.6, height: Math.max(2, yScale(bottom) - yScale(top)) };
     const fill = isTotal ? PRIMARY : value >= 0 ? token("color.chartSeries2") : token("color.negative");
     nodes.push(rectPrimitive({ id: stableId(id, "bar", category), role: "chart-mark", frame: bar, style: fillStyle(fill) }));
-    nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: bar.y - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`, style: textStyle(CHART_LABEL, INK, true, "center") }));
+    nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`, style: textStyle(CHART_LABEL, INK, true, "center") }));
     if (index > 0) nodes.push(linePrimitive({ id: stableId(id, "connector", index), role: "chart-connector", x1: plot.x + (index - 1) * span + span * 0.8, y1: yScale(previous), x2: plot.x + index * span + span * 0.2, y2: yScale(previous), style: lineStyle(SECONDARY, token("line.hairline"), "dash") }));
     const point = { x: bar.x + bar.width / 2, y: bar.y, changeX: bar.x + bar.width / 2, changeY: bar.y - 38, leaderX: bar.x + bar.width };
     pointMap.set(`value:${category}`, point);
     pointMap.set(`category:${category}`, point);
     categoryMap.set(category, { x: bar.x, y: plot.y, width: bar.width, height: plot.height });
-    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * span, y: plot.y + plot.height + 8, width: span, height: 28 }, text: category, style: textStyle(AXIS_LABEL) }));
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * span, y: plot.y + plot.height + 38, width: span, height: 28 }, text: category, style: textStyle(AXIS_LABEL) }));
     previous = end;
   });
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale });

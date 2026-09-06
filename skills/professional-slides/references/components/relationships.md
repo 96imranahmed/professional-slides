@@ -39,7 +39,7 @@ The action title states the governing branch logic and resulting consequence. It
 
 The native implementation lives in [`runtime/insight-tree-table.mjs`](../../runtime/insight-tree-table.mjs). HTML and PowerPoint receive the same editable rectangles, text, orthogonal connector lines, disc chevrons, and terminal arrowheads.
 
-For `roadmap`, use equal-width bands for ordinal or maturity stages; use proportional widths only when elapsed time is the declared encoding, and record the relevant `period` or `maturity` on each stage. For `timeline`, normalize dates to the declared domain before calculating event positions. For `matrix`, declare axis labels, low-to-high direction, and domain. The [map owner](maps.md) defines authorized geographies, crop-relative coordinates, country anchors, and analytical region caveats. For `funnel`, calculate every width and conversion from the same denominator contract.
+For `roadmap`, use equal-width bands for ordinal or maturity stages; use proportional widths only when elapsed time is the declared encoding, and record the relevant `period` or `maturity` on each stage. For `timeline`, normalize dates to the declared domain before calculating event positions. For `matrix`, supply `xAxis` and `yAxis`, each with `label`, `minLabel`, and `maxLabel`. Coordinates run from 0 to 1, left to right and bottom to top; the rendered labels state both domains and directions. The [map owner](maps.md) defines authorized geographies, crop-relative coordinates, country anchors, and analytical region caveats. For `funnel`, calculate every width from the first stage denominator. Zero values have no bar; a separate label column preserves legibility without inflating narrow stages.
 
 ## Construction
 

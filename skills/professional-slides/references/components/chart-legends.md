@@ -51,3 +51,5 @@ Use the canonical [scene-to-native chart mapping](../tools/css-to-native-mapper.
 ## Acceptance check
 
 Verify each key maps to one visible encoding and follows chart order. Actual and forecast remain distinct without colour. Peer exhibits share one mapping. Legends do not shift comparable plots. A default `top-right` legend remains one row above the plot and ends on the chart region's right guide. Every label is readable in the final render.
+
+State legends require an explicit `state`: `actual` uses a filled square, `forecast` a dashed open square, `target` a solid open square, `scenario` a dotted open circle, and `missing` a short horizontal line. Unknown states reject.

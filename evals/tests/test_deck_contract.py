@@ -31,6 +31,7 @@ def slide(number, page_type, chapter_id=None, header="structural", tracker_label
         "dotId": f"D{number:02d}",
         "pageType": page_type,
         "title": f"Slide {number} advances the decision",
+        "sourceRole": "Supporting evidence",
         "communicationJob": f"Perform narrative job {number}",
         "chapterId": chapter_id,
         "hypothesisIds": ["NAV"] if page_type in {"cover", "contents_tracker", "chapter_transition"} else ["H1"],
@@ -96,6 +97,10 @@ class DeckContractTests(unittest.TestCase):
     def new_dd(self):
         return {
             "schemaVersion": 1,
+            "mainQuestion": "Should we proceed?",
+            "governingAnswer": "Proceed with measured gates",
+            "themeManifestPath": "theme.json",
+            "treatmentLedgerPath": "treatment.json",
             "workflowMode": "new_deck",
             "templateId": "commercial-due-diligence",
             "deliveryMode": "executive_pre_read",
@@ -145,6 +150,10 @@ class DeckContractTests(unittest.TestCase):
     def existing_without_summary(self):
         return {
             "schemaVersion": 1,
+            "mainQuestion": "Should we proceed?",
+            "governingAnswer": "Proceed with measured gates",
+            "themeManifestPath": "theme.json",
+            "treatmentLedgerPath": "treatment.json",
             "workflowMode": "existing_deck_revision",
             "templateId": "custom",
             "deliveryMode": "executive_presentation",
@@ -317,7 +326,31 @@ class DeckContractTests(unittest.TestCase):
         contract = self.existing_without_summary()
         contract["sourceSlideCount"] = 3
         errors = validator.validate_contract(contract)
-        self.assertIn("existing_deck_revision sourceSlideCount must equal plannedSlideCount", errors)
+        self.assertIn("existing_deck_revision page-count changes require approval.dotDashApproved", errors)
+
+    def test_approved_existing_deck_can_change_page_count(self):
+        contract = self.existing_without_summary()
+        contract["sourceSlideCount"] = 3
+        contract["approval"]["dotDashApproved"] = True
+        self.assertEqual(validator.validate_contract(contract), [])
+
+    def test_existing_target_enforces_selected_tracker(self):
+        contract = self.new_dd()
+        contract.update(workflowMode="existing_deck_revision", sourceSlideCount=4)
+        contract["approval"]["asIsDotDashComplete"] = True
+        contract["slides"][-1]["trackerLabel"] = "Wrong label"
+        self.assertTrue(any("exact declared chapter label" in e for e in validator.validate_contract(contract)))
+        contract["slides"][-1]["headerVariant"] = "untracked"
+        self.assertTrue(any("tracked header variant" in e for e in validator.validate_contract(contract)))
+
+    def test_required_story_and_provenance_fields(self):
+        for field in ("mainQuestion", "governingAnswer", "themeManifestPath", "treatmentLedgerPath"):
+            contract = self.new_dd()
+            del contract[field]
+            self.assertTrue(any(field in e for e in validator.validate_contract(contract)), field)
+        contract = self.new_dd()
+        del contract["slides"][0]["sourceRole"]
+        self.assertTrue(any("sourceRole" in e for e in validator.validate_contract(contract)))
 
     def test_existing_missing_summary_requires_non_forcing_recommendation(self):
         contract = self.existing_without_summary()

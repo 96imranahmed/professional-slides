@@ -270,6 +270,8 @@ export function goldenFixtureSpecs() {
       children: [
         at("legend", "legend", { x: 490, y: 154, width: 700, height: 34 }, { items: ["Short-term / quick", "Medium-term / gradual", "Long-term / transformational"] }),
         at("matrix", "matrix", { x: 90, y: 188, width: 1100, height: 420 }, {
+          xAxis: { label: "Effort", minLabel: "Low", maxLabel: "High" },
+          yAxis: { label: "Impact", minLabel: "Low", maxLabel: "High" },
           bubbles: true,
           highlightQuadrant: "topRight",
           points: [
