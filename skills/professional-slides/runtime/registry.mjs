@@ -203,11 +203,33 @@ function contentRailInsets(props = {}) {
 }
 
 function resolveChartTitleVariant(props = {}) {
+  assertChartTitleCopy(props);
   if (props.unit !== undefined && (typeof props.unit !== "string" || !props.unit.trim())) throw new Error("Chart title unit must be nonempty text");
   const variant = props.variant ?? "underlined";
   if (!["underlined", "unit"].includes(variant)) throw new Error(`Unknown chart-title variant: ${variant}`);
   if (variant === "unit" && (typeof props.unit !== "string" || !props.unit.trim())) throw new Error("Chart title unit variant requires a unit");
   return variant;
+}
+// Chart titles identify the measure, population and period. Values and changes
+// belong on chart marks/annotations, never in this shared title band. Keep this
+// fail-closed: numeric context must use an unambiguous period or unit spelling.
+function assertChartTitleCopy(props = {}) {
+  for (const [field, value] of [["heading", props.heading || props.text], ["unit", props.unit]]) {
+    if (typeof value !== "string") continue;
+    let copy = value.normalize("NFKC");
+    const year = "(?:19|20)\\d{2}";
+    const period = `(?:FY\\s*${year}|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
+    copy = copy.replace(new RegExp(`\\b${period}\\b(?![\\d.%])`, "gi"), "period");
+    copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
+    copy = copy.replace(new RegExp(`([,(]\\s*)${year}(?=\\s*(?:$|[,) ;]))`, "g"), "$1period");
+    if (field === "unit") {
+      // Scale denominators describe units, not observed values.
+      copy = copy.replace(/\bper\s+(?:100[,. ]?000|1[,. ]?000|100|1)\b/gi, "per population");
+    }
+    if (/\p{N}/u.test(copy) || /\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|doubled|tripled|halved)\b/i.test(copy)) {
+      throw new Error(`Chart title ${field} must not contain statistics or chart results: ${JSON.stringify(value)}. Use a descriptive measure/population heading and explicit period; move values and changes to chart labels or annotations.`);
+    }
+  }
 }
 function chartTitleLayout(frame, props) {
   const variant = resolveChartTitleVariant(props);

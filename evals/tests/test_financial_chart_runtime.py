@@ -3,6 +3,37 @@ from test_source_structure import run_node
 
 
 class FinancialChartRuntimeTests(unittest.TestCase):
+    def test_chart_titles_reject_statistics_across_all_shared_entry_points(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const frame={x:60,y:60,width:1000,height:500};
+const title=REGISTRY.get('chart-title');
+const data={categories:['2024','2025'],series:[{name:'Homicides',values:[382,305]}]};
+const invalid=['NYPD: 382 to 305','SF: 35 to 28','Decline of −20.2%','Revenue $1.2bn','Share 1/3','Rate 35 per 100,000','NYPD: 2025','Revenue in 2025: 305','Revenue, 2025.5','Twenty percent decline','Revenue doubled','SF: ３５ to ２８'];
+for(const heading of invalid) {
+ assert.throws(()=>title.measureContent({frame,props:{heading}}),/must not contain statistics/);
+ assert.throws(()=>title.render({id:'title',frame,props:{heading}}),/must not contain statistics/);
+ assert.throws(()=>title.render({id:'title',frame,props:{text:heading}}),/must not contain statistics/);
+ assert.throws(()=>REGISTRY.get('chart.column').render({id:'chart',frame,props:{...data,heading}}),/must not contain statistics/);
+ const charts=[heading,'SF reported homicides'].map(heading=>({heading,component:'chart.column',props:data}));
+ assert.throws(()=>REGISTRY.get('chart-group').render({id:'group',frame,props:{charts}}),/must not contain statistics/);
+}
+for(const heading of ['NYPD reported homicides','Reported homicides in 2025','Revenue, 2025','Revenue (2025)','Revenue FY2025','Revenue Q1 2025','Revenue 2024–2025']) {
+ assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading,unit:'index'}}));
+}
+for(const unit of ['%','$B','USD millions, 2026','homicides per 100,000']) {
+ assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'Reported homicides',unit}}));
+}
+for(const unit of ['index, 382 to 305','−20.2%','35 per 100,000']) {
+ assert.throws(()=>title.render({id:'title',frame,props:{heading:'Reported homicides',unit}}),/must not contain statistics/);
+}
+// The action title remains free to state a quantified conclusion.
+assert.doesNotThrow(()=>REGISTRY.get('section-heading').render({id:'section',frame,props:{heading:'Homicides fell 20%'}}));
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result['accepted'])
+
     def test_growth_bracket_stays_near_small_marks_on_a_shared_scale(self):
         result = run_node("""
 import assert from 'node:assert/strict';

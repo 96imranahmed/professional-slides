@@ -57,6 +57,8 @@ Set `mode` to `dark` (default: ink background, on-primary text) or `light` (canv
 
 ## Chart titles
 
+Chart titles identify the measure, population, and period; they must never repeat chart statistics, observed values, ranges of results, or calculated changes. For example, use “NYPD reported homicides” rather than “NYPD: 382 to 305”; put values and percentage changes on marks or annotations. This is a hard runtime rejection in the shared title owner, covering standalone titles, embedded chart headings, and chart-group children, including their unit text. Slide-level action titles are outside this rule. Numeric context must be explicit: `in 2025`, `FY2025`, `Q1 2025`, `2024–2025`, or a comma/parenthesized year; units can include population denominators such as `per 100,000`. Other numeric copy (including spelled-out counts and doubled/tripled/halved results) rejects before rendering. Do not disguise statistics as periods or units.
+
 `chart-title` is registered in [`runtime/registry.mjs`](../../runtime/registry.mjs). Graph headings share the section-heading font, colour, level, rule spacing, and measured wrapping. Inputs are `heading`, optional `unit`, and optional `variant`; `headerBandHeight` aligns wrapped peers in a coordinated group.
 
 - `underlined` is the default. Its rule sits `space.2` below the complete measured title band. Retain it over charts, including headings with units. A neighbouring non-chart region does not inherit this rule; use an unruled heading or no heading when appropriate.

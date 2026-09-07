@@ -72,7 +72,7 @@ export function registerChartGroup(registry) {
         if (chart.heading) nodes.push(...title.render({ id: `${childId}-heading`, frame: { x, y, width: span, height: headingHeight }, props: { ...titleProps(chart), headerBandHeight }, tokens }).nodes);
         const part = ["chart.pie", "chart.donut"].includes(chart.component);
         const localKeys = keysFor(chart) || [];
-        const sharedProps = mode === "shared" ? { legend: false, ...(part ? {variant:"shared-legend", outsideLabels:false, categoryKeys:keys} : {colorIndices:localKeys.map(key => keys.indexOf(key))}) } : localKeys.length <= 1 ? {legend:false,...(part?{variant:"shared-legend",outsideLabels:false,categoryKeys:localKeys}:{})} : {};
+        const sharedProps = mode === "shared" ? { legend: false, ...(part ? {variant:"shared-legend", outsideLabels:false, categoryKeys:keys} : {colorIndices:localKeys.map(key => keys.indexOf(key))}) } : localKeys.length <= 1 ? {legend:false,...(part?{variant:"shared-legend",outsideLabels:false,categoryKeys:localKeys}:{})} : part ? {variant:"outside-labels",outsideLabels:true,legend:false} : {};
         const rendered = registry.get(chart.component).render({ id: childId, frame: { x, y: y + headingHeight, width: span, height: cellHeight - headingHeight }, props: { ...chart.props, ...sharedProps }, tokens });
         for (const node of rendered.nodes) {
           node.data = { ...node.data, chartGroup: id, childChart: childId };
@@ -86,7 +86,7 @@ export function registerChartGroup(registry) {
   const definition = registry.get("chart-group");
   definition.variants = {
     paired: {},
-    "four-way": { preferredSize: { width: 1160, height: 570 }, props: { charts: [1,2,3,4].map(i => ({ heading: `Trend ${i}`, component: "chart.line", props: { categories: ["2023", "2024", "2025"], series: [{ name: "Observed", values: [20+i*5, 30+i*3, 40+i*6] }] } })) } },
+    "four-way": { preferredSize: { width: 1160, height: 570 }, props: { charts: [1,2,3,4].map(i => ({ heading: `Trend ${String.fromCharCode(64 + i)}`, component: "chart.line", props: { categories: ["2023", "2024", "2025"], series: [{ name: "Observed", values: [20+i*5, 30+i*3, 40+i*6] }] } })) } },
     triple: { props: { charts: [...definition.sample.charts, { heading: "Target mix", component: "chart.pie", props: { labels: ["Growth", "New", "Core"], values: [30, 30, 40] } }] } }
   };
   definition.examples = {

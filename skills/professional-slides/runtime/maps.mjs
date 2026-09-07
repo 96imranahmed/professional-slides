@@ -118,14 +118,23 @@ function customGeography(value) {
     const geometry = feature.geometry;
     if (!["Polygon", "MultiPolygon"].includes(geometry?.type)) throw new Error("Custom maps support Polygon and MultiPolygon features");
     if (!Array.isArray(geometry.coordinates)) throw new Error("Custom geometry requires coordinates");
-    const polygons = geometry.type === "Polygon" ? geometry.coordinates : geometry.coordinates.flat();
+    const groups = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+    if (!groups.length || groups.some(group => !Array.isArray(group) || !group.length)) throw new Error("Custom polygon has no rings");
+    const polygons = groups.flat();
     if (!Array.isArray(polygons) || !polygons.length) throw new Error("Custom feature has no rings");
     for (const ring of polygons) {
-      if (!Array.isArray(ring) || ring.length < 4 || ring.some(point => !Array.isArray(point) || point.length !== 2 || !point.every(Number.isFinite) || Math.abs(point[0]) > 180 || Math.abs(point[1]) > 90)) throw new Error("Custom rings require closed WGS84 longitude/latitude coordinates");
+      if (!Array.isArray(ring) || ring.length < 4 || ring.some(point => !Array.isArray(point) || point.length < 2 || !point.every(Number.isFinite) || Math.abs(point[0]) > 180 || Math.abs(point[1]) > 90)) throw new Error("Custom rings require closed WGS84 longitude/latitude coordinates");
       if (ring[0][0] !== ring.at(-1)[0] || ring[0][1] !== ring.at(-1)[1]) throw new Error("Custom polygon ring is not closed");
       if (ring.some((point, i) => i && Math.abs(point[0] - ring[i-1][0]) > 180)) throw new Error("Split antimeridian-crossing custom geometry before import");
     }
-    return { id: featureId, name: feature.properties?.name || featureId, polygons, source };
+    // Ring order determines holes even when the input winding is noncanonical.
+    const oriented = groups.flatMap(group => group.map((ring, index) => {
+      const xy = ring.map(point => point.slice(0, 2));
+      const area = xy.slice(1).reduce((sum, point, i) => sum + xy[i][0] * point[1] - point[0] * xy[i][1], 0);
+      if (!area) throw new Error("Custom polygon ring has zero area");
+      return (area > 0) === (index === 0) ? xy : xy.reverse();
+    }));
+    return { id: featureId, name: feature.properties?.name || featureId, polygons: oriented, source };
   });
   const points = countries.flatMap(c => c.polygons.flat());
   const [minX,minY,maxX,maxY] = points.reduce((b,p) => [Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);

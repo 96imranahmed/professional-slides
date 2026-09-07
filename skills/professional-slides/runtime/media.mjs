@@ -46,6 +46,38 @@ const T = [
   "radius.none",
 ];
 
+export function bitmapDimensions(dataUri) {
+  const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(dataUri || "");
+  if (!match) throw new Error("Media requires embedded PNG/JPEG");
+  const bytes = Buffer.from(match[2], "base64");
+  if (match[1] === "png") {
+    if (bytes.length < 33 || bytes.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a" || bytes.readUInt32BE(8) !== 13 || bytes.toString("ascii", 12, 16) !== "IHDR") throw new Error("Invalid PNG header");
+    const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20);
+    if (!width || !height) throw new Error("Invalid PNG dimensions");
+    return { width, height };
+  }
+  if (bytes.length < 4 || bytes.readUInt16BE(0) !== 0xffd8) throw new Error("Invalid JPEG header");
+  let offset = 2;
+  while (offset < bytes.length) {
+    if (bytes[offset++] !== 0xff) throw new Error("Invalid JPEG marker");
+    while (bytes[offset] === 0xff) offset++;
+    const marker = bytes[offset++];
+    if (marker === 0xd9 || marker === 0xda) break;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > bytes.length) break;
+    const length = bytes.readUInt16BE(offset);
+    if (length < 2 || offset + length > bytes.length) throw new Error("Truncated JPEG segment");
+    if ([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf].includes(marker)) {
+      if (length < 8) throw new Error("Invalid JPEG frame");
+      const height = bytes.readUInt16BE(offset + 3), width = bytes.readUInt16BE(offset + 5);
+      if (!width || !height) throw new Error("Invalid JPEG dimensions");
+      return { width, height };
+    }
+    offset += length;
+  }
+  throw new Error("JPEG has no dimensions frame");
+}
+
 export function mediaNode({ id, frame, props, role = "image" }) {
   if (
     !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(
@@ -62,6 +94,9 @@ export function mediaNode({ id, frame, props, role = "image" }) {
     !Number.isFinite(props.width + props.height)
   )
     throw new Error("Media requires positive intrinsic width and height");
+  const intrinsic = bitmapDimensions(props.dataUri);
+  if (props.width !== intrinsic.width || props.height !== intrinsic.height)
+    throw new Error("Media intrinsic dimensions do not match the bitmap header");
   const scale = Math.min(
     frame.width / props.width,
     frame.height / props.height,

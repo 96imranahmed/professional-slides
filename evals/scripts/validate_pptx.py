@@ -87,7 +87,7 @@ REGISTERED_TEMPLATE_IDS = {
 }
 NEW_DECK_VISUAL_MODES = {"clean-native-standard", "reference-led", "custom-user-directed"}
 NEW_DECK_TRACKER_SYSTEMS = {"none", "standard-chapter", "hierarchical-segmented"}
-FULL_STATE_TRACKER_VARIANTS = {"sequential-circles", "split-contents", "none"}
+FULL_STATE_TRACKER_VARIANTS = {"sequential-circles", "split-contents", "text-agenda", "none"}
 ANALYTICAL_TRACKER_VARIANTS = {"compact-number-strip", "compact-label", "none"}
 CANONICAL_LAYOUTS = {
     "single-dominant-exhibit",

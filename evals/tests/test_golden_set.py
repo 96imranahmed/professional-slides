@@ -78,7 +78,7 @@ const standards=specs.filter(spec=>spec.kind==='standard');
 const chartFixtures=specs.filter(spec=>['chart','variant','board'].includes(spec.kind)&&REGISTRY.get(spec.target)?.category==='chart');
 const guidedExamples=specs.filter(spec=>spec.example&&(REGISTRY.get(spec.target)?.category==='chart'||spec.target==='chart-group'));
 const hasSquare=text=>String(text||'').includes(String.fromCharCode(91))||String(text||'').includes(String.fromCharCode(93));
-assert.equal(standards.length,25);
+assert.equal(standards.length,27);
 assert.ok(guidedExamples.length>=10);
 assert.ok(standards.every(hasGuidance));
 assert.ok(chartFixtures.every(hasGuidance));
@@ -99,7 +99,7 @@ assert.ok(group.guidance?.useWhen&&group.guidance?.why&&group.guidance?.actionTi
 console.log(JSON.stringify({accepted:true,slides:deck.slides.length,standards:standards.length,chartFixtures:chartFixtures.length,guidedExamples:guidedExamples.length,manifestCharts:manifestCharts.length}));
 """)
         self.assertTrue(result["accepted"])
-        self.assertEqual(result["standards"], 25)
+        self.assertEqual(result["standards"], 27)
 
     def test_pptx_package_has_no_phantom_masters_and_preserves_font_roles(self):
         result = run_node("""
@@ -256,7 +256,7 @@ assert.ok(audit.slides<=210);
 console.log(JSON.stringify(audit));
 """)
         self.assertEqual(result["components"], 63)
-        self.assertEqual(result["standards"], 25)
+        self.assertEqual(result["standards"], 27)
 
     def test_pie_variants_are_centered_and_category_labels_do_not_duplicate_legend(self):
         result = run_node("""

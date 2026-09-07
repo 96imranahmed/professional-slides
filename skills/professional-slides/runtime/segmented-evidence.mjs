@@ -17,6 +17,7 @@ const TOKENS = [
   "color.onPrimary",
   "color.componentPrimary",
   "color.chartSeries3",
+  "color.chartSeries2",
   "color.surfaceMuted",
   "color.rule",
   "line.hairline",
@@ -357,7 +358,7 @@ export function registerSegmentedEvidence(registry) {
     const marks = result.nodes.filter((n) => n.role === "chart-mark");
     segments.forEach((s, i) => {
       const fill =
-        i === segments.length - 1 ? "color.chartSeries3" : "color.ink";
+        segments.length === 2 ? ["color.ink", "color.chartSeries3"][i] : ["color.ink", "color.chartSeries2", "color.chartSeries3"][i];
       const group = marks.filter((n) => s.categories.includes(n.data.category));
       if (group.length !== s.categories.length)
         throw new Error("Cannot align segment to chart marks");

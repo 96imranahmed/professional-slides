@@ -332,7 +332,7 @@ function renderBands({ id, frame, horizons }) {
     nodes.push(rectPrimitive({ id: stableId(id,h.id,"band"), role:"horizon-band", frame:{x,y:bottom-height,width,height},style:{fill,stroke:"none",radius:token("radius.none")},data:{horizonId:h.id,order:i+1,conceptual:true} }));
     nodes.push(measuredTextNode({id:stableId(id,h.id,"label"),role:"horizon-label",frame:{x:x+12,y:bottom-height,width:width-24,height},text:h.label,style:textStyle(HEADING,color,true,"center","middle")}));
     nodes.push(measuredTextNode({id:stableId(id,h.id,"title"),role:"horizon-title",frame:{x,y:bottom+20,width,height:48},text:h.title,style:textStyle(HEADING,INK,true)}));
-    const text = [h.timeframe, h.description, ...h.details.map(d=>`${d.label}: ${d.value}`)].filter(Boolean).join("\n");
+    const text = [h.timeframe, h.description, h.summary, ...h.details.map(d=>`${d.label}: ${d.value}`)].filter(Boolean).join("\n");
     nodes.push(measuredTextNode({id:stableId(id,h.id,"body"),role:"horizon-description",frame:{x,y:bottom+76,width,height:frame.y+frame.height-bottom-76},text,style:textStyle()}));
   });
   return nodes;

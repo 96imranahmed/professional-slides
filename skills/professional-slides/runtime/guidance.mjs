@@ -53,6 +53,8 @@ export const STANDARD_SLIDE_GUIDANCE = Object.freeze({
   "golden-executive-summary": entry("summarizing a developed argument for an executive audience", "thematic sections preserve evidence, implication and conditions while one close states the recommendation", "use Executive summary; each internal theme heading should state a substantive conclusion"),
   "golden-table-insight-category-bullets": entry("comparing developed qualitative evidence and closing with one synthesis", "the table supports row-by-row reasoning while the insight states the governing consequence", "state the cross-row pattern that supports the synthesis"),
   "golden-table-insight-bar-columns": entry("combining qualitative comparison with in-cell quantitative bars and one synthesis", "the table keeps scale and explanatory evidence in the same scan path", "state the quantitative ranking and the qualification that changes its interpretation"),
+  "golden-tracker-text-agenda-overview": SLIDE_TYPE_GUIDANCE["tracker-page"],
+  "golden-tracker-text-agenda-progress": SLIDE_TYPE_GUIDANCE["tracker-page"],
   "golden-tracker-sequential-progress": SLIDE_TYPE_GUIDANCE["tracker-page"],
   "golden-tracker-number-strip-content": entry("using a compact numbered tracker on a page within a tracked section", "the marker preserves orientation without competing with the analytical title", "state the page answer; do not repeat the selected section label"),
   "golden-tracker-split-progress": SLIDE_TYPE_GUIDANCE["tracker-page"],

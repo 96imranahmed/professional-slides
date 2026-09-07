@@ -82,6 +82,8 @@ function trackerStandardSpecs() {
     target: "tracker-label", kind: "standard"
   });
   return [
+    full("golden-tracker-text-agenda-overview", { layout: "text-agenda", selectedId: null }, 3),
+    full("golden-tracker-text-agenda-progress", { layout: "text-agenda" }, 4),
     full("golden-tracker-sequential-progress", { title: "Contents", layout: "sequential-circles", mode: "light" }, 3),
     content("golden-tracker-number-strip-content", "compact-number-strip", 4, "(Insert action title)"),
     full("golden-tracker-split-progress", { parentTitle: "Section A", layout: "split-contents", density: "regular", mode: "light" }, 5),

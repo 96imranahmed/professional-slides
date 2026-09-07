@@ -13,8 +13,16 @@ const response = await fetch(config.url, {
 if (!response.ok)
   throw new Error(`Geography download failed: ${response.status}`);
 const bytes = Buffer.from(await response.arrayBuffer());
-await fs.writeFile(
-  outputPath,
-  JSON.stringify(importGeography(bytes, config), null, 2) + "\n",
-  { flag: "wx" },
-);
+const result = importGeography(bytes, config);
+const sourcePath = `${outputPath}.source.geojson`;
+// Exclusive creation keeps existing evidence intact and prevents overwrites.
+const sourceFile = await fs.open(sourcePath, "wx");
+try {
+  await sourceFile.writeFile(bytes);
+  await fs.writeFile(outputPath, JSON.stringify(result, null, 2) + "\n", { flag: "wx" });
+} catch (error) {
+  await fs.unlink(sourcePath);
+  throw error;
+} finally {
+  await sourceFile.close();
+}
