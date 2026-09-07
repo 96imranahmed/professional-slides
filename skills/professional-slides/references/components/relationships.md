@@ -19,6 +19,8 @@ Relationship components show order, dependency, hierarchy, progression, position
 
 Choose the component from the relationship the audience must decode. Do not use a process for unordered peers, a roadmap without progression, a tree without parent-child logic, or a funnel when stages do not share a valid population.
 
+The runtime `process` and process-style `roadmap` accept stage objects with `label` and optional `period`, `maturity`, and short `detail`. Each supplied field is rendered on its own line and measured at the stage width. Roadmap labels sit inside their stage bands, above the band fill in paint order; empty decorative bands must not cover or detach from the stage copy. A stage that cannot fit its complete text rejects rather than clipping or shrinking it. Use the existing `wave-columns` roadmap for developed activity and deliverable lists. The process-style roadmap uses equal ordinal spacing; its duration labels do not make the bands proportional to elapsed time.
+
 ## Tree-based insight and implication tables
 
 Use `insight-tree-table` when one root finding branches through named drivers into leaf evidence and every leaf needs an aligned interpretation or implication. The tree is the evidence structure; the adjacent fields are not independent tables. Use a flat analytical table when rows do not share parent-child logic, and use the standalone `tree` when the leaf-level interpretation does not need to remain row-aligned.
@@ -57,7 +59,7 @@ The relationship owners consume these complete theme interfaces; do not add loca
 
 | Component family | Consumed custom properties |
 | --- | --- |
-| `process`, `timeline`, `journey` | `--component-primary`, `--surface-1`, `--on-primary`, `--ink`, `--text-secondary`, `--font-body`, `--type-compact`, `--type-label`, `--line-standard`, `--line-hairline`, `--radius-round` |
+| `process`, `timeline`, `journey` | `--component-primary`, `--surface-1`, `--on-primary`, `--ink`, `--text-secondary`, `--font-body`, `--type-compact`, `--type-label`, `--space-2`, `--line-standard`, `--line-hairline`, `--radius-round` |
 | `roadmap` | the process properties plus `--component-primary-tint`, `--surface-2`, `--rule`, `--type-heading`, `--radius-small` |
 | `tree`, `organization` | `--component-primary`, `--component-primary-tint`, `--surface-1`, `--surface-2`, `--rule`, `--on-primary`, `--ink`, `--text-secondary`, `--font-body`, `--type-compact`, `--line-hairline`, `--line-standard`, `--radius-none`, `--radius-small` |
 | `matrix` | `--component-primary`, `--chart-series-2`, `--surface-1`, `--rule`, `--ink`, `--status-positive`, `--status-caution`, `--status-negative`, `--on-primary`, `--font-body`, `--type-label`, `--line-hairline`, `--line-standard`, `--radius-none`, `--radius-round` |

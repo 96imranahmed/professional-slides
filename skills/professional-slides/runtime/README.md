@@ -24,7 +24,7 @@ The root can be any nested combination of:
 - `section({ heading, treatment, composition })`
 - `component({ component, props })`
 
-Sizes may be fixed pixels, `fill`, `hug`, fractional `{ fr: n }`, or percentage `{ percent: n }`. `hug` is resolved recursively from nested content, and the compiler rejects track, cross-axis, absolute, overlay, and final-scene overflow instead of silently clipping it. Only the native adapter converts pixels to inches. A section accepts another composition tree, so it can contain any number or arrangement of charts, tables, text, processes, or nested sections. No fixed page-level region taxonomy is required.
+Sizes may be fixed pixels, `fill`, `hug`, fractional `{ fr: n }`, or percentage `{ percent: n }`. `hug` height measures authored content at the allocated width through the component's intrinsic or content measurement, including nested section headings and padding. Components without a content measure retain their preferred-size fallback. Row and grid widths resolve before wrapped heights. The compiler rejects track, cross-axis, absolute, overlay, and final-scene overflow instead of silently clipping it. Only the native adapter converts pixels to inches. A section accepts another composition tree, so it can contain any number or arrangement of charts, tables, text, processes, or nested sections. No fixed page-level region taxonomy is required.
 
 ## Content planning
 

@@ -23,6 +23,9 @@ const cases = {
   table_own_bullet:[cell(),bullet()],
   table_wrong_row:[cell(),bullet(1)],
   table_backing_hides_bullet:[bullet(),cell()],
+  roadmap_own_label:[box('band','roadmap-phase',{x:90,y:90,width:300,height:100}),text('label',{role:'process-label'})],
+  roadmap_band_overpaints_label:[text('label',{role:'process-label'}),box('band','roadmap-phase',{x:90,y:90,width:300,height:100})],
+  roadmap_label_outside_band:[box('band','roadmap-phase',{x:140,y:90,width:300,height:100}),text('label',{role:'process-label'})],
   text_text:[text('a'),text('b')],
   text_rule:[text('a'),line('b',113)],
   clipped_text:[text('a',{frame:{...frame,width:80,height:24},text:'This heading wraps across multiple lines'})],
@@ -53,9 +56,9 @@ for (const [id,nodes] of Object.entries(cases)) {
 await browser.close();
 console.log(JSON.stringify(output));
 ''')
-        for case in ["text_text", "text_rule", "clipped_text", "shape_shape", "unrelated_container", "container_does_not_excuse_text_collision", "annotation_crossing_label", "unequal_header_gap", "native_backing_hides_text", "foreign_surface", "foreign_tree_endpoint", "stroked_shape", "table_wrong_row", "table_backing_hides_bullet"]:
+        for case in ["text_text", "text_rule", "clipped_text", "shape_shape", "unrelated_container", "container_does_not_excuse_text_collision", "annotation_crossing_label", "unequal_header_gap", "native_backing_hides_text", "foreign_surface", "foreign_tree_endpoint", "stroked_shape", "table_wrong_row", "table_backing_hides_bullet", "roadmap_band_overpaints_label", "roadmap_label_outside_band"]:
             self.assertFalse(results[case]["accepted"], case)
-        for case in ["separated", "surface_and_own_text", "nested_surface", "marker_and_cue", "masked_grid", "table_own_bullet", "own_tree_endpoint"]:
+        for case in ["separated", "surface_and_own_text", "nested_surface", "marker_and_cue", "masked_grid", "table_own_bullet", "own_tree_endpoint", "roadmap_own_label"]:
             self.assertTrue(results[case]["accepted"], case)
         self.assertGreater(results["clipped_text"]["overflow"], 0)
 

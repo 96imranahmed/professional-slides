@@ -58,7 +58,17 @@ Every chart must define:
 - visible source plus calculation provenance;
 - editability and fallback policy for each target platform.
 
-Compute and reconcile the result before designing the visual. The visible data, labels, title, and source ledger must agree after rounding.
+Compute and reconcile the result before designing the visual. The visible data, labels, title, and source ledger must agree on measurement basis and reported precision, following the rules below.
+
+## Reported precision and scenario consistency
+
+Preserve source-reported values separately from derived values. Calculate from unrounded inputs when available and round only for display. When the source provides independently rounded parts and totals, retain the published values and a concise rounding qualification instead of altering a part to force equality. A reported percentage change calculated from unavailable unrounded inputs must not be replaced with a different percentage calculated from rounded display values.
+
+Check the arithmetic before selecting an additive encoding. A waterfall must reconcile; unreconciled source figures belong in a table or comparison until the basis is resolved. A supplied total that disagrees materially with its stated formula is a source conflict, not a rounding adjustment: show the reported figure, identify the conflicting basis, and limit conclusions that depend on it. Never invent a balancing residual or silently correct the source.
+
+Keep actuals, forecasts and sensitivities distinct, including their scenario names, baseline, period, population, gross/net state and tax basis. Do not subtract a cash cost from an after-tax earnings measure, combine overlapping benefits, or present a no-change scenario as a forecast of a proposed option. A necessary conversion requires an explicit sourced or assumed basis and a reproducible calculation.
+
+A source's historical model can be reproduced as that dated model; it is not current observed evidence. A peak, endpoint or upper bound does not supply the missing annual series. Preserve the supported comparison using endpoint bars, a compact table or a range rather than interpolating an apparently measured path.
 
 ## Meaningful-position gate
 

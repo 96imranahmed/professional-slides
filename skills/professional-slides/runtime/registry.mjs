@@ -202,6 +202,13 @@ function contentRailInsets(props = {}) {
     : 18;
 }
 
+function sectionContentInsets(frame, props = {}) {
+  const padding = normalizeInsets(props.padding ?? token("space.4"));
+  const headerFrame = insetFrame(frame, padding);
+  const header = props.heading ? headingLayout(headerFrame, { ...props, rule: props.treatment !== "muted" }).height : 0;
+  return { ...padding, top: padding.top + header };
+}
+
 function resolveChartTitleVariant(props = {}) {
   assertChartTitleCopy(props);
   if (props.unit !== undefined && (typeof props.unit !== "string" || !props.unit.trim())) throw new Error("Chart title unit must be nonempty text");
@@ -344,17 +351,27 @@ function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY,
 
 function processNodes({ id, frame, props, roadmap = false, journey = false }) {
   const items = props.items;
+  if (!Array.isArray(items) || !items.length) throw new Error(`${id} requires ordered stages`);
   const nodes = [];
   const span = frame.width / items.length;
   const railY = frame.y + frame.height * (roadmap ? 0.32 : 0.48);
   nodes.push(openLine(stableId(id, "rail"), frame.x + span * 0.35, railY, frame.x + frame.width - span * 0.35, railY, "process-rail", PRIMARY, STANDARD));
   items.forEach((item, index) => {
+    if (typeof item.label !== "string" || !item.label.trim()) throw new Error(`${id} stage ${index + 1} requires a label`);
     const center = frame.x + span * (index + 0.5);
     const active = props.active === index;
     nodes.push(ellipsePrimitive({ id: stableId(id, "step-marker", index), role: "process-marker", frame: { x: center - 18, y: railY - 18, width: 36, height: 36 }, style: boxStyle(active ? PRIMARY : SURFACE, PRIMARY, STANDARD, token("radius.round")) }));
     nodes.push(textPrimitive({ id: stableId(id, "step-number", index), role: "process-number", frame: { x: center - 18, y: railY - 18, width: 36, height: 36 }, text: String(index + 1), style: textStyle(LABEL, active ? WHITE : PRIMARY, true, "center") }));
-    nodes.push(textPrimitive({ id: stableId(id, "step-label", index), role: "process-label", frame: { x: frame.x + span * index + 6, y: railY + 28, width: span - 12, height: 58 }, text: item.label || item, style: textStyle(COMPACT, INK, true, "center", "top") }));
-    if (roadmap) nodes.push(rectPrimitive({ id: stableId(id, "phase-band", index), role: "roadmap-phase", frame: { x: frame.x + span * index + 10, y: frame.y + frame.height * 0.58, width: span - 20, height: frame.height * 0.24 }, style: boxStyle(index % 2 ? MUTED_SURFACE : PRIMARY_TINT, RULE, HAIRLINE, SMALL_RADIUS) }));
+    const inset = tokenValue(token("space.2"));
+    const label = [item.label || item, item.period, item.maturity, item.detail].filter(value => value !== undefined && value !== null && value !== "").join("\n");
+    const labelWidth = span - (roadmap ? 20 + 2 * inset : 12);
+    const measured = measureText(label, labelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: true });
+    const bandTop = railY + 28;
+    const bandHeight = Math.max(frame.height * 0.24, measured.height + 2 * inset);
+    const labelTop = roadmap ? bandTop + (bandHeight - measured.height) / 2 : bandTop;
+    if (labelWidth <= 0 || (roadmap ? bandTop + bandHeight : labelTop + measured.height) > frame.y + frame.height) throw new Error(`${id} stage ${index + 1} needs more room for its complete label`);
+    if (roadmap) nodes.push(rectPrimitive({ id: stableId(id, "phase-band", index), role: "roadmap-phase", frame: { x: frame.x + span * index + 10, y: bandTop, width: span - 20, height: bandHeight }, style: boxStyle(index % 2 ? MUTED_SURFACE : PRIMARY_TINT, RULE, HAIRLINE, SMALL_RADIUS) }));
+    nodes.push(textPrimitive({ id: stableId(id, "step-label", index), role: "process-label", frame: { x: center - labelWidth / 2, y: labelTop, width: labelWidth, height: measured.height }, text: measured.text, style: { ...textStyle(COMPACT, INK, true, "center", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
     if (journey) nodes.push(textPrimitive({ id: stableId(id, "touchpoint", index), role: "journey-touchpoint", frame: { x: frame.x + span * index + 8, y: frame.y + 14, width: span - 16, height: 42 }, text: item.touchpoint || "Touchpoint", style: textStyle(LABEL, SECONDARY, false, "center") }));
   });
   return nodes;
@@ -569,8 +586,7 @@ function registerCore(registry) {
         const headerFrame = { x: frame.x + padding.left, y: frame.y + padding.top, width: frame.width - padding.left - padding.right, height: frame.height };
         const headerProps = { ...props, variant: treatment === "primary" ? "inverse" : "standard", rule: treatment !== "muted" };
         if (props.heading) nodes.push(...sectionHeadingNodes({ id: stableId(id, "header"), frame: headerFrame, props: headerProps }));
-        const top = padding.top + (props.heading ? headingLayout(headerFrame, headerProps).height : 0);
-        const contentFrame = { x: frame.x + padding.left, y: frame.y + top, width: frame.width - padding.left - padding.right, height: frame.height - top - padding.bottom };
+        const contentFrame = insetFrame(frame, sectionContentInsets(frame, props));
         if (treatment !== "open") nodes.unshift(rectPrimitive({ id: stableId(id, "surface"), role: "section-surface", frame, style: boxStyle(fill, stroke, treatment === "primary" ? STANDARD : HAIRLINE, edge === "full-bleed" ? token("radius.none") : SMALL_RADIUS), data: { edge, contentFrame } }));
         return { nodes, contentFrame };
       }
@@ -733,6 +749,10 @@ function registerCore(registry) {
     } }),
   ];
   for (const definition of definitions) {
+    if (["process", "roadmap", "timeline", "journey"].includes(definition.id)) {
+      definition.tokens.push("space.2");
+      definition.version = "2.1.0";
+    }
     if (["table", "comparison-table", "heatmap", "trend-rows"].includes(definition.id)) {
       definition.tokens = TABLE_TOKENS;
       const normalize = props => {
@@ -791,7 +811,9 @@ function registerCore(registry) {
         if (definition.resolveVariant(props) !== "body") throw new Error("Content measurement requires the body bullet-list variant");
         return bodyListLayout(frame, props.items);
       };
+      definition.measureIntrinsic = input => definition.resolveVariant(input.props) === "body" ? definition.measureContent(input) : null;
     }
+    if (definition.id === "section") definition.measureInsets = ({ frame, props }) => sectionContentInsets(frame, props);
     if (definition.id === "section-heading") definition.variants.inverse = { backdrop: "primary" };
     if (definition.id === "insight") definition.measureContent = ({ frame, props }) => { definition.resolveVariant(props); return insightLayout(frame, props); };
     if (definition.id === "section-boundary") definition.variants.subsection = { preferredSize: { width: 520, height: 24 } };

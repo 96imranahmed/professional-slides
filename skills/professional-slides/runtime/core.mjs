@@ -314,22 +314,43 @@ function fraction(value) {
   return 0;
 }
 
-function gridTrackPreferences(node, axis, registry) {
+function gridTrackPreferences(node, axis, registry, widths = null) {
   const tracks = axis === "width" ? node.columns : node.rows;
+  const columnGap = isTokenReference(node.columnGap) ? tokenValue(node.columnGap) : Number(node.columnGap || 0);
   return tracks.map((_, index) => Math.max(0, ...node.children
     .filter((child) => ((axis === "width" ? child.cell?.column : child.cell?.row) ?? 0) === index && ((axis === "width" ? child.cell?.columnSpan : child.cell?.rowSpan) ?? 1) === 1)
-    .map((child) => preferredSize(child, axis, registry))));
+    .map((child) => {
+      const column = child.cell?.column ?? 0, span = child.cell?.columnSpan ?? 1;
+      const width = widths ? widths.slice(column, column + span).reduce((sum, value) => sum + value, 0) + (span - 1) * columnGap : null;
+      return preferredSize(child, axis, registry, width);
+    })));
 }
 
-function preferredSize(node, axis, registry) {
+// Width is resolved before measuring wrapped content. Sample preferred sizes
+// remain a fallback only for components without intrinsic measurement.
+function preferredSize(node, axis, registry, width = null) {
   if (node.nodeType === "component") {
-    return registry.get(node.component)?.preferredSize?.[axis] || 0;
+    const definition = registry.get(node.component);
+    if (axis === "height" && width !== null) {
+      const measure = definition?.measureIntrinsic ?? definition?.measureContent;
+      const measured = measure?.({ frame: { x: 0, y: 0, width }, props: node.props });
+      if (measured?.height !== undefined) {
+        if (!Number.isFinite(measured.height) || measured.height < 0) throw new Error(`Invalid intrinsic height for ${node.id}`);
+        return measured.height;
+      }
+    }
+    return definition?.preferredSize?.[axis] || 0;
   }
   if (node.nodeType === "section") {
     const padding = normalizeInsets(node.padding);
     const nested = node.composition || (node.children?.length ? flow({ id: `${node.id}-intrinsic`, direction: "column", gap: token("space.3"), children: node.children }) : null);
-    const content = nested ? preferredSize(nested, axis, registry) : 0;
+    const innerWidth = width === null ? null : width - padding.left - padding.right;
+    const content = nested ? preferredSize(nested, axis, registry, innerWidth) : 0;
     if (axis === "width") return content + padding.left + padding.right;
+    if (width !== null && registry.get("section")?.measureInsets) {
+      const insets = registry.get("section").measureInsets({ frame: { x: 0, y: 0, width }, props: node });
+      return content + insets.top + insets.bottom;
+    }
     return content + padding.top + padding.bottom + (node.heading ? 46 : 0);
   }
   const padding = normalizeInsets(node.padding);
@@ -338,9 +359,14 @@ function preferredSize(node, axis, registry) {
   if (node.nodeType === "flow") {
     const row = node.direction === "row";
     const gap = isTokenReference(node.gap) ? tokenValue(node.gap) : Number(node.gap || 0);
-    const childValues = node.children.map((child) => {
+    const innerWidth = width === null ? null : width - horizontalPadding;
+    const widths = axis === "height" && innerWidth !== null
+      ? row ? allocateTracks(node.children.map(child => child.size?.width), innerWidth, Math.max(0, node.children.length - 1) * gap, node.children.map(child => preferredSize(child, "width", registry)))
+        : node.children.map(child => resolveLength(child.size?.width, innerWidth, preferredSize(child, "width", registry)) ?? innerWidth)
+      : [];
+    const childValues = node.children.map((child, index) => {
       const explicit = child.size?.[axis];
-      const preferred = preferredSize(child, axis, registry);
+      const preferred = preferredSize(child, axis, registry, widths[index] ?? null);
       if (typeof explicit === "number" || isTokenReference(explicit) || explicit === "hug") return resolveLength(explicit, 0, preferred) ?? preferred;
       return preferred;
     });
@@ -353,7 +379,9 @@ function preferredSize(node, axis, registry) {
     const tracks = axis === "width" ? node.columns : node.rows;
     const gapValue = axis === "width" ? node.columnGap : node.rowGap;
     const gap = isTokenReference(gapValue) ? tokenValue(gapValue) : Number(gapValue || 0);
-    const contentPreferences = gridTrackPreferences(node, axis, registry);
+    const columnGap = isTokenReference(node.columnGap) ? tokenValue(node.columnGap) : Number(node.columnGap || 0);
+    const widths = axis === "height" && width !== null ? allocateTracks(node.columns, width - horizontalPadding, Math.max(0, node.columns.length - 1) * columnGap, gridTrackPreferences(node, "width", registry)) : null;
+    const contentPreferences = gridTrackPreferences(node, axis, registry, widths);
     const trackPreferred = tracks.map((track, index) => {
       const content = contentPreferences[index];
       if (typeof track === "number" || isTokenReference(track) || track === "hug") return resolveLength(track, 0, content) ?? content;
@@ -366,7 +394,7 @@ function preferredSize(node, axis, registry) {
   if (node.nodeType === "overlay" || node.nodeType === "absolute") {
     const extent = Math.max(0, ...(node.children || []).map((child) => {
       if (child.frame) return (axis === "width" ? child.frame.x + child.frame.width : child.frame.y + child.frame.height);
-      return preferredSize(child, axis, registry);
+      return preferredSize(child, axis, registry, width === null ? null : width - horizontalPadding);
     }));
     return extent + (axis === "width" ? horizontalPadding : verticalPadding);
   }
@@ -435,13 +463,13 @@ export function resolveLayout(root, frame, registry) {
       const gap = isTokenReference(node.gap) ? tokenValue(node.gap) : Number(node.gap || 0);
       const mainAvailable = row ? inner.width : inner.height;
       const specs = node.children.map((child) => row ? child.size?.width : child.size?.height);
-      const preferred = node.children.map((child) => preferredSize(child, row ? "width" : "height", registry));
+      const preferred = node.children.map((child) => preferredSize(child, row ? "width" : "height", registry, row ? null : resolveLength(child.size?.width, inner.width, preferredSize(child, "width", registry)) ?? inner.width));
       const lengths = allocateTracks(specs, mainAvailable, Math.max(0, node.children.length - 1) * gap, preferred);
       let cursor = row ? inner.x : inner.y;
       node.children.forEach((child, index) => {
         const crossSpec = row ? child.size?.height : child.size?.width;
         const crossAvailable = row ? inner.height : inner.width;
-        const cross = resolveLength(crossSpec, crossAvailable, preferredSize(child, row ? "height" : "width", registry)) ?? crossAvailable;
+        const cross = resolveLength(crossSpec, crossAvailable, preferredSize(child, row ? "height" : "width", registry, row ? lengths[index] : null)) ?? crossAvailable;
         if (cross < 0 || cross > crossAvailable + 0.01) throw new Error(`Flow child ${child.id} exceeds its cross axis`);
         const childFrame = row
           ? { x: cursor, y: inner.y, width: lengths[index], height: cross }
@@ -455,7 +483,7 @@ export function resolveLayout(root, frame, registry) {
       const columnGap = isTokenReference(node.columnGap) ? tokenValue(node.columnGap) : Number(node.columnGap || 0);
       const rowGap = isTokenReference(node.rowGap) ? tokenValue(node.rowGap) : Number(node.rowGap || 0);
       const widths = allocateTracks(node.columns, inner.width, Math.max(0, node.columns.length - 1) * columnGap, gridTrackPreferences(node, "width", registry));
-      const heights = allocateTracks(node.rows, inner.height, Math.max(0, node.rows.length - 1) * rowGap, gridTrackPreferences(node, "height", registry));
+      const heights = allocateTracks(node.rows, inner.height, Math.max(0, node.rows.length - 1) * rowGap, gridTrackPreferences(node, "height", registry, widths));
       const starts = (values, start, gap) => values.map((_, index) => start + values.slice(0, index).reduce((sum, value) => sum + value, 0) + index * gap);
       const xs = starts(widths, inner.x, columnGap);
       const ys = starts(heights, inner.y, rowGap);

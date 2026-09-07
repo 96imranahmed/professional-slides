@@ -30,6 +30,24 @@ For a repetitive run, use the [analytical substance check](../components/copy.md
 
 Match container height to useful content. A few sentences at the top of tall cards leave an unfinished page even when the cards occupy most of the canvas. An executive pre-read close should connect the recommendation to its decisive evidence and explain what changes the decision; use [decision-close guidance](../components/copy.md#decision-close). Prefer compact open sections or a decision table when those relationships warrant them. A deliberately sparse stage close remains valid for a narrated presentation.
 
+## Allocate evidence before geometry
+
+Count the real categories, rows, stages, comparison fields and text before assigning boxes. Choose the exhibit's reading task, then allocate its region:
+
+| Reading task | Composition decision |
+| --- | --- |
+| Compare several short options on common criteria | One analytical table or repeated evidence group, with a stable schema and deliberate family order. Keep lever, benefit basis, implementation horizon, dependency and status distinct. |
+| Explain why a selected option works | A developed mechanism, driver decomposition or dependency exhibit; separate it from the portfolio only when the proof needs that space. |
+| Compare magnitudes or changes | A chart with the relevant comparator and common measurement basis; use a table when precise lookup across mixed fields is the primary job. |
+| Relate evidence at different levels | A composite with one dominant field and a clearly subordinate decomposition or additional evidence section. Allocate width by the labels and proof each field requires. |
+| Show timing or sequence | A registered relationship component with explicit stage labels, optional periods and dependencies. Unequal duration needs a supported time scale; ordinal stage positions do not encode duration. |
+
+For comparable options, draft all rows before deciding the page count. Consolidate sparse family pages when their combined rows remain readable, preserving family names and case IDs in the comparison field. Split a long exhibit at a meaningful family or analytical boundary and repeat its schema, column widths and units. A separate page per source row is appropriate only when that row has a distinct developed argument.
+
+Resolve component capacity with the actual longest labels and fullest rows. Use intrinsic content measurement at the allocated width; sample height is not evidence that production text fits. If a component cannot fit, first remove duplicate copy, rebalance widths, or regroup the evidence. Select a registered compact density for the entire coherent family when the delivery mode warrants it, before resorting to a split. Do not crop meaningful fields, omit qualifiers or locally shrink individual text objects.
+
+Inspect both content density and visual balance. A large container containing two short bullets remains sparse. Compare how much decision-relevant evidence the reader can actually inspect, including values, comparison dimensions, conditions and reasoning. Retain a compact complete group when the content is complete; develop missing proof when it is not. Never use a target slide count or occupancy percentage as a substitute for this judgment.
+
 ## Select an evidence-density mode
 
 Use one mode for each slide family:
@@ -39,7 +57,7 @@ Use one mode for each slide family:
 - **Executive pre-read:** denser evidence that remains readable without narration.
 - **Analytical appendix:** compact, precise, and source-rich.
 
-Never shrink text to make the wrong composition fit. Simplify the copy or redesign the page.
+Choose the registered density profile once for each coherent family and carry it through the treatment ledger. Never shrink text locally to make the wrong composition fit. Simplify duplicate copy or redesign the page; keep the measurements and qualifiers that make its evidence meaningful.
 
 ## Colour system
 
@@ -105,6 +123,8 @@ When a reference deck is authorized:
 2. identify its layouts, anchors, typography, spacing, colours, tables, charts, and recurring components;
 3. separate deliberate rules from one-off exceptions;
 4. reuse the closest valid structure.
+
+When modernizing an authorized reference, preserve its evidence relationships, comparison depth, meaningful row order and content hierarchy while applying the selected current theme. Compare the source and candidate at equal viewing size. Check which observations, calculations, countercases and conditions the reader can recover from each, then compare grouping and reading effort. Pixel similarity and matching page counts cannot establish equivalent content or design quality.
 
 Do not copy source content or assets unless authorized. Do not claim fidelity without comparing the final render with the reference.
 
