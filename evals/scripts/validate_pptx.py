@@ -2356,7 +2356,9 @@ def semantic_cli() -> int:
 
 
 # --- Per-slide independent visual gate ---
-VISUAL_RUBRIC_VERSION = "9"
+COMPOSITION_REVIEW_RULE = 'Judge missing argument, not unused pixels. A complete content-sized group may be vertically centered with outer whitespace. Do not demand filler or expand the evidence-to-insight gap to meet a canvas-fill target. A retained compact metric can decode a chart; flag it as recap only when it duplicates already explicit labels without a reading benefit. Distinguish such additional evidence from an insight. Compare content-start anchors within the same composition family, not across full-height charts, compact chart-and-insight groups, and icon rows. Honor explicit user requirements for vertically centered content groups. A density finding must identify missing reasoning, an incomplete component, illegible evidence, or an unexplained difference within a repeated composition family; outer whitespace or a lower content start alone is insufficient.'
+
+VISUAL_RUBRIC_VERSION = "10"
 VISUAL_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
  'type': 'object',
  'additionalProperties': False,
@@ -2585,7 +2587,7 @@ Reject a slide for any major visual or semantic defect, including:
 
 Evaluate financial relationships as defined by their sources. Do not demand an equation or netting operation between non-additive balances, proceeds, authorizations and commitments. A reported line item whose official name includes "and other" may legitimately be a single series. Confirm scope and definitions before declaring a missing category. Use bridges for additive changes and integrated assumptions for scenario comparisons; routine derivations need not occupy the analytical canvas.
 
-Judge missing argument, not unused pixels. A complete content-sized group may be vertically centered with outer whitespace. Do not demand filler or expand the evidence-to-insight gap to meet a canvas-fill target. A retained compact metric can decode a chart; flag it as recap only when it duplicates already explicit labels without a reading benefit. Distinguish such additional evidence from an insight.
+{COMPOSITION_REVIEW_RULE}
 
 Do not reward minimalism merely for having whitespace. For an executive pre-read, expect a substantively occupied analytical canvas with a dominant exhibit plus the labels, comparison, qualifier, or attached synthesis needed to make the claim complete. Also do not reward density created by filler.
 
@@ -3050,7 +3052,7 @@ CONSISTENCY_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
                                                                             'minLength': 1}}}}}}
 CONSISTENCY_ALLOWED_MODELS = ("gpt-5.6-luna", "gpt-5.6-terra")
 CONSISTENCY_DEFAULT_MODEL = "gpt-5.6-luna"
-CONSISTENCY_RUBRIC_VERSION = "2"
+CONSISTENCY_RUBRIC_VERSION = "3"
 CONSISTENCY_MINIMUM_SCORE = 90
 CONSISTENCY_SCORE_NAMES = (
     "visualSystemCoherence",
@@ -3098,6 +3100,8 @@ Review all attached slide images as one deck. Treat the contract, theme, and tre
 Compare repeated roles across multiple slides: action-title anchors, content starts, section headings and underlines, metric fields, chart legends, tracker states, sources, page numbers, callouts, spacing, density, semantic colours, and visual family. Identify groups of slides that use the same role and record each material comparison group. Every slide must appear in slideCoverage, even structural pages.
 
 When an executive summary and navigation system both exist, compare their evidence and meaning as one storyline. Summary themes may consolidate related body chapters and use substantive audience-facing headings; retain the mapping in planning metadata, not visible chapter numbers or navigation labels. Require a comparison group named `executive-summary-to-navigation`. Reject omitted or contradictory major arguments, not a different theme count or sensible semantic consolidation. Explicit user instructions for dense argument-led summaries take precedence over default theme density. The closing recommendation must specify a choice, priority or conditional strategy supported by the argument; a restatement of the question or generic instruction to compare options is insufficient.
+
+{COMPOSITION_REVIEW_RULE}
 
 Reject cross-slide drift including:
 - invented or inconsistent component variants without a documented content reason;

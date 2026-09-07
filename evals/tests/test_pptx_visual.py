@@ -59,6 +59,9 @@ class PptxVisualTests(unittest.TestCase):
                 root / "deck.pptx", [root / "slide-1.png"], *inputs
             )
         self.assertIn("professional_slides_skill_references", prompt)
+        self.assertIn(validator.COMPOSITION_REVIEW_RULE, prompt)
+        self.assertIn("within the same composition family", prompt)
+        self.assertIn("outer whitespace or a lower content start alone is insufficient", prompt)
         self.assertIn("secondary rail merely repeats chart values", prompt)
         self.assertIn("keeps a short unit inline in a secondary colour", prompt)
         self.assertIn("Chart headings retain their rule even with inline units", prompt)

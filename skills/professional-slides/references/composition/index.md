@@ -70,3 +70,8 @@ Both HTML and PowerPoint consume the same resolved scene. HTML serializes canoni
 Each slide is rendered independently as HTML and from the saved editable PPTX. Acceptance requires token/theme agreement, Artifact Tool import and geometry readback, no unexpected overlaps or text overflow, and image-parity thresholds. Component and chart thresholds also apply to their variant fixtures. Standard compositions exercise the same components in context.
 
 Accepted runs are retained under `output/golden/runs/`. `output/golden/index.html` orders the review from standard compositions through layout examples to component families, pairs the HTML and PowerPoint images, and links the McKinsey deck. Its manifest binds source hashes, complete coverage, candidate hashes, and report hashes. `npm run golden:check` rejects stale or altered evidence. A failed run does not replace the previous accepted set. Never claim that an older accepted set validates changed sources.
+
+
+### Review density within the composition family
+
+Compare content-start anchors within a coherent composition family. A full-height chart, a compact chart with a measured insight, and a vertically centered icon row need not start at the same vertical position. Honor explicit user centering requirements. Both visual and consistency reviews must identify missing reasoning, an incomplete component, illegibility, or unexplained drift within a repeated family before rejecting density. Outer whitespace alone is not evidence of incompleteness; adding filler or inflating insight panels does not fix it.
