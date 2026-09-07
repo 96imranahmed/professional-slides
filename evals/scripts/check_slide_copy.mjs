@@ -10,7 +10,7 @@ const args=process.argv.slice(2), get=name=>{const i=args.indexOf(name);return i
 const required=name=>{const v=get(name);if(!v || v.startsWith('--')) throw new Error(`Required ${name}`);return path.resolve(v);};
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const reportPath=required('--report');
-const model=get('--model') || 'gpt-5.6-luna';
+const model=get('--model') || 'gpt-5.6-terra';
 let temp;
 try {
   if (!['gpt-5.6-luna','gpt-5.6-terra'].includes(model)) throw new Error('Unsupported independent reviewer');
@@ -32,13 +32,17 @@ try {
     console.log(JSON.stringify({accepted:true,targets:report.judgement.items.length}));
   } else {
     temp=await fs.mkdtemp(path.join(os.tmpdir(),'slides-copy-'));
-    const items=[];
+    const batches=[];
     // Bounded batches preserve full slide context while keeping coverage auditable.
-    for(let i=0;i<inventory.slides.length;i+=4){
-      const batch={...inventory,slides:inventory.slides.slice(i,i+4)},targets=batch.slides.flatMap(s=>s.targets);
+    for(let i=0;i<inventory.slides.length;i++) batches.push(i);
+    const results=new Array(batches.length);
+    let next=0;
+    async function worker(){while(next<batches.length){
+      const index=next++,i=batches[index];
+      const batch={...inventory,slides:inventory.slides.slice(i,i+1)},targets=batch.slides.flatMap(s=>s.targets);
       if(!targets.length)continue;
       const schema=path.join(temp,`schema-${i}.json`),output=path.join(temp,`review-${i}.json`);
-      await fs.writeFile(schema,JSON.stringify(copyReviewSchema(targets)));
+      await fs.writeFile(schema,JSON.stringify(copyReviewSchema(targets,batch.slides.flatMap(s=>s.context.map(t=>t.id)))));
       await new Promise((resolve,reject)=>{
         const child=spawn('codex',['exec','--model',model,'-c','model_reasoning_effort="high"','--sandbox','read-only','--ephemeral','--ignore-user-config','--ignore-rules','--skip-git-repo-check','--output-schema',schema,'--output-last-message',output,'--cd',temp,...batch.slides.flatMap(s=>['--image',paths[`render${s.slide}`]]),'-'],{stdio:['pipe','ignore','pipe']});
         let detail='';child.stderr.on('data',d=>{detail=(detail+d).slice(-3000);});
@@ -47,10 +51,17 @@ try {
         child.stdin.end(buildCopyPrompt(batch));
       });
       const answer=JSON.parse(await fs.readFile(output,'utf8'));
-      if(!Array.isArray(answer.items))throw new Error('Malformed copy review');
-      items.push(...answer.items);
+      if(!answer.items || Array.isArray(answer.items) || typeof answer.items!=='object')throw new Error('Malformed copy review');
+      const expected=new Map(targets.map(t=>[t.id,t]));
+      if(Object.keys(answer.items).some(id=>!expected.has(id)) || targets.some(t=>!Object.hasOwn(answer.items,t.id)))throw new Error('Incomplete copy review');
+      results[index]=targets.map(t=>({...answer.items[t.id],id:t.id,textHash:copyHash(t.text)}));
       console.error(`Reviewed slides ${batch.slides.map(s=>s.slide).join(',')}`);
     }
+    }
+    const workers=await Promise.allSettled(Array.from({length:Math.min(3,batches.length)},()=>worker()));
+    const failure=workers.find(r=>r.status==='rejected');
+    if(failure)throw failure.reason;
+    const items=results.flatMap(r=>r || []);
     if(JSON.stringify(await readInputs())!==JSON.stringify(Object.fromEntries(Object.entries(inputs).filter(([k])=>k!=='inventory'))))throw new Error('Inputs changed during review');
     const judgement={items},errors=validateCopyReview(inventory,judgement);
     const report={version:COPY_CHECK_VERSION,model,inputs,accepted:errors.length===0,validationErrors:errors,judgement};
