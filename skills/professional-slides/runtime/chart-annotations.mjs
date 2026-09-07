@@ -491,9 +491,14 @@ export function renderChangeAnnotations({ id, plot, props, pointMap }) {
       return;
     }
 
-    const bracketY = plot.y - evidenceBand - 34;
     const leftX = Math.min(start.x, end.x);
     const rightX = Math.max(start.x, end.x);
+    // Stay above every mark in the interval, including an interior line peak,
+    // while avoiding empty full-height leaders for small values on shared scales.
+    const intervalTop = Math.min(start.y, end.y, ...[...pointMap.values()]
+      .filter(point => point.x >= leftX && point.x <= rightX)
+      .map(point => point.changeY ?? point.y));
+    const bracketY = evidenceBand ? plot.y - evidenceBand - 34 : Math.max(plot.y - 34, intervalTop - 34);
     const frame = labelFrame(annotation.text, (leftX + rightX) / 2, bracketY - 24, plot);
     nodes.push(line(id, index, "span", leftX, bracketY, rightX, bracketY, false, annotation.style));
     nodes.push(line(id, index, "start-drop", start.x, bracketY, start.x, start.y, false, annotation.style));

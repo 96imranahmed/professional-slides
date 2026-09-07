@@ -556,11 +556,14 @@ function lineChart({ id, frame, props, area = false }) {
   const endLabels = props.directLabels === "end";
   const showLegend = !endLabels && props.legend !== false && series.length > 1;
   const values = series.flatMap((item) => item.values);
-  const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: props.dataLabels === true });
+  const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length < 6);
+  const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
+  if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
   const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y" });
   const labelWidth = axisLabelWidth(bounds);
   const plot = chartFrame(frame, {
-    leftInset: showValueAxis ? labelWidth + 8 : 54,
+    leftInset: showValueAxis ? Math.max(labelWidth + 8, showDataLabels ? 68 : 0) : showDataLabels ? 68 : 54,
+    valueLabelInset: showDataLabels ? 68 : 0,
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
@@ -617,21 +620,23 @@ function lineChart({ id, frame, props, area = false }) {
         frame: { x: point.x - 5, y: point.y - 5, width: 10, height: 10 },
         style: fillStyle(SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length])
       }));
-      const mappedPoint = { ...point, changeX: point.x, changeY: point.y - (props.dataLabels === true ? 30 : 16) };
+      const mappedPoint = { ...point, changeX: point.x, changeY: point.y - (showDataLabels ? 30 : 16) };
       pointMap.set(`${item.name}:${point.category}`, mappedPoint);
       if (series.length === 1) pointMap.set(`value:${point.category}`, mappedPoint);
       const categoryPoint = pointMap.get(`category:${point.category}`);
       if (!categoryPoint || mappedPoint.y < categoryPoint.y) pointMap.set(`category:${point.category}`, mappedPoint);
-      if (props.dataLabels === true) {
+      if (showDataLabels) {
         const first = point.category === categories[0];
+        const last = point.category === categories.at(-1);
         nodes.push(textPrimitive({
           id: stableId(id, "value-label", item.name, point.category),
           role: "data-label",
           frame: first
-            ? { x: point.x + 8, y: Math.min(plot.y + plot.height - 24, point.y + 8), width: 60, height: 24 }
-            : { x: Math.max(plot.x + 4, Math.min(plot.x + plot.width - 64, point.x - 30)), y: point.y - 27, width: 60, height: 24 },
+            ? { x: point.x - 68, y: point.y - 12, width: 60, height: 24 }
+            : last ? { x: point.x + 8, y: point.y - 12, width: 60, height: 24 }
+            : { x: point.x - 30, y: point.y - 27, width: 60, height: 24 },
           text: formatValue(point.value, props),
-          style: textStyle(CHART_LABEL, INK, true, first ? "left" : "center")
+          style: textStyle(CHART_LABEL, INK, true, first ? "right" : last ? "left" : "center")
         }));
       }
     });

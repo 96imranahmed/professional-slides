@@ -167,6 +167,21 @@ for(const link of links){assert.equal(link.data.semantic.requires.length,2);for(
 console.log('{}');
 ''')
 
+    def test_rebased_index_requires_a_measurement_decision(self):
+        run_node(r'''
+import assert from 'node:assert/strict';
+import {assertChartSelection} from './skills/professional-slides/runtime/planner.mjs';
+const props={unit:'index',categories:['2024','2025'],series:[{values:[100,107.3]}]};
+assert.throws(()=>assertChartSelection('chart.column',props),/INDEX_JUSTIFICATION/);
+assert.throws(()=>assertChartSelection('chart-group',{charts:[{component:'chart.column',unit:'index',props:{...props,unit:undefined}}]}),/INDEX_JUSTIFICATION/);
+const selection={question:'How do trajectories diverge from a shared base?',dataBasis:'observed',reason:'Compare relative trajectories',rejectedAlternative:'Native scales conceal the relative divergence',measurementBasis:'rebased-index',indexBase:{period:'2024',value:100},indexJustification:'Common-base paths reveal the divergence timing',absoluteValueContext:'2024 trips: NYC 1195m; BART 50.7m'};
+assert.doesNotThrow(()=>assertChartSelection('chart.column',{...props,chartSelection:selection}));
+assert.throws(()=>assertChartSelection('chart.column',{...props,chartSelection:{...selection,indexBase:{period:'2024',value:0}}}),/INDEX_JUSTIFICATION/);
+assert.doesNotThrow(()=>assertChartSelection('chart.column',{...props,chartSelection:{...selection,measurementBasis:'published-index'}}));
+assert.doesNotThrow(()=>assertChartSelection('chart.column',{...props,unit:'trips, m'}));
+console.log('{}');
+''')
+
     def test_constant_rate_scenario_rejected_before_authoring(self):
         run_node(r'''
 import assert from 'node:assert/strict';

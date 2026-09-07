@@ -13,6 +13,27 @@ For an analytical slide, use the complete proposed action title as the dot. It s
 
 For explanatory pages, use the [storylining title rule](index.md#write-the-title-spine): a precise mechanism or distinction heading is valid when the page teaches rather than recommends.
 
+## Ask questions that sharpen the argument
+
+Before drafting the dot-dash, test whether the brief is specific enough to support a compelling argument for its intended audience. A broad topic is not an argument. When missing context could change the governing answer, evidence selection, priorities, or recommendation, ask the user targeted questions to narrow it down. This applies across topics; do not impose a domain-specific intake checklist.
+
+Use the conversation and supplied brief first. Ask several questions together when several material uncertainties remain, then follow up selectively on answers that expose a decisive trade-off. Choose questions for their effect on the argument, not to fill a standard questionnaire. Useful lines of inquiry include:
+
+- Who is this for, who makes the decision, and whose preferences matter? If it is for a client, establish the relevant client identity and context rather than assuming the user's preferences apply.
+- What decision, change in belief, or action should the deck enable? What would a successful outcome look like?
+- Which priorities, criteria, or trade-offs matter most, and which constraints are non-negotiable?
+- What alternatives, current position, or baseline are under consideration? What is already known or believed?
+- What time horizon, resources, or circumstances could change the answer?
+- What is the strongest concern or counterargument, and what evidence would change the audience's mind?
+
+Adapt the wording and selection to the actual brief. Do not ask again for known answers, invent preferences, assume a client shares the user's priorities, or steer the answers toward a preferred conclusion. If the brief is already sufficient, proceed without an unnecessary interview. For an explanatory deck, narrow the audience's knowledge gap and intended understanding rather than inventing a decision.
+
+Summarize the resulting argument brief above the dot-dash: audience, intended outcome, decisive criteria, constraints, and unresolved questions. Distinguish user/client statements from author assumptions. Explain how the answers change the provisional thesis, the proof required, and what belongs outside the story. Merely recording the answers without changing a generic outline does not satisfy this step.
+
+While waiting, continue research or design work that does not depend on the answer. Keep a material unknown explicit; do not finalize a personalized recommendation around an invented preference. If the user wants a general treatment or elects to proceed without further context, use transparent conditional arguments and record that scope.
+
+Before presenting the plan, apply a specificity check: could the same title spine and recommendation be reused unchanged for a materially different audience or decision? If so, identify what is missing and ask a useful follow-up or revise the argument. The remedy is a sharper supported thesis, not superficial personalization or extra labels.
+
 ## Planning grammar
 
 Present the approval artifact as a table by default, with one row per slide in production order. Use the host's table artifact when available; otherwise render and save a Markdown table. Do not replace the review table with a long numbered prose list unless the owner requests that format.
@@ -180,3 +201,12 @@ In each slide's design cell, name the primary component and variant, then every 
 
 
 Summary theme-to-body mapping is semantic planning metadata. Do not put chapter references on the summary canvas to satisfy navigation checks. Develop the substantive argument and finish with a supported priority or conditional choice.
+
+
+### Measurement choice precedes chart choice
+
+Prefer the source's native units and compact direct values, with growth annotations where change matters. Use clearly labelled percentage changes when relative change is the question. Do not routinely rebase population, trips, counts or financial values to 100 merely to make unequal entities look similar. An index is justified only when its common-base trajectory answers a specific question that native units or percentage changes cannot express as clearly.
+
+The design cell must name the measurement basis (`native`, `percentage-change`, `per-capita`, `rebased-index`, or `published-index`). For a rebased index, record `chartSelection.indexJustification`, `indexBase: {period, value}`, and `absoluteValueContext`. Explain the discarded native-unit or percentage-change alternative and the magnitude information normalization hides. The planner rejects a rebased index without this record. A source-published index remains its native measurement, but declare `published-index` so it cannot be confused with an invented rebase.
+
+Also specify point labels, value-axis visibility and growth-annotation treatment before authoring. With fewer than six line-chart points, default to a value label on every dot and omit the left quantitative axis. If a quantitative axis is retained for a justified reading task, use the registered diagonal growth connector and circular badge (`style: arrow`); a bracket is valid when that axis is absent. Never remove the date/category axis merely because the value axis is omitted.

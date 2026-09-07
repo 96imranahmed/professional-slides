@@ -3,6 +3,40 @@ from test_source_structure import run_node
 
 
 class FinancialChartRuntimeTests(unittest.TestCase):
+    def test_growth_bracket_stays_near_small_marks_on_a_shared_scale(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const nodes=REGISTRY.get('chart.column').render({id:'small',frame:{x:60,y:100,width:600,height:480},props:{categories:['2024','2025'],series:[{name:'Trips',values:[50.7,55.6]}],yMin:0,yMax:1400,changeAnnotations:[{style:'bracket',start:'2024',end:'2025',text:'+9.8%'}]}}).nodes;
+const span=nodes.find(n=>n.data?.annotationPart==='span');
+const tops=nodes.filter(n=>n.role==='chart-mark').map(n=>n.frame.y);
+assert.ok(span.frame.y < Math.min(...tops));
+assert.ok(Math.min(...tops)-span.frame.y < 100, 'Bracket should follow the interval, not the full chart height');
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result['accepted'])
+
+    def test_five_point_lines_use_direct_values_and_axis_appropriate_growth(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const line=REGISTRY.get('chart.line'),frame={x:60,y:120,width:1100,height:520};
+const props={categories:['2026','2027','2028','2029','2030'],series:[{name:'Jobs',values:[-52.5,16.4,137.7,90.9,62.9]}],valueFormat:{decimals:1},changeAnnotations:[{style:'bracket',start:{category:'2026'},end:{category:'2030'},text:'+115.4'}]};
+const sparse=line.render({id:'small',frame,props}).nodes;
+assert.equal(sparse.filter(n=>n.role==='data-label').length,5);
+assert.equal(sparse.filter(n=>n.id.endsWith('y-axis')).length,0);
+assert.equal(sparse.filter(n=>n.role==='axis-label').length,0);
+assert.equal(sparse.filter(n=>n.role==='category-label').length,5);
+assert.ok(sparse.some(n=>n.role==='annotation-text' && n.text==='+115.4'));
+assert.throws(()=>line.render({id:'bad',frame,props:{...props,showValueAxis:true}}),/LINE_AXIS_CHANGE_STYLE/);
+const diagonal=line.render({id:'diagonal',frame,props:{...props,showValueAxis:true,dataLabels:false,changeAnnotations:[{...props.changeAnnotations[0],style:'arrow'}]}}).nodes;
+assert.ok(diagonal.some(n=>n.id.endsWith('y-axis')));
+assert.ok(diagonal.some(n=>n.role==='annotation-surface'));
+assert.ok(diagonal.some(n=>n.data?.annotationStyle==='arrow'));
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result['accepted'])
+
     def test_sparse_plot_center_matches_its_section_without_unused_axis_gutter(self):
         result = run_node("""
 import assert from 'node:assert/strict';

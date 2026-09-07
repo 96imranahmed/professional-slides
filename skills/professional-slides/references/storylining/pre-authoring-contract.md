@@ -19,6 +19,7 @@ Record:
 - template ID: registered ID, or `none` for direct storylining;
 - visual-system mode: clean-native-standard, reference-led, or custom-user-directed, with approval evidence for the latter two;
 - `mainQuestion` and `governingAnswer`;
+- the [argument brief](dot-dash.md#ask-questions-that-sharpen-the-argument): intended audience and outcome, whose criteria apply, decisive priorities and constraints, material answers or unresolved questions, and their effect on the thesis and proof; distinguish supplied context from author assumptions and record when the user requests a general treatment;
 - the mandatory executive-summary slide, its complete approved copy, and a recorded pass of the [standalone argument and evidence test](dot-dash.md#standalone-argument-and-evidence-test);
 - an evidence mapping from each decisive claim to its source, actual values or examples, comparator, inference limits, and proof slide IDs;
 - slide count and ordered slide records;

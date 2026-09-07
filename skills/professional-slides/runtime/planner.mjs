@@ -114,6 +114,10 @@ function trackerAudienceCopy(tracker) {
 export function assertChartSelection(component, props, path = 'chart') {
   const selection = props.chartSelection;
   if (selection && (!selection.question?.trim() || !selection.reason?.trim() || !selection.rejectedAlternative?.trim() || !selection.dataBasis?.trim())) throw new Error(`${path}: chart selection requires question, dataBasis, reason and rejectedAlternative`);
+  const indexed = selection?.measurementBasis === 'rebased-index' || /\bindex(?:ed)?\b/i.test(String(props.unit || '') + ' ' + String(props.heading || ''));
+  if (indexed && selection?.measurementBasis !== 'published-index') {
+    if (selection?.measurementBasis !== 'rebased-index' || !selection.indexJustification?.trim() || !selection.absoluteValueContext?.trim() || !selection.indexBase?.period?.trim() || !Number.isFinite(selection.indexBase?.value) || selection.indexBase.value <= 0) throw new Error(`${path}: INDEX_JUSTIFICATION requires an explicit rebased-index purpose, base period/value, absolute-value context and reason native units or percentage changes are inadequate`);
+  }
   if (component === 'chart.line') {
     const years = (props.categories || []).map(v => /^\d{4}(?:\s.*)?$/.test(String(v)) ? Number(String(v).slice(0,4)) : Number(v));
     const values = (props.series || []).map(s => s.values);
@@ -121,7 +125,7 @@ export function assertChartSelection(component, props, path = 'chart') {
     if (selection?.dataBasis === 'constant-rate-scenario' || selection?.dataBasis === 'endpoint-only') throw new Error(`${path}: constant-rate or endpoint-only evidence requires bar/column comparison, not a line trajectory`);
     if (linear && !['observed','published-forecast'].includes(selection?.dataBasis)) throw new Error(`${path}: linear year series requires source-backed chart selection; constant-rate extrapolation belongs in endpoint bars`);
   }
-  for (const child of props.charts || []) assertChartSelection(child.component, child.props || child, path + '.charts');
+  for (const child of props.charts || []) assertChartSelection(child.component, {...(child.props || child), heading:child.heading ?? child.props?.heading, unit:child.unit ?? child.props?.unit}, path + '.charts');
 }
 
 function validateItem(item, path, registry) {

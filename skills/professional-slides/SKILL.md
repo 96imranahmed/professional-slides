@@ -32,7 +32,7 @@ An analytical page must add substantive evidence, a developed explanation or a u
 
 ## Start with the brief
 
-Know the audience, decision, question, evidence limits, delivery mode, and format.
+Know the audience, decision, question, evidence limits, delivery mode, and format. Before dot-dash, [ask questions that sharpen the argument](references/storylining/dot-dash.md#ask-questions-that-sharpen-the-argument) when the brief is too broad: ask several targeted questions as needed, reuse known context, and use the answers to narrow the thesis and proof.
 
 Distinguish a decision from an explanation or learning objective. Do not invent a recommendation when the audience needs to understand a mechanism. If the requested deliverable stops at storylining or proposed structure, read Templates, Storylining and the relevant copy/composition/design owners, then deliver the plan. Defer platform implementation and export gates until a slide document is requested.
 

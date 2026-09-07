@@ -140,3 +140,10 @@ Use the treatment when distinct groups imply different actions or consequences. 
 Same-page category comparisons use one grouped/segmented exhibit or equivalent peer charts. On a `chart-group`, declare `comparison: {kind: "matched", unit: "..."}` with identical chart types, periods/categories, explicit domains and value formats. Do not compare a line on one side with bars on the other. Different metrics may use different chart types in a four-way dashboard, but the two sides of one comparison must remain equivalent. When source definitions cannot be reconciled, separate the exhibits and state the limit instead of presenting a false matched comparison.
 
 For compact large-number labels, declare one shared `valueFormat.compactUnit` (`k`, `m`, or `bn`) for peer charts; `decimals` defaults to one. Keep raw series values and growth calculations unchanged. See [large numbers](../components/copy.md#large-numbers).
+
+
+### Avoid unnecessary rebasing and axis duplication
+
+Choose native units or explicitly labelled percentage change before considering a rebased index. The dot-dash design must justify an index, state its base and retain absolute-value context; see the [measurement-choice gate](../storylining/dot-dash.md#measurement-choice-precedes-chart-choice). A published source index is distinct from an author-created rebase.
+
+Line charts with fewer than six values default to direct labels on every dot and no left value axis. Where the value axis remains, encode growth with the diagonal connector and circular badge (`changeAnnotations.style: arrow`), not an overhead bracket. With no value axis, the bracket remains valid. This changes presentation, never underlying values, dates, shared scales or required growth emphasis.
