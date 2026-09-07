@@ -192,10 +192,10 @@ export function registerMedia(registry) {
         items.length < 2 ||
         items.length > 4 ||
         new Set(items.map((i) => i.id)).size !== items.length ||
-        items.some((i) => !i.id || !i.title || !i.text)
+        items.some((i) => !i.id || !i.text)
       )
         throw new Error(
-          "Icon trends require two to four identified, titled evidence items",
+          "Icon trends require two to four identified evidence items",
         );
       if (
         props.connector !== undefined &&
@@ -252,11 +252,11 @@ export function registerMedia(registry) {
         }
         const heading = registry.get("section-heading"),
           hp = { heading: item.title, rule: false };
-        const hh = heading.measureHeader({
+        const hh = item.title ? heading.measureHeader({
           frame: { x: textX, y: textY, width: textWidth, height },
           props: hp,
-        }).height;
-        nodes.push(
+        }).height : 0;
+        if(item.title) nodes.push(
           ...heading.render({
             id: stableId(id, item.id, "heading"),
             frame: { x: textX, y: textY, width: textWidth, height: hh + gap },
@@ -264,7 +264,7 @@ export function registerMedia(registry) {
             tokens,
           }).nodes,
         );
-        const bodyY = textY + hh + tokenValue(token("space.3"));
+        const bodyY = textY + hh + (item.title ? tokenValue(token("space.3")) : 0);
         if (bodyY >= y + height)
           throw new Error("Icon trends need more height");
         nodes.push(

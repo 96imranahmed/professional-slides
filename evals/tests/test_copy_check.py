@@ -48,3 +48,16 @@ for(const text of ['attached rendered slide images','unique, relevant and suppor
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result['ok'])
+
+    def test_icon_evidence_can_omit_redundant_headings(self):
+        result=run_node('''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const owner=REGISTRY.get('icon-trends');
+const props={...owner.sample,items:owner.sample.items.map(item=>({...item,title:''}))};
+const result=owner.render({id:'icons',frame:{x:0,y:0,width:1160,height:460},props,tokens:owner.tokens});
+assert.deepEqual(result.nodes.filter(n=>n.type==='text').map(n=>n.text),props.items.map(i=>i.text));
+assert.ok(!result.nodes.some(n=>n.role==='heading'));
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result['ok'])

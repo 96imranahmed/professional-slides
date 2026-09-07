@@ -138,3 +138,5 @@ Direct diagnostic command: `node evals/scripts/check_slide_copy.mjs --pptx <deck
 The prose inventory includes summary list items and every decision-tree label and conclusion. Evidence references must use exact emitted IDs. Dedicated source registers and methodology-reference pages may retain necessary reference content; this is distinct from a methodology-only box beside an analytical exhibit.
 
 Review one rendered slide at a time against its exact keyed text inventory, with bounded concurrency. Require every target key in the response schema; the runner binds the immutable input text hash to each returned judgement. Main action titles are tested for supported answer synthesis, subsidiary headings for added meaning, and navigation titles against the deck outline. A title is not required to invent an extra fact absent from its exhibit.
+
+Icon evidence cards may omit their headings when the icon and body already identify the subject. Preserve any information carried only by the heading in the body; do not fabricate a headline to satisfy a component schema.
