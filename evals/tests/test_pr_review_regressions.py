@@ -17,7 +17,7 @@ const render=(id,props,box=frame)=>REGISTRY.get(id).render({id:'review',frame:bo
     def test_auto_bounds_respect_data_and_constant_series(self):
         self.check_js("""
 for(const values of [[100,110],[-110,-100],[0.2,0.4],[100,100]]) {
- const nodes=render('chart.line',{categories:['A','B'],series:[{name:'Revenue',values}]});
+ const nodes=render('chart.line',{categories:['A','B'],series:[{name:'Revenue',values}],showValueAxis:true});
  const ticks=nodes.filter(n=>n.role==='axis-label').map(n=>Number(n.text));
  assert.ok(Math.min(...ticks)<=Math.min(...values));
  assert.ok(Math.max(...ticks)>=Math.max(...values));

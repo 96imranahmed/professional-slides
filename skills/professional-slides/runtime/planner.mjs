@@ -1,3 +1,4 @@
+import { assertPlanRelationships } from "./semantic-integrity.mjs";
 import {
   SLIDE,
   absolute,
@@ -110,6 +111,23 @@ function trackerAudienceCopy(tracker) {
   };
 }
 
+export function assertChartSelection(component, props, path = 'chart') {
+  const selection = props.chartSelection;
+  if (selection && (!selection.question?.trim() || !selection.reason?.trim() || !selection.rejectedAlternative?.trim() || !selection.dataBasis?.trim())) throw new Error(`${path}: chart selection requires question, dataBasis, reason and rejectedAlternative`);
+  const indexed = selection?.measurementBasis === 'rebased-index' || /\bindex(?:ed)?\b/i.test(String(props.unit || '') + ' ' + String(props.heading || ''));
+  if (indexed && selection?.measurementBasis !== 'published-index') {
+    if (selection?.measurementBasis !== 'rebased-index' || !selection.indexJustification?.trim() || !selection.absoluteValueContext?.trim() || !selection.indexBase?.period?.trim() || !Number.isFinite(selection.indexBase?.value) || selection.indexBase.value <= 0) throw new Error(`${path}: INDEX_JUSTIFICATION requires an explicit rebased-index purpose, base period/value, absolute-value context and reason native units or percentage changes are inadequate`);
+  }
+  if (component === 'chart.line') {
+    const years = (props.categories || []).map(v => /^\d{4}(?:\s.*)?$/.test(String(v)) ? Number(String(v).slice(0,4)) : Number(v));
+    const values = (props.series || []).map(s => s.values);
+    const linear = years.length >= 3 && years.every(Number.isFinite) && years.every((v,i)=>i===0 || v>years[i-1]) && values.length && values.every(v => v.length === years.length && v.every(Number.isFinite) && v.slice(2).every((y,i) => Math.abs((y-v[i+1])/(years[i+2]-years[i+1])-(v[1]-v[0])/(years[1]-years[0])) < 1e-8));
+    if (selection?.dataBasis === 'constant-rate-scenario' || selection?.dataBasis === 'endpoint-only') throw new Error(`${path}: constant-rate or endpoint-only evidence requires bar/column comparison, not a line trajectory`);
+    if (linear && !['observed','published-forecast'].includes(selection?.dataBasis)) throw new Error(`${path}: linear year series requires source-backed chart selection; constant-rate extrapolation belongs in endpoint bars`);
+  }
+  for (const child of props.charts || []) assertChartSelection(child.component, {...(child.props || child), heading:child.heading ?? child.props?.heading, unit:child.unit ?? child.props?.unit}, path + '.charts');
+}
+
 function validateItem(item, path, registry) {
   if (!item?.id) throw new Error(`${path}.id is required`);
   if (!item.job || !String(item.job).trim()) throw new Error(`${path}.job must state why the item is on the slide`);
@@ -119,6 +137,12 @@ function validateItem(item, path, registry) {
   if (["section", "section-heading", "content-rail"].includes(item.component)) assertSectionHeadingProps(item.props);
   validateContentValue({ heading: item.heading }, path);
   validateContentValue(item.props || {}, `${path}.props`);
+  const checkChange = (props) => {
+    if (props.changeIntent && !(props.changeAnnotations?.length)) throw new Error(`${path}: declared change requires a highlighted change annotation`);
+    for (const chart of props.charts || []) checkChange(chart.props || chart);
+  };
+  checkChange(item.props || {});
+  assertChartSelection(item.component, item.props || {}, path);
   (item.items || []).forEach((child, index) => validateItem(child, `${path}.items[${index}]`, registry));
 }
 
@@ -138,6 +162,7 @@ export function validateSlidePlan(plan, registry = REGISTRY) {
     }
   }
   plan.items.forEach((item, index) => validateItem(item, `${plan.id}.items[${index}]`, registry));
+  assertPlanRelationships(plan);
   const density = resolveSlideDensity(plan);
   const defaultBudget = density.resolved === "appendix" ? 130 : density.resolved === "pre-read" ? 85 : density.resolved === "live-pitch" ? 30 : 55;
   const override = plan.copyBudget;
@@ -251,7 +276,7 @@ function planCover(plan) {
     id: plan.id,
     density: plan.density ?? "executive",
     frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
-    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
+    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.variant ? {variant:plan.variant} : {}), ...(plan.image ? {image:plan.image} : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
   };
   return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, required: "live-pitch", resolved: spec.density, reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
 }

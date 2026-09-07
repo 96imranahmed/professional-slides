@@ -1,5 +1,7 @@
+import { contrastRatio } from "./palettes.mjs";
 import {
   linePrimitive,
+  rectPrimitive,
   stableId,
   textPrimitive,
   token,
@@ -23,9 +25,10 @@ const SERIES = [
   token("color.chartSeries6")
 ];
 const DEFAULT_CURVE_COLORS = Object.freeze([5, 0, 1, 2, 3, 4]);
-const VARIANT_CAPACITY = Object.freeze({ curves: 5, stepped: 5, "stepped-minimal": 10 });
+const VARIANT_CAPACITY = Object.freeze({ curves: 5, stepped: 5, "stepped-minimal": 10, "stepped-bands": 3 });
 
 export const HORIZONS_TOKENS = Object.freeze([
+  "color.surfaceMuted", "color.onPrimary", "radius.none",
   "font.body",
   "type.heading",
   "type.body",
@@ -62,6 +65,7 @@ const MINIMAL_SAMPLE_HORIZONS = Object.freeze(CURVE_SAMPLE_HORIZONS.map((item, i
 
 export const HORIZONS_VARIANTS = Object.freeze({
   curves: Object.freeze({}),
+  "stepped-bands": Object.freeze({ props: Object.freeze({ xLabel: undefined, yLabel: undefined, horizons: STEPPED_SAMPLE_HORIZONS }) }),
   stepped: Object.freeze({ props: Object.freeze({ xLabel: undefined, yLabel: undefined, horizons: STEPPED_SAMPLE_HORIZONS }) }),
   "stepped-minimal": Object.freeze({ props: Object.freeze({ xLabel: undefined, yLabel: undefined, horizons: MINIMAL_SAMPLE_HORIZONS }) })
 });
@@ -312,6 +316,24 @@ function renderStepped({ id, frame, horizons, minimal }) {
 
 export function renderHorizons({ id, frame, props = {} }) {
   const { variant, horizons } = normalizedHorizons(props);
+  if (variant === "stepped-bands") return renderBands({ id, frame, horizons });
   if (variant === "curves") return renderCurves({ id, frame, props, horizons });
   return renderStepped({ id, frame, props, horizons, minimal: variant === "stepped-minimal" });
+}
+
+function renderBands({ id, frame, horizons }) {
+  if (frame.width < 800 || frame.height < 350) throw new Error("Horizon bands require an 800 by 350 frame");
+  const gap = 24, width = (frame.width - gap * (horizons.length - 1)) / horizons.length;
+  const bottom = frame.y + 160, nodes = [];
+  horizons.forEach((h, i) => {
+    const x = frame.x + i * (width + gap), height = 64 + i * 40;
+    const fill = i === 0 ? token("color.surfaceMuted") : i === 1 ? INK : SERIES[2];
+    const color = contrastRatio(tokenValue(fill),tokenValue(INK)) >= 4.5 ? INK : token("color.onPrimary");
+    nodes.push(rectPrimitive({ id: stableId(id,h.id,"band"), role:"horizon-band", frame:{x,y:bottom-height,width,height},style:{fill,stroke:"none",radius:token("radius.none")},data:{horizonId:h.id,order:i+1,conceptual:true} }));
+    nodes.push(measuredTextNode({id:stableId(id,h.id,"label"),role:"horizon-label",frame:{x:x+12,y:bottom-height,width:width-24,height},text:h.label,style:textStyle(HEADING,color,true,"center","middle")}));
+    nodes.push(measuredTextNode({id:stableId(id,h.id,"title"),role:"horizon-title",frame:{x,y:bottom+20,width,height:48},text:h.title,style:textStyle(HEADING,INK,true)}));
+    const text = [h.timeframe, h.description, h.summary, ...h.details.map(d=>`${d.label}: ${d.value}`)].filter(Boolean).join("\n");
+    nodes.push(measuredTextNode({id:stableId(id,h.id,"body"),role:"horizon-description",frame:{x,y:bottom+76,width,height:frame.y+frame.height-bottom-76},text,style:textStyle()}));
+  });
+  return nodes;
 }

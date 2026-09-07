@@ -1,0 +1,425 @@
+import { readFileSync } from "node:fs";
+import { primitive, stableId, token, tokenValue } from "./core.mjs";
+
+const iconData = `data:image/png;base64,${readFileSync(new URL("../assets/lucide/briefcase-business.png", import.meta.url)).toString("base64")}`;
+export const MEDIA_SAMPLE = Object.freeze({
+  dataUri: iconData,
+  alt: "Briefcase",
+  authorization: "Lucide ISC license; assets/lucide/LICENSE",
+  sourceUrl:
+    "https://github.com/lucide-icons/lucide/blob/main/icons/briefcase-business.svg",
+  width: 192,
+  height: 192,
+});
+const loadAsset = (directory, name, alt, authorization) => ({
+  dataUri: `data:image/png;base64,${readFileSync(new URL(`../assets/${directory}/${name}.png`, import.meta.url)).toString('base64')}`,
+  alt, authorization, width:192, height:192
+});
+const TREND_MEDIA = [MEDIA_SAMPLE, ...['house','train-front','chart-no-axes-combined'].map(name => loadAsset('lucide',name,name,'Lucide ISC; assets/lucide/LICENSE'))];
+const LOGO_MEDIA = ['github','python','rust','javascript'].map(name => ({
+  mediaVariants: Object.fromEntries(['grayscale','color'].map(mode => [mode,loadAsset('simple-icons',name+'-'+mode,name,'Simple Icons CC0; assets/simple-icons/LICENSE.md; editorial identification')]))
+}));
+const WORDMARK_RECORDS=JSON.parse(readFileSync(new URL("../assets/simple-icons/treatments.json",import.meta.url),"utf8"));
+const WORDMARK_MEDIA=['visa','cisco','intel','samsung'].map(name=>{
+  const record=WORDMARK_RECORDS.find(r=>r.name===name);
+  return {mediaVariants:Object.fromEntries(['grayscale','color'].map(mode=>[mode,{...loadAsset('simple-icons',name+'-'+mode,name,'Simple Icons CC0; assets/simple-icons/LICENSE.md; editorial identification'),width:record.width,height:record.height}]))};
+});
+const COLLAGE_MEDIA=[WORDMARK_MEDIA[0],LOGO_MEDIA[0],WORDMARK_MEDIA[1],LOGO_MEDIA[1],WORDMARK_MEDIA[2],LOGO_MEDIA[2],WORDMARK_MEDIA[3],LOGO_MEDIA[3]];
+const COLLAGE_CELLS=[
+  {x:0,y:0,width:.32,height:.20},{x:.40,y:.04,width:.14,height:.24},
+  {x:.65,y:0,width:.34,height:.28},{x:.03,y:.35,width:.15,height:.25},
+  {x:.26,y:.37,width:.30,height:.20},{x:.68,y:.40,width:.13,height:.25},
+  {x:.03,y:.77,width:.40,height:.20},{x:.86,y:.74,width:.10,height:.23}
+];
+const IMAGE_MEDIA = {...loadAsset('pexels','category','Abstract Pexels background','User-selected Pexels image; assets/pexels/source.json'),width:480,height:480,sourceUrl:'https://images.pexels.com/photos/7135013/pexels-photo-7135013.jpeg'};
+const COVER_MEDIA = {...IMAGE_MEDIA,...loadAsset('pexels','cover','Abstract Pexels background','User-selected Pexels image; assets/pexels/source.json'),width:640,height:720};
+
+const T = [
+  "space.3",
+  "space.4",
+  "space.5",
+  "color.rule",
+  "line.hairline",
+  "color.surfaceMuted",
+  "color.componentPrimary",
+  "color.onPrimary",
+  "radius.none",
+];
+
+export function bitmapDimensions(dataUri) {
+  const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(dataUri || "");
+  if (!match) throw new Error("Media requires embedded PNG/JPEG");
+  const bytes = Buffer.from(match[2], "base64");
+  if (match[1] === "png") {
+    if (bytes.length < 33 || bytes.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a" || bytes.readUInt32BE(8) !== 13 || bytes.toString("ascii", 12, 16) !== "IHDR") throw new Error("Invalid PNG header");
+    const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20);
+    if (!width || !height) throw new Error("Invalid PNG dimensions");
+    return { width, height };
+  }
+  if (bytes.length < 4 || bytes.readUInt16BE(0) !== 0xffd8) throw new Error("Invalid JPEG header");
+  let offset = 2;
+  while (offset < bytes.length) {
+    if (bytes[offset++] !== 0xff) throw new Error("Invalid JPEG marker");
+    while (bytes[offset] === 0xff) offset++;
+    const marker = bytes[offset++];
+    if (marker === 0xd9 || marker === 0xda) break;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > bytes.length) break;
+    const length = bytes.readUInt16BE(offset);
+    if (length < 2 || offset + length > bytes.length) throw new Error("Truncated JPEG segment");
+    if ([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf].includes(marker)) {
+      if (length < 8) throw new Error("Invalid JPEG frame");
+      const height = bytes.readUInt16BE(offset + 3), width = bytes.readUInt16BE(offset + 5);
+      if (!width || !height) throw new Error("Invalid JPEG dimensions");
+      return { width, height };
+    }
+    offset += length;
+  }
+  throw new Error("JPEG has no dimensions frame");
+}
+
+export function mediaNode({ id, frame, props, role = "image" }) {
+  if (
+    !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(
+      props?.dataUri || "",
+    ) ||
+    !props.alt?.trim() ||
+    !props.authorization?.trim()
+  )
+    throw new Error(
+      "Media requires embedded PNG/JPEG, alt text and authorization",
+    );
+  if (
+    !(props.width > 0 && props.height > 0) ||
+    !Number.isFinite(props.width + props.height)
+  )
+    throw new Error("Media requires positive intrinsic width and height");
+  const intrinsic = bitmapDimensions(props.dataUri);
+  if (props.width !== intrinsic.width || props.height !== intrinsic.height)
+    throw new Error("Media intrinsic dimensions do not match the bitmap header");
+  const scale = Math.min(
+    frame.width / props.width,
+    frame.height / props.height,
+  );
+  const width = props.width * scale,
+    height = props.height * scale;
+  return primitive({
+    type: "image",
+    id,
+    role,
+    frame: {
+      x: frame.x + (frame.width - width) / 2,
+      y: frame.y + (frame.height - height) / 2,
+      width,
+      height,
+    },
+    data: { ...props, circular: false },
+  });
+}
+
+export function registerMedia(registry) {
+  const image = registry.get("image-frame");
+  const imageRender = image.render;
+  image.render = (input) =>
+    input.props.dataUri && input.props.width
+      ? { nodes: [mediaNode({ ...input, id: stableId(input.id, "image") })] }
+      : imageRender(input);
+  for (const name of ["icon", "logo"]) {
+    const owner = registry.get(name),
+      original = owner.render;
+    owner.render = (input) =>
+      input.props.dataUri
+        ? { nodes: [mediaNode({ ...input, role: name })] }
+        : original(input);
+    owner.examples = {
+      ...(owner.examples || {}),
+      "sourced-media": { props: MEDIA_SAMPLE },
+    };
+  }
+  const cover = registry.get("cover"),
+    plain = cover.render;
+  cover.variants = {
+    plain: {},
+    "half-image": {
+      props: {
+        title: "(Insert title)",
+        subtitle: "(Insert subtitle)",
+        image: COVER_MEDIA,
+      },
+    },
+  };
+  cover.defaultVariant = "plain";
+  cover.variantProp = "variant";
+  cover.resolveVariant = (props) => {
+    const value = props.variant ?? "plain";
+    if (!Object.hasOwn(cover.variants, value))
+      throw new Error("Unknown cover variant");
+    return value;
+  };
+  cover.render = (input) => {
+    const { variant, image, ...props } = input.props;
+    if (cover.resolveVariant(input.props) === "plain") {
+      if (image) throw new Error("Cover image requires half-image variant");
+      return plain({ ...input, props });
+    }
+    if (!image) throw new Error("Half-image cover requires sourced image");
+    const half = input.frame.width / 2;
+    return {
+      nodes: [
+        ...plain({ ...input, frame: { ...input.frame, width: half }, props })
+          .nodes,
+        mediaNode({
+          id: stableId(input.id, "image"),
+          frame: {
+            x: input.frame.x + half,
+            y: input.frame.y,
+            width: half,
+            height: input.frame.height,
+          },
+          props: image,
+          role: "cover-image",
+        }),
+      ],
+    };
+  };
+  const tokens = [
+    ...new Set([
+      ...T,
+      ...registry.get("paragraph").tokens,
+      ...registry.get("section-heading").tokens,
+      ...registry.get("bullet-list").tokens,
+      ...registry.get("connector").tokens,
+    ]),
+  ];
+  const items = [1, 2, 3, 4].map((i) => ({
+    id: `trend-${i}`,
+    title: `(Insert trend ${i})`,
+    text: "(Insert supporting evidence.)",
+    media: TREND_MEDIA[i-1],
+  }));
+  registry.set("icon-trends", {
+    id: "icon-trends",
+    version: "1.0.0",
+    category: "media",
+    role: "icon-trends",
+    tokens,
+    preferredSize: { width: 1160, height: 460 },
+    sample: { items },
+    guidance: {
+      useWhen: "comparing independent trends with recognizable subjects",
+      why: "sourced icons or images identify each subject while editable text develops its evidence",
+      actionTitle: "state the shared consequence of the trends",
+    },
+    variants: { columns: {}, rows: {}, "image-columns": {props:{items:items.map(item=>({...item,media:IMAGE_MEDIA}))}} },
+    defaultVariant: "columns",
+    variantProp: "variant",
+    resolveVariant(props = {}) {
+      const v = props.variant ?? "columns";
+      if (!["columns", "rows", "image-columns"].includes(v))
+        throw new Error("Unknown icon-trends variant");
+      return v;
+    },
+    render({ id, frame, props, tokens }) {
+      const variant = registry.get("icon-trends").resolveVariant(props),
+        items = props.items;
+      if (
+        !Array.isArray(items) ||
+        items.length < 2 ||
+        items.length > 4 ||
+        new Set(items.map((i) => i.id)).size !== items.length ||
+        items.some((i) => !i.id || !i.text)
+      )
+        throw new Error(
+          "Icon trends require two to four identified evidence items",
+        );
+      if (
+        props.connector !== undefined &&
+        !["none", "chevron"].includes(props.connector)
+      )
+        throw new Error("Trend connectors must be none or chevron");
+      const gap = tokenValue(token("space.5")),
+        nodes = [];
+      items.forEach((item, i) => {
+        const column = variant !== "rows";
+        const width = column
+          ? (frame.width - gap * (items.length - 1)) / items.length
+          : frame.width;
+        const height = column
+          ? frame.height
+          : (frame.height - gap * (items.length - 1)) / items.length;
+        const x = frame.x + (column ? i * (width + gap) : 0),
+          y = frame.y + (column ? 0 : i * (height + gap));
+        const iconSize = Math.min(column ? (variant === "image-columns" ? width : 100) : height, column ? width : 100);
+        const mediaFrame = {
+          x: column ? x + (width - iconSize) / 2 : x,
+          y,
+          width: iconSize,
+          height: iconSize,
+        };
+        nodes.push(
+          mediaNode({
+            id: stableId(id, item.id, "media"),
+            frame: mediaFrame,
+            props: item.media,
+            role: "trend-media",
+          }),
+        );
+        const textX = column ? x : x + iconSize + gap,
+          textWidth = column ? width : width - iconSize - gap;
+        let textY = column ? y + iconSize + gap : y;
+        if (column && props.connector === "chevron") {
+          nodes.push(
+            ...registry
+              .get("connector")
+              .render({
+                id: stableId(id, item.id, "connector"),
+                frame: {
+                  x: x + width / 2 - 12,
+                  y: textY,
+                  width: 24,
+                  height: 24,
+                },
+                props: { variant: "chevron" },
+                tokens,
+              }).nodes,
+          );
+          textY += 24 + gap;
+        }
+        const heading = registry.get("section-heading"),
+          hp = { heading: item.title, rule: false };
+        const hh = item.title ? heading.measureHeader({
+          frame: { x: textX, y: textY, width: textWidth, height },
+          props: hp,
+        }).height : 0;
+        if(item.title) nodes.push(
+          ...heading.render({
+            id: stableId(id, item.id, "heading"),
+            frame: { x: textX, y: textY, width: textWidth, height: hh + gap },
+            props: hp,
+            tokens,
+          }).nodes,
+        );
+        const bodyY = textY + hh + (item.title ? tokenValue(token("space.3")) : 0);
+        if (bodyY >= y + height)
+          throw new Error("Icon trends need more height");
+        nodes.push(
+          ...registry
+            .get("paragraph")
+            .render({
+              id: stableId(id, item.id, "body"),
+              frame: {
+                x: textX,
+                y: bodyY,
+                width: textWidth,
+                height: y + height - bodyY,
+              },
+              props: { text: item.text },
+              tokens,
+            }).nodes,
+        );
+      });
+      if (props.verticalAlign !== undefined && !["center", "top"].includes(props.verticalAlign)) throw new Error("Icon trends verticalAlign must be center or top");
+      if (variant !== "rows" && props.verticalAlign !== "top") {
+        for (const node of nodes) if (node.type === "text" && node.data.textLayout) node.frame.height = node.data.textLayout.height;
+        const bottom = Math.max(...nodes.map(node => node.frame.y + node.frame.height));
+        const shift = (frame.height - (bottom - frame.y)) / 2;
+        for (const node of nodes) {
+          node.frame.y += shift;
+          if (node.type === "line") { node.data.y1 += shift; node.data.y2 += shift; }
+        }
+      }
+      return { nodes };
+    },
+  });
+  registry.set("logo-collage", {
+    id: "logo-collage",
+    version: "1.0.0",
+    category: "media",
+    role: "logo-collage",
+    variants: {grayscale:{},color:{}},
+    defaultVariant: "grayscale",
+    variantProp: "variant",
+    resolveVariant(props={}) {
+      const variant=props.variant??"grayscale";
+      if(!["grayscale","color"].includes(variant)) throw new Error("Unknown logo treatment");
+      return variant;
+    },
+    examples: {
+      "area-grayscale":{props:{layout:"collage",variant:"grayscale",items:COLLAGE_MEDIA.map((media,i)=>({id:`collage-${i}`,...media,cell:COLLAGE_CELLS[i]}))}},
+      "area-color":{props:{layout:"collage",variant:"color",items:COLLAGE_MEDIA.map((media,i)=>({id:`collage-${i}`,...media,cell:COLLAGE_CELLS[i]}))}},
+      "radial-grayscale":{props:{layout:"radial",variant:"grayscale",items:LOGO_MEDIA.map((media,i)=>({id:`radial-${i}`,...media}))}},
+      "radial-color":{props:{layout:"radial",variant:"color",items:LOGO_MEDIA.map((media,i)=>({id:`radial-${i}`,...media}))}}
+    },
+    tokens,
+    preferredSize: { width: 1160, height: 400 },
+    sample: {
+      items: [1, 2, 3, 4].map((i) => ({ id: `brand-${i}`, ...LOGO_MEDIA[i-1] })),
+    },
+    guidance: {
+      useWhen: "showing the membership of an employer, customer or partner set",
+      why: "sourced marks make a bounded group recognizable without implying market share",
+      actionTitle: "state the membership or ecosystem distinction",
+    },
+    render({ id, frame, props }) {
+      const items = props.items;
+      if (
+        !Array.isArray(items) ||
+        !items.length ||
+        items.length > 12 ||
+        new Set(items.map((i) => i.id)).size !== items.length ||
+        items.some((i) => !i.id)
+      )
+        throw new Error(
+          "Logo collage requires one to twelve uniquely identified assets",
+        );
+      const variant=registry.get("logo-collage").resolveVariant(props);
+      const layout=props.layout??"grid";
+      if(!["grid","radial","collage"].includes(layout)) throw new Error("Logo collage layout must be grid, radial or collage");
+      const gap=tokenValue(token("space.5"));
+      const size=Math.min(80,frame.width/4,frame.height/3);
+      if(size<40) throw new Error("Logo collage is too dense");
+      let frames;
+      if(layout==="grid") {
+        const columns=props.columns??Math.ceil(Math.sqrt(items.length));
+        if(!Number.isInteger(columns)||columns<1||columns>items.length)
+          throw new Error("Invalid logo collage columns");
+        const rows=Math.ceil(items.length/columns);
+        if(items.length>=3&&rows===1) throw new Error("Use multiple logo grid rows");
+        const width=columns*size+(columns-1)*gap,height=rows*size+(rows-1)*gap;
+        if(width>frame.width||height>frame.height) throw new Error("Logo collage is too dense");
+        frames=items.map((_,i)=>({x:frame.x+(frame.width-width)/2+(i%columns)*(size+gap),y:frame.y+(frame.height-height)/2+Math.floor(i/columns)*(size+gap),width:size,height:size}));
+      } else if(layout==="collage") {
+        if(items.some(item=>!item.cell)) throw new Error("Area collage requires a normalized cell for every logo");
+        frames=items.map(item=>{
+          const c=item.cell;
+          if(![c.x,c.y,c.width,c.height].every(Number.isFinite)||c.x<0||c.y<0||c.width<=0||c.height<=0||c.x+c.width>1||c.y+c.height>1)
+            throw new Error("Collage cells must stay inside the normalized rectangle");
+          return {x:frame.x+c.x*frame.width,y:frame.y+c.y*frame.height,width:c.width*frame.width,height:c.height*frame.height};
+        });
+        for(let i=0;i<frames.length;i++) for(let j=i+1;j<frames.length;j++){
+          const a=frames[i],b=frames[j];
+          if(Math.min(a.x+a.width,b.x+b.width)>Math.max(a.x,b.x)&&Math.min(a.y+a.height,b.y+b.height)>Math.max(a.y,b.y))
+            throw new Error("Collage cells must not overlap");
+        }
+        frames=frames.map(f=>{
+          const width=Math.min(f.width,280),height=Math.min(f.height,96);
+          return {x:f.x+(f.width-width)/2,y:f.y+(f.height-height)/2,width,height};
+        });
+      } else {
+        const radius=items.length===1?0:Math.min(160,(frame.width-size)/2,(frame.height-size)/2);
+        if(items.length>1&&2*radius*Math.sin(Math.PI/items.length)<Math.SQRT2*size+gap)
+          throw new Error("Radial logo collage is too dense; enlarge the section or use a grid");
+        frames=items.map((_,i)=>{
+          const angle=-Math.PI/2+2*Math.PI*i/items.length;
+          return {x:frame.x+frame.width/2+radius*Math.cos(angle)-size/2,y:frame.y+frame.height/2+radius*Math.sin(angle)-size/2,width:size,height:size};
+        });
+      }
+      return {nodes:items.map((item,i)=>{
+        const media=item.mediaVariants?.[variant]??(item.treatment===variant?item:null);
+        if(!media) throw new Error("Supply prepared logo media for the selected treatment");
+        return mediaNode({id:stableId(id,item.id),role:"logo",frame:frames[i],props:media});
+      })};
+    },
+  });
+  return registry;
+}

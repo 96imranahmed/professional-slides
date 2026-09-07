@@ -74,7 +74,7 @@ For analytical slides, apply the [analytical substance check](../components/copy
 
 When navigation materially improves orientation, map parent tracker IDs, labels, and order to the dot-dash section groups, then map chapter-item IDs, labels, order, and governed slide ranges to their analytical subgroups. The [tracker owner](../components/trackers/index.md) controls eligibility, hierarchy, variants, placement, and visibility.
 
-When an executive summary and tracker both exist, map each summary proof branch to the corresponding chapter in the same semantic order and map the overall action to the decision chapter. Branch headings remain evidence-led conclusions, while tracker labels remain short navigation labels; any wording difference must preserve an obvious one-to-one bridge. Do not move from `Operating momentum` in the summary to an unexplained `Growth quality` chapter in the body.
+When an executive summary and tracker both exist, record how substantive summary themes support the body arguments in planning metadata. Themes may consolidate related sections. Use audience-facing headings such as Career and industry; never add Chapter 1 or other navigation references to the summary. Test coverage and meaning rather than requiring identical labels or a one-to-one visible mapping.
 
 Do not create a tracker item without a matching dot-dash group. Do not rename or reorder an approved item during authoring.
 

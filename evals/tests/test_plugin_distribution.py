@@ -21,9 +21,15 @@ class PluginDistributionTests(unittest.TestCase):
             icon = b'\x89PNG\r\n\x1a\nicon-fixture'
             (source/'assets/icon.png').write_bytes(icon)
             (source/'assets/private.txt').write_text('excluded')
+            skill_assets = source/'skills/professional-slides/assets'
+            skill_assets.mkdir(parents=True)
+            (skill_assets/'map.png').write_bytes(icon)
+            (skill_assets/'LICENSE').write_text('Asset license')
             packager.package(source, dest)
             self.assertEqual((dest/'assets/icon.png').read_bytes(), icon)
             self.assertFalse((dest/'assets/private.txt').exists())
+            self.assertEqual((dest/'skills/professional-slides/assets/map.png').read_bytes(), icon)
+            self.assertEqual((dest/'skills/professional-slides/assets/LICENSE').read_text(), 'Asset license')
 
     def test_package_excludes_generated_private_and_dependency_files(self):
         with tempfile.TemporaryDirectory() as tmp:

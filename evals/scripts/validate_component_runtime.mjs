@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { auditEmbeddedMedia } from "./media_integrity.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -191,6 +192,9 @@ async function inspectPackage(pptxPath, deck) {
   }
   const expectedNamesBySlide = deck.slides.map((slide) => slide.nodes.map((node) => `ps:${node.id}`));
   const missingNames = expectedNamesBySlide.flatMap((expected, index) => expected.filter((name) => !namesBySlide[index]?.includes(name)).map((name) => ({ slide: index + 1, name })));
+  const mediaFiles = Object.keys(zip.files).filter(name => /^ppt\/media\//.test(name) && !zip.files[name].dir);
+  const expectedMedia = deck.slides.flatMap(slide => slide.nodes.filter(node => node.type === "image" && node.data.dataUri).map(node => Buffer.from(node.data.dataUri.split(",")[1], "base64")));
+  const mediaIntegrity = auditEmbeddedMedia(expectedMedia, await Promise.all(mediaFiles.map(name => zip.file(name).async("nodebuffer"))));
   const expectedWidth = Math.round(SLIDE.width / 96 * 914400);
   const expectedHeight = Math.round(SLIDE.height / 96 * 914400);
   return {
@@ -211,7 +215,8 @@ async function inspectPackage(pptxPath, deck) {
     cornerRadiusMismatches,
     textStyleMismatches,
     chartPartCount: Object.keys(zip.files).filter((name) => /^ppt\/charts\/chart\d+\.xml$/.test(name) && !zip.files[name].dir).length,
-    mediaPartCount: Object.keys(zip.files).filter((name) => /^ppt\/media\//.test(name) && !zip.files[name].dir).length
+    mediaIntegrity,
+    mediaPartCount: mediaFiles.length
   };
 }
 
@@ -369,7 +374,7 @@ async function main() {
     && packageAudit.textStyleMismatches.length === 0
     && packageAudit.schemeReferences.length > 0
     && packageAudit.chartPartCount === 0
-    && packageAudit.mediaPartCount === 0;
+    && packageAudit.mediaIntegrity.accepted;
   const report = {
     schema: "professional-slides.component-validation/v1",
     generatedAt: new Date().toISOString(),

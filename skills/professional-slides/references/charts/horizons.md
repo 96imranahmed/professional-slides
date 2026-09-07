@@ -14,7 +14,7 @@ Showing how a portfolio moves from the current core through emerging growth play
 
 Use `chart.horizons` with one ordered `horizons` array. Each horizon requires a stable `id` and `label`, and may add `title`, `timeframe`, `description`, `summary`, zero to four `{ label, value }` details, a registered `colorIndex`, and normalized `start` and `end` positions. The array order owns the sequence. Starts must not move backwards and each end must follow its start.
 
-The owner accepts three variants:
+The owner accepts four variants:
 
 - `curves` is the default Three Horizons model. It uses conceptual value-over-time axes with proper triangular arrowheads, staggered editable curves, direct horizon labels, and concise descriptions.
 - `stepped` removes the conceptual axes and curves. It uses ascending horizontal stage rules with a developed title, timeframe, details, and narrative in each column.
@@ -44,3 +44,7 @@ Treating conceptual horizons as a precise forecast, mixing unrelated initiatives
 ## Acceptance test
 
 The sequence from current core to future options remains understandable in grayscale, every horizon maps to one ordered semantic record, arrowheads are explicit native line endpoints, and the selected density variant fits without clipping or a local type override.
+
+## Ascending header bands
+
+Select `stepped-bands` for two or three past, present and future states. Ascending filled headers share a bottom baseline; each state's title, timeframe, narrative and labelled details sit below. Header height indicates ordered progression only, not a measured quantity. Distinguish an aspiration, scenario or forecast in its label and evidence. Keep `stepped-minimal` for a longer concise sequence and `curves` when overlapping growth horizons matter.

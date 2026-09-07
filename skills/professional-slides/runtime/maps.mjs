@@ -88,6 +88,7 @@ function resolveCountryId(value) {
 }
 
 export function resolveGeography(value = "world") {
+  if (value && typeof value === "object") return customGeography(value);
   const text = String(value ?? "world").trim();
   const countryMatch = text.match(/^country\s*:\s*(.+)$/i);
   if (countryMatch) {
@@ -101,6 +102,46 @@ export function resolveGeography(value = "world") {
   const countries = NATURAL_EARTH_COUNTRIES.filter((country) => countryMatches(country, definition.criteria));
   if (!countries.length) throw new Error(`Map geography has no countries: ${presetId}`);
   return Object.freeze({ id: presetId, title: definition.title, bounds: definition.bounds, countries: Object.freeze(countries) });
+}
+
+// Geometry is downloaded and converted before compilation; renderers never fetch.
+function customGeography(value) {
+  const { id, title, source, geojson } = value;
+  if (!id || !title || !source?.url || !/^https?:\/\//.test(source.url) || !source.license || !/^[a-f0-9]{64}$/i.test(source.sha256 || "")) throw new Error("Custom geography requires id, title and source URL, license and SHA-256");
+  if (geojson?.type !== "FeatureCollection" || !geojson.features?.length) throw new Error("Custom map requires a WGS84 GeoJSON FeatureCollection");
+  if (geojson.crs) throw new Error("Reproject custom geometry to RFC 7946 WGS84 before import");
+  const ids = new Set();
+  const countries = geojson.features.map((feature, index) => {
+    const featureId = String(feature.id ?? feature.properties?.id ?? "");
+    if (!featureId || ids.has(featureId)) throw new Error("Custom features require unique stable ids");
+    ids.add(featureId);
+    const geometry = feature.geometry;
+    if (!["Polygon", "MultiPolygon"].includes(geometry?.type)) throw new Error("Custom maps support Polygon and MultiPolygon features");
+    if (!Array.isArray(geometry.coordinates)) throw new Error("Custom geometry requires coordinates");
+    const groups = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+    if (!groups.length || groups.some(group => !Array.isArray(group) || !group.length)) throw new Error("Custom polygon has no rings");
+    const polygons = groups.flat();
+    if (!Array.isArray(polygons) || !polygons.length) throw new Error("Custom feature has no rings");
+    for (const ring of polygons) {
+      if (!Array.isArray(ring) || ring.length < 4 || ring.some(point => !Array.isArray(point) || point.length < 2 || !point.every(Number.isFinite) || Math.abs(point[0]) > 180 || Math.abs(point[1]) > 90)) throw new Error("Custom rings require closed WGS84 longitude/latitude coordinates");
+      if (ring[0][0] !== ring.at(-1)[0] || ring[0][1] !== ring.at(-1)[1]) throw new Error("Custom polygon ring is not closed");
+      if (ring.some((point, i) => i && Math.abs(point[0] - ring[i-1][0]) > 180)) throw new Error("Split antimeridian-crossing custom geometry before import");
+    }
+    // Ring order determines holes even when the input winding is noncanonical.
+    const oriented = groups.flatMap(group => group.map((ring, index) => {
+      const xy = ring.map(point => point.slice(0, 2));
+      const area = xy.slice(1).reduce((sum, point, i) => sum + xy[i][0] * point[1] - point[0] * xy[i][1], 0);
+      if (!area) throw new Error("Custom polygon ring has zero area");
+      return (area > 0) === (index === 0) ? xy : xy.reverse();
+    }));
+    return { id: featureId, name: feature.properties?.name || featureId, polygons: oriented, source };
+  });
+  const points = countries.flatMap(c => c.polygons.flat());
+  const [minX,minY,maxX,maxY] = points.reduce((b,p) => [Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);
+  const padX = Math.max(.001, (maxX-minX)*.08), padY = Math.max(.001, (maxY-minY)*.08);
+  const bounds = value.bounds || [Math.max(-180,minX-padX),Math.max(-90,minY-padY),Math.min(180,maxX+padX),Math.min(90,maxY+padY)];
+  if (!Array.isArray(bounds) || bounds.length !== 4 || !bounds.every(Number.isFinite) || bounds[0]>=bounds[2] || bounds[1]>=bounds[3] || bounds[0]<-180 || bounds[2]>180 || bounds[1]<-90 || bounds[3]>90) throw new Error("Invalid custom geography bounds");
+  return { id: `custom:${id}`, title, bounds, countries, source, custom: true };
 }
 
 function countryMatches(country, criteria) {
@@ -187,8 +228,8 @@ function projection(frame, bounds) {
 
 function polygonNode({ id, country, paths, highlighted }) {
   const points = paths.flat();
-  const xs = points.map((point) => point[0]), ys = points.map((point) => point[1]);
-  const x = Math.min(...xs), y = Math.min(...ys), width = Math.max(...xs) - x, height = Math.max(...ys) - y;
+  const [x,y,maxX,maxY] = points.reduce((b,p)=>[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);
+  const width=maxX-x, height=maxY-y;
   if (width < 0.35 || height < 0.35) return null;
   const normalized = paths.map((path) => path.map(([px, py]) => [Number(((px - x) / width).toFixed(6)), Number(((py - y) / height).toFixed(6))]));
   const fill = highlighted ? PRIMARY : MUTED_SURFACE;
@@ -203,14 +244,20 @@ function polygonNode({ id, country, paths, highlighted }) {
       countryId: country.id,
       countryName: country.name,
       highlighted,
-      source: NATURAL_EARTH_SOURCE.name,
-      sourceUrl: NATURAL_EARTH_SOURCE.url,
-      sourceCommit: NATURAL_EARTH_SOURCE.commit
+      source: country.source?.name || country.source?.url || NATURAL_EARTH_SOURCE.name,
+      sourceUrl: country.source?.url || NATURAL_EARTH_SOURCE.url,
+      sourceSha256: country.source?.sha256,
+      sourceLicense: country.source?.license,
+      sourceCommit: country.source ? undefined : NATURAL_EARTH_SOURCE.commit
     }
   });
 }
 
 function markerCoordinate(marker, geography, projected) {
+  if (marker.longitude !== undefined || marker.latitude !== undefined) {
+    if (!Number.isFinite(marker.longitude) || !Number.isFinite(marker.latitude) || !projected.contains([marker.longitude, marker.latitude])) throw new Error("Map longitude/latitude marker is outside the crop");
+    return projected.project([marker.longitude, marker.latitude]);
+  }
   if (marker.country) {
     const id = resolveCountryId(marker.country);
     const country = geography.countries.find((candidate) => candidate.id === id);
@@ -248,7 +295,8 @@ function markerNodes({ id, frame, geography, projected, markers }) {
 export function mapNodes({ id, frame, props = {} }) {
   if (props.markers !== undefined && !Array.isArray(props.markers)) throw new Error("Map markers must be an array");
   const geography = resolveGeography(props.geography ?? "world");
-  const highlighted = new Set((props.highlightCountries || []).map(resolveCountryId));
+  if (props.highlightCountries !== undefined && !Array.isArray(props.highlightCountries)) throw new Error("Map highlights must be an array");
+  const highlighted = new Set((props.highlightCountries || []).map(value => geography.custom ? String(value) : resolveCountryId(value)));
   const absentHighlights = [...highlighted].filter((countryId) => !geography.countries.some((country) => country.id === countryId));
   if (absentHighlights.length) throw new Error(`Highlighted countries are outside ${geography.id}: ${absentHighlights.join(", ")}`);
   const projected = projection(frame, geography.bounds);
@@ -260,3 +308,9 @@ export function mapNodes({ id, frame, props = {} }) {
   if (!nodes.some((node) => node.role === "map-land")) throw new Error(`Map geography ${geography.id} produced no visible land shapes`);
   return nodes;
 }
+
+export const CUSTOM_MAP_SAMPLE = {
+  id: "germany-import", title: "Germany imported geometry",
+  source: { ...NATURAL_EARTH_SOURCE, license: "Public domain" },
+  geojson: { type: "FeatureCollection", features: [{ type: "Feature", id: "DEU", properties: { name: "Germany" }, geometry: { type: "Polygon", coordinates: COUNTRY_BY_ID.get("DEU").polygons.map(ring => [...ring, ring[0]]) } }] }
+};

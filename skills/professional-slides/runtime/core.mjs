@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { tagSemanticNodes } from "./semantic-integrity.mjs";
 import { resolvePalette, heatScaleTokens } from "./palettes.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
@@ -682,11 +683,13 @@ export function compileDeck(deckSpec, registry) {
         version: definition.version,
         category: definition.category,
         role: node.role || definition.role,
+        ...(props.semantic ? {relationships: props.semantic} : {}),
         variant: definition.resolveVariant?.(props),
         frame,
         tokens: definition.tokens
       });
     }
+    tagSemanticNodes(nodes, componentInstances);
     assertUniqueIds(nodes);
     for (const node of nodes) {
       node.style = Object.fromEntries(Object.entries(node.style).map(([key, value]) => [key,

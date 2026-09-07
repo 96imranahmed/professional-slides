@@ -70,3 +70,20 @@ Give every mark a semantic or compositional purpose. Consider `icon-only`, `imag
 ## Embedded image input
 
 The registered `image-frame` component accepts `dataUri` (embedded PNG or JPEG), nonempty `alt`, and `authorization` referencing the asset record. Prepare the authorized crop at the target aspect ratio before embedding; both adapters preserve that rectangular crop. Omit `dataUri` only for an explicit planning placeholder. Quote avatars retain their separate circular treatment.
+
+## Icon trends and logo collages
+
+Use registered `icon-trends` for two to four independent trends. `columns` puts a sourced icon or image above each heading and explanation; `rows` gives longer explanations horizontal space. `image-columns` is the larger image-led counterpart of `columns`: full-column square images above the same headings and descriptions. It uses dedicated image assets rather than enlarging icons or removing their text. Each item requires `id`, `title`, `text` and `media`. Default to no connector. Set `connector: chevron` only when a directional relationship is real. Use one coherent asset treatment across peers.
+
+Use `logo-collage` with one to twelve identified assets to show set membership. Logos stay small (at most 80 pixels on the structural canvas) and are centered in a compact multi-row grid by default; `layout: radial` distributes them around the section center. Avoid a straight logo strip. Choose the `grayscale` or `color` treatment consistently within a set. Supply authorized prepared assets under `mediaVariants.grayscale` and `mediaVariants.color`, or declare a matching `treatment` on a single asset; never recolor brands using the deck series palette. Preserve aspect ratios and equal visual weight. An explicit grid column count must retain multiple rows for three or more logos. For A/B ecosystems, place two collages under substantive headings in a row, optionally separated by the shared section boundary. Keep source dates and selection criteria visible; logo count and area do not encode market share.
+
+The shared media renderer accepts embedded PNG/JPEG, intrinsic `width` and `height`, `alt`, and `authorization`; optional `sourceUrl` preserves traceability. It contains assets without distortion. Prepare intentional photographic crops before embedding. The bundled Lucide fixture is licensed demonstration artwork, not a substitute for choosing the right icon or obtaining actual logos. `runtime/media.mjs` owns these compositions and their token bindings.
+
+For an area-filling rectangular collage, use `layout: collage` with a normalized `cell: {x,y,width,height}` on each item. Spread unequal cells across the full section to accommodate wide wordmarks, tall emblems and compact marks, following the reference composition. Cells must remain inside the section and must not overlap. The runtime contains each asset without stretching or cropping; individual marks remain modest (maximum 280 by 96 structural pixels), and whitespace supplies breathing room. This is an optical arrangement, never a market-share encoding. Both grayscale and color treatments use the same placement contract. Prefer the simpler grid when mixed silhouettes do not need an area composition.
+
+### Production photographs
+
+For a dedicated image panel, find a relevant photograph on Pexels or another licensed source, verify the subject and source page, download and decode the actual image, then embed it. Record source, photographer and usage basis in notes or the asset ledger. Inspect the final crop at slide size. Registry samples are layout examples, not automatically appropriate production imagery; do not substitute a gradient, icon or unrelated sample for a subject photograph.
+
+
+Column icon and dedicated-image groups default to vertical centering within the allocated body frame. Center the occupied media, headings and descriptions together, preserving their internal alignment; do not center the title/footer with them. `verticalAlign: "top"` is an explicit content-driven exception.

@@ -66,12 +66,15 @@ function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotati
   };
 }
 
-function formatValue(value, props) {
+export function formatValue(value, props) {
   const format = props.valueFormat;
   if (!format) return String(value);
-  const decimals = format.decimals ?? 0;
+  const units = {k: 1000, m: 1000000, bn: 1000000000};
+  if (format.compactUnit !== undefined && !Object.hasOwn(units, format.compactUnit)) throw new Error("valueFormat.compactUnit must be k, m or bn");
+  const divisor = units[format.compactUnit] || 1;
+  const decimals = format.decimals ?? (format.compactUnit ? 1 : 0);
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > 6) throw new Error("valueFormat.decimals must be an integer from zero to six");
-  return `${format.prefix || ""}${Number(value).toFixed(decimals)}${format.suffix || ""}`;
+  return `${format.prefix || ""}${Number(value / divisor).toFixed(decimals)}${format.compactUnit || ""}${format.suffix || ""}`;
 }
 
 function textStyle(size = CHART_LABEL, color = SECONDARY, bold = false, align = "center") {
@@ -232,7 +235,8 @@ function horizontalAxes(id, plot, xMin, xMax, steps = 4, { gridlines = false, sh
       }));
     }
   }
-  nodes.push(linePrimitive({ id: stableId(id, "y-axis"), role: "chart-axis", x1: plot.x, y1: plot.y, x2: plot.x, y2: plot.y + plot.height, style: lineStyle(INK) }));
+  const zeroX = plot.x + (0-xMin)/(xMax-xMin)*plot.width;
+  nodes.push(linePrimitive({ id: stableId(id, "y-axis"), role: "chart-axis", x1: zeroX, y1: plot.y, x2: zeroX, y2: plot.y + plot.height, style: lineStyle(INK) }));
   if (showValueAxis) nodes.push(linePrimitive({ id: stableId(id, "x-axis"), role: "chart-axis", x1: plot.x, y1: plot.y + plot.height, x2: plot.x + plot.width, y2: plot.y + plot.height, style: lineStyle(INK) }));
   return nodes;
 }
@@ -336,7 +340,11 @@ function withDecorations(nodes, options) {
     const crossesGrid = nodes.some((node) => node.role === "chart-gridline" && node.frame.y > frame.y && node.frame.y < frame.y + height && node.frame.x < frame.x + width && node.frame.x + node.frame.width > frame.x);
     if (!insideMark && crossesGrid) backings.push(rectPrimitive({ id: stableId(label.id, "backing"), role: "chart-label-surface", frame, style: { fill: token("color.surface"), stroke: "none", lineWidth: token("line.hairline") }, data: { forNode: label.id } }));
   }
-  return [...underlay, ...nodes.flatMap((node) => [...backings.filter((backing) => backing.data.forNode === node.id), node]), ...overlay];
+  // Shared by columns, bars and waterfalls: opaque marks cannot cover axes.
+  // Gridlines remain in the background; annotations remain in the foreground.
+  const foregroundAxes = nodes.filter(node => node.role === "chart-axis");
+  const layeredNodes = [...nodes.filter(node => node.role !== "chart-axis"), ...foregroundAxes];
+  return [...underlay, ...layeredNodes.flatMap((node) => [...backings.filter((backing) => backing.data.forNode === node.id), node]), ...overlay];
 }
 
 function categoricalChart({ id, frame, props, horizontal = false, stacked = false, tokens = TOKENS }) {
@@ -360,12 +368,13 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const horizontalCategoryLabelWidth = horizontal
     ? Math.min(180, Math.max(72, Math.ceil(Math.max(...categories.map(category => measureText(category, 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width))) + 12))
     : 0;
+  const negativeLabelGutter = horizontal && !stacked && showDataLabels && values.some(v=>v<0) ? barLabelWidth + barLabelGap : 0;
   const plot = chartFrame(frame, {
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
-    leftInset: horizontal ? horizontalCategoryLabelWidth + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54,
+    leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54,
     valueLabelInset: horizontal && !stacked && showDataLabels ? barLabelWidth + barLabelGap : 0,
     centerPlot: !horizontal && !showValueAxis
   });
@@ -377,7 +386,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       categoryValues.filter(value => value > 0).reduce((sum, value) => sum + value, 0)
     ];
   });
-  const bounds = numericBounds(stacked ? stackExtents : values, { min: props.yMin, max: props.yMax, axis: horizontal ? "x" : "y", includeZero: true });
+  const bounds = numericBounds(stacked ? stackExtents : values, { min: horizontal ? (props.xMin ?? props.yMin) : props.yMin, max: horizontal ? (props.xMax ?? props.yMax) : props.yMax, axis: horizontal ? "x" : "y", includeZero: true });
   const twoMarkContrast = !stacked && !barHighlight && props.colorIndices === undefined && categories.length * series.length === 2;
   const twoSeriesContrast = !stacked && !barHighlight && props.colorIndices === undefined && series.length === 2;
   const colorIndexFor = (seriesIndex, categoryIndex) => {
@@ -406,7 +415,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   nodes.push(...(horizontal
     ? horizontalAxes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })
     : axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })));
-  if (bounds.min < 0 && bounds.max > 0) nodes.push(linePrimitive({
+  if (!horizontal && bounds.min < 0 && bounds.max > 0) nodes.push(linePrimitive({
     id: stableId(id, "zero-baseline"), role: "chart-axis",
     ...(horizontal
       ? { x1: xScale(0), y1: plot.y, x2: xScale(0), y2: plot.y + plot.height }
@@ -522,7 +531,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       id: stableId(id, "category", category),
       role: "category-label",
       frame: horizontal
-        ? { x: plot.x - horizontalCategoryLabelWidth - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: categoryStart, width: horizontalCategoryLabelWidth, height: groupSpan }
+        ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: categoryStart, width: horizontalCategoryLabelWidth, height: groupSpan }
         : { x: categoryStart - 8, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: groupSpan + 16, height: 28 },
       text: category,
       style: textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center")
@@ -547,11 +556,14 @@ function lineChart({ id, frame, props, area = false }) {
   const endLabels = props.directLabels === "end";
   const showLegend = !endLabels && props.legend !== false && series.length > 1;
   const values = series.flatMap((item) => item.values);
-  const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: props.dataLabels === true });
+  const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length < 6);
+  const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
+  if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
   const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y" });
   const labelWidth = axisLabelWidth(bounds);
   const plot = chartFrame(frame, {
-    leftInset: showValueAxis ? labelWidth + 8 : 54,
+    leftInset: showValueAxis ? Math.max(labelWidth + 8, showDataLabels ? 68 : 0) : showDataLabels ? 68 : 54,
+    valueLabelInset: showDataLabels ? 68 : 0,
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
@@ -608,21 +620,23 @@ function lineChart({ id, frame, props, area = false }) {
         frame: { x: point.x - 5, y: point.y - 5, width: 10, height: 10 },
         style: fillStyle(SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length])
       }));
-      const mappedPoint = { ...point, changeX: point.x, changeY: point.y - (props.dataLabels === true ? 30 : 16) };
+      const mappedPoint = { ...point, changeX: point.x, changeY: point.y - (showDataLabels ? 30 : 16) };
       pointMap.set(`${item.name}:${point.category}`, mappedPoint);
       if (series.length === 1) pointMap.set(`value:${point.category}`, mappedPoint);
       const categoryPoint = pointMap.get(`category:${point.category}`);
       if (!categoryPoint || mappedPoint.y < categoryPoint.y) pointMap.set(`category:${point.category}`, mappedPoint);
-      if (props.dataLabels === true) {
+      if (showDataLabels) {
         const first = point.category === categories[0];
+        const last = point.category === categories.at(-1);
         nodes.push(textPrimitive({
           id: stableId(id, "value-label", item.name, point.category),
           role: "data-label",
           frame: first
-            ? { x: point.x + 8, y: Math.min(plot.y + plot.height - 24, point.y + 8), width: 60, height: 24 }
-            : { x: Math.max(plot.x + 4, Math.min(plot.x + plot.width - 64, point.x - 30)), y: point.y - 27, width: 60, height: 24 },
+            ? { x: point.x - 68, y: point.y - 12, width: 60, height: 24 }
+            : last ? { x: point.x + 8, y: point.y - 12, width: 60, height: 24 }
+            : { x: point.x - 30, y: point.y - 27, width: 60, height: 24 },
           text: formatValue(point.value, props),
-          style: textStyle(CHART_LABEL, INK, true, first ? "left" : "center")
+          style: textStyle(CHART_LABEL, INK, true, first ? "right" : last ? "left" : "center")
         }));
       }
     });

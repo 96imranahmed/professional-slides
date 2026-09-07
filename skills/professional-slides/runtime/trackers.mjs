@@ -37,6 +37,10 @@ export const TRACKER_TOKENS = Object.freeze([
 ]);
 
 const TRACKER_PAGE_VARIANTS = Object.freeze(Object.fromEntries([
+  ...["overview", "selected"].map(state => [
+    `text-agenda-${state}-light`,
+    { props: { layout: "text-agenda", mode: "light", selectedId: state === "selected" ? "B" : null } }
+  ]),
   ...["light", "dark"].flatMap(mode => ["overview", "selected"].map(state => [
     `sequential-${state}-${mode}`,
     { props: { layout: "sequential-circles", mode, selectedId: state === "selected" ? "B" : null } }
@@ -90,19 +94,20 @@ function pageSettings(props) {
   const mode = props.mode ?? "light";
   const density = props.density ?? "regular";
   const selectionTreatment = props.selectionTreatment ?? "tint";
-  if (!["sequential-circles", "split-contents"].includes(layout)) throw new Error(`Unknown tracker-page layout: ${layout}`);
+  if (!["sequential-circles", "split-contents", "text-agenda"].includes(layout)) throw new Error(`Unknown tracker-page layout: ${layout}`);
   if (!["light", "dark"].includes(mode)) throw new Error(`Unknown tracker-page mode: ${mode}`);
   if (!["regular", "long"].includes(density)) throw new Error(`Unknown tracker-page density: ${density}`);
   if (!["tint", "inverse"].includes(selectionTreatment)) throw new Error(`Unknown tracker-page selection treatment: ${selectionTreatment}`);
   if (layout === "sequential-circles" && density !== "regular") throw new Error("Sequential tracker uses its one stable density");
   if (layout === "sequential-circles" && props.selectionTreatment !== undefined) throw new Error("Sequential tracker does not use a row selection treatment");
+  if (layout === "text-agenda" && (mode !== "light" || density !== "regular" || props.selectionTreatment !== undefined)) throw new Error("Text agenda uses light mode, regular density, and text emphasis only");
   return { layout, mode, density, selectionTreatment };
 }
 
 export function resolveTrackerPageVariant(props = {}) {
   const { layout, mode, density, selectionTreatment } = pageSettings(props);
   const state = props.selectedId === null || props.selectedId === undefined ? "overview" : "selected";
-  const key = layout === "sequential-circles"
+  const key = layout === "text-agenda" ? `text-agenda-${state}-light` : layout === "sequential-circles"
     ? `sequential-${state}-${mode}`
     : state === "overview"
       ? `split-overview-${density}-${mode}`
@@ -130,9 +135,8 @@ function sequentialNodes({ id, frame, props, items, dark }) {
   if (items.length > 6) throw new Error("Sequential tracker supports three to six items; use split contents for longer lists");
   const foreground = dark ? WHITE : INK, quiet = dark ? WHITE : SECONDARY;
   const nodes = [rectPrimitive({ id: stableId(id, "surface"), role: "tracker-page-surface", frame, style: box(dark ? INK : CANVAS, dark ? INK : CANVAS) })];
-  const titleText = String(props.title ?? "Contents").trim();
-  if (!titleText) throw new Error("Sequential tracker requires a page title");
-  nodes.push(measuredText(stableId(id, "title"), "tracker-page-title", { x: frame.x + 72, y: frame.y + 62, width: frame.width - 144, height: 70 }, titleText, style(token("type.sectionTitle"), foreground, true, "left", "top", true), { trackerId: props.trackerId ?? "deck-sections" }));
+  const titleText = String(props.title ?? "").trim();
+  if (titleText) nodes.push(measuredText(stableId(id, "title"), "tracker-page-title", { x: frame.x + 72, y: frame.y + 62, width: frame.width - 144, height: 70 }, titleText, style(token("type.sectionTitle"), foreground, true, "left", "top", true), { trackerId: props.trackerId ?? "deck-sections" }));
   const left = frame.x + 108, right = frame.x + frame.width - 108, markerSize = 52;
   const railY = frame.y + frame.height * 0.48;
   nodes.push(linePrimitive({ id: stableId(id, "rail"), role: "tracker-rail", x1: left, y1: railY, x2: right, y2: railY, style: { stroke: quiet, lineWidth: HAIRLINE }, data: { trackerId: props.trackerId ?? "deck-sections" } }));
@@ -185,9 +189,37 @@ function splitNodes({ id, frame, props, items, dark, density, selectionTreatment
   return nodes;
 }
 
+function textAgendaNodes({ id, frame, props, items }) {
+  if (items.length > 6) throw new Error("Text agenda supports three to six short section labels");
+  const x = frame.x + frame.width * 0.105, width = frame.width * 0.79;
+  const fontSize = token("type.deckTitle");
+  // Measure every label at the stronger weight so selection never changes geometry.
+  const labels = items.map(item => measureText(item.label, width, {
+    fontFamily: tokenValue(DISPLAY_FONT), fontSize: tokenValue(fontSize), bold: true, wrapWidthRatio: 1
+  }));
+  if (labels.some(label => label.lines.length !== 1)) throw new Error("Text agenda requires single-line labels; shorten copy or choose another tracker");
+  const rowHeight = Math.max(...labels.map(label => label.height));
+  const gap = tokenValue(token("space.6"));
+  const height = rowHeight * items.length + gap * (items.length - 1);
+  if (height > frame.height * 0.8) throw new Error("Text agenda list exceeds its page field");
+  const top = frame.y + (frame.height - height) / 2;
+  const overview = props.selectedId === null || props.selectedId === undefined;
+  return [
+    rectPrimitive({ id: stableId(id, "surface"), role: "tracker-page-surface", frame, style: box(CANVAS) }),
+    ...items.map((item, index) => {
+      const data = commonData(props, item, index), label = labels[index];
+      return textPrimitive({ id: stableId(id, "item-label", item.id), role: "tracker-item-label",
+        frame: { x, y: top + index * (rowHeight + gap), width, height: rowHeight }, text: item.label,
+        style: { ...style(fontSize, overview || data.selected ? INK : SECONDARY, overview || data.selected, "left", "top", true), lineHeight: label.lineHeight, wrap: false },
+        data: { ...data, textLayout: label } });
+    })
+  ];
+}
+
 export function trackerPageNodes({ id, frame, props }) {
   const items = trackerItems(props), settings = pageSettings(props);
   resolveTrackerPageVariant(props);
+  if (settings.layout === "text-agenda") return textAgendaNodes({ id, frame, props, items });
   return settings.layout === "sequential-circles"
     ? sequentialNodes({ id, frame, props, items, dark: settings.mode === "dark" })
     : splitNodes({ id, frame, props, items, dark: settings.mode === "dark", density: settings.density, selectionTreatment: settings.selectionTreatment });
@@ -226,7 +258,7 @@ export function trackerLabelNodes({ id, frame, props }) {
     return nodes;
   }
   const parent = String(props.parentTitle ?? props.parentLabel ?? "").trim();
-  const text = construction === "compact-breadcrumb" && parent ? `${parent}  /  ${selected.id}. ${selected.label}` : `${selected.id}. ${selected.label}`;
+  const text = construction === "compact-breadcrumb" && parent ? `${parent}  /  ${selected.label}` : selected.label;
   return [measuredText(stableId(id, "text"), "tracker-compact-label", frame, text, style(token("type.label"), foreground, true, "left", "top"), { trackerId: props.trackerId ?? "deck-sections", sectionId: selected.id, selected: true, construction })];
 }
 
@@ -238,7 +270,7 @@ export function registerTrackers(registry) {
     { id: "D", label: "Section D" }
   ];
   registry.set("tracker-page", {
-    id: "tracker-page", version: "2.1.0", category: "navigation", role: "tracker-page",
+    id: "tracker-page", version: "2.2.0", category: "navigation", role: "tracker-page",
     tokens: [...TRACKER_TOKENS], preferredSize: { ...SLIDE },
     sample: { trackerId: "example-sections", title: "Contents", parentTitle: "Section A", items: sampleItems, selectedId: "B", layout: "sequential-circles", mode: "light", density: "regular" },
     variants: TRACKER_PAGE_VARIANTS, defaultVariant: "sequential-selected-light", resolveVariant: resolveTrackerPageVariant,

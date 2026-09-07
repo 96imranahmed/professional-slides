@@ -1,0 +1,51 @@
+[
+  {
+    "name": "house",
+    "dir": "lucide",
+    "url": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/house.svg",
+    "license": "ISC; lucide/LICENSE",
+    "sha256": "28216c479005731ef5e382e7d8627eda2b129b019eb1f3d9de9f5915576d448e"
+  },
+  {
+    "name": "train-front",
+    "dir": "lucide",
+    "url": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/train-front.svg",
+    "license": "ISC; lucide/LICENSE",
+    "sha256": "27757ea510a6d1d6258cb838a72a7b239c96f3724923adb5d529a25c3ee8e2eb"
+  },
+  {
+    "name": "chart-no-axes-combined",
+    "dir": "lucide",
+    "url": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/chart-no-axes-combined.svg",
+    "license": "ISC; lucide/LICENSE",
+    "sha256": "2f8a708c357488cfde7428d9b055b9bb4a99c08dc71e9296da03ecc19291c4ab"
+  },
+  {
+    "name": "github",
+    "dir": "simple-icons",
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/github.svg",
+    "license": "CC0-1.0; trademarks remain with owners; editorial identification only",
+    "sha256": "3bf8cceead820aec50d4ee825a3fd02c5a1cd6665cc9cf4cbf3d9c8861a204bb"
+  },
+  {
+    "name": "python",
+    "dir": "simple-icons",
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/python.svg",
+    "license": "CC0-1.0; trademarks remain with owners; editorial identification only",
+    "sha256": "ad9468e1c4903f73ae7eebfbe980f0f727a10db695be3d914e7d8bd25356a862"
+  },
+  {
+    "name": "rust",
+    "dir": "simple-icons",
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/rust.svg",
+    "license": "CC0-1.0; trademarks remain with owners; editorial identification only",
+    "sha256": "95a291d8887610d103704adcc5c5f2cbfa4c80a96f8e72b00531d5691beb67a8"
+  },
+  {
+    "name": "javascript",
+    "dir": "simple-icons",
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/javascript.svg",
+    "license": "CC0-1.0; trademarks remain with owners; editorial identification only",
+    "sha256": "c9be35a7a861ebe80ae4ee706d05004b99ee59fc63db69da6dcc10776718434b"
+  }
+]

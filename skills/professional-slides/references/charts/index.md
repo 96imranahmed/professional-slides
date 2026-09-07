@@ -7,7 +7,7 @@ Choose a chart from the analytical question, not from visual variety. The chart 
 | Analytical question | Default | Read |
 | --- | --- | --- |
 | Which category is larger or smaller? | Sorted bar/column | [Bar and column](bar-column.md) |
-| How has a measure changed over time? | Line | [Line](line.md) |
+| How does an observed or independently modeled trajectory evolve across meaningful periods? | Line, when trajectory is the question | [Line](line.md) |
 | How does a total divide into parts? | Stacked bars/areas | [Stacked](stacked.md) |
 | How does one small total divide into a few familiar parts? | Pie or donut, by exception | [Pie and donut](pie-donut.md) |
 | How does a survey response mix differ across user groups? | Percentage segments by group | [Percentage segments by user group](percentage-segment-by-group.md) |
@@ -15,6 +15,26 @@ Choose a chart from the analytical question, not from visual variety. The chart 
 | How do two or three variables relate? | Scatter/bubble | [Scatter and bubble](scatter-bubble.md) |
 | Where are concentrations, gaps, or priorities? | Heatmap/highlight table | [Heatmap and table](heatmap-table.md) |
 | How do current, emerging, and future growth plays mature over time? | Horizons | [Horizons](horizons.md) |
+
+## Select from the available evidence before dot-dash approval
+
+| Available evidence and question | Most appropriate encoding | Reject |
+| --- | --- | --- |
+| One comparable value per category, including a common future endpoint | Bar/column on a common basis | A line joining categories or invented interim dates |
+| One observed rate mechanically repeated over future years | One bar per category for the common endpoint (or annual rate), with a derived implication beside it | A cumulative straight-line scenario presented as temporal insight |
+| Only start and finish are known | Paired/grouped bars; slope only when direction is the actual question | Fabricated intermediate points |
+| Multiple observed periods or a published model with a meaningful path | Line when turning points, acceleration, timing or volatility matter | A line chosen merely because labels are years |
+| Ordered stages, each with a reconciled contribution to a total | Waterfall | Unreconciled causal claims |
+| Shares of the same total across matched groups | 100% stacked bars | Separate pies requiring precise comparison |
+| Paired observations of two measured variables | Scatter; bubble only with a meaningful third variable | Artificial coordinates or causal inference from association |
+| Distribution across many observations | Histogram or another distribution encoding | Averages alone when spread is the question |
+| Mixed qualitative criteria or exact lookup values | Table with dimension-led emphasis | Forcing text categories into a graph |
+
+A straight observed series is not automatically invalid. The distinction is evidence provenance: measured or independently modeled points can establish a path; multiplying one fixed rate by 1, 2, 3, 4, 5 does not add temporal evidence. Do not manufacture time points for visual variety.
+
+Record `chartSelection: {question, dataBasis, reason, rejectedAlternative}` for each planned graph, including each small multiple. Use `constant-rate-scenario` for mechanically accumulated rates and `endpoint-only` for endpoint evidence; both reject `chart.line`. Linear numeric-year series without source-backed `observed` or `published-forecast` diagnosis fail the planner. Cite the actual source or calculation in the dot-dash. Never relabel a constructed scenario as observed to pass validation.
+
+Assumptions, calculation definitions and chart restatements are not insights. Keep essential methodology concise in the source/note furniture and exact formulas in speaker notes. An adjacent insight must add a supported consequence, threshold, trade-off or action beyond the plotted values. Do not place a methodology box where the slide needs an implication.
 
 Avoid pie and donut charts by default. Use them only for a small number of parts, one total, and an audience that benefits from the familiar form. Never use them for precise comparison. Their complete exception contract lives in [Pie and donut](pie-donut.md).
 
@@ -109,3 +129,21 @@ Use the registered chart runtime and its generated previews for geometry. Chart-
 ## Analytical acceptance test
 
 Reconcile the chart data and calculation before platform QA. Check the title: it states the intended pattern. Check the chart: the pattern remains visible and verifiable without the title. Chart scaffolding, metric dashboards, and default office styling fail even when technically correct. The [evaluation owner](../evaluation/index.md) and platform tools own rendered-file acceptance.
+
+## Segment-linked implications
+
+`chart.column` accepts `segments` for one measure grouped into two or three contiguous category sets. Each segment supplies `id`, `label`, `categories`, `heading` and `items` (multiple implications). Segments must partition every plotted category exactly once in plot order. The renderer retains the common scale, adds segment headings and dividers, and associates each group with a matching coloured header band above a light neutral explanation body. These are group-specific analytical sections, not repeated detached insight boxes.
+
+Use the treatment when distinct groups imply different actions or consequences. Preserve category labels and values; bar colour identifies group membership. Competing category highlights and multiple series are rejected because they would make the colour meaning ambiguous. Keep unsupported deductions out of the explanation bodies.
+
+
+Same-page category comparisons use one grouped/segmented exhibit or equivalent peer charts. On a `chart-group`, declare `comparison: {kind: "matched", unit: "..."}` with identical chart types, periods/categories, explicit domains and value formats. Do not compare a line on one side with bars on the other. Different metrics may use different chart types in a four-way dashboard, but the two sides of one comparison must remain equivalent. When source definitions cannot be reconciled, separate the exhibits and state the limit instead of presenting a false matched comparison.
+
+For compact large-number labels, declare one shared `valueFormat.compactUnit` (`k`, `m`, or `bn`) for peer charts; `decimals` defaults to one. Keep raw series values and growth calculations unchanged. See [large numbers](../components/copy.md#large-numbers).
+
+
+### Avoid unnecessary rebasing and axis duplication
+
+Choose native units or explicitly labelled percentage change before considering a rebased index. The dot-dash design must justify an index, state its base and retain absolute-value context; see the [measurement-choice gate](../storylining/dot-dash.md#measurement-choice-precedes-chart-choice). A published source index is distinct from an author-created rebase.
+
+Line charts with fewer than six values default to direct labels on every dot and no left value axis. Where the value axis remains, encode growth with the diagonal connector and circular badge (`changeAnnotations.style: arrow`), not an overhead bracket. With no value axis, the bracket remains valid. This changes presentation, never underlying values, dates, shared scales or required growth emphasis.

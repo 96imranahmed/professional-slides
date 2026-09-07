@@ -30,6 +30,8 @@ def package(source: Path, destination: Path):
             continue
         if not (rel.as_posix() in ALLOWED_FILES
                 or (rel.parts[0] in ALLOWED_ROOTS and p.suffix in EXTENSIONS)
+                or (rel.parts[:3] == ('skills', 'professional-slides', 'assets')
+                    and (p.suffix == '.png' or p.name == 'LICENSE'))
                 or (rel.parts[0] == 'assets' and p.suffix in ASSET_EXTENSIONS)):
             continue
         if p.is_symlink():

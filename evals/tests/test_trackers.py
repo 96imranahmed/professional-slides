@@ -10,10 +10,10 @@ import assert from 'node:assert/strict';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 import { componentFixtureSpecs, componentVariantFixtureSpecs } from './skills/professional-slides/runtime/fixtures.mjs';
 const page=REGISTRY.get('tracker-page'),label=REGISTRY.get('tracker-label');
-assert.equal(Object.keys(page.variants).length,16);
+assert.equal(Object.keys(page.variants).length,18);
 assert.equal(Object.keys(label.variants).length,6);
 const fixtures=[...componentFixtureSpecs(),...componentVariantFixtureSpecs()];
-assert.equal(fixtures.filter(s=>s.target==='tracker-page').length,16);
+assert.equal(fixtures.filter(s=>s.target==='tracker-page').length,18);
 assert.equal(fixtures.filter(s=>s.target==='tracker-label').length,6);
 assert.equal(page.variants['split-selected-long-light'].props.items.length,8);
 const items=['A','B','C','D'].map(id=>({id,label:`Section ${id}`}));
@@ -24,7 +24,7 @@ const selected=full.filter(n=>n.data.selected).map(n=>n.data.sectionId).filter(B
 assert.deepEqual([...new Set(selected)],['B']);
 assert.equal(compact[0].data.trackerId,'map');
 assert.equal(compact[0].data.sectionId,'B');
-assert.equal(compact[0].text,'Contents / B. Section B');
+assert.equal(compact[0].text,'Contents / Section B');
 for(const props of [
  {items:items.slice(0,2)},
  {items:[...items,{id:'A',label:'Duplicate'}]},
@@ -73,6 +73,28 @@ assert.ok(Math.abs((listTop+listBottom)/2-360)<2);
 const highlight=split.find(n=>n.role==='tracker-selection');
 assert.ok(highlight.frame.width/backdrop.frame.width>=0.60&&highlight.frame.width/backdrop.frame.width<=0.80);
 assert.ok(!split.some(n=>n.role==='tracker-subtitle'));
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_text_agenda_preserves_labels_and_frames_without_markers(self):
+        result = run_node(r"""
+import assert from 'node:assert/strict';
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const page=REGISTRY.get('tracker-page'),frame={x:0,y:0,width:1280,height:720};
+const items=['On campus','Made better by Neo','Taking Neo further','Frontier education. Frontier AI.','And everything around it'].map((label,index)=>({id:String(index+1),label}));
+const render=selectedId=>page.render({id:'agenda',frame,props:{items,layout:'text-agenda',selectedId}}).nodes;
+const overview=render(null), selected=render('2');
+assert.deepEqual(selected.map(n=>n.frame),overview.map(n=>n.frame));
+assert.equal(selected.length,6);
+assert.deepEqual(selected.slice(1).map(n=>n.text),items.map(n=>n.label));
+assert.ok(overview.slice(1).every(n=>n.style.bold&&n.style.color.tokenId==='color.ink'));
+assert.ok(selected.slice(1).every(n=>n.style.bold===n.data.selected));
+assert.equal(selected[2].style.color.tokenId,'color.ink');
+assert.equal(selected[1].style.color.tokenId,'color.textSecondary');
+for (const extra of [{mode:'dark'},{density:'long'},{selectionTreatment:'tint'},{selectedId:'missing'},{items:[...items,...items.map(n=>({...n,id:'x'+n.id}))]},{items:items.map(n=>({...n,label:'Long label '.repeat(30)}))}]) {
+ assert.throws(()=>page.render({id:'bad',frame,props:{items,layout:'text-agenda',...extra}}));
+}
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

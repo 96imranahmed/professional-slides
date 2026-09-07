@@ -10,11 +10,12 @@ Default to no visible tracker for decks with no more than two named sections or 
 
 Use one system. Full and compact states share the same label map: IDs, order, and active state remain exact. `compact-label` displays the active labels; `compact-number-strip` may omit labels visually but retains their underlying IDs and order.
 
-The native standard pairs `sequential-circles` full states with `compact-number-strip` analytical states. Use `split-contents` or `compact-label` only when hierarchy or recognition requires them. Never improvise a tracker.
+The native standard pairs `sequential-circles` full states with `compact-label` analytical states showing only the section name. Use `split-contents` for hierarchy or `compact-number-strip` only by explicit choice. Never improvise a tracker.
 
 | Construction | Use when |
 | --- | --- |
 | `sequential-circles` full state | Default for three to six short peer sections. Center the rail vertically. |
+| `text-agenda` full state | Three to six short peer labels in a vertically centered list. Emphasize all labels in an overview or only the active label at a section pause. No numbering or extra heading. |
 | `split-contents` full state | Parent title left; three to eleven items right. A longer list is a density state. Use circular numbers unless the source requires otherwise. The selected row defaults to a light tonal highlight; use the inverse treatment only for deliberate stronger emphasis. |
 | `compact-label` analytical state | Parent and active-child labels above the action title. |
 | `compact-number-strip` analytical state | Stable section numbers in one quiet strip. |
@@ -23,7 +24,7 @@ The native standard pairs `sequential-circles` full states with `compact-number-
 
 ## Contents progress pages
 
-A contents overview may have no selection. A progress page marks exactly one item with circle or row emphasis.
+A contents overview may have no selection. A progress page marks exactly one item with its declared circle, row, or text emphasis.
 
 When planned, show the full tracker at every major section change. Never introduce one isolated late-section page.
 
@@ -34,6 +35,12 @@ For a hierarchy, keep the parent left and only its children right. Allow hierarc
 Selection needs a non-colour cue. Preserve peer inset, baseline, marker size, and rule thickness. Default to a light tonal row highlight so the label remains dark-on-light. The optional inverse treatment uses the primary surface with on-primary label text; invert the circular marker outline as well so its boundary remains visible. Do not imply completion.
 
 Give split-content rows equal padding. Its optical list width is normally around three quarters of the right field, with generous space after short labels. The backdrop fills height to the right edge.
+
+## Text agenda
+
+Use `text-agenda` for the reference pattern of an all-emphasized agenda followed by repeated section pauses with one dark active label and quiet neutral peers. Ignore screenshot controls and overlays. Keep the exact approved wording, order, left edge, row positions, type size, and spacing across every occurrence, even when reference screenshots show editorial changes. The complete list is vertically centered with generous separation.
+
+The canonical light-mode runtime uses `type.deckTitle` and `space.6`; the overview is bold, while selection uses bold active text and regular inactive text as its non-colour cue. Quiet text uses `color.textSecondary` so it remains readable rather than copying near-invisible screenshot grey. IDs remain in the shared map even though markers are hidden. Do not imply that muted items are completed. Keep labels to one line; reject overflow rather than shrinking individual labels. An optional compact state uses the same map on analytical pages.
 
 ## Parent and chapter hierarchy
 
@@ -82,3 +89,8 @@ Use editable markers, text, and native lines on the registered page guides. Pres
 - Every compact-label breadcrumb reads as one tight inline phrase; the separator never floats in a fixed remote column.
 - Structural edits update tracker ranges, page numbers, and cross-references.
 - The montage shows no stale, skipped, duplicated, or intermittently missing state.
+
+
+Compact content-slide trackers default to the section name only, without its numeric identifier. Number strips are explicit opt-in; chapter tracker pages retain the full map.
+
+Internal titles on sequential tracker pages are optional and omitted by default. When slide chrome already names the current section, do not add an internal heading describing the number of chapters or the visible tracker. The runtime rejects structure-only count headings, and the criticality gate checks any remaining title.

@@ -32,11 +32,13 @@ The standalone legend primitive permits all twenty combinations of its four key 
 
 ## Coordinated chart groups
 
-`chart-group` is registered by [`runtime/chart-group.mjs`](../../runtime/chart-group.mjs). Supply `charts`, an array of two (`paired`) or three (`triple`) children, each with `component`, `props`, and optional `heading` and `unit`. Supported children are pie, donut, bar, column, stacked bar/column, line, and area charts. An explicit group variant must match the child count.
+`chart-group` is registered by [`runtime/chart-group.mjs`](../../runtime/chart-group.mjs). Supply `charts`, an array of two (`paired`) three (`triple`), or four (`four-way`) children, each with `component`, `props`, and optional `heading` and `unit`. Any registered `chart.*` component may be a child, and four-way groups may mix chart types. Each child must still fit its allocated panel. An explicit group variant must match the child count.
 
 Optional `categoryKeys` gives the exact shared key order. Otherwise the first occurrence across children determines order. Pie/donut `props.labels` and other charts' `props.series[].name` supply the keys; every used key must occur exactly once in the shared mapping, with at most six keys. Reordering a child's input never changes its category colours.
 
-The group allocates equal-width children, a common measured [chart-title band](index.md#chart-titles), and a reserved bottom legend band. It disables local legends and outside pie labels, then renders one bottom-centred legend. Geometry and token declarations live in the executable owner. Child nodes retain stable group/child IDs and remain editable primitives in both adapters; this does not promise a native PowerPoint chart or group object. Golden fixtures cover paired and triple groups, donuts, unit headings, and columns. Reject legend overflow, unsupported children, or inconsistent keys before export.
+The four-way variant uses a 2x2 grid; other groups use one row. Use `legendMode: independent` for charts with unrelated encodings; charts without common category/series keys select that mode automatically. Otherwise `shared` preserves one category map. A single shared category needs no legend or reserved legend band. Independent children also omit a one-category legend.
+
+The group allocates equal-width children, a common measured [chart-title band](index.md#chart-titles), and a reserved bottom legend band. It disables local legends and outside pie labels, then renders one bottom-centred legend. Geometry and token declarations live in the executable owner. Child nodes retain stable group/child IDs and remain editable primitives in both adapters; this does not promise a native PowerPoint chart or group object. Golden fixtures cover paired, triple and four-way groups, donuts, unit headings, and columns. Reject legend overflow, unsupported children, or inconsistent keys before export.
 
 ## Theme contract
 
@@ -53,3 +55,5 @@ Use the canonical [scene-to-native chart mapping](../tools/css-to-native-mapper.
 Verify each key maps to one visible encoding and follows chart order. Actual and forecast remain distinct without colour. Peer exhibits share one mapping. Legends do not shift comparable plots. A default `top-right` legend remains one row above the plot and ends on the chart region's right guide. Every label is readable in the final render.
 
 State legends require an explicit `state`: `actual` uses a filled square, `forecast` a dashed open square, `target` a solid open square, `scenario` a dotted open circle, and `missing` a short horizontal line. Unknown states reject.
+
+Use four-way for four related trends. Declare consistent value bounds when readers compare magnitude across panels; independently scaled panels must display their distinct scales and units. Keep headings short and omit decorative mini-pies. Split the page if body-size labels cannot fit.

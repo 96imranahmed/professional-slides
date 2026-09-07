@@ -100,3 +100,8 @@ This is the hard package and variable gate. It does not replace rendering, visua
 ## Reject, repair, rerun
 
 `rejected` is a blocking result. Repair the source builder, shared theme, component, content, or acceptance manifest only when the manifest was wrong. Never mutate PPTX XML to silence a finding. Export a new candidate, render it, and run the hard validator again. Repeat until the exact candidate is accepted. Only the accepted candidate hash may be delivered.
+
+
+### Semantic dependency gate
+
+Every native object exports its `professional-slides.semantic/v1` tag in `cNvPr@descr`: exact scene ID, role, component owner, dependency IDs and required counterpart roles. Canonical provenance compares those tags with the scene and checks dependency presence in the exact PPTX. Missing tags, orphaned insight text/surfaces, annotation leaders without their keyed labels, and broken metric label/value pairs block release. The planner separately rejects detached analytical paragraphs and invalid section-member references. Run mutation regressions that delete each tag and each declared dependency; visual review remains responsible for semantic misclassification and content quality.

@@ -625,6 +625,12 @@ export function measureTable({ frame, props }) {
 }
 
 export function renderTable({ id, frame, props }) {
+  if (props.comparisonAxis !== undefined) {
+    if (!["rows", "columns"].includes(props.comparisonAxis)) throw new Error("Table comparisonAxis must be rows or columns");
+    if (props.comparisonAxis === "rows" && ["dimensions", "standard"].includes(props.treatment)) throw new Error("Row dimensions require first-column emphasis, not a filled item header");
+    if (props.comparisonAxis === "rows" && props.columns?.[0]?.type !== "category") throw new Error("Row dimensions require a category first column");
+    if (props.comparisonAxis === "columns" && props.treatment !== "dimensions") throw new Error("Column dimensions require the dimensions header treatment");
+  }
   const m = measureTable({ frame, props }),
     nodes = [],
     xs = m.widths.map((_, c) => frame.x + sum(m.widths.slice(0, c)));
@@ -647,10 +653,11 @@ export function renderTable({ id, frame, props }) {
       }),
     );
   const header = props.treatment ?? "open";
-  if (!["open", "standard"].includes(header))
+  if (!["open", "standard", "dimensions"].includes(header))
     throw new Error("Unknown table header treatment");
   m.columns.forEach((column, c) => {
-    if (header === "standard")
+    const filledHeader = header === "standard" || (header === "dimensions" && column.type !== "category");
+    if (filledHeader)
       nodes.push(
         rectPrimitive({
           id: stableId(id, "header-cell", c),
@@ -676,7 +683,7 @@ export function renderTable({ id, frame, props }) {
         m.headers[c],
         textStyle(
           true,
-          header === "standard" ? white : ink,
+          filledHeader ? white : ink,
           column.align ?? "left",
           m.textSize,
         ),
@@ -715,7 +722,7 @@ export function renderTable({ id, frame, props }) {
         (m.rows[r].style ?? props.rowStyle) === "accented"
           ? t("color.componentPrimaryTint")
           : null;
-      if (cell.type === "category" && (cell.surface ?? "primary") === "primary")
+      if (cell.type === "category" && (cell.surface ?? (header === "dimensions" ? "plain" : "primary")) === "primary")
         fill = primary;
       if (cell.type === "highlight") fill = t("color.componentPrimaryTint");
       if (cell.type === "heatmap")

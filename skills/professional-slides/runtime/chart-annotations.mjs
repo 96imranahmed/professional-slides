@@ -223,6 +223,7 @@ function evidenceNodes(id, placement) {
   const callout = annotation.treatment === "callout";
   const dotEnded = annotation.treatment === "orthogonal-dot";
   const data = {
+    annotationKey: `${id}:evidence:${index}`,
     annotationTreatment: annotation.treatment,
     border: annotation.border !== false,
     orientation: annotation.orientation,
@@ -436,7 +437,7 @@ function line(id, index, part, x1, y1, x2, y2, endArrow = false, style = "arrow"
       endArrow,
       ...(endArrow ? { endArrowType: "triangle" } : {}),
       annotationStyle: style,
-      annotationKey: `${index}:${style}`,
+      annotationKey: `${id}:${index}:${style}`,
       annotationPart: part
     }
   });
@@ -449,7 +450,7 @@ function labelNodes(id, index, frame, text, style) {
       role: "annotation-surface",
       frame,
       style: { fill: PRIMARY, stroke: PRIMARY, lineWidth: HAIRLINE, opacity: 1 },
-      data: { annotationStyle: style }
+      data: { annotationStyle: style, annotationKey: `${id}:${index}:${style}` }
     }),
     textPrimitive({
       id: stableId(id, "change-label", index),
@@ -457,7 +458,7 @@ function labelNodes(id, index, frame, text, style) {
       frame: { x: frame.x + 10, y: frame.y + 4, width: frame.width - 20, height: frame.height - 8 },
       text,
       style: textStyle(ANNOTATION, ON_PRIMARY, true),
-      data: { annotationStyle: style }
+      data: { annotationStyle: style, annotationKey: `${id}:${index}:${style}` }
     })
   ];
 }
@@ -490,9 +491,14 @@ export function renderChangeAnnotations({ id, plot, props, pointMap }) {
       return;
     }
 
-    const bracketY = plot.y - evidenceBand - 34;
     const leftX = Math.min(start.x, end.x);
     const rightX = Math.max(start.x, end.x);
+    // Stay above every mark in the interval, including an interior line peak,
+    // while avoiding empty full-height leaders for small values on shared scales.
+    const intervalTop = Math.min(start.y, end.y, ...[...pointMap.values()]
+      .filter(point => point.x >= leftX && point.x <= rightX)
+      .map(point => point.changeY ?? point.y));
+    const bracketY = evidenceBand ? plot.y - evidenceBand - 34 : Math.max(plot.y - 34, intervalTop - 34);
     const frame = labelFrame(annotation.text, (leftX + rightX) / 2, bracketY - 24, plot);
     nodes.push(line(id, index, "span", leftX, bracketY, rightX, bracketY, false, annotation.style));
     nodes.push(line(id, index, "start-drop", start.x, bracketY, start.x, start.y, false, annotation.style));
@@ -535,7 +541,7 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
       role: "annotation-surface",
       frame,
       style: { fill: PRIMARY, stroke: PRIMARY, lineWidth: HAIRLINE, opacity: 1 },
-      data: { category: item.category, annotationStyle: "rail" }
+      data: { category: item.category, annotationStyle: "rail", annotationKey: `${railId}:rail:${item.category}` }
     }));
     nodes.push(textPrimitive({
       id: stableId(railId, "annotation-rail-text", index),
@@ -543,7 +549,7 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
       frame: { x: frame.x + 8, y: frame.y + 3, width: frame.width - 16, height: frame.height - 6 },
       text: item.text,
       style: textStyle(ANNOTATION, ON_PRIMARY, true),
-      data: { category: item.category, annotationStyle: "rail" }
+      data: { category: item.category, annotationStyle: "rail", annotationKey: `${railId}:rail:${item.category}` }
     }));
   });
   if (row.label) {

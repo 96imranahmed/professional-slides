@@ -46,7 +46,7 @@ function executiveSummarySpec() {
   let y = 0;
   for (const [index, [heading, bullets]] of themes.entries()) {
     const headingHeight = REGISTRY.get("section-heading").measureHeader({ frame: { x: 0, y: 0, width, height: 100 }, props: { heading, rule: false } }).height;
-    items.push({ id: `theme-${index}`, job: "state the theme conclusion", component: "section-heading", props: { heading, rule: false }, frame: { x: 0, y, width, height: headingHeight } });
+    items.push({ id: `theme-${index}`, job: "state the theme conclusion", component: "section-heading", props: { heading, rule: false, semantic: {kind:"section-member",relatedTo:[`bullets-${index}`]} }, frame: { x: 0, y, width, height: headingHeight } });
     y += headingHeight + tokenValue(token("space.2"));
     const props = { variant: "body", items: bullets }, height = REGISTRY.get("bullet-list").measureContent({ frame: { width }, props }).height;
     items.push({ id: `bullets-${index}`, job: "develop evidence, implication and condition", component: "bullet-list", props, frame: { x: 0, y, width, height } });
@@ -82,6 +82,8 @@ function trackerStandardSpecs() {
     target: "tracker-label", kind: "standard"
   });
   return [
+    full("golden-tracker-text-agenda-overview", { layout: "text-agenda", selectedId: null }, 3),
+    full("golden-tracker-text-agenda-progress", { layout: "text-agenda" }, 4),
     full("golden-tracker-sequential-progress", { title: "Contents", layout: "sequential-circles", mode: "light" }, 3),
     content("golden-tracker-number-strip-content", "compact-number-strip", 4, "(Insert action title)"),
     full("golden-tracker-split-progress", { parentTitle: "Section A", layout: "split-contents", density: "regular", mode: "light" }, 5),
@@ -113,6 +115,12 @@ const GOLDEN_LAYOUT_IDS = new Set([
   "fixture-chart.bubble-size-legend-top-right",
   "fixture-chart.bubble-quadrant-focus-tint",
   "fixture-chart-group-paired-columns",
+  "fixture-chart-group-four-way-mixed",
+  "fixture-logo-collage-radial-grayscale",
+  "fixture-logo-collage-radial-color",
+  "fixture-logo-collage-area-grayscale",
+  "fixture-logo-collage-area-color",
+  "fixture-map-imported-geometry",
   "fixture-planner-auto"
 ]);
 

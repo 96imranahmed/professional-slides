@@ -117,3 +117,28 @@ A direct implication field may omit a generic heading such as “The qualified v
 ### Omit redundant umbrella headings
 
 A parent heading must add information beyond its children. When named proof branches already explain the content, remove rhetorical labels such as “What the evidence establishes”, “The universe verdict”, or “Our analysis”. Move the substantive content into the released space; do not preserve a blank heading slot. This applies to both sides of a slide and does not remove necessary chart measure, period or unit headings.
+
+### Large numbers
+
+Default to compact display: `k`, `m`, or `bn`, usually one decimal. Use a shared magnitude and precision across peer charts, tables, metrics and annotations: `8.3m` beside `0.8m`, not mixed `8,300,000` and `800k`. Preserve exact underlying values for calculations. Retain full precision only when the decision requires it. Never round before calculating growth; avoid rounding a material nonzero value to zero.
+
+
+Executive summaries must be dense enough to carry the argument without narration: use substantive theme headings, developed evidence, relevant magnitudes, implications and the countercase. Do not expose chapter numbers or phrases such as “Chapter 1”; planning metadata owns the theme-to-body mapping, which may consolidate related sections. The bottom band states an actual recommendation or conditional choice, not “compare options,” “shortlist both,” a research checklist or a restatement of the problem. Preserve scope limits while still making a useful recommendation. Honor explicitly requested higher summary density by allocating space and a justified copy budget, never shrinking local text.
+
+## Mandatory contextual copy query
+
+Run the shared `runtime/copy-check.mjs` contract via `evals/scripts/check_slide_copy.mjs` on the emitted scene, approved contract and exact PPTX before visual acceptance. The visual validator invokes it automatically; missing or failed queries block delivery. Trackers, internal headings, insight bodies and evidence-note bodies use the same owner. Do not put network calls inside synchronous component renderers.
+
+The reviewer receives each exact rendered slide image together with all slide text, layout roles, evidence, notes and the deck question. It states what the reader already learns visually, then identifies the unique, relevant, supported contribution of each target. Useful information can still require relocation when its prominence exceeds its decision value. For each emitted target ID it must identify added information, the consequence of deletion, supporting on-slide IDs and one decision: keep, remove, move to notes or rewrite. Every target needs a result; reviewer counts are not trusted. A non-keep decision blocks acceptance. A useful clause cannot excuse a padded block. Methodology belongs in source notes unless a concise measurement qualification is needed to decode the exhibit. Preserve necessary worksheet rules while deleting redundant headers and generic instructions.
+
+Reports bind the exact PPTX, per-slide rendered images, scene, contract, checker, runner and target inventory hashes. Changes invalidate review; subset diagnostics cannot pass full-deck acceptance. Query errors, malformed JSON, missing IDs, duplicate IDs, invalid evidence references and stale results fail closed. This enforces a contextual semantic review, not a mathematical proof that prose is useful. Do not claim quality from transport or schema tests alone; exercise known rejected examples against the real reviewer.
+
+Direct diagnostic command: `node evals/scripts/check_slide_copy.mjs --pptx <deck.pptx> --scene <scene.json> --render-dir <renders> --contract <contract.json> --report <copy-review.json>`. Optional `--slides 13,29,30` reviews a subset; omit it for release. `--check` validates a saved report without querying again.
+
+The prose inventory includes summary list items and every decision-tree label and conclusion. Evidence references must use exact emitted IDs. Dedicated source registers and methodology-reference pages may retain necessary reference content; this is distinct from a methodology-only box beside an analytical exhibit.
+
+Review one rendered slide at a time against its exact keyed text inventory, with bounded concurrency. Require every target key in the response schema; the runner binds the immutable input text hash to each returned judgement. Main action titles are tested for supported answer synthesis, subsidiary headings for added meaning, and navigation titles against the deck outline. A title is not required to invent an extra fact absent from its exhibit.
+
+Icon evidence cards may omit their headings when the icon and body already identify the subject. Preserve any information carried only by the heading in the body; do not fabricate a headline to satisfy a component schema.
+
+Apply criticality by information job. Executive-summary theme labels provide navigation; required growth annotations provide measurement and emphasis even when their arithmetic is recoverable from direct labels. Verify their accuracy and scope. These roles do not excuse redundant or unsupported insight prose. Carry explicit user requirements in `copyRequirements` so the semantic query does not erase requested information hierarchy.

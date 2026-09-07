@@ -11,6 +11,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import shutil
 import posixpath
 import re
 import subprocess
@@ -85,7 +87,7 @@ REGISTERED_TEMPLATE_IDS = {
 }
 NEW_DECK_VISUAL_MODES = {"clean-native-standard", "reference-led", "custom-user-directed"}
 NEW_DECK_TRACKER_SYSTEMS = {"none", "standard-chapter", "hierarchical-segmented"}
-FULL_STATE_TRACKER_VARIANTS = {"sequential-circles", "split-contents", "none"}
+FULL_STATE_TRACKER_VARIANTS = {"sequential-circles", "split-contents", "text-agenda", "none"}
 ANALYTICAL_TRACKER_VARIANTS = {"compact-number-strip", "compact-label", "none"}
 CANONICAL_LAYOUTS = {
     "single-dominant-exhibit",
@@ -1859,7 +1861,14 @@ def validate_canonical_generation(
         else:
             manifest_without_hash = dict(design_manifest)
             recorded_design_hash = manifest_without_hash.pop("designHash", None)
-            computed_design_hash = hashlib.sha256(json.dumps(manifest_without_hash, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+            # Runtime hashes JSON.stringify bytes. Python formats small floats in
+            # scientific notation, which changes real imported-map hashes.
+            runtime_node = os.environ.get("RUNTIME_NODE") or shutil.which("node")
+            computed_design_hash = None
+            if runtime_node:
+                completed = subprocess.run([runtime_node, "-e", "let s='';process.stdin.setEncoding('utf8');process.stdin.on('data',x=>s+=x);process.stdin.on('end',()=>process.stdout.write(require('node:crypto').createHash('sha256').update(JSON.stringify(JSON.parse(s))).digest('hex')));"], input=json.dumps(manifest_without_hash, ensure_ascii=False), text=True, capture_output=True, timeout=30)
+                if completed.returncode == 0:
+                    computed_design_hash = completed.stdout.strip()
             deck_record = receipt.get("deck", {})
             if recorded_design_hash != computed_design_hash or not isinstance(deck_record, dict) or deck_record.get("designHash") != recorded_design_hash:
                 findings.append(Finding("generation.design_hash", "design manifest hash does not reconcile with the receipt"))
@@ -1944,6 +1953,26 @@ def validate_canonical_generation(
                             if node.attrib.get("name")
                         }
                         expected_names = {f"ps:{node.get('id')}" for node in slide.get("nodes", []) if isinstance(node, dict) and node.get("id")}
+                        exported_tags = {node.attrib.get("name"): node.attrib.get("descr", "") for node in xml.findall(".//p:cNvPr", NS)}
+                        scene_nodes = {node.get("id"): node for node in slide.get("nodes", [])}
+                        owner_ids = {item.get("instanceId") for item in slide.get("componentInstances", [])}
+                        exported_order = [node.attrib.get("name", "") for node in xml.findall(".//p:cNvPr", NS)]
+                        for error in validate_exported_baseline_order(scene_nodes, exported_order):
+                            findings.append(Finding("generation.baseline_layering", error, slide=index + 1))
+                        for node_id, scene_node in scene_nodes.items():
+                            tag = scene_node.get("data", {}).get("semantic")
+                            try:
+                                exported = json.loads(exported_tags.get(f"ps:{node_id}", ""))
+                            except (ValueError, TypeError):
+                                exported = {}
+                            if not isinstance(tag, dict) or tag.get("schema") != "professional-slides.semantic/v1" or tag.get("id") != node_id or tag.get("owner") not in owner_ids or any(exported.get(key) != value for key, value in tag.items()):
+                                findings.append(Finding("generation.semantic_tag", f"slide {index + 1}: missing or mismatched semantic tag for {node_id}", slide=index + 1))
+                                continue
+                            for dependency in tag.get("requires", []):
+                                if dependency not in scene_nodes or f"ps:{dependency}" not in actual_names:
+                                    findings.append(Finding("generation.dangling_dependency", f"slide {index + 1}: {node_id} lost dependency {dependency}", slide=index + 1))
+                            if tag.get("requiredRoles") and scene_node.get("text", None) != "" and not any(scene_nodes.get(dep, {}).get("role") in tag["requiredRoles"] for dep in tag.get("requires", [])):
+                                findings.append(Finding("generation.dangling_role", f"slide {index + 1}: {node_id} has no required counterpart", slide=index + 1))
                         if expected_names != actual_names:
                             missing = sorted(expected_names - actual_names)
                             unexpected = sorted(actual_names - expected_names)
@@ -1988,6 +2017,27 @@ def provenance_cli() -> int:
     print(encoded, end="")
     return 0 if report["accepted"] else 1
 
+
+
+def validate_exported_baseline_order(scene_nodes: dict[str, Any], exported_order: list[str]) -> list[str]:
+    """Check actual PowerPoint stacking, not merely the planned node sequence."""
+    positions = {name: index for index, name in enumerate(exported_order)}
+    errors = []
+    for node_id, axis in scene_nodes.items():
+        if axis.get("role") != "chart-axis":
+            continue
+        a = axis.get("frame", {})
+        owner = axis.get("data", {}).get("componentInstance")
+        for mark_id, mark in scene_nodes.items():
+            if mark.get("role") != "chart-mark" or mark.get("type") != "rect" or mark.get("data", {}).get("componentInstance") != owner:
+                continue
+            b = mark.get("frame", {})
+            if not all(key in a and key in b for key in ("x", "y", "width", "height")):
+                continue
+            intersects = a["x"] <= b["x"]+b["width"] and a["x"]+a["width"] >= b["x"] and a["y"] <= b["y"]+b["height"] and a["y"]+a["height"] >= b["y"]
+            if intersects and positions.get(f"ps:{node_id}", -1) < positions.get(f"ps:{mark_id}", -1):
+                errors.append(f"BASELINE_LAYERING: {node_id} is behind {mark_id} in exported PowerPoint")
+    return errors
 
 
 # --- Deterministic semantic gate ---
@@ -2306,11 +2356,14 @@ def semantic_cli() -> int:
 
 
 # --- Per-slide independent visual gate ---
+COMPOSITION_REVIEW_RULE = 'Judge missing argument, not unused pixels. A complete content-sized group may be vertically centered with outer whitespace. Do not demand filler or expand the evidence-to-insight gap to meet a canvas-fill target. A retained compact metric can decode a chart; flag it as recap only when it duplicates already explicit labels without a reading benefit. Distinguish such additional evidence from an insight. Compare content-start anchors within the same composition family, not across full-height charts, compact chart-and-insight groups, and icon rows. Honor explicit user requirements for vertically centered content groups. A density finding must identify missing reasoning, an incomplete component, illegible evidence, or an unexplained difference within a repeated composition family; outer whitespace or a lower content start alone is insufficient.'
+
+VISUAL_RUBRIC_VERSION = "10"
 VISUAL_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
  'type': 'object',
  'additionalProperties': False,
  'required': ['rubricVersion', 'verdict', 'summary', 'deckScores', 'slides', 'findings'],
- 'properties': {'rubricVersion': {'type': 'string', 'const': '7'},
+ 'properties': {'rubricVersion': {'type': 'string', 'const': VISUAL_RUBRIC_VERSION},
                 'verdict': {'type': 'string', 'enum': ['accept', 'reject']},
                 'summary': {'type': 'string', 'minLength': 1},
                 'deckScores': {'$ref': '#/$defs/scores'},
@@ -2388,7 +2441,22 @@ VISUAL_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
                                       'recommendedChange': {'type': 'string', 'minLength': 1}}}}}
 VISUAL_ALLOWED_MODELS = ("gpt-5.6-luna", "gpt-5.6-terra")
 VISUAL_DEFAULT_MODEL = "gpt-5.6-terra"
-VISUAL_RUBRIC_VERSION = "7"
+# Criticality coverage and decisions are mandatory, not score modifiers.
+VISUAL_SCHEMA['$defs']['copyAudit']['required'].append('criticality')
+VISUAL_SCHEMA['$defs']['copyAudit']['properties']['criticality'] = {
+    'type': 'object', 'additionalProperties': False,
+    'required': ['itemCount', 'items'],
+    'properties': {
+        'itemCount': {'type': 'integer', 'minimum': 0},
+        'items': {'type': 'array', 'items': {
+            'type': 'object', 'additionalProperties': False,
+            'required': ['text', 'role', 'deletionConsequence', 'passes'],
+            'properties': {
+                'text': {'type': 'string', 'minLength': 1},
+                'role': {'type': 'string', 'minLength': 1},
+                'deletionConsequence': {'type': 'string', 'minLength': 1},
+                'passes': {'type': 'boolean'}}}}}}
+
 VISUAL_MINIMUM_SCORE = 90
 VISUAL_SCORE_NAMES = (
     "compositionCompleteness",
@@ -2443,6 +2511,35 @@ def visual_rendered_slides(render_dir: Path, expected_count: int) -> list[Path]:
     return [path for _, path in indexed]
 
 
+def compact_review_payload(value: str) -> str:
+    """Keep analytical content; replace embedded binary media with exact hashes."""
+    try:
+        parsed = json.loads(value)
+    except ValueError:
+        return value
+    def visit(item):
+        if isinstance(item, str) and item.startswith("data:"):
+            return {"embeddedMedia": item.split(",", 1)[0], "sha256": hashlib.sha256(item.encode("utf-8")).hexdigest(), "characters": len(item)}
+        if isinstance(item, dict):
+            if item.get("type") in {"Polygon", "MultiPolygon"} and "coordinates" in item:
+                coordinates = item["coordinates"]
+                points = []
+                def collect(part):
+                    if isinstance(part, list) and len(part) >= 2 and all(isinstance(x, (int, float)) for x in part[:2]):
+                        points.append(part[:2])
+                    elif isinstance(part, list):
+                        for child in part:
+                            collect(child)
+                collect(coordinates)
+                summary = {"sha256": hashlib.sha256(json.dumps(coordinates, separators=(",", ":")).encode()).hexdigest(), "vertices": len(points), "bounds": [min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)] if points else None}
+                return {key: summary if key == "coordinates" else visit(child) for key, child in item.items()}
+            return {key: visit(child) for key, child in item.items()}
+        if isinstance(item, list):
+            return [visit(child) for child in item]
+        return item
+    return json.dumps(visit(parsed), ensure_ascii=False, separators=(",", ":"))
+
+
 def visual_read_required(path: Path, label: str) -> str:
     try:
         value = path.read_text(encoding="utf-8").strip()
@@ -2450,7 +2547,7 @@ def visual_read_required(path: Path, label: str) -> str:
         raise ValueError(f"cannot read {label}: {exc}") from exc
     if not value:
         raise ValueError(f"{label} is empty: {path}")
-    return value
+    return compact_review_payload(value)
 
 
 def build_visual_prompt(
@@ -2481,6 +2578,7 @@ Reject a slide for any major visual or semantic defect, including:
 - redundant hierarchy: an action title plus a generic exhibit label plus per-metric labels plus a methodology label plus a separate takeaway. Reject generic labels such as "current snapshot", "calculation boundary", "read-through", or "company definition" when they add no decision meaning;
 - multiple detached takeaways. One slide has one governing conclusion, normally carried by the action title; material qualifiers must be readable alongside the relevant evidence, while provenance belongs in the source note;
 - excessive empty space between supporting text and its following insight: require one compact content-sized group with the smallest readable theme gap after the measured text bottom, not independently top- and bottom-anchored items;
+- same-page category comparisons using unequal encodings, units, periods, categories or scales. Require one grouped/segmented exhibit or equivalent peer charts; mixed charts are only for different questions. Reject pages consisting only of warnings, unmatched policy targets or decorative timelines without substantive evidence.
 - dangling analytical paragraphs below charts or tables. Hard requirement: use the shared insight box for detached synthesis, or a deliberate adjacent bullet-list section for developed interpretation. A nested table-plus-insight half-page composite is valid; do not require every insight to be full-width. Reject substantive text dangling below a terminal insight. Dense, well-written, consistently grouped text is acceptable; noise is inconsistent treatment, weak grouping or unclear fragments, not density alone;
 - tiny supporting copy that conceals a material assumption, weak data ink, or insufficiently developed evidence for the declared delivery mode;
 - a split analytical page whose secondary rail merely repeats chart values or argues an unrelated conclusion. A complementary interpretation rail, coordinated small multiples, or open comparison table is valid when it advances the same governing claim.
@@ -2489,7 +2587,7 @@ Reject a slide for any major visual or semantic defect, including:
 
 Evaluate financial relationships as defined by their sources. Do not demand an equation or netting operation between non-additive balances, proceeds, authorizations and commitments. A reported line item whose official name includes "and other" may legitimately be a single series. Confirm scope and definitions before declaring a missing category. Use bridges for additive changes and integrated assumptions for scenario comparisons; routine derivations need not occupy the analytical canvas.
 
-Judge missing argument, not unused pixels. A complete content-sized group may be vertically centered with outer whitespace. Do not demand filler or expand the evidence-to-insight gap to meet a canvas-fill target. A retained compact metric can decode a chart; flag it as recap only when it duplicates already explicit labels without a reading benefit. Distinguish such additional evidence from an insight.
+{COMPOSITION_REVIEW_RULE}
 
 Do not reward minimalism merely for having whitespace. For an executive pre-read, expect a substantively occupied analytical canvas with a dominant exhibit plus the labels, comparison, qualifier, or attached synthesis needed to make the claim complete. Also do not reward density created by filler.
 
@@ -2500,6 +2598,8 @@ Chevron restraint: standalone implication chevrons, including disc-chevrons, sho
 Hard chart-position gate: inspect the generation script and evidence as well as the render. Reject arbitrary, random, pseudo-random, index-cycled, jittered or beeswarm within-category coordinates. A category has one fixed position; fabricated spread is not a measure, even when disclosed. Scatter and bubble plots require two meaningful quantitative measures with observation-level provenance. Resolve overlap without moving true data coordinates. Lines require a meaningful ordered axis and must not connect arbitrarily ordered records. Any violation is a blocker and cannot be offset by visual scores.
 
 Hard semantic copy gate: never accept a recap of content already shown on the same slide, especially graph or table narration, in ANY paragraph, bullet, caption or box. Necessary chart labels, units, legends and compact comparison annotations decode the exhibit; they are not redundant prose. An insight must add a supported new deduction beyond the visible evidence AND title. A numerical restatement, new calculation alone, summary, or methodology note is not insight. Adding 'therefore', moving prose into bullets, or enclosing it does not fix it. Do not demand a box if no defensible deduction exists.
+
+Mandatory criticality gate: inspect EVERY visible title, internal heading, annotation and supporting section/container, including evidence-note boxes and tracker pages. In copyAudit.criticality report itemCount and one item per inspected element with exact text, role, deletionConsequence and passes. Count from the rendered slide; do not omit redundant elements. Removing an element must lose necessary argument, scope, interpretation, decision or navigation to pass. Whole supporting sections need a separate audit item from their heading. Methodology-only boxes should move to source notes unless their prominence prevents a specific material misreading; quote that risk rather than accepting the evidence-note role as justification. Tracker text that merely announces visible structure, such as “The comparison in five chapters”, fails. Retain the substantive section name and actual navigation labels. Accurate paraphrases of the body still fail. Any failure requires a major TITLE_CRITICALITY, ANNOTATION_CRITICALITY or SECTION_CRITICALITY finding and rejection. For simple directly labelled two-bar charts, put derived catch-up requirements in the insight as supporting evidence, not a leader attached to a bar representing a different quantity. Assess the whole insight argument, including its supporting premises.
 
 For EVERY slide, return copyAudit with noRecap (boolean), recapEvidence (specific explanation of the inspected supporting copy, quoting any recap), insightCount (number of visible insight surfaces or claimed insight statements), and insights (one record per insight). Each record must quote the exact insight text, identify its on-slide premises, state what new deduction it adds, and classify it as supported_deduction, recap, or unsupported. Use an empty insights array only when there are no insights; still inspect other supporting copy. Reject any recap or non-deductive insight as a major COPY_RECAP or INSIGHT_NOT_DEDUCTION finding and reject the slide/deck. Missing copyAudit, incomplete insight coverage, or a failed copy decision blocks acceptance regardless of scores. Judge meaning, not shared-word counts; do not invent reasoning absent from the actual statement or premises.
 
@@ -2578,6 +2678,18 @@ def validate_visual_copy_audit(value: Any, label: str) -> list[str]:
         errors.append(f"{label}.noRecap must be a boolean")
     if not non_empty_string(value.get("recapEvidence")):
         errors.append(f"{label}.recapEvidence must explain the inspected copy")
+    criticality = value.get("criticality")
+    if not isinstance(criticality, dict):
+        errors.append(f"{label}.criticality is required")
+    else:
+        items = criticality.get("items")
+        count = criticality.get("itemCount")
+        if type(count) is not int or count < 0 or not isinstance(items, list) or count != len(items):
+            errors.append(f"{label}.criticality must cover every title, heading, annotation and supporting section")
+        if isinstance(items, list):
+            for item in items:
+                if not isinstance(item, dict) or any(not non_empty_string(item.get(k)) for k in ("text", "role", "deletionConsequence")) or type(item.get("passes")) is not bool:
+                    errors.append(f"{label}.criticality item must include text, role, deletion consequence and decision")
     count, insights = value.get("insightCount"), value.get("insights")
     if type(count) is not int or count < 0:
         errors.append(f"{label}.insightCount must be a nonnegative integer")
@@ -2601,6 +2713,7 @@ def validate_visual_copy_audit(value: Any, label: str) -> list[str]:
 def visual_copy_audit_passes(value: Any) -> bool:
     return (not validate_visual_copy_audit(value, "copyAudit")
             and value["noRecap"] is True
+            and all(item["passes"] for item in value["criticality"]["items"])
             and all(item["classification"] == "supported_deduction" for item in value["insights"]))
 
 
@@ -2793,10 +2906,27 @@ def run_visual_model_judge(
     return build_visual_report(judgement, pptx, renders, contract, theme_manifest, treatment_ledger, generation_script, model)
 
 
+def run_required_copy_check(pptx: Path, scene: Path, contract: Path, report: Path, check: bool = False, render_dir: Path | None = None) -> None:
+    bundled = Path.home() / ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node"
+    node = os.environ.get("RUNTIME_NODE") or (str(bundled) if bundled.is_file() else shutil.which("node"))
+    if not node:
+        raise RuntimeError("Copy usefulness gate requires Node.js")
+    command = [node, str(ROOT / "evals/scripts/check_slide_copy.mjs"),
+               "--pptx", str(pptx.resolve()), "--scene", str(scene.resolve()),
+               "--contract", str(contract.resolve()), "--report", str(report.resolve()),
+               "--render-dir", str((render_dir or scene.parent / "renders").resolve())]
+    if check:
+        command.append("--check")
+    completed = subprocess.run(command, text=True, capture_output=True, timeout=5400, check=False)
+    if completed.returncode:
+        raise RuntimeError("Mandatory copy usefulness gate rejected: " + (completed.stdout + completed.stderr)[-12000:])
+
+
 def visual_cli() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pptx", type=Path)
     parser.add_argument("--render-dir", type=Path, required=True)
+    parser.add_argument("--scene", type=Path, help="Emitted scene; defaults to scene.json beside the contract")
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--theme-manifest", type=Path, required=True)
     parser.add_argument("--treatment-ledger", type=Path, required=True)
@@ -2809,8 +2939,13 @@ def visual_cli() -> int:
     try:
         count = visual_pptx_slide_count(args.pptx)
         renders = visual_rendered_slides(args.render_dir, count)
+        scene = args.scene or args.contract.parent / "scene.json"
         if args.check_report:
             report = json.loads(args.check_report.read_text(encoding="utf-8"))
+            copy_path = report.get("copyReviewPath")
+            if not copy_path:
+                raise RuntimeError("Visual report has no mandatory copy usefulness review")
+            run_required_copy_check(args.pptx, scene, args.contract, Path(copy_path), check=True, render_dir=args.render_dir)
             errors = validate_visual_cached_report(
                 report, args.pptx, renders, args.contract, args.theme_manifest,
                 args.treatment_ledger, args.generation_script, args.model,
@@ -2819,12 +2954,18 @@ def visual_cli() -> int:
                 print("\n".join(f"ERROR: {error}" for error in errors), file=sys.stderr)
                 return 1
         else:
+            copy_path = args.report.with_suffix(".copy.json")
+            run_required_copy_check(args.pptx, scene, args.contract, copy_path, render_dir=args.render_dir)
             report = run_visual_model_judge(
                 args.pptx, renders, args.contract, args.theme_manifest,
                 args.treatment_ledger, args.generation_script, args.model, args.timeout_seconds,
             )
+            report["copyReviewPath"] = str(copy_path.resolve())
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
+        if not args.check_report:
+            args.report.parent.mkdir(parents=True, exist_ok=True)
+            args.report.write_text(json.dumps({"accepted": False, "error": str(exc)}), encoding="utf-8")
         return 2
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -2883,7 +3024,7 @@ CONSISTENCY_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
                                                'additionalProperties': False,
                                                'required': ['id', 'slides', 'role', 'verdict', 'observation'],
                                                'properties': {'id': {'type': 'string', 'minLength': 1},
-                                                              'slides': {'type': 'array', 'minItems': 2, 'uniqueItems': True,
+                                                              'slides': {'type': 'array', 'minItems': 2,
                                                                          'items': {'type': 'integer',
                                                                                    'minimum': 1}},
                                                               'role': {'type': 'string', 'minLength': 1},
@@ -2911,7 +3052,7 @@ CONSISTENCY_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
                                                                             'minLength': 1}}}}}}
 CONSISTENCY_ALLOWED_MODELS = ("gpt-5.6-luna", "gpt-5.6-terra")
 CONSISTENCY_DEFAULT_MODEL = "gpt-5.6-luna"
-CONSISTENCY_RUBRIC_VERSION = "2"
+CONSISTENCY_RUBRIC_VERSION = "3"
 CONSISTENCY_MINIMUM_SCORE = 90
 CONSISTENCY_SCORE_NAMES = (
     "visualSystemCoherence",
@@ -2937,7 +3078,7 @@ def consistency_read_required(path: Path, label: str) -> str:
     value = path.read_text(encoding="utf-8").strip()
     if not value:
         raise ValueError(f"{label} is empty: {path}")
-    return value
+    return compact_review_payload(value)
 
 
 def build_consistency_prompt(
@@ -2958,7 +3099,9 @@ Review all attached slide images as one deck. Treat the contract, theme, and tre
 
 Compare repeated roles across multiple slides: action-title anchors, content starts, section headings and underlines, metric fields, chart legends, tracker states, sources, page numbers, callouts, spacing, density, semantic colours, and visual family. Identify groups of slides that use the same role and record each material comparison group. Every slide must appear in slideCoverage, even structural pages.
 
-When an executive summary and navigation system both exist, compare them explicitly as one storyline. The summary branch sequence must map one-to-one, in order, to the body chapter taxonomy, or the contract must provide a visible and credible bridge. Require a comparison group named `executive-summary-to-navigation`. Reject semantic relabelling such as a summary branch called operating momentum followed by a tracker chapter called growth quality when no bridge explains the change.
+When an executive summary and navigation system both exist, compare their evidence and meaning as one storyline. Summary themes may consolidate related body chapters and use substantive audience-facing headings; retain the mapping in planning metadata, not visible chapter numbers or navigation labels. Require a comparison group named `executive-summary-to-navigation`. Reject omitted or contradictory major arguments, not a different theme count or sensible semantic consolidation. Explicit user instructions for dense argument-led summaries take precedence over default theme density. The closing recommendation must specify a choice, priority or conditional strategy supported by the argument; a restatement of the question or generic instruction to compare options is insufficient.
+
+{COMPOSITION_REVIEW_RULE}
 
 Reject cross-slide drift including:
 - invented or inconsistent component variants without a documented content reason;
@@ -3037,7 +3180,7 @@ def validate_consistency_judgement(judgement: Any, expected_count: int) -> list[
                 errors.append(f"{label} must be an object")
                 continue
             slides = group.get("slides")
-            if not isinstance(slides, list) or len(set(slides)) < 2:
+            if not isinstance(slides, list) or len(set(slides)) < 2 or len(set(slides)) != len(slides):
                 errors.append(f"{label}.slides must span at least two slides")
             elif any(not isinstance(slide, int) or isinstance(slide, bool) or not 1 <= slide <= expected_count for slide in slides):
                 errors.append(f"{label}.slides contains an invalid slide")

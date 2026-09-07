@@ -19,6 +19,7 @@ Record:
 - template ID: registered ID, or `none` for direct storylining;
 - visual-system mode: clean-native-standard, reference-led, or custom-user-directed, with approval evidence for the latter two;
 - `mainQuestion` and `governingAnswer`;
+- the [argument brief](dot-dash.md#ask-questions-that-sharpen-the-argument): intended audience and outcome, whose criteria apply, decisive priorities and constraints, material answers or unresolved questions, and their effect on the thesis and proof; distinguish supplied context from author assumptions and record when the user requests a general treatment;
 - the mandatory executive-summary slide, its complete approved copy, and a recorded pass of the [standalone argument and evidence test](dot-dash.md#standalone-argument-and-evidence-test);
 - an evidence mapping from each decisive claim to its source, actual values or examples, comparator, inference limits, and proof slide IDs;
 - slide count and ordered slide records;
@@ -44,7 +45,7 @@ Copy each `title` verbatim from its dot. The job is planning metadata. Map the a
 
 Use tracker.system hierarchical-segmented only when deck sections and analytical subgroups both need orientation. Map parent and chapter items to exact approved IDs, labels, order, and contiguous ranges. Governed slides record both IDs; tracked headers require `parent-tracker-label`, `chapter-tracker-label`, and `action-title`.
 
-When a visible tracker is approved, record `fullStateVariant`, `compactStateVariant`, and `transitionVariant`. The native standard is sequential-circles plus compact-number-strip. Use `none` for an unused state. The allowed constructions and their HTML references live in [Trackers and Navigation](../components/trackers/index.md). A contents progress page also records the selected item ID; a hierarchical progress page records both the parent ID and selected child ID.
+When a visible tracker is approved, record `fullStateVariant`, `compactStateVariant`, and `transitionVariant`. The native standard is sequential-circles plus compact-label showing the section name only. Number strips are explicit opt-in. Use `none` for an unused state. The allowed constructions and their HTML references live in [Trackers and Navigation](../components/trackers/index.md). A contents progress page also records the selected item ID; a hierarchical progress page records both the parent ID and selected child ID.
 
 ## New deck
 

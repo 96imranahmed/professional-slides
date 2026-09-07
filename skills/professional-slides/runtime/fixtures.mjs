@@ -97,7 +97,11 @@ const VARIANT_BOARD_LAYOUTS = Object.freeze({
   "chart.pie": { capacity: 2, columns: 2 },
   "chart.donut": { capacity: 2, columns: 2 },
   "chart.horizons": { capacity: 1, columns: 1 },
-  "chart-group": { capacity: 2, columns: 2 }
+  "chart.column": { capacity: 1, columns: 1 },
+  "chart-group": { capacity: 1, columns: 1 },
+  "cover": { capacity: 1, columns: 1 },
+  "icon-trends": { capacity: 1, columns: 1 },
+  "tree": { capacity: 1, columns: 1 }
 });
 
 function boardVariantProps(definition, variant) {

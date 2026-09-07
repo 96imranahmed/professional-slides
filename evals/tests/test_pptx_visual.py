@@ -4,6 +4,8 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 from pathlib import Path
 
 from evals.tests.test_pptx_validator import build_pptx
@@ -41,7 +43,7 @@ def judgement(score: int = 95, verdict: str = "accept"):
             "summary": "The slide is complete and visually finished.",
             "scores": scores,
             "findings": [],
-            "copyAudit": {"noRecap": True, "recapEvidence": "The exhibit has necessary labels and no supporting recap.", "insightCount": 0, "insights": []},
+            "copyAudit": {"noRecap": True, "recapEvidence": "The exhibit has necessary labels and no supporting recap.", "insightCount": 0, "insights": [], "criticality": {"itemCount": 0, "items": []}},
         }],
     }
 
@@ -57,6 +59,9 @@ class PptxVisualTests(unittest.TestCase):
                 root / "deck.pptx", [root / "slide-1.png"], *inputs
             )
         self.assertIn("professional_slides_skill_references", prompt)
+        self.assertIn(validator.COMPOSITION_REVIEW_RULE, prompt)
+        self.assertIn("within the same composition family", prompt)
+        self.assertIn("outer whitespace or a lower content start alone is insufficient", prompt)
         self.assertIn("secondary rail merely repeats chart values", prompt)
         self.assertIn("keeps a short unit inline in a secondary colour", prompt)
         self.assertIn("Chart headings retain their rule even with inline units", prompt)
@@ -67,6 +72,51 @@ class PptxVisualTests(unittest.TestCase):
         self.assertIn("executive-summary standalone narrative test", prompt)
         self.assertIn("not word count or table presence alone", prompt)
         self.assertNotIn("Mandatory calibration", prompt)
+
+    def test_response_schema_and_validator_use_the_same_rubric(self):
+        self.assertEqual(validator.VISUAL_SCHEMA['properties']['rubricVersion']['const'], validator.VISUAL_RUBRIC_VERSION)
+        self.assertIn('criticality', validator.VISUAL_SCHEMA['$defs']['copyAudit']['required'])
+
+    def test_criticality_is_required_and_cannot_be_averaged_away(self):
+        value = judgement(score=100)
+        audit = value['slides'][0]['copyAudit']
+        audit['criticality'] = {'itemCount': 1, 'items': [{
+            'text': 'Treat supply catch-up as upside', 'role': 'insight-heading',
+            'deletionConsequence': 'None: the body already states the implication.', 'passes': False}]}
+        self.assertFalse(validator.derive_visual_acceptance(value, []))
+        audit['criticality']['items'][0]['passes'] = True
+        audit['criticality']['items'][0]['deletionConsequence'] = 'Identifies the applicable period, otherwise ambiguous.'
+        self.assertTrue(validator.derive_visual_acceptance(value, []))
+        audit['criticality']['itemCount'] = 2
+        self.assertFalse(validator.derive_visual_acceptance(value, []))
+        del audit['criticality']
+        self.assertFalse(validator.derive_visual_acceptance(value, []))
+
+    def test_tracker_slop_and_methodology_container_fail_criticality(self):
+        for text, role in [
+            ('The comparison in five chapters', 'tracker-heading'),
+            ('Population basis: Census count versus July 2025 estimate; difference is not migration.', 'evidence-note')]:
+            value = judgement(score=100)
+            value['slides'][0]['copyAudit']['criticality'] = {'itemCount': 1, 'items': [{
+                'text': text, 'role': role, 'deletionConsequence': 'No lost argument; navigation is visible or methodology belongs in the source note.', 'passes': False}]}
+            self.assertFalse(validator.derive_visual_acceptance(value, []))
+
+    def test_exported_baseline_order_rejects_reordered_native_objects(self):
+        nodes = {
+            'axis': {'role': 'chart-axis', 'frame': {'x': 0, 'y': 100, 'width': 100, 'height': 0}, 'data': {'componentInstance': 'chart'}},
+            'bar': {'role': 'chart-mark', 'type': 'rect', 'frame': {'x': 20, 'y': 0, 'width': 30, 'height': 100}, 'data': {'componentInstance': 'chart'}}}
+        self.assertFalse(validator.validate_exported_baseline_order(nodes, ['ps:bar', 'ps:axis']))
+        errors = validator.validate_exported_baseline_order(nodes, ['ps:axis', 'ps:bar'])
+        self.assertTrue(any('BASELINE_LAYERING' in error for error in errors))
+
+    def test_visual_entrypoint_requires_successful_copy_query(self):
+        with patch.object(validator.subprocess, 'run', return_value=SimpleNamespace(returncode=1,stdout='COPY_USEFULNESS: remove filler',stderr='')) as run:
+            with self.assertRaisesRegex(RuntimeError, 'Mandatory copy usefulness gate rejected'):
+                validator.run_required_copy_check(Path('deck.pptx'),Path('scene.json'),Path('contract.json'),Path('copy.json'))
+            self.assertIn('check_slide_copy.mjs', run.call_args.args[0][1])
+        with patch.object(validator.subprocess, 'run', return_value=SimpleNamespace(returncode=0,stdout='',stderr='')) as run:
+            validator.run_required_copy_check(Path('deck.pptx'),Path('scene.json'),Path('contract.json'),Path('copy.json'),check=True)
+            self.assertIn('--check',run.call_args.args[0])
 
     def test_every_slide_must_be_enumerated_exactly_once(self):
         value = judgement()

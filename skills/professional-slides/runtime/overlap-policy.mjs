@@ -2,8 +2,9 @@
 // collisions. No rule exempts text/text, headings, legends, or whole charts.
 export const OVERLAP_POLICY = Object.freeze({
   containedCellMarks: ["table-bullet", "table-binary-mark", "table-rating-track", "table-rating-sector", "table-bar", "table-implication"],
-  surfaces: ["divider-surface", "section-surface", "rail-surface", "panel-surface", "insight-surface", "quote-surface", "image-frame", "annotation-surface"],
+  surfaces: ["evidence-note-surface", "segment-surface", "decision-conclusion-surface","divider-surface", "section-surface", "rail-surface", "panel-surface", "insight-surface", "quote-surface", "image-frame", "annotation-surface"],
   containedLabels: {
+    "horizon-band": "horizon-label", "decision-box": "decision-label", "segment-header-band": "segment-copy",
     "table-cell": "table-cell-text", "table-header-cell": "table-header-text",
     "organization-node": "node-label", "tree-node": "node-label", "tree-root": "node-label", "organization-root": "node-label",
     "insight-tree-insight-surface": "insight-tree-insight-text", "insight-tree-implication-surface": "insight-tree-implication-text",
@@ -20,6 +21,8 @@ export const OVERLAP_POLICY = Object.freeze({
   },
   chartGeometry: ["chart-gridline", "chart-axis", "chart-threshold-line", "chart-mark", "chart-marker", "chart-line", "chart-area", "chart-reference-line", "chart-connector", "chart-point-highlight", "horizon-axis", "horizon-curve", "horizon-step-line"],
   pairs: [
+    ["decision-connector", "decision-connector", "decision branch junction"],
+    ["decision-connector", "decision-box", "decision connector terminates at its own node"],
     ["table-rating-track", "table-rating-sector", "ordinal sector overlays its own neutral disc"],
     ["table-binary-mark", "table-binary-mark", "check or cross stroke junction"],
     ["relationship-disc", "relationship-chevron", "chevron inside its own inference marker"],

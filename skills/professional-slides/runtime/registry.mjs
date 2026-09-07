@@ -19,6 +19,8 @@ import {
   tokenValue,
   wedgePrimitive
 } from "./core.mjs";
+import { registerSegmentedEvidence } from "./segmented-evidence.mjs";
+import { registerMedia } from "./media.mjs";
 import { registerCharts } from "./charts.mjs";
 import { renderTable, measureTable, TABLE_TOKENS } from "./tables.mjs";
 import { TABLE_VARIANTS } from "./table-fixtures.mjs";
@@ -31,7 +33,7 @@ import { renderChartCallout } from "./chart-annotations.mjs";
 import { PAGE_RULES, PAGE_BRANDING, PAGE_TEMPLATE_TOKENS, pageTemplateLayout, renderPageTemplate, resolvePageTemplate } from "./page-template.mjs";
 import { TRACKER_TOKENS, registerTrackers, trackerLabelNodes } from "./trackers.mjs";
 import { registerQuoteCluster } from "./quote-cluster.mjs";
-import { MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
+import { CUSTOM_MAP_SAMPLE, MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
 import { registerInsightTreeTable } from "./insight-tree-table.mjs";
 
 const FONT = token("font.body");
@@ -201,11 +203,33 @@ function contentRailInsets(props = {}) {
 }
 
 function resolveChartTitleVariant(props = {}) {
+  assertChartTitleCopy(props);
   if (props.unit !== undefined && (typeof props.unit !== "string" || !props.unit.trim())) throw new Error("Chart title unit must be nonempty text");
   const variant = props.variant ?? "underlined";
   if (!["underlined", "unit"].includes(variant)) throw new Error(`Unknown chart-title variant: ${variant}`);
   if (variant === "unit" && (typeof props.unit !== "string" || !props.unit.trim())) throw new Error("Chart title unit variant requires a unit");
   return variant;
+}
+// Chart titles identify the measure, population and period. Values and changes
+// belong on chart marks/annotations, never in this shared title band. Keep this
+// fail-closed: numeric context must use an unambiguous period or unit spelling.
+function assertChartTitleCopy(props = {}) {
+  for (const [field, value] of [["heading", props.heading || props.text], ["unit", props.unit]]) {
+    if (typeof value !== "string") continue;
+    let copy = value.normalize("NFKC");
+    const year = "(?:19|20)\\d{2}";
+    const period = `(?:FY\\s*${year}|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
+    copy = copy.replace(new RegExp(`\\b${period}\\b(?![\\d.%])`, "gi"), "period");
+    copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
+    copy = copy.replace(new RegExp(`([,(]\\s*)${year}(?=\\s*(?:$|[,) ;]))`, "g"), "$1period");
+    if (field === "unit") {
+      // Scale denominators describe units, not observed values.
+      copy = copy.replace(/\bper\s+(?:100[,. ]?000|1[,. ]?000|100|1)\b/gi, "per population");
+    }
+    if (/\p{N}/u.test(copy) || /\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|doubled|tripled|halved)\b/i.test(copy)) {
+      throw new Error(`Chart title ${field} must not contain statistics or chart results: ${JSON.stringify(value)}. Use a descriptive measure/population heading and explicit period; move values and changes to chart labels or annotations.`);
+    }
+  }
 }
 function chartTitleLayout(frame, props) {
   const variant = resolveChartTitleVariant(props);
@@ -601,6 +625,7 @@ function registerCore(registry) {
     } }),
     component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.componentPrimary", "color.onPrimary", "space.1", "space.3", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "circle" }) }) }),
     component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.4", "space.5", "space.6", "line.hairline", "radius.small"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
+    component({ id: "evidence-note", category: "section", role: "evidence-note", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.4", "space.5", "space.6", "line.hairline", "radius.small"], preferredSize: { width: 1160, height: 150 }, sample: { heading: "Measurement basis", text: "(Insert scope, period or scenario assumptions)" }, render: input => { if (!input.props.heading || !input.props.text) throw new Error("Evidence note requires heading and body"); return { nodes: insightNodes({...input, props:{...input.props, variant:"neutral", align:"left"}}).map(node => ({...node, role:node.role.replace("insight-", "evidence-note-")})) }; } }),
     component({ id: "panel", category: "section", role: "panel", tokens: ["color.surface", "color.surfaceMuted", "color.componentPrimary", "color.rule", "color.ink", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "radius.none", ...[1, 2, 3, 4, 5, 6].map(index => `color.chartSeries${index}`)], preferredSize: { width: 400, height: 240 }, sample: { heading: "(Insert panel heading)", text: "(Insert panel description)" }, render: ({ id, frame, props, tokens = TOKENS }) => {
       const tone = props.tone || "open";
       const seriesColorIndex = props.seriesColorIndex;
@@ -780,6 +805,7 @@ function registerCore(registry) {
       const render = definition.render;
       definition.render = input => { definition.resolveVariant(input.props); return render(input); };
       definition.examples = {
+        "imported-geometry": { props: { geography: CUSTOM_MAP_SAMPLE, highlightCountries: ["DEU"], markers: [{longitude:13.4,latitude:52.5,label:"Berlin",size:14}] } },
         "world-country-highlight": { props: { geography: "world", markers: [], highlightCountries: ["USA", "DEU", "CHN"] } },
         "country-marker-anchor": { props: { geography: "europe", markers: [{ country: "GBR", label: "United Kingdom", fraction: 1 }] } }
       };
@@ -864,7 +890,7 @@ function registerCore(registry) {
 }
 
 export function createRegistry() {
-  return registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map()))))));
+  return registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map()))))))));
 }
 
 export const REGISTRY = createRegistry();

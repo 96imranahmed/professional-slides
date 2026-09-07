@@ -23,6 +23,7 @@ const competitorBars={columns:[text('Competitor',.16,'category'),text('Positioni
  ['Company C',bullets('(Insert positioning point 1)','(Insert positioning point 2)'),{values:[289,45]},'6%','16%']
 ]};
 export const TABLE_VARIANTS={
+ 'dimension-headers':{preferredSize:size,props:{treatment:'dimensions',columns:[text('Option',.28,'category'),...['Reach','Fit','Readiness'].map(label=>({...text(label,.24,'harvey'),scale:'fit'}))],scales:{fit:rating},rows:[['Option A',{value:3},{value:2},{value:1}],['Option B',{value:1},{value:4},{value:3}],['Option C',{value:2},{value:1},{value:4}]]}},
  standard:{props:{treatment:'standard'}},
  open:{props:{treatment:'open'}},
  'plain-rows':{preferredSize:size,props:{...trends,columns:trends.columns.map(c=>({...c,type:'text'})),rowStyle:'plain'}},
