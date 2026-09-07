@@ -20,7 +20,7 @@ Review the exact final editable artifact, not only the source code or an interme
 6. Apply the deletion test.
 7. For PowerPoint, require the four accepted artifacts in [PowerPoint reports](#powerpoint-reports); follow the linked platform owners for commands and repair loops.
 
-Every planned slide maps to exactly one sequenced dot. New decks and structural revisions require a validated pre-authoring contract. A missing executive summary is not a defect by itself in an existing deck when the revision did not authorize adding one.
+Every planned slide maps to exactly one sequenced dot. New decks and structural revisions require a validated pre-authoring contract. Every full deck or recreation must include an executive summary in the approved dot-dash and final artifact. Bounded individual-slide edits preserve their authorized scope.
 
 ## Hard release gates
 
@@ -31,8 +31,9 @@ Release only when all apply:
 - The deck answers the brief and has one governing thought.
 - The title spine fulfils the [communication job](../storylining/index.md#write-the-title-spine): a clear executive memo for a decision, or a coherent explanatory progression for teaching.
 - Each slide has one narrative job and one dominant exhibit.
-- The executive summary, when required, preserves the approved governing branches and overall action and passes the [standalone narrative test](../components/copy.md#executive-summary-narrative).
-- The close follows from the evidence.
+- The mandatory executive summary and dot-dash pass the [standalone argument and evidence test](../storylining/dot-dash.md#standalone-argument-and-evidence-test). The summary preserves the approved governing branches and overall action and passes the [standalone narrative test](../components/copy.md#executive-summary-narrative).
+- The close follows from the evidence. Implication slides show the canonical evidence-to-implication arrow; proximity alone does not express that relationship.
+- Every decisive case maps to visible proof, including dedicated evidence slides where needed. Reject table-heavy synthesis that lacks the graphs needed to test its numerical claims, and statistics unrelated to the slide’s criterion.
 - Missing data is explicit; a missing-data statement never counts as completed analysis.
 
 ### Evidence
@@ -53,6 +54,14 @@ Release only when all apply:
 - The chosen [composition](../composition/index.md) fits the evidence, keeps one dominant exhibit, and leaves no under-composed analytical canvas.
 - [Deck rhythm](../design/index.md#deck-rhythm) passes separately from style consistency; repetitive chart runs and empty closing cards need an analytical reason, not a matching palette.
 - Every slide passes the full-size anti-slop audit with no unexplained object, label, treatment, or inconsistency.
+
+### Substance and grouping rejection checks
+
+Record a per-slide verdict with the exact claim, visible premises, inference limit, and any failed grouping in the review evidence. Apply the [claim-to-proof check](../components/copy.md#claim-to-proof-check) before layout and again to the exact render. A slide fails when its title exceeds the evidence, a comparative claim supplies only one side, a conclusion replaces evidence with imagery, or material statistical context is absent. Missing research is an unresolved gap, not permission to use unsupported rhetoric.
+
+Reject dangling headings, unaligned name/value text, detached qualifications, and side rails whose items have no visible parent or evidence relationship. Check actual label-to-content proximity and alignment at full size, not only whether the objects exist. Apply [analytical composites](../design/slide-layouts.md#analytical-composites) and [category visuals](../components/icons-and-logos.md#category-icons-and-images).
+
+At montage scale, reject an unjustified repeated image-plus-text silhouette, images on every analytical page, or a repair that turns every page into the same table or card template. Structural covers may be sparse; analytical pages must earn their space with readable evidence and reasoning. Passing geometry checks does not establish any of these semantic or visual gates.
 
 ### Platform
 

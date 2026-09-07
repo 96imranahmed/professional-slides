@@ -28,6 +28,8 @@ Sizes may be fixed pixels, `fill`, `hug`, fractional `{ fr: n }`, or percentage 
 
 ## Content planning
 
+Use the approved [dot-dash slide design plan](../references/storylining/dot-dash.md#slide-design-plan) as authoring-model input. Translate its ordered sections, arguments, component types, material props, and reading order into the existing items and composition inputs below. Reconcile the resolved layout with that plan, including when using `auto`; generation must not silently redesign the approved slide.
+
 `planSlide()` consumes an answer-first title plus arbitrary items:
 
 ```js

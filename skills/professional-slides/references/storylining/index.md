@@ -43,7 +43,7 @@ Choose the arc from the communication job:
 - problem, solution, evidence, ask for a proposal or funding request;
 - baseline, variance, cause, action for performance diagnosis;
 - question, tests, synthesis, recommendation for hypothesis-led analysis.
-- concept, mechanism, worked example, limits, application for explanation or teaching; adapt the order to the learner's prerequisites rather than inserting an executive summary or recommendation.
+- concept, mechanism, worked example, limits, application for explanation or teaching; adapt the body to the learner’s prerequisites and make the mandatory executive summary an overview of the explanation rather than an invented recommendation.
 
 ## Write and approve the dot-dash
 
@@ -62,13 +62,13 @@ For each slide record:
 - communication job;
 - action title;
 - decisive evidence;
-- exhibit form;
+- reviewed layout and reading order, ordered section/component types, and each section's argument and evidence, following the [slide design plan](dot-dash.md#slide-design-plan);
 - source or evidence gap;
 - decision implication or learning consequence;
 - hypothesis branch or concept dependency;
 - navigation state when used.
 
-For analytical slides, apply the [analytical substance check](../components/copy.md#analytical-substance) before selecting the exhibit. Preserve that reasoning in the storyboard so the production handoff contains more than a title and a list of values. Do not prescribe decorative layout details here.
+For analytical slides, apply the [analytical substance check](../components/copy.md#analytical-substance) before selecting the exhibit. Preserve that reasoning in the storyboard so the production handoff contains more than a title and a list of values. Review the substantive slide design with the dot-dash before approval. Leave decorative and exact token-resolved geometry decisions to implementation. Pass the approved design plans to the authoring model and map them into the existing item and composition contract.
 
 ## Keep hierarchical trackers parallel
 

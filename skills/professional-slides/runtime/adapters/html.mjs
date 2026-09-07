@@ -96,6 +96,7 @@ function polygonPoints(frame, geometry) {
 function svgNode(node) {
   const { frame, style, data } = node;
   if (node.type === "image") {
+    if (!data.circular) return `<image data-node-id="${escapeHtml(node.id)}" data-role="${escapeHtml(node.role)}" x="${frame.x}" y="${frame.y}" width="${frame.width}" height="${frame.height}" preserveAspectRatio="none" href="${escapeHtml(data.dataUri)}"><title>${escapeHtml(data.alt)}</title></image>`;
     const clipId = `portrait-${escapeHtml(node.id)}`;
     return `<defs><clipPath id="${clipId}"><ellipse cx="${frame.x + frame.width / 2}" cy="${frame.y + frame.height / 2}" rx="${frame.width / 2}" ry="${frame.height / 2}"/></clipPath></defs><image data-node-id="${escapeHtml(node.id)}" data-role="${escapeHtml(node.role)}" x="${frame.x}" y="${frame.y}" width="${frame.width}" height="${frame.height}" href="${escapeHtml(data.dataUri)}" clip-path="url(#${clipId})"><title>${escapeHtml(data.alt)}</title></image>`;
   }

@@ -50,12 +50,12 @@ const SERIES = [
   token("color.chartSeries6")
 ];
 
-function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false } = {}) {
+function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0 } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
   leftInset = Math.max(leftInset, bands.left);
   const top = (topLegend ? 52 : 28) + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top;
   const bottom = 68 + bands.bottom;
-  const rightInset = endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16;
+  const rightInset = Math.max(valueLabelInset, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16);
   if (frame.height - bottom - top < 100) throw new Error("Chart annotation bands leave insufficient plot height; enlarge or split the exhibit");
   if (frame.width - leftInset - rightInset < 120) throw new Error("Chart has insufficient plot width; enlarge or split the exhibit");
   return {
@@ -355,6 +355,8 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const values = series.flatMap((item) => item.values);
   const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && series.length === 1);
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
+  const barLabelGap = tokenValue(token("space.3"));
+  const barLabelWidth = Math.max(50, ...values.map(value => Math.ceil(measureText(formatValue(value, props), 300, {fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1}).width)));
   const horizontalCategoryLabelWidth = horizontal
     ? Math.min(180, Math.max(72, Math.ceil(Math.max(...categories.map(category => measureText(category, 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width))) + 12))
     : 0;
@@ -364,6 +366,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
     leftInset: horizontal ? horizontalCategoryLabelWidth + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54,
+    valueLabelInset: horizontal && !stacked && showDataLabels ? barLabelWidth + barLabelGap : 0,
     centerPlot: !horizontal && !showValueAxis
   });
   const stackExtents = categories.flatMap((_, categoryIndex) => {
@@ -457,8 +460,8 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
           ? stacked
             ? { x: bar.x + 2, y: bar.y - 2, width: Math.max(1, bar.width - 4), height: bar.height + 4 }
             : value >= 0
-              ? { x: Math.min(plot.x + plot.width - 52, bar.x + bar.width + 4), y: bar.y - 2, width: 50, height: bar.height + 4 }
-              : { x: Math.max(plot.x, bar.x - 54), y: bar.y - 2, width: 50, height: bar.height + 4 }
+              ? { x: bar.x + bar.width + barLabelGap, y: bar.y - 2, width: barLabelWidth, height: bar.height + 4 }
+              : { x: bar.x - barLabelGap - barLabelWidth, y: bar.y - 2, width: barLabelWidth, height: bar.height + 4 }
           : stacked
             ? { x: bar.x + 2, y: bar.y + (bar.height - 24) / 2, width: bar.width - 4, height: 24 }
             : value >= 0
@@ -568,7 +571,7 @@ function lineChart({ id, frame, props, area = false }) {
     const x = xScale(index);
     const categoryX = Math.max(plot.x, Math.min(plot.x + plot.width - categorySlot, x - categorySlot / 2));
     categoryMap.set(category, { x: categoryX, y: plot.y, width: categorySlot, height: plot.height });
-    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL) }));
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL, INK, false, index === 0 ? "left" : index === categories.length - 1 ? "right" : "center") }));
   });
   series.forEach((item, seriesIndex) => {
     const points = item.values.map((value, index) => ({ x: xScale(index), y: yScale(value), value, category: categories[index] }));
@@ -826,7 +829,7 @@ function scatterQuadrantNodes({ id, plot, quadrants, xScale, yScale }) {
 
 function scatterLegend({ id, frame, props, bubble, seriesNames }) {
   if (props.legend === false) return [];
-  const items = seriesNames.length > 1 ? seriesNames.map((name, index) => ({ label: name, colorIndex: index })) : [];
+  const items = seriesNames.length > 1 ? seriesNames.map((name, index) => ({ label: name, colorIndex: props.colorIndices?.[index] ?? index })) : [];
   if (props.sizeLegend !== undefined) {
     if (!bubble) throw new Error("Only bubble charts accept a size legend");
     if (!props.sizeLegend || typeof props.sizeLegend !== "object" || typeof props.sizeLegend.label !== "string" || !props.sizeLegend.label.trim()) throw new Error("Bubble size legend requires a non-empty label");
@@ -862,6 +865,18 @@ function scatter({ id, frame, props, bubble = false }) {
     ...axes(id, plot, yBounds.min, yBounds.max, 4, { gridlines: props.gridlines === true }),
     ...scatterLegend({ id, frame, props, bubble, seriesNames })
   ];
+  // Both quantitative dimensions need a visible scale, even without point labels.
+  for (let index = 0; index <= 4; index++) {
+    const value = xBounds.min + xBounds.span * index / 4;
+    nodes.push(textPrimitive({ id: stableId(id, "x-axis-label", index), role: "axis-label", frame: { x: xScale(value) - (index === 0 ? 0 : index === 4 ? 64 : 32), y: plot.y + plot.height + 20, width: 64, height: 28 }, text: String(Number(value.toFixed(2))), style: textStyle(AXIS_LABEL, SECONDARY, false, index === 0 ? "left" : index === 4 ? "right" : "center") }));
+  }
+  if (props.yTickLabels) {
+    for (let index = nodes.length - 1; index >= 0; index--) if (nodes[index].role === "axis-label" && !nodes[index].id.includes("x-axis-label")) nodes.splice(index, 1);
+    for (const [index, tick] of props.yTickLabels.entries()) {
+      if (!Number.isFinite(tick.value) || typeof tick.label !== "string") throw new Error("Scatter yTickLabels require finite values and text labels");
+      nodes.push(textPrimitive({ id: stableId(id, "category-axis-label", index), role: "axis-label", frame: { x: plot.x - 54, y: yScale(tick.value) - 14, width: 48, height: 28 }, text: tick.label, style: textStyle(AXIS_LABEL, SECONDARY, false, "right") }));
+    }
+  }
   const pointMap = new Map();
   const categoryMap = new Map();
   const bubbleSizes = bubble ? props.points.map(point => point.size) : [];
@@ -878,8 +893,8 @@ function scatter({ id, frame, props, bubble = false }) {
     const x = xScale(point.x);
     const y = yScale(point.y);
     const seriesIndex = seriesNames.length ? seriesNames.indexOf(point.series) : 0;
-    nodes.push(ellipsePrimitive({ id: stableId(id, "point", point.name), role: "chart-marker", frame: { x: x - size / 2, y: y - size / 2, width: size, height: size }, style: fillStyle(SERIES[seriesIndex % SERIES.length]), data: { series: point.series ?? null, sizeValue: bubble ? point.size : null } }));
-    nodes.push(textPrimitive({ id: stableId(id, "label", point.name), role: "data-label", frame: { x: x + size / 2 + 4, y: y - 12, width: 96, height: 24 }, text: point.name, style: textStyle(CHART_LABEL, INK, false, "left") }));
+    nodes.push(ellipsePrimitive({ id: stableId(id, "point", point.name), role: "chart-marker", frame: { x: x - size / 2, y: y - size / 2, width: size, height: size }, style: fillStyle(SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length]), data: { series: point.series ?? null, sizeValue: bubble ? point.size : null } }));
+    if (point.showLabel !== false && props.dataLabels !== false) nodes.push(textPrimitive({ id: stableId(id, "label", point.name), role: "data-label", frame: { x: x + size / 2 + 4, y: y - 12, width: 96, height: 24 }, text: point.name, style: textStyle(CHART_LABEL, INK, false, "left") }));
     const mappedPoint = { x, y, changeX: x, changeY: y - 16 };
     pointMap.set(`value:${point.name}`, mappedPoint);
     pointMap.set(`${point.series || "value"}:${point.name}`, mappedPoint);

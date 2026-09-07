@@ -377,8 +377,8 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
                         heading = branch.get("heading")
                         if non_empty_string(heading) and heading.strip().lower() in GENERIC_SYNTHESIS_HEADINGS:
                             errors.append(f"{branch_location}.heading must state a substantive conclusion")
-            if slide.get("title") != "Executive summary":
-                errors.append(f"{location}.title must equal Executive summary for executive_synthesis")
+            if slide.get("title") != "Executive summary" and not str(slide.get("title", "")).startswith("Executive summary:"):
+                errors.append(f"{location}.title must start with Executive summary for executive_synthesis")
             if slide.get("terminalSurfacePosition") == "none":
                 errors.append(f"{location}.terminalSurfacePosition must place the overall action")
         tracker_label = slide.get("trackerLabel")
@@ -2471,7 +2471,7 @@ Reject a slide for any major visual or semantic defect, including:
 - an incomplete component such as a metric without its registered divider/label grammar or a callout without a visible attachment;
 - sparse or under-composed evidence that leaves material dead space, undersizes the dominant exhibit, or reads like an unfinished draft for its delivery mode;
 - a component or composition that fails its canonical owner contract; open compositions are valid when their relationships, jobs and geometry are explicit;
-- a chart without a complete exhibit heading, necessary units/period, readable labels, or canonical legend/direct-label treatment. The standard chart title keeps a short unit inline in a secondary colour, moves a material period into the concise heading, and falls back to a second unit line only when measured fit requires it. Peer analytical headers use the same top anchor and underline baseline;
+- a chart without a complete exhibit heading, necessary units/period, readable labels, or canonical legend/direct-label treatment. The standard chart title keeps a short unit inline in a secondary colour, moves a material period into the concise heading, and falls back to a second unit line only when measured fit requires it. Chart headings retain their rule even with inline units. Non-chart headings and insight regions may omit rules or redundant headings; align baselines only where peer rules are deliberately used;
 - an automatic/default Office legend whose placement, keys, spacing, or plot reservation visibly departs from the shared legend grammar;
 - a tracker that is unnecessary, uses a nonregistered state, repeats a full-state construction on analytical pages, or competes with the title;
 - weak hierarchy, awkward alignment, inconsistent spacing, gratuitous UI-like panels, clipping, wrapping, overlap, or unfinished polish;
@@ -2956,8 +2956,8 @@ When an executive summary and navigation system both exist, compare them explici
 Reject cross-slide drift including:
 - invented or inconsistent component variants without a documented content reason;
 - full-state trackers repeated on analytical pages, skipped tracker states, or changing selected-state geometry;
-- charts that mix automatic Office legends with the shared legend grammar, or inconsistent exhibit-heading variants (unit headings omit the line; no-unit headings normally include it);
-- recurring metric fields missing dividers or changing value/label grammar;
+- charts that mix automatic Office legends with the shared legend grammar, or inconsistent chart-heading variants (chart headings retain their line with or without inline units; non-chart headings may omit rules at the author’s discretion);
+- recurring metric fields changing value/label grammar or omitting a divider required by their selected variant; open prominent metric fields may use consistent whitespace without dividers;
 - title, source, grid, plot, or footer anchors that jump without a structural reason;
 - one or more sparse analytical pages that break the deck's intended executive pre-read density;
 - semantic colours that change meaning or decorative series colours applied to furniture;

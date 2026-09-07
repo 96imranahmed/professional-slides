@@ -57,6 +57,9 @@ Use one aligned row below chronological category labels when a secondary period-
 
 ## Construction details
 
+Place outside value labels a full `space.3` token beyond each bar endpoint. Reserve the measured label width plus this gap in the chart gutter; never clamp a label back onto its bar to fit. Apply the same clear gap to positive and negative bars. Category labels also need visible separation from the baseline.
+
+
 When the title does not explain an exception, render every row with the peer series role. Do not combine a selected bar, region box, and region tint on one chart.
 
 ### State and annotation geometry

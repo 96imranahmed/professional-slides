@@ -11,6 +11,8 @@ Metric fields present one to three headline values whose comparison or implicati
 
 Do not create a separate box for each value by default. Peers share the same value role, divider length, label grammar, description depth, and base colour. Emphasize one metric only when the title or a direct annotation explains why it is exceptional.
 
+The runtime `metric` component supports `variant: "prominent"` for a large headline value in a roomy metric field. It uses the shared cover-title size and body-sized labels. Its open value/label field does not require a divider: aligned peer labels and generous consistent whitespace can separate stacked prominent values. Do not add rules solely because metrics repeat. Use a divider only when the chosen field variant specifies one; peer metrics use the same variant. Allocate enough height for the larger value rather than leaving a small number stranded in a tall field.
+
 ## Content contract
 
 Every metric includes a value, unit or basis, period or population when material, and a concise label. Add one interpretation or definition when the metric is a ratio, proxy, threshold result, nonstandard unit, or otherwise lacks a self-evident denominator. Use comparable units and periods across peers or make the difference explicit.

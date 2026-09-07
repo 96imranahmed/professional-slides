@@ -10,6 +10,8 @@ Use a bracket, interval line, arrow, or endpoint label to show a supported absol
 
 For each chart, identify the comparison the reader must verify before allocating the plot. When the claim depends on growth, a gap, margin expansion, or a threshold crossing, request the corresponding annotation in the chart's content props. Endpoint values and a claim in the title do not show the calculated change on the exhibit. Omit the extra annotation when the plotted measure already is that change, such as directly labelled year-over-year growth bars, or when the same comparison is already encoded clearly; record that reason in the storyboard.
 
+Prefer an annotation attached to the exact plotted point or period over a detached right-hand paragraph explaining that point. Reserve enough chart space to keep marks and labels legible. Longer supporting information may occupy a deliberately grouped section beneath the chart under the [analytical composite rules](../design/slide-layouts.md#analytical-composites); this prose section is distinct from the numeric `annotationRail`. Do not add a poster or side rail merely to balance a chart.
+
 Use `changeAnnotations` for a supported A-to-B change or gap, `referenceLines` for a decision threshold, and `annotations` for an evidence-linked observation. These inputs have different jobs. An empty `annotations: []` does not request growth arrows, and the renderer does not infer them from prose. Bind endpoints to exact category and series keys, reconcile the displayed calculation with source precision, and reserve the shared annotation band before sizing marks. For example:
 
 ```js

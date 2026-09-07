@@ -39,6 +39,14 @@ Apply the [no-recap and new-deduction gate](#no-recap-and-new-deduction-gate). A
 
 Let this reasoning determine visual capacity: a driver decomposition, comparable periods, sensitivity range, or evidence-and-consequence table may develop the proof. Add only the forms the argument needs. Larger bars, extra bullets, repeated metrics, and taller cards do not supply missing substance. If there is no distinct implication, merge or remove the page within the authorized narrative scope; otherwise flag it for the owner.
 
+### Claim-to-proof check
+
+Before choosing a layout, state the exact premises that make the proposed title reasonable. A comparative verdict needs comparable evidence for both sides on the stated criterion. An isolated example, an attractive photograph, or one favourable period cannot establish general superiority. Distinguish commercial scale, per-item performance, profitability, audience response, and artistic judgement; evidence for one does not automatically prove another. Narrow an overclaimed title or develop the missing comparison.
+
+When quantitative evidence can test the claim, research and show the relevant values, comparison basis, period, units, and sample sizes. Check whether totals reflect output volume and whether averages hide a distribution or outlier; include a compact decomposition, underlying rows, or another meaningful statistic when it changes interpretation. Do not infer profitability from gross revenue, viewership from revenue, or sustained performance from a single selected year. Do not invent numbers or force statistics onto an inherently qualitative claim: use specific comparable examples and explain the mechanism instead.
+
+Hide the title and remove decorative imagery. The remaining exhibit must still let a reader reconstruct the argument. A photo with a generic caption, a pair of anecdotes without a comparison, or two large bars beside unsupported prose fails. Repair the reasoning before changing spacing or enlarging objects. A concluding verdict must synthesize the decisive evidence against explicit criteria, with a material limitation where needed; it cannot be a hero image plus restated slogans. A compact comparison table is useful when multiple criteria require a visible evidence-to-verdict relationship, but is not mandatory on every slide.
+
 ## No-recap and new-deduction gate
 
 Never add a recap of information already visible on the same slide, especially graph or table content. This applies to paragraphs, bullets, captions, annotation prose and boxes. A different format or synonyms do not add meaning. Necessary data labels, units, legends and concise comparison annotations decode the exhibit; they do not license an accompanying prose retelling.
@@ -49,7 +57,7 @@ For each proposed insight, record in authoring/review evidence, not on the slide
 
 For example, after a chart already shows demand above capacity, “Demand exceeds capacity” is a recap. “Additional promotion will increase the backlog unless throughput improves” is a deduction only when the page also establishes that capacity cannot expand in the relevant period. Without that premise, qualify the claim or omit it. Do not invent insight to fill a box.
 
-Audit all remaining supporting copy for information gain. Delete repeated evidence; retain genuinely additional evidence or needed explanation in the appropriate exhibit or adjacent bullet section. Put incidental calculation/source notes in provenance furniture or notes, not the insight. Reformatting rejected insight as bullet points is not a repair if it remains a recap.
+Audit all remaining supporting copy for information gain. Delete repeated evidence; retain genuinely additional evidence or needed explanation in the appropriate exhibit or deliberately grouped section beside or beneath it. Put incidental calculation/source notes in provenance furniture or notes, not the insight. Reformatting rejected insight as bullet points is not a repair if it remains a recap.
 
 This is a release-blocking semantic copy check, not a style preference or a word-overlap heuristic. The independent final review must explicitly record the no-recap decision and each insight's premises, added deduction and verdict. Missing review evidence, any recap, or any non-deductive/unsupported insight fails even when layout and all numerical scores pass. Recheck the exact exported text after repairs.
 
@@ -76,6 +84,10 @@ Keep labels only when they help the audience decode data, navigation, timing, ow
 A role label on a callout, synthesis item, or terminal action surface is presumptively unnecessary. Delete `Answer`, `Key takeaway`, and similar rhetorical-role labels when the sentence and placement already communicate the role. Use substantive section headings and insight statements instead. Never render the recommendation and its call to action in separate text-box surfaces.
 In a split chart page, title the right-hand field with the actual evidence subclaim or consequence. In an executive synthesis, every branch heading must state a substantive conclusion rather than name the branch's rhetorical job.
 
+Use inline named examples when the name and explanation form one thought: **The Winter Soldier:** Institutional distrust turns the hero's own organisation into the threat. The name may use semibold emphasis; do not force a new line between the name and its explanation. Reserve separate headings for actual multi-item groups.
+
+Every label must visibly belong to its content through proximity, alignment, a table field, or a shared container. A relevant heading far above scattered paragraphs does not establish grouping. Do not use generic headings to disguise an unstructured collection of claims.
+
 ## Punctuation
 
 Audience-facing copy must contain zero em dashes. Use commas, full stops, parentheses, or a clear connector instead. Follow [Quote Cluster](quote-cluster.md) when a sourced quotation contains ineligible punctuation.
@@ -94,3 +106,14 @@ Apply the [portability test](#analytical-substance). Watch for repeated `not jus
 4. Apply the [no-recap and new-deduction gate](#no-recap-and-new-deduction-gate) to every rendered page, then reapply [analytical substance](#analytical-substance) with its title and detached conclusion hidden. Use the [notes rule](#insight-versus-speaker-notes) for supporting derivations.
 5. Read insight and recommendation copy aloud: complete sentences must sound natural, not clipped or padded.
 6. Scan the exact final artifact for the Unicode em dash character and repeat until there are zero matches.
+
+
+### Bullet markers and implication copy
+
+Use circular bullet dots, vertically centred on the first text line, with row spacing distinct from wrapped-line spacing. Use circled numbers when order matters. Subordinate headings within an already titled section do not repeat its underline.
+
+A direct implication field may omit a generic heading such as “The qualified verdict”. Keep its related paragraphs close together and vertically centre the complete measured group against the evidence field; do not centre each paragraph in a separate oversized frame. Develop enough reasoning to explain why the evidence supports the verdict and what limits or changes it. Concision must not reduce the close to unsupported labels.
+
+### Omit redundant umbrella headings
+
+A parent heading must add information beyond its children. When named proof branches already explain the content, remove rhetorical labels such as “What the evidence establishes”, “The universe verdict”, or “Our analysis”. Move the substantive content into the released space; do not preserve a blank heading slot. This applies to both sides of a slide and does not remove necessary chart measure, period or unit headings.

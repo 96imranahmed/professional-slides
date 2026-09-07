@@ -4,7 +4,7 @@ This file owns the component-level grammar for enclosing, separating, or heading
 
 ## Choose one section treatment
 
-Assign one primary treatment to each repeated slide family before authoring its pages. Peer regions at the same hierarchical level must use the same treatment, and comparable chart, table, diagram, and comparison headers must use one deck-wide analytical-header treatment. Prefer the open treatment with a quiet underline because it scales across exhibits without consuming analytical space. Different semantic roles may coexist—for example, an open analytical canvas beside a theme-defined implication rail—but do not alternate treatments among equivalent regions merely for variety.
+Assign one primary treatment to each repeated slide family before authoring its pages. Keep comparable semantic roles coherent, but do not require every region to have the same header or underline. Chart headings retain the rule; non-chart headings default to open typography, with optional rules only when substantial content needs separation. Different semantic roles may coexist—for example, an open analytical canvas beside a theme-defined implication rail—but do not alternate treatments among equivalent regions merely for variety.
 
 Use `chart-title` for chart and small-multiple headings, and `section-heading` for non-chart analytical regions and rails. A chart-side description and an analytical takeaway rail (`content-rail` with `treatment="open"`) share typography, colour, one top anchor, and one header band. An open rail applies no top inset: give it the same frame top as its peer chart or exhibit heading. Measure wrapping before layout; size the band to the tallest peer and bottom-align the text. Place each rule `space-2` below the text box, so one-line and multiline headings retain equal clearance and one rule baseline. Reserve `space-3` after the rule before section content. The runtime token IDs are `space.2` and `space.3`. A muted insight rail retains its internal top padding, shared typography, and borderless heading.
 
@@ -76,7 +76,7 @@ Detached implication regions use the active [`Insight Box`](insight-box.md) vari
 
 - each visible line, box, fill, or highlighted header expresses a named grouping, hierarchy, or state;
 - peer regions use one treatment and one resolved variant;
-- comparable analytical headers use one deck-wide treatment, with the open underlined form preferred unless an approved theme or semantic boundary requires another mode;
+- chart headings retain rules; non-chart heading rules are discretionary and should not turn the deck into a grid of boxes;
 - peer headings pass the shared treatment and measured-clearance contract above in both rendered outputs;
 - the action title remains the first read and the dominant evidence remains clear;
 - boundaries terminate on valid component or slide-family guides;

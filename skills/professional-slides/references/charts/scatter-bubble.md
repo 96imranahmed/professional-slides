@@ -83,3 +83,9 @@ Reject decorative bubble sizes, unauthorized or distorted logos, logos that repl
 ## Acceptance test
 
 Verify the relationship and outliers remain clear when logos become text labels. Every label maps to the correct observation. Every bubble area and position reconciles to the declared measures. When present, the size legend is neutral, named, and top-right; quadrant titles remain readable without becoming a substitute for the action title.
+
+
+For dense point sets, use `dataLabels: false` to suppress all point labels or `showLabel: false` on individual points; retain each point’s stable name for data identity and annotations. Use `colorIndices` to preserve the deck’s series mapping in both marks and legends. Do not force labels onto every observation when they hide the distribution.
+
+
+Centre an x-axis title on the actual plot bounds, excluding the y-label gutter and any side rail. Keep correlation coefficients and sample definitions in the linked analysis or notes unless they change the visible argument. A side table that merely lists calculations fails the insight test; use the supported consequence of the relationship instead, and distinguish related measures from independent evidence.

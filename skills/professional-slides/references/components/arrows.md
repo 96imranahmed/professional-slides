@@ -47,3 +47,5 @@ Build each arrow from editable native line and shape geometry, preserving the re
 - The selected variant has enough emphasis for its job without competing with the evidence.
 - Empty arrow header slots have no visible rule.
 - Every arrow remains editable and uses theme-bound colours and dimensions.
+
+A coherent verdict limitation and reassessment condition may share one unheaded implication field when both follow from the same historical evidence. An inference arrow can connect the evidence to that qualified conclusion. Do not require a heading or change it to an unrelated-context boundary simply because the implication contains two paragraphs.

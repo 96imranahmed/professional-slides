@@ -107,7 +107,7 @@ function customPolygonPoints(node) {
 function addNode(slide, node, pptx) {
   const { frame, style, data } = node;
   if (node.type === "image") {
-    slide.addImage({ data: data.dataUri, x: inch(frame.x), y: inch(frame.y), w: inch(frame.width), h: inch(frame.height), rounding: true, altText: data.alt, objectName: `ps:${node.id}` });
+    slide.addImage({ data: data.dataUri, x: inch(frame.x), y: inch(frame.y), w: inch(frame.width), h: inch(frame.height), rounding: data.circular === true, altText: data.alt, objectName: `ps:${node.id}` });
     return;
   }
   if (node.type === "text") {

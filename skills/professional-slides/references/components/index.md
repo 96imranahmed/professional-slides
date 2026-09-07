@@ -43,7 +43,7 @@ These are hierarchy levels of one title family, not separate visual designs. Lik
 
 ## Deck cover
 
-Keep the cover title very short: name the document or topic rather than placing the recommendation or argument on the cover. An optional subtitle is a short identity label, typically the company or client name. Do not turn it into a thesis summary, evidence-date inventory, price snapshot or methodology paragraph. Put the recommendation in the executive summary and provenance in the relevant evidence pages or notes. Prefer one line per field; the renderer's two-line capacity is a fit limit, not a writing target.
+Keep the cover title very short: name the document or topic rather than placing the recommendation or argument on the cover. A succinct subtitle states the deck’s scope or purpose, such as “Market performance and prospects”. Do not turn it into a thesis summary, evidence-date inventory, price snapshot or methodology paragraph. Put the recommendation in the executive summary and provenance in the relevant evidence pages or notes. Prefer one line per field; the renderer's two-line capacity is a fit limit, not a writing target.
 
 Use the shared `cover` component in [`runtime/registry.mjs`](../../runtime/registry.mjs) for a plain deck title and optional subtitle. It inherits the deck canvas, display and body fonts, ink and secondary-text colours, the deck-title size, and the standard body size for the subtitle. Both lines share the page's left guide; the measured block is vertically centred with `space.5` between title and subtitle.
 
@@ -59,7 +59,7 @@ Set `mode` to `dark` (default: ink background, on-primary text) or `light` (canv
 
 `chart-title` is registered in [`runtime/registry.mjs`](../../runtime/registry.mjs). Graph headings share the section-heading font, colour, level, rule spacing, and measured wrapping. Inputs are `heading`, optional `unit`, and optional `variant`; `headerBandHeight` aligns wrapped peers in a coordinated group.
 
-- `underlined` is the default. Its rule sits `space.2` below the complete measured title band. Use it for a chart beside an open underlined analytical rail; give both components the same frame top so their headings and rules share one level.
+- `underlined` is the default. Its rule sits `space.2` below the complete measured title band. Retain it over charts, including headings with units. A neighbouring non-chart region does not inherit this rule; use an unruled heading or no heading when appropriate.
 - `unit` is the explicit borderless alternative and requires nonempty unit text. Use it only when the chart's peer regions are also borderless.
 
 Keep a short unit such as `$B`, `%`, or `index` on the same line as the heading, preceded by a comma. The unit remains a separate editable text object at exactly the heading's font size, with regular weight and `color.chartUnit`; hierarchy comes from weight and colour, not a smaller unit. Shorten the heading first. Only when the measured heading and unit still cannot fit does the component place the unit on a second line at the same size with `space.1` clearance. Put a material period or population in the heading when it remains concise, for example `Q2 2026 reported-to-normalized income bridge, $B`; do not overload the unit with `$B, Q2 2026`.

@@ -19,6 +19,8 @@ Record:
 - template ID: registered ID, or `none` for direct storylining;
 - visual-system mode: clean-native-standard, reference-led, or custom-user-directed, with approval evidence for the latter two;
 - `mainQuestion` and `governingAnswer`;
+- the mandatory executive-summary slide, its complete approved copy, and a recorded pass of the [standalone argument and evidence test](dot-dash.md#standalone-argument-and-evidence-test);
+- an evidence mapping from each decisive claim to its source, actual values or examples, comparator, inference limits, and proof slide IDs;
 - slide count and ordered slide records;
 - each slide's title, job, hypothesis branch or concept dependency, `sourceRole`, and arbitrary ordered `items`;
 - the decisive inference and any assumption or qualification the reader must see, mapped to its visible content item rather than left only in notes;
@@ -38,7 +40,7 @@ Record:
 
 Use tracker.system none when no tracker is needed. In that state, contents and transition slides are empty, and the analytical header is untracked.
 
-Copy each `title` verbatim from its dot. The job is planning metadata.
+Copy each `title` verbatim from its dot. The job is planning metadata. Map the approved dot-dash design plan into the same slide's `items` and composition: preserve section order, semantic jobs, component types and variants, arguments, evidence, material props, and peer relationships. Retain the reviewed plan version or hash with approval evidence and a section-to-item mapping so the authoring model receives the complete approved design, not only the title spine. Do not introduce a separate runtime layout schema.
 
 Use tracker.system hierarchical-segmented only when deck sections and analytical subgroups both need orientation. Map parent and chapter items to exact approved IDs, labels, order, and contiguous ranges. Governed slides record both IDs; tracked headers require `parent-tracker-label`, `chapter-tracker-label`, and `action-title`.
 
@@ -50,13 +52,13 @@ The contract must cover every approved dot and all required structural pages. It
 
 ## Existing deck
 
-The initial inventory includes `sourceSlideCount` and one record for every source slide. After an approved structural change, preserve `sourceSlideCount` and record every target slide under `plannedSlideCount`; differing counts require `approval.dotDashApproved: true`. Record a missing executive summary as recommended_not_forced. Do not force a new executive summary, contents page, or tracker outside the authorized scope.
+The initial inventory includes `sourceSlideCount` and one record for every source slide. After an approved structural change, preserve `sourceSlideCount` and record every target slide under `plannedSlideCount`; differing counts require `approval.dotDashApproved: true`. Include a missing executive summary in the target plan for every full-deck revision or recreation. A bounded individual-slide edit does not authorize restructuring the whole deck; flag the missing summary for that broader revision. Contents and trackers remain conditional on the communication need.
 
 Validate before the first mutation and after an approved structural change.
 
 ## Gate
 
-Before production, verify all required fields and reconcile slide counts. Each approved dot maps to one slide record. Tracker labels, ranges, and full states are consistent. The theme manifest and treatment ledger cover every slide. Reserve the PowerPoint acceptance manifest when required. Match executive-summary disposition to the workflow. Link approval evidence to the reviewed dot-dash.
+Before production, verify all required fields and reconcile slide counts. Each approved dot maps to one slide record. Tracker labels, ranges, and full states are consistent. The theme manifest and treatment ledger cover every slide. Reserve the PowerPoint acceptance manifest when required. Match executive-summary disposition to the workflow. Link approval evidence to the exact reviewed dot-dash table artifact, including its version or hash and slide design plans. Before production, reconcile every section and material layout choice with the planner inputs; an `auto` composition must still satisfy the approved arrangement. Follow the dot-dash owner for material design changes and reapproval.
 
 An executive synthesis uses the same open item and composition contract as any other slide. Validate its serialized fields against [executive-summary narrative](../components/copy.md#executive-summary-narrative) and the [Insight Box owner](../components/insight-box.md).
 

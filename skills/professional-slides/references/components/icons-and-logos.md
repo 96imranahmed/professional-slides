@@ -28,6 +28,10 @@ When a logo is absent from the [asset authorization record](#asset-authorization
 
 ## Category icons and images
 
+Images are optional at slide and deck level. Select them for evidence, a necessary concrete example, or a deliberate structural moment; there is no image-per-slide target. Do not let posters or stills consume analytical space while the argument remains in sparse captions. Removing unnecessary images must restore room for evidence, not produce empty placeholders.
+
+For abstract categories, prefer compact semantic icons when they improve recognition. If concrete images earn their space, group each image, category label, and supporting evidence as one coherent card with a quiet theme-bound border when a visible enclosure is needed or requested. Do not leave the image as a detached banner above unrelated text. Use the same treatment for all peers, without turning every page into cards.
+
 Choose one registered visual treatment for a category composition, normally three to five mutually exclusive peers:
 
 - `icon-only` uses one semantic icon per category when every peer remains distinguishable at final rendered size without using its label to decode the icon;
@@ -62,3 +66,7 @@ For `image-only`, omit the icon slot. For `icon-only`, omit the image slot. Coll
 ## Acceptance check
 
 Give every mark a semantic or compositional purpose. Consider `icon-only`, `image-only`, and `icon-image` treatments. Retain visuals only when they improve differentiation, recognition, readability, balance, or scanning. Peers share one treatment, crop grammar, and registered icon system. Combined icons and images perform different jobs. Use actual Lucide vectors. Keep icon-only cells clear. Logos must be authorized, recognizable, and visible in the final render. Apply one fallback treatment for missing marks. Keep connectors clear of labels and unrelated nodes.
+
+## Embedded image input
+
+The registered `image-frame` component accepts `dataUri` (embedded PNG or JPEG), nonempty `alt`, and `authorization` referencing the asset record. Prepare the authorized crop at the target aspect ratio before embedding; both adapters preserve that rectangular crop. Omit `dataUri` only for an explicit planning placeholder. Quote avatars retain their separate circular treatment.

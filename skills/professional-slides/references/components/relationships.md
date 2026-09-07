@@ -68,3 +68,8 @@ The executable token declarations, preferred sizes, fixture content, and native 
 ## Acceptance check
 
 The relationship is clear without narration. Every node and connector has one job. Labels do not collide, lines terminate on valid boundaries, state is not conveyed by colour alone, and the exact HTML and PowerPoint renders preserve the same order, hierarchy, geometry, and emphasis.
+
+
+## Phase spacing and supporting rows
+
+Keep successive phase bands visually connected, with compact separation at their tips rather than wide empty gutters. Group each heading, band and supporting list closely. The canonical `chevron-process` uses compact overlapping bands and spaced bullet rows by default; `detailStyle: "circled-number"` uses circular ordinal markers when sequence matters. Do not type `(1)`, `(2)` or plain numbered paragraphs into the detail copy. Leave deliberate space between successive supporting rows, while keeping wrapped lines within one point close together. Check the actual rendered gaps rather than only the allocated phase frames.
