@@ -46,7 +46,7 @@ function executiveSummarySpec() {
   let y = 0;
   for (const [index, [heading, bullets]] of themes.entries()) {
     const headingHeight = REGISTRY.get("section-heading").measureHeader({ frame: { x: 0, y: 0, width, height: 100 }, props: { heading, rule: false } }).height;
-    items.push({ id: `theme-${index}`, job: "state the theme conclusion", component: "section-heading", props: { heading, rule: false }, frame: { x: 0, y, width, height: headingHeight } });
+    items.push({ id: `theme-${index}`, job: "state the theme conclusion", component: "section-heading", props: { heading, rule: false, semantic: {kind:"section-member",relatedTo:[`bullets-${index}`]} }, frame: { x: 0, y, width, height: headingHeight } });
     y += headingHeight + tokenValue(token("space.2"));
     const props = { variant: "body", items: bullets }, height = REGISTRY.get("bullet-list").measureContent({ frame: { width }, props }).height;
     items.push({ id: `bullets-${index}`, job: "develop evidence, implication and condition", component: "bullet-list", props, frame: { x: 0, y, width, height } });

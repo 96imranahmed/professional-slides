@@ -625,6 +625,12 @@ export function measureTable({ frame, props }) {
 }
 
 export function renderTable({ id, frame, props }) {
+  if (props.comparisonAxis !== undefined) {
+    if (!["rows", "columns"].includes(props.comparisonAxis)) throw new Error("Table comparisonAxis must be rows or columns");
+    if (props.comparisonAxis === "rows" && ["dimensions", "standard"].includes(props.treatment)) throw new Error("Row dimensions require first-column emphasis, not a filled item header");
+    if (props.comparisonAxis === "rows" && props.columns?.[0]?.type !== "category") throw new Error("Row dimensions require a category first column");
+    if (props.comparisonAxis === "columns" && props.treatment !== "dimensions") throw new Error("Column dimensions require the dimensions header treatment");
+  }
   const m = measureTable({ frame, props }),
     nodes = [],
     xs = m.widths.map((_, c) => frame.x + sum(m.widths.slice(0, c)));

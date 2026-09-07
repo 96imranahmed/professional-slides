@@ -2,6 +2,20 @@ import { linePrimitive, stableId, token } from "./core.mjs";
 import { legendNodes, LEGEND_TOKENS } from "./legends.mjs";
 import { CHART_GUIDANCE } from "./guidance.mjs";
 
+export function assertEquivalentComparisons(props) {
+  if (!props.comparison) return;
+  if (props.comparison.kind !== "matched" || typeof props.comparison.unit !== "string" || !props.comparison.unit.trim()) throw new Error("Matched comparison requires a shared unit");
+  const charts = props.charts || [];
+  const signature = chart => {
+    const p=chart.props || {}, horizontal=chart.component.endsWith("bar");
+    const min=p[horizontal?"xMin":"yMin"], max=p[horizontal?"xMax":"yMax"];
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max<=min) throw new Error("Matched comparison requires an explicit common scale");
+    return JSON.stringify({component:chart.component,unit:chart.unit || props.comparison.unit,categories:p.categories,min,max,format:p.valueFormat || {},legend:p.legend ?? false,dataLabels:p.dataLabels ?? null});
+  };
+  const expected=charts.length ? signature(charts[0]) : null;
+  for(const chart of charts) if(signature(chart)!==expected) throw new Error("Matched comparison charts must use equivalent encodings, units, categories, periods, scales and label treatments");
+}
+
 export function registerChartGroup(registry) {
   const SUPPORTED = [...registry.keys()].filter(id => id.startsWith("chart."));
   registry.set("chart-group", {
@@ -14,6 +28,7 @@ export function registerChartGroup(registry) {
       { heading: "Future mix", component: "chart.pie", props: { labels: ["New", "Core", "Growth"], values: [30, 40, 30] } }
     ] },
     render({ id, frame, props, tokens }) {
+      assertEquivalentComparisons(props);
       const charts = props.charts;
       if (!Array.isArray(charts) || charts.length < 2 || charts.length > 4) throw new Error("A chart group needs two to four charts");
       if (props.divider !== undefined && typeof props.divider !== "boolean") throw new Error("Chart-group divider must be a boolean");

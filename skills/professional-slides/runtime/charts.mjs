@@ -66,12 +66,15 @@ function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotati
   };
 }
 
-function formatValue(value, props) {
+export function formatValue(value, props) {
   const format = props.valueFormat;
   if (!format) return String(value);
-  const decimals = format.decimals ?? 0;
+  const units = {k: 1000, m: 1000000, bn: 1000000000};
+  if (format.compactUnit !== undefined && !Object.hasOwn(units, format.compactUnit)) throw new Error("valueFormat.compactUnit must be k, m or bn");
+  const divisor = units[format.compactUnit] || 1;
+  const decimals = format.decimals ?? (format.compactUnit ? 1 : 0);
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > 6) throw new Error("valueFormat.decimals must be an integer from zero to six");
-  return `${format.prefix || ""}${Number(value).toFixed(decimals)}${format.suffix || ""}`;
+  return `${format.prefix || ""}${Number(value / divisor).toFixed(decimals)}${format.compactUnit || ""}${format.suffix || ""}`;
 }
 
 function textStyle(size = CHART_LABEL, color = SECONDARY, bold = false, align = "center") {

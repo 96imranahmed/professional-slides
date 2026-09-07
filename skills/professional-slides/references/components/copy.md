@@ -117,3 +117,7 @@ A direct implication field may omit a generic heading such as “The qualified v
 ### Omit redundant umbrella headings
 
 A parent heading must add information beyond its children. When named proof branches already explain the content, remove rhetorical labels such as “What the evidence establishes”, “The universe verdict”, or “Our analysis”. Move the substantive content into the released space; do not preserve a blank heading slot. This applies to both sides of a slide and does not remove necessary chart measure, period or unit headings.
+
+### Large numbers
+
+Default to compact display: `k`, `m`, or `bn`, usually one decimal. Use a shared magnitude and precision across peer charts, tables, metrics and annotations: `8.3m` beside `0.8m`, not mixed `8,300,000` and `800k`. Preserve exact underlying values for calculations. Retain full precision only when the decision requires it. Never round before calculating growth; avoid rounding a material nonzero value to zero.

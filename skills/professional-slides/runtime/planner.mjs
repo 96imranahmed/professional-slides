@@ -1,3 +1,4 @@
+import { assertPlanRelationships } from "./semantic-integrity.mjs";
 import {
   SLIDE,
   absolute,
@@ -119,6 +120,11 @@ function validateItem(item, path, registry) {
   if (["section", "section-heading", "content-rail"].includes(item.component)) assertSectionHeadingProps(item.props);
   validateContentValue({ heading: item.heading }, path);
   validateContentValue(item.props || {}, `${path}.props`);
+  const checkChange = (props) => {
+    if (props.changeIntent && !(props.changeAnnotations?.length)) throw new Error(`${path}: declared change requires a highlighted change annotation`);
+    for (const chart of props.charts || []) checkChange(chart.props || chart);
+  };
+  checkChange(item.props || {});
   (item.items || []).forEach((child, index) => validateItem(child, `${path}.items[${index}]`, registry));
 }
 
@@ -138,6 +144,7 @@ export function validateSlidePlan(plan, registry = REGISTRY) {
     }
   }
   plan.items.forEach((item, index) => validateItem(item, `${plan.id}.items[${index}]`, registry));
+  assertPlanRelationships(plan);
   const density = resolveSlideDensity(plan);
   const defaultBudget = density.resolved === "appendix" ? 130 : density.resolved === "pre-read" ? 85 : density.resolved === "live-pitch" ? 30 : 55;
   const override = plan.copyBudget;

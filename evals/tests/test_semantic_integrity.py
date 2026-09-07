@@ -1,0 +1,104 @@
+import unittest
+from test_source_structure import run_node
+
+class SemanticIntegrityTests(unittest.TestCase):
+    def test_each_object_tag_and_dependency_survives_mutation(self):
+        result=run_node('''
+import assert from 'node:assert/strict';
+import {compileDeck,absolute,component} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {assertSemanticIntegrity} from './skills/professional-slides/runtime/semantic-integrity.mjs';
+const children=[component({id:'takeaway',component:'insight',props:{text:'Growth supports investment.'},frame:{x:60,y:500,width:1000,height:100}}),component({id:'metric',component:'metric',props:{value:'42',label:'Active sites',delta:'+2'},frame:{x:60,y:100,width:240,height:180}}),component({id:'chart',component:'chart.column',props:{categories:['2024','2025'],series:[{name:'Sales',values:[20,40]}],changeAnnotations:[{start:'2024',end:'2025',style:'bracket',text:'+100%'}]},frame:{x:340,y:100,width:750,height:380}})];
+const slide=compileDeck({id:'test',slides:[{id:'s',composition:absolute({id:'all',children})}]},REGISTRY).slides[0];
+for(const node of slide.nodes){
+ const copy=structuredClone(slide.nodes);delete copy.find(n=>n.id===node.id).data.semantic;
+ assert.throws(()=>assertSemanticIntegrity(copy,slide.componentInstances),/Dangling/);
+}
+let checked=0;
+for(const node of slide.nodes.filter(n=>n.data.semantic.requires.length)){
+ for(const dep of node.data.semantic.requires){assert.throws(()=>assertSemanticIntegrity(slide.nodes.filter(n=>n.id!==dep),slide.componentInstances),/Dangling/);checked++;}
+}
+assert.ok(checked>10);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+    def test_detached_prose_and_fake_section_tags_fail(self):
+        result=run_node('''
+import assert from 'node:assert/strict';
+import {assertPlanRelationships} from './skills/professional-slides/runtime/semantic-integrity.mjs';
+const evidence={id:'chart',component:'chart.line'};
+const text={id:'takeaway',component:'paragraph',props:{text:'Trips increased.'},frame:{x:0,y:400,width:800,height:40}};
+assert.throws(()=>assertPlanRelationships({items:[evidence,text]}),/Dangling/);
+assert.throws(()=>assertPlanRelationships({items:[{id:'secondary',items:[evidence,text]}]}),/Dangling/);
+assert.throws(()=>assertPlanRelationships({items:[evidence,{...text,props:{...text.props,semantic:{kind:'section-member',relatedTo:['missing']}}}]}),/Dangling/);
+assert.doesNotThrow(()=>assertPlanRelationships({items:[evidence,{...text,component:'insight'}]}));
+const heading={id:'heading',component:'section-heading',props:{text:'Network scope',semantic:{kind:'section-member',relatedTo:['takeaway']}},frame:{x:0,y:350,width:800,height:32}};
+assert.doesNotThrow(()=>assertPlanRelationships({items:[evidence,heading,{...text,props:{...text.props,semantic:{kind:'section-member',relatedTo:['heading']}}}]}));
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+    def test_dimension_axis_and_missing_change_reject(self):
+        result=run_node('''
+import assert from 'node:assert/strict';
+import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
+import {validateSlidePlan} from './skills/professional-slides/runtime/planner.mjs';
+const table={id:'t',frame:{x:0,y:0,width:800,height:300},props:{comparisonAxis:'rows',treatment:'dimensions',columns:[{label:'Criterion',type:'category'},{label:'NYC',type:'text'},{label:'SF',type:'text'}],rows:[['Rent','10','20']]}};
+assert.throws(()=>renderTable(table),/Row dimensions/);
+table.props.treatment='open';assert.doesNotThrow(()=>renderTable(table));
+const plan={id:'p',title:'Sales grew',items:[{id:'c',job:'Compare sales',component:'chart.column',props:{changeIntent:'time',categories:['2024','2025'],series:[{name:'Sales',values:[20,40]}]}}]};
+assert.throws(()=>validateSlidePlan(plan),/highlighted change annotation/);
+plan.items[0].props.changeAnnotations=[{start:'2024',end:'2025',text:'+100%'}];assert.doesNotThrow(()=>validateSlidePlan(plan));
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+    def test_matched_comparison_rejects_type_period_and_scale_drift(self):
+        result=run_node('''
+import assert from 'node:assert/strict';
+import {assertEquivalentComparisons} from './skills/professional-slides/runtime/chart-group.mjs';
+const chart={component:'chart.column',props:{categories:['2024','2025'],yMin:0,yMax:100,valueFormat:{decimals:1}}};
+const props={comparison:{kind:'matched',unit:'units'},charts:[chart,structuredClone(chart)]};
+assert.doesNotThrow(()=>assertEquivalentComparisons(props));
+for(const mutate of [c=>c.component='chart.line',c=>c.props.categories=['2023','2025'],c=>c.props.yMax=200,c=>c.unit='percent']) {
+ const broken=structuredClone(props);mutate(broken.charts[1]);assert.throws(()=>assertEquivalentComparisons(broken),/equivalent/);
+}
+assert.doesNotThrow(()=>assertEquivalentComparisons({charts:[chart,{component:'chart.line',props:{}}]}));
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+    def test_review_payload_keeps_values_and_hashes_binary_assets(self):
+        import json
+        from test_canonical_generation import validator
+        source={"series":[1,2,3],"source":"https://example.com","media":{"dataUri":"data:image/png;base64,"+"A"*1100000,"alt":"City map"}}
+        result=json.loads(validator.compact_review_payload(json.dumps(source)))
+        self.assertEqual(result["series"],[1,2,3])
+        self.assertEqual(result["media"]["alt"],"City map")
+        self.assertEqual(len(result["media"]["dataUri"]["sha256"]),64)
+        self.assertLess(len(json.dumps(result)),1000)
+        polygon={"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]],"properties":{"source":"public boundary"}}
+        result=json.loads(validator.compact_review_payload(json.dumps(polygon)))
+        self.assertEqual(result["coordinates"]["vertices"],4)
+        self.assertEqual(result["coordinates"]["bounds"],[0,0,1,1])
+        self.assertEqual(result["properties"],polygon["properties"])
+
+    def test_consistency_schema_uses_supported_subset(self):
+        from test_canonical_generation import validator
+        import json
+        self.assertNotIn('uniqueItems', json.dumps(validator.CONSISTENCY_SCHEMA))
+
+    def test_compact_numbers_keep_shared_magnitude_and_raw_values(self):
+        result=run_node('''
+import assert from 'node:assert/strict';
+import {formatValue} from './skills/professional-slides/runtime/charts.mjs';
+const props={valueFormat:{compactUnit:'m'}};
+assert.equal(formatValue(8300000,props),'8.3m');
+assert.equal(formatValue(826079,props),'0.8m');
+assert.equal(formatValue(-8300000,props),'-8.3m');
+assert.throws(()=>formatValue(123,{valueFormat:{compactUnit:'invalid'}}),/compactUnit/);
+assert.equal(formatValue(826079,{valueFormat:{decimals:0}}),'826079');
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])

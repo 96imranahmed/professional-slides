@@ -58,6 +58,7 @@ function shapeOptions(node) {
     w: inch(frame.width),
     h: inch(frame.height),
     objectName: `ps:${node.id}`,
+    altText: JSON.stringify({ ...node.data.semantic, description: node.data.alt || null }),
     fill: style.fill === "none" ? { color: "FFFFFF", transparency: 100 } : { color: colorValue(style.fill), transparency },
     line: style.stroke === "none" ? { color: "FFFFFF", transparency: 100, width: 0 } : lineOptions(style),
     ...(style.rotate ? { rotate: Number(style.rotate) } : {}),
@@ -107,13 +108,14 @@ function customPolygonPoints(node) {
 function addNode(slide, node, pptx) {
   const { frame, style, data } = node;
   if (node.type === "image") {
-    slide.addImage({ data: data.dataUri, x: inch(frame.x), y: inch(frame.y), w: inch(frame.width), h: inch(frame.height), rounding: data.circular === true, altText: data.alt, objectName: `ps:${node.id}` });
+    slide.addImage({ data: data.dataUri, x: inch(frame.x), y: inch(frame.y), w: inch(frame.width), h: inch(frame.height), rounding: data.circular === true, objectName: `ps:${node.id}`, altText: JSON.stringify({...node.data.semantic, description:node.data.alt || null}) });
     return;
   }
   if (node.type === "text") {
     slide.addText(node.text, {
       x: inch(frame.x), y: inch(frame.y), w: inch(frame.width), h: inch(frame.height),
       objectName: `ps:${node.id}`,
+    altText: JSON.stringify({ ...node.data.semantic, description: node.data.alt || null }),
       fontFace: styleValue(style.fontFamily),
       fontSize: styleValue(style.fontSize),
       color: colorValue(style.color),
@@ -142,6 +144,7 @@ function addNode(slide, node, pptx) {
       flipH: x2 < x1,
       flipV: y2 < y1,
       objectName: `ps:${node.id}`,
+    altText: JSON.stringify({ ...node.data.semantic, description: node.data.alt || null }),
       line: lineOptions(style, data)
     });
     return;
@@ -186,7 +189,7 @@ function themeXmlColor(name, tokenId, tokens) {
   return `<a:${name}><a:srgbClr val="${hex(tokens[tokenId].value)}"/></a:${name}>`;
 }
 
-async function applyTheme(pptxPath, tokens) {
+async function applyTheme(pptxPath, tokens, deck) {
   const JSZip = await loadJsZip();
   const zip = await JSZip.loadAsync(await fs.readFile(pptxPath));
   const themeNames = Object.keys(zip.files).filter((name) => /^ppt\/theme\/theme\d+\.xml$/.test(name));
@@ -221,6 +224,20 @@ async function applyTheme(pptxPath, tokens) {
   const types = await zip.file("[Content_Types].xml").async("string");
   zip.file("[Content_Types].xml", types.replace(/<Override\b[^>]*PartName="\/ppt\/slideMasters\/(slideMaster\d+\.xml)"[^>]*\/>/g,
     (entry, name) => zip.file(`ppt/slideMasters/${name}`) ? entry : ""));
+  // PptxGenJS omits altText on native text/shapes. Bind the canonical semantic
+  // graph to every cNvPr in the same package pass that materializes theme tokens.
+  const escapeAttribute = value => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  for (const [index, sceneSlide] of deck.slides.entries()) {
+    const part = `ppt/slides/slide${index + 1}.xml`;
+    const tags = new Map(sceneSlide.nodes.map(node => [`ps:${node.id}`, {...node.data.semantic, description:node.data.alt || null}]));
+    const xml = await zip.file(part).async("string");
+    zip.file(part, xml.replace(/<p:cNvPr\b[^>]*>/g, element => {
+      const name = element.match(/\bname="([^"]*)"/)?.[1];
+      if (!tags.has(name)) return element;
+      const clean = element.replace(/\sdescr="[^"]*"/g, "");
+      return clean.replace(/(\/?>)$/, ` descr="${escapeAttribute(JSON.stringify(tags.get(name)))}"$1`);
+    }));
+  }
   const bytes = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
   await fs.writeFile(pptxPath, bytes);
 }
@@ -250,7 +267,7 @@ export async function writePptx(deck, pptxPath) {
   });
   await fs.mkdir(path.dirname(pptxPath), { recursive: true });
   await pptx.writeFile({ fileName: pptxPath });
-  await applyTheme(pptxPath, tokens);
+  await applyTheme(pptxPath, tokens, deck);
   const bytes = await fs.readFile(pptxPath);
   return { pptxPath, sha256: crypto.createHash("sha256").update(bytes).digest("hex") };
 }

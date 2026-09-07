@@ -11,6 +11,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import shutil
 import posixpath
 import re
 import subprocess
@@ -1859,7 +1861,14 @@ def validate_canonical_generation(
         else:
             manifest_without_hash = dict(design_manifest)
             recorded_design_hash = manifest_without_hash.pop("designHash", None)
-            computed_design_hash = hashlib.sha256(json.dumps(manifest_without_hash, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+            # Runtime hashes JSON.stringify bytes. Python formats small floats in
+            # scientific notation, which changes real imported-map hashes.
+            runtime_node = os.environ.get("RUNTIME_NODE") or shutil.which("node")
+            computed_design_hash = None
+            if runtime_node:
+                completed = subprocess.run([runtime_node, "-e", "let s='';process.stdin.setEncoding('utf8');process.stdin.on('data',x=>s+=x);process.stdin.on('end',()=>process.stdout.write(require('node:crypto').createHash('sha256').update(JSON.stringify(JSON.parse(s))).digest('hex')));"], input=json.dumps(manifest_without_hash, ensure_ascii=False), text=True, capture_output=True, timeout=30)
+                if completed.returncode == 0:
+                    computed_design_hash = completed.stdout.strip()
             deck_record = receipt.get("deck", {})
             if recorded_design_hash != computed_design_hash or not isinstance(deck_record, dict) or deck_record.get("designHash") != recorded_design_hash:
                 findings.append(Finding("generation.design_hash", "design manifest hash does not reconcile with the receipt"))
@@ -1944,6 +1953,23 @@ def validate_canonical_generation(
                             if node.attrib.get("name")
                         }
                         expected_names = {f"ps:{node.get('id')}" for node in slide.get("nodes", []) if isinstance(node, dict) and node.get("id")}
+                        exported_tags = {node.attrib.get("name"): node.attrib.get("descr", "") for node in xml.findall(".//p:cNvPr", NS)}
+                        scene_nodes = {node.get("id"): node for node in slide.get("nodes", [])}
+                        owner_ids = {item.get("instanceId") for item in slide.get("componentInstances", [])}
+                        for node_id, scene_node in scene_nodes.items():
+                            tag = scene_node.get("data", {}).get("semantic")
+                            try:
+                                exported = json.loads(exported_tags.get(f"ps:{node_id}", ""))
+                            except (ValueError, TypeError):
+                                exported = {}
+                            if not isinstance(tag, dict) or tag.get("schema") != "professional-slides.semantic/v1" or tag.get("id") != node_id or tag.get("owner") not in owner_ids or any(exported.get(key) != value for key, value in tag.items()):
+                                findings.append(Finding("generation.semantic_tag", f"slide {index + 1}: missing or mismatched semantic tag for {node_id}", slide=index + 1))
+                                continue
+                            for dependency in tag.get("requires", []):
+                                if dependency not in scene_nodes or f"ps:{dependency}" not in actual_names:
+                                    findings.append(Finding("generation.dangling_dependency", f"slide {index + 1}: {node_id} lost dependency {dependency}", slide=index + 1))
+                            if tag.get("requiredRoles") and scene_node.get("text", None) != "" and not any(scene_nodes.get(dep, {}).get("role") in tag["requiredRoles"] for dep in tag.get("requires", [])):
+                                findings.append(Finding("generation.dangling_role", f"slide {index + 1}: {node_id} has no required counterpart", slide=index + 1))
                         if expected_names != actual_names:
                             missing = sorted(expected_names - actual_names)
                             unexpected = sorted(actual_names - expected_names)
@@ -2443,6 +2469,35 @@ def visual_rendered_slides(render_dir: Path, expected_count: int) -> list[Path]:
     return [path for _, path in indexed]
 
 
+def compact_review_payload(value: str) -> str:
+    """Keep analytical content; replace embedded binary media with exact hashes."""
+    try:
+        parsed = json.loads(value)
+    except ValueError:
+        return value
+    def visit(item):
+        if isinstance(item, str) and item.startswith("data:"):
+            return {"embeddedMedia": item.split(",", 1)[0], "sha256": hashlib.sha256(item.encode("utf-8")).hexdigest(), "characters": len(item)}
+        if isinstance(item, dict):
+            if item.get("type") in {"Polygon", "MultiPolygon"} and "coordinates" in item:
+                coordinates = item["coordinates"]
+                points = []
+                def collect(part):
+                    if isinstance(part, list) and len(part) >= 2 and all(isinstance(x, (int, float)) for x in part[:2]):
+                        points.append(part[:2])
+                    elif isinstance(part, list):
+                        for child in part:
+                            collect(child)
+                collect(coordinates)
+                summary = {"sha256": hashlib.sha256(json.dumps(coordinates, separators=(",", ":")).encode()).hexdigest(), "vertices": len(points), "bounds": [min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)] if points else None}
+                return {key: summary if key == "coordinates" else visit(child) for key, child in item.items()}
+            return {key: visit(child) for key, child in item.items()}
+        if isinstance(item, list):
+            return [visit(child) for child in item]
+        return item
+    return json.dumps(visit(parsed), ensure_ascii=False, separators=(",", ":"))
+
+
 def visual_read_required(path: Path, label: str) -> str:
     try:
         value = path.read_text(encoding="utf-8").strip()
@@ -2450,7 +2505,7 @@ def visual_read_required(path: Path, label: str) -> str:
         raise ValueError(f"cannot read {label}: {exc}") from exc
     if not value:
         raise ValueError(f"{label} is empty: {path}")
-    return value
+    return compact_review_payload(value)
 
 
 def build_visual_prompt(
@@ -2481,6 +2536,7 @@ Reject a slide for any major visual or semantic defect, including:
 - redundant hierarchy: an action title plus a generic exhibit label plus per-metric labels plus a methodology label plus a separate takeaway. Reject generic labels such as "current snapshot", "calculation boundary", "read-through", or "company definition" when they add no decision meaning;
 - multiple detached takeaways. One slide has one governing conclusion, normally carried by the action title; material qualifiers must be readable alongside the relevant evidence, while provenance belongs in the source note;
 - excessive empty space between supporting text and its following insight: require one compact content-sized group with the smallest readable theme gap after the measured text bottom, not independently top- and bottom-anchored items;
+- same-page category comparisons using unequal encodings, units, periods, categories or scales. Require one grouped/segmented exhibit or equivalent peer charts; mixed charts are only for different questions. Reject pages consisting only of warnings, unmatched policy targets or decorative timelines without substantive evidence.
 - dangling analytical paragraphs below charts or tables. Hard requirement: use the shared insight box for detached synthesis, or a deliberate adjacent bullet-list section for developed interpretation. A nested table-plus-insight half-page composite is valid; do not require every insight to be full-width. Reject substantive text dangling below a terminal insight. Dense, well-written, consistently grouped text is acceptable; noise is inconsistent treatment, weak grouping or unclear fragments, not density alone;
 - tiny supporting copy that conceals a material assumption, weak data ink, or insufficiently developed evidence for the declared delivery mode;
 - a split analytical page whose secondary rail merely repeats chart values or argues an unrelated conclusion. A complementary interpretation rail, coordinated small multiples, or open comparison table is valid when it advances the same governing claim.
@@ -2883,7 +2939,7 @@ CONSISTENCY_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
                                                'additionalProperties': False,
                                                'required': ['id', 'slides', 'role', 'verdict', 'observation'],
                                                'properties': {'id': {'type': 'string', 'minLength': 1},
-                                                              'slides': {'type': 'array', 'minItems': 2, 'uniqueItems': True,
+                                                              'slides': {'type': 'array', 'minItems': 2,
                                                                          'items': {'type': 'integer',
                                                                                    'minimum': 1}},
                                                               'role': {'type': 'string', 'minLength': 1},
@@ -2937,7 +2993,7 @@ def consistency_read_required(path: Path, label: str) -> str:
     value = path.read_text(encoding="utf-8").strip()
     if not value:
         raise ValueError(f"{label} is empty: {path}")
-    return value
+    return compact_review_payload(value)
 
 
 def build_consistency_prompt(
@@ -3037,7 +3093,7 @@ def validate_consistency_judgement(judgement: Any, expected_count: int) -> list[
                 errors.append(f"{label} must be an object")
                 continue
             slides = group.get("slides")
-            if not isinstance(slides, list) or len(set(slides)) < 2:
+            if not isinstance(slides, list) or len(set(slides)) < 2 or len(set(slides)) != len(slides):
                 errors.append(f"{label}.slides must span at least two slides")
             elif any(not isinstance(slide, int) or isinstance(slide, bool) or not 1 <= slide <= expected_count for slide in slides):
                 errors.append(f"{label}.slides contains an invalid slide")

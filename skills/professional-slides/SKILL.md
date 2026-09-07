@@ -7,6 +7,18 @@ description: Create or revise presentations, slide decks, PowerPoint files, or G
 
 The singular design goal is to avoid slide noise. Noise comes from inconsistent standards, dangling labels or commentary, weak grouping, and poorly constructed text, not from text density itself. Dense slides are welcome when the evidence needs them and the writing, hierarchy, spacing and recurring treatments remain clear and consistent. Preserve substance; do not chase empty space or shorten complete reasoning into abrupt fragments. Use only the guidance needed for this task.
 
+## Structural requirements
+
+Every rendered object must carry a semantic ID, role, owner and exact dependency IDs through the scene and PowerPoint `cNvPr` description. The compiler and exported-file provenance gate reject missing tags or dependencies. Detached analytical prose must use an `insight` component or a deliberately headed content section; a generic paragraph under an exhibit is invalid. Pair standalone section headings and bodies with `props.semantic: {kind: "section-member", relatedTo: ["exact-peer-id"]}`. Never create a fake heading or tag to bypass grouping.
+
+Highlight every growth or change comparison with a keyed `changeAnnotations` callout and declare `changeIntent` on its chart. State the interval and unit, distinguish percent from percentage points, and use absolute changes when a percentage is undefined or misleading. Do not label a cross-sectional city gap as growth.
+
+For a same-page category comparison, use one grouped/segmented exhibit or equivalent left/right charts. Matched peers must share encoding, unit, category/period coverage, quantitative domain, label treatment and plot geometry. Declare `chart-group.comparison: {kind: "matched", unit: "..."}` and explicit common axis bounds. Mixed four-chart grids remain valid for different analytical questions, not inconsistent renderings of the same comparison.
+
+For comparison tables, declare `comparisonAxis: rows` when the first column contains dimensions and `comparisonAxis: columns` when the top row contains dimensions. Emphasize the dimensions: use category cells in the first case and `treatment: dimensions` in the second. NYC/SF, products, companies and scenarios are comparison items, not dimensions.
+
+An analytical page must add substantive evidence, a developed explanation or a usable decision instrument. A caveat, generic warning, unmatched pair of policy targets or decorative timeline alone is not a page. Replace it with a common-period comparison, a transparently calculated scenario, or consolidate it into the relevant exhibit. Never imply that matching the chart styling reconciles incompatible measures.
+
 ## Start with the brief
 
 Know the audience, decision, question, evidence limits, delivery mode, and format.
@@ -63,6 +75,9 @@ Render the deck and create one sequenced as-is dot per source slide before the f
 Preserve the design unless a redesign is requested. Recommend missing new-deck structures but do not add them without authorization.
 
 ## Remove noise, preserve substance
+
+Use compact large-number labels (for example `8.3m` and `0.8m`) with one shared magnitude and precision across a comparison. Keep full values in data and notes; round only display text. Select a relevant, verified photograph from Pexels or another licensed source for dedicated image panels; embed the actual asset and inspect its crop. Do not reuse a generic sample gradient or icon as subject photography.
+
 
 - One slide, one main claim, one dominant exhibit.
 - Keep rules above charts, but choose non-chart heading rules only when substantial content needs separation. Prefer open headings and whitespace; a compact implication may use only one box and an arrow, beside or below the evidence. Delete generic verdict labels and title-restating paragraphs. A companion analytical deep dive into a selected chart period or category uses a substantive ruled heading aligned with the chart heading; distinguish it from an unheaded implication. Omit umbrella headings such as “What the evidence establishes” when substantive child headings already explain the content.
