@@ -132,3 +132,17 @@ const links=slide.nodes.filter(n=>n.role==='decision-connector');assert.equal(li
 for(const link of links){assert.equal(link.data.semantic.requires.length,2);for(const id of link.data.semantic.requires) assert.throws(()=>assertSemanticIntegrity(slide.nodes.filter(n=>n.id!==id),slide.componentInstances),/Dangling/);}
 console.log('{}');
 ''')
+
+    def test_constant_rate_scenario_rejected_before_authoring(self):
+        run_node(r'''
+import assert from 'node:assert/strict';
+import {assertChartSelection} from './skills/professional-slides/runtime/planner.mjs';
+const props={categories:['2025','2026','2027','2028'],series:[{values:[0,5,10,15]}]};
+assert.throws(()=>assertChartSelection('chart.line',props),/endpoint bars/);
+const selection={question:'Which endpoint is larger?',dataBasis:'constant-rate-scenario',reason:'Compare common endpoints',rejectedAlternative:'Line adds no observed temporal information'};
+assert.throws(()=>assertChartSelection('chart.line',{...props,chartSelection:selection}),/bar\/column/);
+assert.throws(()=>assertChartSelection('chart-group',{charts:[{component:'chart.line',props:{...props,chartSelection:selection}}]}),/bar\/column/);
+assert.doesNotThrow(()=>assertChartSelection('chart.bar',{...props,chartSelection:selection}));
+assert.doesNotThrow(()=>assertChartSelection('chart.line',{...props,chartSelection:{...selection,dataBasis:'observed',reason:'Source observations show a stable measured pace'}}));
+console.log('{}');
+''')

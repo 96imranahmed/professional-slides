@@ -136,3 +136,7 @@ Deliver only verified artifacts and state any real limitation.
 - Compact analytical-slide trackers show the section name only by default. Number strips require explicit selection; full chapter tracker pages remain separate.
 - Icon and image trend columns are vertically centered as one content group within the available body frame by default, preserving aligned headings and internal spacing.
 - A detached heading and paragraph are still dangling even when linked with semantic tags. Scope, measurement bases and assumptions beside exhibits use a containing `evidence-note` surface with an actual exhibit dependency; deductions use `insight`. Tags must validate visible structure, never excuse its absence.
+
+- Diagnose graph choice in the dot-dash using actual data provenance, available periods and the analytical question. Record chosen encoding, rejected alternative and rationale before approval. Constant-rate extrapolations use endpoint bars, not artificial line trajectories. Assumptions and chart restatements are not insights; put essential method in source notes and reserve the secondary insight for a derived consequence. See the mandatory chart-choice diagnosis in Storylining and the evidence-based chart router.
+
+- Executive summaries use substantive headings, evidence-dense developed arguments and an actual recommendation. Never print chapter numbers or navigation labels as summary headings. Store semantic theme-to-body mapping in the plan; themes may consolidate related chapters. A generic instruction to compare or verify is not the recommendation.

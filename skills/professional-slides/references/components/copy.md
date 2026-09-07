@@ -121,3 +121,6 @@ A parent heading must add information beyond its children. When named proof bran
 ### Large numbers
 
 Default to compact display: `k`, `m`, or `bn`, usually one decimal. Use a shared magnitude and precision across peer charts, tables, metrics and annotations: `8.3m` beside `0.8m`, not mixed `8,300,000` and `800k`. Preserve exact underlying values for calculations. Retain full precision only when the decision requires it. Never round before calculating growth; avoid rounding a material nonzero value to zero.
+
+
+Executive summaries must be dense enough to carry the argument without narration: use substantive theme headings, developed evidence, relevant magnitudes, implications and the countercase. Do not expose chapter numbers or phrases such as “Chapter 1”; planning metadata owns the theme-to-body mapping, which may consolidate related sections. The bottom band states an actual recommendation or conditional choice, not “compare options,” “shortlist both,” a research checklist or a restatement of the problem. Preserve scope limits while still making a useful recommendation. Honor explicitly requested higher summary density by allocating space and a justified copy budget, never shrinking local text.

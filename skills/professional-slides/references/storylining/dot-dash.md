@@ -41,6 +41,12 @@ For each analytical case, record the actual values or specific examples, source,
 
 Match the evidence to the criterion. Revenue supports commercial reach, not audience satisfaction or storytelling quality. Where relevant, test independent measures such as audience ratings alongside revenue. For a ratings-versus-gross analysis, match film IDs and cohorts, record rating date, vote counts, exclusions and sample size, show the scatter and any reported correlation, and distinguish association from causation. These are illustrative measures: use topic-appropriate primary evidence, not a mandatory entertainment-data checklist. Narrow or reject a proposed relationship if the data does not support it.
 
+### Mandatory chart-choice diagnosis
+
+Before approving each analytical dot, inspect the actual available observations and calculate derived values. Its design cell must state: (1) the decision question, (2) data provenance and shape, including observed versus modeled versus mechanically extrapolated, (3) available periods and matched units/population, (4) the chosen encoding and why it exposes useful information, (5) the nearest alternative and why it is rejected, and (6) the new deduction in any secondary insight. Carry this record into `chartSelection` in the authoring contract. Missing diagnosis blocks the dot-dash, even if the proposed chart is registered and renders correctly.
+
+Apply the [chart-selection table](../charts/index.md#select-from-the-available-evidence-before-dot-dash-approval). For example, a single annual housing-addition rate multiplied over five years provides an endpoint comparison, not evidence of changing momentum: plan common-period bars on the left and a calculated required-pace implication on the right. Put fixed-rate/fixed-population assumptions in the note, not an insight box. Reject that line-chart choice at planning time; do not postpone the decision to visual QA.
+
 For every proposed graph, put both axes’ meanings and their source fields or calculations in the design cell. Apply the [meaningful-position gate](../charts/index.md#meaningful-position-gate) before approval; category bands with fabricated within-band coordinates fail.
 
 Audit the planned exhibit mix. Keep tables for comparisons that benefit from rows and columns; use graphs to expose numerical patterns that prose cells conceal. Record the evidence-to-implication relationship and choose only one or two marked emphasis points under the arrow-restraint rule; compact grouping is sufficient elsewhere.
@@ -171,3 +177,6 @@ The expanded list below explains the grammar; present its slide records as the t
 ## Component choice audit
 
 In each slide's design cell, name the primary component and variant, then every secondary component and variant (or `none`). Give a content-specific reason for each. Consider other suitable variants; do not choose the first registered option by habit. Audit secondary halves and rails independently of the main exhibit. Explain recurring table/schema choices once for their comparison family. Apply the [main and secondary design audit](../design/index.md#main-and-secondary-design-audit) before showing the revised plan.
+
+
+Summary theme-to-body mapping is semantic planning metadata. Do not put chapter references on the summary canvas to satisfy navigation checks. Develop the substantive argument and finish with a supported priority or conditional choice.

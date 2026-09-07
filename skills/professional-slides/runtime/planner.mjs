@@ -111,6 +111,19 @@ function trackerAudienceCopy(tracker) {
   };
 }
 
+export function assertChartSelection(component, props, path = 'chart') {
+  const selection = props.chartSelection;
+  if (selection && (!selection.question?.trim() || !selection.reason?.trim() || !selection.rejectedAlternative?.trim() || !selection.dataBasis?.trim())) throw new Error(`${path}: chart selection requires question, dataBasis, reason and rejectedAlternative`);
+  if (component === 'chart.line') {
+    const years = (props.categories || []).map(v => /^\d{4}(?:\s.*)?$/.test(String(v)) ? Number(String(v).slice(0,4)) : Number(v));
+    const values = (props.series || []).map(s => s.values);
+    const linear = years.length >= 3 && years.every(Number.isFinite) && years.every((v,i)=>i===0 || v>years[i-1]) && values.length && values.every(v => v.length === years.length && v.every(Number.isFinite) && v.slice(2).every((y,i) => Math.abs((y-v[i+1])/(years[i+2]-years[i+1])-(v[1]-v[0])/(years[1]-years[0])) < 1e-8));
+    if (selection?.dataBasis === 'constant-rate-scenario' || selection?.dataBasis === 'endpoint-only') throw new Error(`${path}: constant-rate or endpoint-only evidence requires bar/column comparison, not a line trajectory`);
+    if (linear && !['observed','published-forecast'].includes(selection?.dataBasis)) throw new Error(`${path}: linear year series requires source-backed chart selection; constant-rate extrapolation belongs in endpoint bars`);
+  }
+  for (const child of props.charts || []) assertChartSelection(child.component, child.props || child, path + '.charts');
+}
+
 function validateItem(item, path, registry) {
   if (!item?.id) throw new Error(`${path}.id is required`);
   if (!item.job || !String(item.job).trim()) throw new Error(`${path}.job must state why the item is on the slide`);
@@ -125,6 +138,7 @@ function validateItem(item, path, registry) {
     for (const chart of props.charts || []) checkChange(chart.props || chart);
   };
   checkChange(item.props || {});
+  assertChartSelection(item.component, item.props || {}, path);
   (item.items || []).forEach((child, index) => validateItem(child, `${path}.items[${index}]`, registry));
 }
 

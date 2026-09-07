@@ -45,3 +45,6 @@ Irregular periods presented as equal, markers on every point, duplicate direct l
 ## Acceptance test
 
 The direction, inflection, and status boundary remain clear in grayscale and all plotted points reconcile to the source.
+
+
+Constant-rate extrapolations and endpoint-only comparisons fail the [chart-choice gate](index.md#select-from-the-available-evidence-before-dot-dash-approval). Use common-period bars; a calendar axis alone is not evidence of temporal variation.
