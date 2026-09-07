@@ -87,8 +87,9 @@ Preserve the design unless a redesign is requested. Recommend missing new-deck s
 - On implication slides, visibly connect evidence to its implication with the canonical inference arrow. When the right-hand conclusion follows from the left-hand evidence, explicitly include the shared [inference boundary](references/components/guidelines.md#split-section-relationships) in the content plan and verify its arrow in the render.
 - Keep simple plot fields blank. Gridlines are off by default and should be enabled only when a dense or multiseries chart requires intermediate scale reading.
 - In reusable template specimens, use neutral parenthetical prompts such as `(Insert action title)` or `(Insert section title)`. Never use square-bracket placeholder copy. Put brief guidance on when to use the slide or chart, why the form is appropriate, and what the action title should reflect in speaker notes rather than on the canvas.
+- Keep supporting text and its following insight in one compact, content-sized group. Use the smallest readable theme gap after the measured text bottom; never push the insight away with a fixed lower anchor or flexible spacer.
 - Delete labels, boxes, strips, icons, and copy that do not add meaning.
-- Never invent evidence or hide uncertainty.
+- Never invent evidence or hide uncertainty. Enforce the [meaningful-position gate](references/charts/index.md#meaningful-position-gate): no arbitrary within-category scatter or jitter; every coordinate must have a defensible data meaning. Violations block release.
 
 ## Lock deck-wide consistency
 

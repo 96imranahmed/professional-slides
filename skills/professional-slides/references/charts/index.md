@@ -40,6 +40,16 @@ Every chart must define:
 
 Compute and reconcile the result before designing the visual. The visible data, labels, title, and source ledger must agree after rounding.
 
+## Meaningful-position gate
+
+Hard requirement: every plotted coordinate must encode a sourced measure, a documented calculation, or an exact named category position. Reject random, pseudo-random, index-cycled, or decorative within-category offsets, including jittered strip plots and beeswarm layouts. Disclosure of jitter does not waive this rule. Category membership belongs at one fixed position; it is not a second quantitative variable.
+
+For scatter and bubble charts, both axes must represent meaningful quantitative measures with units and observation-level provenance. Never encode a category as a numeric band and fabricate variation inside it. Resolve overlapping observations with transparency, explicit multiplicity labels, aggregation, or a different encoding while preserving their true coordinates.
+
+Choose the replacement from the analytical question: a line chart requires a meaningful ordered axis such as release date or year; a scatter can compare gross with IMDb rating when both values belong to the same film. A summary comparison may use bars, and a distribution may use a histogram or empirical cumulative distribution with a defined count or proportion. Do not connect unordered films merely to replace dots with a line.
+
+Before approval, record the meaning and source or calculation of both axes in the dot-dash design cell. Before release, reconcile representative marks to source records and inspect the authoring transformation for artificial offsets. Any arbitrary coordinate is a release-blocking evidence defect, regardless of visual scores.
+
 ## Extension and capacity
 
 Chart data arrays are extensible, but the layout is not allowed to clip, overlap, or make a local type exception as categories or points are added. Up to eight horizontal categories or plotted points use the selected page density. Nine to twelve promote the complete page to `pre-read`; more than twelve promote it to `appendix` and still require the encoding-specific fit checks. The threshold applies to the longest category, label, point, or series-value array. A chart that remains illegible after promotion must change orientation, aggregate, use small multiples, or split across pages.

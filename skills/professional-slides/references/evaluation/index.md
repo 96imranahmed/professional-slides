@@ -41,7 +41,7 @@ Release only when all apply:
 - Claims reconcile with their exhibits and sources.
 - Every page passes the [no-recap and new-deduction gate](../components/copy.md#no-recap-and-new-deduction-gate). Graph/table narration in any supporting copy and non-deductive insight boxes are release-blocking defects, not minor copy suggestions. The final review records explicit per-slide copy evidence.
 - Facts, estimates, claims, and inferences are distinguishable.
-- Charts use the correct scale, units, labels, and series.
+- Charts use the correct scale, units, labels, and series. The [meaningful-position gate](../charts/index.md#meaningful-position-gate) is mandatory: inspect source transformations as well as renders and reject arbitrary within-category offsets, jitter, or scatter axes without two meaningful measures. Visual scores cannot override this evidence defect.
 - The final render contains each requested [change, gap, or threshold annotation](../components/chart-callouts.md#authoring-decision), and focal marks pass the [primary/comparator contrast check](../charts/index.md#focus-and-comparator-colours).
 - Tables are composed exhibits rather than raw spreadsheet grids.
 - No evidence is invented.

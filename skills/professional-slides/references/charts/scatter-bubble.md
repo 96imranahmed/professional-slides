@@ -20,7 +20,7 @@ One observation per point, x and y measures with units, optional size measure, s
 - Encode magnitude by bubble area, not diameter.
 - Add quadrant lines only when thresholds are meaningful.
 - Label highlighted points and provide a key or appendix for the rest.
-- Use transparency or disclosed jitter only to reveal overlap.
+- Preserve true coordinates. Use transparency or explicit multiplicity labels to reveal overlap; jitter and arbitrary within-category offsets are prohibited by the [meaningful-position gate](index.md#meaningful-position-gate).
 - Add a trend line only when the data type and sample support the named fitting method; report its basis or diagnostic and otherwise omit the line.
 - Use association language unless the analysis supports causality.
 - Use logos admitted by the [asset authorization record](../components/icons-and-logos.md#asset-authorization-record) inside points when entity recognition materially improves a market map or competitor landscape. Preserve the analytical position and bubble area; the logo does not become the mark's size encoding.

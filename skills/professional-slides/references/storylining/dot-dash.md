@@ -41,6 +41,8 @@ For each analytical case, record the actual values or specific examples, source,
 
 Match the evidence to the criterion. Revenue supports commercial reach, not audience satisfaction or storytelling quality. Where relevant, test independent measures such as audience ratings alongside revenue. For a ratings-versus-gross analysis, match film IDs and cohorts, record rating date, vote counts, exclusions and sample size, show the scatter and any reported correlation, and distinguish association from causation. IMDb is an optional source, not a mandatory metric for every deck. Narrow or reject a proposed relationship if the data does not support it.
 
+For every proposed graph, put both axes’ meanings and their source fields or calculations in the design cell. Apply the [meaningful-position gate](../charts/index.md#meaningful-position-gate) before approval; category bands with fabricated within-band coordinates fail.
+
 Audit the planned exhibit mix. Keep tables for comparisons that benefit from rows and columns; use graphs to expose numerical patterns that prose cells conceal. Record the evidence-to-implication arrow in the design plan wherever that relationship is shown.
 
 ## Slide design plan

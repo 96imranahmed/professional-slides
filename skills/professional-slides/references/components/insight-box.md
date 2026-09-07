@@ -6,7 +6,7 @@ Default to one untitled, complete sentence that connects the conclusion to its m
 
 Place developed explanation or additional evidence in a deliberate adjacent bullet-list section, not this component. Neither bullets nor a filled surface may shelter a recap. Plain paragraphs floating below an exhibit are not an alternative insight treatment. Dense, well-written evidence is welcome; do not compress it into unclear fragments merely to fit a box.
 
-Use at most one insight box per slide. Never repeat it by section, column, branch, row, paragraph, metric, or chart. If several sections seem to need separate boxes, consolidate them into one governing synthesis or split the page. In a full-width layout, place the box after the evidence and normally near the lower content guide. When a parent composition assigns a synthesis or implication rail, use that slot. Body copy uses regular weight; only an optional internal title may use the stronger heading role. Centre text by default. A full-width box may use left alignment for long, ordered, or structured content.
+Use at most one insight box per slide. Never repeat it by section, column, branch, row, paragraph, metric, or chart. If several sections seem to need separate boxes, consolidate them into one governing synthesis or split the page. In a full-width layout, place the box after the evidence; do not force it onto the lower content guide when that creates a large empty gap. When a parent composition assigns a synthesis or implication rail, use that slot. Body copy uses regular weight; only an optional internal title may use the stronger heading role. Centre text by default. A full-width box may use left alignment for long, ordered, or structured content.
 
 When the box closes the argument, it is the last substantive content on the page. Do not leave a dangling caveat, label, explanatory paragraph, or second takeaway below it. Integrate a material qualification into the relevant evidence bullet above, or into the insight sentence when it directly limits that action. Keep genuine source and footnote furniture in the footer; do not shrink substantive limitations into footnotes to hide them.
 
@@ -20,6 +20,10 @@ Treat surface, width, alignment, and internal structure as independent choices. 
 - Left alignment: left-align structured or long full-width content; otherwise keep the default centered alignment.
 - Internal header: optional internal header for a substantive grouping such as **Retention signal and expansion gate**. Do not add a production-role label.
 - The optional internal header is text-only. Never add a line directly below it.
+
+## Compact attachment to supporting text
+
+Treat supporting paragraphs or bullets and the following insight as one content-sized group. Position the box from the measured bottom of the preceding text, using the smallest standard theme spacing token that preserves readable separation. Do not distribute the two items across the height of a rail, insert a flexible spacer, or pin the box to a lower anchor. If the rail needs vertical centering, center the combined group, preserving its compact internal gap. Keep the box’s own text padding intact; fix the external gap rather than squeezing its contents. Reject unexplained dead space between the supporting text and insight in full-size review.
 
 ## Theme contract
 
