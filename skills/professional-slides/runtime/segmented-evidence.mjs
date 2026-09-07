@@ -207,7 +207,7 @@ export function registerSegmentedEvidence(registry) {
     const width = (frame.width - 40) / 2;
     branches.forEach((b, i) => {
       const x = frame.x + i * (width + 40),
-        fill = i ? "color.ink" : "color.chartSeries3",
+        fill = i ? "color.componentPrimary" : "color.surfaceMuted",
         center = x + width / 2;
       connect(
         stableId(id, b.id, "link"),

@@ -10,7 +10,7 @@ Default to no visible tracker for decks with no more than two named sections or 
 
 Use one system. Full and compact states share the same label map: IDs, order, and active state remain exact. `compact-label` displays the active labels; `compact-number-strip` may omit labels visually but retains their underlying IDs and order.
 
-The native standard pairs `sequential-circles` full states with `compact-number-strip` analytical states. Use `split-contents` or `compact-label` only when hierarchy or recognition requires them. Never improvise a tracker.
+The native standard pairs `sequential-circles` full states with `compact-label` analytical states showing only the section name. Use `split-contents` for hierarchy or `compact-number-strip` only by explicit choice. Never improvise a tracker.
 
 | Construction | Use when |
 | --- | --- |
