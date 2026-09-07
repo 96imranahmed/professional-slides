@@ -24,7 +24,7 @@ const selected=full.filter(n=>n.data.selected).map(n=>n.data.sectionId).filter(B
 assert.deepEqual([...new Set(selected)],['B']);
 assert.equal(compact[0].data.trackerId,'map');
 assert.equal(compact[0].data.sectionId,'B');
-assert.equal(compact[0].text,'Contents / B. Section B');
+assert.equal(compact[0].text,'Contents / Section B');
 for(const props of [
  {items:items.slice(0,2)},
  {items:[...items,{id:'A',label:'Duplicate'}]},

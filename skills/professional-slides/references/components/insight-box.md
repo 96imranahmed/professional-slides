@@ -40,3 +40,6 @@ Create one editable group containing the background shape and editable text. Kee
 ## Check
 
 Apply the opening cardinality and synthesis rules. Use one registered fill or the dotted no-fill variant. Filled variants have no border. Body text is regular; only an optional internal title is bold. Keep contrast readable and text centred by default. Left alignment requires full-width or structured content. Headers name real content. Every object remains editable.
+
+
+Measurement bases, scope qualifiers and scenario assumptions use `evidence-note`, which reuses the canonical neutral surface and typography with distinct semantic roles. Supply heading, text and `semantic: {kind: "evidence-note", relatedTo: [exhibitId]}`. The referenced exhibit must exist. A generic headed paragraph does not provide containment and fails on an analytical page. Deductions continue to use insight.

@@ -91,11 +91,9 @@ function band(id, frame, heading, items, fill) {
   ];
 }
 export function registerSegmentedEvidence(registry) {
-  const tree = registry.get("tree"),
-    plain = tree.render;
+  const tree = registry.get("tree");
   tree.tokens = [...new Set([...tree.tokens, ...TOKENS])];
   tree.variants = {
-    standard: {},
     "decision-conclusions": {
       preferredSize: { width: 1160, height: 500 },
       props: {
@@ -122,21 +120,19 @@ export function registerSegmentedEvidence(registry) {
       },
     },
   };
-  tree.defaultVariant = "standard";
+  tree.defaultVariant = "decision-conclusions";
+  tree.preferredSize = { width: 1160, height: 500 };
+  tree.sample = structuredClone(tree.variants["decision-conclusions"].props);
   tree.variantProp = "variant";
   tree.resolveVariant = (props = {}) => {
-    const v = props.variant ?? "standard";
+    const v = props.variant ?? "decision-conclusions";
     if (!Object.hasOwn(tree.variants, v))
-      throw new Error("Unknown tree variant");
+      throw new Error("Decision trees require multiple levels: root, decision branches and terminal conclusions");
     return v;
   };
   tree.render = (input) => {
     const { id, frame, props } = input;
-    if (tree.resolveVariant(props) === "standard") {
-      if (props.branches)
-        throw new Error("Branches require decision-conclusions");
-      return plain(input);
-    }
+    tree.resolveVariant(props);
     const branches = props.branches;
     if (
       !props.root ||
@@ -167,8 +163,8 @@ export function registerSegmentedEvidence(registry) {
       new Set(ids).size !== ids.length
     )
       throw new Error("Decision IDs must be unique and nonempty");
-    if (frame.width < 900 || frame.height < 420)
-      throw new Error("Decision tree requires 900 by 420");
+    if (frame.width < 900 || frame.height < 440)
+      throw new Error("Decision tree requires 900 by 440");
     const nodes = [],
       root = {
         x: frame.x + frame.width / 2 - 150,
@@ -191,7 +187,7 @@ export function registerSegmentedEvidence(registry) {
           { white: whiteOn(fill), bold: true, role: "decision-label" },
         ),
       );
-    const connect = (key, x1, y1, x2, y2) =>
+    const connect = (key, x1, y1, x2, y2, from, to) =>
       nodes.push(
         linePrimitive({
           id: key,
@@ -204,7 +200,7 @@ export function registerSegmentedEvidence(registry) {
             stroke: token("color.rule"),
             lineWidth: token("line.hairline"),
           },
-          data: { endArrow: true },
+          data: { endArrow: true, dependencies: [from, to] },
         }),
       );
     nodeBox(`${id}-root`, root, props.root, "color.ink");
@@ -219,6 +215,7 @@ export function registerSegmentedEvidence(registry) {
         frame.y + 70,
         center,
         frame.y + 140,
+        `${id}-root-box`, `${stableId(id,b.id)}-box`,
       );
       nodeBox(
         stableId(id, b.id),
@@ -236,6 +233,7 @@ export function registerSegmentedEvidence(registry) {
           frame.y + 210,
           lx + leafWidth / 2,
           frame.y + 280,
+          `${stableId(id,b.id)}-box`, `${stableId(id,c.id)}-box`,
         );
         nodeBox(
           stableId(id, c.id),
@@ -265,6 +263,10 @@ export function registerSegmentedEvidence(registry) {
         { bold: true, role: "decision-conclusion" },
       ),
     );
+    for (const node of nodes) {
+      if (node.role === 'decision-label') node.data.dependencies = [node.id.replace(/-text$/, '-box')];
+      if (node.role === 'decision-box') node.data.dependencies = [node.id.replace(/-box$/, '-text')];
+    }
     return { nodes };
   };
   const chart = registry.get("chart.column"),

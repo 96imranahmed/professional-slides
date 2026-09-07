@@ -82,3 +82,6 @@ Use editable markers, text, and native lines on the registered page guides. Pres
 - Every compact-label breadcrumb reads as one tight inline phrase; the separator never floats in a fixed remote column.
 - Structural edits update tracker ranges, page numbers, and cross-references.
 - The montage shows no stale, skipped, duplicated, or intermittently missing state.
+
+
+Compact content-slide trackers default to the section name only, without its numeric identifier. Number strips are explicit opt-in; chapter tracker pages retain the full map.

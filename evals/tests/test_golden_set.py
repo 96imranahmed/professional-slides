@@ -255,7 +255,7 @@ assert.deepEqual(audit.duplicateVisualBranches,[]);
 assert.ok(audit.slides<=210);
 console.log(JSON.stringify(audit));
 """)
-        self.assertEqual(result["components"], 62)
+        self.assertEqual(result["components"], 63)
         self.assertEqual(result["standards"], 25)
 
     def test_pie_variants_are_centered_and_category_labels_do_not_duplicate_legend(self):

@@ -5,6 +5,8 @@ const sameAnnotation = (a,b) => a.data.annotationKey !== undefined
   ? a.data.annotationKey === b.data.annotationKey
   : a.data.targetCategory === b.data.targetCategory && a.data.targetSeries === b.data.targetSeries;
 const requirements = {
+  'decision-conclusion': ['decision-conclusion-surface'], 'decision-conclusion-surface': ['decision-conclusion'],
+  'evidence-note-body': ['evidence-note-surface'], 'evidence-note-heading': ['evidence-note-surface','evidence-note-body'], 'evidence-note-surface': ['evidence-note-body'],
   'insight-body': ['insight-surface'], 'insight-heading': ['insight-surface','insight-body'],
   'insight-surface': ['insight-body'], 'insight-border-dot': ['insight-surface'],
   'annotation-leader': ['annotation-text'], 'annotation-text': ['annotation-surface'], 'annotation-surface': ['annotation-text'],
@@ -20,7 +22,7 @@ export function tagSemanticNodes(nodes, instances) {
     const relationship = instances.find(i=>i.instanceId===node.data.componentInstance)?.relationships;
     const relatedOwners = (relationship?.relatedTo || []).map(id=>instances.find(i=>i.id===id)?.instanceId);
     for(const owner of relatedOwners) candidates.push(...nodes.filter(n=>n.data.componentInstance===owner && visible(n)));
-    node.data = {...node.data, semantic: {schema:SEMANTIC_SCHEMA,id:node.id,role:node.role,owner:node.data.componentInstance,requires:candidates.map(p=>p.id),requiredRoles}};
+    node.data = {...node.data, semantic: {schema:SEMANTIC_SCHEMA,id:node.id,role:node.role,owner:node.data.componentInstance,requires:[...new Set([...candidates.map(p=>p.id), ...(node.data.dependencies || [])])],requiredRoles}};
   }
   assertSemanticIntegrity(nodes, instances);
 }
@@ -47,6 +49,11 @@ export function assertPlanRelationships(plan) {
     const evidence=items.some(i=>i.component?.startsWith('chart') || ['table','map','process','timeline','tree','metric','insight'].includes(i.component));
     for(const item of items) {
       if(item.items) visit(item.items);
+      if(item.component==='evidence-note' && evidence) {
+        const relation=item.props?.semantic;
+        if(relation?.kind!=='evidence-note' || !relation.relatedTo?.length || relation.relatedTo.some(id=>!byId.has(id) || byId.get(id)===item || !['table','map','process','timeline','tree','metric'].includes(byId.get(id).component) && !byId.get(id).component?.startsWith('chart'))) throw new Error(`Dangling ${item.id}: evidence note requires real exhibit references`);
+      }
+      if(item.component==='paragraph' && evidence) throw new Error(`Dangling ${item.id}: a heading and paragraph are not a containing component; use evidence-note or insight`);
       if(item.component!=='paragraph' && item.component!=='section-heading') continue;
       const relation=item.props?.semantic;
       if(relation) {

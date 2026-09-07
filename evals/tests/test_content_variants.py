@@ -33,6 +33,11 @@ const nodes=group.render({id:'four',frame,props:gp}).nodes;
 assert.equal(new Set(nodes.filter(n=>n.data.childChart).map(n=>n.data.childChart)).size,4);
 const tree=REGISTRY.get('tree'),tp={variant:'decision-conclusions',...tree.variants['decision-conclusions'].props};
 assert.equal(tree.render({id:'tree',frame,props:tp}).nodes.filter(n=>n.role==='decision-conclusion').length,1);
+assert.equal(tree.defaultVariant,'decision-conclusions');
+assert.throws(()=>tree.render({id:'flat',frame,props:{root:'Pass?',children:['No','Yes']}}),/requires/);
+assert.throws(()=>tree.render({id:'flat',frame,props:{variant:'standard',root:'Pass?',children:['No','Yes']}}),/multiple levels/);
+const boxes=tree.render({id:'levels',frame,props:tree.sample}).nodes.filter(n=>n.role==='decision-box');
+assert.equal(new Set(boxes.map(n=>n.frame.y)).size,3);
 const bad=structuredClone(tp);bad.branches[1].conclusions[0].id='a1';
 assert.throws(()=>tree.render({id:'bad',frame,props:bad}),/unique/);
 const chart=REGISTRY.get('chart.column'), cp=chart.examples['segment-implications'].props;
@@ -112,3 +117,18 @@ bad.items[1].cell={x:-1,y:0,width:.1,height:.1};
 assert.throws(()=>c.render({id:'bad',frame,props:bad}),/normalized rectangle/);
 console.log('{}');
 """)
+
+    def test_icon_columns_center_actual_content_and_tracker_uses_name(self):
+        run_node(r'''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const owner=REGISTRY.get('icon-trends'),frame={x:0,y:0,width:1160,height:570};
+const nodes=owner.render({id:'center',frame,props:owner.sample}).nodes;
+const top=Math.min(...nodes.map(n=>n.frame.y)), bottom=Math.max(...nodes.map(n=>n.frame.y+n.frame.height));
+assert.ok(top>0);assert.ok(Math.abs(top-(570-bottom))<1);
+const label=REGISTRY.get('tracker-label');
+const rendered=label.render({id:'name',frame:{x:0,y:0,width:1000,height:40},props:{...label.sample,construction:'compact-label'}}).nodes;
+assert.equal(rendered.length,1);
+assert.equal(rendered[0].text,label.sample.items.find(i=>i.id===label.sample.selectedId).label);
+console.log('{}');
+''')

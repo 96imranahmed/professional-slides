@@ -34,7 +34,8 @@ assert.throws(()=>assertPlanRelationships({items:[{id:'secondary',items:[evidenc
 assert.throws(()=>assertPlanRelationships({items:[evidence,{...text,props:{...text.props,semantic:{kind:'section-member',relatedTo:['missing']}}}]}),/Dangling/);
 assert.doesNotThrow(()=>assertPlanRelationships({items:[evidence,{...text,component:'insight'}]}));
 const heading={id:'heading',component:'section-heading',props:{text:'Network scope',semantic:{kind:'section-member',relatedTo:['takeaway']}},frame:{x:0,y:350,width:800,height:32}};
-assert.doesNotThrow(()=>assertPlanRelationships({items:[evidence,heading,{...text,props:{...text.props,semantic:{kind:'section-member',relatedTo:['heading']}}}]}));
+assert.throws(()=>assertPlanRelationships({items:[evidence,heading,{...text,props:{...text.props,semantic:{kind:'section-member',relatedTo:['heading']}}}]}),/Dangling/);
+assert.doesNotThrow(()=>assertPlanRelationships({items:[evidence,{id:'note',component:'evidence-note',props:{heading:'Scope',text:'Matched period',semantic:{kind:'evidence-note',relatedTo:[evidence.id]}}}]}));
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
@@ -102,3 +103,32 @@ assert.equal(formatValue(826079,{valueFormat:{decimals:0}}),'826079');
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
+
+    def test_horizontal_common_scale_and_negative_zero_geometry(self):
+        result=run_node('''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const render=values=>REGISTRY.get('chart.bar').render({id:'c',frame:{x:0,y:0,width:900,height:400},props:{categories:['A','B'],series:[{name:'s',values}],xMin:0,xMax:10,dataLabels:false}}).nodes;
+const first=nodes=>nodes.find(n=>n.role==='chart-mark').frame.width;
+assert.equal(first(render([2,4])),first(render([2,8])));
+const nodes=REGISTRY.get('chart.bar').render({id:'n',frame:{x:0,y:0,width:900,height:400},props:{categories:['Motor vehicle theft','Burglary'],series:[{name:'s',values:[-44,-29]}],xMin:-50,xMax:0,valueFormat:{suffix:'%'}}}).nodes;
+const axis=nodes.find(n=>n.id==='n:y-axis');
+for(const mark of nodes.filter(n=>n.role==='chart-mark')) assert.ok(Math.abs(mark.frame.x+mark.frame.width-axis.frame.x)<.001);
+const labels=nodes.filter(n=>n.role==='data-label');
+const categories=nodes.filter(n=>n.role==='category-label');
+for(const label of labels) for(const cat of categories) if(Math.abs(label.frame.y-cat.frame.y)<60) assert.ok(cat.frame.x+cat.frame.width<label.frame.x);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+    def test_tree_connectors_require_exact_endpoint_boxes(self):
+        run_node(r'''
+import assert from 'node:assert/strict';
+import {compileDeck,absolute,component} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {assertSemanticIntegrity} from './skills/professional-slides/runtime/semantic-integrity.mjs';
+const slide=compileDeck({id:'tree',slides:[{id:'s',composition:absolute({id:'all',children:[component({id:'tree',component:'tree',props:REGISTRY.get('tree').sample,frame:{x:0,y:0,width:1100,height:500}})]})}]},REGISTRY).slides[0];
+const links=slide.nodes.filter(n=>n.role==='decision-connector');assert.equal(links.length,6);
+for(const link of links){assert.equal(link.data.semantic.requires.length,2);for(const id of link.data.semantic.requires) assert.throws(()=>assertSemanticIntegrity(slide.nodes.filter(n=>n.id!==id),slide.componentInstances),/Dangling/);}
+console.log('{}');
+''')

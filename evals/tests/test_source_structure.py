@@ -101,8 +101,8 @@ console.log(JSON.stringify({
 }));
 """
         )
-        self.assertEqual(result["registry"], 62)
-        self.assertEqual(result["components"], 49)
+        self.assertEqual(result["registry"], 63)
+        self.assertEqual(result["components"], 50)
         self.assertEqual(result["charts"], 13)
         self.assertEqual(result["layoutFixtures"], 65)
         self.assertGreater(result["componentBoards"], 0)

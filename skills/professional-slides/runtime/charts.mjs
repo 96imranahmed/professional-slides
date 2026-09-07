@@ -235,7 +235,8 @@ function horizontalAxes(id, plot, xMin, xMax, steps = 4, { gridlines = false, sh
       }));
     }
   }
-  nodes.push(linePrimitive({ id: stableId(id, "y-axis"), role: "chart-axis", x1: plot.x, y1: plot.y, x2: plot.x, y2: plot.y + plot.height, style: lineStyle(INK) }));
+  const zeroX = plot.x + (0-xMin)/(xMax-xMin)*plot.width;
+  nodes.push(linePrimitive({ id: stableId(id, "y-axis"), role: "chart-axis", x1: zeroX, y1: plot.y, x2: zeroX, y2: plot.y + plot.height, style: lineStyle(INK) }));
   if (showValueAxis) nodes.push(linePrimitive({ id: stableId(id, "x-axis"), role: "chart-axis", x1: plot.x, y1: plot.y + plot.height, x2: plot.x + plot.width, y2: plot.y + plot.height, style: lineStyle(INK) }));
   return nodes;
 }
@@ -363,12 +364,13 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const horizontalCategoryLabelWidth = horizontal
     ? Math.min(180, Math.max(72, Math.ceil(Math.max(...categories.map(category => measureText(category, 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width))) + 12))
     : 0;
+  const negativeLabelGutter = horizontal && !stacked && showDataLabels && values.some(v=>v<0) ? barLabelWidth + barLabelGap : 0;
   const plot = chartFrame(frame, {
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
-    leftInset: horizontal ? horizontalCategoryLabelWidth + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54,
+    leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54,
     valueLabelInset: horizontal && !stacked && showDataLabels ? barLabelWidth + barLabelGap : 0,
     centerPlot: !horizontal && !showValueAxis
   });
@@ -380,7 +382,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       categoryValues.filter(value => value > 0).reduce((sum, value) => sum + value, 0)
     ];
   });
-  const bounds = numericBounds(stacked ? stackExtents : values, { min: props.yMin, max: props.yMax, axis: horizontal ? "x" : "y", includeZero: true });
+  const bounds = numericBounds(stacked ? stackExtents : values, { min: horizontal ? (props.xMin ?? props.yMin) : props.yMin, max: horizontal ? (props.xMax ?? props.yMax) : props.yMax, axis: horizontal ? "x" : "y", includeZero: true });
   const twoMarkContrast = !stacked && !barHighlight && props.colorIndices === undefined && categories.length * series.length === 2;
   const twoSeriesContrast = !stacked && !barHighlight && props.colorIndices === undefined && series.length === 2;
   const colorIndexFor = (seriesIndex, categoryIndex) => {
@@ -409,7 +411,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   nodes.push(...(horizontal
     ? horizontalAxes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })
     : axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })));
-  if (bounds.min < 0 && bounds.max > 0) nodes.push(linePrimitive({
+  if (!horizontal && bounds.min < 0 && bounds.max > 0) nodes.push(linePrimitive({
     id: stableId(id, "zero-baseline"), role: "chart-axis",
     ...(horizontal
       ? { x1: xScale(0), y1: plot.y, x2: xScale(0), y2: plot.y + plot.height }
@@ -525,7 +527,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       id: stableId(id, "category", category),
       role: "category-label",
       frame: horizontal
-        ? { x: plot.x - horizontalCategoryLabelWidth - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: categoryStart, width: horizontalCategoryLabelWidth, height: groupSpan }
+        ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: categoryStart, width: horizontalCategoryLabelWidth, height: groupSpan }
         : { x: categoryStart - 8, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: groupSpan + 16, height: 28 },
       text: category,
       style: textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center")

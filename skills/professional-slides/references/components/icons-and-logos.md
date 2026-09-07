@@ -84,3 +84,6 @@ For an area-filling rectangular collage, use `layout: collage` with a normalized
 ### Production photographs
 
 For a dedicated image panel, find a relevant photograph on Pexels or another licensed source, verify the subject and source page, download and decode the actual image, then embed it. Record source, photographer and usage basis in notes or the asset ledger. Inspect the final crop at slide size. Registry samples are layout examples, not automatically appropriate production imagery; do not substitute a gradient, icon or unrelated sample for a subject photograph.
+
+
+Column icon and dedicated-image groups default to vertical centering within the allocated body frame. Center the occupied media, headings and descriptions together, preserving their internal alignment; do not center the title/footer with them. `verticalAlign: "top"` is an explicit content-driven exception.

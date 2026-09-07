@@ -2,7 +2,7 @@
 // collisions. No rule exempts text/text, headings, legends, or whole charts.
 export const OVERLAP_POLICY = Object.freeze({
   containedCellMarks: ["table-bullet", "table-binary-mark", "table-rating-track", "table-rating-sector", "table-bar", "table-implication"],
-  surfaces: ["segment-surface", "decision-conclusion-surface","divider-surface", "section-surface", "rail-surface", "panel-surface", "insight-surface", "quote-surface", "image-frame", "annotation-surface"],
+  surfaces: ["evidence-note-surface", "segment-surface", "decision-conclusion-surface","divider-surface", "section-surface", "rail-surface", "panel-surface", "insight-surface", "quote-surface", "image-frame", "annotation-surface"],
   containedLabels: {
     "horizon-band": "horizon-label", "decision-box": "decision-label", "segment-header-band": "segment-copy",
     "table-cell": "table-cell-text", "table-header-cell": "table-header-text",

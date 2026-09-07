@@ -129,3 +129,10 @@ For plugin development only, finish the complete implementation batch before run
 Run the [evaluation guide](references/evaluation/index.md) on the exact final artifact. Render every slide, review the full montage, inspect every slide at full size, check overflow and sources, and verify the editable file itself. For PowerPoint, verify the canonical generation receipt, compile the hard acceptance manifest, run the exported-PPTX validator, then run the independent visual validator with every exact slide render and the exact generation script. A rejection from any structural, adapter, component, provenance, or visual gate requires a source repair, fresh export, fresh render, and another review. Repeat until the exact candidate is accepted. For dual-format work, validate PowerPoint and Google Slides separately.
 
 Deliver only verified artifacts and state any real limitation.
+
+### Required structural defaults
+
+- Decision trees must have at least three node layers: a root question, substantive decision branches, and terminal conclusions. Root-to-outcome single-level trees are invalid, regardless of available space. Use `tree` with `decision-conclusions`; allocate a full body region and do not invent branches to fill space. If the content has only one decision, choose another composition.
+- Compact analytical-slide trackers show the section name only by default. Number strips require explicit selection; full chapter tracker pages remain separate.
+- Icon and image trend columns are vertically centered as one content group within the available body frame by default, preserving aligned headings and internal spacing.
+- A detached heading and paragraph are still dangling even when linked with semantic tags. Scope, measurement bases and assumptions beside exhibits use a containing `evidence-note` surface with an actual exhibit dependency; deductions use `insight`. Tags must validate visible structure, never excuse its absence.

@@ -226,7 +226,7 @@ export function trackerLabelNodes({ id, frame, props }) {
     return nodes;
   }
   const parent = String(props.parentTitle ?? props.parentLabel ?? "").trim();
-  const text = construction === "compact-breadcrumb" && parent ? `${parent}  /  ${selected.id}. ${selected.label}` : `${selected.id}. ${selected.label}`;
+  const text = construction === "compact-breadcrumb" && parent ? `${parent}  /  ${selected.label}` : selected.label;
   return [measuredText(stableId(id, "text"), "tracker-compact-label", frame, text, style(token("type.label"), foreground, true, "left", "top"), { trackerId: props.trackerId ?? "deck-sections", sectionId: selected.id, selected: true, construction })];
 }
 

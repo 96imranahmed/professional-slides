@@ -283,6 +283,16 @@ export function registerMedia(registry) {
             }).nodes,
         );
       });
+      if (props.verticalAlign !== undefined && !["center", "top"].includes(props.verticalAlign)) throw new Error("Icon trends verticalAlign must be center or top");
+      if (variant !== "rows" && props.verticalAlign !== "top") {
+        for (const node of nodes) if (node.type === "text" && node.data.textLayout) node.frame.height = node.data.textLayout.height;
+        const bottom = Math.max(...nodes.map(node => node.frame.y + node.frame.height));
+        const shift = (frame.height - (bottom - frame.y)) / 2;
+        for (const node of nodes) {
+          node.frame.y += shift;
+          if (node.type === "line") { node.data.y1 += shift; node.data.y2 += shift; }
+        }
+      }
       return { nodes };
     },
   });
