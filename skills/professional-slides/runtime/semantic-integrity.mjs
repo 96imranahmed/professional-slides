@@ -26,7 +26,27 @@ export function tagSemanticNodes(nodes, instances) {
   }
   assertSemanticIntegrity(nodes, instances);
 }
+/** Deterministic checks complement the independent semantic criticality review. */
+export function assertVisualCriticality(nodes) {
+  const normalize = text => String(text || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const structureOnly = /^(?:(?:the|this|our) )?(?:(?:comparison|presentation|deck|story|overview|agenda|contents) (?:in|across|of) )?(?:\d+|three|four|five|six|seven|eight|nine|ten) (?:chapters|sections|parts|topics)$/;
+  for (const [index,node] of nodes.entries()) {
+    const peers = nodes.filter(p => p.data.componentInstance === node.data.componentInstance);
+    if (node.role === 'chart-axis') {
+      const a=node.frame;
+      const covered = nodes.slice(index+1).find(p => p.data.componentInstance === node.data.componentInstance && p.role === 'chart-mark' && p.type === 'rect' && a.x <= p.frame.x+p.frame.width && a.x+a.width >= p.frame.x && a.y <= p.frame.y+p.frame.height && a.y+a.height >= p.frame.y);
+      if (covered) throw new Error(`BASELINE_LAYERING: ${node.id} is behind bar ${covered.id}`);
+    }
+    if (['tracker-page-title','section-heading','insight-heading','evidence-note-heading'].includes(node.role)) {
+      const text=normalize(node.text);
+      if (structureOnly.test(text)) throw new Error(`TITLE_CRITICALITY: ${node.id} only announces visible structure`);
+      const body=peers.filter(p=>['insight-body','evidence-note-body'].includes(p.role)).map(p=>normalize(p.text)).join(' ');
+      if (text && body && (` ${body} `).includes(` ${text} `)) throw new Error(`TITLE_CRITICALITY: ${node.id} duplicates its body`);
+    }
+  }
+}
 export function assertSemanticIntegrity(nodes, instances) {
+  assertVisualCriticality(nodes);
   const byId = new Map(nodes.map(n=>[n.id,n]));
   const owners = new Set(instances.map(i=>i.instanceId));
   for (const node of nodes) {

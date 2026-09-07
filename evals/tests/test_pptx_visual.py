@@ -83,6 +83,23 @@ class PptxVisualTests(unittest.TestCase):
         del audit['criticality']
         self.assertFalse(validator.derive_visual_acceptance(value, []))
 
+    def test_tracker_slop_and_methodology_container_fail_criticality(self):
+        for text, role in [
+            ('The comparison in five chapters', 'tracker-heading'),
+            ('Population basis: Census count versus July 2025 estimate; difference is not migration.', 'evidence-note')]:
+            value = judgement(score=100)
+            value['slides'][0]['copyAudit']['criticality'] = {'itemCount': 1, 'items': [{
+                'text': text, 'role': role, 'deletionConsequence': 'No lost argument; navigation is visible or methodology belongs in the source note.', 'passes': False}]}
+            self.assertFalse(validator.derive_visual_acceptance(value, []))
+
+    def test_exported_baseline_order_rejects_reordered_native_objects(self):
+        nodes = {
+            'axis': {'role': 'chart-axis', 'frame': {'x': 0, 'y': 100, 'width': 100, 'height': 0}, 'data': {'componentInstance': 'chart'}},
+            'bar': {'role': 'chart-mark', 'type': 'rect', 'frame': {'x': 20, 'y': 0, 'width': 30, 'height': 100}, 'data': {'componentInstance': 'chart'}}}
+        self.assertFalse(validator.validate_exported_baseline_order(nodes, ['ps:bar', 'ps:axis']))
+        errors = validator.validate_exported_baseline_order(nodes, ['ps:axis', 'ps:bar'])
+        self.assertTrue(any('BASELINE_LAYERING' in error for error in errors))
+
     def test_every_slide_must_be_enumerated_exactly_once(self):
         value = judgement()
         value["slides"][0]["slide"] = 2

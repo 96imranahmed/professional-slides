@@ -2,6 +2,40 @@ import unittest
 from test_source_structure import run_node
 
 class SemanticIntegrityTests(unittest.TestCase):
+    def test_bar_axes_render_above_marks_in_both_orientations(self):
+        result=run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck,absolute,component} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+for (const type of ['chart.column','chart.bar']) {
+ for (const values of [[20,40],[-20,40]]) {
+  const slide=compileDeck({id:'test',slides:[{id:'s',composition:absolute({id:'all',children:[component({id:'chart',component:type,props:{categories:['A','B'],series:[{name:'Value',values}],gridlines:true},frame:{x:60,y:100,width:900,height:450}})]})}]},REGISTRY).slides[0];
+  const nodes=slide.nodes, marks=nodes.flatMap((n,i)=>n.role==='chart-mark'?[i]:[]), axes=nodes.flatMap((n,i)=>n.role==='chart-axis'?[i]:[]), grids=nodes.flatMap((n,i)=>n.role==='chart-gridline'?[i]:[]);
+  assert.ok(marks.length && axes.length && grids.length);
+  assert.ok(Math.min(...axes)>Math.max(...marks), 'Axes must paint above every bar');
+  assert.ok(Math.max(...grids)<Math.min(...marks), 'Gridlines must remain behind bars');
+ }
+}
+console.log(JSON.stringify({ok:true}));
+""")
+        self.assertTrue(result['ok'])
+
+    def test_criticality_validator_rejects_mutated_layers_and_redundant_titles(self):
+        result=run_node("""
+import assert from 'node:assert/strict';
+import {assertVisualCriticality} from './skills/professional-slides/runtime/semantic-integrity.mjs';
+const node=(id,role,text,frame={x:0,y:0,width:100,height:100})=>({id,role,text,frame,type:role==='chart-mark'?'rect':'text',data:{componentInstance:'owner'}});
+const axis=node('axis','chart-axis','',{x:0,y:100,width:100,height:0}),bar=node('bar','chart-mark','');
+assert.doesNotThrow(()=>assertVisualCriticality([bar,axis]));
+assert.throws(()=>assertVisualCriticality([axis,bar]),/BASELINE_LAYERING/);
+for (const text of ['The comparison in five chapters','Our presentation across 4 sections']) assert.throws(()=>assertVisualCriticality([node('title','tracker-page-title',text)]),/TITLE_CRITICALITY/);
+assert.doesNotThrow(()=>assertVisualCriticality([node('title','tracker-page-title','Careers and industries')]));
+assert.throws(()=>assertVisualCriticality([node('title','insight-heading','Capacity constrains growth'),node('body','insight-body','Capacity constrains growth until the second factory opens.')]),/TITLE_CRITICALITY/);
+assert.doesNotThrow(()=>assertVisualCriticality([node('body','insight-body','Capacity constrains growth until the second factory opens.')]));
+console.log(JSON.stringify({ok:true}));
+""")
+        self.assertTrue(result['ok'])
+
     def test_each_object_tag_and_dependency_survives_mutation(self):
         result=run_node('''
 import assert from 'node:assert/strict';

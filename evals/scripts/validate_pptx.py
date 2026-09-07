@@ -1956,6 +1956,9 @@ def validate_canonical_generation(
                         exported_tags = {node.attrib.get("name"): node.attrib.get("descr", "") for node in xml.findall(".//p:cNvPr", NS)}
                         scene_nodes = {node.get("id"): node for node in slide.get("nodes", [])}
                         owner_ids = {item.get("instanceId") for item in slide.get("componentInstances", [])}
+                        exported_order = [node.attrib.get("name", "") for node in xml.findall(".//p:cNvPr", NS)]
+                        for error in validate_exported_baseline_order(scene_nodes, exported_order):
+                            findings.append(Finding("generation.baseline_layering", error, slide=index + 1))
                         for node_id, scene_node in scene_nodes.items():
                             tag = scene_node.get("data", {}).get("semantic")
                             try:
@@ -2014,6 +2017,27 @@ def provenance_cli() -> int:
     print(encoded, end="")
     return 0 if report["accepted"] else 1
 
+
+
+def validate_exported_baseline_order(scene_nodes: dict[str, Any], exported_order: list[str]) -> list[str]:
+    """Check actual PowerPoint stacking, not merely the planned node sequence."""
+    positions = {name: index for index, name in enumerate(exported_order)}
+    errors = []
+    for node_id, axis in scene_nodes.items():
+        if axis.get("role") != "chart-axis":
+            continue
+        a = axis.get("frame", {})
+        owner = axis.get("data", {}).get("componentInstance")
+        for mark_id, mark in scene_nodes.items():
+            if mark.get("role") != "chart-mark" or mark.get("type") != "rect" or mark.get("data", {}).get("componentInstance") != owner:
+                continue
+            b = mark.get("frame", {})
+            if not all(key in a and key in b for key in ("x", "y", "width", "height")):
+                continue
+            intersects = a["x"] <= b["x"]+b["width"] and a["x"]+a["width"] >= b["x"] and a["y"] <= b["y"]+b["height"] and a["y"]+a["height"] >= b["y"]
+            if intersects and positions.get(f"ps:{node_id}", -1) < positions.get(f"ps:{mark_id}", -1):
+                errors.append(f"BASELINE_LAYERING: {node_id} is behind {mark_id} in exported PowerPoint")
+    return errors
 
 
 # --- Deterministic semantic gate ---
@@ -2430,7 +2454,7 @@ VISUAL_SCHEMA['$defs']['copyAudit']['properties']['criticality'] = {
                 'deletionConsequence': {'type': 'string', 'minLength': 1},
                 'passes': {'type': 'boolean'}}}}}}
 
-VISUAL_RUBRIC_VERSION = "8"
+VISUAL_RUBRIC_VERSION = "9"
 VISUAL_MINIMUM_SCORE = 90
 VISUAL_SCORE_NAMES = (
     "compositionCompleteness",
@@ -2573,7 +2597,7 @@ Hard chart-position gate: inspect the generation script and evidence as well as 
 
 Hard semantic copy gate: never accept a recap of content already shown on the same slide, especially graph or table narration, in ANY paragraph, bullet, caption or box. Necessary chart labels, units, legends and compact comparison annotations decode the exhibit; they are not redundant prose. An insight must add a supported new deduction beyond the visible evidence AND title. A numerical restatement, new calculation alone, summary, or methodology note is not insight. Adding 'therefore', moving prose into bullets, or enclosing it does not fix it. Do not demand a box if no defensible deduction exists.
 
-Mandatory criticality gate: inspect EVERY visible title, internal heading and annotation. In copyAudit.criticality report itemCount and one item per inspected element with exact text, role, deletionConsequence and passes. Count from the rendered slide; do not omit redundant elements. Removing an element must lose necessary argument, scope, interpretation, decision or navigation to pass. Accurate paraphrases of the body still fail. Any failure requires a major TITLE_CRITICALITY or ANNOTATION_CRITICALITY finding and rejection. For simple directly labelled two-bar charts, put derived catch-up requirements in the insight as supporting evidence, not a leader attached to a bar representing a different quantity. Assess the whole insight argument, including its supporting premises.
+Mandatory criticality gate: inspect EVERY visible title, internal heading, annotation and supporting section/container, including evidence-note boxes and tracker pages. In copyAudit.criticality report itemCount and one item per inspected element with exact text, role, deletionConsequence and passes. Count from the rendered slide; do not omit redundant elements. Removing an element must lose necessary argument, scope, interpretation, decision or navigation to pass. Whole supporting sections need a separate audit item from their heading. Methodology-only boxes should move to source notes unless their prominence prevents a specific material misreading; quote that risk rather than accepting the evidence-note role as justification. Tracker text that merely announces visible structure, such as “The comparison in five chapters”, fails. Retain the substantive section name and actual navigation labels. Accurate paraphrases of the body still fail. Any failure requires a major TITLE_CRITICALITY, ANNOTATION_CRITICALITY or SECTION_CRITICALITY finding and rejection. For simple directly labelled two-bar charts, put derived catch-up requirements in the insight as supporting evidence, not a leader attached to a bar representing a different quantity. Assess the whole insight argument, including its supporting premises.
 
 For EVERY slide, return copyAudit with noRecap (boolean), recapEvidence (specific explanation of the inspected supporting copy, quoting any recap), insightCount (number of visible insight surfaces or claimed insight statements), and insights (one record per insight). Each record must quote the exact insight text, identify its on-slide premises, state what new deduction it adds, and classify it as supported_deduction, recap, or unsupported. Use an empty insights array only when there are no insights; still inspect other supporting copy. Reject any recap or non-deductive insight as a major COPY_RECAP or INSIGHT_NOT_DEDUCTION finding and reject the slide/deck. Missing copyAudit, incomplete insight coverage, or a failed copy decision blocks acceptance regardless of scores. Judge meaning, not shared-word counts; do not invent reasoning absent from the actual statement or premises.
 
@@ -2659,7 +2683,7 @@ def validate_visual_copy_audit(value: Any, label: str) -> list[str]:
         items = criticality.get("items")
         count = criticality.get("itemCount")
         if type(count) is not int or count < 0 or not isinstance(items, list) or count != len(items):
-            errors.append(f"{label}.criticality must cover every title, heading and annotation")
+            errors.append(f"{label}.criticality must cover every title, heading, annotation and supporting section")
         if isinstance(items, list):
             for item in items:
                 if not isinstance(item, dict) or any(not non_empty_string(item.get(k)) for k in ("text", "role", "deletionConsequence")) or type(item.get("passes")) is not bool:

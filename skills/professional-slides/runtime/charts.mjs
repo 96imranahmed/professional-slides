@@ -340,7 +340,11 @@ function withDecorations(nodes, options) {
     const crossesGrid = nodes.some((node) => node.role === "chart-gridline" && node.frame.y > frame.y && node.frame.y < frame.y + height && node.frame.x < frame.x + width && node.frame.x + node.frame.width > frame.x);
     if (!insideMark && crossesGrid) backings.push(rectPrimitive({ id: stableId(label.id, "backing"), role: "chart-label-surface", frame, style: { fill: token("color.surface"), stroke: "none", lineWidth: token("line.hairline") }, data: { forNode: label.id } }));
   }
-  return [...underlay, ...nodes.flatMap((node) => [...backings.filter((backing) => backing.data.forNode === node.id), node]), ...overlay];
+  // Shared by columns, bars and waterfalls: opaque marks cannot cover axes.
+  // Gridlines remain in the background; annotations remain in the foreground.
+  const foregroundAxes = nodes.filter(node => node.role === "chart-axis");
+  const layeredNodes = [...nodes.filter(node => node.role !== "chart-axis"), ...foregroundAxes];
+  return [...underlay, ...layeredNodes.flatMap((node) => [...backings.filter((backing) => backing.data.forNode === node.id), node]), ...overlay];
 }
 
 function categoricalChart({ id, frame, props, horizontal = false, stacked = false, tokens = TOKENS }) {

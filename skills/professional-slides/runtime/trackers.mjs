@@ -130,9 +130,8 @@ function sequentialNodes({ id, frame, props, items, dark }) {
   if (items.length > 6) throw new Error("Sequential tracker supports three to six items; use split contents for longer lists");
   const foreground = dark ? WHITE : INK, quiet = dark ? WHITE : SECONDARY;
   const nodes = [rectPrimitive({ id: stableId(id, "surface"), role: "tracker-page-surface", frame, style: box(dark ? INK : CANVAS, dark ? INK : CANVAS) })];
-  const titleText = String(props.title ?? "Contents").trim();
-  if (!titleText) throw new Error("Sequential tracker requires a page title");
-  nodes.push(measuredText(stableId(id, "title"), "tracker-page-title", { x: frame.x + 72, y: frame.y + 62, width: frame.width - 144, height: 70 }, titleText, style(token("type.sectionTitle"), foreground, true, "left", "top", true), { trackerId: props.trackerId ?? "deck-sections" }));
+  const titleText = String(props.title ?? "").trim();
+  if (titleText) nodes.push(measuredText(stableId(id, "title"), "tracker-page-title", { x: frame.x + 72, y: frame.y + 62, width: frame.width - 144, height: 70 }, titleText, style(token("type.sectionTitle"), foreground, true, "left", "top", true), { trackerId: props.trackerId ?? "deck-sections" }));
   const left = frame.x + 108, right = frame.x + frame.width - 108, markerSize = 52;
   const railY = frame.y + frame.height * 0.48;
   nodes.push(linePrimitive({ id: stableId(id, "rail"), role: "tracker-rail", x1: left, y1: railY, x2: right, y2: railY, style: { stroke: quiet, lineWidth: HAIRLINE }, data: { trackerId: props.trackerId ?? "deck-sections" } }));

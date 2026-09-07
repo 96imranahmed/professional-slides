@@ -147,3 +147,11 @@ Every title, internal heading, annotation and supporting section MUST pass the d
 Apply this check during dot-dash planning and again to every exact rendered slide. Record the exact text, role, deletion consequence and pass/fail for each title, heading and annotation. Missing coverage or any failed item blocks acceptance regardless of aggregate scores or other passing tests. Use TITLE_CRITICALITY for redundant titles/headings and ANNOTATION_CRITICALITY for unnecessary chart callouts.
 
 For a simple directly labelled two-value bar comparison, a derived catch-up requirement or decision implication belongs in the insight section, potentially as a second supporting bullet. Do not attach it to a bar as if it were the plotted quantity. Chart annotations must need a specific visual anchor to explain that mark, event or interval; preserve warranted growth/change highlights. Assess insight reasoning as a whole: a calculated supporting premise may support a deduction without being a standalone insight itself.
+
+### Baseline and supporting-copy requirements
+
+The shared bar/column renderer paints the category axis and zero baseline above opaque bar shapes, with gridlines behind the marks. A continuous baseline must survive native PowerPoint export; do not repair individual slides with duplicate lines.
+
+Criticality includes whole supporting sections, not just their headings. Methodology-only boxes (population basis, coverage, source definitions) normally belong in source notes. An evidence-note tag or neutral surface does not exempt a box from the deletion test. Retain a prominent qualification only when it prevents a material misreading and cannot be communicated adequately in the source note. Do not invent an insight when none is supported.
+
+Tracker pages are not exempt: headings such as “The comparison in five chapters” merely describe visible structure and fail criticality. Use the current substantive section name in slide chrome and omit the redundant internal heading. Keep the actual tracker labels needed for navigation.

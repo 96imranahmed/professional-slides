@@ -85,3 +85,5 @@ Use editable markers, text, and native lines on the registered page guides. Pres
 
 
 Compact content-slide trackers default to the section name only, without its numeric identifier. Number strips are explicit opt-in; chapter tracker pages retain the full map.
+
+Internal titles on sequential tracker pages are optional and omitted by default. When slide chrome already names the current section, do not add an internal heading describing the number of chapters or the visible tracker. The runtime rejects structure-only count headings, and the criticality gate checks any remaining title.
