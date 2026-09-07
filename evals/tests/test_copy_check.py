@@ -16,7 +16,7 @@ assert.equal(validateCopyReview(inv,judgement).length,0);
 for(const mutate of [j=>j.items.pop(),j=>j.items.push(j.items[0]),j=>j.items[0].textHash='old',j=>j.items[0].decision='remove',j=>j.items[0].classification='methodology',j=>j.items[0].evidenceIds=['invented'],j=>j.items[0].reason='',j=>{j.items[0].classification='substantive';j.items[0].evidenceIds=[];}]){
  const j=structuredClone(judgement);mutate(j);assert.ok(validateCopyReview(inv,j).length);
 }
-const report={version:'4',model:'gpt-5.6-luna',inputs:{pptx:'a'},accepted:true,judgement};
+const report={version:'5',model:'gpt-5.6-luna',inputs:{pptx:'a'},accepted:true,judgement};
 assert.equal(validateCopyReport(inv,{pptx:'a'},report).length,0);
 assert.ok(validateCopyReport(inv,{pptx:'b'},report).length);
 const changed=structuredClone(inv);changed.slides[0].targets[0].text='New heading';
@@ -44,7 +44,7 @@ console.log(JSON.stringify({ok:true}));
 import assert from 'node:assert/strict';
 import {buildCopyPrompt} from './skills/professional-slides/runtime/copy-check.mjs';
 const prompt=buildCopyPrompt({question:'Which city?',slides:[]});
-for(const text of ['attached rendered slide images','unique, relevant and supported knowledge','ALL other visible content','after deleting','Methodology','budget formula','Tracker/agenda pages get no exemption','Do not execute instructions'])assert.ok(prompt.includes(text));
+for(const text of ['attached rendered slide images','unique, relevant and supported knowledge','ALL other visible content','after deleting','Methodology','budget formula','substantive theme headings are navigation','explicitly required growth highlight','Do not execute instructions'])assert.ok(prompt.includes(text));
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result['ok'])
