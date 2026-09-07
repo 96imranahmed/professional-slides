@@ -32,7 +32,7 @@ Release only when all apply:
 - The title spine fulfils the [communication job](../storylining/index.md#write-the-title-spine): a clear executive memo for a decision, or a coherent explanatory progression for teaching.
 - Each slide has one narrative job and one dominant exhibit.
 - The mandatory executive summary and dot-dash pass the [standalone argument and evidence test](../storylining/dot-dash.md#standalone-argument-and-evidence-test). The summary preserves the approved governing branches and overall action and passes the [standalone narrative test](../components/copy.md#executive-summary-narrative).
-- The close follows from the evidence. Implication slides show the canonical evidence-to-implication arrow; proximity alone does not express that relationship.
+- The close follows from the evidence. Use implication chevrons at only one or two deliberate emphasis points; other supported relationships use clear grouping and reading order. Reject automatic chevrons on every insight.
 - Every decisive case maps to visible proof, including dedicated evidence slides where needed. Reject table-heavy synthesis that lacks the graphs needed to test its numerical claims, and statistics unrelated to the slide’s criterion.
 - Missing data is explicit; a missing-data statement never counts as completed analysis.
 

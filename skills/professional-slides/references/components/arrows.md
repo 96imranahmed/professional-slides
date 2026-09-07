@@ -49,3 +49,7 @@ Build each arrow from editable native line and shape geometry, preserving the re
 - Every arrow remains editable and uses theme-bound colours and dimensions.
 
 A coherent verdict limitation and reassessment condition may share one unheaded implication field when both follow from the same historical evidence. An inference arrow can connect the evidence to that qualified conclusion. Do not require a heading or change it to an unrelated-context boundary simply because the implication contains two paragraphs.
+
+## Deck-level restraint
+
+Use standalone implication chevrons, including disc-chevrons, at only one or two deliberate emphasis points in a deck. Do not attach one automatically to every insight, side rail, or evidence-to-conclusion pair. Elsewhere, compact grouping, alignment and reading order can express the connection. Process chevrons that encode actual stages are a separate semantic use; this limit concerns repeated implication furniture. Audit the full montage for overuse.

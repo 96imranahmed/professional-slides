@@ -42,7 +42,7 @@ The shared section heading owns heading text and its optional rule only. It has 
 
 ### Split-section relationships
 
-For a left exhibit and right-hand interpretation, record the relationship in the plan and treatment ledger before selecting a boundary:
+For a left exhibit and right-hand interpretation, record the relationship in the plan and treatment ledger before selecting a boundary. The arrow variants below apply only to the one or two deliberate emphasis points allowed by deck-level restraint; otherwise use compact grouping without a marker:
 
 - **Supported inference:** use `section-boundary` with `variant="inference"`: a quiet vertical divider interrupted by a compact right-pointing disc-chevron. The left must support the right-hand conclusion; position alone does not imply causation.
 - **Open reasoning lists:** develop the left evidence and right consequence as bullet lists under their peer headings, not dense paragraphs. Use `connector` with `variant="chevron"` in the gutter, vertically centered against the measured bullet content as specified in [Arrows](arrows.md#geometry-and-placement). Preserve complete reasoning and qualifications in the bullets; do not turn them into telegraphic labels.
@@ -54,7 +54,7 @@ Reserve the boundary inside the inter-section gap, from the content top to the c
 
 Serialize that decision as a separate content item, for example `{ id: "evidence-to-conclusion", job: "connect the evidence to its supported conclusion", component: "section-boundary", props: { variant: "inference" } }`, with its frame in the reserved gutter. Set the adjacent `content-rail` to `dividerLeft: false` so it does not add a second line. `dividerLeft: true` draws a plain separator only; neither the rail nor the planner turns it into an inference marker. Reuse this registered design rather than drawing a new arrow.
 
-For a planned supported inference, a missing arrow fails rendered review even when both text fields are present. Check the reasoning as well as the marker: if the right-hand conclusion depends on evidence absent from the left, develop the exhibit or classify the region as related context. Do not add an arrow to conceal an unsupported leap.
+For the one or two deliberately marked inferences selected under the [deck-level restraint rule](arrows.md#deck-level-restraint), verify the planned arrow. Other inferences may use compact grouping without a marker. Check the reasoning as well as the marker: if the right-hand conclusion depends on evidence absent from the left, develop the exhibit or classify the region as related context. Do not add an arrow to conceal an unsupported leap.
 
 ### Line construction
 
