@@ -70,6 +70,10 @@ class PptxVisualTests(unittest.TestCase):
         self.assertIn("not word count or table presence alone", prompt)
         self.assertNotIn("Mandatory calibration", prompt)
 
+    def test_response_schema_and_validator_use_the_same_rubric(self):
+        self.assertEqual(validator.VISUAL_SCHEMA['properties']['rubricVersion']['const'], validator.VISUAL_RUBRIC_VERSION)
+        self.assertIn('criticality', validator.VISUAL_SCHEMA['$defs']['copyAudit']['required'])
+
     def test_criticality_is_required_and_cannot_be_averaged_away(self):
         value = judgement(score=100)
         audit = value['slides'][0]['copyAudit']

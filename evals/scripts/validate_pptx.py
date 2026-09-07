@@ -2356,11 +2356,12 @@ def semantic_cli() -> int:
 
 
 # --- Per-slide independent visual gate ---
+VISUAL_RUBRIC_VERSION = "9"
 VISUAL_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
  'type': 'object',
  'additionalProperties': False,
  'required': ['rubricVersion', 'verdict', 'summary', 'deckScores', 'slides', 'findings'],
- 'properties': {'rubricVersion': {'type': 'string', 'const': '7'},
+ 'properties': {'rubricVersion': {'type': 'string', 'const': VISUAL_RUBRIC_VERSION},
                 'verdict': {'type': 'string', 'enum': ['accept', 'reject']},
                 'summary': {'type': 'string', 'minLength': 1},
                 'deckScores': {'$ref': '#/$defs/scores'},
@@ -2454,7 +2455,6 @@ VISUAL_SCHEMA['$defs']['copyAudit']['properties']['criticality'] = {
                 'deletionConsequence': {'type': 'string', 'minLength': 1},
                 'passes': {'type': 'boolean'}}}}}}
 
-VISUAL_RUBRIC_VERSION = "9"
 VISUAL_MINIMUM_SCORE = 90
 VISUAL_SCORE_NAMES = (
     "compositionCompleteness",
