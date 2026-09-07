@@ -19,6 +19,18 @@ const TREND_MEDIA = [MEDIA_SAMPLE, ...['house','train-front','chart-no-axes-comb
 const LOGO_MEDIA = ['github','python','rust','javascript'].map(name => ({
   mediaVariants: Object.fromEntries(['grayscale','color'].map(mode => [mode,loadAsset('simple-icons',name+'-'+mode,name,'Simple Icons CC0; assets/simple-icons/LICENSE.md; editorial identification')]))
 }));
+const WORDMARK_RECORDS=JSON.parse(readFileSync(new URL("../assets/simple-icons/treatments.json",import.meta.url),"utf8"));
+const WORDMARK_MEDIA=['visa','cisco','intel','samsung'].map(name=>{
+  const record=WORDMARK_RECORDS.find(r=>r.name===name);
+  return {mediaVariants:Object.fromEntries(['grayscale','color'].map(mode=>[mode,{...loadAsset('simple-icons',name+'-'+mode,name,'Simple Icons CC0; assets/simple-icons/LICENSE.md; editorial identification'),width:record.width,height:record.height}]))};
+});
+const COLLAGE_MEDIA=[WORDMARK_MEDIA[0],LOGO_MEDIA[0],WORDMARK_MEDIA[1],LOGO_MEDIA[1],WORDMARK_MEDIA[2],LOGO_MEDIA[2],WORDMARK_MEDIA[3],LOGO_MEDIA[3]];
+const COLLAGE_CELLS=[
+  {x:0,y:0,width:.32,height:.20},{x:.40,y:.04,width:.14,height:.24},
+  {x:.65,y:0,width:.34,height:.28},{x:.03,y:.35,width:.15,height:.25},
+  {x:.26,y:.37,width:.30,height:.20},{x:.68,y:.40,width:.13,height:.25},
+  {x:.03,y:.77,width:.40,height:.20},{x:.86,y:.74,width:.10,height:.23}
+];
 const IMAGE_MEDIA = {...loadAsset('pexels','category','Abstract Pexels background','User-selected Pexels image; assets/pexels/source.json'),width:480,height:480,sourceUrl:'https://images.pexels.com/photos/7135013/pexels-photo-7135013.jpeg'};
 const COVER_MEDIA = {...IMAGE_MEDIA,...loadAsset('pexels','cover','Abstract Pexels background','User-selected Pexels image; assets/pexels/source.json'),width:640,height:720};
 
@@ -288,6 +300,8 @@ export function registerMedia(registry) {
       return variant;
     },
     examples: {
+      "area-grayscale":{props:{layout:"collage",variant:"grayscale",items:COLLAGE_MEDIA.map((media,i)=>({id:`collage-${i}`,...media,cell:COLLAGE_CELLS[i]}))}},
+      "area-color":{props:{layout:"collage",variant:"color",items:COLLAGE_MEDIA.map((media,i)=>({id:`collage-${i}`,...media,cell:COLLAGE_CELLS[i]}))}},
       "radial-grayscale":{props:{layout:"radial",variant:"grayscale",items:LOGO_MEDIA.map((media,i)=>({id:`radial-${i}`,...media}))}},
       "radial-color":{props:{layout:"radial",variant:"color",items:LOGO_MEDIA.map((media,i)=>({id:`radial-${i}`,...media}))}}
     },
@@ -315,7 +329,7 @@ export function registerMedia(registry) {
         );
       const variant=registry.get("logo-collage").resolveVariant(props);
       const layout=props.layout??"grid";
-      if(!["grid","radial"].includes(layout)) throw new Error("Logo collage layout must be grid or radial");
+      if(!["grid","radial","collage"].includes(layout)) throw new Error("Logo collage layout must be grid, radial or collage");
       const gap=tokenValue(token("space.5"));
       const size=Math.min(80,frame.width/4,frame.height/3);
       if(size<40) throw new Error("Logo collage is too dense");
@@ -329,6 +343,23 @@ export function registerMedia(registry) {
         const width=columns*size+(columns-1)*gap,height=rows*size+(rows-1)*gap;
         if(width>frame.width||height>frame.height) throw new Error("Logo collage is too dense");
         frames=items.map((_,i)=>({x:frame.x+(frame.width-width)/2+(i%columns)*(size+gap),y:frame.y+(frame.height-height)/2+Math.floor(i/columns)*(size+gap),width:size,height:size}));
+      } else if(layout==="collage") {
+        if(items.some(item=>!item.cell)) throw new Error("Area collage requires a normalized cell for every logo");
+        frames=items.map(item=>{
+          const c=item.cell;
+          if(![c.x,c.y,c.width,c.height].every(Number.isFinite)||c.x<0||c.y<0||c.width<=0||c.height<=0||c.x+c.width>1||c.y+c.height>1)
+            throw new Error("Collage cells must stay inside the normalized rectangle");
+          return {x:frame.x+c.x*frame.width,y:frame.y+c.y*frame.height,width:c.width*frame.width,height:c.height*frame.height};
+        });
+        for(let i=0;i<frames.length;i++) for(let j=i+1;j<frames.length;j++){
+          const a=frames[i],b=frames[j];
+          if(Math.min(a.x+a.width,b.x+b.width)>Math.max(a.x,b.x)&&Math.min(a.y+a.height,b.y+b.height)>Math.max(a.y,b.y))
+            throw new Error("Collage cells must not overlap");
+        }
+        frames=frames.map(f=>{
+          const width=Math.min(f.width,280),height=Math.min(f.height,96);
+          return {x:f.x+(f.width-width)/2,y:f.y+(f.height-height)/2,width,height};
+        });
       } else {
         const radius=items.length===1?0:Math.min(160,(frame.width-size)/2,(frame.height-size)/2);
         if(items.length>1&&2*radius*Math.sin(Math.PI/items.length)<Math.SQRT2*size+gap)

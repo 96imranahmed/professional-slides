@@ -116,6 +116,8 @@ const GOLDEN_LAYOUT_IDS = new Set([
   "fixture-chart-group-four-way-mixed",
   "fixture-logo-collage-radial-grayscale",
   "fixture-logo-collage-radial-color",
+  "fixture-logo-collage-area-grayscale",
+  "fixture-logo-collage-area-color",
   "fixture-map-imported-geometry",
   "fixture-planner-auto"
 ]);

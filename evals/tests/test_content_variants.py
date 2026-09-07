@@ -95,3 +95,20 @@ assert.throws(()=>render({variant:'theme'}),/Unknown logo treatment/);
 assert.throws(()=>render({items:[{id:'missing'}]}),/prepared logo media/);
 console.log('{}');
 """)
+
+    def test_area_collage_preserves_mixed_aspects_and_rejects_bad_cells(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const c=REGISTRY.get('logo-collage'),frame={x:0,y:0,width:1160,height:400},props=c.examples['area-color'].props;
+const nodes=c.render({id:'area',frame,props}).nodes;
+assert.equal(nodes.length,8);
+assert.ok(nodes.some(n=>n.frame.width/n.frame.height>2));
+assert.ok(nodes.every(n=>n.frame.width<=280&&n.frame.height<=96));
+assert.ok(Math.max(...nodes.map(n=>n.frame.x+n.frame.width))-Math.min(...nodes.map(n=>n.frame.x))>900);
+const bad=structuredClone(props);bad.items[1].cell=bad.items[0].cell;
+assert.throws(()=>c.render({id:'bad',frame,props:bad}),/overlap/);
+bad.items[1].cell={x:-1,y:0,width:.1,height:.1};
+assert.throws(()=>c.render({id:'bad',frame,props:bad}),/normalized rectangle/);
+console.log('{}');
+""")

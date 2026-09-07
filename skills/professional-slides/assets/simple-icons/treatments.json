@@ -34,5 +34,57 @@
       "color": "Brand hex applied to authorized monochrome Simple Icons mark",
       "grayscale": "Neutral gray 666666 applied to the same mark"
     }
+  },
+  {
+    "name": "visa",
+    "width": 192,
+    "height": 62,
+    "brandHex": "1A1F71",
+    "sourceUrl": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/visa.svg",
+    "sha256": "7cce4eea7b16b6eddf60d7d78b7b814d13ab3001bfa5e184480a7ff4a895e4ad",
+    "metadataSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/data/simple-icons.json",
+    "treatments": {
+      "color": "Brand hex applied to the authorized Simple Icons mark; transparent padding trimmed",
+      "grayscale": "Neutral gray 666666; identical geometry"
+    }
+  },
+  {
+    "name": "cisco",
+    "width": 192,
+    "height": 102,
+    "brandHex": "1BA0D7",
+    "sourceUrl": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/cisco.svg",
+    "sha256": "005c240c62355768860ad0bb19820033bc840ee390192c7139f8777d78291391",
+    "metadataSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/data/simple-icons.json",
+    "treatments": {
+      "color": "Brand hex applied to the authorized Simple Icons mark; transparent padding trimmed",
+      "grayscale": "Neutral gray 666666; identical geometry"
+    }
+  },
+  {
+    "name": "intel",
+    "width": 192,
+    "height": 76,
+    "brandHex": "0071C5",
+    "sourceUrl": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/intel.svg",
+    "sha256": "25d0d4387af0999eb5dc79b165ecfd7b972ff43047406da533f3207ac92c0a57",
+    "metadataSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/data/simple-icons.json",
+    "treatments": {
+      "color": "Brand hex applied to the authorized Simple Icons mark; transparent padding trimmed",
+      "grayscale": "Neutral gray 666666; identical geometry"
+    }
+  },
+  {
+    "name": "samsung",
+    "width": 192,
+    "height": 30,
+    "brandHex": "1428A0",
+    "sourceUrl": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/samsung.svg",
+    "sha256": "4a241ca8ebab6e71883b172acb9fb454efa69f308e4f2c31ec80668aeb6627d9",
+    "metadataSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/data/simple-icons.json",
+    "treatments": {
+      "color": "Brand hex applied to the authorized Simple Icons mark; transparent padding trimmed",
+      "grayscale": "Neutral gray 666666; identical geometry"
+    }
   }
 ]
