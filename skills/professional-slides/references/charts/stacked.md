@@ -29,7 +29,7 @@ Each stack must reconcile to its total. Every series must contain exactly one fi
 
 Use the shared [chart legend](../components/chart-legends.md) whenever segment identity is not printed unambiguously inside every stack. The ordinary multi-series stacked-bar and stacked-column treatment may place one horizontal legend row at the top right of the chart field; it does not require a narrative rail. Use the shared [change and highlight grammar](../components/chart-callouts.md#shared-highlight-and-change-grammar) for forecast bands, endpoint change, focal spans, and segment emphasis.
 
-When a narrative category rail explains the stack, bind each rail item and its corresponding segment to the same declared series key and colour index. Never recolour the right-hand stack independently. Connect the explanatory rail to the chart with the shared [implication arrow](../components/arrows.md), using the compact disc-chevron by default.
+When a narrative category rail explains the stack, bind each rail item and its corresponding segment to the same declared series key and colour index. Never recolour the right-hand stack independently. Bind the explanatory rail through alignment and matching series keys. Add a shared [implication arrow](../components/arrows.md) only at a selected deck-level emphasis point.
 
 Keep the plot field blank by default. Add gridlines only when total or segment values cannot be read reliably from labels and baselines.
 

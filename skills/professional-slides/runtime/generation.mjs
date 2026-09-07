@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { DESIGN_SYSTEM_VERSION, MANIFEST_SCHEMA, SCENE_SCHEMA, hashJson } from "./core.mjs";
+import { assertOutputDirectory } from "./output-path.mjs";
 import { planDeck } from "./planner.mjs";
 import { REGISTRY, registryManifest } from "./registry.mjs";
 import { renderSlideHtml } from "./adapters/html.mjs";
@@ -69,7 +70,7 @@ export async function writeCanonicalDeck({
   if (!authoringScriptPath) throw new Error("writeCanonicalDeck requires authoringScriptPath for provenance");
   const scriptPath = path.resolve(authoringScriptPath);
   const stem = safeFileName(fileStem, "deck");
-  const directory = path.resolve(outputDirectory);
+  const directory = await assertOutputDirectory(outputDirectory);
   const htmlDirectory = path.join(directory, "html");
   await fs.mkdir(htmlDirectory, { recursive: true });
 

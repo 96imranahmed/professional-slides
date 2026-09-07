@@ -29,7 +29,7 @@ The table is the review and approval surface, not a requirement to use tables in
 
 Do not add a separate `Slide title` field, make the owner infer a title from planning prose, or add filler dashes to create symmetry. A slide's communication job may be tracked separately in the storyboard or contract, but it does not replace or paraphrase the dot.
 
-When the approved story is compiled into the pre-authoring contract, copy each dot verbatim into that slide record's `title`. When the deck is authored, use that approved title on the slide. Any title change is a dot-dash change and follows the approval rule below.
+When the approved story is compiled into the pre-authoring contract, copy each dot verbatim into that slide record's `title`. When the deck is authored, use that approved title on the slide. Any title change updates the dot-dash and follows the authorization rule below.
 
 ## Standalone argument and evidence test
 
@@ -39,11 +39,11 @@ Read the executive summary and dot-dash without slides or narration. Together th
 
 For each analytical case, record the actual values or specific examples, source, population and period, comparator, inference limit, and the slide or slides that will present the proof. A conclusion table does not substitute for that proof. Use dedicated evidence slides when the trend, distribution, or relationship needs room; link their findings into the synthesis slide. Mark missing evidence as unresolved rather than filling space with unrelated statistics.
 
-Match the evidence to the criterion. Revenue supports commercial reach, not audience satisfaction or storytelling quality. Where relevant, test independent measures such as audience ratings alongside revenue. For a ratings-versus-gross analysis, match film IDs and cohorts, record rating date, vote counts, exclusions and sample size, show the scatter and any reported correlation, and distinguish association from causation. IMDb is an optional source, not a mandatory metric for every deck. Narrow or reject a proposed relationship if the data does not support it.
+Match the evidence to the criterion. Revenue supports commercial reach, not audience satisfaction or storytelling quality. Where relevant, test independent measures such as audience ratings alongside revenue. For a ratings-versus-gross analysis, match film IDs and cohorts, record rating date, vote counts, exclusions and sample size, show the scatter and any reported correlation, and distinguish association from causation. These are illustrative measures: use topic-appropriate primary evidence, not a mandatory entertainment-data checklist. Narrow or reject a proposed relationship if the data does not support it.
 
 For every proposed graph, put both axes’ meanings and their source fields or calculations in the design cell. Apply the [meaningful-position gate](../charts/index.md#meaningful-position-gate) before approval; category bands with fabricated within-band coordinates fail.
 
-Audit the planned exhibit mix. Keep tables for comparisons that benefit from rows and columns; use graphs to expose numerical patterns that prose cells conceal. Record the evidence-to-implication arrow in the design plan wherever that relationship is shown.
+Audit the planned exhibit mix. Keep tables for comparisons that benefit from rows and columns; use graphs to expose numerical patterns that prose cells conceal. Record the evidence-to-implication relationship and choose only one or two marked emphasis points under the arrow-restraint rule; compact grouping is sufficient elsewhere.
 
 ## Slide design plan
 
@@ -96,7 +96,7 @@ When the user approves a structural change, write the target dot-dash and revali
 
 For a net-new deck or any target-story or structural change, use the available feedback mechanism to gather feedback. Retain dated owner confirmation linked to the exact approved dot-dash version or hash in the pre-authoring contract's `approvalEvidence` field. Revise until approved, and do not create a slide document, ghost deck, or production file before that record exists. A faithful authorized revision to an existing deck may proceed from the as-is dot-dash without new approval when titles, order, and structure remain unchanged; any change to those fields returns to this approval gate.
 
-If the story, any proposed slide title, or a material slide design choice changes after approval, update the affected dots and design plans and obtain approval again.
+If the story, any proposed slide title, or a material slide design choice changes after approval, update the affected dots and design plans. An explicit user request to fix or replace that item authorizes the scoped change; do not ask the user to approve their own instruction again. Seek approval only for a material change outside the authorized scope.
 
 Explicit standing auto-approval satisfies the approval gate within its stated scope. Record that user instruction, its date, and each approved plan version or hash; do not fabricate a separate user review or repeatedly request confirmation. Approval does not waive evidence or quality checks.
 

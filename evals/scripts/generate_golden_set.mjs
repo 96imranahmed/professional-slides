@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
+import { assertOutputDirectory } from "../../skills/professional-slides/runtime/output-path.mjs";
 import { GOLDEN_PALETTES } from "../../skills/professional-slides/runtime/palettes.mjs";
 import { auditGoldenCoverage, goldenGalleryGroups } from "../../skills/professional-slides/runtime/golden-set.mjs";
 import { hashRenderFiles, verifyRenderFiles } from "./render_integrity.mjs";
@@ -55,11 +56,14 @@ function validate(palette, directory) {
   });
 }
 async function main() {
+  await assertOutputDirectory(destination);
   await verifyRuntimeLock();
   if (process.argv.includes("--check")) { const report = await check(); console.log(JSON.stringify({ accepted: true, runId: report.runId, coverage: report.coverage })); return; }
   const source = await sourceState(), runId = `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
   const runDirectory = path.join(destination, "runs", runId);
   await fs.mkdir(runDirectory, { recursive: true });
+  const receiptDirectory = path.join(destination, "receipts", runId);
+  await fs.mkdir(receiptDirectory, { recursive: true });
   const palettes = [];
   for (const id of GOLDEN_PALETTES) {
     console.log(`Validating ${id}: isolated components, variants, layouts and standard slides`);
@@ -81,7 +85,7 @@ async function main() {
       layoutArgs: ["--expected-slide-size-emu", "12192000,6858000", "--validate-heading-fit"],
       explicitTotalSlideCount: report.deck.slideCount, requiredNativeTableOwnerSlides: [], requiredNativeChartOwnerSlides: [],
       fontPolicy: { basis: "design", families: [...new Set([fonts.body, fonts.display, fonts.serif, fonts.semibold.family])] },
-      verifyArtifactToolImport: true, receiptPath: path.join(root, "tmp", `golden-${runId}-${id}-finalization.json`)
+      verifyArtifactToolImport: true, receiptPath: path.join(receiptDirectory, `${id}-finalization.json`)
     });
     palettes.push({ id, pptx: path.relative(destination, pptx), sha256: sha(await fs.readFile(pptx)), report: path.relative(destination, reportPath), reportSha256: sha(reportBytes), renderHashes: await hashRenderFiles(directory, report.fixtures), coverage: auditGoldenCoverage(report.fixtures) });
   }

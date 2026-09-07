@@ -41,6 +41,10 @@ For every production mode, read the relevant Composition, Design, Theming, Compo
 
 Do not repeat owner rules. Use the registered runtime component and its generated preview when prose does not resolve geometry.
 
+## Workspace and installation boundary
+
+Treat the installed plugin as read-only. Resolve its references and runtime from the skill location, but place all task-generated plans, downloaded evidence, scratch files, renders, reports and final decks under one `output/<task>/` directory in the user’s working project, outside the plugin. Do not create parallel top-level `tmp/` or `deliverables/` folders. Never run the developer golden suite for an ordinary deck; validate that deck only. Developer packaging and full golden runs belong to a source checkout. See [artifact lifecycle](references/tools/artifact-lifecycle.md).
+
 ## Build a new deck
 
 1. Select one matching template when available.
@@ -105,7 +109,7 @@ Apply the deletion test: remove anything whose absence does not weaken the argum
 
 For net-new PowerPoint, use `runtime/generation.mjs` as the only production entrypoint. `writeCanonicalDeckPlan()` compiles the approved content plan through the same planner, scene, registry, token system, HTML observer, PptxGenJS adapter, and Artifact Tool observer used by the golden set. Do not create a parallel PptxGenJS builder, duplicate shared components, or recreate theme values as slide-local constants. Keep the canonical generation receipt beside the exact PPTX; an output-only visual score does not prove that the required mechanism was used.
 
-Finish the complete implementation batch before running `npm run validate:runtime`; do not restart the expensive render-and-readback suite after each intermediate edit. The final run regenerates the [golden set](references/composition/index.md#golden-component-set) in the canonical McKinsey palette; fast contract tests retain coverage of other supported palette inputs. A single-component probe is not release evidence.
+For plugin development only, finish the complete implementation batch before running `npm run validate:runtime`; do not restart the expensive render-and-readback suite after each intermediate edit. The final run regenerates the [golden set](references/composition/index.md#golden-component-set) in the canonical McKinsey palette; fast contract tests retain coverage of other supported palette inputs. A single-component probe is not release evidence.
 
 Run the [evaluation guide](references/evaluation/index.md) on the exact final artifact. Render every slide, review the full montage, inspect every slide at full size, check overflow and sources, and verify the editable file itself. For PowerPoint, verify the canonical generation receipt, compile the hard acceptance manifest, run the exported-PPTX validator, then run the independent visual validator with every exact slide render and the exact generation script. A rejection from any structural, adapter, component, provenance, or visual gate requires a source repair, fresh export, fresh render, and another review. Repeat until the exact candidate is accepted. For dual-format work, validate PowerPoint and Google Slides separately.
 

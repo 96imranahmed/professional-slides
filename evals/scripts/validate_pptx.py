@@ -2489,6 +2489,8 @@ Reject a slide for any major visual or semantic defect, including:
 
 Evaluate financial relationships as defined by their sources. Do not demand an equation or netting operation between non-additive balances, proceeds, authorizations and commitments. A reported line item whose official name includes "and other" may legitimately be a single series. Confirm scope and definitions before declaring a missing category. Use bridges for additive changes and integrated assumptions for scenario comparisons; routine derivations need not occupy the analytical canvas.
 
+Judge missing argument, not unused pixels. A complete content-sized group may be vertically centered with outer whitespace. Do not demand filler or expand the evidence-to-insight gap to meet a canvas-fill target. A retained compact metric can decode a chart; flag it as recap only when it duplicates already explicit labels without a reading benefit. Distinguish such additional evidence from an insight.
+
 Do not reward minimalism merely for having whitespace. For an executive pre-read, expect a substantively occupied analytical canvas with a dominant exhibit plus the labels, comparison, qualifier, or attached synthesis needed to make the claim complete. Also do not reward density created by filler.
 
 Apply the copy owner's executive-summary standalone narrative test. Each titled theme needs multiple distinct, developed bullets, not one compressed point or paragraph; another format requires an explicit user/reference-directed exception. A clean table with one fact and one terse consequence per theme can still fail if the governing argument, counterargument or change condition remains implicit. Judge the developed reasoning, not word count or table presence alone. A declared, justified summary copy-budget override does not authorize smaller type or filler.
@@ -2881,7 +2883,7 @@ CONSISTENCY_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
                                                'additionalProperties': False,
                                                'required': ['id', 'slides', 'role', 'verdict', 'observation'],
                                                'properties': {'id': {'type': 'string', 'minLength': 1},
-                                                              'slides': {'type': 'array',
+                                                              'slides': {'type': 'array', 'minItems': 2, 'uniqueItems': True,
                                                                          'items': {'type': 'integer',
                                                                                    'minimum': 1}},
                                                               'role': {'type': 'string', 'minLength': 1},

@@ -174,3 +174,7 @@ The gallery groups page furniture with composed chrome, section containers with 
 The report is `professional-slides.component-validation/v1`. Each fixture records full-frame, blurred-structure, and foreground similarity because a sparse slide can otherwise hide a broken chart.
 
 Component reports require `validate-overlap.mjs`: browser line-box clipping, text/rule and text/text intersections, visible shape/shape intersections, and heading-gap consistency. It repeats the check with Artifact Tool's recovered PPTX frames and verifies text/explicit wraps; this geometry check complements, rather than replaces, exact-PPTX image comparison. Touching boundaries and subpixel font rounding are tolerated. `overlap-policy.mjs` declares specific containment, masking, and chart/diagram junctions; it cannot exempt text/text or an entire component. `evals/tests/test_overlap.py` injects defects to prove rejection. Repair the owner or composition and rerender; do not add a blanket exception to turn a failed report green.
+
+## Output ownership
+
+Always pass an explicit task-workspace `outputDirectory` to canonical generation. Installed plugin directories are read-only, including via symlinks. A developer checkout may generate only under its `output/` tree. Keep scratch, final decks and reports together under `output/<task>/`; see [artifact lifecycle](../references/tools/artifact-lifecycle.md).

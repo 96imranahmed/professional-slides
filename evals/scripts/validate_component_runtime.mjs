@@ -25,7 +25,7 @@ const argValue = (name, fallback) => {
 };
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const outputDirectory = path.resolve(argValue("--output", path.join(repositoryRoot, "tmp", "component-validation")));
+const outputDirectory = path.resolve(argValue("--output", path.join(repositoryRoot, "output", "component-validation")));
 const browserPath = argValue("--browser", process.env.PLAYWRIGHT_BROWSER_PATH);
 const runtimePython = process.env.RUNTIME_PYTHON;
 const presentationSkillDirectory = process.env.PRESENTATION_SKILL_DIR;

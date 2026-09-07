@@ -6,7 +6,7 @@ Use the fewest words that preserve the decision. Every sentence must add a claim
 
 State the answer, not the topic. Use the most decision-relevant supported comparison, magnitude, period, segment, or threshold when it sharpens the claim. Narrow the title when the evidence is weaker than the wording.
 
-Structural navigation pages may use their fixed heading. **Executive summary** is the sole structural-title exception: keep that page title and express the governing answer through its substantive branch conclusions and one overall action.
+Structural navigation pages may use their fixed heading. **Executive summary** is the sole structural-title exception: use that heading or an explicit `Executive summary: <answer>` title and express the governing answer through its substantive branch conclusions and one overall action.
 
 ## Executive-summary narrative
 
@@ -82,9 +82,9 @@ For a pre-read, test the slide without narration; speaker notes cannot supply re
 Keep labels only when they help the audience decode data, navigation, timing, ownership, units, or scenario state.
 
 A role label on a callout, synthesis item, or terminal action surface is presumptively unnecessary. Delete `Answer`, `Key takeaway`, and similar rhetorical-role labels when the sentence and placement already communicate the role. Use substantive section headings and insight statements instead. Never render the recommendation and its call to action in separate text-box surfaces.
-In a split chart page, title the right-hand field with the actual evidence subclaim or consequence. In an executive synthesis, every branch heading must state a substantive conclusion rather than name the branch's rhetorical job.
+In a split chart page, a companion analytical deep dive needs a substantive heading; a self-explanatory implication can remain unheaded. In an executive synthesis, every branch heading must state a substantive conclusion rather than name the branch's rhetorical job.
 
-Use inline named examples when the name and explanation form one thought: **The Winter Soldier:** Institutional distrust turns the hero's own organisation into the threat. The name may use semibold emphasis; do not force a new line between the name and its explanation. Reserve separate headings for actual multi-item groups.
+Use inline named examples when the name and explanation form one thought: **Pilot programme:** A controlled rollout tests demand before full deployment. The name may use semibold emphasis; do not force a new line between the name and its explanation. Reserve separate headings for actual multi-item groups.
 
 Every label must visibly belong to its content through proximity, alignment, a table field, or a shared container. A relevant heading far above scattered paragraphs does not establish grouping. Do not use generic headings to disguise an unstructured collection of claims.
 

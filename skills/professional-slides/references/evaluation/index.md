@@ -1,6 +1,6 @@
 # Evaluation
 
-Use this guide to decide whether a deck is ready. Keep generated decks, renders, plans, and review reports in ignored `output/` or `deliverables/` directories, never in committed source.
+Use this guide to decide whether a deck is ready. Keep generated decks, renders, plans, and review reports in one task-owned `output/` directory outside the installed plugin, never in committed source.
 
 For an evaluation, create a fresh output subdirectory and preserve the inputs and review evidence there. Keep control and treatment independent.
 

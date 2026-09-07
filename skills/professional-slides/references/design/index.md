@@ -18,7 +18,7 @@ Use the [composition model](../composition/index.md) for the content-item contra
 
 Do not impose the same card grid, three-column layout, process rail, or footer strip on most slides. Give each slide one dominant exhibit; route any detached synthesis or terminal action through the canonical [`Insight Box`](../components/insight-box.md). Evidence-attached chart annotations follow [`chart callouts`](../components/chart-callouts.md).
 
-Whitespace must support hierarchy. It must not conceal missing evidence or undersized content. On an executive pre-read, one dominant analytical item should normally occupy 60% to 90% of the usable content field. The examples of comparison, qualifier, definition, period, and attached interpretation are non-scored planning prompts; the [copy owner](../components/copy.md) defines completeness.
+Whitespace must support hierarchy. It must not conceal missing evidence or undersized content. On an executive pre-read, use 60% to 90% as a planning guide, not a fill quota. Once the argument is complete, keep related text and insight compact and position the group deliberately within the available field. Do not reopen that gap, enlarge containers, or add prose merely to consume whitespace. The examples of comparison, qualifier, definition, period, and attached interpretation are non-scored planning prompts; the [copy owner](../components/copy.md) defines completeness.
 
 ## Deck rhythm
 

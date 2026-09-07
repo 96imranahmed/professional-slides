@@ -9,7 +9,7 @@ The McKinsey, BCG, and Bain palettes are independent, brand-inspired presets, no
 - `skills/professional-slides/SKILL.md` routes new decks, structural revisions, and bounded slide edits.
 - `skills/professional-slides/references/` owns storylining, design, component semantics, charts, deck templates, platform guidance, and QA.
 - `skills/professional-slides/runtime/` owns executable composition, tokens, component geometry, and adapters. Start with its [runtime guide](skills/professional-slides/runtime/README.md).
-- `evals/` owns reusable validators and regression tests. Generated decks and evaluation reports belong in ignored `output/` or `deliverables/` directories.
+- `evals/` owns reusable validators and regression tests. Generated decks, scratch and evaluation reports belong under one ignored `output/` root.
 - `.codex-plugin/plugin.json` exposes the one canonical skill.
 
 ## Use
@@ -17,6 +17,12 @@ The McKinsey, BCG, and Bain palettes are independent, brand-inspired presets, no
 Invoke `$professional-slides` with the audience, decision, evidence limits, delivery context, output platform, and any authorized reference. New decks require an approved storyline before authoring. Existing-deck and bounded-slide requests preserve the unaffected content and design.
 
 The runtime currently produces editable PowerPoint primitives, including charts. Charts are not native workbook-backed chart objects. Google Slides remains a downstream import or separately validated platform workflow; PowerPoint parity does not prove Google Slides fidelity. The built-in media fixtures demonstrate placement, not a library of corporate logos or photographs.
+
+## Distribution and user files
+
+Build a clean package with `python3 evals/scripts/package_plugin.py`. The installable directory is `output/package/professional-slides`; point the marketplace entry or local install source there, never at a used working checkout. The allowlist includes reusable skills, runtime, validators and tests, with a hash inventory. It excludes local research, generated decks, scratch, dependencies and personal configuration. Installation does no generation.
+
+Users create task artifacts in `output/<task>/` in their own project, outside the installed plugin. The canonical export runtime rejects plugin-local writes, including symlink aliases. A developer checkout may write only under its own `output/`. Retain the latest useful output and required rebuild/QA inputs; remove superseded task-owned intermediates rather than copying them into a release. See [artifact lifecycle](skills/professional-slides/references/tools/artifact-lifecycle.md).
 
 ## Extend
 
@@ -41,7 +47,7 @@ Use the bundled workspace dependencies returned by Codex's `load_workspace_depen
 "$RUNTIME_NODE" evals/scripts/generate_golden_set.mjs --check
 ```
 
-Also run the installed plugin-creator's `validate_plugin.py` against this repository and skill-creator's `quick_validate.py` against the skill directory. After source changes, reinstall `professional-slides@personal` and compare the installed manifest, skill, and eval files with the source.
+Also run the installed plugin-creator's `validate_plugin.py` against this repository and skill-creator's `quick_validate.py` against the skill directory. After source changes, rebuild the clean package, reinstall from its marketplace entry and compare the installed manifest, skill, and eval files with the source.
 
 ### Golden component evaluation
 
