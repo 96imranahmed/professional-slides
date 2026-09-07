@@ -12,6 +12,19 @@ packager = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(packager)
 
 class PluginDistributionTests(unittest.TestCase):
+    def test_package_preserves_icon_bytes_and_excludes_non_asset_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source, dest = Path(tmp)/'source', Path(tmp)/'package'
+            (source/'.codex-plugin').mkdir(parents=True)
+            (source/'.codex-plugin/plugin.json').write_text('{}')
+            (source/'assets').mkdir()
+            icon = b'\x89PNG\r\n\x1a\nicon-fixture'
+            (source/'assets/icon.png').write_bytes(icon)
+            (source/'assets/private.txt').write_text('excluded')
+            packager.package(source, dest)
+            self.assertEqual((dest/'assets/icon.png').read_bytes(), icon)
+            self.assertFalse((dest/'assets/private.txt').exists())
+
     def test_package_excludes_generated_private_and_dependency_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             source, dest = Path(tmp)/'source', Path(tmp)/'package'
