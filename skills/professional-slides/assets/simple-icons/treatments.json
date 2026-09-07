@@ -1,0 +1,38 @@
+[
+  {
+    "name": "github",
+    "brandHex": "181717",
+    "metadataSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/data/simple-icons.json",
+    "treatments": {
+      "color": "Brand hex applied to authorized monochrome Simple Icons mark",
+      "grayscale": "Neutral gray 666666 applied to the same mark"
+    }
+  },
+  {
+    "name": "python",
+    "brandHex": "3776AB",
+    "metadataSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/data/simple-icons.json",
+    "treatments": {
+      "color": "Brand hex applied to authorized monochrome Simple Icons mark",
+      "grayscale": "Neutral gray 666666 applied to the same mark"
+    }
+  },
+  {
+    "name": "rust",
+    "brandHex": "000000",
+    "metadataSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/data/simple-icons.json",
+    "treatments": {
+      "color": "Brand hex applied to authorized monochrome Simple Icons mark",
+      "grayscale": "Neutral gray 666666 applied to the same mark"
+    }
+  },
+  {
+    "name": "javascript",
+    "brandHex": "F7DF1E",
+    "metadataSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/data/simple-icons.json",
+    "treatments": {
+      "color": "Brand hex applied to authorized monochrome Simple Icons mark",
+      "grayscale": "Neutral gray 666666 applied to the same mark"
+    }
+  }
+]

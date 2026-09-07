@@ -77,3 +77,21 @@ assert.ok(images.filter(n=>n.role==='trend-media').every(n=>n.frame.width>200));
 assert.equal(images.filter(n=>n.type==='text').length,8);
 console.log('{}');
 ''')
+
+    def test_logo_collage_uses_small_grid_or_radial_marks_and_prepared_treatments(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const c=REGISTRY.get('logo-collage'),frame={x:0,y:0,width:1160,height:400};
+const render=props=>c.render({id:'logos',frame,props:{...c.sample,...props}}).nodes;
+const gray=render({}),color=render({variant:'color'}),radial=render({layout:'radial'});
+assert.equal(new Set(gray.map(n=>n.frame.y)).size,2);
+assert.ok(gray.every(n=>n.frame.width<=80&&n.frame.height<=80));
+assert.ok(radial.every(n=>n.frame.width<=80));
+assert.ok(new Set(radial.map(n=>Math.round(n.frame.y))).size>1);
+assert.notEqual(gray[1].data.dataUri,color[1].data.dataUri);
+assert.throws(()=>render({columns:4}),/multiple logo grid rows/);
+assert.throws(()=>render({variant:'theme'}),/Unknown logo treatment/);
+assert.throws(()=>render({items:[{id:'missing'}]}),/prepared logo media/);
+console.log('{}');
+""")

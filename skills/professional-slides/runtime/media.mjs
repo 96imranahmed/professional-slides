@@ -16,7 +16,9 @@ const loadAsset = (directory, name, alt, authorization) => ({
   alt, authorization, width:192, height:192
 });
 const TREND_MEDIA = [MEDIA_SAMPLE, ...['house','train-front','chart-no-axes-combined'].map(name => loadAsset('lucide',name,name,'Lucide ISC; assets/lucide/LICENSE'))];
-const LOGO_MEDIA = ['github','python','rust','javascript'].map(name => loadAsset('simple-icons',name,name,'Simple Icons CC0; assets/simple-icons/LICENSE.md; editorial identification'));
+const LOGO_MEDIA = ['github','python','rust','javascript'].map(name => ({
+  mediaVariants: Object.fromEntries(['grayscale','color'].map(mode => [mode,loadAsset('simple-icons',name+'-'+mode,name,'Simple Icons CC0; assets/simple-icons/LICENSE.md; editorial identification')]))
+}));
 const IMAGE_MEDIA = {...loadAsset('pexels','category','Abstract Pexels background','User-selected Pexels image; assets/pexels/source.json'),width:480,height:480,sourceUrl:'https://images.pexels.com/photos/7135013/pexels-photo-7135013.jpeg'};
 const COVER_MEDIA = {...IMAGE_MEDIA,...loadAsset('pexels','cover','Abstract Pexels background','User-selected Pexels image; assets/pexels/source.json'),width:640,height:720};
 
@@ -277,6 +279,18 @@ export function registerMedia(registry) {
     version: "1.0.0",
     category: "media",
     role: "logo-collage",
+    variants: {grayscale:{},color:{}},
+    defaultVariant: "grayscale",
+    variantProp: "variant",
+    resolveVariant(props={}) {
+      const variant=props.variant??"grayscale";
+      if(!["grayscale","color"].includes(variant)) throw new Error("Unknown logo treatment");
+      return variant;
+    },
+    examples: {
+      "radial-grayscale":{props:{layout:"radial",variant:"grayscale",items:LOGO_MEDIA.map((media,i)=>({id:`radial-${i}`,...media}))}},
+      "radial-color":{props:{layout:"radial",variant:"color",items:LOGO_MEDIA.map((media,i)=>({id:`radial-${i}`,...media}))}}
+    },
     tokens,
     preferredSize: { width: 1160, height: 400 },
     sample: {
@@ -299,30 +313,36 @@ export function registerMedia(registry) {
         throw new Error(
           "Logo collage requires one to twelve uniquely identified assets",
         );
-      const columns = props.columns ?? Math.min(4, items.length);
-      if (!Number.isInteger(columns) || columns < 1 || columns > items.length)
-        throw new Error("Invalid logo collage columns");
-      const rows = Math.ceil(items.length / columns),
-        gap = tokenValue(token("space.5"));
-      const width = (frame.width - gap * (columns - 1)) / columns,
-        height = (frame.height - gap * (rows - 1)) / rows;
-      if (width < 40 || height < 40)
-        throw new Error("Logo collage is too dense");
-      return {
-        nodes: items.map((item, i) =>
-          mediaNode({
-            id: stableId(id, item.id),
-            role: "logo",
-            frame: {
-              x: frame.x + (i % columns) * (width + gap),
-              y: frame.y + Math.floor(i / columns) * (height + gap),
-              width,
-              height,
-            },
-            props: item,
-          }),
-        ),
-      };
+      const variant=registry.get("logo-collage").resolveVariant(props);
+      const layout=props.layout??"grid";
+      if(!["grid","radial"].includes(layout)) throw new Error("Logo collage layout must be grid or radial");
+      const gap=tokenValue(token("space.5"));
+      const size=Math.min(80,frame.width/4,frame.height/3);
+      if(size<40) throw new Error("Logo collage is too dense");
+      let frames;
+      if(layout==="grid") {
+        const columns=props.columns??Math.ceil(Math.sqrt(items.length));
+        if(!Number.isInteger(columns)||columns<1||columns>items.length)
+          throw new Error("Invalid logo collage columns");
+        const rows=Math.ceil(items.length/columns);
+        if(items.length>=3&&rows===1) throw new Error("Use multiple logo grid rows");
+        const width=columns*size+(columns-1)*gap,height=rows*size+(rows-1)*gap;
+        if(width>frame.width||height>frame.height) throw new Error("Logo collage is too dense");
+        frames=items.map((_,i)=>({x:frame.x+(frame.width-width)/2+(i%columns)*(size+gap),y:frame.y+(frame.height-height)/2+Math.floor(i/columns)*(size+gap),width:size,height:size}));
+      } else {
+        const radius=items.length===1?0:Math.min(160,(frame.width-size)/2,(frame.height-size)/2);
+        if(items.length>1&&2*radius*Math.sin(Math.PI/items.length)<Math.SQRT2*size+gap)
+          throw new Error("Radial logo collage is too dense; enlarge the section or use a grid");
+        frames=items.map((_,i)=>{
+          const angle=-Math.PI/2+2*Math.PI*i/items.length;
+          return {x:frame.x+frame.width/2+radius*Math.cos(angle)-size/2,y:frame.y+frame.height/2+radius*Math.sin(angle)-size/2,width:size,height:size};
+        });
+      }
+      return {nodes:items.map((item,i)=>{
+        const media=item.mediaVariants?.[variant]??(item.treatment===variant?item:null);
+        if(!media) throw new Error("Supply prepared logo media for the selected treatment");
+        return mediaNode({id:stableId(id,item.id),role:"logo",frame:frames[i],props:media});
+      })};
     },
   });
   return registry;
