@@ -73,3 +73,7 @@ The relationship is clear without narration. Every node and connector has one jo
 ## Phase spacing and supporting rows
 
 Keep successive phase bands visually connected, with compact separation at their tips rather than wide empty gutters. Group each heading, band and supporting list closely. The canonical `chevron-process` uses compact overlapping bands and spaced bullet rows by default; `detailStyle: "circled-number"` uses circular ordinal markers when sequence matters. Do not type `(1)`, `(2)` or plain numbered paragraphs into the detail copy. Leave deliberate space between successive supporting rows, while keeping wrapped lines within one point close together. Check the actual rendered gaps rather than only the allocated phase frames.
+
+## Decision conclusions
+
+Select `tree` variant `decision-conclusions` for a two-sided decision with leaf outcomes. Supply `root`, two `branches` with stable `id`, `label` and one to three identified `conclusions: [{id, text}]`, plus one overall `conclusion`. Keep each branch and its leaves in one structural colour family, with labels carrying the meaning in grayscale. Connectors terminate at boxes; the neutral conclusion band spans both families. Use ordinary `tree` for a single-level hierarchy. Do not use branching to suggest probabilities or causality unsupported by the evidence.

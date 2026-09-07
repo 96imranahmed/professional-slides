@@ -167,3 +167,7 @@ The expanded list below explains the grammar; present its slide records as the t
 - The title spine moves from answer to evidence to action.
 - The section map matches the dot-dash sequence.
 - The explicit compact-number-strip decision matches the short story.
+
+## Component choice audit
+
+In each slide's design cell, name the primary component and variant, then every secondary component and variant (or `none`). Give a content-specific reason for each. Consider other suitable variants; do not choose the first registered option by habit. Audit secondary halves and rails independently of the main exhibit. Explain recurring table/schema choices once for their comparison family. Apply the [main and secondary design audit](../design/index.md#main-and-secondary-design-audit) before showing the revised plan.

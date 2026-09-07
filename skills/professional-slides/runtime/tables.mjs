@@ -647,10 +647,11 @@ export function renderTable({ id, frame, props }) {
       }),
     );
   const header = props.treatment ?? "open";
-  if (!["open", "standard"].includes(header))
+  if (!["open", "standard", "dimensions"].includes(header))
     throw new Error("Unknown table header treatment");
   m.columns.forEach((column, c) => {
-    if (header === "standard")
+    const filledHeader = header === "standard" || (header === "dimensions" && column.type !== "category");
+    if (filledHeader)
       nodes.push(
         rectPrimitive({
           id: stableId(id, "header-cell", c),
@@ -676,7 +677,7 @@ export function renderTable({ id, frame, props }) {
         m.headers[c],
         textStyle(
           true,
-          header === "standard" ? white : ink,
+          filledHeader ? white : ink,
           column.align ?? "left",
           m.textSize,
         ),
@@ -715,7 +716,7 @@ export function renderTable({ id, frame, props }) {
         (m.rows[r].style ?? props.rowStyle) === "accented"
           ? t("color.componentPrimaryTint")
           : null;
-      if (cell.type === "category" && (cell.surface ?? "primary") === "primary")
+      if (cell.type === "category" && (cell.surface ?? (header === "dimensions" ? "plain" : "primary")) === "primary")
         fill = primary;
       if (cell.type === "highlight") fill = t("color.componentPrimaryTint");
       if (cell.type === "heatmap")

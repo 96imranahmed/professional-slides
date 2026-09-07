@@ -13,7 +13,7 @@ import {HORIZONS_SAMPLE} from './skills/professional-slides/runtime/horizons.mjs
 const owner=REGISTRY.get('chart.horizons');
 assert.ok(owner);
 assert.equal(owner.defaultVariant,'curves');
-assert.deepEqual(Object.keys(owner.variants),['curves','stepped','stepped-minimal']);
+assert.deepEqual(Object.keys(owner.variants),['curves','stepped-bands','stepped','stepped-minimal']);
 const frame={x:60,y:150,width:1160,height:460};
 const render=variant=>owner.render({id:`horizons-${variant}`,frame,props:{...structuredClone(HORIZONS_SAMPLE),...structuredClone(owner.variants[variant].props||{}),variant}}).nodes;
 

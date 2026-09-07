@@ -70,3 +70,11 @@ Give every mark a semantic or compositional purpose. Consider `icon-only`, `imag
 ## Embedded image input
 
 The registered `image-frame` component accepts `dataUri` (embedded PNG or JPEG), nonempty `alt`, and `authorization` referencing the asset record. Prepare the authorized crop at the target aspect ratio before embedding; both adapters preserve that rectangular crop. Omit `dataUri` only for an explicit planning placeholder. Quote avatars retain their separate circular treatment.
+
+## Icon trends and logo collages
+
+Use registered `icon-trends` for two to four independent trends. `columns` puts a sourced icon or image above each heading and explanation; `rows` gives longer explanations horizontal space. `image-columns` is the larger image-led counterpart of `columns`: full-column square images above the same headings and descriptions. It uses dedicated image assets rather than enlarging icons or removing their text. Each item requires `id`, `title`, `text` and `media`. Default to no connector. Set `connector: chevron` only when a directional relationship is real. Use one coherent asset treatment across peers.
+
+Use `logo-collage` with one to twelve identified assets and optional `columns` to show set membership. For A/B ecosystems, place two collages under substantive headings in a row, optionally separated by the shared section boundary. Keep source dates and selection criteria visible; logo count and area do not encode market share.
+
+The shared media renderer accepts embedded PNG/JPEG, intrinsic `width` and `height`, `alt`, and `authorization`; optional `sourceUrl` preserves traceability. It contains assets without distortion. Prepare intentional photographic crops before embedding. The bundled Lucide fixture is licensed demonstration artwork, not a substitute for choosing the right icon or obtaining actual logos. `runtime/media.mjs` owns these compositions and their token bindings.

@@ -27,7 +27,7 @@ def package(source: Path, destination: Path):
         rel = p.relative_to(source)
         if p.is_relative_to(destination) or any(x in EXCLUDED for x in rel.parts):
             continue
-        if not (rel.as_posix() in ALLOWED_FILES or (rel.parts[0] in ALLOWED_ROOTS and p.suffix in EXTENSIONS)):
+        if not (rel.as_posix() in ALLOWED_FILES or (rel.parts[0] in ALLOWED_ROOTS and (p.suffix in EXTENSIONS or (rel.parts[:3] == ('skills', 'professional-slides', 'assets') and (p.suffix == '.png' or p.name == 'LICENSE'))))):
             continue
         if p.is_symlink():
             raise ValueError(f'Symlinks must not enter the distributable: {rel}')

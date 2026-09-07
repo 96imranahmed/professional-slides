@@ -252,10 +252,10 @@ assert.ok(componentVariantFixtureSpecs().every(f=>!f.defaultVariant));
 assert.equal(audit.variants,audit.variantSlides+audit.omittedDefaultDuplicates);
 assert.ok(audit.componentSlides<audit.components+audit.variantSlides);
 assert.deepEqual(audit.duplicateVisualBranches,[]);
-assert.ok(audit.slides<=190);
+assert.ok(audit.slides<=210);
 console.log(JSON.stringify(audit));
 """)
-        self.assertEqual(result["components"], 60)
+        self.assertEqual(result["components"], 62)
         self.assertEqual(result["standards"], 25)
 
     def test_pie_variants_are_centered_and_category_labels_do_not_duplicate_legend(self):

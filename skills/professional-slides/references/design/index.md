@@ -51,7 +51,7 @@ Use one identical component-primary swatch across tracker emphasis, structural h
 
 ### Semantic treatment registry
 
-Before authoring, record the [theme manifest](../theming/index.md#theme-manifest) and create one deck treatment ledger. For every slide or contiguous slide range, name the visual family, density, analytical-header template, tracker state, page layout, tables, callouts, sources, charts, and repeated component variants. Reuse those treatments. Create a new variant only when the meaning changes, and record the semantic reason as an explicit exception rather than tuning one slide locally.
+Before authoring, record the [theme manifest](../theming/index.md#theme-manifest) and create one deck treatment ledger. For every slide or contiguous slide range, name the visual family, density, analytical-header template, tracker state, page layout, tables, callouts, sources, charts, and repeated component variants. Reuse chrome and comparable table schemas. Select other registered variants when content or hierarchy benefits, recording the reason instead of tuning slide-local styles.
 
 The ledger owns one `tableHeader` record with `variantId`, `fillRole`, `textRole`, `ruleRole`, `rowHeightToken`, `paddingXToken`, and `paddingYToken`. Every analytical table references that record by `variantId`; no slide carries a parallel header definition.
 
@@ -59,7 +59,7 @@ The ledger owns one `tableHeader` record with `variantId`, `fillRole`, `textRole
 
 Use a separate implication or action region only when it adds a distinct conclusion, condition, owner, or action that is not already clear from the title and exhibit.
 
-Choose one registered [`insight-box`](../components/insight-box.md) variant, normally a light tonal or neutral surface, or the dotted no-fill treatment when a filled block would be too heavy. Reserve the primary surface for a decisive action or stage moment. Do not stack an implication box and a recommendation box. If deletion changes nothing, remove the region.
+Choose a content-appropriate registered [`insight-box`](../components/insight-box.md) variant, normally a light tonal or neutral surface, or the dotted no-fill treatment when a filled block would be too heavy. Reserve the primary surface for a decisive action or stage moment. Do not stack an implication box and a recommendation box. If deletion changes nothing, remove the region.
 
 ## Typography system
 
@@ -133,3 +133,9 @@ Repair the owning rule when the same defect appears more than once. Keep intenti
 ## Cross-platform fallbacks and QA
 
 PowerPoint and Google Slides may render differently. Use native editable objects where possible, then render each final platform separately. A successful export is not visual proof.
+
+## Main and secondary design audit
+
+Before production, record each slide's main exhibit and every secondary section with its component, variant, analytical job and reason for selection. Consider credible alternatives instead of accepting registry order. An absent secondary section is valid when the main exhibit is sufficient.
+
+Review these choices across the complete sequence, including nested halves and rails. Repeated insight boxes, two-metric-plus-insight rails, logo grids or chart silhouettes require a content-specific comparison reason. Change the composition where repetition obscures a different job. Preserve table schemas and recurring chrome where they aid reading. Do not add images, arrows or random variants just to meet a diversity quota. An unexplained repeated composition blocks design approval.

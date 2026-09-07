@@ -19,7 +19,7 @@ Components are reusable slide elements. Use them only when they perform a clear 
 - [Chart callouts](chart-callouts.md): evidence-linked annotations and leaders.
 - [Chart titles](#chart-titles): shared graph headings, same-size units, rules, and measured title bands.
 - [Chart legends](chart-legends.md): shared series, category, status, and actual/forecast keys.
-- [Chart groups](chart-legends.md#coordinated-chart-groups): two or three charts with shared category mapping and one legend.
+- [Chart groups](chart-legends.md#coordinated-chart-groups): two to four charts with shared category mapping and one legend.
 - [Analytical tables](../charts/heatmap-table.md): shared table headers, alignment, composition, and native translation.
 - [Table cell status and comparison indicators](comparison-indicators.md): completion spinners, traffic-light cells, heatmap cells, and their required legends.
 - [Item indicators](item-indicators.md): numbered or lettered row and category markers.
@@ -47,7 +47,7 @@ Keep the cover title very short: name the document or topic rather than placing 
 
 Use the shared `cover` component in [`runtime/registry.mjs`](../../runtime/registry.mjs) for a plain deck title and optional subtitle. It inherits the deck canvas, display and body fonts, ink and secondary-text colours, the deck-title size, and the standard body size for the subtitle. Both lines share the page's left guide; the measured block is vertically centred with `space.5` between title and subtitle.
 
-Do not add default decoration, branding, rules, dates, or footer copy. The component accepts only `title` and `subtitle`, freezes measured line breaks for both adapters, and rejects copy exceeding two lines per field instead of shrinking it. Test the cover in the golden set, not against retired decorative reference artwork.
+Do not add default decoration, branding, rules, dates, or footer copy. The plain variant accepts `title` and `subtitle`, freezes measured line breaks for both adapters, and rejects copy exceeding two lines per field instead of shrinking it. Select `half-image` with a sourced `image` when place, product or subject imagery earns half the cover. The left half retains the short title and subtitle; the right contains the prepared image without distortion. Prepare a crop matching that half if it must fill the field. Both variants are tested in the golden set.
 
 ## Section dividers
 

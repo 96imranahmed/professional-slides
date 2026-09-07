@@ -85,3 +85,13 @@ HTML renders one SVG path per country. PowerPoint renders one editable native cu
 ## Acceptance check
 
 The displayed crop matches the declared geography. Every highlighted country and marker resolves inside it. The analytical membership is explicit where a regional acronym is used. Labels remain legible without covering the location they describe. State is not conveyed by colour alone. The exact HTML and PowerPoint renders preserve the same crop, country set, marker positions, and emphasis.
+
+## Arbitrary locations
+
+`map.props.geography` may be a sourced object instead of a preset name: `{id, title, source: {url, license, sha256}, geojson, bounds?}`. `geojson` is an RFC 7946 WGS84 FeatureCollection of Polygon/MultiPolygon features with unique IDs. City, district, campus and custom-region boundaries use the same editable map renderer. Highlight feature IDs with `highlightCountries`; place markers with `longitude` and `latitude` and an explicit label.
+
+Find boundary data at the jurisdiction's official open-data portal first; use Census TIGER/Line for US administrative areas, Natural Earth for suitable regional detail, or OpenStreetMap with its attribution requirements. Match boundary vintage and geographic unit to the comparison. Record the download URL, licence and hash of the downloaded bytes. Never relabel a nearby preset as the requested location.
+
+In a source checkout, `node evals/scripts/import_geography.mjs config.json output.json` downloads and validates a GeoJSON source. Config supplies `url`, `license`, `id`, `title`, and optional `idProperty`, `nameProperty`, `bounds`. In an installed plugin, call `importGeography(bytes, config)` from `runtime/import-geography.mjs` and keep output in the task directory. Preserve original bytes beside the normalized result so provenance can be verified. Rendering never fetches network data.
+
+Reproject other coordinate systems to WGS84 and split antimeridian-crossing rings before import; the runtime rejects them rather than guessing. Preserve polygon holes and inspect coastline, labels and highlights in both observers. Use equal map scales when comparing physical extent; otherwise label independent crops. This simplified local projection does not support distance or area measurement.

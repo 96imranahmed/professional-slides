@@ -109,3 +109,9 @@ Use the registered chart runtime and its generated previews for geometry. Chart-
 ## Analytical acceptance test
 
 Reconcile the chart data and calculation before platform QA. Check the title: it states the intended pattern. Check the chart: the pattern remains visible and verifiable without the title. Chart scaffolding, metric dashboards, and default office styling fail even when technically correct. The [evaluation owner](../evaluation/index.md) and platform tools own rendered-file acceptance.
+
+## Segment-linked implications
+
+`chart.column` accepts `segments` for one measure grouped into two or three contiguous category sets. Each segment supplies `id`, `label`, `categories`, `heading` and `items` (multiple implications). Segments must partition every plotted category exactly once in plot order. The renderer retains the common scale, adds segment headings and dividers, and associates each group with a matching coloured header band above a light neutral explanation body. These are group-specific analytical sections, not repeated detached insight boxes.
+
+Use the treatment when distinct groups imply different actions or consequences. Preserve category labels and values; bar colour identifies group membership. Competing category highlights and multiple series are rejected because they would make the colour meaning ambiguous. Keep unsupported deductions out of the explanation bodies.

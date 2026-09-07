@@ -19,6 +19,8 @@ import {
   tokenValue,
   wedgePrimitive
 } from "./core.mjs";
+import { registerSegmentedEvidence } from "./segmented-evidence.mjs";
+import { registerMedia } from "./media.mjs";
 import { registerCharts } from "./charts.mjs";
 import { renderTable, measureTable, TABLE_TOKENS } from "./tables.mjs";
 import { TABLE_VARIANTS } from "./table-fixtures.mjs";
@@ -31,7 +33,7 @@ import { renderChartCallout } from "./chart-annotations.mjs";
 import { PAGE_RULES, PAGE_BRANDING, PAGE_TEMPLATE_TOKENS, pageTemplateLayout, renderPageTemplate, resolvePageTemplate } from "./page-template.mjs";
 import { TRACKER_TOKENS, registerTrackers, trackerLabelNodes } from "./trackers.mjs";
 import { registerQuoteCluster } from "./quote-cluster.mjs";
-import { MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
+import { CUSTOM_MAP_SAMPLE, MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
 import { registerInsightTreeTable } from "./insight-tree-table.mjs";
 
 const FONT = token("font.body");
@@ -780,6 +782,7 @@ function registerCore(registry) {
       const render = definition.render;
       definition.render = input => { definition.resolveVariant(input.props); return render(input); };
       definition.examples = {
+        "imported-geometry": { props: { geography: CUSTOM_MAP_SAMPLE, highlightCountries: ["DEU"], markers: [{longitude:13.4,latitude:52.5,label:"Berlin",size:14}] } },
         "world-country-highlight": { props: { geography: "world", markers: [], highlightCountries: ["USA", "DEU", "CHN"] } },
         "country-marker-anchor": { props: { geography: "europe", markers: [{ country: "GBR", label: "United Kingdom", fraction: 1 }] } }
       };
@@ -864,7 +867,7 @@ function registerCore(registry) {
 }
 
 export function createRegistry() {
-  return registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map()))))));
+  return registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map()))))))));
 }
 
 export const REGISTRY = createRegistry();
