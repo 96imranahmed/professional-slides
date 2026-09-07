@@ -7,6 +7,7 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_ROOTS = {'skills', 'evals'}
+ASSET_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.svg'}
 ALLOWED_FILES = {'.codex-plugin/plugin.json', 'README.md', 'package.json'}
 EXTENSIONS = {'.md', '.mjs', '.py', '.json', '.toml', '.yaml', '.yml', '.svg'}
 EXCLUDED = {'output', 'tmp', 'deliverables', 'renders', 'node_modules', '__pycache__', '.git'}
@@ -27,7 +28,11 @@ def package(source: Path, destination: Path):
         rel = p.relative_to(source)
         if p.is_relative_to(destination) or any(x in EXCLUDED for x in rel.parts):
             continue
-        if not (rel.as_posix() in ALLOWED_FILES or (rel.parts[0] in ALLOWED_ROOTS and (p.suffix in EXTENSIONS or (rel.parts[:3] == ('skills', 'professional-slides', 'assets') and (p.suffix == '.png' or p.name == 'LICENSE'))))):
+        if not (rel.as_posix() in ALLOWED_FILES
+                or (rel.parts[0] in ALLOWED_ROOTS and p.suffix in EXTENSIONS)
+                or (rel.parts[:3] == ('skills', 'professional-slides', 'assets')
+                    and (p.suffix == '.png' or p.name == 'LICENSE'))
+                or (rel.parts[0] == 'assets' and p.suffix in ASSET_EXTENSIONS)):
             continue
         if p.is_symlink():
             raise ValueError(f'Symlinks must not enter the distributable: {rel}')
