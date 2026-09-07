@@ -16,6 +16,8 @@ Apply this check during dot-dash planning and again to every exact rendered slid
 
 For a simple directly labelled two-value bar comparison, a derived catch-up requirement or decision implication belongs in the insight section, potentially as a second supporting bullet. Do not attach it to a bar as if it were the plotted quantity. Chart annotations must need a specific visual anchor to explain that mark, event or interval; preserve warranted growth/change highlights. Assess insight reasoning as a whole: a calculated supporting premise may support a deduction without being a standalone insight itself.
 
+The mandatory semantic copy query is implemented by `runtime/copy-check.mjs` and invoked through `evals/scripts/check_slide_copy.mjs` before visual acceptance. It inventories emitted prose by exact object ID, reviews full slide context, and fails on missing coverage, changed copy or evidence, unsupported claims, redundant headings, generic instructions and misplaced methodology. The visual CLI runs this gate automatically and rechecks its bound report on cached acceptance. See [copy usefulness gate](references/components/copy.md#mandatory-contextual-copy-query).
+
 ## Structural requirements
 
 Every rendered object must carry a semantic ID, role, owner and exact dependency IDs through the scene and PowerPoint `cNvPr` description. The compiler and exported-file provenance gate reject missing tags or dependencies. Detached analytical prose must use an `insight` component or a deliberately headed content section; a generic paragraph under an exhibit is invalid. Pair standalone section headings and bodies with `props.semantic: {kind: "section-member", relatedTo: ["exact-peer-id"]}`. Never create a fake heading or tag to bypass grouping.

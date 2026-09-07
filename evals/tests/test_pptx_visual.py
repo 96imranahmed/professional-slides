@@ -4,6 +4,8 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 from pathlib import Path
 
 from evals.tests.test_pptx_validator import build_pptx
@@ -99,6 +101,15 @@ class PptxVisualTests(unittest.TestCase):
         self.assertFalse(validator.validate_exported_baseline_order(nodes, ['ps:bar', 'ps:axis']))
         errors = validator.validate_exported_baseline_order(nodes, ['ps:axis', 'ps:bar'])
         self.assertTrue(any('BASELINE_LAYERING' in error for error in errors))
+
+    def test_visual_entrypoint_requires_successful_copy_query(self):
+        with patch.object(validator.subprocess, 'run', return_value=SimpleNamespace(returncode=1,stdout='COPY_USEFULNESS: remove filler',stderr='')) as run:
+            with self.assertRaisesRegex(RuntimeError, 'Mandatory copy usefulness gate rejected'):
+                validator.run_required_copy_check(Path('deck.pptx'),Path('scene.json'),Path('contract.json'),Path('copy.json'))
+            self.assertIn('check_slide_copy.mjs', run.call_args.args[0][1])
+        with patch.object(validator.subprocess, 'run', return_value=SimpleNamespace(returncode=0,stdout='',stderr='')) as run:
+            validator.run_required_copy_check(Path('deck.pptx'),Path('scene.json'),Path('contract.json'),Path('copy.json'),check=True)
+            self.assertIn('--check',run.call_args.args[0])
 
     def test_every_slide_must_be_enumerated_exactly_once(self):
         value = judgement()

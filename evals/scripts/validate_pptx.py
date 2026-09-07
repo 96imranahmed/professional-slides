@@ -2904,10 +2904,27 @@ def run_visual_model_judge(
     return build_visual_report(judgement, pptx, renders, contract, theme_manifest, treatment_ledger, generation_script, model)
 
 
+def run_required_copy_check(pptx: Path, scene: Path, contract: Path, report: Path, check: bool = False, render_dir: Path | None = None) -> None:
+    bundled = Path.home() / ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node"
+    node = os.environ.get("RUNTIME_NODE") or (str(bundled) if bundled.is_file() else shutil.which("node"))
+    if not node:
+        raise RuntimeError("Copy usefulness gate requires Node.js")
+    command = [node, str(ROOT / "evals/scripts/check_slide_copy.mjs"),
+               "--pptx", str(pptx.resolve()), "--scene", str(scene.resolve()),
+               "--contract", str(contract.resolve()), "--report", str(report.resolve()),
+               "--render-dir", str((render_dir or scene.parent / "renders").resolve())]
+    if check:
+        command.append("--check")
+    completed = subprocess.run(command, text=True, capture_output=True, timeout=5400, check=False)
+    if completed.returncode:
+        raise RuntimeError("Mandatory copy usefulness gate rejected: " + (completed.stdout + completed.stderr)[-12000:])
+
+
 def visual_cli() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pptx", type=Path)
     parser.add_argument("--render-dir", type=Path, required=True)
+    parser.add_argument("--scene", type=Path, help="Emitted scene; defaults to scene.json beside the contract")
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--theme-manifest", type=Path, required=True)
     parser.add_argument("--treatment-ledger", type=Path, required=True)
@@ -2920,8 +2937,13 @@ def visual_cli() -> int:
     try:
         count = visual_pptx_slide_count(args.pptx)
         renders = visual_rendered_slides(args.render_dir, count)
+        scene = args.scene or args.contract.parent / "scene.json"
         if args.check_report:
             report = json.loads(args.check_report.read_text(encoding="utf-8"))
+            copy_path = report.get("copyReviewPath")
+            if not copy_path:
+                raise RuntimeError("Visual report has no mandatory copy usefulness review")
+            run_required_copy_check(args.pptx, scene, args.contract, Path(copy_path), check=True, render_dir=args.render_dir)
             errors = validate_visual_cached_report(
                 report, args.pptx, renders, args.contract, args.theme_manifest,
                 args.treatment_ledger, args.generation_script, args.model,
@@ -2930,12 +2952,18 @@ def visual_cli() -> int:
                 print("\n".join(f"ERROR: {error}" for error in errors), file=sys.stderr)
                 return 1
         else:
+            copy_path = args.report.with_suffix(".copy.json")
+            run_required_copy_check(args.pptx, scene, args.contract, copy_path, render_dir=args.render_dir)
             report = run_visual_model_judge(
                 args.pptx, renders, args.contract, args.theme_manifest,
                 args.treatment_ledger, args.generation_script, args.model, args.timeout_seconds,
             )
+            report["copyReviewPath"] = str(copy_path.resolve())
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
+        if not args.check_report:
+            args.report.parent.mkdir(parents=True, exist_ok=True)
+            args.report.write_text(json.dumps({"accepted": False, "error": str(exc)}), encoding="utf-8")
         return 2
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")

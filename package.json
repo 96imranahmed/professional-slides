@@ -13,7 +13,8 @@
     "golden:check": "node evals/scripts/generate_golden_set.mjs --check",
     "validate:components": "node evals/scripts/validate_component_runtime.mjs",
     "import:maps": "node evals/scripts/import_natural_earth_maps.mjs",
-    "package:plugin": "python3 evals/scripts/package_plugin.py"
+    "package:plugin": "python3 evals/scripts/package_plugin.py",
+    "validate:copy": "node evals/scripts/check_slide_copy.mjs"
   },
   "peerDependencies": {
     "@napi-rs/canvas": "0.1.100",
