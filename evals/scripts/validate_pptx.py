@@ -2414,7 +2414,23 @@ VISUAL_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
                                       'recommendedChange': {'type': 'string', 'minLength': 1}}}}}
 VISUAL_ALLOWED_MODELS = ("gpt-5.6-luna", "gpt-5.6-terra")
 VISUAL_DEFAULT_MODEL = "gpt-5.6-terra"
-VISUAL_RUBRIC_VERSION = "7"
+# Criticality coverage and decisions are mandatory, not score modifiers.
+VISUAL_SCHEMA['$defs']['copyAudit']['required'].append('criticality')
+VISUAL_SCHEMA['$defs']['copyAudit']['properties']['criticality'] = {
+    'type': 'object', 'additionalProperties': False,
+    'required': ['itemCount', 'items'],
+    'properties': {
+        'itemCount': {'type': 'integer', 'minimum': 0},
+        'items': {'type': 'array', 'items': {
+            'type': 'object', 'additionalProperties': False,
+            'required': ['text', 'role', 'deletionConsequence', 'passes'],
+            'properties': {
+                'text': {'type': 'string', 'minLength': 1},
+                'role': {'type': 'string', 'minLength': 1},
+                'deletionConsequence': {'type': 'string', 'minLength': 1},
+                'passes': {'type': 'boolean'}}}}}}
+
+VISUAL_RUBRIC_VERSION = "8"
 VISUAL_MINIMUM_SCORE = 90
 VISUAL_SCORE_NAMES = (
     "compositionCompleteness",
@@ -2557,6 +2573,8 @@ Hard chart-position gate: inspect the generation script and evidence as well as 
 
 Hard semantic copy gate: never accept a recap of content already shown on the same slide, especially graph or table narration, in ANY paragraph, bullet, caption or box. Necessary chart labels, units, legends and compact comparison annotations decode the exhibit; they are not redundant prose. An insight must add a supported new deduction beyond the visible evidence AND title. A numerical restatement, new calculation alone, summary, or methodology note is not insight. Adding 'therefore', moving prose into bullets, or enclosing it does not fix it. Do not demand a box if no defensible deduction exists.
 
+Mandatory criticality gate: inspect EVERY visible title, internal heading and annotation. In copyAudit.criticality report itemCount and one item per inspected element with exact text, role, deletionConsequence and passes. Count from the rendered slide; do not omit redundant elements. Removing an element must lose necessary argument, scope, interpretation, decision or navigation to pass. Accurate paraphrases of the body still fail. Any failure requires a major TITLE_CRITICALITY or ANNOTATION_CRITICALITY finding and rejection. For simple directly labelled two-bar charts, put derived catch-up requirements in the insight as supporting evidence, not a leader attached to a bar representing a different quantity. Assess the whole insight argument, including its supporting premises.
+
 For EVERY slide, return copyAudit with noRecap (boolean), recapEvidence (specific explanation of the inspected supporting copy, quoting any recap), insightCount (number of visible insight surfaces or claimed insight statements), and insights (one record per insight). Each record must quote the exact insight text, identify its on-slide premises, state what new deduction it adds, and classify it as supported_deduction, recap, or unsupported. Use an empty insights array only when there are no insights; still inspect other supporting copy. Reject any recap or non-deductive insight as a major COPY_RECAP or INSIGHT_NOT_DEDUCTION finding and reject the slide/deck. Missing copyAudit, incomplete insight coverage, or a failed copy decision blocks acceptance regardless of scores. Judge meaning, not shared-word counts; do not invent reasoning absent from the actual statement or premises.
 
 Score every slide and the deck from 0 to 100 on exactly these dimensions:
@@ -2634,6 +2652,18 @@ def validate_visual_copy_audit(value: Any, label: str) -> list[str]:
         errors.append(f"{label}.noRecap must be a boolean")
     if not non_empty_string(value.get("recapEvidence")):
         errors.append(f"{label}.recapEvidence must explain the inspected copy")
+    criticality = value.get("criticality")
+    if not isinstance(criticality, dict):
+        errors.append(f"{label}.criticality is required")
+    else:
+        items = criticality.get("items")
+        count = criticality.get("itemCount")
+        if type(count) is not int or count < 0 or not isinstance(items, list) or count != len(items):
+            errors.append(f"{label}.criticality must cover every title, heading and annotation")
+        if isinstance(items, list):
+            for item in items:
+                if not isinstance(item, dict) or any(not non_empty_string(item.get(k)) for k in ("text", "role", "deletionConsequence")) or type(item.get("passes")) is not bool:
+                    errors.append(f"{label}.criticality item must include text, role, deletion consequence and decision")
     count, insights = value.get("insightCount"), value.get("insights")
     if type(count) is not int or count < 0:
         errors.append(f"{label}.insightCount must be a nonnegative integer")
@@ -2657,6 +2687,7 @@ def validate_visual_copy_audit(value: Any, label: str) -> list[str]:
 def visual_copy_audit_passes(value: Any) -> bool:
     return (not validate_visual_copy_audit(value, "copyAudit")
             and value["noRecap"] is True
+            and all(item["passes"] for item in value["criticality"]["items"])
             and all(item["classification"] == "supported_deduction" for item in value["insights"]))
 
 

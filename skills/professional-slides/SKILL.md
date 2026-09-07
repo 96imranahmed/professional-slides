@@ -7,6 +7,15 @@ description: Create or revise presentations, slide decks, PowerPoint files, or G
 
 The singular design goal is to avoid slide noise. Noise comes from inconsistent standards, dangling labels or commentary, weak grouping, and poorly constructed text, not from text density itself. Dense slides are welcome when the evidence needs them and the writing, hierarchy, spacing and recurring treatments remain clear and consistent. Preserve substance; do not chase empty space or shorten complete reasoning into abrupt fragments. Use only the guidance needed for this task.
 
+
+## Criticality is a hard acceptance gate
+
+Every title, internal heading, annotation and supporting section MUST pass the deletion test: identify the specific argument, scope, evidence interpretation, decision or navigation that becomes materially weaker or ambiguous if it is removed. Accuracy alone is insufficient. A heading that paraphrases its body, generic label, repeated conclusion or decorative annotation fails. Remove it; do not invent a replacement heading to satisfy a component slot. Necessary measure, unit, period and comparison labels remain.
+
+Apply this check during dot-dash planning and again to every exact rendered slide. Record the exact text, role, deletion consequence and pass/fail for each title, heading and annotation. Missing coverage or any failed item blocks acceptance regardless of aggregate scores or other passing tests. Use TITLE_CRITICALITY for redundant titles/headings and ANNOTATION_CRITICALITY for unnecessary chart callouts.
+
+For a simple directly labelled two-value bar comparison, a derived catch-up requirement or decision implication belongs in the insight section, potentially as a second supporting bullet. Do not attach it to a bar as if it were the plotted quantity. Chart annotations must need a specific visual anchor to explain that mark, event or interval; preserve warranted growth/change highlights. Assess insight reasoning as a whole: a calculated supporting premise may support a deduction without being a standalone insight itself.
+
 ## Structural requirements
 
 Every rendered object must carry a semantic ID, role, owner and exact dependency IDs through the scene and PowerPoint `cNvPr` description. The compiler and exported-file provenance gate reject missing tags or dependencies. Detached analytical prose must use an `insight` component or a deliberately headed content section; a generic paragraph under an exhibit is invalid. Pair standalone section headings and bodies with `props.semantic: {kind: "section-member", relatedTo: ["exact-peer-id"]}`. Never create a fake heading or tag to bypass grouping.

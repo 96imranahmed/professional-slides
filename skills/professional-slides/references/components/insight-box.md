@@ -43,3 +43,7 @@ Apply the opening cardinality and synthesis rules. Use one registered fill or th
 
 
 Measurement bases, scope qualifiers and scenario assumptions use `evidence-note`, which reuses the canonical neutral surface and typography with distinct semantic roles. Supply heading, text and `semantic: {kind: "evidence-note", relatedTo: [exhibitId]}`. The referenced exhibit must exist. A generic headed paragraph does not provide containment and fails on an analytical page. Deductions continue to use insight.
+
+## Mandatory criticality
+
+Apply the hard [criticality gate](../design/index.md#criticality-is-a-hard-acceptance-gate). Omit optional headings that paraphrase the body. Derived comparison requirements can support the insight as a second point; do not move them to a chart callout merely to avoid the insight test.

@@ -139,3 +139,11 @@ PowerPoint and Google Slides may render differently. Use native editable objects
 Before production, record each slide's main exhibit and every secondary section with its component, variant, analytical job and reason for selection. Consider credible alternatives instead of accepting registry order. An absent secondary section is valid when the main exhibit is sufficient.
 
 Review these choices across the complete sequence, including nested halves and rails. Repeated insight boxes, two-metric-plus-insight rails, logo grids or chart silhouettes require a content-specific comparison reason. Change the composition where repetition obscures a different job. Preserve table schemas and recurring chrome where they aid reading. Do not add images, arrows or random variants just to meet a diversity quota. An unexplained repeated composition blocks design approval.
+
+## Criticality is a hard acceptance gate
+
+Every title, internal heading, annotation and supporting section MUST pass the deletion test: identify the specific argument, scope, evidence interpretation, decision or navigation that becomes materially weaker or ambiguous if it is removed. Accuracy alone is insufficient. A heading that paraphrases its body, generic label, repeated conclusion or decorative annotation fails. Remove it; do not invent a replacement heading to satisfy a component slot. Necessary measure, unit, period and comparison labels remain.
+
+Apply this check during dot-dash planning and again to every exact rendered slide. Record the exact text, role, deletion consequence and pass/fail for each title, heading and annotation. Missing coverage or any failed item blocks acceptance regardless of aggregate scores or other passing tests. Use TITLE_CRITICALITY for redundant titles/headings and ANNOTATION_CRITICALITY for unnecessary chart callouts.
+
+For a simple directly labelled two-value bar comparison, a derived catch-up requirement or decision implication belongs in the insight section, potentially as a second supporting bullet. Do not attach it to a bar as if it were the plotted quantity. Chart annotations must need a specific visual anchor to explain that mark, event or interval; preserve warranted growth/change highlights. Assess insight reasoning as a whole: a calculated supporting premise may support a deduction without being a standalone insight itself.
