@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "commercial-due-diligence",
+      "file": "commercial-due-diligence.md",
+      "status": "stable",
+      "primaryDecision": "Whether and under what conditions to proceed with an acquisition, investment, sale, or financing after testing the commercial case.",
+      "audiences": ["buyer", "seller", "investor", "lender"],
+      "aliases": ["commercial dd", "cdd", "acquisition diligence"]
+    },
+    {
+      "id": "project-progress-update",
+      "file": "project-progress-update.md",
+      "status": "stable",
+      "primaryDecision": "Whether a major programme remains on track and which intervention, escalation, or sponsor decision is required.",
+      "audiences": ["sponsor", "steering committee", "board", "public authority"],
+      "aliases": ["programme update", "project status", "steerco update"]
+    },
+    {
+      "id": "startup-pitch-deck",
+      "file": "startup-pitch-deck.md",
+      "status": "stable",
+      "primaryDecision": "Whether an investor should fund a startup and engage in the next stage of the investment process.",
+      "audiences": ["venture investor", "angel investor", "investment committee"],
+      "aliases": ["investor pitch", "fundraising deck", "venture pitch"]
+    }
+  ]
+}
