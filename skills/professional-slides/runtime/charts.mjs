@@ -1144,7 +1144,7 @@ export function registerCharts(registry) {
     ];
     registry.set(chart.id, {
       id: chart.id,
-      version: "2.3.0",
+      version: "2.4.0",
       category: "chart",
       role: "chart",
       tokens: [...new Set([...tokens, ...registry.get("chart-title").tokens])].sort(),
@@ -1159,7 +1159,10 @@ export function registerCharts(registry) {
       // Samples belong exclusively to fixtures. Never inject example annotations,
       // targets or data into a production chart with partially supplied props.
       render: ({ id, frame, props = {}, tokens }) => {
-        if (!props.heading) return { nodes: chart.render({ id, frame, tokens, props }) };
+        if (!String(props.heading ?? "").trim()) {
+          if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
+          return { nodes: chart.render({ id, frame, tokens, props }) };
+        }
         const title = registry.get("chart-title"), titleProps = { heading: props.heading, unit: props.unit, variant: props.titleVariant };
         const height = title.measureContent({ frame, props: titleProps }).height;
         return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...chart.render({ id, frame: { ...frame, y: frame.y + height, height: frame.height - height }, tokens, props })] };

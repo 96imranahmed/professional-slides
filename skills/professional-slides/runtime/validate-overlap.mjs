@@ -60,7 +60,7 @@ export async function auditSlideOverlaps(page, slide) {
       if (a.type === "text" && b.type === "text") return null;
       // A legitimate text backing must precede its text in the native paint
       // order. Otherwise it hides that text, even if an HTML preview looks fine.
-      for (const [text, shape] of [[a, b], [b, a]]) if (text.type === "text" && shape.type !== "text" && shape.type !== "line" && value(shape.style.fill) !== "none" && shape.data.paintOrder > text.data.paintOrder) return null;
+      for (const [text, shape] of [[a, b], [b, a]]) if (text.type === "text" && shape.type !== "text" && shape.type !== "line" && value(shape.style.fill) !== "none" && (shape.data.paintOrder ?? entries.indexOf(shape)) > (text.data.paintOrder ?? entries.indexOf(text))) return null;
       for (const [surface, child] of [[a, b], [b, a]]) {
         const related = own(surface, child) || descendant(surface, child);
         if (policy.surfaces.includes(surface.role) && related && inside(surface.frame, child.frame)) return `contained by ${surface.role}`;

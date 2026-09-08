@@ -16,6 +16,16 @@ Write one sentence:
 
 Then define the main question and governing answer. If the answer is not yet supported, write it as a hypothesis.
 
+Resolve the decision stage as well as the topic: diagnose the situation, select options for detailed design, or authorize a defined action. An options diagnostic can conclude which levers merit design without implying that implementation, savings, funding, or staffing changes are approved. Carry that stage into the summary and close. A conditional option should retain its specific enabling condition; it does not need a generic approval disclaimer on every page.
+
+## Organize the evidence before writing titles
+
+Use the existing source ledger and storyboard, not a second reporting framework. For every material fact, retain its source location, population or business boundary, measure, unit, period, reported precision, and evidence state: observed, source-modeled, supplied assumption, or analyst-derived. For a calculation, retain its inputs and formula. For a qualitative fact, retain the actual mechanism, condition or named example rather than reducing it to a generic topic.
+
+Read across the full input before selecting a thesis. Distinguish comparable observations from adjacent facts: an annual benefit and implementation duration describe different dimensions; cash expenditure and after-tax earnings have different bases; national net employment and regional gross job flows answer different questions. Preserve source totals and independently rounded inputs without silently forcing reconciliation. Use the [chart owner's precision rules](../charts/index.md#reported-precision-and-scenario-consistency).
+
+List the decisive unanswered questions and contradictions alongside the evidence they qualify. A conflict that could change the answer belongs in the relevant decision test, not in a generic limitations appendix. State the narrow conclusion the inputs support while the conflict remains unresolved. A source's illustrative arrangement does not establish that it will preserve today's economics, and a no-change valuation does not value a proposed restructuring.
+
 ## Build the problem logic
 
 For decisions under uncertainty, use the [hypothesis tree](hypothesis-tree.md) to split the main question into distinct tests. Explain why each branch matters and how the branches combine into the decision.
@@ -23,6 +33,10 @@ For decisions under uncertainty, use the [hypothesis tree](hypothesis-tree.md) t
 For explanatory or instructional work, map the concepts and dependencies the audience must understand. Distinguish established mechanisms, illustrative assumptions, and unresolved questions rather than inventing provisional hypotheses for settled teaching material. Explain how the parts answer the communication question and what prerequisite understanding each page supplies.
 
 Prioritize branches that could change the conclusion. Retain every other material branch with an explicit disposition such as appendix, parked, or unresolved.
+
+Keep the branch structure distinct from the source's document structure. Several source pages can jointly answer one question; one dense source page can contain several distinct tests. Sequence diagnosis before option selection and detailed authorization, and distinguish independent decisions from cross-cutting constraints. Valuation, tax, execution risk or legal authority can constrain several branches without becoming a competing strategic option.
+
+Allocate each core evidence group to the smallest useful set of pages. Keep short options with comparable fields in one portfolio; separate an option only when its own evidence needs a developed test. Keep a decision-changing countercase in the main story. Place reference schedules, historical detail and alternative assumptions in the appendix when they support the answer but do not advance the main argument. Track these dispositions so condensation cannot silently remove a material option, caveat or condition.
 
 ## Prove the governing answer
 
@@ -83,6 +97,8 @@ Do not create a tracker item without a matching dot-dash group. Do not rename or
 Read the titles alone. A decision deck should form a clear executive memo; an explanatory deck should form a coherent account of the subject. Analytical titles state supported conclusions or actions. Explanatory headings may name the mechanism or distinction when a takeaway would overstate the page.
 
 Remove repeated claims, empty topic labels, and unsupported certainty.
+
+Draft the title after the page's proof is explicit. Test the exact verbs: evidence of exposure supports `is exposed`, a sensitivity supports `could`, and an established approval supports `will proceed`. A modeled upper bound is not a prediction. Keep a title's condition attached to its conclusion when omitting it changes the meaning; carry supporting magnitudes into the exhibit rather than loading every number into the title.
 
 ## Validate the handoff
 

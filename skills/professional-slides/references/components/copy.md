@@ -14,8 +14,8 @@ An executive pre-read must explain the case without narration. Apply this sequen
 
 1. Develop two to four substantive themes in stacked, full-width sections. Each theme has a titled conclusion and multiple distinct bullets that collectively cover evidence plus an implication, risk, or condition. Two or three bullets is the normal structure; if a theme supports only one distinct statement, merge it with another theme rather than padding it. Splitting sentences or adding data rehash does not create completeness.
 2. Use the [composition owner](../composition/index.md) for layout and the [pre-authoring contract](../storylining/pre-authoring-contract.md) for serialization. A paragraph narrative or table requires explicit user or reference authority; separate `Evidence` and `Consequence` cells do not replace connected reasoning.
-3. Close with one recommendation and change condition in an untitled [shared insight box](insight-box.md).
-4. Review the summary alone: can the reader explain the recommendation, supporting case, strongest counterargument and change condition? Missing reasoning fails even when the bullet count and layout pass.
+3. Close with one supported recommendation and change condition in an untitled [shared insight box](insight-box.md). Match the current decision stage using [decision-close guidance](#decision-close). An explanatory brief closes with the supported consequence or application and its limits, without inventing an approval request.
+4. Review the summary alone: can the reader explain the governing answer, supporting case, strongest counterargument and condition? For a decision brief, the recommendation must follow from that case. Missing reasoning fails even when the bullet count and layout pass.
 
 Outside the executive-summary structure above, choose copy length for decision completeness rather than a universal minimum. When the supplied reference or pre-read brief needs more developed reasoning, declare a slide-specific copy-budget override with its rationale before authoring, and carry it into hard acceptance. Keep the deck's body-size tokens; do not shrink text or raise every slide's limit. Numerical rehash and methodology remain subject to the speaker-notes test below.
 
@@ -28,6 +28,27 @@ Concise does not mean telegraphic. Insight and recommendation copy uses natural,
 Keep neighboring bullets parallel in both meaning and grammar. Preserve only the connective words needed to avoid ambiguity. Prefer `Make accelerated training easier to adopt` over `Simplify accelerated training` when adoption is the claim.
 
 Do not expose planning language such as `Slide job`, `Exhibit logic`, `So what`, `Hypothesis`, or `Decision relevance` unless the deck is teaching that method.
+
+Keep source-packet and evaluation language out of audience copy. An absent causal effect size does not erase a supported observation or a conditional operating implication. Name the observed problem and supported consequence, and qualify only the inference that remains uncertain. Use `The savings estimate excludes implementation cost` when that changes interpretation; do not repeat that the evidence packet lacks unspecified information.
+
+Separate a value's measurement period from implementation timing. For example, `$8–12M annually; 18–24 months to implement` preserves two different facts. `$8–12M annual potential over 18–24 months` can imply a cumulative value. Keep annual, one-off, gross, net, investment, and nonfinancial capacity outcomes explicit, and do not sum overlapping option estimates into a portfolio forecast.
+
+## Write evidence, interpretation and action once
+
+Assign every proposed statement a job before placing it. These are authoring distinctions, not extra visible labels:
+
+| Information job | What to write | Where it belongs |
+| --- | --- | --- |
+| Evidence | A necessary sourced fact, value, observation, example or client requirement, with its material scope | The primary exhibit, or a grouped additional evidence section |
+| Interpretation | A supported consequence, dependency, trade-off or constraint that goes beyond those premises | A title, an anchored analytical annotation, or one optional insight; do not repeat the same conclusion in all three |
+| Action | What the audience should decide or do, why the evidence supports it, and the condition or authority that limits it | The appropriate decision page or close |
+| Qualification | The minimum wording needed to decode a measure or avoid an overclaim | Beside the affected value or claim; full derivations and incidental source detail go in notes |
+
+Write the exhibit first, then the title and any remaining interpretation. Read the whole page in order and remove duplicate propositions, including repeated tails on otherwise useful bullets. A new source fact need not contain a deduction to be worth showing. Conversely, adding `therefore` to a fact does not make it an insight. A source requirement earns space when the audience needs it, even if it is qualitative.
+
+For an option row, preserve the action or mechanism, outcome with its basis, timing, and specific enabling condition. For example, `Consolidate supplier contracts; $6–9M annual potential; 12–18 months to implement; subject to service-level testing` is a complete comparison record. It does not authorize implementation or establish a net benefit after transition costs. Use short parallel fields for lookup and connected sentences for reasoning; do not repeat those fields in a second prose section.
+
+Map every source-dependent statement to the actual source pages it uses, including summary statements combining several pages. The final copy review can assess only the evidence it receives. A missing source mapping is repaired by supplying the correct hash-bound evidence and rerunning review, not by weakening the grounding requirement.
 
 ## Analytical substance
 
@@ -63,7 +84,13 @@ This is a release-blocking semantic copy check, not a style preference or a word
 
 ## Decision close
 
-For an executive pre-read, synthesize the current recommendation, decisive evidence, strongest counterargument, and change conditions. Apply [analytical substance](#analytical-substance) to those conditions. Name the relevant review event or accountable owner when known, and leave missing inputs explicit. Synthesize previously developed thresholds rather than copying their inventory into cards. Follow [deck rhythm](../design/index.md#deck-rhythm) when allocating space.
+Match the close to the communication job and stage established at intake:
+
+- **Diagnosis or option selection:** state the finding and which options merit the next defined test or design step, with the evidence and enabling conditions. Do not convert potential savings into an approved target or uncosted ideas into implementation commitments.
+- **Authorization:** recommend the supported choice, its scope, resources and known owner, including the strongest countercase and the condition that changes the decision. Keep independent approvals distinct.
+- **Explanation:** synthesize what the audience can now understand or apply, and the material limits. Do not invent a recommendation merely to populate the close component.
+
+For an executive pre-read, develop the decisive evidence and change conditions enough to stand without narration. Apply [analytical substance](#analytical-substance) to those conditions. Name the relevant review event or accountable owner when known, and leave missing inputs explicit. Synthesize previously developed thresholds rather than copying their inventory into cards. Follow [deck rhythm](../design/index.md#deck-rhythm) when allocating space.
 
 Separate what the audience must decide now from later approvals or management deliverables. Use concise trigger language for conditions already proved in the body. Reject a close that stacks an approval list, paragraph-heavy action table, repeated risk inventory, and restated takeaway; combine duplicate commitments and move supporting detail back to its analytical page. Keep the authority boundary and decisive caveat visible, and show unknown owners only where that gap prevents the next action.
 
@@ -123,13 +150,13 @@ A parent heading must add information beyond its children. When named proof bran
 Default to compact display: `k`, `m`, or `bn`, usually one decimal. Use a shared magnitude and precision across peer charts, tables, metrics and annotations: `8.3m` beside `0.8m`, not mixed `8,300,000` and `800k`. Preserve exact underlying values for calculations. Retain full precision only when the decision requires it. Never round before calculating growth; avoid rounding a material nonzero value to zero.
 
 
-Executive summaries must be dense enough to carry the argument without narration: use substantive theme headings, developed evidence, relevant magnitudes, implications and the countercase. Do not expose chapter numbers or phrases such as “Chapter 1”; planning metadata owns the theme-to-body mapping, which may consolidate related sections. The bottom band states an actual recommendation or conditional choice, not “compare options,” “shortlist both,” a research checklist or a restatement of the problem. Preserve scope limits while still making a useful recommendation. Honor explicitly requested higher summary density by allocating space and a justified copy budget, never shrinking local text.
+Executive summaries must be dense enough to carry the argument without narration: use substantive theme headings, developed evidence, relevant magnitudes, implications and the countercase. Do not expose chapter numbers or phrases such as “Chapter 1”; planning metadata owns the theme-to-body mapping, which may consolidate related sections. Follow the [decision close](#decision-close) for the bottom band. A selection-stage recommendation names the supported options and why they merit design; generic instructions such as “compare options” add no decision. Honor explicitly requested higher summary density by allocating space and a justified copy budget, never shrinking local text.
 
 ## Mandatory contextual copy query
 
 Run the shared `runtime/copy-check.mjs` contract via `evals/scripts/check_slide_copy.mjs` on the emitted scene, approved contract and exact PPTX before visual acceptance. The visual validator invokes it automatically; missing or failed queries block delivery. Trackers, internal headings, insight bodies and evidence-note bodies use the same owner. Do not put network calls inside synchronous component renderers.
 
-The reviewer receives each exact rendered slide image together with all slide text, layout roles, evidence, notes and the deck question. It states what the reader already learns visually, then identifies the unique, relevant, supported contribution of each target. Useful information can still require relocation when its prominence exceeds its decision value. For each emitted target ID it must identify added information, the consequence of deletion, supporting on-slide IDs and one decision: keep, remove, move to notes or rewrite. Every target needs a result; reviewer counts are not trusted. A non-keep decision blocks acceptance. A useful clause cannot excuse a padded block. Methodology belongs in source notes unless a concise measurement qualification is needed to decode the exhibit. Preserve necessary worksheet rules while deleting redundant headers and generic instructions.
+The reviewer receives each exact rendered slide image together with all slide text, layout roles, evidence, notes and the deck question. It states what the reader already learns visually, then identifies the unique, relevant, supported contribution of each target. Useful information can still require relocation when its prominence exceeds its decision value. For each emitted target ID it must identify added information, the consequence of deletion, supporting on-slide or mapped source IDs and one decision: keep, remove, move to notes or rewrite. The [contract's `copySources`](../storylining/pre-authoring-contract.md) supplies hash-bound source excerpts when the grounding is not itself displayed. Distinguish the first presentation of necessary sourced evidence from an interpretation of that evidence; a factual observation or explicit client deliverable does not need an extra deduction to earn its place. Every target needs a result; reviewer counts are not trusted. A non-keep decision blocks acceptance. A useful clause cannot excuse a padded block. Methodology belongs in source notes unless a concise measurement qualification is needed to decode the exhibit. Preserve necessary worksheet rules while deleting redundant headers and generic instructions.
 
 Reports bind the exact PPTX, per-slide rendered images, scene, contract, checker, runner and target inventory hashes. Changes invalidate review; subset diagnostics cannot pass full-deck acceptance. Query errors, malformed JSON, missing IDs, duplicate IDs, invalid evidence references and stale results fail closed. This enforces a contextual semantic review, not a mathematical proof that prose is useful. Do not claim quality from transport or schema tests alone; exercise known rejected examples against the real reviewer.
 

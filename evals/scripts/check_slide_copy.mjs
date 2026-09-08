@@ -2,7 +2,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import {spawn} from 'node:child_process';
+import {spawn, execFileSync} from 'node:child_process';
+import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {buildCopyInventory,buildCopyPrompt,copyReviewSchema,copyHash,validateCopyReview,validateCopyReport,COPY_CHECK_VERSION} from '../../skills/professional-slides/runtime/copy-check.mjs';
 
@@ -17,13 +18,24 @@ try {
   const paths={pptx:required('--pptx'),scene:required('--scene'),contract:required('--contract'),checker:path.join(root,'skills/professional-slides/runtime/copy-check.mjs'),runner:fileURLToPath(import.meta.url)};
   async function readInputs(){return Object.fromEntries(await Promise.all(Object.entries(paths).map(async([k,p])=>[k,copyHash(await fs.readFile(p))])));}
   const scene=JSON.parse(await fs.readFile(paths.scene,'utf8')),contract=JSON.parse(await fs.readFile(paths.contract,'utf8'));
-  const inventory=buildCopyInventory(scene,contract);
+  let sourceEvidence=[];
+  if(contract.copySources!==undefined && !Array.isArray(contract.copySources))throw new Error('copySources must be an array');
+  if(contract.copySources?.length){
+    const reader=path.join(root,'evals/scripts/read_copy_sources.py');
+    const bundled=path.join(os.homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3');
+    const python=process.env.RUNTIME_PYTHON || (existsSync(bundled)?bundled:'python3');
+    const result=JSON.parse(execFileSync(python,[reader],{input:JSON.stringify({records:contract.copySources,base:path.dirname(paths.contract),slideCount:scene.slides.length}),encoding:'utf8',maxBuffer:16*1024*1024}));
+    sourceEvidence=result.sources;
+    Object.assign(paths,result.paths,{sourceReader:reader});
+  }
+  const inventory=buildCopyInventory(scene,contract,sourceEvidence);
   // Optional subset is diagnostic; its report cannot pass an all-slide check.
   const selected=get('--slides')?.split(',').map(Number);
   if(selected){if(selected.some(n=>!inventory.slides.some(s=>s.slide===n)))throw new Error('Unknown slide');inventory.slides=inventory.slides.filter(s=>selected.includes(s.slide));}
   const renderDir=required('--render-dir');
   for(const slide of inventory.slides) paths[`render${slide.slide}`]=path.join(renderDir,`slide-${slide.slide}.png`);
   const inputs=await readInputs();
+  if(sourceEvidence.some(record=>inputs[record.id]!==record.source.sha256))throw new Error('Copy source changed during extraction');
   inputs.inventory=copyHash(inventory);
   if(args.includes('--check')) {
     const report=JSON.parse(await fs.readFile(reportPath,'utf8'));
@@ -42,7 +54,7 @@ try {
       const batch={...inventory,slides:inventory.slides.slice(i,i+1)},targets=batch.slides.flatMap(s=>s.targets);
       if(!targets.length)continue;
       const schema=path.join(temp,`schema-${i}.json`),output=path.join(temp,`review-${i}.json`);
-      await fs.writeFile(schema,JSON.stringify(copyReviewSchema(targets,batch.slides.flatMap(s=>s.context.map(t=>t.id)))));
+      await fs.writeFile(schema,JSON.stringify(copyReviewSchema(targets,batch.slides.flatMap(s=>[...s.context,...s.sourceEvidence].map(t=>t.id)))));
       await new Promise((resolve,reject)=>{
         const child=spawn('codex',['exec','--model',model,'-c','model_reasoning_effort="high"','--sandbox','read-only','--ephemeral','--ignore-user-config','--ignore-rules','--skip-git-repo-check','--output-schema',schema,'--output-last-message',output,'--cd',temp,...batch.slides.flatMap(s=>['--image',paths[`render${s.slide}`]]),'-'],{stdio:['pipe','ignore','pipe']});
         let detail='';child.stderr.on('data',d=>{detail=(detail+d).slice(-3000);});

@@ -14,7 +14,7 @@ export const OVERLAP_POLICY = Object.freeze({
     "quote-avatar": "quote-avatar-label",
     "tracker-marker": "tracker-marker-label", "tracker-compact-marker": "tracker-compact-marker-label",
     "highlight-marker": "highlight-number", "matrix-point": "matrix-point-label",
-    "rollout-phase": "rollout-phase-label", "process-band": "process-label",
+    "rollout-phase": "rollout-phase-label", "process-band": "process-label", "roadmap-phase": "process-label",
     "status-marker": "status-cue", "rollout-row-marker": "rollout-row-label",
     "chart-mark": "data-label", "chart-segment": "data-label", "chart-label-surface": "data-label",
     "table-number-circle": "table-number-value", "table-section-marker": "table-section-number"

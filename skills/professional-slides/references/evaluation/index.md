@@ -106,6 +106,16 @@ Do not average defects away. One critical defect fails the deck. One major defec
 
 Self-review proves only that a deck is deliverable. It does not prove that the skill improves performance.
 
+### Comparison with a reference deck
+
+Inspect every source page and every exact candidate render at full size, then compare the complete sequences. Record source-to-candidate page mappings, including deliberate consolidations, splits and omissions. For differing aspect ratios, check both equal visible height and fit-to-width views. Use the source's visible crop when normalizing type size; a PDF media box with extra margins can conceal a legibility regression.
+
+For each substantive exhibit, identify the source's strongest analytical device and demonstrate how the candidate preserves or improves its function. Check the actual relationships: nested stages, option families, hypothesis–assessment–evidence rows, common scales, scenario bands, totals, and the distinction between current, estimated and potential results. Retaining all words and numbers does not pass when the reader must reconstruct a grouping or comparison that was visible in the source.
+
+Judge evidence, insight, copy, hierarchy, comparison effort, readable density and visual execution separately. Reject material regressions in any dimension, including tiny type inside an underused canvas, fragmented comparables, misplaced emphasis and unsupported stronger claims. A modern theme may change colours, spacing and styling; it must retain the evidence relationships and make them at least as easy to read. Do not average away a weak page or use a high similarity score as proof of equivalence. Incorrect or misleading source treatments must be corrected, with the reason recorded.
+
+Attribute each deficit to available input, authoring guidance, component capability or export behavior before changing the skill. In a blind forward test, distinguish withheld source facts from author losses, while retaining enough raw evidence to express the relationships being tested. Preserve the first plan and artifact, record every repair, and evaluate generalized changes on a fresh case before claiming first-pass improvement.
+
 For a release comparison:
 
 1. use the same brief, inputs, runtime, budget, and platform for control and treatment;

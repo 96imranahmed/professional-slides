@@ -202,6 +202,13 @@ function contentRailInsets(props = {}) {
     : 18;
 }
 
+function sectionContentInsets(frame, props = {}) {
+  const padding = normalizeInsets(props.padding ?? token("space.4"));
+  const headerFrame = insetFrame(frame, padding);
+  const header = props.heading ? headingLayout(headerFrame, { ...props, rule: props.treatment !== "muted" }).height : 0;
+  return { ...padding, top: padding.top + header };
+}
+
 function resolveChartTitleVariant(props = {}) {
   assertChartTitleCopy(props);
   if (props.unit !== undefined && (typeof props.unit !== "string" || !props.unit.trim())) throw new Error("Chart title unit must be nonempty text");
@@ -218,7 +225,8 @@ function assertChartTitleCopy(props = {}) {
     if (typeof value !== "string") continue;
     let copy = value.normalize("NFKC");
     const year = "(?:19|20)\\d{2}";
-    const period = `(?:FY\\s*${year}|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
+    const fiscalYear = `(?:${year}|\\d{2})`;
+    const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
     copy = copy.replace(new RegExp(`\\b${period}\\b(?![\\d.%])`, "gi"), "period");
     copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
     copy = copy.replace(new RegExp(`([,(]\\s*)${year}(?=\\s*(?:$|[,) ;]))`, "g"), "$1period");
@@ -344,17 +352,27 @@ function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY,
 
 function processNodes({ id, frame, props, roadmap = false, journey = false }) {
   const items = props.items;
+  if (!Array.isArray(items) || !items.length) throw new Error(`${id} requires ordered stages`);
   const nodes = [];
   const span = frame.width / items.length;
   const railY = frame.y + frame.height * (roadmap ? 0.32 : 0.48);
   nodes.push(openLine(stableId(id, "rail"), frame.x + span * 0.35, railY, frame.x + frame.width - span * 0.35, railY, "process-rail", PRIMARY, STANDARD));
   items.forEach((item, index) => {
+    if (typeof item.label !== "string" || !item.label.trim()) throw new Error(`${id} stage ${index + 1} requires a label`);
     const center = frame.x + span * (index + 0.5);
     const active = props.active === index;
     nodes.push(ellipsePrimitive({ id: stableId(id, "step-marker", index), role: "process-marker", frame: { x: center - 18, y: railY - 18, width: 36, height: 36 }, style: boxStyle(active ? PRIMARY : SURFACE, PRIMARY, STANDARD, token("radius.round")) }));
     nodes.push(textPrimitive({ id: stableId(id, "step-number", index), role: "process-number", frame: { x: center - 18, y: railY - 18, width: 36, height: 36 }, text: String(index + 1), style: textStyle(LABEL, active ? WHITE : PRIMARY, true, "center") }));
-    nodes.push(textPrimitive({ id: stableId(id, "step-label", index), role: "process-label", frame: { x: frame.x + span * index + 6, y: railY + 28, width: span - 12, height: 58 }, text: item.label || item, style: textStyle(COMPACT, INK, true, "center", "top") }));
-    if (roadmap) nodes.push(rectPrimitive({ id: stableId(id, "phase-band", index), role: "roadmap-phase", frame: { x: frame.x + span * index + 10, y: frame.y + frame.height * 0.58, width: span - 20, height: frame.height * 0.24 }, style: boxStyle(index % 2 ? MUTED_SURFACE : PRIMARY_TINT, RULE, HAIRLINE, SMALL_RADIUS) }));
+    const inset = tokenValue(token("space.2"));
+    const label = [item.label || item, item.period, item.maturity, item.detail].filter(value => value !== undefined && value !== null && value !== "").join("\n");
+    const labelWidth = span - (roadmap ? 20 + 2 * inset : 12);
+    const measured = measureText(label, labelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: true });
+    const bandTop = railY + 28;
+    const bandHeight = Math.max(frame.height * 0.24, measured.height + 2 * inset);
+    const labelTop = roadmap ? bandTop + (bandHeight - measured.height) / 2 : bandTop;
+    if (labelWidth <= 0 || (roadmap ? bandTop + bandHeight : labelTop + measured.height) > frame.y + frame.height) throw new Error(`${id} stage ${index + 1} needs more room for its complete label`);
+    if (roadmap) nodes.push(rectPrimitive({ id: stableId(id, "phase-band", index), role: "roadmap-phase", frame: { x: frame.x + span * index + 10, y: bandTop, width: span - 20, height: bandHeight }, style: boxStyle(index % 2 ? MUTED_SURFACE : PRIMARY_TINT, RULE, HAIRLINE, SMALL_RADIUS) }));
+    nodes.push(textPrimitive({ id: stableId(id, "step-label", index), role: "process-label", frame: { x: center - labelWidth / 2, y: labelTop, width: labelWidth, height: measured.height }, text: measured.text, style: { ...textStyle(COMPACT, INK, true, "center", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
     if (journey) nodes.push(textPrimitive({ id: stableId(id, "touchpoint", index), role: "journey-touchpoint", frame: { x: frame.x + span * index + 8, y: frame.y + 14, width: span - 16, height: 42 }, text: item.touchpoint || "Touchpoint", style: textStyle(LABEL, SECONDARY, false, "center") }));
   });
   return nodes;
@@ -439,21 +457,52 @@ function initiativeRolloutNodes({ id, frame, props }) {
   return nodes;
 }
 
-function waveRoadmapNodes({ id, frame, props }) {
+function waveRoadmapLayout(frame, props) {
   const items = props.items || [];
-  const span = frame.width / items.length;
-  const railY = frame.y + frame.height * 0.40;
+  if (!Array.isArray(items) || !items.length) throw new Error("Wave roadmap requires at least one stage");
+  const span = frame.width / items.length, inset = tokenValue(token("space.2"));
+  const width = span - 2 * inset, gap = tokenValue(token("space.4"));
+  const markerSize = tokenValue(token("icon.medium"));
+  const measure = (value, size, bold = false) => value ? measureText(value, width, { fontSize: tokenValue(size), bold }) : null;
+  const list = (label, values) => {
+    if (values !== undefined && !Array.isArray(values)) throw new Error(`Roadmap ${label} must be an array`);
+    return values?.length ? `${label}\n${values.map(value => `▪  ${value}`).join("\n")}` : "";
+  };
+  const cells = items.map((item, index) => ({
+    range: measure(item.range || "", COMPACT, true),
+    heading: measure(item.heading || item.label || `Wave ${index + 1}`, token("type.heading"), true),
+    activities: measure(list("Key activities", item.activities), COMPACT),
+    deliverables: measure(list("Main deliverables", item.deliverables), COMPACT)
+  }));
+  const maximum = key => Math.max(0, ...cells.map(cell => cell[key]?.height ?? 0));
+  const rangeHeight = maximum("range"), headingHeight = maximum("heading");
+  const headingTop = rangeHeight ? rangeHeight + tokenValue(token("space.3")) : 0;
+  const railY = headingTop + headingHeight + gap + markerSize / 2;
+  const activitiesTop = railY + markerSize / 2 + gap;
+  const activitiesHeight = maximum("activities"), deliverablesHeight = maximum("deliverables");
+  const deliverablesTop = activitiesTop + activitiesHeight + (activitiesHeight && deliverablesHeight ? gap : 0);
+  const height = (deliverablesHeight ? deliverablesTop + deliverablesHeight : activitiesHeight ? activitiesTop + activitiesHeight : railY + markerSize / 2) + inset;
+  return { cells, span, inset, width, markerSize, rangeHeight, headingTop, headingHeight, railY, activitiesTop, deliverablesTop, height };
+}
+
+function waveRoadmapNodes({ id, frame, props }) {
+  const layout = waveRoadmapLayout(frame, props);
+  if (layout.height > frame.height) throw new Error(`Roadmap ${id} complete activity and deliverable rows need ${layout.height.toFixed(1)}px, but only ${frame.height}px is allocated; widen, regroup or split the stages`);
+  const railY = frame.y + layout.railY;
   const nodes = [openLine(stableId(id, "rail"), frame.x, railY, frame.x + frame.width, railY, "roadmap-rail", RULE, STANDARD, { endArrow: true })];
-  items.forEach((item, index) => {
-    const x = frame.x + index * span;
-    const center = x + span / 2;
-    nodes.push(textPrimitive({ id: stableId(id, "range", index), role: "roadmap-range", frame: { x: x + 8, y: frame.y, width: span - 16, height: 28 }, text: item.range || "(Insert time range)", style: textStyle(COMPACT, SECONDARY, true, "center") }));
-    const heading = measureText(item.heading || item.label || `Wave ${index + 1}`, span - 16, { fontSize: tokenValue(token("type.heading")), bold: true });
-    if (frame.y + 42 + heading.height > railY - 20) throw new Error("Roadmap heading exceeds its band; enlarge the component or shorten the copy");
-    nodes.push(textPrimitive({ id: stableId(id, "heading", index), role: "roadmap-heading", frame: { x: x + 8, y: frame.y + 42, width: span - 16, height: heading.height }, text: heading.text, style: { ...textStyle(token("type.heading"), INK, true, "center", "top"), lineHeight: heading.lineHeight, wrap: false }, data: { textLayout: heading } }));
-    nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: "roadmap-marker", frame: { x: center - 15, y: railY - 15, width: 30, height: 30 }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }));
-    nodes.push(textPrimitive({ id: stableId(id, "activities", index), role: "roadmap-activities", frame: { x: x + 8, y: railY + 36, width: span - 16, height: 112 }, text: `Key activities\n${(item.activities || []).map((value) => `▪  ${value}`).join("\n")}`, style: textStyle(COMPACT, INK, false, "left", "top") }));
-    nodes.push(textPrimitive({ id: stableId(id, "deliverables", index), role: "roadmap-deliverables", frame: { x: x + 8, y: railY + 176, width: span - 16, height: frame.height - (railY - frame.y) - 178 }, text: `Main deliverables\n${(item.deliverables || []).map((value) => `▪  ${value}`).join("\n")}`, style: textStyle(COMPACT, INK, false, "left", "top") }));
+  layout.cells.forEach((cell, index) => {
+    const x = frame.x + index * layout.span, center = x + layout.span / 2;
+    for (const [key, y, size, color, bold, align] of [
+      ["range", layout.rangeHeight - (cell.range?.height ?? 0), COMPACT, SECONDARY, true, "center"],
+      ["heading", layout.headingTop + layout.headingHeight - cell.heading.height, token("type.heading"), INK, true, "center"],
+      ["activities", layout.activitiesTop, COMPACT, INK, false, "left"],
+      ["deliverables", layout.deliverablesTop, COMPACT, INK, false, "left"]
+    ]) {
+      const text = cell[key];
+      if (!text) continue;
+      nodes.push(textPrimitive({ id: stableId(id, key, index), role: `roadmap-${key}`, frame: { x: x + layout.inset, y: frame.y + y, width: layout.width, height: text.height }, text: text.text, style: { ...textStyle(size, color, bold, align, "top"), lineHeight: text.lineHeight, wrap: false }, data: { textLayout: text } }));
+    }
+    nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: "roadmap-marker", frame: { x: center - layout.markerSize / 2, y: railY - layout.markerSize / 2, width: layout.markerSize, height: layout.markerSize }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }));
   });
   return nodes;
 }
@@ -569,8 +618,7 @@ function registerCore(registry) {
         const headerFrame = { x: frame.x + padding.left, y: frame.y + padding.top, width: frame.width - padding.left - padding.right, height: frame.height };
         const headerProps = { ...props, variant: treatment === "primary" ? "inverse" : "standard", rule: treatment !== "muted" };
         if (props.heading) nodes.push(...sectionHeadingNodes({ id: stableId(id, "header"), frame: headerFrame, props: headerProps }));
-        const top = padding.top + (props.heading ? headingLayout(headerFrame, headerProps).height : 0);
-        const contentFrame = { x: frame.x + padding.left, y: frame.y + top, width: frame.width - padding.left - padding.right, height: frame.height - top - padding.bottom };
+        const contentFrame = insetFrame(frame, sectionContentInsets(frame, props));
         if (treatment !== "open") nodes.unshift(rectPrimitive({ id: stableId(id, "surface"), role: "section-surface", frame, style: boxStyle(fill, stroke, treatment === "primary" ? STANDARD : HAIRLINE, edge === "full-bleed" ? token("radius.none") : SMALL_RADIUS), data: { edge, contentFrame } }));
         return { nodes, contentFrame };
       }
@@ -733,7 +781,12 @@ function registerCore(registry) {
     } }),
   ];
   for (const definition of definitions) {
+    if (["process", "roadmap", "timeline", "journey"].includes(definition.id)) {
+      definition.tokens.push("space.2");
+      definition.version = "2.1.0";
+    }
     if (["table", "comparison-table", "heatmap", "trend-rows"].includes(definition.id)) {
+      definition.version = "3.0.0";
       definition.tokens = TABLE_TOKENS;
       const normalize = props => {
         if (definition.id === "heatmap") return { ...props, columns: props.columns.map((label,index)=>({label,type:index?'heatmap':'text',scale:index?'score':undefined})), rows: props.rows.map(row=>row.map((value,index)=>index?{value}:value)), scales: {score:{type:'heatmap',label:'Assessment',min:1,max:5,anchors:{1:'Low',3:'Medium',5:'High'}}} };
@@ -782,7 +835,12 @@ function registerCore(registry) {
       const render = definition.render;
       definition.render = input => { definition.resolveVariant(input.props); return render(input); };
     }
-    if (definition.id === "roadmap") definition.variants["wave-columns"] = { preferredSize: { width: 1160, height: 480 }, props: { items: [1, 2, 3].map((index) => ({ heading: `(Insert wave ${index} heading)`, range: `(Insert time range ${index})`, activities: ["(Insert activity)"], deliverables: ["(Insert deliverable)"] })) } };
+    if (definition.id === "roadmap") {
+      definition.version = "2.2.0";
+      definition.tokens.push("space.2", "space.3", "space.4", "icon.medium");
+      definition.variants["wave-columns"] = { preferredSize: { width: 1160, height: 480 }, props: { items: [1, 2, 3].map((index) => ({ heading: `(Insert wave ${index} heading)`, range: `(Insert time range ${index})`, activities: ["(Insert activity)"], deliverables: ["(Insert deliverable)"] })) } };
+      definition.measureIntrinsic = ({ frame, props }) => definition.resolveVariant(props) === "wave-columns" ? waveRoadmapLayout(frame, props) : null;
+    }
     if (definition.id === "bullet-list") {
       definition.tokens.push("type.body", "space.2", "space.4");
       const render = definition.render;
@@ -791,7 +849,9 @@ function registerCore(registry) {
         if (definition.resolveVariant(props) !== "body") throw new Error("Content measurement requires the body bullet-list variant");
         return bodyListLayout(frame, props.items);
       };
+      definition.measureIntrinsic = input => definition.resolveVariant(input.props) === "body" ? definition.measureContent(input) : null;
     }
+    if (definition.id === "section") definition.measureInsets = ({ frame, props }) => sectionContentInsets(frame, props);
     if (definition.id === "section-heading") definition.variants.inverse = { backdrop: "primary" };
     if (definition.id === "insight") definition.measureContent = ({ frame, props }) => { definition.resolveVariant(props); return insightLayout(frame, props); };
     if (definition.id === "section-boundary") definition.variants.subsection = { preferredSize: { width: 520, height: 24 } };

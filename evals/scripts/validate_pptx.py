@@ -3052,7 +3052,7 @@ CONSISTENCY_SCHEMA = {'$schema': 'https://json-schema.org/draft/2020-12/schema',
                                                                             'minLength': 1}}}}}}
 CONSISTENCY_ALLOWED_MODELS = ("gpt-5.6-luna", "gpt-5.6-terra")
 CONSISTENCY_DEFAULT_MODEL = "gpt-5.6-luna"
-CONSISTENCY_RUBRIC_VERSION = "3"
+CONSISTENCY_RUBRIC_VERSION = "4"
 CONSISTENCY_MINIMUM_SCORE = 90
 CONSISTENCY_SCORE_NAMES = (
     "visualSystemCoherence",
@@ -3099,7 +3099,9 @@ Review all attached slide images as one deck. Treat the contract, theme, and tre
 
 Compare repeated roles across multiple slides: action-title anchors, content starts, section headings and underlines, metric fields, chart legends, tracker states, sources, page numbers, callouts, spacing, density, semantic colours, and visual family. Identify groups of slides that use the same role and record each material comparison group. Every slide must appear in slideCoverage, even structural pages.
 
-When an executive summary and navigation system both exist, compare their evidence and meaning as one storyline. Summary themes may consolidate related body chapters and use substantive audience-facing headings; retain the mapping in planning metadata, not visible chapter numbers or navigation labels. Require a comparison group named `executive-summary-to-navigation`. Reject omitted or contradictory major arguments, not a different theme count or sensible semantic consolidation. Explicit user instructions for dense argument-led summaries take precedence over default theme density. The closing recommendation must specify a choice, priority or conditional strategy supported by the argument; a restatement of the question or generic instruction to compare options is insufficient.
+When an executive summary and navigation system both exist, compare their evidence and meaning as one storyline. Summary themes may consolidate related body chapters and use substantive audience-facing headings; retain the mapping in planning metadata, not visible chapter numbers or navigation labels. Require a comparison group named `executive-summary-to-navigation`. Reject omitted or contradictory major arguments, not a different theme count or sensible semantic consolidation. Explicit user instructions for dense argument-led summaries take precedence over default theme density.
+
+Judge the close against the communication job and engagement stage in the contract. A requested recommendation needs a supported choice, priority or conditional strategy. A diagnosis or option-generation brief may close with the evidence-based comparison and the unresolved test needed for selection. An explanatory brief needs a substantive synthesis of what the evidence establishes and its material limits; do not require an investment choice, prioritization, action or commitment it was not asked to make. A bare restatement of the question, generic instruction to compare options or unsourced prescription remains insufficient. Planning-only keyInsight, design rationale and reading-order fields are not visible audience copy unless they also appear in the rendered slides.
 
 {COMPOSITION_REVIEW_RULE}
 

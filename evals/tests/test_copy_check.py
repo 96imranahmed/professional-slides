@@ -2,10 +2,29 @@ import unittest
 from test_source_structure import run_node
 
 class CopyCheckTests(unittest.TestCase):
+    def test_source_grounding_is_scoped_and_does_not_exempt_recap(self):
+        result=run_node('''
+import assert from 'node:assert/strict';
+import {buildCopyInventory,copyHash,validateCopyReview,copyReviewSchema} from './skills/professional-slides/runtime/copy-check.mjs';
+const scene={slides:[1,2].map(i=>({id:'s'+i,nodes:[{id:'fact'+i,type:'text',role:'paragraph',text:'A source-grounded operating finding',data:{}}]}))};
+const inv=buildCopyInventory(scene,{},[{id:'source:diagnostic',text:'Underlying finding',slides:[1],source:{sha256:'a'}}]);
+assert.equal(inv.slides[0].sourceEvidence.length,1);assert.equal(inv.slides[1].sourceEvidence.length,0);
+const subset={...inv,slides:inv.slides.slice(0,1)};
+const item={id:'fact1',textHash:copyHash('A source-grounded operating finding'),decision:'keep',classification:'evidence',addedInformation:'A material observed constraint',deletionConsequence:'The design constraint would disappear',evidenceIds:['source:diagnostic'],reason:'Source establishes the constraint',repair:'None'};
+assert.deepEqual(validateCopyReview(subset,{items:[item]}),[]);
+assert.ok(validateCopyReview(subset,{items:[{...item,classification:'recap'}]}).length);
+assert.ok(validateCopyReview(subset,{items:[{...item,evidenceIds:['source:unmapped']}]}).length);
+assert.ok(validateCopyReview(subset,{items:[{...item,evidenceIds:[]}]}).length);
+const schema=copyReviewSchema(inv.slides[0].targets,['fact1','source:diagnostic']);
+assert.deepEqual(schema.properties.items.properties.fact1.properties.evidenceIds.items.enum,['source:diagnostic']);
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result['ok'])
+
     def test_inventory_coverage_hashes_grounding_and_decisions(self):
         result=run_node('''
 import assert from 'node:assert/strict';
-import {buildCopyInventory,copyHash,validateCopyReview,validateCopyReport} from './skills/professional-slides/runtime/copy-check.mjs';
+import {buildCopyInventory,copyHash,validateCopyReview,validateCopyReport,COPY_CHECK_VERSION} from './skills/professional-slides/runtime/copy-check.mjs';
 const node=(id,role,text)=>({id,role,text,type:'text',data:{componentInstance:'scope'}});
 const scene={slides:[{id:'s',nodes:[node('heading','evidence-note-heading','Price basis'),node('body','evidence-note-body','ACS 2020–2024 existing housing stock.'),node('value','data-label','$2.5k')]}]};
 const inv=buildCopyInventory(scene,{mainQuestion:'Which city?'});
@@ -16,7 +35,7 @@ assert.equal(validateCopyReview(inv,judgement).length,0);
 for(const mutate of [j=>j.items.pop(),j=>j.items.push(j.items[0]),j=>j.items[0].textHash='old',j=>j.items[0].decision='remove',j=>j.items[0].classification='methodology',j=>j.items[0].evidenceIds=['invented'],j=>j.items[0].reason='',j=>{j.items[0].classification='substantive';j.items[0].evidenceIds=[];}]){
  const j=structuredClone(judgement);mutate(j);assert.ok(validateCopyReview(inv,j).length);
 }
-const report={version:'5',model:'gpt-5.6-luna',inputs:{pptx:'a'},accepted:true,judgement};
+const report={version:COPY_CHECK_VERSION,model:'gpt-5.6-luna',inputs:{pptx:'a'},accepted:true,judgement};
 assert.equal(validateCopyReport(inv,{pptx:'a'},report).length,0);
 assert.ok(validateCopyReport(inv,{pptx:'b'},report).length);
 const changed=structuredClone(inv);changed.slides[0].targets[0].text='New heading';

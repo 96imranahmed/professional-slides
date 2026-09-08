@@ -340,6 +340,8 @@ function heatFill(scale, value) {
 }
 const foreground = (fill) =>
   contrastRatio(tokenValue(fill), v("color.ink")) >= 4.5 ? ink : white;
+const categorySurface = (cell, props) =>
+  cell.surface ?? (props.treatment === "dimensions" ? "plain" : "primary");
 
 function contentLayout(cell, width, props, used) {
   const dense = props.density === "dense",
@@ -426,6 +428,10 @@ function contentLayout(cell, width, props, used) {
     texts = [requireText(cell.text, "cell")];
     bold = cell.type === "category" || bold;
   }
+  // A plain label has no block edge to anchor a protruding badge. Keep its
+  // reference marker beside the label and measure the reduced text width.
+  const inlineSectionMarker = cell.sectionNumber !== undefined && categorySurface(cell, props) === "plain";
+  if (inlineSectionMarker) offset = v("icon.medium") + gap;
   const blocks = texts.map((s) => measure(s, inner - offset, bold, size));
   const blockHeight = blocks.length
     ? sum(blocks.map((b) => b.height)) + (blocks.length - 1) * gap
@@ -456,7 +462,10 @@ function contentLayout(cell, width, props, used) {
     numberMarker,
     numberWidth,
     numberDisplay: cell.numberDisplay,
+    inlineSectionMarker,
+    blockHeight,
     height: Math.max(
+      inlineSectionMarker ? v("icon.medium") : 0,
       ["binary", "harvey"].includes(cell.type) ? marker : 0,
       numberMarker,
       blockHeight,
@@ -510,13 +519,7 @@ function layoutLegend(id, scale, width, size, gap) {
 
 export function measureTable({ frame, props }) {
   const model = normalize(props),
-    density =
-      props.density ??
-      (model.rows.length > 10 || model.columns.length > 6
-        ? "dense"
-        : model.rows.length > 5 || model.columns.length > 4
-          ? "compact"
-          : "body");
+    density = props.density ?? "body";
   if (!["body", "compact", "dense"].includes(density))
     throw new Error("Unknown table density");
   const tableProps = { ...props, density },
@@ -536,13 +539,27 @@ export function measureTable({ frame, props }) {
   const headers = model.columns.map((c, i) =>
     c.label ? measure(c.label, widths[i] - 2 * padding, true, textSize) : null,
   );
-  const headerHeight =
-    Math.max(...headers.map((h) => h?.height ?? 0)) + 2 * padding;
+  const headerHeight = headers.some(Boolean)
+    ? Math.max(...headers.map((h) => h?.height ?? 0)) + 2 * padding
+    : 0;
   const layouts = model.cells.map((row) =>
     row.map((cell) =>
       cell ? contentLayout(cell, widths[cell.column], tableProps, used) : null,
     ),
   );
+  const sectionMarkerSize = v("icon.medium");
+  // A marker straddles the category's top edge. Reserve its inward half and
+  // a real gap inside the cell as well as the existing clearance above it.
+  model.cells.forEach((row, r) => row.forEach((cell, c) => {
+    if (cell?.sectionNumber === undefined || layouts[r][c].inlineSectionMarker) return;
+    const inset = Math.max(padding, sectionMarkerSize / 2 + gap / 2 + gap);
+    layouts[r][c].topInset = inset;
+    // Single-row categories and their peer values share a content baseline.
+    if (cell.rowSpan === 1) row.forEach((peer, pc) => {
+      if (peer?.rowSpan === 1) layouts[r][pc].topInset = inset;
+    });
+  }));
+  const cellHeight = layout => layout.height + padding + (layout.topInset ?? padding);
   // All rows in a bar column must reserve the same label width so their
   // common numeric domain also has the same physical plot width.
   model.columns.forEach((_, c) => {
@@ -568,23 +585,22 @@ export function measureTable({ frame, props }) {
     Math.max(
       minimumRowHeight,
       ...row.map((l, c) =>
-        l && model.cells[r][c].rowSpan === 1 ? l.height + 2 * padding : 0,
+        l && model.cells[r][c].rowSpan === 1 ? cellHeight(l) : 0,
       ),
     ),
   );
-  const sectionMarkerSize = v("icon.medium");
   // Numbered section markers straddle the horizontal centre of the category
   // cell's top edge. Reserve explicit air above each marked section so the
   // disc never collides with the preceding group or the header rule.
   const topGaps = model.cells.map((row) =>
-    row.some((cell) => cell?.sectionNumber !== undefined)
+    row.some((cell) => cell?.sectionNumber !== undefined && categorySurface(cell, tableProps) !== "plain")
       ? sectionMarkerSize / 2 + gap
       : 0,
   );
   model.cells.forEach((row, r) =>
     row.forEach((cell, c) => {
       if (!cell || cell.rowSpan === 1) return;
-      const required = layouts[r][c].height + 2 * padding,
+      const required = cellHeight(layouts[r][c]),
         allocated = sum(heights.slice(r, r + cell.rowSpan));
       if (required > allocated) {
         const extra = (required - allocated) / cell.rowSpan;
@@ -656,6 +672,7 @@ export function renderTable({ id, frame, props }) {
   if (!["open", "standard", "dimensions"].includes(header))
     throw new Error("Unknown table header treatment");
   m.columns.forEach((column, c) => {
+    if (!m.headerHeight) return;
     const filledHeader = header === "standard" || (header === "dimensions" && column.type !== "category");
     if (filledHeader)
       nodes.push(
@@ -722,7 +739,7 @@ export function renderTable({ id, frame, props }) {
         (m.rows[r].style ?? props.rowStyle) === "accented"
           ? t("color.componentPrimaryTint")
           : null;
-      if (cell.type === "category" && (cell.surface ?? (header === "dimensions" ? "plain" : "primary")) === "primary")
+      if (cell.type === "category" && categorySurface(cell, props) === "primary")
         fill = primary;
       if (cell.type === "highlight") fill = t("color.componentPrimaryTint");
       if (cell.type === "heatmap")
@@ -752,9 +769,9 @@ export function renderTable({ id, frame, props }) {
       const color = fill ? foreground(fill) : ink;
       const inner = {
         x: area.x + m.padding,
-        y: area.y + m.padding,
+        y: area.y + (l.topInset ?? m.padding),
         width: area.width - 2 * m.padding,
-        height: height - 2 * m.padding,
+        height: height - m.padding - (l.topInset ?? m.padding),
       };
       if (cell.type === "implication") {
         // Canonical row implication: an icon-medium primary disc and two
@@ -842,7 +859,8 @@ export function renderTable({ id, frame, props }) {
             cell.type,
           )
         )
-          y = area.y + (height - l.height) / 2;
+          y = inner.y + (inner.height - l.height) / 2;
+        if (l.inlineSectionMarker) y += (l.height - l.blockHeight) / 2;
         if (cell.type === "binary") {
           const s = l.marker,
             markY = area.y + (height - s) / 2,
@@ -987,12 +1005,12 @@ export function renderTable({ id, frame, props }) {
       }
       if (cell.sectionNumber !== undefined) {
         const diameter = m.sectionMarkerSize,
-          cx = area.x + (area.width - m.gap) / 2,
-          cy = area.y + m.gap / 2,
+          cx = l.inlineSectionMarker ? inner.x + diameter / 2 : area.x + (area.width - m.gap) / 2,
+          cy = l.inlineSectionMarker ? inner.y + inner.height / 2 : area.y + m.gap / 2,
           markerData = {
             ...data,
             sectionNumber: cell.sectionNumber,
-            placement: "top-center",
+            placement: l.inlineSectionMarker ? "inline-start" : "top-center",
           };
         nodes.push(
           ellipsePrimitive({

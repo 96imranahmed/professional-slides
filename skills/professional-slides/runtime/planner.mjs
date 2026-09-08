@@ -43,36 +43,39 @@ function extentOf(props = {}) {
   );
 }
 
-function capacityRequirement(item, path, reasons) {
-  let required = "live-pitch";
+function capacityRecommendation(item, path, reasons) {
+  let recommended = "live-pitch";
   const props = item.props || {};
   if (item.component === "insight-tree-table") {
     const branches = Array.isArray(props.branches) ? props.branches.length : 0;
     const leaves = Array.isArray(props.branches) ? props.branches.reduce((count, branch) => count + (Array.isArray(branch?.leaves) ? branch.leaves.length : 0), 0) : 0;
     if (branches >= 4 || leaves >= 6) {
-      required = "pre-read";
-      reasons.push({ path, component: item.component, measure: "hierarchy", count: Math.max(branches, leaves), required });
+      recommended = "pre-read";
+      reasons.push({ path, component: item.component, measure: "hierarchy", count: Math.max(branches, leaves), recommended });
     }
   } else if (item.component === "table") {
     const rows = Array.isArray(props.rows) ? props.rows.length : 0;
     const columns = Array.isArray(props.columns) ? props.columns.length : 0;
-    required = rows > 8 || columns > 6 ? "appendix" : rows > 5 || columns > 4 ? "pre-read" : required;
-    if (required !== "live-pitch") reasons.push({ path, component: item.component, measure: rows >= columns ? "rows" : "columns", count: Math.max(rows, columns), required });
+    recommended = rows > 8 || columns > 6 ? "appendix" : rows > 5 || columns > 4 ? "pre-read" : recommended;
+    if (recommended !== "live-pitch") reasons.push({ path, component: item.component, measure: rows >= columns ? "rows" : "columns", count: Math.max(rows, columns), recommended });
   } else if (typeof item.component === "string" && item.component.startsWith("chart.")) {
     const extent = extentOf(props);
-    required = extent > 12 ? "appendix" : extent > 8 ? "pre-read" : required;
-    if (required !== "live-pitch") reasons.push({ path, component: item.component, measure: "marks", count: extent, required });
+    recommended = extent > 12 ? "appendix" : extent > 8 ? "pre-read" : recommended;
+    if (recommended !== "live-pitch") reasons.push({ path, component: item.component, measure: "marks", count: extent, recommended });
   }
-  for (const [index, child] of (item.items || []).entries()) required = maximumDensity(required, capacityRequirement(child, `${path}.items[${index}]`, reasons));
-  return required;
+  for (const [index, child] of (item.items || []).entries()) recommended = maximumDensity(recommended, capacityRecommendation(child, `${path}.items[${index}]`, reasons));
+  return recommended;
 }
 
 export function resolveSlideDensity(plan) {
   const requested = plan.density ?? "executive";
   if (!DENSITY_ORDER.includes(requested)) throw new Error(`Unknown density profile: ${requested}`);
   const reasons = [];
-  const required = (plan.items || []).reduce((result, item, index) => maximumDensity(result, capacityRequirement(item, `${plan.id}.items[${index}]`, reasons)), "live-pitch");
-  return { requested, required, resolved: maximumDensity(requested, required), reasons };
+  const recommended = (plan.items || []).reduce((result, item, index) => maximumDensity(result, capacityRecommendation(item, `${plan.id}.items[${index}]`, reasons)), "live-pitch");
+  // An explicit family density is an authoring choice, never an invitation to
+  // silently shrink it. Intrinsic measurement and render gates still enforce fit.
+  const explicit = plan.density !== undefined;
+  return { requested, recommended, resolved: explicit ? requested : maximumDensity(requested, recommended), selection: explicit ? "explicit" : "capacity-default", reasons };
 }
 
 function validateContentValue(value, path = "props") {
@@ -134,6 +137,12 @@ function validateItem(item, path, registry) {
   if (item.component && !registry.has(item.component)) throw new Error(`${path}.component is not registered: ${item.component}`);
   if ((!item.component && (!Array.isArray(item.items) || !item.items.length)) || (item.items !== undefined && (!Array.isArray(item.items) || !item.items.length))) throw new Error(`${path} needs a component or nested items`);
   if (item.items) assertSectionHeadingProps(item);
+  if (item.heading && item.items?.length === 1) {
+    const child = item.items[0];
+    if (child.component?.startsWith("chart.") && String(child.props?.heading ?? "").trim()) {
+      throw new Error(`${path}: a section wrapping one headed chart creates redundant heading levels; remove the section heading and let the chart own its measure, unit and rule`);
+    }
+  }
   if (["section", "section-heading", "content-rail"].includes(item.component)) assertSectionHeadingProps(item.props);
   validateContentValue({ heading: item.heading }, path);
   validateContentValue(item.props || {}, `${path}.props`);
@@ -278,7 +287,7 @@ function planCover(plan) {
     frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
     composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.variant ? {variant:plan.variant} : {}), ...(plan.image ? {image:plan.image} : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
   };
-  return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, required: "live-pitch", resolved: spec.density, reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
+  return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, recommended: "live-pitch", resolved: spec.density, selection: plan.density === undefined ? "capacity-default" : "explicit", reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
 }
 
 export function planSlide(plan, registry = REGISTRY) {

@@ -28,7 +28,34 @@ Category tables are useful but must not become the default for every claim. Audi
 
 For a repetitive run, use the [analytical substance check](../components/copy.md#analytical-substance) to decide whether to consolidate overlapping pages or develop distinct proof. A bridge can explain drivers, a trend can test persistence when comparable periods exist, and a scenario comparison can expose sensitivity when its assumptions are supported. Keep a bar chart when magnitude is the question. Swapping chart types, adding decoration, or changing colours solely for variety fails this check.
 
+Plan diversity at the level of analytical relationships. A decision sequence can move from a hypothesis-and-evidence matrix to a financial reconciliation, a segment diagnostic, a provider landscape and a qualified valuation comparison because each asks the audience to do different work. A programme sequence may need nested phases, a common-week deliverable schedule and dated governance lanes. Recasting all of these as separate charts with summary bullets discards structure even when every fact survives. These are compositional capabilities within the existing deck types, not new industry templates.
+
+For each page, record a short structure description: the dominant encoding, the shared comparison axis or entity key, the nesting, and how supporting evidence attaches. Review these descriptions together before export. Repeated descriptions require a comparability reason; distinct source relationships flattened into the same description require replanning. A varied list of component names is insufficient if every page still has the same two panels and bottom bullets.
+
 Match container height to useful content. A few sentences at the top of tall cards leave an unfinished page even when the cards occupy most of the canvas. An executive pre-read close should connect the recommendation to its decisive evidence and explain what changes the decision; use [decision-close guidance](../components/copy.md#decision-close). Prefer compact open sections or a decision table when those relationships warrant them. A deliberately sparse stage close remains valid for a narrated presentation.
+
+## Allocate evidence before geometry
+
+Count the real categories, rows, stages, comparison fields and text before assigning boxes. Choose the exhibit's reading task, then allocate its region:
+
+| Reading task | Composition decision |
+| --- | --- |
+| Compare several short options on common criteria | One analytical table or repeated evidence group, with a stable schema and deliberate family order. Keep lever, benefit basis, implementation horizon, dependency and status distinct. |
+| Explain why a selected option works | A developed mechanism, driver decomposition or dependency exhibit; separate it from the portfolio only when the proof needs that space. |
+| Compare magnitudes or changes | A chart with the relevant comparator and common measurement basis; use a table when precise lookup across mixed fields is the primary job. |
+| Relate evidence at different levels | A composite with one dominant field and a clearly subordinate decomposition or additional evidence section. Allocate width by the labels and proof each field requires. |
+| Show timing or sequence | A registered relationship component with explicit stage labels, optional periods and dependencies. Unequal duration needs a supported time scale; ordinal stage positions do not encode duration. |
+| Compare multiple measures for the same entities | A shared-row analytical exhibit with quantitative marks and exact-value or qualitative columns. Keep one entity order, attach denominators to their measures, and separate totals from individual entities. Split panels only when their different reading tasks justify the additional lookup. |
+| Reconcile reported, adjusted and potential results | An aligned reconciliation with current value, adjustment, result and calculation basis; group recurring economics separately from one-time effects. Use a bridge only when the supplied movements reconcile. |
+| Test hypotheses across a portfolio | Nested family and hypothesis rows with assessment and visible supporting evidence. Preserve unknown assessments; avoid flattening the hierarchy into an undifferentiated list. |
+| Coordinate dates, deliverables and decision bodies | Shared time columns with distinct workstream or governance lanes. Put meetings, documents and dependencies on that common frame; separate lists cannot preserve same-week coordination. |
+| Show a range of uncertain outcomes | Comparable scenarios or supported range bands with their bases and assumptions directly attached. Distinguish uncertainty from observed variation and avoid inventing intermediate trajectories. |
+
+For comparable options, draft all rows before deciding the page count. Consolidate sparse family pages when their combined rows remain readable, preserving family names and case IDs in the comparison field. Split a long exhibit at a meaningful family or analytical boundary and repeat its schema, column widths and units. A separate page per source row is appropriate only when that row has a distinct developed argument.
+
+Resolve component capacity with the actual longest labels and fullest rows. Use intrinsic content measurement at the allocated width; sample height is not evidence that production text fits. If a component cannot fit, first remove duplicate copy, rebalance widths, or regroup the evidence. Select a registered compact density for the entire coherent family when the delivery mode warrants it, before resorting to a split. Do not crop meaningful fields, omit qualifiers or locally shrink individual text objects.
+
+Inspect both content density and visual balance. A large container containing two short bullets remains sparse. Compare how much decision-relevant evidence the reader can actually inspect, including values, comparison dimensions, conditions and reasoning. Retain a compact complete group when the content is complete; develop missing proof when it is not. Never use a target slide count or occupancy percentage as a substitute for this judgment.
 
 ## Select an evidence-density mode
 
@@ -39,7 +66,7 @@ Use one mode for each slide family:
 - **Executive pre-read:** denser evidence that remains readable without narration.
 - **Analytical appendix:** compact, precise, and source-rich.
 
-Never shrink text to make the wrong composition fit. Simplify the copy or redesign the page.
+Choose the registered density profile once for each coherent family and carry it through the treatment ledger. Never shrink text locally to make the wrong composition fit. Simplify duplicate copy or redesign the page; keep the measurements and qualifiers that make its evidence meaningful.
 
 ## Colour system
 
@@ -105,6 +132,10 @@ When a reference deck is authorized:
 2. identify its layouts, anchors, typography, spacing, colours, tables, charts, and recurring components;
 3. separate deliberate rules from one-off exceptions;
 4. reuse the closest valid structure.
+
+When modernizing an authorized reference, preserve its evidence relationships, comparison depth, meaningful row order and content hierarchy while applying the selected current theme. Compare the source and candidate at equal viewing size. Check which observations, calculations, countercases and conditions the reader can recover from each, then compare grouping and reading effort. Pixel similarity and matching page counts cannot establish equivalent content or design quality.
+
+Before redesigning each source page, record its strongest device, complete evidence payload, heading hierarchy, focal emphasis and normalized readable type size. Map those to the proposed page or pages. Inspect dense tables, schedule grids, brackets, nested labels and qualifier placement explicitly; these often carry the analytical work. A split must preserve comparisons and earn its extra page count. Smaller text coupled with less visible evidence and more unused canvas is a regression, not modernization. Match readable evidence density before adding whitespace for style.
 
 Do not copy source content or assets unless authorized. Do not claim fidelity without comparing the final render with the reference.
 

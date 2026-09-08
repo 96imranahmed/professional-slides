@@ -19,6 +19,10 @@ Relationship components show order, dependency, hierarchy, progression, position
 
 Choose the component from the relationship the audience must decode. Do not use a process for unordered peers, a roadmap without progression, a tree without parent-child logic, or a funnel when stages do not share a valid population.
 
+The runtime `process` and process-style `roadmap` accept stage objects with `label` and optional `period`, `maturity`, and short `detail`. Each supplied field is rendered on its own line and measured at the stage width. Roadmap labels sit inside their stage bands, above the band fill in paint order; empty decorative bands must not cover or detach from the stage copy. A stage that cannot fit its complete text rejects rather than clipping or shrinking it. Use the existing `wave-columns` roadmap for developed activity and deliverable lists. The process-style roadmap uses equal ordinal spacing; its duration labels do not make the bands proportional to elapsed time.
+
+The `wave-columns` variant measures each stage's optional range, heading, activities and deliverables at the allocated column width. Its shared activity and deliverable rows align across stages, with the deliverable row placed below the fullest activity list. Use its intrinsic height for a hugged group. Empty ranges and lists produce no placeholder or orphan heading. Reject a frame that cannot hold all supplied rows; fixed text-box heights must never let activities run into deliverables.
+
 ## Tree-based insight and implication tables
 
 Use `insight-tree-table` when one root finding branches through named drivers into leaf evidence and every leaf needs an aligned interpretation or implication. The tree is the evidence structure; the adjacent fields are not independent tables. Use a flat analytical table when rows do not share parent-child logic, and use the standalone `tree` when the leaf-level interpretation does not need to remain row-aligned.
@@ -31,7 +35,7 @@ The executable contract is:
 - three substantive headers for the tree, insight, and implication fields;
 - `rowTreatment: "tonal"` by default, or `"open"` when whitespace already separates the aligned rows.
 
-One to three branches normally retain the requested page density. Four branches, or six to seven leaves overall, require at least `pre-read`; the planner promotes the complete page so the action title, headers, node labels, insight rows, implication rows, and annotations remain one coherent type system. This is a capacity state, not a separate business-content variant. If seven leaf rows still do not fit the available body frame at the promoted density, enlarge the valid region or split the hierarchy.
+Declare one page density for the coherent hierarchy family and measure all branches and leaf rows at that size. If density is unspecified, four branches or six to seven leaves suggest `pre-read`; an explicit density takes precedence. When changing profile, change the action title, headers, node labels, insight rows, implication rows and annotations together. This is a capacity choice, not a separate business-content variant. If the complete hierarchy still does not fit, enlarge the valid region or split at a meaningful branch boundary.
 
 The root, branch, and leaf boxes use one repeated treatment and retain equal peer geometry. Orthogonal connectors terminate at node boundaries and sit behind the nodes. A compact disc-chevron connects each leaf to its aligned insight. A separate native line with a triangular end arrowhead connects that insight to its implication. Neither connector column receives a header rule, and the implication arrows never sit on top of row rules. Tonal rows use the theme-bound neutral surface and preserve the same vertical gaps as the open treatment.
 
@@ -57,7 +61,7 @@ The relationship owners consume these complete theme interfaces; do not add loca
 
 | Component family | Consumed custom properties |
 | --- | --- |
-| `process`, `timeline`, `journey` | `--component-primary`, `--surface-1`, `--on-primary`, `--ink`, `--text-secondary`, `--font-body`, `--type-compact`, `--type-label`, `--line-standard`, `--line-hairline`, `--radius-round` |
+| `process`, `timeline`, `journey` | `--component-primary`, `--surface-1`, `--on-primary`, `--ink`, `--text-secondary`, `--font-body`, `--type-compact`, `--type-label`, `--space-2`, `--line-standard`, `--line-hairline`, `--radius-round` |
 | `roadmap` | the process properties plus `--component-primary-tint`, `--surface-2`, `--rule`, `--type-heading`, `--radius-small` |
 | `tree`, `organization` | `--component-primary`, `--component-primary-tint`, `--surface-1`, `--surface-2`, `--rule`, `--on-primary`, `--ink`, `--text-secondary`, `--font-body`, `--type-compact`, `--line-hairline`, `--line-standard`, `--radius-none`, `--radius-small` |
 | `matrix` | `--component-primary`, `--chart-series-2`, `--surface-1`, `--rule`, `--ink`, `--status-positive`, `--status-caution`, `--status-negative`, `--on-primary`, `--font-body`, `--type-label`, `--line-hairline`, `--line-standard`, `--radius-none`, `--radius-round` |
