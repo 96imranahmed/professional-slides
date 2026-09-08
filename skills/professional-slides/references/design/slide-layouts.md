@@ -24,7 +24,13 @@ Action title, source, footer, page number, and navigation are registered compone
 
 ## Analytical composites
 
-An analytical page may combine distinct component types inside equal peer sections. For example, use an open two-column composition with a centered chart on the left and a vertically stacked table plus the slide's single insight box on the right. The table and insight share the right-hand section's width; the insight does not have to span the whole page. This is not the full-bleed `section-split-50-50` variant described below. Keep peer headings aligned and select the boundary from the relationship, not from the component types.
+An analytical page may combine distinct component types when they answer different parts of the same question. Start with the comparisons the reader must make, then choose shared rows, a common time scale, nested groups, aligned panels or a dominant field with attached detail. Equal peer sections are one option, not the default. A chart and table containing the same entities often belong in one aligned exhibit; independent panels with different entity orders force the reader to perform the join. Keep peer headings aligned when peer sections are justified.
+
+### One heading owner per analytical exhibit
+
+The slide title states the page's conclusion. Each distinct analytical exhibit may then have one heading identifying its measure, period or substantive question. A section wrapping one chart must not add a second heading above that chart's own heading. Keep the section untitled and let the chart own its heading, unit and rule. Remove paraphrases such as a parent saying that assets span segments above a chart already labelled with assets by segment.
+
+A parent heading is useful when it groups several genuinely distinct child exhibits. Child captions then identify only their distinct measures or populations; they do not restate the parent conclusion or reproduce its full rule treatment. Table field labels and chart units remain necessary decoding information, even when the page already has an action title. Inspect the complete title stack in the render: hierarchy must follow analytical scope, not the nesting depth of containers.
 
 Chart headings retain their analytical rule. Non-chart headings and side sections use rules at the model’s discretion, only when enough distinct content needs explicit separation. Do not propagate a chart underline to its neighbouring text, metrics or insight. Use typography, proximity and whitespace first; a compact implication may consist only of one insight box and a chevron or arrow. Omit generic role headings and paragraphs that repeat the title. The insight may sit beside the evidence or horizontally below it. When genuinely comparable peer headings both need rules, align their measured heading bands and rule baselines.
 

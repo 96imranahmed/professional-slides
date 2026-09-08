@@ -4,6 +4,27 @@ from test_source_structure import run_node
 
 
 class DensityCapacityTests(unittest.TestCase):
+    def test_explicit_family_density_survives_cardinality_but_not_real_overflow(self):
+        result = run_node(r"""
+import assert from 'node:assert/strict';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const props={columns:[{label:'Provider',type:'category'},{label:'Arrangement',type:'text'}],rows:Array.from({length:9},(_,i)=>[`Provider ${i+1}`,'Captive'])};
+const plan={id:'readable',title:'Providers retain their own financing channel',density:'executive',layout:'absolute',copyBudget:{maxWordsPerSlide:100,rationale:'Nine short provider records'},items:[{id:'providers',job:'Compare financing arrangements',component:'table',props,frame:{x:0,y:0,width:1160,height:500}}]};
+const output=planDeck({id:'providers',slides:[plan]},REGISTRY);
+const slide=output.deck.slides[0],text=slide.nodes.filter(n=>n.role==='table-cell-text');
+assert.equal(slide.density,'executive');
+assert.ok(text.length>=18);assert.ok(text.every(n=>n.style.fontSize.tokenId==='type.body'));
+const tooShort=structuredClone(plan);tooShort.items[0].frame.height=180;
+assert.throws(()=>planDeck({id:'overflow',slides:[tooShort]},REGISTRY),/table|fit|height/i);
+const compact=structuredClone(plan);compact.items[0].props.density='compact';
+const compactSlide=planDeck({id:'compact',slides:[compact]},REGISTRY).deck.slides[0];
+assert.equal(compactSlide.density,'executive');
+assert.ok(compactSlide.nodes.filter(n=>n.role==='table-cell-text').every(n=>n.style.fontSize.tokenId==='type.compact'));
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result['accepted'])
+
     def test_extended_charts_tables_and_trees_promote_the_complete_page(self):
         result = run_node(r"""
 import assert from 'node:assert/strict';
@@ -16,7 +37,7 @@ const treePlan={id:'tree-density',title:'Branches converge on one implication',l
 const tree=planSlide(treePlan);
 assert.equal(tree.spec.density,'pre-read');
 assert.equal(tree.decision.density.requested,'executive');
-assert.equal(tree.decision.density.required,'pre-read');
+assert.equal(tree.decision.density.recommended,'pre-read');
 assert.equal(tree.decision.density.reasons[0].component,'insight-tree-table');
 
 const chartProps={categories:Array.from({length:9},(_,i)=>`Period ${i+1}`),series:[{name:'Measure',values:Array.from({length:9},(_,i)=>i+1)}]};

@@ -72,6 +72,8 @@ For every proposed graph, put both axes’ meanings and their source fields or c
 
 Audit the planned exhibit mix. Keep tables for comparisons that benefit from rows and columns; use graphs to expose numerical patterns that prose cells conceal. Record the evidence-to-implication relationship and choose only one or two marked emphasis points under the arrow-restraint rule; compact grouping is sufficient elsewhere.
 
+For a reference comparison, add the source page mapping and its strongest analytical device to each design cell. State which relationships remain visible together, what is intentionally changed, and why any split improves reading. Across the plan, compare structures rather than component names: shared-row economics, nested hypothesis evidence, time-aligned lanes and a scenario band perform different analytical jobs even within one content type. Reject a plan that converts those different jobs into repeated chart/table-plus-bullet pages. Assign one heading owner to each exhibit before writing section labels.
+
 ## Slide design plan
 
 Include a design plan with every dot, including structural slides. The owner reviews the argument and its visual expression together before authoring. Use plain language in the review artifact and retain stable item IDs and registered component names in the handoff. Read the relevant composition, design, component, and chart owners before proposing these choices.

@@ -36,7 +36,7 @@ import {validateSlidePlan,planSlide} from './skills/professional-slides/runtime/
 const plan={id:'summary',title:'Executive summary',density:'pre-read',layout:'flow.column',items:[{id:'case',job:'develop the decision case',component:'paragraph',props:{text:Array(98).fill('word').join(' ')}}]};
 assert.throws(()=>validateSlidePlan(plan),/permits 85/);
 const approved={...plan,copyBudget:{maxWordsPerSlide:160,rationale:'Reference-led standalone narrative'}};
-assert.deepEqual(planSlide(approved).decision.content,{countedWords:100,budget:160,density:{requested:'pre-read',required:'live-pitch',resolved:'pre-read',reasons:[]},defaultBudget:85,overrideRationale:'Reference-led standalone narrative'});
+assert.deepEqual(planSlide(approved).decision.content,{countedWords:100,budget:160,density:{requested:'pre-read',recommended:'live-pitch',resolved:'pre-read',selection:'explicit',reasons:[]},defaultBudget:85,overrideRationale:'Reference-led standalone narrative'});
 assert.equal(plan.density,'pre-read');
 assert.equal(plan.copyBudget,undefined);
 assert.throws(()=>validateSlidePlan(plan),/permits 85/);

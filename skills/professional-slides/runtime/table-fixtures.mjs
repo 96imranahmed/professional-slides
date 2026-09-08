@@ -23,7 +23,7 @@ const competitorBars={columns:[text('Competitor',.16,'category'),text('Positioni
  ['Company C',bullets('(Insert positioning point 1)','(Insert positioning point 2)'),{values:[289,45]},'6%','16%']
 ]};
 export const TABLE_VARIANTS={
- 'dimension-headers':{preferredSize:size,props:{treatment:'dimensions',columns:[text('Option',.28,'category'),...['Reach','Fit','Readiness'].map(label=>({...text(label,.24,'harvey'),scale:'fit'}))],scales:{fit:rating},rows:[['Option A',{value:3},{value:2},{value:1}],['Option B',{value:1},{value:4},{value:3}],['Option C',{value:2},{value:1},{value:4}]]}},
+ 'dimension-headers':{preferredSize:size,props:{treatment:'dimensions',columns:[text('Option',.28,'category'),...['Reach','Fit','Readiness'].map(label=>({...text(label,.24,'harvey'),scale:'fit'}))],scales:{fit:rating},rows:[[{text:'Option A',sectionNumber:1},{value:3},{value:2},{value:1}],[{text:'Option B',sectionNumber:2},{value:1},{value:4},{value:3}],[{text:'Option C',sectionNumber:3},{value:2},{value:1},{value:4}]]}},
  standard:{props:{treatment:'standard'}},
  open:{props:{treatment:'open'}},
  'plain-rows':{preferredSize:size,props:{...trends,columns:trends.columns.map(c=>({...c,type:'text'})),rowStyle:'plain'}},
@@ -47,7 +47,7 @@ export const TABLE_VARIANTS={
  ]}},
  'bar-columns':{preferredSize:size,props:competitorBars},
  'bar-columns-plain-numbers':{preferredSize:size,props:{...competitorBars,columns:competitorBars.columns.map(column=>column.type==='number'?{...column,numberDisplay:'plain',align:'right'}:column)}},
- 'variable-cardinality':{preferredSize:size,props:{columns:[text('Market',.2,'category'),text('Signal',.24),{...text('Growth',.12,'number'),align:'center'},{...text('Share',.12,'number'),numberDisplay:'plain',align:'right'},text('Evidence',.2),text('Owner',.12)],rows:Array.from({length:8},(_,index)=>[
+ 'variable-cardinality':{preferredSize:size,props:{density:'compact',columns:[text('Market',.2,'category'),text('Signal',.24),{...text('Growth',.12,'number'),align:'center'},{...text('Share',.12,'number'),numberDisplay:'plain',align:'right'},text('Evidence',.2),text('Owner',.12)],rows:Array.from({length:8},(_,index)=>[
   `(Insert market ${index+1})`,`(Insert signal ${index+1})`,`${6+index}%`,`${18+index}%`,`(Insert evidence ${index+1})`,`(Insert owner ${index+1})`
  ])}},
  'heatmap-1-10':{preferredSize:size,props:{columns:[text('Capability',.32,'category'),{...text('Current',.2,'heatmap'),scale:'maturity'},{...text('Target',.2,'heatmap'),scale:'maturity'},text('Development priority',.28)],scales:{maturity:{type:'heatmap',label:'Maturity',min:1,max:10,palette:'theme-sequential',anchors:{1:'Not established',5:'Repeatable',10:'Fully embedded'}}},rows:[['(Insert capability 1)',{value:4},{value:8},'(Insert development priority)'],['(Insert capability 2)',{value:7},{value:9},'(Insert development priority)'],['(Insert capability 3)',{value:'missing'},{value:7},'(Insert development priority)']]}},

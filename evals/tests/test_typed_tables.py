@@ -3,6 +3,30 @@ from test_source_structure import run_node
 
 
 class TypedTableTests(unittest.TestCase):
+    def test_plain_case_markers_are_attached_and_numeric_rows_align(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+for(const pageDensity of ['executive','pre-read','appendix']) for(const surface of ['plain','primary']) {
+ const props={treatment:'dimensions',comparisonAxis:'columns',columns:[{key:'case',label:'Adoption case',width:.26,type:'category'},{key:'trend',label:'Trend',width:.18,type:'number',numberDisplay:'plain',align:'right'},{key:'step',label:'Step-up',width:.18,type:'number',numberDisplay:'plain',align:'right'},{key:'new',label:'New occupations',width:.20,type:'number',numberDisplay:'plain',align:'right'},{key:'total',label:'Total gained',width:.18,type:'number',numberDisplay:'plain',align:'right'}],rows:[[{text:'Late (2%)',sectionNumber:1,surface},'0.7','0.2','0.2','1.0'],[{text:'Midpoint (21%)',sectionNumber:2,surface},'0.5','0.1','0.2','0.9'],[{text:'Early (41%)',sectionNumber:3,surface},'0.4','0.1','0.2','0.7']]};
+ const deck=compileDeck({slides:[{id:'cases',density:pageDensity,composition:component({id:'table',component:'table',props})}]},REGISTRY);
+ const nodes=deck.slides[0].nodes;
+ for(const marker of nodes.filter(n=>n.role==='table-section-marker')) {
+  const cells=nodes.filter(n=>n.role==='table-cell-text'&&n.data.row===marker.data.row);
+  const label=cells.find(n=>n.data.column===0);
+  for(const cell of cells) assert.ok(Math.abs(cell.frame.y+cell.frame.height/2-label.frame.y-label.frame.height/2)<.01,'Scenario and values must share a vertical center');
+  if(surface==='plain') {
+   assert.equal(marker.data.placement,'inline-start');
+   assert.ok(label.frame.x>=marker.frame.x+marker.frame.width+3.9,'Marker needs measured label clearance');
+   assert.ok(Math.abs(marker.frame.y+marker.frame.height/2-label.frame.y-label.frame.height/2)<.01);
+  } else assert.ok(label.frame.y>=marker.frame.y+marker.frame.height+3.9);
+ }
+}
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
     def test_headerless_table_has_no_empty_header_band_or_rule(self):
         result = run_node('''
 import assert from 'node:assert/strict';
@@ -151,9 +175,9 @@ const make=(rowCount,columnCount)=>({
 });
 const frame={x:0,y:0,width:1160,height:632};
 for(const [rows,columns] of [[2,2],[8,6],[12,3]]){
- const props=make(rows,columns),measurement=measureTable({frame,props}),nodes=renderTable({id:`t-${rows}-${columns}`,frame,props}).nodes;
+ const props={...make(rows,columns),density:rows>10||columns>6?'dense':rows>5||columns>4?'compact':'body'},measurement=measureTable({frame,props}),nodes=renderTable({id:`t-${rows}-${columns}`,frame,props}).nodes;
  assert.equal(measurement.rows.length,rows);assert.equal(measurement.columns.length,columns);
- assert.equal(measurement.density,rows>10||columns>6?'dense':rows>5||columns>4?'compact':'body');
+ assert.equal(measurement.density,props.density);
  assert.equal(nodes.filter(node=>node.role==='table-number-circle').length,rows);
  assert.equal(nodes.filter(node=>node.role==='table-number-value').length,rows);
 }

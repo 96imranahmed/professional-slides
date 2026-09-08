@@ -82,9 +82,9 @@ Before approval, record the meaning and source or calculation of both axes in th
 
 ## Extension and capacity
 
-Chart data arrays are extensible, but the layout is not allowed to clip, overlap, or make a local type exception as categories or points are added. Up to eight horizontal categories or plotted points use the selected page density. Nine to twelve promote the complete page to `pre-read`; more than twelve promote it to `appendix` and still require the encoding-specific fit checks. The threshold applies to the longest category, label, point, or series-value array. A chart that remains illegible after promotion must change orientation, aggregate, use small multiples, or split across pages.
+Chart data arrays are extensible, but the layout is not allowed to clip, overlap, or make a local type exception as categories or points are added. An explicit page-family density is preserved. When density is unspecified, nine to twelve marks suggest `pre-read` and more than twelve suggest `appendix`; the extent is the largest category, label or point count, or total supplied series values. These are fallback hints, not evidence that smaller type is necessary or sufficient. Measure the actual labels and plot. A chart that remains illegible must change orientation, aggregate only on a valid basis, use small multiples or split across pages.
 
-The same principle applies to every chart family: capacity changes the page-level density profile, while the chart retains its semantic label, legend, datapoint, and annotation roles. The planner records the requested, required, and resolved density plus the triggering extent.
+The same principle applies to every chart family: an intentional density change affects the complete page while the chart retains its semantic label, legend, datapoint and annotation roles. The planner records the requested, recommended and resolved density, explicit or fallback selection, and triggering extent. A chart `unit` requires its own nonempty `heading`; when a parent supplies the analytical title, put both heading and unit visibly in that parent and omit both from the child. A hidden child unit is invalid.
 
 ## Exhibit-resolution gate
 

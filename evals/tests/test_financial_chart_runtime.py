@@ -3,6 +3,20 @@ from test_source_structure import run_node
 
 
 class FinancialChartRuntimeTests(unittest.TestCase):
+    def test_declared_chart_units_cannot_disappear_when_heading_is_empty(self):
+        result = run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const chart=REGISTRY.get('chart.bar'),frame={x:60,y:60,width:1100,height:600};
+const props={categories:['Group A','Group B'],series:[{name:'Net change',values:[163,-63]}],unit:'Thousand workers'};
+for(const heading of [undefined,'','  ']) assert.throws(()=>chart.render({id:'units',frame,props:{...props,heading}}),/unit requires a nonempty chart heading/);
+const rendered=chart.render({id:'visible',frame,props:{...props,heading:'Net demand minus supply, 2030'}}).nodes;
+assert.equal(rendered.filter(n=>n.role==='chart-unit'&&n.text.trim()==='Thousand workers').length,1);
+assert.doesNotThrow(()=>chart.render({id:'parent-title',frame,props:{categories:props.categories,series:props.series}}));
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result['accepted'])
+
     def test_chart_titles_reject_statistics_across_all_shared_entry_points(self):
         result = run_node("""
 import assert from 'node:assert/strict';
