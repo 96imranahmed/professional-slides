@@ -225,7 +225,8 @@ function assertChartTitleCopy(props = {}) {
     if (typeof value !== "string") continue;
     let copy = value.normalize("NFKC");
     const year = "(?:19|20)\\d{2}";
-    const period = `(?:FY\\s*${year}|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
+    const fiscalYear = `(?:${year}|\\d{2})`;
+    const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
     copy = copy.replace(new RegExp(`\\b${period}\\b(?![\\d.%])`, "gi"), "period");
     copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
     copy = copy.replace(new RegExp(`([,(]\\s*)${year}(?=\\s*(?:$|[,) ;]))`, "g"), "$1period");

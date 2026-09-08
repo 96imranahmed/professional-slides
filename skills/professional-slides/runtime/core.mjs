@@ -317,13 +317,39 @@ function fraction(value) {
 function gridTrackPreferences(node, axis, registry, widths = null) {
   const tracks = axis === "width" ? node.columns : node.rows;
   const columnGap = isTokenReference(node.columnGap) ? tokenValue(node.columnGap) : Number(node.columnGap || 0);
-  return tracks.map((_, index) => Math.max(0, ...node.children
+  const childWidths = widths ? node.children.map(child => {
+    const column = child.cell?.column ?? 0, span = child.cell?.columnSpan ?? 1;
+    return widths.slice(column, column + span).reduce((sum, value) => sum + value, 0) + (span - 1) * columnGap;
+  }) : null;
+  const children = childWidths ? alignPeerHeaders(node.children, childWidths, registry, child => child.cell?.row ?? 0) : node.children;
+  return tracks.map((_, index) => Math.max(0, ...children
     .filter((child) => ((axis === "width" ? child.cell?.column : child.cell?.row) ?? 0) === index && ((axis === "width" ? child.cell?.columnSpan : child.cell?.rowSpan) ?? 1) === 1)
     .map((child) => {
       const column = child.cell?.column ?? 0, span = child.cell?.columnSpan ?? 1;
       const width = widths ? widths.slice(column, column + span).reduce((sum, value) => sum + value, 0) + (span - 1) * columnGap : null;
       return preferredSize(child, axis, registry, width);
     })));
+}
+
+function placementProps(node) {
+  if (node.nodeType !== "section") return node.props || {};
+  assertSectionHeadingProps(node);
+  return { treatment: node.treatment, edge: node.edge, heading: node.heading, padding: node.padding, headerBandHeight: node.headerBandHeight };
+}
+
+// Shared heading baselines consume real height. Measure that shared band before
+// allocating hugged peers, rather than growing it only after their frames lock.
+function alignPeerHeaders(children, widths, registry, group = () => 0) {
+  const headers = children.map((node, index) => registry.get(node.nodeType === "section" ? "section" : node.component)?.measureHeader?.({
+    frame: { x: 0, y: 0, width: widths[index], height: 0 }, props: placementProps(node)
+  }));
+  return children.map((node, index) => {
+    const own = headers[index];
+    if (!own?.ruled) return node;
+    const peers = headers.filter((header, i) => header?.ruled && group(children[i]) === group(node) && Math.abs(header.top - own.top) < 0.01);
+    const headerBandHeight = Math.max(own.height, ...peers.map(header => header.height));
+    return node.nodeType === "section" ? { ...node, headerBandHeight } : { ...node, props: { ...node.props, headerBandHeight } };
+  });
 }
 
 // Width is resolved before measuring wrapped content. Sample preferred sizes
@@ -333,7 +359,12 @@ function preferredSize(node, axis, registry, width = null) {
     const definition = registry.get(node.component);
     if (axis === "height" && width !== null) {
       const measure = definition?.measureIntrinsic ?? definition?.measureContent;
-      const measured = measure?.({ frame: { x: 0, y: 0, width }, props: node.props });
+      let measured;
+      try {
+        measured = measure?.({ frame: { x: 0, y: 0, width }, props: node.props });
+      } catch (error) {
+        throw new Error(`Cannot measure ${node.id} (${node.component}) at ${width}px wide: ${error.message}`, { cause: error });
+      }
       if (measured?.height !== undefined) {
         if (!Number.isFinite(measured.height) || measured.height < 0) throw new Error(`Invalid intrinsic height for ${node.id}`);
         return measured.height;
@@ -364,7 +395,8 @@ function preferredSize(node, axis, registry, width = null) {
       ? row ? allocateTracks(node.children.map(child => child.size?.width), innerWidth, Math.max(0, node.children.length - 1) * gap, node.children.map(child => preferredSize(child, "width", registry)))
         : node.children.map(child => resolveLength(child.size?.width, innerWidth, preferredSize(child, "width", registry)) ?? innerWidth)
       : [];
-    const childValues = node.children.map((child, index) => {
+    const children = row && widths.length ? alignPeerHeaders(node.children, widths, registry) : node.children;
+    const childValues = children.map((child, index) => {
       const explicit = child.size?.[axis];
       const preferred = preferredSize(child, axis, registry, widths[index] ?? null);
       if (typeof explicit === "number" || isTokenReference(explicit) || explicit === "hug") return resolveLength(explicit, 0, preferred) ?? preferred;
@@ -466,7 +498,8 @@ export function resolveLayout(root, frame, registry) {
       const preferred = node.children.map((child) => preferredSize(child, row ? "width" : "height", registry, row ? null : resolveLength(child.size?.width, inner.width, preferredSize(child, "width", registry)) ?? inner.width));
       const lengths = allocateTracks(specs, mainAvailable, Math.max(0, node.children.length - 1) * gap, preferred);
       let cursor = row ? inner.x : inner.y;
-      node.children.forEach((child, index) => {
+      const children = row ? alignPeerHeaders(node.children, lengths, registry) : node.children;
+      children.forEach((child, index) => {
         const crossSpec = row ? child.size?.height : child.size?.width;
         const crossAvailable = row ? inner.height : inner.width;
         const cross = resolveLength(crossSpec, crossAvailable, preferredSize(child, row ? "height" : "width", registry, row ? lengths[index] : null)) ?? crossAvailable;
@@ -638,11 +671,6 @@ export function compileDeck(deckSpec, registry) {
       });
     }
     const placements = [...templatePlacements, ...resolveLayout(slideSpec.composition, slideSpec.frame || contentFrame, registry)];
-    const placementProps = (node) => {
-      if (node.nodeType !== "section") return node.props || {};
-      assertSectionHeadingProps(node);
-      return { treatment: node.treatment, edge: node.edge, heading: node.heading, padding: node.padding };
-    };
     const headerBandHeight = (placement) => {
       const measure = ({ node, frame }) => registry.get(node.nodeType === "section" ? "section" : node.component)?.measureHeader?.({ frame, props: placementProps(node) });
       const own = measure(placement);
@@ -696,7 +724,12 @@ export function compileDeck(deckSpec, registry) {
       const instanceId = stableId(slideId, node.id || node.component);
       const props = { ...node.props, headerBandHeight: headerBandHeight({ node, frame }) };
       if (["page-template", "slide-chrome", "section-divider"].includes(node.component)) props.pageTemplate = { ...pageTemplate, ...node.props?.pageTemplate };
-      const rendered = definition.render({ id: instanceId, frame, tokens: slideTokens, props });
+      let rendered;
+      try {
+        rendered = definition.render({ id: instanceId, frame, tokens: slideTokens, props });
+      } catch (error) {
+        throw new Error(`Cannot render ${instanceId} (${definition.id}): ${error.message}`, { cause: error });
+      }
       placements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
       assertDeclaredComponentTokens(definition, rendered.nodes, instanceId);
       rendered.nodes.forEach((item) => {

@@ -536,13 +536,22 @@ export function measureTable({ frame, props }) {
   const headers = model.columns.map((c, i) =>
     c.label ? measure(c.label, widths[i] - 2 * padding, true, textSize) : null,
   );
-  const headerHeight =
-    Math.max(...headers.map((h) => h?.height ?? 0)) + 2 * padding;
+  const headerHeight = headers.some(Boolean)
+    ? Math.max(...headers.map((h) => h?.height ?? 0)) + 2 * padding
+    : 0;
   const layouts = model.cells.map((row) =>
     row.map((cell) =>
       cell ? contentLayout(cell, widths[cell.column], tableProps, used) : null,
     ),
   );
+  const sectionMarkerSize = v("icon.medium");
+  // A marker straddles the category's top edge. Reserve its inward half and
+  // a real gap inside the cell as well as the existing clearance above it.
+  model.cells.forEach((row, r) => row.forEach((cell, c) => {
+    if (cell?.sectionNumber === undefined) return;
+    layouts[r][c].topInset = Math.max(padding, sectionMarkerSize / 2 + gap / 2 + gap);
+  }));
+  const cellHeight = layout => layout.height + padding + (layout.topInset ?? padding);
   // All rows in a bar column must reserve the same label width so their
   // common numeric domain also has the same physical plot width.
   model.columns.forEach((_, c) => {
@@ -568,11 +577,10 @@ export function measureTable({ frame, props }) {
     Math.max(
       minimumRowHeight,
       ...row.map((l, c) =>
-        l && model.cells[r][c].rowSpan === 1 ? l.height + 2 * padding : 0,
+        l && model.cells[r][c].rowSpan === 1 ? cellHeight(l) : 0,
       ),
     ),
   );
-  const sectionMarkerSize = v("icon.medium");
   // Numbered section markers straddle the horizontal centre of the category
   // cell's top edge. Reserve explicit air above each marked section so the
   // disc never collides with the preceding group or the header rule.
@@ -584,7 +592,7 @@ export function measureTable({ frame, props }) {
   model.cells.forEach((row, r) =>
     row.forEach((cell, c) => {
       if (!cell || cell.rowSpan === 1) return;
-      const required = layouts[r][c].height + 2 * padding,
+      const required = cellHeight(layouts[r][c]),
         allocated = sum(heights.slice(r, r + cell.rowSpan));
       if (required > allocated) {
         const extra = (required - allocated) / cell.rowSpan;
@@ -656,6 +664,7 @@ export function renderTable({ id, frame, props }) {
   if (!["open", "standard", "dimensions"].includes(header))
     throw new Error("Unknown table header treatment");
   m.columns.forEach((column, c) => {
+    if (!m.headerHeight) return;
     const filledHeader = header === "standard" || (header === "dimensions" && column.type !== "category");
     if (filledHeader)
       nodes.push(
@@ -752,9 +761,9 @@ export function renderTable({ id, frame, props }) {
       const color = fill ? foreground(fill) : ink;
       const inner = {
         x: area.x + m.padding,
-        y: area.y + m.padding,
+        y: area.y + (l.topInset ?? m.padding),
         width: area.width - 2 * m.padding,
-        height: height - 2 * m.padding,
+        height: height - m.padding - (l.topInset ?? m.padding),
       };
       if (cell.type === "implication") {
         // Canonical row implication: an icon-medium primary disc and two
@@ -842,7 +851,7 @@ export function renderTable({ id, frame, props }) {
             cell.type,
           )
         )
-          y = area.y + (height - l.height) / 2;
+          y = inner.y + (inner.height - l.height) / 2;
         if (cell.type === "binary") {
           const s = l.marker,
             markY = area.y + (height - s) / 2,

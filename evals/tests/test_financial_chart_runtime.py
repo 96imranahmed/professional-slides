@@ -10,7 +10,7 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const frame={x:60,y:60,width:1000,height:500};
 const title=REGISTRY.get('chart-title');
 const data={categories:['2024','2025'],series:[{name:'Homicides',values:[382,305]}]};
-const invalid=['NYPD: 382 to 305','SF: 35 to 28','Decline of −20.2%','Revenue $1.2bn','Share 1/3','Rate 35 per 100,000','NYPD: 2025','Revenue in 2025: 305','Revenue, 2025.5','Twenty percent decline','Revenue doubled','SF: ３５ to ２８'];
+const invalid=['NYPD: 382 to 305','SF: 35 to 28','Decline of −20.2%','Revenue $1.2bn','Share 1/3','Rate 35 per 100,000','NYPD: 2025','Revenue in 2025: 305','Revenue, 2025.5','Twenty percent decline','Revenue doubled','SF: ３５ to ２８','Revenue FY14.5','Revenue FY14: 17%'];
 for(const heading of invalid) {
  assert.throws(()=>title.measureContent({frame,props:{heading}}),/must not contain statistics/);
  assert.throws(()=>title.render({id:'title',frame,props:{heading}}),/must not contain statistics/);
@@ -19,7 +19,7 @@ for(const heading of invalid) {
  const charts=[heading,'SF reported homicides'].map(heading=>({heading,component:'chart.column',props:data}));
  assert.throws(()=>REGISTRY.get('chart-group').render({id:'group',frame,props:{charts}}),/must not contain statistics/);
 }
-for(const heading of ['NYPD reported homicides','Reported homicides in 2025','Revenue, 2025','Revenue (2025)','Revenue FY2025','Revenue Q1 2025','Revenue 2024–2025']) {
+for(const heading of ['NYPD reported homicides','Reported homicides in 2025','Revenue, 2025','Revenue (2025)','Revenue FY2025','Revenue Q1 2025','Revenue 2024–2025','Revenue FY14','FY14–FY17 average earnings impact','Revenue FY14–17','Revenue FY2014–2017']) {
  assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading,unit:'index'}}));
 }
 for(const unit of ['%','$B','USD millions, 2026','homicides per 100,000']) {

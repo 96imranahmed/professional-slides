@@ -3,6 +3,42 @@ from test_source_structure import run_node
 
 
 class TypedTableTests(unittest.TestCase):
+    def test_headerless_table_has_no_empty_header_band_or_rule(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {renderTable,measureTable} from './skills/professional-slides/runtime/tables.mjs';
+const frame={x:60,y:60,width:500,height:300};
+const base={density:'compact',columns:[{key:'case',label:'',type:'category'}],rows:[[{type:'category',text:'Finance',sectionNumber:1}]]};
+for(const treatment of ['open','standard','dimensions']) {
+ const props={...base,treatment};
+ const measured=measureTable({frame,props}),nodes=renderTable({id:'no-header',frame,props}).nodes;
+ assert.equal(measured.headerHeight,0);
+ assert.ok(!nodes.some(n=>n.role==='table-header-text'||n.role==='table-header-cell'||n.id.includes('header-rule')));
+ const labelled=measureTable({frame,props:{...props,columns:[{...props.columns[0],label:'Option'}]}});
+ assert.equal(labelled.height-measured.height,labelled.headerHeight);
+}
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+    def test_short_numbered_categories_reserve_clearance_at_every_density(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+for(const pageDensity of ['executive','pre-read','appendix']) for(const density of ['body','compact','dense']) {
+ const props={variant:'open',density,columns:[{key:'case',label:'Option',type:'category'},{key:'value',label:'Evidence',type:'text'}],rows:[[{type:'category',text:'Finance',sectionNumber:1},'Shared services'],[{type:'category',text:'Research',sectionNumber:2,rowSpan:2},'Capacity'],[null,'Compliance']]};
+ const deck=compileDeck({slides:[{id:'clearance',density:pageDensity,composition:component({id:'cases',component:'table',props,frame:{x:60,y:60,width:1160,height:600}})}]},REGISTRY);
+ const nodes=deck.slides[0].nodes;
+ for(const marker of nodes.filter(n=>n.role==='table-section-marker')) {
+  const text=nodes.find(n=>n.role==='table-cell-text'&&n.data.row===marker.data.row&&n.data.column===marker.data.column);
+  assert.ok(text.frame.y >= marker.frame.y+marker.frame.height+3.9, `${pageDensity}/${density}: marker overlaps category text`);
+ }
+}
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
     def test_variant_coverage_fonts_and_determinism(self):
         result = run_node('''
 import assert from 'node:assert/strict';

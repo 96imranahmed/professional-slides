@@ -45,7 +45,7 @@ Rows accept `style: plain | accented`, independently of cell encodings. A catego
 
 Circular and oval numbers are presentation treatments, not rating scales. Keep the exact value inside the editable theme-bound bubble, centre it in its column and row, and use the same treatment down the complete metric column. Separate metric columns may demonstrate circle and oval variants. Use plain right-aligned numbers when bubbles would over-emphasize routine values or when the formatted value cannot fit without enlarging the column. In-cell bar values use the active table body size, including its shared density adjustment. Two-series bars default to a strongly contrasting theme-bound pair, with identical legend swatches.
 
-A category may set `sectionNumber` to a unique positive integer for referenceable cases, numbered findings or discussion sections. Render the number in a compact circular marker centered on the category block's top edge, with half of the marker protruding into reserved whitespace. Do not pin it to the top-left corner or let it collide with the preceding group. The marker's job is referenceability, not decoration; obvious reading order does not remove the need to identify cases that will be discussed individually.
+A category may set `sectionNumber` to a unique positive integer for referenceable cases, numbered findings or discussion sections. Render the number in a compact circular marker centered on the category block's top edge, with half of the marker protruding into reserved whitespace. Reserve clearance both above the group and inside the category so the inward half cannot cover its label, including short and spanning cells. Do not pin it to the top-left corner or let it collide with the preceding group. The marker's job is referenceability, not decoration; obvious reading order does not remove the need to identify cases that will be discussed individually.
 
 Use one body density for the table: `body` by default or the registered `compact` role for a consistently dense table family. Headers retain the shared header role.
 
@@ -76,6 +76,8 @@ Generate editable cell fills from the declared domain, not row-relative applicat
 ## Table header contract
 
 A table in a split analytical layout follows the [peer section-title requirement](../design/slide-layouts.md#analytical-composites). Its section title sits above the column-header row; field labels are not a substitute. Keep section-title treatment separate from the column-header treatment below.
+
+When every column label is intentionally empty, omit the header band and its rules entirely; do not reserve an empty header strip. A partially labelled header retains the shared band for column alignment. Omit labels only when the surrounding exhibit makes every field's meaning clear.
 
 Use one deck-wide header treatment for every analytical table: one fill role, one text role, one rule treatment, one row height, and one internal padding system. Bind it to the exact [`tableHeader` record](../design/index.md#semantic-treatment-registry) in the deck treatment ledger and reuse its `variantId` without slide-local recolouring.
 

@@ -165,7 +165,7 @@ html,body{margin:0;width:${SLIDE.width}px;height:${SLIDE.height}px;overflow:hidd
 <body>
 <main class="slide" data-scene-schema="professional-slides.scene/v1">
 <svg class="scene" viewBox="0 0 ${SLIDE.width} ${SLIDE.height}" aria-hidden="true">
-<defs><marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 Z" fill="context-stroke"/></marker></defs>
+<defs><marker id="arrowhead" markerWidth="3" markerHeight="3" refX="3" refY="1.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L3,1.5 L0,3 Z" fill="context-stroke"/></marker></defs>
 ${shapes}
 </svg>
 ${text}
