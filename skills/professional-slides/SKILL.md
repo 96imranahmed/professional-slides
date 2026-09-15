@@ -139,21 +139,33 @@ The runtime takes `professional-slides.deck/v3`: content and intent only, about 
 ```json
 { "schema": "professional-slides.deck/v3", "id": "australia-post", "palette": "mckinsey",
   "brief": "…the client's brief…", "answer": "…the governing answer in one sentence…",
-  "cover": { "title": "Returning Australia Post to profit", "subtitle": "Steering committee · March 2023" },
+  "footer": "Australia Post · steering committee", "agenda": "once",
+  "cover": { "title": "Returning Australia Post to profit", "subtitle": "Steering committee", "date": "March 2023", "logo": "Australia Post" },
   "slides": [
-    { "title": "Costs grew 9% against 5% revenue growth, moving FY22 into a $13bn loss",
+    { "kind": "section", "title": "Where the money goes", "summary": "Costs, volumes and the network" },
+    { "title": "Costs grew 9% against 5% revenue growth, moving FY22 into a $13bn loss", "tag": "Preliminary",
       "exhibit": { "type": "chart.line", "heading": "Revenue and cost, FY15–FY22", "unit": "$bn",
                    "categories": ["FY15", "FY18", "FY22"],
                    "series": [{ "name": "Revenue", "values": [6.4, 6.9, 8.4] }, { "name": "Cost", "values": [6.2, 6.8, 8.6] }] },
       "points": ["Letters volume fell 8% a year while the network was kept whole", "Parcels grew but at half the margin"],
       "soWhat": "The gap is structural: no revenue scenario closes it without a network decision.",
-      "source": "Australia Post annual reports FY15–FY22" },
+      "note": "FY22 excludes the one-off restructuring charge", "source": "Australia Post annual reports FY15–FY22" },
     { "title": "…", "exhibits": [ { "type": "table", "panelHeading": "…", "columns": ["…"], "rows": [["…"]] }, { "type": "chart.column", "panelHeading": "…", "…": "…" } ], "soWhat": "…" },
     { "kind": "section", "title": "What it would take" }
   ] }
 ```
 
-`exhibit.type` is any registered component (`chart.column`, `chart.bar`, `chart.stacked-bar`, `chart.line`, `chart.pie`, `chart.waterfall`, `table`, `image` with a `path`, `metrics`, `timeline`, `matrix`, …). One exhibit plus `points` gives a two-thirds hero with a headed side column (`pointsHeading`, default "What it means", whose rule aligns with the chart heading; `pointsAlign: "middle"` centres the points on the exhibit instead); two or three `exhibits` give a two-up row with one shared value scale; `points` alone give a text page; every page may carry one `soWhat`, which becomes the takeaway box at the foot. Titles are held to two lines at 24pt; a third line drops to 22pt and the page gate reports it.
+**Deck.** `footer` is the document title printed beside the page number on every page. `agenda: true` inserts a Contents page before the first section and an Agenda page (current section tinted) before each later one; `"once"` inserts only the Contents page. Section slides take a `summary` that becomes the agenda detail column. `logo` names the mark for the cover's top-left corner.
+
+**Cover.** `title`, `subtitle`, `date`, `logo`; dark by default, `tone: "light"` for the plain cover, `image` for the half-image cover.
+
+**Page.** `title` (two lines at 24pt; a third line drops to 22pt and the page gate reports it), one `exhibit` or several `exhibits`, `points`, `soWhat`, `source` and `note` (the "Source:" and "Note:" prefixes are added), `tag` (a small right-aligned label above the title: *Preliminary*, *Illustrative*, *Draft*), `titleLead` (a word the title starts with, set in the accent colour), `callout` (a cream reading aid, `"text"` or `{ "lead", "text" }`, placed under the points or at the foot), `metrics` (a KPI strip above the exhibit: `[{ "value", "label", "sublabel", "delta" }]`), `rows` (a label + text table with no other exhibit), `arrange` (`stack`, `grid` or `row` when the automatic layout picks wrongly), `density`, `notes`, `tracker`.
+
+Points are strings or `{ "lead", "text", "icon", "state" }`: a lead is set semibold before the text, an `icon` (from the 48-name vocabulary: target, rocket, people, gear, shield, clock, money, lightbulb, checklist, warning, growth, …) draws an outline marker, and `state: "yes"|"no"` draws a green tick or red cross. Points with leads and no icons get numbered discs; plain strings get dots. `pointsHeading` (default "What it means") heads the side column; `pointsAlign: "middle"` centres the points on the exhibit instead.
+
+**Exhibits.** `exhibit.type` is any registered component (`chart.column`, `chart.bar`, `chart.stacked-bar`, `chart.line`, `chart.pie`, `chart.donut`, `chart.waterfall`, `chart.range`, `table`, `image` with a `path`, `metrics`, `timeline`, `matrix`, `gantt`, `cycle`, `steps`, `people`, `logos`, `framework`, …) or one of the composer aliases: `cards` (`items: [{ title, text|points, icon }]`, `tone: outline|header|numbered|plain`), `quadrants` (`quadrants: [{ title, points }]`), `swot` (`strengths`, `weaknesses`, `opportunities`, `threats`), `compare` (`left`/`right` with `heading` and `points`), `phase-table` (`phases`, `rows: [{ label, cells }]`, chevron header), `rows` (`[{ label, text|points, number }]`). Charts take `cagr: { from, to }` (a CAGR pill on the heading line), `forecastFrom` (lighter fills from that category), `dataTable` (a value table hugged under the chart), `center` (a KPI in a donut's hole), `highlights`; a `chart.range` takes `low` and `high` series. Tables take `recommended: "<column>"` to tint the winning column, and infer status pills, progress bars and ticks from their cells (see the table menu above).
+
+**Layout is derived.** One exhibit plus `points` gives a hero beside a headed side column (2:1 for a chart, 3:2 for a table); a single-series chart with three categories or fewer becomes a column of KPI tiles instead of a thin chart; two exhibits give a two-up row, two charts on the same categories over `points` stack, four or more form a grid; `points` alone give a text page; a table over eight rows paginates and two tables of different treatment split, each page titled `(1/2)`, `(2/2)`. `layout` overrides all of this (`exhibit-full`, `exhibit-left`, `exhibit-right`, `two-up`, `stack`, `grid`, `text`).
 
 ```bash
 node runtime/build-deck.mjs deck.json out/ --preflight   # story gates only: titles, hedges, words, monotony

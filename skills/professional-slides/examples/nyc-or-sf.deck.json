@@ -1,500 +1,496 @@
 {
-  "schema": "professional-slides.deck/v3",
-  "id": "nyc-or-sf",
-  "palette": "mckinsey",
-  "brief": "Help Imran decide where to live and work: NYC or SF and nearby towns within about 45 minutes of work. Another PM role, ideally working with an AI research lab. Move alone within next year; partner within a couple of years; children's schooling relevant in three years. Priorities ranked: quality education for kids and family life, safety, then frequent neighborhood activities and walkability. Housing budget depends on work. Building a business is a possibility in 5-10 years.",
-  "answer": "Lead with Park Slope: Anthropic offers the role in NYC, its school evidence is the strongest in the set, and the commute has 17 minutes of slack. Switch to SF only if an offer puts you inside model decisions in a way the NYC role does not. Hoboken is the fallback for a midtown office; Berkeley is out on commute.",
-  "cover": {
-    "title": "NYC or San Francisco?",
-    "subtitle": "Where to live and work for the next role, the family and the business after that\nDecision brief for Imran · September 2026"
-  },
-  "slides": [
-    {
-      "title": "Lead with Park Slope; move to SF only for a role inside model decisions",
-      "exhibit": {
-        "type": "table",
-        "columns": [
-          "Gate (ranked by the brief)",
-          "Park Slope",
-          "Noe Valley",
-          "Hoboken",
-          "Berkeley"
-        ],
-        "rows": [
-          [
-            "1 · School evidence",
-            "P.S. 321: 89/90% vs 79/80% peers",
-            "Alvarado: 60/53% (CA scale)",
-            "Connors: 73/65%, below district",
-            "District 72/70%, no school named"
-          ],
-          [
-            "2 · Safety, matched 2024 rate",
-            "671 /100k citywide; precinct rising",
-            "597 /100k; low-rate neighborhood",
-            "189 /100k, lowest",
-            "639 /100k; robberies −48%"
-          ],
-          [
-            "3 · Weekly anchor",
-            "Sat Greenmarket, Prospect Park",
-            "Sat market, 24th St",
-            "Tue/Thu/Sat markets",
-            "Sat downtown market"
-          ],
-          [
-            "Commute ≤ 45 min",
-            "28 min ride, 17 min slack",
-            "20 min ride, 25 min slack",
-            "41 min door to door",
-            "55 min: fails"
-          ],
-          [
-            "Two-bed rent",
-            "$4,500–5,600",
-            "$4,950–6,500",
-            "$3,600–4,400",
-            "$3,995–4,100"
-          ],
-          [
-            "Research role in city",
-            "Anthropic Research or Labs",
-            "Anthropic + OpenAI Core Models",
-            "NYC roles, PATH commute",
-            "SF roles, BART commute"
-          ]
-        ]
-      },
-      "soWhat": "Park Slope is the only location that clears every gate with evidence in hand; SF wins only if the role itself is better.",
-      "source": "NYC Public Schools 2024-25 reports; CA Dashboard 2025; HomeSnacks/FBI 2024; Rome2Rio; Zillow 8 Sep 2026; Anthropic and OpenAI postings",
-      "serves": [
-        "education",
-        "safety",
-        "walkability",
-        "commute",
-        "housing",
-        "role"
-      ]
-    },
-    {
-      "title": "Both cities offer the role; only Anthropic lets you take it in New York",
-      "exhibit": {
-        "type": "chart.bar",
-        "heading": "Published annual pay for research-connected PM roles",
-        "unit": "$k",
-        "categories": [
-          "Anthropic · Research (NYC/SF)",
-          "Anthropic · Labs (NYC/SF)",
-          "OpenAI · Core Models (SF)",
-          "OpenAI · API Agents (SF)"
-        ],
-        "series": [
-          {
-            "name": "High",
-            "values": [
-              385,
-              460,
-              490,
-              400
-            ]
-          },
-          {
-            "name": "Low",
-            "values": [
-              305,
-              385,
-              347,
-              300
-            ]
-          }
-        ],
-        "valueFormat": {
-          "decimals": 0
-        }
-      },
-      "points": [
-        "Research and Core Models put you inside model decisions; Labs and API Agents build founder skills",
-        "The two OpenAI roles are SF-only, so an OpenAI offer is a reason to move west",
-        "Pay bands overlap; the role, not the salary, separates the offers"
-      ],
-      "soWhat": "In interviews, establish which decisions you own and which researchers you sit with; a lab name alone proves nothing.",
-      "source": "Anthropic and OpenAI job postings retrieved 8 Sep 2026; API Agents band estimated from adjacent listings",
-      "serves": [
-        "role"
-      ]
-    },
-    {
-      "title": "NYC schools beat their peers by 7–12 points; the SF pair is a preference",
-      "exhibits": [
-        {
-          "type": "chart.column",
-          "panelHeading": "New York",
-          "heading": "Share meeting NY State standards, 2025",
-          "unit": "%",
-          "categories": [
-            "P.S. 321 English",
-            "P.S. 321 Math",
-            "P.S. 87 English",
-            "P.S. 87 Math"
-          ],
-          "series": [
-            {
-              "name": "School",
-              "values": [
-                89,
-                90,
-                88,
-                84
-              ]
-            },
-            {
-              "name": "Peer group",
-              "values": [
-                79,
-                80,
-                76,
-                77
-              ]
-            }
-          ]
-        },
-        {
-          "type": "chart.column",
-          "panelHeading": "San Francisco",
-          "heading": "Share meeting CA standards, 2025",
-          "unit": "%",
-          "categories": [
-            "Jefferson English",
-            "Jefferson Math",
-            "Alvarado English",
-            "Alvarado Math"
-          ],
-          "series": [
-            {
-              "name": "School",
-              "values": [
-                62.9,
-                64.5,
-                59.5,
-                53.1
-              ]
-            }
-          ]
-        }
-      ],
-      "soWhat": "Education does not decide the city; it decides the neighborhood. Jefferson leads Alvarado by 3 and 11 points, but Alvarado offers Spanish immersion.",
-      "source": "NYC Public Schools 2024-25 School Quality Snapshots; California School Dashboard 2025. Scales are not comparable across states.",
-      "serves": [
-        "education"
-      ]
-    },
-    {
-      "title": "Hoboken is safest on the matched measure; neighborhoods differ more than cities",
-      "exhibit": {
-        "type": "chart.bar",
-        "heading": "Violent crimes per 100,000 residents, 2024",
-        "unit": "per 100k",
-        "categories": [
-          "Hoboken",
-          "San Francisco",
-          "Berkeley",
-          "New York City"
-        ],
-        "series": [
-          {
-            "name": "Rate",
-            "values": [
-              188.5,
-              596.5,
-              638.8,
-              671.0
-            ]
-          }
-        ],
-        "valueFormat": {
-          "decimals": 0
-        }
-      },
-      "points": [
-        "Noe Valley and Inner Sunset rank among SF's lower-rate neighborhoods",
-        "Felony-assault counts rose in the two NYC precincts examined; get the rates before signing a lease",
-        "Berkeley pedestrian robberies fell from 205 to 106 in 2024"
-      ],
-      "soWhat": "Safety is your #2 priority and the evidence is citywide: walk the actual streets in daylight and at night before choosing a block.",
-      "source": "HomeSnacks compilation of FBI 2024 data; NYPD precinct reports; SFPD neighborhood rankings; Berkeley PD 2024",
-      "serves": [
-        "safety",
-        "walkability"
-      ]
-    },
-    {
-      "title": "Every shortlisted commute fits in 45 minutes except Berkeley, which fails by 10",
-      "exhibit": {
-        "type": "chart.stacked-bar",
-        "heading": "Illustrative door-to-door journey to a central office",
-        "unit": "minutes",
-        "categories": [
-          "Park Slope → Union Sq",
-          "Upper West Side → 18 St",
-          "Noe Valley → Montgomery",
-          "Hoboken → 33rd St",
-          "Berkeley → Montgomery"
-        ],
-        "series": [
-          {
-            "name": "Walk to transit",
-            "values": [
-              8,
-              8,
-              8,
-              10,
-              5
-            ]
-          },
-          {
-            "name": "Wait",
-            "values": [
-              5,
-              5,
-              5,
-              5,
-              15
-            ]
-          },
-          {
-            "name": "Ride",
-            "values": [
-              28,
-              15,
-              20,
-              16,
-              25
-            ]
-          },
-          {
-            "name": "Walk to office",
-            "values": [
-              8,
-              8,
-              8,
-              10,
-              10
-            ]
-          }
-        ],
-        "referenceLines": [
-          {
-            "value": 45,
-            "label": "45-minute limit"
-          }
-        ]
-      },
-      "soWhat": "Ride time is not the constraint; waiting and walking are. Berkeley's 15-minute wait already halves the published 30-minute headway.",
-      "source": "Rome2Rio station-to-station estimates; walk and wait times are assumptions, not measured routes",
-      "serves": [
-        "commute"
-      ]
-    },
-    {
-      "title": "Rent moves five points of gross pay: a comfort decision, not a viability one",
-      "exhibits": [
-        {
-          "type": "chart.column",
-          "panelHeading": "Annual rent",
-          "heading": "Annual rent at three monthly budgets",
-          "unit": "$k",
-          "categories": [
-            "$4,000",
-            "$5,500",
-            "$6,500"
-          ],
-          "series": [
-            {
-              "name": "Annual rent",
-              "values": [
-                48,
-                66,
-                78
-              ]
-            }
-          ]
-        },
-        {
-          "type": "table",
-          "panelHeading": "Rent as a share of gross salary",
-          "columns": [
-            "Monthly rent",
-            "$305k salary",
-            "$385k salary",
-            "$460k salary"
-          ],
-          "rows": [
-            [
-              "$4,000",
-              "15.7%",
-              "12.5%",
-              "10.4%"
-            ],
-            [
-              "$5,500",
-              "21.6%",
-              "17.1%",
-              "14.3%"
-            ],
-            [
-              "$6,500",
-              "25.6%",
-              "20.3%",
-              "17.0%"
-            ]
-          ]
-        }
-      ],
-      "soWhat": "A $1,500 monthly premium is $18,000 a year; state and city income tax between NY, NJ and CA moves more than that.",
-      "source": "Zillow two-bedroom asks, 8 Sep 2026; salary bands from posted roles; gross-pay arithmetic, no tax modeled",
-      "serves": [
-        "housing"
-      ]
-    },
-    {
-      "title": "Hoboken is the midtown fallback: cheapest and safest, but its school trails its district",
-      "exhibits": [
-        {
-          "type": "chart.column",
-          "panelHeading": "Connors Elementary vs Hoboken district, 2024-25",
-          "heading": "Share meeting NJ standards",
-          "unit": "%",
-          "categories": [
-            "ELA",
-            "Math"
-          ],
-          "series": [
-            {
-              "name": "Connors",
-              "values": [
-                73,
-                65
-              ]
-            },
-            {
-              "name": "District",
-              "values": [
-                75,
-                67
-              ]
-            }
-          ]
-        },
-        {
-          "type": "table",
-          "panelHeading": "Two-bedroom asks",
-          "columns": [
-            "Listing",
-            "Size",
-            "Rent"
-          ],
-          "rows": [
-            [
-              "332 Jefferson #415",
-              "1 bath / 1,000 sq ft",
-              "$3,600"
-            ],
-            [
-              "300 Newark #4F",
-              "2 bath / 1,150 sq ft",
-              "$4,400"
-            ],
-            [
-              "Park Slope range",
-              "900–1,000 sq ft",
-              "$4,500–5,600"
-            ]
-          ]
-        }
-      ],
-      "soWhat": "Hoboken saves roughly $12,000 a year against Park Slope and has the lowest matched crime rate; it qualifies only if the office is reachable by PATH.",
-      "source": "Hoboken Public Schools 2024-25; Zillow 8 Sep 2026; HomeSnacks/FBI 2024",
-      "serves": [
-        "education",
-        "housing",
-        "safety"
-      ]
-    },
-    {
-      "title": "Rent for stage one, book two visits, and fix the school before entry year",
-      "exhibits": [
-        {
-          "type": "table",
-          "panelHeading": "Sequence the commitments",
-          "columns": [
-            "Stage",
-            "When",
-            "Decision at that point"
-          ],
-          "rows": [
-            [
-              "1 · Move alone",
-              "Year 1",
-              "Rent a one-bedroom near the actual office; keep it reversible"
-            ],
-            [
-              "2 · Partner joins",
-              "Year 2–3",
-              "Re-size the home; compare moving with staying larger from the start"
-            ],
-            [
-              "3 · School entry",
-              "Year 3",
-              "Confirm address priority (NYC) or assignment (SF) for the entry year"
-            ],
-            [
-              "4 · Business option",
-              "Year 5–10",
-              "A tie-breaker between equal offers, not a reason to pick a city now"
-            ]
-          ]
-        },
-        {
-          "type": "table",
-          "panelHeading": "Verify on the visits",
-          "columns": [
-            "Visit",
-            "Verify before signing",
-            "Then decide"
-          ],
-          "rows": [
-            [
-              "NYC · Park Slope",
-              "P.S. 321 address priority and seats; weekday commute to the real office; two streets you would use daily",
-              "Lead option if the role is in NYC"
-            ],
-            [
-              "SF · Noe Valley",
-              "Alvarado immersion access; J Church to the office; Inner Sunset if Jefferson fits better",
-              "Only if the SF role owns model decisions"
-            ],
-            [
-              "NJ · Hoboken",
-              "Connors placement; timed PATH journey to the real office",
-              "Fallback for a midtown office"
-            ]
-          ]
-        }
-      ],
-      "soWhat": "Require the family fit first; among the locations that pass, take the role with the closest researcher collaboration.",
-      "source": "Brief; NYC DOE and SFUSD enrollment rules; transit timings to be measured on the visit",
-      "serves": [
-        "housing",
-        "education"
-      ]
-    }
-  ],
-  "criteria": [
+ "schema": "professional-slides.deck/v3",
+ "id": "nyc-or-sf",
+ "palette": "mckinsey",
+ "brief": "Help Imran decide where to live and work: NYC or SF and nearby towns within about 45 minutes of work. Another PM role, ideally working with an AI research lab. Move alone within next year; partner within a couple of years; children's schooling relevant in three years. Priorities ranked: quality education for kids and family life, safety, then frequent neighborhood activities and walkability. Housing budget depends on work. Building a business is a possibility in 5-10 years.",
+ "answer": "Lead with Park Slope: Anthropic offers the role in NYC, its school evidence is the strongest in the set, and the commute has 17 minutes of slack. Switch to SF only if an offer puts you inside model decisions in a way the NYC role does not. Hoboken is the fallback for a midtown office; Berkeley is out on commute.",
+ "cover": {
+  "title": "NYC or San Francisco?",
+  "subtitle": "Where to live and work for the next role, the family and the business after that",
+  "date": "Decision brief · September 2026"
+ },
+ "slides": [
+  {
+   "title": "Lead with Park Slope; move to SF only for a role inside model decisions",
+   "exhibit": {
+    "type": "table",
+    "columns": [
+     "Gate (ranked by the brief)",
+     "Park Slope",
+     "Noe Valley",
+     "Hoboken",
+     "Berkeley"
+    ],
+    "rows": [
+     [
+      "1 · School evidence",
+      "P.S. 321: 89/90% vs 79/80% peers",
+      "Alvarado: 60/53% (CA scale)",
+      "Connors: 73/65%, below district",
+      "District 72/70%, no school named"
+     ],
+     [
+      "2 · Safety, matched 2024 rate",
+      "671 /100k citywide; precinct rising",
+      "597 /100k; low-rate neighborhood",
+      "189 /100k, lowest",
+      "639 /100k; robberies −48%"
+     ],
+     [
+      "3 · Weekly anchor",
+      "Sat Greenmarket, Prospect Park",
+      "Sat market, 24th St",
+      "Tue/Thu/Sat markets",
+      "Sat downtown market"
+     ],
+     [
+      "Commute ≤ 45 min",
+      "28 min ride, 17 min slack",
+      "20 min ride, 25 min slack",
+      "41 min door to door",
+      "55 min: fails"
+     ],
+     [
+      "Two-bed rent",
+      "$4,500–5,600",
+      "$4,950–6,500",
+      "$3,600–4,400",
+      "$3,995–4,100"
+     ],
+     [
+      "Research role in city",
+      "Anthropic Research or Labs",
+      "Anthropic + OpenAI Core Models",
+      "NYC roles, PATH commute",
+      "SF roles, BART commute"
+     ]
+    ],
+    "recommended": "Park Slope"
+   },
+   "soWhat": "Park Slope is the only location that clears every gate with evidence in hand; SF wins only if the role itself is better.",
+   "source": "NYC Public Schools 2024-25 reports; CA Dashboard 2025; HomeSnacks/FBI 2024; Rome2Rio; Zillow 8 Sep 2026; Anthropic and OpenAI postings",
+   "serves": [
     "education",
     "safety",
     "walkability",
     "commute",
     "housing",
     "role"
-  ]
+   ]
+  },
+  {
+   "title": "Both cities offer the role; only Anthropic lets you take it in New York",
+   "exhibit": {
+    "type": "chart.range",
+    "heading": "Published annual pay for research-connected PM roles",
+    "unit": "$k, published base-salary band",
+    "categories": [
+     "Anthropic · Research",
+     "Anthropic · Labs",
+     "OpenAI · Core Models",
+     "OpenAI · API Agents"
+    ],
+    "valueFormat": {
+     "decimals": 0
+    },
+    "low": [
+     305,
+     385,
+     347,
+     300
+    ],
+    "high": [
+     385,
+     460,
+     490,
+     400
+    ]
+   },
+   "points": [
+    "Research and Core Models put you inside model decisions; Labs and API Agents build founder skills",
+    "The two OpenAI roles are SF-only, so an OpenAI offer is a reason to move west",
+    "Pay bands overlap; the role, not the salary, separates the offers"
+   ],
+   "soWhat": "In interviews, establish which decisions you own and which researchers you sit with; a lab name alone proves nothing.",
+   "source": "Anthropic and OpenAI job postings retrieved 8 Sep 2026; API Agents band estimated from adjacent listings",
+   "serves": [
+    "role"
+   ],
+   "tag": "Illustrative"
+  },
+  {
+   "title": "NYC schools beat their peers by 7–12 points; the SF pair is a preference",
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "panelHeading": "New York",
+     "heading": "Share meeting NY State standards, 2025",
+     "unit": "%",
+     "categories": [
+      "P.S. 321 English",
+      "P.S. 321 Math",
+      "P.S. 87 English",
+      "P.S. 87 Math"
+     ],
+     "series": [
+      {
+       "name": "School",
+       "values": [
+        89,
+        90,
+        88,
+        84
+       ]
+      },
+      {
+       "name": "Peer group",
+       "values": [
+        79,
+        80,
+        76,
+        77
+       ]
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "panelHeading": "San Francisco",
+     "heading": "Share meeting CA standards, 2025",
+     "unit": "%",
+     "categories": [
+      "Jefferson English",
+      "Jefferson Math",
+      "Alvarado English",
+      "Alvarado Math"
+     ],
+     "series": [
+      {
+       "name": "School",
+       "values": [
+        62.9,
+        64.5,
+        59.5,
+        53.1
+       ]
+      }
+     ]
+    }
+   ],
+   "soWhat": "Education does not decide the city; it decides the neighborhood. Jefferson leads Alvarado by 3 and 11 points, but Alvarado offers Spanish immersion.",
+   "source": "NYC Public Schools 2024-25 School Quality Snapshots; California School Dashboard 2025. Scales are not comparable across states.",
+   "serves": [
+    "education"
+   ]
+  },
+  {
+   "title": "Hoboken is safest on the matched measure; neighborhoods differ more than cities",
+   "exhibit": {
+    "type": "chart.bar",
+    "heading": "Violent crimes per 100,000 residents, 2024",
+    "unit": "per 100k",
+    "categories": [
+     "Hoboken",
+     "San Francisco",
+     "Berkeley",
+     "New York City"
+    ],
+    "series": [
+     {
+      "name": "Rate",
+      "values": [
+       188.5,
+       596.5,
+       638.8,
+       671.0
+      ]
+     }
+    ],
+    "valueFormat": {
+     "decimals": 0
+    }
+   },
+   "points": [
+    "Noe Valley and Inner Sunset rank among SF's lower-rate neighborhoods",
+    "Felony-assault counts rose in the two NYC precincts examined; get the rates before signing a lease",
+    "Berkeley pedestrian robberies fell from 205 to 106 in 2024"
+   ],
+   "soWhat": "Safety is your #2 priority and the evidence is citywide: walk the actual streets in daylight and at night before choosing a block.",
+   "source": "HomeSnacks compilation of FBI 2024 data; NYPD precinct reports; SFPD neighborhood rankings; Berkeley PD 2024",
+   "serves": [
+    "safety",
+    "walkability"
+   ]
+  },
+  {
+   "title": "Every shortlisted commute fits in 45 minutes except Berkeley, which fails by 10",
+   "exhibit": {
+    "type": "chart.stacked-bar",
+    "heading": "Illustrative door-to-door journey to a central office",
+    "unit": "minutes",
+    "categories": [
+     "Park Slope → Union Sq",
+     "Upper West Side → 18 St",
+     "Noe Valley → Montgomery",
+     "Hoboken → 33rd St",
+     "Berkeley → Montgomery"
+    ],
+    "series": [
+     {
+      "name": "Walk to transit",
+      "values": [
+       8,
+       8,
+       8,
+       10,
+       5
+      ]
+     },
+     {
+      "name": "Wait",
+      "values": [
+       5,
+       5,
+       5,
+       5,
+       15
+      ]
+     },
+     {
+      "name": "Ride",
+      "values": [
+       28,
+       15,
+       20,
+       16,
+       25
+      ]
+     },
+     {
+      "name": "Walk to office",
+      "values": [
+       8,
+       8,
+       8,
+       10,
+       10
+      ]
+     }
+    ],
+    "referenceLines": [
+     {
+      "value": 45,
+      "label": "45-minute limit"
+     }
+    ]
+   },
+   "soWhat": "Ride time is not the constraint; waiting and walking are. Berkeley's 15-minute wait already halves the published 30-minute headway.",
+   "source": "Rome2Rio station-to-station estimates; walk and wait times are assumptions, not measured routes",
+   "serves": [
+    "commute"
+   ]
+  },
+  {
+   "title": "Rent moves five points of gross pay: a comfort decision, not a viability one",
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "panelHeading": "Annual rent",
+     "heading": "Annual rent at three monthly budgets",
+     "unit": "$k",
+     "categories": [
+      "$4,000",
+      "$5,500",
+      "$6,500"
+     ],
+     "series": [
+      {
+       "name": "Annual rent",
+       "values": [
+        48,
+        66,
+        78
+       ]
+      }
+     ]
+    },
+    {
+     "type": "table",
+     "panelHeading": "Rent as a share of gross salary",
+     "columns": [
+      "Monthly rent",
+      "$305k salary",
+      "$385k salary",
+      "$460k salary"
+     ],
+     "rows": [
+      [
+       "$4,000",
+       "15.7%",
+       "12.5%",
+       "10.4%"
+      ],
+      [
+       "$5,500",
+       "21.6%",
+       "17.1%",
+       "14.3%"
+      ],
+      [
+       "$6,500",
+       "25.6%",
+       "20.3%",
+       "17.0%"
+      ]
+     ]
+    }
+   ],
+   "soWhat": "A $1,500 monthly premium is $18,000 a year; state and city income tax between NY, NJ and CA moves more than that.",
+   "source": "Zillow two-bedroom asks, 8 Sep 2026; salary bands from posted roles; gross-pay arithmetic, no tax modeled",
+   "serves": [
+    "housing"
+   ]
+  },
+  {
+   "title": "Hoboken is the midtown fallback: cheapest and safest, but its school trails its district",
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "panelHeading": "Connors Elementary vs Hoboken district, 2024-25",
+     "heading": "Share meeting NJ standards",
+     "unit": "%",
+     "categories": [
+      "ELA",
+      "Math"
+     ],
+     "series": [
+      {
+       "name": "Connors",
+       "values": [
+        73,
+        65
+       ]
+      },
+      {
+       "name": "District",
+       "values": [
+        75,
+        67
+       ]
+      }
+     ]
+    },
+    {
+     "type": "table",
+     "panelHeading": "Two-bedroom asks",
+     "columns": [
+      "Listing",
+      "Size",
+      "Rent"
+     ],
+     "rows": [
+      [
+       "332 Jefferson #415",
+       "1 bath / 1,000 sq ft",
+       "$3,600"
+      ],
+      [
+       "300 Newark #4F",
+       "2 bath / 1,150 sq ft",
+       "$4,400"
+      ],
+      [
+       "Park Slope range",
+       "900–1,000 sq ft",
+       "$4,500–5,600"
+      ]
+     ]
+    }
+   ],
+   "soWhat": "Hoboken saves roughly $12,000 a year against Park Slope and has the lowest matched crime rate; it qualifies only if the office is reachable by PATH.",
+   "source": "Hoboken Public Schools 2024-25; Zillow 8 Sep 2026; HomeSnacks/FBI 2024",
+   "serves": [
+    "education",
+    "housing",
+    "safety"
+   ]
+  },
+  {
+   "title": "Rent for stage one, book two visits, and fix the school before entry year",
+   "exhibits": [
+    {
+     "type": "table",
+     "panelHeading": "Sequence the commitments",
+     "columns": [
+      "Stage",
+      "When",
+      "Decision at that point"
+     ],
+     "rows": [
+      [
+       "1 · Move alone",
+       "Year 1",
+       "Rent a one-bedroom near the actual office; keep it reversible"
+      ],
+      [
+       "2 · Partner joins",
+       "Year 2–3",
+       "Re-size the home; compare moving with staying larger from the start"
+      ],
+      [
+       "3 · School entry",
+       "Year 3",
+       "Confirm address priority (NYC) or assignment (SF) for the entry year"
+      ],
+      [
+       "4 · Business option",
+       "Year 5–10",
+       "A tie-breaker between equal offers, not a reason to pick a city now"
+      ]
+     ]
+    },
+    {
+     "type": "table",
+     "panelHeading": "Verify on the visits",
+     "columns": [
+      "Visit",
+      "Verify before signing",
+      "Then decide"
+     ],
+     "rows": [
+      [
+       "NYC · Park Slope",
+       "P.S. 321 address priority and seats; weekday commute to the real office; two streets you would use daily",
+       "Lead option if the role is in NYC"
+      ],
+      [
+       "SF · Noe Valley",
+       "Alvarado immersion access; J Church to the office; Inner Sunset if Jefferson fits better",
+       "Only if the SF role owns model decisions"
+      ],
+      [
+       "NJ · Hoboken",
+       "Connors placement; timed PATH journey to the real office",
+       "Fallback for a midtown office"
+      ]
+     ]
+    }
+   ],
+   "soWhat": "Require the family fit first; among the locations that pass, take the role with the closest researcher collaboration.",
+   "source": "Brief; NYC DOE and SFUSD enrollment rules; transit timings to be measured on the visit",
+   "serves": [
+    "housing",
+    "education"
+   ]
+  }
+ ],
+ "criteria": [
+  "education",
+  "safety",
+  "walkability",
+  "commute",
+  "housing",
+  "role"
+ ],
+ "footer": "NYC or SF · decision brief"
 }

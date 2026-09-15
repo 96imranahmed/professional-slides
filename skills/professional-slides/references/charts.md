@@ -47,13 +47,15 @@ Calculate from unrounded inputs and round for display; keep independently rounde
 ## Construction
 
 1. Match the encoding to the comparison task and use an honest scale.
-2. Keep the exhibit header on one line: a heading naming measure, population and period, with a short unit appended after a comma at the same size in the secondary colour. The heading carries no statistics; values live on the marks.
+2. The exhibit header is a heading naming measure, population and period on its first line, and the unit (with a base year or sample size when the reader needs it) on a compact grey second line inside the same band. The heading carries no statistics; values live on the marks. A `cagr: {from, to}` on the spec adds one computed pill (`CAGR 2024–2030E: +12%`) at the band's right.
 3. Resolve every series, highlight, plot band and legend key through the theme tokens, and keep those properties editable in the exported file.
 4. Direct-label values when they pass the label gate; otherwise use the shared legend.
 5. Default to a blank plot field, adding quiet gridlines when a dense scale needs intermediate lookup. With fewer than eight values, all shown directly, omit the quantitative axis and keep the category axis.
 6. Decide the annotation before plotting: attach the growth, gap, threshold or observation to exact evidence and reserve its geometry.
 
-**Focus and comparator colours.** For a focal measure against a baseline, benchmark or peer set, use `component-primary` for focus and `chart-comparator` for the light-grey comparators, choosing the focal category from the argument and keeping its exact-key mapping across slides. One-series bars request `highlights: [{category, style: "bar"}]`; grouped bars request `focusSeries`. Target 3:1 contrast between the two fills, in colour and in greyscale.
+**Focus and comparator colours.** For a focal measure against a baseline, benchmark or peer set, use `component-primary` for focus and `chart-comparator` for the light-grey comparators, choosing the focal category from the argument and keeping its exact-key mapping across slides. One-series bars request `highlights: [{category, style: "bar"}]` and the highlighted bar takes the palette accent (`color.accent`) while the rest keep the series colour; the composer sets that highlight itself when the action title names a category. Grouped bars request `focusSeries`. Target 3:1 contrast between the two fills, in colour and in greyscale.
+
+**Forecast, labels and companions.** `forecastFrom: "<category>"` shades every bar from that category on in the forecast tint and marks the boundary. Value labels are 11pt semibold: inside the bar in white when the bar is wide enough, outside it otherwise. `dataTable: [[...]]` hugs a value table under the chart, its columns aligned to the categories; `center: "value"` prints a KPI in a donut's hole; multi-series lines drop the legend and carry `endLabels` (the series name at the end of each line). Native charts keep these as per-point fills and data labels in the exported workbook chart.
 
 **Direct-label gate.** A direct label stays at the body-sized chart-label role, sits inside the plot or the declared gutter, reaches 4.5:1 text contrast, and clears every mark, label, axis and leader by four pixels. It identifies the category or series, and the value when the value is not already printed. Labels and annotations use the semibold role; legend rows and axis ticks stay regular. When a required label cannot fit, keep the decisive non-colliding labels and use the shared legend.
 
@@ -64,6 +66,10 @@ Calculate from unrounded inputs and round for display; keep independently rounde
 Category comparison, ranking, discrete periods, actual-versus-benchmark pairs. One categorical dimension, one or a few series, explicit units, a declared order, one finite value per category per series, bounds containing every value and zero. Horizontal bars for long labels or rankings, vertical columns for up to eight ordered periods. Sort by value unless another order carries meaning, start the axis at zero, plot signed values from the baseline, highlight one bar, and reserve `space.3` beyond each endpoint for outside labels. Variants: ranked bar or discrete column; clustered comparison, for two or three series when within-category comparison is the job; actual-and-forecast columns on one scale with the interval marked once plus a non-colour cue; column with reference line; endpoint growth; annotation rail of secondary period values bound to exact category keys.
 
 *Example:* six locations, door-to-door minutes each, sorted ascending, a 45-minute reference line, the two qualifying bars in primary and the rest in comparator grey.
+
+## Range
+
+`chart.range` draws one horizontal floating band per category between `low` and `high` arrays (pay bands, scenario ranges, confidence intervals), with the low value labelled at the band's left end and the high value at its right; `highlights` accent one band. It is emitted as a native stacked bar with an invisible base, so the bands stay editable. Use it when the spread is the finding; when only the midpoints matter, use a bar.
 
 ## Line
 

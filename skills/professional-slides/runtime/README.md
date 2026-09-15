@@ -3,12 +3,18 @@
 Node lays the page out; Python writes and checks the file. No vendor runtime.
 
 ```
-compose.mjs        deck/v3 spec → planner items (hero/side/two-up/text layouts, images by path)
-planner.mjs        items → composition tree; density; section headings
+compose.mjs        deck/v3 spec → planner items: layouts (hero/side/two-up/stack/grid/text), exhibit aliases (cards, quadrants, swot, compare, phase-table, rows), table styling and verdict inference, pagination and splitting, metrics strips, agenda pages, chart rules (highlight from title, CAGR badge, end labels)
+planner.mjs        items → composition tree; density; section headings; dividers, covers, page chrome (tag, titleLead, callout, note/source)
 core.mjs           tokens (modular type scale, 12-column grid, 4px baseline), the composition solver, compileDeck → scene
 text-layout.mjs    wrap-once measurement; font-metrics.mjs uses @napi-rs/canvas when present, bundled Arial/Georgia tables otherwise
-registry.mjs       components (charts.mjs, tables.mjs, trackers.mjs, …); fitText degradation ladder; paragraph measure cap
-emit/emit_pptx.py  scene → editable PPTX (title placeholders, wrap=square, autofit, native charts, grouped diagrams, palette → theme)
+registry.mjs       components (charts.mjs, tables.mjs, trackers.mjs, panels.mjs, gantt.mjs, extras.mjs, framework.mjs, maps.mjs, …); fitText degradation ladder; paragraph measure cap
+marks.mjs          the shared marker vocabulary: numberMarker, iconMarker, stateMarker (lists, cards, table category cells, map pins, agenda)
+icons.mjs          48 named icons as path data, emitted as editable freeforms
+panels.mjs         cards, quadrants, metric tiles, agenda
+gantt.mjs          project plan (periods, tiers, groups, bars, milestones, today line)
+extras.mjs         cycle, steps, people, logos
+framework.mjs      strategy house and pyramid
+emit/emit_pptx.py  scene → editable PPTX (title placeholders, wrap=square, autofit, native charts with per-point fills and labels, preset autoshapes and freeforms for chevrons/arrows/icons/polygons, palette → theme)
 emit/render_pptx.py  PPTX → PDF (LibreOffice) → PNG per slide + montage
 emit/readback_pptx.py  saved PPTX re-opened with python-pptx and compared to the scene
 gates/page_gates.py  deterministic page gates (ink, dead band, internal void, hero, type range, cpl, words, titles, monotony, ticks)

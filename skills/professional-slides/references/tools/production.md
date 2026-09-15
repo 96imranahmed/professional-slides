@@ -36,7 +36,8 @@ Deterministic, per page, before any model is consulted:
 - no single layout on more than 40% of pages;
 - axis ticks on nice numbers;
 - every object inside its resolved frame, with no unintended overlap;
-- titles: within 14 words, free of the hedge lexicon, no two sharing more than 60% of their tokens;
+- titles: within 14 words (a trailing `(1/2)` page marker is not counted), free of the hedge lexicon, no two sharing more than 60% of their tokens;
+- structural pages - cover, agenda, section divider, tracker - are exempt from the ink, dead-band and hero gates; chart furniture (status labels, progress labels, badges, page tags, cover date and logo) is exempt from the body type range;
 - coverage: every ranked criterion in the brief has at least one comparative exhibit across all options.
 
 ## What delivery refuses
