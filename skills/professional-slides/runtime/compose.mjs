@@ -5,14 +5,16 @@
 // {
 //   "schema": "professional-slides.deck/v3",
 //   "id": "nyc-or-sf", "palette": "mckinsey", "density": "executive",
-//   "cover": { "title", "subtitle", "image": "assets/cover.jpg" },
+//   "cover": { "title", "subtitle", "date", "logo", "tone": "dark|light", "image": "assets/cover.jpg" },
+//   "footer": "Document title",          // right footer, beside the page number
 //   "slides": [
 //     { "title": "Costs grew 9% against 5% revenue growth, moving FY22 into a loss",
 //       "exhibit": { "type": "chart.column", "heading": "Revenue and cost, $bn", "unit": "$bn",
 //                    "categories": [...], "series": [{ "name": "...", "values": [...] }] },
 //       "points": ["...", "..."],           // ≤ 3 short supporting points (optional)
 //       "soWhat": "One-sentence consequence for the decision",   // optional
-//       "source": "Australia Post annual reports 2015–22", "notes": "...",
+//       "source": "Australia Post annual reports 2015–22", "note": "Figures may not sum", "notes": "speaker notes",
+//       "tag": "Preliminary", "titleLead": "Why", "callout": "How to read this page",
 //       "layout": "auto" },                 // auto | exhibit-full | exhibit-left | exhibit-right | two-up | text
 //     { "kind": "section", "title": "Where the money goes" }
 //   ]
@@ -220,9 +222,20 @@ export function composeSlide(slide, index, baseDir) {
     } else if (points.length) items.push(pointsItem(points, `${id}-points`));
     for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
   }
+  // A reading note sits at the top of the side column when there is one,
+  // otherwise as a full-width band above the content.
+  if (slide.callout) {
+    const note = { id: `${id}-callout`, component: "callout", props: typeof slide.callout === "string" ? { text: slide.callout } : slide.callout, size: HUG };
+    const row = items.find((it) => it.id === `${id}-row`);
+    const at = row?.items?.findIndex((it) => it.id === `${id}-side`) ?? -1;
+    if (at >= 0) row.items[at] = { id: `${id}-side-column`, layout: "flow.column", size: row.items[at].size, items: [note, { ...row.items[at], size: { width: { fr: 1 }, height: "fill" } }] };
+    else items.unshift(note);
+  }
   if (slide.soWhat) items.push(soWhatItem(slide.soWhat, `${id}-sowhat`));
   if (!items.length) throw new Error(`${id}: a slide needs an exhibit, points, paragraphs or a soWhat`);
-  return { id, title: slide.title, layout: "flow.column", ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: slide.source } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
+  // Footer: "Source:" and "Note:" lead their lines, as on a consulting page.
+  const prefixed = (label, text) => (text && !/^(source|sources|note|notes)\s*:/i.test(text) ? `${label}: ${text}` : text);
+  return { id, title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(slide.note ? { note: prefixed("Note", slide.note) } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }
 
 /** Expand a v3 deck into the deckPlan the planner consumes. */
@@ -232,7 +245,10 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   const slides = [];
   if (spec.cover) {
     const cover = { id: "cover", kind: "cover", title: spec.cover.title, subtitle: spec.cover.subtitle || "" };
+    if (spec.cover.date) cover.date = spec.cover.date;
+    if (spec.cover.logo || spec.logo) cover.logo = spec.cover.logo || spec.logo;
     if (spec.cover.image) { cover.variant = "half-image"; cover.image = imageProps(spec.cover.image, baseDir); }
+    else cover.variant = spec.cover.tone === "light" ? "plain" : "dark";
     if (spec.cover.notes) cover.notes = spec.cover.notes;
     slides.push(cover);
   }
@@ -242,7 +258,12 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     palette: spec.palette || "mckinsey",
     ...(spec.pageTemplate ? { pageTemplate: spec.pageTemplate } : {}),
     ...(spec.typography ? { typography: spec.typography } : {}),
-    slides: slides.map((s) => spec.density && !s.density && s.kind !== "cover" ? { ...s, density: spec.density } : s)
+    slides: slides.map((s) => {
+      const page = spec.density && !s.density && s.kind !== "cover" ? { ...s, density: spec.density } : { ...s };
+      // The document title sits in the footer beside the page number.
+      if (spec.footer && s.kind !== "cover" && page.companyName === undefined) page.companyName = spec.footer;
+      return page;
+    })
   };
 }
 

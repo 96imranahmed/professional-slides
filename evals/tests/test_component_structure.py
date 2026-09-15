@@ -42,8 +42,8 @@ console.log(JSON.stringify({
 }));
 """
         )
-        self.assertEqual(result["registry"], 64)
-        self.assertEqual(result["components"], 51)
+        self.assertEqual(result["registry"], 65)
+        self.assertEqual(result["components"], 52)
         self.assertEqual(result["charts"], 13)
         self.assertEqual(result["layoutFixtures"], 76)
         self.assertGreater(result["componentBoards"], 0)
@@ -89,36 +89,39 @@ console.log(JSON.stringify({
             self.assertEqual(chrome["title"], {"x": 60, "y": chrome["textBottom"] + 8, "width": 1160, "height": 0})
             self.assertEqual(chrome["footer"], {"x": 60, "y": 680, "width": 1160, "height": 0})
 
-    def test_cover_is_only_title_and_optional_subtitle_with_shared_tokens(self):
+    def test_cover_is_dark_by_default_with_a_lower_third_title_block(self):
         result = run_node("""
 import assert from 'node:assert/strict';
 import { compileDeck, component, TOKENS } from './skills/professional-slides/runtime/core.mjs';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const frame = {x:0,y:0,width:1280,height:720};
 const compile = (props, options={}) => compileDeck({...options,slides:[{id:'cover-test',frame,composition:component({id:'cover',component:'cover',frame,props})}]},REGISTRY);
-const basic = compile({title:'Growth strategy',subtitle:'Priorities for the next planning cycle'});
-const [title, subtitle] = basic.slides[0].nodes;
-assert.deepEqual(basic.slides[0].nodes.map(n=>[n.type,n.role]), [['text','cover-title'],['text','cover-subtitle']]);
-assert.equal(title.frame.x,60);
-assert.equal(subtitle.frame.x,title.frame.x);
-assert.equal(subtitle.frame.y-title.frame.y-title.frame.height,TOKENS['space.5'].value);
-assert.equal((title.frame.y+subtitle.frame.y+subtitle.frame.height)/2,360);
-assert.equal(title.style.fontFamily.tokenId,'font.display');
-assert.equal(subtitle.style.fontFamily.tokenId,'font.body');
-assert.equal(title.style.fontSize.tokenId,'type.deckTitle');
-assert.equal(subtitle.style.fontSize.tokenId,'type.body');
-assert.equal(title.style.color.tokenId,'color.ink');
-assert.equal(subtitle.style.color.tokenId,'color.textSecondary');
-assert.ok([title,subtitle].every(n=>n.style.wrap===false && n.data.textLayout.lines.length===1));
-for (const subtitleValue of [undefined,'','   ']) assert.equal(compile({title:'Growth strategy',subtitle:subtitleValue}).slides[0].nodes.length,1);
+// Default: dark full bleed, accent rule, title, subtitle, date; block bottom at 78% of the page.
+const dark = compile({title:'Growth strategy',subtitle:'Priorities for the next planning cycle',date:'September 2026',logo:'Acme'});
+const roles = dark.slides[0].nodes.map(n=>n.role);
+assert.deepEqual(roles, ['cover-surface','cover-accent','cover-logo','cover-title','cover-subtitle','cover-date']);
+const by = role => dark.slides[0].nodes.find(n=>n.role===role);
+assert.equal(by('cover-surface').style.fill.tokenId,'color.ink');
+assert.equal(by('cover-title').style.color.tokenId,'color.onPrimary');
+assert.equal(by('cover-title').style.fontFamily.tokenId,'font.display');
+assert.equal(by('cover-title').style.fontSize.tokenId,'type.deckTitle');
+assert.equal(by('cover-subtitle').style.fontSize.tokenId,'type.heading');
+assert.equal(by('cover-title').frame.x,60);
+assert.equal(by('cover-logo').frame.y,44);
+const date = by('cover-date');
+assert.ok(Math.abs(date.frame.y+date.frame.height-720*0.78)<0.01,'block bottom anchors at 78%');
+assert.equal(by('cover-subtitle').frame.y-by('cover-title').frame.y-by('cover-title').frame.height,TOKENS['space.5'].value);
+// Light tone keeps ink on canvas with no surface.
+const light = compile({title:'Growth strategy',subtitle:'Commercial priorities',variant:'plain'});
+assert.deepEqual(light.slides[0].nodes.map(n=>n.role),['cover-accent','cover-title','cover-subtitle']);
+assert.equal(light.slides[0].nodes[1].style.color.tokenId,'color.ink');
+for (const subtitleValue of [undefined,'','   ']) assert.equal(compile({title:'Growth strategy',subtitle:subtitleValue}).slides[0].nodes.length,3);
 const company = compile({title:'Growth strategy',subtitle:'Commercial priorities'},{palette:'bain',typography:{body:'Arial',display:'Georgia'}});
-assert.equal(company.slides[0].nodes[0].style.fontFamily.value,'Georgia');
-assert.equal(company.slides[0].nodes[1].style.fontFamily.value,'Arial');
-assert.equal(company.slides[0].nodes[0].style.color.value,company.tokens['color.ink'].value);
-assert.equal(company.slides[0].nodes[1].style.color.value,company.tokens['color.textSecondary'].value);
+assert.equal(company.slides[0].nodes.find(n=>n.role==='cover-title').style.fontFamily.value,'Georgia');
+assert.equal(company.slides[0].nodes.find(n=>n.role==='cover-subtitle').style.fontFamily.value,'Arial');
 const wrapped = compile({title:'Growth strategy\\nfor the next cycle',subtitle:'Commercial priorities\\nand delivery milestones'});
-assert.deepEqual(wrapped.slides[0].nodes.map(n=>n.data.textLayout.lines.length),[2,2]);
-for (const props of [{title:''},{title:42},{title:'A',subtitle:42},{title:'A',badge:'Extra label'},{title:'A\\nB\\nC'},{title:'A',subtitle:'B\\nC\\nD'}]) assert.throws(()=>compile(props));
+assert.deepEqual(wrapped.slides[0].nodes.filter(n=>n.type==='text').map(n=>n.data.textLayout.lines.length),[2,2]);
+for (const props of [{title:''},{title:42},{title:'A',subtitle:42},{title:'A',badge:'Extra label'},{title:'A\\nB\\nC\\nD'},{title:'A',subtitle:'B\\nC\\nD'}]) assert.throws(()=>compile(props));
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

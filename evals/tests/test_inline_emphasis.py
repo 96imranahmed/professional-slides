@@ -17,7 +17,7 @@ assert.ok(mixed.lines.length>2);
 assert.ok(mixed.runs.some(r=>r.bold)&&mixed.runs.some(r=>!r.bold));
 assert.equal(mixed.runs.filter(r=>r.bold).map(r=>r.text).join(' ').replace(/\\s+/g,' ').trim(),'Review the complete evidence');
 assert.ok(mixed.width<=180);
-assert.throws(()=>measureTextRuns([{text:'Invalid',bold:true,fontSize:8}],100),/boolean bold only/);
+assert.throws(()=>measureTextRuns([{text:'Invalid',bold:true,fontSize:8}],100),/boolean bold/);
 assert.throws(()=>measureTextRuns([{text:'Unbreakableword',bold:true}],5),/Unbreakable/);
 console.log(JSON.stringify({ok:true}));
 """)

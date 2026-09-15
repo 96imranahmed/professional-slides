@@ -140,6 +140,7 @@ export function registerMedia(registry) {
     plain = cover.render;
   cover.variants = {
     plain: {},
+    dark: { props: { title: "(Insert title)", subtitle: "(Insert subtitle)", tone: "dark" } },
     "half-image": {
       props: {
         title: "(Insert title)",
@@ -148,25 +149,26 @@ export function registerMedia(registry) {
       },
     },
   };
-  cover.defaultVariant = "plain";
+  cover.defaultVariant = "dark";
   cover.variantProp = "variant";
   cover.resolveVariant = (props) => {
-    const value = props.variant ?? "plain";
+    const value = props.variant ?? "dark";
     if (!Object.hasOwn(cover.variants, value))
       throw new Error("Unknown cover variant");
     return value;
   };
   cover.render = (input) => {
     const { variant, image, ...props } = input.props;
-    if (cover.resolveVariant(input.props) === "plain") {
+    const resolved = cover.resolveVariant(input.props);
+    if (resolved !== "half-image") {
       if (image) throw new Error("Cover image requires half-image variant");
-      return plain({ ...input, props });
+      return plain({ ...input, props: { ...props, tone: resolved === "dark" ? "dark" : "light" } });
     }
     if (!image) throw new Error("Half-image cover requires sourced image");
     const half = input.frame.width / 2;
     return {
       nodes: [
-        ...plain({ ...input, frame: { ...input.frame, width: half }, props })
+        ...plain({ ...input, frame: { ...input.frame, width: half }, props: { ...props, tone: props.tone ?? "light" } })
           .nodes,
         mediaNode({
           id: stableId(input.id, "image"),

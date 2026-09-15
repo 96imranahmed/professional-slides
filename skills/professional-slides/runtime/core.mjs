@@ -54,6 +54,8 @@ export const TOKENS = Object.freeze({
   "color.chartUnit": colour("--chart-unit-color", "#757575"),
   "color.componentPrimary": colour("--component-primary", "#00A6E6", "accent1"),
   "color.componentPrimaryTint": colour("--component-primary-tint", "#DCEEF8"),
+  "color.calloutTint": colour("--callout-tint", "#FFF6DC"),
+  "color.accent": colour("--accent", "#00A6E6"),
   "color.rule": colour("--rule", "#929BA3"),
   "color.chartGrid": colour("--chart-gridline", "#D4D8DC"),
   "color.chartComparator": colour("--chart-comparator", "#D9DDE0"),
@@ -242,7 +244,7 @@ export function primitive({ type, id, role, frame, style = {}, text = null, data
 
 export function textPrimitive({ id, role = "text", frame, text, runs, style = {}, data = {}, tokens = [] }) {
   const value = String(text ?? "");
-  if (runs !== undefined && (!Array.isArray(runs) || !runs.length || runs.some(run => !run || typeof run.text !== 'string' || typeof run.bold !== 'boolean' || Object.keys(run).some(key => !['text', 'bold'].includes(key))) || runs.map(run => run.text).join('') !== value)) throw new Error('Measured text runs must reconstruct the exact text and may vary only bold');
+  if (runs !== undefined && (!Array.isArray(runs) || !runs.length || runs.some(run => !run || typeof run.text !== 'string' || typeof run.bold !== 'boolean' || (run.accent !== undefined && typeof run.accent !== 'boolean') || Object.keys(run).some(key => !['text', 'bold', 'accent'].includes(key))) || runs.map(run => run.text).join('') !== value)) throw new Error('Measured text runs must reconstruct the exact text and may vary only bold and accent');
   const node = primitive({ type: "text", id, role, frame, text: value, style, data, tokens });
   return runs === undefined ? node : { ...node, runs: runs.map(run => ({ ...run })) };
 }

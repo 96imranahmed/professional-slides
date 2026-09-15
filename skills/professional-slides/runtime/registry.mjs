@@ -128,15 +128,44 @@ function measuredTextNode(input) {
 function insightLayout(frame, props) {
   if (typeof props.text !== "string" || !props.text.trim()) throw new Error("Insight requires a nonempty synthesis sentence");
   if (props.align !== undefined && !["left", "center"].includes(props.align)) throw new Error("Insight alignment must be left or center");
-  const paddingX = tokenValue(token("space.5")), paddingY = tokenValue(token(props.text.includes("\n\n") ? "space.6" : "space.4"));
-  const width = frame.width - 2 * paddingX;
+  // A takeaway band: 16 px side padding, 12 px above and below one or two lines
+  // of semibold body text, left-aligned (the gallery's grey band). The primary
+  // variant carries a chevron disc at the left and reserves its width.
+  const paddingX = tokenValue(token("space.4")), paddingY = tokenValue(token(props.text.includes("\n\n") ? "space.5" : "space.3"));
+  const marker = (props.variant ?? "tonal") === "primary" || props.marker === "chevron" ? tokenValue(token("icon.medium")) : 0;
+  const markerGap = marker ? tokenValue(token("space.3")) : 0;
+  const width = frame.width - 2 * paddingX - marker - markerGap;
   if (width <= 0) throw new Error("Insight width cannot contain its theme padding");
   const options = { fontFamily: tokenValue(FONT), wrapWidthRatio: 1 };
-  const body = measureText(props.text, width, { ...options, fontSize: tokenValue(BODY), bold: false });
+  const body = measureText(props.text, width, { ...options, fontSize: tokenValue(BODY), bold: true });
   const heading = props.heading ? measureText(props.heading, width, { ...options, fontSize: tokenValue(token("type.heading")), bold: true }) : null;
   const gap = heading ? tokenValue(token("space.2")) : 0;
   const contentHeight = body.height + (heading?.height ?? 0) + gap;
-  return { body, heading, width, paddingX, paddingY, gap, contentHeight, height: contentHeight + 2 * paddingY };
+  return { body, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: Math.max(contentHeight, marker) + 2 * paddingY };
+}
+
+// A reading note: the cream box a consulting page carries top-right to say how
+// to read it, or to flag a caveat. Compact type, hairline caution border.
+function calloutLayout(frame, props) {
+  if (typeof props.text !== "string" || !props.text.trim()) throw new Error("Callout requires text");
+  const paddingX = tokenValue(token("space.3")), paddingY = tokenValue(token("space.2"));
+  const width = frame.width - 2 * paddingX;
+  if (width <= 0) throw new Error("Callout has no text width");
+  const options = { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), wrapWidthRatio: 1 };
+  const lead = props.lead?.trim() ? measureText(props.lead, width, { ...options, bold: true }) : null;
+  const body = measureText(props.text, width, options);
+  const gap = lead ? tokenValue(token("space.2")) / 2 : 0;
+  return { lead, body, paddingX, paddingY, gap, height: (lead?.height ?? 0) + gap + body.height + 2 * paddingY };
+}
+
+function calloutNodes({ id, frame, props }) {
+  const layout = calloutLayout(frame, props);
+  if (layout.height > frame.height + 0.01) throw new Error(`Callout overflows its ${frame.height}px box; shorten the note`);
+  const nodes = [rectPrimitive({ id: stableId(id, "surface"), role: "callout-surface", frame: { ...frame, height: layout.height }, style: boxStyle(token("color.calloutTint"), token("color.caution"), HAIRLINE, token("radius.none")) })];
+  let y = frame.y + layout.paddingY;
+  if (layout.lead) { nodes.push(textPrimitive({ id: stableId(id, "lead"), role: "callout-lead", frame: { x: frame.x + layout.paddingX, y, width: frame.width - 2 * layout.paddingX, height: layout.lead.height }, text: layout.lead.text, style: { ...textStyle(COMPACT, INK, true, "left", "top"), lineHeight: layout.lead.lineHeight, wrap: false }, data: { textLayout: layout.lead } })); y += layout.lead.height + layout.gap; }
+  nodes.push(textPrimitive({ id: stableId(id, "text"), role: "callout-text", frame: { x: frame.x + layout.paddingX, y, width: frame.width - 2 * layout.paddingX, height: layout.body.height }, text: layout.body.text, style: { ...textStyle(COMPACT, INK, false, "left", "top"), lineHeight: layout.body.lineHeight, wrap: false }, data: { textLayout: layout.body } }));
+  return nodes;
 }
 
 function insightNodes({ id, frame, props }) {
@@ -161,10 +190,18 @@ function insightNodes({ id, frame, props }) {
     }
   }
   let y = frame.y + (frame.height - layout.contentHeight) / 2;
+  const textX = frame.x + layout.paddingX + layout.marker + layout.markerGap;
+  if (layout.marker) {
+    // Chevron disc: reversed on the primary band, primary on a tinted band.
+    const size = layout.marker, mx = frame.x + layout.paddingX, my = frame.y + (frame.height - size) / 2;
+    const discFill = variant === "primary" ? WHITE : PRIMARY, chevron = variant === "primary" ? PRIMARY : WHITE;
+    nodes.push(ellipsePrimitive({ id: stableId(id, "marker"), role: "insight-marker", frame: { x: mx, y: my, width: size, height: size }, style: boxStyle(discFill, discFill, HAIRLINE, token("radius.round")) }));
+    nodes.push(shapePrimitive({ id: stableId(id, "marker-chevron"), role: "insight-marker-glyph", geometry: "iconPath", frame: { x: mx + size * 0.3, y: my + size * 0.28, width: size * 0.4, height: size * 0.44 }, style: { fill: "none", stroke: chevron, lineWidth: token("line.standard"), lineCap: "round" }, data: { paths: [{ points: [[0.2, 0], [0.8, 0.5], [0.2, 1]], closed: false }] } }));
+  }
   for (const [part, measured] of [["heading", layout.heading], ["body", layout.body]]) {
     if (!measured) continue;
-    nodes.push(textPrimitive({ id: stableId(id, part), role: `insight-${part}`, frame: { x: frame.x + layout.paddingX, y, width: layout.width, height: measured.height }, text: measured.text,
-      style: { ...textStyle(part === "heading" ? token("type.heading") : BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, part === "heading", props.align ?? "center", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
+    nodes.push(textPrimitive({ id: stableId(id, part), role: `insight-${part}`, frame: { x: textX, y, width: layout.width, height: measured.height }, text: measured.text,
+      style: { ...textStyle(part === "heading" ? token("type.heading") : BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, true, props.align ?? "left", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
     y += measured.height + layout.gap;
   }
   return nodes;
@@ -179,7 +216,11 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
     : { x: frame.x, y: frame.y, width: frame.width, height: frame.height - ruleGap };
   // Fit ladder: the action title is set at 24pt; a title that needs a third line
   // is retried at 22pt. Beyond that the page gate (TITLE_LINES) reports it.
-  const measureTitle = (fontSize) => measureText(props.text, baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, bold: true, wrapWidthRatio: 0.98 });
+  // An optional lead-in ("Why", "Drive") is set in the accent colour as a run.
+  const lead = typeof props.lead === "string" && props.lead.trim() && props.text.startsWith(props.lead) ? props.lead : null;
+  const measureTitle = (fontSize) => lead
+    ? measureTextRuns([{ text: lead, bold: true, accent: true }, { text: props.text.slice(lead.length), bold: true }], baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, wrapWidthRatio: 0.98 })
+    : measureText(props.text, baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, bold: true, wrapWidthRatio: 0.98 });
   let fontSize = tokenValue(size), textLayout = measureTitle(fontSize);
   if (chrome && !section && textLayout.lines.length > 2) {
     const long = tokenValue(token("type.actionTitleLong"));
@@ -194,8 +235,9 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
     role: section ? "section-title" : "action-title",
     frame: textFrame,
     text: textLayout.text,
+    ...(lead ? { runs: textLayout.runs } : {}),
     style: { ...textStyle(fontSize === tokenValue(size) ? size : token("type.actionTitleLong"), INK, true), fontFamily: DISPLAY, valign: "top", lineHeight: textLayout.lineHeight, wrap: false },
-    data: { titleVariant: variant, textLayout, ruleGap }
+    data: { titleVariant: variant, textLayout, ruleGap, ...(lead ? { lead } : {}) }
   })];
   if (TITLE_VARIANTS[variant].rule) nodes.push(openLine(stableId(id, chrome ? "title-rule" : "rule"), textFrame.x, ruleY, textFrame.x + textFrame.width, ruleY, "title-rule", RULE, HAIRLINE, { titleVariant: variant }));
   return nodes;
@@ -691,14 +733,22 @@ function registerCore(registry) {
     }),
     component({
       id: "slide-chrome", category: "shared", role: "slide-chrome",
-      tokens: ["color.canvas", "color.ink", "font.display", "type.actionTitle", "type.actionTitleLong", "layout.titleContentGap", ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
+      tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.accent", "font.display", "font.body", "type.source", "type.actionTitle", "type.actionTitleLong", "layout.titleContentGap", ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
       preferredSize: { width: SLIDE.width, height: SLIDE.height },
       sample: { title: "(Insert action title)", source: "Source: (Insert source)", footerRight: "(Insert company name)", pageNumber: 7 },
       render: ({ id, frame, props }) => {
         const page = renderPageTemplate({ id, frame, props });
         const tracker = props.tracker ? trackerLabelNodes({ id: stableId(id, "tracker"), frame: { x: frame.x + CHROME.left, y: frame.y + 30, width: page.titleWidth, height: 20 }, props: props.tracker }) : [];
-        const titles = titleNodes({ id, frame, props: { text: props.title, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker ? 58 : CHROME.titleTop }, chrome: true });
+        const titles = titleNodes({ id, frame, props: { text: props.title, lead: props.titleLead, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker ? 58 : CHROME.titleTop }, chrome: true });
         const title = titles.find((node) => node.role === "action-title");
+        // Page tag: PRELIMINARY, ILLUSTRATIVE, CONFIDENTIAL, Exhibit 3 — small caps
+        // in the top-right corner, above the title band.
+        if (props.tag) {
+          const text = String(props.tag).trim().toUpperCase();
+          const tag = measureText(text, 320, { fontFamily: tokenValue(FONT), fontSize: tokenValue(SOURCE), bold: false, wrapWidthRatio: 1 });
+          if (tag.lines.length > 1) throw new Error("Page tag must fit on one line");
+          titles.push(textPrimitive({ id: stableId(id, "tag"), role: "page-tag", frame: { x: frame.x + frame.width - CHROME.right - Math.ceil(tag.width) - 2, y: frame.y + 22, width: Math.ceil(tag.width) + 2, height: tag.height }, text, style: { ...textStyle(SOURCE, SECONDARY, false, "right", "top"), lineHeight: tag.lineHeight, wrap: false }, data: { textLayout: tag, tag: text } }));
+        }
         const titleBottom = title.frame.y + title.data.textLayout.height;
         const baseBottom = page.contentFrame.y + page.contentFrame.height;
         // One content top for the whole deck: the body starts at CHROME.bodyTop whether
@@ -733,19 +783,37 @@ function registerCore(registry) {
     component({ id: "section-heading", category: "shared", role: "section-heading", tokens: SECTION_HEADING_TOKENS, preferredSize: { width: 720, height: 52 }, sample: { heading: "(Insert section heading)", rule: true }, render: ({ id, frame, props }) => ({ nodes: sectionHeadingNodes({ id, frame, props }) }) }),
     component({ id: "action-title", category: "shared", role: "title", tokens: ["font.display", "type.actionTitle", "color.ink", "color.rule", "line.hairline", "space.2"], preferredSize: { width: 1136, height: 86 }, sample: { text: "(Insert action title)" }, render: ({ id, frame, props }) => ({ nodes: titleNodes({ id, frame, props }) }) }),
     component({ id: "section-title", category: "shared", role: "title", tokens: ["font.display", "type.sectionTitle", "color.ink", "color.rule", "line.hairline", "space.2"], preferredSize: { width: 720, height: 64 }, sample: { text: "(Insert section title)" }, render: ({ id, frame, props }) => ({ nodes: titleNodes({ id, frame, props, section: true }) }) }),
-    component({ id: "cover", category: "navigation", role: "cover", tokens: ["color.ink", "color.textSecondary", "font.display", "font.body", "type.deckTitle", "type.body", "space.5"], preferredSize: { width: 1280, height: 720 }, sample: { title: "(Insert presentation title)", subtitle: "(Insert subtitle)" }, render: ({ id, frame, props }) => {
+    component({ id: "cover", category: "navigation", role: "cover", tokens: ["color.ink", "color.canvas", "color.onPrimary", "color.textSecondary", "color.componentPrimary", "color.chartSeries4", "font.display", "font.body", "type.deckTitle", "type.heading", "type.body", "type.compact", "space.2", "space.5", "line.hairline", "line.standard", "radius.none"], preferredSize: { width: 1280, height: 720 }, sample: { title: "(Insert presentation title)", subtitle: "(Insert subtitle)" }, render: ({ id, frame, props }) => {
       if (typeof props.title !== "string" || !props.title.trim()) throw new Error("Cover requires a deck title");
       if (props.subtitle !== undefined && typeof props.subtitle !== "string") throw new Error("Cover subtitle must be text");
       // The compiler supplies headerBandHeight to every component as layout metadata.
-      if (Object.keys(props).some(key => !["title", "subtitle", "headerBandHeight"].includes(key))) throw new Error("Cover supports only title and subtitle; use the page template for other furniture");
-      const width = frame.width - CHROME.left - CHROME.right;
+      if (Object.keys(props).some(key => !["title", "subtitle", "date", "logo", "tone", "headerBandHeight"].includes(key))) throw new Error("Cover supports title, subtitle, date, logo and tone; use the page template for other furniture");
+      // Dark tone is the gallery default: navy full bleed, title block in the
+      // lower third, a logo slot top-left, a date line under the subtitle.
+      const dark = (props.tone ?? "dark") === "dark";
+      const ink = dark ? WHITE : INK, secondary = dark ? token("color.chartSeries4") : SECONDARY;
+      const width = Math.min(frame.width - CHROME.left - CHROME.right, frame.width * 0.72);
       const title = measureText(props.title, width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")), bold: true, wrapWidthRatio: 1 });
-      const subtitle = props.subtitle?.trim() ? measureText(props.subtitle, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
-      const gap = subtitle ? tokenValue(token("space.5")) : 0, height = title.height + gap + (subtitle?.height || 0);
-      if (title.lines.length > 2 || subtitle?.lines.length > 2 || height > frame.height - 2 * CHROME.left) throw new Error("Cover text exceeds its allocated space; shorten the title or subtitle");
-      const x = frame.x + CHROME.left, y = frame.y + (frame.height - height) / 2;
-      const nodes = [textPrimitive({ id: stableId(id, "title"), role: "cover-title", frame: { x, y, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.deckTitle"), INK, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } })];
-      if (subtitle) nodes.push(textPrimitive({ id: stableId(id, "subtitle"), role: "cover-subtitle", frame: { x, y: y + title.height + gap, width, height: subtitle.height }, text: subtitle.text, style: { ...textStyle(BODY, SECONDARY, false, "left", "top"), lineHeight: subtitle.lineHeight, wrap: false }, data: { textLayout: subtitle } }));
+      const subtitle = props.subtitle?.trim() ? measureText(props.subtitle, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), wrapWidthRatio: 1 }) : null;
+      const date = props.date?.trim() ? measureText(props.date, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
+      const gap = tokenValue(token("space.5")), small = tokenValue(token("space.2"));
+      const height = title.height + (subtitle ? gap + subtitle.height : 0) + (date ? gap + date.height : 0);
+      if (title.lines.length > 3 || subtitle?.lines.length > 2 || height > frame.height * 0.6) throw new Error("Cover text exceeds its allocated space; shorten the title or subtitle");
+      const x = frame.x + CHROME.left;
+      // Anchor the block so its bottom sits at 78% of the page; a taller block grows upward.
+      let y = frame.y + frame.height * 0.78 - height;
+      const nodes = [];
+      if (dark) nodes.push(rectPrimitive({ id: stableId(id, "surface"), role: "cover-surface", frame, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) }));
+      // Accent rule above the title: the one graphic element on a text cover.
+      nodes.push(openLine(stableId(id, "accent"), x, y - gap, x + 72, y - gap, "cover-accent", PRIMARY, token("line.standard")));
+      if (props.logo?.trim()) {
+        const logo = measureText(props.logo, 320, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: 1 });
+        nodes.push(textPrimitive({ id: stableId(id, "logo"), role: "cover-logo", frame: { x, y: frame.y + CHROME.titleTop, width: 320, height: logo.height }, text: logo.text, style: { ...textStyle(token("type.heading"), ink, true, "left", "top"), fontFamily: DISPLAY, lineHeight: logo.lineHeight, wrap: false }, data: { textLayout: logo } }));
+      }
+      nodes.push(textPrimitive({ id: stableId(id, "title"), role: "cover-title", frame: { x, y, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.deckTitle"), ink, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } }));
+      y += title.height;
+      if (subtitle) { y += gap; nodes.push(textPrimitive({ id: stableId(id, "subtitle"), role: "cover-subtitle", frame: { x, y, width, height: subtitle.height }, text: subtitle.text, style: { ...textStyle(token("type.heading"), secondary, false, "left", "top"), lineHeight: subtitle.lineHeight, wrap: false }, data: { textLayout: subtitle } })); y += subtitle.height; }
+      if (date) { y += gap; nodes.push(textPrimitive({ id: stableId(id, "date"), role: "cover-date", frame: { x, y, width, height: date.height }, text: date.text, style: { ...textStyle(BODY, secondary, false, "left", "top"), lineHeight: date.lineHeight, wrap: false }, data: { textLayout: date } })); }
       return { nodes };
     } }),
     component({ id: "section-divider", category: "navigation", role: "divider", tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.onPrimary", "font.display", "type.deckTitle", "type.sectionNumber", "line.hairline", "radius.none", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { title: "(Insert section title)" }, render: ({ id, frame, props }) => {
@@ -780,8 +848,9 @@ function registerCore(registry) {
       return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: "paragraph", frame: { ...frame, width }, text: props.text, ...(props.runs?{runs:props.runs}:{}), style: textStyle(BODY, INK, false, props.align || "left", "top") })] };
     } }),
     component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.componentPrimary", "color.onPrimary", "space.1", "space.3", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "circle" }) }) }),
-    component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.4", "space.5", "space.6", "line.hairline", "radius.small"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
-    component({ id: "evidence-note", category: "section", role: "evidence-note", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.4", "space.5", "space.6", "line.hairline", "radius.small"], preferredSize: { width: 1160, height: 150 }, sample: { heading: "Measurement basis", text: "(Insert scope, period or scenario assumptions)" }, render: input => { if (!input.props.heading || !input.props.text) throw new Error("Evidence note requires heading and body"); return { nodes: insightNodes({...input, props:{...input.props, variant:"neutral", align:"left"}}).map(node => ({...node, role:node.role.replace("insight-", "evidence-note-")})) }; } }),
+    component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.3", "space.4", "space.5", "space.6", "line.hairline", "line.standard", "radius.small", "radius.round", "icon.medium"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
+    component({ id: "callout", category: "section", role: "callout", tokens: ["color.calloutTint", "color.caution", "color.ink", "font.body", "type.compact", "space.2", "space.3", "line.hairline", "radius.none"], preferredSize: { width: 360, height: 72 }, sample: { text: "(Insert reading note)" }, render: input => ({ nodes: calloutNodes(input) }) }),
+    component({ id: "evidence-note", category: "section", role: "evidence-note", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.3", "space.4", "space.5", "space.6", "line.hairline", "line.standard", "radius.small", "radius.round", "icon.medium"], preferredSize: { width: 1160, height: 150 }, sample: { heading: "Measurement basis", text: "(Insert scope, period or scenario assumptions)" }, render: input => { if (!input.props.heading || !input.props.text) throw new Error("Evidence note requires heading and body"); return { nodes: insightNodes({...input, props:{...input.props, variant:"neutral", align:"left"}}).map(node => ({...node, role:node.role.replace("insight-", "evidence-note-")})) }; } }),
     component({ id: "panel", category: "section", role: "panel", tokens: ["color.surface", "color.surfaceMuted", "color.componentPrimary", "color.rule", "color.ink", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "radius.none", ...[1, 2, 3, 4, 5, 6].map(index => `color.chartSeries${index}`)], preferredSize: { width: 400, height: 240 }, sample: { heading: "(Insert panel heading)", text: "(Insert panel description)" }, render: ({ id, frame, props, tokens = TOKENS }) => {
       const tone = props.tone || "open";
       const seriesColorIndex = props.seriesColorIndex;
@@ -1009,6 +1078,7 @@ function registerCore(registry) {
     if (definition.id === "section") definition.measureInsets = ({ frame, props }) => sectionContentInsets(frame, props);
     if (definition.id === "section-heading") definition.variants.inverse = { backdrop: "primary" };
     if (["insight", "evidence-note"].includes(definition.id)) definition.measureContent = ({ frame, props }) => { definition.resolveVariant(props); return insightLayout(frame, props); };
+    if (definition.id === "callout") definition.measureContent = ({ frame, props }) => calloutLayout(frame, props);
     if (definition.id === "section-boundary") definition.variants.subsection = { preferredSize: { width: 520, height: 24 } };
     if (definition.id === "map") {
       definition.version = "3.1.0";

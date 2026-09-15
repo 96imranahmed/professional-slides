@@ -47,7 +47,7 @@ CHART_PLOT_ROLES = {"chart-mark", "data-label", "category-label", "chart-axis", 
 # re-wrap them on a one-pixel advance difference. Prose keeps wrap="square".
 LABEL_ROLES = {"legend-label", "data-label", "category-label", "axis-label", "value-label", "metric-value", "metric-label",
                "metric-delta", "page-number", "source-text", "chart-unit", "process-label", "tracker-label", "table-cell",
-               "table-header", "pie-label", "reference-label", "end-label", "stack-label", "total-label", "scale-endpoint"}
+               "table-header", "pie-label", "reference-label", "end-label", "stack-label", "total-label", "scale-endpoint", "page-tag", "cover-date", "cover-logo"}
 CHROME_COMPONENTS = {"slide-chrome", "page-template", "section", "paragraph", "section-heading",
                      "bullet-list", "insight", "evidence-note", "chart-title", "footnote", "cover"}
 NATIVE = {
@@ -158,7 +158,8 @@ class Emitter:
                         continue
                     run = p.add_run()
                     run.text = text_all[lo:hi]
-                    self._font(run.font, family, size, bold or r.get("bold", False), color)
+                    accent = rgb(self.colors.get("color.accent") or self.colors.get("color.componentPrimary")) if r.get("accent") else None
+                    self._font(run.font, family, size, bold or r.get("bold", False), accent or color)
                 offset = end + 1
         else:
             for para_text in paragraphs:
@@ -525,12 +526,13 @@ class Emitter:
                     skip_instances.add(iid)
         # group membership: diagram-like components with several primitives
         member_shapes: dict[str, list] = {}
+        title_shape = None
         for node in nodes:
             inst = (node.get("data") or {}).get("componentInstance")
             if inst in skip_instances and node.get("role") in CHART_PLOT_ROLES:
                 continue
             if node is title_node:
-                shape = self.add_text(slide, node, as_title=True)
+                shape = title_shape = self.add_text(slide, node, as_title=True)
             elif node["type"] == "text":
                 shape = self.add_text(slide, node)
             elif node["type"] == "rect":
@@ -549,6 +551,11 @@ class Emitter:
                 shape = self.add_rect(slide, node)
             if shape is not None and inst:
                 member_shapes.setdefault(inst, []).append(shape)
+        if title_shape is not None:
+            # The layout creates the placeholder first; surfaces drawn after it
+            # (a dark cover) would hide it. Put it on top of the z-order.
+            tree = title_shape._element.getparent()
+            tree.remove(title_shape._element); tree.append(title_shape._element)
         if self.groups:
             for iid, shapes in member_shapes.items():
                 comp = instances.get(iid, {}).get("component", "")

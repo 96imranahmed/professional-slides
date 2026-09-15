@@ -44,7 +44,7 @@ export function measureText(text, width, { fontFamily = activeDesignTokens()?.["
 // Styled runs share a single font family, point size and line box. Only emphasis
 // varies; neither the author nor an adapter may independently reflow a run.
 export function measureTextRuns(runs, width, { fontFamily = activeDesignTokens()?.["font.body"].value ?? "Arial", fontSize = 16, wrapWidthRatio = 0.97 } = {}) {
-  if (!Array.isArray(runs) || !runs.length || runs.some(run => !run || typeof run.text !== 'string' || typeof run.bold !== 'boolean' || Object.keys(run).some(key => !['text', 'bold'].includes(key)))) throw new Error('Text runs require text and boolean bold only');
+  if (!Array.isArray(runs) || !runs.length || runs.some(run => !run || typeof run.text !== 'string' || typeof run.bold !== 'boolean' || (run.accent !== undefined && typeof run.accent !== 'boolean') || Object.keys(run).some(key => !['text', 'bold', 'accent'].includes(key)))) throw new Error('Text runs require text and boolean bold (and optional boolean accent) only');
   if (!(width > 0) || !(wrapWidthRatio > 0 && wrapWidthRatio <= 1)) throw new Error('Text runs require a positive width and valid wrap ratio');
   const ctx = fontContext();
   if (!ctx.hasFont(fontFamily)) throw new Error(`Required font is not installed: ${fontFamily}`);
@@ -53,22 +53,22 @@ export function measureTextRuns(runs, width, { fontFamily = activeDesignTokens()
   const ranges = runs.map(run => { const start = offset; offset += run.text.length; return { ...run, start, end: offset }; });
   const merge = parts => parts.reduce((result, part) => {
     if (!part.text) return result;
-    if (result.at(-1)?.bold === part.bold) result.at(-1).text += part.text;
-    else result.push({ text: part.text, bold: part.bold });
+    if (result.at(-1)?.bold === part.bold && Boolean(result.at(-1)?.accent) === Boolean(part.accent)) result.at(-1).text += part.text;
+    else result.push({ text: part.text, bold: part.bold, ...(part.accent ? { accent: true } : {}) });
     return result;
   }, []);
   const runWidth = parts => merge(parts).reduce((total, part) => {
     ctx.font = `${part.bold ? 'bold' : 'normal'} ${fontSize * 96 / 72}px "${fontFamily}"`;
     return total + measureWidth(ctx,part.text).width;
   }, 0);
-  const wordRuns = (start, end) => ranges.filter(run => run.end > start && run.start < end).map(run => ({ text: source.slice(Math.max(start, run.start), Math.min(end, run.end)), bold: run.bold }));
+  const wordRuns = (start, end) => ranges.filter(run => run.end > start && run.start < end).map(run => ({ text: source.slice(Math.max(start, run.start), Math.min(end, run.end)), bold: run.bold, ...(run.accent ? { accent: true } : {}) }));
   const lineRuns = [];
   offset = 0;
   for (const paragraph of source.split('\n')) {
     let line = [];
     for (const match of paragraph.matchAll(/\S+/g)) {
       const word = wordRuns(offset + match.index, offset + match.index + match[0].length);
-      const candidate = merge([...line, ...(line.length ? [{ text: ' ', bold: line.at(-1).bold }] : []), ...word]);
+      const candidate = merge([...line, ...(line.length ? [{ text: ' ', bold: line.at(-1).bold, ...(line.at(-1).accent ? { accent: true } : {}) }] : []), ...word]);
       if (line.length && runWidth(candidate) > width * wrapWidthRatio) { lineRuns.push(line); line = merge(word); }
       else line = candidate;
       if (runWidth(line) > width + 0.01) throw new Error(`Unbreakable text exceeds its width: ${match[0]}`);

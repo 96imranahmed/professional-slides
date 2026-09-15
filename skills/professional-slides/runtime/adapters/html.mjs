@@ -145,7 +145,7 @@ function textNode(node) {
   const color = cssBinding(style.color);
   const layoutStyle = `${style.lineHeight ? `line-height:${style.lineHeight}px;` : ""}${style.wrap === false ? "white-space:pre;" : ""}`;
   const nativeBold = style.fontWeight ? style.fontFamily.nativeBold : style.bold;
-  const content = node.runs ? node.runs.map(run => `<span style="font-weight:${run.bold ? 700 : 400}">${escapeHtml(run.text)}</span>`).join('') : escapeHtml(node.text);
+  const content = node.runs ? node.runs.map(run => `<span style="font-weight:${run.bold ? 700 : 400}${run.accent ? ';color:var(--accent)' : ''}">${escapeHtml(run.text)}</span>`).join('') : escapeHtml(node.text);
   return `<div class="text-node" data-node-id="${escapeHtml(node.id)}" data-role="${escapeHtml(node.role)}" style="left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px;justify-content:${justify};align-items:${alignItems};text-align:${textAlign};font-family:${fontFamily};font-size:${fontSize};font-weight:${nativeBold ? 700 : 400};color:${color};${layoutStyle}"><span>${content}</span></div>`;
 }
 

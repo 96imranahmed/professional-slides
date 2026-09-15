@@ -171,7 +171,7 @@ assert.equal(title.find(n=>n.role==='chart-unit').style.color.tokenId,'color.cha
 assert.equal(title.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
 assert.equal(title.filter(n=>n.role==='section-heading-rule').length,1);
 const cover=REGISTRY.get('cover').render({id:'cover',frame:{x:0,y:0,width:1280,height:720},props:{title:'Strategy',subtitle:'Priorities for the planning cycle'}}).nodes;
-assert.equal(cover.find(n=>n.role==='cover-subtitle').style.fontSize.tokenId,'type.body');
+assert.equal(cover.find(n=>n.role==='cover-subtitle').style.fontSize.tokenId,'type.heading');
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

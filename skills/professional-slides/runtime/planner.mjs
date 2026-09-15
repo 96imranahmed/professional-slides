@@ -118,7 +118,7 @@ function layoutKind(plan, items) {
 }
 
 function makeItem(item, index, cell = null) {
-  const size = item.size || { width: { fr: item.weight || 1 }, height: (["paragraph", "insight", "evidence-note", "table"].includes(item.component) || item.component === "bullet-list" && item.props?.variant === "body") ? "hug" : "fill" };
+  const size = item.size || { width: { fr: item.weight || 1 }, height: (["paragraph", "insight", "evidence-note", "callout", "table"].includes(item.component) || item.component === "bullet-list" && item.props?.variant === "body") ? "hug" : "fill" };
   if (item.items) {
     const nestedPlan = { id: item.id, layout: item.layout || "auto", gap: item.gap, leftover: item.leftover };
     const nested = makeComposition(nestedPlan, item.items);
@@ -196,13 +196,15 @@ function planCover(plan) {
   if (!plan.title || !String(plan.title).trim()) throw new Error(`${plan.id}.title is required`);
   if (String(plan.title).includes("—") || String(plan.subtitle || "").includes("—")) throw new Error(`${plan.id} contains a Unicode em dash`);
   if (plan.items !== undefined || plan.chrome !== undefined || plan.source !== undefined || plan.note !== undefined || plan.tracker !== undefined) {
-    throw new Error(`${plan.id} cover content belongs in title and subtitle only`);
+    throw new Error(`${plan.id} cover content belongs in title, subtitle, date and logo only`);
   }
+  // Dark is the default cover; a sourced image makes it half-image.
+  const variant = plan.variant ?? (plan.image ? "half-image" : "dark");
   const spec = {
     id: plan.id,
     density: plan.density ?? "executive",
     frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
-    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.variant ? {variant:plan.variant} : {}), ...(plan.image ? {image:plan.image} : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
+    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.date ? { date: plan.date } : {}), ...(plan.logo ? { logo: plan.logo } : {}), variant, ...(plan.image ? {image:plan.image} : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
   };
   return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, recommended: "live-pitch", resolved: spec.density, selection: plan.density === undefined ? "capacity-default" : "explicit", reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
 }
@@ -229,7 +231,7 @@ export function planSlide(plan, registry = REGISTRY) {
   const titleVariant = resolveTitleVariant({ variant: plan.titleVariant });
   const body = makeComposition({...plan, gap: plan.gap ?? (["pre-read","appendix"].includes(content.density.resolved) && ["flow.row","flow.column"].includes(layoutKind(plan,plan.items)) ? "space.3" : undefined)}, plan.items, { root: true });
   return {
-    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, tracker: plan.tracker, source: plan.source, note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
+    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.tag ? { tag: plan.tag } : {}), tracker: plan.tracker, source: plan.source, note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
     decision: {
       titleVariant,
       density: content.density,
@@ -242,7 +244,7 @@ export function planSlide(plan, registry = REGISTRY) {
   };
 }
 
-const TEMPLATE_INSTANCE_KEYS = new Set(["id", "title", "notes", "source", "note", "companyName", "pageNumber", "tracker", "itemContent"]);
+const TEMPLATE_INSTANCE_KEYS = new Set(["id", "title", "titleLead", "tag", "notes", "source", "note", "companyName", "pageNumber", "tracker", "itemContent"]);
 
 function templateItemIndex(items, index = new Map()) {
   for (const item of items || []) {
