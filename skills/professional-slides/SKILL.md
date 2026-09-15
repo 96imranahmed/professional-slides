@@ -104,6 +104,18 @@ Record in the Exhibit column *why* that encoding was chosen when the choice is n
 
 ## The page
 
+**Tables are not all the same table.** The runtime picks a treatment from the content and you can force one with `treatment`/`variant` or object columns:
+
+| Content | Treatment | What it draws |
+| --- | --- | --- |
+| Sequence: rows numbered, or a Stage / Step / Phase first column | `categories` | numbered circle markers on a filled first column |
+| Scorecard: criteria × options, four or more columns | `standard` | filled header row, bold criteria column |
+| Decision: last column is Decision / Then / So what | `standard` + `highlight` cells | filled header, tinted decision column |
+| Listing: everything else | `open` | rules only |
+| Ratings or scores across options | `comparison-table` with `selectedColumn`; `harvey`, `binary`, `heatmap` or `bars` cell types | Harvey balls, ticks, heat or in-cell bars |
+
+Vary deliberately: two scorecards in a row are fine; every table in the deck drawn the same way is not.
+
 **Row rule.** Every panel that sits beside another carries a heading band, and all the bands in a row share one rule line; content starts level below it. A chart brings its own heading; a table, image or list beside it gets a `panelHeading` (or the runtime supplies one). Tables in one row share one type size. Nothing in a row aligns to the heading *text* of its neighbour, only to the rule.
 
 - Canvas 1280 x 720 px, 60 px outer margins.

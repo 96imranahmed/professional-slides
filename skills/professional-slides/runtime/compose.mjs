@@ -51,7 +51,10 @@ function imageProps(ref, baseDir) {
 function exhibitItem(ex, id, baseDir, size = SIZE) {
   const { type, layout: _l, ...rest } = ex;
   if (type === "image") return { id, component: "image-frame", props: imageProps(ex.path ? ex : ex.image, baseDir), size };
-  if (type === "table") return { id, component: "table", props: { variant: rest.variant || "plain", treatment: rest.treatment || "open", density: rest.density || "body", columns: rest.columns.map((c) => typeof c === "string" ? { label: c, type: "text" } : c), rows: rest.rows, fillHeight: size.height === "fill", ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}) }, size };
+  if (type === "table") {
+    const styled = styleTable(rest);
+    return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}) }, size };
+  }
   if (type === "metrics") return { id, layout: "flow.row", size: HUG, items: rest.items.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: m, size: { width: { fr: 1 }, height: 140 } })) };
   if (type.startsWith("chart.")) {
     const props = { dataLabels: true, legend: Array.isArray(rest.series) && rest.series.length > 1, highlights: [], annotations: [], referenceLines: [], ...rest };
@@ -72,6 +75,43 @@ function headedPanel(ex, item, id) {
   }
   const heading = ex.panelHeading || ex.heading || (ex.columns ? String(typeof ex.columns[0] === "string" ? ex.columns[0] : ex.columns[0]?.label || "") : "") || "Detail";
   return { id: `${id}-panel`, heading, treatment: "open", size: item.size, items: [item] };
+}
+
+/**
+ * Table treatment is chosen from what the table says, not from the first option
+ * in the list. An explicit `treatment`, `variant` or object column wins.
+ *   sequence  (rows numbered, or a Stage/Step/Phase first column) → numbered category
+ *             markers on a filled first column ("categories" treatment)
+ *   scorecard (criteria × options, ≥ 4 columns)                   → filled header ("standard")
+ *   decision  (last column is a Decision/Then/So-what)             → filled header, accented last column
+ *   listing   (anything else)                                      → open rules only
+ */
+export function styleTable(ex) {
+  const columns = ex.columns.map((c, i) => typeof c === "string" ? { label: c, type: "text", bold: i === 0 } : { ...c });
+  const explicit = ex.treatment || ex.variant || ex.columns.some((c) => typeof c === "object");
+  if (explicit) return { variant: ex.variant || "plain", treatment: ex.treatment || "open", columns, rows: ex.rows };
+  const first = ex.rows.map((r) => String(r[0] ?? ""));
+  const numbered = first.length > 1 && first.every((v) => /^\s*\d+\s*[·.)\-–:]\s*\S/.test(v));
+  const head0 = String(columns[0].label || "").toLowerCase();
+  const headLast = String(columns[columns.length - 1].label || "").toLowerCase();
+  const sequence = numbered || /^(stage|step|phase|wave|horizon|priority|milestone)s?\b/.test(head0);
+  const decision = /\b(decide|decision|implication|so what|then\b|recommend|verdict|action)/.test(headLast);
+  const scorecard = columns.length >= 4 && /\b(gate|criteri|dimension|factor|requirement|measure|option)/.test(head0);
+  if (sequence) {
+    const cols = [{ ...columns[0], type: "category" }, ...columns.slice(1)];
+    const rows = ex.rows.map((r, i) => {
+      const m = String(r[0]).match(/^\s*(\d+)\s*[·.)\-–:]\s*(.*)$/);
+      const cell = { type: "category", text: m ? m[2] : String(r[0]), sectionNumber: m ? Number(m[1]) : i + 1 };
+      return [cell, ...r.slice(1)];
+    });
+    return { variant: "standard", treatment: "categories", columns: cols, rows };
+  }
+  if (scorecard) return { variant: "standard", treatment: "standard", columns, rows: ex.rows };
+  if (decision) {
+    const rows = ex.rows.map((r) => [...r.slice(0, -1), { text: String(r[r.length - 1]), type: "highlight" }]);
+    return { variant: "standard", treatment: "standard", columns, rows };
+  }
+  return { variant: "plain", treatment: "open", columns, rows: ex.rows };
 }
 
 function niceCeiling(value) {
