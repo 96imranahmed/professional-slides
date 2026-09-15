@@ -686,7 +686,27 @@ export function measureTable({ frame, props }) {
   };
 }
 
-export function renderTable({ id, frame, props }) {
+// Degradation ladder for tables: body → compact → dense before refusing. A table
+// that loses its band height to a shared heading steps its type down one notch
+// rather than failing the page.
+export function renderTable(input) {
+  const ladder = ["body", "compact", "dense"];
+  const start = Math.max(0, ladder.indexOf(input.props.density ?? "body"));
+  let lastError = null;
+  for (let i = start; i < ladder.length; i += 1) {
+    try {
+      const result = renderTableAt({ ...input, props: { ...input.props, density: ladder[i] } });
+      if (i > start) for (const node of result.nodes) node.data = { ...node.data, fitStep: ladder[i] };
+      return result;
+    } catch (error) {
+      if (!/only \d+px is allocated/.test(error.message)) throw error;
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+function renderTableAt({ id, frame, props }) {
   if (props.comparisonAxis !== undefined) {
     if (!["rows", "columns"].includes(props.comparisonAxis)) throw new Error("Table comparisonAxis must be rows or columns");
     if (props.comparisonAxis === "rows" && ["dimensions", "standard"].includes(props.treatment)) throw new Error("Row dimensions require first-column emphasis, not a filled item header");

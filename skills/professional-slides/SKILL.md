@@ -104,6 +104,8 @@ Record in the Exhibit column *why* that encoding was chosen when the choice is n
 
 ## The page
 
+**Row rule.** Every panel that sits beside another carries a heading band, and all the bands in a row share one rule line; content starts level below it. A chart brings its own heading; a table, image or list beside it gets a `panelHeading` (or the runtime supplies one). Tables in one row share one type size. Nothing in a row aligns to the heading *text* of its neighbour, only to the rule.
+
 - Canvas 1280 x 720 px, 60 px outer margins.
 - 12-column grid: 82 px columns, 16 px gutters.
 - Action title 24 pt, at most two lines, with the right 20% of the title band reserved for a tracker or sticker.

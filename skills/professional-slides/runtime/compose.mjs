@@ -60,6 +60,20 @@ function exhibitItem(ex, id, baseDir, size = SIZE) {
   return { id, component: type, props: rest, size };
 }
 
+/**
+ * Row rule: every panel in a row carries a heading band and the bands share one
+ * rule line, so content starts level across the row. Charts bring their own
+ * heading (chart-title); anything else is wrapped in a headed section.
+ */
+function headedPanel(ex, item, id) {
+  if (String(ex.type).startsWith("chart.")) {
+    if (ex.panelHeading && !ex.heading) item.props.heading = ex.panelHeading;
+    return item;
+  }
+  const heading = ex.panelHeading || ex.heading || (ex.columns ? String(typeof ex.columns[0] === "string" ? ex.columns[0] : ex.columns[0]?.label || "") : "") || "Detail";
+  return { id: `${id}-panel`, heading, treatment: "open", size: item.size, items: [item] };
+}
+
 function niceCeiling(value) {
   if (!(value > 0)) return 1;
   const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
@@ -91,7 +105,7 @@ export function composeSlide(slide, index, baseDir) {
   const items = [];
   if (layout === "exhibit-full") items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir));
   else if (layout === "exhibit-left" || layout === "exhibit-right") {
-    const hero = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" });
+    const hero = headedPanel(exhibits[0], exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" }), `${id}-exhibit`);
     // The side column is a headed section so its rule shares the chart heading's
     // band and the points start level with the plot, not with the heading text.
     // `pointsAlign: "middle"` centres the points on the exhibit instead.
@@ -101,6 +115,13 @@ export function composeSlide(slide, index, baseDir) {
       : { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: 1 }, height: "fill" }, items: [list] };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: layout === "exhibit-left" ? [hero, side] : [side, hero] });
   } else if (layout === "two-up") {
+    // Peer tables share one density: a row with a text-heavy table steps every
+    // table in it to compact together, so type stays uniform across the row.
+    const tables = exhibits.filter((ex) => ex.type === "table" && !ex.density);
+    if (tables.length >= 2) {
+      const heavy = tables.some((ex) => (ex.rows || []).some((row) => row.some((cell) => String(cell).length > 60)) || (ex.rows || []).length > 5);
+      if (heavy) for (const ex of tables) ex.density = "compact";
+    }
     // Peer charts with one unit share one value scale, or the comparison lies.
     const charts = exhibits.filter((ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.series));
     if (charts.length >= 2 && charts.every((ex) => ex.unit === charts[0].unit && ex.yMax === undefined)) {
@@ -108,7 +129,7 @@ export function composeSlide(slide, index, baseDir) {
       const shared = niceCeiling(max);
       for (const ex of charts) { ex.yMin = ex.yMin ?? 0; ex.yMax = shared; }
     }
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 3).map((ex, i) => ({ ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), heading: ex.panelHeading, size: SIZE })) });
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 3).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE }, `${id}-exhibit-${i}`)) });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`));
   } else {
     const points = slide.points || [];

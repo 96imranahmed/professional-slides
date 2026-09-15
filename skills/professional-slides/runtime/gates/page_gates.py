@@ -380,12 +380,26 @@ def gate_words(slide_no, slide, findings, profile):
         ))
 
 
+def _inside(inner, outer):
+    a, b = inner.get("frame") or {}, outer.get("frame") or {}
+    return (a.get("x", 0) >= b.get("x", 0) - 1 and a.get("y", 0) >= b.get("y", 0) - 1
+            and a.get("x", 0) + a.get("width", 0) <= b.get("x", 0) + b.get("width", 0) + 1
+            and a.get("y", 0) + a.get("height", 0) <= b.get("y", 0) + b.get("height", 0) + 1)
+
+
 def gate_hero_exhibit(slide_no, slide, findings, image=None):
     """HERO_EXHIBIT. Only applies to pages that carry an exhibit at all. With the render,
     also requires the hero frame to carry ink (a thin strip in a big frame is not a hero)."""
     exhibits = [c for c in slide.get("componentInstances", []) if is_exhibit(c)]
     if not exhibits:
         return
+    # A row of peer panels is one exhibit for this purpose: measure the section that
+    # holds them when two or more exhibits sit side by side inside it.
+    for sec in (c for c in slide.get("componentInstances", []) if c.get("component") == "section"):
+        inside = [e for e in exhibits if _inside(e, sec)]
+        if len(inside) >= 2:
+            exhibits = [sec] + [e for e in exhibits if e not in inside]
+            break
     if image is not None:
         big = max(exhibits, key=lambda c: float((c.get("frame") or {}).get("width", 0)) * float((c.get("frame") or {}).get("height", 0)))
         f = big.get("frame") or {}
