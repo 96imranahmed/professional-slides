@@ -1,5 +1,5 @@
 import unittest
-from evals.tests.test_source_structure import run_node
+from node_probe import run_node
 
 
 class OverlapTests(unittest.TestCase):

@@ -1,24 +1,9 @@
 import unittest
 
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class QuoteClusterTests(unittest.TestCase):
-    def test_quote_cluster_is_the_single_runtime_owner(self):
-        result = run_node("""
-import assert from 'node:assert/strict';
-import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-const definition=REGISTRY.get('quote-cluster');
-assert.ok(definition);
-assert.equal(REGISTRY.has('quote'),false);
-assert.equal(definition.defaultVariant,'three-speech-bubble-staggered-full');
-assert.equal(Object.keys(definition.variants).length,11);
-assert.equal(definition.resolveVariant(definition.sample),definition.defaultVariant);
-assert.deepEqual(Object.keys(definition.variants).map(key=>definition.resolveVariant({...definition.sample,...definition.variants[key].props})),Object.keys(definition.variants));
-console.log(JSON.stringify({accepted:true}));
-""")
-        self.assertTrue(result["accepted"])
-
     def test_original_speech_bubble_is_staggered_and_theme_bound(self):
         result = run_node("""
 import assert from 'node:assert/strict';

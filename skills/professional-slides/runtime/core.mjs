@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { tagSemanticNodes } from "./semantic-integrity.mjs";
 import { resolvePalette, heatScaleTokens } from "./palettes.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
@@ -25,13 +24,20 @@ export const CONTENT_FRAME = Object.freeze({ x: 60, y: 46, width: 1160, height: 
 export const CHROME = Object.freeze({
   left: 60,
   right: 60,
-  titleTop: 48,
-  titleHeight: 58,
-  bodyTop: 150,
+  titleTop: 44,
+  titleHeight: 36,      // one 24pt line box; a second line adds 36
+  titleRail: 0.2,       // right share of the title band reserved for a tracker or sticker
+  bodyTop: 140,         // 44 + 2 × 36 + 24: identical for one- and two-line titles
   sourceTop: 648,
   footerRuleY: 680,
   footerTop: 684
 });
+// 12-column grid inside the 1160px content width: 12 × 82 + 11 × 16.
+export const GRID = Object.freeze({ columns: 12, column: 82, gutter: 16 });
+export function gridSpan(columns, start = 0) {
+  if (!Number.isInteger(columns) || columns < 1 || columns > GRID.columns || start < 0 || start + columns > GRID.columns) throw new Error(`Invalid grid span ${start}+${columns}`);
+  return { x: CHROME.left + start * (GRID.column + GRID.gutter), width: columns * GRID.column + (columns - 1) * GRID.gutter };
+}
 
 const colour = (cssVar, value, themeSlot = null) => ({ kind: "color", cssVar, value, themeSlot });
 const length = (cssVar, value) => ({ kind: "lengthPx", cssVar, value });
@@ -67,23 +73,23 @@ export const TOKENS = Object.freeze({
   "weight.semibold": { kind: "fontWeight", cssVar: "--weight-semibold", value: 600 },
   "font.display": font("--font-display", "Arial"),
   "font.serif": font("--font-serif", "Georgia"),
-  "type.deckTitle": point("--type-deck-title", 38),
-  "type.actionTitle": point("--type-action-title", 30),
-  "type.actionTitleLong": point("--type-action-title-long", 27),
+  "type.deckTitle": point("--type-deck-title", 32),
+  "type.actionTitle": point("--type-action-title", 24),
+  "type.actionTitleLong": point("--type-action-title-long", 22),
   "type.sectionTitle": point("--type-section-title", 24),
   "type.sectionNumber": point("--type-section-number", 170),
   "type.quoteMark": point("--type-quote-mark", 48),
   "type.quoteMarkHero": point("--type-quote-mark-hero", 76),
-  "type.heading": point("--type-heading", 16),
-  "type.body": point("--type-body", 14),
-  // Chart text keeps semantic roles so adapters can preserve purpose and
-  // weight, while its default size stays aligned to ordinary body copy.
-  "type.chartLabel": point("--type-chart-label", 14),
-  "type.chartAnnotation": point("--type-chart-annotation", 14),
-  "type.compact": point("--type-compact", 12),
-  "type.label": point("--type-label", 10),
+  "type.heading": point("--type-heading", 14),
+  "type.body": point("--type-body", 12),
+  // Modular scale 8 / 9 / 10 / 12 / 14 / 18 / 24 / 32 (about 1.2). Chart furniture
+  // sits two steps below body, as on a consulting page.
+  "type.chartLabel": point("--type-chart-label", 10),
+  "type.chartAnnotation": point("--type-chart-annotation", 10),
+  "type.compact": point("--type-compact", 10),
+  "type.label": point("--type-label", 9),
   "type.source": point("--type-source", 8),
-  "type.metric": point("--type-metric", 26),
+  "type.metric": point("--type-metric", 28),
   "space.1": length("--space-1", 4),
   "space.2": length("--space-2", 8),
   "space.3": length("--space-3", 12),
@@ -104,18 +110,23 @@ export const TOKENS = Object.freeze({
 export const DENSITY_PROFILES = Object.freeze({
   "live-pitch": Object.freeze({ typeScale: 1.15 }),
   executive: Object.freeze({ typeScale: 1 }),
-  "pre-read": Object.freeze({ typeScale: 0.9 }),
-  appendix: Object.freeze({ typeScale: 0.8 })
+  "pre-read": Object.freeze({ typeScale: 0.92 }),
+  appendix: Object.freeze({ typeScale: 0.84 })
 });
+// Page chrome keeps its size at every density so hierarchy ratios survive the knob.
+const DENSITY_FIXED = new Set(["type.deckTitle", "type.actionTitle", "type.actionTitleLong", "type.sectionTitle", "type.sectionNumber", "type.source", "type.quoteMark", "type.quoteMarkHero"]);
+const snapHalfPoint = (value) => Math.round(value * 2) / 2;
 
 export function resolveDensityTokens(baseTokens, density = "executive") {
   if (typeof density !== "string" || !Object.hasOwn(DENSITY_PROFILES, density)) throw new Error(`Unknown density profile: ${density}`);
   const scale = DENSITY_PROFILES[density].typeScale;
   return Object.fromEntries(Object.entries(baseTokens).map(([tokenId, definition]) => [
     tokenId,
-    tokenId.startsWith("type.")
-      ? { ...definition, value: Number((definition.value * scale).toFixed(2)) }
-      : { ...definition }
+    tokenId.startsWith("type.") && !DENSITY_FIXED.has(tokenId)
+      ? { ...definition, value: snapHalfPoint(definition.value * scale) }
+      : tokenId.startsWith("space.")
+        ? { ...definition, value: Math.max(2, Math.round(definition.value * scale)) }
+        : { ...definition }
   ]));
 }
 
@@ -272,8 +283,17 @@ export function shapePrimitive({ id, role = "shape", geometry = "rect", frame, s
   return primitive({ type: "shape", id, role, frame, style, data: { ...data, geometry }, tokens });
 }
 
-export function flow({ id, direction = "row", gap = token("space.4"), padding = 0, size = {}, cell = null, frame = null, children = [] }) {
-  return { nodeType: "flow", id, direction, gap, padding, size, cell, frame, children };
+export const FLOW_LEFTOVER_POLICIES = Object.freeze(["start", "distribute", "center", "end"]);
+
+/**
+ * `leftover` names what happens to main-axis space no child claimed. Every child
+ * hugging its content leaves `fractionTotal === 0`, so without a policy the
+ * remainder is silently abandoned at the far end of the frame. "start" preserves
+ * that legacy packing; slide bodies opt into an explicit policy.
+ */
+export function flow({ id, direction = "row", gap = token("space.4"), padding = 0, size = {}, cell = null, frame = null, children = [], leftover = "start" }) {
+  if (!FLOW_LEFTOVER_POLICIES.includes(leftover)) throw new Error(`${id}.leftover must be one of ${FLOW_LEFTOVER_POLICIES.join(", ")}`);
+  return { nodeType: "flow", id, direction, gap, padding, size, cell, frame, children, leftover };
 }
 
 export function grid({ id, columns, rows, columnGap = token("space.4"), rowGap = token("space.4"), padding = 0, size = {}, cell = null, frame = null, children = [] }) {
@@ -298,7 +318,8 @@ export function assertSectionHeadingProps(props = {}) {
 
 export function section(options) {
   assertSectionHeadingProps(options);
-  const { id, treatment = "open", edge = "contained", heading = null, padding = token("space.4"), children = [], composition = null, size = {}, cell = null, frame = null } = options;
+  // Open sections keep the grid's left and right edges; boxed sections pad inward.
+  const { id, treatment = "open", edge = "contained", heading = null, padding = treatment === "open" ? 0 : token("space.4"), children = [], composition = null, size = {}, cell = null, frame = null } = options;
   return { nodeType: "section", id, treatment, edge, heading, padding, children, composition, size, cell, frame };
 }
 
@@ -355,6 +376,32 @@ function alignPeerHeaders(children, widths, registry, group = () => 0) {
   });
 }
 
+const FILLS_FRAME = (id) => /^chart\./.test(id) || ["chart-group", "image-frame", "section-divider", "cover", "tracker-page", "map", "matrix", "heatmap", "funnel", "tree", "organization", "relationship-network", "quote-cluster", "logo-collage", "panel", "content-rail", "section-boundary"].includes(id);
+const PROBE_HEIGHT = 1400;
+const renderMeasurements = new Map();
+function measureByRender(node, definition, width) {
+  if (!definition?.render || FILLS_FRAME(definition.id)) {
+    // scale the sample size with the width so a half-width chart is not as tall as a full one
+    const size = definition?.preferredSize;
+    if (size?.width && size?.height && FILLS_FRAME(definition.id) && width) return Math.round(Math.min(size.height, size.height * (width / size.width) * 1.1));
+    return null;
+  }
+  const key = hashJson({ id: definition.id, width, props: node.props, tokens: activeDesignTokens() ? Object.keys(activeDesignTokens()).length : 0 });
+  if (renderMeasurements.has(key)) return renderMeasurements.get(key);
+  let height = null;
+  try {
+    const rendered = definition.render({ id: `probe:${node.id}`, frame: { x: 0, y: 0, width, height: PROBE_HEIGHT }, props: node.props });
+    const nodes = rendered?.nodes || [];
+    if (nodes.length) {
+      const bottom = Math.max(...nodes.map((n) => (n.frame?.y ?? 0) + (n.frame?.height ?? 0)));
+      // a component that stretched a surface to the whole probe is a frame-filler
+      height = bottom >= PROBE_HEIGHT * 0.9 ? null : Math.ceil(bottom);
+    }
+  } catch { height = null; }
+  renderMeasurements.set(key, height);
+  return height;
+}
+
 // Width is resolved before measuring wrapped content. Sample preferred sizes
 // remain a fallback only for components without intrinsic measurement.
 function preferredSize(node, axis, registry, width = null) {
@@ -372,6 +419,12 @@ function preferredSize(node, axis, registry, width = null) {
         if (!Number.isFinite(measured.height) || measured.height < 0) throw new Error(`Invalid intrinsic height for ${node.id}`);
         return measured.height;
       }
+      // Universal fallback: components that draw to a frame are measured by
+      // rendering them once at this width into a tall probe and taking the ink
+      // extent. Components that scale to whatever frame they get (charts, images,
+      // dividers) keep their declared size, proportionally to the width.
+      const byRender = measureByRender(node, definition, width);
+      if (byRender !== null) return byRender;
     }
     return definition?.preferredSize?.[axis] || 0;
   }
@@ -500,7 +553,14 @@ export function resolveLayout(root, frame, registry) {
       const specs = node.children.map((child) => row ? child.size?.width : child.size?.height);
       const preferred = node.children.map((child) => preferredSize(child, row ? "width" : "height", registry, row ? null : resolveLength(child.size?.width, inner.width, preferredSize(child, "width", registry)) ?? inner.width));
       const lengths = allocateTracks(specs, mainAvailable, Math.max(0, node.children.length - 1) * gap, preferred);
-      let cursor = row ? inner.x : inner.y;
+      // Space no child claimed. Abandoning it is what leaves a dead band below
+      // an all-hug body; the policy says where it goes instead.
+      const claimed = lengths.reduce((sum, value) => sum + value, 0) + Math.max(0, node.children.length - 1) * gap;
+      const leftover = Math.max(0, mainAvailable - claimed);
+      const policy = node.leftover || "start";
+      const extraGap = policy === "distribute" && node.children.length > 1 ? leftover / (node.children.length - 1) : 0;
+      const leadOffset = policy === "center" ? leftover / 2 : policy === "end" ? leftover : 0;
+      let cursor = (row ? inner.x : inner.y) + leadOffset;
       const children = row ? alignPeerHeaders(node.children, lengths, registry) : node.children;
       children.forEach((child, index) => {
         const crossSpec = row ? child.size?.height : child.size?.width;
@@ -511,7 +571,7 @@ export function resolveLayout(root, frame, registry) {
           ? { x: cursor, y: inner.y, width: lengths[index], height: cross }
           : { x: inner.x, y: cursor, width: cross, height: lengths[index] };
         walk(child, childFrame);
-        cursor += lengths[index] + gap;
+        cursor += lengths[index] + gap + extraGap;
       });
       return;
     }
@@ -624,6 +684,37 @@ export function buildManifest(deck) {
   };
   manifest.designHash = hashJson(manifest);
   return manifest;
+}
+
+const NATIVE_CHART_TYPES = Object.freeze({
+  "chart.column": "column", "chart.bar": "bar", "chart.stacked-column": "stacked-column",
+  "chart.stacked-bar": "stacked-bar", "chart.line": "line", "chart.pie": "pie", "chart.donut": "donut",
+  "chart.scatter": "scatter", "chart.area": "area"
+});
+/** Data an emitter needs for a native chart. Types outside NATIVE_CHART_TYPES keep shapes. */
+export function nativeChartSpec(componentId, props = {}, frame) {
+  const type = NATIVE_CHART_TYPES[componentId];
+  if (!type) return null;
+  // Reference lines, annotations and highlights need the plot scale; PowerPoint does
+  // not expose it, so those charts stay as assembled, grouped shapes.
+  if ((props.referenceLines || []).length || (props.annotations || []).length || (props.highlights || []).length || (props.changeAnnotations || []).length) return null;
+  const series = Array.isArray(props.series) ? props.series.map(s => ({ name: s.name, values: [...(s.values || [])] }))
+    : Array.isArray(props.values) ? [{ name: props.name || "", values: [...props.values] }] : [];
+  return {
+    type,
+    categories: [...(props.categories || props.labels || [])],
+    series,
+    ...(Array.isArray(props.points) ? { points: props.points.map(p => ({ ...p })) } : {}),
+    unit: props.unit ?? null,
+    yMin: props.yMin ?? null,
+    yMax: props.yMax ?? null,
+    dataLabels: props.dataLabels !== false,
+    legend: props.legend === true || (series.length > 1 && props.legend !== false),
+    gridlines: props.gridlines === true,
+    valueFormat: props.valueFormat ?? null,
+    colorIndices: Array.isArray(props.colorIndices) ? [...props.colorIndices] : null,
+    frame: { ...frame }
+  };
 }
 
 export function compileDeck(deckSpec, registry, {slideCache}={}) {
@@ -759,10 +850,12 @@ export function compileDeck(deckSpec, registry, {slideCache}={}) {
         ...(props.semantic ? {relationships: props.semantic} : {}),
         variant: definition.resolveVariant?.(props),
         frame,
-        tokens: definition.tokens
+        tokens: definition.tokens,
+        // Chart data travels with the instance so an emitter can write a native,
+        // workbook-backed chart object in this frame instead of loose shapes.
+        ...(String(definition.id).startsWith("chart.") ? { nativeChart: nativeChartSpec(definition.id, props, frame) } : {})
       });
     }
-    tagSemanticNodes(nodes, componentInstances);
     assertUniqueIds(nodes);
     for (const node of nodes) {
       const nodeTokens = chromeOwners.has(node.data.componentInstance) || node.data.componentAncestors?.some(owner => chromeOwners.has(owner)) ? designTokens : slideTokens;

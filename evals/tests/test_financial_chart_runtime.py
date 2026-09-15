@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class FinancialChartRuntimeTests(unittest.TestCase):
@@ -149,13 +149,10 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result['accepted'])
 
-    def test_chart_labels_annotations_legends_and_title_subtitles_use_body_size(self):
+    def test_chart_labels_annotations_legends_and_title_subtitles_use_the_chart_label_scale(self):
         result = run_node("""
 import assert from 'node:assert/strict';
-import {TOKENS} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-assert.equal(TOKENS['type.chartLabel'].value,TOKENS['type.body'].value);
-assert.equal(TOKENS['type.chartAnnotation'].value,TOKENS['type.body'].value);
 const frame={x:60,y:150,width:1000,height:500};
 const column=REGISTRY.get('chart.column');
 const props={categories:['Current','Future'],series:[{name:'Actual',values:[80,150]},{name:'Plan',values:[72,140]}],dataLabels:true,annotations:[{series:'Actual',category:'Future',text:'Above plan'}],changeAnnotations:[]};
@@ -163,7 +160,7 @@ const nodes=column.render({id:'column',frame,props}).nodes;
 assert.ok(nodes.filter(n=>n.role==='data-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 assert.ok(nodes.filter(n=>n.role==='legend-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 assert.ok(nodes.filter(n=>n.role==='annotation-text').every(n=>n.style.fontSize.tokenId==='type.chartAnnotation'));
-assert.ok(nodes.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.body'));
+assert.ok(nodes.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 const waterfall=REGISTRY.get('chart.waterfall');
 const change=waterfall.render({id:'waterfall',frame,props:{...waterfall.sample,...waterfall.examples['end-to-end-construction'].props}}).nodes;
 assert.ok(change.filter(n=>n.role==='data-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
@@ -179,7 +176,7 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
-    def test_sparse_directly_labelled_charts_omit_value_axes_and_keep_body_sized_category_ticks(self):
+    def test_sparse_directly_labelled_charts_omit_value_axes_and_keep_chart_label_sized_ticks(self):
         result = run_node("""
 import assert from 'node:assert/strict';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
@@ -189,10 +186,10 @@ const sparse=column.render({id:'sparse',frame,props:{categories:['Revenue','Oper
 assert.equal(sparse.filter(n=>n.role==='axis-label').length,0);
 assert.equal(sparse.filter(n=>n.id.endsWith('y-axis')).length,0);
 assert.equal(sparse.filter(n=>n.id.endsWith('x-axis')).length,1);
-assert.ok(sparse.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.body'));
+assert.ok(sparse.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 const threshold=column.render({id:'threshold',frame,props:{categories:['A','B','C','D'],series:[{name:'Actual',values:[1,2,3,4]},{name:'Plan',values:[2,3,4,5]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
 assert.equal(threshold.filter(n=>n.role==='axis-label').length,5);
-assert.ok(threshold.filter(n=>n.role==='axis-label').every(n=>n.style.fontSize.tokenId==='type.body'));
+assert.ok(threshold.filter(n=>n.role==='axis-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 const forced=column.render({id:'forced',frame,props:{categories:['A','B'],series:[{name:'Value',values:[1,2]}],dataLabels:true,showValueAxis:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
 assert.equal(forced.filter(n=>n.role==='axis-label').length,5);
 const horizontal=REGISTRY.get('chart.bar').render({id:'horizontal',frame,props:{categories:['A','B'],series:[{name:'Value',values:[1,2]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;

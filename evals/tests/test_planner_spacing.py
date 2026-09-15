@@ -1,23 +1,8 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class PlannerSpacingTests(unittest.TestCase):
-    def test_media_provenance_is_not_counted_as_visible_slide_copy(self):
-        result = run_node(r'''
-import assert from 'node:assert/strict';
-import {planSlide} from './skills/professional-slides/runtime/planner.mjs';
-import {MEDIA_SAMPLE} from './skills/professional-slides/runtime/media.mjs';
-const plan={id:'media-copy',title:'The partner is identified by its mark',density:'executive',layout:'flow.column',items:[{id:'image',job:'Identify the partner',component:'image-frame',props:MEDIA_SAMPLE}]};
-const baseline=planSlide(plan).decision.content.countedWords;
-const changed=structuredClone(plan);changed.items[0].props.authorization='Provenance record '.repeat(300);changed.items[0].props.sourceUrl='https://example.com/source';
-assert.equal(planSlide(changed).decision.content.countedWords,baseline);
-changed.items[0].props.alt+=' second identity';
-assert.equal(planSlide(changed).decision.content.countedWords,baseline+2);
-console.log(JSON.stringify({accepted:true}));
-''')
-        self.assertTrue(result['accepted'])
-
     def test_heading_hug_uses_measured_lines_before_related_body_gap(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';

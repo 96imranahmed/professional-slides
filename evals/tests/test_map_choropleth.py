@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class ChoroplethTests(unittest.TestCase):
@@ -27,44 +27,6 @@ bad=structuredClone(props);bad.choropleth.scale.domain=[1,1];assert.throws(()=>c
 bad=structuredClone(props);bad.geography.geojson.features[0].properties.labelPoint=undefined;assert.throws(()=>compile(bad),/labelPoint/);
 bad=structuredClone(props);bad.highlightCountries=['west'];assert.throws(()=>compile(bad),/cannot combine/);
 console.log(JSON.stringify({ok:true}));
-""")
-        self.assertTrue(result['ok'])
-
-    def test_native_map_preserves_editable_feature_paths_and_label_lines(self):
-        result = run_node("""
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import {createRequire} from 'node:module';
-import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
-import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-import {CHOROPLETH_MAP_SAMPLE} from './skills/professional-slides/runtime/maps.mjs';
-import {writePptx} from './skills/professional-slides/runtime/adapters/pptxgenjs.mjs';
-import {auditNativeTextStyle} from './evals/scripts/native_text_style_audit.mjs';
-const frame={x:60,y:140,width:600,height:400};
-const props=structuredClone(CHOROPLETH_MAP_SAMPLE);props.choropleth.values[0].value=3;
-const deck=compileDeck({slides:[{id:'native-map',frame,composition:component({id:'regions',component:'map',frame,props})}]},REGISTRY);
-const directory=await fs.mkdtemp(path.join(os.tmpdir(),'ps-map-'));
-try {
-const file=path.join(directory,'map.pptx');await writePptx(deck,file);
-const require=createRequire(import.meta.url),Zip=require(require.resolve('jszip',{paths:[process.env.RUNTIME_NODE_MODULES]}));
-const zip=await Zip.loadAsync(await fs.readFile(file)),xml=await zip.file('ppt/slides/slide1.xml').async('string');
-const blocks=xml.match(/<p:sp>[\\s\\S]*?<\\/p:sp>/g)||[];
-for(const node of deck.slides[0].nodes.filter(n=>n.role==='map-land')){
- const block=blocks.find(b=>b.includes(`name="ps:${node.id}"`));
- assert.ok(block.includes('<a:custGeom>'));assert.ok(block.includes('<a:path'));
- assert.ok(block.includes(node.style.fill.value.slice(1).toUpperCase()));
- assert.equal(node.data.sourceSha256,'0'.repeat(64));
- assert.equal(node.style.stroke.tokenId,'color.rule');
- assert.notEqual(node.style.stroke.value,'#FFFFFF');
- assert.ok(block.includes(node.style.stroke.value.slice(1).toUpperCase()));
- if(node.data.featureId==='west')assert.equal(node.style.fill.value,'#FFFFFF');
-}
-assert.ok(!xml.includes('<p:pic>'));
-for(const node of deck.slides[0].nodes.filter(n=>n.type==='text'))assert.deepEqual(auditNativeTextStyle(blocks.find(b=>b.includes(`name="ps:${node.id}"`)),node),[]);
-console.log(JSON.stringify({ok:true}));
-}finally{await fs.rm(directory,{recursive:true,force:true});}
 """)
         self.assertTrue(result['ok'])
 

@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class TypedTableTests(unittest.TestCase):
@@ -123,9 +123,12 @@ for(const pageDensity of ['executive','pre-read','appendix']) for(const density 
  const props={variant:'open',density,columns:[{key:'case',label:'Option',type:'category'},{key:'value',label:'Evidence',type:'text'}],rows:[[{type:'category',text:'Finance',sectionNumber:1},'Shared services'],[{type:'category',text:'Research',sectionNumber:2,rowSpan:2},'Capacity'],[null,'Compliance']]};
  const deck=compileDeck({slides:[{id:'clearance',density:pageDensity,composition:component({id:'cases',component:'table',props,frame:{x:60,y:60,width:1160,height:600}})}]},REGISTRY);
  const nodes=deck.slides[0].nodes;
+ // The clearance is one space.1 step, and space tokens now scale with the page
+ // density (4px at executive, 3px at appendix), so read it off the slide.
+ const clearance=deck.slides[0].tokens['space.1'].value;
  for(const marker of nodes.filter(n=>n.role==='table-section-marker')) {
   const text=nodes.find(n=>n.role==='table-cell-text'&&n.data.row===marker.data.row&&n.data.column===marker.data.column);
-  assert.ok(text.frame.y >= marker.frame.y+marker.frame.height+3.9, `${pageDensity}/${density}: marker overlaps category text`);
+  assert.ok(text.frame.y >= marker.frame.y+marker.frame.height+clearance-0.1, `${pageDensity}/${density}: marker overlaps category text`);
  }
 }
 console.log(JSON.stringify({accepted:true}));
@@ -150,7 +153,7 @@ for(const palette of ['mckinsey','bcg','bain']) for(const [variant,fixture] of O
    assert.equal(node.style.fill.tokenId,'color.componentPrimary');
    assert.equal(node.style.fill.value,{mckinsey:'#051C2C',bcg:'#197A56',bain:'#CB2027'}[palette]);
   }
-  if(node.type==='text'){assert.equal(node.style.fontFamily.value,'Georgia');assert.ok([12,14].includes(node.style.fontSize.value));assert.equal(node.style.wrap,false);}
+  if(node.type==='text'){assert.equal(node.style.fontFamily.value,'Georgia');assert.ok([10,12].includes(node.style.fontSize.value));assert.equal(node.style.wrap,false);}
  }
 }
 assert.deepEqual([...seen].sort(),[...CELL_TYPES].sort());

@@ -1,5 +1,3 @@
-import { sceneVisibleWords, assessArgument } from './production-policy.mjs';
-import { assertPlanRelationships } from "./semantic-integrity.mjs";
 import {
   SLIDE,
   TOKENS,
@@ -16,7 +14,6 @@ import {
 } from "./core.mjs";
 import { REGISTRY } from "./registry.mjs";
 
-const words = (value) => String(value || "").trim().split(/\s+/).filter(Boolean);
 const DENSITY_ORDER = Object.freeze(["live-pitch", "executive", "pre-read", "appendix"]);
 
 function maximumDensity(left, right) {
@@ -38,7 +35,7 @@ function extentOf(props = {}) {
 }
 
 function capacityRecommendation(item, path, reasons) {
-  let recommended = "live-pitch";
+  let recommended = "executive";
   const props = item.props || {};
   if (item.component === "insight-tree-table") {
     const branches = Array.isArray(props.branches) ? props.branches.length : 0;
@@ -65,70 +62,14 @@ export function resolveSlideDensity(plan) {
   const requested = plan.density ?? "executive";
   if (!DENSITY_ORDER.includes(requested)) throw new Error(`Unknown density profile: ${requested}`);
   const reasons = [];
-  const recommended = (plan.items || []).reduce((result, item, index) => maximumDensity(result, capacityRecommendation(item, `${plan.id}.items[${index}]`, reasons)), "live-pitch");
-  // An explicit family density is an authoring choice, never an invitation to
-  // silently shrink it. Intrinsic measurement and render gates still enforce fit.
+  const recommended = (plan.items || []).reduce((result, item, index) => maximumDensity(result, capacityRecommendation(item, `${plan.id}.items[${index}]`, reasons)), "executive");
+  // An explicit density is the author's; otherwise the denser of default and recommendation.
   const explicit = plan.density !== undefined;
   return { requested, recommended, resolved: explicit ? requested : maximumDensity(requested, recommended), selection: explicit ? "explicit" : "capacity-default", reasons };
 }
 
-function validateContentValue(value, path = "props") {
-  if (typeof value === "string" && value.includes("—")) throw new Error(`${path} contains a Unicode em dash`);
-  if (Array.isArray(value)) return value.forEach((item, index) => validateContentValue(item, `${path}[${index}]`));
-  if (!value || typeof value !== "object") return;
-  for (const [key, child] of Object.entries(value)) {
-    validateContentValue(child, `${path}.${key}`);
-  }
-}
-
-function countWords(value) {
-  if (typeof value === "string") return words(value).length;
-  if (Array.isArray(value)) return value.reduce((sum, item) => sum + countWords(item), 0);
-  if (!value || typeof value !== "object") return 0;
-  // Embedded media carries asset/provenance metadata, not visible slide prose.
-  // Its identity still counts through the accessible label.
-  if (typeof value.dataUri === "string" && value.dataUri.startsWith("data:image/") && value.width > 0 && value.height > 0) return countWords(value.alt);
-  const metadata = new Set(['id','job','semantic','notes','source','chartSelection','changeIntent','dataBasis','provenance','sourceId','sourceIds','evidenceIds','alt','url','path','variant','role','format','color','fill','align','surface','type','kind','measurementBasis']);
-  return Object.entries(value).reduce((sum, [key,item]) => sum + (metadata.has(key) ? 0 : countWords(item)), 0);
-}
-
-function itemAudienceCopy(item) {
-  return {
-    heading: item.heading,
-    props: item.props || {},
-    items: (item.items || []).map(itemAudienceCopy)
-  };
-}
-
-function trackerAudienceCopy(tracker) {
-  if (!tracker || typeof tracker !== "object") return null;
-  return {
-    title: tracker.title,
-    parentTitle: tracker.parentTitle,
-    items: (tracker.items || []).map(item => ({ id: item.id, label: item.label }))
-  };
-}
-
-export function assertChartSelection(component, props, path = 'chart') {
-  const selection = props.chartSelection;
-  if (selection && (!selection.question?.trim() || !selection.reason?.trim() || !selection.rejectedAlternative?.trim() || !selection.dataBasis?.trim())) throw new Error(`${path}: chart selection requires question, dataBasis, reason and rejectedAlternative`);
-  const indexed = selection?.measurementBasis === 'rebased-index' || /\bindex(?:ed)?\b/i.test(String(props.unit || '') + ' ' + String(props.heading || ''));
-  if (indexed && selection?.measurementBasis !== 'published-index') {
-    if (selection?.measurementBasis !== 'rebased-index' || !selection.indexJustification?.trim() || !selection.absoluteValueContext?.trim() || !selection.indexBase?.period?.trim() || !Number.isFinite(selection.indexBase?.value) || selection.indexBase.value <= 0) throw new Error(`${path}: INDEX_JUSTIFICATION requires an explicit rebased-index purpose, base period/value, absolute-value context and reason native units or percentage changes are inadequate`);
-  }
-  if (component === 'chart.line') {
-    const years = (props.categories || []).map(v => /^\d{4}(?:\s.*)?$/.test(String(v)) ? Number(String(v).slice(0,4)) : Number(v));
-    const values = (props.series || []).map(s => s.values);
-    const linear = years.length >= 3 && years.every(Number.isFinite) && years.every((v,i)=>i===0 || v>years[i-1]) && values.length && values.every(v => v.length === years.length && v.every(Number.isFinite) && v.slice(2).every((y,i) => Math.abs((y-v[i+1])/(years[i+2]-years[i+1])-(v[1]-v[0])/(years[1]-years[0])) < 1e-8));
-    if (selection?.dataBasis === 'constant-rate-scenario' || selection?.dataBasis === 'endpoint-only') throw new Error(`${path}: constant-rate or endpoint-only evidence requires bar/column comparison, not a line trajectory`);
-    if (linear && !['observed','published-forecast'].includes(selection?.dataBasis)) throw new Error(`${path}: linear year series requires source-backed chart selection; constant-rate extrapolation belongs in endpoint bars`);
-  }
-  for (const child of props.charts || []) assertChartSelection(child.component, {...(child.props || child), heading:child.heading ?? child.props?.heading, unit:child.unit ?? child.props?.unit}, path + '.charts');
-}
-
 function validateItem(item, path, registry) {
   if (!item?.id) throw new Error(`${path}.id is required`);
-  if (!item.job || !String(item.job).trim()) throw new Error(`${path}.job must state why the item is on the slide`);
   if (item.component && !registry.has(item.component)) throw new Error(`${path}.component is not registered: ${item.component}`);
   if ((!item.component && (!Array.isArray(item.items) || !item.items.length)) || (item.items !== undefined && (!Array.isArray(item.items) || !item.items.length))) throw new Error(`${path} needs a component or nested items`);
   if (item.items) assertSectionHeadingProps(item);
@@ -139,14 +80,11 @@ function validateItem(item, path, registry) {
     }
   }
   if (["section", "section-heading", "content-rail"].includes(item.component)) assertSectionHeadingProps(item.props);
-  validateContentValue({ heading: item.heading }, path);
-  validateContentValue(item.props || {}, `${path}.props`);
   const checkChange = (props) => {
     if (props.changeIntent && !(props.changeAnnotations?.length) && props.changePresentation !== 'direct-labels') throw new Error(`${path}: declared change requires a highlighted change annotation`);
     for (const chart of props.charts || []) checkChange(chart.props || chart);
   };
   checkChange(item.props || {});
-  assertChartSelection(item.component, item.props || {}, path);
   (item.items || []).forEach((child, index) => validateItem(child, `${path}.items[${index}]`, registry));
 }
 
@@ -154,8 +92,6 @@ export function validateSlidePlan(plan, registry = REGISTRY) {
   if (!plan?.id) throw new Error("Slide plan id is required");
   resolveTitleVariant({ variant: plan.titleVariant });
   if (!plan.title || !String(plan.title).trim()) throw new Error(`${plan.id}.title is required`);
-  // Title length is diagnostic; measured wrapping and fit remain enforced.
-  if (String(plan.title).includes("—")) throw new Error(`${plan.id}.title contains a Unicode em dash`);
   if (!Array.isArray(plan.items) || plan.items.length === 0) throw new Error(`${plan.id}.items must contain at least one content item`);
   if (plan.template !== undefined) {
     const reference = plan.template;
@@ -166,31 +102,9 @@ export function validateSlidePlan(plan, registry = REGISTRY) {
     }
   }
   plan.items.forEach((item, index) => validateItem(item, `${plan.id}.items[${index}]`, registry));
-  assertPlanRelationships(plan);
   const density = resolveSlideDensity(plan);
-  const defaultBudget = density.resolved === "appendix" ? 130 : density.resolved === "pre-read" ? 85 : density.resolved === "live-pitch" ? 30 : 55;
-  const override = plan.copyBudget;
-  if (override !== undefined && (!override || typeof override !== "object" || Array.isArray(override)
-    || Object.keys(override).some(key => !["maxWordsPerSlide", "rationale"].includes(key))
-    || !Number.isInteger(override.maxWordsPerSlide) || override.maxWordsPerSlide <= 0
-    || typeof override.rationale !== "string" || !override.rationale.trim())) {
-    throw new Error(`${plan.id}.copyBudget requires a positive integer maxWordsPerSlide and a nonempty rationale`);
-  }
-  const budget = override?.maxWordsPerSlide ?? defaultBudget;
-  const countedWords = countWords({
-    title: plan.title,
-    subtitle: plan.subtitle,
-    source: plan.source,
-    note: plan.note,
-
-    companyName: plan.companyName,
-    tracker: trackerAudienceCopy(plan.tracker),
-    items: plan.items.map(itemAudienceCopy)
-  });
-  // This is a planning estimate. Enforce explicit limits only against emitted
-  // audience-visible text in planDeck; metadata must never reject a slide.
   if (plan.provenanceRequired && !plan.source) throw new Error(`${plan.id} requires a source`);
-  return { countedWords, budget, density, advisory: !override && countedWords > budget ? ['Visible copy estimate exceeds profile guidance; inspect readable fit and completeness'] : [], argumentFindings: assessArgument(plan), ...(override ? { defaultBudget, overrideRationale: override.rationale } : {}) };
+  return { density };
 }
 
 function layoutKind(plan, items) {
@@ -231,17 +145,22 @@ function makeItem(item, index, cell = null) {
   });
 }
 
-function makeComposition(plan, items) {
+function makeComposition(plan, items, { root = false } = {}) {
   const kind = layoutKind(plan, items);
   if (plan.gap !== undefined && (typeof plan.gap !== "string" || !plan.gap.startsWith("space.") || !Object.hasOwn(TOKENS, plan.gap))) throw new Error(`${plan.id}.gap must name a canonical spacing token`);
   if (plan.gap !== undefined && !["flow.row", "flow.column"].includes(kind)) throw new Error(`${plan.id}.gap is supported only for row and column flows`);
   if (kind === "absolute") return absolute({ id: `${plan.id}-absolute`, children: items.map((item, index) => makeItem(item, index)) });
   if (kind === "overlay") return overlay({ id: `${plan.id}-overlay`, children: items.map((item, index) => makeItem(item, index)) });
   if (kind === "flow.row" || kind === "flow.column") {
+    // A slide body whose blocks all hug their content claims less than the frame.
+    // Without a policy the remainder is abandoned below the last block, which is
+    // what produces a dead band across the lower third of the page.
+    const bodyColumn = root && kind === "flow.column";
     return flow({
       id: `${plan.id}-${kind.replace(".", "-")}`,
       direction: kind.endsWith("row") ? "row" : "column",
       gap: token(plan.gap ?? "space.4"),
+      leftover: bodyColumn ? "distribute" : "start",
       children: items.map((item, index) => makeItem(item, index))
     });
   }
@@ -308,7 +227,7 @@ function planTracker(plan, registry) {
 export function planSlide(plan, registry = REGISTRY) {
   const content = validateSlidePlan(plan, registry);
   const titleVariant = resolveTitleVariant({ variant: plan.titleVariant });
-  const body = makeComposition({...plan, gap: plan.gap ?? (["pre-read","appendix"].includes(content.density.resolved) && ["flow.row","flow.column"].includes(layoutKind(plan,plan.items)) ? "space.3" : undefined)}, plan.items);
+  const body = makeComposition({...plan, gap: plan.gap ?? (["pre-read","appendix"].includes(content.density.resolved) && ["flow.row","flow.column"].includes(layoutKind(plan,plan.items)) ? "space.3" : undefined)}, plan.items, { root: true });
   return {
     spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, tracker: plan.tracker, source: plan.source, note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
     decision: {
@@ -323,7 +242,7 @@ export function planSlide(plan, registry = REGISTRY) {
   };
 }
 
-const TEMPLATE_INSTANCE_KEYS = new Set(["id", "title", "notes", "source", "note", "companyName", "pageNumber", "tracker", "copyBudget", "itemContent"]);
+const TEMPLATE_INSTANCE_KEYS = new Set(["id", "title", "notes", "source", "note", "companyName", "pageNumber", "tracker", "itemContent"]);
 
 function templateItemIndex(items, index = new Map()) {
   for (const item of items || []) {
@@ -376,10 +295,5 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
     : slide.kind === "tracker" ? planTracker(slide, registry)
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? defaultTitleVariant : slide.titleVariant }, registry));
   const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, slides: planned.map((item) => item.spec) }, registry, {slideCache});
-  for(const [i,slide] of deck.slides.entries()) {
-    planned[i].decision.visibleWords=sceneVisibleWords(slide);
-    const limit=deckPlan.slides[i].copyBudget?.maxWordsPerSlide;
-    if(limit && planned[i].decision.visibleWords>limit) throw new Error(`${slide.id}: visible copy exceeds explicit budget ${limit}`);
-  }
   return {deck, decisions:planned.map(item=>item.decision)};
 }

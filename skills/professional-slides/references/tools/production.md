@@ -1,80 +1,50 @@
-# Production workflow
+# Production
 
-Use one approved, substantive deck specification, then deterministic preflight, canonical generation and one coordinated rendered review. One initial review plus one targeted repair pass is the default. Further repair requires a named unresolved material defect. Never deliver an unresolved correctness failure as accepted or restart the loop for editorial taste.
-
-## Commands and ownership
-
-From the skill directory (resolve the bundled Node runtime and `RUNTIME_NODE_MODULES` through workspace dependencies):
+## Commands
 
 ```bash
-node runtime/build-deck.mjs /absolute/deck-spec.json /absolute/output/deck --preflight
-node runtime/build-deck.mjs /absolute/deck-spec.json /absolute/output/deck
-node runtime/deliver-deck.mjs /absolute/deck-spec.json /absolute/output/deck
-node runtime/review-deck.mjs --pptx /absolute/output/deck/deck.pptx --scene /absolute/output/deck/scene.json --render-dir /absolute/output/deck/rendered --contract /absolute/output/deck/contract.json --report /absolute/output/deck/review.json
+node runtime/build-deck.mjs deck.json out/ --preflight     # plan + story gates, no export
+node runtime/build-deck.mjs deck.json out/ [--no-render]   # scene.json, <id>.pptx, rendered/, readback.json, gates.json
+node runtime/deliver-deck.mjs deck.json out/ [--reviewer auto|codex|claude|packet] [--model m] [--review review.json] [--skip-build]
 ```
 
-The build command derives story-plan, contract, treatment ledger, theme and acceptance manifests from one `professional-slides.deck-spec/v2` input. It performs measured compile preflight before export. Generation uses one Artifact Tool import for observation and slide PNGs; all reviewers reuse these PNGs. A canonical receipt binds the actual PPTX and generated files. `generated-needs-review` is deliberately not an acceptance claim.
+`build-deck.mjs` composes the deck/v3 spec into a plan, lays it out against measured text (bundled Arial-compatible metrics; no native dependencies), emits an editable PPTX with python-pptx, renders it with LibreOffice, reads the saved file back and runs the page gates. Exit 0 when the gates pass, 2 with findings (the deck is still written for inspection), 1 on a crash. `deliver-deck.mjs` builds, requires the gates and readback to pass, runs the review through the selected backend, and copies `out/<id>-DELIVERED.pptx` only when the review accepts; a rejection writes `out/REJECTED.md` and `delivery.json` with the blockers and removes any earlier deliverable. With `--reviewer packet` (the default when no `codex` or `claude` CLI is on the path) delivery writes `out/review-packet/` and exits 3; the calling agent reviews it and reruns with `--review out/review.json`.
 
-Input shape and executable examples: [composition recipes](../composition/recipes.md) and `examples/decision-pre-read.json` under the skill. `deckPlan` contains ordinary canonical planner records. `context` carries the main question and governing answer. Each analytical slide has `argument: {question, answer, evidence: [sourceId], interpretation, qualification, disposition, rationale}`; evidence records contain `id`, `text`, `source` and `basis` (unit, period, population/geography and observed/assumed status as applicable). Omit a qualification only if none materially affects interpretation. Never treat evidence metadata as independent proof.
+Environment: `python3` with `python-pptx` and Pillow, LibreOffice (`soffice`) and `pdftoppm` on the path; `RUNTIME_PYTHON` overrides the interpreter. No Codex runtime, no `@napi-rs/canvas`, no PptxGenJS.
 
-The repository's `validate_pptx.py hard` and `provenance` commands remain developer/diagnostic owners for exact package checks. The installed production command is portable; it does not require the developer checkout or golden corpus. Use the delivery command to run package/provenance checks and coordinated review together.
+## Rendering
 
-## Severity and completeness
+The build renders with LibreOffice headless by default: exported PPTX to PNG per slide, plus a python-pptx readback that recovers each shape's frame, text and line count from the saved file.
 
-Whole-deck outcome review is required in addition to local object checks. It receives the original user brief, research requirements, complete visible slide sequence, source provenance and the montage. It tests whether the audience can make the requested comparison, whether missing research was avoidable, and whether the visual relationships support that work. An author-selected decision stage, a repeated caveat or successful structural checks cannot excuse an unfulfilled brief. Text-led decks remain valid when their evidence and composition do the requested job.
+The exported file is the candidate of record. Keep meaning-bearing content native and separately addressable: one paragraph per real paragraph, `wrap="square"`, autofit on the body, title and body placeholders on a real layout set, native charts with embedded workbooks, and grouped diagram geometry. Then a reader can edit the deck, Reset Slide works, and a template swap keeps the content.
 
-The machine-readable [rule registry](../evaluation/rules.json) owns the rule IDs and severity. Facts, evidence, comparison meaning, unreadable text, overflow, broken dependencies and provenance are material. A missing-argument finding must name the absent premise or relationship and a concrete repair. Raw blank space or low word count never suffices. Unsupported content does not become acceptable because it is dense.
+Inspect every rendered slide for title wrapping, overflow, font substitution, chart labels and number formats, image crops, master furniture and source notes, connector routing, tracker states and page numbers. After a structural repair, render the whole deck again.
 
-Copy and visual judgments share one target inventory. Attach whole-page findings to its title; review each page's argument and appearance. Preserve necessary interpretation, synthesis, qualification and navigation. Word counts and editorial preferences are advisory unless a user explicitly imposed a constraint. Scores are diagnostics. Pure redundancy is advisory unless it obscures material meaning.
+Google Slides is a downstream import: finish and verify the PPTX, import it, then verify the native deck separately. Import can change fonts, wrapping, crops, connectors, line weights, charts and object order, so parity stays unverified until the native render is inspected.
 
-Inspect the full montage once for order and recurring constructions. The coordinated reviewer consumes exact images and scoped evidence; the author also checks the montage. Separate copy, visual and consistency model passes are diagnostic tools, not three mandatory production loops.
+## What the gates check
 
-## Reuse and bounded execution
+Deterministic, per page, before any model is consulted:
 
-Review batches contain at most four slides and default to two workers, splitting earlier when their estimated payload exceeds 48 KB; `--batch-size` and `--concurrency` allow bounded adjustment. Each batch retains complete local context. Assess slides independently; explicit `dependsOn` and argument `buildsOn` records supply cross-slide argument dependencies. Use the whole outline for navigation. Do not reuse a result after a changed image, local content, mapped source, policy, reviewer settings or declared dependency. Final reports still bind the entire current PPTX and inventory. `--check` verifies an existing report without model calls; diagnostic subsets cannot authorize a whole deck.
+- ink coverage at least 8% of the canvas (dense is fine; emptiness is the defect);
+- trailing dead band at most 8%, and no internal empty band over 18% of the page height;
+- the largest exhibit on an analytical page covers at least 40% of the content area and its frame carries ink;
+- action title at most two lines;
+- body type between 10 and 14 pt;
+- 45 to 90 characters per line;
+- at most 100 body words of prose on an exhibit page, 140 on a text page (table cells are evidence, not prose);
+- no single layout on more than 40% of pages;
+- axis ticks on nice numbers;
+- every object inside its resolved frame, with no unintended overlap;
+- titles: within 14 words, free of the hedge lexicon, no two sharing more than 60% of their tokens;
+- coverage: every ranked criterion in the brief has at least one comparative exhibit across all options.
 
-The same output directory retains `.review-cache`. Use delivery `--fresh` for an explicit fresh-data request: it clears only that output directory's build/review caches and repair history. Source inputs are preserved; supply freshly researched evidence in the spec. No other deck's output is deleted.
+## What delivery refuses
 
-Performance records separate build and review phases, model calls, cache hits, exports and imports. Research must be timed separately by the author. Performance budgets are targets until measured; report actual median and p95 for fresh builds and revisions, and keep quality failures visible.
+Delivery hands over a deck when the page gates pass and the review accepts it. When either fails, the findings are the result: the file is named `*-REJECTED.pptx` and the blocking findings are reported directly, rather than attached as a note beside a delivered deck.
 
-## Repair matrix
+Blocking findings are factual errors, unsupported claims, misleading comparisons, missing evidence on a ranked criterion, missing argument, unreadable text, overflow, broken geometry, broken dependencies and provenance failures; editorial preferences are advisory. A missing-argument finding names the absent premise and a concrete repair, because blank space or a low word count on its own is a diagnostic.
 
-| Finding | Repair owner | Recheck |
-| --- | --- | --- |
-| Wrong value, period, scope | Evidence and authoritative spec | Affected source dependents, then exact artifact |
-| Missing comparison or explanation | Argument plan | Affected page and declared dependents |
-| Clipping or overflow | Composition/geometry | Affected renders; shared changes invalidate their users |
-| Wording preference | Editorial advice | Settle after the bounded pass |
-| Unsupported component | Tested fallback or separate runtime development | Release certification outside production |
-| Changed theme | Deck theme | All affected renders and comparisons |
+## Repairs
 
-## Release and learning
-
-Pin instructions, policy, schema, runtime and examples through the plugin release fingerprint. Certify one completed batch; verify installed/source parity. Do not run developer golden tests during ordinary generation.
-
-Use the [benchmark and learning protocol](../evaluation/production-benchmark.md) to assess output quality, speed, reviewer calibration and curated examples. Synthetic fixtures exercise mechanics and are labelled as such. They do not establish human preference or real-world quality gains.
-
-## Executable contracts and reuse
-
-New production specifications use v2; v1 remains a compatibility input with fewer semantic guarantees. V2 requires `context.decisionStage`, `executiveSummaryDecision` and, when a synthesis is present, ordered `synthesisGroups` with branch-to-evidence coverage. The canonical Python synthesis validator owns these rules. Multi-page groups record their transition into detail.
-
-Each evidence `basis` has `unit`, `period`, `population` and `status` (observed, estimated, assumed, target, potential or qualitative). Optional `grossNet` and `recurrence` preserve those distinctions. Declared `comparisons` contain evidence IDs and require an explicit qualification when their bases differ. Each analytical argument has `bindings: [{text, visibleIds, evidenceIds}]`; text must exist in emitted objects belonging to those component IDs. The reviewer still checks whether the cited evidence supports the claim. Optional `relationships` assert parent-child containment, aligned evidence rows or shared-axis alignment using actual component IDs.
-
-Preflight writes `argument-proposals.json` with evidence-linked merge/deepen/retain suggestions. These are proposals, not automatic changes to an approved story. Use measured candidates from the recipe owner to select geometry before approval. Reuse the validated preflight compile when its spec, source bytes, fonts and runtime still match. Local changes reuse unaffected compiled slides. Unchanged complete builds verify cached artifact hashes before avoiding export/import.
-
-Delivery forwards `--model`, `--reasoning-effort`, `--batch-size`, `--batch-bytes`, `--concurrency` and `--timeout-ms`. Hard and provenance checks run concurrently before model review. Each slide has an explicit page-review target, including image-only pages; dependency images travel with their scoped context and invalidate reuse when changed. Compact successful reviews retain exact coverage and grounding. Rejected findings are cached too, so unchanged defects do not trigger another model call.
-
-`repair-history.json` records changed candidates, model calls and unresolved defects. After the bounded repair allowance, use `--material-defect "specific unresolved defect"` to justify another changed-candidate review. A transient transport retry does not authorize re-judging content. Stage deadlines terminate stalled processes; completed review batches remain reusable.
-
-
-## Consolidated planning and bounded review
-
-Resolve continuity, duplicate claims, comparison coverage, navigation and exhibit choices in one consolidated pre-export planning review. Incorporate it into the existing dot-dash/pre-authoring step, not a stack of overlapping audits. After export, inspect the exact artifact and montage for repeated layouts, unexplained detail, buried insights and weak space allocation as well as factual and geometry defects. “Readable and unclipped” alone is not design acceptance.
-
-Consolidate findings by cause with affected slide IDs and one coordinated repair. Distinguish factual errors, missing decisive evidence, visual failures, stylistic preferences and irreducible uncertainty. A local slide need not restate the complete brief when declared dependencies supply its premise. New research demands must name an actual unsupported claim or an omitted requirement within the agreed scope; genuine later discoveries still remain material.
-
-Malformed reviewer output is a transport/schema problem, not a deck defect. Permit one schema repair attempt for invalid coverage or identifiers, preserving the candidate. Never rewrite sound deck content to accommodate an invalid review record.
-
-Cache local judgments by local content/render, relevant requirements, source bytes and declared dependencies; keep full story/coverage review global. Deduplicate sources within model packets without discarding their original evidence. Run independent local and global checks against one immutable candidate under a shared concurrency limit. Source changes invalidate true dependents and final reports remain bound to exact artifact hashes.
-
-Measure source ingestion, input hashing, packet construction, each local batch and whole-deck review separately, with calls, cache hits/misses and payload bytes. Concurrent stage durations can overlap and must not be added as wall time. Benchmark lighter settings before changing defaults; report research separately from generation/review. Optimize the measured critical path, not merely PPTX export.
+Consolidate findings by cause with their affected slide IDs and one coordinated repair. A wrong value returns to the evidence and the specification; a missing comparison returns to the argument plan; clipping returns to the composition. A shared change invalidates every page that uses it, so recheck those renders. When the repair allowance ends with a defect unresolved, report that defect precisely rather than recording it as accepted.

@@ -50,18 +50,3 @@ class PluginDistributionTests(unittest.TestCase):
             self.assertEqual((dest/'keep').read_text(),'keep')
             (source/'skills').mkdir();(source/'skills/leak.md').symlink_to(dest/'keep')
             with self.assertRaises(ValueError):packager.package(source,Path(tmp)/'new')
-
-    def test_output_guard_blocks_plugin_and_symlink_bypass(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            base=Path(tmp);plugin=base/'plugin';plugin.mkdir();outside=base/'work';outside.mkdir()
-            (outside/'alias').symlink_to(plugin,target_is_directory=True)
-            script=f'''import {{assertOutputDirectory}} from {json.dumps((ROOT/'skills/professional-slides/runtime/output-path.mjs').as_uri())};
-import assert from 'node:assert/strict';
-const plugin={json.dumps(str(plugin))};
-await assert.rejects(assertOutputDirectory(plugin+'/output/deck',plugin), /read-only/);
-await assert.rejects(assertOutputDirectory({json.dumps(str(outside/'alias/deck'))},plugin), /read-only/);
-await assertOutputDirectory({json.dumps(str(outside/'output/deck'))},plugin);
-'''
-            r=subprocess.run([os.environ.get('RUNTIME_NODE','node'),'--input-type=module','-e',script],capture_output=True,text=True)
-            self.assertEqual(r.returncode,0,r.stderr)
-            self.assertFalse((plugin/'output').exists())

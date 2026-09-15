@@ -1,47 +1,80 @@
 #!/usr/bin/env node
-import fs from 'node:fs/promises';
-import {configureRuntime} from './environment.mjs';
-import path from 'node:path';
-import {assertOutputDirectory} from './output-path.mjs';
-import {fileURLToPath} from 'node:url';
-import {createTimingReport,digest,repairDecision,POLICY,REVIEWER} from './production-policy.mjs';
-import {runProcess} from './process.mjs';
-const runtime=path.dirname(fileURLToPath(import.meta.url));
-export async function deliverDeck(specPath,output,options={}){
-  const {RUNTIME_PYTHON:python,RUNTIME_NODE:node}=configureRuntime();
-  const {model=REVIEWER.defaultModel,reasoningEffort=REVIEWER.defaultReasoningEffort,batchSize=POLICY.batchSize,concurrency=POLICY.concurrency,batchBytes=48000,timeoutMs=POLICY.timeoutMs,fresh=false,materialDefect}=options;
-  if(!REVIEWER.models.includes(model)||!REVIEWER.reasoningEfforts.includes(reasoningEffort)||!Number.isInteger(batchSize)||batchSize<1||batchSize>8||!Number.isInteger(concurrency)||concurrency<1||concurrency>8||!Number.isFinite(batchBytes)||batchBytes<1000||!Number.isFinite(timeoutMs)||timeoutMs<=0)throw new Error('Invalid delivery settings');
-  const timing=createTimingReport('delivery'),directory=await assertOutputDirectory(output);
-  await fs.mkdir(directory,{recursive:true});
-  // Only explicit, named run caches are cleared. Source inputs are never deleted.
-  if(fresh)for(const name of ['.build-cache','.review-cache','repair-history.json'])await fs.rm(path.join(directory,name),{recursive:true,force:true});
-  const reportPath=path.join(directory,'delivery.json'),historyPath=path.join(directory,'repair-history.json');
-  let history;try{history=JSON.parse(await fs.readFile(historyPath,'utf8'));}catch{history={runs:[]};}
-  await fs.writeFile(reportPath,JSON.stringify({accepted:false,status:'running'})+'\n');
-  try{
-    const build=await timing.time('build',async()=>{await runProcess(node,[path.join(runtime,'build-deck.mjs'),path.resolve(specPath),directory],{timeoutMs});return JSON.parse(await fs.readFile(path.join(directory,'build-result.json'),'utf8'));});
-    const settings={model,reasoningEffort,batchSize,concurrency,batchBytes,timeoutMs};
-    const specHash=digest(await fs.readFile(specPath));
-    const unresolved=history.runs.at(-1);
-    if(unresolved?.decision?.action==='report-material-defect'&&unresolved.specHash!==specHash&&!materialDefect)throw new Error('Repair budget exhausted; name the unresolved material defect with --material-defect before another changed candidate review');
-    await timing.time('deterministic-checks',()=>Promise.all([
-      runProcess(python,[path.join(runtime,'validate_pptx.py'),'hard',build.pptxPath,'--manifest',path.join(directory,'powerpoint-acceptance.json'),'--report',path.join(directory,'hard-review.json')],{timeoutMs}),
-      runProcess(python,[path.join(runtime,'validate_pptx.py'),'provenance',build.pptxPath,'--receipt',path.join(directory,'canonical-generation-receipt.json'),'--generation-script',path.join(runtime,'build-deck.mjs'),'--require-planning','--report',path.join(directory,'provenance-review.json')],{timeoutMs})
-    ]));
-    let reviewError;
-    try{await timing.time('coordinated-review',async()=>runProcess(node,[path.join(runtime,'review-deck.mjs'),'--pptx',build.pptxPath,'--receipt',path.join(directory,'canonical-generation-receipt.json'),'--scene',path.join(directory,'scene.json'),'--contract',path.join(directory,'contract.json'),'--render-dir',build.renderDirectory,'--report',path.join(directory,'review.json'),...Object.entries({'model':model,'reasoning-effort':reasoningEffort,'batch-size':batchSize,'concurrency':concurrency,'batch-bytes':batchBytes,'timeout-ms':timeoutMs}).flatMap(([k,v])=>['--'+k,String(v)])],{timeoutMs:timeoutMs*Math.max(1,Math.ceil(JSON.parse(await fs.readFile(path.join(directory,'scene.json'),'utf8')).slides.length/concurrency))*2}));}catch(e){reviewError=e;}
-    const review=JSON.parse(await fs.readFile(path.join(directory,'review.json'),'utf8'));
-    const passes=history.runs.filter(r=>r.modelCalls>0).length+(review.timings?.modelCalls>0?1:0);
-    const decision=repairDecision([...(review.judgement?.items||[]),...(review.outcome?.findings||[])],passes);
-    history.runs.push({specHash,settings,materialDefect:materialDefect||null,modelCalls:review.timings?.modelCalls||0,decision,accepted:review.accepted===true});
-    await fs.writeFile(historyPath,JSON.stringify(history,null,2)+'\n');
-    if(reviewError||!review.accepted)throw reviewError||new Error('Review rejected');
-    const report={accepted:true,candidateSha256:digest(await fs.readFile(build.pptxPath)),reusedBuild:build.reusedBuild,timings:timing.finish(),review:'review.json',note:'Automated checks accepted; inspect montage before user delivery.'};
-    await fs.writeFile(reportPath,JSON.stringify(report,null,2)+'\n');return report;
-  }catch(error){await fs.writeFile(reportPath,JSON.stringify({accepted:false,error:error.message,timings:timing.finish()},null,2)+'\n');throw error;}
+// Build, gate, review, and hand over — or refuse.
+//
+//   node runtime/deliver-deck.mjs spec.json out/ [--reviewer auto|codex|claude|packet] [--model m]
+//                                              [--review review.json] [--skip-build] [--brief "…"]
+//
+// Exit 0: accepted; the deliverable is out/<id>-DELIVERED.pptx. Exit 2: rejected; no
+// deliverable is written, out/REJECTED.md lists the blockers, and any earlier deliverable
+// copy is removed so a stale file can never be mistaken for an accepted one. Exit 1: crash.
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { buildDeck } from "./build-deck.mjs";
+import { runReview, validateReview, reviewOutcome } from "./reviewer.mjs";
+
+export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto", model, reviewFile, skipBuild = false, brief, answer } = {}) {
+  const directory = path.resolve(outputDirectory);
+  const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
+  brief = brief ?? spec.brief ?? spec.context?.originalBrief ?? "";
+  answer = answer ?? spec.answer ?? spec.context?.governingAnswer ?? "";
+  const stem = spec.id || spec.deckPlan?.id || "deck";
+  const delivered = path.join(directory, `${stem}-DELIVERED.pptx`);
+  const rejectedNote = path.join(directory, "REJECTED.md");
+  await fs.rm(delivered, { force: true });
+  await fs.rm(rejectedNote, { force: true });
+
+  const build = skipBuild ? JSON.parse(await fs.readFile(path.join(directory, "build-result.json"), "utf8")) : await buildDeck(specPath, directory);
+  const report = { accepted: false, stage: "build", build: { status: build.status, pptx: build.pptxPath, montage: build.montagePath } };
+  const blockers = [];
+  if (build.readback && build.readback.accepted !== true) blockers.push(...(build.readback.findings || []).slice(0, 20).map((f) => ({ slide: f.slide ?? null, code: "BROKEN_GEOMETRY", severity: "blocker", reason: `readback ${f.code} on ${f.shape || ""}`, repair: "Fix the emitter or the scene so the saved file matches the scene" })));
+  if (build.gates && build.gates.passed === false) blockers.push(...(build.gates.findings || []).map((f) => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: `gate ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
+  if (blockers.length) return reject(report, directory, rejectedNote, "page gates", blockers);
+
+  report.stage = "review";
+  let review;
+  if (reviewFile) review = JSON.parse(await fs.readFile(reviewFile, "utf8"));
+  else {
+    const run = await runReview({ outputDirectory: directory, brief, answer, backend: reviewer, model });
+    if (run.status === "packet-written") {
+      report.review = { status: "pending", packet: run.packetDir, note: run.note };
+      await fs.writeFile(path.join(directory, "delivery.json"), JSON.stringify(report, null, 2) + "\n");
+      return report;
+    }
+    review = run.review;
+  }
+  const slideIds = JSON.parse(await fs.readFile(path.join(directory, "scene.json"), "utf8")).slides.map((s) => s.id);
+  const errors = validateReview(review, slideIds);
+  if (errors.length) return reject(report, directory, rejectedNote, "invalid review", errors.map((e) => ({ slide: null, code: "EDITORIAL", severity: "blocker", reason: `review record invalid: ${e}`, repair: "Return a review that matches the schema; this is a transport problem, not a deck defect" })));
+  const outcome = reviewOutcome(review);
+  report.review = { accepted: outcome.accepted, summary: review.summary, findings: review.findings.length, blocking: outcome.blocking.length, file: path.join(directory, "review.json") };
+  if (!outcome.accepted) return reject(report, directory, rejectedNote, "review", outcome.blocking);
+
+  await fs.copyFile(build.pptxPath, delivered);
+  report.accepted = true; report.stage = "delivered"; report.deliverable = delivered;
+  await fs.writeFile(path.join(directory, "delivery.json"), JSON.stringify(report, null, 2) + "\n");
+  return report;
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  const [spec,out,...args]=process.argv.slice(2),get=k=>{const i=args.indexOf('--'+k);return i<0?undefined:args[i+1];};if(!spec||!out)throw new Error('Usage: deliver-deck.mjs spec.json output-directory [--fresh] [--model name] [--reasoning-effort effort] [--batch-size n] [--concurrency n] [--timeout-ms n] [--material-defect reason]');
-  const options={fresh:args.includes('--fresh'),materialDefect:get('material-defect')};for(const [flag,key] of [['model','model'],['reasoning-effort','reasoningEffort'],['batch-size','batchSize'],['concurrency','concurrency'],['batch-bytes','batchBytes'],['timeout-ms','timeoutMs']])if(get(flag)!==undefined)options[key]=['model','reasoningEffort'].includes(key)?get(flag):Number(get(flag));
-  console.log(JSON.stringify(await deliverDeck(path.resolve(spec),path.resolve(out),options)));
+
+async function reject(report, directory, notePath, stage, blockers) {
+  report.accepted = false; report.rejectedAt = stage; report.blockers = blockers;
+  const lines = [`# REJECTED at ${stage}`, "", `${blockers.length} blocking finding(s). No deliverable was written.`, ""];
+  for (const b of blockers) lines.push(`- slide ${b.slide ?? "deck"} · ${b.code} · ${b.severity}: ${b.reason}${b.repair ? ` → ${b.repair}` : ""}`);
+  await fs.writeFile(notePath, lines.join("\n") + "\n");
+  await fs.writeFile(path.join(directory, "delivery.json"), JSON.stringify(report, null, 2) + "\n");
+  return report;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const [spec, out, ...args] = process.argv.slice(2);
+  const get = (k) => { const i = args.indexOf("--" + k); return i < 0 ? undefined : args[i + 1]; };
+  if (!spec || !out) { console.error("Usage: deliver-deck.mjs spec.json output-directory [--reviewer auto|codex|claude|packet] [--model m] [--review review.json] [--skip-build] [--brief text]"); process.exit(1); }
+  try {
+    const report = await deliverDeck(path.resolve(spec), path.resolve(out), { reviewer: get("reviewer") || "auto", model: get("model"), reviewFile: get("review"), skipBuild: args.includes("--skip-build"), brief: get("brief") });
+    console.log(JSON.stringify(report));
+    process.exit(report.accepted ? 0 : report.review?.status === "pending" ? 3 : 2);
+  } catch (error) {
+    console.error(error.stack || error.message);
+    process.exit(1);
+  }
 }

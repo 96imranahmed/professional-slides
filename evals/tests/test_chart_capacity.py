@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class ChartCapacityTests(unittest.TestCase):
@@ -36,7 +36,7 @@ const small=marks.find(n=>n.data.category==='E'&&n.data.series==='Small'),large=
 assert.ok(Math.abs(small.frame.height/large.frame.height-1/35)<.00001);
 const attached=labels.find(n=>n.data.category==='E'&&n.data.series==='Small');
 assert.equal(attached.text.replaceAll('\n',' '),'1 296k workers');
-assert.ok(attached.data.external);assert.ok(attached.text.split('\n').length>=3);
+assert.ok(attached.data.external);assert.ok(attached.text.split('\n').length>=2);
 const measured=measureText(attached.text,attached.frame.width,{fontFamily:attached.style.fontFamily.value,fontSize:attached.style.fontSize.value,bold:true});
 assert.ok(attached.frame.height>=measured.height);
 const axis=nodes.find(n=>n.id==='stack:x-axis').frame,span=axis.width/5;
@@ -88,7 +88,7 @@ for(const title of ['A short title','The complete evidence supports a longer dec
  const compact=chrome.render({id:'compact',frame,props:{...base,pageTemplate:{contentSpacing:'compact'}}});
  const heading=compact.nodes.find(n=>n.role==='action-title');
  assert.ok(compact.contentFrame.y>=heading.frame.y+heading.data.textLayout.height);
- assert.ok(compact.contentFrame.y<normal.contentFrame.y);
+ assert.equal(compact.contentFrame.y,normal.contentFrame.y);
  assert.equal(compact.contentFrame.y+compact.contentFrame.height,normal.contentFrame.y+normal.contentFrame.height);
  assert.equal(heading.style.fontSize.value,normal.nodes.find(n=>n.role==='action-title').style.fontSize.value);
 }

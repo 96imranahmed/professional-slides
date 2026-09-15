@@ -1,34 +1,36 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class PageTemplateTests(unittest.TestCase):
-    def test_wrapped_titles_preserve_the_title_to_content_gap(self):
+    def test_wrapped_titles_share_one_content_top_and_clear_the_title(self):
         result = run_node("""
 import assert from 'node:assert/strict';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-import {token,tokenValue} from './skills/professional-slides/runtime/core.mjs';
+import {CHROME,token,tokenValue} from './skills/professional-slides/runtime/core.mjs';
 const chrome=REGISTRY.get('slide-chrome'),frame={x:0,y:0,width:1280,height:720};
 const render=title=>chrome.render({id:'page',frame,props:{title,source:'Source: Company data'}});
 const single=render('Revenue growth accelerated');
 const wrappedWithout=render('Revenue growth translated into faster operating income\\ngrowth');
 const wrappedWith=chrome.render({id:'page',frame,props:{title:'Revenue growth translated into faster operating income\\ngrowth',titleVariant:'with-line',source:'Source: Company data'}});
 const compact=chrome.render({id:'page',frame,props:{title:'Revenue growth accelerated',pageTemplate:{contentSpacing:'compact'},source:'Source: Company data'}});
-const compactTitle=compact.nodes.find(n=>n.role==='action-title');
-assert.equal(compact.contentFrame.y-compactTitle.frame.y-compactTitle.data.textLayout.height,tokenValue(token('space.5')));
-assert.ok(compact.contentFrame.height>single.contentFrame.height);
 assert.throws(()=>chrome.render({id:'bad',frame,props:{title:'Test',pageTemplate:{contentSpacing:'arbitrary'}}}),/contentSpacing/);
-const title=wrappedWithout.nodes.find(node=>node.role==='action-title');
-const actualGap=wrappedWithout.contentFrame.y-title.frame.y-title.data.textLayout.height;
-assert.equal(title.data.textLayout.lines.length,2);
-assert.equal(actualGap,tokenValue(token('layout.titleContentGap')));
-assert.ok(wrappedWithout.contentFrame.y>single.contentFrame.y);
+const clearance=tokenValue(token('space.5'));
+const gapOf=r=>{const t=r.nodes.find(n=>n.role==='action-title');return r.contentFrame.y-t.frame.y-t.data.textLayout.height;};
+// One content top for every page: a second title line eats the slack rather
+// than pushing the content down, and contentSpacing does not move it either.
+for(const r of [single,wrappedWithout,wrappedWith,compact]) {
+ assert.equal(r.contentFrame.y,CHROME.bodyTop);
+ assert.ok(gapOf(r)>=clearance);
+}
+assert.equal(wrappedWithout.nodes.find(n=>n.role==='action-title').data.textLayout.lines.length,2);
 assert.deepEqual(wrappedWithout.contentFrame,wrappedWith.contentFrame);
-console.log(JSON.stringify({accepted:true,actualGap,singleTop:single.contentFrame.y,wrappedTop:wrappedWithout.contentFrame.y}));
+console.log(JSON.stringify({accepted:true,singleGap:gapOf(single),wrappedGap:gapOf(wrappedWithout),contentTop:single.contentFrame.y}));
 """)
         self.assertTrue(result["accepted"])
-        self.assertEqual(result["actualGap"], 56)
-        self.assertGreater(result["wrappedTop"], result["singleTop"])
+        self.assertEqual(result["contentTop"], 140)
+        self.assertEqual(result["singleGap"], 60)
+        self.assertEqual(result["wrappedGap"], 24)
 
     def test_footer_defaults_and_rule_variants_share_baseline(self):
         result = run_node("""
@@ -50,7 +52,7 @@ const plain=chrome.render({id:'page',frame,props});
 assert.ok(!plain.nodes.some(n=>n.type==='line'));
 const separate=chrome.render({id:'page',frame,props:{...props,pageTemplate:{sourcePlacement:'separate'}}});
 assert.ok(plain.contentFrame.height>separate.contentFrame.height);
-assert.equal(plain.contentFrame.height,518);
+assert.equal(plain.contentFrame.height,528);
 assert.ok(!REGISTRY.get('source').render({id:'source',frame:{x:0,y:0,width:500,height:26},props:{text:'Source: Company data'}}).nodes.some(n=>n.type==='line'));
 const divider=REGISTRY.get('section-divider').render({id:'divider',frame,props:{title:'Section A'}}).nodes;
 assert.ok(!divider.some(n=>n.type==='line'));
@@ -94,7 +96,7 @@ const {deck}=planDeck({id:'company',pageTemplate,slides:[slide,{...slide,id:'nex
 assert.deepEqual(deck.manifest.pageTemplate,{sourcePlacement:'inline',contentSpacing:'standard',...pageTemplate});
 for(const [i,s] of deck.slides.entries()) {
  const title=s.nodes.find(n=>n.role==='action-title'),logo=s.componentInstances.find(n=>n.id.endsWith(':logo'));
- assert.ok(logo);assert.equal(logo.frame.x,1040);assert.equal(logo.frame.y,48);
+ assert.ok(logo);assert.equal(logo.frame.x,1040);assert.equal(logo.frame.y,44);
  assert.ok(title.frame.x+title.frame.width<logo.frame.x);
  assert.equal(s.nodes.find(n=>n.role==='page-number').text,String(i+1));
  assert.equal(s.nodes.filter(n=>n.role==='source-text').length,1);

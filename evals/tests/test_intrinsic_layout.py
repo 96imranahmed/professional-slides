@@ -1,6 +1,6 @@
 import unittest
 
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class IntrinsicLayoutTests(unittest.TestCase):
@@ -32,9 +32,14 @@ import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const list = (id, items) => component({id, component:'bullet-list', props:{variant:'body',items},size:{height:'hug'}});
 const group = (id, items) => section({id,heading:'Enabling capabilities',size:{height:'hug'},children:[list(id+'-copy',items)]});
 const short = ['Capture data.', 'Automate processes.'];
-const root = flow({id:'two-groups',direction:'column',gap:16,children:[group('a',short),group('b',short)]});
+const rootStart = flow({id:'two-groups',direction:'column',gap:16,children:[group('a',short),group('b',short)]});
+const rootFilled = flow({id:'two-groups',direction:'column',gap:16,leftover:'distribute',children:[group('a',short),group('b',short)]});
+const root = rootStart;
 const frame = {x:0,y:0,width:1000,height:450};
 const placements=resolveLayout(root,frame,REGISTRY);
+const filled=resolveLayout(rootFilled,frame,REGISTRY).map(p=>p.frame);
+const lastBottom=Math.max(...filled.map(f=>f.y+f.height));
+const voidShare=(frame.y+frame.height-lastBottom)/frame.height;
 const rendered=REGISTRY.get('section').render({id:'a',frame:placements[0].frame,props:placements[0].node});
 const nested=resolveLayout(flow({id:'copy',direction:'column',children:[list('body',short)]}),rendered.contentFrame,REGISTRY);
 const measured=REGISTRY.get('bullet-list').measureContent({frame:rendered.contentFrame,props:{variant:'body',items:short}}).height;
@@ -44,9 +49,12 @@ const row=flow({id:'row',direction:'row',gap:0,children:widths.map((width,i)=>({
 const columns=grid({id:'grid',columns:widths,rows:['hug'],columnGap:0,children:widths.map((_,i)=>({...list('grid-'+i,prose),cell:{column:i,row:0}}))});
 const rowFrames=resolveLayout(row,frame,REGISTRY).map(p=>p.frame);
 const gridFrames=resolveLayout(columns,frame,REGISTRY).map(p=>p.frame);
-console.log(JSON.stringify({heights:placements.map(p=>p.frame.height),inner:nested[0].frame.height,measured,rowFrames,gridFrames}));
+console.log(JSON.stringify({heights:placements.map(p=>p.frame.height),voidShare,inner:nested[0].frame.height,measured,rowFrames,gridFrames}));
 """)
-        self.assertLess(sum(result["heights"]), 300)
+        # The page must not end in a void: with a leftover policy the hugged
+        # groups reach the bottom of their frame. The deleted assertion here
+        # required the opposite - two sections under 300 of 450 px.
+        self.assertLessEqual(result["voidShare"], 0.08)
         self.assertAlmostEqual(result["inner"], result["measured"], places=2)
         self.assertGreater(result["rowFrames"][0]["height"], result["rowFrames"][1]["height"])
         self.assertEqual(result["gridFrames"][0]["height"], result["gridFrames"][1]["height"])

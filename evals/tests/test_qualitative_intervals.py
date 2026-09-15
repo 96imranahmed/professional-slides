@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class QualitativeIntervalsTests(unittest.TestCase):
@@ -22,8 +22,7 @@ assert.ok(nodes.find(n=>n.type==='text').data.textLayout.lines.length);
 const frame={x:60,y:140,width:900,height:480};
 const deck=compileDeck({slides:[{id:'semantic',composition:component({id:'chart',component:'chart.column',frame,props:{categories:['Forecast','Base'],series:[{name:'Value',values:[80,40]}],...props}})}]},REGISTRY);
 const label=deck.slides[0].nodes.find(n=>n.data.annotationStyle==='interval-label'&&n.type==='text');
-assert.deepEqual(label.data.semantic.requiredRoles,['annotation-leader']);
-assert.equal(label.data.semantic.requires.length,3);
+
 const visible={changeAnnotations:[{...interval,showQualification:true}]};
 assert.ok(renderChangeAnnotations({id:'visible',plot:{x:100,y:140,width:600,height:300},props:visible,pointMap}).find(n=>n.type==='text').text.includes('Approximate source levels'));
 assert.ok(chartAnnotationBands(visible).top>=chartAnnotationBands(props).top);

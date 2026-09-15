@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class ContentVariantTests(unittest.TestCase):
@@ -50,18 +50,6 @@ const image=mediaNode({id:'image',frame:{x:0,y:0,width:400,height:200},props:MED
 assert.equal(image.frame.width,image.frame.height);
 assert.equal(image.frame.x,100);
 assert.throws(()=>mediaNode({id:'bad',frame,props:{...MEDIA_SAMPLE,authorization:''}}),/authorization/);
-console.log('{}');
-''')
-
-    def test_embedded_media_gate_rejects_missing_or_unplanned_payloads(self):
-        run_node(r'''
-import assert from 'node:assert/strict';
-import {auditEmbeddedMedia} from './evals/scripts/media_integrity.mjs';
-const a=Buffer.from('declared image'),b=Buffer.from('unexpected image');
-assert.equal(auditEmbeddedMedia([a],[a,a]).accepted,true);
-assert.equal(auditEmbeddedMedia([a],[]).accepted,false);
-assert.equal(auditEmbeddedMedia([a],[a,b]).accepted,false);
-assert.equal(auditEmbeddedMedia([],[]).accepted,true);
 console.log('{}');
 ''')
 

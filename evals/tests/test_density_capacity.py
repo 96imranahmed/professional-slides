@@ -1,6 +1,6 @@
 import unittest
 
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class DensityCapacityTests(unittest.TestCase):
@@ -55,11 +55,11 @@ assert.throws(()=>resolveSlideDensity({id:'bad-density',density:'tiny',items:[]}
 const deck=planDeck({id:'density-deck',slides:[treePlan]},REGISTRY).deck;
 const slide=deck.slides[0];
 assert.equal(slide.density,'pre-read');
-assert.equal(slide.tokens['type.body'].value,12.6);
-assert.equal(slide.tokens['type.chartLabel'].value,12.6);
-assert.equal(slide.tokens['type.actionTitle'].value,27);
-assert.ok(slide.nodes.filter(node=>node.role==='node-label'||node.role==='insight-tree-insight-text'||node.role==='insight-tree-implication-text').every(node=>node.style.fontSize.value===12.6));
-assert.equal(slide.nodes.find(node=>node.role==='action-title').style.fontSize.value,30);
+assert.equal(slide.tokens['type.body'].value,11);
+assert.equal(slide.tokens['type.chartLabel'].value,9);
+assert.equal(slide.tokens['type.actionTitle'].value,24);
+assert.ok(slide.nodes.filter(node=>node.role==='node-label'||node.role==='insight-tree-insight-text'||node.role==='insight-tree-implication-text').every(node=>node.style.fontSize.value===11));
+assert.equal(slide.nodes.find(node=>node.role==='action-title').style.fontSize.value,24);
 assert.equal(slide.nodes.filter(node=>node.role==='tree-node'&&node.data.depth===1).length,4);
 assert.equal(slide.nodes.filter(node=>node.role==='tree-node'&&node.data.depth===2).length,7);
 console.log(JSON.stringify({accepted:true}));

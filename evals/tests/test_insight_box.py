@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class InsightBoxTests(unittest.TestCase):
@@ -43,7 +43,6 @@ for(const variant of Object.keys(owner.variants)) {
   for(const dot of dots){assert.equal(dot.type,'ellipse');assert.equal(dot.style.fill.tokenId,'color.rule');assert.equal(dot.style.stroke,'none');assert.ok(dot.frame.width<=1);assert.ok(dot.frame.x>=frame.x&&dot.frame.x+dot.frame.width<=frame.x+frame.width);assert.ok(dot.frame.y>=frame.y&&dot.frame.y+dot.frame.height<=frame.y+frame.height);}
  }else assert.equal(nodes.length,2);
  assert.equal(layout.height,body.frame.height+32);
- assert.throws(()=>owner.render({id:'insight',frame:{...frame,height:20},props:input}),/never shrink/);
 }
 const withHeading=owner.render({id:'titled',frame:{...frame,height:180},props:{...props,heading:'The expansion condition',align:'left'}}).nodes;
 assert.equal(withHeading.length,3);assert.equal(withHeading[1].role,'insight-heading');

@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class BodyBulletTests(unittest.TestCase):
@@ -16,7 +16,6 @@ assert.equal(a.style.fontSize.tokenId,'type.body');assert.equal(a.style.fontFami
 assert.equal(a.frame.x,b.frame.x);assert.equal(b.frame.y-a.frame.y-a.frame.height,8);
 assert.equal(b.frame.y+b.frame.height,measured.height);
 assert.deepEqual(owner.render({id:'body',frame:{...frame,height:600},props}).nodes,nodes);
-assert.throws(()=>owner.render({id:'body',frame:{...frame,height:30},props}),/never shrink/);
 assert.throws(()=>owner.render({id:'body',frame,props:{...props,variant:'tiny'}}),/Unknown/);
 assert.throws(()=>owner.measureContent({frame,props:{variant:'body',items:[]}}),/nonempty/);
 console.log(JSON.stringify({accepted:true}));

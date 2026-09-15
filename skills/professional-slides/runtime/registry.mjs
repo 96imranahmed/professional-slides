@@ -57,7 +57,7 @@ const BODY = token("type.body");
 const COMPACT = token("type.compact");
 const LABEL = token("type.label");
 const SOURCE = token("type.source");
-const SECTION_HEADING_TOKENS = ["color.componentPrimary", "color.ink", "color.onPrimary", "font.body", "type.heading", "line.hairline", "space.2", "space.3"];
+const SECTION_HEADING_TOKENS = ["color.componentPrimary", "color.ink", "color.onPrimary", "font.body", "type.heading", "line.hairline", "space.1", "space.2", "space.3", "space.4"];
 
 const textStyle = (size = BODY, color = INK, bold = false, align = "left", valign = "mid") => ({
   fontFamily: FONT,
@@ -98,12 +98,30 @@ const component = ({ id, category, role = category, tokens, preferredSize, sampl
   render
 });
 
+/** Body copy never runs wider than ≈ 80 characters (item 6, measure cap). */
+function paragraphMeasure(frameWidth, props = {}) {
+  if (props.maxMeasure === false) return frameWidth;
+  return Math.min(frameWidth, Math.round(tokenValue(BODY) * 96 / 72 * 0.47 * 80));
+}
+
+// Degradation ladder for measured text: fit at the token size; otherwise step the
+// size down in 0.5pt steps to a floor of 80% (never below 9pt) and record the step.
+// Only when the floor still overflows does the component refuse, naming the overflow.
+export function fitText({ text, runs, width, height, fontFamily, fontSize, bold, minScale = 0.8, floorPt = 9 }) {
+  const measure = (size) => runs ? measureTextRuns(runs, width, { fontFamily, fontSize: size, wrapWidthRatio: 1 }) : measureText(text, width, { fontFamily, fontSize: size, bold, wrapWidthRatio: 1 });
+  let size = fontSize, layout = measure(size);
+  const floor = Math.max(floorPt, Math.round(fontSize * minScale * 2) / 2);
+  while (height !== undefined && layout.height > height && size - 0.5 >= floor) { size -= 0.5; layout = measure(size); }
+  return { layout, fontSize: size, stepped: size !== fontSize, overflow: height !== undefined && layout.height > height ? layout.height - height : 0 };
+}
+
 function measuredTextNode(input) {
   if(input.runs && input.runs.map(r=>r.text).join("")!==input.text)throw new Error("Paragraph emphasis must preserve exact text");
-  const options={fontFamily:tokenValue(input.style.fontFamily),fontSize:tokenValue(input.style.fontSize),bold:input.style.bold,wrapWidthRatio:1};
-  const textLayout = input.runs ? measureTextRuns(input.runs,input.frame.width,options) : measureText(input.text,input.frame.width,options);
-  if (textLayout.height > input.frame.height) throw new Error(`${input.id} exceeds its allocated text height`);
-  return textPrimitive({ ...input, text: textLayout.text, ...(textLayout.runs?{runs:textLayout.runs}:{}), style: { ...input.style, lineHeight: textLayout.lineHeight, wrap: false }, data: { ...input.data, textLayout } });
+  const fit = fitText({ text: input.text, runs: input.runs, width: input.frame.width, height: input.frame.height, fontFamily: tokenValue(input.style.fontFamily), fontSize: tokenValue(input.style.fontSize), bold: input.style.bold });
+  if (fit.overflow > 0) throw new Error(`${input.id} overflows its ${input.frame.height}px box by ${Math.ceil(fit.overflow)}px even at ${fit.fontSize}pt; split the page or cut the copy`);
+  const textLayout = fit.layout;
+  const style = { ...input.style, lineHeight: textLayout.lineHeight, wrap: false, ...(fit.stepped ? { fontSize: { tokenId: input.style.fontSize.tokenId ?? "type.body", kind: "fontSizePt", value: fit.fontSize } } : {}) };
+  return textPrimitive({ ...input, text: textLayout.text, ...(textLayout.runs?{runs:textLayout.runs}:{}), style, data: { ...input.data, textLayout, ...(fit.stepped ? { fitStep: fit.fontSize } : {}) } });
 }
 
 function insightLayout(frame, props) {
@@ -122,7 +140,7 @@ function insightLayout(frame, props) {
 
 function insightNodes({ id, frame, props }) {
   const layout = insightLayout(frame, props), variant = props.variant ?? "tonal";
-  if (layout.height > frame.height) throw new Error("Insight exceeds its frame; enlarge the box or edit the sentence, never shrink type");
+  if (layout.height > frame.height) throw new Error(`Insight overflows its ${frame.height}px box by ${Math.ceil(layout.height - frame.height)}px; give it the space or shorten the sentence`);
   const fill = variant === "primary" ? PRIMARY : variant === "neutral" ? MUTED_SURFACE : variant === "dotted" ? "none" : PRIMARY_TINT;
   const foreground = variant === "primary" ? WHITE : INK;
   const nodes = [rectPrimitive({ id: stableId(id, "surface"), role: "insight-surface", frame, style: boxStyle(fill, "none", HAIRLINE, SMALL_RADIUS) })];
@@ -158,7 +176,15 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
   const baseTextFrame = chrome
     ? { x: frame.x + CHROME.left, y: frame.y + (props.titleTop ?? CHROME.titleTop), width: props.availableTitleWidth ?? frame.width - CHROME.left - CHROME.right, height: CHROME.titleHeight }
     : { x: frame.x, y: frame.y, width: frame.width, height: frame.height - ruleGap };
-  const textLayout = measureText(props.text, baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(size), bold: true, wrapWidthRatio: 1 });
+  // Fit ladder: the action title is set at 24pt; a title that needs a third line
+  // is retried at 22pt. Beyond that the page gate (TITLE_LINES) reports it.
+  const measureTitle = (fontSize) => measureText(props.text, baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, bold: true, wrapWidthRatio: 0.98 });
+  let fontSize = tokenValue(size), textLayout = measureTitle(fontSize);
+  if (chrome && !section && textLayout.lines.length > 2) {
+    const long = tokenValue(token("type.actionTitleLong"));
+    const retry = measureTitle(long);
+    if (retry.lines.length < textLayout.lines.length) { fontSize = long; textLayout = retry; }
+  }
   const textFrame = chrome ? { ...baseTextFrame, height: Math.max(baseTextFrame.height, textLayout.height) } : baseTextFrame;
   const ruleY = textFrame.y + textLayout.height + ruleGap;
   if (!chrome && textLayout.height > textFrame.height) throw new Error(`Title ${id} exceeds its allocated height; shorten it or allocate more space`);
@@ -167,7 +193,7 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
     role: section ? "section-title" : "action-title",
     frame: textFrame,
     text: textLayout.text,
-    style: { ...textStyle(size, INK, true), fontFamily: DISPLAY, valign: "top", lineHeight: textLayout.lineHeight, wrap: false },
+    style: { ...textStyle(fontSize === tokenValue(size) ? size : token("type.actionTitleLong"), INK, true), fontFamily: DISPLAY, valign: "top", lineHeight: textLayout.lineHeight, wrap: false },
     data: { titleVariant: variant, textLayout, ruleGap }
   })];
   if (TITLE_VARIANTS[variant].rule) nodes.push(openLine(stableId(id, chrome ? "title-rule" : "rule"), textFrame.x, ruleY, textFrame.x + textFrame.width, ruleY, "title-rule", RULE, HAIRLINE, { titleVariant: variant }));
@@ -179,8 +205,10 @@ function headingLayout(frame, props = {}) {
   const headingWidth = frame.width;
   const heading = measureText(props.heading || props.text || "", headingWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true });
   const bandHeight = Math.max(heading.height, props.headerBandHeight || 0);
-  const ruleGap = tokenValue(token("space.2"));
-  const contentGap = tokenValue(token("space.3"));
+  // The rule binds to the heading (one baseline unit below its box, which already
+  // carries the descender) and the body sits a clear step below the rule.
+  const ruleGap = tokenValue(token("space.1"));
+  const contentGap = tokenValue(token("space.4"));
   return { heading, headingWidth, bandHeight, ruleGap, height: bandHeight + (props.rule === false ? 0 : ruleGap) + contentGap };
 }
 
@@ -208,8 +236,16 @@ function contentRailInsets(props = {}) {
     : 18;
 }
 
+/** Boxed sections pad on all sides; open sections keep the grid's left and right edges. */
+function sectionPadding(props = {}) {
+  if (props.padding !== undefined) return normalizeInsets(props.padding);
+  const treatment = props.treatment || "open";
+  const value = tokenValue(token("space.4"));
+  return treatment === "open" ? { top: 0, right: 0, bottom: 0, left: 0 } : { top: value, right: value, bottom: value, left: value };
+}
+
 function sectionContentInsets(frame, props = {}) {
-  const padding = normalizeInsets(props.padding ?? token("space.4"));
+  const padding = sectionPadding(props);
   const headerFrame = insetFrame(frame, padding);
   const header = props.heading ? headingLayout(headerFrame, { ...props, rule: props.treatment !== "muted" }).height : 0;
   return { ...padding, top: padding.top + header };
@@ -239,11 +275,13 @@ function assertChartTitleCopy(props = {}) {
     // A bounded observation window describes the measure. Mask only the
     // complete duration phrase so adjoining result values still reject.
     copy = copy.replace(/\bwithin\s+(?:one|1)\s+year\b/gi, "within observation period");
-    if (field === "unit") {
-      // Scale denominators describe units, not observed values.
-      copy = copy.replace(/\bper\s+(?:100[,. ]?000|1[,. ]?000|100|1)\b/gi, "per population");
-    }
-    if (/\p{N}/u.test(copy) || /\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|doubled|tripled|halved)\b/i.test(copy)) {
+    // Scale denominators and named budgets/thresholds describe the measure, not a result.
+    copy = copy.replace(/\bper\s+(?:100[,. ]?000|100k|1[,. ]?000|1k|100|10|1)\b(?:\s+(?:residents|people|employees|units|capita))?/gi, "per population");
+    copy = copy.replace(/\b\d+(?:\.\d+)?\s*(?:-|–)\s*(?:minute|min|hour|day|week|month|year)\b/gi, "duration"); // "45-minute limit" names a threshold
+    const numberWords = "(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)";
+    // A number word is a result only when it quantifies a change or share ("twenty percent", "one point"),
+    // not when it counts things the chart shows ("three monthly budgets").
+    if (/\p{N}/u.test(copy) || /\b(?:doubled|tripled|halved)\b/i.test(copy) || new RegExp(`\\b${numberWords}\\s+(?:percent|per\\s*cent|points?|pts|x|times|fold|percentage)`, "i").test(copy)) {
       throw new Error(`Chart title ${field} must not contain statistics or chart results: ${JSON.stringify(value)}. Use a descriptive measure/population heading and explicit period; move values and changes to chart labels or annotations.`);
     }
   }
@@ -606,9 +644,10 @@ function registerCore(registry) {
         const title = titles.find((node) => node.role === "action-title");
         const titleBottom = title.frame.y + title.data.textLayout.height;
         const baseBottom = page.contentFrame.y + page.contentFrame.height;
-        const contentTop = page.pageTemplate.contentSpacing === "compact"
-          ? Math.max(titleBottom, page.logoFrame ? page.logoFrame.y + page.logoFrame.height : titleBottom) + tokenValue(token("space.5"))
-          : Math.max(page.contentFrame.y, titleBottom + tokenValue(token("layout.titleContentGap")));
+        // One content top for the whole deck: the body starts at CHROME.bodyTop whether
+        // the title takes one line or two. Only a three-line title pushes it down.
+        const gap = tokenValue(token("space.5"));
+        const contentTop = Math.max(CHROME.bodyTop, titleBottom + gap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
         const contentFrame = { ...page.contentFrame, y: contentTop, height: baseBottom - contentTop };
         if (contentFrame.height <= 0) throw new Error("Action title leaves no room for slide content; shorten the title or split the slide");
         return { ...page, contentFrame, nodes: [...tracker, ...titles, ...page.nodes] };
@@ -622,7 +661,7 @@ function registerCore(registry) {
         const treatment = props.treatment || "open";
         const edge = props.edge || "contained";
         if(!["contained","full-bleed"].includes(edge))throw new Error("Unknown section edge treatment");
-        const padding = normalizeInsets(props.padding ?? token("space.4"));
+        const padding = sectionPadding(props);
         const fill = treatment === "muted" ? MUTED_SURFACE : treatment === "primary" ? PRIMARY : SURFACE;
         const stroke = treatment === "open" ? RULE : fill;
         const nodes = [];
@@ -680,7 +719,8 @@ function registerCore(registry) {
     component({ id: "page-number", category: "shared", role: "page-number", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 48, height: 24 }, sample: { value: 7 }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "page-number", frame, text: String(props.value), style: textStyle(SOURCE, SECONDARY, false, "right") })] }) }),
     component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "color.ink"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => {
       if (typeof props.text !== "string" || !props.text.trim()) throw new Error(`paragraph ${id} requires a non-empty text string; keep geometry in the component frame`);
-      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: "paragraph", frame, text: props.text, ...(props.runs?{runs:props.runs}:{}), style: textStyle(BODY, INK, false, props.align || "left", "top") })] };
+      const width = paragraphMeasure(frame.width, props);
+      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: "paragraph", frame: { ...frame, width }, text: props.text, ...(props.runs?{runs:props.runs}:{}), style: textStyle(BODY, INK, false, props.align || "left", "top") })] };
     } }),
     component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.componentPrimary", "color.onPrimary", "space.1", "space.3", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "circle" }) }) }),
     component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.4", "space.5", "space.6", "line.hairline", "radius.small"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
@@ -902,7 +942,7 @@ function registerCore(registry) {
       if (!Object.hasOwn(props ?? {}, "text")) return null;
       if (typeof props.text !== "string" || !props.text.trim()) throw new Error("paragraph requires a non-empty text string for measurement");
       if(props.runs && props.runs.map(r=>r.text).join("")!==props.text)throw new Error("Paragraph emphasis must preserve exact text");
-      return (props.runs?measureTextRuns:measureText)(props.runs||props.text, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false, wrapWidthRatio: 1 });
+      return (props.runs?measureTextRuns:measureText)(props.runs||props.text, paragraphMeasure(frame.width, props), { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false, wrapWidthRatio: 1 });
     };
     if (definition.id === "section") definition.measureInsets = ({ frame, props }) => sectionContentInsets(frame, props);
     if (definition.id === "section-heading") definition.variants.inverse = { backdrop: "primary" };

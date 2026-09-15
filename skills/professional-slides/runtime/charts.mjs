@@ -4,6 +4,7 @@ import {
   ellipsePrimitive,
   TOKENS,
   chartAnnotationStyle,
+  isTokenReference,
   tokenDefinition,
   linePrimitive,
   rectPrimitive,
@@ -41,7 +42,7 @@ const GRID = token("color.chartGrid");
 const PRIMARY = token("color.chartSeries1");
 const CHART_LABEL = token("type.chartLabel");
 const CHART_ANNOTATION = token("type.chartAnnotation");
-const AXIS_LABEL = token("type.body");
+const AXIS_LABEL = token("type.chartLabel");
 const SPARSE_DIRECT_LABEL_LIMIT = 8;
 const SERIES = [
   token("color.chartSeries1"),
@@ -87,14 +88,46 @@ function topLegend({ id, frame, items, align = "right", variant = "swatch" }) {
   return legendNodes({ id, frame: { x: frame.x + 54, y: frame.y + 7, width: frame.width - 70, height: 28 }, props: { items, placement: align === "right" ? "top-right" : "top", variant } });
 }
 
-function range(values, includeZero) {
+/**
+ * Tick steps a reader recognises: 1, 2, 2.5 or 5 times a power of ten.
+ * Interpolating the raw data extrema instead yields axes reading 14.025 or
+ * 22.75, which is the loudest amateur tell a chart can carry.
+ */
+const STEP_LADDER = Object.freeze([1, 2, 2.5, 5]);
+
+/** Candidate steps in ascending order, starting a decade below the rough step. */
+function* stepCandidates(rough) {
+  const start = Math.floor(Math.log10(rough > 0 && Number.isFinite(rough) ? rough : 1)) - 1;
+  for (let exponent = start; exponent <= start + 4; exponent += 1) {
+    const magnitude = Math.pow(10, exponent);
+    for (const rung of STEP_LADDER) yield rung * magnitude;
+  }
+}
+
+function range(values, includeZero, steps = 4) {
   let min = Math.min(...values), max = Math.max(...values);
   if (includeZero) { min = Math.min(0, min); max = Math.max(0, max); }
   if (min === max) {
     const padding = Math.abs(min) * 0.05 || 1;
     min -= padding; max += padding;
   }
-  return { min, max, span: max - min || 1 };
+  // Round the domain outward so that it spans exactly `steps` whole steps. Only
+  // then is every tick a nice number; rounding the endpoints alone still leaves
+  // a span like 50 divided into four parts of 12.5.
+  const dataMin = min, dataMax = max;
+  // Smallest ladder step whose `steps` whole increments, anchored at or below the
+  // data minimum, still reach the data maximum. Smallest keeps the plot full.
+  let step = null, niceMin = 0;
+  for (const candidate of stepCandidates((dataMax - dataMin) / steps)) {
+    const start = Math.floor(dataMin / candidate + 1e-9) * candidate;
+    if (start + candidate * steps >= dataMax - 1e-9) { step = candidate; niceMin = start; break; }
+  }
+  if (step === null) { step = (dataMax - dataMin) / steps; niceMin = dataMin; }
+  const decimals = Math.max(0, -Math.floor(Math.log10(step)) + (STEP_LADDER.includes(step / Math.pow(10, Math.floor(Math.log10(step)))) && String(step / Math.pow(10, Math.floor(Math.log10(step)))) === "2.5" ? 1 : 0));
+  const round = (value) => Number(value.toFixed(Math.min(10, decimals)));
+  min = round(niceMin);
+  max = round(niceMin + step * steps);
+  return { min, max, span: max - min || 1, step: round(step) };
 }
 
 function assertGridlineOption(props) {
@@ -164,7 +197,14 @@ function normalizedHighlights(props, { categories = [], series = [], allowBar = 
 }
 
 function axisTickText(min, max, index, steps = 4) {
-  return String(Number((min + (max - min) * index / steps).toPrecision(6)));
+  const value = min + (max - min) * index / steps;
+  // The domain is already rounded to whole steps, so the tick is exact; trim the
+  // binary-float tail rather than inventing precision.
+  const decimals = Math.max(0, ...[min, max, (max - min) / steps].map((entry) => {
+    const text = String(Number(entry.toPrecision(12)));
+    return text.includes(".") ? text.split(".")[1].length : 0;
+  }));
+  return String(Number(value.toFixed(Math.min(10, decimals))));
 }
 
 function axisLabelWidth(bounds) {
@@ -234,9 +274,22 @@ function horizontalAxes(id, plot, xMin, xMax, steps = 4, { gridlines = false, sh
   return nodes;
 }
 
-function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, allowOutsideReferenceLabels = false }) {
+function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, xScale = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, allowOutsideReferenceLabels = false }) {
   const underlay = [];
   const overlay = [];
+  // Horizontal charts carry a value axis along x: a reference is a vertical line
+  // with its label set above the plot, clear of the bars.
+  if (!yScale && xScale) {
+    for (const [index, reference] of (props.referenceLines || []).entries()) {
+      const x = xScale(reference.value);
+      underlay.push(linePrimitive({ id: stableId(id, "reference-line", index), role: "chart-reference-line", x1: x, y1: plot.y - 4, x2: x, y2: plot.y + plot.height, style: lineStyle(token("color.componentPrimary"), token("line.standard"), "dash") }));
+      if (reference.label) {
+        const measured = measureText(reference.label, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 });
+        const left = Math.min(plot.x + plot.width - measured.width, x + 6);
+        overlay.push(textPrimitive({ id: stableId(id, "reference-label", index), role: "chart-reference-label", frame: { x: left, y: plot.y - measured.height - 6, width: measured.width, height: measured.height }, text: measured.text, style: { ...textStyle(CHART_LABEL, token("color.componentPrimary"), true, "left"), valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured, value: reference.value } }));
+      }
+    }
+  }
   const evidenceAnnotations = renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles });
   const annotationPlacements = evidenceAnnotations.placements;
   const overlaps = (a, b, padding = 4) => !(
@@ -328,7 +381,8 @@ function withDecorations(nodes, options) {
   const { underlay, overlay } = decorations({ ...options, obstacles: nodes });
   const backings = [];
   for (const label of nodes.filter((node) => node.role === "data-label")) {
-    const measured = measureText(label.text, label.frame.width, { fontFamily: label.style.fontFamily.value, fontSize: label.style.fontSize.value, bold: label.style.bold });
+    const resolve = (value, fallback) => isTokenReference(value) ? tokenValue(value) : (value?.value ?? value ?? fallback);
+    const measured = measureText(label.text, label.frame.width + 0.5, { fontFamily: resolve(label.style.fontFamily, "Arial"), fontSize: resolve(label.style.fontSize, tokenValue(CHART_LABEL)), bold: label.style.bold, wrapWidthRatio: 1 });
     const width = measured.width + 4, height = measured.height + 2;
     const x = label.style.align === "left" ? label.frame.x - 2 : label.style.align === "right" ? label.frame.x + label.frame.width - width + 2 : label.frame.x + (label.frame.width - width) / 2;
     const frame = { x, y: label.frame.y + (label.frame.height - height) / 2, width, height };
@@ -681,6 +735,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     pointMap,
     categoryMap,
     yScale: horizontal ? null : yScale,
+    xScale: horizontal ? xScale : null,
     allowBarHighlight: true,
     allowAnnotationRail: !horizontal,
     allowOutsideReferenceLabels: !horizontal

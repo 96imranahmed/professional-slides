@@ -649,7 +649,7 @@ export function measureTable({ frame, props }) {
   );
   // Reserve visible scale bars/swatches and labels together. Never infer row-local scales.
   const legendHeight = sum(legends.map((l) => l.height));
-  const height =
+  let height =
     headerHeight +
     sum(topGaps) +
     sum(heights) +
@@ -658,6 +658,15 @@ export function measureTable({ frame, props }) {
     throw new Error(
       `Table content needs ${height.toFixed(1)}px, but only ${frame.height}px is allocated; widen, simplify or split the table`,
     );
+  // A table given more height than it needs spreads the surplus across its rows,
+  // up to 1.8× the natural row height, so a hero table fills its frame the way a
+  // consulting scorecard does instead of leaving a void beneath it.
+  if (props.fillHeight === true && Number.isFinite(frame.height) && frame.height > height + 0.01 && heights.length) {
+    const surplus = Math.min(frame.height - height, heights.reduce((a, b) => a + b, 0) * 0.8);
+    const per = surplus / heights.length;
+    for (let r = 0; r < heights.length; r += 1) heights[r] += per;
+    height += surplus;
+  }
   return {
     ...model,
     density,

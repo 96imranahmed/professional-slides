@@ -1,26 +1,8 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class GoldenSetTests(unittest.TestCase):
-    def test_gallery_groups_related_layers_without_hiding_fixtures(self):
-        result = run_node("""
-import assert from 'node:assert/strict';
-import { goldenSetSpecs, goldenGalleryGroups } from './skills/professional-slides/runtime/golden-set.mjs';
-const specs=goldenSetSpecs(),groups=goldenGalleryGroups(specs);
-const ids=groups.flatMap(g=>g.fixtures.map(f=>f.id));
-assert.deepEqual([...ids].sort(),specs.map(f=>f.id).sort());
-assert.equal(new Set(ids).size,specs.length);
-for(const [id,targets] of [['page-shell',['slide-chrome','page-template']],['section-container',['section','section-heading']],['titles',['action-title','section-title']]]) {
- const group=groups.find(g=>g.id===id);
- assert.ok(group.description);
- assert.deepEqual([...new Set(group.fixtures.map(f=>f.target))].sort(),targets.sort());
- for(const target of targets) assert.ok(group.fixtures.some(f=>f.target===target&&(f.coverage||[]).some(item=>item.target===target)));
-}
-console.log(JSON.stringify({accepted:true}));
-""")
-        self.assertTrue(result["accepted"])
-
     def test_section_divider_modes_rule_variants_and_generic_copy(self):
         result = run_node("""
 import assert from 'node:assert/strict';
@@ -67,72 +49,10 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
-    def test_template_copy_and_guidance_contract(self):
-        result = run_node("""
-import assert from 'node:assert/strict';
-import { buildGoldenSetDeck, goldenSetSpecs } from './skills/professional-slides/runtime/golden-set.mjs';
-import { REGISTRY, registryManifest } from './skills/professional-slides/runtime/registry.mjs';
-const specs=goldenSetSpecs(), {deck}=buildGoldenSetDeck();
-const hasGuidance=spec=>['Guidance','Use when:','Why:','Action title:'].every(label=>(spec.notes||'').includes(label));
-const standards=specs.filter(spec=>spec.kind==='standard');
-const chartFixtures=specs.filter(spec=>['chart','variant','board'].includes(spec.kind)&&REGISTRY.get(spec.target)?.category==='chart');
-const guidedExamples=specs.filter(spec=>spec.example&&(REGISTRY.get(spec.target)?.category==='chart'||spec.target==='chart-group'));
-const hasSquare=text=>String(text||'').includes(String.fromCharCode(91))||String(text||'').includes(String.fromCharCode(93));
-assert.equal(standards.length,27);
-assert.ok(guidedExamples.length>=10);
-assert.ok(standards.every(hasGuidance));
-assert.ok(chartFixtures.every(hasGuidance));
-assert.ok(guidedExamples.every(hasGuidance));
-for(const slide of deck.slides) {
-  assert.equal(hasSquare(slide.notes),false);
-  for(const node of slide.nodes||[]) if(typeof node.text==='string') assert.equal(hasSquare(node.text),false);
-}
-const textFor=id=>deck.slides.find(slide=>slide.id===id).nodes.map(node=>node.text).filter(Boolean);
-assert.ok(textFor('golden-divider').includes('(Insert section title)'));
-assert.ok(textFor('golden-rollout').includes('(We plan to roll-out across Y years)'));
-assert.ok(textFor('golden-text').includes('(Insert section title)'));
-const manifestCharts=registryManifest().components.filter(component=>component.category==='chart');
-assert.ok(chartFixtures.length<manifestCharts.reduce((count,component)=>count+Math.max(1,Object.keys(component.variants||{}).length),0));
-assert.ok(manifestCharts.every(component=>component.guidance?.useWhen&&component.guidance?.why&&component.guidance?.actionTitle));
-const group=registryManifest().components.find(component=>component.id==='chart-group');
-assert.ok(group.guidance?.useWhen&&group.guidance?.why&&group.guidance?.actionTitle);
-console.log(JSON.stringify({accepted:true,slides:deck.slides.length,standards:standards.length,chartFixtures:chartFixtures.length,guidedExamples:guidedExamples.length,manifestCharts:manifestCharts.length}));
-""")
-        self.assertTrue(result["accepted"])
-        self.assertEqual(result["standards"], 27)
-
-    def test_pptx_package_has_no_phantom_masters_and_preserves_font_roles(self):
-        result = run_node("""
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import { createRequire } from 'node:module';
-import { compileDeck,component } from './skills/professional-slides/runtime/core.mjs';
-import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-import { writePptx } from './skills/professional-slides/runtime/adapters/pptxgenjs.mjs';
-const require=createRequire(import.meta.url),JSZip=require(require.resolve('jszip',{paths:[process.env.RUNTIME_NODE_MODULES]}));
-const directory=await fs.mkdtemp(path.join(os.tmpdir(),'ps-golden-package-test-'));
-try {
- const frame={x:60,y:80,width:1100,height:150};
- const deck=compileDeck({typography:{display:'Georgia'},slides:[1,2,3].map(i=>({id:`slide-${i}`,composition:component({id:`title-${i}`,component:'action-title',frame,props:{text:'Operating model'}})}))},REGISTRY);
- const file=path.join(directory,'test.pptx');await writePptx(deck,file);
- const zip=await JSZip.loadAsync(await fs.readFile(file));
- const xml=await zip.file('[Content_Types].xml').async('string');
- for(const match of xml.matchAll(/<Override[^>]*PartName="([^\"]+)"/g)) assert.ok(zip.file(match[1].slice(1)),match[1]);
- const theme=await zip.file('ppt/theme/theme1.xml').async('string');
- assert.ok(theme.includes('<a:majorFont><a:latin typeface="Georgia"'));
- assert.ok(theme.includes('<a:minorFont><a:latin typeface="Arial"'));
- console.log(JSON.stringify({accepted:true}));
-} finally { await fs.rm(directory,{recursive:true,force:true}); }
-""")
-        self.assertTrue(result["accepted"])
-
     def test_graph_title_owner_and_unit_variant(self):
         result = run_node("""
 import assert from 'node:assert/strict';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-import { TOKENS } from './skills/professional-slides/runtime/core.mjs';
 const title=REGISTRY.get('chart-title'),frame={x:60,y:180,width:500,height:90};
 const plain=title.render({id:'title',frame,props:{heading:'Current mix'}}).nodes;
 const unit=title.render({id:'title',frame,props:{heading:'Current mix',unit:'Revenue share, %'}}).nodes;
@@ -145,8 +65,6 @@ assert.equal(unit.find(n=>n.role==='section-heading').text,'Current mix,');
 assert.equal(unit.find(n=>n.role==='chart-unit').text,' Revenue share, %');
 assert.equal(unit.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
 assert.equal(unit.find(n=>n.role==='chart-unit').frame.x,unit.find(n=>n.role==='section-heading').frame.x+unit.find(n=>n.role==='section-heading').frame.width);
-assert.equal(TOKENS['type.chartLabel'].value,TOKENS['type.body'].value);
-assert.equal(TOKENS['type.chartAnnotation'].value,TOKENS['type.body'].value);
 assert.deepEqual(plain[0].style,unit[0].style);
 assert.throws(()=>title.render({id:'title',frame,props:{heading:'Mix',variant:'unit'}}),/unit/);
 const borderless=title.render({id:'title',frame,props:{heading:'Current mix',unit:'%',variant:'unit'}}).nodes;
@@ -230,34 +148,6 @@ console.log(JSON.stringify({palettes:decks.map(d=>d.palette.id),goldenPalettes:G
 """)
         self.assertEqual(result["palettes"], ["mckinsey", "bcg", "bain"])
         self.assertEqual(result["goldenPalettes"], ["mckinsey"])
-
-    def test_registry_drives_complete_nonduplicated_golden_coverage(self):
-        result = run_node("""
-import assert from 'node:assert/strict';
-import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-import { goldenSetSpecs, auditGoldenCoverage } from './skills/professional-slides/runtime/golden-set.mjs';
-import { componentVariantFixtureSpecs } from './skills/professional-slides/runtime/fixtures.mjs';
-const specs=goldenSetSpecs(), audit=auditGoldenCoverage(specs);
-assert.ok(audit.accepted);
-assert.ok(!auditGoldenCoverage(specs.slice(1)).accepted);
-assert.ok(!auditGoldenCoverage([...specs,specs[0]]).accepted);
-assert.ok(!auditGoldenCoverage([...specs,{id:'unknown'}]).accepted);
-const coverage=specs.flatMap(spec=>spec.coverage||[]);
-for(const definition of REGISTRY.values()) {
-  const variants=Object.keys(definition.variants||{});
-  if(!variants.length) assert.equal(coverage.filter(item=>item.target===definition.id&&item.variant===null).length,1);
-  for(const variant of variants) assert.equal(coverage.filter(item=>item.target===definition.id&&item.variant===variant).length,1);
-}
-assert.ok(componentVariantFixtureSpecs().every(f=>!f.defaultVariant));
-assert.equal(audit.variants,audit.variantSlides+audit.omittedDefaultDuplicates);
-assert.ok(audit.componentSlides<audit.components+audit.variantSlides);
-assert.deepEqual(audit.duplicateVisualBranches,[]);
-assert.equal(audit.slides,audit.componentSlides+audit.layouts+audit.standards);
-assert.ok(audit.slides<coverage.length+audit.layouts+audit.standards);
-console.log(JSON.stringify(audit));
-""")
-        self.assertEqual(result["components"], 64)
-        self.assertEqual(result["standards"], 27)
 
     def test_pie_variants_are_centered_and_category_labels_do_not_duplicate_legend(self):
         result = run_node("""

@@ -1,52 +1,167 @@
 ---
 name: professional-slides
-description: Create or revise PowerPoint and Google Slides with substantive arguments, evidence-rich readable pages, editable components, and bounded rendered QA. Use for new decks, structural revisions, and individual-slide edits.
+description: Build, restructure or rewrite a slide deck as an argument - board decks, steerco and project updates, investor and pitch decks, commercial due diligence, executive summaries and pre-reads - and produce an editable .pptx. Covers storyline and action titles, the ghost deck, chart and table selection, page layout, and rendered verification. Use for "make me a deck/slides/presentation", "turn this analysis into slides", "restructure/rewrite/fix an existing deck", "write the storyline", "sharpen the titles", "build a pptx".
 ---
 
 # Professional Slides
 
-Produce a substantive, decision-useful argument with readable evidence and clear hierarchy. Preserve complete reasoning and material qualifications. Density follows the reading task: analytical pre-reads should stand alone; a pitch may deliberately reveal less. Empty space, brevity, novelty and decorative variety are not quality objectives.
+A deck is an argument that happens to be paginated. The reader gets the answer from the titles alone, read top to bottom like a memo, and verifies it from the exhibits. Everything else on the page exists to make one of those two jobs easier. So the order of work is: settle the answer, write the titles that carry it, choose the exhibit that proves each title, then draw the page.
 
-## Choose the task route
+## The one-minute version
 
-- **New deck or structural revision:** read [storylining](references/storylining/index.md), the [production workflow](references/tools/production.md), and [composition](references/composition/index.md). Use [templates](references/templates/index.md) only when a template or reference applies. Inspect an existing deck before structural revisions.
-- **Bounded copy or visual revision:** inspect affected slides and the existing montage, preserve unrelated content, and load only the relevant component owner. Reuse verified unchanged renders; expand scope only for shared changes. Do not restart storyline approval for a local edit.
-- **Runtime or skill development:** use [runtime guidance](runtime/README.md#content-planning) and [evaluation](references/evaluation/index.md). Complete the implementation batch before developer golden rendering. Ordinary deck production uses a tested release and does not modify shared runtime code.
-- Load chart, table, theme, asset and platform owners only for selected components or an actual uncertainty. [Design](references/design/index.md), [copy](references/components/copy.md), [theming](references/theming/index.md), and [tools](references/tools/index.md) remain canonical owners.
+1. Write the governing answer in one sentence: *After this deck the audience should decide ___ because ___.*
+2. Write the title of every page, in order. Read them alone. If they do not resolve the question, the deck is not ready to build.
+3. For each title, name the exhibit that proves it and the two or three numbers it carries.
+4. Get that table approved. It is the ghost deck, and it is the only approval gate.
+5. Build, render, verify, deliver.
 
-## Plan the argument before geometry
+## Write the action title first
 
-Preserve the original user brief in `context.originalBrief`. A request for help deciding requires researched alternatives and a supported recommendation or decision boundary; do not substitute a checklist of research the author has not performed. Use [source evidence](references/storylining/source-evidence.md) to distinguish unperformed work from uncertainty remaining after research.
+An action title states the finding, not the subject. Use the formula:
 
-Gather a scoped evidence ledger with source, measure, period, geography/population, unit and uncertainty. Never invent evidence or imply comparability that the sources do not support. Match the title's commitment to the evidence and decision stage.
+**[subject] [verb of change or state] [magnitude or comparator] [period or condition]**
 
-For each page, plan its question, answer, evidence, interpretation and material qualification. One coherent question may need several linked exhibits. Use the [composition recipes](references/composition/recipes.md) to choose relationships from the question, not the topic. Assess each thin page: merge with a related page, deepen using available evidence, or retain deliberate simplicity for a stated narrative purpose. Do not invent analysis or add filler to satisfy density.
+Keep it to 14 words and two lines. The page proves the title; the title never exceeds what the page shows.
 
-For new/structurally revised decks, present one substantive design-aware dot-dash for owner approval: exact titles, evidence, component choices and layout relationships. Existing authorization remains valid; do not add calibration or storyboard approval gates. The approved plan is the authoritative specification consumed by the runtime; derived artifacts must not introduce new decisions.
+| Weak | Strong |
+| --- | --- |
+| Financial performance, 2015-2022 | Costs grew 9% a year against revenue's 5%, turning profit into loss by 2022 |
+| Workforce and productivity | Workforce fell from 26,000 to 22,000 while mail per employee neared the 330,000 ceiling |
+| Unit cost benchmarking | Processing and delivery unit costs already sit below benchmark, at 0.63 and 0.29 per piece |
+| Next steps | Quantify revenue options before approving the recovery plan |
+| The 45-minute limit looks plausible for some central-office journeys | Transit rides use only 15-28 of the 45 minutes; walking and waiting decide which locations qualify |
+| Four neighborhoods offer distinct combinations of schools and everyday activity | All six locations clear the school screen; commute and rent cut the list to two |
 
-## Compose readable, substantive pages
+**Match the verb to the evidence.** Measured exposure supports *is exposed*. A sensitivity supports *could reach*. A board minute supports *will proceed*. Two endpoints support *fell from A to B*; they do not support *is accelerating*, which needs the intervening periods. When the strongest verb the evidence supports is weaker than the one you want, either get the evidence or narrow the title.
 
-Use registered editable components and shared theme tokens. Keep comparable measures, encodings, scales, periods and recurring treatments consistent. Preserve exact approved titles, material caveats, source provenance and user-supplied assets.
+**Replace hedges with the measured fact.** These words appear when the finding has not been written yet: *looks plausible, some, may, offers, distinct combinations, requires verification, potentially, a range of, various, considerations, insights, several factors*. Each one marks a place where a number, a comparator or a decision belongs.
 
-Evaluate content by its contribution: evidence, explanation, comparison, qualification, synthesis, navigation or action. Useful interpretation can restate a finding to explain its importance. An insight may synthesize supported evidence; it need not introduce a novel deduction. Remove redundant transcription and unsupported conclusions. Supporting prose may be plain text linked to an actual exhibit; it does not require a visible heading or box.
+**Give every page a distinct title.** Two titles that share most of their words describe one page; merge them. A title that restates the brief's question tells the reader nothing they did not bring with them.
 
-Allocate body regions according to measured content. Use coordinated density profiles, content-sized supporting groups and readable body text. Word counts are diagnostics unless the user explicitly imposes a ceiling. Keep internal metadata and notes out of visible-copy counts. A sparse analytical page needs a missing-argument diagnosis, not a pixel quota; a dense page must still fit and remain readable.
+**Chart headings are not titles.** A chart heading names the measure, the population and the period: `NYPD reported homicides, 2015-2025`. The statistics live on the marks and in the action title, so the heading stays true when the data updates. `NYPD: 382 to 305` belongs on the bars.
 
-Use conditional annotations: label changes directly when that communicates the relationship; add arrows/brackets only when they clarify a distinct comparison with exact anchors. Select variants deliberately and preserve useful consistency. Plan overview and section-transition trackers for substantial multi-section decks when navigation helps; honor explicit user preferences.
+## Test the story before you build
 
-## Generate and verify
+Run these on the title list, before any page exists.
 
-For net-new PowerPoint, use `runtime/generation.mjs` through the declarative command in [production](references/tools/production.md). `writeCanonicalDeckPlan()` owns planning, compilation, the PptxGenJS adapter and Artifact Tool observation/rendering. Keep the receipt and exact artifact hashes. Never create parallel raw slide builders or tune local literals to bypass a component defect.
+- **Vertical test.** Each title states a finding, and the page under it contains the proof of that finding and nothing that proves something else.
+- **Horizontal test.** Read the titles alone as a memo. They must move from answer to proof to action and resolve the governing question. If the last title restates the first, the deck spent its pages without moving.
+- **MECE test.** Sibling pages divide their parent question without overlap and without a gap that changes the answer. Enterprise, SMB and high-growth overlap: a high-growth enterprise account lands in two buckets, so a number counted once appears twice. Split by employee count, or by contract value, or by motion - one axis per level.
+- **Deletion test.** Remove the page. If understanding and the ability to act are unchanged, merge it into its neighbour or drop it.
+- **Scorecard-first rule.** When the brief is "choose among N options on K criteria", page 3 is the N x K scorecard. Column order follows the client's own ranking of the criteria; cells that fail a hard screen are struck. Every later page is one row or one column of that scorecard, expanded. This keeps the recommendation traceable to a comparison the reader has already seen.
+- **Coverage rule.** Every criterion the client ranked gets at least one exhibit that compares all options on it. Page count follows the ranking: the first-ranked criterion gets the most pages. A criterion that decides the recommendation gets measured, not asserted.
 
-Run deterministic preflight before model review. Inspect the exact editable artifact's renders and its full montage in one coordinated review stage. Check facts, readability, missing reasoning and consistency; consolidate findings by cause. Reuse unchanged slide review evidence and the same candidate renders. All slides must be covered before final acceptance.
+## Ghost the deck
 
-The [rule registry](references/evaluation/rules.json) and [production workflow](references/tools/production.md) own severity and repair policy. Incorrect facts, misleading comparisons, missing evidence, unreadable content, broken geometry or provenance remain blockers. Editorial preferences are advisory. One initial review and one targeted repair pass are the default; additional passes require a specific unresolved material defect. Do not declare an unresolved defect accepted when the repair budget ends. Report the precise limitation.
+The ghost deck is one table, one row per page, and it is the approval gate. Write it before any file exists and revise it in place.
 
-Deliver the verified artifact with material limitations. Generation success alone is not editorial acceptance. For dual-format output, verify each final format. Performance and human-preference claims require measured evidence.
+| # | Action title | Exhibit | Numbers it carries | So what | Criterion |
+| --- | --- | --- | --- | --- | --- |
+| 3 | All six locations clear the school screen; commute and rent cut the list to two | 6 x 4 scorecard, criteria in ranked order | 6 options, 4 criteria, 2 survivors | The decision is a commute-rent trade, not a schools question | all four |
+| 4 | Transit rides use only 15-28 of the 45 minutes; walking and waiting decide which locations qualify | Stacked door-to-door bar, 6 locations, 45-min reference line | 15-28 min ride, 12-19 min walk+wait, 45-min limit | Two locations clear the limit door-to-door; the rest fail on access, not rail | commute (2nd) |
+| 5 | Three of the six sit in districts above the citywide proficiency median | Dot plot, 6 locations against citywide median | 6 district scores, 1 median, 3 above | Schools do not separate the shortlist; stop spending pages on them | schools (1st) |
+| 9 | Take Location B: it clears the commute limit at the lowest rent of the two survivors | Decision table, 2 survivors x 4 criteria, with the reversing condition | $3,950 vs $4,600 rent, 38 vs 43 min | Location A wins only if the office moves downtown | all four |
 
+Record in the Exhibit column *why* that encoding was chosen when the choice is not obvious - "stacked, because the components are the finding". That sentence is the whole chart-selection record; it lives here and nowhere else.
 
-## Quality, diagnosis and release discipline
+## Choose the exhibit from the reader's question
 
-Quality requires a coherent argument, visible insights, useful visual relationships and deliberate pacing as well as accurate, readable output. Choose the relationship, then the exhibit, then supporting prose. “Make it longer” means deeper evidence, alternatives or counterarguments, not additional slices of existing content.
+| The reader's question | Exhibit |
+| --- | --- |
+| Which category is larger or smaller? | Sorted bar or column |
+| How did this evolve across meaningful periods? | Line, when the trajectory is the finding |
+| How does a total divide into parts? | Stacked bar or column |
+| How does one small total split into a few familiar parts? | Pie or donut, two to five parts, by exception |
+| How does a response mix differ across groups? | 100% stacked bars, one row per group |
+| What explains the change from start to finish? | Waterfall that reconciles |
+| How do two or three measures relate? | Scatter; bubble when a third measure sets the area |
+| Where are the concentrations, gaps or priorities? | Heatmap or typed table |
+| Which option wins on which criteria? | Typed comparison table, one row per option |
+| Where is this happening? | Map, when position is the evidence |
+| How do stages, phases or dependencies follow each other? | Process, roadmap, timeline or tree |
+| How do current, emerging and future plays mature? | Horizons |
 
-Diagnose argument, evidence, hierarchy, composition and implementation separately. More research does not repair hierarchy; font enlargement does not repair a fragmented story. Complete and certify runtime/skill changes before producing a deck with that release. Keep detailed mechanics in the focused owners linked above.
+**Choose from the evidence you actually have.** One value per category, including a common future endpoint: bars on a common basis. One observed rate repeated forward: one bar per category, with the implication beside it. Only start and finish known: paired bars. Several observed periods or a published model: a line. Paired observations of two measured variables: a scatter. A calendar axis alone is not evidence of a trajectory.
+
+**Meaningful-position gate.** Every plotted coordinate encodes a sourced measure, a documented calculation or an exact named category position. Both scatter axes carry real quantitative measures with units. Overlapping observations are resolved with transparency, multiplicity labels, aggregation or a different encoding, each of which preserves the true coordinates. A fabricated offset inside a category band is a blocking evidence defect, whatever the page looks like.
+
+**Numbers go on marks, not in sentences.** A sentence that transcribes the chart doubles the reading and halves the exhibit. Replace *"Processing cost per piece fell from 0.70 to 0.63 and delivery from 0.34 to 0.29"* with two labelled endpoints on the bars and a title that carries the consequence: *Unit costs already sit below benchmark*.
+
+## Write the page
+
+- Keep body copy to 100 words on an exhibit page and 140 on a text page. Beyond that the exhibit has stopped being the evidence.
+- End the page on a consequence. The last sentence says what changes for the reader. Pages that end on *not*, *cannot*, *requires* or *verify* hand the work back; move that clause up beside the claim it limits and finish on the decision it leaves standing.
+- Use one methodology footnote at source size, once per page, instead of repeating the caveat beside every number.
+- Put instructions to the reader on the action page only. "First verify, then scout" is the close of a deck, not a caption on page 6.
+- Write in full sentences with the connective words the reasoning needs.
+
+| Instead of | Write |
+| --- | --- |
+| Further work may be required | Public evidence does not show retention |
+| Hold. Wait for cash recovery. | We recommend holding the position until cash generation improves. |
+| Simplify accelerated training | Make accelerated training easier to adopt |
+| $8-12M annual potential over 18-24 months | $8-12M annually; 18-24 months to implement |
+
+## The page
+
+- Canvas 1280 x 720 px, 60 px outer margins.
+- 12-column grid: 82 px columns, 16 px gutters.
+- Action title 24 pt, at most two lines, with the right 20% of the title band reserved for a tracker or sticker.
+- Headings 14-16 pt. Body 12-14 pt. Chart furniture - axis ticks, direct labels, legends - 9-10 pt. Source 8 pt.
+- A hero exhibit occupies at least 40% of the content area on an analytical page.
+- At most 40% of pages share one layout; a run longer than that means several pages are asking the same question.
+- Trailing empty band at the bottom of the content area: 8% or less. More than that means the exhibit should be larger or the page should merge with its neighbour.
+
+## One page, rewritten
+
+**Before.** Title: *The 45-minute limit looks plausible for some central-office journeys.* Body: four paragraphs, 210 words, explaining that transit times vary, that walking times were not measured, and that the reader should verify their own commute. Exhibit: a 180 px bar chart of rail travel time for three of the six locations, no reference line.
+
+**After.** Title: *Transit rides use only 15-28 of the 45 minutes; walking and waiting decide which locations qualify.* Exhibit: one stacked horizontal bar per location, all six, segments for walk-to-station, wait, ride, walk-to-office, with a vertical 45-minute reference line and the two qualifying bars in the primary colour. The bar occupies 60% of the content area. Body, 60 words: the ride is the smallest segment in every location; access adds 12-19 minutes; two locations clear the limit door-to-door; the rank changes from the rail-only view, which is why the rail-only view is not the screen. One footnote: schedule basis and time of day. The page ends on the consequence, not on the caveat.
+
+## Write the spec, then build
+
+The runtime takes `professional-slides.deck/v3`: content and intent only, about ten fields per page. Layout, sizes, density and nesting are derived from what the page carries.
+
+```json
+{ "schema": "professional-slides.deck/v3", "id": "australia-post", "palette": "mckinsey",
+  "brief": "…the client's brief…", "answer": "…the governing answer in one sentence…",
+  "cover": { "title": "Returning Australia Post to profit", "subtitle": "Steering committee · March 2023" },
+  "slides": [
+    { "title": "Costs grew 9% against 5% revenue growth, moving FY22 into a $13bn loss",
+      "exhibit": { "type": "chart.line", "heading": "Revenue and cost, FY15–FY22", "unit": "$bn",
+                   "categories": ["FY15", "FY18", "FY22"],
+                   "series": [{ "name": "Revenue", "values": [6.4, 6.9, 8.4] }, { "name": "Cost", "values": [6.2, 6.8, 8.6] }] },
+      "points": ["Letters volume fell 8% a year while the network was kept whole", "Parcels grew but at half the margin"],
+      "soWhat": "The gap is structural: no revenue scenario closes it without a network decision.",
+      "source": "Australia Post annual reports FY15–FY22" },
+    { "title": "…", "exhibits": [ { "type": "table", "panelHeading": "…", "columns": ["…"], "rows": [["…"]] }, { "type": "chart.column", "panelHeading": "…", "…": "…" } ], "soWhat": "…" },
+    { "kind": "section", "title": "What it would take" }
+  ] }
+```
+
+`exhibit.type` is any registered component (`chart.column`, `chart.bar`, `chart.stacked-bar`, `chart.line`, `chart.pie`, `chart.waterfall`, `table`, `image` with a `path`, `metrics`, `timeline`, `matrix`, …). One exhibit plus `points` gives a two-thirds hero with a side column; two or three `exhibits` give a two-up row with one shared value scale; `points` alone give a text page; every page may carry one `soWhat`, which becomes the takeaway box at the foot. Titles are held to two lines at 24pt; a third line drops to 22pt and the page gate reports it.
+
+```bash
+node runtime/build-deck.mjs deck.json out/ --preflight   # story gates only: titles, hedges, words, monotony
+node runtime/build-deck.mjs deck.json out/               # scene → editable pptx → LibreOffice render → readback → page gates
+node runtime/deliver-deck.mjs deck.json out/             # + review; hands over out/<id>-DELIVERED.pptx only if accepted
+```
+
+Build takes a few seconds; the render is the slow step (LibreOffice, ~3 s for ten pages). Delivery refuses a deck that fails the page gates or the review and writes `out/REJECTED.md` with the blockers instead of a deliverable. In an agent session the review runs as a packet: read `out/review-packet/prompt.md` and the renders, write `out/review.json` to its schema, then rerun delivery with `--review out/review.json`. Flags and gate thresholds are in [production](references/tools/production.md).
+
+## Density
+
+`executive` is the default. Use `pre-read` when the document is read unattended and the page must stand without narration. Use `live-pitch` only when the deck is presented and the words are spoken aloud; an analytical brief uses `executive` or `pre-read`. `appendix` is for source-rich support behind the main story. Choose once per coherent family of pages and keep type, spacing and chrome on that one profile.
+
+## Further detail
+
+[Storylining](references/storylining.md) - hypothesis trees, the dot-dash, the Australia Post worked example.
+[Charts](references/charts.md) - per-encoding data contracts and construction rules.
+[Components](references/components.md) - the registered component set, props and when to use each.
+[Copy](references/copy.md) - titles, body, labels, decision closes.
+[Design](references/design.md) - grid, type, spacing, composition choices.
+[Composition](references/composition.md) - layout primitives and recipes.
+[Theming](references/theming.md) - palettes, tokens, density profiles.
+[Templates](references/templates/index.md) - due diligence, progress update, pitch deck.
+[Production](references/tools/production.md) - commands, gates, delivery.
+[Evaluation](references/evaluation/index.md) - page gates and review codes.

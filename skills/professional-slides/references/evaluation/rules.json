@@ -1,10 +1,10 @@
 {
   "schema": "professional-slides.rules/v1",
-  "version": 2,
+  "version": 3,
   "rules": [
     {
       "id": "contribution",
-      "owner": "../components/copy.md",
+      "owner": "../copy.md",
       "severity": "advisory",
       "rationale": "Evidence, explanation, qualification and synthesis can justify content.",
       "positive": "Supported chart interpretation",
@@ -12,7 +12,7 @@
     },
     {
       "id": "facts",
-      "owner": "../components/copy.md",
+      "owner": "../copy.md",
       "severity": "material",
       "rationale": "Claims require supplied evidence and accurate scope.",
       "positive": "Comparable dated measures",
@@ -20,7 +20,7 @@
     },
     {
       "id": "density",
-      "owner": "../composition/recipes.md",
+      "owner": "../composition.md",
       "severity": "material",
       "rationale": "Missing argument must identify absent reasoning; empty pixels alone are advisory.",
       "positive": "Comparison plus conditions",
@@ -28,59 +28,69 @@
     },
     {
       "id": "readability",
-      "owner": "../design/slide-layouts.md",
+      "owner": "../design.md",
       "severity": "material",
       "rationale": "Measured fit and readable type are required.",
       "positive": "Content-sized explanation",
       "negative": "Clipped axis label"
     },
     {
+      "id": "coverage",
+      "owner": "../storylining.md",
+      "severity": "material",
+      "rationale": "Every ranked criterion needs one comparative exhibit across all options.",
+      "positive": "Scorecard covering all options on every ranked criterion",
+      "negative": "Recommendation resting on an unmeasured tie-breaker"
+    },
+    {
+      "id": "title-spine",
+      "owner": "../copy.md",
+      "severity": "material",
+      "rationale": "Titles carry the answer: within 14 words, hedge-free, distinct from each other.",
+      "positive": "Transit rides use only 15-28 of the 45 minutes",
+      "negative": "The 45-minute limit looks plausible for some journeys"
+    },
+    {
+      "id": "so-what",
+      "owner": "../copy.md",
+      "severity": "material",
+      "rationale": "The last sentence of a page states a consequence.",
+      "positive": "Two locations clear the limit door-to-door",
+      "negative": "Page ending on requires verification"
+    },
+    {
+      "id": "meaningful-position",
+      "owner": "../charts.md",
+      "severity": "material",
+      "rationale": "Every plotted coordinate encodes a sourced measure, calculation or named category position.",
+      "positive": "Scatter of two measured variables",
+      "negative": "Jittered offsets inside a category band"
+    },
+    {
+      "id": "chart-heading",
+      "owner": "../components.md",
+      "severity": "material",
+      "rationale": "A chart heading names measure, population and period; statistics live on the marks.",
+      "positive": "NYPD reported homicides, 2015-2025",
+      "negative": "NYPD: 382 to 305"
+    },
+    {
       "id": "review",
       "owner": "../tools/production.md",
       "severity": "material",
-      "rationale": "Complete current coverage; scoped reuse and bounded repair.",
+      "rationale": "Complete current coverage; delivery requires passing gates and an accepted review.",
       "positive": "Recheck changed dependency",
       "negative": "Accept stale image"
     },
     {
-      "id": "copy-count",
-      "owner": "../tools/powerpoint/acceptance.md",
-      "severity": "advisory",
-      "rationale": "Count visible copy; enforce only explicit limits.",
-      "positive": "Rich readable pre-read",
-      "negative": "Count speaker notes"
-    },
-    {
-      "id": "ownership",
-      "owner": "../tools/production.md",
-      "severity": "material",
-      "rationale": "Canonical spec, editable runtime and exact receipt.",
-      "positive": "One source specification",
-      "negative": "Parallel raw builder"
-    },
-    {
       "id": "annotations",
-      "owner": "../components/chart-callouts.md",
+      "owner": "../components.md",
       "severity": "advisory",
-      "rationale": "Annotate only when it clarifies the relationship.",
+      "rationale": "Annotate when it clarifies the relationship.",
       "positive": "Directly labelled change",
       "negative": "Redundant arrow"
-    },
-    {
-      "id": "learning",
-      "owner": "production-benchmark.md",
-      "severity": "advisory",
-      "rationale": "Human labels and held-out decks substantiate improvement.",
-      "positive": "Blind comparison",
-      "negative": "Synthetic fixture claimed as human preference"
     }
   ],
-  "execution": {
-    "reviewPasses": 2,
-    "batchSize": 4,
-    "concurrency": 2,
-    "timeoutMs": 180000
-  },
   "materialCodes": [
     "FACTUAL_ERROR",
     "UNSUPPORTED_CLAIM",

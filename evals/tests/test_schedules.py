@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class ScheduleTests(unittest.TestCase):
@@ -15,7 +15,7 @@ const frame={x:60,y:120,width:1160,height:570};
 withDesignTokens(resolveDensityTokens(TOKENS,'live-pitch'),()=>{
 const result=datedLanes({id:'schedule',frame,props}),nodes=result.nodes;
 const date=nodes.find(n=>n.id==='schedule:terminal-date'),body=nodes.find(n=>n.id==='schedule:terminal-text'),marker=nodes.find(n=>n.id==='schedule:terminal');
-assert.equal(date.style.fontSize.tokenId,'type.body');assert.equal(date.style.fontSize.value,16.1);
+assert.equal(date.style.fontSize.tokenId,'type.body');assert.equal(date.style.fontSize.value,14);
 assert.equal(date.text,props.axis.domain[1]);assert.equal(date.style.align,'right');assert.equal(body.style.align,'right');
 const source=datedLanes({id:'schedule',frame,props:{...props,dateTreatment:'source'}});
 assert.ok(result.height>source.height);

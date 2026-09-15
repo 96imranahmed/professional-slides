@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
-import {configureRuntime} from "../../skills/professional-slides/runtime/environment.mjs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
 const root = process.cwd();
-const {RUNTIME_NODE:runtimeNode,RUNTIME_PYTHON:runtimePython}=configureRuntime();
+const runtimeNode = process.env.RUNTIME_NODE || process.execPath, runtimePython = process.env.RUNTIME_PYTHON || "python3";
 const sourceRoots = ["skills/professional-slides/runtime", "evals/scripts"];
 
 async function walk(directory) {

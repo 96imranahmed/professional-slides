@@ -145,5 +145,5 @@ export async function auditObservedOverlaps(page, deck, observed) {
     audits.push(await auditSlideOverlaps(page, { ...slide, nodes }));
   }
   const result = summarizeOverlapAudits(audits);
-  return { ...result, accepted: result.accepted && !textMismatches.length, source: "artifact-tool-imported-pptx-geometry", textMismatches };
+  return { ...result, accepted: result.accepted && !textMismatches.length, source: "imported-pptx-geometry", textMismatches };
 }
