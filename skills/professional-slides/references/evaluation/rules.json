@@ -1,0 +1,111 @@
+{
+  "schema": "professional-slides.rules/v1",
+  "version": 2,
+  "rules": [
+    {
+      "id": "contribution",
+      "owner": "../components/copy.md",
+      "severity": "advisory",
+      "rationale": "Evidence, explanation, qualification and synthesis can justify content.",
+      "positive": "Supported chart interpretation",
+      "negative": "Redundant transcription"
+    },
+    {
+      "id": "facts",
+      "owner": "../components/copy.md",
+      "severity": "material",
+      "rationale": "Claims require supplied evidence and accurate scope.",
+      "positive": "Comparable dated measures",
+      "negative": "Unsupported causal claim"
+    },
+    {
+      "id": "density",
+      "owner": "../composition/recipes.md",
+      "severity": "material",
+      "rationale": "Missing argument must identify absent reasoning; empty pixels alone are advisory.",
+      "positive": "Comparison plus conditions",
+      "negative": "Price-only claim of superior value"
+    },
+    {
+      "id": "readability",
+      "owner": "../design/slide-layouts.md",
+      "severity": "material",
+      "rationale": "Measured fit and readable type are required.",
+      "positive": "Content-sized explanation",
+      "negative": "Clipped axis label"
+    },
+    {
+      "id": "review",
+      "owner": "../tools/production.md",
+      "severity": "material",
+      "rationale": "Complete current coverage; scoped reuse and bounded repair.",
+      "positive": "Recheck changed dependency",
+      "negative": "Accept stale image"
+    },
+    {
+      "id": "copy-count",
+      "owner": "../tools/powerpoint/acceptance.md",
+      "severity": "advisory",
+      "rationale": "Count visible copy; enforce only explicit limits.",
+      "positive": "Rich readable pre-read",
+      "negative": "Count speaker notes"
+    },
+    {
+      "id": "ownership",
+      "owner": "../tools/production.md",
+      "severity": "material",
+      "rationale": "Canonical spec, editable runtime and exact receipt.",
+      "positive": "One source specification",
+      "negative": "Parallel raw builder"
+    },
+    {
+      "id": "annotations",
+      "owner": "../components/chart-callouts.md",
+      "severity": "advisory",
+      "rationale": "Annotate only when it clarifies the relationship.",
+      "positive": "Directly labelled change",
+      "negative": "Redundant arrow"
+    },
+    {
+      "id": "learning",
+      "owner": "production-benchmark.md",
+      "severity": "advisory",
+      "rationale": "Human labels and held-out decks substantiate improvement.",
+      "positive": "Blind comparison",
+      "negative": "Synthetic fixture claimed as human preference"
+    }
+  ],
+  "execution": {
+    "reviewPasses": 2,
+    "batchSize": 4,
+    "concurrency": 2,
+    "timeoutMs": 180000
+  },
+  "materialCodes": [
+    "FACTUAL_ERROR",
+    "UNSUPPORTED_CLAIM",
+    "MISLEADING_COMPARISON",
+    "MISSING_EVIDENCE",
+    "MISSING_ARGUMENT",
+    "UNREADABLE",
+    "OVERFLOW",
+    "BROKEN_GEOMETRY",
+    "PROVENANCE",
+    "BROKEN_DEPENDENCY"
+  ],
+  "reviewer": {
+    "models": [
+      "gpt-6-astra",
+      "gpt-5.6-luna",
+      "gpt-5.6-terra"
+    ],
+    "defaultModel": "gpt-5.6-terra",
+    "reasoningEfforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh"
+    ],
+    "defaultReasoningEffort": "high"
+  }
+}
