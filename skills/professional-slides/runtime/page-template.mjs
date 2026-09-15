@@ -7,8 +7,9 @@ export const PAGE_TEMPLATE_TOKENS = ["font.body", "type.source", "color.textSeco
 
 export function resolvePageTemplate(input = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("pageTemplate must be an object");
-  for (const key of Object.keys(input)) if (!["rules", "branding", "sourcePlacement", "companyName", "logo"].includes(key)) throw new Error(`Unknown pageTemplate setting: ${key}`);
-  const result = { rules: "none", branding: "footer-company", sourcePlacement: "inline", ...input };
+  for (const key of Object.keys(input)) if (!["rules", "branding", "sourcePlacement", "companyName", "logo", "contentSpacing"].includes(key)) throw new Error(`Unknown pageTemplate setting: ${key}`);
+  const result = { rules: "none", branding: "footer-company", sourcePlacement: "inline", contentSpacing: "standard", ...input };
+  if (!["standard", "compact"].includes(result.contentSpacing)) throw new Error("Unknown page-template contentSpacing");
   if (!PAGE_RULES.includes(result.rules)) throw new Error(`Unknown page-template rules: ${result.rules}`);
   if (!PAGE_BRANDING.includes(result.branding)) throw new Error(`Unknown page-template branding: ${result.branding}`);
   if (!["inline", "separate"].includes(result.sourcePlacement)) throw new Error("Unknown page-template sourcePlacement");
@@ -91,5 +92,5 @@ export function renderPageTemplate({ id, frame, props = {} }) {
   if (layout.template.rules !== "none") nodes.push(rule("footer-rule", layout.ruleY));
   if (layout.template.rules === "top-and-bottom") nodes.push(rule("header-rule", frame.y + 28));
   const placements = layout.logoFrame ? [{ node: component({ id: stableId(id, "logo"), component: layout.template.logo.component, props: layout.template.logo.props || {} }), frame: layout.logoFrame }] : [];
-  return { nodes, placements, contentFrame: layout.contentFrame, pageTemplate: layout.template, titleWidth: layout.titleWidth };
+  return { nodes, placements, logoFrame: layout.logoFrame, contentFrame: layout.contentFrame, pageTemplate: layout.template, titleWidth: layout.titleWidth };
 }

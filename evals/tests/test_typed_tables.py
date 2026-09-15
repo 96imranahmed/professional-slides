@@ -3,6 +3,75 @@ from test_source_structure import run_node
 
 
 class TypedTableTests(unittest.TestCase):
+    def test_category_hierarchy_and_equal_height_logo_column(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
+import {TABLE_VARIANTS} from './skills/professional-slides/runtime/table-fixtures.mjs';
+const props=TABLE_VARIANTS['category-logo-comparison'].props;
+const frame={x:60,y:60,width:1160,height:580};
+const nodes=renderTable({id:'logos',frame,props}).nodes;
+const logos=nodes.filter(n=>n.role==='table-logo');
+assert.equal(logos.length,2);
+assert.equal(logos[0].frame.height,logos[1].frame.height);
+assert.notEqual(logos[0].frame.width,logos[1].frame.width);
+for(const n of logos) assert.ok(Math.abs(n.frame.width/n.frame.height-n.data.width/n.data.height)<1e-3);
+const surfaces=nodes.filter(n=>n.role==='table-cell');
+assert.ok(surfaces.some(n=>n.data.cellType==='category'&&n.style.fill.tokenId==='color.componentPrimary'));
+assert.ok(!nodes.some(n=>n.role==='table-header-cell'&&n.type==='rect'));
+assert.throws(()=>renderTable({id:'too-wide',frame,props:{...props,columns:props.columns.map((c,i)=>i===1?{...c,label:'ID'}:c),columnWidths:[.4,.05,.55]}}),/Logo column|narrow|does not fit/);
+assert.throws(()=>renderTable({id:'no-category',frame,props:{...props,columns:props.columns.map(c=>({...c,type:'text'})),rows:[['A','B','C']]}}),/Category hierarchy/);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result['accepted'])
+
+    def test_signed_bars_share_origin_and_tight_spacing_preserves_body_type(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {renderTable,measureTable} from './skills/professional-slides/runtime/tables.mjs';
+const props={rowSpacing:'tight',columns:[{label:'Region',type:'text',width:.4},{label:'Net employment, %',type:'bars',scale:'net',width:.6}],scales:{net:{type:'bars',label:'Net employment',unit:'%',min:-20,max:20,series:['Net'],legend:false}},rows:Array.from({length:17},(_,i)=>[`Region ${i+1}`,{values:[i-8]}])};
+const frame={x:60,y:60,width:1160,height:580};
+const tight=measureTable({frame,props});
+assert.ok(tight.height<580);
+assert.throws(()=>measureTable({frame,props:{...props,rowSpacing:'normal'}}),/content needs/);
+const nodes=renderTable({id:'net',frame,props}).nodes;
+assert.ok(nodes.filter(n=>n.role==='table-cell-text').every(n=>n.style.fontSize.tokenId==='type.body'));
+const bars=nodes.filter(n=>n.role==='table-bar'),axes=nodes.filter(n=>n.role==='table-bar-axis');
+assert.equal(bars.length,16);assert.equal(axes.length,17);
+assert.ok(bars.every(n=>n.data.zeroX===bars[0].data.zeroX));
+for(const bar of bars){assert.ok(Math.abs(bar.frame.width/Math.abs(bar.data.value)-bars[0].frame.width/8)<.001);assert.deepEqual(bar.data.domain,[-20,20]);if(bar.data.value<0)assert.ok(Math.abs(bar.frame.x+bar.frame.width-bar.data.zeroX)<.001);else assert.equal(bar.frame.x,bar.data.zeroX);}
+const labels=nodes.filter(n=>n.role==='table-cell-text'&&n.data.cellType==='bars');
+assert.ok(labels.some(n=>n.text==='0'));assert.ok(labels.some(n=>n.text==='-8'));
+assert.ok(!nodes.some(n=>n.role==='table-legend'));
+const formatted=renderTable({id:'formatted',frame,props:{...props,scales:{net:{...props.scales.net,valueFormat:{decimals:1,sign:'always',suffix:'%'}}}}}).nodes;
+const copy=formatted.filter(n=>n.role==='table-cell-text'&&n.data.cellType==='bars').map(n=>n.text);
+assert.ok(copy.includes('+8.0%'));assert.ok(copy.includes('-8.0%'));assert.ok(copy.includes('0.0%'));
+assert.deepEqual(formatted.filter(n=>n.role==='table-bar').map(n=>n.data.value),bars.map(n=>n.data.value));
+assert.throws(()=>renderTable({id:'bad',frame,props:{...props,scales:{net:{...props.scales.net,valueFormat:{sign:'approximate'}}}}}),/sign must/);
+
+for(const bounds of [{min:1,max:20},{min:-20,max:-1},{min:0,max:0}])assert.throws(()=>renderTable({id:'bad',frame,props:{...props,scales:{net:{...props.scales.net,...bounds}}}}),/containing zero/);
+assert.throws(()=>renderTable({id:'bad',frame,props:{...props,columns:[props.columns[0],{...props.columns[1],label:'Net'}]}}),/unit visible/);
+assert.throws(()=>measureTable({frame,props:{...props,rowSpacing:'tiny'}}),/rowSpacing/);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+    def test_shared_bar_scale_keeps_physical_units_across_unequal_columns(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
+const props={columns:[{label:'Lost, jobs',type:'bars',scale:'jobs',width:.45},{label:'Gained, jobs',type:'bars',scale:'jobs',width:.55}],scales:{jobs:{type:'bars',label:'Employment',unit:'jobs',min:0,max:200000,series:['Jobs'],legend:false}},rows:[[{values:[7]},{values:[200000]}],[{values:[100]},{values:[100]}]]};
+const nodes=renderTable({id:'shared',frame:{x:0,y:0,width:1160,height:580},props}).nodes;
+const bars=nodes.filter(n=>n.role==='table-bar');
+const equal=bars.filter(n=>n.data.value===100);
+assert.equal(equal.length,2);
+assert.ok(Math.abs(equal[0].frame.width-equal[1].frame.width)<.001);
+const full=bars.find(n=>n.data.value===200000);
+assert.ok(bars.every(n=>Math.abs(n.frame.width-full.frame.width*n.data.value/200000)<.001));
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
     def test_plain_case_markers_are_attached_and_numeric_rows_align(self):
         result = run_node('''
 import assert from 'node:assert/strict';
@@ -137,7 +206,8 @@ for(const variant of ['bar-columns','heatmap-1-10','grouped-hypotheses','numbere
   assert.equal(swatches.length,10);assert.equal(new Set(swatches.map(n=>n.style.fill.value)).size,10);
   props.rows[0][1].value=11;assert.throws(()=>renderTable({id:'bad',frame,props}),/outside/);
  }else if(variant==='grouped-hypotheses'){
-  assert.ok(nodes.some(n=>n.role==='table-binary-mark'));assert.ok(nodes.some(n=>n.type==='wedge'));
+  const marks=nodes.filter(n=>n.role==='table-binary-mark');assert.ok(marks.length);assert.ok(marks.every(n=>n.style.lineWidth.tokenId==='line.standard'));assert.ok(nodes.some(n=>n.type==='wedge'));
+  const rule=nodes.find(n=>n.role==='table-rule');assert.ok(marks.every(n=>n.style.lineWidth.value>rule.style.lineWidth.value));
   delete props.scales.confirmation.test;assert.throws(()=>renderTable({id:'bad',frame,props}),/confirmation test/);
  }else if(variant==='numbered-sections'){
   const markers=nodes.filter(n=>n.role==='table-section-marker'),numbers=nodes.filter(n=>n.role==='table-section-number');
@@ -201,7 +271,7 @@ const compact=renderTable({id:'compact',frame,props:structuredClone(TABLE_VARIAN
 const labelled=renderTable({id:'labelled',frame,props:structuredClone(TABLE_VARIANTS['grouped-hypotheses-labelled'].props)}).nodes;
 assert.equal(TOKENS['icon.small'].value,16);assert.equal(TOKENS['icon.small'].cssVar,'--icon-sm');
 const compactMarks=compact.filter(n=>n.role==='table-binary-mark');
-assert.ok(compactMarks.length>0);assert.ok(compactMarks.every(n=>n.style.lineWidth.tokenId==='line.hairline'));
+assert.ok(compactMarks.length>0);assert.ok(compactMarks.every(n=>n.style.lineWidth.tokenId==='line.standard'));
 const groups=new Map();for(const mark of compactMarks){const key=`${mark.data.row}:${mark.data.column}`;groups.set(key,[...(groups.get(key)??[]),mark]);}
 for(const group of groups.values()){
  const xs=group.flatMap(n=>[n.data.x1,n.data.x2]),ys=group.flatMap(n=>[n.data.y1,n.data.y2]);

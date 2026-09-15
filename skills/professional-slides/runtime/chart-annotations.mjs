@@ -10,7 +10,7 @@ import {
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 
-export const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction"]);
+export const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label"]);
 export const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot"]);
 // Keep a full label-height gap between the observation box and the plot. The
 // chart reserves this band before calculating marks, so value labels remain
@@ -18,6 +18,8 @@ export const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogo
 export const EVIDENCE_CALLOUT_BAND = 88;
 export const CHANGE_ANNOTATION_BAND = 84;
 export const ANNOTATION_RAIL_BAND = 52;
+const annotationRailLineHeight = () => measureText("0",1000,{fontSize:tokenValue(token("type.chartAnnotation"))}).height;
+const annotationRailBand = () => Math.max(ANNOTATION_RAIL_BAND,annotationRailLineHeight()+tokenValue(token("space.4"))*2);
 
 const PRIMARY = token("color.componentPrimary");
 const PRIMARY_TINT = token("color.componentPrimaryTint");
@@ -35,7 +37,7 @@ const EVIDENCE_BOX_HEIGHT = 56;
 const ORTHOGONAL_GAP = 28;
 const ENDPOINT_DIAMETER = 8;
 const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label"]);
-const SCALAR_BUBBLE = /^(?:[+−\-£$€¥]{0,2}\s*\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|pp|bps|x|×|bn|mn|[kKmMbBtT])?|N\/A)$/;
+const SCALAR_BUBBLE = /^(?:[~≈]?\s*[+−\-£$€¥]{0,2}\s*\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|pp|bps|x|×|bn|mn|[kKmMbBtT])?|N\/A)$/;
 
 function textStyle(size, color, bold = false, align = "center") {
   return {
@@ -322,9 +324,14 @@ export function normalizeChangeAnnotations(props = {}) {
     if (!annotation || typeof annotation.text !== "string" || !annotation.text.trim()) {
       throw new Error(`Chart change annotation ${index + 1} needs concise text`);
     }
-    if (!SCALAR_BUBBLE.test(annotation.text.trim()) || annotation.text.trim() === "N/A") throw new Error("Chart change bubbles require one numeric value; put the measure and period outside the bubble");
     const style = annotation.style || "arrow";
     if (!CHANGE_ANNOTATION_STYLES.includes(style)) throw new Error(`Unknown chart change annotation style: ${style}`);
+    if (style === "interval-label") {
+      if (!["exact-source", "approximate-source-readings"].includes(annotation.basis)) throw new Error("Qualitative interval needs an explicit exact-source or approximate-source-readings basis");
+      if (typeof annotation.qualification !== "string" || !annotation.qualification.trim()) throw new Error("Qualitative interval needs a qualification");
+      if (annotation.showQualification !== undefined && typeof annotation.showQualification !== "boolean") throw new Error("showQualification must be boolean");
+      if (annotation.basis === "approximate-source-readings" && !/approximate|estimated|rough|~|≈/i.test(annotation.qualification)) throw new Error("Approximate interval qualification must explicitly identify approximate readings");
+    } else if (!SCALAR_BUBBLE.test(annotation.text.trim()) || annotation.text.trim() === "N/A") throw new Error("Chart change bubbles require one numeric value; put the measure and period outside the bubble");
     return {
       ...annotation,
       style,
@@ -369,10 +376,18 @@ export function chartAnnotationBands(props = {}) {
   const changes = normalizeChangeAnnotations(props);
   const rail = normalizeAnnotationRail(props);
   return {
-    top: changes.length ? CHANGE_ANNOTATION_BAND : 0,
-    bottom: rail.rows.length * ANNOTATION_RAIL_BAND,
+    top: changes.length ? Math.max(CHANGE_ANNOTATION_BAND, ...changes.filter(a => a.style === "interval-label").map(a => measureIntervalLabel(a, 260).height + 44)) : 0,
+    bottom: rail.rows.length ? (rail.rows.length-1)*annotationRailBand()+Math.max(30,annotationRailLineHeight()+6) : 0,
     left: Math.max(0, ...rail.rows.map(row => row.labelWidth ? row.labelWidth + 12 : 0))
   };
+}
+
+function measureIntervalLabel(annotation, width) {
+  const measured = measureText(annotation.text.trim() + (annotation.showQualification ? `\n${annotation.qualification.trim()}` : ""), width, {
+    fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(ANNOTATION), wrapWidthRatio: 1
+  });
+  if (measured.lines.length > 3) throw new Error("Qualitative interval label exceeds three measured lines; shorten its text or qualification");
+  return measured;
 }
 
 function resolveAnchor(pointMap, anchor, id) {
@@ -424,7 +439,7 @@ function overlaps(a, b, padding = 6) {
 }
 
 function line(id, index, part, x1, y1, x2, y2, endArrow = false, style = "arrow") {
-  const directional = style === "arrow" || style === "construction";
+  const directional = style === "arrow" || style === "construction" || style === "interval-label";
   return linePrimitive({
     id: stableId(id, "change", index, part),
     role: "annotation-leader",
@@ -475,6 +490,23 @@ export function renderChangeAnnotations({ id, plot, props, pointMap }) {
     const end = resolveAnchor(pointMap, annotation.end, id);
     if (Math.hypot(end.x - start.x, end.y - start.y) < 20) throw new Error(`${id} change annotation endpoints are too close to show clearly`);
 
+    if (annotation.style === "interval-label") {
+      if (Math.abs(end.x - start.x) < 20) throw new Error("Qualitative interval needs distinct horizontal category positions");
+      const width = Math.min(260, plot.width);
+      const measured = measureIntervalLabel(annotation, width);
+      if (measured.height > measureIntervalLabel(annotation, 260).height) throw new Error("Qualitative interval label needs the full measured annotation width");
+      const bracketY = plot.y - evidenceBand - 24;
+      const frame = {x:Math.max(plot.x,Math.min(plot.x+plot.width-width,(start.x+end.x)/2-width/2)),y:bracketY-8-measured.height,width,height:measured.height};
+      const data = {annotationStyle:annotation.style,annotationKey:`${id}:${index}:${annotation.style}`,basis:annotation.basis,qualification:annotation.qualification,start:annotation.start,end:annotation.end};
+      for (const [part,x1,y1,x2,y2,arrow] of [["span",start.x,bracketY,end.x,bracketY,true],["start-drop",start.x,bracketY,start.x,start.y,false],["end-drop",end.x,bracketY,end.x,end.y,false]]) {
+        const primitive = line(id,index,part,x1,y1,x2,y2,arrow,annotation.style);
+        primitive.data = {...primitive.data,...data};
+        nodes.push(primitive);
+      }
+      labels.push({frame,annotation,index,measured,data});
+      return;
+    }
+
     if (annotation.style === "arrow") {
       const dx = end.x - start.x;
       const dy = end.y - start.y;
@@ -511,7 +543,10 @@ export function renderChangeAnnotations({ id, plot, props, pointMap }) {
       if (overlaps(labels[index].frame, labels[peer].frame)) throw new Error("Chart change annotation labels overlap; widen the exhibit or reduce the annotations");
     }
   }
-  labels.forEach(({ frame, annotation, index }) => nodes.push(...labelNodes(id, index, frame, annotation.text, annotation.style)));
+  labels.forEach(({ frame, annotation, index, measured, data }) => {
+    if (annotation.style === "interval-label") nodes.push(textPrimitive({id:stableId(id,"change-label",index),role:"annotation-text",frame,text:measured.text,style:textStyle(ANNOTATION,INK),data:{...data,textLayout:{lines:measured.lines,lineHeight:measured.lineHeight}}}));
+    else nodes.push(...labelNodes(id, index, frame, annotation.text, annotation.style));
+  });
   return nodes;
 }
 
@@ -522,20 +557,21 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
   const nodes = [];
   rail.rows.forEach((row, rowIndex) => {
   const railId = rowIndex ? stableId(id, "rail-row", rowIndex) : id;
-  const y = plot.y + plot.height + 40 + rowIndex * ANNOTATION_RAIL_BAND;
+  const y = plot.y + plot.height + Math.max(40,(plot.categoryLabelHeight ?? 0)+16) + (plot.categoryGroupHeight ?? 0) + rowIndex * annotationRailBand();
   row.items.forEach((item, index) => {
     const category = categoryMap.get(item.category);
     if (!category) throw new Error(`${id} annotation rail references unknown category ${item.category}`);
-    const center = category.x + category.width / 2;
-    const measured = measureText(item.text, Math.max(32, category.width - 20), {
+    const center = category.labelCenter ?? category.x + category.width / 2;
+    const labelSpan=category.labelSpan ?? category.width;
+    const measured = measureText(item.text, Math.max(32, labelSpan - 20), {
       fontFamily: tokenValue(token("font.bodySemibold")),
       fontSize: tokenValue(ANNOTATION),
       bold: true,
       wrapWidthRatio: 1
     });
-    const width = Math.min(category.width - 10, Math.max(52, Math.ceil(measured.width) + 20));
-    if (width < 48 || measured.height > 24) throw new Error(`Annotation rail text for ${item.category} does not fit its category span`);
-    const frame = { x: center - width / 2, y, width, height: 30 };
+    const width = Math.min(labelSpan - 10, Math.max(52, Math.ceil(measured.width) + 20));
+    if (width < 48 || measured.height > annotationRailLineHeight()) throw new Error(`Annotation rail text for ${item.category} does not fit its category span`);
+    const frame = { x: center - width / 2, y, width, height: Math.max(30,measured.height+6) };
     nodes.push(ellipsePrimitive({
       id: stableId(railId, "annotation-rail-surface", index),
       role: "annotation-surface",

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import {configureRuntime} from '../../skills/professional-slides/runtime/environment.mjs';
+configureRuntime({presentation:true});
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

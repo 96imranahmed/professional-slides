@@ -95,3 +95,21 @@ Find boundary data at the jurisdiction's official open-data portal first; use Ce
 In a source checkout, `node evals/scripts/import_geography.mjs config.json output.json` downloads and validates a GeoJSON source. Config supplies `url`, `license`, `id`, `title`, and optional `idProperty`, `nameProperty`, `bounds`. In an installed plugin, call `importGeography(bytes, config)` from `runtime/import-geography.mjs` and keep output in the task directory. The CLI writes exact downloaded bytes to `output.json.source.geojson` beside `output.json`, with exclusive creation to protect existing evidence. When calling the runtime directly, preserve original bytes beside the normalized result so provenance can be verified. Rendering never fetches network data.
 
 Reproject other coordinate systems to WGS84 and split antimeridian-crossing rings before import; the runtime rejects them rather than guessing. Preserve polygon holes and inspect coastline, labels and highlights in both observers. Use equal map scales when comparing physical extent; otherwise label independent crops. This simplified local projection does not support distance or area measurement.
+
+## Quantitative regional maps
+
+Use `choropleth: { values: [{ featureId, value }], scale: { domain: [min, max], unit: "%", palette: "red-white-green", decimals: 1 }, labels: { placement: "external" } }` with sourced custom GeoJSON. Every included feature must have one finite value within the explicit domain; unknown IDs, duplicates and missing values reject. Quantitative fills cannot combine with independent country highlights or markers. Values, units, domain, scale bin and source hashes remain attached to editable polygon nodes.
+
+The shared quantitative legend and geography use the same eleven theme-bound heat-scale bins. Supported palettes are `theme-sequential`, `red-white`, `red-white-green`, and explicitly relative `red-yellow-green`; this is a discretized quantitative scale, not a continuous gradient or source-specific local palette. Domain endpoints and units appear once in a measured native legend. Keep exact numbers in the accompanying chart or necessary labels.
+
+For external feature names, custom GeoJSON properties provide `name` and a WGS84 `labelPoint` inside the intended region. Derive an interior representative point from the sourced polygon rather than guessing a geographic center. `labelText` may add line breaks to the complete name, preserving every non-whitespace character. The owner measures two external lanes, orders labels by anchor height and routes leaders through a common lane boundary to avoid crossovers. All labels and leaders depend on their own land feature. Impossible name, lane or geography capacity rejects rather than reducing typography or dropping regions. Inspect the native render at the complete analytical frame before acceptance.
+
+
+For an explicitly relative low-to-high value comparison, use `scale: { domain: [min, max], unit: "%", palette: "red-yellow-green", semantics: "relative-level" }`. This shared eleven-bin palette uses a yellow midpoint rather than the canvas color; its legend prints Low and High alongside the exact numeric endpoints and unit. Relative level does not assert that red means a negative value or that the midpoint is zero. The red-yellow-green palette requires this explicit semantic declaration. Quantitative map regions use visible `color.rule` boundaries, so even a white-bin region in another scale remains distinguishable against the canvas. All marks retain the scale semantics, feature values, IDs and source provenance.
+
+
+## Spatial decision evidence and identity
+
+Each map states the spatial question it answers. Use sourced locations and boundaries; distinguish actual destinations from illustrative proxies. Pins and straight-line connectors do not establish walking access, school eligibility or travel time. Never invent catchments, routes or commute polygons to make an exhibit more persuasive.
+
+Reuse option IDs, labels and a consistent visual identity across maps, tables and recommendations. Color cannot be the only identity cue. Mark observed geography and assumed scenarios distinctly both visually and verbally. Pair spatial evidence with the compact decision evidence needed to interpret it, not decorative pins.

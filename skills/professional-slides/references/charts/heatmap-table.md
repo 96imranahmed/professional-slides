@@ -32,7 +32,7 @@ Default to a filled category first column when row labels organize the adjacent 
 | `binary` | Compact binary state using the registered [comparison-indicator](../components/comparison-indicators.md) contract |
 | `harvey` | Ordinal disc using the registered [comparison-indicator](../components/comparison-indicators.md) contract |
 | `heatmap` | Bounded score using the registered [comparison-indicator](../components/comparison-indicators.md) contract |
-| `bars` | One or more labelled bars with one zero-based scale shared across rows |
+| `bars` | One or more labelled bars with one declared scale containing zero, shared across rows; negative and positive values extend from the same physical zero baseline |
 | `implication` | With `relation: implies`, connect the preceding fact/condition to the following consequence in each row; use ordinary columns for non-causal comparisons |
 
 Treat an implication column as clear connector space: omit its header rule and every row separator beneath the arrow, while the adjacent evidence and consequence columns retain their normal rules.
@@ -48,6 +48,10 @@ Circular and oval numbers are presentation treatments, not rating scales. Keep t
 A category may set `sectionNumber` to a unique positive integer for referenceable cases, numbered findings or discussion sections. On a filled category block, render the number in a compact circular marker centered on its top edge, with half protruding into reserved whitespace. On a plain category cell, place the marker inline beside the label, reserve its width before measuring text, and align its centre with the label. A floating edge marker needs a visible block to anchor it. Reserve clearance both above the group and inside the category so the inward half cannot cover its label, including short and spanning cells. Single-row labels and their numeric peers share the same vertical content centre; marker clearance must not push only the label below its values. Do not pin it to the top-left corner or let it collide with the preceding group. The marker's job is referenceability, not decoration; obvious reading order does not remove the need to identify cases that will be discussed individually.
 
 Use one body density for the table: `body` by default or the registered `compact` role for a consistently dense table family. Headers retain the shared header role.
+
+For many short rows, use `rowSpacing: tight` to reduce vertical padding while keeping the chosen body role and horizontal label space. This is a whole-table spacing decision, independent of `density`; it must not shrink any text. Measure the complete table including headers and legends before splitting a joint comparison. Tight spacing is unsuitable when long wrapped prose needs a more generous rhythm.
+
+In-cell bars use a shared finite `min`/`max` domain containing zero. Signed values extend left or right from a visible common zero baseline, and their exact signed labels stay aligned in a separate value column. Preserve consistent scales down each bar column. Different measures may use separate declared scales, with units visible at their headers. A single-series bar scale may set `legend: false` only when every using column header contains its unit and the header identifies the measure. Multi-series, binary, rating and heatmap legends remain required. Do not repeat a separate full-width legend for each self-explanatory single-series quantitative column.
 
 ## Case identifiers and logical order
 
@@ -119,6 +123,21 @@ Check every requested column and row, including span continuations and explicit 
 
 ## Dimension-led and full-field comparisons
 
-Use table `treatment: dimensions` (registered `dimension-headers` variant) when rows are items compared across distinct dimensions. Fill the dimension headers across the top and leave the item/category header and cells plain. An explicitly declared category-cell surface remains an intentional emphasis. Declare `comparisonAxis: columns`. Conversely, when NYC/SF, products or scenarios are across the top and criteria are in the first column, declare `comparisonAxis: rows`, make the first column `type: category`, and use the open header treatment. Highlight the dimension axis, not the comparison-item axis. The runtime rejects a filled item header for declared row dimensions.
+Apply **Categories > Dimensions > Items**. When genuine category groups organize the rows, use `treatment: categories`: highlight the left category cells, including row spans, and keep dimension headers quiet. This hierarchy takes precedence over the dimension-axis fill. When no higher category grouping exists, use table `treatment: dimensions` (registered `dimension-headers` variant) when rows are items compared across distinct dimensions. Fill the dimension headers across the top and leave the item/category header and cells plain. An explicitly declared category-cell surface remains an intentional emphasis. Declare `comparisonAxis: columns`. Conversely, when NYC/SF, products or scenarios are across the top and criteria are in the first column, declare `comparisonAxis: rows`, make the first column `type: category`, and use the open header treatment. Highlight the dimension axis, not the comparison-item axis. The runtime rejects a filled item header for declared row dimensions.
 
 A table may occupy the full evidence field. Combine typed number, bar, Harvey-ball, binary and rationale columns when each answers a different part of the same comparison. Define units, scales and rating anchors; never substitute a Harvey ball for an exact value the decision needs. A total row must aggregate compatible quantities. Preserve a recurring schema across comparable slides instead of varying table treatments for decoration.
+
+A table or qualitative matrix may itself perform the synthesis job when its comparison and evidence support the governing answer. Do not add prose branches or a close box solely to make it look like an executive summary. Preserve category, dimension and item distinctions even without colour; retain exact values, ordinal anchors and material qualifications beside the fields they decode. A qualitative stage label does not authorize a numerical score or interval scale.
+
+Columns using one bar scale share the same physical plot length per unit, including when their overall column widths differ. Reserve a common measured plot width and let label gutters absorb the remaining width; independently sizing each column by its own longest value can distort the comparison.
+
+Bar scales accept the shared chart `valueFormat` (`decimals`, `prefix`, `suffix`, `compactUnit`, and `sign: auto | always`). Formatting changes measured labels only; marks retain the raw values. `always` adds a plus sign to positive displayed numbers and leaves zero unsigned. Declare precision for source totals such as `1.0`; do not encode an alternative value in display text.
+
+### Logo columns
+
+Use typed `logo` cells with a sourced `media` record for item identity. Every peer logo renders at the same measured body-line height; widths vary with intrinsic proportions. Align logos consistently in the column and preserve their full marks. Widen the column if its widest logo cannot fit at the common height; do not individually shrink wide logos. Keep category emphasis on the category axis.
+
+
+## Analytical table structure
+
+Group rows by substantive category, align comparable values and expose the decisive difference through meaningful order, comparison columns or selective emphasis. Distinguish unavailable/not assessed from zero or poor performance. Do not repeat every table cell in supporting prose. Apply the same definitions and units across comparable options; retain material mismatches visibly rather than hiding them behind a score.

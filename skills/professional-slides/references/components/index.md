@@ -7,6 +7,7 @@ Components are reusable slide elements. Use them only when they perform a clear 
 - [Copy](copy.md): titles, labels, body text, and copy QA.
 - [Text boxes](text-box.md): text-container geometry and overflow.
 - [Insight boxes](insight-box.md): reusable slide-level insights, implications, recommendations, decisions, and actions.
+- [Relationship networks](relationship-network.md): exact reciprocal or directed coordination among a center and surrounding participants.
 - [Quote clusters](quote-cluster.md): one to five sourced statements in full-field or sectional placements.
 - [Trackers](trackers/index.md): navigation.
 - [Guidelines](guidelines.md): rules, borders, and section treatments.
@@ -79,6 +80,8 @@ Apply the canonical [rhetorical-role label rule](copy.md#labels) to every callou
 ## Sources and footers
 
 Page furniture belongs to the deck's page template, implemented by [`page-template.mjs`](../../runtime/page-template.mjs) and consumed by slide chrome and the content planner. Default to no header or footer rule. The `bottom` variant adds a rule above the footer; `top-and-bottom` also adds a top-page rule. These choices are independent of title and chart-heading underlines.
+
+Dense evidence families may select `pageTemplate.contentSpacing: "compact"`: slide chrome reserves `space.5` below the measured title (and branding), instead of the standard body anchor and title gap. Keep this choice coherent within a page family; it recovers whitespace without reducing type or source margins. Default `standard` retains existing geometry.
 
 `page-template` renders furniture only. `slide-chrome` composes it with the shared action title; it does not define another furniture style.
 

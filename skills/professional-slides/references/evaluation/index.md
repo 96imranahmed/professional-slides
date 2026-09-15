@@ -2,11 +2,26 @@
 
 Use this guide to decide whether a deck is ready. Keep generated decks, renders, plans, and review reports in one task-owned `output/` directory outside the installed plugin, never in committed source.
 
-For an evaluation, create a fresh output subdirectory and preserve the inputs and review evidence there. Keep control and treatment independent.
+For a new evaluation attempt, create a task-owned output subdirectory and preserve its inputs and review evidence. Reuse unchanged, hash-bound source extracts rather than duplicating source acquisition. Keep control and treatment independent when the task includes a controlled comparison.
+
+## Choose the evaluation mode
+
+Declare what is being evaluated before selecting commands. These modes separate evidence gathering from artifact acceptance; they do not create alternate release gates.
+
+| Mode | Evidence and appropriate checks |
+| --- | --- |
+| Original-document analysis | Review the authorized source scope using exact files, cached text/OCR, title-sequence context and necessary original-page checks. Record every document's disposition and access limits under [source evidence](../storylining/source-evidence.md). No recreation, per-source-slide model calls or full golden run is required. |
+| Guidance or contract change | Batch related changes, check consistency across canonical references and evaluator instructions, and run focused schema/semantic cases appropriate to the change. Source examples inform the cases; rebuilding the source corpus is not a validation requirement. |
+| Runtime or export change | Reproduce the affected behavior with complete representative inputs, then apply the component-runtime and exact-artifact gates below. A demonstrated capability gap, not a pattern name, justifies a new primitive. |
+| Generated-deck delivery or reference comparison | Review the exact final editable artifact and required rendered coverage. A source-only analysis or accepted contract does not substitute for these gates. |
+
+Preserve the user's requested scope. An executive-summary review uses the title spine and neighboring pages to establish context; it is not an exhaustive slide audit. Report available, reviewed and uncertain documents separately from inaccessible listings. Missing access prevents claims about those originals, not useful analysis of the verified subset.
 
 ## Per-deck self-review
 
-For skill-development tests, independently review the story before judging rendering. `evals/scripts/validate_story_plan.py` takes the original brief, proposed plan, and all supporting evidence/assumption ledgers via `--support`. It requires at least 90 in each of six story dimensions and no major or blocker finding. Preserve exact input hashes and adjudicate findings against the complete packet; a missing judge input is a harness defect, not an author failure.
+Production acceptance follows the [severity and repair policy](../tools/production.md). Scores are diagnostics; material defects and complete evidence coverage determine acceptance. Developer certification and corpus research remain separate from ordinary generation.
+
+Honor explicit reviewer settings through the [production workflow](../tools/production.md). Legacy visual and consistency commands remain optional diagnostics; their model-diversity options do not add production gates.
 
 Test reusable changes with fresh-context authors on materially different communication jobs. Give them only the brief, raw evidence, and frozen skill, not earlier answers or reviewer repairs. Keep the first candidate and all review results; distinguish first-pass acceptance from later repaired delivery. Passing a small holdout set supports those tested cases, not a universal quality claim.
 
@@ -18,20 +33,19 @@ Review the exact final editable artifact, not only the source code or an interme
 4. Check titles, evidence, sources, and uncertainty.
 5. Check clipping, overlap, broken assets, and unreadable text.
 6. Apply the deletion test.
-7. For PowerPoint, require the four accepted artifacts in [PowerPoint reports](#powerpoint-reports); follow the linked platform owners for commands and repair loops.
 
-Every planned slide maps to exactly one sequenced dot. New decks and structural revisions require a validated pre-authoring contract. Every full deck or recreation must include an executive summary in the approved dot-dash and final artifact. Bounded individual-slide edits preserve their authorized scope.
+Every planned slide maps to exactly one sequenced dot. New decks and structural revisions require a validated [pre-authoring contract](../storylining/pre-authoring-contract.md), including the canonical summary decision and any purpose-specific exception. Bounded individual-slide edits preserve their authorized scope. An original-document analysis records the source's actual synthesis role or absence; it does not impose new pages on the original.
 
-## Hard release gates
+## Review dimensions
 
-Release only when all apply:
+Review these dimensions under the canonical severity policy; the checklist does not introduce additional style blockers.
 
 ### Story
 
 - The deck answers the brief and has one governing thought.
 - The title spine fulfils the [communication job](../storylining/index.md#write-the-title-spine): a clear executive memo for a decision, or a coherent explanatory progression for teaching.
 - Each slide has one narrative job and one dominant exhibit.
-- The mandatory executive summary and dot-dash pass the [standalone argument and evidence test](../storylining/dot-dash.md#standalone-argument-and-evidence-test). The summary preserves the approved governing branches and overall action and passes the [standalone narrative test](../components/copy.md#executive-summary-narrative).
+- The planned synthesis and dot-dash satisfy the canonical summary decision and the [standalone argument and evidence test](../storylining/dot-dash.md#standalone-argument-and-evidence-test) for their declared communication scope. Preserve approved governing branches, qualifications and any supported action using the [copy owner](../components/copy.md#executive-summary-narrative); do not demand an unplanned summary or redundant close from an allowed exception.
 - The close follows from the evidence. Use implication chevrons at only one or two deliberate emphasis points; other supported relationships use clear grouping and reading order. Reject automatic chevrons on every insight.
 - Every decisive case maps to visible proof, including dedicated evidence slides where needed. Reject table-heavy synthesis that lacks the graphs needed to test its numerical claims, and statistics unrelated to the slide’s criterion.
 - Missing data is explicit; a missing-data statement never counts as completed analysis.
@@ -39,7 +53,7 @@ Release only when all apply:
 ### Evidence
 
 - Claims reconcile with their exhibits and sources.
-- Every page passes the [no-recap and new-deduction gate](../components/copy.md#no-recap-and-new-deduction-gate). Graph/table narration in any supporting copy and non-deductive insight boxes are release-blocking defects, not minor copy suggestions. The final review records explicit per-slide copy evidence.
+- Review contribution and analytical completeness. Supported interpretation and synthesis are valid; material unsupported claims block release. Editorial duplication is advisory.
 - Facts, estimates, claims, and inferences are distinguishable.
 - Charts use the correct scale, units, labels, and series. The [meaningful-position gate](../charts/index.md#meaningful-position-gate) is mandatory: inspect source transformations as well as renders and reject arbitrary within-category offsets, jitter, or scatter axes without two meaningful measures. Visual scores cannot override this evidence defect.
 - The final render contains each requested [change, gap, or threshold annotation](../components/chart-callouts.md#authoring-decision), and focal marks pass the [primary/comparator contrast check](../charts/index.md#focus-and-comparator-colours).
@@ -73,34 +87,21 @@ At montage scale, reject an unjustified repeated image-plus-text silhouette, ima
 
 ## PowerPoint validation owner
 
-All PowerPoint contract, semantic, exported-file, per-slide visual, and cross-slide consistency gates are subcommands of `evals/scripts/validate_pptx.py`. The script reads the canonical storylining, composition, design, component, chart, and evaluation owners through its `SKILL_REFERENCE_MAP`; do not create a parallel validator rulebook or another `validate_pptx*.py` entrypoint.
+`runtime/validate_pptx.py` owns deterministic package and provenance checks and optional legacy diagnostics. `evals/scripts/validate_pptx.py` is a compatibility entry point to that implementation. The production review owner is `runtime/review-deck.mjs`; do not add parallel validators.
 
 ## PowerPoint reports
 
-Every final PowerPoint candidate requires four acceptance artifacts bound to the same exact PPTX hash and governing inputs:
-
-- an accepted canonical generation receipt proving that the deck used the shared planner, scene, registry, theme tokens, HTML observer, PptxGenJS adapter, and Artifact Tool observer rather than a parallel builder;
-- an accepted deterministic hard report from [PowerPoint hard acceptance](../tools/powerpoint/acceptance.md);
-- an accepted per-slide visual report from [PowerPoint rendering and QA](../tools/powerpoint/rendering.md#independent-visual-reports);
-- an accepted cross-slide consistency report from the same rendering owner, using a different approved judge model.
-
-Every slide and deck dimension must score at least 90, every comparison group must accept, and no blocker or major finding may remain. The platform owners define commands, inspection scope, and rejection handling; this evaluation owner defines the release requirement.
-
-Run `python evals/scripts/validate_pptx.py provenance <deck.pptx> --receipt <canonical-generation-receipt.json> --generation-script <builder.mjs> --require-planning` for ordinary net-new decks. The gate recomputes the canonical runtime hash, reconciles the scene and design manifest, matches every scene node to the exact native PowerPoint object, binds the authoring script, and rejects direct PptxGenJS calls. Visual similarity cannot substitute for this proof.
+The [production workflow](../tools/production.md) owns the required receipt, package/provenance checks, coordinated review, montage inspection and scoped rerun policy. `runtime/deliver-deck.mjs` runs the automated checks together. Separate visual and consistency reports are optional diagnostics for a named investigation, not additional mandatory review loops.
 
 ## Component-runtime gate
 
-After changing layout, tokens, components, charts, or adapters, run `npm run check` and then the golden runtime gate with the bundled workspace paths. The golden deck places compatible variants of one component on paginated grid boards, keeps dense or full-frame variants isolated, and includes a curated non-duplicative composition set. The exhaustive layout suite remains in regression tests. The report records every default and non-default component instance as an explicit coverage key, independent of slide count, and rejects duplicate visual branches that differ only by a variant name. Release validation uses the canonical McKinsey palette; other supported palette inputs remain fast contract checks rather than duplicate visual decks. The validator renders the HTML observer and exact saved PPTX, imports the PPTX with Artifact Tool, and rejects missing names, theme drift, or visual disagreement. Review both contact sheets and the lowest-scoring individual fixtures before accepting the report.
+After changing runtime layout, tokens, components, charts, or adapters, run `npm run check` and then the golden runtime gate with the bundled workspace paths. The golden deck places compatible variants of one component on paginated grid boards, keeps dense or full-frame variants isolated, and includes a curated non-duplicative composition set. The exhaustive layout suite remains in regression tests. The report records every default and non-default component instance as an explicit coverage key, independent of slide count, and rejects duplicate visual branches that differ only by a variant name. Release validation uses the canonical McKinsey palette; other supported palette inputs remain fast contract checks rather than duplicate visual decks. The validator renders the HTML observer and exact saved PPTX, imports the PPTX with Artifact Tool, and rejects missing names, theme drift, or visual disagreement. Review both contact sheets and the lowest-scoring individual fixtures before accepting the report.
 
 Require the overlap gate in component reports. It checks rendered HTML line boxes and visible SVG geometry, then checks imported PPTX frames, paint order, recovered text, and explicit line counts. Reject text clipping, accidental text/text, text/rule, shape/shape, and connector collisions, and unequal peer heading clearances. A text backing must precede its text in native paint order. The imported-frame check does not replace exact-PPTX image review. Intentional containment and masking must match `runtime/overlap-policy.mjs`; a shared component, chart, or overlay alone never exempts a collision. Keep per-slide coverage and named violations, and test the gate with deliberately broken fixtures.
 
 ## Defects
 
-The authoring term `critical` maps to the reporting severity `blocker`. Critical defects include corrupt or missing artifacts, invented evidence, misleading charts, unreadable renders, wrong platforms, and reference-fidelity breaches.
-
-Major defects include missing required structure, a bypassed pre-authoring gate, wrong navigation, broken assets, unsupported titles, generic copy, repeated decorative components, raw tables, under-resolved exhibits, inconsistent headers, and typography or spacing drift.
-
-Do not average defects away. One critical defect fails the deck. One major defect blocks release. The mean cannot compensate for a weak dimension.
+Use the [canonical severity policy](../tools/production.md#severity-and-completeness) and [rule registry](rules.json). The legacy term `critical` maps to `blocker`. A major or blocker finding must identify a concrete material failure; generic wording, repeated treatments, raw tables or style drift alone remain editorial advice. Scores cannot compensate for a material defect.
 
 ## Skill-effectiveness evaluation
 
@@ -116,6 +117,16 @@ Judge evidence, insight, copy, hierarchy, comparison effort, readable density an
 
 Attribute each deficit to available input, authoring guidance, component capability or export behavior before changing the skill. In a blind forward test, distinguish withheld source facts from author losses, while retaining enough raw evidence to express the relationships being tested. Preserve the first plan and artifact, record every repair, and evaluate generalized changes on a fresh case before claiming first-pass improvement.
 
+### Batch analysis, changes and rendered comparison
+
+For original-only analysis, batch the complete authorized set of document dispositions and source-backed findings before proposing changes. Reuse unchanged extracts and original-page images using the [source evidence cache](../storylining/source-evidence.md#bounded-extraction-fallback). A changed review policy may require reconsidering a disposition; it does not invalidate the unchanged source bytes or require fresh OCR. Do not regenerate the corpus or run one model call per source slide to derive guidance.
+
+For implementation, group related fixes by canonical owner and run appropriate checks once on the coherent batch. Repeat checks when inputs or implementation change, a failure needs resolution, or new evidence raises a concrete concern. Guidance-only changes use their focused contract and consistency checks; runtime changes use the component gate. Record what was checked and what remains outside scope. The rendered-comparison workflow below applies when actual candidate artifacts are part of the task.
+
+Inspect a complete related set of source and candidate slides before starting repairs. Consolidate repeated deficits by canonical owner, retaining the exact page mappings and complete difficult inputs. Update the base guidance and shared components together, and preflight every affected composition with its full copy. Then freeze that source batch, export the affected candidates together, run the complete component gate once, and inspect source/before/after comparisons in one review pass. Avoid one-slide export loops while known related changes remain unimplemented. A failed preflight is useful evidence; fix its shared cause before paying for another full render.
+
+Keep first-attempt artifacts immutable and label source-aware repair batches explicitly. Record which defects the batch was meant to close and evaluate every mapped slide afterward; fixing the motivating screenshot does not close the other mappings. New findings become the next coherent batch. Batch efficiency does not remove exact-artifact rendering or the per-page comparison requirement.
+
 For a release comparison:
 
 1. use the same brief, inputs, runtime, budget, and platform for control and treatment;
@@ -130,6 +141,8 @@ The treatment passes only when it clears the absolute threshold, improves by the
 
 ## Result contract
 
+For original-document analysis, retain the source register, exact reviewed ranges and numbering systems, extraction/cache provenance, per-document dispositions, access limitations and source-backed findings. Do not fill absent artifact paths or acceptance scores with invented values. The result fields below apply to generated self/treatment candidates and controlled comparisons.
+
 Each result records:
 
 - case ID and arm;
@@ -137,9 +150,8 @@ Each result records:
 - pre-authoring review for self and treatment;
 - dimension scores;
 - critical, major, and minor defects;
-- anti-slop review with one audit record per slide;
-- deck-consistency review with material theme-manifest, treatment-ledger, and audit paths, full-deck comparison, palette-role verification, tracker-map verification, repeated-component verification, and zero unresolved findings;
-- the four [PowerPoint acceptance artifacts](#powerpoint-reports) for every self or treatment PPTX, with material paths, the same exact candidate hash, approved distinct judge models for visual and consistency review, iteration counts, and `accepted: true`;
+- coordinated review with complete slide coverage;
+
 - reference comparison when required;
 - fresh-run preparation evidence;
 - reviewer notes.

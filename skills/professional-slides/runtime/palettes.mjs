@@ -39,9 +39,10 @@ export const GOLDEN_PALETTES = Object.freeze(["mckinsey"]);
 
 export function heatScaleTokens(colors) {
   const mix=(a,b,f)=>'#'+[0,1,2].map(i=>Math.round(parseInt(a.slice(1+i*2,3+i*2),16)*(1-f)+parseInt(b.slice(1+i*2,3+i*2),16)*f).toString(16).padStart(2,'0')).join('').toUpperCase();
-  return Object.fromEntries(['theme-sequential','red-white','red-white-green'].flatMap(palette=>Array.from({length:11},(_,i)=>{
+  return Object.fromEntries(['theme-sequential','red-white','red-white-green','red-yellow-green'].flatMap(palette=>Array.from({length:11},(_,i)=>{
     const f=i/10,canvas=colors['color.canvas'],negative=colors['color.negative'],positive=colors['color.positive'];
-    const value=palette==='theme-sequential'?mix(canvas,colors['color.componentPrimary'],f):palette==='red-white'?mix(negative,canvas,f):f<=.5?mix(negative,canvas,f*2):mix(canvas,positive,(f-.5)*2);
+    const midpoint=palette==='red-yellow-green'?'#F4E76E':canvas;
+    const value=palette==='theme-sequential'?mix(canvas,colors['color.componentPrimary'],f):palette==='red-white'?mix(negative,canvas,f):f<=.5?mix(negative,midpoint,f*2):mix(midpoint,positive,(f-.5)*2);
     return [`color.heat.${palette}.${i}`,{kind:'color',cssVar:`--heat-${palette}-${i}`,value,themeSlot:null}];
   })));
 }

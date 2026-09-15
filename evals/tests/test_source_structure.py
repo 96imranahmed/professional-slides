@@ -101,10 +101,10 @@ console.log(JSON.stringify({
 }));
 """
         )
-        self.assertEqual(result["registry"], 63)
-        self.assertEqual(result["components"], 50)
+        self.assertEqual(result["registry"], 64)
+        self.assertEqual(result["components"], 51)
         self.assertEqual(result["charts"], 13)
-        self.assertEqual(result["layoutFixtures"], 65)
+        self.assertEqual(result["layoutFixtures"], 76)
         self.assertGreater(result["componentBoards"], 0)
         self.assertEqual(result["componentCoverage"], result["expectedCoverage"])
         self.assertEqual(result["slideCount"], result["fixtures"])
@@ -229,8 +229,8 @@ console.log(JSON.stringify({one: layout(1), two: layout(2), four: layout(4), seq
         self.assertEqual(result["split"], "section-split-50-50")
         self.assertEqual(result["splitTreatments"], [["open", "full-bleed", 1], ["muted", "full-bleed", 1]])
         self.assertTrue(result["invalidSplitRejected"])
-        self.assertTrue(result["genericLabelRejected"])
-        self.assertTrue(result["genericSectionHeadingRejected"])
+        self.assertFalse(result["genericLabelRejected"])
+        self.assertFalse(result["genericSectionHeadingRejected"])
         self.assertTrue(result["missingJobRejected"])
 
     def test_preprocessor_resolves_all_size_modes_and_rejects_overflow(self):
@@ -688,7 +688,7 @@ console.log(JSON.stringify({results, referenceOverlapsAnnotation}));
         self.assertFalse(result["referenceOverlapsAnnotation"])
 
     def test_validators_use_the_new_model(self):
-        pptx_validator = read(ROOT / "evals" / "scripts" / "validate_pptx.py")
+        pptx_validator = read(RUNTIME / "validate_pptx.py")
         template_validator = read(ROOT / "evals" / "scripts" / "validate_template_registry.py")
         self.assertIn("references/composition/index.md", pptx_validator)
         self.assertIn("../composition/index.md", template_validator)

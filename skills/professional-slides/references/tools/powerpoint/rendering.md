@@ -68,7 +68,7 @@ Use [PowerPoint hard acceptance](acceptance.md) for the validator and repair loo
 
 ## Independent visual reports
 
-When the evaluation owner requires independent PowerPoint reports, use these commands for the exact render set.
+Production uses the [coordinated review](../production.md). The commands below are optional legacy diagnostics for a named visual or consistency investigation; do not run them in addition to production review by default.
 
 ```bash
 python3 evals/scripts/validate_pptx.py visual path/to/candidate.pptx \
@@ -81,7 +81,7 @@ python3 evals/scripts/validate_pptx.py visual path/to/candidate.pptx \
   --report path/to/visual-review.json
 ```
 
-Then run the cross-slide judge with a different approved model:
+For a separate cross-slide diagnostic, a different approved model can be selected:
 
 ```bash
 python3 evals/scripts/validate_pptx.py consistency path/to/candidate.pptx \

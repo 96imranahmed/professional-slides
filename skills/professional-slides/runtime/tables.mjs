@@ -1,3 +1,5 @@
+import { mediaNode } from "./media.mjs";
+import { formatValue } from "./value-format.mjs";
 import {
   token,
   tokenValue,
@@ -16,6 +18,7 @@ import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
 // encoding (e.g. options as columns with prose and rating rows in the same table).
 export const CELL_TYPES = Object.freeze([
   "text",
+  "logo",
   "bullets",
   "category",
   "highlight",
@@ -304,21 +307,22 @@ function scaleFor(cell, props, used) {
       throw new Error("Diverging heatmap requires a named neutral midpoint");
   } else if (cell.type === "bars") {
     if (
+      !Number.isFinite(scale.min) ||
       !Number.isFinite(scale.max) ||
-      scale.max <= 0 ||
-      scale.min !== 0 ||
+      scale.max <= scale.min ||
+      scale.min > 0 || scale.max < 0 ||
       !Array.isArray(scale.series) ||
       !scale.series.length ||
       scale.series.length > 6
     )
       throw new Error(
-        "Bar cells require a shared zero-based positive scale and 1 to 6 named series",
+        "Bar cells require a shared finite domain containing zero and 1 to 6 named series",
       );
     requireText(scale.unit, "bar unit");
     if (
       !Array.isArray(cell.values) ||
       cell.values.length !== scale.series.length ||
-      cell.values.some((n) => !Number.isFinite(n) || n < 0 || n > scale.max)
+      cell.values.some((n) => !Number.isFinite(n) || n < scale.min || n > scale.max)
     )
       throw new Error(
         "Bar values must match the series and remain within the shared domain",
@@ -341,7 +345,7 @@ function heatFill(scale, value) {
 const foreground = (fill) =>
   contrastRatio(tokenValue(fill), v("color.ink")) >= 4.5 ? ink : white;
 const categorySurface = (cell, props) =>
-  cell.surface ?? (props.treatment === "dimensions" ? "plain" : "primary");
+  cell.surface ?? (props.treatment === "dimensions" || props.variant === "plain" ? "plain" : "primary");
 
 function contentLayout(cell, width, props, used) {
   const dense = props.density === "dense",
@@ -354,6 +358,13 @@ function contentLayout(cell, width, props, used) {
   if (inner <= 0) throw new Error("Table cell is too narrow for padding");
   if (["binary", "harvey", "heatmap", "bars"].includes(cell.type))
     cell.scaleRecord = scaleFor(cell, props, used);
+  if (cell.type === "logo") {
+    const height = measure("M", inner, false, bodySize(props)).lineHeight;
+    const media = cell.media;
+    const node = mediaNode({id:"logo-measure", frame:{x:0,y:0,width:inner,height}, props:media, role:"table-logo"});
+    if (node.frame.height < height - 0.01) throw new Error("Logo column must fit every logo at the shared body-height; widen the column");
+    return {height, padding, mediaWidth:node.frame.width};
+  }
   if (cell.type === "implication") {
     if (cell.relation !== "implies")
       throw new Error("Arrow cells require relation: implies");
@@ -364,14 +375,14 @@ function contentLayout(cell, width, props, used) {
     return { height: marker, padding };
   }
   if (cell.type === "bars") {
-    const labels = cell.values.map((n) => String(n));
+    const labels = cell.values.map((n) => formatValue(n, cell.scaleRecord));
     const size = bodySize(props);
     const labelWidth = Math.max(
       ...labels.map((s) => measure(s, inner, true, size).width),
       v("space.6"),
     );
     const rowHeight = Math.max(
-      marker,
+      v("space.4"),
       ...labels.map((s) => measure(s, inner, true, size).height),
     );
     if (inner - labelWidth - gap < v("space.6"))
@@ -477,7 +488,7 @@ function legendText(scale) {
   if (scale.type === "binary")
     return `${scale.label}: ${scale.test}. ${scale.states.yes}; ${scale.states.no}; ${scale.states.missing}.`;
   if (scale.type === "bars")
-    return `${scale.label} (${scale.unit}, common scale 0–${scale.max})`;
+    return `${scale.label} (${scale.unit}, common scale ${scale.min} to ${scale.max})`;
   return `${scale.label}: ${Object.entries(scale.anchors)
     .map(([n, label]) => `${n} = ${label}`)
     .join("; ")}. Missing = Not available; N/A = not applicable.`;
@@ -530,6 +541,11 @@ export function measureTable({ frame, props }) {
       density === "dense" ? "space.1" : compact ? "space.2" : "space.3",
     ),
     gap = v(compact ? "space.1" : "space.2");
+  if (props.rowSpacing !== undefined && !["normal", "tight"].includes(props.rowSpacing))
+    throw new Error("Table rowSpacing must be normal or tight");
+  // Compact line spacing and compact type are separate decisions. A long
+  // list of short records can keep body type while reducing vertical padding.
+  const paddingY = props.rowSpacing === "tight" ? v("space.1") : padding;
   const textSize =
     density === "dense"
       ? "type.label"
@@ -540,7 +556,7 @@ export function measureTable({ frame, props }) {
     c.label ? measure(c.label, widths[i] - 2 * padding, true, textSize) : null,
   );
   const headerHeight = headers.some(Boolean)
-    ? Math.max(...headers.map((h) => h?.height ?? 0)) + 2 * padding
+    ? Math.max(...headers.map((h) => h?.height ?? 0)) + 2 * paddingY
     : 0;
   const layouts = model.cells.map((row) =>
     row.map((cell) =>
@@ -552,30 +568,44 @@ export function measureTable({ frame, props }) {
   // a real gap inside the cell as well as the existing clearance above it.
   model.cells.forEach((row, r) => row.forEach((cell, c) => {
     if (cell?.sectionNumber === undefined || layouts[r][c].inlineSectionMarker) return;
-    const inset = Math.max(padding, sectionMarkerSize / 2 + gap / 2 + gap);
+    const inset = Math.max(paddingY, sectionMarkerSize / 2 + gap / 2 + gap);
     layouts[r][c].topInset = inset;
     // Single-row categories and their peer values share a content baseline.
     if (cell.rowSpan === 1) row.forEach((peer, pc) => {
       if (peer?.rowSpan === 1) layouts[r][pc].topInset = inset;
     });
   }));
-  const cellHeight = layout => layout.height + padding + (layout.topInset ?? padding);
-  // All rows in a bar column must reserve the same label width so their
-  // common numeric domain also has the same physical plot width.
-  model.columns.forEach((_, c) => {
-    const bars = layouts
-      .map((row, r) => (model.cells[r][c]?.type === "bars" ? row[c] : null))
-      .filter(Boolean);
-    if (!bars.length) return;
-    const labelWidth = Math.max(...bars.map((layout) => layout.labelWidth));
-    if (widths[c] - 2 * padding - labelWidth - gap < v("space.6"))
-      throw new Error("Bar column leaves no usable plot width");
-    bars.forEach((layout) => {
-      layout.labelWidth = labelWidth;
-    });
-  });
+  const cellHeight = layout => layout.height + paddingY + (layout.topInset ?? paddingY);
+  // A column shares a plot width across its rows; a scale shared across
+  // columns must also retain the same physical length per unit. Connect both
+  // constraints before reserving label gutters (including unequal columns).
+  const barColumns = model.columns.map((_, c) => ({
+    column: c,
+    entries: layouts.flatMap((row, r) => model.cells[r][c]?.type === "bars"
+      ? [{ layout: row[c], scale: model.cells[r][c].scaleRecord }] : []),
+  })).filter(group => group.entries.length);
+  const pending = new Set(barColumns);
+  while (pending.size) {
+    const group = [pending.values().next().value];
+    pending.delete(group[0]);
+    const scales = new Set(group[0].entries.map(entry => entry.scale));
+    for (let i = 0; i < group.length; i++) {
+      for (const candidate of pending) {
+        if (!candidate.entries.some(entry => scales.has(entry.scale))) continue;
+        pending.delete(candidate);
+        group.push(candidate);
+        candidate.entries.forEach(entry => scales.add(entry.scale));
+      }
+    }
+    const plotWidth = Math.min(...group.flatMap(({ column, entries }) =>
+      entries.map(({ layout }) => widths[column] - 2 * padding - layout.labelWidth - gap)));
+    if (plotWidth < v("space.6")) throw new Error("Bar column leaves no usable plot width");
+    group.forEach(({ column, entries }) => entries.forEach(({ layout }) => {
+      layout.labelWidth = widths[column] - 2 * padding - gap - plotWidth;
+    }));
+  }
   const minimumRowHeight = v(
-    density === "dense"
+    props.rowSpacing === "tight" || density === "dense"
       ? "space.5"
       : density === "compact"
         ? "space.6"
@@ -608,7 +638,13 @@ export function measureTable({ frame, props }) {
       }
     }),
   );
-  const legends = [...used.entries()].map(([id, scale]) =>
+  for (const [id, scale] of used) {
+    if (scale.legend !== false) continue;
+    const columns = model.columns.filter((column, c) => model.cells.some(row => row[c]?.scale === id));
+    if (scale.type !== "bars" || scale.series.length !== 1 || columns.some(column => !column.label.includes(scale.unit)))
+      throw new Error("Only single-series bar legends may be omitted, with their unit visible in every using column header");
+  }
+  const legends = [...used.entries()].filter(([, scale]) => scale.legend !== false).map(([id, scale]) =>
     layoutLegend(id, scale, frame.width, textSize, gap),
   );
   // Reserve visible scale bars/swatches and labels together. Never infer row-local scales.
@@ -636,6 +672,7 @@ export function measureTable({ frame, props }) {
     legends,
     height,
     padding,
+    paddingY,
     gap,
   };
 }
@@ -645,8 +682,9 @@ export function renderTable({ id, frame, props }) {
     if (!["rows", "columns"].includes(props.comparisonAxis)) throw new Error("Table comparisonAxis must be rows or columns");
     if (props.comparisonAxis === "rows" && ["dimensions", "standard"].includes(props.treatment)) throw new Error("Row dimensions require first-column emphasis, not a filled item header");
     if (props.comparisonAxis === "rows" && props.columns?.[0]?.type !== "category") throw new Error("Row dimensions require a category first column");
-    if (props.comparisonAxis === "columns" && props.treatment !== "dimensions") throw new Error("Column dimensions require the dimensions header treatment");
+    if (props.comparisonAxis === "columns" && !["dimensions", "categories"].includes(props.treatment)) throw new Error("Column dimensions require dimensions treatment or a higher category hierarchy");
   }
+  if (props.treatment === "categories" && !props.columns?.some(column => column.type === "category")) throw new Error("Category hierarchy requires category cells");
   const m = measureTable({ frame, props }),
     nodes = [],
     xs = m.widths.map((_, c) => frame.x + sum(m.widths.slice(0, c)));
@@ -669,7 +707,7 @@ export function renderTable({ id, frame, props }) {
       }),
     );
   const header = props.treatment ?? "open";
-  if (!["open", "standard", "dimensions"].includes(header))
+  if (!["open", "standard", "dimensions", "categories"].includes(header))
     throw new Error("Unknown table header treatment");
   m.columns.forEach((column, c) => {
     if (!m.headerHeight) return;
@@ -694,7 +732,7 @@ export function renderTable({ id, frame, props }) {
         "table-header-text",
         {
           x: xs[c] + m.padding,
-          y: frame.y + m.padding,
+          y: frame.y + m.paddingY,
           width: m.widths[c] - 2 * m.padding,
         },
         m.headers[c],
@@ -769,11 +807,15 @@ export function renderTable({ id, frame, props }) {
       const color = fill ? foreground(fill) : ink;
       const inner = {
         x: area.x + m.padding,
-        y: area.y + (l.topInset ?? m.padding),
+        y: area.y + (l.topInset ?? m.paddingY),
         width: area.width - 2 * m.padding,
-        height: height - m.padding - (l.topInset ?? m.padding),
+        height: height - m.paddingY - (l.topInset ?? m.paddingY),
       };
-      if (cell.type === "implication") {
+      if (cell.type === "logo") {
+        const logo = mediaNode({id:stableId(cellId,"logo"),frame:{x:inner.x,y:area.y+(height-l.height)/2,width:inner.width,height:l.height},props:cell.media,role:"table-logo"});
+        logo.data = {...logo.data,...data,sharedHeight:l.height};
+        nodes.push(logo);
+      } else if (cell.type === "implication") {
         // Canonical row implication: an icon-medium primary disc and two
         // editable chevron strokes, with identical geometry in both adapters.
         const diameter = v("icon.medium"),
@@ -820,26 +862,30 @@ export function renderTable({ id, frame, props }) {
         );
       } else if (cell.type === "bars") {
         const plot = inner.width - l.labelWidth - m.gap,
-          scale = cell.scaleRecord;
+          scale = cell.scaleRecord,
+          xScale = value => inner.x + plot * (value - scale.min) / (scale.max - scale.min),
+          zeroX = xScale(0),
+          contentY = inner.y + (inner.height - l.height) / 2;
+        if (scale.min < 0) nodes.push(line(stableId(cellId, "zero"), zeroX, area.y, zeroX, area.y + height, "table-bar-axis", { ...data, domain: [scale.min, scale.max] }));
         cell.values.forEach((value, i) => {
-          const y = inner.y + i * (l.rowHeight + m.gap),
+          const y = contentY + i * (l.rowHeight + m.gap),
             barHeight = v("space.4");
-          if (value > 0)
+          if (value !== 0)
             nodes.push(
               rectPrimitive({
                 id: stableId(cellId, "bar", i),
                 role: "table-bar",
                 frame: {
-                  x: inner.x,
+                  x: Math.min(zeroX, xScale(value)),
                   y: y + (l.rowHeight - barHeight) / 2,
-                  width: (plot * value) / scale.max,
+                  width: Math.abs(xScale(value) - zeroX),
                   height: barHeight,
                 },
                 style: box(barColor(scale, i)),
-                data: { ...data, series: i, value, domain: [0, scale.max] },
+                data: { ...data, series: i, value, zeroX, domain: [scale.min, scale.max] },
               }),
             );
-          const label = measure(String(value), l.labelWidth, true, l.size);
+          const label = measure(formatValue(value, scale), l.labelWidth, true, l.size);
           putText(
             stableId(cellId, "value", i),
             "table-cell-text",
@@ -891,7 +937,7 @@ export function renderTable({ id, frame, props }) {
                 x2,
                 y2,
                 role: "table-binary-mark",
-                style: { stroke: ink, lineWidth: t("line.hairline") },
+                style: { stroke: ink, lineWidth: t("line.standard") },
                 data,
               }),
             ),

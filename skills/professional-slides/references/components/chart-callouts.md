@@ -69,6 +69,10 @@ Change labels use the active theme's component primary and on-primary text; lead
 
 Change bubbles also contain one numeric value, such as `+18%` or `+4.2pp`. Put the metric, basis and period in the exhibit heading or adjacent labels, not inside the bubble. Sentence-length evidence callouts remain a separate treatment.
 
+For a source-supported qualitative transition with no defensible numeric delta, use `changeAnnotations: [{ style: "interval-label", start: "Prior forecast", end: "Base forecast", text: "Forecast reset", basis: "approximate-source-readings", qualification: "Approximate source levels" }]`. The exact keyed endpoints receive a native bracket with a directional span and one plain measured text label, without a numeric bubble or derived delta. `basis` must be `exact-source` or `approximate-source-readings`; qualification is required metadata, and approximate readings must be explicitly identified there. Set `showQualification: true` only when that qualification needs to appear beside the interval; otherwise retain its visible explanation in the exhibit's values or note. Up to three measured lines are supported with reserved space; impossible fit rejects. Endpoints and basis remain attached to all interval nodes for inspection.
+
+Scalar bubbles and annotation rails also accept a single explicit approximation prefix, `~` or `≈`, such as `~50,000` or `≈12.5%`. This preserves supplied precision without admitting prose, ranges, multiple values, or approximate `N/A`.
+
 Typography, contrast, clearance, and fit follow the canonical [direct-label gate](../charts/index.md#direct-label-gate). This owner adds only callout geometry: surfaces, leaders, endpoint binding, and the highlight or change mechanism.
 
 Apply the shared [focus and comparator colours](../charts/index.md#focus-and-comparator-colours) when selecting a category, series, or region highlight.

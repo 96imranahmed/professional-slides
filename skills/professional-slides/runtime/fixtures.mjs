@@ -84,7 +84,7 @@ const VARIANT_BOARD_LAYOUTS = Object.freeze({
   legend: { capacity: 4, columns: 2 },
   "chart-callout": { capacity: 2, columns: 2, fit: "preferred" },
   table: { capacity: 1, columns: 1 },
-  roadmap: { capacity: 2, columns: 2 },
+  roadmap: { capacity: 1, columns: 1 },
   map: { capacity: 4, columns: 2 },
   connector: { capacity: 3, columns: 3 },
   "content-rail": { capacity: 2, columns: 2 },
@@ -382,6 +382,20 @@ export function layoutFixtureSpecs() {
       frame: planned.spec.frame,
       chrome: planned.spec.chrome,
       composition: planned.spec.composition
+    },
+    {
+      id: "fixture-layout-relationship-network",
+      target: "layout.relationship-network",
+      kind: "layout",
+      frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
+      composition: absolute({ id: "network-layout", children: [
+        component({ id: "network-heading", component: "section-heading", frame: { x: 60, y: 90, width: 1160, height: 60 }, props: { heading: "(Insert the coordination relationship)", rule: false } }),
+        component({ id: "network", component: "relationship-network", frame: { x: 60, y: 170, width: 1160, height: 490 }, props: {
+          variant: "hub-ring", centerId: "coordinator", ringOrder: ["a", "b", "c"],
+          nodes: [{ id: "coordinator", label: "(Insert coordinating role)", body: "(Insert its contribution)" }, ...["a", "b", "c"].map(id => ({ id, label: `(Insert participant ${id.toUpperCase()})`, body: "(Insert its distinct contribution)" }))],
+          edges: ["a", "b", "c"].map(id => ({ id: `coordinates-${id}`, from: "coordinator", to: id, direction: "bidirectional", relation: "coordinates-with" }))
+        } })
+      ] })
     },
     {
       id: "fixture-layout-wrapped-titles",

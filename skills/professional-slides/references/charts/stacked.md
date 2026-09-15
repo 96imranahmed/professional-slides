@@ -16,6 +16,14 @@ Use [percentage segments by user group](percentage-segment-by-group.md) for surv
 
 Each stack must reconcile to its total. Every series must contain exactly one finite value per category. Declare absolute versus percentage mode, segment order, treatment of negative values, and the threshold for any grouped `Other` category.
 
+## Total and secondary labels
+
+For nonnegative stacked bars or columns, use `stackTotals: [{category, value}]` to attach an authoritative total to each named stack. Values must reconcile to the plotted components. An independently rounded source total may declare `roundingTolerance` plus a nonempty `roundingReason`; the label preserves the reported value while its attachment remains at the actual component sum. Do not silently recompute an authoritative label. Signed stacks remain supported by the core encoding, but these total attachments reject them until the intended positive, negative or net endpoint is explicit.
+
+Use `secondaryLabels: [{category, series, value, unit, valueFormat}]` for another source measure attached to a segment, or replace `series` with `anchor: "stack-total"` to attach it to a declared total. For example, percentages can retain their independently sourced worker counts. Each secondary value prints with its own unit on the next line; it is not inferred from rounded percentages. Use the shared numeric `valueFormat` instead of arbitrary `formattedValue` copy.
+
+Labels use the shared body role and measured geometry. Total labels reserve space beyond the plot; internal labels must fit their segment. A small column segment may use a short native leader and external label within its category lane; retain the true mark size. A crowded lane or stacked-bar segment rejects rather than shrinking text or discarding a required count. Enlarge or recompose the exhibit before export. Keep total and segment units, source precision and all attachment keys in the dot-dash.
+
 ## Construction
 
 - Use 100% stacking for share and absolute stacking for magnitude.
@@ -80,3 +88,9 @@ Comparing many middle segments, inconsistent series order, irregular time in an 
 ## Acceptance test
 
 Each total or 100% stack reconciles after rounding, explicit bounds contain both stacks and zero, and the composition change supporting the title can be found without consulting a legend repeatedly.
+
+Secondary-unit label text wraps at the measured segment width using the shared label role. If a small segment cannot contain its label vertically, the owner reserves an external column within every category lane and uses a common narrower mark width. Stack heights and values do not change. External labels pack without overlap; unsupported category density rejects. Category labels, grouping brackets and metric rails share the actual stack centers after an external-label gutter changes mark geometry. Rails may use the full category width for readable values, with measured separation from peers. Reserve their measured final row and a trailing theme gap rather than an extra empty row band.
+
+When the chart heading explicitly names a shared secondary unit, use `secondaryLabelStyle: "parenthetical"` with `secondaryUnit` and matching per-record units: `9% (296k)`. This preserves two measures in one attached label without repeating the same unit on every segment. A missing heading decode or inconsistent unit rejects. The default `stacked` treatment retains explicit per-label units.
+
+A column-family chart may declare `categoryGroups: [{id,label,categories}]` to preserve a source grouping such as highest- versus lowest-adoption regions. Each group spans at least two exact, contiguous, ordered categories; groups cannot overlap. The shared owner reserves a measured bracket-and-label band between category labels and any metric rail. The bracket encodes category membership, never change over time.

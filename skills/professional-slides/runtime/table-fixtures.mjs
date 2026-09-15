@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 // Representative contracts, not a taxonomy for selecting business slide layouts.
 const size={width:1160,height:580};
 const bullets=(...items)=>({type:'bullets',items});
@@ -22,10 +23,15 @@ const competitorBars={columns:[text('Competitor',.16,'category'),text('Positioni
  ['Company B',bullets('(Insert positioning point 1)','(Insert positioning point 2)'),{values:[347,55]},'12%','16%'],
  ['Company C',bullets('(Insert positioning point 1)','(Insert positioning point 2)'),{values:[289,45]},'6%','16%']
 ]};
+const logoRecords=JSON.parse(readFileSync(new URL('../assets/simple-icons/treatments.json',import.meta.url),'utf8'));
+const tableLogos=['visa','cisco'].map(name=>{const r=logoRecords.find(r=>r.name===name);return {dataUri:'data:image/png;base64,'+readFileSync(new URL('../assets/simple-icons/'+name+'-grayscale.png',import.meta.url)).toString('base64'),width:r.width,height:r.height,alt:name,authorization:'Simple Icons CC0; editorial identification'};});
 export const TABLE_VARIANTS={
+ 'category-logo-comparison':{preferredSize:size,props:{treatment:'categories',comparisonAxis:'columns',columns:[text('Category',.25,'category'),text('Company',.25,'logo'),text('Role',.5)],rows:[[{text:'Providers',rowSpan:2},{media:tableLogos[0]},'Payment network'],[null,{media:tableLogos[1]},'Networking equipment']] }},
+ 'signed-bar-rows':{preferredSize:size,props:{density:'body',rowSpacing:'tight',columns:[text('Region',.35),{...text('Net change, %',.35,'bars'),scale:'net'},{...text('Employment, thousands',.30,'number'),numberDisplay:'plain'}],scales:{net:{type:'bars',label:'Net change',unit:'%',min:-20,max:20,series:['Net change'],legend:false}},rows:Array.from({length:17},(_,i)=>[`Region ${i+1}`,{values:[i-8]},String(20+i*7)])}},
  'dimension-headers':{preferredSize:size,props:{treatment:'dimensions',columns:[text('Option',.28,'category'),...['Reach','Fit','Readiness'].map(label=>({...text(label,.24,'harvey'),scale:'fit'}))],scales:{fit:rating},rows:[[{text:'Option A',sectionNumber:1},{value:3},{value:2},{value:1}],[{text:'Option B',sectionNumber:2},{value:1},{value:4},{value:3}],[{text:'Option C',sectionNumber:3},{value:2},{value:1},{value:4}]]}},
  standard:{props:{treatment:'standard'}},
  open:{props:{treatment:'open'}},
+ plain:{preferredSize:size,props:{...trends,treatment:'open',variant:'plain'}},
  'plain-rows':{preferredSize:size,props:{...trends,columns:trends.columns.map(c=>({...c,type:'text'})),rowStyle:'plain'}},
  'accented-rows':{preferredSize:size,props:{...trends,columns:trends.columns.map(c=>({...c,type:'text'})),rowStyle:'accented'}},
  'category-bullets':{preferredSize:size,props:trends},

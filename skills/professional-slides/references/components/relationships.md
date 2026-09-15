@@ -17,7 +17,7 @@ Relationship components show order, dependency, hierarchy, progression, position
 | `funnel` | ordered stages, one denominator, proportional widths, values, and optional conversion rates | stage values and displayed conversion rates reconcile; any inflow or non-monotonic stage is explained |
 | [`connector`](arrows.md) | one source ID, target ID, relationship and boundary anchors; the arrow owner defines variants and labels | the route avoids unrelated nodes and text, and direction remains unambiguous without colour |
 
-Choose the component from the relationship the audience must decode. Do not use a process for unordered peers, a roadmap without progression, a tree without parent-child logic, or a funnel when stages do not share a valid population.
+Choose the component from the relationship the audience must decode. Do not use a process for unordered peers, a roadmap without progression, a tree without parent-child logic, or a quantitative funnel when stages do not share a valid population. For qualitative selection states without counts, use the explicit qualitative funnel variant described below.
 
 The runtime `process` and process-style `roadmap` accept stage objects with `label` and optional `period`, `maturity`, and short `detail`. Each supplied field is rendered on its own line and measured at the stage width. Roadmap labels sit inside their stage bands, above the band fill in paint order; empty decorative bands must not cover or detach from the stage copy. A stage that cannot fit its complete text rejects rather than clipping or shrinking it. Use the existing `wave-columns` roadmap for developed activity and deliverable lists. The process-style roadmap uses equal ordinal spacing; its duration labels do not make the bands proportional to elapsed time.
 
@@ -43,7 +43,7 @@ The action title states the governing branch logic and resulting consequence. It
 
 The native implementation lives in [`runtime/insight-tree-table.mjs`](../../runtime/insight-tree-table.mjs). HTML and PowerPoint receive the same editable rectangles, text, orthogonal connector lines, disc chevrons, and terminal arrowheads.
 
-For `roadmap`, use equal-width bands for ordinal or maturity stages; use proportional widths only when elapsed time is the declared encoding, and record the relevant `period` or `maturity` on each stage. For `timeline`, normalize dates to the declared domain before calculating event positions. For `matrix`, supply `xAxis` and `yAxis`, each with `label`, `minLabel`, and `maxLabel`. Coordinates run from 0 to 1, left to right and bottom to top; the rendered labels state both domains and directions. The [map owner](maps.md) defines authorized geographies, crop-relative coordinates, country anchors, and analytical region caveats. For `funnel`, calculate every width from the first stage denominator. Zero values have no bar; a separate label column preserves legibility without inflating narrow stages.
+For `roadmap`, use equal-width bands for ordinal or maturity stages; use proportional widths only when elapsed time is the declared encoding, and record the relevant `period` or `maturity` on each stage. For `timeline`, normalize dates to the declared domain before calculating event positions. For `matrix`, supply `xAxis` and `yAxis`, each with `label`, `minLabel`, and `maxLabel`. Coordinates run from 0 to 1, left to right and bottom to top; the rendered labels state both domains and directions. The [map owner](maps.md) defines authorized geographies, crop-relative coordinates, country anchors, and analytical region caveats. For the default quantitative `funnel`, calculate every width from the first stage denominator. Zero values have no bar; a separate label column preserves legibility without inflating narrow stages.
 
 ## Construction
 
@@ -81,3 +81,11 @@ Keep successive phase bands visually connected, with compact separation at their
 ## Decision conclusions
 
 Select `tree` variant `decision-conclusions` for a two-sided decision with leaf outcomes. Supply `root`, two `branches` with stable `id`, `label` and one to three identified `conclusions: [{id, text}]`, plus one overall `conclusion`. Keep each branch and its leaves in one structural colour family, with labels carrying the meaning in grayscale. Connectors terminate at boxes; the neutral conclusion band spans both families. Single-level decision trees are invalid. The default is `decision-conclusions`, with three visible node layers: root, intermediate decision branches, terminal outcomes. Allocate at least 900 × 440; use another composition when the content does not contain enough meaningful branch logic. Do not use branching to suggest probabilities or causality unsupported by the evidence.
+
+## Shared time domains
+
+For agenda and deliverable grids or governance events on elapsed dates, use the [shared schedule variants](schedules.md) of `timeline`. Preserve the single domain, event precision, lane responsibilities and attached uncertainty.
+
+For phases containing parallel workstreams, shared leadership bands and nested products, use the [phase-workstreams roadmap](phase-workstreams.md). Preserve the parent spans and product/provider relationships rather than flattening them into independent wave cards.
+
+The [qualitative topology variants](qualitative-topology.md) add schematic selection narrowing to `funnel` and equal-width parent phases with a keyed child expansion to `timeline`. They preserve source-authored duration strings and evidence roles without implying counts, retention rates or elapsed-time proportions.

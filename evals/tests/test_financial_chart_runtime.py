@@ -25,6 +25,7 @@ const frame={x:60,y:60,width:1000,height:500};
 const title=REGISTRY.get('chart-title');
 const data={categories:['2024','2025'],series:[{name:'Homicides',values:[382,305]}]};
 const invalid=['NYPD: 382 to 305','SF: 35 to 28','Decline of −20.2%','Revenue $1.2bn','Share 1/3','Rate 35 per 100,000','NYPD: 2025','Revenue in 2025: 305','Revenue, 2025.5','Twenty percent decline','Revenue doubled','SF: ３５ to ２８','Revenue FY14.5','Revenue FY14: 17%'];
+invalid.push('Net employment change to 2030: +16%', 'Reported Gini change versus 2016: one percent', 'Revenue to 2030.5', 'Revenue versus 2016%', 'Disrupted workers within one year: 25%');
 for(const heading of invalid) {
  assert.throws(()=>title.measureContent({frame,props:{heading}}),/must not contain statistics/);
  assert.throws(()=>title.render({id:'title',frame,props:{heading}}),/must not contain statistics/);
@@ -41,6 +42,17 @@ for(const unit of ['%','$B','USD millions, 2026','homicides per 100,000']) {
 }
 for(const unit of ['index, 382 to 305','−20.2%','35 per 100,000']) {
  assert.throws(()=>title.render({id:'title',frame,props:{heading:'Reported homicides',unit}}),/must not contain statistics/);
+}
+for(const heading of ['Net employment change to 2030, midpoint adoption','Reported Gini change versus 2016','Reported Gini change vs. 2016']) {
+ assert.doesNotThrow(()=>title.measureContent({frame,props:{heading}}));
+ assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading}}));
+ assert.doesNotThrow(()=>REGISTRY.get('chart.column').render({id:'chart',frame,props:{...data,heading}}));
+}
+for(const unit of ['Disrupted workers within one year, %','Disrupted workers within 1 year, %']) {
+ assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'Worker disruption',unit}}));
+}
+for(const unit of ['Disrupted workers within one year, 25%','Disrupted workers within one year, one percent']) {
+ assert.throws(()=>title.render({id:'title',frame,props:{heading:'Worker disruption',unit}}),/must not contain statistics/);
 }
 // The action title remains free to state a quantified conclusion.
 assert.doesNotThrow(()=>REGISTRY.get('section-heading').render({id:'section',frame,props:{heading:'Homicides fell 20%'}}));

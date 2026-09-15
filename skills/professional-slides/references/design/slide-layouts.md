@@ -22,6 +22,14 @@ A child is not a miniature slide. Do not give it another action title, footer, p
 
 Action title, source, footer, page number, and navigation are registered components. The standard planner shell allocates these once and passes the remaining body frame to the composition tree. A custom cover or section divider can use an absolute tree, but still consumes the same theme and component registry.
 
+### Synthesis alignment and continuation
+
+Use the [synthesis variation selector](../composition/index.md#synthesis-variation-selector) before styling a summary. In theme/evidence rows, share the label and body track boundaries across the set; each row's height follows its longest measured content. In peer columns, align heading starts and body starts where this helps comparison, allowing unequal content lengths and bottom edges. Do not force equal word counts, bullet counts or empty filler to make peers the same height.
+
+Show parent claims, proof and subordinate options through consistent indentation, spacing and text weight. The hierarchy must remain readable without colour. Keep a qualifier in the same group as the claim or value it limits. Whitespace is normally enough within a branch; use a rule or surface only when a stronger boundary resolves a real grouping ambiguity.
+
+Continued synthesis pages retain the same title role, heading hierarchy and family density. Use a precise continuation title or marker when needed for navigation; do not repeat the previous page's argument as decoration. Structural summary headings and supported answer titles are both valid under the [copy title policy](../components/copy.md#action-titles). Interleaved exhibits may change composition while preserving the sequence's semantic hierarchy.
+
 ## Analytical composites
 
 An analytical page may combine distinct component types when they answer different parts of the same question. Start with the comparisons the reader must make, then choose shared rows, a common time scale, nested groups, aligned panels or a dominant field with attached detail. Equal peer sections are one option, not the default. A chart and table containing the same entities often belong in one aligned exhibit; independent panels with different entity orders force the reader to perform the join. Keep peer headings aligned when peer sections are justified.
@@ -73,3 +81,12 @@ For a direct implication field rather than a separately titled exhibit, omit a r
 ### Companion deep dives versus implications
 
 When a side section expands a specific period, category or segment selected in the main chart, it is a companion analytical exhibit. Give that deep dive a substantive heading and an underline aligned with the main chart’s heading rule, even if the deep dive uses metrics rather than another chart. For example, “Current-year segment revenue” names the selected-year detail and warrants a rule. A standalone implication, scope note or recommendation is a different role and does not inherit that heading or rule requirement. Decide from the relationship and analytical job, not a blanket rule for every RHS or every non-chart component.
+
+
+## Allocate space to evidence and hierarchy
+
+Choose the dominant exhibit and reading order before arranging supporting prose. Allocate space to the principal evidence first. Equal columns indicate comparable evidence or equal importance; they are not the default for unrelated reasoning.
+
+When a substantial contiguous lower region is unused, compare four repairs: enlarge the principal exhibit, combine related evidence, change the arrangement, or merge the page. Do not stretch paragraphs, add filler/decorative shapes, repeat conclusions or increase fonts arbitrarily to occupy space. Whitespace is diagnostic, not a minimum-ink validity rule. Compare viable layouts at the same readable theme typography; prefer the one that exposes the decision relationship with less searching.
+
+At presentation size, the conclusion, principal evidence and material qualification must be distinguishable before every sentence is read. Review repeated page structures at montage scale. A top-aligned pair of prose columns plus a concluding paragraph is not a general analytical template.

@@ -53,7 +53,7 @@ def summary_contract():
 
 
 class PptxSemanticTests(unittest.TestCase):
-    def test_thematic_summary_requires_multiple_distinct_visible_bullets(self):
+    def test_thematic_summary_preserves_variable_distinct_visible_supports(self):
         contract = summary_contract()
         synthesis = contract['slides'][0]['executiveSynthesis']
         synthesis['format'] = 'thematic-bullets'
@@ -63,11 +63,25 @@ class PptxSemanticTests(unittest.TestCase):
             blocks[1].extend([branch['heading'], *branch['bullets']])
         self.assertEqual(validator.validate_semantics(blocks, contract), [])
         synthesis['branches'][0]['bullets'] = [synthesis['branches'][0]['proof']]
-        self.assertTrue(any('two or three substantive bullets' in error for error in validator.validate_semantics(blocks, contract)))
+        self.assertEqual(validator.validate_semantics(blocks, contract), [])
+        synthesis['branches'][0]['bullets'] = []
+        self.assertTrue(any('needs substantive bullets' in error for error in validator.validate_semantics(blocks, contract)))
+        synthesis['branches'][0]['bullets'] = [synthesis['branches'][0]['proof']]
         synthesis['branches'][0]['bullets'] *= 2
         self.assertTrue(any('repeats a bullet' in error for error in validator.validate_semantics(blocks, contract)))
         synthesis['branches'][0]['bullets'][1] = 'An absent approved point.'
         self.assertTrue(any('bullet 2' in error for error in validator.validate_semantics(blocks, contract)))
+
+    def test_summary_close_is_optional_but_declared_action_must_be_visible(self):
+        contract = summary_contract()
+        synthesis = contract['slides'][0]['executiveSynthesis']
+        action = synthesis.pop('overallAction')
+        blocks = {1: ['Executive summary']}
+        for branch in synthesis['branches']:
+            blocks[1].extend([branch['heading'], branch['proof'], branch['consequence']])
+        self.assertEqual(validator.validate_semantics(blocks, contract), [])
+        synthesis['overallAction'] = action
+        self.assertTrue(any('overallAction' in error for error in validator.validate_semantics(blocks, contract)))
 
     def test_compliant_executive_synthesis_passes(self):
         blocks = {

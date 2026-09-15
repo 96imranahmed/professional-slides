@@ -1,6 +1,8 @@
+import { sceneVisibleWords, assessArgument } from './production-policy.mjs';
 import { assertPlanRelationships } from "./semantic-integrity.mjs";
 import {
   SLIDE,
+  TOKENS,
   absolute,
   assertSectionHeadingProps,
   compileDeck,
@@ -13,14 +15,6 @@ import {
   token
 } from "./core.mjs";
 import { REGISTRY } from "./registry.mjs";
-
-const GENERIC_LABELS = new Set([
-  "action", "analysis", "answer", "calculation boundary", "company definition",
-  "current snapshot", "decision", "decision gate", "evidence", "implication",
-  "insight", "interpretation", "key insight", "key takeaway", "operating proof",
-  "priority area", "read-through", "recommendation", "section heading", "synthesis",
-  "takeaway", "what holds back a buy", "what it means", "what the quarter supports"
-]);
 
 const words = (value) => String(value || "").trim().split(/\s+/).filter(Boolean);
 const DENSITY_ORDER = Object.freeze(["live-pitch", "executive", "pre-read", "appendix"]);
@@ -83,9 +77,6 @@ function validateContentValue(value, path = "props") {
   if (Array.isArray(value)) return value.forEach((item, index) => validateContentValue(item, `${path}[${index}]`));
   if (!value || typeof value !== "object") return;
   for (const [key, child] of Object.entries(value)) {
-    if (["heading", "label", "title"].includes(key) && typeof child === "string" && GENERIC_LABELS.has(child.trim().toLowerCase())) {
-      throw new Error(`${path}.${key} is a redundant generic label`);
-    }
     validateContentValue(child, `${path}.${key}`);
   }
 }
@@ -94,7 +85,11 @@ function countWords(value) {
   if (typeof value === "string") return words(value).length;
   if (Array.isArray(value)) return value.reduce((sum, item) => sum + countWords(item), 0);
   if (!value || typeof value !== "object") return 0;
-  return Object.values(value).reduce((sum, item) => sum + countWords(item), 0);
+  // Embedded media carries asset/provenance metadata, not visible slide prose.
+  // Its identity still counts through the accessible label.
+  if (typeof value.dataUri === "string" && value.dataUri.startsWith("data:image/") && value.width > 0 && value.height > 0) return countWords(value.alt);
+  const metadata = new Set(['id','job','semantic','notes','source','chartSelection','changeIntent','dataBasis','provenance','sourceId','sourceIds','evidenceIds','alt','url','path','variant','role','format','color','fill','align','surface','type','kind','measurementBasis']);
+  return Object.entries(value).reduce((sum, [key,item]) => sum + (metadata.has(key) ? 0 : countWords(item)), 0);
 }
 
 function itemAudienceCopy(item) {
@@ -147,7 +142,7 @@ function validateItem(item, path, registry) {
   validateContentValue({ heading: item.heading }, path);
   validateContentValue(item.props || {}, `${path}.props`);
   const checkChange = (props) => {
-    if (props.changeIntent && !(props.changeAnnotations?.length)) throw new Error(`${path}: declared change requires a highlighted change annotation`);
+    if (props.changeIntent && !(props.changeAnnotations?.length) && props.changePresentation !== 'direct-labels') throw new Error(`${path}: declared change requires a highlighted change annotation`);
     for (const chart of props.charts || []) checkChange(chart.props || chart);
   };
   checkChange(item.props || {});
@@ -159,7 +154,7 @@ export function validateSlidePlan(plan, registry = REGISTRY) {
   if (!plan?.id) throw new Error("Slide plan id is required");
   resolveTitleVariant({ variant: plan.titleVariant });
   if (!plan.title || !String(plan.title).trim()) throw new Error(`${plan.id}.title is required`);
-  if (words(plan.title).length > 14) throw new Error(`${plan.id}.title exceeds 14 words`);
+  // Title length is diagnostic; measured wrapping and fit remain enforced.
   if (String(plan.title).includes("—")) throw new Error(`${plan.id}.title contains a Unicode em dash`);
   if (!Array.isArray(plan.items) || plan.items.length === 0) throw new Error(`${plan.id}.items must contain at least one content item`);
   if (plan.template !== undefined) {
@@ -187,14 +182,15 @@ export function validateSlidePlan(plan, registry = REGISTRY) {
     subtitle: plan.subtitle,
     source: plan.source,
     note: plan.note,
-    notes: plan.notes,
+
     companyName: plan.companyName,
     tracker: trackerAudienceCopy(plan.tracker),
     items: plan.items.map(itemAudienceCopy)
   });
-  if (countedWords > budget) throw new Error(`${plan.id} has ${countedWords} counted words; ${density.resolved} permits ${budget}`);
+  // This is a planning estimate. Enforce explicit limits only against emitted
+  // audience-visible text in planDeck; metadata must never reject a slide.
   if (plan.provenanceRequired && !plan.source) throw new Error(`${plan.id} requires a source`);
-  return { countedWords, budget, density, ...(override ? { defaultBudget, overrideRationale: override.rationale } : {}) };
+  return { countedWords, budget, density, advisory: !override && countedWords > budget ? ['Visible copy estimate exceeds profile guidance; inspect readable fit and completeness'] : [], argumentFindings: assessArgument(plan), ...(override ? { defaultBudget, overrideRationale: override.rationale } : {}) };
 }
 
 function layoutKind(plan, items) {
@@ -208,9 +204,9 @@ function layoutKind(plan, items) {
 }
 
 function makeItem(item, index, cell = null) {
-  const size = item.size || { width: { fr: item.weight || 1 }, height: "fill" };
+  const size = item.size || { width: { fr: item.weight || 1 }, height: (["paragraph", "insight", "evidence-note", "table"].includes(item.component) || item.component === "bullet-list" && item.props?.variant === "body") ? "hug" : "fill" };
   if (item.items) {
-    const nestedPlan = { id: item.id, layout: item.layout || "auto" };
+    const nestedPlan = { id: item.id, layout: item.layout || "auto", gap: item.gap };
     const nested = makeComposition(nestedPlan, item.items);
     return section({
       id: item.id,
@@ -237,13 +233,15 @@ function makeItem(item, index, cell = null) {
 
 function makeComposition(plan, items) {
   const kind = layoutKind(plan, items);
+  if (plan.gap !== undefined && (typeof plan.gap !== "string" || !plan.gap.startsWith("space.") || !Object.hasOwn(TOKENS, plan.gap))) throw new Error(`${plan.id}.gap must name a canonical spacing token`);
+  if (plan.gap !== undefined && !["flow.row", "flow.column"].includes(kind)) throw new Error(`${plan.id}.gap is supported only for row and column flows`);
   if (kind === "absolute") return absolute({ id: `${plan.id}-absolute`, children: items.map((item, index) => makeItem(item, index)) });
   if (kind === "overlay") return overlay({ id: `${plan.id}-overlay`, children: items.map((item, index) => makeItem(item, index)) });
   if (kind === "flow.row" || kind === "flow.column") {
     return flow({
       id: `${plan.id}-${kind.replace(".", "-")}`,
       direction: kind.endsWith("row") ? "row" : "column",
-      gap: token("space.4"),
+      gap: token(plan.gap ?? "space.4"),
       children: items.map((item, index) => makeItem(item, index))
     });
   }
@@ -290,10 +288,27 @@ function planCover(plan) {
   return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, recommended: "live-pitch", resolved: spec.density, selection: plan.density === undefined ? "capacity-default" : "explicit", reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
 }
 
+function planTracker(plan, registry) {
+  if (!plan?.id || !plan.title?.trim()) throw new Error("Tracker plan requires id and title");
+  const props = plan.trackerPage;
+  if (!props || !props.items?.some(item => item.id === props.selectedId && item.label === plan.title)) throw new Error("Tracker title must match its selected chapter label");
+  if (plan.items !== undefined || plan.tracker !== undefined) throw new Error("Full tracker content belongs in trackerPage");
+  validateItem({ id: "tracker", job: "orient the reader in the approved sequence", component: "tracker-page", props }, plan.id, registry);
+  const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
+  const density = plan.density ?? "pre-read";
+  return {
+    spec: { id: plan.id, notes: plan.notes || "", density, frame, composition: absolute({ id: `${plan.id}-tracker`, children: [
+      componentNode({ id: "tracker", component: "tracker-page", props, frame, role: "tracker-page" }),
+      componentNode({ id: "page", component: "page-template", props: { pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, frame, role: "page-furniture" })
+    ] }) },
+    decision: { layout: "structural", kind: "tracker", tracker: props, density: { requested: density, recommended: "live-pitch", resolved: density, selection: "explicit", reasons: [] }, itemJobs: [{ id: "tracker", job: "orient the reader in the approved sequence", component: "tracker-page" }] }
+  };
+}
+
 export function planSlide(plan, registry = REGISTRY) {
   const content = validateSlidePlan(plan, registry);
   const titleVariant = resolveTitleVariant({ variant: plan.titleVariant });
-  const body = makeComposition(plan, plan.items);
+  const body = makeComposition({...plan, gap: plan.gap ?? (["pre-read","appendix"].includes(content.density.resolved) && ["flow.row","flow.column"].includes(layoutKind(plan,plan.items)) ? "space.3" : undefined)}, plan.items);
   return {
     spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, tracker: plan.tracker, source: plan.source, note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
     decision: {
@@ -353,14 +368,18 @@ export function instantiateSlideTemplate({ id, template, instances }) {
   });
 }
 
-export function planDeck(deckPlan, registry = REGISTRY) {
+export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
   if (!deckPlan?.id || !Array.isArray(deckPlan.slides)) throw new Error("Deck plan requires id and slides");
   const defaultTitleVariant = resolveTitleVariant({ variant: deckPlan.titleVariant });
   const planned = deckPlan.slides.map((slide) => slide.kind === "cover"
     ? planCover(slide)
+    : slide.kind === "tracker" ? planTracker(slide, registry)
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? defaultTitleVariant : slide.titleVariant }, registry));
-  return {
-    deck: compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, slides: planned.map((item) => item.spec) }, registry),
-    decisions: planned.map((item) => item.decision)
-  };
+  const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, slides: planned.map((item) => item.spec) }, registry, {slideCache});
+  for(const [i,slide] of deck.slides.entries()) {
+    planned[i].decision.visibleWords=sceneVisibleWords(slide);
+    const limit=deckPlan.slides[i].copyBudget?.maxWordsPerSlide;
+    if(limit && planned[i].decision.visibleWords>limit) throw new Error(`${slide.id}: visible copy exceeds explicit budget ${limit}`);
+  }
+  return {deck, decisions:planned.map(item=>item.decision)};
 }

@@ -5,7 +5,7 @@
   "scripts": {
     "check:syntax": "node evals/scripts/check_source_quality.mjs",
     "test": "node evals/scripts/run_tests.mjs",
-    "check": "npm run check:syntax && npm test",
+    "check": "npm run check:syntax && npm run check:policy && npm test",
     "check:release": "node evals/scripts/run_tests.mjs --release",
     "check:dependencies": "node evals/scripts/run_tests.mjs --dependencies",
     "validate:runtime": "node evals/scripts/generate_golden_set.mjs",
@@ -14,7 +14,10 @@
     "validate:components": "node evals/scripts/validate_component_runtime.mjs",
     "import:maps": "node evals/scripts/import_natural_earth_maps.mjs",
     "package:plugin": "python3 evals/scripts/package_plugin.py",
-    "validate:copy": "node evals/scripts/check_slide_copy.mjs"
+    "validate:copy": "node evals/scripts/check_slide_copy.mjs",
+    "check:policy": "node evals/scripts/check_production_policy.mjs",
+    "build:deck": "node skills/professional-slides/runtime/build-deck.mjs",
+    "deliver:deck": "node skills/professional-slides/runtime/deliver-deck.mjs"
   },
   "peerDependencies": {
     "@napi-rs/canvas": "0.1.100",

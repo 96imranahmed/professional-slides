@@ -1,9 +1,12 @@
 // Intentional layering is declared by semantic construction, not by detected
 // collisions. No rule exempts text/text, headings, legends, or whole charts.
 export const OVERLAP_POLICY = Object.freeze({
-  containedCellMarks: ["table-bullet", "table-binary-mark", "table-rating-track", "table-rating-sector", "table-bar", "table-implication"],
-  surfaces: ["evidence-note-surface", "segment-surface", "decision-conclusion-surface","divider-surface", "section-surface", "rail-surface", "panel-surface", "insight-surface", "quote-surface", "image-frame", "annotation-surface"],
+  containedCellMarks: ["table-bullet", "table-binary-mark", "table-rating-track", "table-rating-sector", "table-bar", "table-bar-axis", "table-implication"],
+  surfaces: ["roadmap-leadership-surface","evidence-note-surface", "segment-surface", "decision-conclusion-surface","divider-surface", "section-surface", "rail-surface", "panel-surface", "insight-surface", "quote-surface", "image-frame", "annotation-surface"],
   containedLabels: {
+    "network-node": "network-node-label",
+    "hierarchy-phase-surface": "hierarchy-phase-label",
+    "roadmap-phase-surface": "roadmap-phase", "roadmap-product-surface": "roadmap-product",
     "horizon-band": "horizon-label", "decision-box": "decision-label", "segment-header-band": "segment-copy",
     "table-cell": "table-cell-text", "table-header-cell": "table-header-text",
     "organization-node": "node-label", "tree-node": "node-label", "tree-root": "node-label", "organization-root": "node-label",
@@ -19,12 +22,20 @@ export const OVERLAP_POLICY = Object.freeze({
     "chart-mark": "data-label", "chart-segment": "data-label", "chart-label-surface": "data-label",
     "table-number-circle": "table-number-value", "table-section-marker": "table-section-number"
   },
-  chartGeometry: ["chart-gridline", "chart-axis", "chart-threshold-line", "chart-mark", "chart-marker", "chart-line", "chart-area", "chart-reference-line", "chart-connector", "chart-point-highlight", "horizon-axis", "horizon-curve", "horizon-step-line"],
+  chartGeometry: ["chart-gridline", "chart-axis", "chart-threshold-line", "chart-status-boundary", "chart-mark", "chart-marker", "chart-line", "chart-area", "chart-reference-line", "chart-connector", "chart-point-highlight", "horizon-axis", "horizon-curve", "horizon-step-line"],
+  keyedLineJoints: [{role:'map-label-leader',key:'featureId',reason:'two leader segments meet at their own feature lane joint'}],
   pairs: [
+    ["category-group-rule", "category-group-rule", "contiguous category bracket joints"],
+    ["schedule-relationship", "schedule-relationship", "declared event relationships share their routing corridor"],
+    ["schedule-relationship", "schedule-event", "directed relationship terminates at a dated event"],
+    ["schedule-rail", "schedule-event", "dated event is anchored on its lane rail"],
+    ["schedule-event", "schedule-stem", "event label stem meets its own marker"],
     ["decision-connector", "decision-connector", "decision branch junction"],
     ["decision-connector", "decision-box", "decision connector terminates at its own node"],
     ["table-rating-track", "table-rating-sector", "ordinal sector overlays its own neutral disc"],
     ["table-binary-mark", "table-binary-mark", "check or cross stroke junction"],
+    ["table-bar-axis", "table-bar", "signed bar begins at its own cell zero baseline"],
+    ["table-bar-axis", "table-rule", "shared column zero baseline meets the row boundary"],
     ["relationship-disc", "relationship-chevron", "chevron inside its own inference marker"],
     ["relationship-chevron", "relationship-chevron", "inference chevron joint"],
     ["image-placeholder-line", "image-placeholder-line", "placeholder diagonals"],
@@ -42,6 +53,7 @@ export const OVERLAP_POLICY = Object.freeze({
     ["roadmap-rail", "roadmap-marker", "wave marker on roadmap rail"],
     ["process-rail", "process-marker", "step markers sit on the process rail"],
     ["map-land", "map-marker", "map marker anchored to geography"],
+    ["map-land", "map-label-leader", "feature leader crosses its own map geography corridor"],
     ["map-land", "map-marker-fill", "map marker anchored to geography"],
     ["map-land", "map-label", "map label anchored to geography"],
     ["map-land", "map-land", "contiguous map land mass"],

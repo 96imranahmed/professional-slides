@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { auditEmbeddedMedia } from "./media_integrity.mjs";
+import { auditNativeTextStyle } from "./native_text_style_audit.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -156,12 +157,7 @@ async function inspectPackage(pptxPath, deck) {
     const shapeBlocks = [...xml.matchAll(/<p:sp>[\s\S]*?<\/p:sp>/g)].map((match) => match[0]);
     for (const node of deck.slides[slideIndex].nodes.filter(item => item.type === "text" && item.text)) {
       const block = shapeBlocks.find(candidate => candidate.includes(`name="ps:${node.id}"`));
-      const run = block?.match(/<a:rPr\b([^>]*)>([\s\S]*?)<\/a:rPr>/);
-      const actualFace = run?.[2].match(/<a:latin typeface="([^"]+)"/)?.[1];
-      const actualSize = Number(run?.[1].match(/\bsz="(\d+)"/)?.[1]);
-      const actualBold = /\bb="1"/.test(run?.[1] || "");
-      const expectedBold = Boolean(node.style.fontWeight ? node.style.fontFamily.nativeBold : node.style.bold);
-      if (actualFace !== node.style.fontFamily.value || actualSize !== Math.round(node.style.fontSize.value * 100) || actualBold !== expectedBold) textStyleMismatches.push({ id: node.id, actualFace, expectedFace: node.style.fontFamily.value, actualSize, expectedSize: node.style.fontSize.value * 100, actualBold, expectedBold });
+      textStyleMismatches.push(...auditNativeTextStyle(block, node));
     }
     for (const node of deck.slides[slideIndex].nodes.filter((item) => item.type === "rect" && item.style.radius?.value > 0)) {
       const block = shapeBlocks.find((candidate) => candidate.includes(`name="ps:${node.id}"`));

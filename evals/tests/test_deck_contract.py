@@ -185,6 +185,11 @@ class DeckContractTests(unittest.TestCase):
         errors = validator.validate_contract(contract)
         self.assertTrue(any("slide 2 to be executive_synthesis" in error for error in errors))
 
+    def test_executive_synthesis_accepts_answer_title_without_prefix(self):
+        contract = self.new_dd()
+        contract["slides"][1]["title"] = "Select opportunities with a defensible value case"
+        self.assertEqual(validator.validate_contract(contract), [])
+
     def test_executive_synthesis_requires_substantive_branch_contract(self):
         contract = self.new_dd()
         contract["slides"][1]["executiveSynthesis"]["branches"][0]["heading"] = "Operating proof"

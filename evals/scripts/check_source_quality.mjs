@@ -1,15 +1,11 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
-import os from "node:os";
+import {configureRuntime} from "../../skills/professional-slides/runtime/environment.mjs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
 const root = process.cwd();
-const bundledRoot = path.join(os.homedir(), ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies");
-const bundledNode = path.join(bundledRoot, "node", "bin", "node");
-const bundledPython = path.join(bundledRoot, "python", "bin", "python3");
-const runtimeNode = process.env.RUNTIME_NODE || (await fs.stat(bundledNode).then(() => bundledNode).catch(() => process.execPath));
-const runtimePython = process.env.RUNTIME_PYTHON || (await fs.stat(bundledPython).then(() => bundledPython).catch(() => "python3"));
+const {RUNTIME_NODE:runtimeNode,RUNTIME_PYTHON:runtimePython}=configureRuntime();
 const sourceRoots = ["skills/professional-slides/runtime", "evals/scripts"];
 
 async function walk(directory) {
@@ -39,5 +35,5 @@ for (const file of textual) {
 }
 if (whitespaceErrors.length) throw new Error(`Trailing whitespace:\n${whitespaceErrors.join("\n")}`);
 for (const file of files.filter(file => /\.(?:mjs|js)$/.test(file))) await run(runtimeNode, ["--check", file]);
-await run(runtimePython, ["-m", "compileall", "-q", "evals"]);
+await run(runtimePython, ["-m", "compileall", "-q", "evals", "skills/professional-slides/runtime"]);
 console.log(JSON.stringify({ accepted: true, javascriptFiles: files.filter(file => /\.(?:mjs|js)$/.test(file)).length, pythonRoot: "evals" }));

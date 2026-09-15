@@ -16,7 +16,7 @@ Add or revise templates through the [`template authoring contract`](authoring.md
 
 ## Specimen copy and guidance notes
 
-Reusable slide specimens use neutral parenthetical prompts such as `(Insert action title)`, `(Insert section title)`, `(Insert chart title)`, and `(Insert supporting point)`. Do not use square-bracket placeholders or client-, toolkit-, industry-, or company-specific claims as default copy. When a template includes a reusable executive-summary specimen, include three prompt bullets under each titled theme. Include at least two prompt bullets in every row or rail that advertises a developed list; other specimens follow the selected density profile.
+Reusable slide specimens use neutral parenthetical prompts such as `(Insert action title)`, `(Insert section title)`, `(Insert chart title)`, and `(Insert supporting point)`. Do not use square-bracket placeholders or client-, toolkit-, industry-, or company-specific claims as default copy. Reusable synthesis specimens demonstrate the [copy contract](../components/copy.md#executive-summary-narrative) and selected relationship, not a universal theme or bullet count. Use only the prompt items needed to illustrate the arrangement; include uneven branch support where meaningful.
 
 Every advertised standard slide specimen and chart specimen carries a short speaker note with three fields: `Use when`, `Why`, and `Action title`. The note explains the decision context for the form, the analytical reason it fits, and the kind of evidence-backed conclusion the action title should state. Keep this instruction out of the visible slide body. Covers, dividers, and tracker pages may state that an action title is not applicable and specify the appropriate navigation title instead.
 
@@ -41,5 +41,5 @@ Template branches and chapter labels are seeds, not mandatory page titles or a c
 - exact chapter labels are frozen before tracker implementation and every core dot maps to one chapter;
 - the chapter order accumulates toward the decision rather than cataloguing topics;
 - when a new deck requires an executive synthesis, it and the close express one thesis at different evidence levels;
-- when an existing deck omits the synthesis, record and recommend it without adding it automatically;
+- summary presence and existing-deck changes follow the canonical [synthesis policy](../storylining/index.md#synthesis-scope-and-requirement);
 - deviations from the template improve fit to the actual brief and do not create duplicate or uncovered decision branches.

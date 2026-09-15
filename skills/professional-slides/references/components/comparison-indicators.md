@@ -32,7 +32,7 @@ A traffic-light table must include one visible legend on the same slide. The leg
 
 ### Binary confirmation
 
-Use a compact check for a defined positive state, a compact cross for a defined negative state, and a short horizontal mark for not assessed. The symbol-only `none` label display is the default because a repeated state word usually adds clutter. Use `labelDisplay: "state"` only when the audience may not recognize the symbols or when the cells are read outside the table context. The marker binds to `icon.small`, uses a hairline stroke, and stays close to the compact body-text scale.
+Use a compact check for a defined positive state, a compact cross for a defined negative state, and a short horizontal mark for not assessed. The symbol-only `none` label display is the default because a repeated state word usually adds clutter. Use `labelDisplay: "state"` only when the audience may not recognize the symbols or when the cells are read outside the table context. The marker binds to `icon.small`, uses `line.standard` for legible check, cross and missing-state strokes, and stays close to the compact body-text scale. Row separators retain hairline weight.
 
 The symbol is the primary non-colour cue; colour may reinforce it through the existing positive and negative theme roles. Never leave a missing state blank. Define the confirmation test in the column heading, a concise same-slide note, or accessible metadata, and do not use a check merely to signal preference.
 
@@ -79,7 +79,7 @@ Cells and their legend share one declared scale and palette. Completion values a
 
 ## Native translation
 
-Build completion and ordinal discs as one editable neutral circle plus one editable filled sector, with the value or level in a separate text box. Build traffic lights as editable circles and adjacent text. Build binary confirmation from two editable hairline strokes for a check or cross and one for the missing mark. Add the adjacent state text only for the labelled variant. Build a heatmap as editable table-cell fills plus editable centered values. Resolve every fill and text colour from the active theme before creating the native objects.
+Build completion and ordinal discs as one editable neutral circle plus one editable filled sector, with the value or level in a separate text box. Build traffic lights as editable circles and adjacent text. Build binary confirmation from two editable standard-weight strokes for a check or cross and one for the missing mark, all using `line.standard`. These small evidence marks must remain visibly stronger than the table's hairline row rules. Keep the same weight for positive, negative and missing states. Add the adjacent state text only for the labelled variant. Build a heatmap as editable table-cell fills plus editable centered values. Resolve every fill and text colour from the active theme before creating the native objects.
 
 Group each legend with its table, not with page furniture. Preserve the legend in PowerPoint and Google Slides as editable shapes and text. Keep the table's accessible description, cell labels, and legend wording in speaker notes or object metadata when the platform cannot retain those relationships.
 

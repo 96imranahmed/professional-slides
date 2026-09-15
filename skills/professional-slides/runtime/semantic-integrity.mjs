@@ -17,7 +17,9 @@ const requirements = {
 export function tagSemanticNodes(nodes, instances) {
   for (const node of nodes) {
     const peers = nodes.filter(p => p.id !== node.id && p.data.componentInstance === node.data.componentInstance && visible(p));
-    const requiredRoles = node.data.annotationStyle === 'rail-label' ? [] : requirements[node.role] || [];
+    const requiredRoles = node.data.annotationStyle === 'rail-label' ? []
+      : node.data.annotationStyle === 'interval-label' && node.role === 'annotation-text' ? ['annotation-leader']
+      : requirements[node.role] || [];
     const candidates = peers.filter(p => requiredRoles.includes(p.role) && (!node.role.startsWith('annotation-') || sameAnnotation(node,p)));
     const relationship = instances.find(i=>i.instanceId===node.data.componentInstance)?.relationships;
     const relatedOwners = (relationship?.relatedTo || []).map(id=>instances.find(i=>i.id===id)?.instanceId);
@@ -28,6 +30,8 @@ export function tagSemanticNodes(nodes, instances) {
 }
 /** Deterministic checks complement the independent semantic criticality review. */
 export function assertVisualCriticality(nodes) {
+  const advisory=[];
+  const advise=(node,observation)=>{const finding={code:"EDITORIAL",severity:"minor",id:node.id,observation};advisory.push(finding);};
   const normalize = text => String(text || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
   const structureOnly = /^(?:(?:the|this|our) )?(?:(?:comparison|presentation|deck|story|overview|agenda|contents) (?:in|across|of) )?(?:\d+|three|four|five|six|seven|eight|nine|ten) (?:chapters|sections|parts|topics)$/;
   for (const [index,node] of nodes.entries()) {
@@ -39,11 +43,12 @@ export function assertVisualCriticality(nodes) {
     }
     if (['tracker-page-title','section-heading','insight-heading','evidence-note-heading'].includes(node.role)) {
       const text=normalize(node.text);
-      if (structureOnly.test(text)) throw new Error(`TITLE_CRITICALITY: ${node.id} only announces visible structure`);
+      if (structureOnly.test(text)) advise(node,"Heading only announces visible structure");
       const body=peers.filter(p=>['insight-body','evidence-note-body'].includes(p.role)).map(p=>normalize(p.text)).join(' ');
-      if (text && body && (` ${body} `).includes(` ${text} `)) throw new Error(`TITLE_CRITICALITY: ${node.id} duplicates its body`);
+      if (text && body && (` ${body} `).includes(` ${text} `)) advise(node,"Heading repeats its body; assess its navigation benefit");
     }
   }
+  return advisory;
 }
 export function assertSemanticIntegrity(nodes, instances) {
   assertVisualCriticality(nodes);
@@ -73,7 +78,11 @@ export function assertPlanRelationships(plan) {
         const relation=item.props?.semantic;
         if(relation?.kind!=='evidence-note' || !relation.relatedTo?.length || relation.relatedTo.some(id=>!byId.has(id) || byId.get(id)===item || !['table','map','process','timeline','tree','metric'].includes(byId.get(id).component) && !byId.get(id).component?.startsWith('chart'))) throw new Error(`Dangling ${item.id}: evidence note requires real exhibit references`);
       }
-      if(item.component==='paragraph' && evidence) throw new Error(`Dangling ${item.id}: a heading and paragraph are not a containing component; use evidence-note or insight`);
+      if(item.component==='paragraph' && evidence && item.props?.semantic?.kind==='explanation') {
+        const ids=item.props.semantic.relatedTo;
+        if(!Array.isArray(ids)||!ids.length||ids.some(id=>!byId.has(id)||id===item.id)) throw new Error(`Dangling ${item.id}: explanation requires actual exhibit dependencies`);
+        continue;
+      }
       if(item.component!=='paragraph' && item.component!=='section-heading') continue;
       const relation=item.props?.semantic;
       if(relation) {

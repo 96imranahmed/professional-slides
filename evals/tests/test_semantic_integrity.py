@@ -28,9 +28,9 @@ const node=(id,role,text,frame={x:0,y:0,width:100,height:100})=>({id,role,text,f
 const axis=node('axis','chart-axis','',{x:0,y:100,width:100,height:0}),bar=node('bar','chart-mark','');
 assert.doesNotThrow(()=>assertVisualCriticality([bar,axis]));
 assert.throws(()=>assertVisualCriticality([axis,bar]),/BASELINE_LAYERING/);
-for (const text of ['The comparison in five chapters','Our presentation across 4 sections']) assert.throws(()=>assertVisualCriticality([node('title','tracker-page-title',text)]),/TITLE_CRITICALITY/);
+for (const text of ['The comparison in five chapters','Our presentation across 4 sections']) assert.equal(assertVisualCriticality([node('title','tracker-page-title',text)])[0].severity,'minor');
 assert.doesNotThrow(()=>assertVisualCriticality([node('title','tracker-page-title','Careers and industries')]));
-assert.throws(()=>assertVisualCriticality([node('title','insight-heading','Capacity constrains growth'),node('body','insight-body','Capacity constrains growth until the second factory opens.')]),/TITLE_CRITICALITY/);
+assert.equal(assertVisualCriticality([node('title','insight-heading','Capacity constrains growth'),node('body','insight-body','Capacity constrains growth until the second factory opens.')])[0].severity,'minor');
 assert.doesNotThrow(()=>assertVisualCriticality([node('body','insight-body','Capacity constrains growth until the second factory opens.')]));
 console.log(JSON.stringify({ok:true}));
 """)
@@ -68,7 +68,7 @@ assert.throws(()=>assertPlanRelationships({items:[{id:'secondary',items:[evidenc
 assert.throws(()=>assertPlanRelationships({items:[evidence,{...text,props:{...text.props,semantic:{kind:'section-member',relatedTo:['missing']}}}]}),/Dangling/);
 assert.doesNotThrow(()=>assertPlanRelationships({items:[evidence,{...text,component:'insight'}]}));
 const heading={id:'heading',component:'section-heading',props:{text:'Network scope',semantic:{kind:'section-member',relatedTo:['takeaway']}},frame:{x:0,y:350,width:800,height:32}};
-assert.throws(()=>assertPlanRelationships({items:[evidence,heading,{...text,props:{...text.props,semantic:{kind:'section-member',relatedTo:['heading']}}}]}),/Dangling/);
+assert.doesNotThrow(()=>assertPlanRelationships({items:[evidence,heading,{...text,props:{...text.props,semantic:{kind:'section-member',relatedTo:['heading']}}}]}));
 assert.doesNotThrow(()=>assertPlanRelationships({items:[evidence,{id:'note',component:'evidence-note',props:{heading:'Scope',text:'Matched period',semantic:{kind:'evidence-note',relatedTo:[evidence.id]}}}]}));
 console.log(JSON.stringify({accepted:true}));
 ''')

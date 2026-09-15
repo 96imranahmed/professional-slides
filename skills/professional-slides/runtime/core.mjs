@@ -229,8 +229,11 @@ export function primitive({ type, id, role, frame, style = {}, text = null, data
   };
 }
 
-export function textPrimitive({ id, role = "text", frame, text, style = {}, data = {}, tokens = [] }) {
-  return primitive({ type: "text", id, role, frame, text: String(text ?? ""), style, data, tokens });
+export function textPrimitive({ id, role = "text", frame, text, runs, style = {}, data = {}, tokens = [] }) {
+  const value = String(text ?? "");
+  if (runs !== undefined && (!Array.isArray(runs) || !runs.length || runs.some(run => !run || typeof run.text !== 'string' || typeof run.bold !== 'boolean' || Object.keys(run).some(key => !['text', 'bold'].includes(key))) || runs.map(run => run.text).join('') !== value)) throw new Error('Measured text runs must reconstruct the exact text and may vary only bold');
+  const node = primitive({ type: "text", id, role, frame, text: value, style, data, tokens });
+  return runs === undefined ? node : { ...node, runs: runs.map(run => ({ ...run })) };
 }
 
 export function rectPrimitive({ id, role = "surface", frame, style = {}, data = {}, tokens = [] }) {
@@ -623,13 +626,15 @@ export function buildManifest(deck) {
   return manifest;
 }
 
-export function compileDeck(deckSpec, registry) {
+export function compileDeck(deckSpec, registry, {slideCache}={}) {
   assertNoLegacyPageTaxonomy(deckSpec);
   const { tokens: designTokens, ...palette } = resolvePalette(deckSpec.palette, TOKENS, THEME_SLOT_TOKENS);
   const typography = resolveTypography(deckSpec.typography, designTokens);
   const pageTemplate = registry.get("page-template")?.resolveTemplate(deckSpec.pageTemplate);
   return withDesignTokens(designTokens, () => {
   const slides = deckSpec.slides.map((slideSpec, slideIndex) => {
+    const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate}) : null;
+    if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
     const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
     const density = slideSpec.density ?? "executive";
     const slideTokens = resolveDensityTokens(designTokens, density);
@@ -639,19 +644,23 @@ export function compileDeck(deckSpec, registry) {
     const nodes = [];
     const componentInstances = [];
     const templatePlacements = [];
+    // Page furniture belongs to the deck's visual system. Evidence density
+    // may change by slide without resizing titles, trackers or footers.
+    const chromeOwners = new Set();
     let contentFrame = CONTENT_FRAME;
     let resolvedPageTemplate;
     if (slideSpec.chrome) {
       const chromeDefinition = registry.get("slide-chrome");
       if (!chromeDefinition) throw new Error("The component registry must define slide-chrome");
       const chromeId = stableId(slideId, "chrome");
+      chromeOwners.add(chromeId);
       const chromeProps = { ...slideSpec.chrome, pageTemplate: { ...pageTemplate, ...slideSpec.chrome.pageTemplate }, pageNumber: slideSpec.chrome.pageNumber ?? slideIndex + 1 };
-      const rendered = chromeDefinition.render({
+      const rendered = withDesignTokens(designTokens, () => chromeDefinition.render({
         id: chromeId,
-        tokens: slideTokens,
+        tokens: designTokens,
         frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
         props: chromeProps
-      });
+      }));
       contentFrame = rendered.contentFrame;
       resolvedPageTemplate = rendered.pageTemplate;
       templatePlacements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [chromeId] })));
@@ -722,11 +731,14 @@ export function compileDeck(deckSpec, registry) {
       const definition = registry.get(node.component);
       if (!definition) throw new Error(`Unknown component: ${node.component}`);
       const instanceId = stableId(slideId, node.id || node.component);
+      const chromePlacement = ["page-template", "slide-chrome"].includes(node.component) || ancestors.some(owner => chromeOwners.has(owner));
+      if (chromePlacement) chromeOwners.add(instanceId);
       const props = { ...node.props, headerBandHeight: headerBandHeight({ node, frame }) };
       if (["page-template", "slide-chrome", "section-divider"].includes(node.component)) props.pageTemplate = { ...pageTemplate, ...node.props?.pageTemplate };
       let rendered;
       try {
-        rendered = definition.render({ id: instanceId, frame, tokens: slideTokens, props });
+        const placementTokens = chromePlacement ? designTokens : slideTokens;
+        rendered = withDesignTokens(placementTokens, () => definition.render({ id: instanceId, frame, tokens: placementTokens, props }));
       } catch (error) {
         throw new Error(`Cannot render ${instanceId} (${definition.id}): ${error.message}`, { cause: error });
       }
@@ -753,12 +765,15 @@ export function compileDeck(deckSpec, registry) {
     tagSemanticNodes(nodes, componentInstances);
     assertUniqueIds(nodes);
     for (const node of nodes) {
+      const nodeTokens = chromeOwners.has(node.data.componentInstance) || node.data.componentAncestors?.some(owner => chromeOwners.has(owner)) ? designTokens : slideTokens;
       node.style = Object.fromEntries(Object.entries(node.style).map(([key, value]) => [key,
-        isTokenReference(value) ? { tokenId: value.tokenId, ...slideTokens[value.tokenId] } : value]));
+        isTokenReference(value) ? { tokenId: value.tokenId, ...nodeTokens[value.tokenId] } : value]));
     }
     assertStyleProvenance(nodes);
     assertSceneBounds(nodes);
-    return { id: slideId, notes: slideSpec.notes || "", nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+    const compiled = { id: slideId, notes: slideSpec.notes || "", nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+    slideCache?.set(cacheKey,structuredClone(compiled));
+    return compiled;
     });
   });
   const templateSequences = [];

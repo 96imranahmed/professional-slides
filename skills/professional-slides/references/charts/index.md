@@ -149,7 +149,7 @@ Use the treatment when distinct groups imply different actions or consequences. 
 
 Same-page category comparisons use one grouped/segmented exhibit or equivalent peer charts. On a `chart-group`, declare `comparison: {kind: "matched", unit: "..."}` with identical chart types, periods/categories, explicit domains and value formats. Do not compare a line on one side with bars on the other. Different metrics may use different chart types in a four-way dashboard, but the two sides of one comparison must remain equivalent. When source definitions cannot be reconciled, separate the exhibits and state the limit instead of presenting a false matched comparison.
 
-For compact large-number labels, declare one shared `valueFormat.compactUnit` (`k`, `m`, or `bn`) for peer charts; `decimals` defaults to one. Keep raw series values and growth calculations unchanged. See [large numbers](../components/copy.md#large-numbers).
+For compact large-number labels, declare one shared `valueFormat.compactUnit` (`k`, `m`, or `bn`) for peer charts; `decimals` defaults to one. Keep raw series values and growth calculations unchanged. See [large numbers](../components/copy.md#large-numbers). `valueFormat.sign: always` adds a plus sign to positive displayed numbers; zero remains unsigned. Use shared `decimals` to preserve stated precision. Charts and table bars use the same formatter without changing plotted values.
 
 
 ### Avoid unnecessary rebasing and axis duplication

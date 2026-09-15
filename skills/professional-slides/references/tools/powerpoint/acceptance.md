@@ -2,18 +2,9 @@
 
 Every PowerPoint candidate needs a machine-readable acceptance manifest and a deterministic check of the exact exported `.pptx`. The repository implementation is the `hard` subcommand of the single validation owner, `evals/scripts/validate_pptx.py`. It reads the ZIP/XML package and never changes the deck.
 
-## Keep copy deliberately small
+## Copy diagnostics
 
-Treat these as ceilings, not targets:
-
-| density | title words | counted words per slide | words per text shape | paragraphs per text shape |
-| --- | ---: | ---: | ---: | ---: |
-| `live-pitch` | 10 | 30 | 14 | 3 |
-| `executive` | 12 | 55 | 20 | 4 |
-| `pre-read` | 12 | 85 | 28 | 5 |
-| `appendix` | 14 | 130 | 40 | 6 |
-
-Do not target a fraction of the ceiling: preserve the evidence and interpretation needed for the decision. Use a slide override only for a real evidence, provenance or [executive-summary narrative](../../components/copy.md#executive-summary-narrative) need. Declare its rationale and value in the content plan before authoring; carry that value into `copy.slideOverrides`, without changing the other slides' limits or shrinking body type. Do not use an override to preserve avoidable prose. Source, footer, and page-number shapes may be excluded from word budgets by a declared shape-name pattern, but every visible string remains subject to forbidden-character checks.
+Visible-copy counts are advisory by default. Set `copy.enforceBudgets: true` only for user-imposed limits; explicit per-slide planner `copyBudget` values remain constraints. Preserve readable typography and deterministic fit checks. Internal metadata and speaker notes are not slide copy. The hard validator continues to check exact approved titles, package structure, theme values and semantic dependencies.
 
 ## Acceptance manifest
 
@@ -31,6 +22,7 @@ Compile one JSON manifest from the approved deck contract, theme manifest, and t
     "requireSlideMaster": true
   },
   "copy": {
+    "enforceBudgets": false,
     "forbiddenCharacters": ["\u2014"],
     "maxTitleWords": 12,
     "maxWordsPerSlide": 55,
@@ -91,7 +83,7 @@ The validator rejects:
 
 - corrupt ZIPs, malformed XML, duplicate parts, missing content types, broken internal relationships, missing slide, layout, master, or theme links, and wrong slide size or count;
 - a title that does not match the approved title exactly;
-- copy beyond a declared ceiling or containing a forbidden character;
+- copy beyond an explicitly enforced ceiling or containing a forbidden character;
 - undeclared fonts, colours, scheme-colour roles, font sizes, or below-floor text;
 - missing, duplicated, restyled, moved, or inconsistently materialized role shapes.
 
@@ -104,4 +96,4 @@ This is the hard package and variable gate. It does not replace rendering, visua
 
 ### Semantic dependency gate
 
-Every native object exports its `professional-slides.semantic/v1` tag in `cNvPr@descr`: exact scene ID, role, component owner, dependency IDs and required counterpart roles. Canonical provenance compares those tags with the scene and checks dependency presence in the exact PPTX. Missing tags, orphaned insight text/surfaces, annotation leaders without their keyed labels, and broken metric label/value pairs block release. The planner separately rejects detached analytical paragraphs and invalid section-member references. Run mutation regressions that delete each tag and each declared dependency; visual review remains responsible for semantic misclassification and content quality.
+Every native object exports its `professional-slides.semantic/v1` tag in `cNvPr@descr`: exact scene ID, role, component owner, dependency IDs and required counterpart roles. Canonical provenance compares those tags with the scene and checks dependency presence in the exact PPTX. Missing tags, orphaned insight text/surfaces, annotation leaders without their keyed labels, and broken metric label/value pairs block release. The planner validates actual exhibit and section-member references for explanatory prose. Run mutation regressions that delete each tag and each declared dependency; visual review remains responsible for semantic misclassification and content quality.

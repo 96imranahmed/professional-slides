@@ -19,7 +19,14 @@ const line = (id,y,role='rule') => linePrimitive({id,role,x1:90,y1:y,x2:350,y2:y
 const box = (id,role='box',f=frame) => rectPrimitive({id,role,frame:f,style:{fill:token('color.surfaceMuted'),stroke:'none'}});
 const cell = () => ({...box('cell','table-cell',{x:90,y:90,width:300,height:100}),data:{row:0,column:0}});
 const bullet = (row=0) => ({...box('bullet','table-bullet',{x:108,y:108,width:5,height:5}),data:{row,column:0}});
+const mapLeader=(id,x1,y1,x2,y2,featureId='west')=>linePrimitive({id,role:'map-label-leader',x1,y1,x2,y2,style:{stroke:token('color.ink'),lineWidth:token('line.standard')},data:{featureId}});
 const cases = {
+  map_own_land:[box('land','map-land',{x:90,y:90,width:200,height:100}),mapLeader('leader',120,120,320,120)],
+  map_foreign_land:[{...box('land','map-land',{x:90,y:90,width:200,height:100}),data:{componentInstance:'foreign'}},mapLeader('leader',120,120,320,120)],
+  map_own_joint:[mapLeader('a',100,100,200,100),mapLeader('b',200,100,240,150)],
+  map_cross_feature_lines:[mapLeader('a',100,100,220,160),mapLeader('b',100,160,220,100,'east')],
+  map_same_feature_cross_without_joint:[mapLeader('a',100,100,220,160),mapLeader('b',100,160,220,100)],
+  map_leader_crosses_text:[text('label'),mapLeader('leader',90,113,350,113)],
   table_own_bullet:[cell(),bullet()],
   table_wrong_row:[cell(),bullet(1)],
   table_backing_hides_bullet:[bullet(),cell()],
@@ -56,9 +63,9 @@ for (const [id,nodes] of Object.entries(cases)) {
 await browser.close();
 console.log(JSON.stringify(output));
 ''')
-        for case in ["text_text", "text_rule", "clipped_text", "shape_shape", "unrelated_container", "container_does_not_excuse_text_collision", "annotation_crossing_label", "unequal_header_gap", "native_backing_hides_text", "foreign_surface", "foreign_tree_endpoint", "stroked_shape", "table_wrong_row", "table_backing_hides_bullet", "roadmap_band_overpaints_label", "roadmap_label_outside_band"]:
+        for case in ["map_foreign_land", "map_cross_feature_lines", "map_same_feature_cross_without_joint", "map_leader_crosses_text", "text_text", "text_rule", "clipped_text", "shape_shape", "unrelated_container", "container_does_not_excuse_text_collision", "annotation_crossing_label", "unequal_header_gap", "native_backing_hides_text", "foreign_surface", "foreign_tree_endpoint", "stroked_shape", "table_wrong_row", "table_backing_hides_bullet", "roadmap_band_overpaints_label", "roadmap_label_outside_band"]:
             self.assertFalse(results[case]["accepted"], case)
-        for case in ["separated", "surface_and_own_text", "nested_surface", "marker_and_cue", "masked_grid", "table_own_bullet", "own_tree_endpoint", "roadmap_own_label"]:
+        for case in ["map_own_land", "map_own_joint", "separated", "surface_and_own_text", "nested_surface", "marker_and_cue", "masked_grid", "table_own_bullet", "own_tree_endpoint", "roadmap_own_label"]:
             self.assertTrue(results[case]["accepted"], case)
         self.assertGreater(results["clipped_text"]["overflow"], 0)
 

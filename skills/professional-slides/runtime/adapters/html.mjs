@@ -107,7 +107,7 @@ function svgNode(node) {
   }
   if (node.type === "ellipse") return `<ellipse ${common} cx="${frame.x + frame.width / 2}" cy="${frame.y + frame.height / 2}" rx="${frame.width / 2}" ry="${frame.height / 2}"/>`;
   if (node.type === "line") {
-    const marker = data.endArrow ? ' marker-end="url(#arrowhead)"' : "";
+    const marker = (data.endArrow ? ' marker-end="url(#arrowhead)"' : "") + (data.startArrow ? ' marker-start="url(#arrowhead-start)"' : "");
     return `<line ${common} x1="${data.x1}" y1="${data.y1}" x2="${data.x2}" y2="${data.y2}"${marker}/>`;
   }
   if (node.type === "wedge") return `<path ${common} d="${wedgePath(frame, data.startAngle, data.endAngle)}"/>`;
@@ -139,7 +139,8 @@ function textNode(node) {
   const color = cssBinding(style.color);
   const layoutStyle = `${style.lineHeight ? `line-height:${style.lineHeight}px;` : ""}${style.wrap === false ? "white-space:pre;" : ""}`;
   const nativeBold = style.fontWeight ? style.fontFamily.nativeBold : style.bold;
-  return `<div class="text-node" data-node-id="${escapeHtml(node.id)}" data-role="${escapeHtml(node.role)}" style="left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px;justify-content:${justify};align-items:${alignItems};text-align:${textAlign};font-family:${fontFamily};font-size:${fontSize};font-weight:${nativeBold ? 700 : 400};color:${color};${layoutStyle}"><span>${escapeHtml(node.text)}</span></div>`;
+  const content = node.runs ? node.runs.map(run => `<span style="font-weight:${run.bold ? 700 : 400}">${escapeHtml(run.text)}</span>`).join('') : escapeHtml(node.text);
+  return `<div class="text-node" data-node-id="${escapeHtml(node.id)}" data-role="${escapeHtml(node.role)}" style="left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px;justify-content:${justify};align-items:${alignItems};text-align:${textAlign};font-family:${fontFamily};font-size:${fontSize};font-weight:${nativeBold ? 700 : 400};color:${color};${layoutStyle}"><span>${content}</span></div>`;
 }
 
 export function renderSlideHtml(slide, { title = slide.id } = {}) {
@@ -165,7 +166,7 @@ html,body{margin:0;width:${SLIDE.width}px;height:${SLIDE.height}px;overflow:hidd
 <body>
 <main class="slide" data-scene-schema="professional-slides.scene/v1">
 <svg class="scene" viewBox="0 0 ${SLIDE.width} ${SLIDE.height}" aria-hidden="true">
-<defs><marker id="arrowhead" markerWidth="3" markerHeight="3" refX="3" refY="1.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L3,1.5 L0,3 Z" fill="context-stroke"/></marker></defs>
+<defs><marker id="arrowhead" markerWidth="3" markerHeight="3" refX="3" refY="1.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L3,1.5 L0,3 Z" fill="context-stroke"/></marker><marker id="arrowhead-start" markerWidth="3" markerHeight="3" refX="3" refY="1.5" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M0,0 L3,1.5 L0,3 Z" fill="context-stroke"/></marker></defs>
 ${shapes}
 </svg>
 ${text}

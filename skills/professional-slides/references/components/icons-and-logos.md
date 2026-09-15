@@ -18,6 +18,8 @@ For Lucide, use the actual vector definition from the available Lucide package o
 
 Use logos in market maps, bubble charts, ecosystem diagrams, customer landscapes, or comparison headers when rapid entity recognition materially reduces reading effort. Preserve aspect ratio, clear space, and legibility. Place each logo on a neutral backing only when contrast requires it; do not recolour a trademark to fit the palette unless the brand guidelines explicitly permit it.
 
+In a typed table's peer logo column, use the [shared logo-cell contract](../charts/heatmap-table.md#logo-columns): one displayed height with widths determined by intrinsic proportions. Widen the track for a wide mark rather than shrinking that entity alone. Logo identity remains subordinate to any governing category and comparison dimensions; normalization does not require equal widths or encode relative importance.
+
 Use one delivery-safe asset treatment for a peer set. For PowerPoint, prefer byte-embedded PNG assets when SVG support has not been proven in the exact target renderer; preserve the source SVG separately when useful. Do not mix blank or weakly supported SVG placeholders, raster logos, and bold typographic substitutes in one peer set. If one entity must fall back to text, render every peer through the same logo-plus-label geometry and label weight so the fallback reads as intentional rather than broken.
 
 Asset validity is a rendered-output gate. Inspect every logo at full size in the exported PowerPoint render and confirm that the mark is non-blank, recognizable, sharp enough for its displayed size, and visually aligned with its peers. A source file that opens locally or an image object present in the PPTX does not prove that the logo renders correctly.
@@ -87,3 +89,7 @@ For a dedicated image panel, find a relevant photograph on Pexels or another lic
 
 
 Column icon and dedicated-image groups default to vertical centering within the allocated body frame. Center the occupied media, headings and descriptions together, preserving their internal alignment; do not center the title/footer with them. `verticalAlign: "top"` is an explicit content-driven exception.
+
+### Logos in comparison tables
+
+Within a logo column, use one identical displayed height for every logo, with widths varying to accommodate their proportions. Use the canonical table `logo` cell and its sourced media record. Do not normalize all marks to an equal-width box that produces uneven heights. Trim only empty asset padding during preparation; retain the entire mark and consistent alignment.

@@ -15,6 +15,8 @@ For explanatory pages, use the [storylining title rule](index.md#write-the-title
 
 ## Ask questions that sharpen the argument
 
+When clarification is useful, use ChatGPT's built-in questions flow when available and permitted in the current mode (for example, `request_user_input_async` or `request_user_input`). Group related questions into a concise interaction, offer choices when they help, and allow free-text answers for personal context. Use ordinary chat questions only when that flow is unavailable or unsuitable. Carry forward answers already supplied, including spoken answers, rather than asking the same questions again.
+
 Before drafting the dot-dash, test whether the brief is specific enough to support a compelling argument for its intended audience. A broad topic is not an argument. When missing context could change the governing answer, evidence selection, priorities, or recommendation, ask the user targeted questions to narrow it down. This applies across topics; do not impose a domain-specific intake checklist.
 
 Use the conversation and supplied brief first. Ask several questions together when several material uncertainties remain, then follow up selectively on answers that expose a decisive trade-off. Choose questions for their effect on the argument, not to fill a standard questionnaire. Useful lines of inquiry include:
@@ -54,9 +56,13 @@ When the approved story is compiled into the pre-authoring contract, copy each d
 
 ## Standalone argument and evidence test
 
-Include a fully written executive summary near the start of every full-deck plan, with its own dot and complete supporting dashes. Put its actual governing answer, decisive evidence, reasoning, and material qualification in the approval table; “summarise the findings” is not content.
+Before production, resolve feasible research that could change the recommendation. An honest “not yet investigated” statement does not satisfy a requested comparison. Keep irreducible uncertainty, missing user inputs and unavailable sources explicit, with the work attempted and the resulting decision limit. Approval to prepare slides does not silently change a decision brief into a methodology deck.
 
-Read the executive summary and dot-dash without slides or narration. Together they must resolve the main question unambiguously to the extent the evidence permits: every decisive branch has proof, the proof supports the inference, the strongest relevant countercase is addressed, and the resulting verdict or action follows. Unsupported certainty fails this test. Revise the claim or obtain missing evidence before approval.
+When asked to make a deck longer, expand its evidence, alternatives, explanations, countercases or supported scenarios. Record the distinct contribution of each added page. Splitting a checklist, repeating caveats or adding chapter dividers is not substantive expansion. Preserve a user-specified length, but develop the research needed to support it rather than stretching unchanged content.
+
+Apply the [synthesis requirement and scope](index.md#synthesis-scope-and-requirement). For an included summary section, write every member slide with its own dot and complete supporting dashes. Put its actual governing answer, decisive evidence, reasoning, and material qualification in the approval table; “summarise the findings” is not content.
+
+Read any synthesis and the dot-dash without slides or narration. Together they must resolve the main question unambiguously to the extent the evidence permits: every decisive branch has proof, the proof supports the inference, the strongest relevant countercase is addressed, and the resulting verdict or action follows. Unsupported certainty fails this test. Revise the claim or obtain missing evidence before approval.
 
 For each analytical case, record the actual values or specific examples, source, population and period, comparator, inference limit, and the slide or slides that will present the proof. A conclusion table does not substitute for that proof. Use dedicated evidence slides when the trend, distribution, or relationship needs room; link their findings into the synthesis slide. Mark missing evidence as unresolved rather than filling space with unrelated statistics.
 
@@ -64,7 +70,7 @@ Match the evidence to the criterion. Revenue supports commercial reach, not audi
 
 ### Mandatory chart-choice diagnosis
 
-Before approving each analytical dot, inspect the actual available observations and calculate derived values. Its design cell must state: (1) the decision question, (2) data provenance and shape, including observed versus modeled versus mechanically extrapolated, (3) available periods and matched units/population, (4) the chosen encoding and why it exposes useful information, (5) the nearest alternative and why it is rejected, and (6) the new deduction in any secondary insight. Carry this record into `chartSelection` in the authoring contract. Missing diagnosis blocks the dot-dash, even if the proposed chart is registered and renders correctly.
+Before approving each analytical dot, inspect the actual available observations and calculate derived values. Its design cell must state: (1) the decision question, (2) data provenance and shape, including observed versus modeled versus mechanically extrapolated, (3) available periods and matched units/population, (4) the chosen encoding and why it exposes useful information, (5) the nearest alternative and why it is rejected, and (6) the supported contribution of any secondary insight. Carry this record into `chartSelection` in the authoring contract. Missing diagnosis blocks the dot-dash, even if the proposed chart is registered and renders correctly.
 
 Apply the [chart-selection table](../charts/index.md#select-from-the-available-evidence-before-dot-dash-approval). For example, a single annual housing-addition rate multiplied over five years provides an endpoint comparison, not evidence of changing momentum: plan common-period bars on the left and a calculated required-pace implication on the right. Put fixed-rate/fixed-population assumptions in the note, not an insight box. Reject that line-chart choice at planning time; do not postpone the decision to visual QA.
 
@@ -113,7 +119,7 @@ Present the plan in this order:
 
 Do not present a flat slide list when section logic matters.
 
-Include every structural page explicitly: cover, mandatory visibly labelled executive summary, contents, every repeated tracker state, close, and authored appendix page.
+Include every structural page explicitly: cover, every planned synthesis page, contents when used, every repeated tracker state, close, and authored appendix page. Summary titles follow the copy owner; no visible prefix is mandatory.
 
 ## Keep navigation parallel to the story
 
@@ -216,3 +222,16 @@ Prefer the source's native units and compact direct values, with growth annotati
 The design cell must name the measurement basis (`native`, `percentage-change`, `per-capita`, `rebased-index`, or `published-index`). For a rebased index, record `chartSelection.indexJustification`, `indexBase: {period, value}`, and `absoluteValueContext`. Explain the discarded native-unit or percentage-change alternative and the magnitude information normalization hides. The planner rejects a rebased index without this record. A source-published index remains its native measurement, but declare `published-index` so it cannot be confused with an invented rebase.
 
 Also specify point labels, value-axis visibility and growth-annotation treatment before authoring. With fewer than six line-chart points, default to a value label on every dot and omit the left quantitative axis. If a quantitative axis is retained for a justified reading task, use the registered diagonal growth connector and circular badge (`style: arrow`); a bracket is valid when that axis is absent. Never remove the date/category axis merely because the value axis is omitted.
+
+
+## Continuity, claim ownership and navigation
+
+Every analytical dot records three concise fields in its existing argument: `buildsOn` (prior slide IDs whose conclusion it develops; empty for an opening argument), `newContribution` (what is learned here), and `decisionConsequence` (what changes for the audience). These fields describe reasoning, not another audience-facing title. Introduce an entity through its role in the parent comparison before its detailed statistics. Transitions explain why the next question follows.
+
+Maintain `context.claimLedger`: each claim has an ID, concise statement, one `proofSlide` and optional `summarySlides`. Summaries preview or combine evidence into a decision; they do not reproduce proof pages. Merge adjacent pages with the same decision consequence unless they supply distinct necessary evidence. Apply the deletion test: if removal changes neither understanding nor ability to act, merge or remove it. A different source or heading alone does not earn another slide. Consolidate recurring methodology in one referenced location while retaining qualifications beside the claims they materially limit.
+
+Plan chapters as argument stages before individual pages. For substantial multi-section decks, propose an overview, selected-state tracker pages at major transitions and quiet current-section context where detail otherwise loses its place. Honor explicit navigation preferences; do not add a tracker before every slide. The section map is the sole source for labels, order, membership and selected states. Use the existing tracker components and stable geometry; never maintain duplicate manual navigation lists. Include generated tracker states in the dot-dash before export.
+
+Before authoring, review continuity, claim ownership, comparison coverage, navigation and exhibit choices together once. Record the consolidated findings and their resolution in the pre-authoring contract, not as another user approval step.
+
+Use `trackerStates(sectionMap, options)` from `runtime/argument-contract.mjs` to derive overview and selected-state props from `{id,label}` sections. Place those props in the approved tracker slides' existing `trackerPage` fields; the helper does not silently insert pages. Declared continuity is validated for preceding references and substantive fields; claim proof ownership is validated for known slide IDs. Semantic continuity and useful repetition still require the consolidated planning review.

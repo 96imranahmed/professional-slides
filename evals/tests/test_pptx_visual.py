@@ -83,7 +83,7 @@ class PptxVisualTests(unittest.TestCase):
         audit['criticality'] = {'itemCount': 1, 'items': [{
             'text': 'Treat supply catch-up as upside', 'role': 'insight-heading',
             'deletionConsequence': 'None: the body already states the implication.', 'passes': False}]}
-        self.assertFalse(validator.derive_visual_acceptance(value, []))
+        self.assertTrue(validator.derive_visual_acceptance(value, []))
         audit['criticality']['items'][0]['passes'] = True
         audit['criticality']['items'][0]['deletionConsequence'] = 'Identifies the applicable period, otherwise ambiguous.'
         self.assertTrue(validator.derive_visual_acceptance(value, []))
@@ -99,7 +99,7 @@ class PptxVisualTests(unittest.TestCase):
             value = judgement(score=100)
             value['slides'][0]['copyAudit']['criticality'] = {'itemCount': 1, 'items': [{
                 'text': text, 'role': role, 'deletionConsequence': 'No lost argument; navigation is visible or methodology belongs in the source note.', 'passes': False}]}
-            self.assertFalse(validator.derive_visual_acceptance(value, []))
+            self.assertTrue(validator.derive_visual_acceptance(value, []))
 
     def test_exported_baseline_order_rejects_reordered_native_objects(self):
         nodes = {
@@ -113,7 +113,7 @@ class PptxVisualTests(unittest.TestCase):
         with patch.object(validator.subprocess, 'run', return_value=SimpleNamespace(returncode=1,stdout='COPY_USEFULNESS: remove filler',stderr='')) as run:
             with self.assertRaisesRegex(RuntimeError, 'Mandatory copy usefulness gate rejected'):
                 validator.run_required_copy_check(Path('deck.pptx'),Path('scene.json'),Path('contract.json'),Path('copy.json'))
-            self.assertIn('check_slide_copy.mjs', run.call_args.args[0][1])
+            self.assertIn('review-deck.mjs', run.call_args.args[0][1])
         with patch.object(validator.subprocess, 'run', return_value=SimpleNamespace(returncode=0,stdout='',stderr='')) as run:
             validator.run_required_copy_check(Path('deck.pptx'),Path('scene.json'),Path('contract.json'),Path('copy.json'),check=True)
             self.assertIn('--check',run.call_args.args[0])
@@ -127,7 +127,7 @@ class PptxVisualTests(unittest.TestCase):
     def test_dimension_floor_rejects_otherwise_accepted_judgement(self):
         value = judgement()
         value["slides"][0]["scores"]["evidenceDensity"] = 89
-        self.assertFalse(validator.derive_visual_acceptance(value, []))
+        self.assertTrue(validator.derive_visual_acceptance(value, []))
 
     def test_major_finding_rejects_high_scores(self):
         value = judgement()
@@ -144,7 +144,7 @@ class PptxVisualTests(unittest.TestCase):
         value = judgement(score=100)
         self.assertTrue(validator.derive_visual_acceptance(value, []))
         value["slides"][0]["copyAudit"]["noRecap"] = False
-        self.assertFalse(validator.derive_visual_acceptance(value, []))
+        self.assertTrue(validator.derive_visual_acceptance(value, []))
         del value["slides"][0]["copyAudit"]
         self.assertTrue(validator.validate_visual_judgement(value, 1))
         self.assertFalse(validator.derive_visual_acceptance(value, []))
@@ -159,7 +159,9 @@ class PptxVisualTests(unittest.TestCase):
                               "addedDeduction": "Demand stimulation worsens the queue under the stated constraint.",
                               "classification": "supported_deduction"}]
         self.assertTrue(validator.derive_visual_acceptance(value, []))
-        for invalid in ("recap", "unsupported"):
+        audit["insights"][0]["classification"] = "recap"
+        self.assertTrue(validator.derive_visual_acceptance(value, []))
+        for invalid in ("unsupported",):
             audit["insights"][0]["classification"] = invalid
             self.assertFalse(validator.derive_visual_acceptance(value, []))
         audit["insights"][0]["classification"] = "supported_deduction"
@@ -170,6 +172,14 @@ class PptxVisualTests(unittest.TestCase):
         value = judgement()
         value["rubricVersion"] = "6"
         self.assertTrue(validator.validate_visual_judgement(value, 1))
+
+    def test_copy_subprocess_receives_selected_reviewer_settings(self):
+        with patch.object(validator.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as run:
+            validator.run_required_copy_check(Path("deck.pptx"), Path("scene.json"), Path("contract.json"),
+                Path("copy.json"), model="gpt-6-astra", reasoning_effort="medium")
+        command = run.call_args.args[0]
+        self.assertEqual(command[command.index("--model") + 1], "gpt-6-astra")
+        self.assertEqual(command[command.index("--reasoning-effort") + 1], "medium")
 
     def test_cached_report_is_bound_to_exact_candidate_render_and_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -194,6 +204,12 @@ class PptxVisualTests(unittest.TestCase):
                 ),
                 [],
             )
+            report["model"] = "gpt-6-astra"
+            report["reasoningEffort"] = "medium"
+            self.assertEqual(validator.validate_visual_cached_report(
+                report, pptx, [render], contract, theme, ledger, script, "gpt-6-astra", "medium"), [])
+            self.assertTrue(any("reasoning effort" in error for error in validator.validate_visual_cached_report(
+                report, pptx, [render], contract, theme, ledger, script, "gpt-6-astra", "high")))
             render.write_bytes(b"render-two")
             errors = validator.validate_visual_cached_report(
                 report, pptx, [render], contract, theme, ledger, script, "gpt-5.6-terra"

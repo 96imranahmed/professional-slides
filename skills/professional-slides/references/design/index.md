@@ -14,6 +14,10 @@ Then resolve one [visual family and density profile](../theming/index.md#resolve
 
 ## Compose the page
 
+Carry material reviewed relationships into `slide.designContract`: `readingOrder` lists stable item IDs and `peerGroups` lists groups that must remain side by side. The compiled scene must preserve them; copying a design description into notes is insufficient. A new heading, table or image must serve the approved relationship, not a common builder template.
+
+Judge the visual form against the decision. Spatial choices may need a map; place or product comparisons may need source photographs to show relevant physical qualities; numerical comparisons may need a graph. Acquire these inputs when useful rather than defaulting to text because text is easier to generate. Do not use illustrative imagery as evidence of safety, quality or performance. Review line length, visual hierarchy, group placement and reading order alongside fit. Neither a visual quota nor a canvas-fill target demonstrates good composition.
+
 Use the [composition model](../composition/index.md) for the content-item contract, relationship-based layout selection, and nesting rules. Design begins after that tree resolves: select the visual family, density, guides, treatment, and hierarchy that make the declared relationships visible. [Slide layouts](slide-layouts.md) owns the corresponding page-geometry guidance.
 
 Do not impose the same card grid, three-column layout, process rail, or footer strip on most slides. Give each slide one dominant exhibit; route any detached synthesis or terminal action through the canonical [`Insight Box`](../components/insight-box.md). Evidence-attached chart annotations follow [`chart callouts`](../components/chart-callouts.md).
@@ -68,6 +72,8 @@ Use one mode for each slide family:
 
 Choose the registered density profile once for each coherent family and carry it through the treatment ledger. Never shrink text locally to make the wrong composition fit. Simplify duplicate copy or redesign the page; keep the measurements and qualifiers that make its evidence meaningful.
 
+Evidence density changes the slide's content typography. Page titles, trackers, source lines and page numbers retain the deck's base design typography across densities. The runtime measures and binds this page furniture in the deck context, so a larger schedule label does not also enlarge its title or footer. Recheck available body space after title wrapping; shorten an overlong title without changing its meaning or revise the composition rather than scaling the page furniture locally.
+
 ## Colour system
 
 Use colour for meaning, not decoration.
@@ -97,6 +103,10 @@ Keep the registered title role at one font size across a slide family. Every ord
 Prefer one line. When two lines are needed, wrap at a meaningful phrase and avoid a lone final word. Do not condense, locally shrink, or move a title to balance one slide.
 
 Use readable body text. Dense pre-reads may be compact, but the final render must still work at normal viewing size.
+
+Distinguish orienting labels from claims. A domain label such as “Investments” identifies a track; a conclusion-bearing heading or bold lead states what the evidence says. Judge the label by the ambiguity it prevents, not by whether it passes an action-title test. Express nesting with spacing, indentation and weight before adding colour or surfaces; see [synthesis alignment](slide-layouts.md#synthesis-alignment-and-continuation) and [inline emphasis](../components/inline-emphasis.md).
+
+Choose density for the reading context and a coherent composition family, not by copying a source's font sizes. Semantic colour must retain its meaning across narrative and exhibit pages, with labels or other non-colour cues where needed. Keep decision-changing qualifiers associated with their claims at the same readable evidence density; moving them to small footer copy must not change what the reader concludes.
 
 ## Spacing system
 
@@ -171,11 +181,11 @@ Before production, record each slide's main exhibit and every secondary section 
 
 Review these choices across the complete sequence, including nested halves and rails. Repeated insight boxes, two-metric-plus-insight rails, logo grids or chart silhouettes require a content-specific comparison reason. Change the composition where repetition obscures a different job. Preserve table schemas and recurring chrome where they aid reading. Do not add images, arrows or random variants just to meet a diversity quota. An unexplained repeated composition blocks design approval.
 
-## Criticality is a hard acceptance gate
+## Contribution and material-defect review
 
-Every title, internal heading, annotation and supporting section MUST pass the deletion test: identify the specific argument, scope, evidence interpretation, decision or navigation that becomes materially weaker or ambiguous if it is removed. Accuracy alone is insufficient. A heading that paraphrases its body, generic label, repeated conclusion or decorative annotation fails. Remove it; do not invent a replacement heading to satisfy a component slot. Necessary measure, unit, period and comparison labels remain.
+Every title, heading, annotation and section should contribute evidence, explanation, interpretation, qualification, synthesis or navigation. Necessary labels remain; pure redundancy is an editorial advisory.
 
-Apply this check during dot-dash planning and again to every exact rendered slide. Record the exact text, role, deletion consequence and pass/fail for each title, heading and annotation. Missing coverage or any failed item blocks acceptance regardless of aggregate scores or other passing tests. Use TITLE_CRITICALITY for redundant titles/headings and ANNOTATION_CRITICALITY for unnecessary chart callouts.
+Use one coordinated rendered review with complete coverage. Severity follows the production policy: factual, readability and missing-argument defects block; stylistic preferences do not restart review.
 
 For a simple directly labelled two-value bar comparison, a derived catch-up requirement or decision implication belongs in the insight section, potentially as a second supporting bullet. Do not attach it to a bar as if it were the plotted quantity. Chart annotations must need a specific visual anchor to explain that mark, event or interval; preserve warranted growth/change highlights. Assess insight reasoning as a whole: a calculated supporting premise may support a deduction without being a standalone insight itself.
 

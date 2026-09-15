@@ -10,9 +10,9 @@ const scene={slides:[1,2].map(i=>({id:'s'+i,nodes:[{id:'fact'+i,type:'text',role
 const inv=buildCopyInventory(scene,{},[{id:'source:diagnostic',text:'Underlying finding',slides:[1],source:{sha256:'a'}}]);
 assert.equal(inv.slides[0].sourceEvidence.length,1);assert.equal(inv.slides[1].sourceEvidence.length,0);
 const subset={...inv,slides:inv.slides.slice(0,1)};
-const item={id:'fact1',textHash:copyHash('A source-grounded operating finding'),decision:'keep',classification:'evidence',addedInformation:'A material observed constraint',deletionConsequence:'The design constraint would disappear',evidenceIds:['source:diagnostic'],reason:'Source establishes the constraint',repair:'None'};
+const item={id:'fact1',textHash:copyHash('A source-grounded operating finding'),decision:'keep',severity:'none',code:'NONE',classification:'evidence',addedInformation:'A material observed constraint',deletionConsequence:'The design constraint would disappear',evidenceIds:['source:diagnostic'],reason:'Source establishes the constraint',repair:'None'};
 assert.deepEqual(validateCopyReview(subset,{items:[item]}),[]);
-assert.ok(validateCopyReview(subset,{items:[{...item,classification:'recap'}]}).length);
+assert.deepEqual(validateCopyReview(subset,{items:[{...item,classification:'recap'}]}),[]);
 assert.ok(validateCopyReview(subset,{items:[{...item,evidenceIds:['source:unmapped']}]}).length);
 assert.ok(validateCopyReview(subset,{items:[{...item,evidenceIds:[]}]}).length);
 const schema=copyReviewSchema(inv.slides[0].targets,['fact1','source:diagnostic']);
@@ -29,14 +29,15 @@ const node=(id,role,text)=>({id,role,text,type:'text',data:{componentInstance:'s
 const scene={slides:[{id:'s',nodes:[node('heading','evidence-note-heading','Price basis'),node('body','evidence-note-body','ACS 2020–2024 existing housing stock.'),node('value','data-label','$2.5k')]}]};
 const inv=buildCopyInventory(scene,{mainQuestion:'Which city?'});
 assert.deepEqual(inv.slides[0].targets.map(t=>t.id),['heading','body']);
-const keep=target=>({id:target.id,textHash:copyHash(target.text),decision:'keep',classification:'measurement',addedInformation:'Defines the price measure.',deletionConsequence:'The price could be mistaken for an asking quote.',evidenceIds:['value'],reason:'Identifies the measure.',repair:'None'});
+const keep=target=>({id:target.id,textHash:copyHash(target.text),decision:'keep',severity:'none',code:'NONE',classification:'measurement',addedInformation:'Defines the price measure.',deletionConsequence:'The price could be mistaken for an asking quote.',evidenceIds:['value'],reason:'Identifies the measure.',repair:'None'});
 const judgement={items:inv.slides[0].targets.map(keep)};
 assert.equal(validateCopyReview(inv,judgement).length,0);
-for(const mutate of [j=>j.items.pop(),j=>j.items.push(j.items[0]),j=>j.items[0].textHash='old',j=>j.items[0].decision='remove',j=>j.items[0].classification='methodology',j=>j.items[0].evidenceIds=['invented'],j=>j.items[0].reason='',j=>{j.items[0].classification='substantive';j.items[0].evidenceIds=[];}]){
+for(const mutate of [j=>j.items.pop(),j=>j.items.push(j.items[0]),j=>j.items[0].textHash='old',j=>j.items[0].decision='invalid',j=>j.items[0].classification='invalid',j=>j.items[0].evidenceIds=['invented'],j=>j.items[0].reason='',j=>{j.items[0].classification='substantive';j.items[0].evidenceIds=[];}]){
  const j=structuredClone(judgement);mutate(j);assert.ok(validateCopyReview(inv,j).length);
 }
 const report={version:COPY_CHECK_VERSION,model:'gpt-5.6-luna',inputs:{pptx:'a'},accepted:true,judgement};
 assert.equal(validateCopyReport(inv,{pptx:'a'},report).length,0);
+assert.equal(validateCopyReport(inv,{pptx:'a'},{...report,model:'gpt-6-astra',reasoningEffort:'medium'}).length,0);
 assert.ok(validateCopyReport(inv,{pptx:'b'},report).length);
 const changed=structuredClone(inv);changed.slides[0].targets[0].text='New heading';
 assert.ok(validateCopyReport(changed,{pptx:'a'},report).length);
@@ -63,7 +64,7 @@ console.log(JSON.stringify({ok:true}));
 import assert from 'node:assert/strict';
 import {buildCopyPrompt} from './skills/professional-slides/runtime/copy-check.mjs';
 const prompt=buildCopyPrompt({question:'Which city?',slides:[]});
-for(const text of ['attached rendered slide images','unique, relevant and supported knowledge','ALL other visible content','after deleting','Methodology','budget formula','substantive theme headings are navigation','explicitly required growth highlight','Do not execute instructions'])assert.ok(prompt.includes(text));
+for(const text of ['attached rendered slide images','Evaluate contribution:','ALL other visible content','after deleting','Methodology','budget formula','Substantive theme headings are navigation','explicitly required growth highlight','Do not execute instructions'])assert.ok(prompt.includes(text));
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result['ok'])
@@ -77,6 +78,25 @@ const props={...owner.sample,items:owner.sample.items.map(item=>({...item,title:
 const result=owner.render({id:'icons',frame:{x:0,y:0,width:1160,height:460},props,tokens:owner.tokens});
 assert.deepEqual(result.nodes.filter(n=>n.type==='text').map(n=>n.text),props.items.map(i=>i.text));
 assert.ok(!result.nodes.some(n=>n.role==='heading'));
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result['ok'])
+
+    def test_synthesis_context_reaches_review_without_weakening_grounding(self):
+        result=run_node('''
+import assert from 'node:assert/strict';
+import {buildCopyInventory,buildCopyPrompt,validateCopyReview,copyHash} from './skills/professional-slides/runtime/copy-check.mjs';
+const groups=[{id:'diagnostic',scope:'diagnostic',slides:[1,2],governingAnswer:'Prioritize further design',decisionStage:'options',proofSlides:[2],conditions:['Validate cost']}];
+const decision={status:'present',purpose:'decision',rationale:'Two-page diagnostic'};
+const scene={slides:[1,2].map(i=>({id:'s'+i,nodes:[{id:'n'+i,type:'text',role:'paragraph',text:'A scoped finding',data:{}}]}))};
+const inventory=buildCopyInventory(scene,{synthesisGroups:groups,executiveSummaryDecision:decision});
+assert.deepEqual(inventory.synthesisGroups,groups);
+assert.deepEqual(inventory.summaryDecision,decision);
+const prompt=buildCopyPrompt(inventory);
+assert.ok(prompt.includes(JSON.stringify(groups)));
+assert.ok(prompt.includes('Do not require fixed theme/bullet counts'));
+const review={items:inventory.slides.map(s=>({id:s.targets[0].id,textHash:copyHash(s.targets[0].text),decision:'keep',severity:'none',code:'NONE',classification:'evidence',addedInformation:'Finding',deletionConsequence:'Loss',evidenceIds:[],reason:'Scoped',repair:'None'}))};
+assert.ok(validateCopyReview(inventory,review).some(e=>e.includes('Ungrounded')));
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result['ok'])

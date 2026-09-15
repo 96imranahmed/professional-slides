@@ -59,7 +59,7 @@ assert.equal(slide.tokens['type.body'].value,12.6);
 assert.equal(slide.tokens['type.chartLabel'].value,12.6);
 assert.equal(slide.tokens['type.actionTitle'].value,27);
 assert.ok(slide.nodes.filter(node=>node.role==='node-label'||node.role==='insight-tree-insight-text'||node.role==='insight-tree-implication-text').every(node=>node.style.fontSize.value===12.6));
-assert.equal(slide.nodes.find(node=>node.role==='action-title').style.fontSize.value,27);
+assert.equal(slide.nodes.find(node=>node.role==='action-title').style.fontSize.value,30);
 assert.equal(slide.nodes.filter(node=>node.role==='tree-node'&&node.data.depth===1).length,4);
 assert.equal(slide.nodes.filter(node=>node.role==='tree-node'&&node.data.depth===2).length,7);
 console.log(JSON.stringify({accepted:true}));

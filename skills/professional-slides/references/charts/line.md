@@ -12,7 +12,7 @@ Trends, inflection points, trajectory comparisons, and actual-versus-forecast ov
 
 ## Data contract
 
-A consistently spaced temporal or ordered x-axis, numeric measures, explicit units, and status boundaries for forecast or target. The current runtime rejects missing observations: every series must contain exactly one finite value per category; nulls, mismatched arrays, and bounds excluding values fail before layout. Do not replace missing data with zero, interpolate silently, or drop a period and connect across it. If gaps are material, extend the canonical chart owner with an explicit gap policy before authoring or choose an exhibit that preserves the unavailable observations.
+A consistently spaced temporal or ordered x-axis, numeric measures, explicit units, and status boundaries for forecast or target. The categorical runtime rejects missing observations: every series must contain exactly one finite value per category; nulls, mismatched arrays, and bounds excluding values fail before layout. `chart.line` also supports the explicit numeric sparse contract below; `chart.area` retains the complete categorical contract. Do not replace missing data with zero, interpolate silently, or drop a period and connect across it. If gaps are material, extend the canonical chart owner with an explicit gap policy before authoring or choose an exhibit that preserves the unavailable observations.
 
 ## Construction
 
@@ -48,3 +48,16 @@ The direction, inflection, and status boundary remain clear in grayscale and all
 
 
 Constant-rate extrapolations and endpoint-only comparisons fail the [chart-choice gate](index.md#select-from-the-available-evidence-before-dot-dash-approval). Use common-period bars; a calendar axis alone is not evidence of temporal variation.
+
+
+## Explicit numeric sparse observations
+
+Use this `chart.line` contract for irregularly spaced dates or measurements and series with distinct coverage. It does not alter categorical array behavior. Supply `xAxis: {unit, min, max, ticks:[{value,label}]}`, a visible chart `heading` and shared quantitative `unit`, and named series with `points:[{key,x,y,label?,breakBefore?}]`. All coordinates must be finite, all keys unique within a series, x values strictly increasing and within the shared domain. Optional point/series `unit` and `xUnit` must exactly match the shared axes. Never combine this input with `categories` or `values` arrays. Numeric x spacing is proportional to the supplied values.
+
+Declare `gapPolicy: "connect-observations"` to explicitly join only the supplied observations with straight segments. Such joins do not generate intermediate values. Qualify approximate source digitisation visibly and retain the source image, hash, selected readings and uncertainty. For a true observation gap, use `gapPolicy: "explicit-breaks"` and `breakBefore:true` on the first observation after the gap. No line bridges that break. Nulls are rejected; they are never interpreted as zero or a missing-value policy. A series starts and ends at its own supplied points, with no extension into another series' coverage.
+
+`statusBoundary: {x,beforeLabel,afterLabel}` draws a measured labelled boundary. Every series must then declare `status:"before"` or `status:"after"`; its observations must stay on that side, with a shared boundary observation allowed. This preserves historical/modelled or actual/forecast scope without overlapping incompatible coverage.
+
+The optional `assumption` is a measured body-role caption immediately below the chart title, with explicit dependencies on the plotted observation markers. Use it for a source-supported model assumption, not a second action title. If the caption or status labels consume too much plot space, the owner rejects the allocation.
+
+Use `label:true` on selected points to show their formatted values; overlapping labels reject. Evidence annotations use exact `series` and `category` equal to the point's `key`. Every emitted segment depends on its two exact marker IDs; value labels and keyed annotation objects depend on their target marker. The neutral `numeric-sparse-observations` fixture includes irregular distances, disjoint series coverage, an explicit break and a status boundary. Sparse areas, categorical annotation rails, change decorations and automatic categorical end labels are outside this bounded contract.

@@ -1,3 +1,5 @@
+import { formatValue } from "./value-format.mjs";
+export { formatValue } from "./value-format.mjs";
 import {
   ellipsePrimitive,
   TOKENS,
@@ -50,11 +52,12 @@ const SERIES = [
   token("color.chartSeries6")
 ];
 
-function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0 } = {}) {
+function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0 } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
   leftInset = Math.max(leftInset, bands.left);
-  const top = (topLegend ? 52 : 28) + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top;
-  const bottom = 68 + bands.bottom;
+  const top = (topLegend ? 52 : 28) + totalLabelInset + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top;
+  // Reserve the actual last metric row plus a trailing theme gap, not another full row band.
+  const bottom = bands.bottom ? 40 + bands.bottom + tokenValue(token("space.3")) : 68;
   const rightInset = Math.max(valueLabelInset, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16);
   if (frame.height - bottom - top < 100) throw new Error("Chart annotation bands leave insufficient plot height; enlarge or split the exhibit");
   if (frame.width - leftInset - rightInset < 120) throw new Error("Chart has insufficient plot width; enlarge or split the exhibit");
@@ -66,16 +69,6 @@ function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotati
   };
 }
 
-export function formatValue(value, props) {
-  const format = props.valueFormat;
-  if (!format) return String(value);
-  const units = {k: 1000, m: 1000000, bn: 1000000000};
-  if (format.compactUnit !== undefined && !Object.hasOwn(units, format.compactUnit)) throw new Error("valueFormat.compactUnit must be k, m or bn");
-  const divisor = units[format.compactUnit] || 1;
-  const decimals = format.decimals ?? (format.compactUnit ? 1 : 0);
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 6) throw new Error("valueFormat.decimals must be an integer from zero to six");
-  return `${format.prefix || ""}${Number(value / divisor).toFixed(decimals)}${format.compactUnit || ""}${format.suffix || ""}`;
-}
 
 function textStyle(size = CHART_LABEL, color = SECONDARY, bold = false, align = "center") {
   return { ...(bold ? chartAnnotationStyle() : { fontFamily: FONT }), fontSize: size, color, bold, align, valign: "mid" };
@@ -241,7 +234,7 @@ function horizontalAxes(id, plot, xMin, xMax, steps = 4, { gridlines = false, sh
   return nodes;
 }
 
-function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true }) {
+function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, allowOutsideReferenceLabels = false }) {
   const underlay = [];
   const overlay = [];
   const evidenceAnnotations = renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles });
@@ -290,6 +283,7 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
   }
   if (yScale) {
     for (const [index, reference] of (props.referenceLines || []).entries()) {
+      if(reference.placement === "outside-end" && !allowOutsideReferenceLabels) throw new Error("Outside reference labels are supported only on column charts");
       const y = yScale(reference.value);
       underlay.push(linePrimitive({
         id: stableId(id, "reference-line", index),
@@ -304,13 +298,15 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
       const measured = measureText(text, Math.min(240, plot.width * 0.45), { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(CHART_ANNOTATION), bold: true, wrapWidthRatio: 1 });
       const labelWidth = Math.ceil(measured.width) + 2;
       const labelHeight = measured.height;
-      const labelCandidates = [
+      const labelCandidates = reference.placement === "outside-end" ? [
+        { x: plot.x + plot.width + tokenValue(token("space.3")), y: y-labelHeight/2, width: labelWidth, height: labelHeight, align: "left" }
+      ] : [
         { x: plot.x + plot.width - labelWidth - 4, y: y - labelHeight - 8, width: labelWidth, height: labelHeight, align: "right" },
         { x: plot.x + 8, y: y - labelHeight - 8, width: labelWidth, height: labelHeight, align: "left" },
         { x: plot.x + plot.width - labelWidth - 4, y: y + 8, width: labelWidth, height: labelHeight, align: "right" },
         { x: plot.x + 8, y: y + 8, width: labelWidth, height: labelHeight, align: "left" }
       ];
-      const labelFrame = labelCandidates.find((candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (props.referenceLines || []).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4));
+      const labelFrame = labelCandidates.find((candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (reference.placement === "outside-end" || (props.referenceLines || []).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4)));
       if (!labelFrame) throw new Error("No collision-free reference-line label position; revise the chart composition");
       overlay.push(textPrimitive({
         id: stableId(id, "reference-label", index),
@@ -347,9 +343,62 @@ function withDecorations(nodes, options) {
   return [...underlay, ...layeredNodes.flatMap((node) => [...backings.filter((backing) => backing.data.forNode === node.id), node]), ...overlay];
 }
 
+function stackLabelPlan(props, categories, series, stacked) {
+  const totals = new Map(), secondary = new Map();
+  if(props.secondaryLabelStyle !== undefined && !["stacked", "parenthetical"].includes(props.secondaryLabelStyle)) throw new Error("Unknown secondary label style");
+  if(props.secondaryLabelStyle === "parenthetical" && (typeof props.secondaryUnit !== "string" || !props.secondaryUnit.trim() || !String(props.heading || "").toLowerCase().includes(props.secondaryUnit.toLowerCase()))) throw new Error("Parenthetical secondary labels require a shared unit explicitly decoded in the chart heading");
+  if (props.stackTotals === undefined && props.secondaryLabels === undefined) return { totals, secondary };
+  if (!stacked || series.some(item => item.values.some(value => value < 0)))
+    throw new Error("Stack attachments require nonnegative stacked data; signed endpoints need an explicit interpretation");
+  if (props.dataLabels === false) throw new Error("Stack attachments require visible data labels");
+  for (const [name, records] of [["stackTotals", props.stackTotals], ["secondaryLabels", props.secondaryLabels]]) {
+    if (records !== undefined && !Array.isArray(records)) throw new Error(`${name} must be an array`);
+    for (const record of records || []) {
+      if (!record || !categories.includes(record.category) || !Number.isFinite(record.value))
+        throw new Error(`${name} requires exact category keys and finite values`);
+      if (name === "stackTotals") {
+        if (totals.has(record.category)) throw new Error("Duplicate stack total category");
+        const sum = series.reduce((value, item) => value + item.values[categories.indexOf(record.category)], 0);
+        const tolerance = record.roundingTolerance ?? 0;
+        if (!Number.isFinite(tolerance) || tolerance < 0 || (tolerance > 0 && !record.roundingReason?.trim()))
+          throw new Error("Stack total rounding tolerance requires a finite nonnegative value and an explanation");
+        if (Math.abs(sum - record.value) > tolerance + 1e-9) throw new Error("Stack total does not reconcile to its components");
+        totals.set(record.category, { ...record, endpoint: sum });
+      } else {
+        if ((record.anchor === "stack-total") === (record.series !== undefined) ||
+            (record.anchor !== undefined && record.anchor !== "stack-total") ||
+            (record.series !== undefined && !series.some(item => item.name === record.series)) ||
+            typeof record.unit !== "string" || !record.unit.trim())
+          throw new Error("Secondary labels require an exact series or stack-total anchor and a unit");
+        if (record.formattedValue !== undefined) throw new Error("Secondary labels use valueFormat, not unvalidated formattedValue");
+        const key = `${record.category}:${record.series ?? "stack-total"}`;
+        if (secondary.has(key)) throw new Error("Duplicate secondary label anchor");
+        if(props.secondaryLabelStyle === "parenthetical" && record.unit !== props.secondaryUnit) throw new Error("Secondary label unit differs from the shared unit");
+        secondary.set(key, props.secondaryLabelStyle === "parenthetical" ? formatValue(record.value, record) : `${formatValue(record.value, record)} ${record.unit}`);
+      }
+    }
+  }
+  for (const category of categories) if (secondary.has(`${category}:stack-total`) && !totals.has(category))
+    throw new Error("A secondary total label requires its primary stack total");
+  return { totals, secondary };
+}
+
+const attachedLabelText = (primary,secondary,props) => secondary
+  ? props.secondaryLabelStyle === "parenthetical" ? `${primary} (${secondary})` : `${primary}\n${secondary}`
+  : primary;
+const measureDataLabel = (text, width = 1000) => {
+  const measured = measureText(text, width, {
+    fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1
+  });
+  // Keep the same font-engine clearance used by ordinary text wrapping, and
+  // survive the scene's coordinate rounding without creating a spurious wrap.
+  return { ...measured, width: Math.ceil(measured.width / 0.97) + 2 };
+};
+
 function categoricalChart({ id, frame, props, horizontal = false, stacked = false, tokens = TOKENS }) {
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props);
+  const stackLabels = stackLabelPlan(props, categories, series, stacked);
   const highlights = normalizedHighlights(props, { categories, series, allowBar: !stacked });
   const barHighlight = highlights.find(highlight => highlight.style === "bar");
   const regionHighlight = highlights.find(highlight => highlight.style === "region-box" || highlight.style === "region-tint");
@@ -361,7 +410,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const chartProps = { ...props, highlights };
   const showLegend = props.legend !== false && series.length > 1;
   const values = series.flatMap((item) => item.values);
-  const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && series.length === 1);
+  const showDataLabels = props.dataLabels === true || stackLabels.totals.size > 0 || stackLabels.secondary.size > 0 || (props.dataLabels !== false && series.length === 1);
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   const barLabelGap = tokenValue(token("space.3"));
   const barLabelWidth = Math.max(50, ...values.map(value => Math.ceil(measureText(formatValue(value, props), 300, {fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1}).width)));
@@ -369,15 +418,44 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     ? Math.min(180, Math.max(72, Math.ceil(Math.max(...categories.map(category => measureText(category, 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width))) + 12))
     : 0;
   const negativeLabelGutter = horizontal && !stacked && showDataLabels && values.some(v=>v<0) ? barLabelWidth + barLabelGap : 0;
+  const totalTexts = new Map([...stackLabels.totals].map(([category, record]) => [category,
+    attachedLabelText(formatValue(record.value, props), stackLabels.secondary.get(`${category}:stack-total`),props)]));
+  const totalMetrics = [...totalTexts.values()].map(text => measureDataLabel(text));
+  const totalHeight = totalMetrics.length ? Math.max(...totalMetrics.map(item => item.height)) + barLabelGap : 0;
+  const totalWidth = totalMetrics.length ? Math.max(...totalMetrics.map(item => item.width)) + barLabelGap : 0;
+  for(const reference of props.referenceLines || []) if(reference.placement !== undefined && !["inside", "outside-end"].includes(reference.placement)) throw new Error("Unknown reference-line label placement");
+  if(horizontal && (props.referenceLines || []).some(r=>r.placement === "outside-end")) throw new Error("Outside reference labels require a vertical quantitative axis");
+  const referenceGutter = Math.max(0,...(props.referenceLines || []).filter(r=>r.placement === "outside-end").map(r=>measureDataLabel(r.label || String(r.value)).width + barLabelGap));
   const plot = chartFrame(frame, {
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
     leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54,
-    valueLabelInset: horizontal && !stacked && showDataLabels ? barLabelWidth + barLabelGap : 0,
+    valueLabelInset: horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter,
+    totalLabelInset: horizontal ? 0 : totalHeight,
     centerPlot: !horizontal && !showValueAxis
   });
+  const categoryLayouts = horizontal ? [] : categories.map(category => measureText(category, plot.width/categories.length-8, {fontFamily:tokenValue(FONT),fontSize:tokenValue(AXIS_LABEL)}));
+  if(!horizontal) {
+    plot.categoryLabelHeight=Math.max(...categoryLayouts.map(label=>label.height));
+    plot.height-=Math.max(0,plot.categoryLabelHeight-28);
+    if(plot.height<100)throw new Error("Category labels leave insufficient plot height");
+  }
+  const categoryGroups=props.categoryGroups ?? [];
+  if(!Array.isArray(categoryGroups) || (horizontal && categoryGroups.length)) throw new Error("Category groups require an array on a horizontal category axis");
+  const groupedCategories=new Set(),groupIds=new Set();
+  for(const group of categoryGroups) {
+    if(!group || typeof group.id!=="string" || !group.id.trim() || groupIds.has(group.id) || typeof group.label!=="string" || !group.label.trim() || !Array.isArray(group.categories) || group.categories.length<2) throw new Error("Category groups require unique IDs, labels and at least two categories");
+    groupIds.add(group.id);
+    const indices=group.categories.map(category=>categories.indexOf(category));
+    if(indices.some((n,i)=>n<0 || i>0&&n!==indices[i-1]+1) || group.categories.some(category=>groupedCategories.has(category))) throw new Error("Category groups require exact contiguous ordered non-overlapping categories");
+    group.categories.forEach(category=>groupedCategories.add(category));
+  }
+  const groupLayouts=categoryGroups.map(group=>measureText(group.label,plot.width/categories.length*group.categories.length-16,{fontFamily:tokenValue(FONT),fontSize:tokenValue(AXIS_LABEL)}));
+  plot.categoryGroupHeight=categoryGroups.length?Math.max(...groupLayouts.map(m=>m.height))+tokenValue(token("space.3"))*2:0;
+  plot.height-=plot.categoryGroupHeight;
+  if(plot.height<100)throw new Error("Category groups leave insufficient plot height");
   const stackExtents = categories.flatMap((_, categoryIndex) => {
     if (!stacked) return series.map(item => item.values[categoryIndex]);
     const categoryValues = series.map(item => item.values[categoryIndex]);
@@ -423,13 +501,26 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     style: lineStyle(INK)
   }));
   const categorySpan = (horizontal ? plot.height : plot.width) / categories.length;
-  const groupSpan = categorySpan * 0.7;
+  let groupSpan = categorySpan * 0.7;
+  let stackExternalWidth = 0;
+  if (stacked && !horizontal && showDataLabels) {
+    for (const category of categories) for (const item of series) {
+      const value=item.values[categories.indexOf(category)];
+      const text=attachedLabelText(formatValue(value,props),stackLabels.secondary.get(`${category}:${item.name}`),props);
+      const label=measureDataLabel(text,Math.max(1,groupSpan-8));
+      if(label.height>Math.abs(value)/bounds.span*plot.height) stackExternalWidth=Math.max(stackExternalWidth,measureDataLabel(text,categorySpan*.45).width);
+    }
+    if(stackExternalWidth) {
+      groupSpan=Math.min(groupSpan,categorySpan-stackExternalWidth-tokenValue(token("space.3"))*2);
+      if(groupSpan<tokenValue(token("space.4"))) throw new Error("External stack label leaves insufficient mark width; enlarge the chart or reduce categories");
+    }
+  }
   const barSpan = stacked ? groupSpan : groupSpan / series.length;
   categories.forEach((category, categoryIndex) => {
-    const categoryStart = (horizontal ? plot.y : plot.x) + categoryIndex * categorySpan + (categorySpan - groupSpan) / 2;
+    const categoryStart = (horizontal ? plot.y : plot.x) + categoryIndex * categorySpan + (stackExternalWidth ? tokenValue(token("space.2")) : (categorySpan - groupSpan) / 2);
     categoryMap.set(category, horizontal
       ? { x: plot.x, y: categoryStart, width: plot.width, height: groupSpan }
-      : { x: categoryStart, y: plot.y, width: groupSpan, height: plot.height });
+      : { x: categoryStart, y: plot.y, width: groupSpan, height: plot.height, labelSpan: categorySpan, labelCenter: stacked ? categoryStart+(groupSpan-4)/2 : plot.x+(categoryIndex+.5)*categorySpan });
     let positiveCumulative = 0;
     let negativeCumulative = 0;
     series.forEach((item, seriesIndex) => {
@@ -465,6 +556,9 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
         data: { category, categoryKey: category, series: item.name, seriesKey: item.name, colorIndex, highlighted: Boolean(selected), ...(barHighlight ? { highlightStyle: "bar" } : {}) }
       }));
       if (showDataLabels) {
+        let labelText = attachedLabelText(formatValue(value, props), stackLabels.secondary.get(`${category}:${item.name}`),props);
+        const labelMetrics = measureDataLabel(labelText, stacked && !horizontal ? Math.max(1,bar.width-4) : 1000);
+        labelText = labelMetrics.text;
         const labelFrame = horizontal
           ? stacked
             ? { x: bar.x + 2, y: bar.y - 2, width: Math.max(1, bar.width - 4), height: bar.height + 4 }
@@ -472,7 +566,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
               ? { x: bar.x + bar.width + barLabelGap, y: bar.y - 2, width: barLabelWidth, height: bar.height + 4 }
               : { x: bar.x - barLabelGap - barLabelWidth, y: bar.y - 2, width: barLabelWidth, height: bar.height + 4 }
           : stacked
-            ? { x: bar.x + 2, y: bar.y + (bar.height - 24) / 2, width: bar.width - 4, height: 24 }
+            ? { x: bar.x + 2, y: bar.y + (bar.height - labelMetrics.height) / 2, width: bar.width - 4, height: labelMetrics.height }
             : value >= 0
               ? { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }
               : { x: bar.x - 10, y: Math.min(plot.y + plot.height - 24, bar.y + bar.height + 2), width: bar.width + 20, height: 24 };
@@ -480,7 +574,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
           id: stableId(id, "value-label", item.name, category),
           role: "data-label",
           frame: labelFrame,
-          text: formatValue(value, props),
+          text: labelText,
           style: textStyle(CHART_LABEL, stacked && contrastRatio(tokens[SERIES[colorIndex].tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[SERIES[colorIndex].tokenId].value, tokens["color.ink"].value) ? token("color.onPrimary") : INK, true, horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
           data: { category, series: item.name }
         }));
@@ -512,31 +606,74 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
           changeX: categoryStart + groupSpan / 2,
           changeY: yScale(categoryValue) - (showDataLabels ? 38 : 16)
         });
-    if (stacked && !horizontal && showDataLabels) {
-      const labels = nodes.filter((node) => node.role === "data-label" && node.data.category === category).sort((a, b) => a.frame.y - b.frame.y);
-      const marks = nodes.filter((node) => node.role === "chart-mark" && node.id.endsWith(`:${stableId(category)}`));
-      if (marks.some((mark) => mark.frame.height < 24)) {
-        const startY = Math.min(labels[0].frame.y, plot.y + plot.height - labels.length * 26);
-        labels.forEach((label, index) => {
-          const mark = marks.find((mark) => mark.id === stableId(id, "series", label.data.series, category));
-          const x = mark.frame.x + mark.frame.width + 6;
-          label.frame = { x, y: startY + index * 26, width: 34, height: 24 };
-          // Resolve a new inherited binding through the primitive constructor.
-          Object.assign(label, textPrimitive({ id: label.id, role: label.role, frame: label.frame, text: label.text, data: label.data, style: textStyle(CHART_LABEL, INK, true, "left") }));
-          nodes.push(linePrimitive({ id: stableId(label.id, "leader"), role: "data-label-leader", x1: mark.frame.x + mark.frame.width, y1: mark.frame.y + mark.frame.height / 2, x2: x - 2, y2: label.frame.y + 12, style: lineStyle(INK) }));
-        });
+    if (stacked && showDataLabels) {
+      const labels = nodes.filter(node => node.role === "data-label" && node.data.category === category);
+      const marks = nodes.filter(node => node.role === "chart-mark" && node.data.category === category);
+      for (const label of labels) {
+        const mark = marks.find(mark => mark.data.series === label.data.series);
+        const metrics = measureDataLabel(label.text);
+        if (metrics.width <= mark.frame.width - 4 && metrics.height <= mark.frame.height) continue;
+        if (horizontal) throw new Error("Stacked bar label does not fit its segment; enlarge the chart or use stacked columns with external labels");
+        const x = mark.frame.x + mark.frame.width + 6;
+        const boundary = plot.x + (categoryIndex + 1) * categorySpan;
+        if (x + metrics.width > boundary) throw new Error("External stack label exceeds its category lane; enlarge the chart or reduce categories");
+        label.frame = { x, y: Math.max(plot.y, Math.min(mark.frame.y + (mark.frame.height - metrics.height) / 2, plot.y + plot.height - metrics.height)), width: metrics.width, height: metrics.height };
+        Object.assign(label, textPrimitive({ id: label.id, role: label.role, frame: label.frame, text: label.text, data: { ...label.data, external: true }, style: textStyle(CHART_LABEL, INK, true, "left") }));
+        nodes.push(linePrimitive({ id: stableId(label.id, "leader"), role: "data-label-leader", x1: mark.frame.x + mark.frame.width, y1: mark.frame.y + mark.frame.height / 2, x2: x - 2, y2: label.frame.y + metrics.height / 2, style: lineStyle(INK) }));
       }
+      const external = labels.filter(label => label.data.external).sort((a,b) => a.frame.y-b.frame.y);
+      const separation = tokenValue(token("space.1"));
+      if (external.reduce((sum,label)=>sum+label.frame.height,0) + Math.max(0,external.length-1)*separation > plot.height)
+        throw new Error("External stack labels exceed the plot height; enlarge the chart or reduce categories");
+      for (let i=1;i<external.length;i++) external[i].frame.y = Math.max(external[i].frame.y,external[i-1].frame.y+external[i-1].frame.height+separation);
+      for (let i=external.length-1;i>=0;i--) {
+        const limit=i===external.length-1 ? plot.y+plot.height : external[i+1].frame.y-separation;
+        external[i].frame.y=Math.min(external[i].frame.y,limit-external[i].frame.height);
+      }
+      for (const label of external) {
+        const mark=marks.find(mark=>mark.data.series===label.data.series);
+        Object.assign(label,textPrimitive({id:label.id,role:label.role,frame:label.frame,text:label.text,data:label.data,style:textStyle(CHART_LABEL,INK,true,"left")}));
+        const leader=nodes.find(node=>node.id===stableId(label.id,"leader"));
+        Object.assign(leader,linePrimitive({id:leader.id,role:"data-label-leader",x1:mark.frame.x+mark.frame.width,y1:mark.frame.y+mark.frame.height/2,x2:label.frame.x-2,y2:label.frame.y+label.frame.height/2,style:lineStyle(INK)}));
+      }
+    }
+    if (totalTexts.has(category)) {
+      const text = totalTexts.get(category), metrics = measureDataLabel(text);
+      if ((!horizontal && metrics.width > categorySpan - 8) || (horizontal && metrics.height > groupSpan))
+        throw new Error("Stack total label does not fit its category lane");
+      const endpoint = stackLabels.totals.get(category).endpoint;
+      nodes.push(textPrimitive({ id: stableId(id, "stack-total", category), role: "data-label",
+        frame: horizontal
+          ? { x: xScale(endpoint)+barLabelGap, y: categoryStart+(groupSpan-metrics.height)/2, width: metrics.width, height: metrics.height }
+          : { x: categoryStart+(barSpan-4-metrics.width)/2, y: yScale(endpoint)-barLabelGap-metrics.height, width: metrics.width, height: metrics.height },
+        text, style: textStyle(CHART_LABEL, INK, true, horizontal ? "left" : "center"),
+        data: { category, anchor: "stack-total", value: stackLabels.totals.get(category).value, endpoint }
+      }));
     }
     nodes.push(textPrimitive({
       id: stableId(id, "category", category),
       role: "category-label",
       frame: horizontal
         ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: categoryStart, width: horizontalCategoryLabelWidth, height: groupSpan }
-        : { x: categoryStart - 8, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: groupSpan + 16, height: 28 },
-      text: category,
-      style: textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center")
+        : { x: categoryMap.get(category).labelCenter-(categorySpan-8)/2, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: categorySpan-8, height: categoryLayouts[categoryIndex].height },
+      text: horizontal ? category : categoryLayouts[categoryIndex].text,
+      style: { ...textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), ...(!horizontal ? {valign:"top",lineHeight:categoryLayouts[categoryIndex].lineHeight,wrap:false} : {}) },
+      data: {category,...(!horizontal ? {textLayout:categoryLayouts[categoryIndex]} : {})}
     }));
   });
+  for(const [i,group] of categoryGroups.entries()) {
+    const start=categories.indexOf(group.categories[0]),end=start+group.categories.length;
+    const x1=categoryMap.get(categories[start]).labelCenter-categorySpan/2+8,x2=categoryMap.get(categories[end-1]).labelCenter+categorySpan/2-8;
+    const y=plot.y+plot.height+plot.categoryLabelHeight+tokenValue(token("space.4"));
+    const data={groupId:group.id,dependencies:group.categories.map(category=>stableId(id,"category",category))};
+    for(const [part,a,b,c,d] of [["span",x1,y,x2,y],["left",x1,y-4,x1,y],["right",x2,y-4,x2,y]])nodes.push(linePrimitive({id:stableId(id,"category-group",group.id,part),role:"category-group-rule",x1:a,y1:b,x2:c,y2:d,style:lineStyle(SECONDARY),data}));
+    nodes.push(textPrimitive({id:stableId(id,"category-group",group.id,"label"),role:"category-group-label",frame:{x:x1,y:y+4,width:x2-x1,height:groupLayouts[i].height},text:groupLayouts[i].text,style:{...textStyle(AXIS_LABEL,SECONDARY),valign:"top",lineHeight:groupLayouts[i].lineHeight,wrap:false},data:{...data,textLayout:groupLayouts[i]}}));
+  }
+  if(!horizontal && !stacked) for(const label of nodes.filter(n=>n.role === "data-label")) {
+    const lines=(props.referenceLines||[]).map(r=>yScale(r.value)).sort((a,b)=>b-a);
+    for(const y of lines) if(y>=label.frame.y-4&&y<=label.frame.y+label.frame.height+4) label.frame.y=y-label.frame.height-6;
+    if(label.frame.y<frame.y)throw new Error("Reference lines leave no room for value labels");
+  }
   return withDecorations(nodes, {
     id,
     plot,
@@ -545,11 +682,127 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     categoryMap,
     yScale: horizontal ? null : yScale,
     allowBarHighlight: true,
-    allowAnnotationRail: !horizontal
+    allowAnnotationRail: !horizontal,
+    allowOutsideReferenceLabels: !horizontal
   });
 }
 
+// Explicit sparse observations use numeric positions; no category slot or invented value.
+function sparseLineChart({ id, frame, props }) {
+  const fail = message => { throw new Error(`Sparse line: ${message}`); };
+  const textRequired = value => typeof value === "string" && value.trim();
+  let assumptionNode = null;
+  if (props.assumption !== undefined) {
+    if (!textRequired(props.assumption)) fail("assumption must contain substantive text");
+    const measured = measureText(props.assumption, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) });
+    const height = measured.height + tokenValue(token("space.3"));
+    assumptionNode = textPrimitive({ id: stableId(id, "assumption"), role: "chart-assumption", frame: { x: frame.x, y: frame.y, width: frame.width, height: measured.height }, text: measured.text, style: { ...textStyle(AXIS_LABEL, SECONDARY), align: "left", valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } });
+    frame = { ...frame, y: frame.y + height, height: frame.height - height };
+  }
+  const axis = props.xAxis;
+  if (!axis || !textRequired(axis.unit) || !Number.isFinite(axis.min) || !Number.isFinite(axis.max) || axis.max <= axis.min) fail("xAxis requires a unit and finite increasing min/max");
+  if (props.categories !== undefined || props.values !== undefined || props.xMin !== undefined || props.xMax !== undefined) fail("numeric xAxis cannot be mixed with categorical data or alternate domains");
+  if (!textRequired(props.unit)) fail("a shared quantitative unit is required");
+  if (!["connect-observations", "explicit-breaks"].includes(props.gapPolicy)) fail("declare connect-observations or explicit-breaks; no implicit interpolation or filling");
+  if (!Array.isArray(axis.ticks) || axis.ticks.length < 2 || axis.ticks.length > 12) fail("supply two to twelve explicit numeric axis ticks");
+  const ticks = axis.ticks;
+  if (ticks.some((tick, i) => !tick || !Number.isFinite(tick.value) || tick.value < axis.min || tick.value > axis.max || !textRequired(tick.label) || (i && tick.value <= ticks[i - 1].value))) fail("ticks must have unique increasing in-domain values and labels");
+  const series = props.series;
+  if (!Array.isArray(series) || !series.length || series.length > 6) fail("one to six named sparse series required");
+  const names = new Set(), boundary = props.statusBoundary;
+  if (props.statusBoundary !== undefined && !boundary) fail("statusBoundary cannot be null");
+  if (props.directLabels !== undefined) fail("sparse lines use a legend and explicit point label flags, not categorical endpoint labels");
+  if (boundary && (!Number.isFinite(boundary.x) || boundary.x <= axis.min || boundary.x >= axis.max || !textRequired(boundary.beforeLabel) || !textRequired(boundary.afterLabel))) fail("statusBoundary requires an interior x and both status labels");
+  for (const item of series) {
+    if (!textRequired(item?.name) || names.has(item.name)) fail("series names must be unique");
+    names.add(item.name);
+    if (item.values !== undefined || item.unit !== undefined && item.unit !== props.unit || item.xUnit !== undefined && item.xUnit !== axis.unit) fail("do not mix value arrays or incompatible units with keyed observations");
+    if (!Array.isArray(item.points) || !item.points.length) fail("each series needs explicit keyed points");
+    if (boundary && !["before", "after"].includes(item.status)) fail("every series must declare before/after status when a boundary is supplied");
+    if (!boundary && item.status !== undefined) fail("series status requires a status boundary");
+    const keys = new Set();
+    for (const [i, point] of item.points.entries()) {
+      if (!point || !textRequired(point.key) || keys.has(point.key) || !Number.isFinite(point.x) || !Number.isFinite(point.y)) fail("points require unique exact keys and finite x/y; null is never a value or gap");
+      keys.add(point.key);
+      if (point.x < axis.min || point.x > axis.max || i && point.x <= item.points[i - 1].x) fail("series x positions must increase within the shared domain");
+      if (point.xUnit !== undefined && point.xUnit !== axis.unit || point.unit !== undefined && point.unit !== props.unit) fail("point units must match the shared axes");
+      if (point.breakBefore !== undefined && (typeof point.breakBefore !== "boolean" || props.gapPolicy !== "explicit-breaks" || i === 0)) fail("breakBefore requires explicit-breaks and a preceding observation");
+      if (point.label !== undefined && typeof point.label !== "boolean") fail("point label must be boolean");
+      if (boundary && (item.status === "before" ? point.x > boundary.x : point.x < boundary.x)) fail("historical and modelled coverage cannot cross the declared boundary");
+    }
+  }
+  if (props.annotationRail || props.changeAnnotations?.length || props.highlights?.length || props.pointHighlights?.length) fail("sparse lines require exact keyed point labels or evidence annotations; categorical decorations are unsupported");
+  assertGridlineOption(props);
+  const values = series.flatMap(item => item.points.map(point => point.y));
+  const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y" });
+  const showLegend = props.legend !== false && series.length > 1;
+  const showValueAxis = props.showValueAxis !== false;
+  const labelWidth = axisLabelWidth(bounds);
+  const plot = chartFrame(frame, { topLegend: showLegend, leftInset: showValueAxis ? Math.max(labelWidth + 8, 54) : 54, annotations: props.annotations });
+  const statusHeight = boundary ? Math.max(...[boundary.beforeLabel, boundary.afterLabel].map(label => measureText(label, plot.width / 2 - 16, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }).height)) + tokenValue(token("space.3")) : 0;
+  plot.y += statusHeight; plot.height -= statusHeight;
+  if (plot.height < 100) fail("status labels leave insufficient plot height");
+  const xScale = value => plot.x + (value - axis.min) / (axis.max - axis.min) * plot.width;
+  const yScale = value => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
+  const nodes = [...(showLegend ? topLegend({ id, frame, items: series.map((item, index) => ({ label: item.name, colorIndex: props.colorIndices?.[index] ?? index })) }) : []), ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth })];
+  const tickFrames = [];
+  for (const tick of ticks) {
+    const measured = measureText(tick.label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) });
+    const width = measured.width, x = Math.max(plot.x, Math.min(xScale(tick.value) - width / 2, plot.x + plot.width - width));
+    const tickFrame = { x, y: plot.y + plot.height + 12, width, height: measured.height };
+    if (tickFrames.some(other => other.x + other.width + 8 > x)) fail("numeric axis labels overlap; choose fewer explicit ticks");
+    tickFrames.push(tickFrame);
+    nodes.push(textPrimitive({ id: stableId(id, "x-tick", tick.value), role: "category-label", frame: tickFrame, text: measured.text, style: { ...textStyle(AXIS_LABEL, SECONDARY), align: "left", valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { xValue: tick.value, xUnit: axis.unit, textLayout: measured } }));
+  }
+  if (boundary) {
+    const x = xScale(boundary.x), boundaryId = stableId(id, "status-boundary");
+    nodes.push(linePrimitive({ id: boundaryId, role: "chart-status-boundary", x1: x, y1: plot.y, x2: x, y2: plot.y + plot.height, style: { ...lineStyle(SECONDARY, token("line.hairline")), dash: "dash" }, data: { xValue: boundary.x, xUnit: axis.unit, beforeLabel: boundary.beforeLabel, afterLabel: boundary.afterLabel } }));
+    for (const [side, label, left, width] of [["before", boundary.beforeLabel, plot.x, x - plot.x - 8], ["after", boundary.afterLabel, x + 8, plot.x + plot.width - x - 8]]) {
+      const measured = measureText(label, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) });
+      if (width <= 0 || measured.height > statusHeight) fail("status label does not fit its true time span");
+      nodes.push(textPrimitive({ id: stableId(boundaryId, side), role: "chart-status-label", frame: { x: left, y: plot.y - statusHeight, width, height: measured.height }, text: measured.text, style: { ...textStyle(AXIS_LABEL, SECONDARY), align: "center", valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { status: side, textLayout: measured, dependencies: [boundaryId] } }));
+    }
+  }
+  const pointMap = new Map(), categoryMap = new Map(), labelFrames = [];
+  for (const [seriesIndex, item] of series.entries()) {
+    const color = SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
+    const points = item.points.map(point => ({ ...point, px: xScale(point.x), py: yScale(point.y), nodeId: stableId(id, "point", item.name, point.key) }));
+    points.forEach((point, index) => {
+      const data = { series: item.name, category: point.key, pointKey: point.key, xValue: point.x, value: point.y, xUnit: axis.unit, unit: props.unit, gapPolicy: props.gapPolicy, ...(item.status ? { status: item.status } : {}) };
+      if (index && !point.breakBefore) {
+        const from = points[index - 1];
+        nodes.push(linePrimitive({ id: stableId(id, "segment", item.name, from.key, point.key), role: "chart-line", x1: from.px, y1: from.py, x2: point.px, y2: point.py, style: lineStyle(color, token("line.standard")), data: { ...data, from: from.nodeId, to: point.nodeId, dependencies: [from.nodeId, point.nodeId], connection: "explicit-observation-join" } }));
+      }
+      nodes.push(ellipsePrimitive({ id: point.nodeId, role: "chart-marker", frame: { x: point.px - 3, y: point.py - 3, width: 6, height: 6 }, style: fillStyle(color), data }));
+      pointMap.set(`${item.name}:${point.key}`, { x: point.px, y: point.py, value: point.y, category: point.key, nodeId: point.nodeId });
+      if (series.length === 1) pointMap.set(`value:${point.key}`, pointMap.get(`${item.name}:${point.key}`));
+      if (props.dataLabels === true || point.label) {
+        const label = formatValue(point.y, props), measured = measureText(label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true });
+        const labelFrame = { x: Math.max(plot.x, Math.min(point.px - measured.width / 2, plot.x + plot.width - measured.width)), y: point.py - measured.height - 8, width: measured.width, height: measured.height };
+        if (labelFrame.y < plot.y - 1 || labelFrames.some(other => other.x < labelFrame.x + labelFrame.width + 4 && other.x + other.width + 4 > labelFrame.x && other.y < labelFrame.y + labelFrame.height + 4 && other.y + other.height + 4 > labelFrame.y)) fail("selected point labels overlap or exceed plot; allocate height or label fewer anchors");
+        labelFrames.push(labelFrame);
+        nodes.push(textPrimitive({ id: stableId(point.nodeId, "label"), role: "data-label", frame: labelFrame, text: measured.text, style: { ...textStyle(CHART_LABEL, INK, true), valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { ...data, textLayout: measured, dependencies: [point.nodeId] } }));
+      }
+    });
+  }
+  if (assumptionNode) {
+    assumptionNode.data.dependencies = nodes.filter(node => node.role === "chart-marker").map(node => node.id);
+    nodes.unshift(assumptionNode);
+  }
+  if (new Set(nodes.map(node => node.id)).size !== nodes.length) fail("keys produce colliding native IDs; use distinct stable keys");
+  const rendered = withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale, allowAnnotationRail: false });
+  for (const node of rendered) if (node.data?.targetCategory) {
+    const target = pointMap.get(`${node.data.targetSeries || "value"}:${node.data.targetCategory}`);
+    if (target) node.data.dependencies = [...new Set([...(node.data.dependencies || []), target.nodeId])];
+  }
+  return rendered;
+}
+
 function lineChart({ id, frame, props, area = false }) {
+  if (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined)) {
+    if (area) throw new Error("Sparse observations are supported by chart.line only; areas require complete categorical observations");
+    return sparseLineChart({ id, frame, props });
+  }
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props);
   if (area && categories.length < 2) throw new Error("Area charts require at least two categories");
@@ -1090,6 +1343,7 @@ function chartExamples(id) {
     };
     if (id === "chart.column") {
       Object.assign(examples, {
+        "qualitative-interval": { props: { categories: ["Initial estimate", "Revised estimate", "Current estimate"], series: [{ name: "Approximate level", values: [80, 50, 45] }], valueFormat: { prefix: "~" }, dataLabels: true, annotations: [], highlights: [], referenceLines: [], changeAnnotations: [{ style: "interval-label", start: "Initial estimate", end: "Revised estimate", text: "Assumptions revised", basis: "approximate-source-readings", qualification: "Approximate illustrative levels" }] } },
         "multi-row-annotation-rail": { props: { categories: ["Case A", "Case B", "Case C"], series: [{ name: "Value", values: [230,338,459] }], dataLabels: true, annotationRail: { rows: [{ label: "EPS, $", items: [{ category: "Case A", text: "10.48" }, { category: "Case B", text: "12.52" }, { category: "Case C", text: "14.34" }] }, { label: "P/E", items: [{ category: "Case A", text: "22x" }, { category: "Case B", text: "27x" }, { category: "Case C", text: "32x" }] }] }, highlights: [], annotations: [], referenceLines: [] } },
         "wrapped-reference-label": { props: { categories: ["Case A", "Case B", "Case C"], series: [{ name: "Value", values: [231,338,459] }], dataLabels: true, yMax:520, annotations: [], highlights: [], referenceLines: [{ value:335.02, label:"Reference close\n$335.02" }] } },
         "a-vs-b-change": { props: { categories: ["Current", "Future"], series: [{ name: "Measure", values: [80, 150] }], dataLabels: true, highlights: [{ category: "Future", style: "bar" }], annotations: [], changeAnnotations: [{ start: "Current", end: "Future", style: "arrow", text: "+87.5%" }], referenceLines: [] } },
@@ -1107,6 +1361,27 @@ function chartExamples(id) {
     const examples = {
       "legend-top-right": { props: { categories: ["2023", "2024", "2025", "2026"], series: [{ name: "Core", values: [34, 38, 43, 48] }, { name: "Recurring", values: [18, 24, 31, 39] }, { name: "New", values: [6, 8, 11, 15] }], legend: true, dataLabels: true, annotations: [], highlights: [], referenceLines: [] } }
     };
+    examples["totals-and-secondary-units"] = { props: {
+      categories: ["Group A", "Group B"], series: [{name:"Core",values:[24,32]},{name:"Additional",values:[36,28]}],
+      dataLabels:true, yMin:0, yMax:80, valueFormat:{suffix:"%"},
+      stackTotals:[{category:"Group A",value:60},{category:"Group B",value:60}],
+      secondaryLabels:[{category:"Group B",series:"Core",value:32000,unit:"people",valueFormat:{compactUnit:"k",decimals:0}},{category:"Group B",anchor:"stack-total",value:60000,unit:"people",valueFormat:{compactUnit:"k",decimals:0}}],
+      annotations:[], highlights:[], referenceLines:[]
+    } };
+    examples["parenthetical-secondary-units"] = { props: {
+      heading:"Workers by scenario", categories:["Group A","Group B"],series:[{name:"Core",values:[24,32]},{name:"Additional",values:[36,28]}],
+      dataLabels:true,yMin:0,yMax:80,valueFormat:{suffix:"%"},secondaryLabelStyle:"parenthetical",secondaryUnit:"workers",
+      secondaryLabels:[{category:"Group B",series:"Core",value:32000,unit:"workers",valueFormat:{compactUnit:"k",decimals:0}}],annotations:[],highlights:[],referenceLines:[]
+    } };
+    if(id === "chart.stacked-column") examples["category-groups"] = { props: {
+      categories:["Group A","Group B","Group C","Group D"],series:[{name:"Core",values:[20,30,40,50]},{name:"Additional",values:[30,25,20,15]}],
+      dataLabels:true,yMin:0,yMax:80,categoryGroups:[{id:"first",label:"First cohort",categories:["Group A","Group B"]},{id:"second",label:"Second cohort",categories:["Group C","Group D"]}],annotations:[],highlights:[],referenceLines:[]
+    } };
+    if (id === "chart.stacked-column") examples["small-segment-external-label"] = { props: {
+      categories:["Late","Midpoint","Early"], series:[{name:"Adopted",values:[2,21,41]},{name:"Remaining",values:[39,39,38]}],
+      stackTotals:[{category:"Late",value:41},{category:"Midpoint",value:60},{category:"Early",value:79}],
+      dataLabels:true, yMin:0, yMax:80, valueFormat:{suffix:"%"}, annotations:[], highlights:[], referenceLines:[]
+    } };
     if (id === "chart.stacked-column") examples["total-construction"] = { props: { categories: ["Current", "Future"], series: [{ name: "Core", values: [40, 46] }, { name: "Growth", values: [22, 38] }, { name: "New", values: [8, 20] }], dataLabels: true, annotations: [], changeAnnotations: [{ start: "Current", end: "Future", style: "construction", text: "+34" }], highlights: [], referenceLines: [] } };
     return examples;
   }
@@ -1114,6 +1389,15 @@ function chartExamples(id) {
     "end-to-end-construction": { props: { categories: ["Opening", "Cost", "Mix", "Capacity", "Closing"], values: [70, -20, -15, -10, 25], totals: [0, 4], yMax: 80, annotations: [], changeAnnotations: [{ start: "Opening", end: "Closing", style: "construction", text: "-45" }], highlights: [], referenceLines: [] } }
   };
   if (id === "chart.line") return {
+    "numeric-sparse-observations": { preferredSize: { width: 1160, height: 480 }, props: {
+      categories: undefined, heading: "(Insert source-qualified trajectory)", unit: "%", gapPolicy: "explicit-breaks",
+      xAxis: { unit: "year", min: 2000, max: 2030, ticks: [{value:2000,label:"2000"},{value:2010,label:"2010"},{value:2020,label:"2020"},{value:2030,label:"2030"}] },
+      statusBoundary: { x: 2018, beforeLabel: "Historical", afterLabel: "Modelled" },
+      series: [
+        { name: "Historical", status: "before", points: [{key:"start",x:2000,y:3},{key:"turn",x:2005,y:5},{key:"resume",x:2014,y:4,breakBefore:true},{key:"boundary",x:2018,y:4.5}] },
+        { name: "Scenario", status: "after", points: [{key:"boundary",x:2018,y:4.5},{key:"peak",x:2025,y:6,label:true},{key:"end",x:2030,y:5}] }
+      ], yMin: 0, yMax: 8, valueFormat: {decimals:1,prefix:"~",suffix:"%"}, dataLabels: false, legend: true, annotations: [], highlights: [], referenceLines: []
+    } },
     "callout-borderless": { props: { categories: ["2021", "2022", "2023", "2024", "2025"], series: [{ name: "Measure", values: [0.8, 1.5, 2.2, 2.6, 3.1] }], yMax: 4, dataLabels: false, legend: false, annotations: [{ category: "2024", text: "Adoption accelerates after launch", treatment: "callout", border: false }], highlights: [], referenceLines: [] } },
     "orthogonal-dot-vertical": { props: { categories: ["Q1", "Q2", "Q3", "Q4"], series: [{ name: "Measure", values: [22, 31, 48, 55] }], yMax: 60, dataLabels: false, legend: false, annotations: [{ category: "Q3", text: "The launch creates a clear inflection", treatment: "orthogonal-dot", orientation: "vertical" }], highlights: [], referenceLines: [] } },
     "long-range-growth": { props: { categories: ["2021", "2022", "2023", "2024", "2025"], series: [{ name: "Measure", values: [0.8, 1.5, 2.2, 2.6, 3.1] }], yMax: 4, dataLabels: true, legend: false, annotations: [], changeAnnotations: [{ start: "2021", end: "2025", style: "bracket", text: "+288%" }], highlights: [], referenceLines: [] } },
@@ -1144,7 +1428,7 @@ export function registerCharts(registry) {
     ];
     registry.set(chart.id, {
       id: chart.id,
-      version: "2.4.0",
+      version: "2.6.0",
       category: "chart",
       role: "chart",
       tokens: [...new Set([...tokens, ...registry.get("chart-title").tokens])].sort(),

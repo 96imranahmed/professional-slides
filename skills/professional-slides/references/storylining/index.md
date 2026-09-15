@@ -18,6 +18,16 @@ Then define the main question and governing answer. If the answer is not yet sup
 
 Resolve the decision stage as well as the topic: diagnose the situation, select options for detailed design, or authorize a defined action. An options diagnostic can conclude which levers merit design without implying that implementation, savings, funding, or staffing changes are approved. Carry that stage into the summary and close. A conditional option should retain its specific enabling condition; it does not need a generic approval disclaimer on every page.
 
+## Synthesis scope and requirement
+
+For a full decision pre-read, include a standalone synthesis near the start, potentially spanning several slides. Include one whenever the user explicitly requires it. An explanatory brief, teaching deck, workshop or live pitch may use an organizing overview instead or omit a separate summary when its opening sequence already performs the communication job. Record the purpose, disposition and reason in the approved plan; a template does not silently override the brief. Existing-deck edits preserve their authorized scope: recommend a missing synthesis when useful, but add or restructure it only within an approved structural revision. A bounded slide edit does not trigger deck restructuring.
+
+Classify synthesis scope as whole deck, workstream, diagnostic findings, chapter, teaching or closing. A section recap is not automatically the deck's governing summary. Cover and contents mentions are navigation, and a summary in backup remains backup. Recognize the role from content, source language and context, not a visible English prefix. Use [source evidence](source-evidence.md) for source identity, native page references and extraction limits.
+
+Distinguish decision stages: diagnosis, option exploration, recommendation, endorsement and authorization; explanation has its own organizing purpose. Preserve a provisional option or open question as such. When the preferred option depends on risk weights, timing or enabling conditions, keep that dependency with the choice. Do not invent a single winner or approval request to fill a close.
+
+For a multi-page synthesis, record its member slides in order and how each develops the scoped answer. A summary may interleave narrative and proof exhibits before the transition into detail. Map each material conclusion to its proof slide IDs; several chapters may support a theme without repeating its visible label. Keep the summary's qualifications consistent with the body and any close. Apply the [copy completeness test](../components/copy.md#executive-summary-narrative) to the whole section while each member earns its own job.
+
 ## Organize the evidence before writing titles
 
 Use the existing source ledger and storyboard, not a second reporting framework. For every material fact, retain its source location, population or business boundary, measure, unit, period, reported precision, and evidence state: observed, source-modeled, supplied assumption, or analyst-derived. For a calculation, retain its inputs and formula. For a qualitative fact, retain the actual mechanism, condition or named example rather than reducing it to a generic topic.
@@ -57,7 +67,7 @@ Choose the arc from the communication job:
 - problem, solution, evidence, ask for a proposal or funding request;
 - baseline, variance, cause, action for performance diagnosis;
 - question, tests, synthesis, recommendation for hypothesis-led analysis.
-- concept, mechanism, worked example, limits, application for explanation or teaching; adapt the body to the learner’s prerequisites and make the mandatory executive summary an overview of the explanation rather than an invented recommendation.
+- concept, mechanism, worked example, limits, application for explanation or teaching; adapt the body to the learner’s prerequisites and apply the synthesis policy above; any overview explains the material rather than inventing a recommendation.
 
 ## Write and approve the dot-dash
 
@@ -117,7 +127,7 @@ Check:
 - evidence supports the title;
 - uncertainty is explicit;
 - the governing answer passes the proof and decision tests above;
-- the executive summary and close agree;
+- any synthesis and close agree in scope, authority and qualifications;
 - navigation, when used, follows the story.
 
 For a teaching brief, test conceptual completeness and dependency order instead of recommendation completeness. The close should enable the promised understanding or application without introducing an unsupported decision.

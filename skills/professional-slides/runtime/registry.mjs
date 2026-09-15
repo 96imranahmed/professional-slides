@@ -19,21 +19,25 @@ import {
   tokenValue,
   wedgePrimitive
 } from "./core.mjs";
+import { renderPhaseWorkstreams, measurePhaseWorkstreams, PHASE_WORKSTREAM_TOKENS, PHASE_WORKSTREAM_VARIANTS } from "./phase-workstreams.mjs";
+import { renderQualitativeFunnel, measureQualitativeFunnel, renderPhaseHierarchy, measurePhaseHierarchy, QUALITATIVE_TOPOLOGY_TOKENS, QUALITATIVE_FUNNEL_SAMPLE, PHASE_HIERARCHY_SAMPLE } from './qualitative-topology.mjs';
+import { timeGrid, datedLanes, SCHEDULE_TOKENS, SCHEDULE_VARIANTS } from "./schedules.mjs";
 import { registerSegmentedEvidence } from "./segmented-evidence.mjs";
 import { registerMedia } from "./media.mjs";
 import { registerCharts } from "./charts.mjs";
 import { renderTable, measureTable, TABLE_TOKENS } from "./tables.mjs";
 import { TABLE_VARIANTS } from "./table-fixtures.mjs";
-import { measureText } from "./text-layout.mjs";
+import { measureText, measureTextRuns } from "./text-layout.mjs";
 import { routeConnector } from "./routing.mjs";
-import { legendNodes, LEGEND_TOKENS, LEGEND_VARIANTS, LEGEND_PLACEMENTS } from "./legends.mjs";
+import { legendNodes, LEGEND_TOKENS, LEGEND_VARIANTS, LEGEND_PLACEMENTS, QUANTITATIVE_LEGEND_SAMPLE } from "./legends.mjs";
 import { registerChartGroup } from "./chart-group.mjs";
 import { contrastRatio } from "./palettes.mjs";
 import { renderChartCallout } from "./chart-annotations.mjs";
 import { PAGE_RULES, PAGE_BRANDING, PAGE_TEMPLATE_TOKENS, pageTemplateLayout, renderPageTemplate, resolvePageTemplate } from "./page-template.mjs";
 import { TRACKER_TOKENS, registerTrackers, trackerLabelNodes } from "./trackers.mjs";
+import { registerRelationshipNetwork } from "./relationship-network.mjs";
 import { registerQuoteCluster } from "./quote-cluster.mjs";
-import { CUSTOM_MAP_SAMPLE, MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
+import { CUSTOM_MAP_SAMPLE, CHOROPLETH_MAP_SAMPLE, MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
 import { registerInsightTreeTable } from "./insight-tree-table.mjs";
 
 const FONT = token("font.body");
@@ -95,9 +99,11 @@ const component = ({ id, category, role = category, tokens, preferredSize, sampl
 });
 
 function measuredTextNode(input) {
-  const textLayout = measureText(input.text, input.frame.width, { fontFamily: tokenValue(input.style.fontFamily), fontSize: tokenValue(input.style.fontSize), bold: input.style.bold, wrapWidthRatio: 1 });
+  if(input.runs && input.runs.map(r=>r.text).join("")!==input.text)throw new Error("Paragraph emphasis must preserve exact text");
+  const options={fontFamily:tokenValue(input.style.fontFamily),fontSize:tokenValue(input.style.fontSize),bold:input.style.bold,wrapWidthRatio:1};
+  const textLayout = input.runs ? measureTextRuns(input.runs,input.frame.width,options) : measureText(input.text,input.frame.width,options);
   if (textLayout.height > input.frame.height) throw new Error(`${input.id} exceeds its allocated text height`);
-  return textPrimitive({ ...input, text: textLayout.text, style: { ...input.style, lineHeight: textLayout.lineHeight, wrap: false }, data: { ...input.data, textLayout } });
+  return textPrimitive({ ...input, text: textLayout.text, ...(textLayout.runs?{runs:textLayout.runs}:{}), style: { ...input.style, lineHeight: textLayout.lineHeight, wrap: false }, data: { ...input.data, textLayout } });
 }
 
 function insightLayout(frame, props) {
@@ -228,8 +234,11 @@ function assertChartTitleCopy(props = {}) {
     const fiscalYear = `(?:${year}|\\d{2})`;
     const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
     copy = copy.replace(new RegExp(`\\b${period}\\b(?![\\d.%])`, "gi"), "period");
-    copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
+    copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|to|versus|vs\\.?|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
     copy = copy.replace(new RegExp(`([,(]\\s*)${year}(?=\\s*(?:$|[,) ;]))`, "g"), "$1period");
+    // A bounded observation window describes the measure. Mask only the
+    // complete duration phrase so adjoining result values still reject.
+    copy = copy.replace(/\bwithin\s+(?:one|1)\s+year\b/gi, "within observation period");
     if (field === "unit") {
       // Scale denominators describe units, not observed values.
       copy = copy.replace(/\bper\s+(?:100[,. ]?000|1[,. ]?000|100|1)\b/gi, "per population");
@@ -597,7 +606,9 @@ function registerCore(registry) {
         const title = titles.find((node) => node.role === "action-title");
         const titleBottom = title.frame.y + title.data.textLayout.height;
         const baseBottom = page.contentFrame.y + page.contentFrame.height;
-        const contentTop = Math.max(page.contentFrame.y, titleBottom + tokenValue(token("layout.titleContentGap")));
+        const contentTop = page.pageTemplate.contentSpacing === "compact"
+          ? Math.max(titleBottom, page.logoFrame ? page.logoFrame.y + page.logoFrame.height : titleBottom) + tokenValue(token("space.5"))
+          : Math.max(page.contentFrame.y, titleBottom + tokenValue(token("layout.titleContentGap")));
         const contentFrame = { ...page.contentFrame, y: contentTop, height: baseBottom - contentTop };
         if (contentFrame.height <= 0) throw new Error("Action title leaves no room for slide content; shorten the title or split the slide");
         return { ...page, contentFrame, nodes: [...tracker, ...titles, ...page.nodes] };
@@ -669,7 +680,7 @@ function registerCore(registry) {
     component({ id: "page-number", category: "shared", role: "page-number", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 48, height: 24 }, sample: { value: 7 }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "page-number", frame, text: String(props.value), style: textStyle(SOURCE, SECONDARY, false, "right") })] }) }),
     component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "color.ink"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => {
       if (typeof props.text !== "string" || !props.text.trim()) throw new Error(`paragraph ${id} requires a non-empty text string; keep geometry in the component frame`);
-      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: "paragraph", frame, text: props.text, style: textStyle(BODY, INK, false, props.align || "left", "top") })] };
+      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: "paragraph", frame, text: props.text, ...(props.runs?{runs:props.runs}:{}), style: textStyle(BODY, INK, false, props.align || "left", "top") })] };
     } }),
     component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.componentPrimary", "color.onPrimary", "space.1", "space.3", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "circle" }) }) }),
     component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.4", "space.5", "space.6", "line.hairline", "radius.small"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
@@ -786,7 +797,7 @@ function registerCore(registry) {
       definition.version = "2.1.0";
     }
     if (["table", "comparison-table", "heatmap", "trend-rows"].includes(definition.id)) {
-      definition.version = "3.0.0";
+      definition.version = "3.2.0";
       definition.tokens = TABLE_TOKENS;
       const normalize = props => {
         if (definition.id === "heatmap") return { ...props, columns: props.columns.map((label,index)=>({label,type:index?'heatmap':'text',scale:index?'score':undefined})), rows: props.rows.map(row=>row.map((value,index)=>index?{value}:value)), scales: {score:{type:'heatmap',label:'Assessment',min:1,max:5,anchors:{1:'Low',3:'Medium',5:'High'}}} };
@@ -835,11 +846,46 @@ function registerCore(registry) {
       const render = definition.render;
       definition.render = input => { definition.resolveVariant(input.props); return render(input); };
     }
+    if (definition.id === "timeline") {
+      definition.version = "2.2.0";
+      definition.tokens = [...new Set([...definition.tokens, ...SCHEDULE_TOKENS])];
+      definition.variants = { process: {}, ...SCHEDULE_VARIANTS, "phase-hierarchy": { preferredSize:{width:1160,height:380}, props:{...PHASE_HIERARCHY_SAMPLE,items:undefined} } };
+      definition.tokens = [...new Set([...definition.tokens,...QUALITATIVE_TOPOLOGY_TOKENS])];
+      definition.version = "2.3.0";
+      definition.defaultVariant = "process";
+      definition.variantProp = "variant";
+      definition.resolveVariant = (props = {}) => {
+        const variant = props.variant ?? "process";
+        if (!Object.hasOwn(definition.variants, variant)) throw new Error(`Unknown timeline variant: ${variant}`);
+        return variant;
+      };
+      const render = definition.render;
+      const schedule = input => definition.resolveVariant(input.props) === "phase-hierarchy" ? renderPhaseHierarchy(input) : definition.resolveVariant(input.props) === "time-grid" ? timeGrid(input) : datedLanes(input);
+      definition.render = input => definition.resolveVariant(input.props) === "process" ? render(input) : schedule(input);
+      definition.measureIntrinsic = input => definition.resolveVariant(input.props) === "process" ? null : schedule({ ...input, id: input.id ?? "measure", frame: { ...input.frame, height: input.frame.height ?? Number.MAX_SAFE_INTEGER } });
+    }
+    if (definition.id === "funnel") {
+      definition.version = "2.0.0";
+      definition.tokens = [...new Set([...definition.tokens,...QUALITATIVE_TOPOLOGY_TOKENS])];
+      definition.variants = { quantitative:{}, qualitative:{preferredSize:{width:1160,height:480},props:QUALITATIVE_FUNNEL_SAMPLE} };
+      definition.defaultVariant = "quantitative"; definition.variantProp = "variant";
+      definition.resolveVariant = (props={}) => {const variant=props.variant??"quantitative";if(!Object.hasOwn(definition.variants,variant))throw new Error(`Unknown funnel variant: ${variant}`);return variant;};
+      const render = definition.render;
+      definition.render = input => definition.resolveVariant(input.props)==="qualitative" ? renderQualitativeFunnel(input) : render(input);
+      definition.measureIntrinsic = input => definition.resolveVariant(input.props)==="qualitative" ? measureQualitativeFunnel(input) : null;
+    }
     if (definition.id === "roadmap") {
       definition.version = "2.2.0";
       definition.tokens.push("space.2", "space.3", "space.4", "icon.medium");
       definition.variants["wave-columns"] = { preferredSize: { width: 1160, height: 480 }, props: { items: [1, 2, 3].map((index) => ({ heading: `(Insert wave ${index} heading)`, range: `(Insert time range ${index})`, activities: ["(Insert activity)"], deliverables: ["(Insert deliverable)"] })) } };
-      definition.measureIntrinsic = ({ frame, props }) => definition.resolveVariant(props) === "wave-columns" ? waveRoadmapLayout(frame, props) : null;
+      definition.version = "2.3.0";
+      definition.tokens = [...new Set([...definition.tokens, ...PHASE_WORKSTREAM_TOKENS])];
+      Object.assign(definition.variants, PHASE_WORKSTREAM_VARIANTS);
+      const priorResolve = definition.resolveVariant;
+      definition.resolveVariant = props => props?.variant === "phase-workstreams" ? "phase-workstreams" : priorResolve(props);
+      const priorRender = definition.render;
+      definition.render = input => definition.resolveVariant(input.props) === "phase-workstreams" ? renderPhaseWorkstreams(input) : priorRender(input);
+      definition.measureIntrinsic = ({ frame, props }) => definition.resolveVariant(props) === "phase-workstreams" ? measurePhaseWorkstreams({frame,props}) : definition.resolveVariant(props) === "wave-columns" ? waveRoadmapLayout(frame, props) : null;
     }
     if (definition.id === "bullet-list") {
       definition.tokens.push("type.body", "space.2", "space.4");
@@ -851,12 +897,19 @@ function registerCore(registry) {
       };
       definition.measureIntrinsic = input => definition.resolveVariant(input.props) === "body" ? definition.measureContent(input) : null;
     }
+    if (definition.id === "paragraph") definition.measureContent = ({ frame, props }) => {
+      // Geometry-only layout probes have no copy yet; rendering still requires it.
+      if (!Object.hasOwn(props ?? {}, "text")) return null;
+      if (typeof props.text !== "string" || !props.text.trim()) throw new Error("paragraph requires a non-empty text string for measurement");
+      if(props.runs && props.runs.map(r=>r.text).join("")!==props.text)throw new Error("Paragraph emphasis must preserve exact text");
+      return (props.runs?measureTextRuns:measureText)(props.runs||props.text, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false, wrapWidthRatio: 1 });
+    };
     if (definition.id === "section") definition.measureInsets = ({ frame, props }) => sectionContentInsets(frame, props);
     if (definition.id === "section-heading") definition.variants.inverse = { backdrop: "primary" };
-    if (definition.id === "insight") definition.measureContent = ({ frame, props }) => { definition.resolveVariant(props); return insightLayout(frame, props); };
+    if (["insight", "evidence-note"].includes(definition.id)) definition.measureContent = ({ frame, props }) => { definition.resolveVariant(props); return insightLayout(frame, props); };
     if (definition.id === "section-boundary") definition.variants.subsection = { preferredSize: { width: 520, height: 24 } };
     if (definition.id === "map") {
-      definition.version = "3.0.0";
+      definition.version = "3.1.0";
       definition.variants = Object.fromEntries(MAP_PRESET_IDS.map((geography) => [geography, { props: { geography, markers: [] } }]));
       definition.defaultVariant = "world";
       definition.variantProp = "geography";
@@ -865,14 +918,17 @@ function registerCore(registry) {
       const render = definition.render;
       definition.render = input => { definition.resolveVariant(input.props); return render(input); };
       definition.examples = {
+        "quantitative-regions": { props: {...CHOROPLETH_MAP_SAMPLE, highlightCountries:undefined, markers:undefined}, preferredSize: {width:600,height:400} },
         "imported-geometry": { props: { geography: CUSTOM_MAP_SAMPLE, highlightCountries: ["DEU"], markers: [{longitude:13.4,latitude:52.5,label:"Berlin",size:14}] } },
         "world-country-highlight": { props: { geography: "world", markers: [], highlightCountries: ["USA", "DEU", "CHN"] } },
         "country-marker-anchor": { props: { geography: "europe", markers: [{ country: "GBR", label: "United Kingdom", fraction: 1 }] } }
       };
     }
     if (definition.id === "legend") {
+      definition.version = "2.1.0";
       const visuallyDistinctPlacements = LEGEND_PLACEMENTS.filter(placement => placement !== "inline");
-      definition.variants = Object.fromEntries(Object.keys(LEGEND_VARIANTS).flatMap(mark => visuallyDistinctPlacements.map(placement => [`${mark}-${placement}`, { props: { variant: mark, placement, items: [{ label: "Actual", state: "actual" }, { label: "Forecast", state: "forecast" }, { label: "Target", state: "target" }] }, preferredSize: { width: 540, height: placement === "right" ? 120 : 44 } }])));
+      definition.variants = Object.fromEntries(Object.keys(LEGEND_VARIANTS).filter(mark => mark !== "quantitative-scale").flatMap(mark => visuallyDistinctPlacements.map(placement => [`${mark}-${placement}`, { props: { variant: mark, placement, items: [{ label: "Actual", state: "actual" }, { label: "Forecast", state: "forecast" }, { label: "Target", state: "target" }] }, preferredSize: { width: 540, height: placement === "right" ? 120 : 44 } }])));
+      definition.variants["quantitative-scale-top"] = {props: {...QUANTITATIVE_LEGEND_SAMPLE, items:undefined, placement:"top"}, preferredSize:{width:540,height:64}};
       definition.defaultVariant = "swatch-top";
       definition.resolveVariant = (props = {}) => `${props.variant ?? "swatch"}-${props.placement ?? "top"}`;
     }
@@ -883,6 +939,10 @@ function registerCore(registry) {
       definition.resolveVariant = definition.id === "slide-chrome"
         ? (props = {}) => resolveTitleVariant({ variant: props.titleVariant, rule: props.titleRule })
         : resolveTitleVariant;
+    }
+    if (definition.id === "slide-chrome") {
+      definition.version = "2.1.0";
+      definition.examples = { "compact-content-spacing": { props: { pageTemplate: { contentSpacing: "compact" } } } };
     }
     if (definition.id === "source") {
       definition.variants = TITLE_VARIANTS; definition.defaultVariant = DEFAULT_TITLE_VARIANT;
@@ -931,6 +991,10 @@ function registerCore(registry) {
         const ruled = rail ? props.treatment === "open" : props.rule !== false && props.treatment !== "muted";
         return { top: headerFrame.y, ruled, height: headingLayout(headerFrame, { ...props, rule: ruled }).bandHeight };
       };
+      if (definition.id === "section-heading") definition.measureIntrinsic = ({ frame = {}, props = {} }) => {
+        const measured = definition.measureHeader({ frame: { x: 0, y: 0, height: Number.MAX_SAFE_INTEGER, ...frame }, props });
+        return { height: measured?.height ?? 0 };
+      };
     }
     registry.set(definition.id, definition);
   }
@@ -950,7 +1014,7 @@ function registerCore(registry) {
 }
 
 export function createRegistry() {
-  return registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map()))))))));
+  return registerRelationshipNetwork(registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map())))))))));
 }
 
 export const REGISTRY = createRegistry();

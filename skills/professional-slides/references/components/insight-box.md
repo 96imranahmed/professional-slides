@@ -1,6 +1,6 @@
 # Insight Box
 
-An insight box contains the slide's one detached, supported new deduction. Every instance must pass the [no-recap and new-deduction gate](copy.md#no-recap-and-new-deduction-gate). A summary of the graph, repeated title, evidence paragraph, or methodology note is never insight. Recommendations and next actions qualify only when their reason or condition expresses the deduction. Omit the box when no defensible new conclusion exists.
+An insight box contains a supported synthesis, implication, recommendation or deduction. It may interpret a decisive chart finding without adding a novel fact. Omit a box when plain explanation is sufficient; do not invent a conclusion to fill it.
 
 Default to one untitled, complete sentence that connects the conclusion to its material reason or condition. Combine a headline and its explanation when they express one thought; do not add a separate title, role label, or arrow. Follow the [natural-copy rule](copy.md#body-copy), preserving uncertainty without clipped command sequences or unnecessary padding.
 
@@ -47,3 +47,8 @@ Measurement bases, scope qualifiers and scenario assumptions use `evidence-note`
 ## Mandatory criticality
 
 Apply the hard [criticality gate](../design/index.md#criticality-is-a-hard-acceptance-gate). Omit optional headings that paraphrase the body. Derived comparison requirements can support the insight as a second point; do not move them to a chart callout merely to avoid the insight test.
+
+
+## Integrated insights before repeated summaries
+
+Prefer direct interpretation attached to its chart, map region or comparison row when that relationship is clear. Use at most one detached shared insight region per slide. Do not make a separate takeaway box for each option or column, and do not repeat the action title merely to fill the region.

@@ -79,3 +79,5 @@ Too many categories, rotated labels, non-zero baselines that exaggerate gaps, de
 ## Acceptance test
 
 The rank or comparison should be clear before reading labels, every visible value must match the source after rounding, and horizontal charts follow the same value-axis suppression and optional-gridline contract as vertical charts. Every visible numeric or category tick uses the active body size.
+
+For a column chart whose in-plot reference labels cannot avoid the bars, `referenceLines` may declare `placement: "outside-end"`. The owner reserves a measured right gutter and aligns each label directly with its quantitative reference line. The default `inside` retains collision-checked placement in the plot. Outside placement requires a vertical quantitative axis, and peer reference labels still cannot overlap. Keep complete measure and unit decoding in the chart heading or the label; do not replace a reference with an unanchored note.

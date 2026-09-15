@@ -1,27 +1,10 @@
 #!/usr/bin/env node
 import fs from "node:fs";
-import os from "node:os";
+import {configureRuntime} from "../../skills/professional-slides/runtime/environment.mjs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-const bundledRoot = path.join(os.homedir(), ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies");
-const firstExisting = candidates => candidates.find(candidate => candidate && fs.existsSync(candidate));
-const runtimePython = firstExisting([
-  process.env.RUNTIME_PYTHON,
-  path.join(bundledRoot, "python", "bin", "python3")
-]) || "python3";
-const runtimeNode = firstExisting([
-  process.env.RUNTIME_NODE,
-  path.join(bundledRoot, "node", "bin", "node")
-]) || process.execPath;
-const runtimeNodeModules = firstExisting([
-  process.env.RUNTIME_NODE_MODULES,
-  path.join(bundledRoot, "node", "node_modules"),
-  path.join(path.dirname(path.dirname(runtimeNode)), "node_modules"),
-  path.join(path.dirname(path.dirname(runtimeNode)), "lib", "node_modules")
-]);
-
-if (!runtimeNodeModules) throw new Error("Unable to locate the bundled Node module directory; set RUNTIME_NODE_MODULES");
+const {RUNTIME_PYTHON:runtimePython,RUNTIME_NODE:runtimeNode,RUNTIME_NODE_MODULES:runtimeNodeModules}=configureRuntime();
 if (!fs.existsSync(path.join(runtimeNodeModules, "@napi-rs", "canvas"))) throw new Error(`Required test dependency @napi-rs/canvas is unavailable under ${runtimeNodeModules}`);
 
 function run(command, args) {

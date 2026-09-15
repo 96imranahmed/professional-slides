@@ -13,6 +13,11 @@ const render=title=>chrome.render({id:'page',frame,props:{title,source:'Source: 
 const single=render('Revenue growth accelerated');
 const wrappedWithout=render('Revenue growth translated into faster operating income\\ngrowth');
 const wrappedWith=chrome.render({id:'page',frame,props:{title:'Revenue growth translated into faster operating income\\ngrowth',titleVariant:'with-line',source:'Source: Company data'}});
+const compact=chrome.render({id:'page',frame,props:{title:'Revenue growth accelerated',pageTemplate:{contentSpacing:'compact'},source:'Source: Company data'}});
+const compactTitle=compact.nodes.find(n=>n.role==='action-title');
+assert.equal(compact.contentFrame.y-compactTitle.frame.y-compactTitle.data.textLayout.height,tokenValue(token('space.5')));
+assert.ok(compact.contentFrame.height>single.contentFrame.height);
+assert.throws(()=>chrome.render({id:'bad',frame,props:{title:'Test',pageTemplate:{contentSpacing:'arbitrary'}}}),/contentSpacing/);
 const title=wrappedWithout.nodes.find(node=>node.role==='action-title');
 const actualGap=wrappedWithout.contentFrame.y-title.frame.y-title.data.textLayout.height;
 assert.equal(title.data.textLayout.lines.length,2);
@@ -86,7 +91,7 @@ import {renderSlideHtml} from './skills/professional-slides/runtime/adapters/htm
 const slide={id:'growth',title:'Growth follows demand',source:'Source: Company data',items:[{id:'text',job:'State the constraint',component:'paragraph',props:{text:'Demand exceeds available capacity.'}}]};
 const pageTemplate={rules:'bottom',branding:'top-right-logo',logo:{component:'paragraph',props:{text:'Company name'}}};
 const {deck}=planDeck({id:'company',pageTemplate,slides:[slide,{...slide,id:'next'}]});
-assert.deepEqual(deck.manifest.pageTemplate,pageTemplate.sourcePlacement? pageTemplate:{sourcePlacement:'inline',...pageTemplate});
+assert.deepEqual(deck.manifest.pageTemplate,{sourcePlacement:'inline',contentSpacing:'standard',...pageTemplate});
 for(const [i,s] of deck.slides.entries()) {
  const title=s.nodes.find(n=>n.role==='action-title'),logo=s.componentInstances.find(n=>n.id.endsWith(':logo'));
  assert.ok(logo);assert.equal(logo.frame.x,1040);assert.equal(logo.frame.y,48);
@@ -95,7 +100,7 @@ for(const [i,s] of deck.slides.entries()) {
  assert.equal(s.nodes.filter(n=>n.role==='source-text').length,1);
  assert.ok(!s.nodes.some(n=>n.role==='footer-right'||n.role==='source-rule'));
  assert.ok(renderSlideHtml(s).includes('Company name'));
- const body=s.componentInstances.find(n=>n.id==='text');assert.deepEqual(body.frame,s.contentFrame);
+ const body=s.componentInstances.find(n=>n.id==='text');assert.equal(body.frame.x,s.contentFrame.x);assert.equal(body.frame.width,s.contentFrame.width);assert.ok(body.frame.height<s.contentFrame.height);
 }
 const plain=planDeck({id:'plain',slides:[slide]}).deck;
 assert.equal(plain.manifest.pageTemplate.rules,'none');

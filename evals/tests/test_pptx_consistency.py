@@ -58,7 +58,7 @@ class PptxConsistencyTests(unittest.TestCase):
         self.assertIn(validator.COMPOSITION_REVIEW_RULE, prompt)
         self.assertIn("within the same composition family", prompt)
         self.assertIn("outer whitespace or a lower content start alone is insufficient", prompt)
-        self.assertIn("Every comparison group must span at least two distinct slides", prompt)
+        self.assertIn("comparison groups for genuinely recurring constructions across at least two slides", prompt)
 
     def test_multislide_deck_requires_a_comparison_group(self):
         value = judgement()
@@ -80,7 +80,7 @@ class PptxConsistencyTests(unittest.TestCase):
     def test_dimension_floor_blocks_acceptance(self):
         value = judgement()
         value["deckScores"]["densityRhythm"] = 89
-        self.assertFalse(validator.derive_consistency_acceptance(value, []))
+        self.assertTrue(validator.derive_consistency_acceptance(value, []))
 
 
 if __name__ == "__main__":

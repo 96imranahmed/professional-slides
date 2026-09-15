@@ -45,7 +45,8 @@ function lineOptions(style, data = {}) {
     color: colorValue(style.stroke),
     width: style.lineWidth ? points(styleValue(style.lineWidth)) : 0,
     dashType: styleType,
-    ...(data.endArrow ? { endArrowType: data.endArrowType || "triangle" } : {})
+    ...(data.endArrow ? { endArrowType: data.endArrowType || "triangle" } : {}),
+    ...(data.startArrow ? { beginArrowType: data.startArrowType || "triangle" } : {})
   };
 }
 
@@ -112,14 +113,16 @@ function addNode(slide, node, pptx) {
     return;
   }
   if (node.type === "text") {
-    slide.addText(node.text, {
+    slide.addText(node.runs ? node.runs.map(run => ({ text: run.text, options: { bold: run.bold } })) : node.text, {
       x: inch(frame.x), y: inch(frame.y), w: inch(frame.width), h: inch(frame.height),
       objectName: `ps:${node.id}`,
     altText: JSON.stringify({ ...node.data.semantic, description: node.data.alt || null }),
       fontFace: styleValue(style.fontFamily),
       fontSize: styleValue(style.fontSize),
       color: colorValue(style.color),
-      bold: Boolean(style.fontWeight ? style.fontFamily.nativeBold : style.bold),
+      // PptxGenJS's textbox bold default can override explicit false run values.
+      // Measured runs are complete weights, so inherit a neutral textbox weight.
+      bold: node.runs ? false : Boolean(style.fontWeight ? style.fontFamily.nativeBold : style.bold),
       align: style.align || "left",
       valign: style.valign === "top" ? "top" : style.valign === "bottom" ? "bottom" : "mid",
       margin: 0,

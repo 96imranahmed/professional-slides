@@ -305,7 +305,7 @@ class PptxValidatorTests(unittest.TestCase):
             }
         ])
         codes = report["summary"]["findingCodes"]
-        self.assertIn("copy.shape_word_limit", codes)
+        self.assertNotIn("copy.shape_word_limit", codes)
         self.assertIn("copy.forbidden_character", codes)
 
     def test_rejects_title_drift_from_the_approved_contract(self):
@@ -341,15 +341,17 @@ class PptxValidatorTests(unittest.TestCase):
         self.assertIn("manifest.theme_font_sizes", report["summary"]["findingCodes"])
 
     def test_repair_loop_moves_the_same_brief_from_rejected_to_accepted(self):
+        explicit = manifest(["Margin recovery is credible"])
+        explicit["copy"]["enforceBudgets"] = True
         rejected, _, _ = self.validate([
             {
                 "title": "Margin recovery is credible",
                 "body": "Pricing actions and a wide collection of operational initiatives are expected to offset freight, labour, and other pressures over time.",
             }
-        ])
+        ], manifest_value=explicit)
         accepted, _, _ = self.validate([
             {"title": "Margin recovery is credible", "body": "Pricing offsets freight and labour."}
-        ])
+        ], manifest_value=explicit)
         self.assertFalse(rejected["accepted"])
         self.assertTrue(accepted["accepted"], accepted["findings"])
 
