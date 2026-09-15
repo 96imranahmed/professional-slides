@@ -179,12 +179,9 @@ export function composeSlide(slide, index, baseDir) {
   const layout = chooseLayout(slide);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   const items = [];
-  if (layout === "exhibit-full") {
-    // A full-width table or image keeps its own heading band when it has one;
-    // charts carry their heading inside the plot.
-    const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
-    items.push(exhibits[0].panelHeading || exhibits[0].heading ? headedPanel(exhibits[0], item, `${id}-exhibit`) : item);
-  }
+  // A full-width table needs no heading of its own: the action title and the
+  // header row already say what it is. Heading bands exist for the row rule only.
+  if (layout === "exhibit-full") items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir));
   else if (layout === "exhibit-left" || layout === "exhibit-right") {
     const hero = headedPanel(exhibits[0], exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" }), `${id}-exhibit`);
     // The side column is a headed section so its rule shares the chart heading's

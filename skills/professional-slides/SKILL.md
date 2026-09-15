@@ -116,7 +116,7 @@ Record in the Exhibit column *why* that encoding was chosen when the choice is n
 
 Vary deliberately across the deck, never within a page: every table in the deck drawn the same way is wrong, and so are two treatments side by side. Two tables share a page only when they read as one design and both are light (five rows or fewer, no cell over 60 characters); otherwise the composer gives each table its own page under the same title marked (1/2), (2/2), with the points on the first page and the so-what on every page. Prefer writing it that way yourself. Columns are weighted by their longest content, so a "Year 1" column stays narrow; a table that fills its frame stretches its rows into bands and centres every cell on the row.
 
-**Row rule.** Every panel that sits beside another carries a heading band, and all the bands in a row share one rule line; content starts level below it. A chart brings its own heading; a table, image or list beside it gets a `panelHeading` (or the runtime supplies one). Tables in one row share one type size. Nothing in a row aligns to the heading *text* of its neighbour, only to the rule.
+**Row rule.** Every panel that sits beside another carries a heading band, and all the bands in a row share one rule line; content starts level below it. A chart brings its own heading; a table, image or list beside it gets a `panelHeading` (or the runtime supplies one). A table on its own gets no heading: the action title and its header row are enough. Tables in one row share one type size. Nothing in a row aligns to the heading *text* of its neighbour, only to the rule.
 
 - Canvas 1280 x 720 px, 60 px outer margins.
 - 12-column grid: 82 px columns, 16 px gutters.

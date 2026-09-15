@@ -639,13 +639,13 @@ export function measureTable({ frame, props }) {
       `Table content needs ${height.toFixed(1)}px, but only ${frame.height}px is allocated; widen, simplify or split the table`,
     );
   // A table given more height than it needs spreads the surplus across its rows,
-  // up to 2× the natural row height, so a hero table fills its frame the way a
+  // up to 2.5× the natural row height, so a hero table fills its frame the way a
   // consulting scorecard does instead of leaving a void beneath it.
   // Stretched rows read as bands, so every cell's content is then centred on
   // the row rather than hanging from its top edge beside a centred category.
   let stretched = false;
   if (props.fillHeight === true && Number.isFinite(frame.height) && frame.height > height + 0.01 && heights.length) {
-    const surplus = Math.min(frame.height - height, heights.reduce((a, b) => a + b, 0));
+    const surplus = Math.min(frame.height - height, heights.reduce((a, b) => a + b, 0) * 1.5);
     const per = surplus / heights.length;
     for (let r = 0; r < heights.length; r += 1) heights[r] += per;
     height += surplus;
