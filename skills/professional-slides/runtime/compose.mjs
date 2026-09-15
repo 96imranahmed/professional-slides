@@ -92,8 +92,13 @@ export function composeSlide(slide, index, baseDir) {
   if (layout === "exhibit-full") items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir));
   else if (layout === "exhibit-left" || layout === "exhibit-right") {
     const hero = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" });
-    const side = pointsItem(slide.points || [], `${id}-points`);
-    side.size = { width: { fr: 1 }, height: "hug" };
+    // The side column is a headed section so its rule shares the chart heading's
+    // band and the points start level with the plot, not with the heading text.
+    // `pointsAlign: "middle"` centres the points on the exhibit instead.
+    const list = pointsItem(slide.points || [], `${id}-points`);
+    const side = slide.pointsAlign === "middle"
+      ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, leftover: "center", items: [list] }
+      : { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: 1 }, height: "fill" }, items: [list] };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: layout === "exhibit-left" ? [hero, side] : [side, hero] });
   } else if (layout === "two-up") {
     // Peer charts with one unit share one value scale, or the comparison lies.

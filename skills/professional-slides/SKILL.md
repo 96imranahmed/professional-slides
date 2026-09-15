@@ -139,7 +139,7 @@ The runtime takes `professional-slides.deck/v3`: content and intent only, about 
   ] }
 ```
 
-`exhibit.type` is any registered component (`chart.column`, `chart.bar`, `chart.stacked-bar`, `chart.line`, `chart.pie`, `chart.waterfall`, `table`, `image` with a `path`, `metrics`, `timeline`, `matrix`, …). One exhibit plus `points` gives a two-thirds hero with a side column; two or three `exhibits` give a two-up row with one shared value scale; `points` alone give a text page; every page may carry one `soWhat`, which becomes the takeaway box at the foot. Titles are held to two lines at 24pt; a third line drops to 22pt and the page gate reports it.
+`exhibit.type` is any registered component (`chart.column`, `chart.bar`, `chart.stacked-bar`, `chart.line`, `chart.pie`, `chart.waterfall`, `table`, `image` with a `path`, `metrics`, `timeline`, `matrix`, …). One exhibit plus `points` gives a two-thirds hero with a headed side column (`pointsHeading`, default "What it means", whose rule aligns with the chart heading; `pointsAlign: "middle"` centres the points on the exhibit instead); two or three `exhibits` give a two-up row with one shared value scale; `points` alone give a text page; every page may carry one `soWhat`, which becomes the takeaway box at the foot. Titles are held to two lines at 24pt; a third line drops to 22pt and the page gate reports it.
 
 ```bash
 node runtime/build-deck.mjs deck.json out/ --preflight   # story gates only: titles, hedges, words, monotony

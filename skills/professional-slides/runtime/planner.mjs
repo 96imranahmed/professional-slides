@@ -120,7 +120,7 @@ function layoutKind(plan, items) {
 function makeItem(item, index, cell = null) {
   const size = item.size || { width: { fr: item.weight || 1 }, height: (["paragraph", "insight", "evidence-note", "table"].includes(item.component) || item.component === "bullet-list" && item.props?.variant === "body") ? "hug" : "fill" };
   if (item.items) {
-    const nestedPlan = { id: item.id, layout: item.layout || "auto", gap: item.gap };
+    const nestedPlan = { id: item.id, layout: item.layout || "auto", gap: item.gap, leftover: item.leftover };
     const nested = makeComposition(nestedPlan, item.items);
     return section({
       id: item.id,
@@ -160,7 +160,7 @@ function makeComposition(plan, items, { root = false } = {}) {
       id: `${plan.id}-${kind.replace(".", "-")}`,
       direction: kind.endsWith("row") ? "row" : "column",
       gap: token(plan.gap ?? "space.4"),
-      leftover: bodyColumn ? "distribute" : "start",
+      leftover: plan.leftover ?? (bodyColumn ? "distribute" : "start"),
       children: items.map((item, index) => makeItem(item, index))
     });
   }
