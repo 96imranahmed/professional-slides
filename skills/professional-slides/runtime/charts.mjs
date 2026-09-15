@@ -53,12 +53,14 @@ const SERIES = [
   token("color.chartSeries6")
 ];
 
-function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0 } = {}) {
+function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0 } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
   leftInset = Math.max(leftInset, bands.left);
-  const top = (topLegend ? 52 : 28) + totalLabelInset + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top;
+  // Peer charts in a row pass the row's tallest top band as topInset so their
+  // plots start (and end) on the same lines and one value scale means one pixel scale.
+  const top = Math.max(Number(topInset) || 0, (topLegend ? 52 : 28) + totalLabelInset + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top);
   // Reserve the actual last metric row plus a trailing theme gap, not another full row band.
-  const bottom = bands.bottom ? 40 + bands.bottom + tokenValue(token("space.3")) : 68;
+  const bottom = bands.bottom ? 40 + bands.bottom + tokenValue(token("space.3")) : 56;
   const rightInset = Math.max(valueLabelInset, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16);
   if (frame.height - bottom - top < 100) throw new Error("Chart annotation bands leave insufficient plot height; enlarge or split the exhibit");
   if (frame.width - leftInset - rightInset < 120) throw new Error("Chart has insufficient plot width; enlarge or split the exhibit");
@@ -139,7 +141,8 @@ function assertGridlineOption(props) {
 function resolveValueAxis(props, { valueCount, dataLabelsVisible }) {
   if (props.showValueAxis !== undefined) return props.showValueAxis;
   if (props.gridlines === true) return true;
-  return !(dataLabelsVisible && valueCount < SPARSE_DIRECT_LABEL_LIMIT);
+  // Direct labels replace the value axis: a labelled mark needs no scale to read.
+  return !dataLabelsVisible;
 }
 
 function normalizedCategoricalData(props, { seriesCount = null } = {}) {
@@ -481,6 +484,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   if(horizontal && (props.referenceLines || []).some(r=>r.placement === "outside-end")) throw new Error("Outside reference labels require a vertical quantitative axis");
   const referenceGutter = Math.max(0,...(props.referenceLines || []).filter(r=>r.placement === "outside-end").map(r=>measureDataLabel(r.label || String(r.value)).width + barLabelGap));
   const plot = chartFrame(frame, {
+    topInset: props.plotTopInset,
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
@@ -799,7 +803,7 @@ function sparseLineChart({ id, frame, props }) {
   const showLegend = props.legend !== false && series.length > 1;
   const showValueAxis = props.showValueAxis !== false;
   const labelWidth = axisLabelWidth(bounds);
-  const plot = chartFrame(frame, { topLegend: showLegend, leftInset: showValueAxis ? Math.max(labelWidth + 8, 54) : 54, annotations: props.annotations });
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: showLegend, leftInset: showValueAxis ? Math.max(labelWidth + 8, 54) : 54, annotations: props.annotations });
   const statusHeight = boundary ? Math.max(...[boundary.beforeLabel, boundary.afterLabel].map(label => measureText(label, plot.width / 2 - 16, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }).height)) + tokenValue(token("space.3")) : 0;
   plot.y += statusHeight; plot.height -= statusHeight;
   if (plot.height < 100) fail("status labels leave insufficient plot height");
@@ -876,6 +880,7 @@ function lineChart({ id, frame, props, area = false }) {
   const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y" });
   const labelWidth = axisLabelWidth(bounds);
   const plot = chartFrame(frame, {
+    topInset: props.plotTopInset,
     leftInset: showValueAxis ? Math.max(labelWidth + 8, showDataLabels ? 68 : 0) : showDataLabels ? 68 : 54,
     valueLabelInset: showDataLabels ? 68 : 0,
     topLegend: showLegend,
@@ -988,6 +993,7 @@ function waterfall({ id, frame, props }) {
   if (props.totals !== undefined && (!Array.isArray(props.totals) || props.totals.some(index => !Number.isInteger(index) || index < 0 || index >= props.categories.length) || new Set(props.totals).size !== props.totals.length)) throw new Error("Waterfall totals must contain unique valid category indices");
   const showValueAxis = resolveValueAxis(props, { valueCount: props.values.length, dataLabelsVisible: true });
   const plot = chartFrame(frame, {
+    topInset: props.plotTopInset,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
@@ -1047,7 +1053,7 @@ function rangeChart({ id, frame, props }) {
   const barHighlight = highlights.find((h) => h.style === "bar");
   const labelWidth = Math.max(56, ...[...props.low, ...props.high].map((value) => Math.ceil(measureText(formatValue(value, props), 300, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 }).width) + 12));
   const categoryWidth = Math.max(90, ...categories.map((c) => Math.ceil(measureText(c, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width) + 12));
-  const plot = chartFrame(frame, { leftInset: categoryWidth + labelWidth, valueLabelInset: labelWidth, centerPlot: false });
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: categoryWidth + labelWidth, valueLabelInset: labelWidth, centerPlot: false });
   const bounds = numericBounds([...props.low, ...props.high], { min: props.xMin, max: props.xMax, axis: "x", includeZero: props.includeZero === true });
   const xScale = (value) => plot.x + (value - bounds.min) / bounds.span * plot.width;
   const nodes = [];
@@ -1075,6 +1081,7 @@ function comboChart({ id, frame, props }) {
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props, { seriesCount: 2 });
   const plot = chartFrame(frame, {
+    topInset: props.plotTopInset,
     topLegend: true,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
@@ -1216,6 +1223,7 @@ function scatter({ id, frame, props, bubble = false }) {
   const seriesNames = [...new Set(props.points.map(point => point.series).filter(value => typeof value === "string" && value.trim()))];
   const showLegend = props.legend !== false && (seriesNames.length > 1 || props.sizeLegend !== undefined);
   const plot = chartFrame(frame, {
+    topInset: props.plotTopInset,
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
@@ -1553,12 +1561,20 @@ export function registerCharts(registry) {
       ...(chart.id === "chart.horizons" ? { variants: HORIZONS_VARIANTS, defaultVariant: "curves", variantProp: "variant", resolveVariant: resolveHorizonsVariant } : {}),
       // Samples belong exclusively to fixtures. Never inject example annotations,
       // targets or data into a production chart with partially supplied props.
+      // Row rule: a chart's heading band (heading + unit line) is a ruled header
+      // like a section's, so peers beside it take the same band height and the
+      // rules line up. The compiler passes the shared height back as headerBandHeight.
+      measureHeader: ({ frame, props = {} }) => {
+        if (!String(props.heading ?? "").trim()) return null;
+        const layout = registry.get("chart-title").measureHeader({ frame, props: { heading: props.heading, unit: props.unit, variant: props.titleVariant } });
+        return { top: frame.y, ruled: layout.ruled, height: layout.height };
+      },
       render: ({ id, frame, props = {}, tokens }) => {
         if (!String(props.heading ?? "").trim()) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
           return { nodes: chart.render({ id, frame, tokens, props }) };
         }
-        const title = registry.get("chart-title"), titleProps = { heading: props.heading, unit: props.unit, variant: props.titleVariant, ...(props.badge ? { badge: props.badge } : {}) };
+        const title = registry.get("chart-title"), titleProps = { heading: props.heading, unit: props.unit, variant: props.titleVariant, ...(props.badge ? { badge: props.badge } : {}), ...(props.headerBandHeight ? { headerBandHeight: props.headerBandHeight } : {}) };
         const height = title.measureContent({ frame, props: titleProps }).height;
         return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...chart.render({ id, frame: { ...frame, y: frame.y + height, height: frame.height - height }, tokens, props })] };
       }

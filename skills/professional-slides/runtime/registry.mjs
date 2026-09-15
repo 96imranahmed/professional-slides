@@ -252,8 +252,10 @@ function headingLayout(frame, props = {}) {
   const headingWidth = frame.width;
   const heading = measureText(props.heading || props.text || "", headingWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true });
   const bandHeight = Math.max(heading.height, props.headerBandHeight || 0);
-  // The rule binds to the heading (one baseline unit below its box, which already
-  // carries the descender) and the body sits a clear step below the rule.
+  // Row rule: peers in a row share one band. Every heading sits on the band's
+  // top line (so a heading beside a chart heading reads on the same line) and
+  // the rule sits under the band, one baseline unit below its bottom; the body
+  // sits a clear step below the rule.
   const ruleGap = tokenValue(token("space.1"));
   const contentGap = tokenValue(token("space.4"));
   return { heading, headingWidth, bandHeight, ruleGap, height: bandHeight + (props.rule === false ? 0 : ruleGap) + contentGap };
@@ -268,7 +270,7 @@ function sectionHeadingNodes({ id, frame, props = {} }) {
   const nodes = [textPrimitive({
     id: stableId(id, "heading"),
     role: "section-heading",
-    frame: { x: frame.x, y: frame.y + bandHeight - heading.height, width: headingWidth, height: heading.height },
+    frame: { x: frame.x, y: frame.y, width: headingWidth, height: heading.height },
     text: heading.text,
     style: { ...textStyle(token("type.heading"), color, true, "left", "top"), lineHeight: heading.lineHeight, wrap: false },
     data: { textLayout: heading, headerTop: frame.y, headerBandHeight: bandHeight, ruleGap }
@@ -355,7 +357,7 @@ function chartTitleLayout(frame, props) {
 function chartTitleNodes({ id, frame, props }) {
   const layout = chartTitleLayout(frame, props);
   if (layout.height > frame.height) throw new Error(`Chart title ${id} exceeds its allocated height`);
-  const blockTop = frame.y + layout.bandHeight - layout.block;
+  const blockTop = frame.y;
   const nodes = [textPrimitive({
     id: stableId(id, "heading"),
     role: "section-heading",
@@ -377,7 +379,7 @@ function chartTitleNodes({ id, frame, props }) {
     const badge = measureText(String(props.badge), frame.width * 0.5, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: true, wrapWidthRatio: 1 });
     if (badge.lines.length === 1) {
       const pad = tokenValue(token("space.2")), w = Math.ceil(badge.width) + 2 * pad, h = badge.height + tokenValue(token("space.1"));
-      const bx = frame.x + frame.width - w, by = frame.y + layout.bandHeight - h;
+      const bx = frame.x + frame.width - w, by = frame.y + (layout.heading.height - h) / 2;
       nodes.push(rectPrimitive({ id: stableId(id, "badge-surface"), role: "chart-badge-surface", frame: { x: bx, y: by, width: w, height: h }, style: boxStyle(token("color.accent"), "none", HAIRLINE, token("radius.round")) }));
       nodes.push(textPrimitive({ id: stableId(id, "badge"), role: "chart-badge", frame: { x: bx + pad, y: by + (h - badge.height) / 2, width: w - 2 * pad, height: badge.height }, text: badge.text, style: { ...textStyle(COMPACT, WHITE, true, "center", "top"), lineHeight: badge.lineHeight, wrap: false }, data: { textLayout: badge } }));
     }

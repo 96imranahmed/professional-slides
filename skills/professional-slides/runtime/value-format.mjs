@@ -1,7 +1,9 @@
 // Shared numeric label formatting; encoding continues to use the raw value.
 export function formatValue(value, props) {
   const format = props.valueFormat;
-  if (!format) return String(value);
+  // Without a declared format, labels round the way a reader reads them: whole
+  // numbers from ten up, one decimal below ten. Marks keep the raw value.
+  if (!format) return Number.isInteger(value) ? String(value) : Math.abs(value) >= 10 ? String(Math.round(value)) : String(Math.round(value * 10) / 10);
   if (format.sign !== undefined && !["auto", "always"].includes(format.sign)) throw new Error("valueFormat.sign must be auto or always");
   const units = {k: 1000, m: 1000000, bn: 1000000000};
   if (format.compactUnit !== undefined && !Object.hasOwn(units, format.compactUnit)) throw new Error("valueFormat.compactUnit must be k, m or bn");

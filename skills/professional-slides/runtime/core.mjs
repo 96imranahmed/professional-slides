@@ -56,6 +56,7 @@ export const TOKENS = Object.freeze({
   "color.componentPrimaryTint": colour("--component-primary-tint", "#DCEEF8"),
   "color.calloutTint": colour("--callout-tint", "#FFF6DC"),
   "color.accent": colour("--accent", "#00A6E6"),
+  "color.accentTint": colour("--accent-tint", "#DCF3FD"),
   "color.rule": colour("--rule", "#929BA3"),
   "color.chartGrid": colour("--chart-gridline", "#D4D8DC"),
   "color.chartComparator": colour("--chart-comparator", "#D9DDE0"),
@@ -701,6 +702,7 @@ export function nativeChartSpec(componentId, props = {}, frame) {
   // expose it, so those charts stay as assembled, grouped shapes. A single-bar
   // highlight is a per-point fill and stays native.
   const highlights = props.highlights || [];
+  if (props.native === false) return null;
   if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
   const categories = [...(props.categories || props.labels || [])];
   const series = type === "range"

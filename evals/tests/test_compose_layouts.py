@@ -85,14 +85,25 @@ const chart=find(bar.items,i=>i.component==='chart.bar');
 assert.deepEqual(chart.props.highlights,[{category:'Hoboken',style:'bar'}]);
 const spec=nativeChartSpec('chart.bar',chart.props,{x:0,y:0,width:700,height:400});
 assert.deepEqual(spec.highlightIndices,[0]);
-// A CAGR badge computed from the series, and forecast shading passed to the native chart.
+// A CAGR becomes the growth arrow with its rate in the bubble (years from the
+// category names); forecast shading is passed to the native chart when no
+// annotation forces shapes.
 const col=composeSlide({title:'T',exhibit:{type:'chart.column',heading:'Market',unit:'$B',categories:['2023','2024','2025','2026E'],series:[{name:'m',values:[90,100,121,146.41]}],forecastFrom:'2026E',cagr:{from:'2024',to:'2026E'}}},0);
 const c=find(col.items,i=>i.component==='chart.column');
-assert.equal(c.props.badge,'CAGR 2024–2026E: +21%');
-assert.equal(nativeChartSpec('chart.column',c.props,{x:0,y:0,width:700,height:400}).forecastIndex,3);
+assert.equal(c.props.badge,undefined);
+assert.deepEqual(c.props.changeAnnotations,[{start:'2024',end:'2026E',style:'arrow',text:'+21% p.a.'}]);
+const plain=composeSlide({title:'T',exhibit:{type:'chart.column',heading:'Market',unit:'$B',categories:['2023','2024','2025','2026E'],series:[{name:'m',values:[90,100,121,146.41]}],forecastFrom:'2026E',change:false}},0);
+assert.equal(nativeChartSpec('chart.column',find(plain.items,i=>i.component==='chart.column').props,{x:0,y:0,width:700,height:400}).forecastIndex,3);
 const nodes=REGISTRY.get('chart.column').render({id:'c',frame:{x:0,y:0,width:700,height:400},props:c.props}).nodes;
-assert.ok(nodes.some(n=>n.role==='chart-badge'&&n.text==='CAGR 2024–2026E: +21%'));
+assert.ok(nodes.some(n=>n.role==='annotation-text'&&n.text==='+21% p.a.'));
 assert.equal(nodes.find(n=>n.role==='chart-mark'&&n.data.category==='2026E').style.fill.tokenId,'color.chartSeries6');
+// Period categories get the first-to-last arrow; a gap title gets per-category brackets; bar rankings get nothing.
+const grow=composeSlide({title:'T',exhibit:{type:'chart.line',heading:'Sales',unit:'$m',categories:['2021','2022','2023','2024'],series:[{name:'s',values:[50,60,70,75]}]}},0);
+assert.deepEqual(find(grow.items,i=>i.component==='chart.line').props.changeAnnotations,[{start:'2021',end:'2024',style:'arrow',text:'+50%'}]);
+const gap=composeSlide({title:'Schools beat their peers by 10 points',exhibit:{type:'chart.column',heading:'Share',unit:'%',categories:['English','Math'],series:[{name:'School',values:[89,90]},{name:'Peers',values:[79,80]}]}},0);
+assert.deepEqual(find(gap.items,i=>i.component==='chart.column').props.changeAnnotations.map(a=>a.text),['+10 pp','+10 pp']);
+const rank=composeSlide({title:'T',exhibit:{type:'chart.bar',heading:'Share',unit:'%',categories:['A','B','C','D'],series:[{name:'s',values:[1,2,3,4]}]}},0);
+assert.equal(find(rank.items,i=>i.component==='chart.bar').props.changeAnnotations,undefined);
 assert.equal(nodes.find(n=>n.role==='chart-unit').text,'$B');
 // Range chart: floating bars with both ends labelled; native spec carries low/high.
 const range=REGISTRY.get('chart.range').render({id:'r',frame:{x:0,y:0,width:700,height:400},props:{categories:['A','B'],low:[300,350],high:[380,460]}}).nodes;

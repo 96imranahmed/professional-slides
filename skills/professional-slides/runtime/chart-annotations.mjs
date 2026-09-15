@@ -37,7 +37,7 @@ const EVIDENCE_BOX_HEIGHT = 56;
 const ORTHOGONAL_GAP = 28;
 const ENDPOINT_DIAMETER = 8;
 const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label"]);
-const SCALAR_BUBBLE = /^(?:[~≈]?\s*[+−\-£$€¥]{0,2}\s*\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|pp|bps|x|×|bn|mn|[kKmMbBtT])?|N\/A)$/;
+const SCALAR_BUBBLE = /^(?:[~≈]?\s*[+−\-£$€¥]{0,2}\s*\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|pp|bps|x|×|bn|mn|[kKmMbBtT])?(?:\s*p\.a\.)?|N\/A)$/;
 
 function textStyle(size, color, bold = false, align = "center") {
   return {

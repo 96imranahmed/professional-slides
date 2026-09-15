@@ -25,6 +25,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { measureText } from "./text-layout.mjs";
+import { chartAnnotationBands, evidenceAnnotationTopBandCount, EVIDENCE_CALLOUT_BAND } from "./chart-annotations.mjs";
 
 const V3 = "professional-slides.deck/v3";
 const SIZE = { width: { fr: 1 }, height: "fill" };
@@ -91,16 +92,9 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
     // and no per-point labels when there is more than one series.
     const line = type === "chart.line" || type === "chart.area";
     const props = { dataLabels: !(line && multi), legend: multi && !line, ...(line && multi ? { endLabels: true } : {}), highlights: [], annotations: [], referenceLines: [], ...rest };
-    // CAGR badge: { from, to } names two categories; the rate is computed from
-    // the first series and shown as a pill on the heading line.
-    if (rest.cagr && Array.isArray(rest.categories) && Array.isArray(rest.series) && rest.series[0]) {
-      const a = rest.categories.indexOf(rest.cagr.from), b = rest.categories.indexOf(rest.cagr.to);
-      if (a < 0 || b <= a) throw new Error("cagr.from and cagr.to must name two categories in order");
-      const v0 = rest.series[0].values[a], v1 = rest.series[0].values[b];
-      const rate = v0 > 0 && v1 > 0 ? (Math.pow(v1 / v0, 1 / (b - a)) - 1) * 100 : null;
-      props.badge = rest.cagr.label || (rate === null ? `${rest.cagr.from}–${rest.cagr.to}` : `CAGR ${rest.cagr.from}–${rest.cagr.to}: ${rate >= 0 ? "+" : ""}${rate.toFixed(rate < 10 ? 1 : 0)}%`);
-      delete props.cagr;
-    }
+    // A leftover cagr (one the change rule could not compute) becomes a heading pill.
+    if (rest.cagr) { props.badge = rest.cagr.label || `CAGR ${rest.cagr.from}–${rest.cagr.to}`; delete props.cagr; }
+    delete props.change;
     return { id, component: type, props, size };
   }
   return { id, component: type, props: rest, size };
@@ -313,10 +307,63 @@ function highlightFromTitle(ex, title) {
   return hits.length ? { ...ex, highlights: [{ category: hits[0], style: "bar" }] } : ex;
 }
 
+/**
+ * Growth indicators. A chart that measures a change carries the change on the
+ * chart: an arrow with a bubble from the first to the last period of a single
+ * series, or a bracket per category between two series when the title talks
+ * about the gap. `change: false` turns it off; `change: { from, to, text? }`
+ * (or `change: true`) asks for the arrow explicitly; `cagr` puts the rate in
+ * the bubble as "+13% p.a.".
+ */
+const PERIOD_CATEGORY = /(?:19|20)\d{2}|^FY\s?\d{2,4}|^[QH][1-4]\b|^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b|^(?:Current|Today|Now|Baseline|Before|Future|Target|After|Year \d)/i;
+const GAP_WORDS = /\b(?:gap|beat|beats|lead|leads|ahead|behind|trail|trails|above|below|higher|lower|more than|less than|points?|pts|pp|vs\.?|versus|outperform\w*|exceed\w*)\b/i;
+const CHANGE_TYPES = ["chart.column", "chart.bar", "chart.line", "chart.area"];
+const fmtNumber = (n) => { const a = Math.abs(n); return a >= 10 ? String(Math.round(n)) : n.toFixed(1).replace(/\.0$/, ""); };
+const signed = (n, suffix = "") => `${n >= 0 ? "+" : "−"}${fmtNumber(Math.abs(n))}${suffix}`;
+export function changeFromContent(ex, title) {
+  if (!ex || !CHANGE_TYPES.includes(ex.type) || ex.change === false || (ex.changeAnnotations || []).length) return ex;
+  const categories = ex.categories || [], series = Array.isArray(ex.series) ? ex.series : [];
+  if (categories.length < 2 || !series.length || !series.every((sr) => Array.isArray(sr.values) && sr.values.length === categories.length && sr.values.every(Number.isFinite))) return ex;
+  const percentUnit = /%|percent|share|pts|points/i.test(String(ex.unit || ""));
+  const delta = (a, b) => (percentUnit ? signed(b - a, " pp") : a > 0 ? signed(((b - a) / a) * 100, "%") : null);
+  const out = { ...ex }; delete out.change;
+  if (ex.cagr) {
+    // The CAGR belongs on the arrow between its two periods, not in the heading.
+    const a = categories.indexOf(ex.cagr.from), b = categories.indexOf(ex.cagr.to);
+    if (a < 0 || b <= a) throw new Error("cagr.from and cagr.to must name two categories in order");
+    const v0 = series[0].values[a], v1 = series[0].values[b];
+    const year = (c) => { const m = String(c).match(/(?:19|20)\d{2}/); return m ? Number(m[0]) : null; };
+    const years = year(ex.cagr.from) !== null && year(ex.cagr.to) !== null && year(ex.cagr.to) > year(ex.cagr.from) ? year(ex.cagr.to) - year(ex.cagr.from) : b - a;
+    if (v0 > 0 && v1 > 0) {
+      const rate = (Math.pow(v1 / v0, 1 / years) - 1) * 100;
+      delete out.cagr;
+      return { ...out, changeAnnotations: [{ start: ex.cagr.from, end: ex.cagr.to, style: "arrow", text: `${signed(rate, "%")} p.a.` }] };
+    }
+    return ex;
+  }
+  const explicit = ex.change && typeof ex.change === "object" ? ex.change : null;
+  const periodic = categories.every((c) => PERIOD_CATEGORY.test(String(c)));
+  if (series.length === 1 && (explicit || ex.change === true || (periodic && ex.type !== "chart.bar"))) {
+    const from = explicit?.from ?? categories[0], to = explicit?.to ?? categories[categories.length - 1];
+    const a = categories.indexOf(from), b = categories.indexOf(to);
+    if (a < 0 || b <= a) throw new Error("change.from and change.to must name two categories in order");
+    const text = explicit?.text || delta(series[0].values[a], series[0].values[b]);
+    return text ? { ...out, changeAnnotations: [{ start: from, end: to, style: "arrow", text }] } : ex;
+  }
+  if (series.length === 2 && categories.length <= 6 && (ex.change === true || GAP_WORDS.test(String(title || "")))) {
+    // The subject is the focus series when one is named, else the first series;
+    // the bubble reads subject minus comparator.
+    const focus = series.find((sr) => sr.name === ex.focusSeries) || series[0], base = series.find((sr) => sr !== focus);
+    const annotations = categories.map((c, i) => ({ start: { category: c, series: base.name }, end: { category: c, series: focus.name }, style: "bracket", text: percentUnit ? signed(focus.values[i] - base.values[i], " pp") : signed(focus.values[i] - base.values[i]) }));
+    return { ...out, changeAnnotations: annotations };
+  }
+  return ex;
+}
+
 export function composeSlide(slide, index, baseDir) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
-  if (slide.exhibit) slide = { ...slide, exhibit: highlightFromTitle(slide.exhibit, slide.title) };
-  if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => highlightFromTitle(ex, slide.title)) };
+  if (slide.exhibit) slide = { ...slide, exhibit: changeFromContent(highlightFromTitle(slide.exhibit, slide.title), slide.title) };
+  if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => changeFromContent(highlightFromTitle(ex, slide.title), slide.title)) };
   if (slide.kind === "section") return { id, kind: "divider", title: slide.title, ...(slide.number !== undefined ? { number: slide.number } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
   if (slide.kind === "agenda") return { id, title: slide.title || "Contents", layout: "flow.column", items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items, ...(slide.active !== undefined ? { active: slide.active } : {}) }, size: SIZE }] };
   const slideIn = slide;
@@ -402,6 +449,19 @@ export function composeSlide(slide, index, baseDir) {
       const max = Math.max(...charts.flatMap((ex) => ex.series.flatMap((se) => se.values)));
       const shared = niceCeiling(max);
       for (const ex of charts) { ex.yMin = ex.yMin ?? 0; ex.yMax = shared; }
+    }
+    // One scale needs one plot frame: peers share the row's tallest top band
+    // (legend, growth arrows, callouts), and when one peer must be drawn as
+    // shapes (annotations), all of them are, so their baselines coincide.
+    if (charts.length >= 2) {
+      const decorated = (ex) => (ex.referenceLines || []).length || (ex.annotations || []).length || (ex.changeAnnotations || []).length || (ex.highlights || []).some((h) => h?.style !== "bar");
+      const topBand = (ex) => {
+        const line = ex.type === "chart.line" || ex.type === "chart.area", multi = (ex.series || []).length > 1;
+        const legend = ex.legend === true || (ex.legend !== false && multi && !line);
+        return (legend ? 52 : 28) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top + evidenceAnnotationTopBandCount({ annotations: ex.annotations || [] }) * EVIDENCE_CALLOUT_BAND;
+      };
+      const inset = Math.max(...charts.map(topBand));
+      for (const ex of charts) { ex.plotTopInset = inset; if (charts.some(decorated)) ex.native = false; }
     }
     // Chart beside a narrow table (three columns or fewer): the chart takes 3:2.
     const panelSize = (ex) => {

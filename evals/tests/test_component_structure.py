@@ -467,8 +467,9 @@ console.log(JSON.stringify({chart: select(chart), rail: select(rail)}));
         )
         section = result["chart"]
         rail = result["rail"]
-        self.assertLess(section["heading"]["frame"]["y"], rail["heading"]["frame"]["y"], "chart heading sits above its unit line")
-        self.assertAlmostEqual(section["unit"]["frame"]["y"] + section["unit"]["frame"]["height"], rail["heading"]["frame"]["y"] + rail["heading"]["frame"]["height"], places=3)
+        self.assertAlmostEqual(section["heading"]["frame"]["y"], rail["heading"]["frame"]["y"], places=3, msg="both headings sit on the band's top line")
+        self.assertLess(section["heading"]["frame"]["y"], section["unit"]["frame"]["y"], "chart heading sits above its unit line")
+        self.assertLess(section["unit"]["frame"]["y"] + section["unit"]["frame"]["height"], rail["rule"]["frame"]["y"], "the unit line stays above the shared rule")
         self.assertEqual(section["heading"]["style"]["fontSize"], rail["heading"]["style"]["fontSize"])
         self.assertEqual(section["heading"]["style"]["color"], rail["heading"]["style"]["color"])
         self.assertEqual(section["rule"]["frame"]["y"], rail["rule"]["frame"]["y"])
@@ -508,17 +509,20 @@ console.log(JSON.stringify({
         )
         self.assertGreater(result["frameBottom"] - result["finalBottom"], 100)
 
-    def test_wrapped_headings_share_bottom_guide_and_rule_gap(self):
+    def test_wrapped_headings_share_top_line_and_one_rule(self):
         result = run_node("""
 import { buildFixtureDeck } from './skills/professional-slides/runtime/fixtures.mjs';
 const slide = buildFixtureDeck().deck.slides.find(s => s.id === 'fixture-layout-wrapped-headings');
 const headings = slide.nodes.filter(n => n.role === 'section-heading');
 const rules = slide.nodes.filter(n => n.role === 'section-heading-rule');
-console.log(JSON.stringify({counts: headings.map(n => n.data.textLayout.lines.length), bottoms: headings.map(n => n.frame.y+n.frame.height), gaps: headings.map((n,i) => rules[i].frame.y-n.frame.y-n.frame.height), sizes: headings.map(n => n.style.fontSize.value), wraps: headings.map(n => n.style.wrap)}));
+console.log(JSON.stringify({counts: headings.map(n => n.data.textLayout.lines.length), tops: headings.map(n => n.frame.y), ruleYs: rules.map(n => n.frame.y), gaps: headings.map((n,i) => rules[i].frame.y-n.frame.y-n.frame.height), sizes: headings.map(n => n.style.fontSize.value), wraps: headings.map(n => n.style.wrap)}));
 """)
         self.assertEqual(result["counts"], [1, 2, 3])
-        self.assertEqual(len(set(result["bottoms"])), 1)
-        self.assertEqual(result["gaps"], [4, 4, 4])
+        # Row rule: every heading starts on the band's top line and every rule sits on one shared line.
+        self.assertEqual(len(set(result["tops"])), 1)
+        self.assertEqual(len(set(result["ruleYs"])), 1)
+        self.assertEqual(result["gaps"][2], 4)
+        self.assertTrue(all(gap >= 4 for gap in result["gaps"]))
         self.assertEqual(result["sizes"], [14, 14, 14])
         self.assertEqual(result["wraps"], [False, False, False])
 

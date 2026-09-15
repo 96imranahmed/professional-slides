@@ -187,9 +187,13 @@ assert.equal(sparse.filter(n=>n.role==='axis-label').length,0);
 assert.equal(sparse.filter(n=>n.id.endsWith('y-axis')).length,0);
 assert.equal(sparse.filter(n=>n.id.endsWith('x-axis')).length,1);
 assert.ok(sparse.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
-const threshold=column.render({id:'threshold',frame,props:{categories:['A','B','C','D'],series:[{name:'Actual',values:[1,2,3,4]},{name:'Plan',values:[2,3,4,5]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
-assert.equal(threshold.filter(n=>n.role==='axis-label').length,5);
-assert.ok(threshold.filter(n=>n.role==='axis-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
+// Direct labels replace the value axis however many marks there are; an axis
+// returns only when the marks are unlabelled or it is asked for.
+const labelled=column.render({id:'labelled',frame,props:{categories:['A','B','C','D'],series:[{name:'Actual',values:[1,2,3,4]},{name:'Plan',values:[2,3,4,5]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
+assert.equal(labelled.filter(n=>n.role==='axis-label').length,0);
+const unlabelled=column.render({id:'unlabelled',frame,props:{categories:['A','B','C','D'],series:[{name:'Actual',values:[1,2,3,4]},{name:'Plan',values:[2,3,4,5]}],dataLabels:false,annotations:[],highlights:[],referenceLines:[]}}).nodes;
+assert.equal(unlabelled.filter(n=>n.role==='axis-label').length,5);
+assert.ok(unlabelled.filter(n=>n.role==='axis-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 const forced=column.render({id:'forced',frame,props:{categories:['A','B'],series:[{name:'Value',values:[1,2]}],dataLabels:true,showValueAxis:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
 assert.equal(forced.filter(n=>n.role==='axis-label').length,5);
 const horizontal=REGISTRY.get('chart.bar').render({id:'horizontal',frame,props:{categories:['A','B'],series:[{name:'Value',values:[1,2]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;

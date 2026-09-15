@@ -58,6 +58,8 @@ export const TABLE_TOKENS = [
   "color.onPrimary",
   "color.componentPrimary",
   "color.componentPrimaryTint",
+  "color.accent",
+  "color.accentTint",
   "color.surface",
   "color.surfaceMuted",
   "color.rule",
@@ -806,7 +808,10 @@ function renderTableAt({ id, frame, props }) {
             width: m.widths[c],
             height: m.headerHeight,
           },
-          style: box(ink),
+          // The recommended column's header takes the accent so the column
+          // reads as the answer from the header down.
+          style: box(c === props.highlightColumn ? t("color.accent") : ink),
+          data: { column: c, ...(c === props.highlightColumn ? { highlightColumn: true } : {}) },
         }),
       );
     if (m.headers[c]) {
@@ -851,7 +856,7 @@ function renderTableAt({ id, frame, props }) {
   // to the last row.
   if (Number.isInteger(props.highlightColumn) && m.widths[props.highlightColumn] !== undefined) {
     const c = props.highlightColumn;
-    nodes.push(rectPrimitive({ id: stableId(id, "column-band", c), role: "table-column-band", frame: { x: xs[c], y: frame.y + m.headerHeight + m.gap / 2, width: m.widths[c] - m.gap, height: sum(m.heights) - m.gap }, style: box(t("color.componentPrimaryTint")), data: { column: c, highlightColumn: true } }));
+    nodes.push(rectPrimitive({ id: stableId(id, "column-band", c), role: "table-column-band", frame: { x: xs[c], y: frame.y + m.headerHeight + m.gap / 2, width: m.widths[c] - m.gap, height: sum(m.heights) - m.gap }, style: box(t("color.accentTint")), data: { column: c, highlightColumn: true } }));
   }
   m.cells.forEach((row, r) =>
     row.forEach((cell, c) => {

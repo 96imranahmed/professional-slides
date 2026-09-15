@@ -369,8 +369,12 @@ class Emitter:
 
     def add_line(self, slide, node: dict):
         f = node["frame"]; style = node.get("style") or {}
-        x1 = f.get("x1", f["x"]); y1 = f.get("y1", f["y"])
-        x2 = f.get("x2", f["x"] + f["width"]); y2 = f.get("y2", f["y"] + f["height"])
+        d = node.get("data") or {}
+        # Line endpoints live on the node (or its data); the frame is only the
+        # bounding box, so a rising line must not be read as top-left → bottom-right.
+        pick = lambda key, fallback: node.get(key, d.get(key, f.get(key, fallback)))
+        x1 = pick("x1", f["x"]); y1 = pick("y1", f["y"])
+        x2 = pick("x2", f["x"] + f["width"]); y2 = pick("y2", f["y"] + f["height"])
         conn = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, emu(x1), emu(y1), emu(x2), emu(y2))
         conn.name = f"ps:{node['id']}"
         self._strip_style(conn)
@@ -378,7 +382,7 @@ class Emitter:
         conn.line.color.rgb = rgb(stroke)
         conn.line.width = Pt(float(style_value(style, "lineWidth", 1) or 1) * 0.75)
         dash = style.get("dash") or style.get("lineDash")
-        if dash:
+        if dash and str(dash).lower() not in ("solid", "none", "false"):
             from pptx.enum.dml import MSO_LINE_DASH_STYLE
             conn.line.dash_style = MSO_LINE_DASH_STYLE.DASH
         data = node.get("data") or {}
