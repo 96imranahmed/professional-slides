@@ -691,27 +691,38 @@ export function buildManifest(deck) {
 const NATIVE_CHART_TYPES = Object.freeze({
   "chart.column": "column", "chart.bar": "bar", "chart.stacked-column": "stacked-column",
   "chart.stacked-bar": "stacked-bar", "chart.line": "line", "chart.pie": "pie", "chart.donut": "donut",
-  "chart.scatter": "scatter", "chart.area": "area"
+  "chart.scatter": "scatter", "chart.area": "area", "chart.range": "range"
 });
 /** Data an emitter needs for a native chart. Types outside NATIVE_CHART_TYPES keep shapes. */
 export function nativeChartSpec(componentId, props = {}, frame) {
   const type = NATIVE_CHART_TYPES[componentId];
   if (!type) return null;
-  // Reference lines, annotations and highlights need the plot scale; PowerPoint does
-  // not expose it, so those charts stay as assembled, grouped shapes.
-  if ((props.referenceLines || []).length || (props.annotations || []).length || (props.highlights || []).length || (props.changeAnnotations || []).length) return null;
-  const series = Array.isArray(props.series) ? props.series.map(s => ({ name: s.name, values: [...(s.values || [])] }))
+  // Reference lines and annotations need the plot scale; PowerPoint does not
+  // expose it, so those charts stay as assembled, grouped shapes. A single-bar
+  // highlight is a per-point fill and stays native.
+  const highlights = props.highlights || [];
+  if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
+  const categories = [...(props.categories || props.labels || [])];
+  const series = type === "range"
+    ? [{ name: "low", values: [...(props.low || [])], hidden: true }, { name: "range", values: (props.high || []).map((h, i) => h - (props.low || [])[i]) }]
+    : Array.isArray(props.series) ? props.series.map(s => ({ name: s.name, values: [...(s.values || [])] }))
     : Array.isArray(props.values) ? [{ name: props.name || "", values: [...props.values] }] : [];
+  const forecastIndex = props.forecastFrom !== undefined ? categories.indexOf(props.forecastFrom) : -1;
   return {
     type,
-    categories: [...(props.categories || props.labels || [])],
+    categories,
     series,
+    highlightIndices: highlights.map((h) => categories.indexOf(h.category)).filter((i) => i >= 0),
+    forecastIndex,
+    endLabels: props.endLabels === true || (type === "line" && series.length > 1 && props.legend !== true && props.endLabels !== false),
+    center: props.center ?? null,
+    ...(type === "range" ? { low: [...(props.low || [])], high: [...(props.high || [])] } : {}),
     ...(Array.isArray(props.points) ? { points: props.points.map(p => ({ ...p })) } : {}),
     unit: props.unit ?? null,
     yMin: props.yMin ?? null,
     yMax: props.yMax ?? null,
     dataLabels: props.dataLabels !== false,
-    legend: props.legend === true || (series.length > 1 && props.legend !== false),
+    legend: props.legend === true || (series.length > 1 && props.legend !== false && !(type === "line" && props.endLabels !== false) && type !== "range"),
     gridlines: props.gridlines === true,
     valueFormat: props.valueFormat ?? null,
     colorIndices: Array.isArray(props.colorIndices) ? [...props.colorIndices] : null,

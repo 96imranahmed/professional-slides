@@ -86,7 +86,21 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
   }
   if (type === "metrics") return { id, layout: "flow.row", size: HUG, items: rest.items.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: m, size: { width: { fr: 1 }, height: 140 } })) };
   if (type.startsWith("chart.")) {
-    const props = { dataLabels: true, legend: Array.isArray(rest.series) && rest.series.length > 1, highlights: [], annotations: [], referenceLines: [], ...rest };
+    const multi = Array.isArray(rest.series) && rest.series.length > 1;
+    // Lines carry their series name at the end of the line instead of a legend,
+    // and no per-point labels when there is more than one series.
+    const line = type === "chart.line" || type === "chart.area";
+    const props = { dataLabels: !(line && multi), legend: multi && !line, ...(line && multi ? { endLabels: true } : {}), highlights: [], annotations: [], referenceLines: [], ...rest };
+    // CAGR badge: { from, to } names two categories; the rate is computed from
+    // the first series and shown as a pill on the heading line.
+    if (rest.cagr && Array.isArray(rest.categories) && Array.isArray(rest.series) && rest.series[0]) {
+      const a = rest.categories.indexOf(rest.cagr.from), b = rest.categories.indexOf(rest.cagr.to);
+      if (a < 0 || b <= a) throw new Error("cagr.from and cagr.to must name two categories in order");
+      const v0 = rest.series[0].values[a], v1 = rest.series[0].values[b];
+      const rate = v0 > 0 && v1 > 0 ? (Math.pow(v1 / v0, 1 / (b - a)) - 1) * 100 : null;
+      props.badge = rest.cagr.label || (rate === null ? `${rest.cagr.from}–${rest.cagr.to}` : `CAGR ${rest.cagr.from}–${rest.cagr.to}: ${rate >= 0 ? "+" : ""}${rate.toFixed(rate < 10 ? 1 : 0)}%`);
+      delete props.cagr;
+    }
     return { id, component: type, props, size };
   }
   return { id, component: type, props: rest, size };
@@ -277,6 +291,7 @@ function chooseLayout(slide) {
   if (slide.layout && slide.layout !== "auto") return slide.layout;
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   if (slide.arrange === "stack") return "stack";
+  if (slide.arrange === "row") return "two-up";
   if (slide.arrange === "grid" || exhibits.length >= 4) return "grid";
   // Auto-stack: two charts on one category set with points beside them stack
   // in the hero column rather than shrinking into a three-way row.
@@ -286,10 +301,31 @@ function chooseLayout(slide) {
   return "text";
 }
 
+/**
+ * Highlight the answer: a single-series bar or column chart with no declared
+ * highlight takes one from the title when the title names a category.
+ */
+function highlightFromTitle(ex, title) {
+  if (!ex || !["chart.column", "chart.bar", "chart.range"].includes(ex.type) || (ex.highlights || []).length) return ex;
+  if (ex.type !== "chart.range" && (!Array.isArray(ex.series) || ex.series.length !== 1)) return ex;
+  const t = String(title || "").toLowerCase();
+  const hits = (ex.categories || []).filter((c) => String(c).length >= 3 && new RegExp(`(^|[^a-z0-9])${String(c).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9])`).test(t)).sort((a, b) => t.indexOf(String(a).toLowerCase()) - t.indexOf(String(b).toLowerCase()));
+  return hits.length ? { ...ex, highlights: [{ category: hits[0], style: "bar" }] } : ex;
+}
+
 export function composeSlide(slide, index, baseDir) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
+  if (slide.exhibit) slide = { ...slide, exhibit: highlightFromTitle(slide.exhibit, slide.title) };
+  if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => highlightFromTitle(ex, slide.title)) };
   if (slide.kind === "section") return { id, title: slide.title, items: [{ id: `${id}-divider`, component: "section-divider", props: { title: slide.title, ...(slide.number ? { number: slide.number } : {}) }, size: SIZE }], layout: "flow.column" };
   const slideIn = slide;
+  // A value table under the chart: the chart stacks over a compact table whose
+  // columns are the chart's categories.
+  if (slide.exhibit && Array.isArray(slide.exhibit.dataTable) && slide.exhibit.dataTable.length && !slide.exhibits) {
+    const chart = { ...slide.exhibit }; const rowsIn = chart.dataTable; delete chart.dataTable;
+    const table = { type: "table", density: "compact", treatment: "open", variant: "plain", columns: [{ label: "", type: "text", bold: true, width: 120 }, ...(chart.categories || []).map((c) => ({ label: "", type: "text", align: "center", width: 80 }))], rows: rowsIn.map((r) => [r.label, ...(r.values || []).map(String)]) };
+    slide = { ...slide, exhibit: undefined, exhibits: [chart, table], arrange: "stack", stackWeights: [4, 1] };
+  }
   // Hero fitness: a thin single-series chart becomes a column of KPI tiles
   // (one per category) that stands in for the hero, points beside it.
   let tileColumn = null, tilePoints = [];
@@ -332,7 +368,13 @@ export function composeSlide(slide, index, baseDir) {
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: layout === "exhibit-left" ? [hero, side] : [side, hero] });
   } else if (layout === "stack") {
     // Exhibits stacked in the hero column, points beside them.
-    const stacked = { id: `${id}-stack`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: exhibits.map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE }, `${id}-exhibit-${i}`)) };
+    // A value table under a chart hugs its rows and carries no heading band.
+    const stackItem = (ex, i) => {
+      const hug = Boolean(slide.stackWeights) && ex.type === "table";
+      const item = { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, hug ? HUG : SIZE), size: hug ? HUG : SIZE };
+      return hug ? item : headedPanel(ex, item, `${id}-exhibit-${i}`);
+    };
+    const stacked = { id: `${id}-stack`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: exhibits.map(stackItem) };
     if (slide.points?.length) {
       const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`)] };
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
@@ -369,7 +411,7 @@ export function composeSlide(slide, index, baseDir) {
       if (narrow(ex) && String(other?.type).startsWith("chart.")) return { width: { fr: 2 }, height: "fill" };
       return SIZE;
     };
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 3).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex) }, `${id}-exhibit-${i}`)) });
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex) }, `${id}-exhibit-${i}`)) });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`));
   } else {
     const points = slide.points || [];

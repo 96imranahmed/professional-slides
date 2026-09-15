@@ -42,12 +42,13 @@ CHART_PLOT_ROLES = {"chart-mark", "data-label", "category-label", "chart-axis", 
                     "legend-swatch", "legend-label", "chart-line", "chart-point", "chart-segment", "chart-area",
                     "chart-wedge", "pie-label", "pie-leader", "chart-baseline", "chart-tick", "reference-line",
                     "reference-label", "chart-annotation", "annotation-leader", "chart-callout", "chart-highlight",
-                    "value-label", "series-label", "end-label", "stack-label", "total-label", "axis-title"}
+                    "value-label", "series-label", "end-label", "stack-label", "total-label", "axis-title",
+                    "chart-hole", "chart-marker", "chart-connector", "chart-bar-axis", "chart-quadrant", "chart-quadrant-label"}
 # Single-line labels are sized to their ink; they never wrap, so PowerPoint must not
 # re-wrap them on a one-pixel advance difference. Prose keeps wrap="square".
 LABEL_ROLES = {"legend-label", "data-label", "category-label", "axis-label", "value-label", "metric-value", "metric-label",
                "metric-delta", "page-number", "source-text", "chart-unit", "process-label", "tracker-label", "table-cell",
-               "table-header", "pie-label", "reference-label", "end-label", "stack-label", "total-label", "scale-endpoint", "page-tag", "cover-date", "cover-logo", "table-status-label", "table-progress-label"}
+               "table-header", "pie-label", "reference-label", "end-label", "stack-label", "total-label", "scale-endpoint", "page-tag", "cover-date", "cover-logo", "table-status-label", "table-progress-label", "chart-badge"}
 CHROME_COMPONENTS = {"slide-chrome", "page-template", "section", "paragraph", "section-heading",
                      "bullet-list", "insight", "evidence-note", "chart-title", "footnote", "cover"}
 NATIVE = {
@@ -60,6 +61,7 @@ NATIVE = {
     "donut": XL_CHART_TYPE.DOUGHNUT,
     "area": XL_CHART_TYPE.AREA,
     "scatter": XL_CHART_TYPE.XY_SCATTER,
+    "range": XL_CHART_TYPE.BAR_STACKED,
 }
 
 
@@ -429,6 +431,11 @@ class Emitter:
         ctype = NATIVE.get(spec["type"])
         if ctype is None:
             return None
+        if spec["type"] in ("pie", "donut"):
+            # A square frame keeps the hole at the frame centre in every renderer,
+            # so the centre KPI box lands in the hole.
+            side = min(f["width"], f["height"])
+            f = {"x": f["x"] + (f["width"] - side) / 2, "y": f["y"] + (f["height"] - side) / 2, "width": side, "height": side}
         if spec["type"] == "scatter":
             cd = XyChartData()
             for s in spec.get("series") or [{"name": "", "values": []}]:
@@ -452,21 +459,28 @@ class Emitter:
             chart.legend.include_in_layout = False
             chart.legend.font.size = Pt(10)
         plot = chart.plots[0]
-        if spec["type"] not in ("pie", "donut", "scatter"):
-            plot.gap_width = 60
-            if spec["type"] in ("column", "bar"):
+        kind = spec["type"]
+        is_range = kind == "range"
+        fmt = spec.get("valueFormat") or {}
+        decimals = int(fmt.get("decimals", 0)) if isinstance(fmt, dict) else 0
+        number_format = "0" if decimals == 0 else "0." + "0" * decimals
+        if kind not in ("pie", "donut", "scatter"):
+            plot.gap_width = 60 if not is_range else 80
+            if kind in ("column", "bar"):
                 plot.overlap = 0
+            if is_range:
+                plot.overlap = 100
             va = chart.value_axis
             va.has_major_gridlines = bool(spec.get("gridlines"))
             va.visible = False if spec.get("dataLabels", True) else True
-            va.tick_labels.font.size = Pt(9)
+            va.tick_labels.font.size = Pt(10)  # chart furniture floor is 10 pt
             if spec.get("yMin") is not None:
                 va.minimum_scale = spec["yMin"]
             if spec.get("yMax") is not None:
                 va.maximum_scale = spec["yMax"]
             ca = chart.category_axis
             ca.tick_labels.font.size = Pt(10)
-            if spec["type"] in ("bar", "stacked-bar"):
+            if kind in ("bar", "stacked-bar", "range"):
                 ca.reverse_order = True  # first category at the top, as authored
                 va.crosses = XL_AXIS_CROSSES.MAXIMUM if False else va.crosses
             ca.has_major_gridlines = False
@@ -474,38 +488,109 @@ class Emitter:
             va.major_tick_mark = XL_TICK_MARK.NONE
             ca.format.line.color.rgb = rgb(self.colors.get("color.rule", "#929BA3"))
             va.format.line.fill.background()
-        if spec.get("dataLabels", True):
+        if spec.get("dataLabels", True) and not is_range:
             plot.has_data_labels = True
             dl = plot.data_labels
-            dl.font.size = Pt(9)
+            dl.font.size = Pt(11)   # data labels are the chart's loudest number
             dl.font.bold = True
-            fmt = spec.get("valueFormat") or {}
-            decimals = int(fmt.get("decimals", 0)) if isinstance(fmt, dict) else 0
-            dl.number_format = "0" if decimals == 0 else "0." + "0" * decimals
+            dl.number_format = number_format
             dl.number_format_is_linked = False
-            if spec["type"] in ("column", "bar"):
+            if kind in ("column", "bar"):
                 dl.position = XL_LABEL_POSITION.OUTSIDE_END
-            elif spec["type"] in ("pie", "donut"):
-                dl.position = XL_LABEL_POSITION.OUTSIDE_END if spec["type"] == "pie" else XL_LABEL_POSITION.CENTER
+            elif kind in ("pie", "donut"):
+                dl.position = XL_LABEL_POSITION.OUTSIDE_END if kind == "pie" else XL_LABEL_POSITION.CENTER
         # series colours from the palette (comparator series grey when the runtime would)
         idx = spec.get("colorIndices")
+        accent = self.colors.get("color.accent") or self.colors.get("color.componentPrimary")
+        forecast = self.colors.get("color.chartSeries6")
+        highlight_indices = set(spec.get("highlightIndices") or [])
+        forecast_index = spec.get("forecastIndex", -1)
+        single = len(spec["series"]) == 1
+        max_value = max((abs(v) for s in spec["series"] for v in s["values"] if isinstance(v, (int, float))), default=0)
         for i, ser in enumerate(plot.series):
             ci = idx[i] if idx and i < len(idx) else i
             color = self.series_colors[ci % len(self.series_colors)] if self.series_colors else None
-            if len(spec["series"]) == 2 and i == 1 and not idx:
+            if len(spec["series"]) == 2 and i == 1 and not idx and not is_range and kind not in ("line", "area"):
                 color = self.colors.get("color.chartComparator", color)
-            if color and spec["type"] not in ("pie", "donut"):
+            if is_range and i == 0:
+                # invisible base: the bar floats from low to high
+                ser.format.fill.background(); ser.format.line.fill.background()
+                continue
+            if color and kind not in ("pie", "donut"):
                 fill = ser.format.fill
                 fill.solid(); fill.fore_color.rgb = rgb(color)
-                if spec["type"] == "line":
+                if kind == "line":
                     ser.format.line.color.rgb = rgb(color)
                     ser.format.line.width = Pt(2.25)
                     ser.smooth = False
-            elif spec["type"] in ("pie", "donut"):
+                if kind in ("column", "bar", "stacked-column", "stacked-bar") and single and spec.get("dataLabels", True):
+                    # Series-level labels first (a per-point override otherwise
+                    # creates a series block that hides the other labels), then
+                    # highlight the answer, lighten the forecast, and put the label
+                    # inside a bar that is wide enough to carry it in white.
+                    sdl = ser.data_labels
+                    sdl.show_value = True
+                    sdl.number_format = number_format; sdl.number_format_is_linked = False
+                    sdl.font.size = Pt(11); sdl.font.bold = True
+                    sdl.font.color.rgb = rgb(self.colors.get("color.ink", "#000000"))
+                    if kind in ("column", "bar"):
+                        sdl.position = XL_LABEL_POSITION.OUTSIDE_END
+                    for j, pt in enumerate(ser.points):
+                        value = spec["series"][i]["values"][j]
+                        if j in highlight_indices and accent:
+                            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(accent)
+                        elif forecast_index is not None and forecast_index >= 0 and j >= forecast_index and forecast:
+                            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(forecast)
+                        if kind in ("column", "bar") and max_value and isinstance(value, (int, float)) and abs(value) >= 0.4 * max_value:
+                            lab = pt.data_label
+                            lab.position = XL_LABEL_POSITION.INSIDE_END
+                            lab.font.size = Pt(11); lab.font.bold = True
+                            lab.font.color.rgb = rgb(self.colors.get("color.onPrimary", "#FFFFFF"))
+                            lab.number_format = number_format; lab.number_format_is_linked = False
+                if kind == "line" and spec.get("endLabels"):
+                    # Series name at the last point instead of a legend.
+                    last = len(spec["series"][i]["values"]) - 1
+                    if last >= 0:
+                        lab = ser.points[last].data_label
+                        lab.position = XL_LABEL_POSITION.RIGHT
+                        tf = lab.text_frame
+                        tf.text = str(spec["series"][i].get("name") or "")
+                        for p in tf.paragraphs:
+                            for r in p.runs:
+                                r.font.size = Pt(10); r.font.bold = True; r.font.color.rgb = rgb(color)
+                if is_range:
+                    lows, highs = spec.get("low") or [], spec.get("high") or []
+                    for j, pt in enumerate(ser.points):
+                        if j in highlight_indices and accent:
+                            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(accent)
+                        lab = pt.data_label
+                        lab.position = XL_LABEL_POSITION.INSIDE_END
+                        tf = lab.text_frame
+                        lo = lows[j] if j < len(lows) else ""; hi = highs[j] if j < len(highs) else ""
+                        tf.text = f"{lo:g}–{hi:g}" if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) else f"{lo}–{hi}"
+                        for p in tf.paragraphs:
+                            for r in p.runs:
+                                r.font.size = Pt(10); r.font.bold = True; r.font.color.rgb = rgb(self.colors.get("color.onPrimary", "#FFFFFF"))
+            elif kind in ("pie", "donut"):
                 for j, pt in enumerate(ser.points):
                     c = self.series_colors[j % len(self.series_colors)]
                     if c:
                         pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(c)
+        if kind == "donut" and spec.get("center"):
+            # The centre KPI: a text box over the hole (value bold, label under).
+            center = spec["center"] if isinstance(spec["center"], dict) else {"value": str(spec["center"])}
+            w, h = f["width"] * 0.34, f["height"] * 0.3
+            box = slide.shapes.add_textbox(emu(f["x"] + (f["width"] - w) / 2), emu(f["y"] + (f["height"] - h) / 2), emu(w), emu(h))
+            box.name = f"ps:{instance['instanceId']}:center"
+            tf = box.text_frame; tf.word_wrap = True
+            tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+            p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
+            r = p.add_run(); r.text = str(center.get("value", ""))
+            self._font(r.font, "Arial", 20, True, rgb(self.colors.get("color.ink", "#000000")))
+            if center.get("label"):
+                p2 = tf.add_paragraph(); p2.alignment = PP_ALIGN.CENTER
+                r2 = p2.add_run(); r2.text = str(center["label"])
+                self._font(r2.font, "Arial", 10, False, rgb(self.colors.get("color.textSecondary", "#404040")))
         self.stats["native_charts"] += 1
         return gf
 

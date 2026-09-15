@@ -529,9 +529,15 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     }
     return seriesIndex % SERIES.length;
   };
+  const forecastIndex = props.forecastFrom !== undefined ? categories.indexOf(props.forecastFrom) : -1;
+  if (props.forecastFrom !== undefined && forecastIndex < 0) throw new Error("forecastFrom must name a chart category");
   const colorFor = (seriesIndex, categoryIndex) => {
-    const primary = token("color.componentPrimary"), comparator = token("color.chartComparator");
-    if (barHighlight) return categories[categoryIndex] === barHighlight.category ? primary : comparator;
+    const accent = token("color.accent"), primary = token("color.componentPrimary"), comparator = token("color.chartComparator");
+    // Highlight the answer: the bar the title is about takes the accent; the
+    // others keep their series colour (navy), never grey. Forecast periods are lighter.
+    if (barHighlight && categories[categoryIndex] === barHighlight.category) return accent;
+    if (forecastIndex >= 0 && categoryIndex >= forecastIndex && !stacked && series.length === 1) return token("color.chartSeries6");
+    if (barHighlight) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
     if (props.colorIndices !== undefined || stacked) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
     if (twoSeriesContrast) return series[seriesIndex].name === (props.focusSeries ?? series[0].name) ? primary : comparator;
     if (twoMarkContrast) return categoryIndex === 0 ? primary : comparator;
@@ -861,7 +867,7 @@ function lineChart({ id, frame, props, area = false }) {
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props);
   if (area && categories.length < 2) throw new Error("Area charts require at least two categories");
-  const endLabels = props.directLabels === "end";
+  const endLabels = props.directLabels === "end" || props.endLabels === true;
   const showLegend = !endLabels && props.legend !== false && series.length > 1;
   const values = series.flatMap((item) => item.values);
   const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length < 6);
@@ -1025,6 +1031,44 @@ function waterfall({ id, frame, props }) {
     previous = end;
   });
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale });
+}
+
+/**
+ * Floating range bars: one horizontal bar per category from `low` to `high`
+ * with both values labelled at the ends (pay bands, ranges, min–max).
+ * props: categories, low[], high[], unit?, highlights? ({category, style:"bar"}).
+ */
+function rangeChart({ id, frame, props }) {
+  assertGridlineOption(props);
+  const categories = props.categories || [];
+  if (!categories.length || !Array.isArray(props.low) || !Array.isArray(props.high) || props.low.length !== categories.length || props.high.length !== categories.length) throw new Error("Range chart requires categories with one low and one high value each");
+  categories.forEach((c, i) => { if (!(Number.isFinite(props.low[i]) && Number.isFinite(props.high[i]) && props.high[i] >= props.low[i])) throw new Error(`Range chart ${c}: high must be a finite value at or above low`); });
+  const highlights = normalizedHighlights(props, { categories, series: [{ name: "range" }], allowBar: true });
+  const barHighlight = highlights.find((h) => h.style === "bar");
+  const labelWidth = Math.max(56, ...[...props.low, ...props.high].map((value) => Math.ceil(measureText(formatValue(value, props), 300, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 }).width) + 12));
+  const categoryWidth = Math.max(90, ...categories.map((c) => Math.ceil(measureText(c, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width) + 12));
+  const plot = chartFrame(frame, { leftInset: categoryWidth + labelWidth, valueLabelInset: labelWidth, centerPlot: false });
+  const bounds = numericBounds([...props.low, ...props.high], { min: props.xMin, max: props.xMax, axis: "x", includeZero: props.includeZero === true });
+  const xScale = (value) => plot.x + (value - bounds.min) / bounds.span * plot.width;
+  const nodes = [];
+  const rowSpan = plot.height / categories.length;
+  const barHeight = Math.min(28, Math.max(10, rowSpan * 0.45));
+  const pointMap = new Map(), categoryMap = new Map();
+  categories.forEach((category, index) => {
+    const low = props.low[index], high = props.high[index];
+    const y = plot.y + index * rowSpan + (rowSpan - barHeight) / 2;
+    const x0 = xScale(low), x1 = Math.max(xScale(high), x0 + 2);
+    const fill = barHighlight ? (barHighlight.category === category ? token("color.accent") : SERIES[0]) : SERIES[0];
+    nodes.push(rectPrimitive({ id: stableId(id, "range", category), role: "chart-mark", frame: { x: x0, y, width: x1 - x0, height: barHeight }, style: fillStyle(fill), data: { category, low, high, highlighted: barHighlight?.category === category } }));
+    nodes.push(textPrimitive({ id: stableId(id, "low-label", category), role: "data-label", frame: { x: x0 - labelWidth - 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(low, props), style: textStyle(CHART_LABEL, INK, true, "right"), data: { category, end: "low" } }));
+    nodes.push(textPrimitive({ id: stableId(id, "high-label", category), role: "data-label", frame: { x: x1 + 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(high, props), style: textStyle(CHART_LABEL, INK, true, "left"), data: { category, end: "high" } }));
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: frame.x, y: y - 2, width: categoryWidth, height: barHeight + 4 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "left"), data: { category } }));
+    if (index) nodes.push(linePrimitive({ id: stableId(id, "row-rule", index), role: "chart-gridline", x1: frame.x, y1: plot.y + index * rowSpan, x2: plot.x + plot.width + labelWidth, y2: plot.y + index * rowSpan, style: lineStyle() }));
+    const point = { x: x1, y: y + barHeight / 2, changeX: x1 + 12, changeY: y + barHeight / 2, leaderY: y };
+    pointMap.set(`value:${category}`, point); pointMap.set(`range:${category}`, point);
+    categoryMap.set(category, { x: plot.x, y: plot.y + index * rowSpan, width: plot.width, height: rowSpan });
+  });
+  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, xScale, allowAnnotationRail: false, allowBarHighlight: true });
 }
 
 function comboChart({ id, frame, props }) {
@@ -1376,6 +1420,10 @@ const chartDefinitions = [
     sample: { labels: ["Core", "Growth", "New"], values: [52, 31, 17] }
   },
   {
+    id: "chart.range", render: rangeChart,
+    sample: { heading: "(Insert measure and population)", categories: ["Research", "Labs", "Core Models", "API Agents"], low: [305, 385, 347, 300], high: [385, 460, 490, 400], unit: "$k", highlights: [{ category: "Core Models", style: "bar" }] }
+  },
+  {
     id: "chart.combo", render: comboChart,
     sample: { categories: ["2023", "2024", "2025", "2026"], series: [{ name: "Revenue", values: [42, 55, 68, 82] }, { name: "Plan", values: [45, 58, 70, 85] }], annotations: [{ series: "Revenue", category: "2026", text: "Revenue reaches $82m" }] }
   },
@@ -1477,7 +1525,7 @@ export function registerCharts(registry) {
     const tokens = [
       "font.body", "type.heading", "type.body", "type.chartLabel", "type.chartAnnotation", "type.compact", "type.label", "type.source", "color.ink", "color.textSecondary",
       "font.bodySemibold", "weight.semibold",
-      "color.chartGrid", "color.chartComparator", "color.componentPrimary", "color.componentPrimaryTint", "color.rule",
+      "color.chartGrid", "color.chartComparator", "color.componentPrimary", "color.componentPrimaryTint", "color.accent", "color.rule",
       "color.canvas", "color.surface", "color.surfaceMuted", "color.onPrimary", "color.negative", "line.hairline", "line.standard", "radius.none",
       ...SERIES.map((item) => item.tokenId), ...LEGEND_TOKENS, ...(chart.tokens || [])
     ];
@@ -1502,7 +1550,7 @@ export function registerCharts(registry) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
           return { nodes: chart.render({ id, frame, tokens, props }) };
         }
-        const title = registry.get("chart-title"), titleProps = { heading: props.heading, unit: props.unit, variant: props.titleVariant };
+        const title = registry.get("chart-title"), titleProps = { heading: props.heading, unit: props.unit, variant: props.titleVariant, ...(props.badge ? { badge: props.badge } : {}) };
         const height = title.measureContent({ frame, props: titleProps }).height;
         return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...chart.render({ id, frame: { ...frame, y: frame.y + height, height: frame.height - height }, tokens, props })] };
       }

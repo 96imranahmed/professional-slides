@@ -8,6 +8,7 @@ export function guidanceNote(guidance) {
 }
 
 export const CHART_GUIDANCE = Object.freeze({
+  "chart.range": entry("showing a band per category (pay ranges, min–max, confidence intervals) where both ends matter", "a floating bar from low to high with both values labelled reads as a band; two bars per category would read as two measures", "state which band sits highest or overlaps least and what that decides"),
   "chart.column": entry("comparing discrete categories or showing change across a small number of periods", "a common baseline makes differences in magnitude easy to verify; one declared highlight may focus the decisive bar or category region", "state the most important difference, change or threshold shown by the columns"),
   "chart.bar": entry("ranking categories or comparing labels that need horizontal space", "ordered bar length makes relative position and distance easy to scan; one declared highlight may focus the decisive bar or category region", "state the leading, lagging or otherwise decision-relevant category and the size or consequence of the gap"),
   "chart.stacked-column": entry("showing how an absolute total and its composition change across periods", "the shared baseline preserves the total while the segments reveal contribution", "state the total movement and the segment that explains the most important change"),

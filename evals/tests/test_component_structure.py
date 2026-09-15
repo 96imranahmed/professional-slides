@@ -42,9 +42,9 @@ console.log(JSON.stringify({
 }));
 """
         )
-        self.assertEqual(result["registry"], 67)
+        self.assertEqual(result["registry"], 68)
         self.assertEqual(result["components"], 54)
-        self.assertEqual(result["charts"], 13)
+        self.assertEqual(result["charts"], 14)
         self.assertEqual(result["layoutFixtures"], 76)
         self.assertGreater(result["componentBoards"], 0)
         self.assertEqual(result["componentCoverage"], result["expectedCoverage"])
@@ -449,13 +449,17 @@ const chart = REGISTRY.get('chart-title').render({
   frame: {x: 60, y: 188, width: 770, height: 76},
   props: {heading: 'Q2 2026 year-over-year Search growth', unit: '%'}
 }).nodes;
+// The row rule: the compiler hands every panel in a row the tallest header band
+// (here the chart's two-line heading + unit), so the rules share one line.
+const band = REGISTRY.get('chart-title').measureHeader({frame: {x: 60, y: 188, width: 770, height: 76}, props: {heading: 'Q2 2026 year-over-year Search growth', unit: '%'}}).height;
 const rail = REGISTRY.get('content-rail').render({
   id: 'takeaways',
   frame: {x: 840, y: 188, width: 380, height: 442},
-  props: {heading: 'Key takeaways', treatment: 'open', dividerLeft: true, items: ['One', 'Two']}
+  props: {heading: 'Key takeaways', treatment: 'open', dividerLeft: true, items: ['One', 'Two'], headerBandHeight: band}
 }).nodes;
 const select = nodes => ({
   heading: nodes.find(node => node.role === 'section-heading'),
+  unit: nodes.find(node => node.role === 'chart-unit'),
   rule: nodes.find(node => node.role === 'section-heading-rule')
 });
 console.log(JSON.stringify({chart: select(chart), rail: select(rail)}));
@@ -463,7 +467,8 @@ console.log(JSON.stringify({chart: select(chart), rail: select(rail)}));
         )
         section = result["chart"]
         rail = result["rail"]
-        self.assertEqual(section["heading"]["frame"]["y"], rail["heading"]["frame"]["y"])
+        self.assertLess(section["heading"]["frame"]["y"], rail["heading"]["frame"]["y"], "chart heading sits above its unit line")
+        self.assertAlmostEqual(section["unit"]["frame"]["y"] + section["unit"]["frame"]["height"], rail["heading"]["frame"]["y"] + rail["heading"]["frame"]["height"], places=3)
         self.assertEqual(section["heading"]["style"]["fontSize"], rail["heading"]["style"]["fontSize"])
         self.assertEqual(section["heading"]["style"]["color"], rail["heading"]["style"]["color"])
         self.assertEqual(section["rule"]["frame"]["y"], rail["rule"]["frame"]["y"])

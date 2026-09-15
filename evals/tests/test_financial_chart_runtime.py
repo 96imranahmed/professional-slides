@@ -166,9 +166,9 @@ const change=waterfall.render({id:'waterfall',frame,props:{...waterfall.sample,.
 assert.ok(change.filter(n=>n.role==='data-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 assert.ok(change.filter(n=>n.role==='annotation-text').every(n=>n.style.fontSize.tokenId==='type.chartAnnotation'));
 const title=REGISTRY.get('chart-title').render({id:'title',frame:{x:60,y:60,width:800,height:90},props:{heading:'Performance',unit:'USD millions, 2026'}}).nodes;
-assert.equal(title.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.heading');
+assert.equal(title.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.compact');
 assert.equal(title.find(n=>n.role==='chart-unit').style.color.tokenId,'color.chartUnit');
-assert.equal(title.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
+assert.equal(title.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'stacked');
 assert.equal(title.filter(n=>n.role==='section-heading-rule').length,1);
 const cover=REGISTRY.get('cover').render({id:'cover',frame:{x:0,y:0,width:1280,height:720},props:{title:'Strategy',subtitle:'Priorities for the planning cycle'}}).nodes;
 assert.equal(cover.find(n=>n.role==='cover-subtitle').style.fontSize.tokenId,'type.heading');
@@ -376,7 +376,8 @@ for(const palette of ['mckinsey','bcg','bain']) {
 const explicit=compileDeck({slides:[slide({categories:['Current','Future'],series:[{name:'Measure',values:[80,150]}],colorIndices:[1]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
 assert.deepEqual(explicit.map(n=>n.style.fill.tokenId),['color.chartSeries2','color.chartSeries2']);
 const focused=compileDeck({palette:'bain',slides:[slide({categories:['A','B','C'],series:[{name:'Measure',values:[40,70,55]}],highlights:[{category:'B',style:'bar'}]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
-assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartComparator','color.componentPrimary','color.chartComparator']);
+// Highlight the answer: the named bar takes the accent; the others keep the series colour, never grey.
+assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartSeries1','color.accent','color.chartSeries1']);
 assert.deepEqual(focused.map(n=>n.data.highlighted),[false,true,false]);
 console.log(JSON.stringify({accepted:true}));
 """)
@@ -403,8 +404,8 @@ for(const palette of ['mckinsey','bcg','bain']) for(const kind of ['chart.column
 }
 for(const categories of [['A','B'],['B','A']]) {
   const marks=render('chart.column',{categories,series:[{name:'Value',values:[40,70]}],highlights:[{category:'B',style:'bar'}]}).filter(n=>n.role==='chart-mark');
-  assert.equal(marks.find(n=>n.data.category==='B').style.fill.tokenId,'color.componentPrimary');
-  assert.equal(marks.find(n=>n.data.category==='A').style.fill.tokenId,'color.chartComparator');
+  assert.equal(marks.find(n=>n.data.category==='B').style.fill.tokenId,'color.accent');
+  assert.equal(marks.find(n=>n.data.category==='A').style.fill.tokenId,'color.chartSeries1');
 }
 assert.throws(()=>render('chart.column',{...base,focusSeries:'Unknown'}),/exact chart series/);
 assert.throws(()=>render('chart.column',{...base,colorIndices:[0,1]}),/conflicts/);

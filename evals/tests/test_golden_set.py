@@ -60,11 +60,13 @@ assert.equal(plain.filter(n=>n.role==='section-heading-rule').length,1);
 assert.equal(unit.filter(n=>n.role==='section-heading-rule').length,1);
 assert.equal(unit.find(n=>n.role==='chart-unit').style.color.tokenId,'color.chartUnit');
 assert.equal(unit.find(n=>n.role==='chart-unit').style.bold,false);
-assert.equal(unit.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.heading');
-assert.equal(unit.find(n=>n.role==='section-heading').text,'Current mix,');
-assert.equal(unit.find(n=>n.role==='chart-unit').text,' Revenue share, %');
-assert.equal(unit.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
-assert.equal(unit.find(n=>n.role==='chart-unit').frame.x,unit.find(n=>n.role==='section-heading').frame.x+unit.find(n=>n.role==='section-heading').frame.width);
+// The unit is the second line of the heading, in grey compact type, inside the band.
+assert.equal(unit.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.compact');
+assert.equal(unit.find(n=>n.role==='section-heading').text,'Current mix');
+assert.equal(unit.find(n=>n.role==='chart-unit').text,'Revenue share, %');
+assert.equal(unit.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'stacked');
+assert.equal(unit.find(n=>n.role==='chart-unit').frame.x,unit.find(n=>n.role==='section-heading').frame.x);
+assert.ok(unit.find(n=>n.role==='chart-unit').frame.y+unit.find(n=>n.role==='chart-unit').frame.height<unit.find(n=>n.role==='section-heading-rule').frame.y,'unit sits above the rule');
 assert.deepEqual(plain[0].style,unit[0].style);
 assert.throws(()=>title.render({id:'title',frame,props:{heading:'Mix',variant:'unit'}}),/unit/);
 const borderless=title.render({id:'title',frame,props:{heading:'Current mix',unit:'%',variant:'unit'}}).nodes;

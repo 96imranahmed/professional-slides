@@ -69,3 +69,45 @@ console.log(JSON.stringify({accepted:true}));
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ChartRuleTests(unittest.TestCase):
+    def test_highlight_from_title_cagr_badge_range_and_value_table(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
+// Highlight the answer: the title names Hoboken, so Hoboken's bar takes the accent.
+const bar=composeSlide({title:'Hoboken is the safest of the four',exhibit:{type:'chart.bar',categories:['Hoboken','San Francisco','Berkeley','New York City'],series:[{name:'v',values:[189,587,639,571]}]}},0);
+const chart=find(bar.items,i=>i.component==='chart.bar');
+assert.deepEqual(chart.props.highlights,[{category:'Hoboken',style:'bar'}]);
+const spec=nativeChartSpec('chart.bar',chart.props,{x:0,y:0,width:700,height:400});
+assert.deepEqual(spec.highlightIndices,[0]);
+// A CAGR badge computed from the series, and forecast shading passed to the native chart.
+const col=composeSlide({title:'T',exhibit:{type:'chart.column',heading:'Market',unit:'$B',categories:['2023','2024','2025','2026E'],series:[{name:'m',values:[90,100,121,146.41]}],forecastFrom:'2026E',cagr:{from:'2024',to:'2026E'}}},0);
+const c=find(col.items,i=>i.component==='chart.column');
+assert.equal(c.props.badge,'CAGR 2024–2026E: +21%');
+assert.equal(nativeChartSpec('chart.column',c.props,{x:0,y:0,width:700,height:400}).forecastIndex,3);
+const nodes=REGISTRY.get('chart.column').render({id:'c',frame:{x:0,y:0,width:700,height:400},props:c.props}).nodes;
+assert.ok(nodes.some(n=>n.role==='chart-badge'&&n.text==='CAGR 2024–2026E: +21%'));
+assert.equal(nodes.find(n=>n.role==='chart-mark'&&n.data.category==='2026E').style.fill.tokenId,'color.chartSeries6');
+assert.equal(nodes.find(n=>n.role==='chart-unit').text,'$B');
+// Range chart: floating bars with both ends labelled; native spec carries low/high.
+const range=REGISTRY.get('chart.range').render({id:'r',frame:{x:0,y:0,width:700,height:400},props:{categories:['A','B'],low:[300,350],high:[380,460]}}).nodes;
+assert.equal(range.filter(n=>n.role==='chart-mark').length,2);
+assert.deepEqual(range.filter(n=>n.role==='data-label').map(n=>n.text),['300','380','350','460']);
+const rs=nativeChartSpec('chart.range',{categories:['A','B'],low:[300,350],high:[380,460]},{x:0,y:0,width:700,height:400});
+assert.equal(rs.type,'range');assert.deepEqual(rs.series[1].values,[80,110]);assert.equal(rs.legend,false);
+// A value table under the chart stacks a compact table below it.
+const vt=composeSlide({title:'T',exhibit:{type:'chart.column',categories:['a','b'],series:[{name:'m',values:[1,2]}],dataTable:[{label:'Target',values:[4,4]}]}},0); // a data table keeps its chart, thin or not
+assert.ok(find(vt.items,i=>i.id==='s01-stack'));
+const table=find(vt.items,i=>i.component==='table');assert.equal(table.props.columns.length,3);assert.equal(table.size.height,'hug');
+// Lines with several series use end labels, no legend, no per-point labels.
+const line=composeSlide({title:'T',exhibit:{type:'chart.line',categories:['a','b'],series:[{name:'x',values:[1,2]},{name:'y',values:[2,3]}]}},0);
+const lp=find(line.items,i=>i.component==='chart.line').props;
+assert.equal(lp.endLabels,true);assert.equal(lp.legend,false);assert.equal(lp.dataLabels,false);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
