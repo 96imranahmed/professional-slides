@@ -295,7 +295,8 @@ def gate_title(slide_no, slide, findings):
                 slide_no, "TITLE_LINES", len(lines), THRESHOLDS["title_lines_max"],
                 "Cut the action title to two lines: state the finding, drop the setup clause.",
             ))
-        text = source_text(node)
+        # A continuation marker "(2/3)" on a split page is not part of the claim.
+        text = re.sub(r"\s*\(\d+/\d+\)\s*$", "", source_text(node))
         words = word_count(text)
         if words > THRESHOLDS["title_words_max"]:
             findings.append(finding(

@@ -72,7 +72,7 @@ console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
 
-    def test_plain_case_markers_are_attached_and_numeric_rows_align(self):
+    def test_case_markers_sit_left_and_numeric_rows_align(self):
         result = run_node('''
 import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
@@ -85,11 +85,13 @@ for(const pageDensity of ['executive','pre-read','appendix']) for(const surface 
   const cells=nodes.filter(n=>n.role==='table-cell-text'&&n.data.row===marker.data.row);
   const label=cells.find(n=>n.data.column===0);
   for(const cell of cells) assert.ok(Math.abs(cell.frame.y+cell.frame.height/2-label.frame.y-label.frame.height/2)<.01,'Scenario and values must share a vertical center');
-  if(surface==='plain') {
-   assert.equal(marker.data.placement,'inline-start');
-   assert.ok(label.frame.x>=marker.frame.x+marker.frame.width+3.9,'Marker needs measured label clearance');
-   assert.ok(Math.abs(marker.frame.y+marker.frame.height/2-label.frame.y-label.frame.height/2)<.01);
-  } else assert.ok(label.frame.y>=marker.frame.y+marker.frame.height+3.9);
+  // The marker sits at the left of the cell on the label's centre line on every surface.
+  assert.equal(marker.data.placement,'inline-start');
+  assert.ok(label.frame.x>=marker.frame.x+marker.frame.width+3.9,'Marker needs measured label clearance');
+  assert.ok(Math.abs(marker.frame.y+marker.frame.height/2-label.frame.y-label.frame.height/2)<.01);
+  const number=nodes.find(n=>n.role==='table-section-number'&&n.data.row===marker.data.row);
+  if(surface==='primary'){assert.equal(marker.style.fill.tokenId,'color.onPrimary');assert.equal(number.style.color.tokenId,'color.componentPrimary');}
+  else {assert.equal(marker.style.fill.tokenId,'color.componentPrimary');assert.equal(number.style.color.tokenId,'color.onPrimary');}
  }
 }
 console.log(JSON.stringify({accepted:true}));
@@ -114,7 +116,7 @@ console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
 
-    def test_short_numbered_categories_reserve_clearance_at_every_density(self):
+    def test_numbered_categories_keep_the_marker_left_and_centred_at_every_density(self):
         result = run_node('''
 import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
@@ -128,7 +130,9 @@ for(const pageDensity of ['executive','pre-read','appendix']) for(const density 
  const clearance=deck.slides[0].tokens['space.1'].value;
  for(const marker of nodes.filter(n=>n.role==='table-section-marker')) {
   const text=nodes.find(n=>n.role==='table-cell-text'&&n.data.row===marker.data.row&&n.data.column===marker.data.column);
-  assert.ok(text.frame.y >= marker.frame.y+marker.frame.height+clearance-0.1, `${pageDensity}/${density}: marker overlaps category text`);
+  assert.ok(text.frame.x >= marker.frame.x+marker.frame.width+clearance-0.1, `${pageDensity}/${density}: marker overlaps category text`);
+  const cell=nodes.find(n=>n.role==='table-cell'&&n.data.row===marker.data.row&&n.data.column===marker.data.column);
+  assert.ok(Math.abs(marker.frame.y+marker.frame.height/2-(cell.frame.y+cell.frame.height/2))<.01, `${pageDensity}/${density}: marker is not centred on its cell`);
  }
 }
 console.log(JSON.stringify({accepted:true}));
@@ -217,9 +221,9 @@ for(const variant of ['bar-columns','heatmap-1-10','grouped-hypotheses','numbere
   assert.equal(markers.length,2);assert.equal(numbers.length,2);
   for(const marker of markers){
    const category=nodes.find(n=>n.role==='table-cell'&&n.data.row===marker.data.row&&n.data.column===marker.data.column);
-   assert.equal(marker.data.placement,'top-center');
-   assert.ok(Math.abs(marker.frame.x+marker.frame.width/2-(category.frame.x+category.frame.width/2))<.01);
-   assert.ok(marker.frame.y<category.frame.y&&marker.frame.y+marker.frame.height>category.frame.y);
+   assert.equal(marker.data.placement,'inline-start');
+   assert.ok(marker.frame.x>category.frame.x&&marker.frame.x<category.frame.x+category.frame.width/3,'marker sits at the left of its category box');
+   assert.ok(Math.abs(marker.frame.y+marker.frame.height/2-(category.frame.y+category.frame.height/2))<.01,'marker is centred on its category box');
   }
   props.rows[2][0].sectionNumber=1;assert.throws(()=>renderTable({id:'bad',frame,props}),/unique/);
   props.rows[2][0].sectionNumber=2;props.rows[2][1]={type:'text',text:'(Insert hypothesis)',sectionNumber:3};assert.throws(()=>renderTable({id:'bad',frame,props}),/category cells/);

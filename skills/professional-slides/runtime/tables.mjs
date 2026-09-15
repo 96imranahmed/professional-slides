@@ -439,9 +439,9 @@ function contentLayout(cell, width, props, used) {
     texts = [requireText(cell.text, "cell")];
     bold = cell.type === "category" || bold;
   }
-  // A plain label has no block edge to anchor a protruding badge. Keep its
-  // reference marker beside the label and measure the reduced text width.
-  const inlineSectionMarker = cell.sectionNumber !== undefined && categorySurface(cell, props) === "plain";
+  // A numbered section marker sits at the left of its category cell, on the
+  // label's centre line, whatever the surface; the label starts after it.
+  const inlineSectionMarker = cell.sectionNumber !== undefined;
   if (inlineSectionMarker) offset = v("icon.medium") + gap;
   const blocks = texts.map((s) => measure(s, inner - offset, bold, size));
   const blockHeight = blocks.length
@@ -564,18 +564,7 @@ export function measureTable({ frame, props }) {
     ),
   );
   const sectionMarkerSize = v("icon.medium");
-  // A marker straddles the category's top edge. Reserve its inward half and
-  // a real gap inside the cell as well as the existing clearance above it.
-  model.cells.forEach((row, r) => row.forEach((cell, c) => {
-    if (cell?.sectionNumber === undefined || layouts[r][c].inlineSectionMarker) return;
-    const inset = Math.max(paddingY, sectionMarkerSize / 2 + gap / 2 + gap);
-    layouts[r][c].topInset = inset;
-    // Single-row categories and their peer values share a content baseline.
-    if (cell.rowSpan === 1) row.forEach((peer, pc) => {
-      if (peer?.rowSpan === 1) layouts[r][pc].topInset = inset;
-    });
-  }));
-  const cellHeight = layout => layout.height + paddingY + (layout.topInset ?? paddingY);
+  const cellHeight = layout => layout.height + 2 * paddingY;
   // A column shares a plot width across its rows; a scale shared across
   // columns must also retain the same physical length per unit. Connect both
   // constraints before reserving label gutters (including unequal columns).
@@ -619,14 +608,6 @@ export function measureTable({ frame, props }) {
       ),
     ),
   );
-  // Numbered section markers straddle the horizontal centre of the category
-  // cell's top edge. Reserve explicit air above each marked section so the
-  // disc never collides with the preceding group or the header rule.
-  const topGaps = model.cells.map((row) =>
-    row.some((cell) => cell?.sectionNumber !== undefined && categorySurface(cell, tableProps) !== "plain")
-      ? sectionMarkerSize / 2 + gap
-      : 0,
-  );
   model.cells.forEach((row, r) =>
     row.forEach((cell, c) => {
       if (!cell || cell.rowSpan === 1) return;
@@ -651,7 +632,6 @@ export function measureTable({ frame, props }) {
   const legendHeight = sum(legends.map((l) => l.height));
   let height =
     headerHeight +
-    sum(topGaps) +
     sum(heights) +
     (legends.length ? v("space.4") + legendHeight : 0);
   if (Number.isFinite(frame.height) && height > frame.height + 0.01)
@@ -659,13 +639,17 @@ export function measureTable({ frame, props }) {
       `Table content needs ${height.toFixed(1)}px, but only ${frame.height}px is allocated; widen, simplify or split the table`,
     );
   // A table given more height than it needs spreads the surplus across its rows,
-  // up to 1.8× the natural row height, so a hero table fills its frame the way a
+  // up to 2× the natural row height, so a hero table fills its frame the way a
   // consulting scorecard does instead of leaving a void beneath it.
+  // Stretched rows read as bands, so every cell's content is then centred on
+  // the row rather than hanging from its top edge beside a centred category.
+  let stretched = false;
   if (props.fillHeight === true && Number.isFinite(frame.height) && frame.height > height + 0.01 && heights.length) {
-    const surplus = Math.min(frame.height - height, heights.reduce((a, b) => a + b, 0) * 0.8);
+    const surplus = Math.min(frame.height - height, heights.reduce((a, b) => a + b, 0));
     const per = surplus / heights.length;
     for (let r = 0; r < heights.length; r += 1) heights[r] += per;
     height += surplus;
+    stretched = per > gap;
   }
   return {
     ...model,
@@ -676,7 +660,7 @@ export function measureTable({ frame, props }) {
     headerHeight,
     layouts,
     heights,
-    topGaps,
+    stretched,
     sectionMarkerSize,
     legends,
     height,
@@ -721,8 +705,7 @@ function renderTableAt({ id, frame, props }) {
     (_, r) =>
       frame.y +
       m.headerHeight +
-      sum(m.heights.slice(0, r)) +
-      sum(m.topGaps.slice(0, r + 1)),
+      sum(m.heights.slice(0, r)),
   );
   const putText = (nodeId, role, area, layout, style, data = {}) =>
     nodes.push(
@@ -787,9 +770,7 @@ function renderTableAt({ id, frame, props }) {
     row.forEach((cell, c) => {
       if (!cell) return;
       const l = m.layouts[r][c],
-        height =
-          sum(m.heights.slice(r, r + cell.rowSpan)) +
-          sum(m.topGaps.slice(r + 1, r + cell.rowSpan)),
+        height = sum(m.heights.slice(r, r + cell.rowSpan)),
         area = { x: xs[c], y: ys[r], width: m.widths[c], height };
       const cellId = stableId(id, "cell", r, c),
         data = {
@@ -836,9 +817,9 @@ function renderTableAt({ id, frame, props }) {
       const color = fill ? foreground(fill) : ink;
       const inner = {
         x: area.x + m.padding,
-        y: area.y + (l.topInset ?? m.paddingY),
+        y: area.y + m.paddingY,
         width: area.width - 2 * m.padding,
-        height: height - m.paddingY - (l.topInset ?? m.paddingY),
+        height: height - 2 * m.paddingY,
       };
       if (cell.type === "logo") {
         const logo = mediaNode({id:stableId(cellId,"logo"),frame:{x:inner.x,y:area.y+(height-l.height)/2,width:inner.width,height:l.height},props:cell.media,role:"table-logo"});
@@ -930,6 +911,7 @@ function renderTableAt({ id, frame, props }) {
       } else {
         let y = inner.y;
         if (
+          m.stretched ||
           ["category", "number", "binary", "harvey", "heatmap"].includes(
             cell.type,
           )
@@ -1079,13 +1061,19 @@ function renderTableAt({ id, frame, props }) {
           });
       }
       if (cell.sectionNumber !== undefined) {
+        // The disc sits at the left of the cell on the label's centre line. On a
+        // filled category it reverses (white disc, primary numeral) so the
+        // tracker reads against the box instead of dissolving into it.
         const diameter = m.sectionMarkerSize,
-          cx = l.inlineSectionMarker ? inner.x + diameter / 2 : area.x + (area.width - m.gap) / 2,
-          cy = l.inlineSectionMarker ? inner.y + inner.height / 2 : area.y + m.gap / 2,
+          cx = inner.x + diameter / 2,
+          cy = inner.y + inner.height / 2,
+          onFill = fill === primary,
+          discFill = onFill ? white : primary,
+          numeral = onFill ? primary : white,
           markerData = {
             ...data,
             sectionNumber: cell.sectionNumber,
-            placement: l.inlineSectionMarker ? "inline-start" : "top-center",
+            placement: "inline-start",
           };
         nodes.push(
           ellipsePrimitive({
@@ -1098,8 +1086,8 @@ function renderTableAt({ id, frame, props }) {
               height: diameter,
             },
             style: {
-              fill: primary,
-              stroke: white,
+              fill: discFill,
+              stroke: onFill ? primary : white,
               lineWidth: t("line.standard"),
               radius: t("radius.none"),
             },
@@ -1121,7 +1109,7 @@ function renderTableAt({ id, frame, props }) {
             width: diameter,
           },
           markerText,
-          textStyle(true, white, "center", "type.compact"),
+          textStyle(true, numeral, "center", "type.compact"),
           markerData,
         );
       }
@@ -1141,7 +1129,7 @@ function renderTableAt({ id, frame, props }) {
     }),
   );
   let y =
-    frame.y + m.headerHeight + sum(m.topGaps) + sum(m.heights) + v("space.4");
+    frame.y + m.headerHeight + sum(m.heights) + v("space.4");
   m.legends.forEach(
     ({ id: scaleId, scale, layout, entries, height: legendHeight }) => {
       const legendTop = y;

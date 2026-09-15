@@ -108,13 +108,13 @@ Record in the Exhibit column *why* that encoding was chosen when the choice is n
 
 | Content | Treatment | What it draws |
 | --- | --- | --- |
-| Sequence: rows numbered, or a Stage / Step / Phase first column | `categories` | numbered circle markers on a filled first column |
+| Sequence: rows numbered, or a Stage / Step / Phase first column | `categories` | filled first-column boxes, each with a numbered disc at its left edge on the label's centre line |
 | Scorecard: criteria × options, four or more columns | `standard` | filled header row, bold criteria column |
 | Decision: last column is Decision / Then / So what | `standard` + `highlight` cells | filled header, tinted decision column |
 | Listing: everything else | `open` | rules only |
 | Ratings or scores across options | `comparison-table` with `selectedColumn`; `harvey`, `binary`, `heatmap` or `bars` cell types | Harvey balls, ticks, heat or in-cell bars |
 
-Vary deliberately: two scorecards in a row are fine; every table in the deck drawn the same way is not.
+Vary deliberately across the deck, never within a page: every table in the deck drawn the same way is wrong, and so are two treatments side by side. Two tables share a page only when they read as one design and both are light (five rows or fewer, no cell over 60 characters); otherwise the composer gives each table its own page under the same title marked (1/2), (2/2), with the points on the first page and the so-what on every page. Prefer writing it that way yourself. Columns are weighted by their longest content, so a "Year 1" column stays narrow; a table that fills its frame stretches its rows into bands and centres every cell on the row.
 
 **Row rule.** Every panel that sits beside another carries a heading band, and all the bands in a row share one rule line; content starts level below it. A chart brings its own heading; a table, image or list beside it gets a `panelHeading` (or the runtime supplies one). Tables in one row share one type size. Nothing in a row aligns to the heading *text* of its neighbour, only to the rule.
 

@@ -87,7 +87,7 @@ function headedPanel(ex, item, id) {
  *   listing   (anything else)                                      → open rules only
  */
 export function styleTable(ex) {
-  const columns = ex.columns.map((c, i) => typeof c === "string" ? { label: c, type: "text", bold: i === 0 } : { ...c });
+  const columns = ex.columns.map((c, i) => typeof c === "string" ? { label: c, type: "text", bold: i === 0, width: columnWeight(ex, i) } : { ...c });
   const explicit = ex.treatment || ex.variant || ex.columns.some((c) => typeof c === "object");
   if (explicit) return { variant: ex.variant || "plain", treatment: ex.treatment || "open", columns, rows: ex.rows };
   const first = ex.rows.map((r) => String(r[0] ?? ""));
@@ -112,6 +112,42 @@ export function styleTable(ex) {
     return { variant: "standard", treatment: "standard", columns, rows };
   }
   return { variant: "plain", treatment: "open", columns, rows: ex.rows };
+}
+
+// Columns are weighted by the longest thing they hold (header included) plus
+// the cell padding, clamped so a "Year 1" column stays narrow and a sentence
+// column never starves: content of 12 characters or fewer counts as 12, of 80
+// or more as 80. Short labels therefore stay on one line.
+function columnWeight(ex, i) {
+  const texts = [String(ex.columns[i] ?? ""), ...ex.rows.map((r) => String(r[i]?.text ?? r[i] ?? ""))];
+  const longest = Math.max(...texts.map((s) => s.replace(/^\s*\d+\s*[·.)\-–:]\s*/, "").length));
+  return Math.min(80, Math.max(12, longest)) + 6;
+}
+
+const heavyTable = (ex) => (ex.rows || []).length > 5 || (ex.rows || []).some((row) => row.some((cell) => String(cell?.text ?? cell ?? "").length > 60));
+const tableSignature = (ex) => { const s = styleTable(ex); return `${s.variant}/${s.treatment}`; };
+
+/**
+ * Two tables on one page must read as one design. They share a row only when
+ * their treatments already match and both are light; otherwise each table takes
+ * its own page. The title carries a 1/2 marker, the points travel with the first
+ * page and the so-what, being the pages' shared claim, with every page. An
+ * explicit `layout` is left alone.
+ */
+export function splitTables(slide) {
+  if (slide.layout && slide.layout !== "auto") return [slide];
+  const exhibits = slide.exhibits || [];
+  const tables = exhibits.filter((ex) => ex?.type === "table");
+  if (tables.length < 2) return [slide];
+  const oneDesign = new Set(tables.map(tableSignature)).size === 1;
+  if (oneDesign && !tables.some(heavyTable)) return [slide];
+  return exhibits.map((ex, i) => {
+    const page = { ...slide, exhibit: ex, title: `${slide.title} (${i + 1}/${exhibits.length})` };
+    delete page.exhibits;
+    if (slide.id) page.id = `${slide.id}-${i + 1}`;
+    if (i !== 0) delete page.points;
+    return page;
+  });
 }
 
 function niceCeiling(value) {
@@ -143,7 +179,12 @@ export function composeSlide(slide, index, baseDir) {
   const layout = chooseLayout(slide);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   const items = [];
-  if (layout === "exhibit-full") items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir));
+  if (layout === "exhibit-full") {
+    // A full-width table or image keeps its own heading band when it has one;
+    // charts carry their heading inside the plot.
+    const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
+    items.push(exhibits[0].panelHeading || exhibits[0].heading ? headedPanel(exhibits[0], item, `${id}-exhibit`) : item);
+  }
   else if (layout === "exhibit-left" || layout === "exhibit-right") {
     const hero = headedPanel(exhibits[0], exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" }), `${id}-exhibit`);
     // The side column is a headed section so its rule shares the chart heading's
@@ -157,10 +198,13 @@ export function composeSlide(slide, index, baseDir) {
   } else if (layout === "two-up") {
     // Peer tables share one density: a row with a text-heavy table steps every
     // table in it to compact together, so type stays uniform across the row.
-    const tables = exhibits.filter((ex) => ex.type === "table" && !ex.density);
+    const tables = exhibits.filter((ex) => ex.type === "table");
     if (tables.length >= 2) {
-      const heavy = tables.some((ex) => (ex.rows || []).some((row) => row.some((cell) => String(cell).length > 60)) || (ex.rows || []).length > 5);
-      if (heavy) for (const ex of tables) ex.density = "compact";
+      if (tables.some(heavyTable)) for (const ex of tables) ex.density = ex.density || "compact";
+      // An explicit two-up keeps both tables on the page, so they share one
+      // design: when their inferred treatments differ, both fall back to the
+      // open listing rather than mixing a filled tracker with plain rules.
+      if (new Set(tables.map(tableSignature)).size > 1) for (const ex of tables) { ex.variant = "plain"; ex.treatment = "open"; }
     }
     // Peer charts with one unit share one value scale, or the comparison lies.
     const charts = exhibits.filter((ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.series));
@@ -195,7 +239,7 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     if (spec.cover.notes) cover.notes = spec.cover.notes;
     slides.push(cover);
   }
-  spec.slides.forEach((slide, index) => slides.push(composeSlide(slide, index + (spec.cover ? 1 : 0), baseDir)));
+  for (const page of spec.slides.flatMap(splitTables)) slides.push(composeSlide(page, slides.length, baseDir));
   return {
     id: spec.id,
     palette: spec.palette || "mckinsey",
