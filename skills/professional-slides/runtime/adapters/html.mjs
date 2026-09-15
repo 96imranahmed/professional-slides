@@ -19,7 +19,8 @@ function svgStyle(style) {
   const width = style.lineWidth ? cssBinding(style.lineWidth) : 0;
   const dash = style.dash === "dash" ? "8 6" : "none";
   const opacity = style.opacity ?? 1;
-  return `fill:${fill};stroke:${stroke};stroke-width:${width};stroke-dasharray:${dash};opacity:${opacity}`;
+  const caps = style.lineCap === "round" ? ";stroke-linecap:round;stroke-linejoin:round" : "";
+  return `fill:${fill};stroke:${stroke};stroke-width:${width};stroke-dasharray:${dash};opacity:${opacity}${caps}`;
 }
 
 function polar(cx, cy, radius, angle) {
@@ -66,6 +67,10 @@ function customPolygonPath(frame, data) {
     if (!Array.isArray(path) || path.length < 3) throw new Error("Custom polygon paths require at least three points");
     return path.map(([x, y], index) => `${index ? "L" : "M"} ${frame.x + Number(x) * frame.width} ${frame.y + Number(y) * frame.height}`).join(" ") + " Z";
   }).join(" ");
+}
+
+function iconPathD(frame, data) {
+  return (data.paths || []).map((path) => path.points.map(([x, y], index) => `${index ? "L" : "M"} ${frame.x + Number(x) * frame.width} ${frame.y + Number(y) * frame.height}`).join(" ") + (path.closed ? " Z" : "")).join(" ");
 }
 
 const SHAPE_POINTS = Object.freeze({
@@ -122,6 +127,7 @@ function svgNode(node) {
     const transform = transforms.length ? ` transform="${transforms.join(" ")}"` : "";
     if (data.geometry === "quoteCallout") return `<path ${common}${transform} d="${quoteCalloutPath(frame, data)}"/>`;
     if (data.geometry === "customPolygon") return `<path ${common}${transform} d="${customPolygonPath(frame, data)}"/>`;
+    if (data.geometry === "iconPath") return `<path ${common}${transform} d="${iconPathD(frame, data)}"/>`;
     return `<polygon ${common}${transform} points="${polygonPoints(frame, data.geometry)}"/>`;
   }
   return "";

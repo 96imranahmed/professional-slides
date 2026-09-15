@@ -13,6 +13,7 @@ import {
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
+import { numberMarker } from "./marks.mjs";
 
 // One table compiler. Columns select defaults; individual cells may override the
 // encoding (e.g. options as columns with prose and rating rows in the same table).
@@ -1061,57 +1062,20 @@ function renderTableAt({ id, frame, props }) {
           });
       }
       if (cell.sectionNumber !== undefined) {
-        // The disc sits at the left of the cell on the label's centre line. On a
-        // filled category it reverses (white disc, primary numeral) so the
-        // tracker reads against the box instead of dissolving into it.
-        const diameter = m.sectionMarkerSize,
-          cx = inner.x + diameter / 2,
-          cy = inner.y + inner.height / 2,
-          onFill = fill === primary,
-          discFill = onFill ? white : primary,
-          numeral = onFill ? primary : white,
-          markerData = {
-            ...data,
-            sectionNumber: cell.sectionNumber,
-            placement: "inline-start",
-          };
-        nodes.push(
-          ellipsePrimitive({
-            id: stableId(cellId, "section-marker"),
-            role: "table-section-marker",
-            frame: {
-              x: cx - diameter / 2,
-              y: cy - diameter / 2,
-              width: diameter,
-              height: diameter,
-            },
-            style: {
-              fill: discFill,
-              stroke: onFill ? primary : white,
-              lineWidth: t("line.standard"),
-              radius: t("radius.none"),
-            },
-            data: markerData,
-          }),
-        );
-        const markerText = measure(
-          String(cell.sectionNumber),
-          diameter,
-          true,
-          "type.compact",
-        );
-        putText(
-          stableId(cellId, "section-number"),
-          "table-section-number",
-          {
-            x: cx - diameter / 2,
-            y: cy - markerText.height / 2,
-            width: diameter,
-          },
-          markerText,
-          textStyle(true, numeral, "center", "type.compact"),
-          markerData,
-        );
+        // The deck's one numbered disc, at the left of the cell on the label's
+        // centre line; reversed (white disc, primary numeral) on a filled box.
+        const diameter = m.sectionMarkerSize;
+        nodes.push(...numberMarker({
+          id: stableId(cellId, "section"),
+          role: "table-section-marker",
+          labelRole: "table-section-number",
+          x: inner.x,
+          y: inner.y + inner.height / 2 - diameter / 2,
+          size: diameter,
+          number: cell.sectionNumber,
+          reverse: fill === primary,
+          data: { ...data, sectionNumber: cell.sectionNumber, placement: "inline-start" },
+        }));
       }
       if (cell.type !== "implication" && r + cell.rowSpan < m.rows.length) {
         nodes.push(

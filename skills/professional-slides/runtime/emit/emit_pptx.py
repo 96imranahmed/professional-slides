@@ -241,6 +241,129 @@ class Emitter:
         self.stats["shapes"] += 1
         return shape
 
+    # Preset geometries the scene uses, mapped onto PowerPoint's own autoshapes so
+    # a chevron stays a chevron with its yellow adjustment handle.
+    PRESETS = {
+        "chevron": MSO_SHAPE.CHEVRON, "rightArrow": MSO_SHAPE.RIGHT_ARROW, "leftArrow": MSO_SHAPE.LEFT_ARROW,
+        "notchedRightArrow": MSO_SHAPE.NOTCHED_RIGHT_ARROW, "snip1Rect": MSO_SHAPE.SNIP_1_RECTANGLE,
+        "triangle": MSO_SHAPE.ISOSCELES_TRIANGLE, "rtTriangle": MSO_SHAPE.RIGHT_TRIANGLE, "diamond": MSO_SHAPE.DIAMOND,
+        "pentagon": MSO_SHAPE.REGULAR_PENTAGON, "hexagon": MSO_SHAPE.HEXAGON, "parallelogram": MSO_SHAPE.PARALLELOGRAM,
+        "trapezoid": MSO_SHAPE.TRAPEZOID, "downArrow": MSO_SHAPE.DOWN_ARROW, "upArrow": MSO_SHAPE.UP_ARROW,
+        "homePlate": MSO_SHAPE.PENTAGON, "roundRect": MSO_SHAPE.ROUNDED_RECTANGLE,
+    }
+
+    def _paint(self, shape, style: dict):
+        fill = style_value(style, "fill", None)
+        if fill and fill != "none":
+            shape.fill.solid(); shape.fill.fore_color.rgb = rgb(fill)
+            opacity = style.get("opacity")
+            if opacity is not None and float(opacity) < 1:
+                sf = shape.fill._xPr.find(qn("a:solidFill"))
+                clr = sf[0] if sf is not None and len(sf) else None
+                if clr is not None:
+                    etree.SubElement(clr, qn("a:alpha")).set("val", str(int(float(opacity) * 100000)))
+        else:
+            shape.fill.background()
+        stroke = style_value(style, "stroke", None)
+        if stroke and stroke != "none":
+            shape.line.color.rgb = rgb(stroke)
+            shape.line.width = Pt(float(style_value(style, "lineWidth", 1) or 1) * 0.75)
+            if style.get("lineCap") == "round" or style.get("iconStroke"):
+                ln = shape.line._get_or_add_ln()
+                ln.set("cap", "rnd")
+                join = etree.SubElement(ln, qn("a:round"))
+        else:
+            shape.line.fill.background()
+        rotate = float(style.get("rotate") or 0)
+        if rotate:
+            shape.rotation = rotate
+        if style.get("flipH") or style.get("flipV"):
+            xfrm = shape._element.spPr.find(qn("a:xfrm"))
+            if xfrm is not None:
+                if style.get("flipH"): xfrm.set("flipH", "1")
+                if style.get("flipV"): xfrm.set("flipV", "1")
+
+    def _freeform(self, slide, node: dict, paths, *, closed=True):
+        """paths: list of point lists in scene px (absolute). One freeform, several subpaths."""
+        f = node["frame"]
+        first = paths[0][0]
+        fb = slide.shapes.build_freeform(emu(first[0]), emu(first[1]), scale=1.0)
+        for i, path in enumerate(paths):
+            pts = [(emu(x), emu(y)) for x, y in path]
+            if i:
+                fb.move_to(*pts[0])
+            fb.add_line_segments(pts[1:], close=closed)
+        shape = fb.convert_to_shape(0, 0)
+        shape.name = f"ps:{node['id']}"
+        self._paint(shape, node.get("style") or {})
+        self._strip_style(shape)
+        self._strip_text(shape)
+        self.stats["shapes"] += 1
+        return shape
+
+    def add_shape(self, slide, node: dict):
+        f = node["frame"]; style = node.get("style") or {}; data = node.get("data") or {}
+        geometry = data.get("geometry", "rect")
+        if geometry == "customPolygon":
+            paths = [[(f["x"] + float(x) * f["width"], f["y"] + float(y) * f["height"]) for x, y in path] for path in data.get("paths") or []]
+            return self._freeform(slide, node, paths) if paths else self.add_rect(slide, node)
+        if geometry == "iconPath":
+            # Icon strokes: unit-square polylines, open unless the path says closed.
+            paths = data.get("paths") or []
+            pts = [[(f["x"] + float(x) * f["width"], f["y"] + float(y) * f["height"]) for x, y in path["points"]] for path in paths]
+            closed = [bool(path.get("closed")) for path in paths]
+            first = pts[0][0]
+            fb = slide.shapes.build_freeform(emu(first[0]), emu(first[1]), scale=1.0)
+            for i, path in enumerate(pts):
+                ep = [(emu(x), emu(y)) for x, y in path]
+                if i:
+                    fb.move_to(*ep[0])
+                fb.add_line_segments(ep[1:], close=closed[i])
+            shape = fb.convert_to_shape(0, 0)
+            shape.name = f"ps:{node['id']}"
+            self._paint(shape, {**style, "iconStroke": True})
+            self._strip_style(shape); self._strip_text(shape)
+            self.stats["shapes"] += 1
+            return shape
+        if geometry == "quoteCallout":
+            body = f["height"] * float(data.get("bodyRatio", 0.8))
+            cc = f["x"] + f["width"] * float(data.get("caretCenterRatio", 0.2))
+            ch = f["width"] * float(data.get("caretWidthRatio", 0.1)) / 2
+            left, right, top, bottom, tip = f["x"], f["x"] + f["width"], f["y"], f["y"] + body, f["y"] + f["height"]
+            return self._freeform(slide, node, [[(left, top), (right, top), (right, bottom), (cc + ch, bottom), (cc, tip), (cc - ch, bottom), (left, bottom)]])
+        preset = self.PRESETS.get(geometry)
+        if preset is None:
+            return self.add_rect(slide, node)
+        shape = slide.shapes.add_shape(preset, emu(f["x"]), emu(f["y"]), emu(max(f["width"], 0.5)), emu(max(f["height"], 0.5)))
+        shape.name = f"ps:{node['id']}"
+        try:
+            if geometry == "chevron" and f["width"] and f["height"]:
+                # PowerPoint's adj is a share of the shorter side; the scene draws the
+                # point inset at half that side, which is the preset default (50000).
+                shape.adjustments[0] = 0.5
+            elif geometry == "rightArrow" and f["width"] and f["height"]:
+                shape.adjustments[0] = 0.64
+                shape.adjustments[1] = min(1.0, 0.28 * f["width"] / min(f["width"], f["height"]))
+            elif geometry == "snip1Rect" and f["width"] and f["height"]:
+                shape.adjustments[0] = min(0.5, 0.12 * f["width"] / min(f["width"], f["height"]))
+        except (IndexError, ValueError):
+            pass
+        self._paint(shape, style)
+        self._strip_style(shape)
+        self._strip_text(shape)
+        self.stats["shapes"] += 1
+        return shape
+
+    def add_wedge(self, slide, node: dict):
+        import math
+        f = node["frame"]; data = node.get("data") or {}
+        cx, cy = f["x"] + f["width"] / 2, f["y"] + f["height"] / 2
+        r = min(f["width"], f["height"]) / 2
+        a0, a1 = float(data.get("startAngle", 0)), float(data.get("endAngle", 90))
+        steps = max(2, int(abs(a1 - a0) / 4))
+        pts = [(cx, cy)] + [(cx + r * math.cos(math.radians(a0 + (a1 - a0) * i / steps)), cy + r * math.sin(math.radians(a0 + (a1 - a0) * i / steps))) for i in range(steps + 1)]
+        return self._freeform(slide, node, [pts])
+
     def add_line(self, slide, node: dict):
         f = node["frame"]; style = node.get("style") or {}
         x1 = f.get("x1", f["x"]); y1 = f.get("y1", f["y"])
@@ -255,6 +378,13 @@ class Emitter:
         if dash:
             from pptx.enum.dml import MSO_LINE_DASH_STYLE
             conn.line.dash_style = MSO_LINE_DASH_STYLE.DASH
+        data = node.get("data") or {}
+        if data.get("endArrow") or data.get("startArrow"):
+            ln = conn.line._get_or_add_ln()
+            if data.get("startArrow"):
+                etree.SubElement(ln, qn("a:headEnd")).set("type", "triangle")
+            if data.get("endArrow"):
+                etree.SubElement(ln, qn("a:tailEnd")).set("type", "triangle")
         self.stats["shapes"] += 1
         return conn
 
@@ -411,8 +541,12 @@ class Emitter:
                 shape = self.add_line(slide, node)
             elif node["type"] == "image":
                 shape = self.add_image(slide, node)
+            elif node["type"] == "shape":
+                shape = self.add_shape(slide, node)
+            elif node["type"] == "wedge":
+                shape = self.add_wedge(slide, node)
             else:
-                shape = self.add_rect(slide, node)  # wedge/polygon fallback: bounding box
+                shape = self.add_rect(slide, node)
             if shape is not None and inst:
                 member_shapes.setdefault(inst, []).append(shape)
         if self.groups:

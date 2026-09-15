@@ -39,6 +39,7 @@ import { registerRelationshipNetwork } from "./relationship-network.mjs";
 import { registerQuoteCluster } from "./quote-cluster.mjs";
 import { CUSTOM_MAP_SAMPLE, CHOROPLETH_MAP_SAMPLE, MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
 import { registerInsightTreeTable } from "./insight-tree-table.mjs";
+import { MARK_TOKENS, markerSize, numberMarker, iconMarker, stateMarker } from "./marks.mjs";
 
 const FONT = token("font.body");
 const DISPLAY = token("font.display");
@@ -332,26 +333,82 @@ function estimatedLines(text, width) {
   return String(text).split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0);
 }
 
-function bodyListLayout(frame, items) {
-  if (!Array.isArray(items) || !items.length || items.some(item => typeof item !== "string" || !item.trim())) throw new Error("Body bullet list needs nonempty text items");
-  const offset = tokenValue(token("space.4")), gap = tokenValue(token("space.2")), markerSize = tokenValue(token("space.1"));
+/**
+ * Body list items are strings or { lead?, text?, icon?, state?, number? }. The
+ * marker is one of: dot (a small ink square), number (the deck's numbered disc),
+ * icon (a line icon in a ring), check (green tick / red cross by `state`).
+ * "auto" picks number when any item carries a lead, dot otherwise.
+ */
+export function normalizeListItems(items) {
+  if (!Array.isArray(items) || !items.length) throw new Error("Body bullet list needs nonempty text items");
+  return items.map((item, index) => {
+    const o = typeof item === "string" ? { text: item } : item && typeof item === "object" ? { ...item } : null;
+    if (!o) throw new Error("Body bullet list needs nonempty text items");
+    const lead = typeof o.lead === "string" && o.lead.trim() ? o.lead.trim() : null;
+    const text = typeof o.text === "string" && o.text.trim() ? o.text.trim() : null;
+    if (!lead && !text) throw new Error("Body bullet list needs nonempty text items");
+    return { lead, text, icon: o.icon ?? null, state: o.state ?? null, number: o.number ?? index + 1 };
+  });
+}
+
+export function resolveListMarker(props) {
+  const items = normalizeListItems(props.items);
+  const marker = props.marker ?? "auto";
+  if (marker === "auto") return items.some((i) => i.icon) ? "icon" : items.some((i) => i.state !== null) ? "check" : items.some((i) => i.lead) ? "number" : "dot";
+  if (!["dot", "number", "icon", "check"].includes(marker)) throw new Error(`Unknown list marker: ${marker}`);
+  return marker;
+}
+
+function bodyListLayout(frame, itemsIn, props = {}) {
+  const items = normalizeListItems(itemsIn);
+  const marker = resolveListMarker({ ...props, items: itemsIn });
+  const disc = markerSize();
+  const iconSize = Math.round(disc * 1.5);
+  const markerWidth = marker === "dot" ? 0 : marker === "icon" ? iconSize : disc;
+  const offset = marker === "dot" ? tokenValue(token("space.4")) : markerWidth + tokenValue(token("space.3"));
+  const gap = tokenValue(token(marker === "dot" ? "space.2" : "space.3"));
+  const leadGap = tokenValue(token("space.1"));
+  const markerSquare = tokenValue(token("space.1"));
   if (frame.width <= offset) throw new Error("Body bullet list has no text width");
-  const measured = items.map(text => measureText(text, frame.width - offset, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }));
-  return { offset, gap, markerSize, measured, height: measured.reduce((sum, text) => sum + text.height, 0) + gap * (items.length - 1) };
+  const width = frame.width - offset;
+  const font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 };
+  const measured = items.map((item) => {
+    const lead = item.lead ? measureText(item.lead, width, { ...font, bold: true }) : null;
+    const text = item.text ? measureText(item.text, width, font) : null;
+    const textHeight = (lead?.height ?? 0) + (lead && text ? leadGap : 0) + (text?.height ?? 0);
+    return { item, lead, text, textHeight, height: Math.max(textHeight, markerWidth) };
+  });
+  return { marker, offset, gap, leadGap, markerSize: marker === "dot" ? markerSquare : markerWidth, measured, height: measured.reduce((sum, m) => sum + m.height, 0) + gap * (items.length - 1) };
 }
 
 function bodyListNodes({ id, frame, props }) {
-  const layout = bodyListLayout(frame, props.items);
-  if (layout.height > frame.height) throw new Error(`${id} body bullets exceed the allocated height; allocate space or edit copy, never shrink type`);
+  const layout = bodyListLayout(frame, props.items, props);
+  if (layout.height > frame.height + 0.01) throw new Error(`${id} body bullets exceed the allocated height; allocate space or edit copy, never shrink type`);
   let y = frame.y;
-  return layout.measured.flatMap((text, index) => {
-    const nodes = [
-      rectPrimitive({ id: stableId(id, "marker", index), role: "list-marker", frame: { x: frame.x, y: y + (text.lineHeight - layout.markerSize) / 2, width: layout.markerSize, height: layout.markerSize }, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) }),
-      textPrimitive({ id: stableId(id, "item", index), role: "list-item", frame: { x: frame.x + layout.offset, y, width: frame.width - layout.offset, height: text.height }, text: text.text, style: { ...textStyle(BODY, INK, false, "left", "top"), lineHeight: text.lineHeight, wrap: false }, data: { textLayout: text } })
-    ];
-    y += text.height + layout.gap;
-    return nodes;
+  const nodes = [];
+  layout.measured.forEach((m, index) => {
+    const first = m.lead ?? m.text;
+    const lineCentre = y + first.lineHeight / 2;
+    const mid = y + m.height / 2;
+    if (layout.marker === "dot") {
+      nodes.push(rectPrimitive({ id: stableId(id, "marker", index), role: "list-marker", frame: { x: frame.x, y: lineCentre - layout.markerSize / 2, width: layout.markerSize, height: layout.markerSize }, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) }));
+    } else if (layout.marker === "number") {
+      nodes.push(...numberMarker({ id: stableId(id, "marker", index), role: "list-marker", x: frame.x, y: Math.max(y, lineCentre - layout.markerSize / 2), size: layout.markerSize, number: m.item.number }));
+    } else if (layout.marker === "check") {
+      nodes.push(...stateMarker({ id: stableId(id, "marker", index), role: "list-marker", x: frame.x, y: Math.max(y, lineCentre - layout.markerSize / 2), size: layout.markerSize, state: m.item.state ?? "yes" }));
+    } else {
+      // Icons centre on the item block, as on a feature row.
+      nodes.push(...iconMarker({ id: stableId(id, "marker", index), role: "list-icon", x: frame.x, y: mid - layout.markerSize / 2, size: layout.markerSize, icon: m.item.icon || "info" }));
+    }
+    let ty = layout.marker === "icon" && m.textHeight < m.height ? y + (m.height - m.textHeight) / 2 : y;
+    if (m.lead) {
+      nodes.push(textPrimitive({ id: stableId(id, "lead", index), role: "list-lead", frame: { x: frame.x + layout.offset, y: ty, width: frame.width - layout.offset, height: m.lead.height }, text: m.lead.text, style: { ...textStyle(BODY, INK, true, "left", "top"), lineHeight: m.lead.lineHeight }, data: { textLayout: m.lead } }));
+      ty += m.lead.height + (m.text ? layout.leadGap : 0);
+    }
+    if (m.text) nodes.push(textPrimitive({ id: stableId(id, "item", index), role: "list-item", frame: { x: frame.x + layout.offset, y: ty, width: frame.width - layout.offset, height: m.text.height }, text: m.text.text, style: { ...textStyle(BODY, INK, false, "left", "top"), lineHeight: m.text.lineHeight }, data: { textLayout: m.text } }));
+    y += m.height + layout.gap;
   });
+  return nodes;
 }
 
 function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY, marker = "circle", distribute = false, rolePrefix = "list" }) {
@@ -759,9 +816,14 @@ function registerCore(registry) {
       if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(props.dataUri) || !props.alt?.trim() || !props.authorization?.trim()) throw new Error("Image requires embedded PNG/JPEG, alt text and authorization");
       return { nodes: [primitive({ type: "image", id: stableId(id, "image"), role: "image", frame, data: { dataUri: props.dataUri, alt: props.alt, authorization: props.authorization, circular: false } })] };
     } return ({ nodes: [rectPrimitive({ id: stableId(id, "frame"), role: "image-frame", frame, style: boxStyle(MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS), data: { alt: props.alt } }), textPrimitive({ id: stableId(id, "alt"), role: "image-alt", frame: { x: frame.x + 24, y: frame.y + frame.height / 2 - 18, width: frame.width - 48, height: 36 }, text: props.alt, style: textStyle(LABEL, SECONDARY, true, "center") })] }); } }),
-    component({ id: "icon", category: "media", role: "icon", tokens: ["color.componentPrimary", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.label", "line.hairline", "radius.round"], preferredSize: { width: 90, height: 90 }, sample: { symbol: "✓", label: "(Insert label)" }, render: ({ id, frame, props }) => {
-      const size = Math.min(frame.width, frame.height * 0.62);
-      return { nodes: [ellipsePrimitive({ id: stableId(id, "surface"), role: "icon-surface", frame: { x: frame.x + (frame.width - size) / 2, y: frame.y, width: size, height: size }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }), textPrimitive({ id: stableId(id, "symbol"), role: "icon-symbol", frame: { x: frame.x + (frame.width - size) / 2, y: frame.y, width: size, height: size }, text: props.symbol, style: textStyle(token("type.heading"), WHITE, true, "center") }), textPrimitive({ id: stableId(id, "label"), role: "icon-label", frame: { x: frame.x, y: frame.y + size + 8, width: frame.width, height: frame.height - size - 8 }, text: props.label, style: textStyle(LABEL, INK, true, "center", "top") })] };
+    component({ id: "icon", category: "media", role: "icon", tokens: ["color.componentPrimary", "color.onPrimary", "color.ink", "color.surface", "font.body", "type.heading", "type.compact", "type.label", "line.hairline", "line.standard", "radius.round", "icon.medium"], preferredSize: { width: 90, height: 90 }, sample: { icon: "target", label: "(Insert label)" }, render: ({ id, frame, props }) => {
+      // A line icon in a ring (the deck's one icon treatment) with a label under
+      // it. `symbol` (a glyph) is honoured for backwards compatibility.
+      const size = Math.min(frame.width, props.label ? frame.height * 0.62 : frame.height);
+      const x = frame.x + (frame.width - size) / 2;
+      const nodes = iconMarker({ id: stableId(id, "mark"), role: "icon", x, y: frame.y, size, icon: props.icon || props.symbol, tone: props.tone || "outline" });
+      if (props.label) nodes.push(textPrimitive({ id: stableId(id, "label"), role: "icon-label", frame: { x: frame.x, y: frame.y + size + 8, width: frame.width, height: frame.height - size - 8 }, text: props.label, style: textStyle(LABEL, INK, true, "center", "top") }));
+      return { nodes };
     } }),
     component({ id: "logo", category: "media", role: "logo", tokens: ["color.surface", "color.rule", "color.ink", "font.display", "type.heading", "line.hairline", "radius.small"], preferredSize: { width: 220, height: 90 }, sample: { text: "(Insert logo)" }, render: ({ id, frame, props }) => ({ nodes: [rectPrimitive({ id: stableId(id, "backing"), role: "logo-backing", frame, style: boxStyle() }), textPrimitive({ id: stableId(id, "text"), role: "logo-text", frame: insetFrame(frame, 12), text: props.text, style: { ...textStyle(token("type.heading"), INK, true, "center"), fontFamily: DISPLAY } })] }) }),
     component({ id: "process", category: "relationship", role: "process", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 900, height: 280 }, sample: { items: ["(Insert step 1)", "(Insert step 2)", "(Insert step 3)", "(Insert step 4)"], active: 2 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props: { ...props, items: props.items.map((label) => typeof label === "string" ? { label } : label) } }) }) }),
@@ -928,12 +990,12 @@ function registerCore(registry) {
       definition.measureIntrinsic = ({ frame, props }) => definition.resolveVariant(props) === "phase-workstreams" ? measurePhaseWorkstreams({frame,props}) : definition.resolveVariant(props) === "wave-columns" ? waveRoadmapLayout(frame, props) : null;
     }
     if (definition.id === "bullet-list") {
-      definition.tokens.push("type.body", "space.2", "space.4");
+      definition.tokens.push("type.body", "space.2", "space.4", ...MARK_TOKENS, "color.positive", "color.negative");
       const render = definition.render;
       definition.render = input => definition.resolveVariant(input.props) === "body" ? { nodes: bodyListNodes(input) } : render(input);
       definition.measureContent = ({ frame, props }) => {
         if (definition.resolveVariant(props) !== "body") throw new Error("Content measurement requires the body bullet-list variant");
-        return bodyListLayout(frame, props.items);
+        return bodyListLayout(frame, props.items, props);
       };
       definition.measureIntrinsic = input => definition.resolveVariant(input.props) === "body" ? definition.measureContent(input) : null;
     }
