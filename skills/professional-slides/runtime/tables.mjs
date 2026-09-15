@@ -9,6 +9,7 @@ import {
   ellipsePrimitive,
   wedgePrimitive,
   linePrimitive,
+  shapePrimitive,
   chartAnnotationStyle,
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
@@ -607,11 +608,14 @@ export function measureTable({ frame, props }) {
       : density === "compact"
         ? "type.compact"
         : "type.body";
+  // Chevron headers keep their label clear of the point: inset by half the
+  // band height on both sides (measured at a taller band so the label fits).
+  const chevronInset = props.headerShape === "chevron" ? v("space.5") : 0;
   const headers = model.columns.map((c, i) =>
-    c.label ? measure(c.label, widths[i] - 2 * padding, true, textSize) : null,
+    c.label ? measure(c.label, widths[i] - 2 * padding - 2 * chevronInset, true, textSize) : null,
   );
   const headerHeight = headers.some(Boolean)
-    ? Math.max(...headers.map((h) => h?.height ?? 0)) + 2 * paddingY
+    ? Math.max(...headers.map((h) => h?.height ?? 0)) + 2 * paddingY + (chevronInset ? paddingY : 0)
     : 0;
   const layouts = model.cells.map((row) =>
     row.map((cell) =>
@@ -779,7 +783,19 @@ function renderTableAt({ id, frame, props }) {
   m.columns.forEach((column, c) => {
     if (!m.headerHeight) return;
     const filledHeader = header === "standard" || (header === "dimensions" && column.type !== "category");
-    if (filledHeader)
+    if (filledHeader && props.headerShape === "chevron")
+      // Phase tables: each header is a chevron pointing along the sequence.
+      nodes.push(
+        shapePrimitive({
+          id: stableId(id, "header-cell", c),
+          role: "table-header-cell",
+          geometry: "chevron",
+          frame: { x: xs[c], y: frame.y, width: m.widths[c] - m.gap, height: m.headerHeight },
+          style: box(ink),
+          data: { column: c, headerShape: "chevron" },
+        }),
+      );
+    else if (filledHeader)
       nodes.push(
         rectPrimitive({
           id: stableId(id, "header-cell", c),
@@ -793,23 +809,26 @@ function renderTableAt({ id, frame, props }) {
           style: box(ink),
         }),
       );
-    if (m.headers[c])
+    if (m.headers[c]) {
+      const chevron = filledHeader && props.headerShape === "chevron";
+      const inset = chevron ? m.headerHeight / 2 : 0;
       putText(
         stableId(id, "header-text", c),
         "table-header-text",
         {
-          x: xs[c] + m.padding,
+          x: xs[c] + m.padding + inset,
           y: frame.y + m.paddingY,
-          width: m.widths[c] - 2 * m.padding,
+          width: m.widths[c] - 2 * m.padding - 2 * inset,
         },
         m.headers[c],
         textStyle(
           true,
           filledHeader ? white : ink,
-          column.align ?? "left",
+          chevron ? "center" : column.align ?? "left",
           m.textSize,
         ),
       );
+    }
     if (column.type !== "implication")
       nodes.push(
         line(

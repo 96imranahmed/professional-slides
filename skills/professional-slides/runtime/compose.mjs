@@ -15,11 +15,13 @@
 //       "soWhat": "One-sentence consequence for the decision",   // optional
 //       "source": "Australia Post annual reports 2015–22", "note": "Figures may not sum", "notes": "speaker notes",
 //       "tag": "Preliminary", "titleLead": "Why", "callout": "How to read this page",
-//       "layout": "auto" },                 // auto | exhibit-full | exhibit-left | exhibit-right | two-up | text
+//       "layout": "auto",                 // auto | exhibit-full | exhibit-left | exhibit-right | two-up | stack | grid | text
+//       "arrange": "stack|grid", "metrics": [{ "value": "$2.1B", "label": "..." }], "rows": [{ "label", "text|points" }] },
 //     { "kind": "section", "title": "Where the money goes" }
 //   ]
 // }
-// exhibit.type: any registered component id, or the aliases "table", "image", "metrics".
+// exhibit.type: any registered component id, or the aliases "table", "image", "metrics", "cards",
+// "quadrants", "swot", "compare", "phase-table", "rows".
 import fs from "node:fs";
 import path from "node:path";
 import { measureText } from "./text-layout.mjs";
@@ -51,12 +53,36 @@ function imageProps(ref, baseDir) {
   return { dataUri: `data:${mime};base64,${buffer.toString("base64")}`, width, height, alt: (typeof ref === "object" && ref.alt) || path.basename(file), ...(typeof ref === "object" && ref.credit ? { authorization: ref.credit } : {}) };
 }
 
-function exhibitItem(ex, id, baseDir, size = SIZE) {
+/** Aliases that resolve to a table: compare (two headed columns), phase-table (chevron header, row labels), rows (label + text). */
+function tableAlias(ex) {
+  if (ex.type === "compare") {
+    const left = ex.left || {}, right = ex.right || {};
+    const l = left.points || (left.text ? [left.text] : []), r = right.points || (right.text ? [right.text] : []);
+    const n = Math.max(l.length, r.length);
+    const rows = Array.from({ length: n }, (_, i) => [l[i] ?? "", r[i] ?? ""].map((cell) => (typeof cell === "string" && !cell.trim() ? { type: "text", text: " " } : cell)));
+    return { type: "table", treatment: "standard", variant: "standard", columns: [{ label: left.heading || "Before", type: "text" }, { label: right.heading || "After", type: "text" }], rows, density: ex.density };
+  }
+  if (ex.type === "phase-table") {
+    const phases = ex.phases || ex.columns || [];
+    const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label }, ...phases.map((_, i) => { const cell = (row.cells || [])[i]; return Array.isArray(cell) ? { type: "bullets", items: cell } : cell ?? " "; })]);
+    return { type: "table", treatment: "dimensions", variant: "standard", headerShape: "chevron", columns: [{ label: "", type: "category", width: 110 }, ...phases.map((ph) => ({ label: typeof ph === "string" ? ph : ph.label, type: "text", width: 200 }))], rows, density: ex.density };
+  }
+  if (ex.type === "rows") {
+    const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label, ...(row.number ? { sectionNumber: row.number } : {}) }, Array.isArray(row.points) ? { type: "bullets", items: row.points } : row.text]);
+    return { type: "table", treatment: "categories", variant: "standard", columns: [{ label: "", type: "category", width: 200 }, { label: "", type: "text", width: 800 }], rows, density: ex.density };
+  }
+  return ex;
+}
+
+function exhibitItem(exIn, id, baseDir, size = SIZE) {
+  const ex = tableAlias(exIn);
   const { type, layout: _l, ...rest } = ex;
   if (type === "image") return { id, component: "image-frame", props: imageProps(ex.path ? ex : ex.image, baseDir), size };
+  if (type === "cards" || type === "quadrants") return { id, component: type, props: rest, size };
+  if (type === "swot") return { id, component: "quadrants", props: { quadrants: ["Strengths", "Weaknesses", "Opportunities", "Threats"].map((title, i) => ({ title, points: [rest.strengths, rest.weaknesses, rest.opportunities, rest.threats][i] || [] })) }, size };
   if (type === "table") {
     const styled = styleTable(rest);
-    return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}) }, size };
+    return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
   }
   if (type === "metrics") return { id, layout: "flow.row", size: HUG, items: rest.items.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: m, size: { width: { fr: 1 }, height: 140 } })) };
   if (type.startsWith("chart.")) {
@@ -72,6 +98,7 @@ function exhibitItem(ex, id, baseDir, size = SIZE) {
  * heading (chart-title); anything else is wrapped in a headed section.
  */
 function headedPanel(ex, item, id) {
+  if (["cards", "quadrants", "swot", "metrics"].includes(ex.type) && !ex.panelHeading) return item;
   if (String(ex.type).startsWith("chart.")) {
     if (ex.panelHeading && !ex.heading) item.props.heading = ex.panelHeading;
     return item;
@@ -214,6 +241,30 @@ function niceCeiling(value) {
   return 10 * magnitude;
 }
 
+/** A KPI strip: equal tiles in a row, hugging one tile height. */
+function metricsStrip(metrics, id) {
+  const tiles = metrics.map((m) => (typeof m === "string" ? { value: m } : m));
+  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: m, size: { width: { fr: 1 }, height: "fill" } })) };
+}
+
+/**
+ * Hero fitness: a single-series chart with three categories or fewer is not a
+ * hero; it becomes a KPI strip (value tiles labelled by category) so the page
+ * does not carry a plot that is mostly air.
+ */
+function thinChart(ex) {
+  if (!ex || !String(ex.type).startsWith("chart.") || !Array.isArray(ex.series) || ex.series.length !== 1) return false;
+  const values = ex.series[0].values || [];
+  return values.length > 0 && values.length <= 3 && !ex.type.includes("waterfall") && !ex.type.includes("pie") && !ex.type.includes("donut");
+}
+function chartToMetrics(ex) {
+  // "$k" wraps the number ($48k); "%" and "pts" follow it (48%).
+  const unit = String(ex.unit || "").trim();
+  const m = unit.match(/^([^\w\s%]*)(.*)$/);
+  const prefix = m ? m[1] : "", suffix = m ? m[2] : unit;
+  return (ex.categories || []).map((c, i) => ({ value: `${prefix}${ex.series[0].values[i]}${suffix}`, label: c, tone: "dark" }));
+}
+
 function pointsItem(points, id) {
   return { id, component: "bullet-list", props: { variant: "body", items: points }, size: HUG };
 }
@@ -225,6 +276,11 @@ function soWhatItem(text, id) {
 function chooseLayout(slide) {
   if (slide.layout && slide.layout !== "auto") return slide.layout;
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
+  if (slide.arrange === "stack") return "stack";
+  if (slide.arrange === "grid" || exhibits.length >= 4) return "grid";
+  // Auto-stack: two charts on one category set with points beside them stack
+  // in the hero column rather than shrinking into a three-way row.
+  if (exhibits.length === 2 && slide.points?.length && exhibits.every((ex) => String(ex.type).startsWith("chart.")) && JSON.stringify(exhibits[0].categories) === JSON.stringify(exhibits[1].categories)) return "stack";
   if (exhibits.length >= 2) return "two-up";
   if (exhibits.length === 1) return slide.points?.length ? "exhibit-left" : "exhibit-full";
   return "text";
@@ -233,22 +289,59 @@ function chooseLayout(slide) {
 export function composeSlide(slide, index, baseDir) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   if (slide.kind === "section") return { id, title: slide.title, items: [{ id: `${id}-divider`, component: "section-divider", props: { title: slide.title, ...(slide.number ? { number: slide.number } : {}) }, size: SIZE }], layout: "flow.column" };
+  const slideIn = slide;
+  // Hero fitness: a thin single-series chart becomes a column of KPI tiles
+  // (one per category) that stands in for the hero, points beside it.
+  let tileColumn = null, tilePoints = [];
+  if ((!slide.layout || slide.layout === "auto") && slide.exhibit && !slide.exhibits && thinChart(slide.exhibit) && !slide.metrics) {
+    tileColumn = chartToMetrics(slide.exhibit);
+    tilePoints = slide.points || [];
+    slide = { ...slide, exhibit: undefined, exhibits: undefined, points: undefined };
+  }
+  // `rows` at slide level is the label-and-text table.
+  if (slide.rows && !slide.exhibit && !slide.exhibits) slide = { ...slide, exhibit: { type: "rows", rows: slide.rows } };
   const layout = chooseLayout(slide);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   const items = [];
+  if (Array.isArray(slide.metrics) && slide.metrics.length) items.push(metricsStrip(slide.metrics, `${id}-metrics`));
+  if (tileColumn) {
+    const tiles = { id: `${id}-tiles`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: tileColumn.map((m, i) => ({ id: `${id}-tile-${i}`, component: "metric", props: { ...m, variant: "prominent" }, size: { width: { fr: 1 }, height: "fill" } })) };
+    const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`)] };
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: tilePoints.length ? [tiles, side] : [tiles] });
+  }
   // A full-width table needs no heading of its own: the action title and the
   // header row already say what it is. Heading bands exist for the row rule only.
-  if (layout === "exhibit-full") items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir));
+  const centredCards = (ex) => ex.type === "cards" && ex.tone !== "header" && ex.tone !== "numbered" && (ex.items || []).every((i) => i.icon && !(i.points || []).length);
+  if (layout === "exhibit-full" && centredCards(exhibits[0])) {
+    // Icon cards with a line each hug their content and sit centred in the
+    // space above the takeaway; header and numbered cards fill the page as columns.
+    items.push({ id: `${id}-centre`, layout: "flow.column", size: SIZE, leftover: "center", items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, HUG)] });
+  } else if (layout === "exhibit-full") items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir));
   else if (layout === "exhibit-left" || layout === "exhibit-right") {
-    const hero = headedPanel(exhibits[0], exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" }), `${id}-exhibit`);
+    // Side ratios: chart + points 2:1, table + points 3:2.
+    const heroFr = exhibits[0].type === "table" || exhibits[0].type === "rows" || exhibits[0].type === "compare" ? 3 : 2;
+    const sideFr = heroFr === 3 ? 2 : 1;
+    const hero = headedPanel(exhibits[0], exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: heroFr }, height: "fill" }), `${id}-exhibit`);
     // The side column is a headed section so its rule shares the chart heading's
     // band and the points start level with the plot, not with the heading text.
     // `pointsAlign: "middle"` centres the points on the exhibit instead.
     const list = pointsItem(slide.points || [], `${id}-points`);
     const side = slide.pointsAlign === "middle"
-      ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, leftover: "center", items: [list] }
-      : { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: 1 }, height: "fill" }, items: [list] };
+      ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: [list] }
+      : { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: sideFr }, height: "fill" }, items: [list] };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: layout === "exhibit-left" ? [hero, side] : [side, hero] });
+  } else if (layout === "stack") {
+    // Exhibits stacked in the hero column, points beside them.
+    const stacked = { id: `${id}-stack`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: exhibits.map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE }, `${id}-exhibit-${i}`)) };
+    if (slide.points?.length) {
+      const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`)] };
+      items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
+    } else items.push({ ...stacked, size: SIZE });
+  } else if (layout === "grid") {
+    // Two rows of two small exhibits, every panel headed.
+    const panels = exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE }, `${id}-exhibit-${i}`));
+    items.push({ id: `${id}-grid`, layout: "flow.column", size: SIZE, items: [{ id: `${id}-row-a`, layout: "flow.row", size: SIZE, items: panels.slice(0, 2) }, { id: `${id}-row-b`, layout: "flow.row", size: SIZE, items: panels.slice(2, 4) }] });
+    if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`));
   } else if (layout === "two-up") {
     // Peer tables share one density: a row with a text-heavy table steps every
     // table in it to compact together, so type stays uniform across the row.
@@ -267,7 +360,16 @@ export function composeSlide(slide, index, baseDir) {
       const shared = niceCeiling(max);
       for (const ex of charts) { ex.yMin = ex.yMin ?? 0; ex.yMax = shared; }
     }
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 3).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE }, `${id}-exhibit-${i}`)) });
+    // Chart beside a narrow table (three columns or fewer): the chart takes 3:2.
+    const panelSize = (ex) => {
+      if (exhibits.length !== 2) return SIZE;
+      const other = exhibits.find((o) => o !== ex);
+      const narrow = (t) => t?.type === "table" && (t.columns || []).length <= 3;
+      if (String(ex.type).startsWith("chart.") && narrow(other)) return { width: { fr: 3 }, height: "fill" };
+      if (narrow(ex) && String(other?.type).startsWith("chart.")) return { width: { fr: 2 }, height: "fill" };
+      return SIZE;
+    };
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 3).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex) }, `${id}-exhibit-${i}`)) });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`));
   } else {
     const points = slide.points || [];

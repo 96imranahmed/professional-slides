@@ -40,6 +40,7 @@ import { registerQuoteCluster } from "./quote-cluster.mjs";
 import { CUSTOM_MAP_SAMPLE, CHOROPLETH_MAP_SAMPLE, MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
 import { registerInsightTreeTable } from "./insight-tree-table.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker, stateMarker } from "./marks.mjs";
+import { registerPanels } from "./panels.mjs";
 
 const FONT = token("font.body");
 const DISPLAY = token("font.display");
@@ -1186,7 +1187,7 @@ function registerCore(registry) {
 }
 
 export function createRegistry() {
-  return registerRelationshipNetwork(registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map())))))))));
+  return registerPanels(registerRelationshipNetwork(registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map()))))))))));
 }
 
 export const REGISTRY = createRegistry();
