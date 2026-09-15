@@ -176,8 +176,10 @@ def is_exhibit(instance):
 
 
 def is_cover(slide, index):
+    """Structural pages (cover, section divider, agenda/tracker) are exempt from
+    the ink and void gates: they are navigation, not evidence."""
     components = {str(c.get("component")) for c in slide.get("componentInstances", [])}
-    if "cover" in components:
+    if components & {"cover", "section-divider", "agenda", "tracker-page"}:
         return True
     if components & {"slide-chrome", "section-divider"}:
         return False

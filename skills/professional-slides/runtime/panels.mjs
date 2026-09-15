@@ -182,7 +182,59 @@ export function metricNodes({ id, frame, props }) {
   return nodes;
 }
 
+/* ------------------------------------------------------------------ agenda */
+
+/**
+ * Contents / agenda page: numbered discs, section labels in heading type, the
+ * active section on a tinted band in bold, an optional detail per item.
+ * props: { items: [{ label, detail?, number? }], active?: index }
+ */
+export function agendaLayout(frame, props) {
+  if (!Array.isArray(props.items) || props.items.length < 2 || props.items.length > 10) throw new Error("Agenda takes two to ten items");
+  const disc = markerSize(), gap = v("space.3"), pad = v("space.2");
+  const hasDetail = props.items.some((i) => i.detail);
+  const labelWidth = hasDetail ? Math.min(frame.width * 0.42, 460) : frame.width - disc - gap - 2 * pad;
+  const detailWidth = hasDetail ? frame.width - labelWidth - disc - gap - 3 * pad - v("space.5") : 0;
+  const items = props.items.map((item, index) => {
+    if (!item || typeof item.label !== "string" || !item.label.trim()) throw new Error(`Agenda item ${index + 1} requires a label`);
+    const label = measure(item.label, labelWidth, "type.heading", index === props.active);
+    const detail = item.detail ? measure(item.detail, detailWidth, "type.body") : null;
+    return { item, label, detail, number: item.number ?? index + 1, height: Math.max(label.height, detail?.height ?? 0, disc) + 2 * pad };
+  });
+  const rowGap = v("space.2");
+  const natural = items.reduce((sum, i) => sum + i.height, 0) + rowGap * (items.length - 1);
+  return { items, disc, gap, pad, labelWidth, detailWidth, hasDetail, rowGap, height: natural };
+}
+
+export function agendaNodes({ id, frame, props }) {
+  const L = agendaLayout(frame, props);
+  if (L.height > frame.height + 0.01) throw new Error("Agenda items exceed the page; shorten the details or split the agenda");
+  // Rows spread over the frame when it is taller than the list, up to a generous cap.
+  const spare = Math.max(0, frame.height - L.height);
+  const extra = Math.min(spare / L.items.length, v("space.5"));
+  const nodes = [];
+  let y = frame.y;
+  L.items.forEach((row, i) => {
+    const h = row.height + extra, active = i === props.active, rid = stableId(id, "item", i);
+    if (active) nodes.push(rect(stableId(rid, "band"), "agenda-active", { x: frame.x, y, width: frame.width, height: h }, TINT, "none", "radius.small"));
+    const cy = y + h / 2;
+    nodes.push(...numberMarker({ id: stableId(rid, "number"), role: "agenda-marker", x: frame.x + L.pad, y: cy - L.disc / 2, size: L.disc, number: row.number, data: { index: i, active } }));
+    nodes.push(label(stableId(rid, "label"), "agenda-label", { x: frame.x + L.pad + L.disc + L.gap, y: cy - row.label.height / 2, width: L.labelWidth }, row.label, text("type.heading", INK, active)));
+    if (row.detail) nodes.push(label(stableId(rid, "detail"), "agenda-detail", { x: frame.x + L.pad + L.disc + L.gap + L.labelWidth + v("space.5"), y: cy - row.detail.height / 2, width: L.detailWidth }, row.detail, text("type.body", active ? INK : SECONDARY)));
+    if (!active && i < L.items.length - 1) nodes.push(linePrimitive({ id: stableId(rid, "rule"), role: "agenda-rule", x1: frame.x + L.pad + L.disc + L.gap, y1: y + h + L.rowGap / 2, x2: frame.x + frame.width, y2: y + h + L.rowGap / 2, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
+    y += h + L.rowGap;
+  });
+  return nodes;
+}
+
 export function registerPanels(registry) {
+  registry.set("agenda", {
+    id: "agenda", version: "1.0.0", category: "navigation", role: "agenda", tokens: [...PANEL_TOKENS], preferredSize: { width: 1160, height: 420 },
+    sample: { items: [{ label: "(Insert section 1)", detail: "(Insert what it covers)" }, { label: "(Insert section 2)" }, { label: "(Insert section 3)" }], active: 0 },
+    render: (input) => ({ nodes: agendaNodes(input) }),
+    measureContent: ({ frame, props }) => agendaLayout(frame, props),
+    guidance: { useWhen: "the contents page and the tracker page before each section", why: "readers orient by the numbered list; the tinted band says where they are", actionTitle: "'Contents' or 'Agenda'; the sections carry the claims" }
+  });
   registry.set("cards", {
     id: "cards", version: "1.0.0", category: "section", role: "cards", tokens: [...PANEL_TOKENS], preferredSize: { width: 1160, height: 300 },
     sample: { items: [{ icon: "target", title: "(Insert pillar 1)", text: "(Insert one-line description)" }, { icon: "rocket", title: "(Insert pillar 2)", text: "(Insert one-line description)" }, { icon: "people", title: "(Insert pillar 3)", text: "(Insert one-line description)" }] },

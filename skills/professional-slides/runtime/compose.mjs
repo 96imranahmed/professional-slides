@@ -317,7 +317,8 @@ export function composeSlide(slide, index, baseDir) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   if (slide.exhibit) slide = { ...slide, exhibit: highlightFromTitle(slide.exhibit, slide.title) };
   if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => highlightFromTitle(ex, slide.title)) };
-  if (slide.kind === "section") return { id, title: slide.title, items: [{ id: `${id}-divider`, component: "section-divider", props: { title: slide.title, ...(slide.number ? { number: slide.number } : {}) }, size: SIZE }], layout: "flow.column" };
+  if (slide.kind === "section") return { id, kind: "divider", title: slide.title, ...(slide.number !== undefined ? { number: slide.number } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
+  if (slide.kind === "agenda") return { id, title: slide.title || "Contents", layout: "flow.column", items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items, ...(slide.active !== undefined ? { active: slide.active } : {}) }, size: SIZE }] };
   const slideIn = slide;
   // A value table under the chart: the chart stacks over a compact table whose
   // columns are the chart's categories.
@@ -437,6 +438,29 @@ export function composeSlide(slide, index, baseDir) {
   return { id, title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(slide.note ? { note: prefixed("Note", slide.note) } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }
 
+/**
+ * `agenda: true` numbers the section dividers, inserts a Contents page before
+ * the first section and repeats it (with the coming section highlighted) in
+ * front of every later section: the classic tracker. `agenda: "once"` inserts
+ * only the Contents page.
+ */
+export function agendaPages(slidesIn, agenda) {
+  const sections = slidesIn.filter((s) => s.kind === "section");
+  if (!agenda || sections.length < 2) return slidesIn;
+  const numbered = new Map(sections.map((s, i) => [s, s.number ?? i + 1]));
+  const items = sections.map((s) => ({ label: s.title, ...(s.summary ? { detail: s.summary } : {}) }));
+  const out = [];
+  let seen = 0;
+  for (const slide of slidesIn) {
+    if (slide.kind === "section") {
+      if (seen === 0 || agenda !== "once") out.push({ kind: "agenda", id: `agenda-${seen + 1}`, title: seen === 0 ? "Contents" : "Agenda", items, active: seen });
+      out.push({ ...slide, number: numbered.get(slide) });
+      seen += 1;
+    } else out.push(slide);
+  }
+  return out;
+}
+
 /** Expand a v3 deck into the deckPlan the planner consumes. */
 export function composeDeck(spec, baseDir = process.cwd()) {
   if (!isV3(spec)) throw new Error(`Expected schema ${V3}`);
@@ -451,7 +475,8 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     if (spec.cover.notes) cover.notes = spec.cover.notes;
     slides.push(cover);
   }
-  for (const page of spec.slides.flatMap(splitTables).flatMap(paginateTable)) slides.push(composeSlide(page, slides.length, baseDir));
+  const pages = agendaPages(spec.slides, spec.agenda);
+  for (const page of pages.flatMap(splitTables).flatMap(paginateTable)) slides.push(composeSlide(page, slides.length, baseDir));
   return {
     id: spec.id,
     palette: spec.palette || "mckinsey",

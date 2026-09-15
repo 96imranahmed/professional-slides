@@ -10,6 +10,7 @@ import {
 } from "./core.mjs";
 import { NATURAL_EARTH_COUNTRIES, NATURAL_EARTH_SOURCE } from "./natural-earth-map-data.mjs";
 import { measureText } from './text-layout.mjs';
+import { MARK_TOKENS, markerSize, numberMarker } from './marks.mjs';
 import { normalizeQuantitativeScale, quantitativeScaleColor, quantitativeLegendNodes, QUANTITATIVE_SCALE_TOKENS } from './legends.mjs';
 
 const SURFACE = token("color.surface");
@@ -56,6 +57,7 @@ export const MAP_PRESETS = Object.freeze({
 
 export const MAP_PRESET_IDS = Object.freeze(Object.keys(MAP_PRESETS));
 export const MAP_TOKENS = Object.freeze([
+  ...MARK_TOKENS,
   ...QUANTITATIVE_SCALE_TOKENS, 'type.chartLabel', 'space.2',
   "color.surface",
   "color.rule",
@@ -284,6 +286,17 @@ function markerNodes({ id, frame, geography, projected, markers }) {
     if (marker.size !== undefined && (!Number.isFinite(marker.size) || marker.size <= 0)) throw new Error("Map marker size must be positive and finite");
     if (marker.fraction !== undefined && (!Number.isFinite(marker.fraction) || marker.fraction < 0 || marker.fraction > 1)) throw new Error("Map marker fraction must be a number from zero to one");
     const [centerX, centerY] = markerCoordinate(marker, geography, projected);
+    // A numbered pin is the deck's numbered disc, so the side list matches it.
+    if (marker.number !== undefined) {
+      const disc = markerSize(), pinFrame = { x: centerX - disc / 2, y: centerY - disc / 2, width: disc, height: disc };
+      nodes.push(...numberMarker({ id: stableId(id, "marker-base", index), role: "map-marker", labelRole: "map-marker-number", x: pinFrame.x, y: pinFrame.y, size: disc, number: marker.number, data: { geography: geography.id, number: marker.number } }));
+      if (marker.label) {
+        const width = Math.min(150, Math.max(90, frame.width * 0.18));
+        const placeRight = pinFrame.x + disc + 4 + width <= frame.x + frame.width;
+        nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: { x: placeRight ? pinFrame.x + disc + 4 : pinFrame.x - 4 - width, y: centerY - 12, width, height: 24 }, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: SECONDARY, bold: true, align: placeRight ? "left" : "right", valign: "mid" } }));
+      }
+      continue;
+    }
     const size = marker.size ?? 34;
     const markerFrame = { x: centerX - size / 2, y: centerY - size / 2, width: size, height: size };
     nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: INK, lineWidth: HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id } }));

@@ -41,6 +41,9 @@ import { CUSTOM_MAP_SAMPLE, CHOROPLETH_MAP_SAMPLE, MAP_GUIDANCE, MAP_PRESET_IDS,
 import { registerInsightTreeTable } from "./insight-tree-table.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker, stateMarker } from "./marks.mjs";
 import { registerPanels } from "./panels.mjs";
+import { registerExtras } from "./extras.mjs";
+import { registerGantt } from "./gantt.mjs";
+import { registerFramework } from "./framework.mjs";
 
 const FONT = token("font.body");
 const DISPLAY = token("font.display");
@@ -1198,7 +1201,7 @@ function registerCore(registry) {
 }
 
 export function createRegistry() {
-  return registerPanels(registerRelationshipNetwork(registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map()))))))))));
+  return registerFramework(registerGantt(registerExtras(registerPanels(registerRelationshipNetwork(registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map())))))))))))));
 }
 
 export const REGISTRY = createRegistry();

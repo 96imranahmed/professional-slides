@@ -1275,6 +1275,14 @@ function scatter({ id, frame, props, bubble = false }) {
     const mark = marks.find((node) => node.id === stableId(id, "point", label.text));
     const measured = measureText(label.text, label.frame.width, { fontSize: tokenValue(CHART_LABEL) });
     const width = Math.ceil(measured.width) + 2, height = 24;
+    // A bubble wide enough to carry its name takes the label inside, in white,
+    // as on a positioning matrix; the smaller ones keep an outside label.
+    if (bubble && mark.frame.width >= width + 12 && mark.frame.height >= height + 4) {
+      label.frame = { x: point.x - width / 2, y: point.y - height / 2, width, height };
+      label.style = { ...label.style, color: tokenDefinition(token("color.onPrimary")), bold: true, align: "center" };
+      label.data = { ...label.data, inside: true };
+      continue;
+    }
     const gap = 5;
     const candidates = [
       { x: mark.frame.x + mark.frame.width + gap, y: point.y - height / 2, width, height },

@@ -207,6 +207,18 @@ function planCover(plan) {
   return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, recommended: "live-pitch", resolved: spec.density, selection: plan.density === undefined ? "capacity-default" : "explicit", reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
 }
 
+// A section divider is its own page: navy full bleed, section title, giant
+// numeral; no chrome title, its own page furniture.
+function planDivider(plan) {
+  if (!plan?.id || !plan.title?.trim()) throw new Error("Divider plan requires id and title");
+  const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
+  const props = { title: plan.title, ...(plan.number !== undefined ? { style: "numbered", sectionId: String(plan.number) } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}) };
+  return {
+    spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", frame, composition: absolute({ id: `${plan.id}-divider`, children: [componentNode({ id: "divider", component: "section-divider", props, frame, role: "divider" })] }) },
+    decision: { layout: "structural", kind: "divider", density: { requested: "executive", recommended: "live-pitch", resolved: plan.density ?? "executive", selection: "explicit", reasons: [] }, itemJobs: [{ id: "divider", job: "open the section", component: "section-divider" }] }
+  };
+}
+
 function planTracker(plan, registry) {
   if (!plan?.id || !plan.title?.trim()) throw new Error("Tracker plan requires id and title");
   const props = plan.trackerPage;
@@ -293,6 +305,7 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
   const planned = deckPlan.slides.map((slide) => slide.kind === "cover"
     ? planCover(slide)
     : slide.kind === "tracker" ? planTracker(slide, registry)
+    : slide.kind === "divider" ? planDivider(slide)
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? defaultTitleVariant : slide.titleVariant }, registry));
   const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, slides: planned.map((item) => item.spec) }, registry, {slideCache});
   return {deck, decisions:planned.map(item=>item.decision)};
