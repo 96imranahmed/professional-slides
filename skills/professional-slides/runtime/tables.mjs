@@ -13,7 +13,7 @@ import {
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
-import { numberMarker } from "./marks.mjs";
+import { numberMarker, stateMarker } from "./marks.mjs";
 
 // One table compiler. Columns select defaults; individual cells may override the
 // encoding (e.g. options as columns with prose and rating rows in the same table).
@@ -29,7 +29,22 @@ export const CELL_TYPES = Object.freeze([
   "heatmap",
   "bars",
   "implication",
+  "rag",
+  "lights",
+  "progress",
+  "dot",
+  "check",
 ]);
+// Status vocabularies. Pill labels are the canonical words; the composer maps
+// free text onto them.
+export const RAG_STATES = Object.freeze({
+  "on-track": { label: "On track", color: "color.positive" },
+  complete: { label: "Complete", color: "color.positive" },
+  behind: { label: "Behind plan", color: "color.caution" },
+  "at-risk": { label: "At risk", color: "color.negative" },
+  "not-started": { label: "Not started", color: "color.rule" },
+});
+export const LIGHT_STATES = Object.freeze({ green: "color.positive", amber: "color.caution", red: "color.negative" });
 export const TABLE_TOKENS = [
   "font.body",
   "font.bodySemibold",
@@ -47,6 +62,7 @@ export const TABLE_TOKENS = [
   "color.rule",
   "color.chartGrid",
   "color.positive",
+  "color.caution",
   "color.negative",
   ...Array.from({ length: 6 }, (_, i) => `color.chartSeries${i + 1}`),
   "space.1",
@@ -162,8 +178,9 @@ function normalize(props) {
       throw new Error(
         `Table row ${r + 1} must have exactly ${columns.length} cells, including null span continuations`,
       );
-    if (!["plain", "accented"].includes(row.style ?? props.rowStyle ?? "plain"))
+    if (!["plain", "accented", "total", "group"].includes(row.style ?? props.rowStyle ?? "plain"))
       throw new Error("Unknown table row style");
+    const groupRow = (row.style ?? props.rowStyle) === "group";
     return row.cells.map((value, c) => {
       if (occupied[r][c]) {
         if (value !== null)
@@ -181,6 +198,11 @@ function normalize(props) {
           ? value
           : { text: String(value), value }),
       };
+      // A group row is one label across a grey band; its other cells stay blank.
+      const bandRow = groupRow || (row.style ?? props.rowStyle) === "total";
+      const emptyValue = typeof value === "string" && !value.trim();
+      if (emptyValue && (bandRow ? c > 0 : c === 0)) { cell.blank = true; cell.type = "text"; }
+      if (bandRow) cell.bold = true;
       if (!CELL_TYPES.includes(cell.type))
         throw new Error(`Unknown table cell type: ${cell.type}`);
       if (!["left", "center", "right"].includes(cell.align ?? "left"))
@@ -345,6 +367,8 @@ function heatFill(scale, value) {
 }
 const foreground = (fill) =>
   contrastRatio(tokenValue(fill), v("color.ink")) >= 4.5 ? ink : white;
+const rowBand = (style) =>
+  style === "accented" ? t("color.componentPrimaryTint") : style === "total" ? primary : style === "group" ? t("color.surfaceMuted") : null;
 const categorySurface = (cell, props) =>
   cell.surface ?? (props.treatment === "dimensions" || props.variant === "plain" ? "plain" : "primary");
 
@@ -402,6 +426,34 @@ function contentLayout(cell, width, props, used) {
     offset = 0,
     bold = Boolean(cell.bold),
     size = dense ? "type.label" : compact ? "type.compact" : "type.body";
+  if (cell.blank) return { padding, offset: 0, blocks: [], bold, size, marker, numberMarker: 0, numberWidth: 0, blockHeight: 0, height: 0 };
+  if (cell.type === "rag") {
+    const state = RAG_STATES[cell.value];
+    if (!state) throw new Error(`Table rag cells take one of ${Object.keys(RAG_STATES).join(", ")}`);
+    const label = measure(cell.text || state.label, inner, true, "type.label");
+    const pillWidth = label.width + 2 * v("space.3"), pillHeight = label.height + 2 * v("space.1");
+    if (pillWidth > inner) throw new Error("Table status pill does not fit its column; widen the column");
+    return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, pill: { width: pillWidth, height: pillHeight, color: t(state.color) }, height: pillHeight };
+  }
+  if (cell.type === "lights") {
+    if (!LIGHT_STATES[cell.value]) throw new Error("Table lights cells take green, amber or red");
+    const dot = v("icon.small");
+    if (inner < 3 * dot + 2 * gap) throw new Error("Table lights cell is too narrow for three lamps");
+    return { padding, offset: 0, blocks: [], bold, size, marker, numberMarker: 0, numberWidth: 0, blockHeight: 0, lights: { dot, gap }, height: dot };
+  }
+  if (cell.type === "progress") {
+    const value = Number(cell.value);
+    if (!(value >= 0 && value <= 100)) throw new Error("Table progress cells take a percentage from 0 to 100");
+    const label = measure(cell.text || `${Math.round(value)}%`, inner, true, "type.label");
+    const labelWidth = Math.max(label.width, v("space.6"));
+    if (inner - labelWidth - gap < v("space.6")) throw new Error("Table progress cell leaves no bar width");
+    return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, progress: { value, labelWidth, barHeight: v("space.2") }, height: Math.max(label.height, v("space.2")) };
+  }
+  if (cell.type === "dot" || cell.type === "check") {
+    const size = v("icon.small") + (cell.type === "check" ? v("space.2") : 0);
+    if (inner < size) throw new Error("Table mark cell is too narrow for its mark");
+    return { padding, offset: 0, blocks: [], bold, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: 0, mark: { size, on: cell.value === true || cell.value === "yes" || cell.value === "done" }, height: size };
+  }
   if (cell.type === "binary") {
     cell.labelDisplay =
       cell.labelDisplay ?? cell.scaleRecord.labelDisplay ?? "none";
@@ -436,6 +488,8 @@ function contentLayout(cell, width, props, used) {
       throw new Error("Table bullets require items");
     texts = cell.items.map((s) => requireText(s, "bullet"));
     offset = v("space.4");
+  } else if (cell.type === "category" && cell.sectionNumber !== undefined && !String(cell.text ?? "").trim()) {
+    texts = []; // a bare numbered disc, as in a "#" column
   } else {
     texts = [requireText(cell.text, "cell")];
     bold = cell.type === "category" || bold;
@@ -767,6 +821,19 @@ function renderTableAt({ id, frame, props }) {
         ),
       );
   });
+  // Row-level fills (accented, total, group) are one continuous band so the
+  // row reads as a band rather than a run of tinted cells with slits between.
+  m.cells.forEach((row, r) => {
+    const band = rowBand(m.rows[r].style ?? props.rowStyle);
+    if (!band) return;
+    nodes.push(rectPrimitive({ id: stableId(id, "row-band", r), role: "table-row-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(band), data: { row: r, rowStyle: m.rows[r].style ?? props.rowStyle } }));
+  });
+  // The recommended option's column is one tinted band from the header rule
+  // to the last row.
+  if (Number.isInteger(props.highlightColumn) && m.widths[props.highlightColumn] !== undefined) {
+    const c = props.highlightColumn;
+    nodes.push(rectPrimitive({ id: stableId(id, "column-band", c), role: "table-column-band", frame: { x: xs[c], y: frame.y + m.headerHeight + m.gap / 2, width: m.widths[c] - m.gap, height: sum(m.heights) - m.gap }, style: box(t("color.componentPrimaryTint")), data: { column: c, highlightColumn: true } }));
+  }
   m.cells.forEach((row, r) =>
     row.forEach((cell, c) => {
       if (!cell) return;
@@ -784,10 +851,8 @@ function renderTableAt({ id, frame, props }) {
           labelDisplay: cell.labelDisplay,
           numberDisplay: cell.numberDisplay,
         };
-      let fill =
-        (m.rows[r].style ?? props.rowStyle) === "accented"
-          ? t("color.componentPrimaryTint")
-          : null;
+      const band = rowBand(m.rows[r].style ?? props.rowStyle);
+      let fill = null;
       if (cell.type === "category" && categorySurface(cell, props) === "primary")
         fill = primary;
       if (cell.type === "highlight") fill = t("color.componentPrimaryTint");
@@ -815,14 +880,37 @@ function renderTableAt({ id, frame, props }) {
             data,
           }),
         );
-      const color = fill ? foreground(fill) : ink;
+      const color = fill ? foreground(fill) : band ? foreground(band) : ink;
       const inner = {
         x: area.x + m.padding,
         y: area.y + m.paddingY,
         width: area.width - 2 * m.padding,
         height: height - 2 * m.paddingY,
       };
-      if (cell.type === "logo") {
+      if (cell.blank) {
+        // nothing to draw: a group row's continuation cells
+      } else if (cell.type === "rag") {
+        const { width: pw, height: ph, color: pc } = l.pill;
+        const px0 = area.x + (area.width - m.gap - pw) / 2, py0 = area.y + (height - ph) / 2;
+        nodes.push(rectPrimitive({ id: stableId(cellId, "pill"), role: "table-status-pill", frame: { x: px0, y: py0, width: pw, height: ph }, style: { fill: pc, stroke: "none", lineWidth: t("line.hairline"), radius: t("radius.round") }, data: { ...data, state: cell.value } }));
+        putText(stableId(cellId, "pill-label"), "table-status-label", { x: px0, y: py0 + (ph - l.blocks[0].height) / 2, width: pw }, l.blocks[0], textStyle(true, white, "center", "type.label"), { ...data, state: cell.value });
+      } else if (cell.type === "lights") {
+        const { dot, gap } = l.lights, total = 3 * dot + 2 * gap;
+        const x0 = area.x + (area.width - m.gap - total) / 2, y0 = area.y + (height - dot) / 2;
+        ["red", "amber", "green"].forEach((lamp, i) => nodes.push(ellipsePrimitive({ id: stableId(cellId, "lamp", lamp), role: "table-lamp", frame: { x: x0 + i * (dot + gap), y: y0, width: dot, height: dot }, style: { fill: cell.value === lamp ? t(LIGHT_STATES[lamp]) : t("color.chartGrid"), stroke: "none", lineWidth: t("line.hairline"), radius: t("radius.round") }, data: { ...data, lamp, lit: cell.value === lamp } })));
+      } else if (cell.type === "progress") {
+        const { value, labelWidth, barHeight } = l.progress;
+        const trackWidth = inner.width - labelWidth - m.gap, y0 = area.y + (height - barHeight) / 2;
+        nodes.push(rectPrimitive({ id: stableId(cellId, "track"), role: "table-progress-track", frame: { x: inner.x, y: y0, width: trackWidth, height: barHeight }, style: box(t("color.chartGrid")), data }));
+        if (value > 0) nodes.push(rectPrimitive({ id: stableId(cellId, "fill"), role: "table-progress-fill", frame: { x: inner.x, y: y0, width: trackWidth * value / 100, height: barHeight }, style: box(primary), data: { ...data, value } }));
+        putText(stableId(cellId, "progress-label"), "table-progress-label", { x: inner.x + trackWidth + m.gap, y: area.y + (height - l.blocks[0].height) / 2, width: labelWidth }, l.blocks[0], textStyle(true, color, "right", "type.label"), data);
+      } else if (cell.type === "dot") {
+        const { size, on } = l.mark, x0 = area.x + (area.width - m.gap - size) / 2, y0 = area.y + (height - size) / 2;
+        nodes.push(ellipsePrimitive({ id: stableId(cellId, "dot"), role: "table-dot", frame: { x: x0, y: y0, width: size, height: size }, style: { fill: on ? primary : "none", stroke: on ? "none" : t("color.rule"), lineWidth: t("line.hairline"), radius: t("radius.round") }, data: { ...data, on } }));
+      } else if (cell.type === "check") {
+        const { size, on } = l.mark, x0 = area.x + (area.width - m.gap - size) / 2, y0 = area.y + (height - size) / 2;
+        nodes.push(...stateMarker({ id: stableId(cellId, "check"), role: "table-check", x: x0, y: y0, size, state: on ? "yes" : "no", data }));
+      } else if (cell.type === "logo") {
         const logo = mediaNode({id:stableId(cellId,"logo"),frame:{x:inner.x,y:area.y+(height-l.height)/2,width:inner.width,height:l.height},props:cell.media,role:"table-logo"});
         logo.data = {...logo.data,...data,sharedHeight:l.height};
         nodes.push(logo);

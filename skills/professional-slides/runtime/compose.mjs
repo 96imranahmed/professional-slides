@@ -22,6 +22,7 @@
 // exhibit.type: any registered component id, or the aliases "table", "image", "metrics".
 import fs from "node:fs";
 import path from "node:path";
+import { measureText } from "./text-layout.mjs";
 
 const V3 = "professional-slides.deck/v3";
 const SIZE = { width: { fr: 1 }, height: "fill" };
@@ -88,11 +89,45 @@ function headedPanel(ex, item, id) {
  *   decision  (last column is a Decision/Then/So-what)             → filled header, accented last column
  *   listing   (anything else)                                      → open rules only
  */
+const RAG_WORDS = [
+  [/^(on[\s-]?track|green|ok|on plan|on schedule)$/i, "on-track"],
+  [/^(complete|completed|done|delivered)$/i, "complete"],
+  [/^(behind|behind plan|delayed|amber|yellow|slipping|watch)$/i, "behind"],
+  [/^(at[\s-]?risk|overdue|red|blocked|off[\s-]?track|critical)$/i, "at-risk"],
+  [/^(not started|planned|pending|to do|todo)$/i, "not-started"],
+];
+/** Verdict cells: ✓/✗, status words and "45 %" under a progress heading become typed cells. */
+function verdictCell(value, header) {
+  if (typeof value !== "string") return value;
+  const text = value.trim();
+  if (/^(✓|✔|yes|y|true)$/i.test(text)) return { type: "check", value: "yes" };
+  if (/^(✗|✘|✕|x|no|n|false)$/i.test(text)) return { type: "check", value: "no" };
+  for (const [re, state] of RAG_WORDS) if (re.test(text)) return { type: "rag", value: state, text: /^(green|amber|yellow|red|ok)$/i.test(text) ? undefined : text };
+  if (/^\d{1,3}\s*%$/.test(text) && /(complete|progress|done|achiev)/i.test(String(header || ""))) return { type: "progress", value: Number(text.replace(/[^\d]/g, "")) };
+  return value;
+}
+const columnLabel = (c) => (typeof c === "string" ? c : c?.label || "");
+
 export function styleTable(ex) {
   const columns = ex.columns.map((c, i) => typeof c === "string" ? { label: c, type: "text", bold: i === 0, width: columnWeight(ex, i) } : { ...c });
+  const rowsIn = ex.rows.map((r) => Array.isArray(r) ? r.map((cell, i) => verdictCell(cell, columnLabel(ex.columns[i]))) : r);
+  // The recommended option's column is tinted end to end.
+  const recommended = ex.recommended !== undefined ? columns.findIndex((c) => String(c.label).trim().toLowerCase() === String(ex.recommended).trim().toLowerCase()) : -1;
+  if (ex.recommended !== undefined && recommended < 0) throw new Error(`Table recommended column "${ex.recommended}" is not a column label`);
+  const extra = recommended >= 0 ? { highlightColumn: recommended } : {};
+  // A "Total …" row at the end is the accent total band.
+  rowsIn.forEach((r, i) => {
+    if (Array.isArray(r) && i === rowsIn.length - 1 && /^total\b/i.test(String(r[0]?.text ?? r[0] ?? ""))) rowsIn[i] = { style: "total", cells: r };
+  });
+  // A "#" column of row numbers becomes numbered discs with no filled box.
+  const head0Raw = String(columns[0].label || "").trim();
+  if (/^(#|no\.?|nr\.?|n°)$/i.test(head0Raw) && rowsIn.every((r) => { const row = Array.isArray(r) ? r : r.cells; return /^\d+$/.test(String(row[0]?.text ?? row[0] ?? "").trim()) || r.style; })) {
+    columns[0] = { ...columns[0], type: "category", label: "", width: 48 };
+    rowsIn.forEach((r, i) => { const row = Array.isArray(r) ? r : r.cells; if (/^\d+$/.test(String(row[0]?.text ?? row[0] ?? "").trim())) row[0] = { type: "category", text: "", surface: "plain", sectionNumber: Number(String(row[0]?.text ?? row[0]).trim()) }; });
+  }
   const explicit = ex.treatment || ex.variant || ex.columns.some((c) => typeof c === "object");
-  if (explicit) return { variant: ex.variant || "plain", treatment: ex.treatment || "open", columns, rows: ex.rows };
-  const first = ex.rows.map((r) => String(r[0] ?? ""));
+  if (explicit) return { variant: ex.variant || "plain", treatment: ex.treatment || "open", columns, rows: rowsIn, ...extra };
+  const first = rowsIn.map((r) => String(r[0]?.text ?? r[0] ?? ""));
   const numbered = first.length > 1 && first.every((v) => /^\s*\d+\s*[·.)\-–:]\s*\S/.test(v));
   const head0 = String(columns[0].label || "").toLowerCase();
   const headLast = String(columns[columns.length - 1].label || "").toLowerCase();
@@ -101,29 +136,30 @@ export function styleTable(ex) {
   const scorecard = columns.length >= 4 && /\b(gate|criteri|dimension|factor|requirement|measure|option)/.test(head0);
   if (sequence) {
     const cols = [{ ...columns[0], type: "category" }, ...columns.slice(1)];
-    const rows = ex.rows.map((r, i) => {
-      const m = String(r[0]).match(/^\s*(\d+)\s*[·.)\-–:]\s*(.*)$/);
-      const cell = { type: "category", text: m ? m[2] : String(r[0]), sectionNumber: m ? Number(m[1]) : i + 1 };
+    const rows = rowsIn.map((r, i) => {
+      const m = String(r[0]?.text ?? r[0]).match(/^\s*(\d+)\s*[·.)\-–:]\s*(.*)$/);
+      const cell = { type: "category", text: m ? m[2] : String(r[0]?.text ?? r[0]), sectionNumber: m ? Number(m[1]) : i + 1 };
       return [cell, ...r.slice(1)];
     });
-    return { variant: "standard", treatment: "categories", columns: cols, rows };
+    return { variant: "standard", treatment: "categories", columns: cols, rows, ...extra };
   }
-  if (scorecard) return { variant: "standard", treatment: "standard", columns, rows: ex.rows };
+  if (scorecard) return { variant: "standard", treatment: "standard", columns, rows: rowsIn, ...extra };
   if (decision) {
-    const rows = ex.rows.map((r) => [...r.slice(0, -1), { text: String(r[r.length - 1]), type: "highlight" }]);
-    return { variant: "standard", treatment: "standard", columns, rows };
+    const rows = rowsIn.map((r) => [...r.slice(0, -1), typeof r[r.length - 1] === "string" ? { text: r[r.length - 1], type: "highlight" } : r[r.length - 1]]);
+    return { variant: "standard", treatment: "standard", columns, rows, ...extra };
   }
-  return { variant: "plain", treatment: "open", columns, rows: ex.rows };
+  return { variant: "plain", treatment: "open", columns, rows: rowsIn, ...extra };
 }
 
-// Columns are weighted by the longest thing they hold (header included) plus
-// the cell padding, clamped so a "Year 1" column stays narrow and a sentence
-// column never starves: content of 12 characters or fewer counts as 12, of 80
-// or more as 80. Short labels therefore stay on one line.
+// Columns are weighted by the measured width of the widest thing they hold
+// (header included, the first column bold), plus cell padding, clamped between
+// 60 px and 420 px so a "Year 1" column stays narrow, a short label never
+// wraps, and a sentence column takes the rest and wraps.
 function columnWeight(ex, i) {
-  const texts = [String(ex.columns[i] ?? ""), ...ex.rows.map((r) => String(r[i]?.text ?? r[i] ?? ""))];
-  const longest = Math.max(...texts.map((s) => s.replace(/^\s*\d+\s*[·.)\-–:]\s*/, "").length));
-  return Math.min(80, Math.max(12, longest)) + 6;
+  const font = { fontFamily: "Arial", fontSize: 12, wrapWidthRatio: 1 };
+  const texts = [String(columnLabel(ex.columns[i]) ?? ""), ...ex.rows.map((r) => { const row = Array.isArray(r) ? r : r?.cells || []; return String(row[i]?.text ?? row[i] ?? ""); })];
+  const widest = Math.max(...texts.map((text) => measureText(text.replace(/^\s*\d+\s*[·.)\-–:]\s*/, "") || " ", 4000, { ...font, bold: i === 0 }).width));
+  return Math.min(420, Math.max(60, widest)) + 24;
 }
 
 const heavyTable = (ex) => (ex.rows || []).length > 5 || (ex.rows || []).some((row) => row.some((cell) => String(cell?.text ?? cell ?? "").length > 60));
@@ -146,6 +182,25 @@ export function splitTables(slide) {
   return exhibits.map((ex, i) => {
     const page = { ...slide, exhibit: ex, title: `${slide.title} (${i + 1}/${exhibits.length})` };
     delete page.exhibits;
+    if (slide.id) page.id = `${slide.id}-${i + 1}`;
+    if (i !== 0) delete page.points;
+    return page;
+  });
+}
+
+/**
+ * A long table continues on the next page with its header row repeated rather
+ * than stepping down to dense type: more than MAX_ROWS rows split into equal
+ * pages marked (1/2), (2/2). Applies to a lone table under an auto layout.
+ */
+const MAX_ROWS = 8;
+export function paginateTable(slide) {
+  if (slide.layout && slide.layout !== "auto") return [slide];
+  const ex = slide.exhibit;
+  if (!ex || ex.type !== "table" || !Array.isArray(ex.rows) || ex.rows.length <= MAX_ROWS || slide.exhibits) return [slide];
+  const pages = Math.ceil(ex.rows.length / MAX_ROWS), per = Math.ceil(ex.rows.length / pages);
+  return Array.from({ length: pages }, (_, i) => {
+    const page = { ...slide, exhibit: { ...ex, rows: ex.rows.slice(i * per, (i + 1) * per) }, title: `${slide.title} (${i + 1}/${pages})` };
     if (slide.id) page.id = `${slide.id}-${i + 1}`;
     if (i !== 0) delete page.points;
     return page;
@@ -252,7 +307,7 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     if (spec.cover.notes) cover.notes = spec.cover.notes;
     slides.push(cover);
   }
-  for (const page of spec.slides.flatMap(splitTables)) slides.push(composeSlide(page, slides.length, baseDir));
+  for (const page of spec.slides.flatMap(splitTables).flatMap(paginateTable)) slides.push(composeSlide(page, slides.length, baseDir));
   return {
     id: spec.id,
     palette: spec.palette || "mckinsey",

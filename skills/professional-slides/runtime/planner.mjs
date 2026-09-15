@@ -45,10 +45,8 @@ function capacityRecommendation(item, path, reasons) {
       reasons.push({ path, component: item.component, measure: "hierarchy", count: Math.max(branches, leaves), recommended });
     }
   } else if (item.component === "table") {
-    const rows = Array.isArray(props.rows) ? props.rows.length : 0;
-    const columns = Array.isArray(props.columns) ? props.columns.length : 0;
-    recommended = rows > 8 || columns > 6 ? "appendix" : rows > 5 || columns > 4 ? "pre-read" : recommended;
-    if (recommended !== "live-pitch") reasons.push({ path, component: item.component, measure: rows >= columns ? "rows" : "columns", count: Math.max(rows, columns), recommended });
+    // A dense table steps its own type down (body → compact → dense) and long
+    // tables paginate; it never drags the page's other type with it.
   } else if (typeof item.component === "string" && item.component.startsWith("chart.")) {
     const extent = extentOf(props);
     recommended = extent > 12 ? "appendix" : extent > 8 ? "pre-read" : recommended;

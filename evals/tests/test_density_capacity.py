@@ -43,9 +43,10 @@ assert.equal(tree.decision.density.reasons[0].component,'insight-tree-table');
 const chartProps={categories:Array.from({length:9},(_,i)=>`Period ${i+1}`),series:[{name:'Measure',values:Array.from({length:9},(_,i)=>i+1)}]};
 assert.equal(resolveSlideDensity({id:'chart-density',items:[item('chart.column',chartProps)]}).resolved,'pre-read');
 assert.equal(resolveSlideDensity({id:'chart-appendix',items:[item('chart.column',{...chartProps,categories:Array.from({length:13},(_,i)=>String(i+1)),series:[{name:'Measure',values:Array.from({length:13},(_,i)=>i+1)}]})]}).resolved,'appendix');
-assert.equal(resolveSlideDensity({id:'table-density',items:[item('table',{columns:['A','B','C'],rows:Array.from({length:6},(_,i)=>[`Row ${i+1}`,'A','B'])})]}).resolved,'pre-read');
-assert.equal(resolveSlideDensity({id:'table-appendix',items:[item('table',{columns:['A','B','C'],rows:Array.from({length:9},(_,i)=>[`Row ${i+1}`,'A','B'])})]}).resolved,'appendix');
-assert.equal(resolveSlideDensity({id:'wide-table-appendix',items:[item('table',{columns:Array.from({length:7},(_,i)=>`Column ${i+1}`),rows:[Array.from({length:7},(_,i)=>`Value ${i+1}`)]})]}).resolved,'appendix');
+// Tables step their own type and paginate; they never lower the page density.
+assert.equal(resolveSlideDensity({id:'table-density',items:[item('table',{columns:['A','B','C'],rows:Array.from({length:6},(_,i)=>[`Row ${i+1}`,'A','B'])})]}).resolved,'executive');
+assert.equal(resolveSlideDensity({id:'table-appendix',items:[item('table',{columns:['A','B','C'],rows:Array.from({length:9},(_,i)=>[`Row ${i+1}`,'A','B'])})]}).resolved,'executive');
+assert.equal(resolveSlideDensity({id:'wide-table-appendix',items:[item('table',{columns:Array.from({length:7},(_,i)=>`Column ${i+1}`),rows:[Array.from({length:7},(_,i)=>`Value ${i+1}`)]})]}).resolved,'executive');
 assert.equal(resolveSlideDensity({id:'ordinary-chart',items:[item('chart.line',{categories:Array.from({length:8},(_,i)=>String(i+1)),series:[{name:'Measure',values:Array(8).fill(1)}]})]}).resolved,'executive');
 assert.equal(resolveSlideDensity({id:'grouped-chart',items:[item('chart.column',{categories:Array.from({length:5},(_,i)=>String(i+1)),series:[{name:'Actual',values:Array(5).fill(1)},{name:'Plan',values:Array(5).fill(2)}]})]}).resolved,'pre-read');
 assert.equal(resolveSlideDensity({id:'dense-grouped-chart',items:[item('chart.column',{categories:Array.from({length:7},(_,i)=>String(i+1)),series:[{name:'Actual',values:Array(7).fill(1)},{name:'Plan',values:Array(7).fill(2)}]})]}).resolved,'appendix');
