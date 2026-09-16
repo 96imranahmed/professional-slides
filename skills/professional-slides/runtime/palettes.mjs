@@ -1,33 +1,48 @@
 // Named, versioned presentation presets. They are not official firm templates.
 export const PALETTES = Object.freeze({
   mckinsey: {
-    label: "McKinsey", source: "https://cdn.mckinsey.com/assets/sketch/McK_DS_core_Artboards.pdf",
-    basis: "2020 published design-system colours; presentation-role mapping",
+    label: "McKinsey", source: "https://www.mckinsey.com/featured-insights",
+    basis: "2023–24 published decks (Quantum Technology Monitor, Global Economics Intelligence): serif display titles on a hairline rule, deep navy with electric blue, dash bullets, zebra tables",
     colors: {
-      "color.ink": "#051C2C", "color.textSecondary": "#4D4D4D", "color.componentPrimary": "#051C2C", "color.accent": "#00A9F4", "color.accentTint": "#DDF3FE",
+      "color.ink": "#051C2C", "color.textSecondary": "#4D4D4D", "color.componentPrimary": "#051C2C", "color.accent": "#2251FF", "color.accentTint": "#DCE4FF",
       "color.componentPrimaryTint": "#E6E8EA", "color.surfaceMuted": "#F0F0F0",
-      "color.chartSeries1": "#051C2C", "color.chartSeries2": "#034B6F", "color.chartSeries3": "#00A9F4",
-      "color.chartSeries4": "#027AB1", "color.chartSeries5": "#2251FF", "color.chartSeries6": "#71D2F1"
+      "color.chartSeries1": "#051C2C", "color.chartSeries2": "#2251FF", "color.chartSeries3": "#00A9F4",
+      "color.chartSeries4": "#034B6F", "color.chartSeries5": "#99C4FF", "color.chartSeries6": "#B3D9F5",
+      "font.display": "Georgia",
+      "style.titleWeight": "bold", "style.titleRule": "rule", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dash", "style.tableRows": "zebra", "style.labelWeight": "regular"
     }
   },
   bcg: {
-    label: "BCG", source: "https://www.bcg.com/about/corporate-newsroom",
-    basis: "Public site global colour variables, retrieved 2026-09-03; presentation-role mapping",
+    label: "BCG", source: "https://www.bcg.com/publications",
+    basis: "2022–23 published slideshows (Investor Perspectives, Deskless Workers): regular-weight titles on a light band, green pill date tags, grey chart-heading bands, green bar families",
     colors: {
-      "color.ink": "#212427", "color.textSecondary": "#696969", "color.componentPrimary": "#197A56", "color.accent": "#21BF61", "color.accentTint": "#DFF6E8",
-      "color.componentPrimaryTint": "#E3FDDB", "color.surfaceMuted": "#F1EEEA",
-      "color.chartSeries1": "#0C2B15", "color.chartSeries2": "#197A56", "color.chartSeries3": "#21BF61",
-      "color.chartSeries4": "#A8F0B8", "color.chartSeries5": "#856E57", "color.chartSeries6": "#C4B5A4"
+      "color.ink": "#212427", "color.textSecondary": "#696969", "color.componentPrimary": "#0E7A5E", "color.accent": "#2FBF71", "color.accentTint": "#DFF6E8",
+      "color.componentPrimaryTint": "#E3F3EC", "color.surfaceMuted": "#F2F2F2",
+      "color.chartSeries1": "#0E7A5E", "color.chartSeries2": "#5FB08F", "color.chartSeries3": "#9FD4BB",
+      "color.chartSeries4": "#1F3A2E", "color.chartSeries5": "#7A7A7A", "color.chartSeries6": "#C9C9C9",
+      "style.titleWeight": "regular", "style.titleRule": "band", "style.tagPlacement": "below-title", "style.chartHeading": "band", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold"
     }
   },
   bain: {
-    label: "Bain", source: "https://www.baincapital.com/news/embedded-financial-services-what-it-takes-prosper-new-value-chain",
-    basis: "Joint Bain and Company / Bain Capital publication chart colours; presentation-role mapping, not an official brand guide",
+    label: "Bain", source: "https://www.bain.com/insights",
+    basis: "2023 Global Private Equity roadshow deck: light regular titles, grey bar families with the answer in red, red KPI call-outs, annotation rails",
     colors: {
-      "color.ink": "#252525", "color.textSecondary": "#595959", "color.componentPrimary": "#CB2027", "color.accent": "#CB2027", "color.accentTint": "#F9E3E4",
-      "color.componentPrimaryTint": "#FAE8E9", "color.surfaceMuted": "#F2F2F2",
-      "color.chartSeries1": "#CB2027", "color.chartSeries2": "#640D0D", "color.chartSeries3": "#991B1E",
-      "color.chartSeries4": "#F16667", "color.chartSeries5": "#999999", "color.chartSeries6": "#CCCCCC"
+      "color.ink": "#252525", "color.textSecondary": "#595959", "color.componentPrimary": "#CC0000", "color.accent": "#CC0000", "color.accentTint": "#FAE3E3",
+      "color.componentPrimaryTint": "#FAE8E9", "color.surfaceMuted": "#F2F2F2", "color.chartComparator": "#BFBFBF",
+      "color.chartSeries1": "#8C8C8C", "color.chartSeries2": "#CC0000", "color.chartSeries3": "#4D4D4D",
+      "color.chartSeries4": "#BFBFBF", "color.chartSeries5": "#7A0000", "color.chartSeries6": "#E6E6E6",
+      "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "top-right", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "regular"
+    }
+  },
+  deloitte: {
+    label: "Deloitte", source: "https://www2.deloitte.com/insights",
+    basis: "2023 Digital Consumer Trends deck: black ink with the signature green accent, regular titles, green chart families, ring KPIs",
+    colors: {
+      "color.ink": "#000000", "color.textSecondary": "#53565A", "color.componentPrimary": "#000000", "color.accent": "#86BC25", "color.accentTint": "#EAF4D5",
+      "color.componentPrimaryTint": "#E8E8E8", "color.surfaceMuted": "#F2F2F2",
+      "color.chartSeries1": "#86BC25", "color.chartSeries2": "#046A38", "color.chartSeries3": "#43B02A",
+      "color.chartSeries4": "#0076A8", "color.chartSeries5": "#62B5E5", "color.chartSeries6": "#BBBCBC",
+      "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "regular"
     }
   },
   "consulting-toolkit": { label: "Consulting toolkit reference", basis: "Retained reference palette", colors: {} }

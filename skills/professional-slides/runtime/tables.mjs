@@ -11,6 +11,7 @@ import {
   linePrimitive,
   shapePrimitive,
   chartAnnotationStyle,
+  houseStyle,
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
@@ -849,6 +850,13 @@ function renderTableAt({ id, frame, props }) {
         ),
       );
   });
+  // Zebra rows (house style): every second body row on a muted band, no row
+  // rules, for open and standard tables that carry no filled category column.
+  const zebra = (props.zebra ?? (houseStyle("style.tableRows") === "zebra")) && props.treatment !== "categories" && props.headerShape !== "chevron";
+  if (zebra) m.cells.forEach((row, r) => {
+    if (r % 2 === 0 || rowBand(m.rows[r].style ?? props.rowStyle)) return;
+    nodes.push(rectPrimitive({ id: stableId(id, "zebra", r), role: "table-zebra-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(t("color.surfaceMuted")), data: { row: r, zebra: true } }));
+  });
   // The recommended option's column is one tinted band from the header rule
   // to the last row; row bands (total, group) paint over it so a total stays a total.
   if (Number.isInteger(props.highlightColumn) && m.widths[props.highlightColumn] !== undefined) {
@@ -1202,7 +1210,7 @@ function renderTableAt({ id, frame, props }) {
         // One continuous rule per row unless the row is a run of filled
         // category boxes, whose slits are part of the design.
         const continuous = props.treatment !== "categories" && cell.rowSpan === 1 && !m.columns.some((col) => col.type === "implication");
-        if (!continuous || c === 0) nodes.push(
+        if (zebra && continuous) { /* zebra bands replace the row rules */ } else if (!continuous || c === 0) nodes.push(
           line(
             stableId(cellId, "rule"),
             area.x,

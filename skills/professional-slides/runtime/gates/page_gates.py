@@ -50,7 +50,7 @@ BODY_ROLES = {
     "table-cell-text", "table-cell", "table-header-text",
     "insight-body", "insight-heading", "evidence-note-text",
 }
-CHART_FURNITURE_ROLES = {"axis-label", "category-label", "data-label", "legend-label", "table-status-label", "table-lamp", "table-progress-label"}
+CHART_FURNITURE_ROLES = {"axis-label", "category-label", "data-label", "legend-label", "table-status-label", "table-lamp", "table-progress-label", "chart-bracket-label", "chart-delta-label", "chart-unit"}
 TITLE_ROLES = {"action-title"}
 SOURCE_ROLES = {"source-text", "source", "footnote"}
 NON_BODY_ROLES = SOURCE_ROLES | CHART_FURNITURE_ROLES | TITLE_ROLES | {

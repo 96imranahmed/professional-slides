@@ -43,6 +43,7 @@ const colour = (cssVar, value, themeSlot = null) => ({ kind: "color", cssVar, va
 const length = (cssVar, value) => ({ kind: "lengthPx", cssVar, value });
 const point = (cssVar, value) => ({ kind: "fontSizePt", cssVar, value });
 const font = (cssVar, value) => ({ kind: "fontFamily", cssVar, value });
+const keyword = (cssVar, value) => ({ kind: "keyword", cssVar, value });
 
 export const TOKENS = Object.freeze({
   ...heatScaleTokens({'color.canvas':'#FFFFFF','color.componentPrimary':'#00A6E6','color.negative':'#C53030','color.positive':'#198754'}),
@@ -69,6 +70,7 @@ export const TOKENS = Object.freeze({
   "color.positive": colour("--status-positive", "#198754"),
   "color.caution": colour("--status-caution", "#C47B00"),
   "color.negative": colour("--status-negative", "#C53030"),
+  "color.negativeTint": colour("--status-negative-tint", "#F6DADA"),
   "color.info": colour("--status-info", "#0877BE"),
   "color.onPrimary": colour("--on-primary", "#FFFFFF"),
   "font.body": font("--font-body", "Arial"),
@@ -107,8 +109,20 @@ export const TOKENS = Object.freeze({
   "line.standard": length("--line-standard", 2),
   "radius.none": length("--radius-none", 0),
   "radius.small": length("--radius-small", 4),
-  "radius.round": length("--radius-round", 999)
+  "radius.round": length("--radius-round", 999),
+  // Design profile: the house style a palette carries beyond its colours. Each
+  // palette sets these to what the firm's 2020+ decks do; components read them.
+  "style.titleWeight": keyword("--style-title-weight", "bold"),        // bold | regular
+  "style.titleRule": keyword("--style-title-rule", "none"),            // none | rule (hairline under the title) | band (tinted title band)
+  "style.tagPlacement": keyword("--style-tag-placement", "top-right"), // top-right | below-title (accent pill) | above-title (accent label)
+  "style.chartHeading": keyword("--style-chart-heading", "text"),      // text | band (filled grey band)
+  "style.listMarker": keyword("--style-list-marker", "dot"),           // dot | dash
+  "style.tableRows": keyword("--style-table-rows", "rules"),           // rules | zebra
+  "style.labelWeight": keyword("--style-label-weight", "bold")         // bold | regular (chart value labels)
 });
+export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight"]);
+/** The active design profile value for a style token ("style.titleWeight" → "bold"). */
+export function houseStyle(id) { return tokenValue(token(id)); }
 
 export const DENSITY_PROFILES = Object.freeze({
   "live-pitch": Object.freeze({ typeScale: 1.15 }),
@@ -713,7 +727,7 @@ export function nativeChartSpec(componentId, props = {}, frame) {
   const highlights = props.highlights || [];
   if (props.native === false) return null;
   // Stack totals and category groups are drawn by the runtime; PowerPoint has no native total label.
-  if ((props.stackTotals || []).length || (props.categoryGroups || []).length || (props.secondaryLabels || []).length) return null;
+  if ((props.stackTotals || []).length || (props.categoryGroups || []).length || (props.secondaryLabels || []).length || (props.stackBracket || []).length || (props.deltas || []).length) return null;
   if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
   const categories = [...(props.categories || props.labels || [])];
   const series = type === "range"
@@ -721,7 +735,9 @@ export function nativeChartSpec(componentId, props = {}, frame) {
     : Array.isArray(props.series) ? props.series.map(s => ({ name: s.name, values: [...(s.values || [])] }))
     : Array.isArray(props.values) ? [{ name: props.name || "", values: [...props.values] }] : [];
   const forecastIndex = props.forecastFrom !== undefined ? categories.indexOf(props.forecastFrom) : -1;
+  const labelBold = houseStyle("style.labelWeight") !== "regular";
   return {
+    labelBold,
     type,
     categories,
     series,

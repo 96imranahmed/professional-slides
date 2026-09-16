@@ -238,12 +238,14 @@ function planTracker(plan, registry) {
 
 export function planSlide(plan, registry = REGISTRY) {
   const content = validateSlidePlan(plan, registry);
-  const titleVariant = resolveTitleVariant({ variant: plan.titleVariant });
+  // Undefined lets the house style (a palette's style.titleRule) decide the rule.
+  const titleVariant = plan.titleVariant === undefined ? undefined : resolveTitleVariant({ variant: plan.titleVariant });
+  const titleDecision = titleVariant ?? "house-style";
   const body = makeComposition({...plan, gap: plan.gap ?? (["pre-read","appendix"].includes(content.density.resolved) && ["flow.row","flow.column"].includes(layoutKind(plan,plan.items)) ? "space.3" : undefined)}, plan.items, { root: true });
   return {
     spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.tag ? { tag: plan.tag } : {}), tracker: plan.tracker, source: plan.source, note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
     decision: {
-      titleVariant,
+      titleVariant: titleDecision,
       density: content.density,
       tracker: plan.tracker ?? null,
       layout: layoutKind(plan, plan.items),
@@ -306,7 +308,7 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
     ? planCover(slide)
     : slide.kind === "tracker" ? planTracker(slide, registry)
     : slide.kind === "divider" ? planDivider(slide)
-    : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? defaultTitleVariant : slide.titleVariant }, registry));
+    : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
   const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, slides: planned.map((item) => item.spec) }, registry, {slideCache});
   return {deck, decisions:planned.map(item=>item.decision)};
 }

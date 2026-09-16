@@ -39,6 +39,23 @@ export function quantitativeLegendNodes({id,frame,props}) {
 }
 export const QUANTITATIVE_LEGEND_SAMPLE={variant:'quantitative-scale',scale:{domain:[-5,10],unit:'%',palette:'red-white-green'}};
 
+/** Greedy rows: items in order, a new row when the next item would outrun the width. */
+function packLegendRows(widths, maxWidth, gap) {
+  const rows = [[]]; let used = 0;
+  widths.forEach((w, i) => {
+    const row = rows[rows.length - 1];
+    const next = row.length ? used + gap + w : w;
+    if (row.length && next > maxWidth) { rows.push([i]); used = w; } else { row.push(i); used = next; }
+  });
+  return rows;
+}
+/** How many rows a horizontal legend of these items needs at this width. */
+export function legendRowCount(items, width) {
+  const keyGap = tokenValue(token("space.2")), itemGap = tokenValue(token("space.4"));
+  const widths = items.map((item) => 12 + keyGap + measureText(typeof item === "string" ? item : item.label, width, { fontSize: tokenValue(token("type.chartLabel")), wrapWidthRatio: 1 }).width);
+  return packLegendRows(widths, width, itemGap).length;
+}
+
 export function legendNodes({ id, frame, props }) {
   const variant = props.variant ?? "swatch", placement = props.placement ?? "top";
   if (variant==='quantitative-scale') return quantitativeLegendNodes({id,frame,props});
@@ -57,12 +74,18 @@ export function legendNodes({ id, frame, props }) {
   });
   const widths = items.map((item, index) => keyWidths[index] + keyGap + measureText(item.label, frame.width, { fontSize: tokenValue(token("type.chartLabel")), wrapWidthRatio: 1 }).width);
   const vertical = placement === "right";
-  const width = vertical ? Math.max(0, ...widths) : widths.reduce((a, b) => a + b, 0) + Math.max(0, items.length - 1) * itemGap;
-  const totalHeight = vertical ? items.length * height + Math.max(0, items.length - 1) * keyGap : height;
+  // A horizontal legend wraps onto further rows when its items outrun the frame.
+  const rows = vertical ? items.map((_, i) => [i]) : packLegendRows(widths, frame.width, itemGap);
+  const rowWidth = (row) => row.reduce((a, i) => a + widths[i], 0) + Math.max(0, row.length - 1) * itemGap;
+  const width = vertical ? Math.max(0, ...widths) : Math.max(...rows.map(rowWidth));
+  const totalHeight = vertical ? items.length * height + Math.max(0, items.length - 1) * keyGap : rows.length * height + Math.max(0, rows.length - 1) * 2;
   if (width > frame.width || totalHeight > frame.height) throw new Error("Legend does not fit its allocated space; enlarge the region or shorten labels");
-  let x = placement === "top-right" || vertical ? frame.x + frame.width - width : placement === "bottom-center" ? frame.x + (frame.width - width) / 2 : frame.x;
-  let y = placement === "bottom-center" ? frame.y + frame.height - height : frame.y;
+  const rowOf = new Map(); rows.forEach((row, r) => row.forEach((i, k) => rowOf.set(i, { r, k })));
+  const rowStart = (r) => placement === "top-right" || vertical ? frame.x + frame.width - rowWidth(rows[r]) : placement === "bottom-center" ? frame.x + (frame.width - rowWidth(rows[r])) / 2 : frame.x;
+  let x = rowStart(0);
+  let y = placement === "bottom-center" ? frame.y + frame.height - totalHeight : frame.y;
   return items.flatMap((item, index) => {
+    if (!vertical) { const { r, k } = rowOf.get(index); if (k === 0) { x = rowStart(r); y = (placement === "bottom-center" ? frame.y + frame.height - totalHeight : frame.y) + r * (height + 2); } }
     const keyWidth = keyWidths[index];
     const markerSize = item.markerSize ?? 12;
     const colorIndex = item.colorIndex ?? index;

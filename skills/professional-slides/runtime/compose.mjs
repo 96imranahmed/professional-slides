@@ -26,6 +26,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { measureText } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount, EVIDENCE_CALLOUT_BAND } from "./chart-annotations.mjs";
+import { legendRowCount } from "./legends.mjs";
 
 const V3 = "professional-slides.deck/v3";
 const SIZE = { width: { fr: 1 }, height: "fill" };
@@ -382,6 +383,16 @@ export function changeFromContent(ex, title) {
   const stacked = ex.type === "chart.stacked-column";
   // A stack's change is the change in its totals.
   const totals = stacked ? categories.map((_, i) => series.reduce((sum, sr) => sum + sr.values[i], 0)) : series[0].values;
+  // `change: "steps"`: the period-to-period change between every adjacent pair,
+  // as a small bracket above each pair (the e-Conomy small-multiple pattern).
+  if (ex.change === "steps" && (series.length === 1 || stacked) && categories.length >= 2 && categories.length <= 8) {
+    const annotations = [];
+    for (let i = 1; i < categories.length; i += 1) {
+      const text = delta(totals[i - 1], totals[i]);
+      if (text) annotations.push({ start: categories[i - 1], end: categories[i], style: "bracket", text, compact: true });
+    }
+    return annotations.length ? { ...out, changeAnnotations: annotations } : ex;
+  }
   if ((series.length === 1 || stacked) && (explicit || ex.change === true || (periodic && ex.type !== "chart.bar"))) {
     const from = explicit?.from ?? categories[0], to = explicit?.to ?? categories[categories.length - 1];
     const a = categories.indexOf(from), b = categories.indexOf(to);
@@ -458,9 +469,13 @@ export function composeSlide(slide, index, baseDir) {
     // band and the points start level with the plot, not with the heading text.
     // `pointsAlign: "middle"` centres the points on the exhibit instead.
     const list = pointsItem(slide.points || [], `${id}-points`);
+    // `kpi: { value, label }`: the one big number the chart proves, in the accent
+    // at the top of the side column, above the points.
+    const kpiTile = slide.kpi ? { id: `${id}-kpi`, component: "metric", props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } } : null;
+    const sideItems = kpiTile ? [kpiTile, list] : [list];
     const side = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && unheaded(exhibits[0]))
-      ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: [list] }
-      : { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: sideFr }, height: "fill" }, items: [list] };
+      ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: sideItems }
+      : { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: layout === "exhibit-left" ? [hero, side] : [side, hero] });
   } else if (layout === "stack") {
     // Exhibits stacked in the hero column, points beside them.
@@ -506,7 +521,9 @@ export function composeSlide(slide, index, baseDir) {
       const topBand = (ex) => {
         const line = ex.type === "chart.line" || ex.type === "chart.area", multi = (ex.series || []).length > 1;
         const legend = ex.legend === true || (ex.legend !== false && multi && !line);
-        return (legend ? 52 : 28) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top + evidenceAnnotationTopBandCount({ annotations: ex.annotations || [] }) * EVIDENCE_CALLOUT_BAND;
+        // The legend may wrap; the row's inset must cover the tallest one (1160px row, n panels).
+        const rows = legend ? legendRowCount((ex.series || []).map((sr) => sr.name), Math.max(120, 1160 / Math.max(1, charts.length) - 70)) : 0;
+        return (rows ? 52 + (rows - 1) * 26 : 28) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top + evidenceAnnotationTopBandCount({ annotations: ex.annotations || [] }) * EVIDENCE_CALLOUT_BAND;
       };
       const inset = Math.max(...charts.map(topBand));
       for (const ex of charts) { ex.plotTopInset = inset; if (charts.some(decorated)) ex.native = false; }

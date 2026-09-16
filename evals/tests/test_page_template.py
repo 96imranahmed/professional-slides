@@ -121,7 +121,7 @@ const variants=[...componentFixtureSpecs(),...componentVariantFixtureSpecs()].fi
 assert.equal(variants.filter(n=>n.defaultVariant).length,1);
 const {deck}=buildGoldenSetDeck();
 for(const s of deck.slides.filter(s=>s.id.startsWith('golden-'))) {
- assert.ok(!s.nodes.some(n=>['footer-rule','header-rule','title-rule','divider-rule'].includes(n.role)),s.id);
+ assert.ok(!s.nodes.some(n=>['footer-rule','header-rule','divider-rule'].includes(n.role)),s.id); // the title rule is the house style's, not the template's
  const source=s.nodes.find(n=>n.role==='source-text'),number=s.nodes.find(n=>n.role==='page-number');
  if(source&&number) assert.equal(source.frame.y,number.frame.y,s.id);
 }

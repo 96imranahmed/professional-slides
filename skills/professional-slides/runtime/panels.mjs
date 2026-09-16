@@ -7,7 +7,7 @@ import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitiv
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
 
-const PRIMARY = token("color.componentPrimary"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary");
+const PRIMARY = token("color.componentPrimary"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), ACCENT = token("color.accent");
 const SURFACE = token("color.surface"), MUTED = token("color.surfaceMuted"), RULE = token("color.rule"), TINT = token("color.componentPrimaryTint");
 const FONT = token("font.body"), DISPLAY = token("font.display");
 const v = (id) => tokenValue(token(id));
@@ -36,7 +36,7 @@ function normalizeCards(props) {
  * primary header band carrying the title), "numbered" (numbered disc before
  * the title), "plain" (no card edge; a column of icon + title + text).
  */
-export const CARD_TONES = Object.freeze(["outline", "header", "numbered", "plain", "disc", "big-number", "dark", "columns"]);
+export const CARD_TONES = Object.freeze(["outline", "header", "numbered", "plain", "disc", "big-number", "dark", "columns", "stat"]);
 export function cardsLayout(frame, props) {
   const items = normalizeCards(props);
   const tone = props.tone ?? (items.some((i) => i.icon) ? "outline" : "numbered");
@@ -44,6 +44,7 @@ export function cardsLayout(frame, props) {
   // Icon cards with a line of text each read centred (the "three principles" page).
   const centred = props.align === "center" || (props.align === undefined && ((tone === "outline" || tone === "plain") && items.every((i) => i.icon && !i.points.length) || tone === "disc" || tone === "dark"));
   const open = ["plain", "disc", "big-number", "columns"].includes(tone);
+  if (tone === "stat" && items.some((i) => !i.value)) throw new Error("Stat cards need a value on every card (the figure before the statement)");
   const gap = tone === "big-number" ? v("space.5") + v("space.4") : v("space.4"), pad = open ? 0 : v("space.4");
   const width = (frame.width - gap * (items.length - 1)) / items.length;
   const inner = width - 2 * pad - (tone === "columns" ? v("space.4") : 0);
@@ -51,13 +52,14 @@ export function cardsLayout(frame, props) {
   const iconSize = Math.round(markerSize() * (tone === "disc" ? 3.5 : centred ? 2.5 : 1.75)), disc = markerSize();
   const headGap = v("space.2"), bodyGap = v("space.3");
   const measured = items.map((item) => {
-    const titleWidth = tone === "numbered" ? inner - disc - v("space.3") : inner;
-    const title = measure(item.title, titleWidth, "type.heading", true);
+    const statValueWidth = tone === "stat" && item.value ? Math.ceil(measure(item.value, inner, "type.heading", true).width) + 2 * v("space.3") : 0;
+    const titleWidth = tone === "numbered" ? inner - disc - v("space.3") : tone === "stat" ? inner - statValueWidth : inner;
+    const title = tone === "stat" ? measure(item.title, titleWidth, "type.body", true) : measure(item.title, titleWidth, "type.heading", true);
     const bodyWidth = tone === "big-number" ? inner - 2 * v("space.3") : inner;
     const body = item.text ? measure(item.text, bodyWidth, "type.body") : null;
     const points = item.points.map((p) => measure(p, bodyWidth - v("space.4"), "type.body"));
     const footer = item.footer ? measure(item.footer, inner, "type.compact", true) : null;
-    const value = item.value ? measure(item.value, inner, "type.metric", true) : null;
+    const value = item.value && tone !== "stat" ? measure(item.value, inner, "type.metric", true) : null;
     const number = tone === "big-number" ? measure(String(item.number).padStart(2, "0"), inner, "type.deckTitle", true) : null;
     // Header zone: icon (outline/plain/disc), filled band (header), disc + title
     // (numbered), big numeral + title (big-number), dark tile (dark) or a ruled
@@ -77,16 +79,30 @@ export function cardsLayout(frame, props) {
 
 export function cardsNodes({ id, frame: frameIn, props }) {
   let frame = frameIn;
+  const nodes0 = [];
+  // A question panel (the survey deck's "Should companies prioritize investments?")
+  // takes the left quarter in dark grey; the cards answer it to the right.
+  if (typeof props.question === "string" && props.question.trim()) {
+    const qw = Math.round(frame.width * 0.24), gap = v("space.4"), pad = v("space.4");
+    const q = measure(props.question, qw - 2 * pad, "type.heading", true);
+    const L0 = cardsLayout({ ...frame, x: frame.x + qw + gap, width: frame.width - qw - gap }, props);
+    const h = props.valign === "middle" ? L0.height : frame.height;
+    const top = props.valign === "middle" && frame.height > h ? frame.y + (frame.height - h) / 2 : frame.y;
+    nodes0.push(rect(stableId(id, "question"), "card-question", { x: frame.x, y: top, width: qw, height: h }, SECONDARY, "none", "radius.none"));
+    nodes0.push(label(stableId(id, "question-text"), "card-question-text", { x: frame.x + pad, y: top + pad, width: qw - 2 * pad }, q, text("type.heading", WHITE, true)));
+    frame = { ...frame, x: frame.x + qw + gap, width: frame.width - qw - gap };
+  }
   const L = cardsLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
-  const nodes = [];
+  const nodes = nodes0;
   const fill = frame.height >= L.height && props.valign !== "middle"; // cards fill the frame height so a row reads as one band
   const cardHeight = fill ? frame.height : L.height;
   // Icon rows (`valign: "middle"`) keep their natural height and sit centred in the frame.
   if (props.valign === "middle" && frame.height > L.height) frame = { ...frame, y: frame.y + (frame.height - L.height) / 2, height: L.height };
   L.items.forEach((m, index) => {
     const x = frame.x + index * (L.width + L.gap), cid = stableId(id, "card", index);
-    if (!L.open && L.tone !== "dark") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, SURFACE, RULE, "radius.small"));
+    if (L.tone === "stat") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, MUTED, "none", "radius.none"));
+    else if (!L.open && L.tone !== "dark") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, SURFACE, RULE, "radius.small"));
     let y = frame.y + L.pad;
     const cx = x + L.pad;
     const align = L.centred ? "center" : "left";
@@ -115,6 +131,14 @@ export function cardsNodes({ id, frame: frameIn, props }) {
       nodes.push(linePrimitive({ id: stableId(cid, "title-rule"), role: "card-rule", x1: cx, y1: ry, x2: cx + L.inner, y2: ry, style: { stroke: INK, lineWidth: token("line.hairline") } }));
       if (index) nodes.push(linePrimitive({ id: stableId(cid, "divider"), role: "card-divider", x1: x - L.gap / 2, y1: frame.y, x2: x - L.gap / 2, y2: frame.y + cardHeight, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
       y += m.titleHeight;
+    } else if (L.tone === "stat") {
+      // "88% | Investors that believe …": the figure in the heading role, a hairline
+      // divider, the statement beside it; the copy continues below.
+      const vw = Math.ceil(measure(m.item.value, L.inner, "type.heading", true).width) + v("space.3");
+      nodes.push(label(stableId(cid, "value"), "card-value", { x: cx, y, width: vw }, measure(m.item.value, vw, "type.heading", true), text("type.heading", INK, true)));
+      nodes.push(linePrimitive({ id: stableId(cid, "divider"), role: "card-divider", x1: cx + vw, y1: y, x2: cx + vw, y2: y + m.title.height, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
+      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx + vw + v("space.3"), y, width: L.inner - vw - v("space.3") }, m.title, text("type.body", INK, true)));
+      y += m.title.height;
     } else if (L.tone === "numbered") {
       nodes.push(...numberMarker({ id: stableId(cid, "number"), role: "card-marker", x: cx, y: y + (m.title.lineHeight - L.disc) / 2, size: L.disc, number: m.item.number }));
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx + L.disc + v("space.3"), y, width: L.inner - L.disc - v("space.3") }, m.title, text("type.heading", INK, true)));
@@ -200,7 +224,7 @@ export function quadrantsNodes({ id, frame, props }) {
 export function metricNodes({ id, frame, props }) {
   if (props.value === undefined || props.value === null || String(props.value).trim() === "") throw new Error("Metric requires a value");
   const dark = props.tone === "dark";
-  const pad = v("space.3");
+  const pad = props.tone === "hero" ? 0 : v("space.3");
   const width = frame.width - 2 * pad;
   const valueSize = props.variant === "prominent" ? "type.deckTitle" : "type.metric";
   const value = measureText(String(props.value), width, { fontFamily: tokenValue(DISPLAY), fontSize: v(valueSize), bold: true, wrapWidthRatio: 1 });
@@ -213,9 +237,11 @@ export function metricNodes({ id, frame, props }) {
   const nodes = [];
   if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));
   else if (props.tone === "tint") nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, TINT, "none", "radius.small"));
-  const ink = dark ? WHITE : PRIMARY, grey = dark ? WHITE : SECONDARY;
-  const align = props.align ?? "center";
-  let y = frame.y + (frame.height - total) / 2;
+  // `tone: "hero"`: the one big number beside a chart, in the accent, left-aligned, top-anchored.
+  const hero = props.tone === "hero";
+  const ink = dark ? WHITE : hero ? ACCENT : PRIMARY, grey = dark ? WHITE : hero ? INK : SECONDARY;
+  const align = props.align ?? (hero ? "left" : "center");
+  let y = hero ? frame.y : frame.y + (frame.height - total) / 2;
   nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x + pad, y, width, height: value.height }, text: value.text, style: { fontFamily: DISPLAY, fontSize: token(valueSize), color: ink, bold: true, align, valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
   y += value.height;
   if (labelLayout) { y += gap; nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + pad, y, width }, labelLayout, text("type.compact", grey, false, align))); y += labelLayout.height; }
@@ -303,8 +329,8 @@ export function registerPanels(registry) {
   if (metric) {
     metric.tokens = [...new Set([...metric.tokens, ...PANEL_TOKENS])];
     metric.render = (input) => ({ nodes: metricNodes(input) });
-    metric.variants = { default: {}, prominent: { props: { variant: "prominent" } }, dark: { props: { tone: "dark" } } };
-    metric.resolveVariant = (props = {}) => props.tone === "dark" ? "dark" : props.variant ?? "default";
+    metric.variants = { default: {}, prominent: { props: { variant: "prominent" } }, dark: { props: { tone: "dark" } }, hero: { props: { tone: "hero", variant: "prominent", value: "80%", label: "(Insert what the number is)" } } };
+    metric.resolveVariant = (props = {}) => props.tone === "dark" ? "dark" : props.tone === "hero" ? "hero" : props.variant ?? "default";
   }
   return registry;
 }

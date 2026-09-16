@@ -341,7 +341,7 @@ assert.equal(nearWidthLimit.data.textLayout.lines.length,1);
 assert.ok(nearWidthLimit.data.textLayout.width <= nearWidthLimit.frame.width);
 assert.throws(()=>titleDefinition.render({id:'overflow',frame:{x:0,y:0,width:1000,height:20},props:{text:'Capacity limits growth'}}), /exceeds its allocated height/);
 const plan = {id:'one',title:'Capacity limits growth',items:[{id:'copy',job:'Explain the constraint',component:'paragraph',props:{text:'Capacity limits growth'}}]};
-assert.equal(planDeck({id:'default',slides:[plan]}).decisions[0].titleVariant,'without-line');
+assert.equal(planDeck({id:'default',slides:[plan]}).decisions[0].titleVariant,'house-style'); // the palette's style.titleRule decides
 assert.throws(()=>validateSlidePlan({...plan,titleVariant:'unknown'}), /Unknown title variant/);
 const {deck,decisions} = planDeck({id:'planned',titleVariant:'without-line',slides:[plan,{...plan,id:'two',titleVariant:'with-line'}]});
 const counts = deck.slides.map(s=>s.nodes.filter(n=>n.role==='title-rule').length);
@@ -349,7 +349,7 @@ const counts = deck.slides.map(s=>s.nodes.filter(n=>n.role==='title-rule').lengt
 assert.deepEqual(deck.slides[0].componentInstances.find(c=>c.id==='copy').frame,deck.slides[1].componentInstances.find(c=>c.id==='copy').frame);
 const chrome = compileDeck({slides:[{id:'chrome',chrome:{title:'Capacity limits growth'},composition:absolute({id:'empty',children:[]})}]},REGISTRY);
 const title = chrome.slides[0].nodes.find(n=>n.role==='action-title');
-assert.equal(chrome.manifest.slides[0].componentInstances[0].variant,'without-line');
+assert.equal(chrome.manifest.slides[0].componentInstances[0].variant,'with-line'); // mckinsey house style: a hairline under the title
 assert.equal(chrome.manifest.slides[0].componentInstances[0].instanceId,title.data.componentInstance);
 assert.ok(chrome.manifest.slides[0].componentInstances.every(instance=>typeof instance.instanceId==='string'&&instance.instanceId.length>0));
 console.log(JSON.stringify({counts,decisions:decisions.map(d=>d.titleVariant),chromeRules:chrome.slides[0].nodes.filter(n=>n.role==='title-rule').length,footerRules:chrome.slides[0].nodes.filter(n=>n.role==='footer-rule').length,titleAnchor:[title.frame.x,title.frame.y]}));
@@ -357,7 +357,7 @@ console.log(JSON.stringify({counts,decisions:decisions.map(d=>d.titleVariant),ch
         )
         self.assertEqual(result["counts"], [0, 1])
         self.assertEqual(result["decisions"], ["without-line", "with-line"])
-        self.assertEqual(result["chromeRules"], 0)
+        self.assertEqual(result["chromeRules"], 1)  # mckinsey house style: a hairline under the title
         self.assertEqual(result["footerRules"], 0)
         self.assertEqual(result["titleAnchor"], [60, 44])
 

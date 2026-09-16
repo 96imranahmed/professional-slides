@@ -48,7 +48,7 @@ CHART_PLOT_ROLES = {"chart-mark", "data-label", "category-label", "chart-axis", 
 # re-wrap them on a one-pixel advance difference. Prose keeps wrap="square".
 LABEL_ROLES = {"legend-label", "data-label", "category-label", "axis-label", "value-label", "metric-value", "metric-label",
                "metric-delta", "page-number", "source-text", "chart-unit", "process-label", "tracker-label", "table-cell",
-               "table-header", "pie-label", "reference-label", "end-label", "stack-label", "total-label", "scale-endpoint", "page-tag", "cover-date", "cover-logo", "table-status-label", "table-progress-label", "chart-badge"}
+               "table-header", "pie-label", "reference-label", "end-label", "stack-label", "total-label", "scale-endpoint", "page-tag", "cover-date", "cover-logo", "table-status-label", "table-progress-label", "chart-badge", "chart-bracket-label", "chart-delta-label"}
 CHROME_COMPONENTS = {"slide-chrome", "page-template", "section", "paragraph", "section-heading",
                      "bullet-list", "insight", "evidence-note", "chart-title", "footnote", "cover"}
 NATIVE = {
@@ -510,7 +510,7 @@ class Emitter:
             plot.has_data_labels = True
             dl = plot.data_labels
             dl.font.size = Pt(11)   # data labels are the chart's loudest number
-            dl.font.bold = True
+            dl.font.bold = bool(spec.get("labelBold", True))
             dl.number_format = number_format
             dl.number_format_is_linked = False
             if kind in ("column", "bar"):
@@ -543,7 +543,7 @@ class Emitter:
                     sdl = ser.data_labels
                     sdl.show_value = True
                     sdl.number_format = number_format; sdl.number_format_is_linked = False
-                    sdl.font.size = Pt(11); sdl.font.bold = True
+                    sdl.font.size = Pt(11); sdl.font.bold = bool(spec.get("labelBold", True))
                     sdl.position = XL_LABEL_POSITION.CENTER
                     sdl.font.color.rgb = rgb(self.colors.get("color.onPrimary", "#FFFFFF") if _luminance(color) < 0.45 else self.colors.get("color.ink", "#000000"))
                 if kind == "line":
@@ -558,7 +558,7 @@ class Emitter:
                     sdl = ser.data_labels
                     sdl.show_value = True
                     sdl.number_format = number_format; sdl.number_format_is_linked = False
-                    sdl.font.size = Pt(11); sdl.font.bold = True
+                    sdl.font.size = Pt(11); sdl.font.bold = bool(spec.get("labelBold", True))
                     sdl.font.color.rgb = rgb(self.colors.get("color.ink", "#000000"))
                     if kind in ("column", "bar"):
                         sdl.position = XL_LABEL_POSITION.OUTSIDE_END
@@ -571,7 +571,7 @@ class Emitter:
                         if kind in ("column", "bar") and max_value and isinstance(value, (int, float)) and abs(value) >= 0.4 * max_value:
                             lab = pt.data_label
                             lab.position = XL_LABEL_POSITION.INSIDE_END
-                            lab.font.size = Pt(11); lab.font.bold = True
+                            lab.font.size = Pt(11); lab.font.bold = bool(spec.get("labelBold", True))
                             lab.font.color.rgb = rgb(self.colors.get("color.onPrimary", "#FFFFFF"))
                             lab.number_format = number_format; lab.number_format_is_linked = False
                 if kind == "line" and spec.get("endLabels"):

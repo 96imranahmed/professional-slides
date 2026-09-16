@@ -155,7 +155,7 @@ for(const palette of ['mckinsey','bcg','bain']) for(const [variant,fixture] of O
   if(node.data.cellType)seen.add(node.data.cellType);
   if(node.role==='table-cell'&&node.data.cellType==='category'){
    assert.equal(node.style.fill.tokenId,'color.componentPrimary');
-   assert.equal(node.style.fill.value,{mckinsey:'#051C2C',bcg:'#197A56',bain:'#CB2027'}[palette]);
+   assert.equal(node.style.fill.value,{mckinsey:'#051C2C',bcg:'#0E7A5E',bain:'#CC0000'}[palette]);
   }
   if(node.type==='text'){assert.equal(node.style.fontFamily.value,'Georgia');assert.ok([9,10,12].includes(node.style.fontSize.value),'status labels sit at the label size');assert.equal(node.style.wrap,false);}
  }

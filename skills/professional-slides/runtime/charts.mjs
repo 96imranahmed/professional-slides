@@ -2,6 +2,7 @@ import { formatValue } from "./value-format.mjs";
 export { formatValue } from "./value-format.mjs";
 import {
   ellipsePrimitive,
+  houseStyle,
   TOKENS,
   chartAnnotationStyle,
   isTokenReference,
@@ -16,7 +17,7 @@ import {
   wedgePrimitive
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
-import { legendNodes, LEGEND_TOKENS } from "./legends.mjs";
+import { legendRowCount, legendNodes, LEGEND_TOKENS } from "./legends.mjs";
 import { contrastRatio } from "./palettes.mjs";
 import { CHART_GUIDANCE } from "./guidance.mjs";
 import {
@@ -58,7 +59,9 @@ function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotati
   leftInset = Math.max(leftInset, bands.left);
   // Peer charts in a row pass the row's tallest top band as topInset so their
   // plots start (and end) on the same lines and one value scale means one pixel scale.
-  const top = Math.max(Number(topInset) || 0, (topLegend ? 52 : 28) + totalLabelInset + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top);
+  // topLegend may be a row count (a wrapped legend takes 24px per extra row).
+  const legendRows = topLegend === true ? 1 : Number(topLegend) || 0;
+  const top = Math.max(Number(topInset) || 0, (legendRows ? 52 + (legendRows - 1) * 26 : 28) + totalLabelInset + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top);
   // Reserve the actual last metric row plus a trailing theme gap, not another full row band.
   const bottom = bands.bottom ? 40 + bands.bottom + tokenValue(token("space.3")) : 56;
   const rightInset = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16);
@@ -73,6 +76,8 @@ function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotati
 }
 
 
+/** Value labels follow the house style: bold by default, regular where the firm sets them light. */
+const labelBold = () => houseStyle("style.labelWeight") !== "regular";
 function textStyle(size = CHART_LABEL, color = SECONDARY, bold = false, align = "center") {
   return { ...(bold ? chartAnnotationStyle() : { fontFamily: FONT }), fontSize: size, color, bold, align, valign: "mid" };
 }
@@ -87,8 +92,11 @@ function fillStyle(fill, stroke = fill, width = token("line.hairline"), opacity 
 
 function topLegend({ id, frame, items, align = "right", variant = "swatch" }) {
   if (!items.length) return [];
-  return legendNodes({ id, frame: { x: frame.x + 54, y: frame.y + 7, width: frame.width - 70, height: 28 }, props: { items, placement: align === "right" ? "top-right" : "top", variant } });
+  const rows = legendRowCount(items, frame.width - 70);
+  return legendNodes({ id, frame: { x: frame.x + 54, y: frame.y + 7, width: frame.width - 70, height: 28 + (rows - 1) * 26 }, props: { items, placement: align === "right" ? "top-right" : "top", variant } });
 }
+/** Rows a chart's top legend needs, for the plot inset. */
+const legendRowsFor = (items, frame) => items.length ? legendRowCount(items, frame.width - 70) : 0;
 
 /**
  * Tick steps a reader recognises: 1, 2, 2.5 or 5 times a power of ten.
@@ -300,7 +308,7 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
       if (reference.label) {
         const measured = measureText(reference.label, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 });
         const left = Math.min(plot.x + plot.width - measured.width, x + 6);
-        overlay.push(textPrimitive({ id: stableId(id, "reference-label", index), role: "chart-reference-label", frame: { x: left, y: plot.y - measured.height - 6, width: measured.width, height: measured.height }, text: measured.text, style: { ...textStyle(CHART_LABEL, token("color.componentPrimary"), true, "left"), valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured, value: reference.value } }));
+        overlay.push(textPrimitive({ id: stableId(id, "reference-label", index), role: "chart-reference-label", frame: { x: left, y: plot.y - measured.height - 6, width: measured.width, height: measured.height }, text: measured.text, style: { ...textStyle(CHART_LABEL, token("color.componentPrimary"), labelBold(), "left"), valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured, value: reference.value } }));
       }
     }
   }
@@ -463,6 +471,19 @@ const measureDataLabel = (text, width = 1000) => {
   return { ...measured, width: Math.ceil(measured.width / 0.97) + 2 };
 };
 
+/** deltas: [n, …] aligned with the categories, or [{ category, value, significant? }]. */
+function normalizeDeltas(props, categories) {
+  if (props.deltas === undefined || props.deltas === null) return null;
+  if (!Array.isArray(props.deltas)) throw new Error("Chart deltas must be an array");
+  const map = new Map();
+  props.deltas.forEach((entry, index) => {
+    const record = typeof entry === "number" ? { category: categories[index], value: entry } : entry;
+    if (!record || !categories.includes(record.category) || !Number.isFinite(record.value)) throw new Error("Each chart delta needs a known category and a finite value");
+    map.set(record.category, { value: record.value, significant: record.significant ?? Math.abs(record.value) >= (props.deltaThreshold ?? 5) });
+  });
+  return map;
+}
+
 function categoricalChart({ id, frame, props, horizontal = false, stacked = false, tokens = TOKENS }) {
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props);
@@ -494,14 +515,21 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   for(const reference of props.referenceLines || []) if(reference.placement !== undefined && !["inside", "outside-end"].includes(reference.placement)) throw new Error("Unknown reference-line label placement");
   if(horizontal && (props.referenceLines || []).some(r=>r.placement === "outside-end")) throw new Error("Outside reference labels require a vertical quantitative axis");
   const referenceGutter = Math.max(0,...(props.referenceLines || []).filter(r=>r.placement === "outside-end").map(r=>measureDataLabel(r.label || String(r.value)).width + barLabelGap));
+  // A delta column (change versus the previous survey) sits to the right of
+  // horizontal bars: a signed value in a tinted disc per category.
+  const deltas = normalizeDeltas(props, categories);
+  const deltaWidth = deltas ? 64 : 0;
+  // A bracket subtotal on a stacked column spans the named segments and prints their sum beside the stack.
+  const stackBracket = stacked && !horizontal && Array.isArray(props.stackBracket) && props.stackBracket.length ? props.stackBracket : null;
+  if (stackBracket && stackBracket.some((name) => !series.some((item) => item.name === name))) throw new Error("stackBracket must name series of the chart");
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
-    topLegend: showLegend,
+    topLegend: showLegend ? legendRowsFor(series.map((item) => item.name), frame) : false,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
     leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54,
-    valueLabelInset: horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter,
+    valueLabelInset: (horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter) + deltaWidth,
     totalLabelInset: horizontal ? 0 : totalHeight,
     centerPlot: !horizontal && !showValueAxis
   });
@@ -590,6 +618,12 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       if(groupSpan<tokenValue(token("space.4"))) throw new Error("External stack label leaves insufficient mark width; enlarge the chart or reduce categories");
     }
   }
+  if (stackBracket) groupSpan = Math.min(groupSpan, categorySpan * 0.5);
+  if (deltas && horizontal) {
+    // The delta column's heading ("Change vs. June"), right-aligned above the discs.
+    const heading = props.deltasLabel || "Change vs. prior";
+    nodes.push(textPrimitive({ id: stableId(id, "deltas-heading"), role: "chart-delta-label", frame: { x: plot.x + plot.width + deltaWidth - 150, y: plot.y - 22, width: 150 - 4, height: 18 }, text: heading, style: textStyle(token("type.compact"), SECONDARY, false, "right"), data: { deltasHeading: true } }));
+  }
   const barSpan = stacked ? groupSpan : groupSpan / series.length;
   categories.forEach((category, categoryIndex) => {
     const categoryStart = (horizontal ? plot.y : plot.x) + categoryIndex * categorySpan + (stackExternalWidth ? tokenValue(token("space.2")) : (categorySpan - groupSpan) / 2);
@@ -650,7 +684,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
           role: "data-label",
           frame: labelFrame,
           text: labelText,
-          style: textStyle(CHART_LABEL, stacked && contrastRatio(tokens[SERIES[colorIndex].tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[SERIES[colorIndex].tokenId].value, tokens["color.ink"].value) ? token("color.onPrimary") : INK, true, horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
+          style: textStyle(CHART_LABEL, stacked && contrastRatio(tokens[SERIES[colorIndex].tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[SERIES[colorIndex].tokenId].value, tokens["color.ink"].value) ? token("color.onPrimary") : INK, labelBold(), horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
           data: { category, series: item.name }
         }));
       }
@@ -664,6 +698,30 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
         else negativeCumulative = end;
       }
     });
+    if (stackBracket) {
+      // Bracket the named segments and print their sum at the bracket's middle.
+      const marks = nodes.filter(node => node.role === "chart-mark" && node.data.category === category && stackBracket.includes(node.data.series));
+      if (marks.length) {
+        const top = Math.min(...marks.map(m => m.frame.y)), bottom = Math.max(...marks.map(m => m.frame.y + m.frame.height));
+        const right = Math.max(...marks.map(m => m.frame.x + m.frame.width)), bx = right + 6, tick = 5;
+        const sum = stackBracket.reduce((acc, name) => acc + series.find(item => item.name === name).values[categoryIndex], 0);
+        nodes.push(linePrimitive({ id: stableId(id, "bracket", category), role: "chart-bracket", x1: bx, y1: top, x2: bx, y2: bottom, style: lineStyle(INK, token("line.hairline")) }));
+        nodes.push(linePrimitive({ id: stableId(id, "bracket-top", category), role: "chart-bracket", x1: bx - tick, y1: top, x2: bx, y2: top, style: lineStyle(INK, token("line.hairline")) }));
+        nodes.push(linePrimitive({ id: stableId(id, "bracket-bottom", category), role: "chart-bracket", x1: bx - tick, y1: bottom, x2: bx, y2: bottom, style: lineStyle(INK, token("line.hairline")) }));
+        nodes.push(textPrimitive({ id: stableId(id, "bracket-label", category), role: "chart-bracket-label", frame: { x: bx + 4, y: (top + bottom) / 2 - 12, width: Math.max(28, categorySpan - groupSpan - 14), height: 24 }, text: formatValue(sum, props), style: textStyle(CHART_LABEL, INK, true, "left"), data: { category, bracket: true } }));
+      }
+    }
+    if (deltas && horizontal) {
+      const record = deltas.get(category);
+      if (record) {
+        const size = 26, cx = plot.x + plot.width + deltaWidth - size - 4, cy = categoryStart + groupSpan / 2 - size / 2;
+        const positive = record.value > 0, neutral = record.value === 0;
+        const fill = neutral ? token("color.surfaceMuted") : (record.significant ? (positive ? token("color.accent") : token("color.negative")) : (positive ? token("color.accentTint") : token("color.negativeTint")));
+        const fg = record.significant && !neutral ? token("color.onPrimary") : INK;
+        nodes.push(ellipsePrimitive({ id: stableId(id, "delta", category), role: "chart-delta", frame: { x: cx, y: cy, width: size, height: size }, style: fillStyle(fill), data: { category, delta: record.value } }));
+        nodes.push(textPrimitive({ id: stableId(id, "delta-label", category), role: "chart-delta-label", frame: { x: cx - 4, y: cy + 1, width: size + 8, height: size - 2 }, text: `${record.value > 0 ? "+" : record.value < 0 ? "−" : ""}${formatValue(Math.abs(record.value), props)}`, style: textStyle(token("type.compact"), fg, true, "center"), data: { category, delta: record.value } }));
+      }
+    }
     const categoryValues = series.map(item => item.values[categoryIndex]);
     const categoryValue = stacked
       ? (Math.abs(positiveCumulative) >= Math.abs(negativeCumulative) ? positiveCumulative : negativeCumulative)
@@ -693,7 +751,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
         const boundary = plot.x + (categoryIndex + 1) * categorySpan;
         if (x + metrics.width > boundary) throw new Error("External stack label exceeds its category lane; enlarge the chart or reduce categories");
         label.frame = { x, y: Math.max(plot.y, Math.min(mark.frame.y + (mark.frame.height - metrics.height) / 2, plot.y + plot.height - metrics.height)), width: metrics.width, height: metrics.height };
-        Object.assign(label, textPrimitive({ id: label.id, role: label.role, frame: label.frame, text: label.text, data: { ...label.data, external: true }, style: textStyle(CHART_LABEL, INK, true, "left") }));
+        Object.assign(label, textPrimitive({ id: label.id, role: label.role, frame: label.frame, text: label.text, data: { ...label.data, external: true }, style: textStyle(CHART_LABEL, INK, labelBold(), "left") }));
         nodes.push(linePrimitive({ id: stableId(label.id, "leader"), role: "data-label-leader", x1: mark.frame.x + mark.frame.width, y1: mark.frame.y + mark.frame.height / 2, x2: x - 2, y2: label.frame.y + metrics.height / 2, style: lineStyle(INK) }));
       }
       const external = labels.filter(label => label.data.external).sort((a,b) => a.frame.y-b.frame.y);
@@ -721,7 +779,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
         frame: horizontal
           ? { x: xScale(endpoint)+barLabelGap, y: categoryStart+(groupSpan-metrics.height)/2, width: metrics.width, height: metrics.height }
           : { x: categoryStart+(barSpan-4-metrics.width)/2, y: yScale(endpoint)-barLabelGap-metrics.height, width: metrics.width, height: metrics.height },
-        text, style: textStyle(CHART_LABEL, INK, true, horizontal ? "left" : "center"),
+        text, style: textStyle(CHART_LABEL, INK, labelBold(), horizontal ? "left" : "center"),
         data: { category, anchor: "stack-total", value: stackLabels.totals.get(category).value, endpoint }
       }));
     }
@@ -857,7 +915,7 @@ function sparseLineChart({ id, frame, props }) {
         const labelFrame = { x: Math.max(plot.x, Math.min(point.px - measured.width / 2, plot.x + plot.width - measured.width)), y: point.py - measured.height - 8, width: measured.width, height: measured.height };
         if (labelFrame.y < plot.y - 1 || labelFrames.some(other => other.x < labelFrame.x + labelFrame.width + 4 && other.x + other.width + 4 > labelFrame.x && other.y < labelFrame.y + labelFrame.height + 4 && other.y + other.height + 4 > labelFrame.y)) fail("selected point labels overlap or exceed plot; allocate height or label fewer anchors");
         labelFrames.push(labelFrame);
-        nodes.push(textPrimitive({ id: stableId(point.nodeId, "label"), role: "data-label", frame: labelFrame, text: measured.text, style: { ...textStyle(CHART_LABEL, INK, true), valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { ...data, textLayout: measured, dependencies: [point.nodeId] } }));
+        nodes.push(textPrimitive({ id: stableId(point.nodeId, "label"), role: "data-label", frame: labelFrame, text: measured.text, style: { ...textStyle(CHART_LABEL, INK, labelBold()), valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { ...data, textLayout: measured, dependencies: [point.nodeId] } }));
       }
     });
   }
@@ -968,7 +1026,7 @@ function lineChart({ id, frame, props, area = false }) {
             : last ? { x: point.x + 8, y: point.y - 12, width: 60, height: 24 }
             : { x: point.x - 30, y: point.y - 27, width: 60, height: 24 },
           text: formatValue(point.value, props),
-          style: textStyle(CHART_LABEL, INK, true, first ? "right" : last ? "left" : "center")
+          style: textStyle(CHART_LABEL, INK, labelBold(), first ? "right" : last ? "left" : "center")
         }));
       }
     });
@@ -1040,7 +1098,7 @@ function waterfall({ id, frame, props }) {
     const bar = { x: plot.x + index * span + span * 0.2, y: yScale(top), width: span * 0.6, height: Math.max(2, yScale(bottom) - yScale(top)) };
     const fill = isTotal ? PRIMARY : value >= 0 ? token("color.chartSeries2") : token("color.negative");
     nodes.push(rectPrimitive({ id: stableId(id, "bar", category), role: "chart-mark", frame: bar, style: fillStyle(fill) }));
-    nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`, style: textStyle(CHART_LABEL, INK, true, "center") }));
+    nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`, style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
     if (index > 0) nodes.push(linePrimitive({ id: stableId(id, "connector", index), role: "chart-connector", x1: plot.x + (index - 1) * span + span * 0.8, y1: yScale(previous), x2: plot.x + index * span + span * 0.2, y2: yScale(previous), style: lineStyle(SECONDARY, token("line.hairline"), "dash") }));
     const point = { x: bar.x + bar.width / 2, y: bar.y, changeX: bar.x + bar.width / 2, changeY: bar.y - 38, leaderX: bar.x + bar.width };
     pointMap.set(`value:${category}`, point);
@@ -1079,8 +1137,8 @@ function rangeChart({ id, frame, props }) {
     const x0 = xScale(low), x1 = Math.max(xScale(high), x0 + 2);
     const fill = barHighlight ? (barHighlight.category === category ? token("color.accent") : SERIES[0]) : SERIES[0];
     nodes.push(rectPrimitive({ id: stableId(id, "range", category), role: "chart-mark", frame: { x: x0, y, width: x1 - x0, height: barHeight }, style: fillStyle(fill), data: { category, low, high, highlighted: barHighlight?.category === category } }));
-    nodes.push(textPrimitive({ id: stableId(id, "low-label", category), role: "data-label", frame: { x: x0 - labelWidth - 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(low, props), style: textStyle(CHART_LABEL, INK, true, "right"), data: { category, end: "low" } }));
-    nodes.push(textPrimitive({ id: stableId(id, "high-label", category), role: "data-label", frame: { x: x1 + 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(high, props), style: textStyle(CHART_LABEL, INK, true, "left"), data: { category, end: "high" } }));
+    nodes.push(textPrimitive({ id: stableId(id, "low-label", category), role: "data-label", frame: { x: x0 - labelWidth - 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(low, props), style: textStyle(CHART_LABEL, INK, labelBold(), "right"), data: { category, end: "low" } }));
+    nodes.push(textPrimitive({ id: stableId(id, "high-label", category), role: "data-label", frame: { x: x1 + 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(high, props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { category, end: "high" } }));
     nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: frame.x, y: y - 2, width: categoryWidth, height: barHeight + 4 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "left"), data: { category } }));
     if (index) nodes.push(linePrimitive({ id: stableId(id, "row-rule", index), role: "chart-gridline", x1: frame.x, y1: plot.y + index * rowSpan, x2: plot.x + plot.width + labelWidth, y2: plot.y + index * rowSpan, style: lineStyle() }));
     const point = { x: x1, y: y + barHeight / 2, changeX: x1 + 12, changeY: y + barHeight / 2, leaderY: y };
@@ -1411,7 +1469,7 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
     }));
     const holeClear = !donut || Math.hypot(Math.max(0, Math.abs(dx) - halfWidth), Math.max(0, Math.abs(dy) - halfHeight)) >= size * 0.23;
     if (!percentage || measured.height > 28 || !cornersFit || !holeClear) throw new Error(`Pie/donut percentage for ${props.labels[index]} does not fit its slice; enlarge the chart or use a bar/stacked-bar encoding`);
-    nodes.push(textPrimitive({ id: stableId(id, "percentage", index), role: "data-label", frame: { x: insideX - 32, y: insideY - 14, width: 64, height: 28 }, text, style: textStyle(CHART_LABEL, foreground, true, "center"), data: { categoryKey: props.labels[index], contrast: contrastRatio(background, tokens[foreground.tokenId].value) } }));
+    nodes.push(textPrimitive({ id: stableId(id, "percentage", index), role: "data-label", frame: { x: insideX - 32, y: insideY - 14, width: 64, height: 28 }, text, style: textStyle(CHART_LABEL, foreground, labelBold(), "center"), data: { categoryKey: props.labels[index], contrast: contrastRatio(background, tokens[foreground.tokenId].value) } }));
   });
   if (outside) {
     props.values.forEach((value, index) => {
@@ -1577,7 +1635,7 @@ export function registerCharts(registry) {
       "font.bodySemibold", "weight.semibold",
       "color.chartGrid", "color.chartComparator", "color.componentPrimary", "color.componentPrimaryTint", "color.accent", "color.rule",
       "color.canvas", "color.surface", "color.surfaceMuted", "color.onPrimary", "color.negative", "line.hairline", "line.standard", "radius.none",
-      ...SERIES.map((item) => item.tokenId), ...LEGEND_TOKENS, ...(chart.tokens || [])
+      ...SERIES.map((item) => item.tokenId), ...LEGEND_TOKENS, ...(chart.tokens || []), "color.accent", "color.accentTint", "color.negative", "color.negativeTint", "color.surfaceMuted", "color.onPrimary", "type.compact"
     ];
     registry.set(chart.id, {
       id: chart.id,

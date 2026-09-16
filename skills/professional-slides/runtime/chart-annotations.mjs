@@ -407,6 +407,13 @@ function resolveAnchor(pointMap, anchor, id) {
   };
 }
 
+/** A compact change label: the text alone, no bubble, for step brackets on small multiples. */
+function compactLabelFrame(text, centerX, centerY, plot) {
+  const measured = measureText(text, 120, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+  const width = Math.ceil(measured.width) + 6, height = 20;
+  return { x: Math.max(plot.x - 10, Math.min(plot.x + plot.width + 10 - width, centerX - width / 2)), y: centerY - height / 2, width, height };
+}
+
 function labelFrame(text, centerX, centerY, plot) {
   const measured = measureText(text, 168, {
     fontFamily: tokenValue(token("font.bodySemibold")),
@@ -544,8 +551,9 @@ export function renderChangeAnnotations({ id, plot, props, pointMap }) {
     const intervalTop = Math.min(start.y, end.y, ...[...pointMap.values()]
       .filter(point => point.x >= leftX && point.x <= rightX)
       .map(point => point.changeY ?? point.y));
-    const bracketY = evidenceBand ? plot.y - evidenceBand - 34 : Math.max(plot.y - 34, intervalTop - 34);
-    const frame = labelFrame(annotation.text, (leftX + rightX) / 2, bracketY - 24, plot);
+    const compact = annotation.compact === true;
+    const bracketY = evidenceBand ? plot.y - evidenceBand - (compact ? 18 : 34) : Math.max(plot.y - (compact ? 18 : 34), intervalTop - (compact ? 18 : 34));
+    const frame = compact ? compactLabelFrame(annotation.text, (leftX + rightX) / 2, bracketY - 10, plot) : labelFrame(annotation.text, (leftX + rightX) / 2, bracketY - 24, plot);
     nodes.push(line(id, index, "span", leftX, bracketY, rightX, bracketY, false, annotation.style));
     nodes.push(line(id, index, "start-drop", start.x, bracketY, start.x, start.y, false, annotation.style));
     nodes.push(line(id, index, "end-drop", end.x, bracketY, end.x, end.y, annotation.style === "construction", annotation.style));
@@ -559,6 +567,7 @@ export function renderChangeAnnotations({ id, plot, props, pointMap }) {
   }
   labels.forEach(({ frame, annotation, index, measured, data }) => {
     if (annotation.style === "interval-label") nodes.push(textPrimitive({id:stableId(id,"change-label",index),role:"annotation-text",frame,text:measured.text,style:textStyle(ANNOTATION,INK),data:{...data,textLayout:{lines:measured.lines,lineHeight:measured.lineHeight}}}));
+    else if (annotation.compact === true) nodes.push(textPrimitive({ id: stableId(id, "change-label", index), role: "annotation-text", frame, text: annotation.text, style: textStyle(ANNOTATION, INK, true), data: { annotationStyle: annotation.style, annotationKey: `${id}:${index}:${annotation.style}`, compact: true } }));
     else nodes.push(...labelNodes(id, index, frame, annotation.text, annotation.style));
   });
   return nodes;
