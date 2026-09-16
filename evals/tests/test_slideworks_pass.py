@@ -121,6 +121,44 @@ console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])
 
+    def test_paired_bars_bubble_grid_and_segment_growth(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+import {composeSlide,changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
+import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
+const registry=createRegistry();
+// Paired bars: one panel per series, the later panels without category labels, drawn not native.
+const paired=composeSlide({title:'T',exhibit:{type:'chart.bar',paired:true,categories:['a','b','c'],series:[{name:'Share of commuters',values:[1,2,3]},{name:'Share of residents',values:[4,5,6]}]},points:['p']},0);
+const panels=paired.items.find(i=>i.id==='s01-row').items;
+assert.equal(panels.length,2);
+assert.equal(panels[0].props.heading,'Share of commuters');assert.equal(panels[0].props.categoryLabels,undefined);
+assert.equal(panels[1].props.categoryLabels,false);assert.equal(panels[1].props.native,false);
+assert.ok(panels[0].size.width.fr>panels[1].size.width.fr,'the labelled panel takes the label column');
+assert.throws(()=>composeSlide({title:'T',exhibit:{type:'chart.bar',paired:true,categories:['a'],series:[{name:'s',values:[1]}]}},0),/two or three/);
+const bar=registry.get('chart.bar');
+const nodes=bar.render({id:'b',frame:{x:0,y:0,width:500,height:300},props:{categories:['a','b'],series:[{name:'s',values:[1,2]}],categoryLabels:false,dataLabels:true}}).nodes;
+assert.equal(nodes.filter(n=>n.role==='category-label').length,0);
+assert.equal(nativeChartSpec('chart.bar',{categories:['a'],series:[{name:'s',values:[1]}],categoryLabels:false},{x:0,y:0,width:600,height:400}),null);
+// Bubble grid: one bubble per nonzero cell, values printed, shape validated.
+const grid=registry.get('chart.bubble-grid');
+const g=grid.render({id:'g',frame:{x:0,y:0,width:700,height:400},props:{rows:['R1','R2'],columns:['C1','C2','C3'],values:[[30,9,0],[15,12,6]]}}).nodes;
+assert.equal(g.filter(n=>n.role==='chart-mark').length,5);
+assert.equal(g.filter(n=>n.role==='data-label').length,6);
+assert.throws(()=>grid.render({id:'g',frame:{x:0,y:0,width:700,height:400},props:{rows:['R1'],columns:['C1','C2'],values:[[1]]}}),/shape/);
+// Segment growth: a CAGR per segment beside the last stack; no implied arrow beside it.
+const stack=registry.get('chart.stacked-column');
+const sg=stack.render({id:'s',frame:{x:0,y:0,width:700,height:400},props:{categories:['2021','2022','2023'],series:[{name:'A',values:[42,37,30]},{name:'B',values:[9,9,3]}],segmentGrowth:{from:'2021',to:'2023'},dataLabels:true}}).nodes;
+const growth=sg.filter(n=>n.data?.growth);
+assert.equal(growth.length,2);assert.equal(growth[0].text,'−15%');
+assert.ok(sg.some(n=>n.data?.growthHeading&&n.text==='CAGR 2021–23'));
+assert.throws(()=>stack.render({id:'s',frame:{x:0,y:0,width:700,height:400},props:{categories:['2021','2022'],series:[{name:'A',values:[1,2]}],segmentGrowth:{from:'2022',to:'2021'}}}),/in order/);
+const noArrow=changeFromContent({type:'chart.stacked-column',categories:['2021','2022','2023'],series:[{name:'A',values:[42,37,30]}],segmentGrowth:{from:'2021',to:'2023'}},'T');
+assert.equal(noArrow.changeAnnotations,undefined);
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -449,7 +449,8 @@ export function changeFromContent(ex, title) {
   // that peaks and falls back, or starts from next to nothing, gets no arrow
   // unless the author asks for one (an epidemic curve, a launch ramp).
   const peak = Math.max(...totals.map(Math.abs)), first = Math.abs(totals[0]), last = Math.abs(totals[totals.length - 1]);
-  const trends = first >= peak * 0.05 && (last >= peak * 0.6 || last <= first);
+  // A growth column beside the stack already states the change per segment.
+  const trends = first >= peak * 0.05 && (last >= peak * 0.6 || last <= first) && !ex.segmentGrowth;
   if ((series.length === 1 || stacked) && (explicit || ex.change === true || (periodic && ex.type !== "chart.bar" && trends))) {
     const from = explicit?.from ?? categories[0], to = explicit?.to ?? categories[categories.length - 1];
     const a = categories.indexOf(from), b = categories.indexOf(to);
@@ -471,8 +472,27 @@ export function changeFromContent(ex, title) {
   return ex;
 }
 
+/**
+ * `paired: true` on a horizontal bar chart with two or three series: one panel
+ * per series side by side, each on its own scale and headed by the series
+ * name, sharing the left panel's category column (the McKinsey "share of
+ * commuters | share of residents" pair). The row is a two-up of peers, so the
+ * plots share one top band and the rows line up.
+ */
+function pairedBars(slide) {
+  const ex = slide.exhibit;
+  if (!ex || ex.type !== "chart.bar" || ex.paired !== true) return slide;
+  const series = Array.isArray(ex.series) ? ex.series : [];
+  if (series.length < 2 || series.length > 3) throw new Error("paired bars take two or three series");
+  const { paired, heading, unit, units: unitsIn, ...rest } = ex;
+  const units = Array.isArray(unitsIn) ? unitsIn : [];
+  const panels = series.map((sr, i) => ({ ...rest, series: [sr], panelHeading: sr.name, ...(units[i] || unit ? { unit: units[i] || unit } : {}), ...(i ? { categoryLabels: false } : {}), native: false }));
+  return { ...slide, exhibit: undefined, exhibits: panels, arrange: "row", pairedHeading: heading, pairedWeights: series.map((_, i) => (i ? 1 : 1.35)) };
+}
+
 export function composeSlide(slide, index, baseDir) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
+  slide = pairedBars(slide);
   if (slide.exhibit) slide = { ...slide, exhibit: changeFromContent(highlightFromTitle(percentStack(slide.exhibit), slide.title), slide.title) };
   if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => changeFromContent(highlightFromTitle(percentStack(ex), slide.title), slide.title)) };
   if (slide.kind === "takeaways") return { id, kind: "takeaways", ...(slide.title ? { title: slide.title } : {}), items: slide.points || slide.items, ...(slide.tone === "light" ? { mode: "light" } : {}), ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
@@ -595,6 +615,7 @@ export function composeSlide(slide, index, baseDir) {
     }
     // Chart beside a narrow table (three columns or fewer): the chart takes 3:2.
     const panelSize = (ex) => {
+      if (slide.pairedWeights) return { width: { fr: slide.pairedWeights[exhibits.indexOf(ex)] }, height: "fill" };
       if (exhibits.length !== 2) return SIZE;
       const other = exhibits.find((o) => o !== ex);
       const narrow = (t) => t?.type === "table" && (t.columns || []).length <= 3;

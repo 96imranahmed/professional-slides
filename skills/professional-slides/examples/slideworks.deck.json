@@ -115,6 +115,80 @@
    "source": "Venture Intelligence; Bain analysis"
   },
   {
+   "title": "Traditional sectors demonstrated resilience in an otherwise slowing market",
+   "exhibit": {
+    "type": "chart.stacked-column",
+    "heading": "Annual PE-VC investments in India by sector",
+    "unit": "$B",
+    "categories": [
+     "2021",
+     "2022",
+     "2023"
+    ],
+    "series": [
+     {
+      "name": "Traditional",
+      "values": [
+       42.0,
+       37.0,
+       29.5
+      ]
+     },
+     {
+      "name": "Software & SaaS",
+      "values": [
+       9.1,
+       8.6,
+       3.0
+      ]
+     },
+     {
+      "name": "New-age tech",
+      "values": [
+       18.7,
+       16.0,
+       6.8
+      ]
+     }
+    ],
+    "segmentGrowth": {
+     "from": "2021",
+     "to": "2023"
+    },
+    "stackTotals": [
+     {
+      "category": "2021",
+      "value": 69.8
+     },
+     {
+      "category": "2022",
+      "value": 61.6
+     },
+     {
+      "category": "2023",
+      "value": 39.3
+     }
+    ]
+   },
+   "pointsTone": "muted",
+   "pointsHeading": "Investment trends",
+   "points": [
+    {
+     "lead": "New-age tech investments declined ~65%",
+     "text": "over 2022\u201323 as cautionary investor sentiment hit business-model viability"
+    },
+    {
+     "lead": "SaaS dealmaking corrected",
+     "text": "as most scale assets were well funded post-2021 and valuation mismatches persisted"
+    },
+    {
+     "lead": "Traditional sectors held ~75% of investments",
+     "text": "in 2023, gaining share as investors backed proven models"
+    }
+   ],
+   "source": "Venture Intelligence; Bain analysis"
+  },
+  {
    "title": "South Korea limited spread through rapid cluster investigation and scaled testing",
    "exhibit": {
     "type": "chart.line",
@@ -305,6 +379,71 @@
    "source": "Texas A&M Urban Mobility Report, 2017"
   },
   {
+   "title": "Transit commutes track income and place of work across the District's wards",
+   "exhibit": {
+    "type": "chart.bar",
+    "paired": true,
+    "categories": [
+     "Ward 1",
+     "Ward 2",
+     "Ward 3",
+     "Ward 4",
+     "Ward 5",
+     "Ward 6",
+     "Ward 7",
+     "Ward 8"
+    ],
+    "series": [
+     {
+      "name": "Commute by public transportation, % of commuters",
+      "values": [
+       41,
+       28,
+       22,
+       35,
+       38,
+       36,
+       44,
+       47
+      ]
+     },
+     {
+      "name": "Low-income households, % of households",
+      "values": [
+       18,
+       9,
+       6,
+       17,
+       26,
+       20,
+       38,
+       46
+      ]
+     },
+     {
+      "name": "Place of work outside DC, % of workers",
+      "values": [
+       14,
+       11,
+       16,
+       19,
+       22,
+       15,
+       31,
+       34
+      ]
+     }
+    ],
+    "unit": "%"
+   },
+   "points": [
+    "Wards 7 and 8 combine the highest transit share with the lowest incomes",
+    "A third of their workers commute outside the District, where high-frequency service is thin",
+    "Improving cross-boundary transit reaches the riders who depend on it most"
+   ],
+   "source": "US Census ACS 2019; DDOT"
+  },
+  {
    "kind": "section",
    "title": "What the survey says",
    "summary": "GenAI use cases in credit are moving from pilot to deployment",
@@ -350,6 +489,74 @@
     "50% rank return on investment as the least important factor"
    ],
    "source": "IACPM/McKinsey survey, December 2024 (n = 33)"
+  },
+  {
+   "title": "Most institutions are testing GenAI use cases, with super regionals leading deployment",
+   "exhibit": {
+    "type": "chart.bubble-grid",
+    "heading": "GenAI use cases by institution type and development stage",
+    "unit": "Number of use cases indicated by survey participants",
+    "rows": [
+     "Mega banks (8)",
+     "Super regionals (7)",
+     "Core regionals (13)",
+     "Other (5)"
+    ],
+    "columns": [
+     "Ideation & planning",
+     "Proof of concept",
+     "Pilot",
+     "Full deployment",
+     "Discontinued"
+    ],
+    "values": [
+     [
+      30,
+      9,
+      9,
+      4,
+      0
+     ],
+     [
+      15,
+      12,
+      9,
+      6,
+      0
+     ],
+     [
+      54,
+      13,
+      13,
+      6,
+      0
+     ],
+     [
+      8,
+      9,
+      9,
+      4,
+      0
+     ]
+    ]
+   },
+   "pointsTone": "dark",
+   "pointsHeading": "Key insights",
+   "points": [
+    {
+     "lead": "Core regionals carry the most activity",
+     "text": "with 54 use cases in ideation and 13 each in proof of concept and pilot"
+    },
+    {
+     "lead": "Super regionals lead deployment",
+     "text": "with 6 use cases fully deployed, the highest share of their pipeline"
+    },
+    {
+     "lead": "No institution has discontinued a use case",
+     "text": "so far, though most remain before pilot"
+    }
+   ],
+   "source": "IACPM/McKinsey survey, December 2024"
   },
   {
    "title": "Our community of metals experts extends across the world",

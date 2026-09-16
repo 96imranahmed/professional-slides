@@ -576,7 +576,10 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   const barLabelGap = tokenValue(token("space.3"));
   const barLabelWidth = Math.max(50, ...values.map(value => Math.ceil(measureText(formatValue(value, props), 300, {fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1}).width)));
-  const horizontalCategoryLabelWidth = horizontal
+  // `categoryLabels: false`: the right panel of a paired bar chart shares the
+  // left panel's category column and draws none of its own.
+  const hideCategoryLabels = horizontal && props.categoryLabels === false;
+  const horizontalCategoryLabelWidth = horizontal && !hideCategoryLabels
     ? Math.min(180, Math.max(72, Math.ceil(Math.max(...categories.map(category => measureText(category, 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width))) + 12))
     : 0;
   const negativeLabelGutter = horizontal && !stacked && showDataLabels && values.some(v=>v<0) ? barLabelWidth + barLabelGap : 0;
@@ -591,7 +594,24 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   // A delta column (change versus the previous survey) sits to the right of
   // horizontal bars: a signed value in a tinted disc per category.
   const deltas = normalizeDeltas(props, categories);
-  const deltaWidth = deltas ? 64 : 0;
+  // `segmentGrowth: { from, to, label? }` on a stacked column: the rate per
+  // segment between two categories in a column at the right, aligned to the
+  // last stack's segments (the Bain "CAGR 2019–23" column).
+  const segmentGrowth = stacked && !horizontal && props.segmentGrowth ? (() => {
+    const g = props.segmentGrowth;
+    const a = categories.indexOf(g.from), b = categories.indexOf(g.to);
+    if (a < 0 || b <= a) throw new Error("segmentGrowth.from and .to must name two categories in order");
+    const year = (c) => { const m = String(c).match(/(?:19|20)\d{2}/); return m ? Number(m[0]) : null; };
+    const years = year(g.from) !== null && year(g.to) !== null && year(g.to) > year(g.from) ? year(g.to) - year(g.from) : null;
+    const rows = series.map((item) => {
+      const v0 = item.values[a], v1 = item.values[b];
+      if (!(v0 > 0 && v1 > 0)) return { name: item.name, text: "n/a" };
+      const rate = years ? (Math.pow(v1 / v0, 1 / years) - 1) * 100 : (v1 / v0 - 1) * 100;
+      return { name: item.name, text: `${rate >= 0 ? "+" : "−"}${Math.abs(rate).toFixed(Math.abs(rate) < 10 ? 1 : 0)}%` };
+    });
+    return { to: g.to, label: g.label || (years ? `CAGR ${g.from}–${String(g.to).slice(-2)}` : `Change ${g.from}–${g.to}`), rows };
+  })() : null;
+  const deltaWidth = (deltas ? 64 : 0) + (segmentGrowth ? 76 : 0);
   // A bracket subtotal on a stacked column spans the named segments and prints their sum beside the stack.
   const stackBracket = stacked && !horizontal && Array.isArray(props.stackBracket) && props.stackBracket.length ? props.stackBracket : null;
   if (stackBracket && stackBracket.some((name) => !series.some((item) => item.name === name))) throw new Error("stackBracket must name series of the chart");
@@ -699,6 +719,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     const heading = props.deltasLabel || "Change vs. prior";
     nodes.push(textPrimitive({ id: stableId(id, "deltas-heading"), role: "chart-delta-label", frame: { x: plot.x + plot.width + deltaWidth - 150, y: plot.y - 22, width: 150 - 4, height: 18 }, text: heading, style: textStyle(token("type.compact"), SECONDARY, false, "right"), data: { deltasHeading: true } }));
   }
+  const segmentMids = new Map();
   const barSpan = stacked ? groupSpan : groupSpan / series.length;
   categories.forEach((category, categoryIndex) => {
     const categoryStart = (horizontal ? plot.y : plot.x) + categoryIndex * categorySpan + (stackExternalWidth ? tokenValue(token("space.2")) : (categorySpan - groupSpan) / 2);
@@ -767,6 +788,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
         ? { x: xScale(end), y: bar.y + bar.height / 2, changeX: xScale(end) + (value >= 0 ? 12 : -12), changeY: bar.y + bar.height / 2, leaderY: bar.y }
         : { x: bar.x + bar.width / 2, y: yScale(end), changeX: bar.x + bar.width / 2, changeY: yScale(end) + (value >= 0 ? -(showDataLabels ? 38 : 16) : (showDataLabels ? 38 : 16)), leaderX: bar.x + bar.width };
       pointMap.set(`${item.name}:${category}`, point);
+      if (segmentGrowth && category === segmentGrowth.to) segmentMids.set(item.name, bar.y + bar.height / 2);
       if (series.length === 1) pointMap.set(`value:${category}`, point);
       if (stacked) {
         if (value >= 0) positiveCumulative = end;
@@ -858,7 +880,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
         data: { category, anchor: "stack-total", value: stackLabels.totals.get(category).value, endpoint }
       }));
     }
-    nodes.push(textPrimitive({
+    if (!hideCategoryLabels) nodes.push(textPrimitive({
       id: stableId(id, "category", category),
       role: "category-label",
       frame: horizontal
@@ -881,6 +903,16 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     const lines=(props.referenceLines||[]).map(r=>yScale(r.value)).sort((a,b)=>b-a);
     for(const y of lines) if(y>=label.frame.y-4&&y<=label.frame.y+label.frame.height+4) label.frame.y=y-label.frame.height-6;
     if(label.frame.y<frame.y)throw new Error("Reference lines leave no room for value labels");
+  }
+  if (segmentGrowth) {
+    // Heading and one rate per segment, right of the plot, level with the last stack's segments.
+    const x = plot.x + plot.width + (deltas ? 64 : 0) + 8, width = 66;
+    nodes.push(textPrimitive({ id: stableId(id, "growth-heading"), role: "chart-delta-label", frame: { x, y: plot.y - 22, width, height: 18 }, text: segmentGrowth.label, style: textStyle(token("type.compact"), SECONDARY, false, "left"), data: { growthHeading: true } }));
+    for (const row of segmentGrowth.rows) {
+      const mid = segmentMids.get(row.name);
+      if (mid === undefined) continue;
+      nodes.push(textPrimitive({ id: stableId(id, "growth", row.name), role: "chart-delta-label", frame: { x, y: mid - 10, width, height: 20 }, text: row.text, style: textStyle(CHART_LABEL, INK, true, "left"), data: { series: row.name, growth: row.text } }));
+    }
   }
   return withDecorations(nodes, {
     id,
@@ -1254,6 +1286,53 @@ function waffleChart({ id, frame, props }) {
     nodes.push(textPrimitive({ id: stableId(id, "value", category), role: "data-label", frame: { x: plot.x + index * slot, y: y0 - labelBand + 2, width: slot, height: 24 }, text: percent ? `${count}%` : formatValue(count, props), style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
     const layout = categoryLayouts[index];
     nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * slot + 6, y: y0 + blockHeight + 12, width: slot - 12, height: layout.height }, text: layout.text, style: { ...textStyle(AXIS_LABEL, SECONDARY, false, "center"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
+  });
+  return nodes;
+}
+
+/**
+ * Bubble grid (the survey deck's matrix of counts): `rows` by `columns`, one
+ * bubble per cell sized by its value with the value printed inside, row labels
+ * at the left and column labels along the foot. Zero cells print a small "0".
+ */
+function bubbleGridLayout(frameIn, props) {
+  const frame = Number.isFinite(frameIn.height) ? frameIn : { ...frameIn, height: 400 };
+  const rows = props.rows || [], columns = props.columns || [], values = props.values || [];
+  if (!rows.length || !columns.length || values.length !== rows.length || values.some((r) => !Array.isArray(r) || r.length !== columns.length)) throw new Error("Bubble grid requires rows, columns and a values matrix of that shape");
+  const flat = values.flat();
+  if (flat.some((v) => !(Number.isFinite(v) && v >= 0))) throw new Error("Bubble grid values are non-negative numbers");
+  const labelWidth = Math.min(200, Math.max(80, ...rows.map((r) => Math.ceil(measureText(String(r), 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width) + 16)));
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: labelWidth, valueLabelInset: 0, centerPlot: false });
+  const columnLabelWidth = Math.max(plot.width / columns.length - 12, 72);
+  const columnLayouts = columns.map((c) => measureText(String(c), columnLabelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
+  const footBand = Math.max(...columnLayouts.map((l) => l.height)) + 16;
+  const cellW = plot.width / columns.length, cellH = (plot.height - footBand) / rows.length;
+  const max = Math.max(1, ...flat);
+  const maxDiameter = Math.min(cellW, cellH) * 0.86;
+  return { rows, columns, values, plot, labelWidth, columnLayouts, columnLabelWidth, footBand, cellW, cellH, max, maxDiameter, height: (plot.y - frame.y) + rows.length * Math.max(40, Math.min(cellH, 90)) + footBand };
+}
+function bubbleGrid({ id, frame, props, tokens = TOKENS }) {
+  const L = bubbleGridLayout(frame, props);
+  const nodes = [];
+  const fill = PRIMARY;
+  // Values inside the bubbles read in white on a dark fill, ink on a light one.
+  const insideColor = contrastRatio(tokens[fill.tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[fill.tokenId].value, tokens["color.ink"].value) ? token("color.onPrimary") : INK;
+  L.rows.forEach((row, r) => {
+    const cy = L.plot.y + r * L.cellH + L.cellH / 2;
+    nodes.push(textPrimitive({ id: stableId(id, "row", row), role: "category-label", frame: { x: L.plot.x - L.labelWidth, y: cy - 20, width: L.labelWidth - 12, height: 40 }, text: String(row), style: textStyle(AXIS_LABEL, INK, true, "right") }));
+    if (r) nodes.push(linePrimitive({ id: stableId(id, "row-rule", r), role: "chart-gridline", x1: L.plot.x - L.labelWidth, y1: L.plot.y + r * L.cellH, x2: L.plot.x + L.plot.width, y2: L.plot.y + r * L.cellH, style: lineStyle(GRID, token("line.hairline")) }));
+    L.columns.forEach((column, c) => {
+      const value = L.values[r][c];
+      const cx = L.plot.x + c * L.cellW + L.cellW / 2;
+      const d = value > 0 ? Math.max(14, L.maxDiameter * Math.sqrt(value / L.max)) : 0;
+      if (d) nodes.push(ellipsePrimitive({ id: stableId(id, "bubble", row, column), role: "chart-mark", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: fillStyle(fill), data: { row, column, value } }));
+      const inside = d >= 24;
+      nodes.push(textPrimitive({ id: stableId(id, "value", row, column), role: "data-label", frame: inside || !d ? { x: cx - Math.max(d, 48) / 2, y: cy - 10, width: Math.max(d, 48), height: 20 } : { x: cx - 24, y: cy - d / 2 - 22, width: 48, height: 20 }, text: formatValue(value, props), style: textStyle(CHART_LABEL, inside ? insideColor : INK, labelBold(), "center") }));
+    });
+  });
+  L.columns.forEach((column, c) => {
+    const layout = L.columnLayouts[c];
+    nodes.push(textPrimitive({ id: stableId(id, "column", column), role: "category-label", frame: { x: L.plot.x + c * L.cellW + L.cellW / 2 - L.columnLabelWidth / 2, y: L.plot.y + L.plot.height - L.footBand + 12, width: L.columnLabelWidth, height: layout.height }, text: layout.text, style: { ...textStyle(AXIS_LABEL, INK, true, "center"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
   });
   return nodes;
 }
@@ -1671,6 +1750,10 @@ const chartDefinitions = [
     sample: { labels: ["Core", "Growth", "New"], values: [52, 31, 17] }
   },
   {
+    id: "chart.bubble-grid", render: bubbleGrid,
+    sample: { heading: "(Insert measure and population)", rows: ["Mega banks", "Super regionals", "Core regionals", "Other"], columns: ["Ideation", "Concept", "Pilot", "Deployed"], values: [[30, 9, 9, 4], [15, 12, 9, 6], [54, 13, 13, 6], [8, 9, 9, 0]], unit: "Number of use cases" }
+  },
+  {
     id: "chart.waffle", render: waffleChart,
     sample: { heading: "(Insert measure and population)", categories: ["Underwriting", "Credit applications", "Portfolio monitoring", "Controls and reporting"], series: [{ name: "Respondents", values: [38, 42, 58, 42] }], unit: "Number of respondents" }
   },
@@ -1804,6 +1887,7 @@ export function registerCharts(registry) {
       // like a section's, so peers beside it take the same band height and the
       // rules line up. The compiler passes the shared height back as headerBandHeight.
       ...(chart.id === "chart.waffle" ? { measureContent: ({ frame, props = {} }) => ({ height: waffleLayout(frame, props).height }) } : {}),
+      ...(chart.id === "chart.bubble-grid" ? { measureContent: ({ frame, props = {} }) => ({ height: bubbleGridLayout(frame, props).height }) } : {}),
       measureHeader: ({ frame, props = {} }) => {
         if (!String(props.heading ?? "").trim()) return null;
         const layout = registry.get("chart-title").measureHeader({ frame, props: { heading: props.heading, unit: props.unit, variant: props.titleVariant } });
