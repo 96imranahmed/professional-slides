@@ -177,6 +177,12 @@ node runtime/deliver-deck.mjs deck.json out/             # + review; hands over 
 
 Build takes a few seconds; the render is the slow step (LibreOffice, ~3 s for ten pages). Delivery refuses a deck that fails the page gates or the review and writes `out/REJECTED.md` with the blockers instead of a deliverable. In an agent session the review runs as a packet: read `out/review-packet/prompt.md` and the renders, write `out/review.json` to its schema, then rerun delivery with `--review out/review.json`. Flags and gate thresholds are in [production](references/tools/production.md).
 
+## House style
+
+The palette carries a house style, taken from the firms' 2022–24 published decks, so one deck reads as one house: `mckinsey` sets serif titles on a hairline rule, electric-blue accents, dash bullets and zebra tables; `bcg` sets regular-weight titles on a light grey band, a green pill for the page tag, grey chart-heading bands and green bar families; `bain` sets light titles, grey bars with the answer in red and regular value labels; `deloitte` sets black ink with the signature green. The style is a set of tokens (`style.titleWeight`, `style.titleRule`, `style.tagPlacement`, `style.chartHeading`, `style.listMarker`, `style.tableRows`, `style.labelWeight`) that components read; a deck's `typography` block still overrides the faces.
+
+Modern pages carry their numbers as furniture, not prose: a delta column beside a ranked bar (`deltas: [+2, +14, …]` with `deltasLabel`), a bracketed subtotal beside a stack (`stackBracket: ["Somewhat agree", "Strongly agree"]`), period-to-period brackets on small multiples (`change: "steps"`), a hero number beside the chart (`kpi: { value: "80%", label: "…" }`), stat cards (`cards`, `tone: "stat"`, each `value` | statement, with an optional `question` panel at the left) and an accent-outlined insight (`callout: { tone: "outline", text }`).
+
 ## Density
 
 `executive` is the default. Use `pre-read` when the document is read unattended and the page must stand without narration. Use `live-pitch` only when the deck is presented and the words are spoken aloud; an analytical brief uses `executive` or `pre-read`. `appendix` is for source-rich support behind the main story. Choose once per coherent family of pages and keep type, spacing and chrome on that one profile.

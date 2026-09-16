@@ -58,3 +58,7 @@ For a reference-derived theme, inspect the approved reference first and map ever
 - A final object-level audit finds every editable-object colour resolving to a declared role, and every role resolving to one swatch.
 
 Resolved values for the exact deck are written to `design-manifest.json`, and per-slide values to `scene.json` under `slides[].tokens`; those generated records are the value reference for that deck.
+
+## House style tokens
+
+Each palette sets seven `style.*` keyword tokens beyond its colours; components read them through `houseStyle(id)` and a page may still ask for a specific title variant. `style.titleWeight` (`bold` | `regular`), `style.titleRule` (`none` | `rule` under the title | `band` behind it), `style.tagPlacement` (`top-right` small caps | `below-title` accent pill | `above-title` accent label), `style.chartHeading` (`text` | `band`, a filled grey band with white heading), `style.listMarker` (`dot` | `dash`), `style.tableRows` (`rules` | `zebra`), `style.labelWeight` (`bold` | `regular` value labels, in the scene and the native chart). The `mckinsey` palette also sets `font.display` to a serif; `examples/house-style.deck.json` shows the same eight pages under any palette.
