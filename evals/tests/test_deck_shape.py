@@ -404,3 +404,49 @@ assert.equal(high.style.color.tokenId,'color.ink');
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result["accepted"])
+
+
+class CorpusCalibrationTests(unittest.TestCase):
+    """The floors are calibrated against the reference corpus, and the page can
+    carry the furniture that corpus carries."""
+
+    def test_ink_floors_track_the_measured_corpus(self):
+        # 192 sampled pages of published client decks: median ink 19%, lower
+        # quartile 12%. A balanced page floors just under that quartile.
+        self.assertGreaterEqual(page_gates.FILL_LEVELS["balanced"]["ink_min"], 0.11)
+        self.assertGreaterEqual(page_gates.FILL_LEVELS["full"]["ink_min"], 0.13)
+        self.assertLess(page_gates.FILL_LEVELS["airy"]["ink_min"], 0.11)
+        self.assertEqual(page_gates.REFERENCE_PAGE["inkMedian"], 0.19)
+
+    def test_a_small_image_is_a_mark_not_a_photograph(self):
+        # The reference pages carry a small image on about half their pages
+        # (median 0.5% of the page): logos, icons, spot art. The photograph
+        # budget is about decoration, so it starts at 3% of the canvas.
+        def slide_with(width, height):
+            return {"id": "s01", "componentInstances": [{"id": "chrome", "component": "slide-chrome"},
+                                                        {"id": "s01-0", "component": "image-frame",
+                                                         "frame": {"x": 60, "y": 162, "width": width, "height": height}}],
+                    "nodes": [{"type": "image", "role": "image", "frame": {"x": 60, "y": 162, "width": width, "height": height}},
+                              {"type": "text", "role": "list-item", "text": "The mark is not the argument"}]}
+        icons = [slide_with(120, 100) for _ in range(8)]
+        for index, slide in enumerate(icons, start=1):
+            slide["id"] = f"s{index:02d}"
+            slide["componentInstances"][1]["id"] = f"s{index:02d}-0"
+        self.assertNotIn("IMAGE_BUDGET", codes(page_gates.run_gates(deck(icons))))
+        photos = [slide_with(600, 400) for _ in range(8)]
+        for index, slide in enumerate(photos, start=1):
+            slide["id"] = f"s{index:02d}"
+            slide["componentInstances"][1]["id"] = f"s{index:02d}-0"
+        self.assertIn("IMAGE_BUDGET", codes(page_gates.run_gates(deck(photos))))
+
+    def test_a_page_carries_numbered_notes(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const page=composeSlide({title:'T',points:['a','b'],note:['Excludes the 2019 disposal','FY22 basis; figures may not sum']},0);
+assert.equal(page.note,'Notes: 1. Excludes the 2019 disposal   2. FY22 basis; figures may not sum');
+assert.equal(composeSlide({title:'T',points:['a'],note:'Single line'},0).note,'Note: Single line');
+assert.equal(composeSlide({title:'T',points:['a'],note:[]},0).note,undefined);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result["accepted"])

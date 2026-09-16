@@ -80,8 +80,10 @@ ARGUMENT_COMPONENTS = {"insight", "callout", "bullet-list", "evidence-note", "st
 # Pages carried by pictures rather than measurement.
 QUALITATIVE_COMPONENTS = {"image-frame", "logos", "logo-collage", "people", "quote-cluster", "icon-trends"}
 STRUCTURE_COMPONENTS = {"section-divider", "agenda", "tracker-page", "statement", "takeaways"}
-# A photograph, not an icon, a logo mark or a rule: 120 x 100 px and up.
-PHOTO_MIN_AREA = 12000
+# A photograph, not an icon, a logo mark or a spot image: the reference pages
+# carry a small image on about half their pages (median 0.5% of the page), and
+# those are marks, not decoration. A photograph covers 3% of the canvas and up.
+PHOTO_MIN_AREA = 0.03 * CANVAS_W * CANVAS_H
 # "1939 • Marvel Comics #1": a bullet doing the work of a comma, a bracket or a
 # second line. Only a line that starts with one is a list marker.
 # A space on at least one side: "1939 • Marvel Comics #1" is a separator, the
@@ -118,11 +120,18 @@ DEFAULT_PROFILE = "executive"
 # How full the deck means to read (`fill` on the spec, carried on the scene).
 # Emptiness is right for a live-pitch deck and wrong for a pre-read, so the
 # three geometric thresholds move with it; nothing else does.
+# Ink is calibrated against the corpus, not against taste: 192 sampled pages of
+# published client decks run a median ink share of 19% with a lower quartile of
+# 12%. A balanced page floors just under that quartile; a document-weight page
+# at it; an airy page is allowed to be a poster.
 FILL_LEVELS = {
-    "full": {"ink_min": 0.10, "dead_band_max": 0.06, "internal_void_max": 0.16, "column_void_max": 0.20},
-    "balanced": {"ink_min": 0.08, "dead_band_max": 0.08, "internal_void_max": 0.22, "column_void_max": 1.0},
-    "airy": {"ink_min": 0.04, "dead_band_max": 0.14, "internal_void_max": 0.32, "column_void_max": 1.0},
+    "full": {"ink_min": 0.14, "dead_band_max": 0.06, "internal_void_max": 0.16, "column_void_max": 0.20},
+    "balanced": {"ink_min": 0.115, "dead_band_max": 0.08, "internal_void_max": 0.22, "column_void_max": 1.0},
+    "airy": {"ink_min": 0.05, "dead_band_max": 0.14, "internal_void_max": 0.32, "column_void_max": 1.0},
 }
+# The reference corpus, for the density report: sampled pages of published
+# McKinsey, BCG and Bain decks measured on the same 1280x720 basis.
+REFERENCE_PAGE = {"inkMedian": 0.19, "inkQ1": 0.121, "words": 181, "textBlocks": 135, "furnitureWords": 27}
 DEFAULT_FILL = "balanced"
 
 # What a page of this deck is expected to carry. Mirrors runtime/weight.mjs: the
@@ -153,6 +162,7 @@ THRESHOLDS = {
     "monotony_max": 0.35,
     "column_void_max": 1.0,
     "image_pages_max": 0.30,   # photographs on more than three pages in ten
+    "photo_area_min": 0.03,    # a photograph covers 3% of the page; smaller images are marks (logos, icons, spot art)
     "image_run_max": 2,        # consecutive analytical pages carrying photographs
     "data_pages_min": 0.45,    # pages whose evidence is a chart, a table or measured tiles
     "families_min": 3,         # distinct page families in a deck of ten pages or more
