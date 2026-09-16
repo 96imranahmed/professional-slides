@@ -42,6 +42,12 @@ def slides_with(report, code):
     return sorted({f["slide"] for f in report["findings"] if f["code"] == code and f["slide"]})
 
 
+# The synthetic fixtures below measure geometry and typography. Density is a
+# separate contract (see test_deck_shape.py), so these scenes switch its floors
+# off rather than padding a fixture page to 95 words.
+WEIGHT_OFF = {"pageWords": 0, "columnFill": 0, "plotSpan": 0, "pointWords": 0, "tableFill": 0, "elements": 1}
+
+
 def good_slide():
     """A page that satisfies every gate: one hero exhibit, tight prose, a title."""
 
@@ -88,7 +94,7 @@ class SyntheticGoodPageTests(unittest.TestCase):
     def test_a_page_that_meets_every_threshold_produces_no_findings(self):
         scene = {"slides": [{"id": "s01", "nodes": [], "componentInstances": [
             {"id": "cover", "component": "cover", "frame": {"x": 0, "y": 0, "width": 1280, "height": 720}}]},
-            good_slide()]}
+            good_slide()], "weight": WEIGHT_OFF}
         report = page_gates.run_gates(scene, render_dir=None)
         self.assertEqual(report["findings"], [], json.dumps(report["findings"], indent=1))
         self.assertTrue(report["accepted"])
@@ -100,7 +106,7 @@ class SyntheticGoodPageTests(unittest.TestCase):
         def scene_with(mutate):
             slide = copy.deepcopy(base)
             mutate(slide)
-            return {"slides": [slide]}
+            return {"slides": [slide], "weight": WEIGHT_OFF}
 
         def node(slide, node_id):
             return next(n for n in slide["nodes"] if n["id"] == node_id)
@@ -150,7 +156,9 @@ class SyntheticGoodPageTests(unittest.TestCase):
         ]
         paragraph["text"] = "\n".join(lines)
         paragraph["data"]["textLayout"] = {"source": " ".join(lines), "lines": lines}
-        report = page_gates.run_gates({"slides": [slide]}, render_dir=None)
+        # This fixture measures geometry, not density: the weight floors are
+        # off so a deliberately minimal page does not trip them.
+        report = page_gates.run_gates({"slides": [slide], "weight": WEIGHT_OFF}, render_dir=None)
         self.assertTrue(report["accepted"], report["findings"])
 
 
@@ -271,7 +279,7 @@ class CliTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             scene = Path(tmp) / "scene.json"
-            scene.write_text(json.dumps({"slides": [good_slide()]}))
+            scene.write_text(json.dumps({"slides": [good_slide()], "weight": WEIGHT_OFF}))
             result = subprocess.run(
                 [sys.executable, str(GATES / "page_gates.py"), str(scene)],
                 capture_output=True, text=True, cwd=str(ROOT))

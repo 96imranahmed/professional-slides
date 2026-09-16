@@ -33,10 +33,19 @@ assert.ok(find(thin.items,i=>i.id==='s01-side'));
 assert.equal(find(thin.items,i=>String(i.component||'').startsWith('chart.')),null);
 // Side ratios: chart 2:1, table 3:2.
 const chartSide=composeSlide({title:'T',exhibit:{type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]},points:['p']},0);
-// The implication chevron sits between the exhibit and its consequences.
-assert.deepEqual(chartSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[2,'connector',1]);
-const tableSide=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:['p']},0);
-assert.deepEqual(tableSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[3,'connector',2]);
+// The implication chevron sits between the exhibit and its consequences, and
+// the column's width is negotiated against what it holds: one short point does
+// not earn a full track, three sentences do.
+assert.deepEqual(chartSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[2,'connector',0.8]);
+const deepPoints=['Wealth nearly doubled on advisory fees while lending margins compressed across the book','Corporate slipped as the rate cycle ran and the book lost a fifth of its contribution','Retail held flat as deposit growth offset the fee decline in a falling market'];
+const fullColumn=composeSlide({title:'T',exhibit:{type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]},points:deepPoints},0);
+assert.deepEqual(fullColumn.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[2,'connector',1]);
+// A table's column starts at 3:2 and is measured the same way: the wider the
+// track, the more it has to carry to keep it.
+const tableSide=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:deepPoints},0);
+assert.deepEqual(tableSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[3,'connector',1.6]);
+const tableSideFull=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:[...deepPoints,...deepPoints]},0);
+assert.deepEqual(tableSideFull.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[3,'connector',2]);
 // Auto-stack: two charts on one category set with points.
 const stack=composeSlide({title:'T',exhibits:[{type:'chart.column',categories:['a','b'],series:[{name:'s',values:[1,2]}]},{type:'chart.line',categories:['a','b'],series:[{name:'m',values:[3,4]}]}],points:['p']},0);
 assert.ok(find(stack.items,i=>i.id==='s01-stack'));

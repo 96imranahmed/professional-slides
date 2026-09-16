@@ -141,7 +141,11 @@
     }
    ],
    "soWhat": "Half the workforce is one offer away from leaving; retention is a manager problem before it is a pay problem.",
-   "source": "Future of work survey, October 2026; 4,985 deskless workers in four countries"
+   "source": "Future of work survey, October 2026; 4,985 deskless workers in four countries",
+   "callout": {
+    "lead": "How to read",
+    "text": "Agreement is the top two boxes; the strongly-agree share is the group that leaves first, and it is the one retention work has to reach."
+   }
   },
   {
    "title": "Investors want companies to keep investing while delivering on guidance",
@@ -373,7 +377,11 @@
     }
    ],
    "soWhat": "Travel carries the growth to 2027; e-commerce has to double its rate after that to hit the ambition.",
-   "source": "Company analysis"
+   "source": "Company analysis",
+   "callout": {
+    "lead": "Reading the steps",
+    "text": "The brackets are year-on-year growth; the step after 2027 is the one the plan has not yet earned."
+   }
   }
  ]
 }

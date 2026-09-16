@@ -106,11 +106,14 @@ assert.throws(()=>resolveFill({fill:'packed'}),/Unknown fill/);
 const chart={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
 const points=['one','two','three'];
 const list=(fill)=>composeSlide({title:'T',exhibit:chart,points},0,undefined,fill).items.find(i=>i.id==='s01-row').items.find(i=>i.id==='s01-side').items[0];
-// A full page spreads its points down the column; a balanced one hugs the top.
+// Any deck that is not airy spreads its points down the column; an airy deck
+// keeps its air, which is what the reader is there for.
 assert.equal(list('full').props.distribute,true);
 assert.equal(list('full').size.height,'fill');
-assert.equal(list('balanced').props.distribute,undefined);
-assert.equal(list('balanced').size.height,'hug');
+assert.equal(list('balanced').props.distribute,true);
+assert.equal(list('balanced').size.height,'fill');
+assert.equal(list('airy').props.distribute,undefined);
+assert.equal(list('airy').size.height,'hug');
 // The deck plan carries the resolved fill so the gates can read it.
 assert.equal(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',density:'pre-read',slides:[{title:'T',points}]}).fill,'full');
 // Distribution spreads the rows without moving the first one.

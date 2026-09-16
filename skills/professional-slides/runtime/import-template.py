@@ -192,6 +192,24 @@ def solid_fill_hex(shape) -> str | None:
     return None
 
 
+def walk(shapes):
+    """Every shape on the slide, group members included: a house that draws its
+    labels inside groups still carries those words on the page."""
+    for shape in shapes:
+        yield shape
+        if getattr(shape, "shape_type", None) is not None and "GROUP" in str(shape.shape_type):
+            try:
+                yield from walk(shape.shapes)
+            except Exception:
+                continue
+
+
+# A 32 x 18 grid over the 1280 x 720 page; the body starts below the title band.
+GRID = 40
+GRID_COLUMNS, GRID_ROWS = 32, 18
+BODY_ROW = 4
+
+
 def analyse(path: Path, base: str) -> dict:
     prs = Presentation(str(path))
     scale = PAGE_W / (prs.slide_width / 914400 * 96)
@@ -236,6 +254,10 @@ def analyse(path: Path, base: str) -> dict:
     # --- content slides ----------------------------------------------------
     slides = list(prs.slides)
     words, shapes_per_slide, charts, tables, pictures = [], [], 0, 0, 0
+    # How much of each page's body the house actually covers: the union of the
+    # shape boxes below the title band, on a coarse grid. A house whose pages are
+    # two thirds covered expects a deck that fills its columns.
+    coverage = []
     title_sizes, body_sizes, fills = [], [], collections.Counter()
     slide_titles = []
     slide_title_frames, slide_body_frames = [], []
@@ -243,7 +265,8 @@ def analyse(path: Path, base: str) -> dict:
     for slide in slides:
         count = 0
         slide_words = 0
-        for shape in slide.shapes:
+        covered = set()
+        for shape in walk(slide.shapes):
             count += 1
             kind = placeholder_kind(shape)
             # Footer copy repeated on most pages (a document title, a company
@@ -271,6 +294,18 @@ def analyse(path: Path, base: str) -> dict:
                     slide_titles.append(text.strip())
             elif text.strip():
                 body_sizes.extend(run_sizes(shape))
+            text_for_coverage = text_of(shape)
+            text = text_for_coverage
+            grouping = shape.shape_type is not None and "GROUP" in str(shape.shape_type)
+            carries = bool(text.strip()) or getattr(shape, "has_chart", False) or getattr(shape, "has_table", False) or (shape.shape_type is not None and "PICTURE" in str(shape.shape_type)) or solid_fill_hex(shape)
+            if shape.width and shape.height and shape.top is not None and carries and not grouping:
+                x0, y0 = px(shape.left or 0, scale), px(shape.top, scale)
+                x1, y1 = x0 + px(shape.width, scale), y0 + px(shape.height, scale)
+                if (x1 - x0) * (y1 - y0) > PAGE_W * PAGE_H * 0.55:
+                    x1 = x0  # a background or a full-page frame is not coverage
+                for gx in range(max(0, int(x0 // GRID)), min(GRID_COLUMNS, int(x1 // GRID) + 1)):
+                    for gy in range(max(BODY_ROW, int(y0 // GRID)), min(GRID_ROWS, int(y1 // GRID) + 1)):
+                        covered.add((gx, gy))
             fill = solid_fill_hex(shape)
             if fill and fill not in ("FFFFFF", "000000") and luminance(fill) < 0.85:
                 fills[fill] += 1
@@ -284,6 +319,9 @@ def analyse(path: Path, base: str) -> dict:
                     pass
         shapes_per_slide.append(count)
         words.append(slide_words)
+        body_cells = GRID_COLUMNS * (GRID_ROWS - BODY_ROW)
+        if body_cells and count:
+            coverage.append(len(covered) / float(body_cells))
 
     # --- colours -----------------------------------------------------------
     dk1, dk2 = theme_colors.get("dk1", "000000"), theme_colors.get("dk2")
@@ -400,6 +438,33 @@ def analyse(path: Path, base: str) -> dict:
         density = "live-pitch"
     complexity = "high" if median_shapes >= 18 else "medium" if median_shapes >= 8 else "low"
 
+    # --- weight: how full this house's pages read ----------------------------
+    # The template is the house's own answer to "how much does a page carry".
+    # Measured here and written into the profile, it becomes the floor every
+    # page of a deck built on this template is held to, so one template drives
+    # layout, palette, chrome AND density consistently.
+    body_coverage = statistics.median(coverage) if coverage else 0.0
+    fill = "full" if (median_words >= 90 or body_coverage >= 0.62) else "airy" if (median_words < 35 and body_coverage < 0.38) else "balanced"
+    base_weight = {
+        "full": {"pageWords": 130, "columnFill": 0.68, "plotSpan": 0.60, "pointWords": 10, "tableFill": 0.55, "elements": 2},
+        "balanced": {"pageWords": 95, "columnFill": 0.55, "plotSpan": 0.52, "pointWords": 8, "tableFill": 0.45, "elements": 1},
+        "airy": {"pageWords": 0, "columnFill": 0.0, "plotSpan": 0.0, "pointWords": 0, "tableFill": 0.0, "elements": 1},
+    }[fill]
+    weight = dict(base_weight)
+    if median_words:
+        # A floor at 70% of the template's own median: the house's pages are the
+        # target, and a page well under them is thin *for this house*.
+        weight["pageWords"] = int(round(max(40, min(260, median_words * 0.7))))
+    if body_coverage:
+        weight["columnFill"] = round(max(0.30, min(0.80, body_coverage * 0.85)), 2)
+    if median_shapes:
+        weight["elements"] = 2 if median_shapes >= 12 else 1
+    observations.append(
+        f"Weight measured from the template: median {median_words:.0f} words and {median_shapes:.0f} shapes a slide, "
+        f"body coverage {body_coverage:.0%} - pages of a deck on this template are held to {weight['pageWords']} words "
+        f"and a {weight['columnFill']:.0%} column, at fill '{fill}'"
+    )
+
     page_template = {}
     if not company and footer_texts:
         text, n = footer_texts.most_common(1)[0]
@@ -419,11 +484,14 @@ def analyse(path: Path, base: str) -> dict:
         **({"pageTemplate": page_template} if page_template else {}),
         **({"footer": company} if company else {}),
         "density": density,
+        "fill": fill,
+        "weight": weight,
         "complexity": complexity,
         "observations": observations,
         "stats": {
             "slides": len(slides), "slideSize": [round(prs.slide_width / 914400, 2), round(prs.slide_height / 914400, 2)],
             "medianWordsPerSlide": median_words, "medianShapesPerSlide": median_shapes,
+            "medianBodyCoverage": round(body_coverage, 3),
             "charts": charts, "tables": tables, "pictures": pictures,
             "titleSizesPt": sorted(set(title_sizes))[:6], "bodySizesPt": sorted(set(body_sizes))[:8],
             "themeColors": theme_colors, "themeFonts": theme_fonts, "topFills": [f"#{c}" for c in top_fills],
@@ -445,7 +513,7 @@ def main() -> int:
     profile = analyse(path, args.base)
     out = Path(args.out) if args.out else path.with_suffix(".house.json")
     out.write_text(json.dumps(profile, indent=1) + "\n", encoding="utf-8")
-    print(json.dumps({"status": "written", "profile": str(out), "palette": profile["palette"]["colors"], "typography": profile["typography"], "chrome": profile.get("chrome"), "density": profile["density"], "observations": profile["observations"]}, indent=1))
+    print(json.dumps({"status": "written", "profile": str(out), "palette": profile["palette"]["colors"], "typography": profile["typography"], "chrome": profile.get("chrome"), "density": profile["density"], "fill": profile["fill"], "weight": profile["weight"], "observations": profile["observations"]}, indent=1))
     return 0
 
 

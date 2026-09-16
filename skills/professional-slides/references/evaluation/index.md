@@ -25,6 +25,12 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | One number over a table | `METRIC_STACK` | a lone tile belongs beside its evidence |
 | Sections and tracker | `NO_SECTIONS` | required past twelve analytical pages |
 | Label punctuation | `DOT_SEPARATOR` | no bullet or middle dot joining two labels |
+| Page text floor | `THIN_PAGE` | the deck's `weight.pageWords` (95 balanced, 130 full); reference client pages run a median of 196 |
+| Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |
+| Marks in the exhibit | `PLOT_SPAN` | marks span `weight.plotSpan` of the exhibit frame (annotated and peer-aligned charts exempt) |
+| Table against its budget | `THIN_TABLE` | uses `weight.tableFill` of the page's row budget |
+| Values printed | `NUMBERS_ON_MARKS` | at least three numeric data labels on an exhibit page |
+| Evidence elements | `THIN_EVIDENCE` | `weight.elements` (2 on a document-weight deck) |
 | Axis ticks | `NICE_TICKS` | nice numbers |
 | Coverage | `MISSING_EVIDENCE` | every ranked criterion has a comparative exhibit across all options |
 

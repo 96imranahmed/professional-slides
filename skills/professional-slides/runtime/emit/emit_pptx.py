@@ -513,7 +513,10 @@ class Emitter:
             decimals = 1 if fractional and max(abs(v) for v in fractional) < 10 else 0
         number_format = "0" if decimals == 0 else "0." + "0" * decimals
         if kind not in ("pie", "donut", "scatter"):
-            plot.gap_width = 60 if not is_range else 80
+            # Bar weight follows the category count, as in the drawn charts:
+            # few categories take fat bars, many take thinner ones.
+            categories = len(spec.get("categories") or [])
+            plot.gap_width = 80 if is_range else 35 if categories <= 3 else 45 if categories <= 6 else 60
             if kind in ("column", "bar"):
                 plot.overlap = 0
             if is_range:

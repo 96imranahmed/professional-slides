@@ -27,6 +27,7 @@ import path from "node:path";
 import { measureText } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount, EVIDENCE_CALLOUT_BAND } from "./chart-annotations.mjs";
 import { legendRowCount } from "./legends.mjs";
+import { resolveWeight, normalizeWeight } from "./weight.mjs";
 
 const V3 = "professional-slides.deck/v3";
 const SIZE = { width: { fr: 1 }, height: "fill" };
@@ -338,10 +339,16 @@ export function paginateTable(slide, bodyScale = 1) {
   });
 }
 
+/**
+ * The shared ceiling for peer charts. The ladder is fine-grained on purpose: a
+ * 62% maximum rounded to 100 leaves the bars crossing three fifths of the plot
+ * and the page reading empty, where a ceiling of 80 keeps the scale honest and
+ * the marks worth looking at.
+ */
 function niceCeiling(value) {
   if (!(value > 0)) return 1;
   const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
-  for (const rung of [1, 2, 2.5, 5, 10]) if (rung * magnitude >= value) return rung * magnitude;
+  for (const rung of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (rung * magnitude >= value) return rung * magnitude;
   return 10 * magnitude;
 }
 
@@ -377,10 +384,33 @@ function photoStrip(slide, id, baseDir, fr = 1) {
   return { id, component: "image-frame", props: { ...imageProps(slide.photo, baseDir), fit: "cover" }, size: { width: { fr }, height: "fill" } };
 }
 
-function pointsItem(points, id, tone, fill) {
-  // A full page spreads its points down the side column; an airy one lets them
-  // hug the top. The list fills its track only when it is spreading.
-  const distribute = fill === "full" && points.length > 1;
+// The body frame a content page lays out into, and the furniture between its
+// columns: used to measure a side column against what it holds before the
+// planner turns fractions into pixels.
+const BODY_WIDTH = 1160, BODY_HEIGHT = 508, CONNECTOR_WIDTH = 44, COLUMN_GAP = 16;
+const LIST_BODY_PX = 14, LIST_ITEM_GAP = 16, LIST_LEAD_GAP = 4, LIST_MARKER_OFFSET = 22;
+/** The height a points list wants at a given column width. */
+function pointsHeight(points, width) {
+  const textWidth = Math.max(60, width - LIST_MARKER_OFFSET);
+  let total = 0;
+  (points || []).forEach((point, index) => {
+    const object = point && typeof point === "object";
+    const lead = object && point.lead ? measureText(String(point.lead), textWidth, { fontFamily: "Arial", fontSize: LIST_BODY_PX, bold: true }) : null;
+    const text = String(object ? point.text ?? "" : point ?? "");
+    const body = text ? measureText(text, textWidth, { fontFamily: "Arial", fontSize: LIST_BODY_PX }) : null;
+    total += (lead ? lead.height + (body ? LIST_LEAD_GAP : 0) : 0) + (body ? body.height : 0);
+    if (index < (points || []).length - 1) total += LIST_ITEM_GAP;
+  });
+  return total;
+}
+
+function pointsItem(points, id, tone, fill, inColumn = false) {
+  // The side column is a track, not a shelf: its points spread down it unless
+  // the deck is airy, where the white space is the point. A list that hugs the
+  // top of a 500px column leaves two fifths of it empty, which is how a page
+  // that carries real content still reads as thin. A list under a row of
+  // exhibits hugs instead — there it is a footer, not a column.
+  const distribute = inColumn && fill !== "airy" && points.length > 1;
   return { id, component: "bullet-list", props: { variant: "body", items: points, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}), ...(distribute ? { distribute: true } : {}) }, size: distribute ? { width: { fr: 1 }, height: "fill" } : HUG };
 }
 
@@ -592,7 +622,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
   if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
   if (tileColumn) {
     const tiles = { id: `${id}-tiles`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: tileColumn.map((m, i) => ({ id: `${id}-tile-${i}`, component: "metric", props: { ...m, variant: "prominent" }, size: { width: { fr: 1 }, height: "fill" } })) };
-    const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`, sideTreatment(slide), fill)] };
+    const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`, sideTreatment(slide), fill, true)] };
     // The tile column reads as the evidence, so the same implication marker joins it to the meaning.
     const tileChevron = (slide.implication ?? true) && tilePoints.length ? { id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: 44, height: "fill" } } : null;
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: tilePoints.length ? [tiles, tileChevron, side].filter(Boolean) : [tiles] });
@@ -610,9 +640,10 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
     items.push(item);
   }
   else if (layout === "exhibit-left" || layout === "exhibit-right") {
-    // Side ratios: chart + points 2:1, table + points 3:2.
+    // Side ratios: chart + points 2:1, table + points 3:2 — a starting point,
+    // not a constant. The column is then measured against what it holds (below).
     const heroFr = exhibits[0].type === "table" || exhibits[0].type === "rows" || exhibits[0].type === "compare" ? 3 : 2;
-    const sideFr = heroFr === 3 ? 2 : 1;
+    const baseSideFr = heroFr === 3 ? 2 : 1;
     // A chart beside a text column keeps a one-line heading with the unit
     // inline; the two-line heading is for peers in a row, where the bands align.
     const heroItem = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: heroFr }, height: "fill" });
@@ -622,7 +653,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
     // band and the points start level with the plot, not with the heading text.
     // `pointsAlign: "middle"` centres the points on the exhibit instead.
     const tone = sideTreatment(slide);
-    const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill) : null;
+    const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true) : null;
     // `kpi: { value, label }`: the one big number the chart proves, in the accent
     // at the top of the side column, above the points.
     const kpiTile = slide.kpi ? { id: `${id}-kpi`, component: "metric", props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } } : null;
@@ -632,13 +663,39 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
     const insightBox = slide.insight ? { id: `${id}-insight`, component: "insight", props: typeof slide.insight === "string" ? { text: slide.insight, variant: "tonal" } : { variant: "tonal", ...slide.insight }, size: HUG } : null;
     if (!list && !insightBox && !kpiTile) throw new Error(`${id}: a side column needs points, an insight or a kpi`);
     const sideItems = [kpiTile, insightBox, list].filter(Boolean);
-    const heading = slide.pointsHeading === false || (insightBox && !slide.pointsHeading) ? null : slide.pointsHeading || "What it means";
+    // "What it means" above three lines of text is a label on a mostly empty
+    // column. The heading earns its line when the column holds a list; a column
+    // that is one number or one box takes the blank band and keeps the rule.
+    const heading = slide.pointsHeading === false || (insightBox && !slide.pointsHeading) || (!list && !slide.pointsHeading) ? null : slide.pointsHeading || "What it means";
+    // The column's width is negotiated with its content, not fixed by the
+    // layout: forty words in a 361px track leave two fifths of the column
+    // empty, and the exhibit beside it wanted that width anyway. A short column
+    // narrows (its text then wraps to more lines, and the hero grows); a column
+    // that would overrun widens.
+    const sideFr = (() => {
+      if (fill === "airy" || !list) return baseSideFr;
+      const columns = heroFr + baseSideFr + (slide.photo ? 1 : 0);
+      const track = (fr) => Math.max(140, (BODY_WIDTH - CONNECTOR_WIDTH - COLUMN_GAP * columns) * (fr / (heroFr + fr + (slide.photo ? 1 : 0))));
+      const extras = (kpiTile ? 126 : 0) + (insightBox ? 104 : 0) + (heading ? 44 : 0);
+      const natural = extras + pointsHeight(slide.points, track(baseSideFr));
+      // A photograph strip takes a quarter of the row, which leaves the
+      // commentary a 267px gutter that nothing reads comfortably. The column
+      // keeps a floor of 300px; the photograph gives up the width.
+      if (slide.photo && track(baseSideFr) < 300) return baseSideFr * 1.25;
+      if (natural < BODY_HEIGHT * 0.45) return baseSideFr * 0.8;
+      if (natural > BODY_HEIGHT * 0.98) return baseSideFr * 1.2;
+      return baseSideFr;
+    })();
     const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && fill !== "full" && (unheaded(exhibits[0]) || (insightBox && !list) || (tone !== "open" && !heading)));
     // A toned panel is always a section (it needs a surface); it takes the
     // heading unless the author suppresses it with `pointsHeading: false`.
+    // A column of several blocks (a number, a box, the points) spreads them down
+    // the track rather than stacking them under the heading with the bottom
+    // third left over.
+    const spread = !centre && fill !== "airy" && sideItems.length > 1 ? "distribute" : null;
     const side = tone === "open" && centre && !heading
       ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: sideItems }
-      : { id: `${id}-side`, ...(heading ? { heading } : {}), treatment: tone, layout: "flow.column", ...(centre ? { leftover: "center" } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
+      : { id: `${id}-side`, ...(heading ? { heading } : {}), treatment: tone, layout: "flow.column", ...(centre ? { leftover: "center" } : spread ? { leftover: spread } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
     // `implication`: the chevron disc between the exhibit and its consequences,
     // the way the firm pages join evidence to implication. On by default for a
     // headed open column beside an exhibit; `implication: false` removes it,
@@ -665,7 +722,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
     };
     const stacked = { id: `${id}-stack`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: exhibits.map(stackItem) };
     if (slide.points?.length) {
-      const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill)] };
+      const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true)] };
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
     } else items.push({ ...stacked, size: SIZE });
   } else if (layout === "grid") {
@@ -687,7 +744,12 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
     // Peer charts with one unit share one value scale, or the comparison lies.
     const charts = exhibits.filter((ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.series));
     if (charts.length >= 2 && charts.every((ex) => ex.unit === charts[0].unit && ex.yMax === undefined)) {
-      const max = Math.max(...charts.flatMap((ex) => ex.series.flatMap((se) => se.values)));
+      // A stack reaches its total, not its tallest segment: scaling a pair of
+      // 100% stacks to their largest segment puts the plot below the data.
+      const reach = (ex) => (["chart.stacked-column", "chart.stacked-bar"].includes(ex.type)
+        ? Math.max(...(ex.categories || []).map((_, i) => ex.series.reduce((sum, se) => sum + (se.values[i] || 0), 0)))
+        : Math.max(...ex.series.flatMap((se) => se.values)));
+      const max = Math.max(...charts.map(reach));
       const shared = niceCeiling(max);
       for (const ex of charts) { ex.yMin = ex.yMin ?? 0; ex.yMax = shared; }
     }
@@ -722,7 +784,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
     // Text beside a photograph: the copy takes the left column (a toned panel
     // when `pointsTone` says so), the photo the right, both full height.
     const tone = sideTreatment(slide);
-    const copy = [...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })), ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone)] : [])];
+    const copy = [...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })), ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true)] : [])];
     const column = { id: `${id}-side`, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: 1.2 }, height: "fill" }, items: copy };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [column, photoStrip(slide, `${id}-photo`, baseDir, 1)] });
   } else {
@@ -815,6 +877,10 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   const pages = agendaPages(tabs ? sectionTabs(spec.slides) : spec.slides, spec.agenda, spec.agendaStyle);
   const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140)) / 508)) : 1;
   const fill = resolveFill(spec);
+  // The weight contract: what a page of this deck is expected to carry. The
+  // deck's own `weight` wins, then the house profile a template produced, then
+  // the fill level.
+  const weight = resolveWeight(spec, fill);
   for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) slides.push(composeSlide(page, slides.length, baseDir, fill));
   return {
     id: spec.id,
@@ -823,6 +889,7 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     ...(spec.typography ? { typography: spec.typography } : {}),
     ...(spec.chrome ? { chrome: spec.chrome } : {}),
     fill,
+    weight,
     slides: slides.map((s) => {
       const page = spec.density && !s.density && s.kind !== "cover" ? { ...s, density: spec.density } : { ...s };
       // The document title sits in the footer beside the page number.
@@ -868,6 +935,11 @@ export function applyTemplate(spec, baseDir = process.cwd()) {
   if (!spec.pageTemplate && house.pageTemplate) out.pageTemplate = house.pageTemplate;
   if (!spec.density && house.density) out.density = house.density;
   if (!spec.footer && house.footer) out.footer = house.footer;
+  // A template deck also sets how full its pages read: the importer measures the
+  // template's own words, elements and body coverage and writes them as `fill`
+  // and `weight`, so a deck built on a dense house is judged by that house.
+  if (!spec.fill && house.fill) out.fill = house.fill;
+  if (!spec.weight && house.weight) out.weight = normalizeWeight(house.weight, "template weight");
   return out;
 }
 

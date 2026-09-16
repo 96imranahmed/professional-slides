@@ -19,7 +19,9 @@ class TemplateImportTests(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = Path(tempfile.mkdtemp())
         # Build a small BCG deck, then read it back as a template.
-        spec = {"schema": "professional-slides.deck/v3", "id": "tpl", "palette": "bcg", "footer": "House test",
+        # A small probe deck: two pages, deliberately light, so the importer has
+        # to measure a sparse house rather than assume ours.
+        spec = {"schema": "professional-slides.deck/v3", "id": "tpl", "palette": "bcg", "footer": "House test", "fill": "airy",
                 "slides": [{"title": "Revenue grew nine percent while costs held flat across every region", "exhibit": {"type": "chart.column", "heading": "Revenue by year", "unit": "$m", "categories": ["2023", "2024", "2025"], "series": [{"name": "Revenue", "values": [40, 46, 52]}]}, "points": ["Growth came from the core", "Costs held flat", "Margin widened three points"]},
                            {"title": "Three regions carry the growth while two are flat", "points": ["North grew 12%", "South grew 9%", "East grew 8%", "West flat", "Central flat"]}]}
         (cls.tmp / "tpl.deck.json").write_text(json.dumps(spec))
@@ -43,6 +45,18 @@ class TemplateImportTests(unittest.TestCase):
         self.assertIn(self.house["density"], {"live-pitch", "executive", "pre-read"})
         self.assertEqual(self.house["footer"], "House test")
         self.assertFalse(any("Arial" in o for o in self.house["observations"]), "Arial is always usable")
+
+    def test_profile_measures_the_house_weight(self):
+        # The template is the house's own answer to how much a page carries, so
+        # the profile carries a fill level and a weight contract, and says how
+        # it got them.
+        self.assertIn(self.house["fill"], {"airy", "balanced", "full"})
+        weight = self.house["weight"]
+        self.assertEqual(sorted(weight), ["columnFill", "elements", "pageWords", "plotSpan", "pointWords", "tableFill"])
+        self.assertLessEqual(weight["pageWords"], 260)
+        self.assertLessEqual(weight["columnFill"], 0.80)
+        self.assertTrue(any("Weight measured from the template" in o for o in self.house["observations"]))
+        self.assertIn("medianBodyCoverage", self.house["stats"])
 
     def test_spec_applies_the_template_and_explicit_fields_win(self):
         house = json.dumps(self.house)

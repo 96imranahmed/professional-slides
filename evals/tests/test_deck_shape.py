@@ -220,3 +220,124 @@ class OutsideLabelTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WeightContractTests(unittest.TestCase):
+    """The density floors a deck (or its template) sets, and the gates that read
+    them. Density is not the defect the gates exist for; empty is."""
+
+    def scene(self, slides, **kw):
+        return deck(slides, **kw)
+
+    def test_the_floors_follow_the_fill_level(self):
+        slides = [page(1, ["chart.bar"], texts=["short"])]
+        balanced = page_gates.run_gates(self.scene(slides))
+        self.assertEqual(balanced["weight"]["pageWords"], 95)
+        airy = page_gates.run_gates(self.scene(slides, fill="airy"))
+        self.assertEqual(airy["weight"]["pageWords"], 0)
+        self.assertNotIn("THIN_PAGE", codes(airy))
+        self.assertIn("THIN_PAGE", codes(balanced))
+
+    def test_a_declared_weight_overrides_the_fill_default(self):
+        slides = [page(1, ["chart.bar"], texts=["a b c d e f g h i j"])]
+        report = page_gates.run_gates(self.scene(slides, weight={"pageWords": 5}))
+        self.assertEqual(report["weight"]["pageWords"], 5)
+        self.assertNotIn("THIN_PAGE", codes(report))
+
+    def test_a_short_column_and_shallow_points_are_reported(self):
+        sid = "s01"
+        instances = [
+            {"id": "chrome", "component": "slide-chrome"},
+            {"id": f"{sid}-0", "component": "chart.bar", "frame": {"x": 60, "y": 162, "width": 700, "height": 460}},
+            {"id": f"{sid}-1", "component": "section", "frame": {"x": 820, "y": 162, "width": 360, "height": 460}},
+        ]
+        nodes = [
+            {"type": "text", "role": "list-item", "text": "Wealth grew", "frame": {"x": 830, "y": 180, "width": 340, "height": 20}},
+            {"type": "text", "role": "list-item", "text": "Retail flat", "frame": {"x": 830, "y": 210, "width": 340, "height": 20}},
+        ]
+        instances[-1]["id"] = f"{sid}-side"
+        slide = {"id": sid, "componentInstances": instances, "nodes": nodes}
+        found = codes(page_gates.run_gates(deck([slide])))
+        self.assertIn("THIN_COLUMN", found)
+        self.assertIn("POINT_DEPTH", found)
+
+    def test_the_report_carries_the_density_numbers(self):
+        slides = [page(1, ["chart.bar"], texts=["a b c"])]
+        report = page_gates.run_gates(deck(slides))
+        density = report["density"]
+        self.assertEqual(density["pageWords"]["floor"], 95)
+        self.assertEqual(density["pageWords"]["referenceMedian"], 196)
+        self.assertIn("columnFill", density)
+        self.assertIn("plotSpan", density)
+
+    def test_the_runtime_and_the_gates_read_one_contract(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {resolveWeight, WEIGHT_BY_FILL, normalizeWeight} from './skills/professional-slides/runtime/weight.mjs';
+import {composeDeck, applyTemplate} from './skills/professional-slides/runtime/compose.mjs';
+// Fill sets the floors; the deck overrides them; a bad key is refused.
+assert.equal(resolveWeight({}, 'full').pageWords, WEIGHT_BY_FILL.full.pageWords);
+assert.equal(resolveWeight({weight:{pageWords:150}}, 'balanced').pageWords, 150);
+assert.throws(()=>normalizeWeight({nope:1}),/Unknown/);
+assert.throws(()=>normalizeWeight({columnFill:4}),/between/);
+// The contract reaches the deck plan, so the gates judge the same numbers.
+const spec={schema:'professional-slides.deck/v3',id:'d',fill:'full',slides:[{title:'T',points:['a','b']}]};
+assert.equal(composeDeck(spec).weight.pageWords, WEIGHT_BY_FILL.full.pageWords);
+assert.equal(composeDeck({...spec,weight:{pageWords:111}}).weight.pageWords, 111);
+// A template's house profile carries fill and weight into a deck that sets neither.
+const house={schema:'professional-slides.house/v1',palette:{base:'bcg',id:'h',label:'H',colors:{}},fill:'full',weight:{pageWords:140,columnFill:0.7}};
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'house-'));
+fs.writeFileSync(path.join(dir,'house.json'), JSON.stringify(house));
+const applied=applyTemplate({schema:'professional-slides.deck/v3',id:'d',template:'house.json',slides:[]}, dir);
+assert.equal(applied.fill,'full');
+assert.equal(applied.weight.pageWords,140);
+// An explicit deck weight still wins over the template's.
+const kept=applyTemplate({schema:'professional-slides.deck/v3',id:'d',template:'house.json',weight:{pageWords:80},slides:[]}, dir);
+assert.equal(kept.weight.pageWords,80);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result["accepted"])
+
+    def test_the_side_column_fills_its_track_unless_the_deck_is_airy(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const chart={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
+const side=(slide,fill)=>composeSlide(slide,0,process.cwd(),fill).items.find(i=>i.id==='s01-row').items.find(i=>i.id==='s01-side');
+const page={title:'T',exhibit:chart,points:['one','two','three']};
+assert.equal(side(page,'balanced').items[0].props.distribute,true,'a balanced column spreads its points');
+assert.equal(side(page,'full').items[0].props.distribute,true);
+assert.equal(side(page,'airy').items[0].props.distribute,undefined,'an airy deck keeps its air');
+// A thin column narrows and gives the width to the exhibit.
+assert.equal(side(page,'balanced').size.width.fr,0.8);
+const deep={title:'T',exhibit:chart,points:[
+ {lead:'Wealth nearly doubled',text:'Advisory fees grew 18% a year while lending margins compressed, so the mix shifted to fee income across the book.'},
+ {lead:'Corporate slipped',text:'Lending margins compressed through the rate cycle and the corporate book lost a fifth of its contribution.'},
+ {lead:'Retail held',text:'Deposit growth offset the fee decline, leaving retail flat against a falling market.'}]};
+assert.equal(side(deep,'balanced').size.width.fr,1);
+// A number alone in the column takes no filler heading.
+assert.equal(side({title:'T',exhibit:chart,kpi:{value:'78%',label:'share'}},'balanced').heading,undefined);
+assert.equal(side(page,'balanced').heading,'What it means');
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result["accepted"])
+
+    def test_bar_weight_follows_the_category_count(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const registry=createRegistry();
+const frame={x:0,y:0,width:600,height:400};
+const draw=(n)=>{
+  const categories=Array.from({length:n},(_,i)=>`c${i}`);
+  const props={categories,series:[{name:'s',values:categories.map((_,i)=>10+i)}],heading:'H'};
+  const nodes=registry.get('chart.column').render({id:'c',frame,props}).nodes;
+  const marks=nodes.filter(node=>node.role==='chart-mark');
+  return marks[0].frame.width/(frame.width/n);
+};
+assert.ok(draw(3)>draw(8),'few categories take fatter bars');
+assert.ok(draw(3)>0.6,'three bars are not ribbons');
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result["accepted"])

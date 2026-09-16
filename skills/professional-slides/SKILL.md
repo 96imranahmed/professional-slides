@@ -155,6 +155,7 @@ Vary deliberately across the deck, never within a page: every table in the deck 
 - At most 35% of pages share one layout; a run longer than that means several pages are asking the same question.
 - Build the deck from at least three families of page - a chart page, a table or scorecard, a two-column comparison, a framework, a picture page - and let the mix follow the questions, not the template. Ten pages of the same construction is one page shown ten times.
 - A lone big number belongs beside the evidence that proves it (`kpi` in the side column), not stacked above a table, where it floats in air and the table starts the page again underneath. Three or more tiles read as a strip of measures and can sit above the exhibit.
+- The commentary column is a track, not a shelf: it reaches the bottom of the exhibit beside it. Write three to five points as a lead and a sentence each (a three-word label in a 360px column leaves two fifths of it white), add the number the chart proves as a `kpi` and the consequence as `soWhat`. A column that still has nothing to say should be narrower - the runtime narrows it and gives the width to the exhibit - or absent.
 - Past a dozen analytical pages the reader needs to know where they are: two to five sections, and a tracker. Decks with sections get the section pills above the title by default; `agenda: true` tracks instead by repeating the contents page, current section tinted, before each section.
 - Trailing empty band at the bottom of the content area: 8% or less. More than that means the exhibit should be larger or the page should merge with its neighbour.
 
@@ -229,11 +230,47 @@ The catalogue covers the consulting repertoire; pick by the reader's question. *
 
 ## Building from a template deck
 
-When the client or the firm supplies a template `.pptx`, read it first and let the deck inherit its house: `python3 runtime/import-template.py template.pptx --base bcg` writes `template.house.json`, a `professional-slides.house/v1` profile, and prints what it inferred. The profile carries a palette overlay on the nearest built-in base (ink, primary, accent and their tints, the six chart series, the muted surface, taken from the theme's colour scheme or, when the theme is stock Office, from the fills the slides actually use), the display and body faces (installed faces only; an uninstalled face is reported), the chrome (left and right margins, title top, body top and footer top on the 1280 × 720 page, read from the title and body placeholders), the repeated footer copy as the deck's `footer`, a density profile from the median words and shapes per slide (`live-pitch` / `executive` / `pre-read`) and a complexity reading. Read the `observations` before building: they say which values were measured and which were guessed. Then set `"template": "template.house.json"` on the deck; the profile fills `palette`, `typography`, `chrome`, `pageTemplate`, `density` and `footer` wherever the spec leaves them unset, and a hand-set `palette` or `chrome` still wins. Edit the profile when a guess is wrong (an accent the importer took from a highlight, a body top set by a subtitle placeholder the deck will not use); it is plain JSON.
+When the client or the firm supplies a template `.pptx`, read it first and let the deck inherit its house: `python3 runtime/import-template.py template.pptx --base bcg` writes `template.house.json`, a `professional-slides.house/v1` profile, and prints what it inferred. The profile carries a palette overlay on the nearest built-in base (ink, primary, accent and their tints, the six chart series, the muted surface, taken from the theme's colour scheme or, when the theme is stock Office, from the fills the slides actually use), the display and body faces (installed faces only; an uninstalled face is reported), the chrome (left and right margins, title top, body top and footer top on the 1280 × 720 page, read from the title and body placeholders), the repeated footer copy as the deck's `footer`, a density profile from the median words and shapes per slide (`live-pitch` / `executive` / `pre-read`) and a complexity reading. The profile also carries the house's **weight**: the importer measures the template's own median words a slide, shapes a slide and body coverage, and writes `fill` plus the `weight` block, so a deck built on a dense house is held to that house's density and a deck built on a sparse one is not. Read the `observations` before building: they say which values were measured and which were guessed, including how the weight was derived. Then set `"template": "template.house.json"` on the deck; the profile fills `palette`, `typography`, `chrome`, `pageTemplate`, `density` and `footer` wherever the spec leaves them unset, and a hand-set `palette` or `chrome` still wins. Edit the profile when a guess is wrong (an accent the importer took from a highlight, a body top set by a subtitle placeholder the deck will not use); it is plain JSON.
+
+## Density is not the enemy
+
+A full page is not a crowded page. Published McKinsey, BCG and Bain client decks - 1,832 pages of them, measured - carry a **median of 196 words of page text**, counting everything printed: the title, the axis and data labels, every table cell, the footnotes. The quartiles are 127 and 282. A ten-row table with four quantitative columns and four footnote markers is a normal page. Three charts side by side, each with its heading and unit, flanked by two statements that carry the numbers in words, is a normal page.
+
+So the instinct to "keep it clean" is usually the instinct to hand the reader less evidence than the analysis produced. Give the page everything that is *load-bearing*:
+
+- **The rows behind the summary.** If the table has four rows because you summarised twelve, show the twelve and band the three that decide it.
+- **The second cut.** The same measure by segment, by region, by year - beside the first, on the same scale, so the reader can see that the finding holds.
+- **The numbers on the marks.** A labelled bar is one reading; a bar plus an axis is two.
+- **The commentary column in full sentences.** A lead and a sentence per point, not a three-word label. Three labels in a 360px column leave two fifths of it white.
+- **The basis.** A footnote that says what is included, what is excluded, and as at when. It costs a line and it is the difference between a claim and an assertion.
+
+What does *not* belong is padding: a sentence that transcribes the chart, a caption that names what the reader can see, a heading that says "What it means" above three words, a fourth decorative photograph. Every gate in this skill is a floor on evidence and a ceiling on prose, in that order: `THIN_PAGE`, `THIN_COLUMN`, `POINT_DEPTH`, `THIN_TABLE`, `PLOT_SPAN` and `NUMBERS_ON_MARKS` fire when the page is carrying less than the deck said it would; `WORDS`, `CPL` and `TITLE_TOO_LONG` fire when prose is doing an exhibit's job. A page that trips none of them is dense in evidence and lean in words, which is what a firm page is.
 
 ## How full a page reads
 
 Emptiness is right for some decks and wrong for others, so the deck says which it is. `fill` takes `full`, `balanced` or `airy`; absent, it follows the density (`pre-read` and `appendix` fill, `live-pitch` is airy, `executive` is balanced). On a `full` deck the side column's points spread down the column instead of hugging its top, and the page gates tighten: ink coverage 10%, trailing band 6%, internal void 16%, and a new COLUMN_VOID finding when the right column stops more than a fifth of the page above the footer — the commonest way a page reads empty while the page-wide bands stay inside their limits. On an `airy` deck the same three thresholds relax (4%, 14%, 32%) and the column gate is off, so a live-pitch page can carry one chart and three words without argument.
+
+## The weight contract
+
+`fill` says how full the pages read; `weight` says what a page must carry, and it is the same contract for every page of the deck, so one template governs density the way it governs colour.
+
+```json
+{ "fill": "full",
+  "weight": { "pageWords": 130, "columnFill": 0.68, "plotSpan": 0.60, "pointWords": 10, "tableFill": 0.45, "elements": 2 } }
+```
+
+| Key | What it floors |
+| --- | --- |
+| `pageWords` | words of page text - everything printed - on a content page (`THIN_PAGE`) |
+| `columnFill` | how far down its own track the commentary column must reach (`THIN_COLUMN`) |
+| `pointWords` | mean words per point in that column, so points are findings and not labels (`POINT_DEPTH`) |
+| `plotSpan` | how much of the exhibit frame the marks must span (`PLOT_SPAN`) |
+| `tableFill` | how much of the page's row budget a table should use (`THIN_TABLE`) |
+| `elements` | evidence elements on an analytical page; 2 on a document-weight deck (`THIN_EVIDENCE`) |
+
+It resolves in three steps: the deck's own `weight`, then the `weight` in the house profile a `template` produced, then the defaults for the deck's `fill` (full 130 / 0.68 / 0.60, balanced 95 / 0.55 / 0.52, airy off). Every number is a floor, never a ceiling: the ceiling on prose is the `WORDS` gate and it has not moved. A catalogue of components or chart types declares `fill: "airy"` and the floors switch off - a page that exists to show one encoding is not carrying an argument.
+
+Both the gates and the runtime read the same block, so a change to it moves the composed page as well as the finding: on a deck that is not airy the side column spreads its points down its track, its width is negotiated against what it holds (a short column narrows and gives the width to the exhibit; a long one widens), and the bars thicken when there are few categories.
 
 ## Density
 

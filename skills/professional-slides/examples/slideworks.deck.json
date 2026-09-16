@@ -183,7 +183,7 @@
    "points": [
     {
      "lead": "New-age tech investments declined ~65%",
-     "text": "over 2022\u201323 as cautionary investor sentiment hit business-model viability"
+     "text": "over 2022–23 as cautionary investor sentiment hit business-model viability"
     },
     {
      "lead": "SaaS dealmaking corrected",
@@ -280,9 +280,14 @@
     {
      "lead": "Surveillance remained necessary",
      "text": "as localised outbreaks continued past the peak"
+    },
+    {
+     "lead": "Daily cases fell back fast",
+     "text": "from a 909-case peak on Feb 29 to under 100 by Mar 20, without a national lockdown"
     }
    ],
-   "source": "KCDC situation reports"
+   "source": "KCDC situation reports",
+   "soWhat": "Testing capacity and contact tracing, not movement restrictions, did the work in the first wave."
   },
   {
    "title": "Washington DC ranks third among very large US urban areas for congestion delay",
@@ -459,9 +464,11 @@
    },
    "callout": {
     "lead": "Outlook legend",
-    "text": "\u2191 strong activity expected; \u2192 moderate; \u2193 limited activity"
+    "text": "↑ strong activity expected; → moderate; ↓ limited activity"
    },
-   "source": "Venture Intelligence; Bain analysis"
+   "source": "Venture Intelligence; Bain analysis",
+   "soWhat": "Healthcare and advanced manufacturing carry the 2024 pipeline; IT services need a valuation reset before deal flow returns.",
+   "note": "Outlook reflects Bain's deal-team view of 2024 activity, not a forecast of returns"
   },
   {
    "title": "Retail and corporate banking hold two thirds of the revenue pool, mostly domestic",
@@ -633,11 +640,21 @@
     "label": "of institutions rank productivity improvement first"
    },
    "points": [
-    "44% rank business needs as the second factor of importance",
-    "25% rank regulatory compliance as the third factor",
-    "50% rank return on investment as the least important factor"
+    {
+     "lead": "Business needs rank second",
+     "text": "for 44% of institutions, ahead of compliance in every region except the EU"
+    },
+    {
+     "lead": "Regulatory compliance ranks third",
+     "text": "for 25%, concentrated among the banks already inside supervisory GenAI reviews"
+    },
+    {
+     "lead": "Return on investment ranks last",
+     "text": "for 50%, which is what a pilot portfolio looks like before it reaches production"
+    }
    ],
-   "source": "IACPM/McKinsey survey, December 2024 (n = 33)"
+   "source": "IACPM/McKinsey survey, December 2024 (n = 33)",
+   "soWhat": "Productivity is the stated case, so the first production use cases will be judged on analyst time saved, not on revenue."
   },
   {
    "title": "Most institutions have access to external GenAI tools but half require internal guidelines first",
@@ -715,15 +732,15 @@
      },
      {
       "value": "0.4%",
-      "label": "China's share of new reported cases, March 18\u201324"
+      "label": "China's share of new reported cases, March 18–24"
      },
      {
       "value": ">160%",
-      "label": "Increase in reported cases March 18\u201324 from Europe"
+      "label": "Increase in reported cases March 18–24 from Europe"
      },
      {
       "value": "35",
-      "label": "New countries or territories with cases, March 18\u201324"
+      "label": "New countries or territories with cases, March 18–24"
      },
      {
       "value": "3.5x",

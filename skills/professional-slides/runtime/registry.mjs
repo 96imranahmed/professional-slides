@@ -497,10 +497,13 @@ function bodyListLayout(frame, itemsIn, props = {}) {
 function bodyListNodes({ id, frame, props }) {
   const layout = bodyListLayout(frame, props.items, props);
   if (layout.height > frame.height + 0.01) throw new Error(`${id} body bullets exceed the allocated height; allocate space or edit copy, never shrink type`);
-  // `distribute: true` (a full-fill deck's side column) spreads the rows down
-  // the frame instead of stacking them at the top, up to twice the theme gap.
+  // `distribute: true` (a side column on any deck that is not airy) spreads the
+  // rows down the frame instead of stacking them at the top. The gap is capped
+  // near the height of a two-line item: past that the list reads as a menu, and
+  // the answer to a column that still ends early is more content or a narrower
+  // column, not more air.
   const spare = Math.max(0, frame.height - layout.height);
-  const extraGap = props.distribute === true && layout.measured.length > 1 ? Math.min(spare / (layout.measured.length - 1), 44) : 0;
+  const extraGap = props.distribute === true && layout.measured.length > 1 ? Math.min(spare / (layout.measured.length - 1), 56) : 0;
   // On a dark or primary panel the list reads in white: white text, white markers,
   // reversed number discs.
   const inverse = props.tone === "inverse";

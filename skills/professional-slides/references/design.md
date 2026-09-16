@@ -89,6 +89,8 @@ Use an image or icon when it improves meaning or recognition: a place, a product
 
 **The photograph budget.** A photograph is evidence only where the picture is what the reader is judging. Keep them under a third of the analytical pages and never two pages running (`IMAGE_BUDGET`, `IMAGE_RUN`); covers, dividers and the closing statement are outside the count and are where a photograph does the most work. A grid of four pictures with captions is a mood board: if the pictures are examples of one claim, the claim is the page and the examples are a list beside it. Every picture page still carries a so-what, an insight or a points column (`MISSING_ARGUMENT`) - a caption names the subject, it does not argue about it.
 
+**Density is evidence, not clutter.** Published client pages carry a median of 196 words of page text (quartiles 127 and 282, measured over 1,832 pages). Fill the page with the rows behind the summary, the second cut of the measure, the values on the marks, the basis in a footnote and a commentary column written in sentences - and keep prose out of the space an exhibit should hold. The `weight` contract sets the floors and the `WORDS` gate keeps the ceiling.
+
 **The page mix.** Across a deck, at least three families of page (chart, table or scorecard, comparison, framework, picture) and at least 45% of analytical pages carrying a measurement (`PAGE_VARIETY`, `EVIDENCE_MIX`). A deck built from one construction is one page shown many times, whatever its titles say.
 
 ## Working from a reference deck

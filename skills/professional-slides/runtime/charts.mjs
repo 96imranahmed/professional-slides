@@ -700,7 +700,11 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     style: lineStyle(INK)
   }));
   const categorySpan = (horizontal ? plot.height : plot.width) / categories.length;
-  let groupSpan = categorySpan * 0.7;
+  // Bar weight follows the category count. Four categories drawn at the
+  // many-category gap read as ribbons with the page showing through; the firm
+  // pages set few, fat bars and many, thinner ones.
+  const barWeight = categories.length <= 3 ? 0.86 : categories.length <= 6 ? 0.78 : 0.7;
+  let groupSpan = categorySpan * barWeight;
   let stackExternalWidth = 0;
   if (stacked && !horizontal && showDataLabels) {
     for (const category of categories) for (const item of series) {

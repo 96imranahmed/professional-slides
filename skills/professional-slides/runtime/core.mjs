@@ -978,7 +978,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   for (const sequence of templateSequences) {
     if (sequence.slides.length !== sequence.total) throw new Error(`Template sequence ${sequence.id} declares ${sequence.total} slides but contains ${sequence.slides.length}`);
   }
-  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), tokens: designTokens, templateSequences };
+  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), ...(deckSpec.weight ? { weight: deckSpec.weight } : {}), tokens: designTokens, templateSequences };
   deck.manifest = buildManifest(deck);
   return deck;
   });

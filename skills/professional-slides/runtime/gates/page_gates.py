@@ -109,6 +109,9 @@ PROFILES = {
     "live-pitch": {"words_exhibit": 70, "words_text": 100},
     "executive": {"words_exhibit": 100, "words_text": 140},
     "pre-read": {"words_exhibit": 130, "words_text": 180},
+    # Source-rich support behind the story, set in the smallest approved type:
+    # it carries more words in the same frame, by design.
+    "appendix": {"words_exhibit": 160, "words_text": 220},
 }
 DEFAULT_PROFILE = "executive"
 
@@ -121,6 +124,21 @@ FILL_LEVELS = {
     "airy": {"ink_min": 0.04, "dead_band_max": 0.14, "internal_void_max": 0.32, "column_void_max": 1.0},
 }
 DEFAULT_FILL = "balanced"
+
+# What a page of this deck is expected to carry. Mirrors runtime/weight.mjs: the
+# deck's `weight` (its own, or the one a template's house profile measured) is
+# carried on the scene, and these are the fallbacks by fill level. Every number
+# is a floor, never a ceiling — the ceiling on prose is WORDS, and density is
+# only a defect when the content is not.
+WEIGHT_BY_FILL = {
+    "full": {"pageWords": 130, "columnFill": 0.68, "plotSpan": 0.60, "pointWords": 10, "tableFill": 0.55, "elements": 2},
+    "balanced": {"pageWords": 95, "columnFill": 0.55, "plotSpan": 0.52, "pointWords": 8, "tableFill": 0.45, "elements": 1},
+    "airy": {"pageWords": 0, "columnFill": 0.0, "plotSpan": 0.0, "pointWords": 0, "tableFill": 0.0, "elements": 1},
+}
+# 1,832 pages of published McKinsey, BCG and Bain client decks: median 196 words
+# of page text, quartiles 127 and 282. The floors sit below that on purpose.
+REFERENCE_PAGE_WORDS = {"p25": 127, "median": 196, "p75": 282, "pages": 1832}
+WEIGHT = dict(WEIGHT_BY_FILL[DEFAULT_FILL])
 
 THRESHOLDS = {
     "ink_min": 0.08,   # a 12pt text page with 120 words sits near 9%; waived when a qualifying hero exhibit carries the page (a line chart is ink-light by nature)
@@ -609,6 +627,242 @@ def gate_nice_ticks(slide_no, slide, findings):
         ))
 
 
+def page_text_words(slide):
+    """Every word printed on the page: title, labels, table cells, footnotes.
+    The same thing `pdftotext` counts, so our pages can be compared with the
+    reference decks rather than with our own idea of a page."""
+    total = 0
+    for node in text_nodes(slide):
+        total += word_count(source_text(node))
+    return total
+
+
+def side_columns(slide):
+    """The commentary columns on the page, as the composer names them."""
+    out = []
+    for instance in slide.get("componentInstances", []):
+        ident = str(instance.get("id") or "")
+        if ident.endswith("-side") and (instance.get("frame") or {}).get("height"):
+            out.append(instance)
+    return out
+
+
+def nodes_inside(slide, frame, predicate=None):
+    out = []
+    for node in slide.get("nodes", []):
+        f = node.get("frame") or {}
+        if not f:
+            continue
+        cx, cy = f.get("x", 0) + f.get("width", 0) / 2, f.get("y", 0) + f.get("height", 0) / 2
+        if not (frame.get("x", 0) - 1 <= cx <= frame.get("x", 0) + frame.get("width", 0) + 1):
+            continue
+        if not (frame.get("y", 0) - 1 <= cy <= frame.get("y", 0) + frame.get("height", 0) + 1):
+            continue
+        if predicate is None or predicate(node):
+            out.append(node)
+    return out
+
+
+def gate_thin_page(slide_no, slide, findings):
+    """THIN_PAGE. A content page carrying less than the deck's weight floor of
+    page text. Not a style rule: a reader who gets three bullets and a chart has
+    been handed the analysis to do themselves."""
+    floor = WEIGHT.get("pageWords") or 0
+    if floor <= 0:
+        return
+    words = page_text_words(slide)
+    if words >= floor:
+        return
+    findings.append(finding(
+        slide_no, "THIN_PAGE", words, floor,
+        "The page is under-carrying. Deepen it where the evidence is: more "
+        "categories or rows on the exhibit, the second cut of the same measure, "
+        "labels on the marks, a footnote that states the basis, and points that "
+        "run to a sentence each. Reference client pages carry a median of "
+        f"{REFERENCE_PAGE_WORDS['median']} words of page text.",
+    ))
+
+
+def gate_thin_column(slide_no, slide, findings):
+    """THIN_COLUMN and POINT_DEPTH. The commentary column is a track the page
+    paid for: it reaches the bottom of the exhibit beside it, and its points
+    carry a sentence rather than a label."""
+    floor = WEIGHT.get("columnFill") or 0
+    depth = WEIGHT.get("pointWords") or 0
+    for column in side_columns(slide):
+        frame = column.get("frame") or {}
+        height = float(frame.get("height") or 0)
+        if height < 120:
+            continue
+        # A toned panel fills its own surface; what matters is the text in it.
+        content = nodes_inside(slide, frame, lambda n: n.get("type") in ("text", "image") or str(n.get("role") or "") in ("list-marker", "list-icon"))
+        if not content:
+            continue
+        bottom = max((n["frame"].get("y", 0) + n["frame"].get("height", 0)) for n in content)
+        reach = (bottom - frame.get("y", 0)) / height
+        if floor > 0 and reach < floor:
+            findings.append(finding(
+                slide_no, "THIN_COLUMN", round(reach, 3), floor,
+                "The commentary column stops early. Give it the content the page "
+                "already implies — a lead and a sentence per point, the number "
+                "the chart proves as a `kpi`, the consequence as `soWhat` — or "
+                "let the exhibit have the width.",
+            ))
+        if depth <= 0:
+            continue
+        items = [n for n in content if str(n.get("role") or "") in ("list-item", "list-lead")]
+        if len(items) >= 2:
+            words = sum(word_count(source_text(n)) for n in items)
+            leads = len([n for n in items if str(n.get("role")) == "list-lead"])
+            bodies = max(1, len(items) - leads)
+            mean = words / float(bodies)
+            if mean < depth:
+                findings.append(finding(
+                    slide_no, "POINT_DEPTH", round(mean, 1), depth,
+                    "The points are labels, not findings. Write each as a lead "
+                    "and a sentence: what the evidence says, and what follows "
+                    "from it for the decision.",
+                ))
+
+
+def gate_plot_span(slide_no, slide, findings):
+    """PLOT_SPAN. The marks should span the exhibit frame they were given. A bar
+    chart whose bars cross half its box is a page that paid for an exhibit and
+    printed a diagram."""
+    floor = WEIGHT.get("plotSpan") or 0
+    if floor <= 0:
+        return
+    for instance in slide.get("componentInstances", []):
+        component = str(instance.get("component") or "")
+        if component not in ("chart.column", "chart.bar", "chart.stacked-column", "chart.stacked-bar"):
+            continue
+        frame = instance.get("frame") or {}
+        marks = nodes_inside(slide, frame, lambda n: str(n.get("role") or "") == "chart-mark")
+        if len(marks) < 2:
+            continue
+        # A chart that brackets periods, flags events or carries a growth arrow
+        # spends that band on content, not on air: those bands are ink.
+        annotated = nodes_inside(slide, frame, lambda n: str(n.get("role") or "") in (
+            "chart-period-label", "chart-event-label", "chart-annotation",
+            "chart-annotation-label", "chart-bracket-label", "chart-callout",
+            "chart-change-label", "chart-delta-label", "annotation-text",
+            "annotation-surface", "chart-badge"))
+        if annotated:
+            continue
+        # Peers in a row share one plot frame: when the annotated panel reserves
+        # a band for its growth arrows, the panel beside it reserves the same
+        # band so their baselines coincide. That band is the row's, not this
+        # chart's failure to fill.
+        peer_annotated = False
+        for other in slide.get("componentInstances", []):
+            if other is instance or not str(other.get("component") or "").startswith("chart."):
+                continue
+            other_frame = other.get("frame") or {}
+            if abs(float(other_frame.get("y") or 0) - float(frame.get("y") or 0)) > 8:
+                continue
+            if abs(float(other_frame.get("height") or 0) - float(frame.get("height") or 0)) > 8:
+                continue
+            if nodes_inside(slide, other_frame, lambda n: str(n.get("role") or "") in (
+                    "chart-period-label", "chart-event-label", "chart-annotation",
+                    "chart-annotation-label", "chart-bracket-label", "chart-callout",
+                    "chart-change-label", "chart-delta-label", "annotation-text",
+                    "annotation-surface", "chart-badge")):
+                peer_annotated = True
+                break
+        if peer_annotated:
+            continue
+        horizontal = component in ("chart.bar", "chart.stacked-bar")
+        if horizontal:
+            low = min(m["frame"].get("x", 0) for m in marks)
+            high = max(m["frame"].get("x", 0) + m["frame"].get("width", 0) for m in marks)
+            span = (high - low) / max(1.0, float(frame.get("width") or 1))
+        else:
+            low = min(m["frame"].get("y", 0) for m in marks)
+            high = max(m["frame"].get("y", 0) + m["frame"].get("height", 0) for m in marks)
+            span = (high - low) / max(1.0, float(frame.get("height") or 1))
+        if span < floor:
+            findings.append(finding(
+                slide_no, "PLOT_SPAN", round(span, 3), floor,
+                "The marks use a fraction of the exhibit. Tighten the value "
+                "scale, drop the reserved annotation band if nothing annotates, "
+                "widen the bars for few categories, or give the freed width back "
+                "to the commentary column.",
+            ))
+            return
+
+
+def gate_thin_table(slide_no, slide, findings):
+    """THIN_TABLE. A table using a fraction of the page's row budget is a table
+    that stopped at the summary level."""
+    floor = WEIGHT.get("tableFill") or 0
+    if floor <= 0:
+        return
+    for instance in top_level_instances(slide):
+        if str(instance.get("component") or "") != "table":
+            continue
+        frame = instance.get("frame") or {}
+        height = float(frame.get("height") or 0)
+        if height < 200:
+            continue
+        rows = nodes_inside(slide, frame, lambda n: str(n.get("role") or "") in ("table-row-rule", "table-cell-text", "table-cell"))
+        if not rows:
+            continue
+        bottom = max((n["frame"].get("y", 0) + n["frame"].get("height", 0)) for n in rows)
+        used = (bottom - frame.get("y", 0)) / height
+        if used < floor:
+            findings.append(finding(
+                slide_no, "THIN_TABLE", round(used, 3), floor,
+                "The table uses a fraction of the page it was given. Bring the "
+                "next level of detail — the rows behind the summary, the column "
+                "that shows the basis — or make the table a strip and put the "
+                "freed height into the argument.",
+            ))
+            return
+
+
+def gate_numbers_on_marks(slide_no, slide, findings):
+    """NUMBERS_ON_MARKS. An exhibit page prints its numbers. A chart whose values
+    live on an axis makes the reader do arithmetic to quote it."""
+    if not WEIGHT.get("pageWords"):
+        return  # an airy deck speaks its numbers aloud; the page need not print them
+    charts = [c for c in slide.get("componentInstances", []) if str(c.get("component") or "").startswith("chart.")]
+    if not charts:
+        return
+    labels = [n for n in text_nodes(slide) if str(n.get("role") or "") == "data-label"]
+    numeric = [n for n in labels if re.search(r"\d", source_text(n))]
+    if len(numeric) >= 3:
+        return
+    findings.append(finding(
+        slide_no, "NUMBERS_ON_MARKS", len(numeric), 3,
+        "Print the values on the marks (`dataLabels`), or label the endpoints "
+        "and the decisive category. The numbers are the evidence; an axis is a "
+        "lookup table.",
+    ))
+
+
+def gate_thin_evidence(slide_no, slide, findings):
+    """THIN_EVIDENCE. A deck that reads as a document (a pre-read, an appendix,
+    anything the weight contract sets to two elements) puts more than one piece
+    of evidence on a page: the chart and the table behind it, the chart and the
+    measured tiles, the two cuts of the same measure."""
+    wanted = int(WEIGHT.get("elements") or 1)
+    if wanted < 2:
+        return
+    instances = top_level_instances(slide)
+    elements = len([c for c in instances if is_exhibit(c)])
+    if any(str(c.get("component") or "") == "metric" for c in instances):
+        elements += 1
+    if elements >= wanted:
+        return
+    findings.append(finding(
+        slide_no, "THIN_EVIDENCE", elements, wanted,
+        "One exhibit on a page of a document-weight deck. Add the second piece "
+        "the argument already implies - the table behind the chart, the same "
+        "measure on another cut, a strip of measured tiles - or merge this page "
+        "with its neighbour.",
+    ))
+
+
 def gate_dot_separators(slide_no, slide, findings):
     """DOT_SEPARATOR. A bullet joining two labels — "1939 • Marvel Comics #1",
     "SUPERMAN • Hope" — is a tic, not a structure. The house writes the qualifier
@@ -845,6 +1099,15 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
     if fill not in FILL_LEVELS:
         raise ValueError(f"Unknown fill level: {fill}")
     THRESHOLDS.update(FILL_LEVELS[fill])
+    # The deck's weight contract: its own, or the one a template's house profile
+    # measured, falling back to the fill level's floors.
+    WEIGHT.clear()
+    WEIGHT.update(WEIGHT_BY_FILL.get(fill, WEIGHT_BY_FILL[DEFAULT_FILL]))
+    declared = scene.get("weight")
+    if isinstance(declared, dict):
+        for key, value in declared.items():
+            if key in WEIGHT and isinstance(value, (int, float)):
+                WEIGHT[key] = value
     slides = scene.get("slides", [])
     findings = []
     content_indexes = []
@@ -894,6 +1157,20 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_cpl(slide_no, slide, findings)
             if wanted("MISSING_ARGUMENT"):
                 gate_missing_argument(slide_no, slide, findings)
+            if wanted("THIN_PAGE"):
+                gate_thin_page(slide_no, slide, findings)
+            if wanted("THIN_COLUMN") or wanted("POINT_DEPTH"):
+                page = []
+                gate_thin_column(slide_no, slide, page)
+                findings.extend(f for f in page if wanted(f["code"]))
+            if wanted("PLOT_SPAN"):
+                gate_plot_span(slide_no, slide, findings)
+            if wanted("THIN_TABLE"):
+                gate_thin_table(slide_no, slide, findings)
+            if wanted("NUMBERS_ON_MARKS"):
+                gate_numbers_on_marks(slide_no, slide, findings)
+            if wanted("THIN_EVIDENCE"):
+                gate_thin_evidence(slide_no, slide, findings)
             if wanted("METRIC_STACK"):
                 gate_metric_stack(slide_no, slide, findings)
         if wanted("DOT_SEPARATOR"):
@@ -911,6 +1188,51 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
     if not gates or "NO_SECTIONS" in gates:
         gate_deck_structure(slides, content_indexes, findings)
 
+    # A density report beside the findings: the numbers this review is about, so
+    # a regression shows up as a number rather than as a screenshot.
+    measured_words, measured_columns, measured_spans = [], [], []
+    for index in content_indexes:
+        slide = slides[index]
+        measured_words.append(page_text_words(slide))
+        for column in side_columns(slide):
+            frame = column.get("frame") or {}
+            height = float(frame.get("height") or 0)
+            content = nodes_inside(slide, frame, lambda n: n.get("type") in ("text", "image"))
+            if height >= 120 and content:
+                bottom = max((n["frame"].get("y", 0) + n["frame"].get("height", 0)) for n in content)
+                measured_columns.append((bottom - frame.get("y", 0)) / height)
+        for instance in slide.get("componentInstances", []):
+            component = str(instance.get("component") or "")
+            if component not in ("chart.column", "chart.bar", "chart.stacked-column", "chart.stacked-bar"):
+                continue
+            frame = instance.get("frame") or {}
+            marks = nodes_inside(slide, frame, lambda n: str(n.get("role") or "") == "chart-mark")
+            if len(marks) < 2:
+                continue
+            if component in ("chart.bar", "chart.stacked-bar"):
+                low = min(m["frame"].get("x", 0) for m in marks)
+                high = max(m["frame"].get("x", 0) + m["frame"].get("width", 0) for m in marks)
+                measured_spans.append((high - low) / max(1.0, float(frame.get("width") or 1)))
+            else:
+                low = min(m["frame"].get("y", 0) for m in marks)
+                high = max(m["frame"].get("y", 0) + m["frame"].get("height", 0) for m in marks)
+                measured_spans.append((high - low) / max(1.0, float(frame.get("height") or 1)))
+
+    def median(values):
+        if not values:
+            return None
+        ordered = sorted(values)
+        middle = len(ordered) // 2
+        value = ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+        return round(value, 3)
+
+    density = {
+        "pageWords": {"median": median(measured_words), "min": min(measured_words) if measured_words else None,
+                      "floor": WEIGHT.get("pageWords"), "referenceMedian": REFERENCE_PAGE_WORDS["median"]},
+        "columnFill": {"median": median(measured_columns), "floor": WEIGHT.get("columnFill"), "columns": len(measured_columns)},
+        "plotSpan": {"median": median(measured_spans), "floor": WEIGHT.get("plotSpan"), "charts": len(measured_spans)},
+    }
+
     by_code = {}
     for item in findings:
         by_code[item["code"]] = by_code.get(item["code"], 0) + 1
@@ -918,6 +1240,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         "schema": "professional-slides.page-gates/v1",
         "profile": profile,
         "fill": fill,
+        "weight": dict(WEIGHT),
+        "density": density,
         "slides": len(slides),
         "coverSlides": covers,
         "contentSlides": len(content_indexes),
