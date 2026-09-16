@@ -63,8 +63,23 @@ export function heatScaleTokens(colors) {
 }
 
 export function resolvePalette(id = "mckinsey", baseTokens, slots) {
-  if (typeof id !== "string" || !Object.hasOwn(PALETTES, id)) throw new Error(`Unknown palette: ${id}`);
-  const preset = PALETTES[id];
+  // A palette object `{ base, colors, label? }` (a house profile imported from a
+  // template deck) overlays its colours and style tokens on a named base.
+  let preset;
+  if (id && typeof id === "object" && !Array.isArray(id)) {
+    const base = id.base ?? "mckinsey";
+    if (!Object.hasOwn(PALETTES, base)) throw new Error(`Unknown palette base: ${base}`);
+    const colors = id.colors || {};
+    for (const [key, value] of Object.entries(colors)) {
+      if (key.startsWith("color.") && !/^#[0-9A-Fa-f]{6}$/.test(String(value))) throw new Error(`Palette colour ${key} must be a #RRGGBB hex`);
+      if (!key.startsWith("color.") && !key.startsWith("style.") && !key.startsWith("font.")) throw new Error(`Palette override ${key} must be a color., style. or font. token`);
+    }
+    preset = { ...PALETTES[base], label: id.label ?? `${PALETTES[base].label} (custom)`, colors: { ...PALETTES[base].colors, ...colors } };
+    id = id.id ?? `${base}-custom`;
+  } else {
+    if (typeof id !== "string" || !Object.hasOwn(PALETTES, id)) throw new Error(`Unknown palette: ${id}`);
+    preset = PALETTES[id];
+  }
   const tokens = Object.fromEntries(Object.entries(baseTokens).map(([key, value]) => [key, { ...value, value: preset.colors[key] ?? value.value }]));
   Object.assign(tokens,heatScaleTokens(Object.fromEntries(Object.entries(tokens).map(([key,definition])=>[key,definition.value]))));
   // A colour token may share a theme slot only while its value equals that slot.

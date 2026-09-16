@@ -287,7 +287,7 @@ export function splitTables(slide) {
  * pages marked (1/2), (2/2). Applies to a lone table under an auto layout.
  */
 const MAX_ROWS = 8;
-export function paginateTable(slide) {
+export function paginateTable(slide, bodyScale = 1) {
   if (slide.layout && slide.layout !== "auto") return [slide];
   const ex = slide.exhibit;
   if (!ex || ex.type !== "table" || !Array.isArray(ex.rows) || slide.exhibits) return [slide];
@@ -296,11 +296,16 @@ export function paginateTable(slide) {
   // cells wrap, so a ranking table keeps a dozen rows on a page while a text
   // table breaks at eight.
   const cellText = (cell) => String(cell?.text ?? (Array.isArray(cell?.points) ? cell.points.join(" ") : cell ?? ""));
-  const lines = (r) => Math.max(1, ...(Array.isArray(r) ? r : r.cells || []).map((cell) => Math.ceil(cellText(cell).length / 42)));
-  const total = ex.rows.reduce((sum, r) => sum + lines(r), 0);
-  const budget = slide.points?.length ? 12 : 16;
-  if (ex.rows.length <= MAX_ROWS && total <= budget) return [slide];
-  const rowsPerPage = Math.max(MAX_ROWS, Math.floor(budget / Math.max(1, total / ex.rows.length)));
+  const columnChars = slide.points?.length ? 30 : 42;
+  const lines = (r) => Math.max(1, ...(Array.isArray(r) ? r : r.cells || []).map((cell) => Math.ceil(cellText(cell).length / columnChars)));
+  // Row heights in body density: a one-line row takes about 34px, each further
+  // line 16px, the header 40px. The budget is the body height (508px built in,
+  // scaled by a template's chrome) less the page's other furniture.
+  const rowPx = (r) => 34 + 16 * (lines(r) - 1);
+  const available = 508 * bodyScale - 40 - (slide.callout ? 70 : 0) - (Array.isArray(slide.metrics) && slide.metrics.length ? 112 : 0) - (slide.soWhat ? 60 : 0);
+  const totalPx = ex.rows.reduce((sum, r) => sum + rowPx(r), 0);
+  if (totalPx <= available) return [slide];
+  const rowsPerPage = Math.max(3, Math.floor(available / Math.max(34, totalPx / ex.rows.length)));
   if (ex.rows.length <= rowsPerPage) return [slide];
   const pages = Math.ceil(ex.rows.length / rowsPerPage), per = Math.ceil(ex.rows.length / pages);
   return Array.from({ length: pages }, (_, i) => {
@@ -729,12 +734,14 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     slides.push(cover);
   }
   const pages = agendaPages(spec.sectionTabs ? sectionTabs(spec.slides) : spec.slides, spec.agenda, spec.agendaStyle);
-  for (const page of pages.flatMap(splitTables).flatMap(paginateTable)) slides.push(composeSlide(page, slides.length, baseDir));
+  const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140)) / 508)) : 1;
+  for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) slides.push(composeSlide(page, slides.length, baseDir));
   return {
     id: spec.id,
     palette: spec.palette || "mckinsey",
     ...(spec.pageTemplate ? { pageTemplate: spec.pageTemplate } : {}),
     ...(spec.typography ? { typography: spec.typography } : {}),
+    ...(spec.chrome ? { chrome: spec.chrome } : {}),
     slides: slides.map((s) => {
       const page = spec.density && !s.density && s.kind !== "cover" ? { ...s, density: spec.density } : { ...s };
       // The document title sits in the footer beside the page number.
@@ -760,7 +767,31 @@ export function coverageFindings(spec) {
 }
 
 /** Accept v2 (deckPlan) or v3 (deck) and return a deckPlan. */
-export function toDeckPlan(spec, baseDir) {
+/**
+ * `template: "house.json"` applies a house profile written by
+ * runtime/import-template.py from a template deck: its palette overlay,
+ * typography, chrome margins, page template and density become the deck's
+ * defaults; anything the spec sets explicitly still wins.
+ */
+export function applyTemplate(spec, baseDir = process.cwd()) {
+  if (!spec?.template) return spec;
+  const file = path.resolve(baseDir, spec.template);
+  if (!file.endsWith(".json")) throw new Error("template must name a house profile .json (run runtime/import-template.py on the .pptx first)");
+  const house = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (house.schema !== "professional-slides.house/v1") throw new Error("template must be a professional-slides.house/v1 profile");
+  const out = { ...spec };
+  delete out.template;
+  if (!spec.palette && house.palette) out.palette = house.palette;
+  if (!spec.typography && house.typography) out.typography = house.typography;
+  if (!spec.chrome && house.chrome) out.chrome = house.chrome;
+  if (!spec.pageTemplate && house.pageTemplate) out.pageTemplate = house.pageTemplate;
+  if (!spec.density && house.density) out.density = house.density;
+  if (!spec.footer && house.footer) out.footer = house.footer;
+  return out;
+}
+
+export function toDeckPlan(specIn, baseDir) {
+  const spec = applyTemplate(specIn, baseDir);
   if (isV3(spec)) return composeDeck(spec, baseDir);
   if (spec?.deckPlan) return spec.deckPlan;
   throw new Error("Spec must be professional-slides.deck/v3 or carry a deckPlan");

@@ -62,3 +62,22 @@ Resolved values for the exact deck are written to `design-manifest.json`, and pe
 ## House style tokens
 
 Each palette sets seven `style.*` keyword tokens beyond its colours; components read them through `houseStyle(id)` and a page may still ask for a specific title variant. `style.titleWeight` (`bold` | `regular`), `style.titleRule` (`none` | `rule` under the title | `band` behind it), `style.tagPlacement` (`top-right` small caps | `below-title` accent pill | `above-title` accent label), `style.chartHeading` (`text` | `band`, a filled grey band with white heading), `style.listMarker` (`dot` | `dash`), `style.tableRows` (`rules` | `zebra`), `style.labelWeight`, `style.titleLead` (`accent`: the lead in the accent before the rest; `pipe`: "Topic | statement", the BCG title) (`bold` | `regular` value labels, in the scene and the native chart). The `mckinsey` palette also sets `font.display` to a serif; `examples/house-style.deck.json` shows the same eight pages under any palette.
+
+## Template decks and house profiles
+
+`runtime/import-template.py template.pptx [--base mckinsey|bcg|bain|deloitte] [--out house.json]` reads a template deck and writes a house profile:
+
+```json
+{ "schema": "professional-slides.house/v1", "source": "template.pptx",
+  "palette": { "base": "bcg", "id": "template", "label": "template",
+               "colors": { "color.ink": "#575757", "color.componentPrimary": "#03522D", "color.accent": "#29BA74", "color.accentTint": "#E1F5EC", "color.chartSeries1": "#03522D", "…": "…", "style.titleWeight": "regular" } },
+  "typography": { "body": "Arial", "display": "Arial", "semibold": { "family": "Arial", "nativeBold": true, "effectiveWeight": 700 } },
+  "chrome": { "left": 66, "right": 66, "titleTop": 65, "bodyTop": 220, "footerTop": 667 },
+  "footer": "Document title", "density": "executive", "complexity": "medium",
+  "observations": ["Accent taken from the most used bright fill #29BA74", "Body face 'Trebuchet MS' is not installed; Arial used"],
+  "stats": { "slides": 16, "medianWordsPerSlide": 113, "medianShapesPerSlide": 21.5, "charts": 4, "tables": 2, "themeColors": {}, "themeFonts": {}, "topFills": [] } }
+```
+
+How the values are chosen. Ink is the theme's `dk2` when it is a saturated brand dark (a navy, a forest green) and `dk1` otherwise; the primary is `accent1` when it is a brand dark, else the most used dark fill; the accent is the most used bright saturated fill that is not the primary (the bright green, the electric blue), else `accent2`; the chart series are the primary followed by the theme accents, greys appended; tints are the primary and accent mixed 86–88% toward white; the muted surface is `lt2` when light enough. Title weight comes from the master's title style, a title rule or band from a line or filled rectangle on the master under the title. Chrome comes from the slides' own title and body placeholders (medians, scaled to 1280 px), with cover-style titles below 35% of the page height excluded. Density: 90 words or 18 shapes per slide and up is `pre-read`, 35 words or 8 shapes is `executive`, less is `live-pitch`.
+
+A palette may also be written by hand as `{ "base": "mckinsey", "colors": { "color.accent": "#E1251B", "style.titleRule": "none" } }`: colour tokens take `#RRGGBB`, and `style.*` and `font.*` tokens overlay the base's house style. `chrome` on the deck takes `left`, `right`, `titleTop`, `bodyTop`, `footerTop` (and optionally `sourceTop`, `footerRuleY`); the composer scales the table line budget to the body height the chrome leaves, and the page gates read the resulting content frame.

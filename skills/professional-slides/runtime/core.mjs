@@ -21,7 +21,7 @@ export function resolveTitleVariant({ variant, rule } = {}) {
 }
 export const SLIDE = Object.freeze({ width: 1280, height: 720 });
 export const CONTENT_FRAME = Object.freeze({ x: 60, y: 46, width: 1160, height: 632 });
-export const CHROME = Object.freeze({
+const DEFAULT_CHROME = Object.freeze({
   left: 60,
   right: 60,
   titleTop: 44,
@@ -32,6 +32,27 @@ export const CHROME = Object.freeze({
   footerRuleY: 680,
   footerTop: 684
 });
+// The page chrome is read at call time everywhere, so a deck built from a
+// template can move the margins: `configureChrome({ left, right, titleTop,
+// bodyTop, footerTop })` for the build, `configureChrome(null)` to restore.
+export const CHROME = { ...DEFAULT_CHROME };
+export function configureChrome(overrides) {
+  const next = { ...DEFAULT_CHROME };
+  if (overrides) {
+    for (const [key, value] of Object.entries(overrides)) {
+      if (!Object.hasOwn(DEFAULT_CHROME, key)) throw new Error(`Unknown chrome setting: ${key}`);
+      if (!Number.isFinite(value)) throw new Error(`Chrome ${key} must be a number`);
+      next[key] = value;
+    }
+    if (next.left < 24 || next.right < 24 || next.left + next.right > 400) throw new Error("Chrome margins must be between 24px and a combined 400px");
+    if (next.titleTop < 16 || next.bodyTop < next.titleTop + 48) throw new Error("Chrome bodyTop must sit at least 48px under titleTop");
+    if (next.footerTop <= next.bodyTop + 200 || next.footerTop > 700) throw new Error("Chrome footerTop leaves no body height");
+    if (overrides.footerTop !== undefined && overrides.sourceTop === undefined) next.sourceTop = next.footerTop - 36;
+    if (overrides.footerTop !== undefined && overrides.footerRuleY === undefined) next.footerRuleY = next.footerTop - 4;
+  }
+  Object.assign(CHROME, next);
+  return { ...CHROME };
+}
 // 12-column grid inside the 1160px content width: 12 × 82 + 11 × 16.
 export const GRID = Object.freeze({ columns: 12, column: 82, gutter: 16 });
 export function gridSpan(columns, start = 0) {
@@ -761,6 +782,10 @@ export function nativeChartSpec(componentId, props = {}, frame) {
 }
 
 export function compileDeck(deckSpec, registry, {slideCache}={}) {
+  configureChrome(deckSpec.chrome || null);
+  try { return compileDeckInner(deckSpec, registry, {slideCache}); } finally { configureChrome(null); }
+}
+function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   assertNoLegacyPageTaxonomy(deckSpec);
   const { tokens: designTokens, ...palette } = resolvePalette(deckSpec.palette, TOKENS, THEME_SLOT_TOKENS);
   const typography = resolveTypography(deckSpec.typography, designTokens);
