@@ -18,6 +18,7 @@ import {
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { legendRowCount, legendNodes, LEGEND_TOKENS } from "./legends.mjs";
+import { EXTRA_CHARTS } from "./charts-extra.mjs";
 import { contrastRatio } from "./palettes.mjs";
 import { CHART_GUIDANCE } from "./guidance.mjs";
 import {
@@ -36,16 +37,16 @@ import {
   renderEvidenceAnnotations
 } from "./chart-annotations.mjs";
 
-const FONT = token("font.body");
-const INK = token("color.ink");
-const SECONDARY = token("color.textSecondary");
-const GRID = token("color.chartGrid");
-const PRIMARY = token("color.chartSeries1");
-const CHART_LABEL = token("type.chartLabel");
-const CHART_ANNOTATION = token("type.chartAnnotation");
-const AXIS_LABEL = token("type.chartLabel");
+export const FONT = token("font.body");
+export const INK = token("color.ink");
+export const SECONDARY = token("color.textSecondary");
+export const GRID = token("color.chartGrid");
+export const PRIMARY = token("color.chartSeries1");
+export const CHART_LABEL = token("type.chartLabel");
+export const CHART_ANNOTATION = token("type.chartAnnotation");
+export const AXIS_LABEL = token("type.chartLabel");
 const SPARSE_DIRECT_LABEL_LIMIT = 8;
-const SERIES = [
+export const SERIES = [
   token("color.chartSeries1"),
   token("color.chartSeries2"),
   token("color.chartSeries3"),
@@ -54,7 +55,7 @@ const SERIES = [
   token("color.chartSeries6")
 ];
 
-function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, periodBand = 0 } = {}) {
+export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, periodBand = 0 } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
   leftInset = Math.max(leftInset, bands.left);
   // Peer charts in a row pass the row's tallest top band as topInset so their
@@ -77,26 +78,26 @@ function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotati
 
 
 /** Value labels follow the house style: bold by default, regular where the firm sets them light. */
-const labelBold = () => houseStyle("style.labelWeight") !== "regular";
-function textStyle(size = CHART_LABEL, color = SECONDARY, bold = false, align = "center") {
+export const labelBold = () => houseStyle("style.labelWeight") !== "regular";
+export function textStyle(size = CHART_LABEL, color = SECONDARY, bold = false, align = "center") {
   return { ...(bold ? chartAnnotationStyle() : { fontFamily: FONT }), fontSize: size, color, bold, align, valign: "mid" };
 }
 
-function lineStyle(stroke = GRID, width = token("line.hairline"), dash = "solid") {
+export function lineStyle(stroke = GRID, width = token("line.hairline"), dash = "solid") {
   return { stroke, lineWidth: width, dash };
 }
 
-function fillStyle(fill, stroke = fill, width = token("line.hairline"), opacity = 1) {
+export function fillStyle(fill, stroke = fill, width = token("line.hairline"), opacity = 1) {
   return { fill, stroke, lineWidth: width, opacity };
 }
 
-function topLegend({ id, frame, items, align = "right", variant = "swatch" }) {
+export function topLegend({ id, frame, items, align = "right", variant = "swatch" }) {
   if (!items.length) return [];
   const rows = legendRowCount(items, frame.width - 70);
   return legendNodes({ id, frame: { x: frame.x + 54, y: frame.y + 7, width: frame.width - 70, height: 28 + (rows - 1) * 26 }, props: { items, placement: align === "right" ? "top-right" : "top", variant } });
 }
 /** Rows a chart's top legend needs, for the plot inset. */
-const legendRowsFor = (items, frame) => items.length ? legendRowCount(items, frame.width - 70) : 0;
+export const legendRowsFor = (items, frame) => items.length ? legendRowCount(items, frame.width - 70) : 0;
 
 /**
  * Tick steps a reader recognises: 1, 2, 2.5 or 5 times a power of ten.
@@ -181,7 +182,7 @@ function normalizedCategoricalData(props, { seriesCount = null } = {}) {
   return { categories: [...props.categories], series };
 }
 
-function numericBounds(values, { min, max, axis = "y", includeZero = false, tight = false } = {}) {
+export function numericBounds(values, { min, max, axis = "y", includeZero = false, tight = false } = {}) {
   if (!Array.isArray(values) || !values.length || values.some(value => !Number.isFinite(value))) throw new Error(`${axis}-axis values must be finite`);
   // With no value axis the marks carry their values, so the domain fits the
   // data (zero-anchored for bars, padded for lines) instead of the tick ladder,
@@ -229,11 +230,11 @@ function axisTickText(min, max, index, steps = 4) {
   return String(Number(value.toFixed(Math.min(10, decimals))));
 }
 
-function axisLabelWidth(bounds) {
+export function axisLabelWidth(bounds) {
   return Math.max(48, ...Array.from({ length: 5 }, (_, index) => Math.ceil(measureText(axisTickText(bounds.min, bounds.max, index), 1000, { fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width)));
 }
 
-function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48 } = {}) {
+export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48 } = {}) {
   const nodes = [];
   if (showValueAxis) {
     for (let index = 0; index <= steps; index += 1) {
@@ -1829,7 +1830,8 @@ const chartDefinitions = [
     render: renderHorizons,
     sample: HORIZONS_SAMPLE,
     tokens: HORIZONS_TOKENS
-  }
+  },
+  ...EXTRA_CHARTS.map(({ id, render, sample }) => ({ id, render, sample }))
 ];
 
 function chartExamples(id) {
@@ -1946,6 +1948,7 @@ export function registerCharts(registry) {
       // like a section's, so peers beside it take the same band height and the
       // rules line up. The compiler passes the shared height back as headerBandHeight.
       ...(chart.id === "chart.waffle" ? { measureContent: ({ frame, props = {} }) => ({ height: waffleLayout(frame, props).height }) } : {}),
+      ...(EXTRA_CHARTS.some((c) => c.id === chart.id) ? { measureContent: ({ frame, props = {} }) => ({ height: EXTRA_CHARTS.find((c) => c.id === chart.id).layout(frame, props).height }) } : {}),
       ...(chart.id === "chart.marimekko" ? { measureContent: ({ frame, props = {} }) => ({ height: marimekkoLayout(frame, props).height }) } : {}),
       ...(chart.id === "chart.bubble-grid" ? { measureContent: ({ frame, props = {} }) => ({ height: bubbleGridLayout(frame, props).height }) } : {}),
       measureHeader: ({ frame, props = {} }) => {
