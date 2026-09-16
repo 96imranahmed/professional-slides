@@ -62,7 +62,20 @@ function tableAlias(ex) {
     const l = left.points || (left.text ? [left.text] : []), r = right.points || (right.text ? [right.text] : []);
     const n = Math.max(l.length, r.length);
     const rows = Array.from({ length: n }, (_, i) => [l[i] ?? "", r[i] ?? ""].map((cell) => (typeof cell === "string" && !cell.trim() ? { type: "text", text: " " } : cell)));
-    return { type: "table", treatment: "standard", variant: "standard", highlightColumn: 1, columns: [{ label: left.heading || "Before", type: "text" }, { label: right.heading || "After", type: "text" }], rows, density: ex.density };
+    // The tinted column is the one the page decides for. Before/after pages
+    // decide for "after", which is the default; a comparison of two options
+    // names its side with `winner` ("left", "right" or a heading), and
+    // `winner: false` leaves both columns plain when the page splits the verdict.
+    const headings = [left.heading || "Before", right.heading || "After"];
+    let highlightColumn = 1;
+    if (ex.winner === false) highlightColumn = undefined;
+    else if (ex.winner !== undefined) {
+      const wanted = String(ex.winner).trim().toLowerCase();
+      const at = wanted === "left" ? 0 : wanted === "right" ? 1 : headings.findIndex((h) => String(h).trim().toLowerCase() === wanted);
+      if (at < 0) throw new Error(`compare winner "${ex.winner}" must be "left", "right", false or a column heading`);
+      highlightColumn = at;
+    }
+    return { type: "table", treatment: "standard", variant: "standard", ...(highlightColumn === undefined ? {} : { highlightColumn }), columns: headings.map((label) => ({ label, type: "text" })), rows, density: ex.density };
   }
   if (ex.type === "phase-table") {
     const phases = ex.phases || ex.columns || [];
@@ -135,7 +148,11 @@ function headedPanel(ex, item, id) {
     if (ex.panelHeading && !ex.heading) item.props.heading = ex.panelHeading;
     return item;
   }
-  const heading = ex.panelHeading || ex.heading || (ex.columns ? String(typeof ex.columns[0] === "string" ? ex.columns[0] : ex.columns[0]?.label || "") : "") || "Detail";
+  // The band exists for the row rule: it gives the panel's content the same
+  // starting line as its neighbour's. When the author has not named the panel,
+  // the band stays blank rather than printing the table's own first column
+  // label back at it (the header row says that already) or the word "Detail".
+  const heading = ex.panelHeading || ex.heading || " ";
   return { id: `${id}-panel`, heading, treatment: "open", size: item.size, items: [item] };
 }
 
@@ -555,6 +572,14 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
   }
   // `rows` at slide level is the label-and-text table.
   if (slide.rows && !slide.exhibit && !slide.exhibits) slide = { ...slide, exhibit: { type: "rows", rows: slide.rows } };
+  // One big number parked above a table reads as two pages glued together: the
+  // tile floats in air and the table starts again under it. A lone metric over a
+  // table is the hero number of the side column instead, beside its evidence.
+  const TABLE_LIKE = ["table", "rows", "compare", "phase-table"];
+  if (Array.isArray(slide.metrics) && slide.metrics.length === 1 && !slide.kpi && slide.metricsPosition !== "bottom" && !slide.exhibits && TABLE_LIKE.includes(slide.exhibit?.type)) {
+    const tile = typeof slide.metrics[0] === "string" ? { value: slide.metrics[0] } : slide.metrics[0];
+    slide = { ...slide, metrics: undefined, kpi: { value: tile.value, ...(tile.label ? { label: tile.label } : {}), ...(tile.sublabel ? { sublabel: tile.sublabel } : {}) } };
+  }
   // A text page whose points carry leads is a numbered ledger: label + text
   // rows with rules, filling the page, rather than a list floating at the top.
   if (!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && (!slide.layout || slide.layout === "auto") && Array.isArray(slide.points) && slide.points.length >= 2 && slide.points.length <= 6 && slide.points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && !pt.icon && pt.state == null)) {
@@ -734,6 +759,9 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
 /**
  * `sectionTabs: true` on the deck: every analytical page under a section
  * carries the section pill tabs above its title, the current section filled.
+ * A deck with sections gets them by default — a reader who cannot tell which
+ * section they are in is reading a pile of pages — and `sectionTabs: false`
+ * takes them off (use `agenda` instead, which tracks by repeating the contents).
  */
 export function sectionTabs(slidesIn) {
   const sections = slidesIn.filter((s) => s.kind === "section");
@@ -781,7 +809,10 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     if (spec.cover.notes) cover.notes = spec.cover.notes;
     slides.push(cover);
   }
-  const pages = agendaPages(spec.sectionTabs ? sectionTabs(spec.slides) : spec.slides, spec.agenda, spec.agendaStyle);
+  // The tracker is on by default once a deck has sections: pills above the title
+  // unless the deck tracks by repeating its contents page (`agenda`).
+  const tabs = spec.sectionTabs ?? (!spec.agenda && spec.slides.filter((s) => s.kind === "section").length >= 2);
+  const pages = agendaPages(tabs ? sectionTabs(spec.slides) : spec.slides, spec.agenda, spec.agendaStyle);
   const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140)) / 508)) : 1;
   const fill = resolveFill(spec);
   for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) slides.push(composeSlide(page, slides.length, baseDir, fill));

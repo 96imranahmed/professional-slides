@@ -6,20 +6,27 @@ A deck is ready when the deterministic page gates pass, the review accepts it, a
 
 Measured on the rendered page, before any model is consulted. Each is a blocking result.
 
-| Gate | Threshold |
-| --- | --- |
-| Ink coverage | at least 18% of the content area |
-| Trailing dead band | at most 8% |
-| Action title | at most two lines, within 14 words |
-| Body type | 10 to 14 pt |
-| Characters per line | 45 to 90 |
-| Body words, exhibit page | at most 100 |
-| Hero exhibit, analytical page | at least 40% of the content area |
-| Layout repetition | no layout on more than 40% of pages |
-| Axis ticks | nice numbers |
-| Geometry | every object inside its frame, no unintended overlap |
-| Title spine | no hedge lexicon; no two titles sharing more than 60% of their tokens |
-| Coverage | every ranked criterion has a comparative exhibit across all options |
+| Gate | Code | Threshold |
+| --- | --- | --- |
+| Ink coverage | `INK_COVERAGE` | at least 8% of the content area (10% on a `full` deck, 4% on an `airy` one) |
+| Trailing dead band | `DEAD_BAND` | at most 8% (6% full, 14% airy) |
+| Internal void | `INTERNAL_VOID` | at most 22% between two content blocks (16% full, 32% airy) |
+| Right column stops short | `COLUMN_VOID` | at most 20% of the page, `full` decks only |
+| Action title | `TITLE_TOO_LONG`, `HEDGED_TITLE` | at most two lines, within 14 words, no hedge lexicon |
+| Body type | `TYPE_RANGE` | 10 to 14 pt body, 8 to 11 pt chart furniture, 20 to 26 pt titles |
+| Characters per line | `CPL` | 35 to 90 |
+| Body words, exhibit page | `WORDS` | at most 100 (density profile moves it) |
+| Hero exhibit, analytical page | `HERO_EXHIBIT` | at least 40% of the content area, carrying ink |
+| Layout repetition | `LAYOUT_MONOTONY` | no layout signature on more than 35% of content pages |
+| Page families | `PAGE_VARIETY` | at least three families across ten pages or more |
+| Measured pages | `EVIDENCE_MIX` | at least 45% of analytical pages carry a chart, a table or measured tiles |
+| Photographs | `IMAGE_BUDGET`, `IMAGE_RUN` | at most 30% of analytical pages, never more than two running |
+| Argument on a picture or comparison page | `MISSING_ARGUMENT` | an insight, a so-what or a points column |
+| One number over a table | `METRIC_STACK` | a lone tile belongs beside its evidence |
+| Sections and tracker | `NO_SECTIONS` | required past twelve analytical pages |
+| Label punctuation | `DOT_SEPARATOR` | no bullet or middle dot joining two labels |
+| Axis ticks | `NICE_TICKS` | nice numbers |
+| Coverage | `MISSING_EVIDENCE` | every ranked criterion has a comparative exhibit across all options |
 
 ## Review codes
 

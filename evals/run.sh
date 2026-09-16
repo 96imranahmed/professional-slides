@@ -27,6 +27,7 @@ esac
 
 suite_status=0
 echo "== unit tests =="
+suite_status=0
 "$PYTHON" -m unittest discover -s evals/tests -p "test_*.py" || suite_status=$?
 
 echo "== page gates (fixture deck) =="

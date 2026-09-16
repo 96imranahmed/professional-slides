@@ -69,6 +69,27 @@ EXHIBIT_COMPONENTS = {
     "process", "chevron-process", "timeline", "roadmap", "organization", "journey",
 }
 
+# Families a page can belong to. A deck that is all one family reads as one page
+# repeated, whatever the titles say.
+DATA_COMPONENTS = {
+    "table", "comparison-table", "heatmap", "trend-rows", "insight-tree-table",
+    "matrix", "chart-group", "metric", "funnel", "gantt",
+}
+# A sentence that says what the page means. Captions inside a panel are not one.
+ARGUMENT_COMPONENTS = {"insight", "callout", "bullet-list", "evidence-note", "status-list"}
+# Pages carried by pictures rather than measurement.
+QUALITATIVE_COMPONENTS = {"image-frame", "logos", "logo-collage", "people", "quote-cluster", "icon-trends"}
+STRUCTURE_COMPONENTS = {"section-divider", "agenda", "tracker-page", "statement", "takeaways"}
+# A photograph, not an icon, a logo mark or a rule: 120 x 100 px and up.
+PHOTO_MIN_AREA = 12000
+# "1939 • Marvel Comics #1": a bullet doing the work of a comma, a bracket or a
+# second line. Only a line that starts with one is a list marker.
+# A space on at least one side: "1939 • Marvel Comics #1" is a separator, the
+# interpunct in a unit ("kW·h") is part of the word.
+DOT_SEPARATOR_RE = re.compile(
+    r"\S(?:[ \t]+[•·∙‧・][ \t]*|[ \t]*[•·∙‧・][ \t]+)\S"
+)
+
 TYPE_RANGES = {
     "body": (10.0, 14.0),
     "chart-furniture": (8.0, 11.0),
@@ -113,6 +134,11 @@ THRESHOLDS = {
     "hero_area_min": 0.40,
     "monotony_max": 0.35,
     "column_void_max": 1.0,
+    "image_pages_max": 0.30,   # photographs on more than three pages in ten
+    "image_run_max": 2,        # consecutive analytical pages carrying photographs
+    "data_pages_min": 0.45,    # pages whose evidence is a chart, a table or measured tiles
+    "families_min": 3,         # distinct page families in a deck of ten pages or more
+    "sections_from": 12,       # analytical pages beyond which a deck needs sections and a tracker
 }
 
 
@@ -186,6 +212,44 @@ def top_level_instances(slide):
 def is_exhibit(instance):
     component = str(instance.get("component") or "")
     return component.startswith("chart.") or component in EXHIBIT_COMPONENTS
+
+
+def all_components(slide):
+    """Every component on the page, nested ones included, minus page chrome."""
+    return [str(c.get("component")) for c in slide.get("componentInstances", [])
+            if str(c.get("id") or "") not in ("chrome", "cover", "page-template")]
+
+
+def photo_nodes(slide):
+    """Photographs on the page: image primitives big enough to be pictures."""
+    out = []
+    for node in slide.get("nodes", []):
+        if node.get("type") != "image":
+            continue
+        frame = node.get("frame") or {}
+        if float(frame.get("width") or 0) * float(frame.get("height") or 0) >= PHOTO_MIN_AREA:
+            out.append(node)
+    return out
+
+
+def page_family(slide):
+    """What carries the page: a chart, a table, photographs, a diagram, measured
+    tiles or words. Finer than the layout signature and coarser than the
+    component list, which is the grain a reader notices flicking through."""
+    components = all_components(slide)
+    if any(c.startswith("chart.") for c in components):
+        return "chart"
+    if any(c in {"table", "comparison-table", "heatmap", "trend-rows", "insight-tree-table"} for c in components):
+        return "table"
+    if photo_nodes(slide):
+        return "image"
+    if any(c in EXHIBIT_COMPONENTS and c not in QUALITATIVE_COMPONENTS for c in components):
+        return "diagram"
+    if any(c in QUALITATIVE_COMPONENTS for c in components):
+        return "image"
+    if "metric" in components:
+        return "metrics"
+    return "text"
 
 
 def is_cover(slide, index):
@@ -545,6 +609,169 @@ def gate_nice_ticks(slide_no, slide, findings):
         ))
 
 
+def gate_dot_separators(slide_no, slide, findings):
+    """DOT_SEPARATOR. A bullet joining two labels — "1939 • Marvel Comics #1",
+    "SUPERMAN • Hope" — is a tic, not a structure. The house writes the qualifier
+    in brackets, on the second line, or as a column of its own."""
+    offenders = []
+    for node in text_nodes(slide):
+        for line in lines_of(node):
+            if DOT_SEPARATOR_RE.search(line) and line.strip() not in offenders:
+                offenders.append(line.strip()[:80])
+    for text in offenders[:3]:
+        findings.append(finding(
+            slide_no, "DOT_SEPARATOR", text, "no bullet between two labels",
+            "Drop the bullet: write \"Marvel Comics #1 (1939)\", or give the year "
+            "its own eyebrow line or column. Bullets start list items; they do "
+            "not join words.",
+        ))
+
+
+def gate_missing_argument(slide_no, slide, findings):
+    """MISSING_ARGUMENT. A page of photographs, or a two-sided comparison, with
+    no sentence that says what it means. A caption names what you are looking at;
+    it does not tell the reader that one side beats the other, or why that
+    matters. Data pages are exempt: their title and their marks carry the claim."""
+    components = all_components(slide)
+    if any(c.startswith("chart.") for c in components) or any(c in DATA_COMPONENTS for c in components):
+        return
+    exhibits = [c for c in top_level_instances(slide) if is_exhibit(c)]
+    photos = photo_nodes(slide)
+    comparison = len(exhibits) == 2
+    if not photos and not comparison:
+        return
+    if any(c in ARGUMENT_COMPONENTS for c in components):
+        return
+    findings.append(finding(
+        slide_no, "MISSING_ARGUMENT",
+        {"photos": len(photos), "panels": len(exhibits)},
+        "one insight, so-what or points column",
+        "Say what the page proves: add `soWhat` (or `insight`, or three `points`) "
+        "that names which side wins on this criterion and what follows. On a "
+        "comparison page the reader must leave knowing the verdict, not the "
+        "exhibits.",
+    ))
+
+
+def gate_metric_stack(slide_no, slide, findings):
+    """METRIC_STACK. One or two big numbers parked above a table read as two
+    pages glued together: the number floats in air and the table starts again
+    below it. A number that the table proves belongs beside it."""
+    instances = top_level_instances(slide)
+    if any(str(c.get("component") or "").startswith("chart.") for c in instances):
+        return
+    rows = []
+    for instance in sorted(instances, key=lambda c: (c.get("frame") or {}).get("y", 0)):
+        component = str(instance.get("component") or "")
+        frame = instance.get("frame") or {}
+        if component == "metric":
+            if rows and rows[-1]["kind"] == "metric" and abs(rows[-1]["y"] - frame.get("y", 0)) < 8:
+                rows[-1]["count"] += 1
+                continue
+            rows.append({"kind": "metric", "y": frame.get("y", 0), "count": 1})
+        elif component in {"table", "comparison-table", "trend-rows"}:
+            rows.append({"kind": "table", "y": frame.get("y", 0), "count": 1})
+    for first, second in zip(rows, rows[1:]):
+        if first["kind"] == "metric" and second["kind"] == "table" and first["count"] <= 2:
+            findings.append(finding(
+                slide_no, "METRIC_STACK", {"tiles": first["count"]},
+                "three tiles in a strip, or the number beside the table",
+                "Move the number beside its evidence — `kpi: { value, label }` in "
+                "the side column with the table as the hero — or give the strip "
+                "three tiles so it reads as a row of measures rather than one "
+                "figure floating over a table.",
+            ))
+            return
+
+
+def gate_image_budget(slides, analytical, findings):
+    """IMAGE_BUDGET and IMAGE_RUN, deck level. Photographs illustrate; they do
+    not argue. A deck where most pages are pictures has stopped making a case,
+    and a run of them reads as a gallery."""
+    total = len(analytical)
+    if total < 6:
+        return
+    flags = [bool(photo_nodes(slides[index])) for index in analytical]
+    pages = [analytical[i] + 1 for i, has in enumerate(flags) if has]
+    share = len(pages) / float(total)
+    if share > THRESHOLDS["image_pages_max"]:
+        findings.append(finding(
+            None, "IMAGE_BUDGET", {"imagePages": pages, "share": round(share, 4)},
+            THRESHOLDS["image_pages_max"],
+            "Cut the photographs to the pages where the picture is the evidence "
+            "(a cover, a divider, one product shot). Replace the rest with the "
+            "measure the page is really about: a chart, a table, a framework.",
+        ))
+    run, longest, member = 0, 0, []
+    best = []
+    for i, has in enumerate(flags):
+        if has:
+            run += 1
+            member.append(analytical[i] + 1)
+            if run > longest:
+                longest, best = run, list(member)
+        else:
+            run, member = 0, []
+    if longest > THRESHOLDS["image_run_max"]:
+        findings.append(finding(
+            None, "IMAGE_RUN", {"slides": best, "run": longest}, THRESHOLDS["image_run_max"],
+            "Break the run: put a chart, a table or a framework page between "
+            "picture pages so the deck keeps arguing between illustrations.",
+        ))
+
+
+def gate_evidence_mix(slides, analytical, findings):
+    """EVIDENCE_MIX and PAGE_VARIETY, deck level. Most pages should carry
+    measurement, and a deck of any length should be built from more than one
+    kind of page."""
+    total = len(analytical)
+    if total < 8:
+        return
+    families = [page_family(slides[index]) for index in analytical]
+    data = sum(1 for family in families if family in ("chart", "table", "metrics"))
+    share = data / float(total)
+    if share < THRESHOLDS["data_pages_min"]:
+        findings.append(finding(
+            None, "EVIDENCE_MIX",
+            {"dataPages": data, "pages": total, "share": round(share, 4)},
+            THRESHOLDS["data_pages_min"],
+            "Under half the pages carry a measurement. Convert the qualitative "
+            "pages the argument leans on into evidence: a scorecard, a ranked "
+            "bar, a table of the criteria — whatever lets the reader check the "
+            "claim instead of taking it.",
+        ))
+    if total >= 10 and len(set(families)) < THRESHOLDS["families_min"]:
+        findings.append(finding(
+            None, "PAGE_VARIETY",
+            {"families": sorted(set(families)), "pages": total}, THRESHOLDS["families_min"],
+            "Every page is built the same way. Mix the register: a scorecard, a "
+            "hero chart, a two-column comparison and a framework page answer "
+            "different questions and should not look alike.",
+        ))
+
+
+def gate_deck_structure(slides, analytical, findings):
+    """NO_SECTIONS, deck level. Past a dozen pages the reader needs to know where
+    they are: sections, and a tracker that says which one is open."""
+    if len(analytical) < THRESHOLDS["sections_from"]:
+        return
+    components = {component for slide in slides for component in all_components(slide)}
+    roles = {str(node.get("role")) for slide in slides for node in slide.get("nodes", [])}
+    sections = "section-divider" in components
+    tracker = bool(components & {"agenda", "tracker-page"}) or "tracker-label" in roles
+    if sections and tracker:
+        return
+    findings.append(finding(
+        None, "NO_SECTIONS",
+        {"pages": len(analytical), "sections": sections, "tracker": tracker},
+        "sections and a tracker",
+        "Group the pages into two to five sections (`kind: \"section\"`), and let "
+        "the reader track them: `agenda: true` repeats the contents page before "
+        "each section with the current one tinted, `sectionTabs: true` puts the "
+        "section pills above every title.",
+    ))
+
+
 def layout_signature(slide):
     """Sorted multiset of top-level component ids plus the row/column shape."""
     instances = [c for c in top_level_instances(slide)]
@@ -665,12 +892,24 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
             findings.extend(f for f in page if wanted(f["code"]))
             if wanted("CPL"):
                 gate_cpl(slide_no, slide, findings)
+            if wanted("MISSING_ARGUMENT"):
+                gate_missing_argument(slide_no, slide, findings)
+            if wanted("METRIC_STACK"):
+                gate_metric_stack(slide_no, slide, findings)
+        if wanted("DOT_SEPARATOR"):
+            gate_dot_separators(slide_no, slide, findings)
         if wanted("TYPE_RANGE"):
             gate_type_range(slide_no, slide, findings)
         if wanted("NICE_TICKS"):
             gate_nice_ticks(slide_no, slide, findings)
     if not gates or "LAYOUT_MONOTONY" in gates:
         gate_layout_monotony(slides, content_indexes, findings)
+    if not gates or gates & {"IMAGE_BUDGET", "IMAGE_RUN"}:
+        gate_image_budget(slides, content_indexes, findings)
+    if not gates or gates & {"EVIDENCE_MIX", "PAGE_VARIETY"}:
+        gate_evidence_mix(slides, content_indexes, findings)
+    if not gates or "NO_SECTIONS" in gates:
+        gate_deck_structure(slides, content_indexes, findings)
 
     by_code = {}
     for item in findings:

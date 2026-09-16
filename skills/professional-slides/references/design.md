@@ -87,6 +87,10 @@ Page furniture - titles, trackers, source lines, page numbers - keeps the deck's
 
 Use an image or icon when it improves meaning or recognition: a place, a product, a physical quality, a stable taxonomy. Keep one visual style and prefer editable vectors and real library icons. Apply the chosen treatment to every peer in a set. Evidence of safety, quality or performance comes from data, and illustrative imagery sits beside it rather than standing in for it.
 
+**The photograph budget.** A photograph is evidence only where the picture is what the reader is judging. Keep them under a third of the analytical pages and never two pages running (`IMAGE_BUDGET`, `IMAGE_RUN`); covers, dividers and the closing statement are outside the count and are where a photograph does the most work. A grid of four pictures with captions is a mood board: if the pictures are examples of one claim, the claim is the page and the examples are a list beside it. Every picture page still carries a so-what, an insight or a points column (`MISSING_ARGUMENT`) - a caption names the subject, it does not argue about it.
+
+**The page mix.** Across a deck, at least three families of page (chart, table or scorecard, comparison, framework, picture) and at least 45% of analytical pages carrying a measurement (`PAGE_VARIETY`, `EVIDENCE_MIX`). A deck built from one construction is one page shown many times, whatever its titles say.
+
 ## Working from a reference deck
 
 When a reference is authorized, render and inspect the full deck, identify its layouts, anchors, typography, spacing, colours, tables, charts and recurring components, separate deliberate rules from one-off exceptions, and reuse the closest valid structure. Before redesigning a source page, record its strongest device, evidence payload, heading hierarchy, focal emphasis and normalized readable type size, then map those onto the proposed page and compare the two at equal viewing size. A modern theme may change colour, spacing and styling while keeping the evidence relationships at least as easy to read.

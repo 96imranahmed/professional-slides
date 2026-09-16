@@ -63,6 +63,25 @@ NATIVE = {
     "scatter": XL_CHART_TYPE.XY_SCATTER,
     "range": XL_CHART_TYPE.BAR_STACKED,
 }
+# Room past the longest bar for its value label. The label sits outside the mark
+# — inside is for a stacked segment, which has no outside — so the scale stops
+# short of the plot edge and the number reads on the page, not on the ink.
+LABEL_HEADROOM = 1.12
+
+
+def _nice_ceiling(value):
+    """The smallest round number at or above `value` (1, 1.2, 1.5, 2, 2.5, 3, 4,
+    5, 6, 8 x a power of ten), so a headroom stop stays a number a reader
+    recognises when the axis is shown."""
+    import math
+
+    if not value or value <= 0:
+        return 1
+    magnitude = 10 ** math.floor(math.log10(value))
+    for rung in (1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10):
+        if rung * magnitude >= value - 1e-9:
+            return rung * magnitude
+    return 10 * magnitude
 
 
 def _luminance(hex_color):
@@ -507,6 +526,14 @@ class Emitter:
                 va.minimum_scale = spec["yMin"]
             if spec.get("yMax") is not None:
                 va.maximum_scale = spec["yMax"]
+            elif kind in ("column", "bar") and spec.get("dataLabels", True):
+                # Value labels belong outside the mark, so the longest bar needs
+                # room past its end: give the hidden value axis a headroom stop
+                # above the largest value. Without it PowerPoint runs the bar to
+                # the plot edge and the label has nowhere to go but inside.
+                vals = [v for s in spec.get("series", []) for v in (s.get("values") or []) if isinstance(v, (int, float))]
+                if vals and min(vals) >= 0 and max(vals) > 0:
+                    va.maximum_scale = _nice_ceiling(max(vals) * LABEL_HEADROOM)
             ca = chart.category_axis
             ca.tick_labels.font.size = Pt(10)
             if kind in ("bar", "stacked-bar", "range"):
@@ -535,7 +562,6 @@ class Emitter:
         highlight_indices = set(spec.get("highlightIndices") or [])
         forecast_index = spec.get("forecastIndex", -1)
         single = len(spec["series"]) == 1
-        max_value = max((abs(v) for s in spec["series"] for v in s["values"] if isinstance(v, (int, float))), default=0)
         for i, ser in enumerate(plot.series):
             ci = idx[i] if idx and i < len(idx) else i
             color = self.series_colors[ci % len(self.series_colors)] if self.series_colors else None
@@ -574,17 +600,10 @@ class Emitter:
                     if kind in ("column", "bar"):
                         sdl.position = XL_LABEL_POSITION.OUTSIDE_END
                     for j, pt in enumerate(ser.points):
-                        value = spec["series"][i]["values"][j]
                         if j in highlight_indices and accent:
                             pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(accent)
                         elif forecast_index is not None and forecast_index >= 0 and j >= forecast_index and forecast:
                             pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(forecast)
-                        if kind in ("column", "bar") and max_value and isinstance(value, (int, float)) and abs(value) >= 0.4 * max_value:
-                            lab = pt.data_label
-                            lab.position = XL_LABEL_POSITION.INSIDE_END
-                            lab.font.size = Pt(11); lab.font.bold = bool(spec.get("labelBold", True))
-                            lab.font.color.rgb = rgb(self.colors.get("color.onPrimary", "#FFFFFF"))
-                            lab.number_format = number_format; lab.number_format_is_linked = False
                 if kind == "line" and spec.get("endLabels"):
                     # Series name at the last point instead of a legend.
                     last = len(spec["series"][i]["values"]) - 1

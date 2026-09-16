@@ -7,7 +7,7 @@
  "cover": {
   "title": "NYC or San Francisco?",
   "subtitle": "Where to live and work for the next role, the family and the business after that",
-  "date": "Decision brief · September 2026"
+  "date": "Decision brief, September 2026"
  },
  "slides": [
   {
@@ -23,21 +23,21 @@
     ],
     "rows": [
      [
-      "1 · School evidence",
+      "1. School evidence",
       "P.S. 321: 89/90% vs 79/80% peers",
       "Alvarado: 60/53% (CA scale)",
       "Connors: 73/65%, below district",
       "District 72/70%, no school named"
      ],
      [
-      "2 · Safety, matched 2024 rate",
+      "2. Safety, matched 2024 rate",
       "671 /100k citywide; precinct rising",
       "597 /100k; low-rate neighborhood",
       "189 /100k, lowest",
       "639 /100k; robberies −48%"
      ],
      [
-      "3 · Weekly anchor",
+      "3. Weekly anchor",
       "Sat Greenmarket, Prospect Park",
       "Sat market, 24th St",
       "Tue/Thu/Sat markets",
@@ -85,10 +85,10 @@
     "heading": "Published annual pay for research-connected PM roles",
     "unit": "$k, published base-salary band",
     "categories": [
-     "Anthropic · Research",
-     "Anthropic · Labs",
-     "OpenAI · Core Models",
-     "OpenAI · API Agents"
+     "Anthropic Research",
+     "Anthropic Labs",
+     "OpenAI Core Models",
+     "OpenAI API Agents"
     ],
     "valueFormat": {
      "decimals": 0
@@ -428,22 +428,22 @@
      ],
      "rows": [
       [
-       "1 · Move alone",
+       "1. Move alone",
        "Year 1",
        "Rent a one-bedroom near the actual office; keep it reversible"
       ],
       [
-       "2 · Partner joins",
+       "2. Partner joins",
        "Year 2–3",
        "Re-size the home; compare moving with staying larger from the start"
       ],
       [
-       "3 · School entry",
+       "3. School entry",
        "Year 3",
        "Confirm address priority (NYC) or assignment (SF) for the entry year"
       ],
       [
-       "4 · Business option",
+       "4. Business option",
        "Year 5–10",
        "A tie-breaker between equal offers, not a reason to pick a city now"
       ]
@@ -459,17 +459,17 @@
      ],
      "rows": [
       [
-       "NYC · Park Slope",
+       "NYC (Park Slope)",
        "P.S. 321 address priority and seats; weekday commute to the real office; two streets you would use daily",
        "Lead option if the role is in NYC"
       ],
       [
-       "SF · Noe Valley",
+       "SF (Noe Valley)",
        "Alvarado immersion access; J Church to the office; Inner Sunset if Jefferson fits better",
        "Only if the SF role owns model decisions"
       ],
       [
-       "NJ · Hoboken",
+       "NJ (Hoboken)",
        "Connors placement; timed PATH journey to the real office",
        "Fallback for a midtown office"
       ]
@@ -492,5 +492,5 @@
   "housing",
   "role"
  ],
- "footer": "NYC or SF · decision brief"
+ "footer": "NYC or SF, decision brief"
 }

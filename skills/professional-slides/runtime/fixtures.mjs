@@ -151,7 +151,7 @@ export function componentFixtureBoardSpecs() {
         }
         const safeVariant = variant.replace(/[^a-z0-9]+/gi, "-");
         return [
-          component({ id: `${definition.id}-${safeVariant}-label`, component: "paragraph", frame: { x, y, width: cellWidth, height: labelHeight }, props: { text: variant === definition.defaultVariant ? `Default · ${variant}` : variant } }),
+          component({ id: `${definition.id}-${safeVariant}-label`, component: "paragraph", frame: { x, y, width: cellWidth, height: labelHeight }, props: { text: variant === definition.defaultVariant ? `Default: ${variant}` : variant } }),
           variantComponentNode(definition, variant, frame, `${definition.id}-${safeVariant}`)
         ];
       });

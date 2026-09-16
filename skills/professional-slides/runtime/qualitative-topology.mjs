@@ -17,7 +17,7 @@ export function measureQualitativeFunnel({frame,props}){
  if(props.stages.some(s=>['value','count','ratio','percentage'].some(k=>k in s))||['denominator','values','counts'].some(k=>k in props))throw new Error('Qualitative funnel must not encode numeric magnitude');
  const gap=val('space.3'),pad=val('space.2'),plot=frame.width*.40,detailWidth=frame.width-plot-gap;
  const sources=props.inputSources??[];if(!Array.isArray(sources)||!sources.length)throw new Error('Qualitative funnel requires input sources');sources.forEach(s=>text(s,'Input source'));
- const input=measure(sources.join(' · '),plot,true),inputDetail=measure(props.inputDescription,detailWidth);
+ const input=measure(sources.join(', '),plot,true),inputDetail=measure(props.inputDescription,detailWidth);
  const inputHeight=Math.max(input.height,inputDetail.height)+gap*2;
  const stages=props.stages.map((s,i)=>{if(!Array.isArray(s.details)||!s.details.length)throw new Error('Each qualitative state requires details');const inset=plot*.055*i;const bottomInset=plot*.055*(i+1);const width=plot-2*bottomInset-2*pad;const heading=measure(s.label,width,true);const detail=measure(s.details.map(v=>text(v,'Stage detail')).join('\n'),detailWidth);return{...s,inset,bottomInset,heading,detail,height:Math.max(heading.height+2*pad,detail.height+pad)};});
  const outcome=props.outcome;if(!outcome||!Array.isArray(outcome.details)||!outcome.details.length)throw new Error('Qualitative funnel requires a distinct selection outcome');

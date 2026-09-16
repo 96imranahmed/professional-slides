@@ -33,7 +33,13 @@ Deterministic, per page, before any model is consulted:
 - body type between 10 and 14 pt;
 - 45 to 90 characters per line;
 - at most 100 body words of prose on an exhibit page, 140 on a text page (table cells are evidence, not prose);
-- no single layout on more than 40% of pages;
+- no single layout on more than 35% of pages;
+- photographs on at most 30% of analytical pages and never more than two running (`IMAGE_BUDGET`, `IMAGE_RUN`);
+- at least 45% of analytical pages carrying a chart, a table or measured tiles, and at least three families of page across a deck of ten or more (`EVIDENCE_MIX`, `PAGE_VARIETY`);
+- a page carried by photographs, or by two peer panels, saying what it means in an insight, a so-what or a points column (`MISSING_ARGUMENT`);
+- no lone metric tile stacked above a table (`METRIC_STACK`);
+- sections and a tracker past twelve analytical pages (`NO_SECTIONS`);
+- no bullet or middle dot joining two labels, on any page including the cover (`DOT_SEPARATOR`);
 - axis ticks on nice numbers;
 - every object inside its resolved frame, with no unintended overlap;
 - titles: within 14 words (a trailing `(1/2)` page marker is not counted), free of the hedge lexicon, no two sharing more than 60% of their tokens;

@@ -68,7 +68,7 @@ export function timeGrid(input) {
   const keys=[...periods.keys()], index=key=>{check(periods.has(key),`unknown period ${key}`);return keys.indexOf(key);};
   let y=frame.y;
   check(cell>g+tokenValue(t('icon.small')),'period cells are too narrow');
-  const axisLabel=props.axis.label??`${props.axis.precision}${props.axis.year?` · ${props.axis.year}`:''}`;
+  const axisLabel=props.axis.label??`${props.axis.precision}${props.axis.year?`, ${props.axis.year}`:''}`;
   const axisHeight=Math.max(metrics(axisLabel,labelWidth,size,true).height,...[...periods.values()].map(p=>metrics([p.label,p.startLabel].filter(Boolean).join('\n'),cell-g,size,true).height));
   w.text('axis',axisLabel,frame.x,y,labelWidth,{bold:true});
   for(const [i,p] of [...periods.values()].entries()) w.text(p.id,[p.label,p.startLabel].filter(Boolean).join('\n'),left+i*cell,y,cell-g,{bold:true,dependencies:['axis']});
@@ -146,7 +146,7 @@ export function datedLanes({id,frame,props}) {
   for(const r of relationships) check(events.has(r.from)&&events.has(r.to)&&r.from!==r.to&&typeof r.kind==='string'&&r.kind&&typeof r.basis==='string'&&r.basis,'relationships require exact distinct event endpoints and a basis');
   const laneKeys=[...lanes.keys()], paired=relationships.length>0;
   if(paired) for(const r of relationships) check(events.get(r.from).laneId===laneKeys[1]&&events.get(r.to).laneId===laneKeys[0],'relationship routing requires the first two adjacent lanes, with refinement below approval');
-  let y=frame.y+w.text('axis',props.axis.label??`${props.axis.domain[0]} – ${props.axis.domain[1]} · elapsed days`,left,frame.y,right-left,{size:'type.source'})+g;
+  let y=frame.y+w.text('axis',props.axis.label??`${props.axis.domain[0]} – ${props.axis.domain[1]}, elapsed days`,left,frame.y,right-left,{size:'type.source'})+g;
   const anchors=new Map();
   for(const [laneIndex,lane] of [...lanes.values()].entries()) {
     const label=[lane.label,lane.responsibility,lane.roleQualification].filter(Boolean).join('\n');
@@ -155,7 +155,7 @@ export function datedLanes({id,frame,props}) {
     const boxes=laneEvents.map(e=>{
       const labelSpan=e.labelWidth??props.eventLabelWidth??(right-left)/Math.max(2,laneEvents.length);
       check(Number.isFinite(labelSpan)&&labelSpan>g&&labelSpan<=right-left,'invalid event label width');
-      const text=[e.label,[e.duration,e.location,e.qualification].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
+      const text=[e.label,[e.duration,e.location,e.qualification].filter(Boolean).join(', ')].filter(Boolean).join('\n');
       const width=labelSpan-g,m=metrics(text,width,size),date=metrics(e.date,width,dateSize);
       return {e,text,width,height:m.height+date.height+g/2,dateHeight:date.height,x:Math.max(left,xDate(e.date)-width/2)};
     });

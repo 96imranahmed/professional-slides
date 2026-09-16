@@ -77,6 +77,10 @@ function normalize(props) {
 }
 
 /** Measure the complete hierarchy without shrinking type or discarding records. */
+// A period qualifies its phase in brackets: a dot between two labels is a tic,
+// not a structure.
+const phaseLabel = (p) => (p.period ? `${p.label} (${p.period})` : p.label);
+
 export function measurePhaseWorkstreams({ frame, props }) {
   if (!(frame?.width > 0) || (frame.height !== undefined && !(frame.height > 0))) throw new Error('Phase-workstreams requires a positive frame');
   const model = normalize(props);
@@ -96,7 +100,7 @@ export function measurePhaseWorkstreams({ frame, props }) {
       columns.push({ phase, ws, x, width, innerWidth: width - 2 * inset }); x += width;
     });
   });
-  const phaseLayouts = model.phases.map(p => measure([p.label, p.period].filter(Boolean).join(' · '), phaseWidth - 2 * inset, true, heading));
+  const phaseLayouts = model.phases.map(p => measure(phaseLabel(p), phaseWidth - 2 * inset, true, heading));
   const phaseHeight = Math.max(...phaseLayouts.map(m => m.height)) + 2 * pad;
   const workstreamHeight = Math.max(...columns.map(c => measure(c.ws.label, c.innerWidth, true).height)) + 2 * pad;
   const flatten = (products, depth = 0, parentId = null) => products.flatMap(p => [{ ...p, depth, parentId }, ...flatten(p.children, depth + 1, p.id)]);
@@ -166,7 +170,7 @@ export function renderPhaseWorkstreams({ id, frame, props }) {
   for (const [pi,p] of m.phases.entries()) {
     const key = `phase-${p.id}`;
     surface(`${key}-surface`, 'roadmap-phase-surface', pi*m.phaseWidth, 0, m.phaseWidth, m.bands.phase.height, 'color.componentPrimaryTint', data(p,[nid(key)]));
-    text(key,'roadmap-phase',[p.label,p.period].filter(Boolean).join(' · '),pi*m.phaseWidth+m.inset,m.pad,m.phaseWidth-2*m.inset,m.phaseLayouts[pi],data(p,[nid(`${key}-surface`)]),true,'type.heading');
+    text(key,'roadmap-phase',phaseLabel(p),pi*m.phaseWidth+m.inset,m.pad,m.phaseWidth-2*m.inset,m.phaseLayouts[pi],data(p,[nid(`${key}-surface`)]),true,'type.heading');
   }
   for (const c of m.columns) {
     const wsKey = `workstream-${c.ws.id}`, phaseKey = nid(`phase-${c.phase.id}`);

@@ -6,7 +6,7 @@
  "agenda": true,
  "cover": {
   "title": "Five reference pages, rebuilt from the spec",
-  "subtitle": "Bar with takeaways · status report · growth chart · project plan · pillars and bridge",
+  "subtitle": "Bar with takeaways, status report, growth chart, project plan, pillars and bridge",
   "date": "September 2026",
   "logo": "Professional slides"
  },
@@ -220,17 +220,17 @@
     ],
     "tiers": [
      {
-      "label": "Phase 1 · Assess",
+      "label": "Phase 1: Assess",
       "from": 0,
       "to": 3
      },
      {
-      "label": "Phase 2 · Design",
+      "label": "Phase 2: Design",
       "from": 4,
       "to": 8
      },
      {
-      "label": "Phase 3 · Implement",
+      "label": "Phase 3: Implement",
       "from": 9,
       "to": 15
      }

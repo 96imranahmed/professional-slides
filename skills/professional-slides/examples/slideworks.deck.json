@@ -2,7 +2,7 @@
  "schema": "professional-slides.deck/v3",
  "id": "slideworks",
  "palette": "mckinsey",
- "footer": "Urban mobility and PE review \u00b7 2026",
+ "footer": "Urban mobility and PE review, 2026",
  "agenda": "once",
  "agendaStyle": "columns",
  "cover": {
@@ -459,7 +459,7 @@
    },
    "callout": {
     "lead": "Outlook legend",
-    "text": "\u2191 strong activity expected \u00b7 \u2192 moderate \u00b7 \u2193 limited activity"
+    "text": "\u2191 strong activity expected; \u2192 moderate; \u2193 limited activity"
    },
    "source": "Venture Intelligence; Bain analysis"
   },

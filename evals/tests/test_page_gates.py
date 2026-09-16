@@ -225,8 +225,13 @@ class KnownBadDeckTests(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_the_cover_is_exempt_from_the_page_gates(self):
-        cover_findings = [f for f in self.report["findings"] if f["slide"] == 1 and f["code"] != "MISSING_RENDER"]
-        self.assertEqual([f["code"] for f in cover_findings], [])
+        # Story and geometry gates do not judge a structural page. Typography
+        # does: type sizes and label punctuation are house rules everywhere, and
+        # this fixture's cover carries "Imran · September 2026".
+        typographic = {"TYPE_RANGE", "DOT_SEPARATOR", "NICE_TICKS", "MISSING_RENDER"}
+        cover_findings = [f for f in self.report["findings"] if f["slide"] == 1]
+        self.assertEqual([f["code"] for f in cover_findings if f["code"] not in typographic], [])
+        self.assertIn("DOT_SEPARATOR", [f["code"] for f in cover_findings])
 
 
 class ProfileTests(unittest.TestCase):
