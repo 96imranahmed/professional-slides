@@ -3,7 +3,7 @@
 // KPI tile. Each shares the deck's heading band, marker vocabulary and body
 // type; the row rule (every panel in a row shares one header height) holds
 // inside a cards row because the cards are laid out here, together.
-import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive } from "./core.mjs";
+import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
 
@@ -13,7 +13,7 @@ const FONT = token("font.body"), DISPLAY = token("font.display");
 const v = (id) => tokenValue(token(id));
 const ACCENT_OR_PRIMARY = () => token("color.accent");
 
-export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
+export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
 const text = (size, color = INK, bold = false, align = "left") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
 const measure = (value, width, size, bold = false) => measureText(String(value), width, { fontFamily: tokenValue(FONT), fontSize: v(size), bold, wrapWidthRatio: 1 });
@@ -221,9 +221,35 @@ export function quadrantsNodes({ id, frame, props }) {
 /* ------------------------------------------------------------------- metric */
 
 /** KPI tile: big number, label, optional sublabel and signed delta; light or dark tone. */
+function ringMetricNodes({ id, frame, props }) {
+  const raw = String(props.value).trim();
+  const share = /^\d+(\.\d+)?\s*%?$/.test(raw) ? Number(raw.replace("%", "")) : NaN;
+  if (!(share >= 0 && share <= 100)) throw new Error("Ring metric takes a percentage value from 0 to 100");
+  const labelLayout = props.label ? measure(props.label, frame.width - 2 * v("space.2"), "type.compact") : null;
+  const gap = v("space.2");
+  const size = Math.max(56, Math.min(frame.width - 2 * v("space.2"), frame.height - (labelLayout ? labelLayout.height + gap : 0) - 4));
+  const circle = { x: frame.x + (frame.width - size) / 2, y: frame.y + (frame.height - size - (labelLayout ? labelLayout.height + gap : 0)) / 2, width: size, height: size };
+  const nodes = [];
+  nodes.push(ellipsePrimitive({ id: stableId(id, "track"), role: "metric-ring-track", frame: circle, style: { fill: token("color.chartGrid"), stroke: "none", lineWidth: token("line.hairline"), radius: token("radius.round") } }));
+  if (share > 0) nodes.push(wedgePrimitive({ id: stableId(id, "arc"), role: "metric-ring", frame: circle, startAngle: -90, endAngle: -90 + 360 * Math.min(share, 100) / 100, style: { fill: ACCENT, stroke: "none", lineWidth: token("line.hairline") }, data: { share } }));
+  const hole = size * 0.72;
+  nodes.push(ellipsePrimitive({ id: stableId(id, "hole"), role: "metric-ring-hole", frame: { x: circle.x + (size - hole) / 2, y: circle.y + (size - hole) / 2, width: hole, height: hole }, style: { fill: SURFACE, stroke: "none", lineWidth: token("line.hairline"), radius: token("radius.round") } }));
+  // The value takes the largest type that fits inside the hole.
+  let valueSize = "type.metric", value = null;
+  for (const candidate of ["type.metric", "type.heading", "type.compact"]) {
+    try { value = measureText(String(props.value), hole - 8, { fontFamily: tokenValue(DISPLAY), fontSize: v(candidate), bold: true, wrapWidthRatio: 1 }); valueSize = candidate; if (value.lines.length === 1) break; } catch { value = null; }
+  }
+  if (!value) throw new Error("Ring metric is too small for its value");
+  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: circle.x + (size - hole) / 2 + 4, y: circle.y + (size - value.height) / 2, width: hole - 8, height: value.height }, text: value.text, style: { fontFamily: DISPLAY, fontSize: token(valueSize), color: INK, bold: true, align: "center", valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
+  if (labelLayout) nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + v("space.2"), y: circle.y + size + gap, width: frame.width - 2 * v("space.2") }, labelLayout, text("type.compact", SECONDARY, false, "center")));
+  return nodes;
+}
+
 export function metricNodes({ id, frame, props }) {
   if (props.value === undefined || props.value === null || String(props.value).trim() === "") throw new Error("Metric requires a value");
-  const METRIC_TONES = ["default", "dark", "tint", "hero", "ink", "rule"];
+  const METRIC_TONES = ["default", "dark", "tint", "hero", "ink", "rule", "ring"];
+  // "ring": a share drawn as an accent arc around the value (the Deloitte KPI ring).
+  if (props.tone === "ring") return ringMetricNodes({ id, frame, props });
   if (props.tone !== undefined && !METRIC_TONES.includes(props.tone)) throw new Error(`Unknown metric tone: ${props.tone}; use one of ${METRIC_TONES.join(", ")}`);
   // "ink": a black tile with the value in the accent (the Bain keynote stat row);
   // "rule": no tile, the value in the accent behind a hairline at the left (the
@@ -378,8 +404,8 @@ export function registerPanels(registry) {
   if (metric) {
     metric.tokens = [...new Set([...metric.tokens, ...PANEL_TOKENS])];
     metric.render = (input) => ({ nodes: metricNodes(input) });
-    metric.variants = { default: {}, prominent: { props: { variant: "prominent" } }, dark: { props: { tone: "dark" } }, hero: { props: { tone: "hero", variant: "prominent", value: "80%", label: "(Insert what the number is)" } }, ink: { props: { tone: "ink", variant: "prominent", value: "1.6x", label: "(Insert what the number is)" } }, rule: { props: { tone: "rule", variant: "prominent", value: "443", label: "(Insert what the number is)" } } };
-    metric.resolveVariant = (props = {}) => ["dark", "hero", "ink", "rule"].includes(props.tone) ? props.tone : props.variant ?? "default";
+    metric.variants = { default: {}, prominent: { props: { variant: "prominent" } }, dark: { props: { tone: "dark" } }, hero: { props: { tone: "hero", variant: "prominent", value: "80%", label: "(Insert what the number is)" } }, ink: { props: { tone: "ink", variant: "prominent", value: "1.6x", label: "(Insert what the number is)" } }, ring: { props: { tone: "ring", value: "68%", label: "(Insert what the share is)" } }, rule: { props: { tone: "rule", variant: "prominent", value: "443", label: "(Insert what the number is)" } } };
+    metric.resolveVariant = (props = {}) => ["dark", "hero", "ink", "rule", "ring"].includes(props.tone) ? props.tone : props.variant ?? "default";
   }
   return registry;
 }

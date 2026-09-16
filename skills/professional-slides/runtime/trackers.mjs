@@ -28,7 +28,8 @@ const NONE = token("radius.none");
 const SMALL = token("radius.small");
 
 export const TRACKER_TOKENS = Object.freeze([
-  "color.canvas", "color.surface", "color.surfaceMuted", "color.componentPrimaryTint",
+  "color.canvas", "color.surface", "color.surfaceMuted", "color.componentPrimaryTint", "color.accent",
+  "space.2", "radius.round",
   "color.componentPrimary", "color.ink", "color.textSecondary", "color.rule", "color.onPrimary",
   "font.body", "font.display", "type.deckTitle", "type.sectionTitle", "type.heading",
   "type.body", "type.compact", "type.label", "space.1", "space.2", "space.3",
@@ -62,7 +63,7 @@ const TRACKER_PAGE_VARIANTS = Object.freeze(Object.fromEntries([
 ]));
 
 const TRACKER_LABEL_VARIANTS = Object.freeze(Object.fromEntries(
-  ["label", "breadcrumb", "number-strip"].flatMap(construction => ["light", "dark"].map(mode => [
+  ["label", "breadcrumb", "number-strip", "pills"].flatMap(construction => ["light", "dark"].map(mode => [
     `${construction}-${mode}`,
     { props: { construction: `compact-${construction}`, mode }, ...(mode === "dark" ? { backdrop: "primary" } : {}) }
   ]))
@@ -77,7 +78,9 @@ function box(fill, stroke = fill, lineWidth = HAIRLINE, radius = NONE) {
 }
 
 function trackerItems(props) {
-  if (!Array.isArray(props.items) || props.items.length < 3 || props.items.length > 11) throw new Error("Tracker requires three to eleven items");
+  // Pill tabs work from two sections; the full-page trackers need three.
+  const minimum = props.construction === "compact-pills" ? 2 : 3;
+  if (!Array.isArray(props.items) || props.items.length < minimum || props.items.length > 11) throw new Error(`Tracker requires ${minimum === 2 ? "two" : "three"} to eleven items`);
   const items = props.items.map((item, index) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(`Tracker item ${index + 1} must be an object`);
     const id = String(item.id ?? "").trim(), label = String(item.label ?? "").trim();
@@ -227,7 +230,7 @@ export function trackerPageNodes({ id, frame, props }) {
 
 function labelSettings(props) {
   const construction = props.construction ?? "compact-label", mode = props.mode ?? "light";
-  if (!["compact-label", "compact-breadcrumb", "compact-number-strip"].includes(construction)) throw new Error(`Unknown tracker-label construction: ${construction}`);
+  if (!["compact-label", "compact-breadcrumb", "compact-number-strip", "compact-pills"].includes(construction)) throw new Error(`Unknown tracker-label construction: ${construction}`);
   if (!["light", "dark"].includes(mode)) throw new Error(`Unknown tracker-label mode: ${mode}`);
   return { construction, mode };
 }
@@ -254,6 +257,27 @@ export function trackerLabelNodes({ id, frame, props }) {
       const data = commonData(props, item, index), active = data.selected, x = x0 + index * (markerSize + gap);
       nodes.push(ellipsePrimitive({ id: stableId(id, "marker", item.id), role: "tracker-compact-marker", frame: { x, y, width: markerSize, height: markerSize }, style: box(active ? foreground : (dark ? INK : SURFACE), active ? foreground : quiet, active ? STANDARD : HAIRLINE, ROUND), data }));
       nodes.push(textPrimitive({ id: stableId(id, "marker-label", item.id), role: "tracker-compact-marker-label", frame: { x, y, width: markerSize, height: markerSize }, text: item.id, style: style(token("type.label"), active ? (dark ? INK : WHITE) : quiet, true, "center", "mid"), data }));
+    });
+    return nodes;
+  }
+  if (construction === "compact-pills") {
+    // Section pill tabs at the right of the title band (the e-Conomy tracker):
+    // every section as a pill, the current one filled in the accent.
+    const nodes = [], padX = tokenValue(token("space.2")), gap = tokenValue(token("space.2"));
+    const height = Math.min(20, frame.height), fontSize = tokenValue(token("type.label"));
+    const measured = items.map((item) => ({ item, layout: measureText(item.label, 240, { fontFamily: tokenValue(BODY_FONT), fontSize, bold: true, wrapWidthRatio: 1 }) }));
+    if (measured.some((m) => m.layout.lines.length > 1)) throw new Error("Pill tracker labels must fit one line; shorten the section labels");
+    const widths = measured.map((m) => Math.ceil(m.layout.width) + 2 * padX);
+    const total = widths.reduce((a, b) => a + b, 0) + gap * (items.length - 1);
+    if (total > frame.width) throw new Error("Pill tracker exceeds the title width; shorten the section labels or use compact-label");
+    let x = frame.x + frame.width - total;
+    const y = frame.y + (frame.height - height) / 2;
+    const accent = token("color.accent");
+    measured.forEach(({ item, layout }, index) => {
+      const data = commonData(props, item, index), active = data.selected, w = widths[index];
+      nodes.push(rectPrimitive({ id: stableId(id, "pill", item.id), role: "tracker-pill", frame: { x, y, width: w, height }, style: box(active ? accent : (dark ? INK : SURFACE), active ? accent : (dark ? WHITE : RULE), HAIRLINE, ROUND), data }));
+      nodes.push(textPrimitive({ id: stableId(id, "pill-label", item.id), role: "tracker-pill-label", frame: { x: x + padX, y: y + (height - layout.height) / 2, width: w - 2 * padX, height: layout.height }, text: item.label, style: { ...style(token("type.label"), active ? WHITE : quiet, true, "center", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { ...data, textLayout: layout } }));
+      x += w + gap;
     });
     return nodes;
   }

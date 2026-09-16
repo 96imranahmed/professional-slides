@@ -87,7 +87,17 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
     const styled = styleTable(rest);
     return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
   }
-  if (type === "metrics") return { id, layout: "flow.row", size: HUG, items: rest.items.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: m, size: { width: { fr: 1 }, height: 140 } })) };
+  // A metrics exhibit: one row up to four tiles, a grid of equal rows beyond
+  // (the McKinsey "Impact to date" 3x3 of navy tiles). `tone` sets every tile.
+  if (type === "metrics") {
+    const tiles = rest.items.map((m) => (typeof m === "string" ? { value: m } : m));
+    const perRow = rest.columns || (tiles.length <= 4 ? tiles.length : tiles.length <= 6 ? 3 : tiles.length <= 8 ? 4 : 3);
+    const rows = []; for (let i = 0; i < tiles.length; i += perRow) rows.push(tiles.slice(i, i + perRow));
+    const tile = (m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(rest.tone ? { tone: rest.tone } : {}), ...(rest.tone === "ink" || rest.tone === "rule" || rows.length > 1 ? { variant: "prominent" } : {}), ...m }, size: { width: { fr: 1 }, height: rows.length > 1 ? "fill" : 140 } });
+    if (rows.length === 1) return { id, layout: "flow.row", size: HUG, items: rows[0].map(tile) };
+    let n = 0;
+    return { id, layout: "flow.column", size, items: rows.map((row, r) => ({ id: `${id}-row-${r}`, layout: "flow.row", size: { width: { fr: 1 }, height: "fill" }, items: row.map((m) => tile(m, n++)) })) };
+  }
   if (type.startsWith("chart.")) {
     const multi = Array.isArray(rest.series) && rest.series.length > 1;
     // Lines carry their series name at the end of the line instead of a legend,
@@ -153,6 +163,10 @@ function verdictCell(value, header) {
   if (/^(✗|✘|✕|x|no|n|false)$/i.test(text)) return { type: "check", value: "no" };
   for (const [re, state] of RAG_WORDS) if (re.test(text)) return { type: "rag", value: state, text: /^(green|amber|yellow|red|ok)$/i.test(text) ? undefined : text };
   if (/^\d{1,3}\s*%$/.test(text) && /(complete|progress|done|achiev)/i.test(String(header || ""))) return { type: "progress", value: Number(text.replace(/[^\d]/g, "")) };
+  // Signed changes under a change heading read in green or red.
+  if (/(change|delta|yoy|y\/y|growth|vs\.?|variance|difference)/i.test(String(header || "")) && /^[+\-−–]\s?\d/.test(text)) return { type: "text", text, tone: /^[+]/.test(text) ? "positive" : "negative" };
+  // Outlook columns: arrows or the outlook words become trend rings.
+  if (/(outlook|trend|momentum|direction)/i.test(String(header || "")) && /^(↑|↗|up|positive|strong|improving|→|flat|neutral|moderate|stable|↓|↘|down|negative|weak|declining)$/i.test(text)) return { type: "trend", value: /^(↑|↗|up|positive|strong|improving)$/i.test(text) ? "up" : /^(↓|↘|down|negative|weak|declining)$/i.test(text) ? "down" : "flat" };
   return value;
 }
 const columnLabel = (c) => (typeof c === "string" ? c : c?.label || "");
@@ -314,7 +328,7 @@ function niceCeiling(value) {
 function metricsStrip(metrics, id, tone) {
   const tiles = metrics.map((m) => (typeof m === "string" ? { value: m } : m));
   const prominent = tone === "ink" || tone === "rule";
-  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
+  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
 }
 
 /**
@@ -495,6 +509,7 @@ export function composeSlide(slide, index, baseDir) {
   slide = pairedBars(slide);
   if (slide.exhibit) slide = { ...slide, exhibit: changeFromContent(highlightFromTitle(percentStack(slide.exhibit), slide.title), slide.title) };
   if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => changeFromContent(highlightFromTitle(percentStack(ex), slide.title), slide.title)) };
+  if (slide.kind === "statement") return { id, kind: "statement", text: slide.text || slide.title, ...(slide.accent ? { accent: slide.accent } : {}), ...(slide.subtext ? { subtext: slide.subtext } : {}), ...(slide.tone === "dark" ? { mode: "dark" } : {}), ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
   if (slide.kind === "takeaways") return { id, kind: "takeaways", ...(slide.title ? { title: slide.title } : {}), items: slide.points || slide.items, ...(slide.tone === "light" ? { mode: "light" } : {}), ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
   if (slide.kind === "section") return { id, kind: "divider", title: slide.title, ...(slide.summary ? { subtitle: slide.summary } : {}), ...(slide.number !== undefined ? { number: slide.number } : {}), ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
   if (slide.kind === "agenda") return { id, title: slide.title || "Contents", layout: "flow.column", items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items, ...(slide.active !== undefined ? { active: slide.active } : {}), ...(slide.style === "columns" ? { variant: "columns" } : {}) }, size: SIZE }] };
@@ -663,6 +678,22 @@ export function composeSlide(slide, index, baseDir) {
  * front of every later section: the classic tracker. `agenda: "once"` inserts
  * only the Contents page.
  */
+/**
+ * `sectionTabs: true` on the deck: every analytical page under a section
+ * carries the section pill tabs above its title, the current section filled.
+ */
+export function sectionTabs(slidesIn) {
+  const sections = slidesIn.filter((s) => s.kind === "section");
+  if (sections.length < 2) return slidesIn;
+  const items = sections.map((s, i) => ({ id: String(i + 1), label: s.title }));
+  let current = 0;
+  return slidesIn.map((slide) => {
+    if (slide.kind === "section") { current = sections.indexOf(slide) + 1; return slide; }
+    if (slide.kind || !current || slide.tracker) return slide;
+    return { ...slide, tracker: { trackerId: "deck-sections", items, selectedId: String(current), construction: "compact-pills" } };
+  });
+}
+
 export function agendaPages(slidesIn, agenda, agendaStyle) {
   const sections = slidesIn.filter((s) => s.kind === "section");
   if (!agenda || sections.length < 2) return slidesIn;
@@ -697,7 +728,7 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     if (spec.cover.notes) cover.notes = spec.cover.notes;
     slides.push(cover);
   }
-  const pages = agendaPages(spec.slides, spec.agenda, spec.agendaStyle);
+  const pages = agendaPages(spec.sectionTabs ? sectionTabs(spec.slides) : spec.slides, spec.agenda, spec.agendaStyle);
   for (const page of pages.flatMap(splitTables).flatMap(paginateTable)) slides.push(composeSlide(page, slides.length, baseDir));
   return {
     id: spec.id,

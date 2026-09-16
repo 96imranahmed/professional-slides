@@ -234,8 +234,17 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
   // is retried at 22pt. Beyond that the page gate (TITLE_LINES) reports it.
   // An optional lead-in ("Why", "Drive") is set in the accent colour as a run.
   const lead = typeof props.lead === "string" && props.lead.trim() && props.text.startsWith(props.lead) ? props.lead : null;
+  // The house decides how a lead reads: in the accent before the rest (McKinsey
+  // "South Korea: …"), or as "Topic | statement" with the topic in bold, a pipe,
+  // and the statement in the title weight (BCG 2023; the bright BCG accent is
+  // too light for running text). The pipe replaces a colon or dash after the lead.
+  const pipe = lead && chrome && houseStyle("style.titleLead") === "pipe";
+  const restOf = (text) => pipe ? text.slice(lead.length).replace(/^\s*[:\-–—|]?\s*/, "") : text.slice(lead.length);
+  const runsFor = () => pipe
+    ? [{ text: lead, bold: true }, { text: " | ", bold: false }, { text: restOf(props.text), bold: titleBold }]
+    : [{ text: lead, bold: titleBold, accent: true }, { text: props.text.slice(lead.length), bold: titleBold }];
   const measureTitle = (fontSize) => lead
-    ? measureTextRuns([{ text: lead, bold: titleBold, accent: true }, { text: props.text.slice(lead.length), bold: titleBold }], baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, wrapWidthRatio: 0.98 })
+    ? measureTextRuns(runsFor(), baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, wrapWidthRatio: 0.98 })
     : measureText(props.text, baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, bold: titleBold, wrapWidthRatio: 0.98 });
   let fontSize = tokenValue(size), textLayout = measureTitle(fontSize);
   if (chrome && !section && textLayout.lines.length > 2) {
@@ -835,7 +844,9 @@ function registerCore(registry) {
         const contentTop = Math.max(CHROME.bodyTop, titleBottom + gap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
         const contentFrame = { ...page.contentFrame, y: contentTop, height: baseBottom - contentTop };
         if (contentFrame.height <= 0) throw new Error("Action title leaves no room for slide content; shorten the title or split the slide");
-        return { ...page, contentFrame, nodes: [...tracker, ...titles, ...page.nodes] };
+        // The title band paints first; the tracker sits on it, above the title.
+        const band = titles.filter((n) => n.role === "title-band"), rest = titles.filter((n) => n.role !== "title-band");
+        return { ...page, contentFrame, nodes: [...band, ...tracker, ...rest, ...page.nodes] };
       }
     }),
     component({ id: "page-template", category: "shared", role: "page-template", tokens: PAGE_TEMPLATE_TOKENS,
@@ -968,6 +979,48 @@ function registerCore(registry) {
       const title = measureText(props.title || "Key takeaways", width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.sectionTitle")), bold: true, wrapWidthRatio: 1 });
       const items = (Array.isArray(props.items) ? props.items : []).map((item) => measureText(String(item), width - 64, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: 1 }));
       return { height: CHROME.titleTop + 8 + title.height + tokenValue(token("space.4")) + 12 + items.reduce((sum, item) => sum + item.height + 16, 0) };
+    } }),
+    // The statement page (e-Conomy, Bain keynotes): one sentence set large and
+    // centred, its key phrase in the accent (bold white on navy), a short accent
+    // rule above; with a photograph (media.mjs) the sentence sits on a navy card.
+    component({ id: "statement", category: "navigation", role: "statement", tokens: ["color.canvas", "color.ink", "color.onPrimary", "color.accent", "font.display", "font.body", "type.deckTitle", "type.heading", "line.hairline", "line.standard", "radius.none", "space.4", "space.5", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { text: "The pandemic has been a catalyst for existing digital users to adopt new online services.", accent: ["adopt new online services"] }, render: ({ id, frame, props }) => {
+      for (const key of Object.keys(props)) if (!["text", "accent", "subtext", "mode", "card", "pageTemplate", "source", "note", "companyName", "pageNumber", "footerLeft", "footerRight", "headerBandHeight"].includes(key)) throw new Error(`Unknown statement setting: ${key}`);
+      if (typeof props.text !== "string" || !props.text.trim()) throw new Error("Statement requires text");
+      const inverse = (props.mode ?? "light") === "dark";
+      const page = renderPageTemplate({ id: stableId(id, "page"), frame, props: { ...props, inverse } });
+      const phrases = (Array.isArray(props.accent) ? props.accent : props.accent ? [props.accent] : []).filter((p) => typeof p === "string" && p.trim());
+      // Split the sentence into runs at each accent phrase, in order of appearance.
+      const runs = [];
+      let rest = props.text.trim();
+      while (rest.length) {
+        const hits = phrases.map((p) => ({ p, at: rest.indexOf(p) })).filter((h) => h.at >= 0).sort((a, b) => a.at - b.at);
+        if (!hits.length) { runs.push({ text: rest, bold: false }); break; }
+        const { p, at } = hits[0];
+        if (at > 0) runs.push({ text: rest.slice(0, at), bold: false });
+        runs.push({ text: p, bold: true, ...(inverse ? {} : { accent: true }) });
+        rest = rest.slice(at + p.length);
+      }
+      const card = props.card ?? null;
+      const width = card ? card.width - 2 * tokenValue(token("space.5")) : Math.round(frame.width * 0.72);
+      const fontSize = tokenValue(token("type.deckTitle"));
+      const layout = measureTextRuns(runs, width, { fontFamily: tokenValue(DISPLAY), fontSize, wrapWidthRatio: 1 });
+      if (layout.lines.length > 5) throw new Error("Statement runs to more than five lines; shorten it");
+      const sub = typeof props.subtext === "string" && props.subtext.trim() ? measureText(props.subtext.trim(), width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), wrapWidthRatio: 1 }) : null;
+      const gap = tokenValue(token("space.4"));
+      const blockHeight = 4 + gap + layout.height + (sub ? gap + sub.height : 0);
+      const cx = card ? card.x + card.width / 2 : frame.x + frame.width / 2;
+      const top = card ? card.y + (card.height - blockHeight) / 2 : frame.y + (frame.height - blockHeight) / 2;
+      const background = inverse ? INK : token("color.canvas"), foreground = inverse || card ? WHITE : INK;
+      const nodes = [];
+      if (!card) nodes.push(rectPrimitive({ id: stableId(id, "surface"), role: "statement-surface", frame, style: boxStyle(background, background, HAIRLINE, token("radius.none")) }));
+      nodes.push(rectPrimitive({ id: stableId(id, "accent-bar"), role: "divider-accent", frame: { x: cx - 32, y: top, width: 64, height: 4 }, style: boxStyle(token("color.accent"), "none", HAIRLINE, token("radius.none")) }));
+      nodes.push(textPrimitive({ id: stableId(id, "text"), role: "statement-text", frame: { x: cx - width / 2, y: top + 4 + gap, width, height: layout.height }, text: layout.text, runs: layout.runs, style: { ...textStyle(token("type.deckTitle"), foreground, false, "center", "top"), fontFamily: DISPLAY, lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
+      if (sub) nodes.push(textPrimitive({ id: stableId(id, "subtext"), role: "statement-subtext", frame: { x: cx - width / 2, y: top + 4 + gap + layout.height + gap, width, height: sub.height }, text: sub.text, style: { ...textStyle(token("type.heading"), foreground, false, "center", "top"), lineHeight: sub.lineHeight, wrap: false }, data: { textLayout: sub } }));
+      return { ...page, nodes: [...nodes, ...page.nodes] };
+    }, measureContent: ({ frame, props }) => {
+      const width = Math.round(frame.width * 0.72);
+      const layout = measureText(String(props.text ?? ""), width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")), wrapWidthRatio: 1 });
+      return { height: 4 + 2 * tokenValue(token("space.4")) + layout.height };
     } }),
     component({ id: "source", category: "shared", role: "source", tokens: ["font.body", "type.source", "color.textSecondary", "color.rule", "line.hairline"], preferredSize: { width: 920, height: 26 }, sample: { text: "Source: (Insert source)" }, render: ({ id, frame, props }) => {
       const variant = resolveTitleVariant(props);

@@ -172,6 +172,21 @@ export function registerMedia(registry) {
       ...base.nodes,
     ] };
   };
+  // A statement over a photograph: the photo fills the page and the sentence
+  // sits on a navy card in the middle (the Bain keynote page).
+  const statement = registry.get("statement"), statementRender = statement.render;
+  statement.render = (input) => {
+    const { image, ...props } = input.props;
+    if (!image) return statementRender(input);
+    const { frame } = input;
+    const card = { x: frame.x + frame.width * 0.17, y: frame.y + frame.height * 0.24, width: frame.width * 0.66, height: frame.height * 0.52 };
+    const base = statementRender({ ...input, props: { ...props, card, mode: "dark" } });
+    return { ...base, nodes: [
+      mediaNode({ id: stableId(input.id, "image"), frame, props: image, role: "statement-image", fit: "cover" }),
+      primitive({ type: "rect", id: stableId(input.id, "card"), role: "statement-card", frame: card, style: { fill: token("color.ink"), stroke: token("color.ink"), lineWidth: token("line.hairline"), radius: token("radius.none") } }),
+      ...base.nodes,
+    ] };
+  };
   const cover = registry.get("cover"),
     plain = cover.render;
   cover.variants = {

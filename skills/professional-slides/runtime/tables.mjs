@@ -36,7 +36,10 @@ export const CELL_TYPES = Object.freeze([
   "progress",
   "dot",
   "check",
+  "trend",
 ]);
+// Outlook cells (the Bain sector tables): an arrow in a ring, green up, grey flat, red down.
+export const TREND_STATES = Object.freeze({ up: { glyph: "↑", color: "color.positive" }, flat: { glyph: "→", color: "color.textSecondary" }, down: { glyph: "↓", color: "color.negative" } });
 // Status vocabularies. Pill labels are the canonical words; the composer maps
 // free text onto them.
 export const RAG_STATES = Object.freeze({
@@ -68,6 +71,7 @@ export const TABLE_TOKENS = [
   "color.positive",
   "color.caution",
   "color.negative",
+  "color.textSecondary",
   ...Array.from({ length: 6 }, (_, i) => `color.chartSeries${i + 1}`),
   "space.1",
   "space.2",
@@ -453,6 +457,13 @@ function contentLayout(cell, width, props, used) {
     const labelWidth = Math.max(label.width, v("space.6"));
     if (inner - labelWidth - gap < v("space.6")) throw new Error("Table progress cell leaves no bar width");
     return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, progress: { value, labelWidth, barHeight: v("space.2") }, height: Math.max(label.height, v("space.2")) };
+  }
+  if (cell.type === "trend") {
+    const key = { up: "up", positive: "up", strong: "up", improving: "up", flat: "flat", neutral: "flat", moderate: "flat", stable: "flat", down: "down", negative: "down", weak: "down", declining: "down" }[String(cell.value).toLowerCase()];
+    if (!key) throw new Error(`Table trend cells take up, flat or down (got ${cell.value})`);
+    const size = v("icon.small") + v("space.2");
+    if (inner < size) throw new Error("Table trend cell is too narrow for its mark");
+    return { padding, offset: 0, blocks: [], bold, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: 0, trend: { size, key }, height: size };
   }
   if (cell.type === "dot" || cell.type === "check") {
     const size = v("icon.small") + (cell.type === "check" ? v("space.2") : 0);
@@ -916,7 +927,9 @@ function renderTableAt({ id, frame, props }) {
             data,
           }),
         );
-      const color = fill ? foreground(fill) : band ? foreground(band) : ink;
+      // `tone: "positive" | "negative"` on a text cell colours a signed change
+      // (the "difference to prior year" rows of the financial tables).
+      const color = fill ? foreground(fill) : band ? foreground(band) : cell.tone === "positive" ? t("color.positive") : cell.tone === "negative" ? t("color.negative") : ink;
       const inner = {
         x: area.x + m.padding,
         y: area.y + m.paddingY,
@@ -943,6 +956,12 @@ function renderTableAt({ id, frame, props }) {
       } else if (cell.type === "dot") {
         const { size, on } = l.mark, x0 = area.x + (area.width - m.gap - size) / 2, y0 = area.y + (height - size) / 2;
         nodes.push(ellipsePrimitive({ id: stableId(cellId, "dot"), role: "table-dot", frame: { x: x0, y: y0, width: size, height: size }, style: { fill: on ? primary : "none", stroke: on ? "none" : t("color.rule"), lineWidth: t("line.hairline"), radius: t("radius.round") }, data: { ...data, on } }));
+      } else if (cell.type === "trend") {
+        const { size, key } = l.trend, x0 = area.x + (area.width - m.gap - size) / 2, y0 = area.y + (height - size) / 2;
+        const color = t(TREND_STATES[key].color);
+        nodes.push(ellipsePrimitive({ id: stableId(cellId, "trend-ring"), role: "table-trend", frame: { x: x0, y: y0, width: size, height: size }, style: { fill: "none", stroke: color, lineWidth: t("line.standard"), radius: t("radius.round") }, data: { ...data, trend: key } }));
+        const glyph = measure(TREND_STATES[key].glyph, size, true, "type.compact");
+        putText(stableId(cellId, "trend-glyph"), "table-trend-glyph", { x: x0, y: y0 + (size - glyph.height) / 2, width: size }, glyph, textStyle(true, color, "center", "type.compact"), { ...data, trend: key });
       } else if (cell.type === "check") {
         const { size, on } = l.mark, x0 = area.x + (area.width - m.gap - size) / 2, y0 = area.y + (height - size) / 2;
         nodes.push(...stateMarker({ id: stableId(cellId, "check"), role: "table-check", x: x0, y: y0, size, state: on ? "yes" : "no", data }));

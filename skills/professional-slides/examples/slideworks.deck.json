@@ -20,13 +20,21 @@
  "slides": [
   {
    "kind": "section",
-   "title": "How the year unfolded",
+   "title": "Year in review",
    "summary": "Deal activity returned to pre-pandemic levels",
    "image": {
     "path": "assets/hills.jpg",
     "alt": "Hills at dusk",
     "credit": "Synthetic render, professional-slides examples"
    }
+  },
+  {
+   "kind": "statement",
+   "text": "Dealmaking has returned to pre-pandemic levels, and the capital that stayed on the sidelines is coming back to fundamentals.",
+   "accent": [
+    "coming back to fundamentals"
+   ],
+   "subtext": "Three findings from the year in review"
   },
   {
    "title": "PE-VC activity declined by ~35% between 2022 and 2023, returning to pre-pandemic levels",
@@ -379,6 +387,147 @@
    "source": "Texas A&M Urban Mobility Report, 2017"
   },
   {
+   "title": "Sector outlook: healthcare and manufacturing stay strong while IT stays soft",
+   "titleLead": "Sector outlook",
+   "exhibit": {
+    "type": "table",
+    "columns": [
+     "Sector",
+     "2023 deal value, $B",
+     "YoY change",
+     "Outlook",
+     "Key drivers"
+    ],
+    "rows": [
+     [
+      "Healthcare",
+      "5.5",
+      "+200%",
+      "up",
+      "Multi-specialty and single-specialty provider platforms; scale assets attracting buyouts"
+     ],
+     [
+      "Advanced manufacturing",
+      "3.9",
+      "+20%",
+      "up",
+      "China+1 tailwinds, PLI incentives, EV supply chain"
+     ],
+     [
+      "Energy",
+      "3.1",
+      "+35%",
+      "up",
+      "Renewables and transmission; policy-backed capex"
+     ],
+     [
+      "Consumer / retail",
+      "4.4",
+      "-15%",
+      "flat",
+      "Selective quick-commerce and D2C consolidation"
+     ],
+     [
+      "IT / ITeS",
+      "2.2",
+      "-65%",
+      "down",
+      "Valuation reset; end-market demand normalising"
+     ],
+     [
+      "Financial services",
+      "4.8",
+      "-30%",
+      "flat",
+      "NBFC and fintech consolidation at reset valuations"
+     ],
+     [
+      "Real estate",
+      "2.6",
+      "+5%",
+      "flat",
+      "Commercial platforms; REIT pipeline"
+     ],
+     [
+      "New-age tech",
+      "6.8",
+      "-60%",
+      "down",
+      "Funding winter continues; path-to-profit focus"
+     ]
+    ]
+   },
+   "callout": {
+    "lead": "Outlook legend",
+    "text": "\u2191 strong activity expected \u00b7 \u2192 moderate \u00b7 \u2193 limited activity"
+   },
+   "source": "Venture Intelligence; Bain analysis"
+  },
+  {
+   "title": "Retail and corporate banking hold two thirds of the revenue pool, mostly domestic",
+   "exhibit": {
+    "type": "chart.marimekko",
+    "heading": "Banking revenue pool by business line and geography, 2025",
+    "unit": "$B; column width = revenue",
+    "categories": [
+     "Retail",
+     "Corporate",
+     "Wealth",
+     "Markets",
+     "Payments"
+    ],
+    "series": [
+     {
+      "name": "Domestic",
+      "values": [
+       42,
+       30,
+       12,
+       8,
+       9
+      ]
+     },
+     {
+      "name": "Europe",
+      "values": [
+       10,
+       14,
+       6,
+       12,
+       4
+      ]
+     },
+     {
+      "name": "Asia",
+      "values": [
+       8,
+       11,
+       4,
+       10,
+       5
+      ]
+     }
+    ]
+   },
+   "pointsTone": "muted",
+   "pointsHeading": "So what",
+   "points": [
+    {
+     "lead": "Retail is 70% domestic",
+     "text": "so rate and deposit dynamics at home drive the largest pool"
+    },
+    {
+     "lead": "Markets is the most international",
+     "text": "with two thirds of revenue booked in Europe and Asia"
+    },
+    {
+     "lead": "Payments is small but growing fastest",
+     "text": "and skews to Asia"
+    }
+   ],
+   "source": "Company reports; team analysis"
+  },
+  {
    "title": "Transit commutes track income and place of work across the District's wards",
    "exhibit": {
     "type": "chart.bar",
@@ -445,7 +594,7 @@
   },
   {
    "kind": "section",
-   "title": "What the survey says",
+   "title": "Survey",
    "summary": "GenAI use cases in credit are moving from pilot to deployment",
    "image": {
     "path": "assets/hills.jpg",
@@ -489,6 +638,107 @@
     "50% rank return on investment as the least important factor"
    ],
    "source": "IACPM/McKinsey survey, December 2024 (n = 33)"
+  },
+  {
+   "title": "Most institutions have access to external GenAI tools but half require internal guidelines first",
+   "metrics": [
+    {
+     "value": "80%",
+     "label": "have access to external GenAI solutions"
+    },
+    {
+     "value": "52%",
+     "label": "require understanding of internal guidelines"
+    },
+    {
+     "value": "38%",
+     "label": "limit tools to specific areas"
+    },
+    {
+     "value": "12%",
+     "label": "have no access to these tools"
+    }
+   ],
+   "metricsTone": "ring",
+   "exhibit": {
+    "type": "chart.bar",
+    "heading": "Institutions by access model",
+    "unit": "Number of institutions",
+    "categories": [
+     "Some colleagues, within specific areas",
+     "Almost all colleagues",
+     "No one"
+    ],
+    "series": [
+     {
+      "name": "Institutions",
+      "values": [
+       17,
+       12,
+       4
+      ]
+     }
+    ]
+   },
+   "points": [
+    "Access is broad but governed: most institutions gate use behind guideline training",
+    "Data-security training is the second most common prerequisite",
+    "The few without access cite regulatory uncertainty"
+   ],
+   "source": "IACPM/McKinsey survey, December 2024 (n = 33)"
+  },
+  {
+   "title": "The global spread is accelerating with more reports of local transmission",
+   "exhibit": {
+    "type": "metrics",
+    "tone": "dark",
+    "items": [
+     {
+      "value": ">380,000",
+      "label": "Reported confirmed cases"
+     },
+     {
+      "value": ">16,000",
+      "label": "Deaths"
+     },
+     {
+      "value": "194",
+      "label": "Countries or territories with reported cases"
+     },
+     {
+      "value": ">115",
+      "label": "Countries or territories with evidence of local transmission"
+     },
+     {
+      "value": ">75",
+      "label": "Countries or territories with more than 100 reported cases"
+     },
+     {
+      "value": "0.4%",
+      "label": "China's share of new reported cases, March 18\u201324"
+     },
+     {
+      "value": ">160%",
+      "label": "Increase in reported cases March 18\u201324 from Europe"
+     },
+     {
+      "value": "35",
+      "label": "New countries or territories with cases, March 18\u201324"
+     },
+     {
+      "value": "3.5x",
+      "label": "Growth in daily cases outside China over two weeks"
+     }
+    ]
+   },
+   "pointsTone": "muted",
+   "pointsHeading": "Impact to date",
+   "points": [
+    "Latest as of March 25, 2020",
+    "Europe now accounts for the greatest share of recent cases while US cases accelerate",
+    "Some Asian countries have kept incremental cases low and are restarting economies"
+   ],
+   "source": "WHO situation reports; Johns Hopkins University"
   },
   {
    "title": "Most institutions are testing GenAI use cases, with super regionals leading deployment",
@@ -676,5 +926,6 @@
     "credit": "Synthetic render, professional-slides examples"
    }
   }
- ]
+ ],
+ "sectionTabs": true
 }

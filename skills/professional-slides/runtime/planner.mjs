@@ -229,6 +229,16 @@ function planTakeaways(plan) {
   };
 }
 
+function planStatement(plan) {
+  if (!plan?.id || !plan.text?.trim()) throw new Error("Statement plan requires id and text");
+  const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
+  const props = { text: plan.text, ...(plan.accent ? { accent: plan.accent } : {}), ...(plan.subtext ? { subtext: plan.subtext } : {}), ...(plan.mode ? { mode: plan.mode } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}), ...(plan.image ? { image: plan.image } : {}) };
+  return {
+    spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", frame, composition: absolute({ id: `${plan.id}-statement`, children: [componentNode({ id: "statement", component: "statement", props, frame, role: "statement" })] }) },
+    decision: { layout: "structural", kind: "statement", density: { requested: "executive", recommended: "live-pitch", resolved: plan.density ?? "executive", selection: "explicit", reasons: [] }, itemJobs: [{ id: "statement", job: "state the message", component: "statement" }] }
+  };
+}
+
 function planTracker(plan, registry) {
   if (!plan?.id || !plan.title?.trim()) throw new Error("Tracker plan requires id and title");
   const props = plan.trackerPage;
@@ -319,6 +329,7 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
     : slide.kind === "tracker" ? planTracker(slide, registry)
     : slide.kind === "divider" ? planDivider(slide)
     : slide.kind === "takeaways" ? planTakeaways(slide)
+    : slide.kind === "statement" ? planStatement(slide)
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
   const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, slides: planned.map((item) => item.spec) }, registry, {slideCache});
   return {deck, decisions:planned.map(item=>item.decision)};

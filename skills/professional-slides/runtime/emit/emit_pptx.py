@@ -48,7 +48,7 @@ CHART_PLOT_ROLES = {"chart-mark", "data-label", "category-label", "chart-axis", 
 # re-wrap them on a one-pixel advance difference. Prose keeps wrap="square".
 LABEL_ROLES = {"legend-label", "data-label", "category-label", "axis-label", "value-label", "metric-value", "metric-label",
                "metric-delta", "page-number", "source-text", "chart-unit", "process-label", "tracker-label", "table-cell",
-               "table-header", "pie-label", "reference-label", "end-label", "stack-label", "total-label", "scale-endpoint", "page-tag", "cover-date", "cover-logo", "table-status-label", "table-progress-label", "chart-badge", "chart-bracket-label", "chart-delta-label", "chart-period-label", "chart-event-label"}
+               "table-header", "pie-label", "reference-label", "end-label", "stack-label", "total-label", "scale-endpoint", "page-tag", "cover-date", "cover-logo", "table-status-label", "table-progress-label", "table-trend-glyph", "chart-badge", "chart-bracket-label", "chart-delta-label", "chart-period-label", "chart-event-label"}
 CHROME_COMPONENTS = {"slide-chrome", "page-template", "section", "paragraph", "section-heading",
                      "bullet-list", "insight", "evidence-note", "chart-title", "footnote", "cover"}
 NATIVE = {

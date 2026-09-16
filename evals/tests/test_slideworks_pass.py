@@ -159,6 +159,56 @@ console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])
 
+    def test_pass_three_furniture(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+import {composeSlide,sectionTabs,styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
+const registry=createRegistry();
+// Metrics grid: nine tiles become three rows of three, prominent, filling the frame.
+const grid=composeSlide({title:'T',exhibit:{type:'metrics',tone:'dark',items:Array.from({length:9},(_,i)=>({value:String(i),label:'l'}))}},0);
+const ex=grid.items.find(i=>i.id==='s01-exhibit');
+assert.equal(ex.items.length,3);assert.equal(ex.items[0].items.length,3);assert.equal(ex.items[0].items[0].props.variant,'prominent');
+// Statement: accent phrase becomes a bold accent run; the plan is structural.
+const st=registry.get('statement');
+const nodes=st.render({id:'s',frame:{x:0,y:0,width:1280,height:720},props:{text:'Growth has coincided with a ratcheting up of risk.',accent:['ratcheting up of risk']}}).nodes;
+const text=nodes.find(n=>n.role==='statement-text');
+assert.equal(text.runs.filter(r=>r.accent).map(r=>r.text).join(' ').replace(/\s+/g,' '),'ratcheting up of risk');
+assert.ok(text.runs.filter(r=>r.accent).every(r=>r.bold));assert.equal(text.runs[0].accent,undefined);
+assert.equal(composeSlide({kind:'statement',text:'x',accent:'x'},0).kind,'statement');
+// Marimekko: column widths follow totals; segments print shares.
+const mk=registry.get('chart.marimekko');
+const m=mk.render({id:'m',frame:{x:0,y:0,width:800,height:400},props:{categories:['A','B'],series:[{name:'x',values:[30,10]},{name:'y',values:[30,30]}],legend:false}}).nodes;
+const marks=m.filter(n=>n.role==='chart-mark');
+assert.equal(marks.length,4);
+const widthA=marks.find(n=>n.data.category==='A').frame.width, widthB=marks.find(n=>n.data.category==='B').frame.width;
+assert.ok(Math.abs(widthA/widthB-1.5)<0.01,'A is 60 wide to B 40');
+assert.ok(m.some(n=>n.role==='data-label'&&n.text==='50%'));
+// Trend cells and signed changes infer from headers; the ring tone draws an arc.
+const t=styleTable({type:'table',columns:['Sector','YoY change','Outlook'],rows:[['H','+20%','up'],['I','-65%','↓']]});
+assert.deepEqual(t.rows[0][1],{type:'text',text:'+20%',tone:'positive'});assert.deepEqual(t.rows[1][2],{type:'trend',value:'down'});
+const table=registry.get('table');
+const tn=table.render({id:'t',frame:{x:0,y:0,width:600,height:200},props:{...t,density:'body'}}).nodes;
+assert.equal(tn.filter(n=>n.role==='table-trend').length,2);
+const ring=registry.get('metric').render({id:'r',frame:{x:0,y:0,width:200,height:150},props:{tone:'ring',value:'68%',label:'share'}}).nodes;
+const arc=ring.find(n=>n.role==='metric-ring');
+assert.ok(Math.abs((arc.data.endAngle-arc.data.startAngle)-360*0.68)<0.01);
+assert.throws(()=>registry.get('metric').render({id:'r',frame:{x:0,y:0,width:200,height:150},props:{tone:'ring',value:'1.6x'}}),/0 to 100/);
+// Section tabs: analytical pages under a section carry the pill tracker.
+const tabs=sectionTabs([{kind:'section',title:'A'},{title:'x'},{kind:'section',title:'B'},{title:'y'}]);
+assert.equal(tabs[1].tracker.construction,'compact-pills');assert.equal(tabs[3].tracker.selectedId,'2');assert.equal(tabs[0].tracker,undefined);
+const tl=registry.get('tracker-label').render({id:'k',frame:{x:60,y:30,width:1160,height:20},props:tabs[1].tracker}).nodes;
+assert.equal(tl.filter(n=>n.role==='tracker-pill').length,2);
+// BCG sets "Topic | statement"; McKinsey keeps the accent lead.
+const frame={x:0,y:0,width:1280,height:720};
+const titleFor=(palette)=>compileDeck({id:'t',palette,slides:[{id:'p',frame,composition:component({id:'chrome',component:'slide-chrome',frame,props:{title:'Sector outlook: IT stays soft',titleLead:'Sector outlook'}})}]},registry).slides[0].nodes.find(n=>n.role==='action-title');
+assert.equal(titleFor('bcg').text,'Sector outlook | IT stays soft');
+assert.equal(titleFor('mckinsey').text,'Sector outlook: IT stays soft');
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

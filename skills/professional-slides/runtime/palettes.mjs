@@ -20,7 +20,7 @@ export const PALETTES = Object.freeze({
       "color.componentPrimaryTint": "#E3F3EC", "color.surfaceMuted": "#F2F2F2",
       "color.chartSeries1": "#0E7A5E", "color.chartSeries2": "#5FB08F", "color.chartSeries3": "#9FD4BB",
       "color.chartSeries4": "#1F3A2E", "color.chartSeries5": "#7A7A7A", "color.chartSeries6": "#C9C9C9",
-      "style.titleWeight": "regular", "style.titleRule": "band", "style.tagPlacement": "below-title", "style.chartHeading": "band", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold"
+      "style.titleWeight": "regular", "style.titleRule": "band", "style.tagPlacement": "below-title", "style.chartHeading": "band", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold", "style.titleLead": "pipe"
     }
   },
   bain: {

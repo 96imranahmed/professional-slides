@@ -1337,6 +1337,61 @@ function bubbleGrid({ id, frame, props, tokens = TOKENS }) {
   return nodes;
 }
 
+/**
+ * Marimekko: columns as wide as their totals (or `widths`), each a 100% stack
+ * of its series, the column total above and the category below; segment
+ * values print inside where they fit. Drawn, never native.
+ */
+function marimekkoLayout(frameIn, props) {
+  const frame = Number.isFinite(frameIn.height) ? frameIn : { ...frameIn, height: 400 };
+  const categories = props.categories || [], series = Array.isArray(props.series) ? props.series : [];
+  if (!categories.length || !series.length || series.some((sr) => !Array.isArray(sr.values) || sr.values.length !== categories.length || sr.values.some((v) => !(Number.isFinite(v) && v >= 0)))) throw new Error("Marimekko requires categories and series of non-negative values, one per category");
+  const totals = categories.map((_, i) => series.reduce((sum, sr) => sum + sr.values[i], 0));
+  const widths = Array.isArray(props.widths) ? props.widths : totals;
+  if (widths.length !== categories.length || widths.some((w) => !(Number.isFinite(w) && w > 0))) throw new Error("Marimekko widths must be positive, one per category");
+  const showLegend = props.legend !== false && series.length > 1;
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: showLegend ? legendRowsFor(series.map((sr) => sr.name), frame) : false, leftInset: 8, valueLabelInset: 8, totalLabelInset: 26, centerPlot: false });
+  const categoryLayouts = categories.map((c, i) => measureText(String(c), Math.max(72, plot.width * widths[i] / widths.reduce((a, b) => a + b, 0) - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
+  const footBand = Math.max(...categoryLayouts.map((l) => l.height)) + 12;
+  return { categories, series, totals, widths, plot, showLegend, categoryLayouts, footBand, height: (plot.y - frame.y) + plot.height + footBand };
+}
+function marimekko({ id, frame, props, tokens = TOKENS }) {
+  const L = marimekkoLayout(frame, props);
+  const { categories, series, totals, widths, plot } = L;
+  const gap = 4, sumW = widths.reduce((a, b) => a + b, 0);
+  const usable = plot.width - gap * (categories.length - 1);
+  const bodyH = plot.height - L.footBand;
+  const nodes = [...(L.showLegend ? topLegend({ id, frame, items: series.map((sr, i) => ({ label: sr.name, colorIndex: props.colorIndices?.[i] ?? i })) }) : [])];
+  let x = plot.x;
+  categories.forEach((category, ci) => {
+    const w = usable * widths[ci] / sumW;
+    const total = totals[ci] || 1;
+    let y = plot.y;
+    series.forEach((sr, si) => {
+      const v = sr.values[ci];
+      const h = bodyH * v / total;
+      if (h <= 0) return;
+      const colorIndex = props.colorIndices?.[si] ?? si % SERIES.length;
+      nodes.push(rectPrimitive({ id: stableId(id, "segment", category, sr.name), role: "chart-mark", frame: { x, y, width: w, height: h }, style: fillStyle(SERIES[colorIndex], token("color.surface")), data: { category, series: sr.name, value: v, share: v / total, colorIndex } }));
+      const text = props.percentLabels === false ? formatValue(v, props) : `${Math.round(100 * v / total)}%`;
+      const label = measureText(text, Math.max(20, w - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: labelBold(), wrapWidthRatio: 1 });
+      if (h >= label.height + 4 && w >= label.width + 6) {
+        const onLight = contrastRatio(tokens[SERIES[colorIndex].tokenId].value, tokens["color.onPrimary"].value) < contrastRatio(tokens[SERIES[colorIndex].tokenId].value, tokens["color.ink"].value);
+        nodes.push(textPrimitive({ id: stableId(id, "segment-label", category, sr.name), role: "data-label", frame: { x: x + 2, y: y + (h - label.height) / 2, width: w - 4, height: label.height }, text, style: textStyle(CHART_LABEL, onLight ? INK : token("color.onPrimary"), labelBold(), "center"), data: { category, series: sr.name } }));
+      }
+      y += h;
+    });
+    // Column total above, category (and its width when widths are given) below.
+    nodes.push(textPrimitive({ id: stableId(id, "total", category), role: "data-label", frame: { x: x - 10, y: plot.y - 24, width: w + 20, height: 20 }, text: formatValue(Array.isArray(props.widths) ? widths[ci] : totals[ci], props), style: textStyle(CHART_LABEL, INK, true, "center"), data: { category, total: true } }));
+    const layout = L.categoryLayouts[ci];
+    const lw = Math.max(72, w - 6);
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: x + w / 2 - lw / 2, y: plot.y + bodyH + 8, width: lw, height: layout.height }, text: layout.text, style: { ...textStyle(AXIS_LABEL, SECONDARY, false, "center"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { category, textLayout: layout } }));
+    x += w + gap;
+  });
+  nodes.push(linePrimitive({ id: stableId(id, "baseline"), role: "chart-axis", x1: plot.x, y1: plot.y + bodyH, x2: plot.x + plot.width, y2: plot.y + bodyH, style: lineStyle(INK, token("line.hairline")) }));
+  return nodes;
+}
+
 function rangeChart({ id, frame, props }) {
   assertGridlineOption(props);
   const categories = props.categories || [];
@@ -1750,6 +1805,10 @@ const chartDefinitions = [
     sample: { labels: ["Core", "Growth", "New"], values: [52, 31, 17] }
   },
   {
+    id: "chart.marimekko", render: marimekko,
+    sample: { heading: "(Insert measure and population)", categories: ["Retail", "Corporate", "Wealth", "Markets"], series: [{ name: "Domestic", values: [42, 30, 12, 8] }, { name: "International", values: [18, 25, 10, 22] }], unit: "$B" }
+  },
+  {
     id: "chart.bubble-grid", render: bubbleGrid,
     sample: { heading: "(Insert measure and population)", rows: ["Mega banks", "Super regionals", "Core regionals", "Other"], columns: ["Ideation", "Concept", "Pilot", "Deployed"], values: [[30, 9, 9, 4], [15, 12, 9, 6], [54, 13, 13, 6], [8, 9, 9, 0]], unit: "Number of use cases" }
   },
@@ -1887,6 +1946,7 @@ export function registerCharts(registry) {
       // like a section's, so peers beside it take the same band height and the
       // rules line up. The compiler passes the shared height back as headerBandHeight.
       ...(chart.id === "chart.waffle" ? { measureContent: ({ frame, props = {} }) => ({ height: waffleLayout(frame, props).height }) } : {}),
+      ...(chart.id === "chart.marimekko" ? { measureContent: ({ frame, props = {} }) => ({ height: marimekkoLayout(frame, props).height }) } : {}),
       ...(chart.id === "chart.bubble-grid" ? { measureContent: ({ frame, props = {} }) => ({ height: bubbleGridLayout(frame, props).height }) } : {}),
       measureHeader: ({ frame, props = {} }) => {
         if (!String(props.heading ?? "").trim()) return null;

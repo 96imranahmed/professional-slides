@@ -118,9 +118,10 @@ export const TOKENS = Object.freeze({
   "style.chartHeading": keyword("--style-chart-heading", "text"),      // text | band (filled grey band)
   "style.listMarker": keyword("--style-list-marker", "dot"),           // dot | dash
   "style.tableRows": keyword("--style-table-rows", "rules"),           // rules | zebra
-  "style.labelWeight": keyword("--style-label-weight", "bold")         // bold | regular (chart value labels)
+  "style.labelWeight": keyword("--style-label-weight", "bold"),        // bold | regular (chart value labels)
+  "style.titleLead": keyword("--style-title-lead", "accent")           // accent (lead in the accent) | pipe (BCG: "Topic | statement", the statement in the accent)
 });
-export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight"]);
+export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead"]);
 /** The active design profile value for a style token ("style.titleWeight" → "bold"). */
 export function houseStyle(id) { return tokenValue(token(id)); }
 
