@@ -762,7 +762,7 @@
    "exhibit": {
     "type": "chart.bubble-grid",
     "heading": "GenAI use cases by institution type and development stage",
-    "unit": "Number of use cases indicated by survey participants",
+    "unit": "use cases",
     "rows": [
      "Mega banks (8)",
      "Super regionals (7)",
@@ -823,7 +823,8 @@
      "text": "so far, though most remain before pilot"
     }
    ],
-   "source": "IACPM/McKinsey survey, December 2024"
+   "source": "IACPM/McKinsey survey, December 2024",
+   "note": "Use cases indicated by survey participants, December 2024 (n = 33)"
   },
   {
    "title": "Our community of metals experts extends across the world",
@@ -853,7 +854,7 @@
    "exhibit": {
     "type": "chart.bar",
     "heading": "Metals consultants staffed by region",
-    "unit": "Number of consultants, 2022",
+    "unit": "consultants",
     "categories": [
      "Americas",
      "EMEA",
@@ -896,7 +897,8 @@
      "text": "so a study staffs from one community"
     }
    ],
-   "source": "Internal staffing records, 2022"
+   "source": "Internal staffing records, 2022",
+   "note": "Internal staffing records, 2022"
   },
   {
    "title": "Investment themes: a return to fundamentals across sectors and geographies",

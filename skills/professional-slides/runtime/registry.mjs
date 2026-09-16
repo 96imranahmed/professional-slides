@@ -399,7 +399,12 @@ function chartTitleLayout(frame, props) {
   const ruled = variant === "underlined" && !band;
   const ruleGap = tokenValue(token("space.1")), contentGap = tokenValue(token("space.3"));
   const height = bandHeight + (ruled ? ruleGap : 0) + contentGap;
-  return { heading, unit, unitSize, unitGap, inline, inlineGap, unitPlacement: unit ? (inline ? "inline" : "stacked") : "none", block, bandHeight, ruleGap, contentHeight: bandHeight, ruled, variant, height, band, padX, padY };
+  // A hero chart's banner is one line. When the composer asked for the inline
+  // unit and the pair would not fit — a heading that wraps, or a unit carrying
+  // a qualification that belongs in the note — the band silently becomes two
+  // lines, so the fallback is recorded and the page gates report it.
+  const wrapped = !band && props.unitPlacement === "inline" && (heading.lines.length > 1 || (unit && !inline));
+  return { heading, unit, unitSize, unitGap, inline, inlineGap, unitPlacement: unit ? (inline ? "inline" : "stacked") : "none", wrapped, block, bandHeight, ruleGap, contentHeight: bandHeight, ruled, variant, height, band, padX, padY };
 }
 function chartTitleNodes({ id, frame, props }) {
   const layout = chartTitleLayout(frame, props);
@@ -413,7 +418,7 @@ function chartTitleNodes({ id, frame, props }) {
     frame: { x: frame.x + layout.padX, y: blockTop, width: frame.width - 2 * layout.padX, height: layout.heading.height },
     text: layout.heading.text,
     style: { ...textStyle(token("type.heading"), layout.band ? WHITE : INK, !layout.band, "left", "top"), lineHeight: layout.heading.lineHeight, wrap: false },
-    data: { textLayout: layout.heading, headerTop: frame.y, headerBandHeight: layout.bandHeight, ruleGap: layout.ruleGap, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }
+    data: { textLayout: layout.heading, headerTop: frame.y, headerBandHeight: layout.bandHeight, ruleGap: layout.ruleGap, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement, ...(layout.wrapped ? { headingWrapped: true } : {}) }
   }));
   if (layout.unit) nodes.push(textPrimitive({
     id: stableId(id, "unit"),

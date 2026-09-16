@@ -341,3 +341,66 @@ assert.ok(draw(3)>0.6,'three bars are not ribbons');
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result["accepted"])
+
+
+class BannerAndRangeTests(unittest.TestCase):
+    """The exhibit banner is one line, and a floating band prints its ends
+    outside itself, in ink."""
+
+    def test_a_two_line_banner_is_reported(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const registry=createRegistry();
+const frame={x:0,y:0,width:720,height:60};
+const render=(props)=>registry.get('chart-title').render({id:'h',frame,props}).nodes;
+// A unit written as a sentence pushes the band to two lines; the heading node
+// records the fallback so the gates can report it.
+const long=render({heading:'Published annual pay for research-connected PM roles',unit:'$k, published base-salary band',unitPlacement:'inline'});
+const wrapped=long.find(n=>(n.data||{}).headingWrapped);
+assert.ok(wrapped,'the fallback is recorded');
+// A heading and a real unit fit on one line and nothing is recorded.
+const short=render({heading:'Published annual pay for PM roles at AI labs',unit:'$k',unitPlacement:'inline'});
+assert.equal(short.find(n=>(n.data||{}).headingWrapped),undefined);
+assert.equal(short.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result["accepted"])
+
+    def test_the_gate_reads_the_recorded_fallback(self):
+        slide = {
+            "id": "s01",
+            "componentInstances": [
+                {"id": "chrome", "component": "slide-chrome"},
+                {"id": "s01-0", "component": "chart.bar", "frame": {"x": 60, "y": 162, "width": 700, "height": 440}},
+            ],
+            "nodes": [
+                {"type": "text", "role": "section-heading", "text": "Published annual pay for research-connected PM roles",
+                 "frame": {"x": 60, "y": 140, "width": 700, "height": 40},
+                 "data": {"headingWrapped": True, "textLayout": {"source": "Published annual pay for research-connected PM roles"}}},
+            ],
+        }
+        report = page_gates.run_gates(deck([slide]))
+        self.assertIn("HEADING_WRAPS", codes(report))
+
+    def test_a_range_chart_is_drawn_so_its_ends_read_in_ink(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const props={categories:['A','B'],low:[305,385],high:[385,460],heading:'H',unit:'$k'};
+// PowerPoint can only label inside a stacked band, so the range chart stays shapes.
+assert.equal(nativeChartSpec('chart.range',props,{x:0,y:0,width:600,height:300}),null);
+const nodes=createRegistry().get('chart.range').render({id:'r',frame:{x:0,y:0,width:600,height:300},props}).nodes;
+const marks=nodes.filter(n=>n.role==='chart-mark');
+const labels=nodes.filter(n=>n.role==='data-label');
+assert.equal(labels.length,4,'a low and a high label per band');
+const low=labels.find(n=>n.data.end==='low'), high=labels.find(n=>n.data.end==='high');
+const band=marks[0];
+assert.ok(low.frame.x+low.frame.width<=band.frame.x+1,'the low value sits left of the band');
+assert.ok(high.frame.x>=band.frame.x+band.frame.width-1,'the high value sits right of it');
+assert.equal(low.style.color.tokenId,'color.ink');
+assert.equal(high.style.color.tokenId,'color.ink');
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result["accepted"])

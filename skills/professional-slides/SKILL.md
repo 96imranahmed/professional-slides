@@ -40,6 +40,8 @@ Keep it to 14 words and two lines. The page proves the title; the title never ex
 
 **Chart headings are not titles.** A chart heading names the measure, the population and the period: `NYPD reported homicides, 2015-2025`. The statistics live on the marks and in the action title, so the heading stays true when the data updates. `NYPD: 382 to 305` belongs on the bars.
 
+**The banner is one line.** Heading plus unit sit on a single line, the unit inline after the heading in grey: *Published annual pay for PM roles at AI labs, $k*. Two lines means the heading is carrying a qualification or the unit has become a sentence - `unit: "$k, published base-salary band"` is a note wearing a unit's clothes. Keep the unit to the unit (`$k`, `%`, `minutes`, `$m`), put the basis in `note`, and let the page gates tell you when the band fell back to two lines (`HEADING_WRAPS`). The two-line band exists for one case: peer charts in a row, where the stacked unit line keeps their headings aligned.
+
 ## Test the story before you build
 
 Run these on the title list, before any page exists.

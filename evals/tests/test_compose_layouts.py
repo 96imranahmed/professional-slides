@@ -119,8 +119,9 @@ assert.equal(nodes.find(n=>n.role==='chart-unit').text,'$B');
 const range=REGISTRY.get('chart.range').render({id:'r',frame:{x:0,y:0,width:700,height:400},props:{categories:['A','B'],low:[300,350],high:[380,460]}}).nodes;
 assert.equal(range.filter(n=>n.role==='chart-mark').length,2);
 assert.deepEqual(range.filter(n=>n.role==='data-label').map(n=>n.text),['300','380','350','460']);
-const rs=nativeChartSpec('chart.range',{categories:['A','B'],low:[300,350],high:[380,460]},{x:0,y:0,width:700,height:400});
-assert.equal(rs.type,'range');assert.deepEqual(rs.series[1].values,[80,110]);assert.equal(rs.legend,false);
+// The band's ends are labelled outside it, in ink, which a native stacked bar
+// cannot do - so the range chart is assembled as shapes.
+assert.equal(nativeChartSpec('chart.range',{categories:['A','B'],low:[300,350],high:[380,460]},{x:0,y:0,width:700,height:400}),null);
 // A value table under the chart stacks a compact table below it.
 const vt=composeSlide({title:'T',exhibit:{type:'chart.column',categories:['a','b'],series:[{name:'m',values:[1,2]}],dataTable:[{label:'Target',values:[4,4]}]}},0); // a data table keeps its chart, thin or not
 assert.ok(find(vt.items,i=>i.id==='s01-stack'));

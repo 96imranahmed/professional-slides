@@ -75,7 +75,7 @@ Category comparison, ranking, discrete periods, actual-versus-benchmark pairs. O
 
 ## Range
 
-`chart.range` draws one horizontal floating band per category between `low` and `high` arrays (pay bands, scenario ranges, confidence intervals), with the low value labelled at the band's left end and the high value at its right; `highlights` accent one band. It is emitted as a native stacked bar with an invisible base, so the bands stay editable. Use it when the spread is the finding; when only the midpoints matter, use a bar.
+`chart.range` draws one horizontal floating band per category between `low` and `high` arrays (pay bands, scenario ranges, confidence intervals), with the low value in ink outside the band's left end and the high value in ink outside its right; `highlights` accent one band. It is assembled as shapes rather than a native stacked bar: PowerPoint can only place a label inside a stacked segment, and a band's ends belong beside the band, not written over it. Use it when the spread is the finding; when only the midpoints matter, use a bar.
 
 ## Line
 

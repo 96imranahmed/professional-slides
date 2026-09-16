@@ -748,7 +748,10 @@ export function nativeChartSpec(componentId, props = {}, frame) {
   // expose it, so those charts stay as assembled, grouped shapes. A single-bar
   // highlight is a per-point fill and stays native.
   const highlights = props.highlights || [];
-  if (props.native === false || type === "scatter") return null;
+  // A floating range band prints its low value left of the band and its high
+  // value right of it, in ink. PowerPoint's stacked-bar stand-in can only put a
+  // label inside the band, so the range chart is assembled as shapes.
+  if (props.native === false || type === "scatter" || type === "range") return null;
   // Keep named scatter points and rich value labels editable as scene shapes
   // until the native exporter can preserve their complete semantics.
   if (props.valueFormat && (typeof props.valueFormat !== "object" ||

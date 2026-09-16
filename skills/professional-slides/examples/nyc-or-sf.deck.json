@@ -82,8 +82,8 @@
    "title": "Both cities offer the role; only Anthropic lets you take it in New York",
    "exhibit": {
     "type": "chart.range",
-    "heading": "Published annual pay for research-connected PM roles",
-    "unit": "$k, published base-salary band",
+    "heading": "Published annual pay for PM roles at AI labs",
+    "unit": "$k",
     "categories": [
      "Anthropic Research",
      "Anthropic Labs",
@@ -116,7 +116,8 @@
    "serves": [
     "role"
    ],
-   "tag": "Illustrative"
+   "tag": "Illustrative",
+   "note": "Published base-salary bands; total compensation is not disclosed"
   },
   {
    "title": "NYC schools beat their peers by 7–12 points; the SF pair is a preference",

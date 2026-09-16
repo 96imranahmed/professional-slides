@@ -840,6 +840,24 @@ def gate_numbers_on_marks(slide_no, slide, findings):
     ))
 
 
+def gate_heading_wraps(slide_no, slide, findings):
+    """HEADING_WRAPS. The exhibit banner is one line: the measure, the population
+    and the period, with the unit inline after it. Two lines means the heading is
+    carrying a qualification that belongs in the note, or a unit written as a
+    sentence ("$k, published base-salary band" rather than "$k")."""
+    for node in text_nodes(slide):
+        data = node.get("data") or {}
+        if not data.get("headingWrapped"):
+            continue
+        findings.append(finding(
+            slide_no, "HEADING_WRAPS", source_text(node)[:90], "one line",
+            "Shorten the heading to the measure, the population and the period, "
+            "and make the unit a unit: \"Published annual pay for PM roles at AI "
+            "labs\" with unit \"$k\", and the basis (\"published base-salary "
+            "band\") in the note under the page.",
+        ))
+
+
 def gate_thin_evidence(slide_no, slide, findings):
     """THIN_EVIDENCE. A deck that reads as a document (a pre-read, an appendix,
     anything the weight contract sets to two elements) puts more than one piece
@@ -1171,6 +1189,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_numbers_on_marks(slide_no, slide, findings)
             if wanted("THIN_EVIDENCE"):
                 gate_thin_evidence(slide_no, slide, findings)
+            if wanted("HEADING_WRAPS"):
+                gate_heading_wraps(slide_no, slide, findings)
             if wanted("METRIC_STACK"):
                 gate_metric_stack(slide_no, slide, findings)
         if wanted("DOT_SEPARATOR"):
