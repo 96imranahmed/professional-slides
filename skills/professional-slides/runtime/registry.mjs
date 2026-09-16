@@ -310,7 +310,9 @@ function contentRailInsets(props = {}) {
 function sectionPadding(props = {}) {
   if (props.padding !== undefined) return normalizeInsets(props.padding);
   const treatment = props.treatment || "open";
-  const value = tokenValue(token("space.4"));
+  // A filled panel breathes: the firm panels set their copy a full gutter off
+  // every edge, not the four pixels a tint can get away with.
+  const value = tokenValue(token("space.5"));
   return treatment === "open" ? { top: 0, right: 0, bottom: 0, left: 0 } : { top: value, right: value, bottom: value, left: value };
 }
 
@@ -369,15 +371,30 @@ function chartTitleLayout(frame, props) {
   const band = houseStyle("style.chartHeading") === "band";
   const padX = band ? tokenValue(token("space.3")) : 0, padY = band ? tokenValue(token("space.2")) : 0;
   const heading = measureText(props.heading || props.text || "", frame.width - 2 * padX, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: !band });
-  const unit = props.unit ? measureText(props.unit, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), wrapWidthRatio: 1 }) : null;
+  // The stacked unit line is compact grey under the heading; the inline unit
+  // sits on the heading's line at the heading's size, separated only by colour.
+  // The inline unit is tried first and falls back to the stacked line — at the
+  // compact size — when the heading wraps or the pair will not fit on the line.
+  const inlineGap = tokenValue(token("space.2"));
+  const measureUnit = (size) => props.unit ? measureText(props.unit, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(size), wrapWidthRatio: 1 }) : null;
+  const wanted = props.unitPlacement === "inline" && !band && heading.lines.length === 1;
+  const inlineMeasure = wanted ? measureUnit(token("type.heading")) : null;
+  const inline = Boolean(inlineMeasure) && inlineMeasure.lines.length === 1 && heading.width + inlineGap + inlineMeasure.width <= frame.width - 2 * padX;
+  const unitSize = inline ? token("type.heading") : COMPACT;
+  const unit = inline ? inlineMeasure : measureUnit(COMPACT);
   if (unit && unit.lines.length !== 1) throw new Error("Chart unit must fit on one line");
-  const unitGap = unit ? (band ? tokenValue(token("space.2")) : tokenValue(token("space.1")) / 2) : 0;
-  const block = heading.height + 2 * padY + (unit ? unitGap + unit.height : 0);
+  // `unitPlacement: "inline"` (the composer's choice for a chart beside a text
+  // column) sets the unit after the heading on the same line, in grey, so the
+  // heading band is one line and level with the side column's heading. It
+  // falls back to the stacked unit line when the heading wraps or the unit
+  // would not fit beside it.
+  const unitGap = unit && !inline ? (band ? tokenValue(token("space.2")) : tokenValue(token("space.1")) / 2) : 0;
+  const block = heading.height + 2 * padY + (unit && !inline ? unitGap + unit.height : 0);
   const bandHeight = Math.max(block, props.headerBandHeight || 0);
   const ruled = variant === "underlined" && !band;
   const ruleGap = tokenValue(token("space.1")), contentGap = tokenValue(token("space.3"));
   const height = bandHeight + (ruled ? ruleGap : 0) + contentGap;
-  return { heading, unit, unitGap, unitPlacement: unit ? "stacked" : "none", block, bandHeight, ruleGap, contentHeight: bandHeight, ruled, variant, height, band, padX, padY };
+  return { heading, unit, unitSize, unitGap, inline, inlineGap, unitPlacement: unit ? (inline ? "inline" : "stacked") : "none", block, bandHeight, ruleGap, contentHeight: bandHeight, ruled, variant, height, band, padX, padY };
 }
 function chartTitleNodes({ id, frame, props }) {
   const layout = chartTitleLayout(frame, props);
@@ -396,9 +413,11 @@ function chartTitleNodes({ id, frame, props }) {
   if (layout.unit) nodes.push(textPrimitive({
     id: stableId(id, "unit"),
     role: "chart-unit",
-    frame: { x: frame.x, y: blockTop + layout.heading.height + layout.padY + layout.unitGap, width: frame.width, height: layout.unit.height },
+    frame: layout.inline
+      ? { x: frame.x + layout.padX + layout.heading.width + layout.inlineGap, y: blockTop, width: Math.max(layout.unit.width + 4, frame.width - layout.padX - layout.heading.width - layout.inlineGap), height: layout.unit.height }
+      : { x: frame.x, y: blockTop + layout.heading.height + layout.padY + layout.unitGap, width: frame.width, height: layout.unit.height },
     text: props.unit,
-    style: { ...textStyle(COMPACT, token("color.chartUnit"), false, "left", "top"), lineHeight: layout.unit.lineHeight, wrap: false },
+    style: { ...textStyle(layout.unitSize, token("color.chartUnit"), false, "left", "top"), lineHeight: layout.unit.lineHeight, wrap: false },
     data: { textLayout: layout.unit, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }
   }));
   if (props.badge) {
@@ -473,6 +492,10 @@ function bodyListLayout(frame, itemsIn, props = {}) {
 function bodyListNodes({ id, frame, props }) {
   const layout = bodyListLayout(frame, props.items, props);
   if (layout.height > frame.height + 0.01) throw new Error(`${id} body bullets exceed the allocated height; allocate space or edit copy, never shrink type`);
+  // `distribute: true` (a full-fill deck's side column) spreads the rows down
+  // the frame instead of stacking them at the top, up to twice the theme gap.
+  const spare = Math.max(0, frame.height - layout.height);
+  const extraGap = props.distribute === true && layout.measured.length > 1 ? Math.min(spare / (layout.measured.length - 1), 44) : 0;
   // On a dark or primary panel the list reads in white: white text, white markers,
   // reversed number discs.
   const inverse = props.tone === "inverse";
@@ -502,7 +525,7 @@ function bodyListNodes({ id, frame, props }) {
       ty += m.lead.height + (m.text ? layout.leadGap : 0);
     }
     if (m.text) nodes.push(textPrimitive({ id: stableId(id, "item", index), role: "list-item", frame: { x: frame.x + layout.offset, y: ty, width: frame.width - layout.offset, height: m.text.height }, text: m.text.text, style: { ...textStyle(BODY, INK_, false, "left", "top"), lineHeight: m.text.lineHeight }, data: { textLayout: m.text } }));
-    y += m.height + layout.gap;
+    y += m.height + layout.gap + extraGap;
   });
   return nodes;
 }
@@ -841,7 +864,10 @@ function registerCore(registry) {
         // One content top for the whole deck: the body starts at CHROME.bodyTop whether
         // the title takes one line or two. Only a three-line title pushes it down.
         const gap = tokenValue(token("space.5"));
-        const contentTop = Math.max(CHROME.bodyTop, titleBottom + gap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
+        // A tracker above the title (pill tabs, a label) sits in the same band as
+        // the title, so the body starts a step lower to keep it off the content.
+        const trackerGap = tracker.length ? tokenValue(token("space.3")) : 0;
+        const contentTop = Math.max(CHROME.bodyTop + trackerGap, titleBottom + gap + trackerGap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
         const contentFrame = { ...page.contentFrame, y: contentTop, height: baseBottom - contentTop };
         if (contentFrame.height <= 0) throw new Error("Action title leaves no room for slide content; shorten the title or split the slide");
         // The title band paints first; the tracker sits on it, above the title.
@@ -1119,11 +1145,26 @@ function registerCore(registry) {
         return [...(width > 0 ? [rectPrimitive({ id: stableId(id, "stage", index), role: "funnel-stage", frame: { x, y: frame.y + index * height + 3, width, height: height - 6 }, style: boxStyle(fill, fill, HAIRLINE, SMALL_RADIUS) })] : []), textPrimitive({ id: stableId(id, "label", index), role: "funnel-label", frame: { x: frame.x + plotWidth + 12, y: frame.y + index * height + 3, width: frame.width - plotWidth - 12, height: height - 6 }, text: `${stage.label}  ${stage.value}`, style: textStyle(COMPACT, INK, true, "left") })];
       }) };
     } }),
-    component({ id: "connector", category: "relationship", role: "connector", tokens: ["color.componentPrimary", "color.onPrimary", "font.body", "type.label", "line.standard", "line.hairline", "icon.medium", "radius.round"], preferredSize: { width: 360, height: 90 }, sample: { label: "therefore", variant: "labelled-line" }, render: ({ id, frame, props }) => {
+    component({ id: "connector", category: "relationship", role: "connector", tokens: ["color.componentPrimary", "color.onPrimary", "font.body", "type.label", "color.rule", "line.standard", "line.hairline", "icon.medium", "icon.large", "space.2", "radius.round"], preferredSize: { width: 360, height: 90 }, sample: { label: "therefore", variant: "labelled-line" }, render: ({ id, frame, props }) => {
       const variant = props.variant ?? (props.label ? "labelled-line" : "disc-chevron"), centerY = frame.y + frame.height / 2;
       if (variant === "chevron") return { nodes: [lightChevronNode(id, frame)] };
+      // `divider-chevron`: a dashed rule down the gutter with the disc centred
+      // on it, for a right-hand column that runs full bleed (a toned panel, a
+      // photograph) where a floating disc would have nothing to sit against.
+      if (variant === "divider-chevron") {
+        const diameter = Math.min(props.size ?? tokenValue(token("icon.large")), frame.width, frame.height);
+        const centerX = frame.x + frame.width / 2, top = frame.y, bottom = frame.y + frame.height;
+        const gap = diameter / 2 + tokenValue(token("space.2"));
+        return { nodes: [
+          linePrimitive({ id: stableId(id, "rule-top"), role: "relationship-divider", x1: centerX, y1: top, x2: centerX, y2: Math.max(top, centerY - gap), style: { stroke: RULE, lineWidth: HAIRLINE, dash: "dash" }, data: { relation: "implies" } }),
+          linePrimitive({ id: stableId(id, "rule-bottom"), role: "relationship-divider", x1: centerX, y1: Math.min(bottom, centerY + gap), x2: centerX, y2: bottom, style: { stroke: RULE, lineWidth: HAIRLINE, dash: "dash" }, data: { relation: "implies" } }),
+          ellipsePrimitive({ id: stableId(id, "disc"), role: "relationship-disc", frame: { x: centerX - diameter / 2, y: centerY - diameter / 2, width: diameter, height: diameter }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")), data: { relation: "implies", arrowVariant: variant } }),
+          openLine(stableId(id, "chevron-top"), centerX - diameter / 8, centerY - diameter / 4, centerX + diameter / 8, centerY, "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 1 }),
+          openLine(stableId(id, "chevron-bottom"), centerX + diameter / 8, centerY, centerX - diameter / 8, centerY + diameter / 4, "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 2 })
+        ] };
+      }
       if (variant === "disc-chevron") {
-        const diameter = tokenValue(token("icon.medium")), centerX = frame.x + frame.width / 2;
+        const diameter = Math.min(props.size ?? tokenValue(token("icon.large")), frame.width, frame.height), centerX = frame.x + frame.width / 2;
         return { nodes: [
           ellipsePrimitive({ id: stableId(id, "disc"), role: "relationship-disc", frame: { x: centerX - diameter / 2, y: centerY - diameter / 2, width: diameter, height: diameter }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")), data: { relation: "implies", arrowVariant: variant, arrowPart: 0 } }),
           openLine(stableId(id, "chevron-top"), centerX - diameter / 8, centerY - diameter / 4, centerX + diameter / 8, centerY, "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 1 }),
@@ -1187,7 +1228,7 @@ function registerCore(registry) {
     const axes = { section: ["treatment", ["open", "muted", "primary", "dark", "tint"]], panel: ["tone", ["open", "muted", "primary", "dark"]], "content-rail": ["treatment", ["muted", "open"]], roadmap: ["variant", ["process", "wave-columns"]], "section-heading": ["variant", ["standard", "accent", "inverse"]] };
     axes["section-boundary"] = ["variant", ["related", "inference", "inference-chevron", "subsection"]];
     axes.metric = ["variant", ["default", "prominent"]];
-    axes.connector = ["variant", ["disc-chevron", "chevron", "line", "labelled-line"]];
+    axes.connector = ["variant", ["disc-chevron", "divider-chevron", "chevron", "line", "labelled-line"]];
     axes["bullet-list"] = ["variant", ["compact", "body"]];
     axes.insight = ["variant", ["tonal", "neutral", "dotted", "primary"]];
     if (axes[definition.id]) {

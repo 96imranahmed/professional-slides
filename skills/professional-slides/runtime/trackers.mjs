@@ -270,7 +270,9 @@ export function trackerLabelNodes({ id, frame, props }) {
     const widths = measured.map((m) => Math.ceil(m.layout.width) + 2 * padX);
     const total = widths.reduce((a, b) => a + b, 0) + gap * (items.length - 1);
     if (total > frame.width) throw new Error("Pill tracker exceeds the title width; shorten the section labels or use compact-label");
-    let x = frame.x + frame.width - total;
+    // The pills stop a gutter short of the page's right margin so they do not
+    // crowd the content or the edge.
+    let x = frame.x + frame.width - total - tokenValue(token("space.2"));
     const y = frame.y + (frame.height - height) / 2;
     const accent = token("color.accent");
     measured.forEach(({ item, layout }, index) => {

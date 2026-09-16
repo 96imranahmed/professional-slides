@@ -486,7 +486,15 @@ class Emitter:
         kind = spec["type"]
         is_range = kind == "range"
         fmt = spec.get("valueFormat") or {}
-        decimals = int(fmt.get("decimals", 0)) if isinstance(fmt, dict) else 0
+        if isinstance(fmt, dict) and "decimals" in fmt:
+            decimals = int(fmt["decimals"])
+        else:
+            # No declared format: labels read the way the drawn charts write them
+            # — whole numbers from ten up, one decimal below ten. A native chart
+            # that rounded 4.2 to 4 would disagree with its own scene.
+            values = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
+            fractional = [v for v in values if abs(v - round(v)) > 1e-9]
+            decimals = 1 if fractional and max(abs(v) for v in fractional) < 10 else 0
         number_format = "0" if decimals == 0 else "0." + "0" * decimals
         if kind not in ("pie", "donut", "scatter"):
             plot.gap_width = 60 if not is_range else 80

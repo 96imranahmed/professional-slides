@@ -93,6 +93,16 @@ PROFILES = {
 }
 DEFAULT_PROFILE = "executive"
 
+# How full the deck means to read (`fill` on the spec, carried on the scene).
+# Emptiness is right for a live-pitch deck and wrong for a pre-read, so the
+# three geometric thresholds move with it; nothing else does.
+FILL_LEVELS = {
+    "full": {"ink_min": 0.10, "dead_band_max": 0.06, "internal_void_max": 0.16, "column_void_max": 0.20},
+    "balanced": {"ink_min": 0.08, "dead_band_max": 0.08, "internal_void_max": 0.22, "column_void_max": 1.0},
+    "airy": {"ink_min": 0.04, "dead_band_max": 0.14, "internal_void_max": 0.32, "column_void_max": 1.0},
+}
+DEFAULT_FILL = "balanced"
+
 THRESHOLDS = {
     "ink_min": 0.08,   # a 12pt text page with 120 words sits near 9%; waived when a qualifying hero exhibit carries the page (a line chart is ink-light by nature)
     "dead_band_max": 0.08,
@@ -104,6 +114,7 @@ THRESHOLDS = {
     "cpl_max": 90,
     "hero_area_min": 0.40,
     "monotony_max": 0.35,
+    "column_void_max": 1.0,
 }
 
 
@@ -210,6 +221,23 @@ def finding(slide_no, code, measured, threshold, repair):
 # --- image measurement -----------------------------------------------------
 
 
+def load_ink_matrix(path, luminance=INK_LUMINANCE):
+    """The 1280x720 ink mask as a numpy array (rows x columns of booleans), or
+    None when numpy is not installed. Column-aware gates need the grid; the
+    row gates take its row sums."""
+    try:
+        import numpy as np
+    except ImportError:
+        return None
+    from PIL import Image
+
+    with Image.open(path) as image:
+        grey = image.convert("L")
+        if grey.size != (CANVAS_W, CANVAS_H):
+            grey = grey.resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
+        return np.asarray(grey) < luminance
+
+
 def load_ink_rows(path, luminance=INK_LUMINANCE):
     """Return rows[y] = count of pixels darker than `luminance` on that row of the
     1280x720 canvas. Ink uses INK_LUMINANCE; occupancy (for the dead-band and
@@ -232,6 +260,34 @@ def load_ink_rows(path, luminance=INK_LUMINANCE):
             int(sum(mask.crop((0, y, CANVAS_W, y + 1)).histogram()[1:]))
             for y in range(CANVAS_H)
         ]
+
+
+def gate_column_void(slide_no, matrix, findings):
+    """COLUMN_VOID. A page whose deck asks to read full must not leave a column
+    empty below its content: a side column that stops halfway down is the
+    commonest way a page reads empty while the page-wide bands stay inside
+    their thresholds. Runs only for `fill: "full"` decks, and only where
+    numpy is available to slice the render."""
+    if matrix is None:
+        return
+    body_top = 140
+    # The composed side column starts at 62% of the width (a 2:1 chart page) and
+    # at 60% for a 3:2 table page; take the wider of the two so a narrow column
+    # is measured whole.
+    for name, x0 in (("side", int(CANVAS_W * 0.60)),):
+        column = matrix[body_top:FOOTER_TOP, x0:CANVAS_W]
+        rows = column.sum(axis=1)
+        if not rows.any():
+            continue  # a page with nothing in that column is a full-width page
+        last = max(y for y, value in enumerate(rows) if value > 2)
+        band = (len(rows) - 1 - last) / float(CANVAS_H)
+        if band > THRESHOLDS["column_void_max"]:
+            findings.append(finding(
+                slide_no, "COLUMN_VOID", round(band, 4), THRESHOLDS["column_void_max"],
+                "The right column stops well above the footer on a deck that reads "
+                "full. Add points, a kpi or a callout, or set the deck's fill to "
+                "balanced.",
+            ))
 
 
 def render_path(render_dir, slide_number):
@@ -331,6 +387,11 @@ def gate_type_range(slide_no, slide, findings):
         if size is None:
             continue
         if role in BODY_ROLES:
+            band = "body"
+        elif role == "chart-unit" and (node.get("data") or {}).get("chartUnitPlacement") == "inline":
+            # The inline unit sits on the heading's line at the heading's size,
+            # told apart from the measure by colour alone; it is heading type,
+            # not chart furniture.
             band = "body"
         elif role in CHART_FURNITURE_ROLES:
             band = "chart-furniture"
@@ -576,6 +637,10 @@ def gate_layout_monotony(slides, content_indexes, findings):
 def run_gates(scene, render_dir=None, profile=DEFAULT_PROFILE, gates=None):
     if profile not in PROFILES:
         raise ValueError(f"Unknown density profile: {profile}")
+    fill = scene.get("fill") or DEFAULT_FILL
+    if fill not in FILL_LEVELS:
+        raise ValueError(f"Unknown fill level: {fill}")
+    THRESHOLDS.update(FILL_LEVELS[fill])
     slides = scene.get("slides", [])
     findings = []
     content_indexes = []
@@ -593,13 +658,15 @@ def run_gates(scene, render_dir=None, profile=DEFAULT_PROFILE, gates=None):
             return not selected or code in selected
 
         if not cover:
-            if render_dir and (wanted("INK_COVERAGE") or wanted("DEAD_BAND") or wanted("INTERNAL_VOID")):
+            if render_dir and (wanted("INK_COVERAGE") or wanted("DEAD_BAND") or wanted("INTERNAL_VOID") or wanted("COLUMN_VOID")):
                 path = render_path(render_dir, slide_no)
                 if path is not None:
                     rows = load_ink_rows(path)
                     occupied = load_ink_rows(path, SURFACE_LUMINANCE)
                     page = []
                     gate_ink_and_dead_band(slide_no, rows, page, occupied)
+                    if THRESHOLDS["column_void_max"] < 1.0 and wanted("COLUMN_VOID"):
+                        gate_column_void(slide_no, load_ink_matrix(path, SURFACE_LUMINANCE), page)
                     # A page carried by a qualifying hero exhibit is not empty,
                     # however thin its marks (a line chart, a map): INK_COVERAGE
                     # then defers to the hero and band gates.
@@ -631,6 +698,7 @@ def run_gates(scene, render_dir=None, profile=DEFAULT_PROFILE, gates=None):
     return {
         "schema": "professional-slides.page-gates/v1",
         "profile": profile,
+        "fill": fill,
         "slides": len(slides),
         "coverSlides": covers,
         "contentSlides": len(content_indexes),

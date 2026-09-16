@@ -126,6 +126,7 @@ export const TOKENS = Object.freeze({
   "layout.titleContentGap": length("--title-content-gap", 56),
   "icon.small": length("--icon-sm", 16),
   "icon.medium": length("--icon-md", 24),
+  "icon.large": length("--icon-lg", 36),
   "line.hairline": length("--line-hairline", 1),
   "line.standard": length("--line-standard", 2),
   "radius.none": length("--radius-none", 0),
@@ -973,7 +974,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   for (const sequence of templateSequences) {
     if (sequence.slides.length !== sequence.total) throw new Error(`Template sequence ${sequence.id} declares ${sequence.total} slides but contains ${sequence.slides.length}`);
   }
-  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, tokens: designTokens, templateSequences };
+  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), tokens: designTokens, templateSequences };
   deck.manifest = buildManifest(deck);
   return deck;
   });

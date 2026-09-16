@@ -33,9 +33,10 @@ assert.ok(find(thin.items,i=>i.id==='s01-side'));
 assert.equal(find(thin.items,i=>String(i.component||'').startsWith('chart.')),null);
 // Side ratios: chart 2:1, table 3:2.
 const chartSide=composeSlide({title:'T',exhibit:{type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]},points:['p']},0);
-assert.deepEqual(chartSide.items[0].items.map(i=>i.size.width.fr),[2,1]);
+// The implication chevron sits between the exhibit and its consequences.
+assert.deepEqual(chartSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[2,'connector',1]);
 const tableSide=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:['p']},0);
-assert.deepEqual(tableSide.items[0].items.map(i=>i.size.width.fr),[3,2]);
+assert.deepEqual(tableSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[3,'connector',2]);
 // Auto-stack: two charts on one category set with points.
 const stack=composeSlide({title:'T',exhibits:[{type:'chart.column',categories:['a','b'],series:[{name:'s',values:[1,2]}]},{type:'chart.line',categories:['a','b'],series:[{name:'m',values:[3,4]}]}],points:['p']},0);
 assert.ok(find(stack.items,i=>i.id==='s01-stack'));

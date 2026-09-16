@@ -1953,7 +1953,7 @@ export function registerCharts(registry) {
       ...(chart.id === "chart.bubble-grid" ? { measureContent: ({ frame, props = {} }) => ({ height: bubbleGridLayout(frame, props).height }) } : {}),
       measureHeader: ({ frame, props = {} }) => {
         if (!String(props.heading ?? "").trim()) return null;
-        const layout = registry.get("chart-title").measureHeader({ frame, props: { heading: props.heading, unit: props.unit, variant: props.titleVariant } });
+        const layout = registry.get("chart-title").measureHeader({ frame, props: { heading: props.heading, unit: props.unit, variant: props.titleVariant, ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}) } });
         return { top: frame.y, ruled: layout.ruled, height: layout.height };
       },
       render: ({ id, frame, props = {}, tokens }) => {
@@ -1961,7 +1961,7 @@ export function registerCharts(registry) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
           return { nodes: chart.render({ id, frame, tokens, props }) };
         }
-        const title = registry.get("chart-title"), titleProps = { heading: props.heading, unit: props.unit, variant: props.titleVariant, ...(props.badge ? { badge: props.badge } : {}), ...(props.headerBandHeight ? { headerBandHeight: props.headerBandHeight } : {}) };
+        const title = registry.get("chart-title"), titleProps = { heading: props.heading, unit: props.unit, variant: props.titleVariant, ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}), ...(props.badge ? { badge: props.badge } : {}), ...(props.headerBandHeight ? { headerBandHeight: props.headerBandHeight } : {}) };
         const height = title.measureContent({ frame, props: titleProps }).height;
         return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...chart.render({ id, frame: { ...frame, y: frame.y + height, height: frame.height - height }, tokens, props })] };
       }

@@ -360,8 +360,27 @@ function photoStrip(slide, id, baseDir, fr = 1) {
   return { id, component: "image-frame", props: { ...imageProps(slide.photo, baseDir), fit: "cover" }, size: { width: { fr }, height: "fill" } };
 }
 
-function pointsItem(points, id, tone) {
-  return { id, component: "bullet-list", props: { variant: "body", items: points, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}) }, size: HUG };
+function pointsItem(points, id, tone, fill) {
+  // A full page spreads its points down the side column; an airy one lets them
+  // hug the top. The list fills its track only when it is spreading.
+  const distribute = fill === "full" && points.length > 1;
+  return { id, component: "bullet-list", props: { variant: "body", items: points, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}), ...(distribute ? { distribute: true } : {}) }, size: distribute ? { width: { fr: 1 }, height: "fill" } : HUG };
+}
+
+/**
+ * How full a page should read. `fill` on the deck: "full" (the pre-read page —
+ * the side column's points spread down the column and the gates want more ink),
+ * "balanced" (the default working page) or "airy" (a live-pitch page, where
+ * white space is the point and the gates relax). Absent, it follows the density:
+ * pre-read and appendix fill, live-pitch is airy, executive is balanced.
+ */
+export const FILL_LEVELS = Object.freeze(["full", "balanced", "airy"]);
+export function resolveFill(spec = {}) {
+  if (spec.fill !== undefined) {
+    if (!FILL_LEVELS.includes(spec.fill)) throw new Error(`Unknown fill: ${spec.fill}; use one of ${FILL_LEVELS.join(", ")}`);
+    return spec.fill;
+  }
+  return { "pre-read": "full", appendix: "full", "live-pitch": "airy" }[spec.density] ?? "balanced";
 }
 
 /**
@@ -390,7 +409,7 @@ function chooseLayout(slide) {
   // in the hero column rather than shrinking into a three-way row.
   if (exhibits.length === 2 && slide.points?.length && exhibits.every((ex) => String(ex.type).startsWith("chart.")) && JSON.stringify(exhibits[0].categories) === JSON.stringify(exhibits[1].categories)) return "stack";
   if (exhibits.length >= 2) return "two-up";
-  if (exhibits.length === 1) return slide.points?.length ? "exhibit-left" : "exhibit-full";
+  if (exhibits.length === 1) return slide.points?.length || slide.insight || slide.kpi ? "exhibit-left" : "exhibit-full";
   return "text";
 }
 
@@ -509,7 +528,7 @@ function pairedBars(slide) {
   return { ...slide, exhibit: undefined, exhibits: panels, arrange: "row", pairedHeading: heading, pairedWeights: series.map((_, i) => (i ? 1 : 1.35)) };
 }
 
-export function composeSlide(slide, index, baseDir) {
+export function composeSlide(slide, index, baseDir, fill = "balanced") {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   slide = pairedBars(slide);
   if (slide.exhibit) slide = { ...slide, exhibit: changeFromContent(highlightFromTitle(percentStack(slide.exhibit), slide.title), slide.title) };
@@ -548,8 +567,10 @@ export function composeSlide(slide, index, baseDir) {
   if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
   if (tileColumn) {
     const tiles = { id: `${id}-tiles`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: tileColumn.map((m, i) => ({ id: `${id}-tile-${i}`, component: "metric", props: { ...m, variant: "prominent" }, size: { width: { fr: 1 }, height: "fill" } })) };
-    const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`, sideTreatment(slide))] };
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: tilePoints.length ? [tiles, side] : [tiles] });
+    const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`, sideTreatment(slide), fill)] };
+    // The tile column reads as the evidence, so the same implication marker joins it to the meaning.
+    const tileChevron = (slide.implication ?? true) && tilePoints.length ? { id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: 44, height: "fill" } } : null;
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: tilePoints.length ? [tiles, tileChevron, side].filter(Boolean) : [tiles] });
   }
   // A full-width table needs no heading of its own: the action title and the
   // header row already say what it is. Heading bands exist for the row rule only.
@@ -558,30 +579,57 @@ export function composeSlide(slide, index, baseDir) {
     // Icon cards with a line each hug their content and sit centred in the
     // space above the takeaway; header and numbered cards fill the page as columns.
     items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { ...SIZE, centre: true }));
-  } else if (layout === "exhibit-full") items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir));
+  } else if (layout === "exhibit-full") {
+    const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
+    if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
+    items.push(item);
+  }
   else if (layout === "exhibit-left" || layout === "exhibit-right") {
     // Side ratios: chart + points 2:1, table + points 3:2.
     const heroFr = exhibits[0].type === "table" || exhibits[0].type === "rows" || exhibits[0].type === "compare" ? 3 : 2;
     const sideFr = heroFr === 3 ? 2 : 1;
-    const hero = headedPanel(exhibits[0], exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: heroFr }, height: "fill" }), `${id}-exhibit`);
+    // A chart beside a text column keeps a one-line heading with the unit
+    // inline; the two-line heading is for peers in a row, where the bands align.
+    const heroItem = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: heroFr }, height: "fill" });
+    if (String(exhibits[0].type).startsWith("chart.") && heroItem.props?.unit && !heroItem.props.unitPlacement) heroItem.props.unitPlacement = "inline";
+    const hero = headedPanel(exhibits[0], heroItem, `${id}-exhibit`);
     // The side column is a headed section so its rule shares the chart heading's
     // band and the points start level with the plot, not with the heading text.
     // `pointsAlign: "middle"` centres the points on the exhibit instead.
     const tone = sideTreatment(slide);
-    const list = pointsItem(slide.points || [], `${id}-points`, tone);
+    const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill) : null;
     // `kpi: { value, label }`: the one big number the chart proves, in the accent
     // at the top of the side column, above the points.
     const kpiTile = slide.kpi ? { id: `${id}-kpi`, component: "metric", props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } } : null;
-    const sideItems = kpiTile ? [kpiTile, list] : [list];
+    // `insight`: the so-what as a tonal box in the side column, centred on the
+    // exhibit when it stands alone, above the points when there are some. The
+    // column then carries no heading unless `pointsHeading` names one.
+    const insightBox = slide.insight ? { id: `${id}-insight`, component: "insight", props: typeof slide.insight === "string" ? { text: slide.insight, variant: "tonal" } : { variant: "tonal", ...slide.insight }, size: HUG } : null;
+    if (!list && !insightBox && !kpiTile) throw new Error(`${id}: a side column needs points, an insight or a kpi`);
+    const sideItems = [kpiTile, insightBox, list].filter(Boolean);
+    const heading = slide.pointsHeading === false || (insightBox && !slide.pointsHeading) ? null : slide.pointsHeading || "What it means";
+    const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && fill !== "full" && (unheaded(exhibits[0]) || (insightBox && !list) || (tone !== "open" && !heading)));
     // A toned panel is always a section (it needs a surface); it takes the
     // heading unless the author suppresses it with `pointsHeading: false`.
-    const side = tone === "open" && (slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && unheaded(exhibits[0])))
+    const side = tone === "open" && centre && !heading
       ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: sideItems }
-      : { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && tone !== "open" && slide.pointsHeading === false) ? { leftover: "center" } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
+      : { id: `${id}-side`, ...(heading ? { heading } : {}), treatment: tone, layout: "flow.column", ...(centre ? { leftover: "center" } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
+    // `implication`: the chevron disc between the exhibit and its consequences,
+    // the way the firm pages join evidence to implication. On by default for a
+    // headed open column beside an exhibit; `implication: false` removes it,
+    // `implication: true` adds it to a toned or unheaded column.
+    // A column that runs the body's full height — a toned box, or an open column
+    // headed by a title, or a page with a photo strip — takes the dashed divider
+    // with the disc centred on it. A short centred column (an insight box, two
+    // lines) needs no divider: the disc alone joins the evidence to its meaning.
+    const fullBleed = Boolean(heading) || tone !== "open" || Boolean(slide.photo);
+    const implication = slide.implication ?? true;
+    const chevron = implication ? { id: `${id}-implication`, component: "connector", props: { variant: fullBleed ? "divider-chevron" : "disc-chevron" }, size: { width: fullBleed ? 44 : 40, height: "fill" } } : null;
     // `photo`: a photograph strip at the right edge, full body height, cropped
     // to fit (the 2022 McKinsey pattern: chart, commentary, photo).
     const photo = photoStrip(slide, `${id}-photo`, baseDir);
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [...(layout === "exhibit-left" ? [hero, side] : [side, hero]), ...(photo ? [photo] : [])] });
+    const ordered = layout === "exhibit-left" ? [hero, chevron, side] : [side, chevron, hero];
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [...ordered.filter(Boolean), ...(photo ? [photo] : [])] });
   } else if (layout === "stack") {
     // Exhibits stacked in the hero column, points beside them.
     // A value table under a chart hugs its rows and carries no heading band.
@@ -592,7 +640,7 @@ export function composeSlide(slide, index, baseDir) {
     };
     const stacked = { id: `${id}-stack`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: exhibits.map(stackItem) };
     if (slide.points?.length) {
-      const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`, sideTreatment(slide))] };
+      const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill)] };
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
     } else items.push({ ...stacked, size: SIZE });
   } else if (layout === "grid") {
@@ -735,13 +783,15 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   }
   const pages = agendaPages(spec.sectionTabs ? sectionTabs(spec.slides) : spec.slides, spec.agenda, spec.agendaStyle);
   const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140)) / 508)) : 1;
-  for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) slides.push(composeSlide(page, slides.length, baseDir));
+  const fill = resolveFill(spec);
+  for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) slides.push(composeSlide(page, slides.length, baseDir, fill));
   return {
     id: spec.id,
     palette: spec.palette || "mckinsey",
     ...(spec.pageTemplate ? { pageTemplate: spec.pageTemplate } : {}),
     ...(spec.typography ? { typography: spec.typography } : {}),
     ...(spec.chrome ? { chrome: spec.chrome } : {}),
+    fill,
     slides: slides.map((s) => {
       const page = spec.density && !s.density && s.kind !== "cover" ? { ...s, density: spec.density } : { ...s };
       // The document title sits in the footer beside the page number.
