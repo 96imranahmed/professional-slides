@@ -537,7 +537,7 @@ export function composeSlide(slide, index, baseDir) {
     // heading unless the author suppresses it with `pointsHeading: false`.
     const side = tone === "open" && (slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && unheaded(exhibits[0])))
       ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: sideItems }
-      : { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
+      : { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && tone !== "open" && slide.pointsHeading === false) ? { leftover: "center" } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
     // `photo`: a photograph strip at the right edge, full body height, cropped
     // to fit (the 2022 McKinsey pattern: chart, commentary, photo).
     const photo = photoStrip(slide, `${id}-photo`, baseDir);

@@ -1213,7 +1213,9 @@ function waterfall({ id, frame, props }) {
  * by category, the count above each block and the category below. `percent:
  * true` draws a 10x10 block per category with `value` dots filled. Single series.
  */
-function waffleLayout(frame, props) {
+function waffleLayout(frameIn, props) {
+  // A hug measurement passes no height: size the dots from the width alone.
+  const frame = Number.isFinite(frameIn.height) ? frameIn : { ...frameIn, height: 400 };
   const categories = props.categories || [];
   const series = Array.isArray(props.series) ? props.series : [];
   if (!categories.length || series.length !== 1 || !Array.isArray(series[0].values) || series[0].values.length !== categories.length) throw new Error("Unit chart requires categories and one series with a count per category");

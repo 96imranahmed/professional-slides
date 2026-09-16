@@ -1,0 +1,473 @@
+{
+ "schema": "professional-slides.deck/v3",
+ "id": "slideworks",
+ "palette": "mckinsey",
+ "footer": "Urban mobility and PE review \u00b7 2026",
+ "agenda": "once",
+ "agendaStyle": "columns",
+ "cover": {
+  "title": "Cities, capital and the return to fundamentals",
+  "subtitle": "Discussion document",
+  "date": "September 2026",
+  "logo": "Professional slides",
+  "image": {
+   "path": "assets/hills.jpg",
+   "alt": "Hills at dusk",
+   "credit": "Synthetic render, professional-slides examples"
+  },
+  "layout": "full"
+ },
+ "slides": [
+  {
+   "kind": "section",
+   "title": "How the year unfolded",
+   "summary": "Deal activity returned to pre-pandemic levels",
+   "image": {
+    "path": "assets/hills.jpg",
+    "alt": "Hills at dusk",
+    "credit": "Synthetic render, professional-slides examples"
+   }
+  },
+  {
+   "title": "PE-VC activity declined by ~35% between 2022 and 2023, returning to pre-pandemic levels",
+   "exhibit": {
+    "type": "chart.column",
+    "heading": "Annual PE-VC investments in India",
+    "unit": "$B",
+    "categories": [
+     "2013",
+     "2014",
+     "2015",
+     "2016",
+     "2017",
+     "2018",
+     "2019",
+     "2020",
+     "2021",
+     "2022",
+     "2023"
+    ],
+    "series": [
+     {
+      "name": "Investments",
+      "values": [
+       9.9,
+       15.5,
+       22.9,
+       19.6,
+       26.7,
+       37.2,
+       47.5,
+       62.2,
+       69.8,
+       61.6,
+       39.3
+      ]
+     }
+    ],
+    "periods": [
+     {
+      "from": "2013",
+      "to": "2016",
+      "label": "Maturing market"
+     },
+     {
+      "from": "2017",
+      "to": "2019",
+      "label": "Growing optimism"
+     },
+     {
+      "from": "2020",
+      "to": "2021",
+      "label": "Covid-19 stimulus"
+     },
+     {
+      "from": "2022",
+      "to": "2023",
+      "label": "Market correction"
+     }
+    ],
+    "change": {
+     "from": "2022",
+     "to": "2023"
+    }
+   },
+   "pointsTone": "dark",
+   "pointsHeading": "Key insights",
+   "points": [
+    {
+     "lead": "Investments returned to pre-pandemic levels",
+     "text": "as global macro headwinds, high interest rates and valuation mismatches slowed dealmaking"
+    },
+    {
+     "lead": "VC saw the sharper decline",
+     "text": "with deal value down ~60% as investors focused on unit economics"
+    },
+    {
+     "lead": "PE stayed resilient",
+     "text": "with a ~20% decline, supported by large buyouts in healthcare and energy"
+    },
+    {
+     "lead": "Dry powder remains at a record",
+     "text": "so deployment is set to recover as valuations settle"
+    }
+   ],
+   "source": "Venture Intelligence; Bain analysis"
+  },
+  {
+   "title": "South Korea limited spread through rapid cluster investigation and scaled testing",
+   "exhibit": {
+    "type": "chart.line",
+    "heading": "Incremental cases per day in South Korea",
+    "unit": "Number of reported cases",
+    "categories": [
+     "Feb 16",
+     "Feb 18",
+     "Feb 20",
+     "Feb 22",
+     "Feb 24",
+     "Feb 26",
+     "Feb 28",
+     "Mar 1",
+     "Mar 3",
+     "Mar 5",
+     "Mar 7",
+     "Mar 9",
+     "Mar 11",
+     "Mar 13",
+     "Mar 15",
+     "Mar 17",
+     "Mar 19",
+     "Mar 21"
+    ],
+    "series": [
+     {
+      "name": "New cases",
+      "values": [
+       1,
+       15,
+       53,
+       229,
+       231,
+       284,
+       571,
+       1062,
+       600,
+       438,
+       483,
+       248,
+       242,
+       110,
+       76,
+       84,
+       152,
+       98
+      ]
+     }
+    ],
+    "events": [
+     {
+      "at": "Feb 18",
+      "label": "Patient 31 identified in Daegu"
+     },
+     {
+      "at": "Feb 24",
+      "label": "Drive-through testing begins"
+     },
+     {
+      "at": "Mar 1",
+      "label": "Daegu church cluster peaks"
+     },
+     {
+      "at": "Mar 9",
+      "label": "Mask rationing introduced"
+     }
+    ]
+   },
+   "pointsTone": "muted",
+   "pointsHeading": false,
+   "points": [
+    {
+     "lead": "Test kits approved early",
+     "text": "after 16 reported cases, with 180,000 individuals tested by Mar 9"
+    },
+    {
+     "lead": "Clusters isolated fast",
+     "text": "as Daegu residents cleared streets and the church congregation was traced"
+    },
+    {
+     "lead": "Surveillance remained necessary",
+     "text": "as localised outbreaks continued past the peak"
+    }
+   ],
+   "source": "KCDC situation reports"
+  },
+  {
+   "title": "Washington DC ranks third among very large US urban areas for congestion delay",
+   "exhibit": {
+    "type": "table",
+    "columns": [
+     "Urban area",
+     "Delay, hours",
+     "Rank",
+     "Travel time index",
+     "Excess fuel, gallons",
+     "Cost, $"
+    ],
+    "rows": [
+     [
+      "Los Angeles-Long Beach-Anaheim CA",
+      "119",
+      "1",
+      "1.51",
+      "35",
+      "2,676"
+     ],
+     [
+      "San Francisco-Oakland CA",
+      "103",
+      "2",
+      "1.50",
+      "39",
+      "2,619"
+     ],
+     [
+      "Washington DC-VA-MD",
+      "102",
+      "3",
+      "1.35",
+      "38",
+      "2,015"
+     ],
+     [
+      "Boston MA-NH-RI",
+      "80",
+      "6",
+      "1.30",
+      "31",
+      "1,580"
+     ],
+     [
+      "Seattle WA",
+      "78",
+      "8",
+      "1.30",
+      "31",
+      "1,551"
+     ],
+     [
+      "Atlanta GA",
+      "77",
+      "8",
+      "1.30",
+      "30",
+      "1,580"
+     ],
+     [
+      "Houston TX",
+      "75",
+      "9",
+      "1.34",
+      "32",
+      "1,508"
+     ],
+     [
+      "Chicago IL-IN",
+      "73",
+      "10",
+      "1.30",
+      "30",
+      "1,431"
+     ],
+     [
+      "Miami FL",
+      "69",
+      "12",
+      "1.31",
+      "32",
+      "1,412"
+     ],
+     [
+      "Dallas-Fort Worth-Arlington TX",
+      "67",
+      "13",
+      "1.26",
+      "25",
+      "1,272"
+     ]
+    ],
+    "highlightRow": "Washington DC-VA-MD"
+   },
+   "callout": {
+    "lead": "What congestion means to you",
+    "text": "102 hours of yearly delay per auto commuter and $2,015 of congestion cost; excess fuel follows the same ranking"
+   },
+   "source": "Texas A&M Urban Mobility Report, 2017"
+  },
+  {
+   "kind": "section",
+   "title": "What the survey says",
+   "summary": "GenAI use cases in credit are moving from pilot to deployment",
+   "image": {
+    "path": "assets/hills.jpg",
+    "alt": "Hills at dusk",
+    "credit": "Synthetic render, professional-slides examples"
+   }
+  },
+  {
+   "title": "Institutions prioritise productivity improvement when initiating GenAI use cases",
+   "exhibit": {
+    "type": "chart.waffle",
+    "heading": "Institutions ranking each factor first",
+    "unit": "Number of institutions",
+    "categories": [
+     "Productivity improvement",
+     "Business needs",
+     "Regulatory compliance",
+     "Return on investment"
+    ],
+    "series": [
+     {
+      "name": "Institutions",
+      "values": [
+       16,
+       15,
+       8,
+       5
+      ]
+     }
+    ]
+   },
+   "pointsTone": "tint",
+   "pointsHeading": false,
+   "kpi": {
+    "value": "47%",
+    "label": "of institutions rank productivity improvement first"
+   },
+   "points": [
+    "44% rank business needs as the second factor of importance",
+    "25% rank regulatory compliance as the third factor",
+    "50% rank return on investment as the least important factor"
+   ],
+   "source": "IACPM/McKinsey survey, December 2024 (n = 33)"
+  },
+  {
+   "title": "Our community of metals experts extends across the world",
+   "metrics": [
+    {
+     "value": "51",
+     "label": "Partners"
+    },
+    {
+     "value": "443",
+     "label": "Consultants staffed on metals studies"
+    },
+    {
+     "value": "39",
+     "label": "Metals experts"
+    },
+    {
+     "value": "533",
+     "label": "Total"
+    },
+    {
+     "value": "6",
+     "label": "Hubs"
+    }
+   ],
+   "metricsTone": "rule",
+   "exhibit": {
+    "type": "chart.bar",
+    "heading": "Metals consultants staffed by region",
+    "unit": "Number of consultants, 2022",
+    "categories": [
+     "Americas",
+     "EMEA",
+     "Asia/Pacific"
+    ],
+    "series": [
+     {
+      "name": "Consultants",
+      "values": [
+       110,
+       221,
+       112
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "EMEA",
+      "style": "bar"
+     }
+    ]
+   },
+   "photo": {
+    "path": "assets/hills.jpg",
+    "alt": "Hills at dusk",
+    "credit": "Synthetic render, professional-slides examples"
+   },
+   "pointsHeading": false,
+   "points": [
+    {
+     "lead": "~50% of expertise sits in EMEA",
+     "text": "with core locations in Brussels, Dusseldorf and Moscow"
+    },
+    {
+     "lead": "Americas and Asia/Pacific each hold ~25%",
+     "text": "from Sao Paolo, Gurgaon and Shanghai"
+    },
+    {
+     "lead": "Every hub pairs partners with experts",
+     "text": "so a study staffs from one community"
+    }
+   ],
+   "source": "Internal staffing records, 2022"
+  },
+  {
+   "title": "Investment themes: a return to fundamentals across sectors and geographies",
+   "photo": {
+    "path": "assets/hills.jpg",
+    "alt": "Hills at dusk",
+    "credit": "Synthetic render, professional-slides examples"
+   },
+   "pointsTone": "muted",
+   "points": [
+    {
+     "lead": "Traditional sectors have shown resilience",
+     "text": "and gained share, with ~75% of investments in 2023 against ~60% in 2022"
+    },
+    {
+     "lead": "Healthcare investments hit a record",
+     "text": "of ~$5.5 billion in 2023, driven by a threefold increase in provider deal value"
+    },
+    {
+     "lead": "IT/ITeS deal activity continued to taper",
+     "text": "declining by ~65% as valuations reset and end markets normalised"
+    },
+    {
+     "lead": "Advanced manufacturing grew ~20% a year",
+     "text": "on supply chain diversification, government incentives and scale assets"
+    },
+    {
+     "lead": "Strong deal activity is expected",
+     "text": "in healthcare and advanced manufacturing across sub-segments in 2024"
+    }
+   ],
+   "source": "Bain analysis"
+  },
+  {
+   "kind": "takeaways",
+   "points": [
+    "Optimise the supply chain and secure strategic materials before the next price cycle",
+    "Combine traditional improvement levers with an end-to-end digital transformation",
+    "Identify and co-develop fit-for-region low-CO2 technology opportunities with partners"
+   ],
+   "image": {
+    "path": "assets/hills.jpg",
+    "alt": "Hills at dusk",
+    "credit": "Synthetic render, professional-slides examples"
+   }
+  }
+ ]
+}
