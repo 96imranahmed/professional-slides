@@ -54,14 +54,14 @@ const SERIES = [
   token("color.chartSeries6")
 ];
 
-function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0 } = {}) {
+function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, periodBand = 0 } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
   leftInset = Math.max(leftInset, bands.left);
   // Peer charts in a row pass the row's tallest top band as topInset so their
   // plots start (and end) on the same lines and one value scale means one pixel scale.
   // topLegend may be a row count (a wrapped legend takes 24px per extra row).
   const legendRows = topLegend === true ? 1 : Number(topLegend) || 0;
-  const top = Math.max(Number(topInset) || 0, (legendRows ? 52 + (legendRows - 1) * 26 : 28) + totalLabelInset + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top);
+  const top = Math.max(Number(topInset) || 0, (legendRows ? 52 + (legendRows - 1) * 26 : 28) + totalLabelInset + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top + periodBand);
   // Reserve the actual last metric row plus a trailing theme gap, not another full row band.
   const bottom = bands.bottom ? 40 + bands.bottom + tokenValue(token("space.3")) : 56;
   const rightInset = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16);
@@ -296,9 +296,82 @@ function horizontalAxes(id, plot, xMin, xMax, steps = 4, { gridlines = false, sh
   return nodes;
 }
 
+/**
+ * Period bands and event flags, as the 2020–24 decks annotate a time series:
+ * `periods: [{ from, to, label }]` brackets runs of categories above the plot
+ * ("Maturing market", "Covid-19 stimulus") with dashed dividers between them;
+ * `events: [{ at, label }]` drops a dashed line at a category from a flag above
+ * the plot ("Mar 9: lockdown"). Both reserve their band in chartFrame.
+ */
+const PERIOD_BAND = 34, EVENT_BAND = 70, EVENT_LABEL_WIDTH = 150;
+export function normalizePeriods(props = {}, categories = []) {
+  if (props.periods === undefined) return [];
+  if (!Array.isArray(props.periods) || !props.periods.length) throw new Error("periods must be a nonempty array of { from, to, label }");
+  return props.periods.map((period) => {
+    const from = categories.indexOf(period?.from), to = categories.indexOf(period?.to);
+    if (from < 0 || to < 0 || to < from) throw new Error("period from and to must name two categories in order");
+    if (typeof period.label !== "string" || !period.label.trim()) throw new Error("period requires a label");
+    return { from, to, label: period.label.trim() };
+  });
+}
+export function normalizeEvents(props = {}, categories = []) {
+  if (props.events === undefined) return [];
+  if (!Array.isArray(props.events) || !props.events.length) throw new Error("events must be a nonempty array of { at, label }");
+  return props.events.map((event) => {
+    const index = categories.indexOf(event?.at);
+    if (index < 0) throw new Error("event at must name a chart category");
+    if (typeof event.label !== "string" || !event.label.trim()) throw new Error("event requires a label");
+    return { index, label: event.label.trim() };
+  });
+}
+const PERIOD_LABEL_GAP = 26;
+export function periodBandHeight(props = {}, categories = []) {
+  // The period band clears the value labels above the tallest column (26px).
+  return (normalizePeriods(props, categories).length ? PERIOD_BAND + PERIOD_LABEL_GAP : 0) + (normalizeEvents(props, categories).length ? EVENT_BAND : 0);
+}
+function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
+  const periods = normalizePeriods(props, categories), events = normalizeEvents(props, categories);
+  const underlay = [], overlay = [];
+  if (!periods.length && !events.length) return { underlay, overlay };
+  const frames = categories.map((c) => categoryMap.get(c));
+  const left = (i) => frames[i].labelCenter !== undefined ? frames[i].labelCenter - frames[i].labelSpan / 2 : frames[i].x;
+  const right = (i) => frames[i].labelCenter !== undefined ? frames[i].labelCenter + frames[i].labelSpan / 2 : frames[i].x + frames[i].width;
+  const centre = (i) => frames[i].labelCenter !== undefined ? frames[i].labelCenter : frames[i].x + frames[i].width / 2;
+  // Above the plot, in order: value labels, any growth-arrow band, event flags, then periods.
+  const changeBand = chartAnnotationBands({ changeAnnotations: props.changeAnnotations || [], annotationRail: null }).top;
+  const eventsTop = plot.y - (events.length ? EVENT_BAND : 0);
+  const periodsTop = eventsTop - changeBand - (periods.length ? PERIOD_BAND + PERIOD_LABEL_GAP : 0);
+  periods.forEach((period, index) => {
+    const x1 = left(period.from) + 4, x2 = right(period.to) - 4, y = periodsTop + PERIOD_BAND - 8;
+    overlay.push(textPrimitive({ id: stableId(id, "period-label", index), role: "chart-period-label", frame: { x: x1, y: periodsTop, width: x2 - x1, height: 22 }, text: period.label, style: textStyle(CHART_LABEL, SECONDARY, true, "center") }));
+    overlay.push(linePrimitive({ id: stableId(id, "period-rule", index), role: "chart-period-rule", x1, y1: y, x2, y2: y, style: lineStyle(SECONDARY, token("line.hairline")) }));
+    for (const x of [x1, x2]) overlay.push(linePrimitive({ id: stableId(id, "period-tick", index, x === x1 ? "a" : "b"), role: "chart-period-rule", x1: x, y1: y, x2: x, y2: y + 6, style: lineStyle(SECONDARY, token("line.hairline")) }));
+    if (index) {
+      const divider = (right(periods[index - 1].to) + left(period.from)) / 2;
+      underlay.push(linePrimitive({ id: stableId(id, "period-divider", index), role: "chart-period-divider", x1: divider, y1: periodsTop + 4, x2: divider, y2: plot.y + plot.height, style: lineStyle(GRID, token("line.hairline"), "dash") }));
+    }
+  });
+  events.forEach((event, index) => {
+    const x = centre(event.index);
+    const row = index % 2, labelTop = eventsTop + row * 34;
+    const label = measureText(event.label, EVENT_LABEL_WIDTH, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), wrapWidthRatio: 1 });
+    if (label.lines.length > 2) throw new Error(`event label "${event.label}" exceeds two lines; shorten it`);
+    // The flag sits to the right of its line, or to the left near the plot's edge.
+    const fits = x + 6 + label.width <= plot.x + plot.width;
+    const lx = fits ? x + 6 : x - 6 - label.width;
+    overlay.push(textPrimitive({ id: stableId(id, "event-label", index), role: "chart-event-label", frame: { x: lx, y: labelTop, width: label.width + 2, height: label.height }, text: label.text, style: { ...textStyle(CHART_LABEL, INK, true, fits ? "left" : "right"), valign: "top", lineHeight: label.lineHeight, wrap: false }, data: { textLayout: label } }));
+    underlay.push(linePrimitive({ id: stableId(id, "event-line", index), role: "chart-event-line", x1: x, y1: labelTop, x2: x, y2: plot.y + plot.height, style: lineStyle(INK, token("line.hairline"), "dash") }));
+  });
+  return { underlay, overlay };
+}
+
 function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, xScale = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, allowOutsideReferenceLabels = false }) {
   const underlay = [];
   const overlay = [];
+  if (props.categories && categoryMap.size && (props.periods || props.events)) {
+    const bands = periodAndEventNodes({ id, plot, props, categoryMap, categories: props.categories });
+    underlay.push(...bands.underlay); overlay.push(...bands.overlay);
+  }
   // Horizontal charts carry a value axis along x: a reference is a vertical line
   // with its label set above the plot, clear of the bars.
   if (!yScale && xScale) {
@@ -522,12 +595,14 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   // A bracket subtotal on a stacked column spans the named segments and prints their sum beside the stack.
   const stackBracket = stacked && !horizontal && Array.isArray(props.stackBracket) && props.stackBracket.length ? props.stackBracket : null;
   if (stackBracket && stackBracket.some((name) => !series.some((item) => item.name === name))) throw new Error("stackBracket must name series of the chart");
+  if (horizontal && (props.periods || props.events)) throw new Error("periods and events annotate vertical columns and lines, not horizontal bars");
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
     topLegend: showLegend ? legendRowsFor(series.map((item) => item.name), frame) : false,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
+    periodBand: periodBandHeight(props, categories),
     leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54,
     valueLabelInset: (horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter) + deltaWidth,
     totalLabelInset: horizontal ? 0 : totalHeight,
@@ -956,6 +1031,7 @@ function lineChart({ id, frame, props, area = false }) {
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
+    periodBand: periodBandHeight(props, categories),
     endLabels
   });
   const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
@@ -967,14 +1043,21 @@ function lineChart({ id, frame, props, area = false }) {
   const pointMap = new Map();
   const categoryMap = new Map();
   const categorySlot = Math.min(120, Math.max(76, plot.width / Math.max(1, categories.length) * 0.82));
+  // Dense periods (more categories than the plot has label slots) label every
+  // nth point, always keeping the first and last, as the firm decks do.
+  const pitch = categories.length > 1 ? (xScale(1) - xScale(0)) : plot.width;
+  const widest = Math.max(...categories.map((c) => measureText(String(c), 400, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width));
+  const every = Math.max(1, Math.ceil((widest + 10) / Math.max(1, pitch)));
   categories.forEach((category, index) => {
     const x = xScale(index);
     // Every label is centred on its point; the first and last may reach into
     // the chart's own insets so the spacing stays even.
     const categoryX = Math.max(frame.x, Math.min(frame.x + frame.width - categorySlot, x - categorySlot / 2));
     categoryMap.set(category, { x: categoryX, y: plot.y, width: categorySlot, height: plot.height });
-    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
+    const shown = every === 1 || index % every === 0 || index === categories.length - 1;
+    if (shown && !(every > 1 && index === categories.length - 1 && (index % every) !== 0 && (categories.length - 1 - Math.floor((categories.length - 1) / every) * every) * pitch < widest + 10)) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
   });
+  const pendingEndLabels = [];
   series.forEach((item, seriesIndex) => {
     const points = item.values.map((value, index) => ({ x: xScale(index), y: yScale(value), value, category: categories[index] }));
     if (area) {
@@ -1032,9 +1115,19 @@ function lineChart({ id, frame, props, area = false }) {
     });
     if (endLabels) {
       const point = points.at(-1);
-      nodes.push(textPrimitive({ id: stableId(id, "end-label", item.name), role: "data-label", frame: { x: point.x + 4, y: point.y - 12, width: 180, height: 24 }, text: `${item.name} ${formatValue(point.value, props)}`, style: textStyle(CHART_LABEL, SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length], true, "left") }));
+      pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 4, y: point.y - 12, text: `${item.name} ${formatValue(point.value, props)}`, color: SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length] });
     }
   });
+  // End labels of lines that finish close together push apart (22px minimum)
+  // inside the plot, in y order, so no series name sits on another.
+  if (pendingEndLabels.length) {
+    const step = 22, sorted = [...pendingEndLabels].sort((a, b) => a.y - b.y);
+    for (let i = 1; i < sorted.length; i++) sorted[i].y = Math.max(sorted[i].y, sorted[i - 1].y + step);
+    const overflow = sorted.at(-1).y + 24 - (plot.y + plot.height);
+    if (overflow > 0) for (const label of sorted) label.y -= overflow;
+    for (let i = sorted.length - 2; i >= 0; i--) sorted[i].y = Math.min(sorted[i].y, sorted[i + 1].y - step);
+    for (const label of pendingEndLabels) nodes.push(textPrimitive({ id: label.id, role: "data-label", frame: { x: label.x, y: label.y, width: 180, height: 24 }, text: label.text, style: textStyle(CHART_LABEL, label.color, true, "left") }));
+  }
   for (const [index, highlight] of (props.pointHighlights || []).entries()) {
     const target = pointMap.get(`${highlight.series || series[0].name}:${highlight.category}`)
       || pointMap.get(`value:${highlight.category}`);
@@ -1115,6 +1208,54 @@ function waterfall({ id, frame, props }) {
  * with both values labelled at the ends (pay bands, ranges, min–max).
  * props: categories, low[], high[], unit?, highlights? ({category, style:"bar"}).
  */
+/**
+ * Unit chart (the survey-deck dot pictogram): one dot per respondent, grouped
+ * by category, the count above each block and the category below. `percent:
+ * true` draws a 10x10 block per category with `value` dots filled. Single series.
+ */
+function waffleLayout(frame, props) {
+  const categories = props.categories || [];
+  const series = Array.isArray(props.series) ? props.series : [];
+  if (!categories.length || series.length !== 1 || !Array.isArray(series[0].values) || series[0].values.length !== categories.length) throw new Error("Unit chart requires categories and one series with a count per category");
+  const values = series[0].values.map((v) => Number(v));
+  if (values.some((v) => !(Number.isInteger(v) && v >= 0))) throw new Error("Unit chart counts are non-negative integers");
+  const percent = props.percent === true;
+  if (percent && values.some((v) => v > 100)) throw new Error("Unit chart percent values run 0–100");
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: 0, valueLabelInset: 0, centerPlot: false });
+  const slot = plot.width / categories.length;
+  const columns = percent ? 10 : Math.max(4, Math.min(10, Math.ceil(Math.sqrt(Math.max(1, ...values)))));
+  const rows = percent ? 10 : Math.max(1, ...values.map((v) => Math.ceil(v / columns)));
+  const gapRatio = 0.45;
+  const categoryLayouts = categories.map((c) => measureText(String(c), slot - 12, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
+  const labelBand = 30, categoryBand = Math.max(...categoryLayouts.map((l) => l.height)) + 16;
+  const cell = Math.max(4, Math.min((slot - 24) / (columns + (columns - 1) * gapRatio), (plot.height - labelBand - categoryBand) / (rows + (rows - 1) * gapRatio)));
+  const pitch = cell * (1 + gapRatio);
+  const blockWidth = columns * cell + (columns - 1) * cell * gapRatio, blockHeight = rows * cell + (rows - 1) * cell * gapRatio;
+  return { categories, values, percent, plot, slot, columns, rows, categoryLayouts, labelBand, categoryBand, cell, pitch, blockWidth, blockHeight, height: (plot.y - frame.y) + labelBand + blockHeight + categoryBand + 8 };
+}
+function waffleChart({ id, frame, props }) {
+  const { categories, values, percent, plot, slot, columns, categoryLayouts, labelBand, categoryBand, cell, pitch, blockWidth, blockHeight } = waffleLayout(frame, props);
+  const nodes = [];
+  const fill = props.color ? token(props.color) : PRIMARY, empty = GRID;
+  categories.forEach((category, index) => {
+    const x0 = plot.x + index * slot + (slot - blockWidth) / 2;
+    const y0 = plot.y + labelBand + (plot.height - labelBand - categoryBand - blockHeight) / 2;
+    const count = values[index];
+    const total = percent ? 100 : count;
+    for (let i = 0; i < total; i += 1) {
+      const r = Math.floor(i / columns), c = i % columns;
+      // Percent blocks fill from the bottom-left, row by row, as a tally.
+      const y = percent ? y0 + blockHeight - cell - r * pitch : y0 + r * pitch;
+      const on = !percent || i < count;
+      nodes.push(ellipsePrimitive({ id: stableId(id, "dot", category, i), role: on ? "chart-mark" : "chart-unit-empty", frame: { x: x0 + c * pitch, y, width: cell, height: cell }, style: fillStyle(on ? fill : empty), data: { category, index: i, on } }));
+    }
+    nodes.push(textPrimitive({ id: stableId(id, "value", category), role: "data-label", frame: { x: plot.x + index * slot, y: y0 - labelBand + 2, width: slot, height: 24 }, text: percent ? `${count}%` : formatValue(count, props), style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
+    const layout = categoryLayouts[index];
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * slot + 6, y: y0 + blockHeight + 12, width: slot - 12, height: layout.height }, text: layout.text, style: { ...textStyle(AXIS_LABEL, SECONDARY, false, "center"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
+  });
+  return nodes;
+}
+
 function rangeChart({ id, frame, props }) {
   assertGridlineOption(props);
   const categories = props.categories || [];
@@ -1528,6 +1669,10 @@ const chartDefinitions = [
     sample: { labels: ["Core", "Growth", "New"], values: [52, 31, 17] }
   },
   {
+    id: "chart.waffle", render: waffleChart,
+    sample: { heading: "(Insert measure and population)", categories: ["Underwriting", "Credit applications", "Portfolio monitoring", "Controls and reporting"], series: [{ name: "Respondents", values: [38, 42, 58, 42] }], unit: "Number of respondents" }
+  },
+  {
     id: "chart.range", render: rangeChart,
     sample: { heading: "(Insert measure and population)", categories: ["Research", "Labs", "Core Models", "API Agents"], low: [305, 385, 347, 300], high: [385, 460, 490, 400], unit: "$k", highlights: [{ category: "Core Models", style: "bar" }] }
   },
@@ -1656,6 +1801,7 @@ export function registerCharts(registry) {
       // Row rule: a chart's heading band (heading + unit line) is a ruled header
       // like a section's, so peers beside it take the same band height and the
       // rules line up. The compiler passes the shared height back as headerBandHeight.
+      ...(chart.id === "chart.waffle" ? { measureContent: ({ frame, props = {} }) => ({ height: waffleLayout(frame, props).height }) } : {}),
       measureHeader: ({ frame, props = {} }) => {
         if (!String(props.heading ?? "").trim()) return null;
         const layout = registry.get("chart-title").measureHeader({ frame, props: { heading: props.heading, unit: props.unit, variant: props.titleVariant } });

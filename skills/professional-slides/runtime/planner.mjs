@@ -202,7 +202,7 @@ function planCover(plan) {
     id: plan.id,
     density: plan.density ?? "executive",
     frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
-    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.date ? { date: plan.date } : {}), ...(plan.logo ? { logo: plan.logo } : {}), variant, ...(plan.image ? {image:plan.image} : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
+    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.date ? { date: plan.date } : {}), ...(plan.logo ? { logo: plan.logo } : {}), variant, ...(plan.image ? {image:plan.image} : {}), ...(plan.image && plan.tone ? { tone: plan.tone } : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
   };
   return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, recommended: "live-pitch", resolved: spec.density, selection: plan.density === undefined ? "capacity-default" : "explicit", reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
 }
@@ -212,10 +212,20 @@ function planCover(plan) {
 function planDivider(plan) {
   if (!plan?.id || !plan.title?.trim()) throw new Error("Divider plan requires id and title");
   const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
-  const props = { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.number !== undefined ? { style: "numbered", sectionId: String(plan.number) } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}) };
+  const props = { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.number !== undefined ? { style: "numbered", sectionId: String(plan.number) } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}), ...(plan.image ? { image: plan.image } : {}) };
   return {
     spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", frame, composition: absolute({ id: `${plan.id}-divider`, children: [componentNode({ id: "divider", component: "section-divider", props, frame, role: "divider" })] }) },
     decision: { layout: "structural", kind: "divider", density: { requested: "executive", recommended: "live-pitch", resolved: plan.density ?? "executive", selection: "explicit", reasons: [] }, itemJobs: [{ id: "divider", job: "open the section", component: "section-divider" }] }
+  };
+}
+
+function planTakeaways(plan) {
+  if (!plan?.id || !Array.isArray(plan.items) || !plan.items.length) throw new Error("Takeaways plan requires id and items");
+  const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
+  const props = { ...(plan.title ? { title: plan.title } : {}), items: plan.items, ...(plan.mode ? { mode: plan.mode } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}), ...(plan.image ? { image: plan.image } : {}) };
+  return {
+    spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", frame, composition: absolute({ id: `${plan.id}-takeaways`, children: [componentNode({ id: "takeaways", component: "takeaways", props, frame, role: "takeaways" })] }) },
+    decision: { layout: "structural", kind: "takeaways", density: { requested: "executive", recommended: "live-pitch", resolved: plan.density ?? "executive", selection: "explicit", reasons: [] }, itemJobs: [{ id: "takeaways", job: "close the deck", component: "takeaways" }] }
   };
 }
 
@@ -308,6 +318,7 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
     ? planCover(slide)
     : slide.kind === "tracker" ? planTracker(slide, registry)
     : slide.kind === "divider" ? planDivider(slide)
+    : slide.kind === "takeaways" ? planTakeaways(slide)
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
   const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, slides: planned.map((item) => item.spec) }, registry, {slideCache});
   return {deck, decisions:planned.map(item=>item.decision)};

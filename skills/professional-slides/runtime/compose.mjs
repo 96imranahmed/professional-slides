@@ -80,7 +80,7 @@ function tableAlias(ex) {
 function exhibitItem(exIn, id, baseDir, size = SIZE) {
   const ex = tableAlias(exIn);
   const { type, layout: _l, ...rest } = ex;
-  if (type === "image") return { id, component: "image-frame", props: imageProps(ex.path ? ex : ex.image, baseDir), size };
+  if (type === "image") return { id, component: "image-frame", props: { ...imageProps(ex.path ? ex : ex.image, baseDir), ...(ex.fit ? { fit: ex.fit } : {}) }, size };
   if (type === "cards" || type === "quadrants") { const { centre, ...sz } = size; return { id, component: type, props: { ...rest, ...(centre ? { valign: "middle" } : {}) }, size: sz }; }
   if (type === "swot") return { id, component: "quadrants", props: { quadrants: ["Strengths", "Weaknesses", "Opportunities", "Threats"].map((title, i) => ({ title, points: [rest.strengths, rest.weaknesses, rest.opportunities, rest.threats][i] || [] })) }, size };
   if (type === "table") {
@@ -94,6 +94,14 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
     // and no per-point labels when there is more than one series.
     const line = type === "chart.line" || type === "chart.area";
     const props = { dataLabels: !(line && multi), legend: multi && !line, ...(line && multi ? { endLabels: true } : {}), highlights: [], annotations: [], referenceLines: [], ...rest };
+    // Lines that finish close together need their end labels pushed apart, which
+    // only the drawn chart can do; the native chart would stack them.
+    if (line && multi && props.endLabels && props.native !== false) {
+      const ends = rest.series.map((sr) => Number(sr.values?.at(-1))).filter(Number.isFinite).sort((a, b) => a - b);
+      const all = rest.series.flatMap((sr) => sr.values || []).filter(Number.isFinite);
+      const range = Math.max(...all) - Math.min(0, ...all) || 1;
+      if (ends.some((v, i) => i && (v - ends[i - 1]) / range < 0.08)) props.native = false;
+    }
     // A leftover cagr (one the change rule could not compute) becomes a heading pill.
     if (rest.cagr) { props.badge = rest.cagr.label || `CAGR ${rest.cagr.from}–${rest.cagr.to}`; delete props.cagr; }
     delete props.change;
@@ -182,6 +190,14 @@ export function styleTable(ex) {
   rowsIn.forEach((r, i) => {
     if (Array.isArray(r) && i === rowsIn.length - 1 && /^total\b/i.test(String(r[0]?.text ?? r[0] ?? ""))) rowsIn[i] = { style: "total", cells: r };
   });
+  // `highlightRow`: the subject's row (by first-cell label or index) as a tinted
+  // band, the way the benchmark tables single out the client city or company.
+  if (ex.highlightRow !== undefined) {
+    const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
+    const at = Number.isInteger(ex.highlightRow) ? ex.highlightRow : rowsIn.findIndex((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
+    if (at < 0 || at >= rowsIn.length) throw new Error(`Table highlightRow "${ex.highlightRow}" is not a row label or index`);
+    rowsIn[at] = Array.isArray(rowsIn[at]) ? { style: "accented", cells: rowsIn[at] } : { ...rowsIn[at], style: "accented" };
+  }
   // A "#" column of row numbers becomes numbered discs with no filled box.
   const head0Raw = String(columns[0].label || "").trim();
   if (/^(#|no\.?|nr\.?|n°)$/i.test(head0Raw) && rowsIn.every((r) => { const row = Array.isArray(r) ? r : r.cells; return /^\d+$/.test(String(row[0]?.text ?? row[0] ?? "").trim()) || r.style; })) {
@@ -260,10 +276,26 @@ const MAX_ROWS = 8;
 export function paginateTable(slide) {
   if (slide.layout && slide.layout !== "auto") return [slide];
   const ex = slide.exhibit;
-  if (!ex || ex.type !== "table" || !Array.isArray(ex.rows) || ex.rows.length <= MAX_ROWS || slide.exhibits) return [slide];
-  const pages = Math.ceil(ex.rows.length / MAX_ROWS), per = Math.ceil(ex.rows.length / pages);
+  if (!ex || ex.type !== "table" || !Array.isArray(ex.rows) || slide.exhibits) return [slide];
+  // The page holds about 16 body lines of table (compact rows in the firm decks
+  // run to 14–20 one-line rows): a row of short cells counts one line, longer
+  // cells wrap, so a ranking table keeps a dozen rows on a page while a text
+  // table breaks at eight.
+  const cellText = (cell) => String(cell?.text ?? (Array.isArray(cell?.points) ? cell.points.join(" ") : cell ?? ""));
+  const lines = (r) => Math.max(1, ...(Array.isArray(r) ? r : r.cells || []).map((cell) => Math.ceil(cellText(cell).length / 42)));
+  const total = ex.rows.reduce((sum, r) => sum + lines(r), 0);
+  const budget = slide.points?.length ? 12 : 16;
+  if (ex.rows.length <= MAX_ROWS && total <= budget) return [slide];
+  const rowsPerPage = Math.max(MAX_ROWS, Math.floor(budget / Math.max(1, total / ex.rows.length)));
+  if (ex.rows.length <= rowsPerPage) return [slide];
+  const pages = Math.ceil(ex.rows.length / rowsPerPage), per = Math.ceil(ex.rows.length / pages);
   return Array.from({ length: pages }, (_, i) => {
-    const page = { ...slide, exhibit: { ...ex, rows: ex.rows.slice(i * per, (i + 1) * per) }, title: `${slide.title} (${i + 1}/${pages})` };
+    const rows = ex.rows.slice(i * per, (i + 1) * per);
+    // A highlighted row travels with the page that holds it; other pages drop the key.
+    const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
+    const keeps = ex.highlightRow === undefined ? false : Number.isInteger(ex.highlightRow) ? ex.highlightRow >= i * per && ex.highlightRow < (i + 1) * per : rows.some((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
+    const { highlightRow, ...rest } = ex;
+    const page = { ...slide, exhibit: { ...rest, rows, ...(keeps ? { highlightRow: Number.isInteger(highlightRow) ? highlightRow - i * per : highlightRow } : {}) }, title: `${slide.title} (${i + 1}/${pages})` };
     if (slide.id) page.id = `${slide.id}-${i + 1}`;
     if (i !== 0) delete page.points;
     return page;
@@ -278,9 +310,11 @@ function niceCeiling(value) {
 }
 
 /** A KPI strip: equal tiles in a row, hugging one tile height. */
-function metricsStrip(metrics, id) {
+/** `metricsTone` on the page sets every tile: dark, tint, ink (black tiles) or rule (accent values behind hairlines). */
+function metricsStrip(metrics, id, tone) {
   const tiles = metrics.map((m) => (typeof m === "string" ? { value: m } : m));
-  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: m, size: { width: { fr: 1 }, height: "fill" } })) };
+  const prominent = tone === "ink" || tone === "rule";
+  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
 }
 
 /**
@@ -301,8 +335,26 @@ function chartToMetrics(ex) {
   return (ex.categories || []).map((c, i) => ({ value: `${prefix}${ex.series[0].values[i]}${suffix}`, label: c, tone: "dark" }));
 }
 
-function pointsItem(points, id) {
-  return { id, component: "bullet-list", props: { variant: "body", items: points }, size: HUG };
+/** `photo: { path, alt, credit }` on a content page: a cropped photograph column. */
+function photoStrip(slide, id, baseDir, fr = 1) {
+  if (!slide.photo) return null;
+  return { id, component: "image-frame", props: { ...imageProps(slide.photo, baseDir), fit: "cover" }, size: { width: { fr }, height: "fill" } };
+}
+
+function pointsItem(points, id, tone) {
+  return { id, component: "bullet-list", props: { variant: "body", items: points, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}) }, size: HUG };
+}
+
+/**
+ * `pointsTone`: the side column as a panel — "dark" (a navy "Key insights"
+ * column, white text), "muted" (grey commentary), "tint" (accent-tinted
+ * message) or "primary". Absent, the column is open with a rule.
+ */
+const POINTS_TONES = ["open", "dark", "muted", "tint", "primary"];
+function sideTreatment(slide) {
+  const tone = slide.pointsTone ?? "open";
+  if (!POINTS_TONES.includes(tone)) throw new Error(`Unknown pointsTone: ${tone}; use one of ${POINTS_TONES.join(", ")}`);
+  return tone;
 }
 
 function soWhatItem(text, id) {
@@ -393,14 +445,20 @@ export function changeFromContent(ex, title) {
     }
     return annotations.length ? { ...out, changeAnnotations: annotations } : ex;
   }
-  if ((series.length === 1 || stacked) && (explicit || ex.change === true || (periodic && ex.type !== "chart.bar"))) {
+  // An implied first-to-last change only reads on a series that trends: a run
+  // that peaks and falls back, or starts from next to nothing, gets no arrow
+  // unless the author asks for one (an epidemic curve, a launch ramp).
+  const peak = Math.max(...totals.map(Math.abs)), first = Math.abs(totals[0]), last = Math.abs(totals[totals.length - 1]);
+  const trends = first >= peak * 0.05 && (last >= peak * 0.6 || last <= first);
+  if ((series.length === 1 || stacked) && (explicit || ex.change === true || (periodic && ex.type !== "chart.bar" && trends))) {
     const from = explicit?.from ?? categories[0], to = explicit?.to ?? categories[categories.length - 1];
     const a = categories.indexOf(from), b = categories.indexOf(to);
     if (a < 0 || b <= a) throw new Error("change.from and change.to must name two categories in order");
     const text = explicit?.text || delta(totals[a], totals[b]);
     // Columns take the diagonal arrow across the tops; a line takes its change
     // beside its last point, where the eye already lands.
-    const style = ex.type === "chart.line" || ex.type === "chart.area" ? "end-bubble" : "arrow";
+    // Adjacent columns take a bracket: an arrow has no room to read between them.
+    const style = ex.type === "chart.line" || ex.type === "chart.area" ? "end-bubble" : b - a === 1 ? "bracket" : "arrow";
     return text ? { ...out, changeAnnotations: [{ start: from, end: to, style, text }] } : ex;
   }
   if (series.length === 2 && categories.length <= 6 && (ex.change === true || GAP_WORDS.test(String(title || "")))) {
@@ -417,8 +475,9 @@ export function composeSlide(slide, index, baseDir) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   if (slide.exhibit) slide = { ...slide, exhibit: changeFromContent(highlightFromTitle(percentStack(slide.exhibit), slide.title), slide.title) };
   if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => changeFromContent(highlightFromTitle(percentStack(ex), slide.title), slide.title)) };
-  if (slide.kind === "section") return { id, kind: "divider", title: slide.title, ...(slide.summary ? { subtitle: slide.summary } : {}), ...(slide.number !== undefined ? { number: slide.number } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
-  if (slide.kind === "agenda") return { id, title: slide.title || "Contents", layout: "flow.column", items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items, ...(slide.active !== undefined ? { active: slide.active } : {}) }, size: SIZE }] };
+  if (slide.kind === "takeaways") return { id, kind: "takeaways", ...(slide.title ? { title: slide.title } : {}), items: slide.points || slide.items, ...(slide.tone === "light" ? { mode: "light" } : {}), ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
+  if (slide.kind === "section") return { id, kind: "divider", title: slide.title, ...(slide.summary ? { subtitle: slide.summary } : {}), ...(slide.number !== undefined ? { number: slide.number } : {}), ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
+  if (slide.kind === "agenda") return { id, title: slide.title || "Contents", layout: "flow.column", items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items, ...(slide.active !== undefined ? { active: slide.active } : {}), ...(slide.style === "columns" ? { variant: "columns" } : {}) }, size: SIZE }] };
   const slideIn = slide;
   // A value table under the chart: the chart stacks over a compact table whose
   // columns are the chart's categories.
@@ -439,17 +498,17 @@ export function composeSlide(slide, index, baseDir) {
   if (slide.rows && !slide.exhibit && !slide.exhibits) slide = { ...slide, exhibit: { type: "rows", rows: slide.rows } };
   // A text page whose points carry leads is a numbered ledger: label + text
   // rows with rules, filling the page, rather than a list floating at the top.
-  if (!slide.exhibit && !slide.exhibits && !slide.rows && (!slide.layout || slide.layout === "auto") && Array.isArray(slide.points) && slide.points.length >= 2 && slide.points.length <= 6 && slide.points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && !pt.icon && pt.state == null)) {
+  if (!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && (!slide.layout || slide.layout === "auto") && Array.isArray(slide.points) && slide.points.length >= 2 && slide.points.length <= 6 && slide.points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && !pt.icon && pt.state == null)) {
     slide = { ...slide, points: undefined, exhibit: { type: "rows", rows: slide.points.map((pt, i) => ({ label: pt.lead, text: pt.text, number: pt.number ?? i + 1 })) } };
   }
   const layout = chooseLayout(slide);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   const items = [];
   const metricsBelow = slide.metricsPosition === "bottom";
-  if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`));
+  if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
   if (tileColumn) {
     const tiles = { id: `${id}-tiles`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: tileColumn.map((m, i) => ({ id: `${id}-tile-${i}`, component: "metric", props: { ...m, variant: "prominent" }, size: { width: { fr: 1 }, height: "fill" } })) };
-    const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`)] };
+    const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`, sideTreatment(slide))] };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: tilePoints.length ? [tiles, side] : [tiles] });
   }
   // A full-width table needs no heading of its own: the action title and the
@@ -468,15 +527,21 @@ export function composeSlide(slide, index, baseDir) {
     // The side column is a headed section so its rule shares the chart heading's
     // band and the points start level with the plot, not with the heading text.
     // `pointsAlign: "middle"` centres the points on the exhibit instead.
-    const list = pointsItem(slide.points || [], `${id}-points`);
+    const tone = sideTreatment(slide);
+    const list = pointsItem(slide.points || [], `${id}-points`, tone);
     // `kpi: { value, label }`: the one big number the chart proves, in the accent
     // at the top of the side column, above the points.
     const kpiTile = slide.kpi ? { id: `${id}-kpi`, component: "metric", props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } } : null;
     const sideItems = kpiTile ? [kpiTile, list] : [list];
-    const side = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && unheaded(exhibits[0]))
+    // A toned panel is always a section (it needs a surface); it takes the
+    // heading unless the author suppresses it with `pointsHeading: false`.
+    const side = tone === "open" && (slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && unheaded(exhibits[0])))
       ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: sideItems }
-      : { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: layout === "exhibit-left" ? [hero, side] : [side, hero] });
+      : { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
+    // `photo`: a photograph strip at the right edge, full body height, cropped
+    // to fit (the 2022 McKinsey pattern: chart, commentary, photo).
+    const photo = photoStrip(slide, `${id}-photo`, baseDir);
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [...(layout === "exhibit-left" ? [hero, side] : [side, hero]), ...(photo ? [photo] : [])] });
   } else if (layout === "stack") {
     // Exhibits stacked in the hero column, points beside them.
     // A value table under a chart hugs its rows and carries no heading band.
@@ -487,7 +552,7 @@ export function composeSlide(slide, index, baseDir) {
     };
     const stacked = { id: `${id}-stack`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: exhibits.map(stackItem) };
     if (slide.points?.length) {
-      const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`)] };
+      const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`, sideTreatment(slide))] };
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
     } else items.push({ ...stacked, size: SIZE });
   } else if (layout === "grid") {
@@ -539,6 +604,13 @@ export function composeSlide(slide, index, baseDir) {
     };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex) }, `${id}-exhibit-${i}`)) });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`));
+  } else if (slide.photo && (slide.points?.length || slide.paragraphs?.length)) {
+    // Text beside a photograph: the copy takes the left column (a toned panel
+    // when `pointsTone` says so), the photo the right, both full height.
+    const tone = sideTreatment(slide);
+    const copy = [...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })), ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone)] : [])];
+    const column = { id: `${id}-side`, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: 1.2 }, height: "fill" }, items: copy };
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [column, photoStrip(slide, `${id}-photo`, baseDir, 1)] });
   } else {
     const points = slide.points || [];
     if (points.length > 4) {
@@ -549,7 +621,7 @@ export function composeSlide(slide, index, baseDir) {
   }
   // A reading note sits at the top of the side column when there is one,
   // otherwise as a full-width band above the content.
-  if (Array.isArray(slide.metrics) && slide.metrics.length && metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`));
+  if (Array.isArray(slide.metrics) && slide.metrics.length && metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
   if (slide.callout) {
     const note = { id: `${id}-callout`, component: "callout", props: typeof slide.callout === "string" ? { text: slide.callout } : slide.callout, size: HUG };
     const row = items.find((it) => it.id === `${id}-row`);
@@ -570,7 +642,7 @@ export function composeSlide(slide, index, baseDir) {
  * front of every later section: the classic tracker. `agenda: "once"` inserts
  * only the Contents page.
  */
-export function agendaPages(slidesIn, agenda) {
+export function agendaPages(slidesIn, agenda, agendaStyle) {
   const sections = slidesIn.filter((s) => s.kind === "section");
   if (!agenda || sections.length < 2) return slidesIn;
   const numbered = new Map(sections.map((s, i) => [s, s.number ?? i + 1]));
@@ -579,7 +651,7 @@ export function agendaPages(slidesIn, agenda) {
   let seen = 0;
   for (const slide of slidesIn) {
     if (slide.kind === "section") {
-      if (seen === 0 || agenda !== "once") out.push({ kind: "agenda", id: `agenda-${seen + 1}`, title: seen === 0 ? "Contents" : "Agenda", items, active: seen });
+      if (seen === 0 || agenda !== "once") out.push({ kind: "agenda", id: `agenda-${seen + 1}`, title: seen === 0 ? "Contents" : "Agenda", items, active: seen, ...(agendaStyle ? { style: agendaStyle } : {}) });
       out.push({ ...slide, number: numbered.get(slide) });
       seen += 1;
     } else out.push(slide);
@@ -596,12 +668,15 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     const cover = { id: "cover", kind: "cover", title: spec.cover.title, subtitle: spec.cover.subtitle || "" };
     if (spec.cover.date) cover.date = spec.cover.date;
     if (spec.cover.logo || spec.logo) cover.logo = spec.cover.logo || spec.logo;
-    if (spec.cover.image) { cover.variant = "half-image"; cover.image = imageProps(spec.cover.image, baseDir); }
+    // `image` with `layout: "full"` puts the title on a card over a full-bleed
+    // photograph; otherwise the photo takes the right half and `tone: "dark"`
+    // paints the title half navy (the McKinsey/BCG 2020 cover).
+    if (spec.cover.image) { cover.variant = spec.cover.layout === "full" ? "full-image" : "half-image"; cover.image = imageProps(spec.cover.image, baseDir); if (spec.cover.tone) cover.tone = spec.cover.tone; }
     else cover.variant = spec.cover.tone === "light" ? "plain" : "dark";
     if (spec.cover.notes) cover.notes = spec.cover.notes;
     slides.push(cover);
   }
-  const pages = agendaPages(spec.slides, spec.agenda);
+  const pages = agendaPages(spec.slides, spec.agenda, spec.agendaStyle);
   for (const page of pages.flatMap(splitTables).flatMap(paginateTable)) slides.push(composeSlide(page, slides.length, baseDir));
   return {
     id: spec.id,

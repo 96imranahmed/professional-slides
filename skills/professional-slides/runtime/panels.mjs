@@ -223,7 +223,13 @@ export function quadrantsNodes({ id, frame, props }) {
 /** KPI tile: big number, label, optional sublabel and signed delta; light or dark tone. */
 export function metricNodes({ id, frame, props }) {
   if (props.value === undefined || props.value === null || String(props.value).trim() === "") throw new Error("Metric requires a value");
-  const dark = props.tone === "dark";
+  const METRIC_TONES = ["default", "dark", "tint", "hero", "ink", "rule"];
+  if (props.tone !== undefined && !METRIC_TONES.includes(props.tone)) throw new Error(`Unknown metric tone: ${props.tone}; use one of ${METRIC_TONES.join(", ")}`);
+  // "ink": a black tile with the value in the accent (the Bain keynote stat row);
+  // "rule": no tile, the value in the accent behind a hairline at the left (the
+  // McKinsey "51 | 443 | 39" stat row).
+  const ink_ = props.tone === "ink", ruled = props.tone === "rule";
+  const dark = props.tone === "dark" || ink_;
   const pad = props.tone === "hero" ? 0 : v("space.3");
   const width = frame.width - 2 * pad;
   const valueSize = props.variant === "prominent" ? "type.deckTitle" : "type.metric";
@@ -235,12 +241,14 @@ export function metricNodes({ id, frame, props }) {
   const total = value.height + (labelLayout ? gap + labelLayout.height : 0) + (sub ? gap + sub.height : 0) + (delta ? gap + delta.height : 0);
   if (total > frame.height + 0.01) throw new Error("Metric tile is too short for its value, label and delta");
   const nodes = [];
-  if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));
+  if (ink_) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, INK, "none", "radius.none"));
+  else if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));
   else if (props.tone === "tint") nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, TINT, "none", "radius.small"));
+  if (ruled) nodes.push(linePrimitive({ id: stableId(id, "rule"), role: "metric-rule", x1: frame.x, y1: frame.y + 4, x2: frame.x, y2: frame.y + frame.height - 4, style: { stroke: RULE, lineWidth: token("line.hairline"), dash: "solid" } }));
   // `tone: "hero"`: the one big number beside a chart, in the accent, left-aligned, top-anchored.
   const hero = props.tone === "hero";
-  const ink = dark ? WHITE : hero ? ACCENT : PRIMARY, grey = dark ? WHITE : hero ? INK : SECONDARY;
-  const align = props.align ?? (hero ? "left" : "center");
+  const ink = ink_ ? ACCENT : dark ? WHITE : hero || ruled ? ACCENT : PRIMARY, grey = dark ? WHITE : hero || ruled ? INK : SECONDARY;
+  const align = props.align ?? (hero || ruled ? "left" : "center");
   let y = hero ? frame.y : frame.y + (frame.height - total) / 2;
   nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x + pad, y, width, height: value.height }, text: value.text, style: { fontFamily: DISPLAY, fontSize: token(valueSize), color: ink, bold: true, align, valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
   y += value.height;
@@ -301,12 +309,53 @@ export function agendaNodes({ id, frame, props }) {
   return nodes;
 }
 
+/**
+ * The 2020 McKinsey contents page: sections as equal columns headed by big
+ * two-digit numerals ("01", "02"), the active section in the accent and bold,
+ * the others in grey. Works on the light page and, with `tone: "dark"`, on navy.
+ */
+export function agendaColumnsNodes({ id, frame, props }) {
+  const items = Array.isArray(props.items) ? props.items : [];
+  if (items.length < 2 || items.length > 6) throw new Error("Column agenda takes two to six sections");
+  const dark = props.tone === "dark";
+  const gap = v("space.5"), width = (frame.width - gap * (items.length - 1)) / items.length;
+  const nodes = [];
+  if (dark) nodes.push(rect(stableId(id, "surface"), "agenda-surface", { x: frame.x - 40, y: frame.y - 40, width: frame.width + 80, height: frame.height + 80 }, INK));
+  const measured = items.map((item, i) => {
+    const active = i === props.active;
+    const numeral = String(item.number ?? i + 1).padStart(2, "0");
+    const number = measureText(numeral, width, { fontFamily: tokenValue(DISPLAY), fontSize: v("type.quoteMark"), bold: true, wrapWidthRatio: 1 });
+    const labelLayout = measure(item.label, width, "type.heading", active);
+    const detail = item.detail ? measure(item.detail, width, "type.body") : null;
+    return { numeral, number, labelLayout, detail, height: number.height + 20 + labelLayout.height + (detail ? 8 + detail.height : 0) };
+  });
+  // One baseline for every column: the numerals sit on a shared line.
+  const top = frame.y + Math.max(0, (frame.height - Math.max(...measured.map((m) => m.height))) / 2) - 40;
+  items.forEach((item, i) => {
+    const active = i === props.active, x = frame.x + i * (width + gap), rid = stableId(id, "item", i);
+    const { numeral, number, labelLayout, detail } = measured[i];
+    const numberColor = active ? ACCENT : dark ? token("color.chartGrid") : SECONDARY;
+    const textColor = active ? (dark ? WHITE : INK) : dark ? token("color.chartGrid") : SECONDARY;
+    let y = top;
+    nodes.push(textPrimitive({ id: stableId(rid, "number"), role: "agenda-number", frame: { x, y, width, height: number.height }, text: numeral, style: { fontFamily: DISPLAY, fontSize: token("type.quoteMark"), color: numberColor, bold: true, align: "left", valign: "top", wrap: false, lineHeight: number.lineHeight }, data: { index: i, active, textLayout: number } }));
+    y += number.height + 8;
+    nodes.push(linePrimitive({ id: stableId(rid, "rule"), role: "agenda-rule", x1: x, y1: y, x2: x + width, y2: y, style: { stroke: active ? ACCENT : dark ? token("color.chartGrid") : RULE, lineWidth: token(active ? "line.standard" : "line.hairline") } }));
+    y += 12;
+    nodes.push(label(stableId(rid, "label"), "agenda-label", { x, y, width }, labelLayout, text("type.heading", textColor, active)));
+    y += labelLayout.height;
+    if (detail) { y += 8; nodes.push(label(stableId(rid, "detail"), "agenda-detail", { x, y, width }, detail, text("type.body", textColor))); }
+  });
+  return nodes;
+}
+
 export function registerPanels(registry) {
   registry.set("agenda", {
-    id: "agenda", version: "1.0.0", category: "navigation", role: "agenda", tokens: [...PANEL_TOKENS], preferredSize: { width: 1160, height: 420 },
+    id: "agenda", version: "1.0.0", category: "navigation", role: "agenda", tokens: [...PANEL_TOKENS, "color.chartGrid", "type.quoteMark"], preferredSize: { width: 1160, height: 420 },
     sample: { items: [{ label: "(Insert section 1)", detail: "(Insert what it covers)" }, { label: "(Insert section 2)" }, { label: "(Insert section 3)" }], active: 0 },
-    render: (input) => ({ nodes: agendaNodes(input) }),
-    measureContent: ({ frame, props }) => agendaLayout(frame, props),
+    variants: { list: {}, columns: { props: { variant: "columns" } } }, defaultVariant: "list",
+    resolveVariant: (props = {}) => props.variant === "columns" ? "columns" : "list",
+    render: (input) => ({ nodes: input.props.variant === "columns" ? agendaColumnsNodes(input) : agendaNodes(input) }),
+    measureContent: ({ frame, props }) => props.variant === "columns" ? { height: frame.height } : agendaLayout(frame, props),
     guidance: { useWhen: "the contents page and the tracker page before each section", why: "readers orient by the numbered list; the tinted band says where they are", actionTitle: "'Contents' or 'Agenda'; the sections carry the claims" }
   });
   registry.set("cards", {
@@ -329,8 +378,8 @@ export function registerPanels(registry) {
   if (metric) {
     metric.tokens = [...new Set([...metric.tokens, ...PANEL_TOKENS])];
     metric.render = (input) => ({ nodes: metricNodes(input) });
-    metric.variants = { default: {}, prominent: { props: { variant: "prominent" } }, dark: { props: { tone: "dark" } }, hero: { props: { tone: "hero", variant: "prominent", value: "80%", label: "(Insert what the number is)" } } };
-    metric.resolveVariant = (props = {}) => props.tone === "dark" ? "dark" : props.tone === "hero" ? "hero" : props.variant ?? "default";
+    metric.variants = { default: {}, prominent: { props: { variant: "prominent" } }, dark: { props: { tone: "dark" } }, hero: { props: { tone: "hero", variant: "prominent", value: "80%", label: "(Insert what the number is)" } }, ink: { props: { tone: "ink", variant: "prominent", value: "1.6x", label: "(Insert what the number is)" } }, rule: { props: { tone: "rule", variant: "prominent", value: "443", label: "(Insert what the number is)" } } };
+    metric.resolveVariant = (props = {}) => ["dark", "hero", "ink", "rule"].includes(props.tone) ? props.tone : props.variant ?? "default";
   }
   return registry;
 }

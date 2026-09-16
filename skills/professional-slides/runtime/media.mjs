@@ -78,7 +78,7 @@ export function bitmapDimensions(dataUri) {
   throw new Error("JPEG has no dimensions frame");
 }
 
-export function mediaNode({ id, frame, props, role = "image" }) {
+export function mediaNode({ id, frame, props, role = "image", fit = "contain" }) {
   if (
     !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(
       props?.dataUri || "",
@@ -97,6 +97,14 @@ export function mediaNode({ id, frame, props, role = "image" }) {
   const intrinsic = bitmapDimensions(props.dataUri);
   if (props.width !== intrinsic.width || props.height !== intrinsic.height)
     throw new Error("Media intrinsic dimensions do not match the bitmap header");
+  if (fit === "cover") {
+    // Fill the frame and crop the overflow evenly from both sides (a photo
+    // panel or full-bleed cover); the crop fractions travel with the node.
+    const scale = Math.max(frame.width / props.width, frame.height / props.height);
+    const w = props.width * scale, h = props.height * scale;
+    const cropX = Math.max(0, (w - frame.width) / w / 2), cropY = Math.max(0, (h - frame.height) / h / 2);
+    return primitive({ type: "image", id, role, frame: { ...frame }, data: { ...props, circular: false, fit: "cover", crop: { left: cropX, right: cropX, top: cropY, bottom: cropY } } });
+  }
   const scale = Math.min(
     frame.width / props.width,
     frame.height / props.height,
@@ -120,9 +128,10 @@ export function mediaNode({ id, frame, props, role = "image" }) {
 export function registerMedia(registry) {
   const image = registry.get("image-frame");
   const imageRender = image.render;
+  // `fit: "cover"` fills the frame and crops (a photo panel beside a chart).
   image.render = (input) =>
     input.props.dataUri && input.props.width
-      ? { nodes: [mediaNode({ ...input, id: stableId(input.id, "image") })] }
+      ? { nodes: [mediaNode({ ...input, props: (({ fit, ...rest }) => rest)(input.props), id: stableId(input.id, "image"), fit: input.props.fit ?? "contain" })] }
       : imageRender(input);
   for (const name of ["icon", "logo"]) {
     const owner = registry.get(name),
@@ -136,6 +145,33 @@ export function registerMedia(registry) {
       "sourced-media": { props: MEDIA_SAMPLE },
     };
   }
+  // A section divider with a sourced photograph: the title panel keeps the left
+  // 42% (navy or canvas by mode) and the photo fills the rest, cropped to fit;
+  // a numbered divider sets its numeral above the title, Bain-style.
+  const divider = registry.get("section-divider"), dividerRender = divider.render;
+  divider.render = (input) => {
+    const { image, ...props } = input.props;
+    if (!image) return dividerRender(input);
+    const { frame } = input;
+    const panelWidth = Math.round(frame.width * 0.42);
+    const base = dividerRender({ ...input, props: { ...props, panelWidth } });
+    return { ...base, nodes: [
+      mediaNode({ id: stableId(input.id, "image"), frame: { x: frame.x + panelWidth, y: frame.y, width: frame.width - panelWidth, height: frame.height }, props: image, role: "divider-image", fit: "cover" }),
+      ...base.nodes,
+    ] };
+  };
+  const takeaways = registry.get("takeaways"), takeawaysRender = takeaways.render;
+  takeaways.render = (input) => {
+    const { image, ...props } = input.props;
+    if (!image) return takeawaysRender(input);
+    const { frame } = input;
+    const panelWidth = Math.round(frame.width * 0.6);
+    const base = takeawaysRender({ ...input, props: { ...props, panelWidth } });
+    return { ...base, nodes: [
+      mediaNode({ id: stableId(input.id, "image"), frame: { x: frame.x + panelWidth, y: frame.y, width: frame.width - panelWidth, height: frame.height }, props: image, role: "takeaways-image", fit: "cover" }),
+      ...base.nodes,
+    ] };
+  };
   const cover = registry.get("cover"),
     plain = cover.render;
   cover.variants = {
@@ -146,6 +182,14 @@ export function registerMedia(registry) {
         title: "(Insert title)",
         subtitle: "(Insert subtitle)",
         image: COVER_MEDIA,
+      },
+    },
+    "full-image": {
+      props: {
+        title: "(Insert title)",
+        subtitle: "(Insert subtitle)",
+        image: COVER_MEDIA,
+        variant: "full-image",
       },
     },
   };
@@ -160,11 +204,44 @@ export function registerMedia(registry) {
   cover.render = (input) => {
     const { variant, image, ...props } = input.props;
     const resolved = cover.resolveVariant(input.props);
-    if (resolved !== "half-image") {
-      if (image) throw new Error("Cover image requires half-image variant");
+    if (resolved !== "half-image" && resolved !== "full-image") {
+      if (image) throw new Error("Cover image requires half-image or full-image variant");
       return plain({ ...input, props: { ...props, tone: resolved === "dark" ? "dark" : "light" } });
     }
-    if (!image) throw new Error("Half-image cover requires sourced image");
+    if (!image) throw new Error("Image cover requires sourced image");
+    if (resolved === "full-image") {
+      // The 2023–24 cover: a full-bleed photograph with the title on a card in the
+      // lower left (white by default, navy with `tone: "dark"`), as BCG and Bain set
+      // theirs. The card takes half the page each way; the plain cover renders into it.
+      const { frame } = input;
+      const margin = 48, pad = 40;
+      const tone = props.tone ?? "light";
+      const fill = tone === "dark" ? token("color.ink") : token("color.canvas");
+      // Size the card from its content: render once into a provisional frame,
+      // read the text block's extent, then fit the card to it with even padding.
+      const probeFrame = { x: frame.x + margin, y: frame.y, width: frame.width * 0.52, height: frame.height };
+      const probed = plain({ ...input, frame: probeFrame, props: { ...props, tone } }).nodes.filter((n) => n.role !== "cover-surface");
+      const logo = probed.find((n) => n.role === "cover-logo");
+      const block = probed.filter((n) => n !== logo);
+      const top = Math.min(...block.map((n) => n.frame.y)), bottom = Math.max(...block.map((n) => n.frame.y + n.frame.height));
+      const logoBand = logo ? logo.frame.height + 28 : 0;
+      const cardHeight = pad + logoBand + (bottom - top) + pad;
+      const card = { x: frame.x + margin, y: frame.y + frame.height - margin - cardHeight, width: frame.width * 0.52, height: cardHeight };
+      const shift = card.y + pad + logoBand - top;
+      const inner = probed.map((n) => {
+        const dy = n === logo ? card.y + pad - n.frame.y : shift;
+        const moved = { ...n, frame: { ...n.frame, y: n.frame.y + dy } };
+        if (n.type === "line") moved.data = { ...n.data, y1: n.data.y1 + dy, y2: n.data.y2 + dy };
+        return moved;
+      });
+      return {
+        nodes: [
+          mediaNode({ id: stableId(input.id, "image"), frame, props: image, role: "cover-image", fit: "cover" }),
+          primitive({ type: "rect", id: stableId(input.id, "card"), role: "cover-card", frame: card, style: { fill, stroke: fill, lineWidth: token("line.hairline"), radius: token("radius.none") } }),
+          ...inner,
+        ],
+      };
+    }
     const half = input.frame.width / 2;
     return {
       nodes: [
@@ -180,6 +257,7 @@ export function registerMedia(registry) {
           },
           props: image,
           role: "cover-image",
+          fit: "cover",
         }),
       ],
     };

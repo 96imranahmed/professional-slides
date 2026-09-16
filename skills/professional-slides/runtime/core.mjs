@@ -727,7 +727,7 @@ export function nativeChartSpec(componentId, props = {}, frame) {
   const highlights = props.highlights || [];
   if (props.native === false) return null;
   // Stack totals and category groups are drawn by the runtime; PowerPoint has no native total label.
-  if ((props.stackTotals || []).length || (props.categoryGroups || []).length || (props.secondaryLabels || []).length || (props.stackBracket || []).length || (props.deltas || []).length) return null;
+  if ((props.stackTotals || []).length || (props.categoryGroups || []).length || (props.secondaryLabels || []).length || (props.stackBracket || []).length || (props.deltas || []).length || (props.periods || []).length || (props.events || []).length) return null;
   if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
   const categories = [...(props.categories || props.labels || [])];
   const series = type === "range"

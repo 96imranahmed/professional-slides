@@ -373,7 +373,7 @@ function heatFill(scale, value) {
 const foreground = (fill) =>
   contrastRatio(tokenValue(fill), v("color.ink")) >= 4.5 ? ink : white;
 const rowBand = (style) =>
-  style === "accented" ? t("color.componentPrimaryTint") : style === "total" ? primary : style === "group" ? t("color.surfaceMuted") : null;
+  style === "accented" ? t("color.accentTint") : style === "total" ? primary : style === "group" ? t("color.surfaceMuted") : null;
 const categorySurface = (cell, props) =>
   cell.surface ?? (props.treatment === "dimensions" || props.variant === "plain" ? "plain" : "primary");
 
