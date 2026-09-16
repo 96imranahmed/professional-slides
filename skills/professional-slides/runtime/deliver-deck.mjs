@@ -10,6 +10,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { deckStem } from "./artifact-path.mjs";
 import { buildDeck } from "./build-deck.mjs";
 import { runReview, validateReview, reviewOutcome } from "./reviewer.mjs";
 
@@ -18,7 +19,7 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
   brief = brief ?? spec.brief ?? spec.context?.originalBrief ?? "";
   answer = answer ?? spec.answer ?? spec.context?.governingAnswer ?? "";
-  const stem = spec.id || spec.deckPlan?.id || "deck";
+  const stem = deckStem(spec);
   const delivered = path.join(directory, `${stem}-DELIVERED.pptx`);
   const rejectedNote = path.join(directory, "REJECTED.md");
   await fs.rm(delivered, { force: true });
@@ -29,6 +30,8 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   const blockers = [];
   if (build.readback && build.readback.accepted !== true) blockers.push(...(build.readback.findings || []).slice(0, 20).map((f) => ({ slide: f.slide ?? null, code: "BROKEN_GEOMETRY", severity: "blocker", reason: `readback ${f.code} on ${f.shape || ""}`, repair: "Fix the emitter or the scene so the saved file matches the scene" })));
   if (build.gates && build.gates.passed === false) blockers.push(...(build.gates.findings || []).map((f) => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: `gate ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
+  if (build.preflight?.passed === false) blockers.push(...(build.preflight.findings || []).map(f => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: f.reason || `preflight ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
+  if (build.status !== "built" && !blockers.length) blockers.push({slide:null, code:"BROKEN_GEOMETRY", severity:"blocker", reason:`Build is not complete: ${build.status}`, repair:"Complete the build and all gates before delivery"});
   if (blockers.length) return reject(report, directory, rejectedNote, "page gates", blockers);
 
   report.stage = "review";

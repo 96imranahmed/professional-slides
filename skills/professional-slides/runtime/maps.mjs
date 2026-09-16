@@ -271,7 +271,7 @@ function markerCoordinate(marker, geography, projected) {
     return projected.project([marker.longitude, marker.latitude]);
   }
   if (marker.country) {
-    const id = resolveCountryId(marker.country);
+    const id = geography.custom ? String(marker.country) : resolveCountryId(marker.country);
     const country = geography.countries.find((candidate) => candidate.id === id);
     if (!country) throw new Error(`Map marker country ${id} is outside ${geography.id}`);
     if (!country.label || !projected.contains(country.label)) throw new Error(`Map marker country ${id} has no visible label point`);

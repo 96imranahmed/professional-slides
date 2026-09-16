@@ -26,7 +26,7 @@ async function resolveRuntime() {
   const fallback = {
     RUNTIME_NODE: process.execPath,
     RUNTIME_PYTHON: process.env.RUNTIME_PYTHON || "python3",
-    RUNTIME_NODE_MODULES: process.env.RUNTIME_NODE_MODULES || path.join(path.dirname(path.dirname(process.execPath)), "node_modules")
+    RUNTIME_NODE_MODULES: process.env.RUNTIME_NODE_MODULES || path.join(repo, "node_modules")
   };
   return fallback;
 }
@@ -48,7 +48,7 @@ function run(command, args) {
 if (process.argv.includes("--release")) {
   // Item 17: the release gate is a pixel comparison against accepted
   // reference images, not a source hash.
-  await run(runtime.RUNTIME_PYTHON, ["evals/scripts/golden_reference.py", "check", "evals/golden/reference"]);
+  await run(runtime.RUNTIME_PYTHON, ["evals/scripts/check_release.py"]);
 } else if (process.argv.includes("--dependencies")) {
   await run(runtime.RUNTIME_NODE, ["evals/scripts/runtime_lock.mjs"]);
 } else {

@@ -4,11 +4,12 @@ typography and density, with explicit spec fields still winning."""
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from node_probe import ROOT, RUNTIME, run_node
+from node_probe import ROOT, RUNTIME, NODE, run_node
 
 SKILL = ROOT / "skills" / "professional-slides"
 
@@ -22,9 +23,9 @@ class TemplateImportTests(unittest.TestCase):
                 "slides": [{"title": "Revenue grew nine percent while costs held flat across every region", "exhibit": {"type": "chart.column", "heading": "Revenue by year", "unit": "$m", "categories": ["2023", "2024", "2025"], "series": [{"name": "Revenue", "values": [40, 46, 52]}]}, "points": ["Growth came from the core", "Costs held flat", "Margin widened three points"]},
                            {"title": "Three regions carry the growth while two are flat", "points": ["North grew 12%", "South grew 9%", "East grew 8%", "West flat", "Central flat"]}]}
         (cls.tmp / "tpl.deck.json").write_text(json.dumps(spec))
-        subprocess.run(["node", str(RUNTIME / "build-deck.mjs"), str(cls.tmp / "tpl.deck.json"), str(cls.tmp / "out"), "--no-render"], check=True, capture_output=True, cwd=ROOT, timeout=300)
+        subprocess.run([NODE, str(RUNTIME / "build-deck.mjs"), str(cls.tmp / "tpl.deck.json"), str(cls.tmp / "out"), "--no-render"], check=True, capture_output=True, cwd=ROOT, timeout=300)
         cls.pptx = cls.tmp / "out" / "tpl.pptx"
-        result = subprocess.run(["python3", str(RUNTIME / "import-template.py"), str(cls.pptx), "--base", "mckinsey", "--out", str(cls.tmp / "house.json")], check=True, capture_output=True, text=True, cwd=ROOT, timeout=120)
+        result = subprocess.run([sys.executable, str(RUNTIME / "import-template.py"), str(cls.pptx), "--base", "mckinsey", "--out", str(cls.tmp / "house.json")], check=True, capture_output=True, text=True, cwd=ROOT, timeout=120)
         cls.summary = json.loads(result.stdout)
         cls.house = json.loads((cls.tmp / "house.json").read_text())
 

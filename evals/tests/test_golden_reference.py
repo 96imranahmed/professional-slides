@@ -44,6 +44,10 @@ class GoldenReferenceTests(unittest.TestCase):
             with Image.open(path) as image:
                 self.assertEqual(image.size, (1280, 720), path.name)
 
+    def test_reference_directory_cannot_be_its_own_candidate(self):
+        with self.assertRaisesRegex(ValueError, "separately"):
+            golden.check(REFERENCE_DIR)
+
     @requires_pil
     def test_an_unchanged_render_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -113,12 +117,12 @@ class GoldenReferenceTests(unittest.TestCase):
             finally:
                 golden.REFERENCE_DIR = original
 
-    def test_cli_check_exits_zero_on_the_committed_references(self):
+    def test_cli_check_rejects_self_comparison(self):
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "check", str(REFERENCE_DIR)],
             capture_output=True, text=True, cwd=str(ROOT))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("4 pass", result.stderr)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("separately", result.stderr)
 
 
 if __name__ == "__main__":

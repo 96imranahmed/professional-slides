@@ -90,6 +90,8 @@ def candidates(directory):
 
 
 def check(directory, report_path=None):
+    if Path(directory).resolve() == REFERENCE_DIR.resolve():
+        raise ValueError("Golden candidates must be rendered separately from references")
     results = []
     for candidate in candidates(directory):
         reference = REFERENCE_DIR / candidate.name

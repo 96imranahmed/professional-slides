@@ -69,7 +69,8 @@ question is optical, the rendered PNG. Exit 0 pass, 2 findings. Every finding is
 | `LAYOUT_MONOTONY` | share of content slides sharing one layout signature | ≤ 0.40 |
 | `NICE_TICKS` | the axis as a whole: step on the 1/2/2.5/5 ladder, every tick a whole step | — |
 | `HEDGED_TITLE` | hedge lexicon hit in the action title | none |
-| `ENDS_ON_CAVEAT` | the last sentence of the last paragraph is a caveat or an instruction | none |
+
+Whether a page needs additional interpretation is an editorial review decision. There is no mandatory closing-consequence gate: a necessary caveat may complete the evidence, and a separate `soWhat` is optional.
 
 The cover slide is exempt from the page-level gates. Density profiles move only
 the word budget (`live-pitch` 70/100, `executive` 100/140, `pre-read` 130/180);
@@ -94,3 +95,13 @@ nothing relaxes a geometric or typographic threshold.
 
 A source-hash change does not fail. A pixel regression does. `--accept` (or the
 `accept` action) updates the references.
+
+`npm run check:release` emits the committed scene through the current PowerPoint
+exporter, renders it in LibreOffice, and compares fresh candidates with the four
+accepted references. Runs and comparison reports remain under
+`output/golden/runs/release-*`; references cannot be their own candidates.
+
+Install Node test dependencies with `npm ci`, then install the browser used by
+rendered overlap tests with `npx playwright install chromium`. Use Node 20.9+
+and set `RUNTIME_PYTHON` when the Python dependencies live outside the default
+interpreter. `RUNTIME_NODE_MODULES` defaults to this checkout's `node_modules`.

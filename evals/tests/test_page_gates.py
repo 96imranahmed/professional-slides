@@ -120,9 +120,6 @@ class SyntheticGoodPageTests(unittest.TestCase):
                 {"lines": ["x" * 120, "y" * 110], "source": "x" * 120}),
             "NICE_TICKS": lambda s: node(s, "a2")["data"]["textLayout"].update(
                 {"lines": ["14.025"], "source": "14.025"}),
-            "ENDS_ON_CAVEAT": lambda s: node(s, "p")["data"]["textLayout"].update(
-                {"source": "Jefferson leads. First verify the enrollment data.",
-                 "lines": ["Jefferson leads. First verify the enrollment data."]}),
             "HERO_EXHIBIT": lambda s: s["componentInstances"][1]["frame"].update(
                 {"width": 300, "height": 200}),
             "WORDS": lambda s: node(s, "p")["data"]["textLayout"].update(
@@ -143,6 +140,18 @@ class SyntheticGoodPageTests(unittest.TestCase):
                 sorted(item), ["code", "measured", "repair", "slide", "threshold"])
             self.assertGreaterEqual(len(item["repair"]), 40, item)
             self.assertIn(" ", item["repair"].strip())
+
+    def test_evidence_can_end_with_a_qualification_without_a_conclusion_strip(self):
+        slide = good_slide()
+        paragraph = next(n for n in slide["nodes"] if n["id"] == "p")
+        lines = [
+            "Jefferson reaches the reading standard in every measured grade.",
+            "Alvarado does not reach it in either of the two relevant grades.",
+        ]
+        paragraph["text"] = "\n".join(lines)
+        paragraph["data"]["textLayout"] = {"source": " ".join(lines), "lines": lines}
+        report = page_gates.run_gates({"slides": [slide]}, render_dir=None)
+        self.assertTrue(report["accepted"], report["findings"])
 
 
 class KnownBadDeckTests(unittest.TestCase):
@@ -176,10 +185,6 @@ class KnownBadDeckTests(unittest.TestCase):
                     titles[index] = page_gates.source_text(node)
         self.assertTrue(any("looks plausible" in titles[i] for i in hedged))
         self.assertTrue(any("distinct combinations" in titles[i] for i in hedged))
-
-    def test_pages_end_on_a_caveat(self):
-        ends = slides_with(self.report, "ENDS_ON_CAVEAT")
-        self.assertGreaterEqual(len(ends), 5)
 
     def test_hero_exhibit_and_ink_gates_fire_on_the_thin_pages(self):
         self.assertTrue(slides_with(self.report, "HERO_EXHIBIT"))
@@ -220,7 +225,7 @@ class KnownBadDeckTests(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_the_cover_is_exempt_from_the_page_gates(self):
-        cover_findings = [f for f in self.report["findings"] if f["slide"] == 1]
+        cover_findings = [f for f in self.report["findings"] if f["slide"] == 1 and f["code"] != "MISSING_RENDER"]
         self.assertEqual([f["code"] for f in cover_findings], [])
 
 

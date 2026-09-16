@@ -30,7 +30,7 @@ Summary theme headings state substantive conclusions - "Career and industry", no
 
 ## Body copy
 
-Keep body copy within 100 words on an exhibit page and 140 on a text page. End the page on a consequence: the last sentence says what changes for the reader. A clause beginning *not*, *cannot*, *requires* or *verify* moves up beside the claim it limits.
+Keep body copy within 100 words on an exhibit page and 140 on a text page. The title and exhibit may complete the page's argument without a separate closing sentence. Add a consequence only when it advances that argument, and keep qualifications beside the claims they limit.
 
 Use plain words, short sentences and explicit uncertainty, in complete sentences with the connective words the reasoning needs.
 
@@ -52,11 +52,13 @@ Numbers belong on marks. Replace a sentence that transcribes the chart with labe
 | Job | What to write | Where it belongs |
 | --- | --- | --- |
 | Evidence | A sourced fact, value, observation, example or client requirement, with its scope | The primary exhibit, or a grouped evidence section |
-| Interpretation | A supported consequence, dependency, trade-off or constraint beyond those premises | The title, an anchored annotation, or one insight - one of the three, not all |
+| Interpretation | A supported consequence, dependency, trade-off or constraint beyond those premises | Place each distinct insight in the title, an anchored annotation or commentary beside its evidence; avoid repeating the same proposition across them |
 | Action | What the audience should decide or do, why the evidence supports it, and the condition that limits it | The decision page or the close |
 | Qualification | The minimum wording needed to decode a measure or avoid an overclaim | Beside the affected value, with derivations in notes |
 
 Read the whole page in order and remove duplicate propositions. A new sourced fact earns its place without a deduction attached; adding *therefore* to a fact does not make it an insight. Reject commentary that would survive replacing the subject and the numbers: "growth remains strong, but risks remain" adds no decision logic.
+
+A page may need no separate insight, one, or two complementary insights. Let the evidence decide. A callout and a closing `soWhat` should not become stacked summary boxes by habit. Keep both only when each contributes distinct reasoning and their placement helps the reader; otherwise merge, relocate or remove the extra message. For example, a sensitivity page can retain the downside-income observation while its rent recommendation belongs on the action page.
 
 ## Labels and hierarchy
 

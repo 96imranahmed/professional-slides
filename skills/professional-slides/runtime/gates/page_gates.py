@@ -52,7 +52,7 @@ BODY_ROLES = {
 }
 CHART_FURNITURE_ROLES = {"axis-label", "category-label", "data-label", "legend-label", "table-status-label", "table-lamp", "table-progress-label", "table-trend-glyph", "chart-bracket-label", "chart-delta-label", "chart-period-label", "chart-event-label", "chart-unit"}
 TITLE_ROLES = {"action-title"}
-SOURCE_ROLES = {"source-text", "source", "footnote"}
+SOURCE_ROLES = {"source-text", "source", "footnote", "footnote-text"}
 NON_BODY_ROLES = SOURCE_ROLES | CHART_FURNITURE_ROLES | TITLE_ROLES | {
     "page-number", "notes", "tracker-label", "chart-unit",
     "cover-title", "cover-subtitle", "section-title",
@@ -81,8 +81,6 @@ HEDGES = (
     "distinct combinations", "offers a", "requires verification",
     "is not a ranking",
 )
-
-CAVEAT_RE = re.compile(r"\b(not|cannot|requires?|verify|confirm|does not|do not)\b", re.I)
 
 # Density profiles change how much prose a page may carry; they never relax a
 # geometric or typographic threshold.
@@ -370,7 +368,7 @@ def gate_title(slide_no, slide, findings):
                 "Rewrite the title as a claim of at most 14 words.",
             ))
         lowered = " " + text.lower()
-        hit = [h.strip() for h in HEDGES if h in lowered]
+        hit = [h.strip() for h in HEDGES if re.search(r"\b" + re.escape(h.strip()).replace(r"\ ", r"\s+") + r"\b", lowered)]
         if hit:
             findings.append(finding(
                 slide_no, "HEDGED_TITLE", hit, list(h.strip() for h in HEDGES),
@@ -547,27 +545,6 @@ def gate_nice_ticks(slide_no, slide, findings):
         ))
 
 
-def gate_ends_on_caveat(slide_no, slide, findings):
-    """ENDS_ON_CAVEAT. The last paragraph must end on a consequence."""
-    prose = [n for n in text_nodes(slide) if n.get("role") in PROSE_ROLES]
-    if not prose:
-        return
-    last = max(prose, key=lambda n: (n.get("frame") or {}).get("y", 0))
-    text = source_text(last).strip()
-    if not text:
-        return
-    sentences = [s for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
-    if not sentences:
-        return
-    final = sentences[-1]
-    if CAVEAT_RE.search(final):
-        findings.append(finding(
-            slide_no, "ENDS_ON_CAVEAT", final[:160], "no closing caveat",
-            "End the page on what follows from the evidence; move the caveat to "
-            "the 8 pt methodology footnote.",
-        ))
-
-
 def layout_signature(slide):
     """Sorted multiset of top-level component ids plus the row/column shape."""
     instances = [c for c in top_level_instances(slide)]
@@ -634,8 +611,8 @@ def gate_layout_monotony(slides, content_indexes, findings):
 # --- driver ----------------------------------------------------------------
 
 
-def run_gates(scene, render_dir=None, profile=DEFAULT_PROFILE, gates=None):
-    if profile not in PROFILES:
+def run_gates(scene, render_dir=None, profile=None, gates=None):
+    if profile is not None and profile not in PROFILES:
         raise ValueError(f"Unknown density profile: {profile}")
     fill = scene.get("fill") or DEFAULT_FILL
     if fill not in FILL_LEVELS:
@@ -647,6 +624,11 @@ def run_gates(scene, render_dir=None, profile=DEFAULT_PROFILE, gates=None):
     covers = []
     for index, slide in enumerate(slides):
         slide_no = index + 1
+        if render_dir and render_path(render_dir, slide_no) is None:
+            findings.append(finding(slide_no, "MISSING_RENDER", "absent", "one PNG per slide", "Render every slide before running page gates."))
+        slide_profile = profile or slide.get("density") or DEFAULT_PROFILE
+        if slide_profile not in PROFILES:
+            raise ValueError(f"Unknown density profile: {slide_profile}")
         cover = is_cover(slide, index)
         if cover:
             covers.append(slide_no)
@@ -675,7 +657,7 @@ def run_gates(scene, render_dir=None, profile=DEFAULT_PROFILE, gates=None):
                     has_hero = any(is_exhibit(c) for c in slide.get("componentInstances", [])) and not hero
                     findings.extend(f for f in page if wanted(f["code"]) and not (f["code"] == "INK_COVERAGE" and has_hero))
             if wanted("WORDS"):
-                gate_words(slide_no, slide, findings, profile)
+                gate_words(slide_no, slide, findings, slide_profile)
             if wanted("HERO_EXHIBIT"):
                 gate_hero_exhibit(slide_no, slide, findings, render_path(render_dir, slide_no) if render_dir else None)
             page = []
@@ -683,8 +665,6 @@ def run_gates(scene, render_dir=None, profile=DEFAULT_PROFILE, gates=None):
             findings.extend(f for f in page if wanted(f["code"]))
             if wanted("CPL"):
                 gate_cpl(slide_no, slide, findings)
-            if wanted("ENDS_ON_CAVEAT"):
-                gate_ends_on_caveat(slide_no, slide, findings)
         if wanted("TYPE_RANGE"):
             gate_type_range(slide_no, slide, findings)
         if wanted("NICE_TICKS"):
@@ -714,7 +694,7 @@ def main(argv=None):
     parser.add_argument("render_dir", nargs="?", default=None,
                         help="Directory of slide-N.png renders; ink gates are skipped without it")
     parser.add_argument("--report", default=None)
-    parser.add_argument("--profile", default=DEFAULT_PROFILE, choices=sorted(PROFILES))
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES))
     parser.add_argument("--only", default=None, help="Comma-separated gate codes to run")
     args = parser.parse_args(argv)
 

@@ -255,7 +255,7 @@ function columnWeight(ex, i) {
   return Math.min(420, Math.max(60, widest)) + 24;
 }
 
-const heavyTable = (ex) => (ex.rows || []).length > 5 || (ex.rows || []).some((row) => row.some((cell) => String(cell?.text ?? cell ?? "").length > 60));
+const heavyTable = (ex) => (ex.rows || []).length > 5 || (ex.rows || []).some((row) => (Array.isArray(row) ? row : row?.cells || []).some((cell) => String(cell?.text ?? cell ?? "").length > 60));
 const tableSignature = (ex) => { const s = styleTable(ex); return `${s.variant}/${s.treatment}`; };
 
 /**

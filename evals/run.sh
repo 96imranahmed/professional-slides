@@ -6,32 +6,26 @@
 #   evals/run.sh --golden   only the reference-image golden check
 #
 # Everything here is vendor-neutral: python3 with Pillow, numpy and python-pptx,
-# plus node for the geometry probes. No Chromium, no Codex runtime.
+# plus node and Playwright Chromium for the rendered geometry probes.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PYTHON="${RUNTIME_PYTHON:-$(command -v python3)}"
 NODE="${RUNTIME_NODE:-$(command -v node)}"
-# Several node-side gates call configureRuntime(), which throws when the Codex
-# runtime cache is absent. Point it at whatever is on PATH.
+# Use explicitly configured interpreters or the executables on PATH.
 export RUNTIME_PYTHON="$PYTHON" RUNTIME_NODE="$NODE"
-if [ -z "${RUNTIME_NODE_MODULES:-}" ]; then
-  node_root="$(dirname "$(dirname "$NODE")")"
-  for candidate in "$node_root/lib/node_modules" "$node_root/node_modules"; do
-    [ -d "$candidate" ] && RUNTIME_NODE_MODULES="$candidate" && break
-  done
-fi
-export RUNTIME_NODE_MODULES="${RUNTIME_NODE_MODULES:-}"
+export RUNTIME_NODE_MODULES="${RUNTIME_NODE_MODULES:-$PWD/node_modules}"
 
 case "${1:-}" in
   --golden)
-    exec "$PYTHON" evals/scripts/golden_reference.py check evals/golden/reference
+    exec "$PYTHON" evals/scripts/check_release.py
     ;;
   --slow)
     export PS_RUN_SLOW=1
     ;;
 esac
 
+suite_status=0
 echo "== unit tests =="
 "$PYTHON" -m unittest discover -s evals/tests -p "test_*.py" || suite_status=$?
 
@@ -49,7 +43,7 @@ for code, count in report["countsByCode"].items():
 PY
 
 echo "== golden reference =="
-"$PYTHON" evals/scripts/golden_reference.py check evals/golden/reference >/dev/null
+"$PYTHON" evals/scripts/check_release.py >/dev/null
 
 echo "== node-side gates =="
 "$NODE" evals/scripts/check_source_quality.mjs

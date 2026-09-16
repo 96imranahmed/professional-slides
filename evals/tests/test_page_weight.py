@@ -55,6 +55,8 @@ const frame={x:0,y:0,width:700,height:90};
 // Inline: one band, the unit on the heading's line at the heading's size, grey.
 const inline=title.render({id:'t',frame,props:{...props,unitPlacement:'inline'}}).nodes;
 const heading=inline.find(n=>n.role==='section-heading'), unit=inline.find(n=>n.role==='chart-unit');
+assert.equal(heading.text,'Revenue by business line,');
+assert.equal(unit.text,'$B');
 assert.equal(unit.style.fontSize.tokenId,'type.heading');
 assert.equal(heading.style.fontSize.tokenId,'type.heading');
 assert.equal(unit.style.color.tokenId,'color.chartUnit');
@@ -62,6 +64,7 @@ assert.equal(unit.style.bold,false);
 assert.ok(Math.abs(unit.frame.y-heading.frame.y)<2,'one line');
 assert.ok(unit.frame.x>heading.frame.x+heading.data.textLayout.width-2,'the unit follows the measured heading');
 const stacked=title.render({id:'t',frame,props}).nodes.find(n=>n.role==='chart-unit');
+assert.equal(title.render({id:'t',frame,props}).nodes.find(n=>n.role==='section-heading').text,props.heading);
 assert.equal(stacked.style.fontSize.tokenId,'type.compact');
 assert.ok(stacked.frame.y>heading.frame.y+10,'the stacked unit sits under the heading');
 // The inline band is shorter than the stacked one, so peers can share it.
@@ -70,6 +73,15 @@ assert.ok(title.measureContent({frame,props:{...props,unitPlacement:'inline'}}).
 const long={heading:'Revenue by business line and geography across the group',unit:'$B, constant currency, excluding disposals',unitPlacement:'inline'};
 const fallback=title.render({id:'t',frame:{x:0,y:0,width:420,height:110},props:long}).nodes.find(n=>n.role==='chart-unit');
 assert.equal(fallback.style.fontSize.tokenId,'type.compact');
+// Include the comma in the fit decision, and remove it when that forces stacking.
+const required=unit.frame.x+unit.data.textLayout.width-frame.x;
+const tight=title.render({id:'tight',frame:{...frame,width:required-1},props:{...props,unitPlacement:'inline'}}).nodes;
+assert.equal(tight.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'stacked');
+assert.equal(tight.find(n=>n.role==='section-heading').text,props.heading);
+const punctuated=title.render({id:'punctuated',frame,props:{...props,heading:props.heading+', ',unitPlacement:'inline'}}).nodes;
+assert.equal(punctuated.find(n=>n.role==='section-heading').text,props.heading+',');
+const alone=title.render({id:'alone',frame,props:{heading:props.heading,unitPlacement:'inline'}}).nodes;
+assert.equal(alone.find(n=>n.role==='section-heading').text,props.heading);
 // The composer asks for it beside a text column and on a full-width chart, and
 // leaves peers in a row alone so their two-line bands align.
 const side=composeSlide({title:'T',exhibit:{type:'chart.column',heading:'H',unit:'$B',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]},points:['p']},0);

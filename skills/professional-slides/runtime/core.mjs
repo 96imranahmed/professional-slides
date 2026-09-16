@@ -748,7 +748,11 @@ export function nativeChartSpec(componentId, props = {}, frame) {
   // expose it, so those charts stay as assembled, grouped shapes. A single-bar
   // highlight is a per-point fill and stays native.
   const highlights = props.highlights || [];
-  if (props.native === false) return null;
+  if (props.native === false || type === "scatter") return null;
+  // Keep named scatter points and rich value labels editable as scene shapes
+  // until the native exporter can preserve their complete semantics.
+  if (props.valueFormat && (typeof props.valueFormat !== "object" ||
+      Object.keys(props.valueFormat).some(key => key !== "decimals"))) return null;
   // Stack totals and category groups are drawn by the runtime; PowerPoint has no native total label.
   if ((props.stackTotals || []).length || (props.categoryGroups || []).length || (props.secondaryLabels || []).length || (props.stackBracket || []).length || (props.deltas || []).length || (props.periods || []).length || (props.events || []).length || props.categoryLabels === false || props.segmentGrowth) return null;
   if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
@@ -793,7 +797,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   const pageTemplate = registry.get("page-template")?.resolveTemplate(deckSpec.pageTemplate);
   return withDesignTokens(designTokens, () => {
   const slides = deckSpec.slides.map((slideSpec, slideIndex) => {
-    const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate}) : null;
+    const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate,chrome:CHROME}) : null;
     if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
     const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
     const density = slideSpec.density ?? "executive";

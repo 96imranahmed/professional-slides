@@ -111,6 +111,10 @@ class Emitter:
         self.prs.slide_height = emu(720)
         self.title_layout = self.prs.slide_layouts[5]  # Title Only
         self.blank_layout = self.prs.slide_layouts[6]
+        tokens = scene.get("tokens") or (scene["slides"][0].get("tokens", {}) if scene.get("slides") else {})
+        typography = scene.get("typography") or {}
+        self.body_font = typography.get("body") or tokens.get("font.body", {}).get("value") or "Arial"
+        self.display_font = typography.get("display") or tokens.get("font.display", {}).get("value") or self.body_font
         self.colors = token_colors(scene)
         self.series_colors = [self.colors.get(f"color.chartSeries{i}") for i in range(1, 7)]
         self.stats = {"slides": 0, "text": 0, "native_charts": 0, "grouped": 0, "shapes": 0, "images": 0}
@@ -223,17 +227,7 @@ class Emitter:
         shape.name = f"ps:{node['id']}"
         if radius > 0 and f["width"] and f["height"]:
             shape.adjustments[0] = min(0.5, radius / min(f["width"], f["height"]))
-        fill = style_value(style, "fill", None)
-        if fill and fill != "none":
-            shape.fill.solid(); shape.fill.fore_color.rgb = rgb(fill)
-        else:
-            shape.fill.background()
-        stroke = style_value(style, "stroke", None)
-        if stroke and stroke != "none":
-            shape.line.color.rgb = rgb(stroke)
-            shape.line.width = Pt(float(style_value(style, "lineWidth", 1) or 1) * 0.75)
-        else:
-            shape.line.fill.background()
+        self._paint(shape, style)
         self._strip_style(shape)
         self._strip_text(shape)
         self.stats["shapes"] += 1
@@ -427,6 +421,9 @@ class Emitter:
             pic.crop_right = float(crop.get("right", 0))
             pic.crop_top = float(crop.get("top", 0))
             pic.crop_bottom = float(crop.get("bottom", 0))
+        if data.get("circular"):
+            geometry = pic._element.spPr.find(qn("a:prstGeom"))
+            geometry.set("prst", "ellipse")
         pic.name = f"ps:{node['id']}"
         self.stats["images"] += 1
         return pic
@@ -474,7 +471,7 @@ class Emitter:
         gf = slide.shapes.add_chart(ctype, emu(f["x"]), emu(f["y"]), emu(f["width"]), emu(f["height"]), cd)
         gf.name = f"ps:{instance['instanceId']}:chart"
         chart = gf.chart
-        chart.font.name = "Arial"
+        chart.font.name = self.body_font
         chart.font.size = Pt(10)
         chart.has_title = False
         chart.has_legend = bool(spec.get("legend"))
@@ -627,11 +624,11 @@ class Emitter:
             tf.vertical_anchor = MSO_ANCHOR.MIDDLE
             p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
             r = p.add_run(); r.text = str(center.get("value", ""))
-            self._font(r.font, "Arial", 20, True, rgb(self.colors.get("color.ink", "#000000")))
+            self._font(r.font, self.body_font, 20, True, rgb(self.colors.get("color.ink", "#000000")))
             if center.get("label"):
                 p2 = tf.add_paragraph(); p2.alignment = PP_ALIGN.CENTER
                 r2 = p2.add_run(); r2.text = str(center["label"])
-                self._font(r2.font, "Arial", 10, False, rgb(self.colors.get("color.textSecondary", "#404040")))
+                self._font(r2.font, self.body_font, 10, False, rgb(self.colors.get("color.textSecondary", "#404040")))
         self.stats["native_charts"] += 1
         return gf
 
@@ -648,14 +645,17 @@ class Emitter:
                     heads = [n for n in nodes if (n.get("data") or {}).get("componentInstance") == iid
                              and n.get("role") in ("section-heading", "section-heading-rule", "chart-unit", "chart-heading", "chart-title")]
                     ci["_headingBottom"] = max((n["frame"]["y"] + n["frame"]["height"] for n in heads), default=None)
-                    self.add_native_chart(slide, ci)
                     skip_instances.add(iid)
         # group membership: diagram-like components with several primitives
         member_shapes: dict[str, list] = {}
         title_shape = None
+        emitted_charts = set()
         for node in nodes:
             inst = (node.get("data") or {}).get("componentInstance")
             if inst in skip_instances and node.get("role") in CHART_PLOT_ROLES:
+                if inst not in emitted_charts:
+                    self.add_native_chart(slide, instances[inst])
+                    emitted_charts.add(inst)
                 continue
             if node is title_node:
                 shape = title_shape = self.add_text(slide, node, as_title=True)
@@ -704,8 +704,6 @@ class Emitter:
         for tid, t in tokens.items():
             if t.get("kind") == "color" and t.get("themeSlot"):
                 slots[t["themeSlot"]] = t["value"].lstrip("#").upper()
-        fonts = {t.get("value") for t in tokens.values() if t.get("kind") == "fontFamily"}
-        family = "Arial" if "Arial" in fonts or not fonts else sorted(fonts)[0]
         buf = io.BytesIO()
         with zipfile.ZipFile(path) as zin:
             with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zout:
@@ -720,7 +718,7 @@ class Emitter:
                                 for child in list(el):
                                     el.remove(child)
                                 etree.SubElement(el, qn("a:srgbClr")).set("val", hexv)
-                        for tag in ("majorFont", "minorFont"):
+                        for tag, family in (("majorFont", self.display_font), ("minorFont", self.body_font)):
                             latin = root.find(f".//a:fontScheme/a:{tag}/a:latin", ns)
                             if latin is not None:
                                 latin.set("typeface", family)

@@ -17,7 +17,7 @@ export const CODES = Object.freeze({
   UNSUPPORTED_CLAIM: "a claim the cited evidence does not support",
   MISLEADING_COMPARISON: "values compared across incompatible bases without saying so",
   MISSING_EVIDENCE: "a ranked criterion or stated requirement has no comparative evidence",
-  MISSING_ARGUMENT: "the page has data but no consequence for the decision",
+  MISSING_ARGUMENT: "the page's purpose or necessary inference is unclear from its title, evidence and commentary together",
   // legibility and geometry
   UNREADABLE: "text too small, clipped or low-contrast to read",
   OVERFLOW: "content exceeds its box or the slide",
@@ -120,7 +120,7 @@ GOVERNING ANSWER: ${packet.answer || "(not supplied)"}
 TITLES ALONE (read as a memo — does the argument flow?):
 ${packet.titles.join("\n")}
 
-For each slide, decide whether a reader gets the finding from the title and can verify it from the exhibit. Report findings with these codes only:
+For each slide, decide whether a reader gets the finding from the title and can verify it from the exhibit. A separate soWhat or closing strip is optional: the title and exhibit may already complete the argument. Two distinct insights can share a page when each is supported and clearly placed. Flag redundant propositions or competing summary boxes, not the absence of a footer conclusion or the mere presence of multiple insights. Report findings with these codes only:
 ${Object.entries(packet.codes).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
 
 Severity: blocker (must fix before any reader sees it), major (fix before delivery), minor (advisory), none. Design codes (DEAD_SPACE, LAYOUT_MONOTONY, NO_HERO_EXHIBIT, OVERSIZED_TYPE, WALL_OF_TEXT, BURIED_NUMBER, HEDGED_TITLE, TITLE_TOO_LONG, INCONSISTENT_ENCODING) may be major. A large empty band, one layout repeated across most pages, and prose where an exhibit belongs are defects, not preferences. Every major or blocker finding needs a repair sentence saying exactly what to add, replace, move, merge, cut, plot or rewrite.

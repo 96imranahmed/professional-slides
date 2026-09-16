@@ -370,16 +370,21 @@ function chartTitleLayout(frame, props) {
   // side padding; the unit line then sits under the band.
   const band = houseStyle("style.chartHeading") === "band";
   const padX = band ? tokenValue(token("space.3")) : 0, padY = band ? tokenValue(token("space.2")) : 0;
-  const heading = measureText(props.heading || props.text || "", frame.width - 2 * padX, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: !band });
+  const rawHeading = String(props.heading || props.text || "").trimEnd();
+  const headingText = props.unit ? rawHeading.replace(/,\s*$/, "") : rawHeading;
+  const measureHeading = (text) => measureText(text, frame.width - 2 * padX, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: !band });
+  let heading = measureHeading(headingText);
   // The stacked unit line is compact grey under the heading; the inline unit
-  // sits on the heading's line at the heading's size, separated only by colour.
+  // sits on the heading's line at the heading's size, after a comma in the heading.
   // The inline unit is tried first and falls back to the stacked line — at the
   // compact size — when the heading wraps or the pair will not fit on the line.
   const inlineGap = tokenValue(token("space.2"));
   const measureUnit = (size) => props.unit ? measureText(props.unit, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(size), wrapWidthRatio: 1 }) : null;
   const wanted = props.unitPlacement === "inline" && !band && heading.lines.length === 1;
+  const inlineHeading = wanted ? measureHeading(`${headingText},`) : null;
   const inlineMeasure = wanted ? measureUnit(token("type.heading")) : null;
-  const inline = Boolean(inlineMeasure) && inlineMeasure.lines.length === 1 && heading.width + inlineGap + inlineMeasure.width <= frame.width - 2 * padX;
+  const inline = Boolean(inlineMeasure) && inlineHeading.lines.length === 1 && inlineMeasure.lines.length === 1 && inlineHeading.width + inlineGap + inlineMeasure.width <= frame.width - 2 * padX;
+  if (inline) heading = inlineHeading;
   const unitSize = inline ? token("type.heading") : COMPACT;
   const unit = inline ? inlineMeasure : measureUnit(COMPACT);
   if (unit && unit.lines.length !== 1) throw new Error("Chart unit must fit on one line");

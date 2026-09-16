@@ -14,7 +14,11 @@
     "deliver:deck": "node skills/professional-slides/runtime/deliver-deck.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.9"
   },
-  "description": "Consulting-grade slide decks as editable PowerPoint. Node layout engine, python-pptx emitter, LibreOffice renderer. No vendor runtime."
+  "description": "Consulting-grade slide decks as editable PowerPoint. Node layout engine, python-pptx emitter, LibreOffice renderer. No vendor runtime.",
+  "devDependencies": {
+    "playwright": "^1.61.1",
+    "sharp": "^0.35.4"
+  }
 }

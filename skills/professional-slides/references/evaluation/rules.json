@@ -54,9 +54,9 @@
       "id": "so-what",
       "owner": "../copy.md",
       "severity": "material",
-      "rationale": "The last sentence of a page states a consequence.",
-      "positive": "Two locations clear the limit door-to-door",
-      "negative": "Page ending on requires verification"
+      "rationale": "Interpretation adds reasoning missing from the title and exhibit; a separate closing strip is optional.",
+      "positive": "A complete comparison without a footer conclusion, or two distinct supported insights beside their evidence",
+      "negative": "Callout and closing strip repeat the same proposition"
     },
     {
       "id": "meaningful-position",

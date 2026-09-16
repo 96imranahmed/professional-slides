@@ -35,7 +35,7 @@ def run_node(source: str) -> dict:
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, "RUNTIME_NODE_MODULES": os.environ.get("RUNTIME_NODE_MODULES", str(Path(NODE).resolve().parents[1] / "node_modules"))},
+        env={**os.environ, "RUNTIME_NODE_MODULES": os.environ.get("RUNTIME_NODE_MODULES", str(ROOT / "node_modules"))},
     )
     if result.returncode:
         raise AssertionError(f"Node probe exited {result.returncode}\n{result.stderr}\n{result.stdout}")
