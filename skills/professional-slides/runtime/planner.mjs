@@ -212,7 +212,7 @@ function planCover(plan) {
 function planDivider(plan) {
   if (!plan?.id || !plan.title?.trim()) throw new Error("Divider plan requires id and title");
   const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
-  const props = { title: plan.title, ...(plan.number !== undefined ? { style: "numbered", sectionId: String(plan.number) } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}) };
+  const props = { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.number !== undefined ? { style: "numbered", sectionId: String(plan.number) } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}) };
   return {
     spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", frame, composition: absolute({ id: `${plan.id}-divider`, children: [componentNode({ id: "divider", component: "section-divider", props, frame, role: "divider" })] }) },
     decision: { layout: "structural", kind: "divider", density: { requested: "executive", recommended: "live-pitch", resolved: plan.density ?? "executive", selection: "explicit", reasons: [] }, itemJobs: [{ id: "divider", job: "open the section", component: "section-divider" }] }

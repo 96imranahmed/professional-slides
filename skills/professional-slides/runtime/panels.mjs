@@ -11,8 +11,9 @@ const PRIMARY = token("color.componentPrimary"), INK = token("color.ink"), WHITE
 const SURFACE = token("color.surface"), MUTED = token("color.surfaceMuted"), RULE = token("color.rule"), TINT = token("color.componentPrimaryTint");
 const FONT = token("font.body"), DISPLAY = token("font.display");
 const v = (id) => tokenValue(token(id));
+const ACCENT_OR_PRIMARY = () => token("color.accent");
 
-export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.componentPrimaryTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
+export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
 const text = (size, color = INK, bold = false, align = "left") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
 const measure = (value, width, size, bold = false) => measureText(String(value), width, { fontFamily: tokenValue(FONT), fontSize: v(size), bold, wrapWidthRatio: 1 });
@@ -26,7 +27,7 @@ function normalizeCards(props) {
   return props.items.map((item, index) => {
     if (!item || typeof item.title !== "string" || !item.title.trim()) throw new Error(`Card ${index + 1} requires a title`);
     const points = Array.isArray(item.points) ? item.points.map((p) => (typeof p === "string" ? p : p?.text)).filter((p) => typeof p === "string" && p.trim()) : [];
-    return { title: item.title.trim(), text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : null, points, icon: item.icon ?? null, number: item.number ?? index + 1, footer: typeof item.footer === "string" && item.footer.trim() ? item.footer.trim() : null };
+    return { title: item.title.trim(), text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : null, points, icon: item.icon ?? null, number: item.number ?? index + 1, footer: typeof item.footer === "string" && item.footer.trim() ? item.footer.trim() : null, value: item.value !== undefined && item.value !== null && String(item.value).trim() ? String(item.value).trim() : null };
   });
 }
 
@@ -35,68 +36,113 @@ function normalizeCards(props) {
  * primary header band carrying the title), "numbered" (numbered disc before
  * the title), "plain" (no card edge; a column of icon + title + text).
  */
+export const CARD_TONES = Object.freeze(["outline", "header", "numbered", "plain", "disc", "big-number", "dark", "columns"]);
 export function cardsLayout(frame, props) {
   const items = normalizeCards(props);
   const tone = props.tone ?? (items.some((i) => i.icon) ? "outline" : "numbered");
+  if (!CARD_TONES.includes(tone)) throw new Error(`Unknown cards tone: ${tone}; use one of ${CARD_TONES.join(", ")}`);
   // Icon cards with a line of text each read centred (the "three principles" page).
-  const centred = props.align === "center" || (props.align === undefined && (tone === "outline" || tone === "plain") && items.every((i) => i.icon && !i.points.length));
-  if (!["outline", "header", "numbered", "plain"].includes(tone)) throw new Error(`Unknown cards tone: ${tone}`);
-  const gap = v("space.4"), pad = tone === "plain" ? 0 : v("space.4");
+  const centred = props.align === "center" || (props.align === undefined && ((tone === "outline" || tone === "plain") && items.every((i) => i.icon && !i.points.length) || tone === "disc" || tone === "dark"));
+  const open = ["plain", "disc", "big-number", "columns"].includes(tone);
+  const gap = tone === "big-number" ? v("space.5") + v("space.4") : v("space.4"), pad = open ? 0 : v("space.4");
   const width = (frame.width - gap * (items.length - 1)) / items.length;
-  const inner = width - 2 * pad;
+  const inner = width - 2 * pad - (tone === "columns" ? v("space.4") : 0);
   if (inner < 80) throw new Error("Cards are too narrow for their padding; use fewer cards");
-  const iconSize = Math.round(markerSize() * (centred ? 2.5 : 1.75)), disc = markerSize();
+  const iconSize = Math.round(markerSize() * (tone === "disc" ? 3.5 : centred ? 2.5 : 1.75)), disc = markerSize();
   const headGap = v("space.2"), bodyGap = v("space.3");
   const measured = items.map((item) => {
     const titleWidth = tone === "numbered" ? inner - disc - v("space.3") : inner;
     const title = measure(item.title, titleWidth, "type.heading", true);
-    const body = item.text ? measure(item.text, inner, "type.body") : null;
-    const points = item.points.map((p) => measure(p, inner - v("space.4"), "type.body"));
+    const bodyWidth = tone === "big-number" ? inner - 2 * v("space.3") : inner;
+    const body = item.text ? measure(item.text, bodyWidth, "type.body") : null;
+    const points = item.points.map((p) => measure(p, bodyWidth - v("space.4"), "type.body"));
     const footer = item.footer ? measure(item.footer, inner, "type.compact", true) : null;
-    // Header zone: icon (outline/plain) or filled band (header) or disc+title (numbered).
-    const iconBlock = (tone === "outline" || tone === "plain") && item.icon ? iconSize + headGap : 0;
-    const bandHeight = tone === "header" ? title.height + 2 * v("space.2") : 0;
-    const titleHeight = tone === "header" ? 0 : title.height;
-    const bodyHeight = (body ? bodyGap + body.height : 0) + points.reduce((sum, p) => sum + v("space.1") + p.height, points.length ? bodyGap - v("space.1") : 0);
+    const value = item.value ? measure(item.value, inner, "type.metric", true) : null;
+    const number = tone === "big-number" ? measure(String(item.number).padStart(2, "0"), inner, "type.deckTitle", true) : null;
+    // Header zone: icon (outline/plain/disc), filled band (header), disc + title
+    // (numbered), big numeral + title (big-number), dark tile (dark) or a ruled
+    // column heading (columns).
+    const iconBlock = ["outline", "plain", "disc"].includes(tone) && item.icon ? iconSize + headGap : 0;
+    const numberBlock = number ? number.height + headGap : 0;
+    const bandHeight = tone === "header" ? title.height + 2 * v("space.2") : tone === "dark" ? Math.max(150, (item.icon ? iconSize + headGap : 0) + title.height + 2 * v("space.4")) : 0;
+    const titleHeight = tone === "header" || tone === "dark" ? 0 : title.height + (tone === "columns" ? v("space.2") + v("space.1") : 0);
+    const valueHeight = value ? bodyGap + value.height : 0;
+    const bodyHeight = (tone === "big-number" ? v("space.3") : 0) + (body ? bodyGap + body.height : 0) + points.reduce((sum, p) => sum + v("space.1") + p.height, points.length ? bodyGap - v("space.1") : 0) + (tone === "big-number" ? v("space.3") : 0);
     const footerHeight = footer ? bodyGap + footer.height : 0;
-    return { item, title, body, points, footer, iconBlock, bandHeight, titleHeight, bodyHeight, footerHeight, height: pad + iconBlock + bandHeight + titleHeight + bodyHeight + footerHeight + pad };
+    return { item, title, body, points, footer, value, number, iconBlock, numberBlock, bandHeight, titleHeight, valueHeight, bodyHeight, footerHeight, height: pad + iconBlock + numberBlock + bandHeight + titleHeight + valueHeight + bodyHeight + footerHeight + pad };
   });
-  const headerHeight = Math.max(...measured.map((m) => m.iconBlock + m.bandHeight + m.titleHeight));
-  return { items: measured, tone, centred, gap, pad, width, inner, iconSize, disc, headGap, bodyGap, headerHeight, height: Math.max(...measured.map((m) => m.height - (m.iconBlock + m.bandHeight + m.titleHeight) + headerHeight)) };
+  const headerHeight = Math.max(...measured.map((m) => m.iconBlock + m.numberBlock + m.bandHeight + m.titleHeight + m.valueHeight));
+  return { items: measured, tone, centred, open, gap, pad, width, inner, iconSize, disc, headGap, bodyGap, headerHeight, height: Math.max(...measured.map((m) => m.height - (m.iconBlock + m.numberBlock + m.bandHeight + m.titleHeight + m.valueHeight) + headerHeight)) };
 }
 
-export function cardsNodes({ id, frame, props }) {
+export function cardsNodes({ id, frame: frameIn, props }) {
+  let frame = frameIn;
   const L = cardsLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
   const nodes = [];
-  const fill = frame.height >= L.height; // cards fill the frame height so a row reads as one band
+  const fill = frame.height >= L.height && props.valign !== "middle"; // cards fill the frame height so a row reads as one band
   const cardHeight = fill ? frame.height : L.height;
+  // Icon rows (`valign: "middle"`) keep their natural height and sit centred in the frame.
+  if (props.valign === "middle" && frame.height > L.height) frame = { ...frame, y: frame.y + (frame.height - L.height) / 2, height: L.height };
   L.items.forEach((m, index) => {
     const x = frame.x + index * (L.width + L.gap), cid = stableId(id, "card", index);
-    if (L.tone !== "plain") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, SURFACE, RULE, "radius.small"));
+    if (!L.open && L.tone !== "dark") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, SURFACE, RULE, "radius.small"));
     let y = frame.y + L.pad;
     const cx = x + L.pad;
+    const align = L.centred ? "center" : "left";
     if (L.tone === "header") {
       nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: frame.y, width: L.width, height: m.bandHeight }, PRIMARY));
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: frame.y + v("space.2"), width: L.inner }, m.title, text("type.heading", WHITE, true)));
       y = frame.y + m.bandHeight + L.pad;
+    } else if (L.tone === "dark") {
+      // A navy tile carries icon and title in white; the copy sits below it on the page.
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: frame.y, width: L.width, height: m.bandHeight }, PRIMARY, "none", "radius.small"));
+      const block = (m.item.icon ? L.iconSize + L.headGap : 0) + m.title.height;
+      let ty = frame.y + (m.bandHeight - block) / 2;
+      if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: cx + (L.inner - L.iconSize) / 2, y: ty, size: L.iconSize, icon: m.item.icon, tone: "filled" })); ty += L.iconSize + L.headGap; }
+      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: ty, width: L.inner }, m.title, text("type.heading", WHITE, true, "center")));
+    } else if (L.tone === "big-number") {
+      // "01 / 02 / 03": the numeral in display type, the title beside the next
+      // card's arrow, and the copy on a muted band that runs to the frame's foot.
+      nodes.push(label(stableId(cid, "number"), "card-number", { x: cx, y, width: L.inner }, m.number, text("type.deckTitle", ACCENT_OR_PRIMARY(), true)));
+      y += m.numberBlock;
+      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, text("type.heading", INK, true)));
+      if (index < L.items.length - 1) nodes.push(...iconMarker({ id: stableId(cid, "arrow"), role: "card-arrow", x: x + L.width + (L.gap - L.disc) / 2, y: y + (m.title.lineHeight - L.disc) / 2, size: L.disc, icon: "arrow-right", tone: "plain", data: { muted: true } }));
+      y += m.title.height;
+    } else if (L.tone === "columns") {
+      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, text("type.heading", INK, true)));
+      const ry = y + m.title.height + v("space.2");
+      nodes.push(linePrimitive({ id: stableId(cid, "title-rule"), role: "card-rule", x1: cx, y1: ry, x2: cx + L.inner, y2: ry, style: { stroke: INK, lineWidth: token("line.hairline") } }));
+      if (index) nodes.push(linePrimitive({ id: stableId(cid, "divider"), role: "card-divider", x1: x - L.gap / 2, y1: frame.y, x2: x - L.gap / 2, y2: frame.y + cardHeight, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
+      y += m.titleHeight;
     } else if (L.tone === "numbered") {
       nodes.push(...numberMarker({ id: stableId(cid, "number"), role: "card-marker", x: cx, y: y + (m.title.lineHeight - L.disc) / 2, size: L.disc, number: m.item.number }));
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx + L.disc + v("space.3"), y, width: L.inner - L.disc - v("space.3") }, m.title, text("type.heading", INK, true)));
       y += m.title.height;
     } else {
-      if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: L.centred ? cx + (L.inner - L.iconSize) / 2 : cx, y, size: L.iconSize, icon: m.item.icon, tone: "outline" })); }
+      if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: L.centred ? cx + (L.inner - L.iconSize) / 2 : cx, y, size: L.iconSize, icon: m.item.icon, tone: L.tone === "disc" ? "filled" : "outline" })); }
       y += m.iconBlock;
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, text("type.heading", INK, true, L.centred ? "center" : "left")));
+      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, text("type.heading", INK, true, align)));
       y += m.title.height;
     }
+    if (m.value) {
+      // A headline figure under the title (price, size, share) in the metric role.
+      const vy = frame.y + L.pad + (L.tone === "header" || L.tone === "dark" ? m.bandHeight : m.iconBlock + m.numberBlock + m.titleHeight) + L.bodyGap;
+      nodes.push(label(stableId(cid, "value"), "card-value", { x: cx, y: vy, width: L.inner }, m.value, text("type.metric", PRIMARY, true, align)));
+    }
     // Content starts level across the row (row rule), below the tallest header.
-    y = L.tone === "header" ? frame.y + L.headerHeight + L.pad : frame.y + L.pad + L.headerHeight;
-    if (m.body) { y += L.bodyGap; nodes.push(label(stableId(cid, "text"), "card-text", { x: cx, y, width: L.inner }, m.body, text("type.body", INK, false, L.centred ? "center" : "left"))); y += m.body.height; }
+    y = L.tone === "header" || L.tone === "dark" ? frame.y + L.headerHeight + L.pad : frame.y + L.pad + L.headerHeight;
+    let tx = cx, tw = L.inner;
+    if (L.tone === "big-number") {
+      // The copy band: muted, from the content line to the card's foot.
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: y + L.bodyGap, width: L.width, height: Math.max(0, cardHeight - (y + L.bodyGap - frame.y)) }, MUTED));
+      tx = cx + v("space.3"); tw = L.inner - 2 * v("space.3"); y += v("space.3");
+    }
+    if (m.body) { y += L.bodyGap; nodes.push(label(stableId(cid, "text"), "card-text", { x: tx, y, width: tw }, m.body, text("type.body", INK, false, align))); y += m.body.height; }
     m.points.forEach((p, k) => {
       y += k ? v("space.1") : L.bodyGap;
-      nodes.push(rect(stableId(cid, "bullet", k), "card-bullet", { x: cx, y: y + (p.lineHeight - v("space.1")) / 2, width: v("space.1"), height: v("space.1") }, INK));
-      nodes.push(label(stableId(cid, "point", k), "card-point", { x: cx + v("space.4"), y, width: L.inner - v("space.4") }, p, text("type.body")));
+      nodes.push(rect(stableId(cid, "bullet", k), "card-bullet", { x: tx, y: y + (p.lineHeight - v("space.1")) / 2, width: v("space.1"), height: v("space.1") }, INK));
+      nodes.push(label(stableId(cid, "point", k), "card-point", { x: tx + v("space.4"), y, width: tw - v("space.4") }, p, text("type.body")));
       y += p.height;
     });
     if (m.footer) {
@@ -130,12 +176,14 @@ export function quadrantsLayout(frame, props) {
 export function quadrantsNodes({ id, frame, props }) {
   const L = quadrantsLayout(frame, props);
   const nodes = [];
-  const dark = props.tone === "dark";
+  // Every header band is navy unless `tone: "light"` asks for the tint; a
+  // checkerboard of tones would rank the quadrants, which a 2x2 does not.
+  const light = props.tone === "light";
   L.cells.forEach((cell, i) => {
     const x = frame.x + (i % 2) * (L.width + L.gap), y0 = frame.y + Math.floor(i / 2) * (L.height + L.gap), qid = stableId(id, "quadrant", i);
     nodes.push(rect(stableId(qid, "surface"), "quadrant-surface", { x, y: y0, width: L.width, height: L.height }, MUTED));
-    nodes.push(rect(stableId(qid, "band"), "quadrant-band", { x, y: y0, width: L.width, height: cell.band }, dark || i % 3 === 0 ? PRIMARY : TINT));
-    nodes.push(label(stableId(qid, "title"), "quadrant-title", { x: x + L.pad, y: y0 + v("space.2"), width: L.inner }, cell.title, text("type.heading", dark || i % 3 === 0 ? WHITE : INK, true)));
+    nodes.push(rect(stableId(qid, "band"), "quadrant-band", { x, y: y0, width: L.width, height: cell.band }, light ? TINT : PRIMARY));
+    nodes.push(label(stableId(qid, "title"), "quadrant-title", { x: x + L.pad, y: y0 + v("space.2"), width: L.inner }, cell.title, text("type.heading", light ? INK : WHITE, true)));
     let y = y0 + cell.band + L.pad;
     cell.points.forEach((p, k) => {
       nodes.push(rect(stableId(qid, "bullet", k), "quadrant-bullet", { x: x + L.pad, y: y + (p.lineHeight - v("space.1")) / 2, width: v("space.1"), height: v("space.1") }, INK));
@@ -238,7 +286,7 @@ export function registerPanels(registry) {
   registry.set("cards", {
     id: "cards", version: "1.0.0", category: "section", role: "cards", tokens: [...PANEL_TOKENS], preferredSize: { width: 1160, height: 300 },
     sample: { items: [{ icon: "target", title: "(Insert pillar 1)", text: "(Insert one-line description)" }, { icon: "rocket", title: "(Insert pillar 2)", text: "(Insert one-line description)" }, { icon: "people", title: "(Insert pillar 3)", text: "(Insert one-line description)" }] },
-    variants: { outline: {}, header: { props: { tone: "header" } }, numbered: { props: { tone: "numbered" } }, plain: { props: { tone: "plain" } } }, defaultVariant: "outline", variantProp: "tone",
+    variants: { outline: {}, header: { props: { tone: "header" } }, numbered: { props: { tone: "numbered" } }, plain: { props: { tone: "plain" } }, disc: { props: { tone: "disc" } }, "big-number": { props: { tone: "big-number", items: [{ title: "(Insert step 1)", text: "(Insert what happens)", points: ["(Insert activity)"] }, { title: "(Insert step 2)", text: "(Insert what happens)", points: ["(Insert activity)"] }, { title: "(Insert step 3)", text: "(Insert what happens)", points: ["(Insert activity)"] }] } }, dark: { props: { tone: "dark" } }, columns: { props: { tone: "columns", items: [{ title: "(Insert column 1)", points: ["(Insert point)"] }, { title: "(Insert column 2)", points: ["(Insert point)"] }, { title: "(Insert column 3)", points: ["(Insert point)"] }] } } }, defaultVariant: "outline", variantProp: "tone",
     resolveVariant: (props = {}) => props.tone ?? (Array.isArray(props.items) && props.items.some((i) => i?.icon) ? "outline" : "numbered"),
     render: (input) => ({ nodes: cardsNodes(input) }),
     measureContent: ({ frame, props }) => cardsLayout(frame, props),

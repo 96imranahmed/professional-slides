@@ -1,6 +1,7 @@
 import {
   ellipsePrimitive,
   linePrimitive,
+  rectPrimitive,
   shapePrimitive,
   stableId,
   textPrimitive,
@@ -69,7 +70,8 @@ export const MAP_TOKENS = Object.freeze([
   "type.label",
   "line.hairline",
   "radius.round",
-  "radius.none"
+  "radius.none",
+  "radius.small"
 ]);
 export const MAP_GUIDANCE = Object.freeze({
   useWhen: "showing geographic distribution, market coverage, regional differences or a location-bound priority",
@@ -279,7 +281,7 @@ function markerCoordinate(marker, geography, projected) {
   return [projected.plot.x + marker.x * projected.plot.width, projected.plot.y + marker.y * projected.plot.height];
 }
 
-function markerNodes({ id, frame, geography, projected, markers }) {
+function markerNodes({ id, frame, geography, projected, markers, highlighted = new Set() }) {
   const nodes = [];
   for (const [index, marker] of markers.entries()) {
     if (!marker || typeof marker !== "object" || Array.isArray(marker)) throw new Error("Map marker must be an object");
@@ -289,11 +291,17 @@ function markerNodes({ id, frame, geography, projected, markers }) {
     // A numbered pin is the deck's numbered disc, so the side list matches it.
     if (marker.number !== undefined) {
       const disc = markerSize(), pinFrame = { x: centerX - disc / 2, y: centerY - disc / 2, width: disc, height: disc };
-      nodes.push(...numberMarker({ id: stableId(id, "marker-base", index), role: "map-marker", labelRole: "map-marker-number", x: pinFrame.x, y: pinFrame.y, size: disc, number: marker.number, data: { geography: geography.id, number: marker.number } }));
+      // On a highlighted country the disc reverses (white on navy) so it stays visible.
+      const onHighlight = marker.country !== undefined && highlighted.has(geography.custom ? String(marker.country) : resolveCountryId(marker.country));
+      nodes.push(...numberMarker({ id: stableId(id, "marker-base", index), role: "map-marker", labelRole: "map-marker-number", x: pinFrame.x, y: pinFrame.y, size: disc, number: marker.number, reverse: onHighlight, data: { geography: geography.id, number: marker.number } }));
       if (marker.label) {
-        const width = Math.min(150, Math.max(90, frame.width * 0.18));
+        // The label sits on a white pill so it reads over land, sea or a filled country.
+        const measured = measureText(marker.label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 });
+        const width = Math.ceil(measured.width) + 12, height = 22;
         const placeRight = pinFrame.x + disc + 4 + width <= frame.x + frame.width;
-        nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: { x: placeRight ? pinFrame.x + disc + 4 : pinFrame.x - 4 - width, y: centerY - 12, width, height: 24 }, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: SECONDARY, bold: true, align: placeRight ? "left" : "right", valign: "mid" } }));
+        const lx = placeRight ? pinFrame.x + disc + 4 : pinFrame.x - 4 - width;
+        nodes.push(rectPrimitive({ id: stableId(id, "marker-label-pill", index), role: "map-label-pill", frame: { x: lx, y: centerY - height / 2, width, height }, style: { fill: SURFACE, stroke: token("color.rule"), lineWidth: token("line.hairline"), radius: token("radius.small") } }));
+        nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: { x: lx + 6, y: centerY - 12, width: width - 12, height: 24 }, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: INK, bold: true, align: "left", valign: "mid" } }));
       }
       continue;
     }
@@ -326,7 +334,7 @@ export function mapNodes({ id, frame, props = {} }) {
     const paths = country.polygons.map((ring) => clipRing(ring, geography.bounds)).filter((ring) => ring.length >= 3).map((ring) => ring.map(projected.project));
     return paths.length ? polygonNode({ id, country, paths, highlighted: highlighted.has(country.id) }) : null;
   }).filter(Boolean);
-  nodes.push(...markerNodes({ id, frame, geography, projected, markers: props.markers || [] }));
+  nodes.push(...markerNodes({ id, frame, geography, projected, markers: props.markers || [], highlighted }));
   if (!nodes.some((node) => node.role === "map-land")) throw new Error(`Map geography ${geography.id} produced no visible land shapes`);
   return nodes;
 }

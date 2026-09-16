@@ -5,7 +5,7 @@
 // is measured once here and carries its layout with it.
 import { token, tokenValue, stableId, textPrimitive, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
-import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
+import { MARK_TOKENS, numberMarker, iconMarker, markerSize } from "./marks.mjs";
 import { mediaNode } from "./media.mjs";
 
 const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary");
@@ -48,6 +48,7 @@ function normalizeCycle(props) {
 }
 
 const DISC = 44, ARROW = 10;
+const markerDiameter = () => markerSize();
 
 /**
  * Nodes sit on a ring at radius R, the first at twelve o'clock, running
@@ -149,32 +150,42 @@ function normalizeSteps(props) {
   });
 }
 
-/** Ascending blocks on one baseline; descriptions hang below the baseline. */
+/**
+ * A staircase: one tread per milestone, each a step higher, numbered at its
+ * left; the description sits above its tread, and a hairline riser drops
+ * from each tread to the baseline so the figure reads as stairs, not bars.
+ */
 export function stepsLayout(frame, props) {
   const items = normalizeSteps(props);
-  const gap = v("space.3"), pad = v("space.3"), rise = 36;
-  const width = (frame.width - gap * (items.length - 1)) / items.length, inner = width - 2 * pad;
+  const gap = v("space.2"), pad = v("space.3"), tread = 44, disc = markerDiameter();
+  const width = (frame.width - gap * (items.length - 1)) / items.length, inner = width - 2 * pad - disc - v("space.2");
   if (inner < 60) throw new Error("Steps are too narrow for their labels; use fewer steps");
-  const measured = items.map((item) => ({ item, title: measure(item.label, inner, "type.compact", true), body: item.text ? measure(item.text, width, "type.compact") : null }));
-  const labelHeight = Math.max(...measured.map((m) => m.title.height));
+  const measured = items.map((item) => ({ item, title: measure(item.label, inner, "type.body", true), body: item.text ? measure(item.text, width - pad, "type.compact") : null }));
+  if (measured.some((m) => m.title.lines.length > 3)) throw new Error("Step labels must fit three lines on the tread; shorten them or use fewer steps");
+  // A tread grows to carry a two-line label at a narrow width.
+  const treadHeight = Math.max(tread, Math.max(...measured.map((m) => m.title.height)) + 2 * v("space.2"));
   const bodyHeight = Math.max(0, ...measured.map((m) => (m.body ? m.body.height : 0)));
-  const minBlock = labelHeight + 2 * pad, maxBlock = minBlock + rise * (items.length - 1);
-  const bodyGap = bodyHeight ? gap : 0;
-  return { items: measured, gap, pad, width, inner, rise, minBlock, maxBlock, bodyHeight, bodyGap, height: maxBlock + bodyGap + bodyHeight };
+  const rise = Math.max(treadHeight + v("space.2"), bodyHeight + v("space.3"));
+  return { items: measured, gap, pad, width, inner, tread: treadHeight, disc, rise, bodyHeight, height: treadHeight + rise * (items.length - 1) + bodyHeight + v("space.3") };
 }
 
 export function stepsNodes({ id, frame, props }) {
   const L = stepsLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`Steps need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the descriptions or use fewer steps`);
-  // Blocks grow into spare height up to twice their natural rise and sit on the frame's bottom edge.
-  const n = L.items.length, blockArea = Math.min(frame.height - L.bodyGap - L.bodyHeight, L.minBlock + 2 * L.rise * (n - 1));
-  const baseline = frame.y + frame.height - L.bodyHeight - L.bodyGap, step = (blockArea - L.minBlock) / (n - 1);
+  const n = L.items.length;
+  // The staircase uses the frame's height: the rise stretches so the last tread sits near the top.
+  const rise = n > 1 ? Math.max(L.rise, (frame.height - L.tread - L.bodyHeight - v("space.3")) / (n - 1)) : L.rise;
+  const baseline = frame.y + frame.height;
   const nodes = [];
+  nodes.push(linePrimitive({ id: stableId(id, "baseline"), role: "step-baseline", x1: frame.x, y1: baseline, x2: frame.x + frame.width, y2: baseline, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
   L.items.forEach((m, i) => {
-    const x = frame.x + i * (L.width + L.gap), height = L.minBlock + step * i, sid = stableId(id, "step", i);
-    nodes.push(rect(stableId(sid, "block"), "step-block", { x, y: baseline - height, width: L.width, height }, i === n - 1 ? ACCENT : PRIMARY));
-    nodes.push(label(stableId(sid, "label"), "step-label", { x: x + L.pad, y: baseline - height + L.pad, width: L.inner }, m.title, text("type.compact", WHITE, true)));
-    if (m.body) nodes.push(label(stableId(sid, "text"), "step-text", { x, y: baseline + L.bodyGap, width: L.width }, m.body, text("type.compact", SECONDARY)));
+    const x = frame.x + i * (L.width + L.gap), top = baseline - L.tread - rise * i, sid = stableId(id, "step", i);
+    const last = i === n - 1;
+    nodes.push(rect(stableId(sid, "tread"), "step-block", { x, y: top, width: L.width, height: L.tread }, last ? ACCENT : PRIMARY));
+    if (i) nodes.push(linePrimitive({ id: stableId(sid, "riser"), role: "step-riser", x1: x, y1: top + L.tread, x2: x, y2: baseline, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
+    nodes.push(...numberMarker({ id: stableId(sid, "number"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, number: i + 1, reverse: true }));
+    nodes.push(label(stableId(sid, "label"), "step-label", { x: x + L.pad + L.disc + v("space.2"), y: top + (L.tread - m.title.height) / 2, width: L.inner }, m.title, text("type.body", WHITE, true)));
+    if (m.body) nodes.push(label(stableId(sid, "text"), "step-text", { x: x + L.pad, y: top - v("space.2") - m.body.height, width: L.width - L.pad }, m.body, text("type.compact", INK)));
   });
   return nodes;
 }

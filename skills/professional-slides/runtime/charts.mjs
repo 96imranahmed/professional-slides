@@ -61,7 +61,7 @@ function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotati
   const top = Math.max(Number(topInset) || 0, (topLegend ? 52 : 28) + totalLabelInset + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top);
   // Reserve the actual last metric row plus a trailing theme gap, not another full row band.
   const bottom = bands.bottom ? 40 + bands.bottom + tokenValue(token("space.3")) : 56;
-  const rightInset = Math.max(valueLabelInset, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16);
+  const rightInset = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16);
   if (frame.height - bottom - top < 100) throw new Error("Chart annotation bands leave insufficient plot height; enlarge or split the exhibit");
   if (frame.width - leftInset - rightInset < 120) throw new Error("Chart has insufficient plot width; enlarge or split the exhibit");
   return {
@@ -104,6 +104,14 @@ function* stepCandidates(rough) {
     const magnitude = Math.pow(10, exponent);
     for (const rung of STEP_LADDER) yield rung * magnitude;
   }
+}
+
+function tightRange(values, includeZero) {
+  let min = Math.min(...values), max = Math.max(...values);
+  if (includeZero) { min = Math.min(0, min); max = Math.max(0, max); return { min, max, span: max - min || 1, step: (max - min) / 4 || 1 }; }
+  const pad = (max - min || Math.abs(max) || 1) * 0.25;
+  min -= pad; max += pad;
+  return { min, max, span: max - min || 1, step: (max - min) / 4 || 1 };
 }
 
 function range(values, includeZero, steps = 4) {
@@ -165,9 +173,12 @@ function normalizedCategoricalData(props, { seriesCount = null } = {}) {
   return { categories: [...props.categories], series };
 }
 
-function numericBounds(values, { min, max, axis = "y", includeZero = false } = {}) {
+function numericBounds(values, { min, max, axis = "y", includeZero = false, tight = false } = {}) {
   if (!Array.isArray(values) || !values.length || values.some(value => !Number.isFinite(value))) throw new Error(`${axis}-axis values must be finite`);
-  const computed = range(values, includeZero);
+  // With no value axis the marks carry their values, so the domain fits the
+  // data (zero-anchored for bars, padded for lines) instead of the tick ladder,
+  // and the tallest mark uses the plot.
+  const computed = tight ? tightRange(values, includeZero) : range(values, includeZero);
   const bounds = { min: min ?? computed.min, max: max ?? computed.max };
   if (!Number.isFinite(bounds.min) || !Number.isFinite(bounds.max) || bounds.max <= bounds.min) throw new Error(`${axis}-axis maximum must be greater than its minimum`);
   if (includeZero && (bounds.min > 0 || bounds.max < 0)) throw new Error(`${axis}-axis bounds for bars must include zero`);
@@ -522,7 +533,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       categoryValues.filter(value => value > 0).reduce((sum, value) => sum + value, 0)
     ];
   });
-  const bounds = numericBounds(stacked ? stackExtents : values, { min: horizontal ? (props.xMin ?? props.yMin) : props.yMin, max: horizontal ? (props.xMax ?? props.yMax) : props.yMax, axis: horizontal ? "x" : "y", includeZero: true });
+  const bounds = numericBounds(stacked ? stackExtents : values, { min: horizontal ? (props.xMin ?? props.yMin) : props.yMin, max: horizontal ? (props.xMax ?? props.yMax) : props.yMax, axis: horizontal ? "x" : "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
   const twoMarkContrast = !stacked && !barHighlight && props.colorIndices === undefined && categories.length * series.length === 2;
   const twoSeriesContrast = !stacked && !barHighlight && props.colorIndices === undefined && series.length === 2;
   const colorIndexFor = (seriesIndex, categoryIndex) => {
@@ -877,7 +888,7 @@ function lineChart({ id, frame, props, area = false }) {
   const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length < 6);
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
-  const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y" });
+  const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y", tight: !showValueAxis && props.gridlines !== true });
   const labelWidth = axisLabelWidth(bounds);
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
@@ -900,9 +911,11 @@ function lineChart({ id, frame, props, area = false }) {
   const categorySlot = Math.min(120, Math.max(76, plot.width / Math.max(1, categories.length) * 0.82));
   categories.forEach((category, index) => {
     const x = xScale(index);
-    const categoryX = Math.max(plot.x, Math.min(plot.x + plot.width - categorySlot, x - categorySlot / 2));
+    // Every label is centred on its point; the first and last may reach into
+    // the chart's own insets so the spacing stays even.
+    const categoryX = Math.max(frame.x, Math.min(frame.x + frame.width - categorySlot, x - categorySlot / 2));
     categoryMap.set(category, { x: categoryX, y: plot.y, width: categorySlot, height: plot.height });
-    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL, INK, false, index === 0 ? "left" : index === categories.length - 1 ? "right" : "center") }));
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
   });
   series.forEach((item, seriesIndex) => {
     const points = item.values.map((value, index) => ({ x: xScale(index), y: yScale(value), value, category: categories[index] }));
@@ -1009,7 +1022,7 @@ function waterfall({ id, frame, props }) {
     else total += value;
     running.push(total);
   });
-  const bounds = numericBounds([0, ...running], { min: props.yMin, max: props.yMax, axis: "y", includeZero: true });
+  const bounds = numericBounds([0, ...running], { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
   const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
   const nodes = axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis });
   if (bounds.min < 0 && bounds.max > 0) nodes.push(linePrimitive({ id: stableId(id, "zero-baseline"), role: "chart-axis", x1: plot.x, y1: yScale(0), x2: plot.x + plot.width, y2: yScale(0), style: lineStyle(INK) }));
@@ -1033,7 +1046,7 @@ function waterfall({ id, frame, props }) {
     pointMap.set(`value:${category}`, point);
     pointMap.set(`category:${category}`, point);
     categoryMap.set(category, { x: bar.x, y: plot.y, width: bar.width, height: plot.height });
-    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * span, y: plot.y + plot.height + 38, width: span, height: 28 }, text: category, style: textStyle(AXIS_LABEL) }));
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * span, y: plot.y + plot.height + 38, width: span, height: 28 }, text: category, style: textStyle(AXIS_LABEL, INK) }));
     previous = end;
   });
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale });

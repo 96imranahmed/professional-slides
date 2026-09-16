@@ -34,8 +34,10 @@ export function numberMarker({ id, role = "marker", labelRole = `${role}-label`,
  */
 export function iconMarker({ id, role = "icon", x, y, size, icon, tone = "outline", data = {} }) {
   const nodes = [];
-  const ring = tone !== "plain";
-  const strokeColor = tone === "filled" ? WHITE : PRIMARY;
+  // outline: ring + primary glyph; filled: primary disc + white glyph; plain:
+  // primary glyph alone; inverse: white glyph alone (on a filled field).
+  const ring = tone !== "plain" && tone !== "inverse";
+  const strokeColor = tone === "filled" || tone === "inverse" ? WHITE : PRIMARY;
   if (ring) nodes.push(ellipsePrimitive({ id: stableId(id, "ring"), role: `${role}-ring`, frame: { x, y, width: size, height: size }, style: { fill: tone === "filled" ? PRIMARY : SURFACE, stroke: PRIMARY, lineWidth: token("line.standard"), radius: token("radius.round") }, data: { ...data, icon, tone } }));
   const definition = iconDefinition(icon);
   const inset = ring ? size * 0.24 : size * 0.06;

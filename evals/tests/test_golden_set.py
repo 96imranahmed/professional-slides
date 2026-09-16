@@ -39,7 +39,7 @@ for(const palette of ['mckinsey']) {
  assert.deepEqual(standard.nodes.filter(n=>n.role==='divider-title').map(n=>n.text),['(Insert section title)']);
  assert.ok(!standard.nodes.some(n=>['divider-number','divider-orientation'].includes(n.role)));
 }
-for(const props of [{title:''},{title:42},{title:'A',mode:'sepia'},{title:'A',style:'numbered'},{title:'A',style:'poster'},{title:'A',subtitle:'B'},{title:'A',number:'1'},{title:'A',orientation:'B'},{title:'A',dividerRule:true},{title:'A',pageTemplate:{rules:'sometimes'}},{title:'A\\nB\\nC'}]) assert.throws(()=>definition.render({id:'bad',frame,props}));
+for(const props of [{title:''},{title:42},{title:'A',mode:'sepia'},{title:'A',style:'numbered'},{title:'A',style:'poster'},{title:'A',subtitle:42},{title:'A',number:'1'},{title:'A',orientation:'B'},{title:'A',dividerRule:true},{title:'A',pageTemplate:{rules:'sometimes'}},{title:'A\\nB\\nC'}]) assert.throws(()=>definition.render({id:'bad',frame,props}));
 const company=compileDeck({palette:'bain',typography:{display:'Georgia'},pageTemplate:{rules:'bottom'},slides:[{id:'divider',frame,composition:component({id:'divider',component:'section-divider',frame,props:{title:'Section A',mode:'light',companyName:'Company',pageNumber:2}})}]},REGISTRY);
 assert.equal(company.slides[0].nodes.find(n=>n.role==='divider-title').style.fontFamily.value,'Georgia');
 assert.equal(company.slides[0].nodes.filter(n=>n.role==='footer-rule').length,1);

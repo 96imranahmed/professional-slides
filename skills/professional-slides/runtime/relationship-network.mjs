@@ -1,7 +1,7 @@
-import { token, tokenValue, textPrimitive, rectPrimitive, linePrimitive, stableId } from './core.mjs';
+import { token, tokenValue, textPrimitive, rectPrimitive, ellipsePrimitive, linePrimitive, stableId } from './core.mjs';
 import { measureText } from './text-layout.mjs';
 
-export const RELATIONSHIP_NETWORK_TOKENS = Object.freeze(['font.body','type.body','color.ink','color.componentPrimary','color.surface','color.surfaceMuted','color.rule','line.standard','line.hairline','space.1','space.2','space.3','space.4']);
+export const RELATIONSHIP_NETWORK_TOKENS = Object.freeze(['font.body','type.body','color.ink','color.componentPrimary','color.surface','color.surfaceMuted','color.rule','line.standard','line.hairline','space.1','space.2','space.3','space.4','color.accent','color.onPrimary','radius.round','radius.none']);
 const t=token, v=id=>tokenValue(t(id));
 const check=(condition,message)=>{if(!condition)throw new Error(`Relationship network: ${message}`);};
 const required=(value,name)=>check(typeof value==='string'&&value.trim(),`${name} requires nonempty text`);
@@ -41,7 +41,8 @@ function framesFor(model,frame){
   const w=id===model.centerId?centerWidth:width,inner=w-pad*2;
   check(inner>0,'node text width is exhausted');
   const heading=measure(node.label,inner,true),body=node.body?measure(node.body,inner):null;
-  return [id,{heading,body,width:w,height:pad*2+heading.height+(body?g+body.height:0)}];
+  const height=pad*2+heading.height+(body?g+body.height:0);
+  return [id,{heading,body,width:w,height:id===model.centerId?Math.max(height,pad*4+heading.height+(body?g+body.height:0)):height}];
  }));
  const maxHeight=Math.max(...model.ringOrder.map(id=>measured.get(id).height));
  const centerHeight=measured.get(model.centerId).height;
@@ -86,14 +87,23 @@ export function relationshipNetwork({id,frame,props}){
   const from=locations.get(edge.from),to=locations.get(edge.to),a=endpoint(from,center(to),g),b=endpoint(to,center(from),g);
   check(Math.hypot(b.x-a.x,b.y-a.y)>=g*2,`edge ${edge.id} has no clear connector length`);
   for(const [key,rect]of locations)if(key!==edge.from&&key!==edge.to)check(!segmentIntersectsRect(a,b,{x:rect.x-g,y:rect.y-g,width:rect.width+g*2,height:rect.height+g*2}),`edge ${edge.id} crosses unrelated node ${key}; revise topology or enlarge composition`);
-  nodes.push(linePrimitive({id:stableId(id,'edge',edge.id),role:'network-edge',x1:a.x,y1:a.y,x2:b.x,y2:b.y,style:{stroke:t('color.componentPrimary'),lineWidth:t('line.standard')},data:{edgeId:edge.id,from:nodeKey(edge.from),to:nodeKey(edge.to),relation:edge.relation,direction:edge.direction,dependencies:[nodeKey(edge.from),nodeKey(edge.to)],startArrow:edge.direction==='bidirectional',startArrowType:'triangle',endArrow:edge.direction!=='none',endArrowType:'triangle'}}));
+  nodes.push(linePrimitive({id:stableId(id,'edge',edge.id),role:'network-edge',x1:a.x,y1:a.y,x2:b.x,y2:b.y,style:{stroke:t('color.rule'),lineWidth:t('line.standard')},data:{edgeId:edge.id,from:nodeKey(edge.from),to:nodeKey(edge.to),relation:edge.relation,direction:edge.direction,dependencies:[nodeKey(edge.from),nodeKey(edge.to)],startArrow:edge.direction==='bidirectional',startArrowType:'triangle',endArrow:edge.direction!=='none',endArrowType:'triangle'}}));
  }
  for(const [key,node]of model.nodes){
   const box=locations.get(key),m=measured.get(key),isCenter=key===model.centerId;
-  nodes.push(rectPrimitive({id:nodeKey(key),role:'network-node',frame:box,style:{fill:t(isCenter?'color.surfaceMuted':'color.surface'),stroke:t('color.rule'),lineWidth:t('line.hairline')},data:{nodeId:key,position:isCenter?'center':'perimeter',ringIndex:model.ringOrder.indexOf(key),dependencies:[headingKey(key)]}}));
-  const text=(suffix,layout,y,bold)=>textPrimitive({id:stableId(nodeKey(key),suffix),role:'network-node-label',frame:{x:box.x+pad,y,width:box.width-pad*2,height:layout.height},text:layout.text,style:{fontFamily:t('font.body'),fontSize:t('type.body'),color:t('color.ink'),bold,valign:'top',lineHeight:layout.lineHeight,wrap:false},data:{nodeId:key,part:bold?'heading':'body',textLayout:layout,dependencies:[nodeKey(key)]}});
-  nodes.push(text('heading',m.heading,box.y+pad,true));
-  if(m.body)nodes.push(text('body',m.body,box.y+pad+m.heading.height+g,false));
+  // The centre is a filled navy ellipse; perimeter nodes are filled boxes,
+  // navy by default, accent when the node says `tone: "accent"`, outline
+  // when `tone: "outline"`, so a model like the 7S can separate hard from soft.
+  const tone=isCenter?'primary':(node.tone??'primary');
+  const fill=tone==='accent'?t('color.accent'):tone==='outline'?t('color.surface'):t('color.componentPrimary');
+  const onFill=tone==='outline'?t('color.ink'):t('color.onPrimary');
+  const shapeStyle={fill,stroke:tone==='outline'?t('color.componentPrimary'):'none',lineWidth:t('line.standard'),radius:t(isCenter?'radius.round':'radius.none')};
+  const nodeData={nodeId:key,position:isCenter?'center':'perimeter',ringIndex:model.ringOrder.indexOf(key),dependencies:[headingKey(key)],tone};
+  nodes.push(isCenter?ellipsePrimitive({id:nodeKey(key),role:'network-node',frame:box,style:shapeStyle,data:nodeData}):rectPrimitive({id:nodeKey(key),role:'network-node',frame:box,style:shapeStyle,data:nodeData}));
+  const block=m.heading.height+(m.body?g+m.body.height:0), top=box.y+(box.height-block)/2;
+  const text=(suffix,layout,y,bold)=>textPrimitive({id:stableId(nodeKey(key),suffix),role:'network-node-label',frame:{x:box.x+pad,y,width:box.width-pad*2,height:layout.height},text:layout.text,style:{fontFamily:t('font.body'),fontSize:t('type.body'),color:onFill,bold,align:'center',valign:'top',lineHeight:layout.lineHeight,wrap:false},data:{nodeId:key,part:bold?'heading':'body',textLayout:layout,dependencies:[nodeKey(key)]}});
+  nodes.push(text('heading',m.heading,top,true));
+  if(m.body)nodes.push(text('body',m.body,top+m.heading.height+g,false));
  }
  check(new Set(nodes.map(node=>node.id)).size===nodes.length,'generated semantic IDs collide');
  for(const node of nodes)check(node.frame.x>=frame.x-.1&&node.frame.y>=frame.y-.1&&node.frame.x+node.frame.width<=frame.x+frame.width+.1&&node.frame.y+node.frame.height<=frame.y+frame.height+.1,`${node.id} exceeds allocated frame`);

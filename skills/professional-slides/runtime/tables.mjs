@@ -14,7 +14,7 @@ import {
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
-import { numberMarker, stateMarker } from "./marks.mjs";
+import { numberMarker, stateMarker, iconMarker, MARK_TOKENS } from "./marks.mjs";
 
 // One table compiler. Columns select defaults; individual cells may override the
 // encoding (e.g. options as columns with prose and rating rows in the same table).
@@ -84,6 +84,7 @@ export const TABLE_TOKENS = [
 ];
 const t = token,
   v = (key) => tokenValue(t(key));
+TABLE_TOKENS.push(...MARK_TOKENS.filter((id) => !TABLE_TOKENS.includes(id)));
 TABLE_TOKENS.push(
   ...["theme-sequential", "red-white", "red-white-green"].flatMap((p) =>
     Array.from({ length: 11 }, (_, i) => `color.heat.${p}.${i}`),
@@ -499,8 +500,8 @@ function contentLayout(cell, width, props, used) {
   }
   // A numbered section marker sits at the left of its category cell, on the
   // label's centre line, whatever the surface; the label starts after it.
-  const inlineSectionMarker = cell.sectionNumber !== undefined;
-  if (inlineSectionMarker) offset = v("icon.medium") + gap;
+  const inlineSectionMarker = cell.sectionNumber !== undefined || (cell.type === "category" && cell.icon);
+  if (inlineSectionMarker) offset = (cell.icon && cell.sectionNumber === undefined ? Math.round(v("icon.medium") * 1.5) : v("icon.medium")) + gap;
   const blocks = texts.map((s) => measure(s, inner - offset, bold, size));
   const blockHeight = blocks.length
     ? sum(blocks.map((b) => b.height)) + (blocks.length - 1) * gap
@@ -1189,13 +1190,21 @@ function renderTableAt({ id, frame, props }) {
           data: { ...data, sectionNumber: cell.sectionNumber, placement: "inline-start" },
         }));
       }
+      if (cell.type === "category" && cell.icon && cell.sectionNumber === undefined) {
+        // An icon in place of the numbered disc, on the same left edge and centre line.
+        const size = Math.round(m.sectionMarkerSize * 1.5);
+        nodes.push(...iconMarker({ id: stableId(cellId, "icon"), role: "table-cell-icon", x: inner.x, y: inner.y + inner.height / 2 - size / 2, size, icon: cell.icon, tone: fill === primary ? "inverse" : "outline", data: { ...data, icon: cell.icon } }));
+      }
       if (cell.type !== "implication" && r + cell.rowSpan < m.rows.length) {
-        nodes.push(
+        // One continuous rule per row unless the row is a run of filled
+        // category boxes, whose slits are part of the design.
+        const continuous = props.treatment !== "categories" && cell.rowSpan === 1 && !m.columns.some((col) => col.type === "implication");
+        if (!continuous || c === 0) nodes.push(
           line(
             stableId(cellId, "rule"),
             area.x,
             area.y + height,
-            area.x + area.width - m.gap,
+            continuous ? frame.x + frame.width - m.gap : area.x + area.width - m.gap,
             area.y + height,
             "table-rule",
             { ...data, rule: "row" },

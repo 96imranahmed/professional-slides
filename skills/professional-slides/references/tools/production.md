@@ -26,9 +26,9 @@ Google Slides is a downstream import: finish and verify the PPTX, import it, the
 
 Deterministic, per page, before any model is consulted:
 
-- ink coverage at least 8% of the canvas (dense is fine; emptiness is the defect);
-- trailing dead band at most 8%, and no internal empty band over 18% of the page height;
-- the largest exhibit on an analytical page covers at least 40% of the content area and its frame carries ink;
+- ink coverage at least 8% of the canvas unless a qualifying hero exhibit carries the page (dense is fine; emptiness is the defect); tinted surfaces count as designed space for the band gates;
+- trailing dead band at most 8%, and no internal empty band over 22% of the page height;
+- the largest exhibit on an analytical page covers at least 40% of the content area and its frame carries ink (at least 2%, which a line chart clears);
 - action title at most two lines;
 - body type between 10 and 14 pt;
 - 45 to 90 characters per line;

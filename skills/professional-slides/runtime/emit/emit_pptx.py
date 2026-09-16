@@ -65,6 +65,17 @@ NATIVE = {
 }
 
 
+def _luminance(hex_color):
+    """Relative luminance (0..1) of a #RRGGBB colour, for label contrast."""
+    try:
+        h = str(hex_color).lstrip("#")
+        r, g, b = (int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+    except Exception:
+        return 1.0
+    lin = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+
+
 def emu(px: float) -> int:
     return int(round(px * PX))
 
@@ -523,6 +534,15 @@ class Emitter:
             if color and kind not in ("pie", "donut"):
                 fill = ser.format.fill
                 fill.solid(); fill.fore_color.rgb = rgb(color)
+                if kind in ("stacked-column", "stacked-bar") and spec.get("dataLabels", True):
+                    # Segment labels sit inside their segment, white on a dark
+                    # fill and ink on a light one, so every segment reads.
+                    sdl = ser.data_labels
+                    sdl.show_value = True
+                    sdl.number_format = number_format; sdl.number_format_is_linked = False
+                    sdl.font.size = Pt(11); sdl.font.bold = True
+                    sdl.position = XL_LABEL_POSITION.CENTER
+                    sdl.font.color.rgb = rgb(self.colors.get("color.onPrimary", "#FFFFFF") if _luminance(color) < 0.45 else self.colors.get("color.ink", "#000000"))
                 if kind == "line":
                     ser.format.line.color.rgb = rgb(color)
                     ser.format.line.width = Pt(2.25)

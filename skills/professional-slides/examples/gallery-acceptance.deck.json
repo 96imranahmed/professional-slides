@@ -1,24 +1,1194 @@
-{"schema":"professional-slides.deck/v3","id":"gallery-acceptance","palette":"mckinsey","footer":"Acceptance set","agenda":true,
- "cover":{"title":"Five reference pages, rebuilt from the spec","subtitle":"Bar with takeaways · status report · growth chart · project plan · pillars and bridge","date":"September 2026","logo":"Professional slides"},
- "slides":[
-  {"kind":"section","title":"Evidence pages","summary":"A ranked bar with takeaways and a growth projection"},
-  {"title":"Category 7 leads adoption at 92%; the bottom three sit under half","tag":"Illustrative","exhibit":{"type":"chart.bar","heading":"Share of respondents adopting each practice","unit":"Percent, n = 240","categories":["Category 1","Category 2","Category 3","Category 4","Category 5","Category 6","Category 7"],"series":[{"name":"Share","values":[27,34,51,60,68,74,92]}]},
-   "pointsHeading":"Key takeaways","points":[{"lead":"Adoption is concentrated","text":"Three practices account for most of the gap to the leaders."},{"lead":"The bottom three are structural","text":"Each depends on a capability the firm has not built."},{"lead":"Category 7 is the template","text":"Its rollout playbook transfers to categories 1 to 3."}],
-   "soWhat":"Fund the three lagging practices with the category 7 playbook before adding new ones.","source":"Practice survey, June 2026"},
-  {"title":"The market reaches $1.65B by 2030 on a 13% CAGR, led by enterprise","exhibit":{"type":"chart.column","heading":"Global market size projection","unit":"$B","categories":["2024","2025","2026E","2027E","2028E","2029E","2030E"],"series":[{"name":"Market","values":[820,900,990,1090,1220,1400,1650]}],"forecastFrom":"2026E","cagr":{"from":"2024","to":"2030E"}},
-   "pointsHeading":"Comments","points":[{"lead":"Enterprise front-loads the growth","text":"Two-thirds of the 2026 to 2028 increment is enterprise seats."},{"lead":"Consumer follows from 2027","text":"Pricing, not demand, gates the consumer segment."},{"lead":"The 2030 figure assumes no price erosion","text":"Every 5% of erosion removes $80M from the endpoint."}],
-   "source":"Company estimates; industry reports; expert interviews"},
-  {"kind":"section","title":"Programme pages","summary":"A status report and a sixteen-week plan"},
-  {"title":"Alpha and Beta wait on a vendor decision; the other four hold their dates","tag":"Status, May 2024",
-   "exhibit":{"type":"table","columns":["#","Workstream","Owner","Phase","Overall status","% complete","Key update / next steps"],
-    "rows":[["1","Stream Alpha","J. Smith","Requirements","At risk","40%","Delayed on vendor dependencies; mitigation in progress"],["2","Stream Beta","S. Johnson","Design","At risk","30%","Scope changes under review; new plan next week"],["3","Stream Gamma","M. Lee","Development","Behind plan","45%","Resource constraints; hiring in progress"],["4","Stream Delta","E. Davis","Development","On track","60%","Requirements approved; on schedule"],["5","Stream Epsilon","D. Brown","Testing","On track","55%","Steady progress; no blockers"],["6","Stream Zeta","L. Wilson","Deployment","Complete","100%","Deployment plan finalised"]]},
-   "soWhat":"Alpha and Beta need the vendor decision this week; everything else holds its dates.","note":"Percent complete and dates are based on the latest available data"},
-  {"title":"Sixteen weeks in three phases, with go-live in week 14","exhibit":{"type":"gantt","periods":["W1","W2","W3","W4","W5","W6","W7","W8","W9","W10","W11","W12","W13","W14","W15","W16"],"tiers":[{"label":"Phase 1 · Assess","from":0,"to":3},{"label":"Phase 2 · Design","from":4,"to":8},{"label":"Phase 3 · Implement","from":9,"to":15}],"today":5.5,
-   "groups":[{"name":"Assess","rows":[{"label":"Stakeholder interviews","from":0,"to":3,"text":"24 interviews"},{"label":"Data baseline","from":1,"to":4}]},{"name":"Design","rows":[{"label":"Target operating model","from":4,"to":8,"text":"Two design sprints"},{"label":"Business case","from":6,"to":9,"milestones":[{"at":9,"label":"SteerCo"}]}]},{"name":"Implement","rows":[{"label":"Pilot in two sites","from":9,"to":13,"text":"Pilot"},{"label":"Scale to all sites","from":12,"to":16,"tone":"accent","milestones":[{"at":14,"label":"Go-live"}]},{"label":"Benefits tracking","from":10,"to":16}]}]},
-   "soWhat":"The design sprints must finish by week 8 or go-live slips a quarter."},
-  {"kind":"section","title":"Strategy pages","summary":"Pillars with a value bridge"},
-  {"title":"Self-serve and unit-cost takeout add $1.1B of run-rate profit by 2030","titleLead":"Drive",
-   "exhibits":[{"type":"cards","tone":"numbered","items":[{"title":"Drive self-serve mix","text":"Increase adoption and channel mix across the base."},{"title":"Scale product","text":"Expand value and use cases in the top accounts."},{"title":"Optimise unit cost","text":"Automate and simplify delivery."}]},
-              {"type":"chart.waterfall","heading":"Value bridge to 2030","unit":"$B, annual run rate","categories":["2024 baseline","Self-serve mix","Unit cost","2030 ambition"],"values":[1.0,0.9,0.2,2.1],"totals":[0,3]}],
-   "soWhat":"Prioritise self-serve mix and product scaling, funded by disciplined unit-cost takeout.","source":"Company analysis"}
- ]}
+{
+ "schema": "professional-slides.deck/v3",
+ "id": "gallery-acceptance",
+ "palette": "mckinsey",
+ "footer": "Acceptance set",
+ "agenda": true,
+ "cover": {
+  "title": "Five reference pages, rebuilt from the spec",
+  "subtitle": "Bar with takeaways · status report · growth chart · project plan · pillars and bridge",
+  "date": "September 2026",
+  "logo": "Professional slides"
+ },
+ "slides": [
+  {
+   "kind": "section",
+   "title": "Evidence pages",
+   "summary": "A ranked bar with takeaways and a growth projection"
+  },
+  {
+   "title": "Category 7 leads adoption at 92%; the bottom three sit under half",
+   "tag": "Illustrative",
+   "exhibit": {
+    "type": "chart.bar",
+    "heading": "Share of respondents adopting each practice",
+    "unit": "Percent, n = 240",
+    "categories": [
+     "Category 1",
+     "Category 2",
+     "Category 3",
+     "Category 4",
+     "Category 5",
+     "Category 6",
+     "Category 7"
+    ],
+    "series": [
+     {
+      "name": "Share",
+      "values": [
+       27,
+       34,
+       51,
+       60,
+       68,
+       74,
+       92
+      ]
+     }
+    ]
+   },
+   "pointsHeading": "Key takeaways",
+   "points": [
+    {
+     "lead": "Adoption is concentrated",
+     "text": "Three practices account for most of the gap to the leaders."
+    },
+    {
+     "lead": "The bottom three are structural",
+     "text": "Each depends on a capability the firm has not built."
+    },
+    {
+     "lead": "Category 7 is the template",
+     "text": "Its rollout playbook transfers to categories 1 to 3."
+    }
+   ],
+   "soWhat": "Fund the three lagging practices with the category 7 playbook before adding new ones.",
+   "source": "Practice survey, June 2026"
+  },
+  {
+   "title": "The market reaches $1.65B by 2030 on a 13% CAGR, led by enterprise",
+   "exhibit": {
+    "type": "chart.column",
+    "heading": "Global market size projection",
+    "unit": "$B",
+    "categories": [
+     "2024",
+     "2025",
+     "2026E",
+     "2027E",
+     "2028E",
+     "2029E",
+     "2030E"
+    ],
+    "series": [
+     {
+      "name": "Market",
+      "values": [
+       820,
+       900,
+       990,
+       1090,
+       1220,
+       1400,
+       1650
+      ]
+     }
+    ],
+    "forecastFrom": "2026E",
+    "cagr": {
+     "from": "2024",
+     "to": "2030E"
+    }
+   },
+   "pointsHeading": "Comments",
+   "points": [
+    {
+     "lead": "Enterprise front-loads the growth",
+     "text": "Two-thirds of the 2026 to 2028 increment is enterprise seats."
+    },
+    {
+     "lead": "Consumer follows from 2027",
+     "text": "Pricing, not demand, gates the consumer segment."
+    },
+    {
+     "lead": "The 2030 figure assumes no price erosion",
+     "text": "Every 5% of erosion removes $80M from the endpoint."
+    }
+   ],
+   "source": "Company estimates; industry reports; expert interviews"
+  },
+  {
+   "kind": "section",
+   "title": "Programme pages",
+   "summary": "A status report and a sixteen-week plan"
+  },
+  {
+   "title": "Alpha and Beta wait on a vendor decision; the other four hold their dates",
+   "tag": "Status, May 2024",
+   "exhibit": {
+    "type": "table",
+    "columns": [
+     "#",
+     "Workstream",
+     "Owner",
+     "Phase",
+     "Overall status",
+     "% complete",
+     "Key update / next steps"
+    ],
+    "rows": [
+     [
+      "1",
+      "Stream Alpha",
+      "J. Smith",
+      "Requirements",
+      "At risk",
+      "40%",
+      "Delayed on vendor dependencies; mitigation in progress"
+     ],
+     [
+      "2",
+      "Stream Beta",
+      "S. Johnson",
+      "Design",
+      "At risk",
+      "30%",
+      "Scope changes under review; new plan next week"
+     ],
+     [
+      "3",
+      "Stream Gamma",
+      "M. Lee",
+      "Development",
+      "Behind plan",
+      "45%",
+      "Resource constraints; hiring in progress"
+     ],
+     [
+      "4",
+      "Stream Delta",
+      "E. Davis",
+      "Development",
+      "On track",
+      "60%",
+      "Requirements approved; on schedule"
+     ],
+     [
+      "5",
+      "Stream Epsilon",
+      "D. Brown",
+      "Testing",
+      "On track",
+      "55%",
+      "Steady progress; no blockers"
+     ],
+     [
+      "6",
+      "Stream Zeta",
+      "L. Wilson",
+      "Deployment",
+      "Complete",
+      "100%",
+      "Deployment plan finalised"
+     ]
+    ]
+   },
+   "soWhat": "Alpha and Beta need the vendor decision this week; everything else holds its dates.",
+   "note": "Percent complete and dates are based on the latest available data"
+  },
+  {
+   "title": "Sixteen weeks in three phases, with go-live in week 14",
+   "exhibit": {
+    "type": "gantt",
+    "periods": [
+     "W1",
+     "W2",
+     "W3",
+     "W4",
+     "W5",
+     "W6",
+     "W7",
+     "W8",
+     "W9",
+     "W10",
+     "W11",
+     "W12",
+     "W13",
+     "W14",
+     "W15",
+     "W16"
+    ],
+    "tiers": [
+     {
+      "label": "Phase 1 · Assess",
+      "from": 0,
+      "to": 3
+     },
+     {
+      "label": "Phase 2 · Design",
+      "from": 4,
+      "to": 8
+     },
+     {
+      "label": "Phase 3 · Implement",
+      "from": 9,
+      "to": 15
+     }
+    ],
+    "today": 5.5,
+    "groups": [
+     {
+      "name": "Assess",
+      "rows": [
+       {
+        "label": "Stakeholder interviews",
+        "from": 0,
+        "to": 3,
+        "text": "24 interviews"
+       },
+       {
+        "label": "Data baseline",
+        "from": 1,
+        "to": 4
+       }
+      ]
+     },
+     {
+      "name": "Design",
+      "rows": [
+       {
+        "label": "Target operating model",
+        "from": 4,
+        "to": 8,
+        "text": "Two design sprints"
+       },
+       {
+        "label": "Business case",
+        "from": 6,
+        "to": 9,
+        "milestones": [
+         {
+          "at": 9,
+          "label": "SteerCo"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "Implement",
+      "rows": [
+       {
+        "label": "Pilot in two sites",
+        "from": 9,
+        "to": 13,
+        "text": "Pilot"
+       },
+       {
+        "label": "Scale to all sites",
+        "from": 12,
+        "to": 16,
+        "tone": "accent",
+        "milestones": [
+         {
+          "at": 14,
+          "label": "Go-live"
+         }
+        ]
+       },
+       {
+        "label": "Benefits tracking",
+        "from": 10,
+        "to": 16
+       }
+      ]
+     }
+    ]
+   },
+   "soWhat": "The design sprints must finish by week 8 or go-live slips a quarter."
+  },
+  {
+   "kind": "section",
+   "title": "Strategy pages",
+   "summary": "Pillars with a value bridge"
+  },
+  {
+   "title": "Self-serve and unit-cost takeout add $1.1B of run-rate profit by 2030",
+   "titleLead": "Drive",
+   "exhibits": [
+    {
+     "type": "cards",
+     "tone": "numbered",
+     "items": [
+      {
+       "title": "Drive self-serve mix",
+       "text": "Increase adoption and channel mix across the base."
+      },
+      {
+       "title": "Scale product",
+       "text": "Expand value and use cases in the top accounts."
+      },
+      {
+       "title": "Optimise unit cost",
+       "text": "Automate and simplify delivery."
+      }
+     ]
+    },
+    {
+     "type": "chart.waterfall",
+     "heading": "Value bridge to 2030",
+     "unit": "$B, annual run rate",
+     "categories": [
+      "2024 baseline",
+      "Self-serve mix",
+      "Unit cost",
+      "2030 ambition"
+     ],
+     "values": [
+      1.0,
+      0.9,
+      0.2,
+      2.1
+     ],
+     "totals": [
+      0,
+      3
+     ]
+    }
+   ],
+   "soWhat": "Prioritise self-serve mix and product scaling, funded by disciplined unit-cost takeout.",
+   "source": "Company analysis"
+  },
+  {
+   "kind": "section",
+   "title": "Process and structure pages",
+   "summary": "Big-number steps, chevron phases, cycles, staircases, houses and hubs"
+  },
+  {
+   "title": "The Blueprint phase has three steps, each closing with a stakeholder decision",
+   "exhibit": {
+    "type": "cards",
+    "tone": "big-number",
+    "items": [
+     {
+      "title": "Lay out first-guess blueprint",
+      "text": "Map the platform business model and structure for the initial blueprint.",
+      "points": [
+       "Onboard the project team",
+       "Engage relevant stakeholders",
+       "Map all elements in a first best-guess version"
+      ]
+     },
+     {
+      "title": "Gather and analyse data",
+      "text": "Gather internal and external data to fill out and validate the blueprint.",
+      "points": [
+       "Collect data from desk research and client insights",
+       "Set up external interviews",
+       "Validate blueprint hypotheses"
+      ]
+     },
+     {
+      "title": "Synthesise findings for pilot",
+      "text": "Build the detailed project plan for the pilot phase.",
+      "points": [
+       "Ensure there are no red flags",
+       "Discuss the revised blueprint",
+       "Plan the pilot in detail and prepare to start"
+      ]
+     }
+    ]
+   },
+   "soWhat": "Week 6 is the gate: no pilot starts without a validated blueprint."
+  },
+  {
+   "title": "Each customer stage has one owner and two deliverables",
+   "exhibit": {
+    "type": "phase-table",
+    "phases": [
+     "Awareness",
+     "Consideration",
+     "Purchase",
+     "Onboarding",
+     "Retention"
+    ],
+    "rows": [
+     {
+      "label": "Owner",
+      "cells": [
+       "Marketing",
+       "Marketing",
+       "Sales",
+       "Customer success",
+       "Customer success"
+      ]
+     },
+     {
+      "label": "Deliverables",
+      "cells": [
+       [
+        "Campaign calendar",
+        "Content library"
+       ],
+       [
+        "Product tours",
+        "Comparison guides"
+       ],
+       [
+        "Quote in 24 hours",
+        "Signed order form"
+       ],
+       [
+        "Kick-off call",
+        "Set-up checklist"
+       ],
+       [
+        "Quarterly review",
+        "Renewal offer"
+       ]
+      ]
+     },
+     {
+      "label": "Metric",
+      "cells": [
+       "Qualified visits",
+       "Trial starts",
+       "Win rate",
+       "Time to first value",
+       "Net retention"
+      ]
+     }
+    ]
+   },
+   "soWhat": "Purchase is the only stage without a named success metric today; add win rate to the dashboard."
+  },
+  {
+   "title": "Improvement runs as a five-step cycle that repeats every quarter",
+   "exhibit": {
+    "type": "cycle",
+    "center": "Quarterly cycle",
+    "items": [
+     {
+      "label": "Measure",
+      "text": "Baseline the metric"
+     },
+     {
+      "label": "Diagnose",
+      "text": "Find the root cause"
+     },
+     {
+      "label": "Design",
+      "text": "Choose the fix"
+     },
+     {
+      "label": "Pilot",
+      "text": "Test on one site"
+     },
+     {
+      "label": "Scale",
+      "text": "Roll out and lock in"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "One loop, one fix",
+     "text": "Each loop closes with a scaled fix, not a report"
+    },
+    {
+     "lead": "Diagnosis gets an owner",
+     "text": "It is the step teams skip, so it is named on the plan"
+    },
+    {
+     "lead": "First loop in January",
+     "text": "Site 3 starts the cycle on the on-time delivery metric"
+    }
+   ],
+   "pointsHeading": "How it runs"
+  },
+  {
+   "title": "Six milestones take the platform from pilot to full launch in 2027",
+   "exhibit": {
+    "type": "steps",
+    "items": [
+     {
+      "label": "Pilot",
+      "text": "Two sites, Q1 2026"
+     },
+     {
+      "label": "Validate",
+      "text": "Unit economics signed off"
+     },
+     {
+      "label": "Scale region",
+      "text": "Twelve sites, Q3 2026"
+     },
+     {
+      "label": "Integrate",
+      "text": "ERP and billing connected"
+     },
+     {
+      "label": "National launch",
+      "text": "All sites, Q1 2027"
+     },
+     {
+      "label": "Optimise",
+      "text": "Continuous improvement"
+     }
+    ]
+   },
+   "soWhat": "Validation in Q2 is the go/no-go; everything after it is execution."
+  },
+  {
+   "title": "The ambition rests on three levers over a shared data foundation",
+   "exhibit": {
+    "type": "framework",
+    "variant": "house",
+    "roof": "Double annual contract value by 2028",
+    "pillars": [
+     {
+      "title": "Expand accounts",
+      "points": [
+       "Cross-sell to the top 200",
+       "Enterprise pricing tier"
+      ]
+     },
+     {
+      "title": "Win new segments",
+      "points": [
+       "Mid-market motion",
+       "Two partner channels"
+      ]
+     },
+     {
+      "title": "Retain and renew",
+      "points": [
+       "Success playbooks",
+       "Usage alerts"
+      ]
+     }
+    ],
+    "foundation": "One customer data platform and a single pricing engine",
+    "highlight": 1
+   },
+   "soWhat": "New segments carry half the growth and none of the current capability; fund that pillar first."
+  },
+  {
+   "title": "Shared values sit at the centre of the seven elements",
+   "exhibit": {
+    "type": "relationship-network",
+    "variant": "hub-ring",
+    "centerId": "values",
+    "nodes": [
+     {
+      "id": "values",
+      "label": "Shared values"
+     },
+     {
+      "id": "strategy",
+      "label": "Strategy",
+      "tone": "accent"
+     },
+     {
+      "id": "structure",
+      "label": "Structure",
+      "tone": "accent"
+     },
+     {
+      "id": "systems",
+      "label": "Systems",
+      "tone": "accent"
+     },
+     {
+      "id": "style",
+      "label": "Style"
+     },
+     {
+      "id": "staff",
+      "label": "Staff"
+     },
+     {
+      "id": "skills",
+      "label": "Skills"
+     }
+    ],
+    "ringOrder": [
+     "strategy",
+     "structure",
+     "systems",
+     "style",
+     "staff",
+     "skills"
+    ],
+    "edges": [
+     {
+      "from": "values",
+      "to": "strategy",
+      "relation": "shapes",
+      "direction": "none"
+     },
+     {
+      "from": "values",
+      "to": "structure",
+      "relation": "shapes",
+      "direction": "none"
+     },
+     {
+      "from": "values",
+      "to": "systems",
+      "relation": "shapes",
+      "direction": "none"
+     },
+     {
+      "from": "values",
+      "to": "style",
+      "relation": "shapes",
+      "direction": "none"
+     },
+     {
+      "from": "values",
+      "to": "staff",
+      "relation": "shapes",
+      "direction": "none"
+     },
+     {
+      "from": "values",
+      "to": "skills",
+      "relation": "shapes",
+      "direction": "none"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Hard elements",
+     "text": "Strategy, structure and systems (blue) are set by leadership"
+    },
+    {
+     "lead": "Soft elements",
+     "text": "Style, staff and skills move only when the hard ones do"
+    },
+    {
+     "lead": "The audit",
+     "text": "Scores each element 1–5 against the target state"
+    }
+   ],
+   "pointsHeading": "Reading the model"
+  },
+  {
+   "kind": "section",
+   "title": "Comparison pages",
+   "summary": "Options, SWOT, before and after, and people"
+  },
+  {
+   "title": "Option B wins on fit and speed; only cost favours the status quo",
+   "exhibit": {
+    "type": "table",
+    "recommended": "Option B",
+    "columns": [
+     "Criterion",
+     "Status quo",
+     "Option A",
+     "Option B"
+    ],
+    "rows": [
+     [
+      "Strategic fit",
+      "✗",
+      "✓",
+      "✓"
+     ],
+     [
+      "Time to value",
+      "18 months",
+      "12 months",
+      "6 months"
+     ],
+     [
+      "Capex",
+      "$0",
+      "$4M",
+      "$6M"
+     ],
+     [
+      "Run cost",
+      "$9M",
+      "$7M",
+      "$5M"
+     ],
+     [
+      "Risk",
+      "Low",
+      "Medium",
+      "Medium"
+     ]
+    ]
+   },
+   "soWhat": "Option B pays back its extra $2M of capex within its first year of run-cost savings."
+  },
+  {
+   "title": "Strengths in product are offset by a thin bench in two regions",
+   "exhibit": {
+    "type": "swot",
+    "strengths": [
+     "Best-rated product in the category",
+     "Net retention above 120%"
+    ],
+    "weaknesses": [
+     "Two regions without a country lead",
+     "Manual onboarding"
+    ],
+    "opportunities": [
+     "Mid-market segment growing 20% a year",
+     "Partner channel untapped"
+    ],
+    "threats": [
+     "Two funded entrants",
+     "Pricing pressure in enterprise"
+    ]
+   },
+   "soWhat": "Hire the two country leads before the mid-market push, or the growth lands on an empty bench."
+  },
+  {
+   "title": "The new operating model moves decisions from the centre to the regions",
+   "exhibit": {
+    "type": "compare",
+    "left": {
+     "heading": "Today",
+     "points": [
+      "Pricing set centrally, quarterly",
+      "Regional P&L reported, not owned",
+      "Hiring approved by group HR"
+     ]
+    },
+    "right": {
+     "heading": "From 2027",
+     "points": [
+      "Regions set price within a corridor",
+      "Regional GMs own the P&L",
+      "Hiring within budget needs no group sign-off"
+     ]
+    }
+   },
+   "callout": {
+    "lead": "How to read",
+    "text": "Each row pairs one decision right today with where it sits after the change."
+   }
+  },
+  {
+   "title": "Three value propositions, each with proof from the last two years",
+   "rows": [
+    {
+     "label": "Functional expertise",
+     "icon": "target",
+     "text": "Fourteen commercial-excellence projects in the sector since 2024, including two for direct competitors."
+    },
+    {
+     "label": "Local network",
+     "icon": "people",
+     "text": "Offices in all three target markets with partners who have run the regulator conversations before."
+    },
+    {
+     "label": "Delivery track record",
+     "icon": "checklist",
+     "text": "Every engagement since 2023 delivered on the agreed date with the agreed team."
+    }
+   ],
+   "soWhat": "The network is the differentiator: no other bidder has partners in all three markets."
+  },
+  {
+   "title": "The core team brings sector, technology and change experience",
+   "exhibit": {
+    "type": "people",
+    "items": [
+     {
+      "name": "A. Khan",
+      "role": "Engagement lead",
+      "points": [
+       "12 years in retail banking",
+       "Led the 2023 core migration"
+      ]
+     },
+     {
+      "name": "B. Ortiz",
+      "role": "Technology lead",
+      "points": [
+       "Platform architect",
+       "Cloud programmes at two banks"
+      ]
+     },
+     {
+      "name": "C. Lee",
+      "role": "Change lead",
+      "points": [
+       "Operating-model design",
+       "Front-line adoption at scale"
+      ]
+     },
+     {
+      "name": "D. Novak",
+      "role": "Analytics",
+      "points": [
+       "Pricing and value models",
+       "Data platform build"
+      ]
+     }
+    ]
+   },
+   "soWhat": "All four have worked together on a live migration; the team needs no forming time."
+  },
+  {
+   "title": "Four capabilities carry the go-to-market plan",
+   "exhibit": {
+    "type": "cards",
+    "tone": "dark",
+    "items": [
+     {
+      "icon": "search",
+      "title": "Market insight",
+      "text": "Segment sizing, buyer research and win-loss analysis."
+     },
+     {
+      "icon": "megaphone",
+      "title": "Demand generation",
+      "text": "Campaigns, content and events tied to pipeline targets."
+     },
+     {
+      "icon": "handshake",
+      "title": "Partner channel",
+      "text": "Two resellers per region with joint plans."
+     },
+     {
+      "icon": "chart-line",
+      "title": "Revenue operations",
+      "text": "Pipeline hygiene, forecasting and pricing control."
+     }
+    ]
+   },
+   "soWhat": "Revenue operations is the one capability nobody owns today; appoint the lead before the campaign launch."
+  },
+  {
+   "title": "Three entry countries, three different reasons to go",
+   "exhibit": {
+    "type": "cards",
+    "tone": "columns",
+    "items": [
+     {
+      "title": "Germany",
+      "text": "The largest market in the region and the slowest to enter.",
+      "points": [
+       "Two partner conversations under way",
+       "Regulation mirrors the home market",
+       "Eighteen months to first revenue"
+      ]
+     },
+     {
+      "title": "Belgium",
+      "text": "The smallest market and the fastest proof of the playbook.",
+      "points": [
+       "Existing customer base of 14",
+       "Language coverage from the Dutch team",
+       "Six months to first revenue"
+      ]
+     },
+     {
+      "title": "Netherlands",
+      "text": "The most digital market, with a gap left by a competitor's exit.",
+      "points": [
+       "Competitor exit in 2025",
+       "Pricing headroom of 10–15%",
+       "Twelve months to first revenue"
+      ]
+     }
+    ]
+   },
+   "soWhat": "Belgium first: it proves the playbook in six months at a tenth of the German cost."
+  },
+  {
+   "title": "The Growth plan doubles seats at a lower cost per seat",
+   "exhibit": {
+    "type": "cards",
+    "tone": "disc",
+    "items": [
+     {
+      "icon": "person",
+      "title": "Starter",
+      "value": "$12",
+      "text": "Per seat per month, up to 10 seats"
+     },
+     {
+      "icon": "people",
+      "title": "Growth",
+      "value": "$9",
+      "text": "Per seat per month, 11 to 100 seats"
+     },
+     {
+      "icon": "building",
+      "title": "Enterprise",
+      "value": "Custom",
+      "text": "Annual contract, dedicated support"
+     }
+    ]
+   },
+   "soWhat": "Move the 40 accounts sitting at 10 seats onto Growth; each one is a price cut that pays for itself in expansion."
+  },
+  {
+   "kind": "section",
+   "title": "More evidence pages",
+   "summary": "Composition, trajectory, bridge, KPIs and a map"
+  },
+  {
+   "title": "Enterprise grows from a third to over half of revenue by 2028",
+   "exhibit": {
+    "type": "chart.stacked-column",
+    "heading": "Revenue by segment",
+    "unit": "$M",
+    "categories": [
+     "2024",
+     "2025",
+     "2026E",
+     "2027E",
+     "2028E"
+    ],
+    "series": [
+     {
+      "name": "Enterprise",
+      "values": [
+       40,
+       58,
+       84,
+       120,
+       165
+      ]
+     },
+     {
+      "name": "Mid-market",
+      "values": [
+       50,
+       60,
+       70,
+       80,
+       90
+      ]
+     },
+     {
+      "name": "SMB",
+      "values": [
+       30,
+       32,
+       34,
+       35,
+       36
+      ]
+     }
+    ],
+    "stackTotals": [
+     {
+      "category": "2024",
+      "value": 120
+     },
+     {
+      "category": "2025",
+      "value": 150
+     },
+     {
+      "category": "2026E",
+      "value": 188
+     },
+     {
+      "category": "2027E",
+      "value": 235
+     },
+     {
+      "category": "2028E",
+      "value": 291
+     }
+    ]
+   },
+   "points": [
+    "Enterprise adds $125M of the $171M of growth",
+    "SMB is flat by design; it is the acquisition funnel",
+    "Mid-market grows with headcount, not price"
+   ],
+   "source": "Company plan, September 2026"
+  },
+  {
+   "title": "Churn fell below 5% in Q3 for the first time since launch",
+   "exhibit": {
+    "type": "chart.line",
+    "heading": "Quarterly logo churn",
+    "unit": "%",
+    "categories": [
+     "Q1 2025",
+     "Q2 2025",
+     "Q3 2025",
+     "Q4 2025",
+     "Q1 2026",
+     "Q2 2026",
+     "Q3 2026"
+    ],
+    "series": [
+     {
+      "name": "Churn",
+      "values": [
+       8.1,
+       7.6,
+       7.2,
+       6.4,
+       5.8,
+       5.3,
+       4.7
+      ]
+     }
+    ]
+   },
+   "points": [
+    "The success playbook launched in Q4 2025",
+    "Usage alerts caught 60% of at-risk accounts in Q2",
+    "Target is 4% by Q2 2027"
+   ],
+   "source": "CRM extract, 1 October 2026"
+  },
+  {
+   "title": "Price and mix explain most of the margin gain; volume was flat",
+   "exhibit": {
+    "type": "chart.waterfall",
+    "heading": "EBITDA bridge, FY25 to FY26",
+    "unit": "$M",
+    "categories": [
+     "FY25",
+     "Price",
+     "Mix",
+     "Volume",
+     "Cost",
+     "FY26"
+    ],
+    "values": [
+     42,
+     9,
+     6,
+     1,
+     -4,
+     54
+    ],
+    "totals": [
+     0,
+     5
+    ]
+   },
+   "points": [
+    "Price held through two rounds of increases",
+    "Mix improved as enterprise share rose",
+    "Cost inflation absorbed $4M"
+   ],
+   "source": "Management accounts FY26"
+  },
+  {
+   "title": "Three numbers define the year: seats, retention and cost to serve",
+   "metrics": [
+    {
+     "value": "41k",
+     "label": "Paid seats",
+     "delta": "+18%"
+    },
+    {
+     "value": "118%",
+     "label": "Net retention",
+     "delta": "+6 pp"
+    },
+    {
+     "value": "$31",
+     "label": "Cost to serve per seat",
+     "delta": "−12%"
+    }
+   ],
+   "exhibit": {
+    "type": "chart.column",
+    "heading": "Paid seats by quarter",
+    "unit": "Thousand",
+    "categories": [
+     "Q1",
+     "Q2",
+     "Q3",
+     "Q4"
+    ],
+    "series": [
+     {
+      "name": "Seats",
+      "values": [
+       34,
+       36,
+       38.5,
+       41
+      ]
+     }
+    ]
+   },
+   "source": "Company data, FY26"
+  },
+  {
+   "title": "We aim to enter Spain, Poland and Brazil by the end of 2027",
+   "exhibit": {
+    "type": "map",
+    "geography": "world",
+    "highlightCountries": [
+     "ESP",
+     "POL",
+     "BRA"
+    ],
+    "markers": [
+     {
+      "country": "ESP",
+      "label": "Spain",
+      "number": 1
+     },
+     {
+      "country": "POL",
+      "label": "Poland",
+      "number": 2
+     },
+     {
+      "country": "BRA",
+      "label": "Brazil",
+      "number": 3
+     }
+    ]
+   },
+   "metrics": [
+    {
+     "value": "$2.1B",
+     "label": "Addressable market"
+    },
+    {
+     "value": "3",
+     "label": "New countries"
+    },
+    {
+     "value": "2027",
+     "label": "Full coverage"
+    }
+   ],
+   "metricsPosition": "bottom",
+   "source": "Company analysis"
+  },
+  {
+   "title": "The board asks three questions before any further investment",
+   "points": [
+    {
+     "lead": "Is the pilot paying back?",
+     "text": "Unit economics at the two pilot sites against the plan, with the variance explained."
+    },
+    {
+     "lead": "Can the platform scale?",
+     "text": "Load, integration and support capacity at twelve sites, evidenced by the Q3 test."
+    },
+    {
+     "lead": "Who owns the outcome?",
+     "text": "One accountable executive per region with a signed target."
+    }
+   ],
+   "callout": "Answers are due at the December board; the paper goes to the committee two weeks before.",
+   "soWhat": "A yes on all three releases the $6M; a no on any one of them pauses the national launch."
+  }
+ ]
+}

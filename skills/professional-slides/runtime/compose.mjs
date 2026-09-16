@@ -61,15 +61,16 @@ function tableAlias(ex) {
     const l = left.points || (left.text ? [left.text] : []), r = right.points || (right.text ? [right.text] : []);
     const n = Math.max(l.length, r.length);
     const rows = Array.from({ length: n }, (_, i) => [l[i] ?? "", r[i] ?? ""].map((cell) => (typeof cell === "string" && !cell.trim() ? { type: "text", text: " " } : cell)));
-    return { type: "table", treatment: "standard", variant: "standard", columns: [{ label: left.heading || "Before", type: "text" }, { label: right.heading || "After", type: "text" }], rows, density: ex.density };
+    return { type: "table", treatment: "standard", variant: "standard", highlightColumn: 1, columns: [{ label: left.heading || "Before", type: "text" }, { label: right.heading || "After", type: "text" }], rows, density: ex.density };
   }
   if (ex.type === "phase-table") {
     const phases = ex.phases || ex.columns || [];
     const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label }, ...phases.map((_, i) => { const cell = (row.cells || [])[i]; return Array.isArray(cell) ? { type: "bullets", items: cell } : cell ?? " "; })]);
-    return { type: "table", treatment: "dimensions", variant: "standard", headerShape: "chevron", columns: [{ label: "", type: "category", width: 110 }, ...phases.map((ph) => ({ label: typeof ph === "string" ? ph : ph.label, type: "text", width: 200 }))], rows, density: ex.density };
+    const labelWidth = Math.max(110, ...(ex.rows || []).map((row) => Math.ceil(measureText(String(row.label || ""), 400, { fontFamily: "Arial", fontSize: 14, bold: true, wrapWidthRatio: 1 }).width) + 32));
+    return { type: "table", treatment: "dimensions", variant: "standard", headerShape: "chevron", columns: [{ label: "", type: "category", width: labelWidth }, ...phases.map((ph) => ({ label: typeof ph === "string" ? ph : ph.label, type: "text", width: 200 }))], rows, density: ex.density };
   }
   if (ex.type === "rows") {
-    const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label, ...(row.number ? { sectionNumber: row.number } : {}) }, Array.isArray(row.points) ? { type: "bullets", items: row.points } : row.text]);
+    const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label, ...(row.number ? { sectionNumber: row.number } : {}), ...(row.icon ? { icon: row.icon } : {}) }, Array.isArray(row.points) ? { type: "bullets", items: row.points } : row.text]);
     return { type: "table", treatment: "categories", variant: "standard", columns: [{ label: "", type: "category", width: 200 }, { label: "", type: "text", width: 800 }], rows, density: ex.density };
   }
   return ex;
@@ -79,7 +80,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
   const ex = tableAlias(exIn);
   const { type, layout: _l, ...rest } = ex;
   if (type === "image") return { id, component: "image-frame", props: imageProps(ex.path ? ex : ex.image, baseDir), size };
-  if (type === "cards" || type === "quadrants") return { id, component: type, props: rest, size };
+  if (type === "cards" || type === "quadrants") { const { centre, ...sz } = size; return { id, component: type, props: { ...rest, ...(centre ? { valign: "middle" } : {}) }, size: sz }; }
   if (type === "swot") return { id, component: "quadrants", props: { quadrants: ["Strengths", "Weaknesses", "Opportunities", "Threats"].map((title, i) => ({ title, points: [rest.strengths, rest.weaknesses, rest.opportunities, rest.threats][i] || [] })) }, size };
   if (type === "table") {
     const styled = styleTable(rest);
@@ -97,6 +98,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
     delete props.change;
     return { id, component: type, props, size };
   }
+  if (type === "relationship-network" && Array.isArray(rest.edges)) rest.edges = rest.edges.map((e, i) => ({ id: `${e.from}-${e.to}-${i}`, direction: "none", relation: "relates-to", ...e }));
   return { id, component: type, props: rest, size };
 }
 
@@ -105,8 +107,11 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
  * rule line, so content starts level across the row. Charts bring their own
  * heading (chart-title); anything else is wrapped in a headed section.
  */
+const DIAGRAM_TYPES = ["cards", "quadrants", "swot", "metrics", "cycle", "steps", "people", "logos", "framework", "relationship-network", "map", "process", "chevron-process", "timeline", "roadmap", "tree", "organization", "funnel", "matrix", "journey", "image"];
+/** A diagram carries no heading band unless the author gives it one; its side column then centres instead. */
+function unheaded(ex) { return DIAGRAM_TYPES.includes(ex.type) && !ex.panelHeading; }
 function headedPanel(ex, item, id) {
-  if (["cards", "quadrants", "swot", "metrics"].includes(ex.type) && !ex.panelHeading) return item;
+  if (unheaded(ex)) return item;
   if (String(ex.type).startsWith("chart.")) {
     if (ex.panelHeading && !ex.heading) item.props.heading = ex.panelHeading;
     return item;
@@ -149,7 +154,7 @@ export function styleTable(ex) {
   // The recommended option's column is tinted end to end.
   const recommended = ex.recommended !== undefined ? columns.findIndex((c) => String(c.label).trim().toLowerCase() === String(ex.recommended).trim().toLowerCase()) : -1;
   if (ex.recommended !== undefined && recommended < 0) throw new Error(`Table recommended column "${ex.recommended}" is not a column label`);
-  const extra = recommended >= 0 ? { highlightColumn: recommended } : {};
+  const extra = recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {};
   // A "Total …" row at the end is the accent total band.
   rowsIn.forEach((r, i) => {
     if (Array.isArray(r) && i === rowsIn.length - 1 && /^total\b/i.test(String(r[0]?.text ?? r[0] ?? ""))) rowsIn[i] = { style: "total", cells: r };
@@ -317,7 +322,7 @@ function highlightFromTitle(ex, title) {
  */
 const PERIOD_CATEGORY = /(?:19|20)\d{2}|^FY\s?\d{2,4}|^[QH][1-4]\b|^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b|^(?:Current|Today|Now|Baseline|Before|Future|Target|After|Year \d)/i;
 const GAP_WORDS = /\b(?:gap|beat|beats|lead|leads|ahead|behind|trail|trails|above|below|higher|lower|more than|less than|points?|pts|pp|vs\.?|versus|outperform\w*|exceed\w*)\b/i;
-const CHANGE_TYPES = ["chart.column", "chart.bar", "chart.line", "chart.area"];
+const CHANGE_TYPES = ["chart.column", "chart.bar", "chart.line", "chart.area", "chart.stacked-column"];
 const fmtNumber = (n) => { const a = Math.abs(n); return a >= 10 ? String(Math.round(n)) : n.toFixed(1).replace(/\.0$/, ""); };
 const signed = (n, suffix = "") => `${n >= 0 ? "+" : "−"}${fmtNumber(Math.abs(n))}${suffix}`;
 export function changeFromContent(ex, title) {
@@ -343,12 +348,18 @@ export function changeFromContent(ex, title) {
   }
   const explicit = ex.change && typeof ex.change === "object" ? ex.change : null;
   const periodic = categories.every((c) => PERIOD_CATEGORY.test(String(c)));
-  if (series.length === 1 && (explicit || ex.change === true || (periodic && ex.type !== "chart.bar"))) {
+  const stacked = ex.type === "chart.stacked-column";
+  // A stack's change is the change in its totals.
+  const totals = stacked ? categories.map((_, i) => series.reduce((sum, sr) => sum + sr.values[i], 0)) : series[0].values;
+  if ((series.length === 1 || stacked) && (explicit || ex.change === true || (periodic && ex.type !== "chart.bar"))) {
     const from = explicit?.from ?? categories[0], to = explicit?.to ?? categories[categories.length - 1];
     const a = categories.indexOf(from), b = categories.indexOf(to);
     if (a < 0 || b <= a) throw new Error("change.from and change.to must name two categories in order");
-    const text = explicit?.text || delta(series[0].values[a], series[0].values[b]);
-    return text ? { ...out, changeAnnotations: [{ start: from, end: to, style: "arrow", text }] } : ex;
+    const text = explicit?.text || delta(totals[a], totals[b]);
+    // Columns take the diagonal arrow across the tops; a line takes its change
+    // beside its last point, where the eye already lands.
+    const style = ex.type === "chart.line" || ex.type === "chart.area" ? "end-bubble" : "arrow";
+    return text ? { ...out, changeAnnotations: [{ start: from, end: to, style, text }] } : ex;
   }
   if (series.length === 2 && categories.length <= 6 && (ex.change === true || GAP_WORDS.test(String(title || "")))) {
     // The subject is the focus series when one is named, else the first series;
@@ -364,7 +375,7 @@ export function composeSlide(slide, index, baseDir) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   if (slide.exhibit) slide = { ...slide, exhibit: changeFromContent(highlightFromTitle(slide.exhibit, slide.title), slide.title) };
   if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => changeFromContent(highlightFromTitle(ex, slide.title), slide.title)) };
-  if (slide.kind === "section") return { id, kind: "divider", title: slide.title, ...(slide.number !== undefined ? { number: slide.number } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
+  if (slide.kind === "section") return { id, kind: "divider", title: slide.title, ...(slide.summary ? { subtitle: slide.summary } : {}), ...(slide.number !== undefined ? { number: slide.number } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
   if (slide.kind === "agenda") return { id, title: slide.title || "Contents", layout: "flow.column", items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items, ...(slide.active !== undefined ? { active: slide.active } : {}) }, size: SIZE }] };
   const slideIn = slide;
   // A value table under the chart: the chart stacks over a compact table whose
@@ -384,10 +395,16 @@ export function composeSlide(slide, index, baseDir) {
   }
   // `rows` at slide level is the label-and-text table.
   if (slide.rows && !slide.exhibit && !slide.exhibits) slide = { ...slide, exhibit: { type: "rows", rows: slide.rows } };
+  // A text page whose points carry leads is a numbered ledger: label + text
+  // rows with rules, filling the page, rather than a list floating at the top.
+  if (!slide.exhibit && !slide.exhibits && !slide.rows && (!slide.layout || slide.layout === "auto") && Array.isArray(slide.points) && slide.points.length >= 2 && slide.points.length <= 6 && slide.points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && !pt.icon && pt.state == null)) {
+    slide = { ...slide, points: undefined, exhibit: { type: "rows", rows: slide.points.map((pt, i) => ({ label: pt.lead, text: pt.text, number: pt.number ?? i + 1 })) } };
+  }
   const layout = chooseLayout(slide);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   const items = [];
-  if (Array.isArray(slide.metrics) && slide.metrics.length) items.push(metricsStrip(slide.metrics, `${id}-metrics`));
+  const metricsBelow = slide.metricsPosition === "bottom";
+  if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`));
   if (tileColumn) {
     const tiles = { id: `${id}-tiles`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: tileColumn.map((m, i) => ({ id: `${id}-tile-${i}`, component: "metric", props: { ...m, variant: "prominent" }, size: { width: { fr: 1 }, height: "fill" } })) };
     const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`)] };
@@ -399,7 +416,7 @@ export function composeSlide(slide, index, baseDir) {
   if (layout === "exhibit-full" && centredCards(exhibits[0])) {
     // Icon cards with a line each hug their content and sit centred in the
     // space above the takeaway; header and numbered cards fill the page as columns.
-    items.push({ id: `${id}-centre`, layout: "flow.column", size: SIZE, leftover: "center", items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, HUG)] });
+    items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { ...SIZE, centre: true }));
   } else if (layout === "exhibit-full") items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir));
   else if (layout === "exhibit-left" || layout === "exhibit-right") {
     // Side ratios: chart + points 2:1, table + points 3:2.
@@ -410,7 +427,7 @@ export function composeSlide(slide, index, baseDir) {
     // band and the points start level with the plot, not with the heading text.
     // `pointsAlign: "middle"` centres the points on the exhibit instead.
     const list = pointsItem(slide.points || [], `${id}-points`);
-    const side = slide.pointsAlign === "middle"
+    const side = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && unheaded(exhibits[0]))
       ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: [list] }
       : { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: "open", size: { width: { fr: sideFr }, height: "fill" }, items: [list] };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: layout === "exhibit-left" ? [hero, side] : [side, hero] });
@@ -484,12 +501,13 @@ export function composeSlide(slide, index, baseDir) {
   }
   // A reading note sits at the top of the side column when there is one,
   // otherwise as a full-width band above the content.
+  if (Array.isArray(slide.metrics) && slide.metrics.length && metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`));
   if (slide.callout) {
     const note = { id: `${id}-callout`, component: "callout", props: typeof slide.callout === "string" ? { text: slide.callout } : slide.callout, size: HUG };
     const row = items.find((it) => it.id === `${id}-row`);
     const at = row?.items?.findIndex((it) => it.id === `${id}-side`) ?? -1;
     if (at >= 0) row.items[at] = { id: `${id}-side-column`, layout: "flow.column", size: row.items[at].size, items: [note, { ...row.items[at], size: { width: { fr: 1 }, height: "fill" } }] };
-    else items.unshift(note);
+    else items.push(note); // full-width pages: the reading aid sits under the exhibit, above the takeaway
   }
   if (slide.soWhat) items.push(soWhatItem(slide.soWhat, `${id}-sowhat`));
   if (!items.length) throw new Error(`${id}: a slide needs an exhibit, points, paragraphs or a soWhat`);

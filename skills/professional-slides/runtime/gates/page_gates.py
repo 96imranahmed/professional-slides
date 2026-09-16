@@ -40,6 +40,7 @@ from nice_ticks import is_nice_tick, nice_axis, parse_number  # noqa: E402
 
 CANVAS_W, CANVAS_H = 1280, 720
 INK_LUMINANCE = 235
+SURFACE_LUMINANCE = 250
 FOOTER_TOP = 660
 
 # --- role vocabulary -------------------------------------------------------
@@ -63,6 +64,9 @@ EXHIBIT_COMPONENTS = {
     "table", "comparison-table", "heatmap", "trend-rows", "insight-tree-table",
     "image-frame", "map", "matrix", "chart-group", "relationship-network",
     "quote-cluster", "icon-trends", "logo-collage", "funnel", "tree",
+    # diagram families: they carry the page the way a chart does
+    "cards", "quadrants", "cycle", "steps", "people", "logos", "framework", "gantt",
+    "process", "chevron-process", "timeline", "roadmap", "organization", "journey",
 }
 
 TYPE_RANGES = {
@@ -90,10 +94,10 @@ PROFILES = {
 DEFAULT_PROFILE = "executive"
 
 THRESHOLDS = {
-    "ink_min": 0.08,   # a 12pt text page with 120 words sits near 9%; DEAD_BAND finds the voids
+    "ink_min": 0.08,   # a 12pt text page with 120 words sits near 9%; waived when a qualifying hero exhibit carries the page (a line chart is ink-light by nature)
     "dead_band_max": 0.08,
-    "internal_void_max": 0.18,   # 130px of nothing between two content blocks
-    "exhibit_ink_min": 0.04,     # a hero frame must carry ink, not just area (a 12pt table sits near 5-6%)
+    "internal_void_max": 0.22,   # 158px of nothing between two content blocks; a centred icon row keeps its air
+    "exhibit_ink_min": 0.02,     # a hero frame must carry ink, not just area (a line chart sits near 2-3%, a 12pt table near 5-6%)
     "title_lines_max": 2,
     "title_words_max": 14,
     "cpl_min": 35,
@@ -206,8 +210,11 @@ def finding(slide_no, code, measured, threshold, repair):
 # --- image measurement -----------------------------------------------------
 
 
-def load_ink_rows(path):
-    """Return rows[y] = count of ink pixels on that row of the 1280x720 canvas."""
+def load_ink_rows(path, luminance=INK_LUMINANCE):
+    """Return rows[y] = count of pixels darker than `luminance` on that row of the
+    1280x720 canvas. Ink uses INK_LUMINANCE; occupancy (for the dead-band and
+    void gates) uses SURFACE_LUMINANCE so a tinted card or band counts as
+    designed space rather than emptiness."""
     from PIL import Image
 
     with Image.open(path) as image:
@@ -217,10 +224,10 @@ def load_ink_rows(path):
         try:
             import numpy as np
 
-            return (np.asarray(grey) < INK_LUMINANCE).sum(axis=1).tolist()
+            return (np.asarray(grey) < luminance).sum(axis=1).tolist()
         except ImportError:
             pass
-        mask = grey.point(lambda p: 255 if p < INK_LUMINANCE else 0, mode="L")
+        mask = grey.point(lambda p: 255 if p < luminance else 0, mode="L")
         return [
             int(sum(mask.crop((0, y, CANVAS_W, y + 1)).histogram()[1:]))
             for y in range(CANVAS_H)
@@ -240,10 +247,11 @@ def render_path(render_dir, slide_number):
 # --- gates -----------------------------------------------------------------
 
 
-def gate_ink_and_dead_band(slide_no, rows, findings):
-    """INK_COVERAGE and DEAD_BAND. COVER_EXEMPT. Needs the render."""
-    content_rows = rows[:FOOTER_TOP]
-    ink = sum(content_rows)
+def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None):
+    """INK_COVERAGE and DEAD_BAND. COVER_EXEMPT. Needs the render.
+    `rows` counts ink; `occupied` (default: rows) counts designed surfaces too."""
+    ink = sum(rows[:FOOTER_TOP])
+    content_rows = (occupied or rows)[:FOOTER_TOP]
     fraction = ink / float(CANVAS_W * CANVAS_H)
     if fraction < THRESHOLDS["ink_min"]:
         findings.append(finding(
@@ -370,7 +378,9 @@ def gate_words(slide_no, slide, findings, profile):
     total = 0
     for node in text_nodes(slide):
         role = node.get("role")
-        if role in NON_BODY_ROLES or role is None or role.startswith("table-"):
+        # Text inside structured exhibits (tables, cards, steps, gantt bars, network
+        # nodes, framework pillars) is evidence in cells, not prose.
+        if role in NON_BODY_ROLES or role is None or role.startswith(("table-", "card-", "step-", "gantt-", "network-", "framework-", "quadrant-", "cycle-", "people-", "profile-", "agenda-")):
             continue
         total += word_count(source_text(node))
     has_exhibit = any(is_exhibit(c) for c in slide.get("componentInstances", []))
@@ -414,7 +424,8 @@ def gate_hero_exhibit(slide_no, slide, findings, image=None):
             x0, y0 = int(max(0, f["x"])), int(max(0, f["y"]))
             x1, y1 = int(min(CANVAS_W, f["x"] + f["width"])), int(min(CANVAS_H, f["y"] + f["height"]))
             if x1 > x0 and y1 > y0:
-                density = float((a[y0:y1, x0:x1] < 235).mean())
+                # Occupancy, not ink: a map's land or a card's tint carries the frame.
+                density = float((a[y0:y1, x0:x1] < SURFACE_LUMINANCE).mean())
                 if density < THRESHOLDS["exhibit_ink_min"]:
                     findings.append(finding(
                         slide_no, "HERO_EXHIBIT", round(density, 4), THRESHOLDS["exhibit_ink_min"],
@@ -586,9 +597,16 @@ def run_gates(scene, render_dir=None, profile=DEFAULT_PROFILE, gates=None):
                 path = render_path(render_dir, slide_no)
                 if path is not None:
                     rows = load_ink_rows(path)
+                    occupied = load_ink_rows(path, SURFACE_LUMINANCE)
                     page = []
-                    gate_ink_and_dead_band(slide_no, rows, page)
-                    findings.extend(f for f in page if wanted(f["code"]))
+                    gate_ink_and_dead_band(slide_no, rows, page, occupied)
+                    # A page carried by a qualifying hero exhibit is not empty,
+                    # however thin its marks (a line chart, a map): INK_COVERAGE
+                    # then defers to the hero and band gates.
+                    hero = []
+                    gate_hero_exhibit(slide_no, slide, hero, path)
+                    has_hero = any(is_exhibit(c) for c in slide.get("componentInstances", [])) and not hero
+                    findings.extend(f for f in page if wanted(f["code"]) and not (f["code"] == "INK_COVERAGE" and has_hero))
             if wanted("WORDS"):
                 gate_words(slide_no, slide, findings, profile)
             if wanted("HERO_EXHIBIT"):

@@ -10,7 +10,7 @@ import {
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 
-export const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label"]);
+export const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label", "end-bubble"]);
 export const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot"]);
 // Keep a full label-height gap between the observation box and the plot. The
 // chart reserves this band before calculating marks, so value labels remain
@@ -376,7 +376,8 @@ export function chartAnnotationBands(props = {}) {
   const changes = normalizeChangeAnnotations(props);
   const rail = normalizeAnnotationRail(props);
   return {
-    top: changes.length ? Math.max(CHANGE_ANNOTATION_BAND, ...changes.filter(a => a.style === "interval-label").map(a => measureIntervalLabel(a, 260).height + 44)) : 0,
+    top: changes.some(a => a.style !== "end-bubble") ? Math.max(CHANGE_ANNOTATION_BAND, ...changes.filter(a => a.style === "interval-label").map(a => measureIntervalLabel(a, 260).height + 44)) : 0,
+    right: changes.some(a => a.style === "end-bubble") ? 150 : 0,
     bottom: rail.rows.length ? (rail.rows.length-1)*annotationRailBand()+Math.max(30,annotationRailLineHeight()+6) : 0,
     left: Math.max(0, ...rail.rows.map(row => row.labelWidth ? row.labelWidth + 12 : 0))
   };
@@ -507,6 +508,19 @@ export function renderChangeAnnotations({ id, plot, props, pointMap }) {
       return;
     }
 
+    if (annotation.style === "end-bubble") {
+      // The change sits beside the last point: a short leader from the end
+      // mark to a bubble in the right gutter, at the end mark's height.
+      const measured = labelFrame(annotation.text, 0, 0, plot);
+      const mark = pointMap.get(`${annotation.end.series ? `${annotation.end.series}:` : "value:"}${annotation.end.category}`) || pointMap.get(`category:${annotation.end.category}`);
+      const y = mark?.y ?? end.y;
+      // Clear the end mark and its value label, then a short leader and the bubble.
+      const x0 = end.x + 44, x1 = x0 + 14;
+      const frame = { x: x1, y: y - measured.height / 2, width: measured.width, height: measured.height };
+      nodes.push(line(id, index, "leader", x0, y, x1, y, false, annotation.style));
+      labels.push({ frame, annotation, index });
+      return;
+    }
     if (annotation.style === "arrow") {
       const dx = end.x - start.x;
       const dy = end.y - start.y;
