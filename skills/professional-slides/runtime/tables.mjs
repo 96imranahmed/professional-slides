@@ -835,13 +835,16 @@ function renderTableAt({ id, frame, props }) {
         ),
       );
     }
-    if (column.type !== "implication")
+    // One continuous header rule unless a column is an implication arrow or
+    // the header sits over a chevron/category run whose slits are by design.
+    const continuousHeader = !m.columns.some((col) => col.type === "implication") && props.headerShape !== "chevron" && header !== "categories";
+    if (continuousHeader ? c === 0 : column.type !== "implication")
       nodes.push(
         line(
           stableId(id, "header-rule", c),
           xs[c],
           frame.y + m.headerHeight,
-          xs[c] + m.widths[c] - m.gap,
+          continuousHeader ? frame.x + frame.width - m.gap : xs[c] + m.widths[c] - m.gap,
           frame.y + m.headerHeight,
         ),
       );
