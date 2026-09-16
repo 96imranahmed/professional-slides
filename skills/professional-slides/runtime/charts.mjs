@@ -1100,19 +1100,32 @@ function comboChart({ id, frame, props }) {
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail
   });
-  const bounds = numericBounds(series.flatMap(item => item.values), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true });
+  // Labelled marks need no value axis; the bars take a zero-anchored domain and,
+  // with `secondaryAxis`, the line takes its own padded domain (a margin over a revenue).
+  const showDataLabels = props.dataLabels !== false;
+  const showValueAxis = resolveValueAxis(props, { valueCount: categories.length * 2, dataLabelsVisible: showDataLabels });
+  const secondary = props.secondaryAxis === true;
+  const barSeries = series[0];
+  const lineSeries = series[1];
+  // With a secondary line the bars keep the lower two-thirds of the plot and the
+  // line floats in the band above them, so the two series never cross.
+  const barMax = Math.max(...barSeries.values, 0);
+  const bounds = numericBounds(secondary ? barSeries.values : series.flatMap(item => item.values), { min: props.yMin, max: props.yMax ?? (secondary && !showValueAxis ? barMax * 1.5 : undefined), axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  const lineBounds = secondary ? numericBounds(lineSeries.values, { min: props.y2Min, max: props.y2Max, axis: "y", tight: true }) : bounds;
   const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
+  const lineBand = { top: plot.y + 44, height: plot.height * 0.3 };
+  const y2Scale = (value) => lineBand.top + lineBand.height - (value - lineBounds.min) / lineBounds.span * lineBand.height;
+  const lineScale = secondary ? y2Scale : yScale;
   const categorySpan = plot.width / categories.length;
   const barWidth = categorySpan * 0.58;
   const nodes = [
     ...topLegend({ id, frame, items: series.map((item) => item.name) }),
-    ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true })
+    ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })
   ];
   const pointMap = new Map();
   const categoryMap = new Map();
-  const barSeries = series[0];
-  const lineSeries = series[1];
   const linePoints = [];
+  const lineFormat = secondary && props.secondaryUnit ? { ...props, valueFormat: { ...(props.valueFormat || {}), suffix: props.secondaryUnit } } : props;
   categories.forEach((category, index) => {
     const x = plot.x + categorySpan * index + categorySpan / 2;
     const barValueY = yScale(barSeries.values[index]);
@@ -1137,8 +1150,16 @@ function comboChart({ id, frame, props }) {
       style: textStyle(AXIS_LABEL)
     }));
     const barPoint = { x, y: barValueY, leaderX: bar.x + bar.width, changeX: x, changeY: barValueY + (barSeries.values[index] >= 0 ? -16 : 16) };
-    const lineY = yScale(lineSeries.values[index]);
+    const lineY = lineScale(lineSeries.values[index]);
     const linePoint = { x, y: lineY, changeX: x, changeY: lineY - 16 };
+    if (showDataLabels) {
+      // The bar's value sits inside its top in white when the bar is tall enough, else above it;
+      // the line's value sits above its point, clear of the bar label.
+      const inside = bar.height >= 40;
+      nodes.push(textPrimitive({ id: stableId(id, "value-label", barSeries.name, category), role: "data-label", frame: { x: bar.x, y: inside ? bar.y + 6 : bar.y - 26, width: bar.width, height: 24 }, text: formatValue(barSeries.values[index], props), style: textStyle(CHART_LABEL, inside ? token("color.onPrimary") : INK, true, "center"), data: { category, series: barSeries.name } }));
+      const ly = Math.min(lineY - 30, inside ? bar.y - 26 : bar.y - 52);
+      nodes.push(textPrimitive({ id: stableId(id, "value-label", lineSeries.name, category), role: "data-label", frame: { x: x - categorySpan / 2, y: ly, width: categorySpan, height: 24 }, text: formatValue(lineSeries.values[index], lineFormat), style: textStyle(CHART_LABEL, SERIES[1], true, "center"), data: { category, series: lineSeries.name } }));
+    }
     categoryMap.set(category, { x: x - categorySpan / 2, y: plot.y, width: categorySpan, height: plot.height });
     pointMap.set(`${barSeries.name}:${category}`, barPoint);
     pointMap.set(`${lineSeries.name}:${category}`, linePoint);

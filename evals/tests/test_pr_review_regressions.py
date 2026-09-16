@@ -89,7 +89,7 @@ assert.throws(()=>legendNodes({id:'legend',frame,props:{variant:'state',items:[{
         self.check_js("""
 const sample=REGISTRY.get('matrix').sample;
 const nodes=render('matrix',sample);
-assert.equal(nodes.filter(n=>n.role==='matrix-axis-label').length,2);
+assert.equal(nodes.filter(n=>n.role==='matrix-axis-label').length,6); // two titles and four end labels
 assert.throws(()=>render('matrix',{points:sample.points}),/xAxis/);
 const stages=render('funnel',{stages:[{label:'Start',value:100},{label:'Half',value:50},{label:'None',value:0}]});
 const marks=stages.filter(n=>n.role==='funnel-stage');

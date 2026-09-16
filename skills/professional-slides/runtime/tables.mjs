@@ -849,6 +849,12 @@ function renderTableAt({ id, frame, props }) {
         ),
       );
   });
+  // The recommended option's column is one tinted band from the header rule
+  // to the last row; row bands (total, group) paint over it so a total stays a total.
+  if (Number.isInteger(props.highlightColumn) && m.widths[props.highlightColumn] !== undefined) {
+    const c = props.highlightColumn;
+    nodes.push(rectPrimitive({ id: stableId(id, "column-band", c), role: "table-column-band", frame: { x: xs[c], y: frame.y + m.headerHeight + m.gap / 2, width: m.widths[c] - m.gap, height: sum(m.heights) - m.gap }, style: box(t("color.accentTint")), data: { column: c, highlightColumn: true } }));
+  }
   // Row-level fills (accented, total, group) are one continuous band so the
   // row reads as a band rather than a run of tinted cells with slits between.
   m.cells.forEach((row, r) => {
@@ -856,12 +862,6 @@ function renderTableAt({ id, frame, props }) {
     if (!band) return;
     nodes.push(rectPrimitive({ id: stableId(id, "row-band", r), role: "table-row-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(band), data: { row: r, rowStyle: m.rows[r].style ?? props.rowStyle } }));
   });
-  // The recommended option's column is one tinted band from the header rule
-  // to the last row.
-  if (Number.isInteger(props.highlightColumn) && m.widths[props.highlightColumn] !== undefined) {
-    const c = props.highlightColumn;
-    nodes.push(rectPrimitive({ id: stableId(id, "column-band", c), role: "table-column-band", frame: { x: xs[c], y: frame.y + m.headerHeight + m.gap / 2, width: m.widths[c] - m.gap, height: sum(m.heights) - m.gap }, style: box(t("color.accentTint")), data: { column: c, highlightColumn: true } }));
-  }
   m.cells.forEach((row, r) =>
     row.forEach((cell, c) => {
       if (!cell) return;

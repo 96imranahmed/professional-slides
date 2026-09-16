@@ -208,6 +208,9 @@ class Emitter:
             tf = shape.text_frame
         shape.name = f"ps:{node['id']}"
         self.fill_text_frame(tf, node)
+        rotate = float((node.get("style") or {}).get("rotate") or 0)
+        if rotate and not as_title:
+            shape.rotation = rotate
         self.stats["text"] += 1
         return shape
 

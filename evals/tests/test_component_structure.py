@@ -605,7 +605,8 @@ const count = role => nodes.filter(node => node.role === role).length;
 console.log(JSON.stringify({categories: count('category-label'), axes: count('chart-axis'), bars: count('chart-mark'), lines: count('chart-line'), markers: count('chart-marker')}));
 """
         )
-        self.assertEqual(result, {"categories": 3, "axes": 2, "bars": 3, "lines": 2, "markers": 3})
+        # Labelled marks need no value axis: one category axis, the values on the marks.
+        self.assertEqual(result, {"categories": 3, "axes": 1, "bars": 3, "lines": 2, "markers": 3})
 
     def test_chart_annotations_are_attached_without_covering_the_target(self):
         result = run_node(

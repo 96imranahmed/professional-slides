@@ -148,13 +148,35 @@ function verdictCell(value, header) {
 }
 const columnLabel = (c) => (typeof c === "string" ? c : c?.label || "");
 
+/** Default rating scales so a spec can write `{ type: "harvey", value: 3 }` without declaring anchors. */
+const DEFAULT_SCALES = {
+  rating: { type: "harvey", label: "Rating", min: 0, max: 4, anchors: { 0: "None", 1: "Weak", 2: "Partial", 3: "Strong", 4: "Full" } },
+  check: { type: "binary", label: "Meets requirement", test: "The option meets the requirement", labelDisplay: "none", states: { yes: "Yes", no: "No", missing: "Not assessed" } },
+  heat: { type: "heatmap", label: "Score", min: 1, max: 5, anchors: { 1: "Lowest", 2: "Low", 3: "Medium", 4: "High", 5: "Highest" }, palette: "theme-sequential" },
+};
+function withDefaultScales(ex, rowsIn) {
+  const scales = { ...(ex.scales || {}) };
+  let used = false;
+  const rows = rowsIn.map((r) => Array.isArray(r) ? r.map((cell) => {
+    if (!cell || typeof cell !== "object" || cell.scale || !["harvey", "binary", "heatmap"].includes(cell.type)) return cell;
+    const id = cell.type === "harvey" ? "rating" : cell.type === "binary" ? "check" : "heat";
+    used = true; scales[id] = scales[id] || DEFAULT_SCALES[id];
+    // Binary states accept the words an author writes: positive/yes/true, negative/no/false.
+    const value = cell.type === "binary" ? ({ positive: "yes", true: "yes", yes: "yes", negative: "no", false: "no", no: "no", missing: "missing", na: "missing" }[String(cell.value).toLowerCase()] ?? cell.value) : cell.value;
+    return { ...cell, value, scale: id };
+  }) : r);
+  return { rows, ...(used || ex.scales ? { scales } : {}) };
+}
+
 export function styleTable(ex) {
   const columns = ex.columns.map((c, i) => typeof c === "string" ? { label: c, type: "text", bold: i === 0, width: columnWeight(ex, i) } : { ...c });
-  const rowsIn = ex.rows.map((r) => Array.isArray(r) ? r.map((cell, i) => verdictCell(cell, columnLabel(ex.columns[i]))) : r);
+  const scaled = withDefaultScales(ex, ex.rows.map((r) => Array.isArray(r) ? r.map((cell, i) => verdictCell(cell, columnLabel(ex.columns[i]))) : r));
+  const rowsIn = scaled.rows;
+  if (scaled.scales) ex = { ...ex, scales: scaled.scales };
   // The recommended option's column is tinted end to end.
   const recommended = ex.recommended !== undefined ? columns.findIndex((c) => String(c.label).trim().toLowerCase() === String(ex.recommended).trim().toLowerCase()) : -1;
   if (ex.recommended !== undefined && recommended < 0) throw new Error(`Table recommended column "${ex.recommended}" is not a column label`);
-  const extra = recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {};
+  const extra = { ...(recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {}), ...(ex.scales ? { scales: ex.scales } : {}) };
   // A "Total …" row at the end is the accent total band.
   rowsIn.forEach((r, i) => {
     if (Array.isArray(r) && i === rowsIn.length - 1 && /^total\b/i.test(String(r[0]?.text ?? r[0] ?? ""))) rowsIn[i] = { style: "total", cells: r };
@@ -325,6 +347,15 @@ const GAP_WORDS = /\b(?:gap|beat|beats|lead|leads|ahead|behind|trail|trails|abov
 const CHANGE_TYPES = ["chart.column", "chart.bar", "chart.line", "chart.area", "chart.stacked-column"];
 const fmtNumber = (n) => { const a = Math.abs(n); return a >= 10 ? String(Math.round(n)) : n.toFixed(1).replace(/\.0$/, ""); };
 const signed = (n, suffix = "") => `${n >= 0 ? "+" : "−"}${fmtNumber(Math.abs(n))}${suffix}`;
+/** `percent: true` on a stacked chart re-expresses each category as shares of its total (100% stack). */
+export function percentStack(ex) {
+  if (!ex || !ex.percent || !["chart.stacked-column", "chart.stacked-bar"].includes(ex.type) || !Array.isArray(ex.series) || !Array.isArray(ex.categories)) return ex;
+  const totals = ex.categories.map((_, i) => ex.series.reduce((sum, sr) => sum + (sr.values[i] || 0), 0));
+  const series = ex.series.map((sr) => ({ ...sr, values: sr.values.map((v, i) => (totals[i] ? Math.round((v / totals[i]) * 1000) / 10 : 0)) }));
+  const { percent, ...rest } = ex;
+  return { ...rest, series, unit: ex.unit || "% of total", yMin: 0, yMax: 100, change: ex.change ?? false };
+}
+
 export function changeFromContent(ex, title) {
   if (!ex || !CHANGE_TYPES.includes(ex.type) || ex.change === false || (ex.changeAnnotations || []).length) return ex;
   const categories = ex.categories || [], series = Array.isArray(ex.series) ? ex.series : [];
@@ -373,8 +404,8 @@ export function changeFromContent(ex, title) {
 
 export function composeSlide(slide, index, baseDir) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
-  if (slide.exhibit) slide = { ...slide, exhibit: changeFromContent(highlightFromTitle(slide.exhibit, slide.title), slide.title) };
-  if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => changeFromContent(highlightFromTitle(ex, slide.title), slide.title)) };
+  if (slide.exhibit) slide = { ...slide, exhibit: changeFromContent(highlightFromTitle(percentStack(slide.exhibit), slide.title), slide.title) };
+  if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => changeFromContent(highlightFromTitle(percentStack(ex), slide.title), slide.title)) };
   if (slide.kind === "section") return { id, kind: "divider", title: slide.title, ...(slide.summary ? { subtitle: slide.summary } : {}), ...(slide.number !== undefined ? { number: slide.number } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
   if (slide.kind === "agenda") return { id, title: slide.title || "Contents", layout: "flow.column", items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items, ...(slide.active !== undefined ? { active: slide.active } : {}) }, size: SIZE }] };
   const slideIn = slide;

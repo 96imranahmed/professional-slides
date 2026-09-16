@@ -117,6 +117,10 @@ Give each case that will be discussed individually a stable circular `sectionNum
 
 *Example:* six locations as rows, four ranked criteria as columns in the client's ranked order, a struck cell where an option fails a hard screen, and a rationale column in plain text.
 
+## Combo
+
+`chart.combo` draws the first series as columns and the second as a line with markers, both labelled. On one scale the line reads against the bars (actual against plan); with `secondaryAxis: true` the line floats in the band above the bars on its own padded scale (a margin over a revenue) and `secondaryUnit` suffixes its labels. The heading's unit line names both units.
+
 ## Pie and donut
 
 One total divided into two to five mutually exclusive parts, when approximate share is enough. One reconciled total, positive parts, stable labels, explicit units, one period and population, and shares summing to 100% within the disclosed rounding tolerance. Start at twelve o'clock and order slices by value. Variants: `legend-top-right` (default - one swatch row above the plot supplies identity, percentages inside the slices), `outside-labels`, `shared-legend` for a coordinated group. Every internal percentage fits its slice with four pixels of clearance; when it cannot, enlarge the chart or switch to bars.

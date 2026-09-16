@@ -1189,6 +1189,241 @@
    ],
    "callout": "Answers are due at the December board; the paper goes to the committee two weeks before.",
    "soWhat": "A yes on all three releases the $6M; a no on any one of them pauses the national launch."
+  },
+  {
+   "title": "Revenue tracked plan within 3% every year while margin rose nine points",
+   "exhibit": {
+    "type": "chart.combo",
+    "heading": "Revenue and EBITDA margin",
+    "unit": "$M; margin in %",
+    "categories": [
+     "2023",
+     "2024",
+     "2025",
+     "2026E"
+    ],
+    "series": [
+     {
+      "name": "Revenue",
+      "values": [
+       42,
+       55,
+       68,
+       82
+      ]
+     },
+     {
+      "name": "EBITDA margin",
+      "values": [
+       14,
+       17,
+       20,
+       23
+      ]
+     }
+    ],
+    "secondaryAxis": true,
+    "secondaryUnit": "%"
+   },
+   "points": [
+    "Plan was missed by $3M in 2023 and never again",
+    "Margin gains come from mix, not price",
+    "2026 plan already assumes the enterprise ramp"
+   ],
+   "source": "Management accounts; 2026 plan"
+  },
+  {
+   "title": "Enterprise is now the majority of revenue in every region but APAC",
+   "exhibit": {
+    "type": "chart.stacked-bar",
+    "percent": true,
+    "heading": "Revenue mix by region",
+    "categories": [
+     "North America",
+     "Europe",
+     "APAC",
+     "LatAm"
+    ],
+    "series": [
+     {
+      "name": "Enterprise",
+      "values": [
+       120,
+       64,
+       18,
+       22
+      ]
+     },
+     {
+      "name": "Mid-market",
+      "values": [
+       60,
+       40,
+       30,
+       14
+      ]
+     },
+     {
+      "name": "SMB",
+      "values": [
+       20,
+       16,
+       32,
+       8
+      ]
+     }
+    ]
+   },
+   "points": [
+    "APAC still sells through SMB partners",
+    "LatAm mix already matches North America",
+    "Mix, not size, sets the sales model per region"
+   ],
+   "source": "CRM, FY26"
+  },
+  {
+   "title": "Vendor B meets every must-have; only Vendor A matches it on price",
+   "exhibit": {
+    "type": "table",
+    "columns": [
+     "Criterion",
+     "Vendor A",
+     "Vendor B",
+     "Vendor C"
+    ],
+    "rows": [
+     [
+      "Functional fit",
+      {
+       "type": "harvey",
+       "value": 2
+      },
+      {
+       "type": "harvey",
+       "value": 4
+      },
+      {
+       "type": "harvey",
+       "value": 3
+      }
+     ],
+     [
+      "Integration",
+      {
+       "type": "harvey",
+       "value": 3
+      },
+      {
+       "type": "harvey",
+       "value": 4
+      },
+      {
+       "type": "harvey",
+       "value": 1
+      }
+     ],
+     [
+      "Security certification",
+      {
+       "type": "binary",
+       "value": "positive"
+      },
+      {
+       "type": "binary",
+       "value": "positive"
+      },
+      {
+       "type": "binary",
+       "value": "negative"
+      }
+     ],
+     [
+      "Reference customers",
+      {
+       "type": "harvey",
+       "value": 1
+      },
+      {
+       "type": "harvey",
+       "value": 3
+      },
+      {
+       "type": "harvey",
+       "value": 4
+      }
+     ],
+     [
+      "Total cost, 3 years",
+      "$1.9M",
+      "$2.0M",
+      "$2.6M"
+     ]
+    ],
+    "recommended": "Vendor B"
+   },
+   "soWhat": "Shortlist Vendor B and negotiate against Vendor A's price."
+  },
+  {
+   "title": "Four initiatives sit in the quick-win quadrant; two are large bets",
+   "exhibit": {
+    "type": "matrix",
+    "heading": "Impact against ease of implementation",
+    "xAxis": {
+     "label": "Ease of implementation",
+     "minLabel": "Hard",
+     "maxLabel": "Easy"
+    },
+    "yAxis": {
+     "label": "Impact",
+     "minLabel": "Low",
+     "maxLabel": "High"
+    },
+    "points": [
+     {
+      "label": "Self-serve onboarding",
+      "x": 0.8,
+      "y": 0.7
+     },
+     {
+      "label": "Pricing corridor",
+      "x": 0.7,
+      "y": 0.85
+     },
+     {
+      "label": "Partner portal",
+      "x": 0.3,
+      "y": 0.8
+     },
+     {
+      "label": "Usage alerts",
+      "x": 0.85,
+      "y": 0.55
+     },
+     {
+      "label": "Data platform",
+      "x": 0.15,
+      "y": 0.9
+     },
+     {
+      "label": "Regional P&L",
+      "x": 0.6,
+      "y": 0.6
+     }
+    ],
+    "quadrantLabels": {
+     "topLeft": "Large bets",
+     "topRight": "Quick wins",
+     "bottomLeft": "Deprioritise",
+     "bottomRight": "Fill-ins"
+    },
+    "highlightQuadrant": "topRight"
+   },
+   "points": [
+    "Quick wins: self-serve onboarding, pricing corridor, usage alerts, regional P&L",
+    "Large bets: partner portal and the data platform",
+    "Nothing sits in the low-impact half"
+   ],
+   "source": "Workshop scoring, September 2026"
   }
  ]
 }

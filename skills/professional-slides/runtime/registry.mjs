@@ -689,30 +689,46 @@ function highlightStripNodes({ id, frame, props }) {
 
 function matrixNodes({ id, frame, props }) {
   for (const axis of ["xAxis", "yAxis"]) {
-    if (!["label", "minLabel", "maxLabel"].every(key => typeof props[axis]?.[key] === "string" && props[axis][key].trim())) throw new Error(`Matrix ${axis} requires label, minLabel, and maxLabel`);
+    if (!["label", "minLabel", "maxLabel"].every(key => typeof props[axis]?.[key] === "string" && props[axis][key].trim()) ) throw new Error(`Matrix ${axis} requires label, minLabel, and maxLabel`);
   }
   const nodes = [];
-  const axisText = (axis, direction) => `${axis.label}: ${axis.minLabel} to ${axis.maxLabel} (${direction})`;
-  for (const [axis, y, direction] of [[props.yAxis, frame.y, "bottom to top"], [props.xAxis, frame.y + frame.height - 32, "left to right"]]) {
-    const text = axisText(axis, direction);
-    const measured = measureText(text, frame.width, { fontSize: tokenValue(LABEL) });
-    if (measured.height > 32) throw new Error("Matrix axis label needs more space");
-    nodes.push(textPrimitive({ id: stableId(id, direction, "label"), role: "matrix-axis-label", frame: { x: frame.x, y, width: frame.width, height: 32 }, text, style: textStyle(LABEL, INK, false, "center") }));
+  // The 2x2: four tinted cells with a slit between, the axis titles along the
+  // left (rotated) and the foot, the end labels at the corners, optional
+  // quadrant names in the cell corners, and named points with their labels.
+  const left = 44, bottom = 44, gap = 4, endLabel = 22;
+  const plot = { x: frame.x + left, y: frame.y + endLabel, width: frame.width - left - 8, height: frame.height - bottom - endLabel };
+  const quadrants = ["topLeft", "topRight", "bottomLeft", "bottomRight"];
+  const cellFrame = (q) => ({ x: plot.x + (q.endsWith("Right") ? plot.width / 2 + gap / 2 : 0), y: plot.y + (q.startsWith("bottom") ? plot.height / 2 + gap / 2 : 0), width: plot.width / 2 - gap / 2, height: plot.height / 2 - gap / 2 });
+  for (const q of quadrants) {
+    const highlighted = props.highlightQuadrant === q;
+    nodes.push(rectPrimitive({ id: stableId(id, "cell", q), role: highlighted ? "matrix-highlight" : "matrix-cell", frame: cellFrame(q), style: boxStyle(highlighted ? token("color.accentTint") : MUTED_SURFACE, "none", HAIRLINE, token("radius.none")), data: { quadrant: q, highlighted } }));
+    const name = props.quadrantLabels?.[q];
+    if (typeof name === "string" && name.trim()) {
+      const c = cellFrame(q);
+      const measured = measureText(name, c.width - 24, { fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 });
+      nodes.push(textPrimitive({ id: stableId(id, "cell-label", q), role: "matrix-quadrant-label", frame: { x: c.x + 12, y: q.startsWith("top") ? c.y + 8 : c.y + c.height - 8 - measured.height, width: c.width - 24, height: measured.height }, text: measured.text, style: { ...textStyle(LABEL, SECONDARY, true, q.endsWith("Right") ? "right" : "left", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { quadrant: q, textLayout: measured } }));
+    }
   }
-  const plotInset = 54;
-  const plot = { x: frame.x + plotInset, y: frame.y + 50, width: frame.width - plotInset - 28, height: frame.height - 100 };
-  if (props.highlightQuadrant === "topRight") nodes.push(rectPrimitive({ id: stableId(id, "quadrant-highlight"), role: "matrix-highlight", frame: { x: plot.x + plot.width / 2, y: plot.y, width: plot.width / 2, height: plot.height / 2 }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.none")) }));
+  // Axis titles and end labels.
+  const yTitle = props.yAxis.label, xTitle = props.xAxis.label;
+  nodes.push(textPrimitive({ id: stableId(id, "y-title"), role: "matrix-axis-label", frame: { x: frame.x - plot.height / 2 + 12, y: plot.y + plot.height / 2 - 12, width: plot.height, height: 24 }, text: yTitle, style: { ...textStyle(LABEL, INK, true, "center"), rotate: -90 } }));
+  nodes.push(textPrimitive({ id: stableId(id, "y-max"), role: "matrix-axis-label", frame: { x: frame.x, y: plot.y - endLabel, width: left + 60, height: endLabel }, text: props.yAxis.maxLabel, style: textStyle(LABEL, SECONDARY, false, "left") }));
+  nodes.push(textPrimitive({ id: stableId(id, "y-min"), role: "matrix-axis-label", frame: { x: frame.x, y: plot.y + plot.height + 4, width: left + 60, height: endLabel }, text: props.yAxis.minLabel, style: textStyle(LABEL, SECONDARY, false, "left") }));
+  nodes.push(textPrimitive({ id: stableId(id, "x-title"), role: "matrix-axis-label", frame: { x: plot.x, y: plot.y + plot.height + bottom - 24, width: plot.width, height: 24 }, text: xTitle, style: textStyle(LABEL, INK, true, "center") }));
+  nodes.push(textPrimitive({ id: stableId(id, "x-min"), role: "matrix-axis-label", frame: { x: plot.x + 4, y: plot.y + plot.height + 4, width: 120, height: endLabel }, text: props.xAxis.minLabel, style: textStyle(LABEL, SECONDARY, false, "left") }));
+  nodes.push(textPrimitive({ id: stableId(id, "x-max"), role: "matrix-axis-label", frame: { x: plot.x + plot.width - 120, y: plot.y + plot.height + 4, width: 120, height: endLabel }, text: props.xAxis.maxLabel, style: textStyle(LABEL, SECONDARY, false, "right") }));
   nodes.push(openLine(stableId(id, "x-axis"), plot.x, plot.y + plot.height, plot.x + plot.width, plot.y + plot.height, "matrix-axis", INK, STANDARD));
   nodes.push(openLine(stableId(id, "y-axis"), plot.x, plot.y, plot.x, plot.y + plot.height, "matrix-axis", INK, STANDARD));
-  nodes.push(openLine(stableId(id, "vertical-split"), plot.x + plot.width / 2, plot.y, plot.x + plot.width / 2, plot.y + plot.height, "matrix-boundary", RULE, HAIRLINE));
-  nodes.push(openLine(stableId(id, "horizontal-split"), plot.x, plot.y + plot.height / 2, plot.x + plot.width, plot.y + plot.height / 2, "matrix-boundary", RULE, HAIRLINE));
   props.points.forEach((point, index) => {
     const x = plot.x + point.x * plot.width;
     const y = plot.y + (1 - point.y) * plot.height;
     const size = point.size || (props.bubbles ? 76 : 18);
-    const color = point.state === "positive" ? token("color.positive") : point.state === "caution" ? token("color.caution") : point.state === "negative" ? token("color.negative") : index === props.highlight ? PRIMARY : token("color.chartSeries2");
+    const color = point.state === "positive" ? token("color.positive") : point.state === "caution" ? token("color.caution") : point.state === "negative" ? token("color.negative") : index === props.highlight ? token("color.accent") : PRIMARY;
     nodes.push(ellipsePrimitive({ id: stableId(id, "point", index), role: "matrix-point", frame: { x: x - size / 2, y: y - size / 2, width: size, height: size }, style: boxStyle(color, SURFACE, HAIRLINE, token("radius.round")) }));
-    nodes.push(textPrimitive({ id: stableId(id, "point-label", index), role: "matrix-point-label", frame: props.bubbles ? { x: x - size * 0.4, y: y - size * 0.32, width: size * 0.8, height: size * 0.64 } : { x: x + 12, y: y - 10, width: 94, height: 22 }, text: point.label, style: textStyle(LABEL, props.bubbles ? WHITE : INK, true, props.bubbles ? "center" : "left") }));
+    // Labels sit to the right of the point, or to the left near the right edge.
+    const labelWidth = Math.min(150, Math.max(80, plot.width * 0.22));
+    const right = x + 12 + labelWidth <= plot.x + plot.width;
+    nodes.push(textPrimitive({ id: stableId(id, "point-label", index), role: "matrix-point-label", frame: props.bubbles ? { x: x - size * 0.4, y: y - size * 0.32, width: size * 0.8, height: size * 0.64 } : { x: right ? x + 12 : x - 12 - labelWidth, y: y - 10, width: labelWidth, height: 22 }, text: point.label, style: textStyle(LABEL, props.bubbles ? WHITE : INK, true, props.bubbles ? "center" : right ? "left" : "right") }));
   });
   return nodes;
 }
@@ -947,7 +963,7 @@ function registerCore(registry) {
     component({ id: "journey", category: "relationship", role: "journey", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 960, height: 300 }, sample: { items: [{ label: "(Insert stage 1)", touchpoint: "(Insert touchpoint 1)" }, { label: "(Insert stage 2)", touchpoint: "(Insert touchpoint 2)" }, { label: "(Insert stage 3)", touchpoint: "(Insert touchpoint 3)" }, { label: "(Insert stage 4)", touchpoint: "(Insert touchpoint 4)" }], active: 3 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props, journey: true }) }) }),
     component({ id: "tree", category: "relationship", role: "tree", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert root question)", children: ["(Insert branch 1)", "(Insert branch 2)", "(Insert branch 3)", "(Insert branch 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props }) }) }),
     component({ id: "organization", category: "relationship", role: "organization", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.none", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert parent role)", children: ["(Insert role 1)", "(Insert role 2)", "(Insert role 3)", "(Insert role 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props, organization: true }) }) }),
-    component({ id: "matrix", category: "relationship", role: "matrix", tokens: ["color.componentPrimary", "color.chartSeries2", "color.surface", "color.rule", "color.ink", "color.positive", "color.caution", "color.negative", "color.onPrimary", "font.body", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 720, height: 410 }, sample: { xAxis: { label: "Effort", minLabel: "Low", maxLabel: "High" }, yAxis: { label: "Impact", minLabel: "Low", maxLabel: "High" }, points: [{ label: "A", x: 0.24, y: 0.35 }, { label: "B", x: 0.56, y: 0.62 }, { label: "C", x: 0.76, y: 0.82 }], highlight: 2 }, render: ({ id, frame, props }) => ({ nodes: matrixNodes({ id, frame, props }) }) }),
+    component({ id: "matrix", category: "relationship", role: "matrix", tokens: ["color.componentPrimary", "color.accent", "color.accentTint", "color.surfaceMuted", "color.textSecondary", "color.chartSeries2", "color.surface", "color.rule", "color.ink", "color.positive", "color.caution", "color.negative", "color.onPrimary", "font.body", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 720, height: 410 }, sample: { xAxis: { label: "Effort", minLabel: "Low", maxLabel: "High" }, yAxis: { label: "Impact", minLabel: "Low", maxLabel: "High" }, points: [{ label: "A", x: 0.24, y: 0.35 }, { label: "B", x: 0.56, y: 0.62 }, { label: "C", x: 0.76, y: 0.82 }], highlight: 2 }, render: ({ id, frame, props }) => ({ nodes: matrixNodes({ id, frame, props }) }) }),
     component({ id: "map", category: "relationship", role: "map", tokens: MAP_TOKENS, preferredSize: { width: 920, height: 440 }, sample: { geography: "world", markers: [{ label: "Americas", x: 0.2, y: 0.45, fraction: 0.75 }, { label: "Europe", x: 0.5, y: 0.34, fraction: 0.5 }, { label: "Asia", x: 0.77, y: 0.44, fraction: 0.25 }] }, render: ({ id, frame, props }) => ({ nodes: mapNodes({ id, frame, props }) }) }),
     component({ id: "funnel", category: "relationship", role: "funnel", tokens: ["color.componentPrimary", "color.chartSeries2", "color.chartSeries3", "color.chartSeries4", "color.onPrimary", "color.ink", "font.body", "type.compact", "line.hairline", "radius.small"], preferredSize: { width: 700, height: 360 }, sample: { stages: [{ label: "Market", value: 100 }, { label: "Qualified", value: 62 }, { label: "Engaged", value: 38 }, { label: "Won", value: 18 }] }, render: ({ id, frame, props, tokens = TOKENS }) => {
       const colors = [PRIMARY, token("color.chartSeries2"), token("color.chartSeries3"), token("color.chartSeries4")];

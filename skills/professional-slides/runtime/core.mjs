@@ -643,12 +643,21 @@ export function assertDeclaredComponentTokens(definition, nodes, instanceId) {
   }
 }
 
+/** The frame a rotated node occupies on the page (a quarter turn swaps its sides about its centre). */
+export function visibleFrame(node) {
+  const rotate = Number(node.style?.rotate || 0) % 180;
+  if (Math.abs(rotate) !== 90) return node.frame;
+  const { x, y, width, height } = node.frame;
+  return { x: x + width / 2 - height / 2, y: y + height / 2 - width / 2, width: height, height: width };
+}
+
 export function assertSceneBounds(nodes, bounds = SLIDE) {
   for (const node of nodes) {
     const values = [node.frame.x, node.frame.y, node.frame.width, node.frame.height];
     if (values.some((value) => !Number.isFinite(value))) throw new Error(`${node.id} has a non-finite frame`);
     if (node.frame.width < 0 || node.frame.height < 0) throw new Error(`${node.id} has a negative frame dimension`);
-    if (node.frame.x < -0.01 || node.frame.y < -0.01 || node.frame.x + node.frame.width > bounds.width + 0.01 || node.frame.y + node.frame.height > bounds.height + 0.01) {
+    const frame = visibleFrame(node);
+    if (frame.x < -0.01 || frame.y < -0.01 || frame.x + frame.width > bounds.width + 0.01 || frame.y + frame.height > bounds.height + 0.01) {
       throw new Error(`${node.id} exceeds the ${bounds.width} by ${bounds.height} slide`);
     }
   }
