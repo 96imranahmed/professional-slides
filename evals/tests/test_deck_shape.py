@@ -450,3 +450,64 @@ assert.equal(composeSlide({title:'T',points:['a'],note:[]},0).note,undefined);
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result["accepted"])
+
+
+class FurnitureTests(unittest.TestCase):
+    """The density the corpus carries and we did not: numbered footnotes bound to
+    a label, a chart that tabulates itself, and a table that goes denser before
+    it splits."""
+
+    def test_footnotes_mark_their_label_and_print_numbered(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const chart={type:'chart.column',heading:'Annual investment',unit:'$B',categories:['2019','2020','2021','2022','2023'],series:[{name:'Deal value',values:[48,62,70,62,39]}],change:{from:'2022',to:'2023'}};
+const page=composeSlide({title:'Activity declined between 2022 and 2023',exhibit:chart,points:['Deal value fell by a third'],
+  footnotes:[{on:'2022',text:'2022 includes two $4B+ deals that did not repeat'},{text:'Values are announced enterprise values'}]},0);
+assert.equal(page.note,'Notes: 1. 2022 includes two $4B+ deals that did not repeat   2. Values are announced enterprise values');
+const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
+const drawn=page.items.flatMap(find).find(i=>String(i.component||'').startsWith('chart.'));
+// The marker lands on the printed label, and the annotation that names the same
+// category still resolves, because inside an exhibit every occurrence is marked.
+assert.deepEqual(drawn.props.categories,['2019','2020','2021','2022\\u00b9','2023']);
+assert.equal(drawn.props.changeAnnotations[0].start,'2022\\u00b9');
+// The title still highlights the category it names, marker or not.
+assert.equal(drawn.props.highlights[0].category,'2022\\u00b9');
+// Nine is the limit, and a footnote needs text.
+assert.throws(()=>composeSlide({title:'T',points:['a'],footnotes:Array.from({length:10},()=>({text:'x'}))},0),/at most nine/);
+assert.throws(()=>composeSlide({title:'T',points:['a'],footnotes:[{on:'x'}]},0),/needs text/);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result["accepted"])
+
+    def test_a_chart_can_tabulate_itself(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const page=composeSlide({title:'T',points:['a','b'],exhibit:{type:'chart.column',heading:'Revenue',unit:'$m',
+  categories:['FY23','FY24','FY25'],series:[{name:'Revenue',values:[52,58.4,61]},{name:'Cost',values:[47,51,55]}],dataTable:true}},0);
+const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
+const parts=page.items.flatMap(find);
+assert.ok(parts.find(i=>String(i.component||'').startsWith('chart.')),'the chart stays the hero');
+const table=parts.find(i=>i.component==='table');
+// Values print the way the chart's own labels do: whole numbers from ten up.
+assert.deepEqual(table.props.rows,[['Revenue','52','58','61'],['Cost','47','51','55']]);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result["accepted"])
+
+    def test_a_dense_table_cell_is_allowed_below_body_type(self):
+        slide = {"id": "s01", "componentInstances": [{"id": "chrome", "component": "slide-chrome"},
+                                                     {"id": "s01-0", "component": "table",
+                                                      "frame": {"x": 60, "y": 162, "width": 1160, "height": 460}}],
+                 "nodes": [{"type": "text", "role": "table-cell-text", "text": "Region 1",
+                            "style": {"fontSize": {"value": 9.0}},
+                            "frame": {"x": 60, "y": 200, "width": 200, "height": 16}},
+                           {"type": "text", "role": "paragraph", "text": "Prose stays at body size",
+                            "style": {"fontSize": {"value": 9.0}},
+                            "frame": {"x": 60, "y": 240, "width": 400, "height": 16}}]}
+        report = page_gates.run_gates(deck([slide]))
+        findings = [f for f in report["findings"] if f["code"] == "TYPE_RANGE"]
+        roles = {f["measured"]["role"] for f in findings}
+        self.assertIn("paragraph", roles)
+        self.assertNotIn("table-cell-text", roles)

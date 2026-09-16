@@ -27,6 +27,7 @@ import path from "node:path";
 import { measureText } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount, EVIDENCE_CALLOUT_BAND } from "./chart-annotations.mjs";
 import { legendRowCount } from "./legends.mjs";
+import { measureTable } from "./tables.mjs";
 import { resolveWeight, normalizeWeight } from "./weight.mjs";
 
 const V3 = "professional-slides.deck/v3";
@@ -319,12 +320,38 @@ export function paginateTable(slide, bodyScale = 1) {
   // Row heights in body density: a one-line row takes about 34px, each further
   // line 16px, the header 40px. The budget is the body height (508px built in,
   // scaled by a template's chrome) less the page's other furniture.
-  const rowPx = (r) => 34 + 16 * (lines(r) - 1);
-  const available = 508 * bodyScale - 40 - (slide.callout ? 70 : 0) - (Array.isArray(slide.metrics) && slide.metrics.length ? 112 : 0) - (slide.soWhat ? 60 : 0);
-  const totalPx = ex.rows.reduce((sum, r) => sum + rowPx(r), 0);
-  if (totalPx <= available) return [slide];
-  const rowsPerPage = Math.max(3, Math.floor(available / Math.max(34, totalPx / ex.rows.length)));
-  if (ex.rows.length <= rowsPerPage) return [slide];
+  // Heights come from the table renderer itself, not from a model of it: the
+  // styled props (status pills, zebra bands, wrapped cells) decide the row
+  // height, and only `measureTable` knows them.
+  const width = slide.points?.length || slide.insight || slide.kpi ? Math.round((BODY_WIDTH - CONNECTOR_WIDTH - COLUMN_GAP * 3) * 3 / 5) : BODY_WIDTH;
+  // A single-line row measures 48px at body density, 32 compact and 24 dense,
+  // with a header of 44, 32 and 24: the fallback when a spec the renderer cannot
+  // measure (mismatched columns, a half-built table) reaches this far.
+  const ROW = { body: { row: 48, line: 20, header: 44 }, compact: { row: 32, line: 16, header: 32 }, dense: { row: 24, line: 14, header: 24 } };
+  const modelled = (density) => {
+    const metric = ROW[density] || ROW.body;
+    return metric.header + ex.rows.reduce((sum, r) => sum + metric.row + metric.line * (lines(r) - 1), 0);
+  };
+  const heightAt = (density) => {
+    try {
+      const styled = styleTable({ ...ex, density });
+      const measured = measureTable({ frame: { x: 0, y: 0, width, height: 100000 }, props: { ...styled, density } }).height;
+      return Number.isFinite(measured) ? measured : modelled(density);
+    } catch {
+      return modelled(density);
+    }
+  };
+  const available = 508 * bodyScale - (slide.callout ? 70 : 0) - (Array.isArray(slide.metrics) && slide.metrics.length ? 112 : 0) - (slide.soWhat ? 44 : 0) - 4;
+  // The density ladder comes before the split. A twenty-row table set compact is
+  // one page of evidence; the same table halved across two pages is two pages of
+  // half an argument, and the reference decks run tables to twenty and thirty
+  // rows rather than splitting them. `density` on the exhibit still wins.
+  const ladder = ex.density === undefined ? ["body", "compact", "dense"] : [ex.density];
+  const fits = ladder.find((density) => heightAt(density) <= available);
+  if (fits) return [fits === "body" || fits === ex.density ? slide : { ...slide, exhibit: { ...ex, density: fits } }];
+  const densest = ladder[ladder.length - 1];
+  const perRow = Math.max(20, heightAt(densest) / Math.max(1, ex.rows.length));
+  const rowsPerPage = Math.max(3, Math.floor(available / perRow));
   const pages = Math.ceil(ex.rows.length / rowsPerPage), per = Math.ceil(ex.rows.length / pages);
   return Array.from({ length: pages }, (_, i) => {
     const rows = ex.rows.slice(i * per, (i + 1) * per);
@@ -332,7 +359,7 @@ export function paginateTable(slide, bodyScale = 1) {
     const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
     const keeps = ex.highlightRow === undefined ? false : Number.isInteger(ex.highlightRow) ? ex.highlightRow >= i * per && ex.highlightRow < (i + 1) * per : rows.some((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
     const { highlightRow, ...rest } = ex;
-    const page = { ...slide, exhibit: { ...rest, rows, ...(keeps ? { highlightRow: Number.isInteger(highlightRow) ? highlightRow - i * per : highlightRow } : {}) }, title: `${slide.title} (${i + 1}/${pages})` };
+    const page = { ...slide, exhibit: { ...rest, density: densest, rows, ...(keeps ? { highlightRow: Number.isInteger(highlightRow) ? highlightRow - i * per : highlightRow } : {}) }, title: `${slide.title} (${i + 1}/${pages})` };
     if (slide.id) page.id = `${slide.id}-${i + 1}`;
     if (i !== 0) delete page.points;
     return page;
@@ -345,6 +372,12 @@ export function paginateTable(slide, bodyScale = 1) {
  * and the page reading empty, where a ceiling of 80 keeps the scale honest and
  * the marks worth looking at.
  */
+/** A chart value as a table cell: whole numbers from ten up, one decimal below. */
+function formatTableValue(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return String(value ?? "");
+  return Math.abs(value) >= 10 ? String(Math.round(value)) : String(Math.round(value * 10) / 10);
+}
+
 function niceCeiling(value) {
   if (!(value > 0)) return 1;
   const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
@@ -468,7 +501,10 @@ function highlightFromTitle(ex, title) {
   if (!ex || !["chart.column", "chart.bar", "chart.range"].includes(ex.type) || (ex.highlights || []).length) return ex;
   if (ex.type !== "chart.range" && (!Array.isArray(ex.series) || ex.series.length !== 1)) return ex;
   const t = String(title || "").toLowerCase();
-  const hits = (ex.categories || []).filter((c) => String(c).length >= 3 && new RegExp(`(^|[^a-z0-9])${String(c).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9])`).test(t)).sort((a, b) => t.indexOf(String(a).toLowerCase()) - t.indexOf(String(b).toLowerCase()));
+  // A category may carry a footnote marker ("2022\u00b9"); the title does not, so
+  // the match is made on the bare label.
+  const bare = (value) => String(value).replace(/[\u00b9\u00b2\u00b3\u2074-\u2079]/g, "");
+  const hits = (ex.categories || []).filter((c) => bare(c).length >= 3 && new RegExp(`(^|[^a-z0-9])${bare(c).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9])`).test(t)).sort((a, b) => t.indexOf(bare(a).toLowerCase()) - t.indexOf(bare(b).toLowerCase()));
   return hits.length ? { ...ex, highlights: [{ category: hits[0], style: "bar" }] } : ex;
 }
 
@@ -575,8 +611,70 @@ function pairedBars(slide) {
   return { ...slide, exhibit: undefined, exhibits: panels, arrange: "row", pairedHeading: heading, pairedWeights: series.map((_, i) => (i ? 1 : 1.35)) };
 }
 
+/**
+ * `footnotes: [{ on, text }]`: the firm page's numbered notes. Each one prints a
+ * superscript against the first occurrence of `on` — a category, a series name,
+ * a column label, a table cell, a point — and its text joins the numbered note
+ * line under the page. A footnote with no `on` (or whose `on` is not found) is
+ * still numbered and still printed: the note is the point, the marker is a
+ * convenience. This is where a page's basis, exclusion and as-at date live, and
+ * it is the cheapest honest density there is.
+ */
+const FOOTNOTE_MARKS = ["\u00b9", "\u00b2", "\u00b3", "\u2074", "\u2075", "\u2076", "\u2077", "\u2078", "\u2079"];
+function applyFootnotes(slide) {
+  const list = Array.isArray(slide.footnotes) ? slide.footnotes : null;
+  if (!list || !list.length) return slide;
+  if (list.length > FOOTNOTE_MARKS.length) throw new Error("A page carries at most nine footnotes");
+  const notes = [];
+  const pending = list.map((entry, index) => {
+    const text = String((typeof entry === "string" ? entry : entry?.text) ?? "").trim();
+    if (!text) throw new Error("A footnote needs text");
+    notes.push(text);
+    const on = typeof entry === "object" && entry?.on ? String(entry.on) : null;
+    return { on, mark: FOOTNOTE_MARKS[index], placed: !on };
+  });
+  // Inside an exhibit a category, a series or a column label is both a printed
+  // label and the key the chart matches its highlights and annotations by, so
+  // every occurrence takes the marker and the references keep resolving.
+  // Outside it, prose takes the marker once.
+  const walk = (node, everywhere) => {
+    if (typeof node === "string") {
+      let out = node;
+      for (const item of pending) {
+        if (!item.on || (item.placed && !everywhere)) continue;
+        if (!out.includes(item.on)) continue;
+        if (!everywhere) {
+          const at = out.indexOf(item.on);
+          out = `${out.slice(0, at + item.on.length)}${item.mark}${out.slice(at + item.on.length)}`;
+        } else {
+          out = out.split(item.on).join(`${item.on}${item.mark}`);
+        }
+        item.placed = true;
+      }
+      return out;
+    }
+    if (Array.isArray(node)) return node.map((item) => walk(item, everywhere));
+    if (node && typeof node === "object") {
+      const out = {};
+      for (const [key, value] of Object.entries(node)) out[key] = key === "path" || key === "type" || key === "dataUri" ? value : walk(value, everywhere);
+      return out;
+    }
+    return node;
+  };
+  const marked = {};
+  if (slide.exhibit !== undefined) marked.exhibit = walk(slide.exhibit, true);
+  if (slide.exhibits !== undefined) marked.exhibits = walk(slide.exhibits, true);
+  for (const key of ["points", "rows", "metrics", "insight", "kpi", "callout"]) {
+    if (slide[key] !== undefined) marked[key] = walk(slide[key], false);
+  }
+  const existing = slide.note === undefined ? [] : Array.isArray(slide.note) ? slide.note : [slide.note];
+  const { footnotes, ...rest } = slide;
+  return { ...rest, ...marked, note: [...notes, ...existing] };
+}
+
 export function composeSlide(slide, index, baseDir, fill = "balanced") {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
+  slide = applyFootnotes(slide);
   slide = pairedBars(slide);
   if (slide.exhibit) slide = { ...slide, exhibit: changeFromContent(highlightFromTitle(percentStack(slide.exhibit), slide.title), slide.title) };
   if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => changeFromContent(highlightFromTitle(percentStack(ex), slide.title), slide.title)) };
@@ -587,6 +685,12 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
   const slideIn = slide;
   // A value table under the chart: the chart stacks over a compact table whose
   // columns are the chart's categories.
+  // `dataTable: true` tabulates the chart's own series under it: the same
+  // numbers, printed, which is the cheapest second element a page can carry and
+  // what the reference pages do under a column chart.
+  if (slide.exhibit && slide.exhibit.dataTable === true && Array.isArray(slide.exhibit.series) && !slide.exhibits) {
+    slide = { ...slide, exhibit: { ...slide.exhibit, dataTable: slide.exhibit.series.map((series) => ({ label: series.name, values: (series.values || []).map((value) => formatTableValue(value)) })) } };
+  }
   if (slide.exhibit && Array.isArray(slide.exhibit.dataTable) && slide.exhibit.dataTable.length && !slide.exhibits) {
     const chart = { ...slide.exhibit }; const rowsIn = chart.dataTable; delete chart.dataTable;
     const table = { type: "table", density: "compact", treatment: "open", variant: "plain", columns: [{ label: "", type: "text", bold: true, width: 120 }, ...(chart.categories || []).map((c) => ({ label: "", type: "text", align: "center", width: 80 }))], rows: rowsIn.map((r) => [r.label, ...(r.values || []).map(String)]) };

@@ -58,6 +58,9 @@ NON_BODY_ROLES = SOURCE_ROLES | CHART_FURNITURE_ROLES | TITLE_ROLES | {
     "cover-title", "cover-subtitle", "section-title",
 }
 PROSE_ROLES = {"paragraph", "body", "body-text"}
+# Table text is a lookup value, so it may be set one step below body type when
+# the table is dense; prose may not.
+TABLE_TEXT_ROLES = {"table-cell-text", "table-cell", "table-header-text"}
 
 # Components that count as an exhibit for HERO_EXHIBIT.
 EXHIBIT_COMPONENTS = {
@@ -94,6 +97,10 @@ DOT_SEPARATOR_RE = re.compile(
 
 TYPE_RANGES = {
     "body": (10.0, 14.0),
+    # A table set dense carries its cells at 9 pt. The reference decks run
+    # twenty- and thirty-row tables at that size rather than splitting them, and
+    # a cell is a lookup value, not prose.
+    "table-dense": (9.0, 14.0),
     "chart-furniture": (8.0, 11.0),
     "action-title": (20.0, 26.0),
     "source": (7.0, 9.0),
@@ -476,7 +483,9 @@ def gate_type_range(slide_no, slide, findings):
         size = font_size(node)
         if size is None:
             continue
-        if role in BODY_ROLES:
+        if role in TABLE_TEXT_ROLES:
+            band = "table-dense"
+        elif role in BODY_ROLES:
             band = "body"
         elif role == "chart-unit" and (node.get("data") or {}).get("chartUnitPlacement") == "inline":
             # The inline unit sits on the heading's line at the heading's size,
@@ -876,7 +885,8 @@ def gate_thin_evidence(slide_no, slide, findings):
     wanted = int(WEIGHT.get("elements") or 1)
     if wanted < 2:
         return
-    instances = top_level_instances(slide)
+    instances = [c for c in slide.get("componentInstances", [])
+                 if str(c.get("id") or "") not in ("chrome", "cover", "page-template")]
     elements = len([c for c in instances if is_exhibit(c)])
     if any(str(c.get("component") or "") == "metric" for c in instances):
         elements += 1

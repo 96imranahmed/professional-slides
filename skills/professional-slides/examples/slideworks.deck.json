@@ -120,7 +120,16 @@
      "text": "so deployment is set to recover as valuations settle"
     }
    ],
-   "source": "Venture Intelligence; Bain analysis"
+   "source": "Venture Intelligence; Bain analysis",
+   "footnotes": [
+    {
+     "on": "2022",
+     "text": "2022 includes two $4B+ deals that did not repeat"
+    },
+    {
+     "text": "Deal values are announced enterprise values, not equity cheques"
+    }
+   ]
   },
   {
    "title": "Traditional sectors demonstrated resilience in an otherwise slowing market",
@@ -194,7 +203,13 @@
      "text": "in 2023, gaining share as investors backed proven models"
     }
    ],
-   "source": "Venture Intelligence; Bain analysis"
+   "source": "Venture Intelligence; Bain analysis",
+   "footnotes": [
+    {
+     "on": "New-age tech",
+     "text": "Consumer internet, fintech and SaaS businesses founded after 2010"
+    }
+   ]
   },
   {
    "title": "South Korea limited spread through rapid cluster investigation and scaled testing",
@@ -287,7 +302,13 @@
     }
    ],
    "source": "KCDC situation reports",
-   "soWhat": "Testing capacity and contact tracing, not movement restrictions, did the work in the first wave."
+   "soWhat": "Testing capacity and contact tracing, not movement restrictions, did the work in the first wave.",
+   "footnotes": [
+    {
+     "on": "Mar 9",
+     "text": "The date the 180,000th test was recorded, not the peak of new cases"
+    }
+   ]
   },
   {
    "title": "Washington DC ranks third among very large US urban areas for congestion delay",
@@ -389,7 +410,16 @@
     "lead": "What congestion means to you",
     "text": "102 hours of yearly delay per auto commuter and $2,015 of congestion cost; excess fuel follows the same ranking"
    },
-   "source": "Texas A&M Urban Mobility Report, 2017"
+   "source": "Texas A&M Urban Mobility Report, 2017",
+   "footnotes": [
+    {
+     "on": "Delay, hours",
+     "text": "Yearly delay per auto commuter; excludes freight and transit riders"
+    },
+    {
+     "text": "Travel time index is the peak-hour journey against the same trip at free flow"
+    }
+   ]
   },
   {
    "title": "Sector outlook: healthcare and manufacturing stay strong while IT stays soft",
@@ -532,7 +562,13 @@
      "text": "and skews to Asia"
     }
    ],
-   "source": "Company reports; team analysis"
+   "source": "Company reports; team analysis",
+   "footnotes": [
+    {
+     "on": "Wealth",
+     "text": "Wealth and asset management, including the private-bank channel"
+    }
+   ]
   },
   {
    "title": "Transit commutes track income and place of work across the District's wards",
@@ -631,7 +667,8 @@
        5
       ]
      }
-    ]
+    ],
+    "dataTable": true
    },
    "pointsTone": "tint",
    "pointsHeading": false,
@@ -702,7 +739,13 @@
     "Data-security training is the second most common prerequisite",
     "The few without access cite regulatory uncertainty"
    ],
-   "source": "IACPM/McKinsey survey, December 2024 (n = 33)"
+   "source": "IACPM/McKinsey survey, December 2024 (n = 33)",
+   "footnotes": [
+    {
+     "on": "Some colleagues",
+     "text": "Access granted to named teams rather than the whole institution"
+    }
+   ]
   },
   {
    "title": "The global spread is accelerating with more reports of local transmission",

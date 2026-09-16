@@ -92,13 +92,20 @@ assert.equal(t.rows[2].style,'total');
 const o=styleTable({recommended:'SystemMax',columns:['Criterion','Option A','SystemMax'],rows:[['Fit','✓','✓']]});
 assert.equal(o.highlightColumn,2);
 assert.throws(()=>styleTable({recommended:'Nope',columns:['A','B'],rows:[['x','y']]}),/recommended/);
-// Long tables paginate with the header repeated and the title marked.
-const rows=Array.from({length:14},(_,i)=>[`Row ${i+1}`,'x']);
-const pages=paginateTable({id:'long',title:'Fourteen rows',exhibit:{type:'table',columns:['A','B'],rows},points:['p']});
-assert.equal(pages.length,2);assert.deepEqual(pages.map(p=>p.exhibit.rows.length),[7,7]);
-assert.deepEqual(pages.map(p=>p.title),['Fourteen rows (1/2)','Fourteen rows (2/2)']);
-assert.deepEqual(pages.map(p=>p.points),[['p'],undefined]);
-assert.equal(paginateTable({title:'t',exhibit:{type:'table',columns:['A'],rows:rows.slice(0,8)}}).length,1);
+// The density ladder comes before the split: fourteen short rows beside a
+// points column are one page set compact or dense, not two pages of seven.
+const rows=(n)=>Array.from({length:n},(_,i)=>[`Row ${i+1}`,'x']);
+const one=paginateTable({id:'long',title:'Fourteen rows',exhibit:{type:'table',columns:['A','B'],rows:rows(14)},points:['p']});
+assert.equal(one.length,1);
+assert.ok(['compact','dense'].includes(one[0].exhibit.density),'the table steps down a density instead of splitting');
+// Past what the page can hold at its densest, it paginates with the header
+// repeated, the title marked and the points on the first page only.
+const pages=paginateTable({id:'long',title:'Many rows',exhibit:{type:'table',columns:['A','B'],rows:rows(60)},points:['p']});
+assert.ok(pages.length>=2);
+assert.deepEqual(pages.map(p=>p.title.replace(/\(\d+\/\d+\)/,'(n/n)'))[0],'Many rows (n/n)');
+assert.equal(pages[0].points[0],'p');assert.equal(pages[1].points,undefined);
+assert.ok(pages.every(p=>p.exhibit.density==='dense'));
+assert.equal(paginateTable({title:'t',exhibit:{type:'table',columns:['A','B'],rows:rows(8)}}).length,1);
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
