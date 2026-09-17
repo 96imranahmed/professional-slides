@@ -100,8 +100,7 @@
     "UNREADABLE",
     "OVERFLOW",
     "BROKEN_GEOMETRY",
-    "PROVENANCE",
-    "BROKEN_DEPENDENCY"
+    "PROVENANCE"
   ],
   "reviewer": {
     "models": [

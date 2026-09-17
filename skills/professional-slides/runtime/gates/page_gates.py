@@ -38,6 +38,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nice_ticks import is_nice_tick, nice_axis, parse_number  # noqa: E402
 
+# The weight contract and the corpus it is calibrated against. One file, read
+# here and by runtime/weight.mjs, so a floor cannot move in the composer
+# without moving in the finding that reports it.
+CONTRACT = json.loads((Path(__file__).resolve().parent.parent / "weight.json").read_text(encoding="utf-8"))
+
 CANVAS_W, CANVAS_H = 1280, 720
 INK_LUMINANCE = 235
 SURFACE_LUMINANCE = 250
@@ -131,32 +136,26 @@ DEFAULT_PROFILE = "executive"
 # published client decks run a median ink share of 19% with a lower quartile of
 # 12%. A balanced page floors just under that quartile; a document-weight page
 # at it; an airy page is allowed to be a poster.
-FILL_LEVELS = {
-    "full": {"ink_min": 0.14, "dead_band_max": 0.06, "internal_void_max": 0.16, "column_void_max": 0.20},
-    "balanced": {"ink_min": 0.115, "dead_band_max": 0.08, "internal_void_max": 0.22, "column_void_max": 1.0},
-    "airy": {"ink_min": 0.05, "dead_band_max": 0.14, "internal_void_max": 0.32, "column_void_max": 1.0},
-}
-# The reference corpus, for the density report: sampled pages of published
-# McKinsey, BCG and Bain decks measured on the same 1280x720 basis.
-REFERENCE_PAGE = {"inkMedian": 0.19, "inkQ1": 0.121, "words": 181, "textBlocks": 135, "furnitureWords": 27}
-DEFAULT_FILL = "balanced"
+FILL_LEVELS = CONTRACT["geometryByFill"]
+# The reference corpus, measured two ways. `slides` is the careful sample: 137
+# landscape analytical slides of published McKinsey, BCG and Bain client work,
+# with covers, dividers, back matter and portrait proposal documents excluded,
+# decomposed band by band and block by block. `corpus` is the wide sample.
+REFERENCE_PAGE = CONTRACT["reference"]["slides"]
+DEFAULT_FILL = CONTRACT["defaultFill"]
 
-# What a page of this deck is expected to carry. Mirrors runtime/weight.mjs: the
-# deck's `weight` (its own, or the one a template's house profile measured) is
-# carried on the scene, and these are the fallbacks by fill level. Every number
-# is a floor, never a ceiling — the ceiling on prose is WORDS, and density is
-# only a defect when the content is not.
-WEIGHT_BY_FILL = {
-    "full": {"pageWords": 120, "columnFill": 0.68, "plotSpan": 0.60, "pointWords": 10, "tableFill": 0.55, "elements": 2},
-    "balanced": {"pageWords": 95, "columnFill": 0.55, "plotSpan": 0.52, "pointWords": 8, "tableFill": 0.45, "elements": 1},
-    "airy": {"pageWords": 0, "columnFill": 0.0, "plotSpan": 0.0, "pointWords": 0, "tableFill": 0.0, "elements": 1},
-}
-# 1,832 pages of published McKinsey, BCG and Bain client decks: median 196 words
-# of page text, quartiles 127 and 282. The floors sit below that on purpose.
-REFERENCE_PAGE_WORDS = {"p25": 127, "median": 196, "p75": 282, "pages": 1832}
-# The same corpus, measured slide by slide and split into the page's three
-# bands: what a reference analytical slide carries where.
-REFERENCE_PAGE_BANDS = {"titleBand": 20, "body": 128, "footer": 19, "pages": 137}
+# What a page of this deck is expected to carry. The deck's `weight` (its own,
+# or the one a template's house profile measured) is carried on the scene, and
+# these are the fallbacks by fill level. Every number is a floor, never a
+# ceiling — the ceiling on prose is WORDS, and density is only a defect when
+# the content is not.
+WEIGHT_BY_FILL = CONTRACT["byFill"]
+# The wide corpus: 1,832 pages of page text, median 196 words, quartiles 127 and
+# 282. The floors sit below that on purpose.
+REFERENCE_PAGE_WORDS = CONTRACT["reference"]["corpus"]
+# The careful sample, split into the page's three bands: what a reference
+# analytical slide carries where.
+REFERENCE_PAGE_BANDS = dict(REFERENCE_PAGE["bands"], pages=REFERENCE_PAGE["pages"])
 WEIGHT = dict(WEIGHT_BY_FILL[DEFAULT_FILL])
 
 THRESHOLDS = {
@@ -309,7 +308,69 @@ def content_frame(slide):
     return {"x": 60, "y": 162, "width": 1160, "height": 506}
 
 
+# --- the gate vocabulary ---------------------------------------------------
+#
+# Every code a gate can emit, with the one line that says what it is about. The
+# docs used to name codes that had been renamed (TITLE_TOO_LONG for what is now
+# TITLE_WORDS) and to omit codes that existed, because there was no list to
+# check against. This is the list, and a test holds the documentation to it.
+GATE_CODES = {
+    "INK_COVERAGE": "the content area carries too little ink to read as a page",
+    "DEAD_BAND": "a trailing band of nothing under the content",
+    "INTERNAL_VOID": "a gap between two content blocks the page does nothing with",
+    "COLUMN_VOID": "the right column stops well above the footer",
+    "TITLE_LINES": "an action title over two lines",
+    "TITLE_WORDS": "an action title past the word budget",
+    "HEDGED_TITLE": "an action title that does not commit to a finding",
+    "TYPE_RANGE": "type set outside the approved range for its role",
+    "CPL": "a measure too narrow or too wide to read",
+    "WORDS": "prose doing the work an exhibit should do",
+    "HERO_EXHIBIT": "an analytical page with no dominant exhibit carrying ink",
+    "LAYOUT_MONOTONY": "one layout signature across most of the deck",
+    "PAGE_VARIETY": "too few page families across the deck",
+    "EVIDENCE_MIX": "too few analytical pages carry a measured exhibit",
+    "IMAGE_BUDGET": "photographs on too many analytical pages",
+    "IMAGE_RUN": "photographs on too many consecutive pages",
+    "MISSING_ARGUMENT": "a picture or comparison page with no argument on it",
+    "METRIC_STACK": "one number parked above a table instead of beside it",
+    "NO_SECTIONS": "a long deck with no sections and no tracker",
+    "DOT_SEPARATOR": "a bullet or middle dot joining two labels",
+    "HEADING_WRAPS": "a heading that wraps where it should fit",
+    "THIN_PAGE": "the page body carries less than the deck's weight contract",
+    "NOTE_HEAVY": "the footer is carrying the page",
+    "THIN_COLUMN": "the commentary column stops short of its track",
+    "POINT_DEPTH": "points that are labels rather than findings",
+    "PLOT_SPAN": "marks spanning too little of the exhibit frame",
+    "THIN_TABLE": "a table using too little of the page's row budget",
+    "THIN_EVIDENCE": "fewer evidence elements than the deck said it would carry",
+    "NUMBERS_ON_MARKS": "marks carrying no printed value",
+    "UNANNOTATED": "a plot with no bracket, flag, change bubble or base",
+    "NICE_TICKS": "an axis on numbers a reader would not choose",
+    "DECK_FLAT": "no page in the deck carries the detail",
+    "MISSING_RENDER": "a page the gates could not measure because it did not render",
+}
+
+# Findings raised before the page is rendered: the composer's plan-time budget
+# and the deck's coverage check. They are not gates, but they share the shape.
+COMPOSE_CODES = {
+    "THIN_PLAN": "what the page will carry falls under the floor, before it is built",
+    "MISSING_EVIDENCE": "a ranked criterion with no comparative exhibit",
+}
+
+
+def emitted_codes():
+    """The codes this module can actually emit, read from its own source.
+
+    A gate that emits a code missing from GATE_CODES, or a code documented
+    there that no gate emits, is drift; the eval suite fails on either.
+    """
+    source = Path(__file__).resolve().read_text(encoding="utf-8")
+    return set(re.findall(r'finding\(\s*\n?\s*\w+,\s*"([A-Z_]+)"', source)) | {"MISSING_RENDER"}
+
+
 def finding(slide_no, code, measured, threshold, repair):
+    if code not in GATE_CODES:
+        raise KeyError(f"{code} is not in the gate vocabulary; add it to GATE_CODES with the line that says what it is about")
     return {
         "slide": slide_no,
         "code": code,

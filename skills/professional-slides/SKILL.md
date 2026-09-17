@@ -240,21 +240,23 @@ The catalogue covers the consulting repertoire; pick by the reader's question. *
 
 When the client or the firm supplies a template `.pptx`, read it first and let the deck inherit its house: `python3 runtime/import-template.py template.pptx --base bcg` writes `template.house.json`, a `professional-slides.house/v1` profile, and prints what it inferred. The profile carries a palette overlay on the nearest built-in base (ink, primary, accent and their tints, the six chart series, the muted surface, taken from the theme's colour scheme or, when the theme is stock Office, from the fills the slides actually use), the display and body faces (installed faces only; an uninstalled face is reported), the chrome (left and right margins, title top, body top and footer top on the 1280 × 720 page, read from the title and body placeholders), the repeated footer copy as the deck's `footer`, a density profile from the median words and shapes per slide (`live-pitch` / `executive` / `pre-read`) and a complexity reading. The profile also carries the house's **weight**: the importer measures the template's own median words a slide, shapes a slide and body coverage, and writes `fill` plus the `weight` block, so a deck built on a dense house is held to that house's density and a deck built on a sparse one is not. Read the `observations` before building: they say which values were measured and which were guessed, including how the weight was derived. Then set `"template": "template.house.json"` on the deck; the profile fills `palette`, `typography`, `chrome`, `pageTemplate`, `density` and `footer` wherever the spec leaves them unset, and a hand-set `palette` or `chrome` still wins. Edit the profile when a guess is wrong (an accent the importer took from a highlight, a body top set by a subtitle placeholder the deck will not use); it is plain JSON.
 
-## Density is not the enemy
+## How full a page reads
 
 A full page is not a crowded page. Published McKinsey, BCG and Bain client decks - 137 analytical slides measured page by page, with covers, dividers, back matter and portrait proposal documents excluded - run like this, against our own:
 
 | Per analytical page | Reference | Ours today |
 | --- | --- | --- |
 | Ink on the page | 19% (quartiles 12% and 32%) | 20% |
-| Words of page text | 185 (p20 104, p80 278) | 128 |
-| — in the title band | 20 | 18 |
-| — **in the body** | **128** | **107** |
-| — in the footer, source and notes | 19 | 24 |
-| Text blocks | 56 line-blocks (40 of them labels of 1–3 words) | 44 |
+| Words of page text | 185 (p20 104, p80 278) | 163 |
+| - in the title band | 20 | 18 |
+| - **in the body** | **128** | **110** |
+| - in the footer, source and notes | 19 | 24 |
+| Text blocks | 142 (56 line-blocks, 40 of them labels of 1-3 words) | 127 |
 | Numeric tokens | 17 | 23 |
 | Drawn objects (marks, rules, brackets) | 29 | 31 |
-| Pages carrying 200+ words | 42% | 8% |
+| Pages carrying 200+ words | 42% | 9% |
+
+Those numbers are not prose: they live in `runtime/weight.json`, which the composer and the gates both read, and this table is checked against that file.
 
 **The floor counts the body.** The title band, the source and the notes are not evidence, and a page that clears a page-wide floor on the strength of a third note has padded the wrong band: `THIN_PAGE` measures the body alone, and `NOTE_HEAVY` reports a page whose footer runs past a third of its text.
 
@@ -262,29 +264,44 @@ A full page is not a crowded page. Published McKinsey, BCG and Bain client decks
 
 Read it carefully: our *body prose* already matches theirs. The gap is everything around the evidence - the labels on the marks, the units, the row headers, the numbered notes, the second cut of the measure. A ten-row table with four quantitative columns and four footnote markers is a normal page. Three charts side by side, each with its heading and unit, flanked by two statements that carry the numbers in words, is a normal page.
 
-Look at the distribution rather than the median and the real gap appears: over 137 analytical reference slides the page text runs 104 words at the lower quintile, 185 at the median and 278 at the upper - and **two pages in five carry 200 words or more**. Our pages are not thin; our *decks* had no heavy page at all. A deck whose pages all weigh the same has not decided which pages matter, which is what the `DECK_FLAT` finding now says.
+Look at the distribution rather than the median and the real gap appears: page text runs 104 words at the lower quintile, 185 at the median and 278 at the upper - and **two pages in five carry 200 words or more**. Our pages are not thin; our *decks* had no heavy page at all. A deck whose pages all weigh the same has not decided which pages matter, which is what the `DECK_FLAT` finding says.
 
-The heavy page is usually one of four shapes. The findings matrix (`rows` with `cells`): findings down the left, two or three columns of short bulleted evidence across, 300-500 words and no chart. The deep measure table: ten to fifteen rows, four to six measures under grouped headers with their units, footnote markers on the cells that need a basis. The model page: the assumptions grid behind a forecast. The half-and-half: a chart with its own callout on one side, six icon-led points on the other.
+### Four heavy-page shapes
+
+The heavy page is usually one of four, and each is a `shape` the composer will build:
+
+| `shape` | What it is | What it needs |
+| --- | --- | --- |
+| `findings-matrix` | findings down the left, two or three columns of short bulleted evidence across; 300-500 words and no chart | `rows` with `cells` |
+| `measure-table` | ten to fifteen rows, four to six measures under grouped headers with their units, footnote markers on the cells that need a basis | a `table` exhibit, `derive`, `total` |
+| `model-page` | the assumptions grid behind a forecast | a chart plus its `dataTable` |
+| `half-and-half` | a chart with its own callout on one side, six icon-led points on the other | an exhibit and `points` |
+
+Naming the shape sets the page's own weight and the defaults that shape needs, so a page that means to be the deck's heavy one does not have to be assembled key by key.
+
+### What belongs on a full page
 
 So the instinct to "keep it clean" is usually the instinct to hand the reader less evidence than the analysis produced. Give the page everything that is *load-bearing*:
 
 - **The rows behind the summary.** If the table has four rows because you summarised twelve, show the twelve and band the three that decide it.
 - **The second cut.** The same measure by segment, by region, by year - beside the first, on the same scale, so the reader can see that the finding holds. `dataTable: true` on a chart tabulates its own series underneath it: the same numbers, printed, which is the cheapest second element a page can carry.
 - **The numbers on the marks.** A labelled bar is one reading; a bar plus an axis is two.
-- **The commentary column in full sentences.** A lead and a sentence per point, not a three-word label. Three labels in a 360px column leave two fifths of it white. Two findings and no list is `insights: ["…", "…"]`, a plain statement above a boxed one, not one box floating in the middle of the track.
+- **The commentary column in full sentences.** A lead and a sentence per point, not a three-word label. Three labels in a 360px column leave two fifths of it white. Two findings and no list is `insights: ["...", "..."]`, a plain statement above a boxed one, not one box floating in the middle of the track.
 - **The second reading of the same numbers.** `derive: ["share", "rank", "change"]` on a table, `total: true` under it, `sub` inside the measure cell, `dataTable: true` under a chart. None of it invents data: it prints what the table already holds, which is where a reference page finds its fifth and sixth columns.
 - **The band furniture.** The reference pages name the part of the argument above the title (`kicker: "People"`), head every column of a label table (`columns: ["Occupation", "What the data shows"]`) and unit every measure. It is a dozen words a page, set small, and it is most of the gap between their text-block count and ours.
 - **The basis.** A footnote that says what is included, what is excluded, and as at when. It costs a line and it is the difference between a claim and an assertion. `footnotes: [{ on: "2022", text: "2022 includes two $4B+ deals that did not repeat" }, { text: "Values are announced enterprise values" }]` prints a superscript against that label - a category, a series, a column, a cell, a point - and the numbered notes under the page. `note` also takes a plain list when nothing needs marking. The reference pages carry two to four.
 
-What does *not* belong is padding: a sentence that transcribes the chart, a caption that names what the reader can see, a heading that says "What it means" above three words, a fourth decorative photograph. Every gate in this skill is a floor on evidence and a ceiling on prose, in that order: `THIN_PAGE`, `THIN_COLUMN`, `POINT_DEPTH`, `THIN_TABLE`, `PLOT_SPAN`, `NUMBERS_ON_MARKS` (every mark carries its value while a chart has twelve marks or fewer) and `UNANNOTATED` (a plot with no bracket, flag, change bubble or base) fire when the page is carrying less than the deck said it would; `DECK_FLAT` when no page in the deck carries the detail; `THIN_PLAN` reports the same shortfall at plan time, with the remedy that page's own data offers; `WORDS`, `CPL`, `NOTE_HEAVY` and `TITLE_TOO_LONG` fire when prose, or a note block, is doing an exhibit's job. A page that trips none of them is dense in evidence and lean in words, which is what a firm page is.
+What does *not* belong is padding: a sentence that transcribes the chart, a caption that names what the reader can see, a heading that says "What it means" above three words, a fourth decorative photograph. Every gate in this skill is a floor on evidence and a ceiling on prose, in that order: `THIN_PAGE`, `THIN_COLUMN`, `POINT_DEPTH`, `THIN_TABLE`, `PLOT_SPAN`, `NUMBERS_ON_MARKS` (every mark carries its value while a chart has twelve marks or fewer) and `UNANNOTATED` (a plot with no bracket, flag, change bubble or base) fire when the page is carrying less than the deck said it would; `DECK_FLAT` when no page in the deck carries the detail; `THIN_PLAN` reports the same shortfall at plan time, with the remedy that page's own data offers; `WORDS`, `CPL`, `NOTE_HEAVY` and `TITLE_WORDS` fire when prose, or a note block, is doing an exhibit's job. A page that trips none of them is dense in evidence and lean in words, which is what a firm page is.
 
-## How full a page reads
+## Density, fill and the weight contract
 
-Emptiness is right for some decks and wrong for others, so the deck says which it is. `fill` takes `full`, `balanced` or `airy`; absent, it follows the density (`pre-read` and `appendix` fill, `live-pitch` is airy, `executive` is balanced). On a `full` deck the side column's points spread down the column instead of hugging its top, and the page gates tighten: ink coverage 10%, trailing band 6%, internal void 16%, and a new COLUMN_VOID finding when the right column stops more than a fifth of the page above the footer — the commonest way a page reads empty while the page-wide bands stay inside their limits. On an `airy` deck the same three thresholds relax (4%, 14%, 32%) and the column gate is off, so a live-pitch page can carry one chart and three words without argument.
+Three settings govern how full a deck reads, from coarsest to finest, and each falls back to the one above it.
 
-## The weight contract
+**`density`** sets type, spacing and chrome. `executive` is the default. Use `pre-read` when the document is read unattended and the page must stand without narration. Use `live-pitch` only when the deck is presented and the words are spoken aloud; an analytical brief uses `executive` or `pre-read`. `appendix` is for source-rich support behind the main story. Choose once per coherent family of pages.
 
-`fill` says how full the pages read; `weight` says what a page must carry, and it is the same contract for every page of the deck, so one template governs density the way it governs colour.
+**`fill`** takes `full`, `balanced` or `airy`, and follows the density when unset (`pre-read` and `appendix` fill, `live-pitch` is airy, `executive` is balanced). On a `full` deck the side column's points spread down the column instead of hugging its top, and the geometric gates tighten: ink coverage 14%, trailing band 6%, internal void 16%, and a `COLUMN_VOID` finding when the right column stops more than a fifth of the page above the footer - the commonest way a page reads empty while the page-wide bands stay inside their limits. On an `airy` deck the same thresholds relax (5%, 14%, 32%) and the column gate is off, so a live-pitch page can carry one chart and three words without argument.
+
+**`weight`** says what a page must carry, and it is the same contract for every page of the deck, so one template governs density the way it governs colour.
 
 ```json
 { "fill": "full",
@@ -302,13 +319,9 @@ Emptiness is right for some decks and wrong for others, so the deck says which i
 
 One floor is not a page's but the deck's: `DECK_FLAT` reports a deck of eight analytical pages or more where none carries 282 words (the corpus's upper quartile) and the eightieth percentile sits within a third of the median. The repair is a page that carries the detail, not a sentence added to every page.
 
-It resolves in three steps: the deck's own `weight`, then the `weight` in the house profile a `template` produced, then the defaults for the deck's `fill` (full 120 / 0.68 / 0.60, balanced 95 / 0.55 / 0.52, airy off). The floors are body words against the reference corpus's own body median of 128. A deck that is not carrying a client argument - a style specimen, a component catalogue - says so with its own `weight` rather than being held to a client deck's floor. Every number is a floor, never a ceiling: the ceiling on prose is the `WORDS` gate and it has not moved. A catalogue of components or chart types declares `fill: "airy"` and the floors switch off - a page that exists to show one encoding is not carrying an argument.
+`weight` resolves in three steps: the deck's own block, then the `weight` in the house profile a `template` produced, then the defaults for the deck's `fill` (full 120 / 0.68 / 0.60, balanced 95 / 0.55 / 0.52, airy off). The floors are body words against the reference corpus's own body median of 128. A deck that is not carrying a client argument - a style specimen, a component catalogue - says so with its own `weight` rather than being held to a client deck's floor. Every number is a floor, never a ceiling: the ceiling on prose is the `WORDS` gate and it has not moved. A catalogue of components or chart types declares `fill: "airy"` and the floors switch off.
 
-Both the gates and the runtime read the same block, so a change to it moves the composed page as well as the finding: on a deck that is not airy the side column spreads its points down its track, its width is negotiated against what it holds (a short column narrows and gives the width to the exhibit; a long one widens), and the bars thicken when there are few categories.
-
-## Density
-
-`executive` is the default. Use `pre-read` when the document is read unattended and the page must stand without narration. Use `live-pitch` only when the deck is presented and the words are spoken aloud; an analytical brief uses `executive` or `pre-read`. `appendix` is for source-rich support behind the main story. Choose once per coherent family of pages and keep type, spacing and chrome on that one profile.
+Both the gates and the runtime read the same `runtime/weight.json`, so a change to a floor moves the composed page as well as the finding that reports it: on a deck that is not airy the side column spreads its points down its track, its width is negotiated against what it holds (a short column narrows and gives the width to the exhibit; a long one widens), and the bars thicken when there are few categories.
 
 ## Further detail
 

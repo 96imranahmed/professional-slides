@@ -518,6 +518,52 @@ class BandFurnitureTests(unittest.TestCase):
     """The band above the title, the headers on a label table and the second
     statement box: the small furniture the reference pages carry page after page."""
 
+    def test_a_standfirst_replaces_the_title_rule_rather_than_stacking_under_it(self):
+        # A rule and a standfirst do the same job - they close the title band -
+        # so a page takes one or the other. The standfirst carries the measure
+        # and the rule carries nothing, so the standfirst wins.
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck, component} from './skills/professional-slides/runtime/core.mjs';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const REGISTRY=createRegistry(), frame={x:0,y:0,width:1280,height:720};
+const chrome=(props)=>compileDeck({slides:[{id:'s1',frame,composition:component({id:'chrome',component:'slide-chrome',frame,
+  props:{title:'Every segment recovered, and only new-age tech is below 2021',source:'Source: fixture',titleVariant:'with-line',...props}})}]},REGISTRY).slides[0].nodes;
+const rules=(nodes)=>nodes.filter(n=>n.role==='title-rule').length;
+assert.equal(rules(chrome({})),1,'a page with no standfirst keeps its rule');
+const standfirst=chrome({subtitle:'Announced deal value by segment, India, $B'});
+assert.equal(rules(standfirst),0,'the standfirst takes the place of the rule');
+const sub=standfirst.find(n=>n.role==='action-subtitle');
+const title=standfirst.find(n=>n.role==='action-title');
+assert.ok(sub,'the standfirst renders');
+assert.ok(sub.frame.y>title.frame.y,'and sits under the title');
+console.log(JSON.stringify({ok:true}));
+""")
+        self.assertTrue(result["ok"])
+
+    def test_a_change_arrow_lifts_clear_of_the_values_it_spans(self):
+        # The arrow runs mark to mark and its bubble rides the midpoint, so on
+        # a falling series it lands on the interior bar and the value printed
+        # above it. It climbs into the band the chart already reserved for it.
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const REGISTRY=createRegistry();
+const frame={x:0,y:0,width:420,height:420};
+const props={heading:'Announced deal value',unit:'$B',categories:['2021','2022','2023'],
+  series:[{name:'Deal value',values:[42,37,30]}],
+  changeAnnotations:[{text:'-29%',start:{category:'2021'},end:{category:'2023'}}]};
+const nodes=REGISTRY.get('chart.column').render({id:'c',frame,props}).nodes;
+const hits=(a,b)=>!(a.x+a.width<=b.x||b.x+b.width<=a.x||a.y+a.height<=b.y||b.y+b.height<=a.y);
+const bubble=nodes.find(n=>n.role==='annotation-surface');
+assert.ok(bubble,'the change bubble renders');
+for(const node of nodes.filter(n=>n.role==='data-label'||n.role==='chart-mark')){
+  assert.ok(!hits(bubble.frame,node.frame),'the bubble sits on '+node.role+' '+(node.text||''));
+}
+console.log(JSON.stringify({ok:true}));
+""")
+        self.assertTrue(result["ok"])
+
     def test_a_kicker_prints_above_the_title_and_yields_to_a_left_tracker(self):
         result = run_node("""
 import assert from 'node:assert/strict';

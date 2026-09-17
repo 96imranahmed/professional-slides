@@ -1,0 +1,56 @@
+{
+  "$comment": "The weight contract and the reference corpus it is calibrated against. This file is the single source: runtime/weight.mjs reads it for the composer and runtime/gates/page_gates.py reads it for the gates, so a change to a floor moves the page and the finding together. Every number under byFill is a floor, never a ceiling - the ceiling on prose is the WORDS gate.",
+  "schema": "professional-slides.weight/v1",
+  "keys": {
+    "pageWords": "words in the page BODY - the title band, source and notes do not count",
+    "columnFill": "share of its own height the side column must reach",
+    "plotSpan": "share of the exhibit frame the marks must span",
+    "pointWords": "mean words per point in a side column",
+    "tableFill": "share of the page's row budget a table should use",
+    "elements": "evidence elements expected on an analytical page"
+  },
+  "ranges": {
+    "pageWords": [0, 400],
+    "columnFill": [0, 1],
+    "plotSpan": [0, 1],
+    "pointWords": [0, 60],
+    "tableFill": [0, 1],
+    "elements": [1, 4]
+  },
+  "defaultFill": "balanced",
+  "byFill": {
+    "full": { "pageWords": 120, "columnFill": 0.68, "plotSpan": 0.60, "pointWords": 10, "tableFill": 0.55, "elements": 2 },
+    "balanced": { "pageWords": 95, "columnFill": 0.55, "plotSpan": 0.52, "pointWords": 8, "tableFill": 0.45, "elements": 1 },
+    "airy": { "pageWords": 0, "columnFill": 0, "plotSpan": 0, "pointWords": 0, "tableFill": 0, "elements": 1 }
+  },
+  "geometryByFill": {
+    "$comment": "The three geometric thresholds that move with fill; nothing else does.",
+    "full": { "ink_min": 0.14, "dead_band_max": 0.06, "internal_void_max": 0.16, "column_void_max": 0.20 },
+    "balanced": { "ink_min": 0.115, "dead_band_max": 0.08, "internal_void_max": 0.22, "column_void_max": 1.0 },
+    "airy": { "ink_min": 0.05, "dead_band_max": 0.14, "internal_void_max": 0.32, "column_void_max": 1.0 }
+  },
+  "reference": {
+    "$comment": "Published McKinsey, BCG and Bain client decks, measured two ways. `slides` is the careful sample: 137 landscape analytical slides, with covers, dividers, back matter and portrait proposal documents excluded, decomposed band by band and block by block. `corpus` is the wide sample: 1,832 pages of page text with no band split. When the two disagree, the slides sample is the one the floors are set against.",
+    "slides": {
+      "pages": 137,
+      "words": 185,
+      "wordsP20": 104,
+      "wordsP80": 278,
+      "wordsMax": 785,
+      "heavyShare": 0.42,
+      "inkMedian": 0.19,
+      "inkQ1": 0.121,
+      "bands": { "titleBand": 20, "body": 128, "footer": 19 },
+      "textBlocks": 142,
+      "lineBlocks": { "label": 40, "phrase": 10.5, "sentence": 4, "total": 56 },
+      "numericTokens": 17,
+      "drawings": 29
+    },
+    "corpus": {
+      "pages": 1832,
+      "p25": 127,
+      "median": 196,
+      "p75": 282
+    }
+  }
+}

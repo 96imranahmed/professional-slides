@@ -928,6 +928,13 @@ function registerCore(registry) {
         if (subtitleText) {
           const measured = measureText(subtitleText, page.titleWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 });
           if (measured.lines.length > 2) throw new Error("A subtitle runs to at most two lines; it names the measure, not the finding");
+          // A rule and a standfirst do the same job - they close the title band
+          // and separate it from the page - so a page takes one or the other,
+          // never both. The standfirst carries the measure and the rule carries
+          // nothing, so the standfirst wins and the rule is dropped. A page
+          // with no standfirst keeps its house rule.
+          const ruleIndex = titles.findIndex((node) => node.role === "title-rule");
+          if (ruleIndex >= 0) titles.splice(ruleIndex, 1);
           const y = titleBottom + tokenValue(token("space.2"));
           titles.push(textPrimitive({
             id: stableId(id, "subtitle"), role: "action-subtitle",

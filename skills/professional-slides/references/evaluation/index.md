@@ -12,7 +12,7 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Trailing dead band | `DEAD_BAND` | at most 8% (6% full, 14% airy) |
 | Internal void | `INTERNAL_VOID` | at most 22% between two content blocks (16% full, 32% airy) |
 | Right column stops short | `COLUMN_VOID` | at most 20% of the page, `full` decks only |
-| Action title | `TITLE_TOO_LONG`, `HEDGED_TITLE` | at most two lines, within 14 words, no hedge lexicon |
+| Action title | `TITLE_LINES`, `TITLE_WORDS`, `HEDGED_TITLE` | at most two lines, within 14 words, no hedge lexicon |
 | Body type | `TYPE_RANGE` | 10 to 14 pt body, 8 to 11 pt chart furniture, 20 to 26 pt titles |
 | Characters per line | `CPL` | 35 to 90 |
 | Body words, exhibit page | `WORDS` | at most 100 prose words (`pre-read` 160, `appendix` 200; table cells and chart furniture are evidence, not prose) |
@@ -35,16 +35,23 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Table against its budget | `THIN_TABLE` | uses `weight.tableFill` of the page's row budget |
 | Values printed | `NUMBERS_ON_MARKS` | every mark while a chart has twelve or fewer, three otherwise |
 | Evidence elements | `THIN_EVIDENCE` | `weight.elements` (2 on a document-weight deck) |
+| Heading fit | `HEADING_WRAPS` | a heading that wraps where the frame could hold it on one line |
 | Axis ticks | `NICE_TICKS` | nice numbers |
-| Coverage | `MISSING_EVIDENCE` | every ranked criterion has a comparative exhibit across all options |
+| Page did not render | `MISSING_RENDER` | every page the gates are asked to measure has a render |
+
+Two more findings share the shape but fire before the page is rendered, from the composer rather than the gates: `THIN_PLAN` (what the page will carry against its floor, with the remedy that page's own data offers) and `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
+
+`page_gates.GATE_CODES` is the list this table is checked against — a code cannot be renamed in the gates without this table failing, and a gate cannot emit a code that is not in it.
 
 ## Review codes
 
 The model review reads each rendered page together with its text, layout roles, mapped evidence and the deck question, and receives that page's gate measurements as inputs. It may block with these codes:
 
-`FACTUAL_ERROR`, `UNSUPPORTED_CLAIM`, `MISLEADING_COMPARISON`, `MISSING_EVIDENCE`, `MISSING_ARGUMENT`, `UNREADABLE`, `OVERFLOW`, `BROKEN_GEOMETRY`, `PROVENANCE`, `BROKEN_DEPENDENCY`.
+`FACTUAL_ERROR`, `UNSUPPORTED_CLAIM`, `MISLEADING_COMPARISON`, `MISSING_EVIDENCE`, `MISSING_ARGUMENT`, `UNREADABLE`, `OVERFLOW`, `BROKEN_GEOMETRY`, `PROVENANCE`.
 
-Every blocking finding names the exact defect and a repair that is a sentence a person can act on. Findings without one of these codes are advisory and settle within the bounded repair pass. `rules.json` holds the machine-readable rule IDs and severities.
+Design defects block too, and carry their own codes: `DEAD_SPACE`, `LAYOUT_MONOTONY`, `NO_HERO_EXHIBIT`, `OVERSIZED_TYPE`, `WALL_OF_TEXT`, `BURIED_NUMBER`, `HEDGED_TITLE`, `TITLE_TOO_LONG`, `INCONSISTENT_ENCODING`. `EDITORIAL` is the advisory one.
+
+Every blocking finding names the exact defect and a repair that is a sentence a person can act on. Findings without one of these codes are advisory and settle within the bounded repair pass. `runtime/reviewer.mjs` holds the vocabulary — it is the schema the review is validated against, so a code that is not there cannot be raised — and `rules.json` holds the rule IDs, severities and which of these codes are material.
 
 ## Review dimensions
 

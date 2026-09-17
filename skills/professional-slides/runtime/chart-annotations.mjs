@@ -486,12 +486,57 @@ function labelNodes(id, index, frame, text, style) {
   ];
 }
 
-export function renderChangeAnnotations({ id, plot, props, pointMap }) {
+/**
+ * How far to lift a change arrow so nothing it spans sits under it.
+ *
+ * The arrow is drawn between two marks and its bubble rides the midpoint, so
+ * on a falling series it crosses the interior bars and the values printed
+ * above them. Rather than guess a gap from the mark geometry, this measures
+ * the frames the chart has actually drawn - marks and data labels - inside the
+ * arrow's horizontal span, and returns the lift that puts the shaft and the
+ * bubble above all of them.
+ *
+ * The ceiling is not the plot's top edge but the top of the band the chart
+ * already reserved for change annotations (CHANGE_ANNOTATION_BAND, which the
+ * bracket styles draw in): an arrow that has to climb out of a plot full of
+ * tall bars climbs into that band rather than sitting on a value label. A
+ * partial lift still moves the bubble off the label it was sitting on.
+ */
+function arrowLift({ start, end, plot, obstacles = [], text, band = 0 }) {
+  const left = Math.min(start.x, end.x), right = Math.max(start.x, end.x);
+  if (right - left < 1) return 0;
+  const bubble = labelFrame(text, (start.x + end.x) / 2, (start.y + end.y) / 2, plot);
+  const half = bubble.height / 2;
+  const spans = obstacles
+    .filter((node) => node.role === "chart-mark" || node.role === "data-label")
+    .map((node) => node.frame)
+    .filter((frame) => frame && frame.x + frame.width > left + 1 && frame.x < right - 1);
+  if (!spans.length) return 0;
+  // The arrow is a straight line, so the shaft's height over an obstacle is
+  // read at the obstacle's own x; the bubble is a box around the midpoint and
+  // has to clear whatever it overlaps horizontally.
+  const shaftY = (x) => start.y + ((x - start.x) / (end.x - start.x)) * (end.y - start.y);
+  const bubbleLeft = bubble.x, bubbleRight = bubble.x + bubble.width;
+  let lift = 0;
+  for (const frame of spans) {
+    const overlapsBubble = frame.x + frame.width > bubbleLeft && frame.x < bubbleRight;
+    const nearest = Math.min(Math.max(frame.x + frame.width / 2, left), right);
+    const clearance = overlapsBubble ? half + 6 : 6;
+    lift = Math.max(lift, shaftY(nearest) + clearance - frame.y);
+  }
+  const headroom = Math.min(start.y, end.y) - (plot.y - band + half);
+  return Math.max(0, Math.min(lift, headroom));
+}
+
+export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles = [] }) {
   const annotations = normalizeChangeAnnotations(props);
   if (!annotations.length) return [];
   const nodes = [];
   const labels = [];
   const evidenceBand = evidenceAnnotationTopBandCount(props) * EVIDENCE_CALLOUT_BAND;
+  // The band the chart frame already held back above the plot for these
+  // annotations; an arrow may climb into it rather than overlap the marks.
+  const changeBand = chartAnnotationBands(props).top;
 
   annotations.forEach((annotation, index) => {
     const start = resolveAnchor(pointMap, annotation.start, id);
@@ -529,6 +574,13 @@ export function renderChangeAnnotations({ id, plot, props, pointMap }) {
       return;
     }
     if (annotation.style === "arrow") {
+      // The arrow runs from the first mark to the last and its bubble sits at
+      // the midpoint, so on a descending series the bubble lands on whatever
+      // the interior categories put there - a bar top, or the value printed
+      // above it. Lift the whole arrow until both the shaft and the bubble
+      // clear every mark and every printed value in the span.
+      const lift = arrowLift({ start, end, plot, obstacles, text: annotation.text, band: changeBand });
+      if (lift > 0) { start.y -= lift; end.y -= lift; }
       const dx = end.x - start.x;
       const dy = end.y - start.y;
       const length = Math.hypot(dx, dy);

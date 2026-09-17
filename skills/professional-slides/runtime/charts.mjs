@@ -468,7 +468,7 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
     }
   }
   overlay.push(...evidenceAnnotations.nodes);
-  overlay.push(...renderChangeAnnotations({ id, plot, props, pointMap }));
+  overlay.push(...renderChangeAnnotations({ id, plot, props, pointMap, obstacles }));
   overlay.push(...renderAnnotationRail({ id, plot, props, categoryMap, allow: allowAnnotationRail }));
   return { underlay, overlay };
 }

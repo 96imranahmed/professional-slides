@@ -22,6 +22,7 @@ export const CODES = Object.freeze({
   UNREADABLE: "text too small, clipped or low-contrast to read",
   OVERFLOW: "content exceeds its box or the slide",
   BROKEN_GEOMETRY: "misaligned, overlapping or orphaned elements",
+  PROVENANCE: "a number or claim with no traceable source, basis or as-at date",
   // design — these block too
   DEAD_SPACE: "a large empty band the page does nothing with",
   LAYOUT_MONOTONY: "the same page construction repeated across most of the deck",

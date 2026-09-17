@@ -2,7 +2,7 @@
  * How much a page is expected to carry.
  *
  * Density is not the defect; empty is. Real client pages run a median of about
- * 200 words of page text (title, labels, table cells, footnotes included), two
+ * 185 words of page text (title, labels, table cells, footnotes included), two
  * or three evidence elements, a commentary column that reaches the bottom of
  * its track. Our pages were running half of that, so the runtime now carries an
  * explicit weight contract and the gates measure against it.
@@ -17,35 +17,33 @@
  *
  * Every number is a floor a page must reach, never a ceiling: the ceiling on
  * prose is the WORDS gate, and it has not moved.
+ *
+ * The numbers themselves live in weight.json, which the Python gates read too.
+ * There is one copy of the contract, so a floor cannot move in the composer
+ * without moving in the finding that reports it.
  */
 
-export const WEIGHT_KEYS = Object.freeze([
-  "pageWords",     // words in the page BODY - the title band, source and notes do not count
-  "columnFill",    // share of its own height the side column must reach
-  "plotSpan",      // share of the exhibit frame the marks must span
-  "pointWords",    // mean words per point in a side column
-  "tableFill",     // share of the page's row budget a table should use
-  "elements",      // evidence elements expected on an analytical page
-]);
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const CONTRACT = Object.freeze(JSON.parse(readFileSync(fileURLToPath(new URL("./weight.json", import.meta.url)), "utf8")));
+
+export const WEIGHT_KEYS = Object.freeze(Object.keys(CONTRACT.keys));
+
+/** What each key floors, in one line - the same text the docs and gates use. */
+export const WEIGHT_KEY_DOC = Object.freeze({ ...CONTRACT.keys });
 
 /**
  * Defaults by fill level. `airy` turns the floors off: a live-pitch page is
  * meant to carry one chart and three words, and the deck says so.
  */
-export const WEIGHT_BY_FILL = Object.freeze({
-  full: Object.freeze({ pageWords: 120, columnFill: 0.68, plotSpan: 0.60, pointWords: 10, tableFill: 0.55, elements: 2 }),
-  balanced: Object.freeze({ pageWords: 95, columnFill: 0.55, plotSpan: 0.52, pointWords: 8, tableFill: 0.45, elements: 1 }),
-  airy: Object.freeze({ pageWords: 0, columnFill: 0, plotSpan: 0, pointWords: 0, tableFill: 0, elements: 1 }),
-});
+export const WEIGHT_BY_FILL = Object.freeze(Object.fromEntries(
+  Object.entries(CONTRACT.byFill).map(([fill, values]) => [fill, Object.freeze({ ...values })]),
+));
 
-const RANGES = {
-  pageWords: [0, 400],
-  columnFill: [0, 1],
-  plotSpan: [0, 1],
-  pointWords: [0, 60],
-  tableFill: [0, 1],
-  elements: [1, 4],
-};
+export const DEFAULT_FILL = CONTRACT.defaultFill;
+
+const RANGES = CONTRACT.ranges;
 
 /** Validate and merge an override block (from the spec or a house profile). */
 export function normalizeWeight(weight, where = "weight") {
@@ -62,17 +60,26 @@ export function normalizeWeight(weight, where = "weight") {
 }
 
 /** The weight contract for a deck: fill defaults, then the house, then the spec. */
-export function resolveWeight(spec = {}, fill = "balanced") {
-  const base = WEIGHT_BY_FILL[fill] || WEIGHT_BY_FILL.balanced;
+export function resolveWeight(spec = {}, fill = DEFAULT_FILL) {
+  const base = WEIGHT_BY_FILL[fill] || WEIGHT_BY_FILL[DEFAULT_FILL];
   return { ...base, ...normalizeWeight(spec.weight, "weight") };
 }
 
 /**
- * The reference corpus, for the record: 1,832 pages of published McKinsey, BCG
- * and Bain client decks measured at a median 196 words of page text (quartiles
- * 127 / 196 / 282). The floors above sit deliberately below that median — a
- * floor is not a target, and a page that clears it is not yet a firm page.
+ * The reference corpus, for the record. `slides` is the careful sample - 137
+ * landscape analytical slides of published McKinsey, BCG and Bain client work,
+ * with covers, dividers, back matter and portrait proposal documents excluded -
+ * measured band by band and block by block. `corpus` is the wide sample: 1,832
+ * pages of page text with no band split. The floors above sit deliberately
+ * below both medians; a floor is not a target, and a page that clears it is not
+ * yet a firm page.
  */
-export const REFERENCE_PAGE_WORDS = Object.freeze({ p25: 127, median: 196, p75: 282, pages: 1832 });
-// The same corpus measured slide by slide, split into the page's three bands.
-export const REFERENCE_PAGE_BANDS = Object.freeze({ titleBand: 20, body: 128, footer: 19, pages: 137 });
+export const REFERENCE = Object.freeze({
+  slides: Object.freeze({ ...CONTRACT.reference.slides, bands: Object.freeze({ ...CONTRACT.reference.slides.bands }), lineBlocks: Object.freeze({ ...CONTRACT.reference.slides.lineBlocks }) }),
+  corpus: Object.freeze({ ...CONTRACT.reference.corpus }),
+});
+
+/** The page's three bands, as a reference analytical slide carries them. */
+export const REFERENCE_PAGE_BANDS = Object.freeze({ ...REFERENCE.slides.bands, pages: REFERENCE.slides.pages });
+/** Page text over the wide corpus, for the distribution the DECK_FLAT gate reads. */
+export const REFERENCE_PAGE_WORDS = Object.freeze({ ...REFERENCE.corpus });

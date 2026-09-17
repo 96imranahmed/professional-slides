@@ -820,6 +820,89 @@ function pairedBars(slide) {
  * convenience. This is where a page's basis, exclusion and as-at date live, and
  * it is the cheapest honest density there is.
  */
+/**
+ * Every key a slide may carry, with the one line that says what it is for.
+ *
+ * Without this, a misspelled key - `subtitile`, `footnote`, `insite` - composed
+ * silently and the page came out missing the thing the author wrote. The check
+ * is a spelling check, not a schema: the value's shape is still the business of
+ * whichever pass reads it.
+ */
+export const SLIDE_KEYS = Object.freeze({
+  // what the page is
+  id: "the page's own id; one is derived from its position when absent",
+  kind: "statement, takeaways, section, agenda or cover; absent means an analytical page",
+  shape: "one of the four heavy-page shapes: findings-matrix, measure-table, model-page, half-and-half",
+  layout: "force a layout instead of letting the composer choose one",
+  arrange: "row or stack, when the page carries more than one exhibit",
+  density: "this page's density profile, overriding the deck's",
+  // the title band
+  title: "the action title: the finding, not the subject",
+  titleLead: "a lead-in phrase set before the title in the accent",
+  subtitle: "the standfirst under the title: the measure, the population and the period",
+  kicker: "the small label above the title naming the part of the argument",
+  tag: "PRELIMINARY, ILLUSTRATIVE, Exhibit 3 - the page's badge",
+  tracker: "the section tracker shown on this page",
+  // the evidence
+  exhibit: "the page's one exhibit",
+  exhibits: "two or more exhibits, arranged by `arrange`",
+  rows: "a label-and-text table written at slide level",
+  columns: "the headers for that table",
+  photo: "a photograph beside the copy",
+  image: "a full-bleed picture, on the fixed-shape pages",
+  metrics: "a strip of measured tiles",
+  metricsPosition: "top (the default) or bottom",
+  metricsTone: "the tiles' treatment",
+  kpi: "the one big number the exhibit proves, at the top of the side column",
+  // the commentary
+  points: "the commentary column: a lead and a sentence per point",
+  pointsHeading: "the heading over that column, or false for none",
+  pointsTone: "open, dark, muted, tint or primary",
+  pointsAlign: "middle to centre the points on the exhibit",
+  paragraphs: "body prose, on a text page",
+  text: "the sentence a statement page carries",
+  subtext: "the line under that sentence",
+  insight: "the so-what as a box in the side column",
+  insights: "two statements in that column: a plain one above a boxed one",
+  callout: "a boxed aside beside the evidence",
+  soWhat: "the page's close, under everything else",
+  implication: "false to drop the marker joining evidence to meaning",
+  items: "the entries on an agenda or takeaways page",
+  active: "which agenda entry the deck is on",
+  summary: "the line under a section divider's title",
+  number: "a section divider's number",
+  // the footer
+  source: "where the numbers came from",
+  note: "the footnote line, or a list of numbered notes",
+  footnotes: "notes tied to a label, printed with a superscript marker",
+  notes: "the speaker notes, which print in the file and never on the page",
+  // the rest
+  serves: "which ranked criteria this page answers",
+  tone: "dark or light, on the fixed-shape pages",
+  accent: "an accent phrase inside a statement",
+  style: "a per-kind style switch (an agenda in columns, say)",
+  stackWeights: "the height shares of stacked exhibits",
+  pairedWeights: "the width shares of paired exhibits",
+});
+
+function assertKnownSlideKeys(slide, id) {
+  const known = Object.keys(SLIDE_KEYS);
+  for (const key of Object.keys(slide)) {
+    if (key in SLIDE_KEYS) continue;
+    const lower = key.toLowerCase();
+    // The nearest known key by a cheap edit distance: a misspelling is almost
+    // always a transposition, a doubled letter or a dropped one.
+    const near = known.filter((candidate) => {
+      const other = candidate.toLowerCase();
+      if (Math.abs(other.length - lower.length) > 2) return false;
+      const shared = [...new Set(lower)].filter((ch) => other.includes(ch)).length;
+      return shared >= Math.max(3, Math.min(other.length, lower.length) - 2);
+    });
+    const hint = near.length ? ` Did you mean ${near.slice(0, 3).map((k) => `\`${k}\``).join(" or ")}?` : "";
+    throw new Error(`${id}: unknown slide key \`${key}\`.${hint} The page keys are ${known.join(", ")}.`);
+  }
+}
+
 const FOOTNOTE_MARKS = ["\u00b9", "\u00b2", "\u00b3", "\u2074", "\u2075", "\u2076", "\u2077", "\u2078", "\u2079"];
 function applyFootnotes(slide) {
   const list = Array.isArray(slide.footnotes) ? slide.footnotes : null;
@@ -872,90 +955,223 @@ function applyFootnotes(slide) {
   return { ...rest, ...marked, note: [...notes, ...existing] };
 }
 
-export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1) {
-  const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
-  slide = applyFootnotes(slide);
-  slide = pairedBars(slide);
-  if (slide.exhibit) slide = { ...slide, exhibit: changeFromContent(highlightFromTitle(percentStack(slide.exhibit), slide.title), slide.title) };
-  if (slide.exhibits) slide = { ...slide, exhibits: slide.exhibits.map((ex) => changeFromContent(highlightFromTitle(percentStack(ex), slide.title), slide.title)) };
-  if (slide.kind === "statement") return { id, kind: "statement", text: slide.text || slide.title, ...(slide.accent ? { accent: slide.accent } : {}), ...(slide.subtext ? { subtext: slide.subtext } : {}), ...(slide.tone === "dark" ? { mode: "dark" } : {}), ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
-  if (slide.kind === "takeaways") return { id, kind: "takeaways", ...(slide.title ? { title: slide.title } : {}), items: slide.points || slide.items, ...(slide.tone === "light" ? { mode: "light" } : {}), ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
-  if (slide.kind === "section") return { id, kind: "divider", title: slide.title, ...(slide.summary ? { subtitle: slide.summary } : {}), ...(slide.number !== undefined ? { number: slide.number } : {}), ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}), ...(slide.notes ? { notes: slide.notes } : {}) };
-  if (slide.kind === "agenda") return { id, title: slide.title || "Contents", layout: "flow.column", items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items, ...(slide.active !== undefined ? { active: slide.active } : {}), ...(slide.style === "columns" ? { variant: "columns" } : {}) }, size: SIZE }] };
-  const slideIn = slide;
-  // A value table under the chart: the chart stacks over a compact table whose
-  // columns are the chart's categories.
-  // A deck whose weight asks for two elements a page gets the second one offered
-  // rather than demanded: a chart of six categories or fewer, with no table, no
-  // A page that names its measure in the standfirst does not name it again over
-  // the plot: with one exhibit, the subtitle is the chart's title, and the
-  // exhibit's own heading band would print it twice. The unit joins the
+/**
+ * The four pages that are not analytical pages.
+ *
+ * Each is a fixed shape with no layout to negotiate, so each is one function
+ * from the spec to the plan rather than an early return buried in the
+ * composer. They share the picture and the speaker notes, which is what
+ * `chrome` carries.
+ */
+const KINDS = {
+  statement: (slide, { id }) => ({ kind: "statement", text: slide.text || slide.title,
+    ...(slide.accent ? { accent: slide.accent } : {}),
+    ...(slide.subtext ? { subtext: slide.subtext } : {}),
+    ...(slide.tone === "dark" ? { mode: "dark" } : {}) }),
+  takeaways: (slide) => ({ kind: "takeaways",
+    ...(slide.title ? { title: slide.title } : {}),
+    items: slide.points || slide.items,
+    ...(slide.tone === "light" ? { mode: "light" } : {}) }),
+  section: (slide) => ({ kind: "divider", title: slide.title,
+    ...(slide.summary ? { subtitle: slide.summary } : {}),
+    ...(slide.number !== undefined ? { number: slide.number } : {}) }),
+  agenda: (slide, { id }) => ({ title: slide.title || "Contents", layout: "flow.column",
+    items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items,
+      ...(slide.active !== undefined ? { active: slide.active } : {}),
+      ...(slide.style === "columns" ? { variant: "columns" } : {}) }, size: SIZE }] }),
+};
+
+/**
+ * The four heavy-page shapes, named.
+ *
+ * SKILL.md describes the shapes a reference deck's dense pages take; a `shape`
+ * on the slide is the author saying "this is that page", and the preset sets
+ * the weight and the defaults that shape needs. Everything a preset sets, the
+ * slide can override, because the shape is a starting point and not a mould.
+ */
+const SHAPES = {
+  // Findings down the left, columns of short bulleted evidence across.
+  "findings-matrix": (slide) => {
+    if (!Array.isArray(slide.rows) && !(slide.exhibit && slide.exhibit.type === "rows")) {
+      throw new Error("A findings-matrix page is built from `rows`, each with `cells`");
+    }
+    return { density: slide.density ?? "pre-read", implication: slide.implication ?? false };
+  },
+  // Ten to fifteen rows, measures under grouped headers, footnote markers.
+  "measure-table": (slide) => {
+    const ex = slide.exhibit;
+    if (!ex || !["table", "rows", "compare"].includes(ex.type)) throw new Error("A measure-table page needs a table exhibit");
+    return { density: slide.density ?? "pre-read",
+      exhibit: { density: ex.density ?? "compact", total: ex.total ?? true, ...ex } };
+  },
+  // The assumptions grid behind a forecast: the chart over its own numbers.
+  "model-page": (slide) => {
+    const ex = slide.exhibit;
+    if (!ex || !String(ex.type).startsWith("chart.")) throw new Error("A model-page is a chart over its own data table");
+    return { density: slide.density ?? "pre-read", exhibit: { ...ex, dataTable: ex.dataTable ?? true } };
+  },
+  // A chart with its own commentary on one side, icon-led points on the other.
+  "half-and-half": (slide) => {
+    if (!slide.exhibit || !Array.isArray(slide.points) || !slide.points.length) {
+      throw new Error("A half-and-half page needs one exhibit and a column of points");
+    }
+    return { density: slide.density ?? "pre-read", layout: slide.layout ?? "exhibit-left" };
+  },
+};
+
+export const SHAPE_NAMES = Object.freeze(Object.keys(SHAPES));
+
+/**
+ * The composer's rewrite passes, in the order they run.
+ *
+ * Each pass reads the slide the last one produced and returns the slide the
+ * next one sees, so the order is the pipeline and the names are what it does.
+ * A pass that needs to hand something to the layout stage rather than to the
+ * next pass writes it on `ctx`.
+ */
+const SLIDE_PASSES = [
+  ["footnotes", (slide) => applyFootnotes(slide)],
+  ["paired-bars", (slide) => pairedBars(slide)],
+
+  // Findings the exhibit's own data supports: a percent stack, the highlight
+  // the title names, the change between the periods it compares.
+  ["read-the-data", (slide) => {
+    const derive = (ex) => changeFromContent(highlightFromTitle(percentStack(ex), slide.title), slide.title);
+    if (slide.exhibit) return { ...slide, exhibit: derive(slide.exhibit) };
+    if (slide.exhibits) return { ...slide, exhibits: slide.exhibits.map(derive) };
+    return slide;
+  }],
+
+  // `shape: "findings-matrix"` and friends: the page says which of the four
+  // heavy shapes it is, and the preset fills in what that shape needs.
+  ["shape", (slide) => {
+    if (!slide.shape) return slide;
+    const preset = SHAPES[slide.shape];
+    if (!preset) throw new Error(`Unknown page shape: ${slide.shape}; use one of ${SHAPE_NAMES.join(", ")}`);
+    const { shape: _s, ...rest } = slide;
+    return { ...rest, ...preset(slide) };
+  }],
+
+  // A page that names its measure in the standfirst does not name it again
+  // over the plot: with one exhibit, the subtitle is the chart's title, and
+  // the exhibit's own heading band would print it twice. The unit joins the
   // standfirst when the standfirst does not already carry it. Panels in a row
   // keep their headings - those name the series, not the measure.
-  if (slide.subtitle && slide.exhibit && !slide.exhibits && slide.exhibit.heading
-      && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi) {
+  ["standfirst-carries-the-measure", (slide) => {
+    if (!(slide.subtitle && slide.exhibit && !slide.exhibits && slide.exhibit.heading
+        && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi)) return slide;
     const unit = typeof slide.exhibit.unit === "string" ? slide.exhibit.unit.trim() : "";
     const carries = unit && slide.subtitle.toLowerCase().includes(unit.toLowerCase());
     const { heading: _h, unit: _u, ...exhibit } = slide.exhibit;
-    slide = { ...slide, subtitle: unit && !carries ? `${slide.subtitle}, ${unit}` : slide.subtitle, exhibit };
-  }
-  // `split: true` on a multi-series chart sets it as small multiples: one panel
-  // per series, each headed by the series name, sharing one value scale and one
-  // category axis. A legend and twelve marks becomes three headings and twelve
-  // labelled marks - the reference's way of showing three cuts of one measure.
-  if (slide.exhibit && slide.exhibit.split === true && !slide.exhibits) {
+    return { ...slide, subtitle: unit && !carries ? `${slide.subtitle}, ${unit}` : slide.subtitle, exhibit };
+  }],
+
+  // `split: true` on a multi-series chart sets it as small multiples: one
+  // panel per series, each headed by the series name, sharing one value scale
+  // and one category axis. A legend and twelve marks becomes three headings
+  // and twelve labelled marks - the reference's way of showing three cuts of
+  // one measure.
+  ["split-into-small-multiples", (slide) => {
+    if (!(slide.exhibit && slide.exhibit.split === true && !slide.exhibits)) return slide;
     const { split: _s, series, ...rest } = slide.exhibit;
     if (!Array.isArray(series) || series.length < 2 || series.length > 4) throw new Error("A split chart needs two to four series");
     // Every panel keeps the unit, so the peers share one value scale and the
     // comparison holds; the measure itself moves to the page's standfirst.
     const measure = [rest.heading, rest.unit].filter(Boolean).join(", ");
-    slide = { ...slide, exhibit: undefined,
+    return { ...slide, exhibit: undefined,
       ...(slide.subtitle || !measure ? {} : { subtitle: measure }),
       exhibits: series.map((entry) => ({ ...rest, heading: entry.name, series: [entry], legend: false })) };
-  }
-  // metrics and no second exhibit, tabulates itself underneath. `dataTable:
-  // false` declines it. A single labelled series is not offered one - its table
-  // would print the same five numbers a second time.
-  if (elements >= 2 && slide.exhibit && !slide.exhibits && String(slide.exhibit.type).startsWith("chart.")
-      && slide.exhibit.dataTable === undefined && Array.isArray(slide.exhibit.series) && Array.isArray(slide.exhibit.categories)
-      && slide.exhibit.categories.length <= 6 && slide.exhibit.series.length >= 2 && slide.exhibit.series.length <= 3
-      && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi && !thinChart(slide.exhibit)) {
-    slide = { ...slide, exhibit: { ...slide.exhibit, dataTable: true } };
-  }
+  }],
+
+  // A deck whose weight asks for two elements a page gets the second one
+  // offered rather than demanded: a chart of six categories or fewer, with no
+  // table, no metrics and no second exhibit, tabulates itself underneath.
+  // `dataTable: false` declines it. A single labelled series is not offered
+  // one - its table would print the same five numbers a second time.
+  ["offer-a-data-table", (slide, { elements }) => {
+    if (!(elements >= 2 && slide.exhibit && !slide.exhibits && String(slide.exhibit.type).startsWith("chart.")
+        && slide.exhibit.dataTable === undefined && Array.isArray(slide.exhibit.series) && Array.isArray(slide.exhibit.categories)
+        && slide.exhibit.categories.length <= 6 && slide.exhibit.series.length >= 2 && slide.exhibit.series.length <= 3
+        && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi && !thinChart(slide.exhibit))) return slide;
+    return { ...slide, exhibit: { ...slide.exhibit, dataTable: true } };
+  }],
+
   // `dataTable: true` tabulates the chart's own series under it: the same
-  // numbers, printed, which is the cheapest second element a page can carry and
-  // what the reference pages do under a column chart.
-  if (slide.exhibit && slide.exhibit.dataTable === true && Array.isArray(slide.exhibit.series) && !slide.exhibits) {
-    slide = { ...slide, exhibit: { ...slide.exhibit, dataTable: slide.exhibit.series.map((series) => ({ label: series.name, values: (series.values || []).map((value) => formatTableValue(value)) })) } };
-  }
-  if (slide.exhibit && Array.isArray(slide.exhibit.dataTable) && slide.exhibit.dataTable.length && !slide.exhibits) {
+  // numbers, printed, which is the cheapest second element a page can carry
+  // and what the reference pages do under a column chart.
+  ["build-the-data-table", (slide) => {
+    if (!(slide.exhibit && slide.exhibit.dataTable === true && Array.isArray(slide.exhibit.series) && !slide.exhibits)) return slide;
+    return { ...slide, exhibit: { ...slide.exhibit, dataTable: slide.exhibit.series.map((series) => ({ label: series.name, values: (series.values || []).map((value) => formatTableValue(value)) })) } };
+  }],
+
+  // The chart stacks over a compact table whose columns are its categories.
+  ["stack-the-data-table", (slide) => {
+    if (!(slide.exhibit && Array.isArray(slide.exhibit.dataTable) && slide.exhibit.dataTable.length && !slide.exhibits)) return slide;
     const chart = { ...slide.exhibit }; const rowsIn = chart.dataTable; delete chart.dataTable;
-    const table = { type: "table", density: "compact", treatment: "open", variant: "plain", columns: [{ label: "", type: "text", bold: true, width: 120 }, ...(chart.categories || []).map((c) => ({ label: "", type: "text", align: "center", width: 80 }))], rows: rowsIn.map((r) => [r.label, ...(r.values || []).map(String)]) };
-    slide = { ...slide, exhibit: undefined, exhibits: [chart, table], arrange: "stack", stackWeights: [4, 1] };
-  }
+    const table = { type: "table", density: "compact", treatment: "open", variant: "plain", columns: [{ label: "", type: "text", bold: true, width: 120 }, ...(chart.categories || []).map(() => ({ label: "", type: "text", align: "center", width: 80 }))], rows: rowsIn.map((r) => [r.label, ...(r.values || []).map(String)]) };
+    return { ...slide, exhibit: undefined, exhibits: [chart, table], arrange: "stack", stackWeights: [4, 1] };
+  }],
+
   // Hero fitness: a thin single-series chart becomes a column of KPI tiles
   // (one per category) that stands in for the hero, points beside it.
-  let tileColumn = null, tilePoints = [];
-  if ((!slide.layout || slide.layout === "auto") && slide.exhibit && !slide.exhibits && thinChart(slide.exhibit) && !slide.metrics) {
-    tileColumn = chartToMetrics(slide.exhibit);
-    tilePoints = slide.points || [];
-    slide = { ...slide, exhibit: undefined, exhibits: undefined, points: undefined };
-  }
+  ["thin-chart-becomes-tiles", (slide, ctx) => {
+    if (!((!slide.layout || slide.layout === "auto") && slide.exhibit && !slide.exhibits && thinChart(slide.exhibit) && !slide.metrics)) return slide;
+    ctx.tileColumn = chartToMetrics(slide.exhibit);
+    ctx.tilePoints = slide.points || [];
+    return { ...slide, exhibit: undefined, exhibits: undefined, points: undefined };
+  }],
+
   // `rows` at slide level is the label-and-text table.
-  if (slide.rows && !slide.exhibit && !slide.exhibits) slide = { ...slide, exhibit: { type: "rows", rows: slide.rows, ...(Array.isArray(slide.columns) ? { columns: slide.columns } : {}) } };
+  ["rows-become-a-table", (slide) => (slide.rows && !slide.exhibit && !slide.exhibits
+    ? { ...slide, exhibit: { type: "rows", rows: slide.rows, ...(Array.isArray(slide.columns) ? { columns: slide.columns } : {}) } }
+    : slide)],
+
   // One big number parked above a table reads as two pages glued together: the
-  // tile floats in air and the table starts again under it. A lone metric over a
-  // table is the hero number of the side column instead, beside its evidence.
-  const TABLE_LIKE = ["table", "rows", "compare", "phase-table"];
-  if (Array.isArray(slide.metrics) && slide.metrics.length === 1 && !slide.kpi && slide.metricsPosition !== "bottom" && !slide.exhibits && TABLE_LIKE.includes(slide.exhibit?.type)) {
+  // tile floats in air and the table starts again under it. A lone metric over
+  // a table is the hero number of the side column instead, beside its evidence.
+  ["lone-metric-joins-its-evidence", (slide) => {
+    const TABLE_LIKE = ["table", "rows", "compare", "phase-table"];
+    if (!(Array.isArray(slide.metrics) && slide.metrics.length === 1 && !slide.kpi && slide.metricsPosition !== "bottom"
+        && !slide.exhibits && TABLE_LIKE.includes(slide.exhibit?.type))) return slide;
     const tile = typeof slide.metrics[0] === "string" ? { value: slide.metrics[0] } : slide.metrics[0];
-    slide = { ...slide, metrics: undefined, kpi: { value: tile.value, ...(tile.label ? { label: tile.label } : {}), ...(tile.sublabel ? { sublabel: tile.sublabel } : {}) } };
-  }
+    return { ...slide, metrics: undefined, kpi: { value: tile.value, ...(tile.label ? { label: tile.label } : {}), ...(tile.sublabel ? { sublabel: tile.sublabel } : {}) } };
+  }],
+
   // A text page whose points carry leads is a numbered ledger: label + text
   // rows with rules, filling the page, rather than a list floating at the top.
-  if (!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && (!slide.layout || slide.layout === "auto") && Array.isArray(slide.points) && slide.points.length >= 2 && slide.points.length <= 6 && slide.points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && !pt.icon && pt.state == null)) {
-    slide = { ...slide, points: undefined, exhibit: { type: "rows", rows: slide.points.map((pt, i) => ({ label: pt.lead, text: pt.text, number: pt.number ?? i + 1 })) } };
+  ["led-points-become-a-ledger", (slide) => {
+    if (!(!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && (!slide.layout || slide.layout === "auto")
+        && Array.isArray(slide.points) && slide.points.length >= 2 && slide.points.length <= 6
+        && slide.points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && !pt.icon && pt.state == null))) return slide;
+    return { ...slide, points: undefined, exhibit: { type: "rows", rows: slide.points.map((pt, i) => ({ label: pt.lead, text: pt.text, number: pt.number ?? i + 1 })) } };
+  }],
+];
+
+/** The pass names, in order - what the composer does to a slide and when. */
+export const PASS_NAMES = Object.freeze(SLIDE_PASSES.map(([name]) => name));
+
+export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1) {
+  const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
+  assertKnownSlideKeys(slide, id);
+  const ctx = { id, baseDir, fill, elements, tileColumn: null, tilePoints: [] };
+
+  // The first three passes run for every page; the fixed-shape pages then take
+  // their own route and the rest go on through the pipeline.
+  for (const [, run] of SLIDE_PASSES.slice(0, 3)) slide = run(slide, ctx);
+  if (KINDS[slide.kind]) {
+    return { id, ...KINDS[slide.kind](slide, ctx),
+      ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}),
+      ...(slide.notes ? { notes: slide.notes } : {}) };
   }
+  const slideIn = slide;
+  for (const [name, run] of SLIDE_PASSES.slice(3)) {
+    try {
+      slide = run(slide, ctx);
+    } catch (error) {
+      throw new Error(`${id} (${name}): ${error.message}`, { cause: error });
+    }
+  }
+  const { tileColumn, tilePoints } = ctx;
   const layout = chooseLayout(slide);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   const items = [];
