@@ -181,6 +181,7 @@ THRESHOLDS = {
     "shape_variety_from": 10,   # analytical pages beyond which the deck needs more than one page architecture
     "shapes_per_ten_min": 3.0,  # distinct architectures per ten pages (the reference decks run about five)
     "shape_share_max": 0.40,    # share of pages on the commonest architecture (the reference median is 0.23)
+    "column_run_max": 4,        # consecutive pages whose commentary column may share one device    # share of pages on the commonest architecture (the reference median is 0.23)
 }
 
 
@@ -333,6 +334,7 @@ GATE_CODES = {
     "LAYOUT_MONOTONY": "one layout signature across most of the deck",
     "PAGE_VARIETY": "too few page families across the deck",
     "PAGE_SHAPE_FLAT": "the deck is built from too few page architectures",
+    "COLUMN_MONOTONY": "the commentary column is marked the same way page after page",
     "EVIDENCE_MIX": "too few analytical pages carry a measured exhibit",
     "IMAGE_BUDGET": "photographs on too many analytical pages",
     "IMAGE_RUN": "photographs on too many consecutive pages",
@@ -1413,6 +1415,70 @@ def page_architecture(slide):
     return shape
 
 
+def column_shape(slide):
+    """How this page marks its commentary column, read off the drawn nodes.
+
+    A numbered disc, a letter, an icon, a hairline or nothing: the device the
+    reader sees. Five consecutive pages of numbered discs is the defect the
+    review caught, and no page-level gate could see it because each page was
+    otherwise different.
+    """
+    roles = {str(n.get("role") or "") for n in slide.get("nodes", []) if n.get("type") in ("text", "rect", "ellipse", "path")}
+    if "list-icon-glyph" in roles or "list-icon" in roles:
+        return "icon"
+    if "list-marker-label" in roles:
+        return "numbered"
+    if "list-rule" in roles:
+        return "ruled"
+    if "list-marker" in roles:
+        return "bulleted"
+    if "list-lead" in roles or "list-item" in roles:
+        return "prose"
+    return None
+
+
+def gate_column_monotony(slides, content_indexes, findings):
+    """COLUMN_MONOTONY, deck level.
+
+    Four or more consecutive analytical pages whose commentary column uses the
+    same device. The reference decks mark a column with icons, an accent lead
+    phrase, a hairline or nothing at all, and reserve the numbered disc for an
+    ordered ledger; a deck that reaches for one device every time reads as one
+    page repeated even when its exhibits differ.
+    """
+    # The defect is a distinctive device used page after page - a numbered
+    # disc, an icon, a letter. The house bullet and unmarked prose are the
+    # absence of a device rather than an overused one, so a run of those is not
+    # what this gate is about; THIN_COLUMN and POINT_DEPTH cover thin columns.
+    marked = {"numbered", "icon", "lettered"}
+    run, start, previous = 0, None, None
+    worst = None
+    for index in content_indexes:
+        shape = column_shape(slides[index])
+        if shape not in marked:
+            shape = None
+        if shape and shape == previous:
+            run += 1
+        else:
+            run, start = 1, index
+        previous = shape
+        if shape and run >= THRESHOLDS["column_run_max"] and (worst is None or run > worst[0]):
+            worst = (run, shape, start)
+    if not worst:
+        return
+    run, shape, start = worst
+    findings.append(finding(
+        None, "COLUMN_MONOTONY", {"shape": shape, "run": run, "from": start + 1},
+        f"at most {THRESHOLDS['column_run_max'] - 1} consecutive pages marked the same way",
+        "The commentary column reaches for one device page after page. Set "
+        "`pointsStyle` on some of these pages, or drop it and let the composer "
+        "rotate: icon-lead (an icon and the lead running into the sentence in "
+        "the accent), ruled (a hairline between items), prose (a bold lead and "
+        "its paragraph), lettered (options rather than steps). The numbered "
+        "disc belongs on an ordered ledger.",
+    ))
+
+
 def gate_page_shape_flat(slides, content_indexes, findings, fill):
     """PAGE_SHAPE_FLAT, deck level.
 
@@ -1581,6 +1647,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         gate_deck_shape(slides, content_indexes, findings, fill)
     if not gates or "PAGE_SHAPE_FLAT" in gates:
         gate_page_shape_flat(slides, content_indexes, findings, fill)
+    if not gates or "COLUMN_MONOTONY" in gates:
+        gate_column_monotony(slides, content_indexes, findings)
 
     # A density report beside the findings: the numbers this review is about, so
     # a regression shows up as a number rather than as a screenshot.

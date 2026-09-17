@@ -647,14 +647,68 @@ function pointsHeight(points, width) {
   return total;
 }
 
-function pointsItem(points, id, tone, fill, inColumn = false) {
+/**
+ * The shapes a commentary column can take.
+ *
+ * Measured over the reference client decks, the numbered disc is one device
+ * among six, and it is used for a full-width ledger of one-line items rather
+ * than for a three-item side column. A composer with one shape produced five
+ * consecutive pages of identical numbered lists; these are the alternatives the
+ * corpus actually uses, and `resolvePointsStyle` rotates through the ones that
+ * suit the content.
+ */
+const POINT_STYLES = {
+  // Icon, then the lead running into the sentence in the house accent.
+  "icon-lead": { marker: "icon", inlineLead: true },
+  // The icon in a ring, the lead above its own text: for points that each
+  // carry their own evidence.
+  "icon-framed": { marker: "icon-ring" },
+  // A bold lead and its paragraph, nothing in the gutter.
+  prose: { marker: "none" },
+  // A hairline between items instead of a mark beside them.
+  ruled: { marker: "rule" },
+  // A / B / C: options, not steps.
+  lettered: { marker: "letter" },
+  // The numbered disc, which the corpus reserves for an ordered ledger.
+  numbered: { marker: "number" },
+  // The plain house bullet.
+  bulleted: { marker: "auto" },
+};
+
+export const POINT_STYLE_NAMES = Object.freeze(Object.keys(POINT_STYLES));
+
+/**
+ * Which shape this column takes: what the author asked for, else what the
+ * content is, else whichever suitable shape has been used least recently.
+ */
+function resolvePointsStyle(slide, points, recentStyles = []) {
+  if (slide.pointsStyle) {
+    if (!POINT_STYLES[slide.pointsStyle]) throw new Error(`Unknown pointsStyle: ${slide.pointsStyle}; use one of ${POINT_STYLE_NAMES.join(", ")}`);
+    return slide.pointsStyle;
+  }
+  const entries = points.map((point) => (typeof point === "string" ? { text: point } : point || {}));
+  // Content decides first, where it speaks clearly.
+  if (entries.some((e) => e.icon)) return "icon-lead";
+  if (entries.some((e) => e.state)) return "numbered";
+  if (entries.every((e) => e.number !== undefined)) return "numbered";
+  if (!entries.some((e) => e.lead)) return "bulleted";
+  // Otherwise the column is a set of parallel findings, and any of these suit
+  // it. Take the one used longest ago so a section does not repeat one shape.
+  const viable = ["icon-lead", "ruled", "prose", "numbered"];
+  const unused = recentStyles.length + 1;
+  const staleness = (name) => { const at = recentStyles.indexOf(name); return at === -1 ? unused : at; };
+  return viable.slice().sort((a, b) => staleness(b) - staleness(a) || viable.indexOf(a) - viable.indexOf(b))[0];
+}
+
+function pointsItem(points, id, tone, fill, inColumn = false, style = null) {
   // The side column is a track, not a shelf: its points spread down it unless
   // the deck is airy, where the white space is the point. A list that hugs the
   // top of a 500px column leaves two fifths of it empty, which is how a page
   // that carries real content still reads as thin. A list under a row of
   // exhibits hugs instead — there it is a footer, not a column.
   const distribute = inColumn && fill !== "airy" && points.length > 1;
-  return { id, component: "bullet-list", props: { variant: "body", items: points, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}), ...(distribute ? { distribute: true } : {}) }, size: distribute ? { width: { fr: 1 }, height: "fill" } : HUG };
+  const shape = style && POINT_STYLES[style] ? POINT_STYLES[style] : {};
+  return { id, component: "bullet-list", props: { variant: "body", items: points, ...shape, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}), ...(distribute ? { distribute: true } : {}) }, size: distribute ? { width: { fr: 1 }, height: "fill" } : HUG };
 }
 
 /**
@@ -973,6 +1027,7 @@ export const SLIDE_KEYS = Object.freeze({
   // the commentary
   points: "the commentary column: a lead and a sentence per point",
   pointsHeading: "the heading over that column, or false for none",
+  pointsStyle: "how the column is marked: icon-lead, icon-framed, prose, ruled, lettered, numbered or bulleted",
   pointsTone: "open, dark, muted, tint or primary",
   pointsAlign: "middle to centre the points on the exhibit",
   paragraphs: "body prose, on a text page",
@@ -1266,7 +1321,7 @@ const SLIDE_PASSES = [
 /** The pass names, in order - what the composer does to a slide and when. */
 export const PASS_NAMES = Object.freeze(SLIDE_PASSES.map(([name]) => name));
 
-export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1, recent = []) {
+export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = []) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   assertKnownSlideKeys(slide, id);
   const ctx = { id, baseDir, fill, elements, tileColumn: null, tilePoints: [] };
@@ -1290,13 +1345,19 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   const { tileColumn, tilePoints } = ctx;
   const layout = chooseLayout(slide, recent);
   if (Array.isArray(recent)) recent.unshift(layout);
+  // The column's shape, resolved once for the page and remembered, so
+  // consecutive pages do not all reach for the same device.
+  // The tile pass moves a thin chart's points onto the context, so read both.
+  const columnPoints = slide.points?.length ? slide.points : tilePoints;
+  const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints, recentStyles) : null;
+  if (pointsStyle && Array.isArray(recentStyles)) recentStyles.unshift(pointsStyle);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   const items = [];
   const metricsBelow = slide.metricsPosition === "bottom";
   if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
   if (tileColumn) {
     const tiles = { id: `${id}-tiles`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: tileColumn.map((m, i) => ({ id: `${id}-tile-${i}`, component: "metric", props: { ...m, variant: "prominent" }, size: { width: { fr: 1 }, height: "fill" } })) };
-    const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`, sideTreatment(slide), fill, true)] };
+    const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle)] };
     // The tile column reads as the evidence, so the same implication marker joins it to the meaning.
     const tileChevron = (slide.implication ?? true) && tilePoints.length ? { id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: 44, height: "fill" } } : null;
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: tilePoints.length ? [tiles, tileChevron, side].filter(Boolean) : [tiles] });
@@ -1326,7 +1387,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // band and the points start level with the plot, not with the heading text.
     // `pointsAlign: "middle"` centres the points on the exhibit instead.
     const tone = sideTreatment(slide);
-    const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true) : null;
+    const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle) : null;
     // `kpi: { value, label }`: the one big number the chart proves, in the accent
     // at the top of the side column, above the points.
     const kpiTile = slide.kpi ? { id: `${id}-kpi`, component: "metric", props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } } : null;
@@ -1451,7 +1512,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" },
       size: { width: { fr: 1 }, height: slide.points?.length ? 150 : "fill" } };
     const sideItems = [kpi];
-    if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true));
+    if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle));
     const hero = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" });
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
       { id: `${id}-side`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, leftover: slide.points?.length ? "distribute" : "center", items: sideItems },
@@ -1478,14 +1539,14 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     };
     const stacked = { id: `${id}-stack`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: exhibits.map(stackItem) };
     if (slide.points?.length) {
-      const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true)] };
+      const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle)] };
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
     } else items.push({ ...stacked, size: SIZE });
   } else if (layout === "grid") {
     // Two rows of two small exhibits, every panel headed.
     const panels = exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE }, `${id}-exhibit-${i}`));
     items.push({ id: `${id}-grid`, layout: "flow.column", size: SIZE, items: [{ id: `${id}-row-a`, layout: "flow.row", size: SIZE, items: panels.slice(0, 2) }, { id: `${id}-row-b`, layout: "flow.row", size: SIZE, items: panels.slice(2, 4) }] });
-    if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`));
+    if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
   } else if (layout === "two-up" || layout === "two-up-contrast") {
     // `two-up-contrast` is the same row with each panel carrying its own
     // caption and no shared column: the page's commentary sits under the panel
@@ -1552,12 +1613,12 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       return SIZE;
     };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex) }, `${id}-exhibit-${i}`)) });
-    if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`));
+    if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
   } else if (slide.photo && (slide.points?.length || slide.paragraphs?.length)) {
     // Text beside a photograph: the copy takes the left column (a toned panel
     // when `pointsTone` says so), the photo the right, both full height.
     const tone = sideTreatment(slide);
-    const copy = [...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })), ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true)] : [])];
+    const copy = [...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })), ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle)] : [])];
     const column = { id: `${id}-side`, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: 1.2 }, height: "fill" }, items: copy };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [column, photoStrip(slide, `${id}-photo`, baseDir, 1)] });
   } else {
@@ -1672,10 +1733,11 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   // The shapes the last few analytical pages took, most recent first: the
   // chooser breaks a tie on variety, so a section spreads across its repertoire
   // instead of repeating whichever shape fitted first.
-  const recent = [];
+  const recent = [], recentStyles = [];
   for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) {
-    slides.push(composeSlide(page, slides.length, baseDir, fill, weight.elements, recent));
+    slides.push(composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles));
     recent.splice(4);
+    recentStyles.splice(3);
   }
   return {
     id: spec.id,
