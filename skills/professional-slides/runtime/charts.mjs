@@ -624,7 +624,13 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
     periodBand: periodBandHeight(props, categories),
-    leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : 54,
+    // The 54px left gutter is the value axis's: it holds "1,200" and its tick.
+    // With the numbers on the marks there is no axis to hold, and a vertical
+    // category label never leaves its own slot, so the plot keeps the width the
+    // axis would have taken and only a reading margin is reserved. The gutter
+    // also mirrors to the right when the plot is centred, so this is twice the
+    // width back on every labelled column chart.
+    leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : showValueAxis ? 54 : 16,
     valueLabelInset: (horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter) + deltaWidth,
     totalLabelInset: horizontal ? 0 : totalHeight,
     centerPlot: !horizontal && !showValueAxis
