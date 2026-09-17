@@ -10,15 +10,15 @@ ALLOWED_ROOTS = {'skills', 'evals'}
 ASSET_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.svg'}
 ALLOWED_FILES = {'.codex-plugin/plugin.json', 'README.md', 'package.json'}
 EXTENSIONS = {'.md', '.mjs', '.py', '.json', '.toml', '.yaml', '.yml', '.svg'}
-EXCLUDED = {'output', 'tmp', 'deliverables', 'renders', 'node_modules', '__pycache__', '.git'}
+EXCLUDED = {'dist', 'output', 'outputs', 'tmp', 'deliverables', 'renders', 'node_modules', '__pycache__', '.git'}
 
 
 def package(source: Path, destination: Path):
     source, destination = source.resolve(), destination.resolve()
     if destination == source or source.is_relative_to(destination):
         raise ValueError('Package destination cannot replace the source or its ancestors')
-    if destination.is_relative_to(source) and not ((source / '.git').exists() and destination.is_relative_to(source / 'output')):
-        raise ValueError('Plugin files are read-only; stage outside the installation or under a developer checkout output/')
+    if destination.is_relative_to(source) and not ((source / '.git').exists() and destination.is_relative_to(source / 'dist')):
+        raise ValueError('Plugin files are read-only; stage outside the installation or under a developer checkout dist/')
     if destination.exists():
         if not (destination / 'package-manifest.json').is_file():
             raise ValueError('Refusing to replace a directory not owned by the package builder')
@@ -52,6 +52,6 @@ def package(source: Path, destination: Path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, default=ROOT / 'output/package/professional-slides')
+    parser.add_argument('--output', type=Path, default=ROOT / 'dist/professional-slides')
     args = parser.parse_args()
     print(json.dumps(package(ROOT, args.output)))

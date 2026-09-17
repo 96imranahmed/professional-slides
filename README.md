@@ -20,7 +20,7 @@ The runtime currently produces editable PowerPoint primitives, including charts.
 
 ## Distribution and user files
 
-Build a clean package with `python3 evals/scripts/package_plugin.py`. The installable directory is `output/package/professional-slides`; point the marketplace entry or local install source there, never at a used working checkout. The allowlist includes reusable skills, runtime, validators and tests, with a hash inventory. It excludes local research, generated decks, scratch, dependencies and personal configuration. Installation does no generation.
+Build a clean package with `python3 evals/scripts/package_plugin.py`. The installable directory is `dist/professional-slides`; point the marketplace entry or local install source there, never at a used working checkout. Reserve `output/` and `outputs/` for generated task artifacts from Claude, Codex and other tools; clearing them must not remove the install source. The allowlist includes reusable skills, runtime, validators and tests, with a hash inventory. It excludes local research, generated decks, scratch, dependencies and personal configuration. Installation does no generation.
 
 Users create task artifacts in `output/<task>/` in their own project, outside the installed plugin. The canonical export runtime rejects plugin-local writes, including symlink aliases. A developer checkout may write only under its own `output/`. Retain the latest useful output and required rebuild/QA inputs; remove superseded task-owned intermediates rather than copying them into a release. See [artifact lifecycle](skills/professional-slides/references/tools/artifact-lifecycle.md).
 
