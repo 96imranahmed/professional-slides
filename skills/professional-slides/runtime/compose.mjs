@@ -139,6 +139,25 @@ function tableAlias(ex) {
 const TABLE_RENDERERS = ["trend-rows", "comparison-table", "heatmap"];
 
 function exhibitItem(exIn, id, baseDir, size = SIZE) {
+  // A `compare` whose sides name an `image` sets the two pictures above the two
+  // columns, aligned to them. A comparison of two named things - two
+  // characters, two cities, two products - is a page the reader should be able
+  // to tell apart before reading a word, and the reference decks lead with the
+  // picture. The images share one height so the columns beneath them start
+  // level, and the exhibit is unchanged underneath: this is furniture above a
+  // comparison, not a different exhibit.
+  if (exIn && exIn.type === "compare" && (exIn.left?.image || exIn.right?.image)) {
+    const { left = {}, right = {}, imageHeight, ...restOfCompare } = exIn;
+    const strip = (side, key) => (side.image
+      ? { id: `${id}-${key}-image`, component: "image-frame", props: { ...imageProps(side.image, baseDir), fit: "cover" }, size: { width: { fr: 1 }, height: "fill" } }
+      : { id: `${id}-${key}-image`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: [] });
+    const bare = { ...restOfCompare, left: { ...left, image: undefined }, right: { ...right, image: undefined } };
+    return { id: `${id}-pictured`, layout: "flow.column", gap: "space.3", size, items: [
+      { id: `${id}-images`, layout: "flow.row", gap: "space.3", size: { width: { fr: 1 }, height: imageHeight ?? 180 },
+        items: [strip(left, "left"), strip(right, "right")] },
+      exhibitItem(bare, id, baseDir, { width: { fr: 1 }, height: "fill" }),
+    ] };
+  }
   // `caption`: the finding under this panel. In a two-up or a grid the
   // reference captions every panel rather than closing with one shared
   // so-what, because each panel answers its own question.
@@ -476,7 +495,7 @@ function implicationColumn(ex) {
 function columnTreatments(ex) {
   const columns = ex.columns || [];
   const flag = (c, name) => c && typeof c === "object" && c[name] === true;
-  const marks = columns.map((c) => ({ heat: flag(c, "heat"), bubble: flag(c, "bubble"), bar: flag(c, "bar") }));
+  const marks = columns.map((c, i) => ({ heat: flag(c, "heat"), bubble: flag(c, "bubble") || ex.bubbleColumn === i, bar: flag(c, "bar") }));
   if (!marks.some((m) => m.heat || m.bubble || m.bar)) return ex;
   marks.forEach((m, i) => {
     if ([m.heat, m.bubble, m.bar].filter(Boolean).length > 1) {
@@ -550,7 +569,7 @@ function columnTreatments(ex) {
       max: Math.ceil(top / step) * step,
     };
   }
-  return { ...ex, columns: nextColumns, rows: nextRows, ...(Object.keys(barScales).length ? { scales } : {}) };
+  return { ...ex, columns: nextColumns, rows: nextRows, bubbleColumn: undefined, ...(Object.keys(barScales).length ? { scales } : {}) };
 }
 
 /** Walk the composed tree and join every chart's unit to its heading. */
@@ -595,8 +614,98 @@ function iconColumn(ex) {
   return { ...ex, columns, rows: nextRows, icons: undefined };
 }
 
+// A table small enough that its numbers carry the page, and short enough that a
+// pill fits round them. Past these the figures are a dataset, not a headline.
+// One vocabulary for "this column is the conclusion drawn from the others",
+// shared by the gutter pass and the fallback highlight so the two cannot
+// disagree about what a verdict is.
+const VERDICT_HEADER = /\b(decide|decision|implication|so what|then\b|recommend|verdict|action|takeaway|what it means)/;
+
+const BUBBLE_ROWS_MAX = 4;
+const BUBBLE_VALUE_CHARS = 6;
+// A bare count or a percentage - the figures a two-row table is *about*.
+// Currency, long decimals and unit suffixes keep their own formatting: the
+// pill is emphasis, and emphasis that rewrites a value is not emphasis.
+const NUMBER_CELL = /^\d{1,3}(,\d{3})*(\.\d)?%?$|^\d+(\.\d)?%?$/;
+
+/**
+ * A short table of short numbers sets them in bubbles.
+ *
+ * Two rows of "37 / 15" and "29.7% / 6.7%" in a plain grid is a spreadsheet
+ * fragment: the figures are the whole point of the page and they read as the
+ * quietest thing on it. The filled pill is the table's counterpart to the
+ * chart's change bubble, and it is already built (`bubble: true`); this is the
+ * composer reaching for it where the shape of the data asks.
+ *
+ * Deliberately narrow: few rows, a genuinely numeric column, short values, and
+ * never more than one such column, because a table that bubbles every column
+ * emphasises nothing.
+ */
+function numberBubbles(ex) {
+  const columns = ex.columns || [], rows = ex.rows || [];
+  if (columns.length < 2 || columns.length > 4) return ex;
+  if (rows.length === 0 || rows.length > BUBBLE_ROWS_MAX) return ex;
+  if (columns.some((c) => typeof c === "object" && c && (c.heat || c.bubble || c.bar || c.implication || c.type))) return ex;
+  if ((ex.derive || []).length || ex.total === true) return ex;
+  const cellsAt = (i) => rows.map((row) => (Array.isArray(row) ? row : row?.cells || [])[i]);
+  const numeric = (i) => {
+    // A header that already earns a treatment keeps it: a Change column reads
+    // in green or red, an Outlook column becomes an arrow ring. A bubble on top
+    // of either would take a cell that already says something and say something
+    // else with it.
+    const header = String(columnLabel(columns[i]) ?? "").toLowerCase();
+    if (/(change|delta|yoy|y\/y|growth|variance|difference|outlook|trend|%\s*complete)/.test(header)) return false;
+    return cellsAt(i).every((cell) => {
+      if (cell === null || cell === undefined || (typeof cell === "object" && cell.text === undefined)) return false;
+      const text = String(cell?.text ?? cell).trim();
+      // A signed value is a change, whatever its header says, and changes are
+      // coloured rather than bubbled.
+      if (/^[+\-−]/.test(text)) return false;
+      return text.length > 0 && text.length <= BUBBLE_VALUE_CHARS && NUMBER_CELL.test(text);
+    });
+  };
+  // The first column labels the rows; a bubble belongs on a measure, not a name.
+  // Where several columns are numeric the last one wins: a table reads left to
+  // right and builds to the measure it concludes on ("Cohort | Films | Share"
+  // is a table about share). Only ever one, because bubbling every column
+  // emphasises nothing.
+  const candidates = columns.map((_, i) => i).filter((i) => i > 0 && numeric(i));
+  if (!candidates.length) return ex;
+  const at = candidates[candidates.length - 1];
+  // Recorded as an index rather than written onto the column: turning a string
+  // column into an object reads downstream as "the author set this column
+  // explicitly" and short-circuits the treatment the table would otherwise
+  // infer from its content.
+  return { ...ex, bubbleColumn: at };
+}
+
+/**
+ * A last column headed "Verdict", "Implication", "So what" or "Recommendation"
+ * is the conclusion drawn from the columns before it.
+ *
+ * It was set as a `highlight` cell - a tint, in a cell shaped exactly like the
+ * evidence beside it, which is what the review objected to: a verdict flush
+ * against the facts reads as one more fact. The gutter of chevrons says
+ * "evidence, then verdict" once, and `implication: true` already builds it. The
+ * header has been saying so all along; nothing was reading it.
+ */
+function verdictColumn(ex) {
+  const columns = ex.columns || [];
+  if (columns.length < 3) return ex;
+  const last = columns[columns.length - 1];
+  if (typeof last === "object" && last && (last.implication !== undefined || last.type)) return ex;
+  const label = String((typeof last === "object" && last ? last.label : last) ?? "").toLowerCase();
+  if (!VERDICT_HEADER.test(label)) return ex;
+  return { ...ex, columns: [...columns.slice(0, -1), { ...(typeof last === "object" && last ? last : { label: String(last ?? "") }), implication: true }] };
+}
+
 export function styleTable(ex) {
-  ex = groupNumericColumns(totalRow(deriveColumns(implicationColumn(columnTreatments(iconColumn(ex))))));
+  // What the author wrote, read before any pass rewrites it: a treatment pass
+  // that turns a string column into an object would otherwise read downstream
+  // as "the author set this column explicitly" and change the table's whole
+  // treatment as a side effect.
+  const authoredColumns = ex.columns;
+  ex = groupNumericColumns(totalRow(deriveColumns(implicationColumn(columnTreatments(iconColumn(numberBubbles(verdictColumn(ex))))))));
   // An object column (one that names a `group`, a `unit`, an alignment) still
   // gets its width from what it holds, unless it sets one: otherwise adding a
   // unit to a header would silently reweight every column to equal shares and
@@ -629,14 +738,14 @@ export function styleTable(ex) {
     columns[0] = { ...columns[0], type: "category", label: "", width: 48 };
     rowsIn.forEach((r, i) => { const row = Array.isArray(r) ? r : r.cells; if (/^\d+$/.test(String(row[0]?.text ?? row[0] ?? "").trim())) row[0] = { type: "category", text: "", surface: "plain", sectionNumber: Number(String(row[0]?.text ?? row[0]).trim()) }; });
   }
-  const explicit = ex.treatment || ex.variant || ex.columns.some((c) => typeof c === "object");
+  const explicit = ex.treatment || ex.variant || authoredColumns.some((c) => typeof c === "object");
   if (explicit) return { variant: ex.variant || "plain", treatment: ex.treatment || "open", columns, rows: rowsIn, ...extra };
   const first = rowsIn.map((r) => String(r[0]?.text ?? r[0] ?? ""));
   const numbered = first.length > 1 && first.every((v) => /^\s*\d+\s*[·.)\-–:]\s*\S/.test(v));
   const head0 = String(columns[0].label || "").toLowerCase();
   const headLast = String(columns[columns.length - 1].label || "").toLowerCase();
   const sequence = numbered || /^(stage|step|phase|wave|horizon|priority|milestone)s?\b/.test(head0);
-  const decision = /\b(decide|decision|implication|so what|then\b|recommend|verdict|action)/.test(headLast);
+  const decision = VERDICT_HEADER.test(headLast);
   const scorecard = columns.length >= 4 && /\b(gate|criteri|dimension|factor|requirement|measure|option)/.test(head0);
   if (sequence) {
     const cols = [{ ...columns[0], type: "category" }, ...columns.slice(1)];
@@ -649,6 +758,8 @@ export function styleTable(ex) {
   }
   if (scorecard) return { variant: "standard", treatment: "standard", columns, rows: rowsIn, ...extra };
   if (decision) {
+    // Under three columns a gutter has nothing to separate, so the conclusion
+    // keeps the tint it always had.
     const rows = rowsIn.map((r) => [...r.slice(0, -1), typeof r[r.length - 1] === "string" ? { text: r[r.length - 1], type: "highlight" } : r[r.length - 1]]);
     return { variant: "standard", treatment: "standard", columns, rows, ...extra };
   }
@@ -1712,7 +1823,16 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // rather than hugging the top of the track. Anything with a list in it has
     // something that can spread instead. `pointsAlign` overrides either way.
     const boxesOnly = sideItems.length > 0 && sideItems.every((item) => insightBoxes.includes(item));
-    const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && fill !== "full" && (boxesOnly || sideItems.length <= 1) && (unheaded(exhibits[0]) || (insightBox && !list) || (tone !== "open" && !heading)));
+    // A short unheaded column of two or three points is also read against the
+    // exhibit rather than down from the title, so it centres too. Three bullets
+    // hugging the top of a 500px track with the bottom half empty is the page
+    // that reads as unfinished; centred, the two halves balance. A headed
+    // column keeps its top - the heading is what the eye starts from.
+    const shortList = list && !heading && Array.isArray(slide.points)
+      && slide.points.length >= 2 && slide.points.length <= 3 && sideItems.length <= 1;
+    const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && fill !== "full"
+      && (boxesOnly || sideItems.length <= 1)
+      && (unheaded(exhibits[0]) || (insightBox && !list) || (tone !== "open" && !heading) || shortList));
     // A toned panel is always a section (it needs a surface); it takes the
     // heading unless the author suppresses it with `pointsHeading: false`.
     // A column of several blocks (a number, a box, the points) spreads them down

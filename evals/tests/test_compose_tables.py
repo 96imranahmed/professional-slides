@@ -15,15 +15,26 @@ assert.deepEqual(stages.rows.map(r=>r[0].sectionNumber),[1,2]);
 assert.equal(stages.rows[0][0].text,'Move alone');
 const numbered=styleTable({columns:['Item','Note'],rows:[['1 · First','a'],['2 · Second','b']]});
 assert.equal(numbered.treatment,'categories');assert.equal(numbered.rows[1][0].text,'Second');assert.equal(numbered.rows[1][0].sectionNumber,2);
+// A last column that names the conclusion - "Then decide", "Verdict", "So
+// what" - is the implication drawn from the columns before it, so it gets the
+// gutter of chevrons rather than one more cell shaped exactly like the
+// evidence. Under three columns a gutter has nothing to separate and the
+// conclusion keeps the tint instead.
 const decision=styleTable({columns:['Visit','Verify','Then decide'],rows:[['NYC','Seats','Lead option']]});
-assert.equal(decision.treatment,'standard');assert.equal(decision.rows[0][2].type,'highlight');
+assert.equal(decision.treatment,'standard');
+assert.equal(decision.columns.length,4,'a gutter column is inserted before the verdict');
+assert.equal(decision.rows[0].filter(c=>c&&c.type==='implication').length,1);
+const twoColumn=styleTable({columns:['Option','Verdict'],rows:[['A','Pick this'],['B','Not this']]});
+assert.equal(twoColumn.rows[0][1].type,'highlight');
 const scorecard=styleTable({columns:['Gate','A','B','C'],rows:[['School','x','y','z']]});
 assert.equal(scorecard.treatment,'standard');
 const listing=styleTable({columns:['Listing','Size','Rent'],rows:[['332 Jefferson','1 bath','$3,600']]});
 assert.equal(listing.treatment,'open');assert.equal(listing.variant,'plain');
 // Column weights follow the longest content, so a "Year 1" column stays narrow.
-const w=stages.columns.map(c=>c.width);
-assert.ok(w[1]<w[0]&&w[0]<w[2],`weights ${w}`);
+// "Decision at that point" is a verdict, so a gutter sits before it and the
+// measured columns are the ones either side of it.
+const w=stages.columns.map(c=>c.width), last=w.length-1;
+assert.ok(w[1]<w[0]&&w[0]<w[last],`weights ${w}`);
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
