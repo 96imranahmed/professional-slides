@@ -147,7 +147,7 @@ function normalizeSteps(props) {
   if (!Array.isArray(props.items) || props.items.length < 3 || props.items.length > 6) throw new Error("Steps take three to six milestones");
   return props.items.map((item, index) => {
     if (!item || !clean(item.label)) throw new Error(`Step ${index + 1} requires a label`);
-    return { label: clean(item.label), text: clean(item.text) };
+    return { label: clean(item.label), text: clean(item.text), icon: item.icon ?? null };
   });
 }
 
@@ -184,7 +184,12 @@ export function stepsNodes({ id, frame, props }) {
     const last = i === n - 1;
     nodes.push(rect(stableId(sid, "tread"), "step-block", { x, y: top, width: L.width, height: L.tread }, last ? ACCENT : PRIMARY));
     if (i) nodes.push(linePrimitive({ id: stableId(sid, "riser"), role: "step-riser", x1: x, y1: top + L.tread, x2: x, y2: baseline, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
-    nodes.push(...numberMarker({ id: stableId(sid, "number"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, number: i + 1, reverse: true }));
+    // The tread's marker: the icon the author named, else the step's number.
+    // A staircase already carries its order in its shape, so an icon loses
+    // nothing and says what the step is about.
+    nodes.push(...(m.item.icon
+      ? iconMarker({ id: stableId(sid, "icon"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, icon: m.item.icon, tone: "plain", color: WHITE })
+      : numberMarker({ id: stableId(sid, "number"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, number: i + 1, reverse: true })));
     nodes.push(label(stableId(sid, "label"), "step-label", { x: x + L.pad + L.disc + v("space.2"), y: top + (L.tread - m.title.height) / 2, width: L.inner }, m.title, text("type.body", WHITE, true)));
     if (m.body) nodes.push(label(stableId(sid, "text"), "step-text", { x: x + L.pad, y: top - v("space.2") - m.body.height, width: L.width - L.pad }, m.body, text("type.compact", INK)));
   });

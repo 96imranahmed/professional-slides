@@ -86,7 +86,13 @@ console.log(JSON.stringify({
         self.assertEqual(result["imageNodes"], 0)
         self.assertFalse(result["fixedTaxonomy"])
         for chrome in result["chrome"]:
-            self.assertEqual(chrome["title"], {"x": 60, "y": chrome["textBottom"] + 8, "width": 1160, "height": 0})
+            # The rule is anchored to the content, not hung under the title: a
+            # fixed gap above the body, so the distance from rule to content
+            # reads the same whether the title took one line or two. It never
+            # rises above where the title leaves it.
+            self.assertEqual(chrome["title"]["x"], 60)
+            self.assertEqual(chrome["title"]["width"], 1160)
+            self.assertGreaterEqual(chrome["title"]["y"], chrome["textBottom"] + 8)
             self.assertEqual(chrome["footer"], {"x": 60, "y": 680, "width": 1160, "height": 0})
 
     def test_cover_is_dark_by_default_with_a_lower_third_title_block(self):
@@ -300,7 +306,13 @@ for (const id of ['action-title','section-title','slide-chrome']) {
   assert.deepEqual(render({[ruleProp]:true}), withLine);
   assert.deepEqual(render({[ruleProp]:false}), withoutLine);
   const line = withLine.find(n=>n.role==='title-rule');
-  assert.equal(line.frame.y - title.frame.y - title.data.textLayout.height, 8);
+  // A standalone title hangs its rule 8px under the text. A chrome page moves it
+  // to a fixed gap above the body instead, so the rule-to-content distance is
+  // the same whether the title took one line or two - it used to be 52px and
+  // 16px, the same band reading differently on every page.
+  const gap = line.frame.y - title.frame.y - title.data.textLayout.height;
+  if (id === 'slide-chrome') assert.ok(gap >= 8, `${id} rule sits at or below the title`);
+  else assert.equal(gap, 8);
   const normalize = nodes => nodes.filter(n=>n.role!=='title-rule').map(({data,...node})=>node);
   assert.deepEqual(normalize(withLine), normalize(withoutLine));
   const spec = {id:'test',frame,composition:component({id:'title',component:id,props:{...definition.sample,[variantProp]:'without-line'},frame})};

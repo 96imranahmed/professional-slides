@@ -19,9 +19,11 @@ const marker=(slide)=>row(slide).items.find(i=>i.component==='connector');
 assert.equal(marker({title:'T',exhibit:chart,points:['p','q']}).props.variant,'divider-chevron');
 // A toned panel is full bleed too, heading or not.
 assert.equal(marker({title:'T',exhibit:chart,pointsTone:'muted',pointsHeading:false,points:['p']}).props.variant,'divider-chevron');
-// A short centred insight needs no divider: the disc alone joins the two halves.
+// Every connector runs the dashed rule through the disc, on a short centred
+// insight as much as on a full-height column. A bare disc floating in an empty
+// gutter reads as a stray mark; the rule is what makes it a connector.
 const insight={title:'T',exhibit:chart,insight:'Lockers cost half what a post office visit costs.'};
-assert.equal(marker(insight).props.variant,'disc-chevron');
+assert.equal(marker(insight).props.variant,'divider-chevron');
 const side=row(insight).items.find(i=>i.id==='s01-side');
 assert.equal(side.heading,undefined,'an insight column carries no filler heading');
 assert.equal(side.leftover,'center');
@@ -86,12 +88,13 @@ const punctuated=title.render({id:'punctuated',frame,props:{...props,heading:pro
 assert.equal(punctuated.find(n=>n.role==='section-heading').text,props.heading+',');
 const alone=title.render({id:'alone',frame,props:{heading:props.heading,unitPlacement:'inline'}}).nodes;
 assert.equal(alone.find(n=>n.role==='section-heading').text,props.heading);
-// The composer asks for it beside a text column and on a full-width chart, and
-// leaves peers in a row alone so their two-line bands align.
+// The composer asks for it on every architecture. A page's shape decides where
+// things sit, never what they are, and peers in a row stay aligned because each
+// band is now one line rather than two.
 const side=composeSlide({title:'T',exhibit:{type:'chart.column',heading:'H',unit:'$B',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]},points:['p']},0);
 assert.equal(side.items[0].items[0].props.unitPlacement,'inline');
 const peers=composeSlide({title:'T',exhibits:[{type:'chart.column',heading:'A',unit:'$B',categories:['a','b','c'],series:[{name:'s',values:[1,2,3]}]},{type:'chart.bar',heading:'B',unit:'$B',categories:['a','b','c'],series:[{name:'t',values:[2,3,4]}]}]},0);
-assert.equal(peers.items[0].items[0].props.unitPlacement,undefined);
+assert.equal(peers.items[0].items[0].props.unitPlacement,'inline');
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])

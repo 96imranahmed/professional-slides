@@ -1014,6 +1014,18 @@ function registerCore(registry) {
         const contentTop = Math.max(CHROME.bodyTop + trackerGap, titleBottom + gap + trackerGap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
         const contentFrame = { ...page.contentFrame, y: contentTop, height: baseBottom - contentTop };
         if (contentFrame.height <= 0) throw new Error("Action title leaves no room for slide content; shorten the title or split the slide");
+        // The rule belongs to the content, not to the title. Hung under the
+        // title it tracked the title's height while the body stayed pinned at
+        // `bodyTop`: a one-line title left 52px of nothing beneath the rule and
+        // a two-line title left 16px, so the same band read differently on
+        // every page. Dropping it to a fixed gap above the content makes that
+        // distance constant and lets the title float in whatever height it
+        // needs. It never rises above where the title leaves it.
+        const ruleGap = tokenValue(token("space.3"));
+        for (const node of titles) {
+          if (node.role !== "title-rule" || !node.frame) continue;
+          node.frame = { ...node.frame, y: Math.max(node.frame.y, contentTop - ruleGap) };
+        }
         // The title band paints first; the tracker sits on it, above the title.
         const band = titles.filter((n) => n.role === "title-band"), rest = titles.filter((n) => n.role !== "title-band");
         return { ...page, contentFrame, nodes: [...band, ...tracker, ...kicker, ...rest, ...page.nodes] };

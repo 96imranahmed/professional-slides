@@ -271,7 +271,11 @@ export function metricNodes({ id, frame, props }) {
   if (ink_) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, INK, "none", "radius.none"));
   else if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));
   else if (props.tone === "tint") nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, TINT, "none", "radius.small"));
-  if (ruled) nodes.push(linePrimitive({ id: stableId(id, "rule"), role: "metric-rule", x1: frame.x, y1: frame.y + 4, x2: frame.x, y2: frame.y + frame.height - 4, style: { stroke: RULE, lineWidth: token("line.hairline"), dash: "solid" } }));
+  // The hairline is a divider *between* tiles, so n tiles carry n-1 rules and
+  // the first carries none. Drawn on the leading edge of every tile it fences
+  // each one off instead of separating them, which is not the reference row
+  // ("51 | 443 | 39") it is named after. `leads: true` marks the first.
+  if (ruled && props.leads !== true) nodes.push(linePrimitive({ id: stableId(id, "rule"), role: "metric-rule", x1: frame.x, y1: frame.y + 4, x2: frame.x, y2: frame.y + frame.height - 4, style: { stroke: RULE, lineWidth: token("line.hairline"), dash: "solid" } }));
   // `tone: "hero"`: the one big number beside a chart, in the accent, left-aligned, top-anchored.
   const hero = props.tone === "hero";
   const ink = ink_ ? ACCENT : dark ? WHITE : hero || ruled ? ACCENT : PRIMARY, grey = dark ? WHITE : hero || ruled ? INK : SECONDARY;

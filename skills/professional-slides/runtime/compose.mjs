@@ -553,8 +553,50 @@ function columnTreatments(ex) {
   return { ...ex, columns: nextColumns, rows: nextRows, ...(Object.keys(barScales).length ? { scales } : {}) };
 }
 
+/** Walk the composed tree and join every chart's unit to its heading. */
+function inlineChartUnits(items) {
+  for (const item of items || []) {
+    if (item?.component && String(item.component).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) {
+      item.props.unitPlacement = "inline";
+    }
+    if (Array.isArray(item?.items)) inlineChartUnits(item.items);
+  }
+}
+
+/**
+ * `icons: [...]` on a table, or `icon` on a row: an icon beside each row label.
+ *
+ * The renderer has always drawn an icon on a `category` cell - it is how the
+ * reference findings matrix marks its rows - and the only surface that could
+ * reach it was the `rows` alias. A plain `columns`/`rows` table had no route to
+ * it at all, which is most of why two cold-run decks of 39 tables carried not
+ * one icon between them. An authored icon draws wherever it is authored.
+ */
+function iconColumn(ex) {
+  const rows = ex.rows || [];
+  const listed = Array.isArray(ex.icons) ? ex.icons : null;
+  const perRow = rows.some((row) => !Array.isArray(row) && row?.icon);
+  if (!listed && !perRow) return ex;
+  if (listed && listed.length !== rows.length) {
+    throw new Error(`A table's \`icons\` needs one per row: ${listed.length} for ${rows.length} rows`);
+  }
+  const columns = (ex.columns || []).map((c, i) => (i === 0
+    ? (typeof c === "object" && c ? { ...c, type: "category" } : { label: String(c ?? ""), type: "category" })
+    : c));
+  const nextRows = rows.map((row, index) => {
+    const cells = Array.isArray(row) ? row : row.cells || [];
+    const icon = listed ? listed[index] : row?.icon;
+    if (!icon) return row;
+    const first = cells[0];
+    const cell = { type: "category", text: String(first?.text ?? first ?? ""), ...(typeof first === "object" && first ? first : {}), icon };
+    const next = [{ ...cell, type: "category", icon }, ...cells.slice(1)];
+    return Array.isArray(row) ? next : { ...row, icon: undefined, cells: next };
+  });
+  return { ...ex, columns, rows: nextRows, icons: undefined };
+}
+
 export function styleTable(ex) {
-  ex = groupNumericColumns(totalRow(deriveColumns(implicationColumn(columnTreatments(ex)))));
+  ex = groupNumericColumns(totalRow(deriveColumns(implicationColumn(columnTreatments(iconColumn(ex))))));
   // An object column (one that names a `group`, a `unit`, an alignment) still
   // gets its width from what it holds, unless it sets one: otherwise adding a
   // unit to a header would silently reweight every column to equal shares and
@@ -740,7 +782,7 @@ function niceCeiling(value) {
 function metricsStrip(metrics, id, tone) {
   const tiles = metrics.map((m) => (typeof m === "string" ? { value: m } : m));
   const prominent = tone === "ink" || tone === "rule";
-  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
+  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...(i === 0 ? { leads: true } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
 }
 
 /**
@@ -1694,7 +1736,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // lines) needs no divider: the disc alone joins the evidence to its meaning.
     const fullBleed = Boolean(heading) || tone !== "open" || Boolean(slide.photo);
     const implication = slide.implication ?? true;
-    const chevron = implication ? { id: `${id}-implication`, component: "connector", props: { variant: fullBleed ? "divider-chevron" : "disc-chevron" }, size: { width: fullBleed ? 44 : 40, height: "fill" } } : null;
+    // The dashed rule runs through the disc on every page, not only where the
+  // exhibit is full-bleed. A bare disc floating in an empty gutter reads as a
+  // stray mark; the rule is what makes it a connector, and both variants have
+  // been drawn all along.
+  const chevron = implication ? { id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: 44, height: "fill" } } : null;
     // `photo`: a photograph strip at the right edge, full body height, cropped
     // to fit (the 2022 McKinsey pattern: chart, commentary, photo).
     const photo = photoStrip(slide, `${id}-photo`, baseDir);
@@ -1897,6 +1943,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   }
   if (slide.soWhat) items.push(soWhatItem(slide.soWhat, `${id}-sowhat`));
   if (!items.length) throw new Error(`${id}: a slide needs an exhibit, points, paragraphs or a soWhat`);
+  // A chart's unit joins its heading on one line, on every architecture. It was
+  // set on `exhibit-top` alone, so the majority of chart pages - every
+  // exhibit-left, exhibit-right and exhibit-full - dropped "$bn" onto a line of
+  // its own. A page's shape decides where things sit, never what they are.
+  inlineChartUnits(items);
   // Footer: "Source:" and "Note:" lead their lines, as on a consulting page.
   const prefixed = (label, text) => (text && !/^(source|sources|note|notes)\s*:/i.test(text) ? `${label}: ${text}` : text);
   // `note` takes a list as well as a line: the reference pages carry two to four
