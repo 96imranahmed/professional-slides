@@ -87,7 +87,10 @@ function tableAlias(ex) {
   }
   if (ex.type === "rows") {
     const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label, ...(row.number ? { sectionNumber: row.number } : {}), ...(row.icon ? { icon: row.icon } : {}) }, Array.isArray(row.points) ? { type: "bullets", items: row.points } : row.text]);
-    return { type: "table", treatment: "categories", variant: "standard", columns: [{ label: "", type: "category", width: 200 }, { label: "", type: "text", width: 800 }], rows, density: ex.density };
+    // `columns: ["What we found", "What it means"]` heads the two tracks. The
+    // reference pages label them; an unlabelled ledger keeps the blank band.
+    const labels = Array.isArray(ex.columns) ? ex.columns.map((column) => String(typeof column === "string" ? column : column?.label || "")) : [];
+    return { type: "table", treatment: "categories", variant: "standard", columns: [{ label: labels[0] || "", type: "category", width: 200 }, { label: labels[1] || "", type: "text", width: 800 }], rows, density: ex.density };
   }
   return ex;
 }
@@ -144,7 +147,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
 const DIAGRAM_TYPES = ["cards", "quadrants", "swot", "metrics", "cycle", "steps", "people", "logos", "framework", "relationship-network", "map", "process", "chevron-process", "timeline", "roadmap", "tree", "organization", "funnel", "matrix", "journey", "image"];
 /** A diagram carries no heading band unless the author gives it one; its side column then centres instead. */
 function unheaded(ex) { return DIAGRAM_TYPES.includes(ex.type) && !ex.panelHeading; }
-function headedPanel(ex, item, id) {
+function headedPanel(ex, item, id, align = true) {
   if (unheaded(ex)) return item;
   if (String(ex.type).startsWith("chart.")) {
     if (ex.panelHeading && !ex.heading) item.props.heading = ex.panelHeading;
@@ -153,8 +156,11 @@ function headedPanel(ex, item, id) {
   // The band exists for the row rule: it gives the panel's content the same
   // starting line as its neighbour's. When the author has not named the panel,
   // the band stays blank rather than printing the table's own first column
-  // label back at it (the header row says that already) or the word "Detail".
-  const heading = ex.panelHeading || ex.heading || " ";
+  // label back at it (the header row says that already) or the word "Detail" -
+  // and when nothing beside it carries a heading to align to, there is no band
+  // at all, because an empty band is a rule and a gap that say nothing.
+  const heading = ex.panelHeading || ex.heading || (align ? " " : null);
+  if (!heading) return item;
   return { id: `${id}-panel`, heading, treatment: "open", size: item.size, items: [item] };
 }
 
@@ -489,7 +495,7 @@ function chooseLayout(slide) {
   // in the hero column rather than shrinking into a three-way row.
   if (exhibits.length === 2 && slide.points?.length && exhibits.every((ex) => String(ex.type).startsWith("chart.")) && JSON.stringify(exhibits[0].categories) === JSON.stringify(exhibits[1].categories)) return "stack";
   if (exhibits.length >= 2) return "two-up";
-  if (exhibits.length === 1) return slide.points?.length || slide.insight || slide.kpi ? "exhibit-left" : "exhibit-full";
+  if (exhibits.length === 1) return slide.points?.length || slide.insight || slide.insights?.length || slide.kpi ? "exhibit-left" : "exhibit-full";
   return "text";
 }
 
@@ -672,7 +678,7 @@ function applyFootnotes(slide) {
   return { ...rest, ...marked, note: [...notes, ...existing] };
 }
 
-export function composeSlide(slide, index, baseDir, fill = "balanced") {
+export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   slide = applyFootnotes(slide);
   slide = pairedBars(slide);
@@ -685,6 +691,16 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
   const slideIn = slide;
   // A value table under the chart: the chart stacks over a compact table whose
   // columns are the chart's categories.
+  // A deck whose weight asks for two elements a page gets the second one offered
+  // rather than demanded: a chart of six categories or fewer, with no table, no
+  // metrics and no second exhibit, tabulates itself underneath. `dataTable:
+  // false` declines it.
+  if (elements >= 2 && slide.exhibit && !slide.exhibits && String(slide.exhibit.type).startsWith("chart.")
+      && slide.exhibit.dataTable === undefined && Array.isArray(slide.exhibit.series) && Array.isArray(slide.exhibit.categories)
+      && slide.exhibit.categories.length <= 6 && slide.exhibit.series.length <= 3
+      && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi && !thinChart(slide.exhibit)) {
+    slide = { ...slide, exhibit: { ...slide.exhibit, dataTable: true } };
+  }
   // `dataTable: true` tabulates the chart's own series under it: the same
   // numbers, printed, which is the cheapest second element a page can carry and
   // what the reference pages do under a column chart.
@@ -705,7 +721,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
     slide = { ...slide, exhibit: undefined, exhibits: undefined, points: undefined };
   }
   // `rows` at slide level is the label-and-text table.
-  if (slide.rows && !slide.exhibit && !slide.exhibits) slide = { ...slide, exhibit: { type: "rows", rows: slide.rows } };
+  if (slide.rows && !slide.exhibit && !slide.exhibits) slide = { ...slide, exhibit: { type: "rows", rows: slide.rows, ...(Array.isArray(slide.columns) ? { columns: slide.columns } : {}) } };
   // One big number parked above a table reads as two pages glued together: the
   // tile floats in air and the table starts again under it. A lone metric over a
   // table is the hero number of the side column instead, beside its evidence.
@@ -752,7 +768,6 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
     // inline; the two-line heading is for peers in a row, where the bands align.
     const heroItem = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: heroFr }, height: "fill" });
     if (String(exhibits[0].type).startsWith("chart.") && heroItem.props?.unit && !heroItem.props.unitPlacement) heroItem.props.unitPlacement = "inline";
-    const hero = headedPanel(exhibits[0], heroItem, `${id}-exhibit`);
     // The side column is a headed section so its rule shares the chart heading's
     // band and the points start level with the plot, not with the heading text.
     // `pointsAlign: "middle"` centres the points on the exhibit instead.
@@ -764,13 +779,29 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
     // `insight`: the so-what as a tonal box in the side column, centred on the
     // exhibit when it stands alone, above the points when there are some. The
     // column then carries no heading unless `pointsHeading` names one.
-    const insightBox = slide.insight ? { id: `${id}-insight`, component: "insight", props: typeof slide.insight === "string" ? { text: slide.insight, variant: "tonal" } : { variant: "tonal", ...slide.insight }, size: HUG } : null;
+    // `insights: [a, b]` is the reference pattern of flanking an exhibit with two
+    // statements that carry the numbers in words; `insight` is the single box.
+    const insightSpecs = (Array.isArray(slide.insights) ? slide.insights : slide.insight !== undefined ? [slide.insight] : []).filter((entry) => entry !== undefined && entry !== null);
+    if (insightSpecs.length > 2) throw new Error(`${id}: a side column carries at most two insights`);
+    // Two statements are a reading, then its consequence: the first set plain in
+    // the column and the second in the box under it. Two equal boxes make the
+    // column read as two unrelated labels with a gap between them.
+    const insightBoxes = insightSpecs.map((entry, at) => {
+      const variant = insightSpecs.length > 1 && at === 0 ? "plain" : "tonal";
+      return { id: insightSpecs.length > 1 ? `${id}-insight-${at + 1}` : `${id}-insight`, component: "insight",
+        props: typeof entry === "string" ? { text: entry, variant } : { variant, ...entry }, size: HUG };
+    });
+    const insightBox = insightBoxes[0] ?? null;
     if (!list && !insightBox && !kpiTile) throw new Error(`${id}: a side column needs points, an insight or a kpi`);
-    const sideItems = [kpiTile, insightBox, list].filter(Boolean);
+    const sideItems = [kpiTile, ...insightBoxes, list].filter(Boolean);
     // "What it means" above three lines of text is a label on a mostly empty
     // column. The heading earns its line when the column holds a list; a column
     // that is one number or one box takes the blank band and keeps the rule.
     const heading = slide.pointsHeading === false || (insightBox && !slide.pointsHeading) || (!list && !slide.pointsHeading) ? null : slide.pointsHeading || "What it means";
+    // The hero's blank heading band exists to line its content up with the
+    // column's heading. With no heading beside it the band is an empty rule, so
+    // the exhibit starts at the top of the body instead.
+    const hero = headedPanel(exhibits[0], heroItem, `${id}-exhibit`, Boolean(heading));
     // The column's width is negotiated with its content, not fixed by the
     // layout: forty words in a 361px track leave two fifths of the column
     // empty, and the exhibit beside it wanted that width anyway. A short column
@@ -780,7 +811,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
       if (fill === "airy" || !list) return baseSideFr;
       const columns = heroFr + baseSideFr + (slide.photo ? 1 : 0);
       const track = (fr) => Math.max(140, (BODY_WIDTH - CONNECTOR_WIDTH - COLUMN_GAP * columns) * (fr / (heroFr + fr + (slide.photo ? 1 : 0))));
-      const extras = (kpiTile ? 126 : 0) + (insightBox ? 104 : 0) + (heading ? 44 : 0);
+      const extras = (kpiTile ? 126 : 0) + insightBoxes.length * 104 + (heading ? 44 : 0);
       const natural = extras + pointsHeight(slide.points, track(baseSideFr));
       // A photograph strip takes a quarter of the row, which leaves the
       // commentary a 267px gutter that nothing reads comfortably. The column
@@ -790,13 +821,22 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
       if (natural > BODY_HEIGHT * 0.98) return baseSideFr * 1.2;
       return baseSideFr;
     })();
-    const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && fill !== "full" && (unheaded(exhibits[0]) || (insightBox && !list) || (tone !== "open" && !heading)));
+    // A column of statements and nothing else - one box, or a statement above a
+    // box - is read against the exhibit beside it, so it centres on the exhibit
+    // rather than hugging the top of the track. Anything with a list in it has
+    // something that can spread instead. `pointsAlign` overrides either way.
+    const boxesOnly = sideItems.length > 0 && sideItems.every((item) => insightBoxes.includes(item));
+    const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && fill !== "full" && (boxesOnly || sideItems.length <= 1) && (unheaded(exhibits[0]) || (insightBox && !list) || (tone !== "open" && !heading)));
     // A toned panel is always a section (it needs a surface); it takes the
     // heading unless the author suppresses it with `pointsHeading: false`.
     // A column of several blocks (a number, a box, the points) spreads them down
     // the track rather than stacking them under the heading with the bottom
     // third left over.
-    const spread = !centre && fill !== "airy" && sideItems.length > 1 ? "distribute" : null;
+    // Spreading blocks down the track works when one of them can absorb the
+    // slack (a points list, which spreads its own items). Statements alone have
+    // nothing to absorb it, so distributing would pin them to opposite ends of
+    // an empty track; they sit together, centred, instead.
+    const spread = !centre && fill !== "airy" && sideItems.length > 1 && !boxesOnly ? "distribute" : null;
     const side = tone === "open" && centre && !heading
       ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: sideItems }
       : { id: `${id}-side`, ...(heading ? { heading } : {}), treatment: tone, layout: "flow.column", ...(centre ? { leftover: "center" } : spread ? { leftover: spread } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
@@ -919,7 +959,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced") {
   const noteLine = Array.isArray(slide.note)
     ? (slide.note.length ? `Notes: ${slide.note.map((item, index) => `${index + 1}. ${String(item).trim().replace(/^\d+\.\s*/, "")}`).join("   ")}` : null)
     : prefixed("Note", slide.note);
-  return { id, title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
+  return { id, title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }
 
 /**
@@ -991,7 +1031,7 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   // deck's own `weight` wins, then the house profile a template produced, then
   // the fill level.
   const weight = resolveWeight(spec, fill);
-  for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) slides.push(composeSlide(page, slides.length, baseDir, fill));
+  for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) slides.push(composeSlide(page, slides.length, baseDir, fill, weight.elements));
   return {
     id: spec.id,
     palette: spec.palette || "mckinsey",

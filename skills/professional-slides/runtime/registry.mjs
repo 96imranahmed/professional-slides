@@ -138,7 +138,12 @@ function insightLayout(frame, props) {
   // A takeaway band: 16 px side padding, 12 px above and below one or two lines
   // of semibold body text, left-aligned (the gallery's grey band). The primary
   // variant carries a chevron disc at the left and reserves its width.
-  const paddingX = tokenValue(token("space.4")), paddingY = tokenValue(token(props.text.includes("\n\n") ? "space.5" : "space.3"));
+  // `plain` is the statement with no box around it: the label that sits above a
+  // boxed takeaway. With no surface there is nothing to inset it from, so it
+  // sits flush with the column and keeps only the reading gap under it.
+  const plain = props.variant === "plain";
+  const paddingX = plain ? 0 : tokenValue(token("space.4"));
+  const paddingY = plain ? tokenValue(token("space.2")) : tokenValue(token(props.text.includes("\n\n") ? "space.5" : "space.3"));
   const marker = (props.variant ?? "tonal") === "primary" || props.marker === "chevron" ? tokenValue(token("icon.medium")) : 0;
   const markerGap = marker ? tokenValue(token("space.3")) : 0;
   const width = frame.width - 2 * paddingX - marker - markerGap;
@@ -185,7 +190,7 @@ function insightNodes({ id, frame, props }) {
   if (layout.height > frame.height) throw new Error(`Insight overflows its ${frame.height}px box by ${Math.ceil(layout.height - frame.height)}px; give it the space or shorten the sentence`);
   const fill = variant === "primary" ? PRIMARY : variant === "neutral" ? MUTED_SURFACE : variant === "dotted" ? "none" : PRIMARY_TINT;
   const foreground = variant === "primary" ? WHITE : INK;
-  const nodes = [rectPrimitive({ id: stableId(id, "surface"), role: "insight-surface", frame, style: boxStyle(fill, "none", HAIRLINE, SMALL_RADIUS) })];
+  const nodes = variant === "plain" ? [] : [rectPrimitive({ id: stableId(id, "surface"), role: "insight-surface", frame, style: boxStyle(fill, "none", HAIRLINE, SMALL_RADIUS) })];
   if (variant === "dotted") {
     // Native renderers collapse hairline dash presets into solid borders.
     // Resolve editable dots once so every adapter receives identical geometry.
@@ -845,9 +850,31 @@ function registerCore(registry) {
       render: ({ id, frame, props }) => {
         const page = renderPageTemplate({ id, frame, props });
         const tracker = props.tracker ? trackerLabelNodes({ id: stableId(id, "tracker"), frame: { x: frame.x + CHROME.left, y: frame.y + 30, width: page.titleWidth, height: 20 }, props: props.tracker }) : [];
+        // `kicker`: the small label above the title that says what part of the
+        // argument this page belongs to ("People", "Commercial evidence"). The
+        // reference pages carry a dozen words of this band furniture against our
+        // four, and it shares the tracker's row: kicker left, pills right.
+        const kickerText = typeof props.kicker === "string" && props.kicker.trim() ? props.kicker.trim() : null;
+        const kicker = [];
+        if (kickerText) {
+          const measured = measureText(kickerText, 420, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.compact")), bold: true, wrapWidthRatio: 1 });
+          if (measured.lines.length > 1) throw new Error("A kicker must fit on one line");
+          // Pill trackers hug the right margin, so the kicker keeps the left of
+          // that row. A left-anchored tracker (label, breadcrumb, number strip)
+          // already names the section, so it wins the slot and the kicker drops.
+          const trackerLeft = tracker.reduce((min, node) => Math.min(min, node.frame ? node.frame.x : Math.min(node.x1 ?? Infinity, node.x2 ?? Infinity)), Infinity);
+          const kickerRight = frame.x + CHROME.left + Math.ceil(measured.width) + 2 + tokenValue(token("space.4"));
+          if (kickerRight <= trackerLeft) kicker.push(textPrimitive({
+            id: stableId(id, "kicker"), role: "kicker",
+            frame: { x: frame.x + CHROME.left, y: frame.y + 30, width: Math.ceil(measured.width) + 2, height: measured.height },
+            text: kickerText,
+            style: { ...textStyle(token("type.compact"), token("color.accent"), true, "left", "top"), lineHeight: measured.lineHeight, wrap: false },
+            data: { textLayout: measured }
+          }));
+        }
         const tagPlacement = props.tag ? houseStyle("style.tagPlacement") : "top-right";
         // An above-title tag (a small accent label, as in a country or section spotlight) sits in the title's top margin.
-        const titles = titleNodes({ id, frame, props: { text: props.title, lead: props.titleLead, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker ? 58 : CHROME.titleTop }, chrome: true });
+        const titles = titleNodes({ id, frame, props: { text: props.title, lead: props.titleLead, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker || kicker.length ? 58 : CHROME.titleTop }, chrome: true });
         const title = titles.find((node) => node.role === "action-title");
         let titleBottom = title.frame.y + title.data.textLayout.height;
         // Page tag: PRELIMINARY, ILLUSTRATIVE, CONFIDENTIAL, Exhibit 3. The house
@@ -879,13 +906,13 @@ function registerCore(registry) {
         const gap = tokenValue(token("space.5"));
         // A tracker above the title (pill tabs, a label) sits in the same band as
         // the title, so the body starts a step lower to keep it off the content.
-        const trackerGap = tracker.length ? tokenValue(token("space.3")) : 0;
+        const trackerGap = tracker.length || kicker.length ? tokenValue(token("space.3")) : 0;
         const contentTop = Math.max(CHROME.bodyTop + trackerGap, titleBottom + gap + trackerGap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
         const contentFrame = { ...page.contentFrame, y: contentTop, height: baseBottom - contentTop };
         if (contentFrame.height <= 0) throw new Error("Action title leaves no room for slide content; shorten the title or split the slide");
         // The title band paints first; the tracker sits on it, above the title.
         const band = titles.filter((n) => n.role === "title-band"), rest = titles.filter((n) => n.role !== "title-band");
-        return { ...page, contentFrame, nodes: [...band, ...tracker, ...rest, ...page.nodes] };
+        return { ...page, contentFrame, nodes: [...band, ...tracker, ...kicker, ...rest, ...page.nodes] };
       }
     }),
     component({ id: "page-template", category: "shared", role: "page-template", tokens: PAGE_TEMPLATE_TOKENS,
@@ -1243,7 +1270,7 @@ function registerCore(registry) {
     axes.metric = ["variant", ["default", "prominent"]];
     axes.connector = ["variant", ["disc-chevron", "divider-chevron", "chevron", "line", "labelled-line"]];
     axes["bullet-list"] = ["variant", ["compact", "body"]];
-    axes.insight = ["variant", ["tonal", "neutral", "dotted", "primary"]];
+    axes.insight = ["variant", ["tonal", "neutral", "dotted", "primary", "plain"]];
     if (axes[definition.id]) {
       const [prop, choices] = axes[definition.id];
       definition.variants = Object.fromEntries(choices.map(choice => [choice, {}]));

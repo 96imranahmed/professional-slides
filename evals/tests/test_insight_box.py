@@ -30,6 +30,17 @@ const props={text:'Stronger operating margins support the growth case, but retur
 for(const variant of Object.keys(owner.variants)) {
  const input={...props,variant}, layout=owner.measureContent({frame,props:input});
  const nodes=owner.render({id:'insight',frame,props:input}).nodes;
+ if(variant==='plain'){
+  // The statement with no box: one text node, flush with the column, and only
+  // the reading gap above and below it.
+  assert.equal(nodes.length,1);
+  const text=nodes[0];
+  assert.equal(text.frame.x,frame.x);
+  assert.equal(text.style.bold,true);
+  assert.equal(text.frame.y+text.frame.height/2,frame.y+frame.height/2);
+  assert.equal(layout.height,text.frame.height+16);
+  continue;
+ }
  // A takeaway band: semibold body, left-aligned, 16px side padding; the primary
  // band carries a chevron disc and offsets the text past it.
  assert.equal(nodes.filter(n=>n.type==='text').length,1); const surface=nodes[0],body=nodes.at(-1);

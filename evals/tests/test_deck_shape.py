@@ -511,3 +511,122 @@ console.log(JSON.stringify({accepted:true}));
         roles = {f["measured"]["role"] for f in findings}
         self.assertIn("paragraph", roles)
         self.assertNotIn("table-cell-text", roles)
+
+
+class BandFurnitureTests(unittest.TestCase):
+    """The band above the title, the headers on a label table and the second
+    statement box: the small furniture the reference pages carry page after page."""
+
+    def test_a_kicker_prints_above_the_title_and_yields_to_a_left_tracker(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck, component} from './skills/professional-slides/runtime/core.mjs';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const REGISTRY=createRegistry(), frame={x:0,y:0,width:1280,height:720};
+const chrome=(props)=>compileDeck({slides:[{id:'s1',frame,composition:component({id:'chrome',component:'slide-chrome',frame,
+  props:{title:'Drivers are the most exposed occupation',source:'Source: fixture',...props}})}]},REGISTRY).slides[0].nodes;
+const kickerOf=(nodes)=>nodes.filter(n=>n.role==='kicker');
+const titleOf=(nodes)=>nodes.find(n=>n.role==='action-title');
+
+const plain=chrome({});
+const withKicker=chrome({kicker:'People'});
+const label=kickerOf(withKicker);
+assert.equal(label.length,1,'the kicker renders');
+assert.equal(label[0].text,'People');
+// It sits above the title, which steps down to make room for it.
+assert.ok(label[0].frame.y < titleOf(withKicker).frame.y);
+assert.ok(titleOf(withKicker).frame.y > titleOf(plain).frame.y);
+// One line only: the band is furniture, not a second title.
+assert.throws(()=>chrome({kicker:'A whole sentence of argument that belongs in the title of the page instead'}),/one line/);
+
+// Pills hug the right margin, so the kicker keeps the left of that row.
+const pills=chrome({kicker:'People',tracker:{construction:'compact-pills',items:[{id:'A',label:'Where'},{id:'B',label:'Why'},{id:'C',label:'What next'}],selectedId:'B'}});
+assert.equal(kickerOf(pills).length,1,'a pill tracker leaves the left of the row free');
+// A left-anchored tracker already names the section, so it wins the slot.
+const breadcrumb=chrome({kicker:'People',tracker:{construction:'compact-label',items:[{id:'A',label:'Where the exposure sits'},{id:'B',label:'Why it persists'},{id:'C',label:'What to do'}],selectedId:'A'}});
+assert.equal(kickerOf(breadcrumb).length,0,'the tracker wins the slot');
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_two_statements_read_as_a_pair_centred_on_the_exhibit(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const rows=[{label:'Passenger vehicle drivers',text:'2.1k jobs, 82% Black or African American'},
+            {label:'Light truck drivers',text:'0.3k jobs, 77% Black or African American'}];
+const side=(page)=>{const walk=(item)=>String(item.id||'').endsWith('-side')?[item]:(item.items||[]).flatMap(walk);
+  return page.items.flatMap(walk)[0];};
+const two=composeSlide({title:'T',rows,insights:['Four in five workers are Black or African American','Automation potential runs above 70%']},0);
+const column=side(two);
+const boxes=column.items.filter(i=>i.component==='insight');
+assert.equal(boxes.length,2,'both statements are placed');
+// A reading, then its consequence: the first plain in the column, the second in
+// the box under it. Two equal boxes read as two unrelated labels.
+assert.deepEqual(boxes.map(b=>b.props.variant),['plain','tonal']);
+// Statements and nothing else are read against the exhibit, so the pair centres
+// on it rather than hugging the top of the track or spreading down it.
+assert.equal(column.leftover,'center');
+const one=composeSlide({title:'T',rows,insights:['Four in five workers are Black or African American']},0);
+const single=side(one);
+assert.equal(single.items.find(i=>i.component==='insight').props.variant,'tonal','one statement is the box');
+assert.equal(single.leftover,'center');
+assert.throws(()=>composeSlide({title:'T',rows,insights:['a','b','c']},0),/at most two insights/);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_a_column_of_statement_boxes_stacks_instead_of_spreading(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {flow, component, resolveLayout} from './skills/professional-slides/runtime/core.mjs';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+// Nothing in a column of hugged boxes can absorb the slack, so distributing it
+// pins one box to the top of the track and the other to the bottom.
+const block=(id)=>component({id,component:'insight',props:{text:'A finding worth a box of its own'},size:{height:'hug'}});
+const gapUnder=(leftover)=>{
+  const column=flow({id:'col',direction:'column',gap:0,size:{width:300,height:600},...(leftover?{leftover}:{}),children:[block('a'),block('b')]});
+  const frames=Object.fromEntries(resolveLayout(column,{x:0,y:0,width:300,height:600},createRegistry()).map(p=>[p.node.id,p.frame]));
+  return frames.b.y-(frames.a.y+frames.a.height);
+};
+assert.ok(gapUnder('distribute')>200,'distribute would pin them apart');
+assert.equal(gapUnder(null),0,'stacked, the second box follows the first');
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_a_label_table_heads_its_columns(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const rows=[{label:'Passenger vehicle drivers',text:'2.1k jobs, 82% Black or African American'},
+            {label:'Light truck drivers',text:'0.3k jobs, 77% Black or African American'}];
+const headed=composeSlide({title:'T',columns:['Occupation','What the data shows'],rows,soWhat:'The exposure is concentrated'},0);
+const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
+const table=headed.items.flatMap(find).find(i=>i.component==='table');
+assert.deepEqual(table.props.columns.map(c=>c.label),['Occupation','What the data shows']);
+// Without headers the table still builds, and nothing invents a heading.
+const bare=composeSlide({title:'T',rows},0);
+const plain=bare.items.flatMap(find).find(i=>i.component==='table');
+assert.ok(!plain.props.columns||plain.props.columns.every(c=>!String(c.label??c).trim()));
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result["accepted"])
+
+    def test_a_document_weight_deck_offers_a_small_chart_its_own_table(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const chart={type:'chart.column',heading:'Revenue',unit:'$m',categories:['FY21','FY22','FY23','FY24','FY25'],
+  series:[{name:'Revenue',values:[44,49,52,58,61]}]};
+const kinds=(page)=>{const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
+  return page.items.flatMap(find).map(i=>i.component);};
+// elements: 1 - the chart is the page's only evidence element.
+const light=composeSlide({title:'T',exhibit:JSON.parse(JSON.stringify(chart)),points:['a b c d e','f g h i j']},0,'.', 'balanced',1);
+assert.ok(!kinds(light).includes('table'));
+// elements: 2 - the cheapest second element is the chart's own numbers.
+const document=composeSlide({title:'T',exhibit:JSON.parse(JSON.stringify(chart)),points:['a b c d e','f g h i j']},0,'.', 'full',2);
+assert.ok(kinds(document).includes('table'),'the chart tabulates itself');
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result["accepted"])
