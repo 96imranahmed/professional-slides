@@ -45,6 +45,7 @@ from nice_ticks import is_nice_tick, nice_axis, parse_number  # noqa: E402
 CONTRACT = json.loads((Path(__file__).resolve().parent.parent / "weight.json").read_text(encoding="utf-8"))
 
 CANVAS_W, CANVAS_H = 1280, 720
+NUMERIC_TOKEN = re.compile(r"^[-−+(]?[$€£]?\d[\d,.]*[%×xkmbn]*\)?$", re.I)
 INK_LUMINANCE = 235
 SURFACE_LUMINANCE = 250
 FOOTER_TOP = 660
@@ -181,6 +182,7 @@ THRESHOLDS = {
     "shape_variety_from": 10,   # analytical pages beyond which the deck needs more than one page architecture
     "shapes_per_ten_min": 3.0,  # distinct architectures per ten pages (the reference decks run about five)
     "shape_share_max": 0.40,    # share of pages on the commonest architecture (the reference median is 0.23)
+    "numbers_per_page_min": 8,  # printed numeric tokens on a measured page (the reference median is 17)
     "column_run_max": 4,        # consecutive pages whose commentary column may share one device    # share of pages on the commonest architecture (the reference median is 0.23)
 }
 
@@ -335,6 +337,7 @@ GATE_CODES = {
     "PAGE_VARIETY": "too few page families across the deck",
     "PAGE_SHAPE_FLAT": "the deck is built from too few page architectures",
     "COLUMN_MONOTONY": "the commentary column is marked the same way page after page",
+    "NUMBERS_ON_PAGE": "a measured page that prints too few of its measures",
     "EVIDENCE_MIX": "too few analytical pages carry a measured exhibit",
     "IMAGE_BUDGET": "photographs on too many analytical pages",
     "IMAGE_RUN": "photographs on too many consecutive pages",
@@ -1086,7 +1089,10 @@ def gate_unannotated(slide_no, slide, findings):
     if not charts:
         return
     marks = [n for n in slide.get("nodes", []) if str(n.get("role") or "") == "chart-mark"]
-    if len(marks) < 3:
+    # Two marks are a comparison and still want the change said on them; the
+    # reference decks annotate almost every plot, and one chart in forty was
+    # what this deck actually carried.
+    if len(marks) < 2:
         return
     annotated = [n for n in slide.get("nodes", []) if str(n.get("role") or "") in ANNOTATION_ROLES]
     if annotated:
@@ -1097,6 +1103,42 @@ def gate_unannotated(slide_no, slide, findings):
         "date, `change` or `cagr` carries the movement in a bubble, "
         "`categoryNotes` names the base under each category, and `annotations` "
         "puts the observation beside the mark it is about.",
+    ))
+
+
+def gate_numbers_on_page(slide_no, slide, findings):
+    """NUMBERS_ON_PAGE. A measured page prints its measures.
+
+    The reference client pages carry a median of 17 numeric tokens - values on
+    marks, table cells, shares in the commentary, the base under a category. A
+    deck about box-office receipts that carries nine has put its evidence in the
+    notes, or left it in the data. This is a floor on printed numbers, not on
+    precision: rounding a figure does not cost it its token.
+    """
+    floor = WEIGHT.get("pageWords")
+    if not floor:
+        return
+    if not [c for c in slide.get("componentInstances", []) if is_exhibit(c)]:
+        return
+    numeric = 0
+    for node in text_nodes(slide):
+        role = str(node.get("role") or "")
+        if role in FOOTER_ROLES or role in TITLE_ROLES:
+            continue
+        for word in re.split(r"\s+", source_text(node)):
+            if NUMERIC_TOKEN.match(word):
+                numeric += 1
+    want = THRESHOLDS["numbers_per_page_min"]
+    if numeric >= want:
+        return
+    findings.append(finding(
+        slide_no, "NUMBERS_ON_PAGE", numeric, want,
+        "The page argues from measures it does not print. Reference client "
+        f"pages carry {REFERENCE_PAGE['numericTokens']} numeric tokens: a value "
+        "on every mark, the base under each category, the share beside the "
+        "count, the figure inside the sentence rather than the adjective. "
+        "`dataTable: true` under a chart, `derive` on a table and "
+        "`categoryNotes` each print numbers the page already holds.",
     ))
 
 

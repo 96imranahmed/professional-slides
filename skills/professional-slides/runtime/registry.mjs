@@ -133,7 +133,13 @@ function measuredTextNode(input) {
 }
 
 function insightLayout(frame, props) {
-  if (typeof props.text !== "string" || !props.text.trim()) throw new Error("Insight requires a nonempty synthesis sentence");
+  // `items`: the closing block as two or three square-bulleted findings on the
+  // band rather than one sentence running across it. The reference decks close
+  // a dense table this way - each line carries its own finding, and the reader
+  // can take them one at a time.
+  const list = Array.isArray(props.items) ? props.items.map((item) => String(item ?? "").trim()).filter(Boolean) : null;
+  if (list && !list.length) throw new Error("Insight items need nonempty text");
+  if (!list && (typeof props.text !== "string" || !props.text.trim())) throw new Error("Insight requires a nonempty synthesis sentence");
   if (props.align !== undefined && !["left", "center"].includes(props.align)) throw new Error("Insight alignment must be left or center");
   // A takeaway band: 16 px side padding, 12 px above and below one or two lines
   // of semibold body text, left-aligned (the gallery's grey band). The primary
@@ -143,17 +149,26 @@ function insightLayout(frame, props) {
   // sits flush with the column and keeps only the reading gap under it.
   const plain = props.variant === "plain";
   const paddingX = plain ? 0 : tokenValue(token("space.4"));
-  const paddingY = plain ? tokenValue(token("space.2")) : tokenValue(token(props.text.includes("\n\n") ? "space.5" : "space.3"));
+  const paddingY = plain ? tokenValue(token("space.2")) : tokenValue(token(!list && props.text.includes("\n\n") ? "space.5" : "space.3"));
   const marker = (props.variant ?? "tonal") === "primary" || props.marker === "chevron" ? tokenValue(token("icon.medium")) : 0;
   const markerGap = marker ? tokenValue(token("space.3")) : 0;
   const width = frame.width - 2 * paddingX - marker - markerGap;
   if (width <= 0) throw new Error("Insight width cannot contain its theme padding");
   const options = { fontFamily: tokenValue(FONT), wrapWidthRatio: 1 };
-  const body = measureText(props.text, width, { ...options, fontSize: tokenValue(BODY), bold: true });
   const heading = props.heading ? measureText(props.heading, width, { ...options, fontSize: tokenValue(token("type.heading")), bold: true }) : null;
   const gap = heading ? tokenValue(token("space.2")) : 0;
+  if (list) {
+    const bulletGap = tokenValue(token("space.3"));
+    const indent = tokenValue(token("space.4"));
+    const rowGap = tokenValue(token("space.2"));
+    const lines = list.map((text) => measureText(text, width - indent, { ...options, fontSize: tokenValue(BODY), bold: true }));
+    const listHeight = lines.reduce((sum, line) => sum + line.height, 0) + rowGap * (lines.length - 1);
+    const contentHeight = listHeight + (heading?.height ?? 0) + gap;
+    return { body: null, lines, indent, bulletGap, rowGap, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: Math.max(contentHeight, marker) + 2 * paddingY };
+  }
+  const body = measureText(props.text, width, { ...options, fontSize: tokenValue(BODY), bold: true });
   const contentHeight = body.height + (heading?.height ?? 0) + gap;
-  return { body, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: Math.max(contentHeight, marker) + 2 * paddingY };
+  return { body, lines: null, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: Math.max(contentHeight, marker) + 2 * paddingY };
 }
 
 // A reading note: the cream box a consulting page carries top-right to say how
@@ -214,6 +229,19 @@ function insightNodes({ id, frame, props }) {
     const discFill = variant === "primary" ? WHITE : PRIMARY, chevron = variant === "primary" ? PRIMARY : WHITE;
     nodes.push(ellipsePrimitive({ id: stableId(id, "marker"), role: "insight-marker", frame: { x: mx, y: my, width: size, height: size }, style: boxStyle(discFill, discFill, HAIRLINE, token("radius.round")) }));
     nodes.push(shapePrimitive({ id: stableId(id, "marker-chevron"), role: "insight-marker-glyph", geometry: "iconPath", frame: { x: mx + size * 0.3, y: my + size * 0.28, width: size * 0.4, height: size * 0.44 }, style: { fill: "none", stroke: chevron, lineWidth: token("line.standard"), lineCap: "round" }, data: { paths: [{ points: [[0.2, 0], [0.8, 0.5], [0.2, 1]], closed: false }] } }));
+  }
+  if (layout.lines) {
+    if (layout.heading) {
+      nodes.push(textPrimitive({ id: stableId(id, "heading"), role: "insight-heading", frame: { x: textX, y, width: layout.width, height: layout.heading.height }, text: layout.heading.text, style: { ...textStyle(token("type.heading"), foreground, true, props.align ?? "left", "top"), lineHeight: layout.heading.lineHeight }, data: { textLayout: layout.heading } }));
+      y += layout.heading.height + layout.gap;
+    }
+    const square = tokenValue(token("space.1"));
+    layout.lines.forEach((line, index) => {
+      nodes.push(rectPrimitive({ id: stableId(id, "bullet", index), role: "insight-bullet", frame: { x: textX, y: y + line.lineHeight / 2 - square / 2, width: square, height: square }, style: boxStyle(foreground, foreground, HAIRLINE, token("radius.none")) }));
+      nodes.push(textPrimitive({ id: stableId(id, "item", index), role: "insight-text", frame: { x: textX + layout.indent, y, width: layout.width - layout.indent, height: line.height }, text: line.text, style: { ...textStyle(BODY, foreground, true, "left", "top"), lineHeight: line.lineHeight }, data: { textLayout: line } }));
+      y += line.height + layout.rowGap;
+    });
+    return nodes;
   }
   for (const [part, measured] of [["heading", layout.heading], ["body", layout.body]]) {
     if (!measured) continue;
@@ -1198,7 +1226,7 @@ function registerCore(registry) {
     component({ id: "legend", category: "data", role: "legend", tokens: LEGEND_TOKENS, preferredSize: { width: 420, height: 44 }, sample: { items: ["Actual", "Forecast", "Target"] }, render: input => ({ nodes: legendNodes(input) }) }),
     component({
       id: "chart-callout", category: "data", role: "annotation",
-      tokens: ["color.surface", "color.rule", "color.componentPrimary", "color.ink", "font.body", "font.bodySemibold", "weight.semibold", "type.chartAnnotation", "line.hairline", "line.standard", "radius.none"],
+      tokens: ["color.surface", "color.rule", "color.componentPrimary", "color.ink", "color.onPrimary", "font.body", "font.bodySemibold", "weight.semibold", "type.chartAnnotation", "line.hairline", "line.standard", "radius.none", "radius.small"],
       preferredSize: { width: 260, height: 90 },
       sample: { text: "(Insert evidence annotation)", direction: "down" },
       variants: { bordered: {}, borderless: { props: { border: false } } },

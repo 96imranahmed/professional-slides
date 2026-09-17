@@ -1016,7 +1016,11 @@ function renderTableAt({ id, frame, props }) {
       let fill = null;
       if (cell.type === "category" && categorySurface(cell, props) === "primary")
         fill = primary;
-      if (cell.type === "highlight") fill = t("color.componentPrimaryTint");
+      // `surface: "bubble"` sets the value in a filled pill rather than a
+      // tinted cell - the same device the change annotation uses on a chart, so
+      // one column of an otherwise flat table carries the emphasis.
+      const bubble = cell.type === "highlight" && cell.surface === "bubble";
+      if (cell.type === "highlight") fill = bubble ? primary : t("color.componentPrimaryTint");
       if (cell.type === "heatmap")
         fill = heatFill(cell.scaleRecord, cell.value);
       if (cell.highlight === true) {
@@ -1030,14 +1034,19 @@ function renderTableAt({ id, frame, props }) {
         nodes.push(
           rectPrimitive({
             id: cellId,
-            role: "table-cell",
-            frame: {
-              ...area,
-              y: area.y + m.gap / 2,
-              height: area.height - m.gap,
-              width: area.width - m.gap,
-            },
-            style: box(fill),
+            role: bubble ? "table-bubble" : "table-cell",
+            frame: bubble
+              // A pill hugs its text rather than filling the cell.
+              ? { x: area.x + m.padding - 8, y: area.y + m.gap / 2 + 2, width: Math.min(area.width - m.gap, area.width - 2 * m.padding + 16), height: area.height - m.gap - 4 }
+              : {
+                  ...area,
+                  y: area.y + m.gap / 2,
+                  height: area.height - m.gap,
+                  width: area.width - m.gap,
+                },
+            style: bubble
+              ? { fill, stroke: "none", lineWidth: t("line.hairline"), radius: t("radius.round") }
+              : box(fill),
             data,
           }),
         );
@@ -1084,8 +1093,9 @@ function renderTableAt({ id, frame, props }) {
         logo.data = {...logo.data,...data,sharedHeight:l.height};
         nodes.push(logo);
       } else if (cell.type === "implication") {
-        // Canonical row implication: an icon-medium primary disc and two
-        // editable chevron strokes, with identical geometry in both adapters.
+        // `draw: false` keeps the gutter and leaves the row unmarked: the
+        // `single` treatment draws one chevron for the whole table rather than
+        // repeating it down every row.
         const diameter = v("icon.medium"),
           x = area.x + area.width / 2,
           y = area.y + height / 2;
@@ -1094,7 +1104,7 @@ function renderTableAt({ id, frame, props }) {
           relation: "implies",
           arrowVariant: "disc-chevron",
         };
-        nodes.push(
+        if (cell.draw !== false) nodes.push(
           ellipsePrimitive({
             id: stableId(cellId, "arrow", 0),
             role: "table-implication",
@@ -1108,10 +1118,10 @@ function renderTableAt({ id, frame, props }) {
             data: { ...arrowData, arrowPart: 0 },
           }),
         );
-        [
+        (cell.draw === false ? [] : [
           [x - diameter * 0.11, y - diameter * 0.23, x + diameter * 0.12, y],
           [x + diameter * 0.12, y, x - diameter * 0.11, y + diameter * 0.23],
-        ].forEach(([x1, y1, x2, y2], part) =>
+        ]).forEach(([x1, y1, x2, y2], part) =>
           nodes.push(
             linePrimitive({
               id: stableId(cellId, "arrow", part + 1),

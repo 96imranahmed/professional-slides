@@ -3,6 +3,7 @@ import {
   ellipsePrimitive,
   linePrimitive,
   rectPrimitive,
+  shapePrimitive,
   stableId,
   textPrimitive,
   token,
@@ -289,6 +290,36 @@ export function renderChartCallout({ id, frame, props }) {
   if (!Object.hasOwn(leaders, direction)) throw new Error(`Unknown callout direction: ${direction}`);
   const measured = measureText(props.text, frame.width - 16, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
   if (measured.height > frame.height - 14) throw new Error("Chart callout text does not fit its frame");
+  // `variant: "speech"` is the filled bubble with a pointed tail the reference
+  // decks put over a chart - an aside in the deck's voice, rather than a
+  // bordered note with a leader line to a mark.
+  if (props.variant === "speech") {
+    const leader = leaders[direction];
+    const fill = token("color.ink");
+    const tail = 18;
+    // The tail is a triangle from the bubble's edge to the point it names.
+    const points = direction === "down"
+      ? [[leader.x1 - tail / 2, frame.y + frame.height], [leader.x1 + tail / 2, frame.y + frame.height], [leader.x2, leader.y2]]
+      : direction === "up"
+        ? [[leader.x1 - tail / 2, frame.y], [leader.x1 + tail / 2, frame.y], [leader.x2, leader.y2]]
+        : direction === "left"
+          ? [[frame.x, leader.y1 - tail / 2], [frame.x, leader.y1 + tail / 2], [leader.x2, leader.y2]]
+          : [[frame.x + frame.width, leader.y1 - tail / 2], [frame.x + frame.width, leader.y1 + tail / 2], [leader.x2, leader.y2]];
+    const minX = Math.min(...points.map((pt) => pt[0])), minY = Math.min(...points.map((pt) => pt[1]));
+    const maxX = Math.max(...points.map((pt) => pt[0])), maxY = Math.max(...points.map((pt) => pt[1]));
+    const width = Math.max(1, maxX - minX), height = Math.max(1, maxY - minY);
+    return { nodes: [
+      rectPrimitive({ id: stableId(id, "bubble"), role: "annotation-surface", frame, style: { fill, stroke: fill, lineWidth: HAIRLINE, radius: token("radius.small") } }),
+      shapePrimitive({ id: stableId(id, "bubble-tail"), role: "annotation-surface", geometry: "polygon",
+        frame: { x: minX, y: minY, width, height },
+        style: { fill, stroke: fill, lineWidth: HAIRLINE },
+        data: { paths: [{ points: points.map(([x, y]) => [(x - minX) / width, (y - minY) / height]), closed: true }] } }),
+      textPrimitive({ id: stableId(id, "bubble-text"), role: "annotation-text",
+        frame: { x: frame.x + 8, y: frame.y + (frame.height - measured.height) / 2, width: frame.width - 16, height: measured.height },
+        text: measured.text, style: { ...textStyle(ANNOTATION, token("color.onPrimary"), true, "center"), lineHeight: measured.lineHeight },
+        data: { textLayout: measured, annotationStyle: "speech" } }),
+    ] };
+  }
   return { nodes: evidenceNodes(id, { index: 0, frame, leader: leaders[direction], annotation: { ...props, treatment: "callout" } }) };
 }
 

@@ -38,6 +38,7 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Values printed | `NUMBERS_ON_MARKS` | every mark while a chart has twelve or fewer, three otherwise |
 | Evidence elements | `THIN_EVIDENCE` | `weight.elements` (2 on a document-weight deck) |
 | Heading fit | `HEADING_WRAPS` | a heading that wraps where the frame could hold it on one line |
+| Numbers printed on the page | `NUMBERS_ON_PAGE` | at least 8 numeric tokens on a measured page (reference client pages carry 17) |
 | Axis ticks | `NICE_TICKS` | nice numbers |
 | Page did not render | `MISSING_RENDER` | every page the gates are asked to measure has a render |
 

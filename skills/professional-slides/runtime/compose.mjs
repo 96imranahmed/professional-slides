@@ -413,8 +413,90 @@ function totalRow(ex) {
   return { ...rest, rows: [...rows.map((row) => (row.plain ? row.cells : row)), { style: "total", cells }] };
 }
 
+/**
+ * A column marked `implication: true` is the conclusion drawn from the columns
+ * before it, not a fourth fact beside them.
+ *
+ * The review put it plainly: a "Verdict" column flush against the evidence in
+ * an identical cell reads as more evidence. The renderer already knows how to
+ * draw a gutter of chevrons (`type: "implication"`), so this inserts one before
+ * the marked column and decides how much of it to draw.
+ *
+ *   `per-row`  a chevron on every row, at four rows or fewer, where the eye
+ *              can follow each line across
+ *   `single`   one chevron centred in the gutter, at five rows or more, so the
+ *              page says "evidence, then verdict" once rather than six times
+ */
+function implicationColumn(ex) {
+  const columns = ex.columns || [];
+  const at = columns.findIndex((c) => c && typeof c === "object" && c.implication === true);
+  if (at < 0) return ex;
+  if (at === 0) throw new Error("An implication column follows the evidence it is drawn from; it cannot be the first column");
+  const rows = ex.rows || [];
+  const style = ex.implicationStyle || (rows.length >= 5 ? "single" : "per-row");
+  if (!["per-row", "single"].includes(style)) throw new Error(`Unknown implicationStyle: ${style}; use per-row or single`);
+  const middle = Math.floor((rows.length - 1) / 2);
+  const gutter = { label: "", type: "implication", width: 52 };
+  const { implication: _flag, ...rest } = columns[at];
+  const marked = { type: "text", ...rest };
+  const nextColumns = [...columns.slice(0, at), gutter, marked, ...columns.slice(at + 1)];
+  const nextRows = rows.map((row, index) => {
+    const cells = Array.isArray(row) ? row : row.cells || [];
+    // A blank cell in the gutter on the rows that carry no chevron.
+    const draw = style === "per-row" || index === middle;
+    const mark = { type: "implication", relation: "implies", ...(draw ? {} : { draw: false }) };
+    const next = [...cells.slice(0, at), mark, ...cells.slice(at)];
+    return Array.isArray(row) ? next : { ...row, cells: next };
+  });
+  return { ...ex, columns: nextColumns, rows: nextRows, implicationStyle: undefined };
+}
+
+/**
+ * Column treatments that turn a value into something the eye reads before the
+ * mind does.
+ *
+ * `heat: true` fills every cell in the column on a sequential scale, which is
+ * how the reference benchmark tables let a reader find the leader without
+ * reading a single number. `bubble: true` sets the value in a filled pill, the
+ * same device the change annotation uses on a chart, so one column of a flat
+ * reference table carries emphasis.
+ */
+function columnTreatments(ex) {
+  const columns = ex.columns || [];
+  const marks = columns.map((c) => (c && typeof c === "object" ? { heat: c.heat === true, bubble: c.bubble === true } : { heat: false, bubble: false }));
+  if (!marks.some((m) => m.heat || m.bubble)) return ex;
+  const nextColumns = columns.map((c, i) => {
+    if (!marks[i].heat && !marks[i].bubble) return c;
+    const { heat: _h, bubble: _b, ...rest } = c;
+    return marks[i].heat ? { ...rest, type: "heatmap" } : rest;
+  });
+  const asNumber = (cell) => {
+    const raw = String(cell?.text ?? cell ?? "").replace(/[^0-9.+-]/g, "");
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  };
+  const nextRows = (ex.rows || []).map((row) => {
+    const cells = Array.isArray(row) ? row : row.cells || [];
+    const next = cells.map((cell, i) => {
+      if (marks[i].heat) {
+        const value = asNumber(cell);
+        if (value === null) throw new Error(`A heat column needs numeric cells; "${String(cell?.text ?? cell)}" is not one`);
+        return { type: "heatmap", value };
+      }
+      if (marks[i].bubble) {
+        const text = String(cell?.text ?? cell ?? "").trim();
+        if (!text) throw new Error("A bubble column needs text in every cell");
+        return { ...(typeof cell === "object" && cell ? cell : {}), type: "highlight", text, surface: "bubble" };
+      }
+      return cell;
+    });
+    return Array.isArray(row) ? next : { ...row, cells: next };
+  });
+  return { ...ex, columns: nextColumns, rows: nextRows };
+}
+
 export function styleTable(ex) {
-  ex = groupNumericColumns(totalRow(deriveColumns(ex)));
+  ex = groupNumericColumns(totalRow(deriveColumns(implicationColumn(columnTreatments(ex)))));
   // An object column (one that names a `group`, a `unit`, an alignment) still
   // gets its width from what it holds, unless it sets one: otherwise adding a
   // unit to a header would silently reweight every column to equal shares and
@@ -739,7 +821,20 @@ function sideTreatment(slide) {
   return tone;
 }
 
+/**
+ * The page's close, under everything else.
+ *
+ * One sentence is the tonal band. A list is the reference decks' other closing
+ * device: two or three square-bulleted lines on a muted surface under a dense
+ * table, each carrying its own finding, rather than one long band that says
+ * three things in a row.
+ */
 function soWhatItem(text, id) {
+  if (Array.isArray(text)) {
+    if (!text.length) throw new Error("A soWhat list needs at least one line");
+    if (text.length > 3) throw new Error("A soWhat list carries at most three lines; the rest belongs in the page");
+    return { id, component: "insight", props: { items: text, variant: "tonal" }, size: HUG };
+  }
   return { id, component: "insight", props: { text, variant: "tonal" }, size: HUG };
 }
 
