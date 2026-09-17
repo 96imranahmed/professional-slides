@@ -459,16 +459,38 @@ function implicationColumn(ex) {
  * how the reference benchmark tables let a reader find the leader without
  * reading a single number. `bubble: true` sets the value in a filled pill, the
  * same device the change annotation uses on a chart, so one column of a flat
- * reference table carries emphasis.
+ * reference table carries emphasis. `bar: true` draws the in-cell bar chart:
+ * the magnitude down the column read at a glance, the figure still beside it.
+ *
+ * The bar cell has always existed, and nothing used it, because reaching it by
+ * hand meant declaring a scale record (min, max, unit, label, series) and then
+ * writing `{type: "bars", values: [41], scale: "share"}` in every row. The
+ * column's own numbers say all of that, so the flag reads them.
  */
 function columnTreatments(ex) {
   const columns = ex.columns || [];
-  const marks = columns.map((c) => (c && typeof c === "object" ? { heat: c.heat === true, bubble: c.bubble === true } : { heat: false, bubble: false }));
-  if (!marks.some((m) => m.heat || m.bubble)) return ex;
+  const flag = (c, name) => c && typeof c === "object" && c[name] === true;
+  const marks = columns.map((c) => ({ heat: flag(c, "heat"), bubble: flag(c, "bubble"), bar: flag(c, "bar") }));
+  if (!marks.some((m) => m.heat || m.bubble || m.bar)) return ex;
+  marks.forEach((m, i) => {
+    if ([m.heat, m.bubble, m.bar].filter(Boolean).length > 1) {
+      throw new Error(`Column ${i + 1} asks for more than one treatment; a column is heat, bubble or bar, not two of them`);
+    }
+  });
+  const barScales = {};
   const nextColumns = columns.map((c, i) => {
-    if (!marks[i].heat && !marks[i].bubble) return c;
-    const { heat: _h, bubble: _b, ...rest } = c;
-    return marks[i].heat ? { ...rest, type: "heatmap" } : rest;
+    if (!marks[i].heat && !marks[i].bubble && !marks[i].bar) return c;
+    const { heat: _h, bubble: _b, bar: _r, ...rest } = c;
+    if (marks[i].heat) return { ...rest, type: "heatmap" };
+    if (!marks[i].bar) return rest;
+    // One scale per bar column, shared across its rows: the bars in a column
+    // are comparable to each other and to nothing else on the page.
+    const label = String(rest.label ?? "").trim();
+    if (!label) throw new Error("A bar column needs a label; it names the scale its bars share");
+    const unit = String(rest.unit ?? "").trim();
+    if (!unit) throw new Error(`The "${label}" bar column needs a unit: a bar without one is a length, not a measure`);
+    barScales[i] = { id: `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-bar`, label, unit };
+    return { ...rest, type: "bars" };
   });
   const asNumber = (cell) => {
     // A typed cell carries no `text`, and `String({})` is "[object Object]",
@@ -494,11 +516,35 @@ function columnTreatments(ex) {
         if (!text) throw new Error("A bubble column needs text in every cell");
         return { ...(typeof cell === "object" && cell ? cell : {}), type: "highlight", text, surface: "bubble" };
       }
+      if (marks[i].bar) {
+        const text = String(cell?.text ?? cell ?? "").trim();
+        const value = asNumber(cell);
+        if (value === null) throw new Error(`A bar column needs numeric cells; "${String(cell?.text ?? cell)}" is not one`);
+        // The bar is drawn from the number; the label beside it is the figure
+        // the author wrote, to the precision they wrote it in.
+        return { type: "bars", values: [value], labels: [text], scale: barScales[i].id };
+      }
       return cell;
     });
     return Array.isArray(row) ? next : { ...row, cells: next };
   });
-  return { ...ex, columns: nextColumns, rows: nextRows };
+  // The scale each bar column shares, read off the column's own numbers: zero
+  // to a round number above the largest, so the bars are proportional to the
+  // measure rather than to each other, and a column of 41/33/30 does not draw
+  // its smallest bar as nothing.
+  const scales = { ...(ex.scales || {}) };
+  for (const [index, record] of Object.entries(barScales)) {
+    const values = nextRows.map((row) => (Array.isArray(row) ? row : row.cells)[index]).map((cell) => cell?.values?.[0]).filter((n) => Number.isFinite(n));
+    if (!values.length) throw new Error(`The "${record.label}" bar column has no numbers to scale`);
+    const top = Math.max(...values, 0), bottom = Math.min(...values, 0);
+    const step = Math.pow(10, Math.floor(Math.log10(Math.max(1e-9, top - bottom)))) / 2;
+    scales[record.id] = {
+      type: "bars", label: record.label, unit: record.unit, series: [record.label],
+      min: bottom < 0 ? Math.floor(bottom / step) * step : 0,
+      max: Math.ceil(top / step) * step,
+    };
+  }
+  return { ...ex, columns: nextColumns, rows: nextRows, ...(Object.keys(barScales).length ? { scales } : {}) };
 }
 
 export function styleTable(ex) {
@@ -904,6 +950,11 @@ const PAGE_SHAPES = {
   "stack": { fit: () => 0 },
   "grid": { fit: (s, ex) => (ex.length >= 4 ? 4 : 0) },
   "exhibit-full": { fit: (s, ex) => (ex.length === 1 && (!hasCommentary(s) || needsFullWidth(ex[0])) ? 3 : 0) },
+  // A long, narrow table cut down the middle and set as two panels side by
+  // side, each with its own header: the reference deck's ranking page. Twelve
+  // rows down the centre of a 1160px body leaves half the page empty and makes
+  // the reader scan a column three times its natural length.
+  "table-halves": { fit: (s, ex) => (ex.length === 1 && !hasCommentary(s) && halvable(ex[0]) ? 3 : 0) },
   "text": { fit: (s, ex) => (ex.length === 0 ? 3 : 0) },
 };
 
@@ -933,6 +984,31 @@ function needsFullWidth(ex) {
   // Sentence-length cells starve the narrow label column when the table is
   // squeezed, and the header word stops fitting before the cell text does.
   return columns.length >= 3 && longest > 60;
+}
+
+/**
+ * A table long enough to want halving and narrow enough to survive it.
+ *
+ * Halving doubles the column count and halves the width each column gets, so it
+ * needs short cells and few of them: a ranking (rank, name, one measure), not a
+ * findings matrix. Ten rows is where the single column starts running past the
+ * page's natural reading length; three columns is where two panels plus their
+ * gutter stop fitting the body width.
+ */
+function halvable(ex) {
+  if (!ex || ex.type !== "table") return false;
+  if (ex.split === false || ex.paginate === false) return false;
+  const columns = ex.columns || [];
+  const rows = ex.rows || [];
+  if (columns.length > 3 || rows.length < 10) return false;
+  // Grouped headers, total rows and row styles belong to one table read
+  // top to bottom; cutting it in half puts the total in the middle of the page.
+  if (ex.total === true || (ex.derive || []).length) return false;
+  if (columns.some((c) => c && typeof c === "object" && (c.group || c.implication || c.bar || c.heat || c.bubble))) return false;
+  if (rows.some((row) => !Array.isArray(row) && row?.style)) return false;
+  const cells = rows.flatMap((row) => (Array.isArray(row) ? row : row?.cells || []));
+  if (cells.some((cell) => cell && typeof cell === "object" && cell.type)) return false;
+  return Math.max(0, ...cells.map((cell) => String(cell?.text ?? cell ?? "").length)) <= 28;
 }
 
 function chooseLayout(slide, recent = []) {
@@ -1498,6 +1574,23 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
     if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
     items.push(item);
+  } else if (layout === "table-halves") {
+    // One table, two panels. The rows split in reading order - the first half
+    // down the left, the second down the right - so the ranking still reads 1
+    // to 12 top-left to bottom-right, and both panels repeat the header, which
+    // is what makes them readable as halves of one table rather than two.
+    const ex = exhibits[0];
+    const rows = ex.rows || [];
+    if (rows.length < 2) throw new Error(`${id}: a halved table needs rows to halve`);
+    const at = Math.ceil(rows.length / 2);
+    // Both panels take the whole table's column widths, not their own half's.
+    // Widths derived per half put "Segment" nine pixels further right on the
+    // right-hand panel, and two tables that nearly line up read worse than two
+    // that plainly do not.
+    const shared = styleTable(ex).columns;
+    const half = (part, suffix) => exhibitItem({ ...ex, columns: shared, rows: part, heading: suffix === "a" ? ex.heading : undefined },
+      `${id}-exhibit-${suffix}`, baseDir, { width: { fr: 1 }, height: "fill" });
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [half(rows.slice(0, at), "a"), half(rows.slice(at), "b")] });
   }
   else if (layout === "exhibit-left" || layout === "exhibit-right") {
     // Side ratios: chart + points 2:1, table + points 3:2 — a starting point,

@@ -1609,9 +1609,14 @@ def gate_page_shape_flat(slides, content_indexes, findings, fill):
         "repeated. Reference client decks run about five architectures per ten "
         "pages: an exhibit with its commentary beside it, the same exhibit full "
         "width with the commentary in columns beneath, two exhibits contrasted, "
-        "one hero number with its proof, a full-bleed table. Let the composer "
-        "choose (drop the explicit `layout` on these pages) or set different "
-        "shapes yourself.",
+        "one hero number with its proof, a full-bleed table. First drop any "
+        "explicit `layout` on these pages and let the composer choose. If they "
+        "are already unset, the shape is not the cause: a page carrying one wide "
+        "exhibit and no commentary has one shape available and should, because "
+        "there is nothing else on it to arrange. Give those pages what a "
+        "reference page carries - two to four points of commentary beside or "
+        "beneath the exhibit, a kpi where the story has a number, a second cut "
+        "of the same data - and the shapes follow the content.",
     ))
 
 

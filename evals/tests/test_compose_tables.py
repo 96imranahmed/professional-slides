@@ -138,3 +138,49 @@ assert.throws(()=>renderTable({id:'bad',frame,props:{...props,rows:[['A',{value:
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
+
+
+class BarColumnTests(unittest.TestCase):
+    """`bar: true` makes the in-cell bar chart reachable.
+
+    The `bars` cell type has existed the whole time and no deck used one,
+    because writing it by hand meant declaring a scale record (min, max, unit,
+    label, series) and then `{type: "bars", values: [41], scale: "share"}` in
+    every row. The column's own numbers say all of that. This is the same shape
+    as `heat: true` and `bubble: true`: a flag on the column, cells written by
+    the composer.
+    """
+
+    def test_a_bar_column_derives_its_shared_scale_and_keeps_the_figures(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+const table = styleTable({type:'table',
+  columns:[{label:'Segment'},{label:'Revenue',unit:'$m'},{label:'Growth to 2027',unit:'% p.a.',bar:true}],
+  rows:[['Enterprise','1,240','11.2'],['Mid-market','780','6.4'],['Regulated','560','14.8']]});
+// One scale for the column, zero to a round number above its largest value, so
+// the bars are proportional to the measure rather than to each other.
+const scale = table.scales['growth-to-2027-bar'];
+assert.equal(scale.type,'bars');
+assert.equal(scale.min,0);
+assert.equal(scale.max,15);
+assert.equal(scale.unit,'% p.a.');
+assert.deepEqual(scale.series,['Growth to 2027']);
+// The bar is drawn from the number; the label beside it is what was written.
+// House rounding would print 14.8 as 15, and a page cannot say 14.8 in its
+// takeaway and 15 in the table the takeaway is drawn from.
+const cells = table.rows.map((r) => (Array.isArray(r) ? r : r.cells)[2]);
+assert.deepEqual(cells.map((c) => c.values[0]), [11.2, 6.4, 14.8]);
+assert.deepEqual(cells.map((c) => c.labels[0]), ['11.2','6.4','14.8']);
+assert.ok(cells.every((c) => c.scale === 'growth-to-2027-bar'));
+// A negative value opens the scale below zero rather than clipping.
+const signed = styleTable({type:'table',columns:[{label:'Team'},{label:'Change',unit:'days',bar:true}],
+  rows:[['Payments','-6.2'],['Ledger','0.4']]});
+assert.ok(signed.scales['change-bar'].min < 0);
+// What the column needs, and what it refuses.
+assert.throws(()=>styleTable({type:'table',columns:[{label:'Growth',bar:true}],rows:[['1']]}),/needs a unit/);
+assert.throws(()=>styleTable({type:'table',columns:[{label:'Growth',unit:'%',bar:true}],rows:[['soon']]}),/numeric cells/);
+assert.throws(()=>styleTable({type:'table',columns:[{label:'Growth',unit:'%',bar:true,heat:true}],rows:[['1']]}),/more than one treatment/);
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result["ok"])

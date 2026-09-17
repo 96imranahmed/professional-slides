@@ -3235,6 +3235,160 @@
         }
       ],
       "source": "Product telemetry, weeks to 31 August 2024"
+    },
+    {
+      "title": "Four segments carry 78% of the pool, and the fastest is the third largest",
+      "subtitle": "Revenue pool and growth by segment, 2024",
+      "exhibit": {
+        "type": "table",
+        "columns": [
+          {
+            "label": "Segment"
+          },
+          {
+            "label": "Revenue pool",
+            "unit": "$m"
+          },
+          {
+            "label": "Share of pool",
+            "unit": "%",
+            "bar": true
+          },
+          {
+            "label": "Growth to 2027",
+            "unit": "% p.a.",
+            "bar": true
+          },
+          {
+            "label": "Where it leaves us",
+            "implication": true
+          }
+        ],
+        "rows": [
+          [
+            "Enterprise platform",
+            "1,240",
+            "34",
+            "11.2",
+            "Defend: the pool and the growth"
+          ],
+          [
+            "Mid-market suite",
+            "780",
+            "21",
+            "6.4",
+            "Hold: funds the rest"
+          ],
+          [
+            "Regulated verticals",
+            "560",
+            "15",
+            "14.8",
+            "Invest: fastest, and we are fourth"
+          ],
+          [
+            "Public sector",
+            "290",
+            "8",
+            "4.1",
+            "Watch: procurement cycles decide it"
+          ],
+          [
+            "Small business",
+            "460",
+            "13",
+            "2.2",
+            "Harvest: no share to win"
+          ],
+          [
+            "Partners and resale",
+            "330",
+            "9",
+            "7.6",
+            "Hold: margin is the constraint"
+          ]
+        ],
+        "implicationStyle": "single"
+      },
+      "soWhat": "Regulated verticals grow at 14.8% on a $560m pool where we hold fourth place, which is the only line on the table where the growth and the gap point the same way.",
+      "source": "Market model, 2024 base case"
+    },
+    {
+      "layout": "table-halves",
+      "title": "Twelve segments ranked by pool, and the top four carry three fifths",
+      "subtitle": "Addressable revenue pool by segment, $m, 2024",
+      "exhibit": {
+        "type": "table",
+        "columns": [
+          "Rank",
+          "Segment",
+          "Revenue pool"
+        ],
+        "rows": [
+          [
+            "1",
+            "Enterprise platform",
+            "1,240"
+          ],
+          [
+            "2",
+            "Mid-market suite",
+            "780"
+          ],
+          [
+            "3",
+            "Regulated verticals",
+            "560"
+          ],
+          [
+            "4",
+            "Small business",
+            "460"
+          ],
+          [
+            "5",
+            "Partners and resale",
+            "330"
+          ],
+          [
+            "6",
+            "Public sector",
+            "290"
+          ],
+          [
+            "7",
+            "Education",
+            "210"
+          ],
+          [
+            "8",
+            "Healthcare",
+            "188"
+          ],
+          [
+            "9",
+            "Logistics",
+            "162"
+          ],
+          [
+            "10",
+            "Energy",
+            "140"
+          ],
+          [
+            "11",
+            "Retail",
+            "121"
+          ],
+          [
+            "12",
+            "Hospitality",
+            "96"
+          ]
+        ]
+      },
+      "soWhat": "The four largest segments hold 61% of the pool, and the order has not changed in two years.",
+      "source": "Market model, 2024 base case"
     }
   ],
   "fill": "airy"

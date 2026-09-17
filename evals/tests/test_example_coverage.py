@@ -174,10 +174,11 @@ console.log(JSON.stringify({styles:[...POINT_STYLE_NAMES]}));
         self.assertFalse(missing, "no example page sets pointsStyle to: " + ", ".join(missing))
 
     def test_the_table_column_treatments_are_drawn(self):
-        # implication reorganises the table; heat and bubble treat one column.
+        # implication reorganises the table; heat, bubble and bar treat a column.
         self.assertOnSomePage('"implication": true', "an implication column")
         self.assertOnSomePage('"heat": true', "a heat-treated column")
         self.assertOnSomePage('"bubble": true', "a bubble-treated column")
+        self.assertOnSomePage('"bar": true', "an in-cell bar column")
 
     def test_both_implication_styles_are_drawn(self):
         # per-row and single place the chevrons differently enough that one
@@ -187,6 +188,11 @@ console.log(JSON.stringify({styles:[...POINT_STYLE_NAMES]}));
 
     def test_the_speech_callout_is_drawn(self):
         self.assertOnSomePage('"treatment": "speech"', "a speech-bubble chart annotation")
+
+    def test_the_halved_table_is_drawn(self):
+        # The composer reaches this one by rotation, which no single deck can
+        # guarantee, so a page asks for it by name.
+        self.assertOnSomePage('"layout": "table-halves"', "a halved ranking table")
 
 
 class ExampleBuildTests(unittest.TestCase):

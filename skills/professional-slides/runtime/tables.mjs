@@ -429,7 +429,11 @@ function contentLayout(cell, width, props, used) {
     return { height: marker, padding };
   }
   if (cell.type === "bars") {
-    const labels = cell.values.map((n) => formatValue(n, cell.scaleRecord));
+    // `labels` keeps what the author wrote. The house rounding reads 14.8 as
+    // 15, which is right for a figure the runtime derived and wrong for one
+    // the author typed - a page cannot say 14.8 in its takeaway and 15 in
+    // the table it is drawn from.
+    const labels = cell.values.map((n, i) => cell.labels?.[i] ?? formatValue(n, cell.scaleRecord));
     const size = bodySize(props);
     const labelWidth = Math.max(
       ...labels.map((s) => measure(s, inner, true, size).width),
@@ -618,7 +622,10 @@ function layoutLegend(id, scale, width, size, gap) {
     layout = measure(text, width, false, size);
   const entries = [];
   let extraHeight = scale.type === "heatmap" ? v("icon.medium") + gap : 0;
-  if (scale.type === "bars") {
+  // A bar column of one series is named by its own column header, so a swatch
+  // row under the table repeats the heading and says nothing. Two or more
+  // series share a cell and do need the key.
+  if (scale.type === "bars" && scale.series.length > 1) {
     const swatch = v("space.3");
     let x = 0,
       y = 0,
@@ -1171,7 +1178,7 @@ function renderTableAt({ id, frame, props }) {
                 data: { ...data, series: i, value, zeroX, domain: [scale.min, scale.max] },
               }),
             );
-          const label = measure(formatValue(value, scale), l.labelWidth, true, l.size);
+          const label = measure(cell.labels?.[i] ?? formatValue(value, scale), l.labelWidth, true, l.size);
           putText(
             stableId(cellId, "value", i),
             "table-cell-text",

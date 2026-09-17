@@ -211,3 +211,62 @@ class GateVocabularyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TableHalvesTests(unittest.TestCase):
+    """A ranking gets a second architecture, and only where halving is honest.
+
+    A page carrying one wide exhibit and no commentary had exactly one viable
+    shape, `exhibit-full` - which is right for a six-column findings table and
+    wrong for a twelve-row ranking, where it runs a narrow list down the centre
+    of the page and leaves half of it empty. `table-halves` cuts that table in
+    reading order and sets the two halves side by side, each with its header.
+
+    The guard matters more than the shape: halving doubles the column count and
+    halves the width each column gets, so anything that needs the full measure,
+    reads top to bottom as one run, or carries typed cells stays whole.
+    """
+
+    def test_a_long_narrow_ranking_halves_and_everything_else_does_not(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const rows = (n) => Array.from({length: n}, (_, i) => [String(i+1), `Segment ${i+1}`, String(1240 - i*90)]);
+const page = (exhibit, extra = {}) => composeSlide({id:'s1', title:'Twelve segments ranked by the pool they carry', exhibit, ...extra}, 0);
+// Several shapes build an `s1-row`; only this one builds the two halves.
+const halved = (p) => (p.items.find((item) => item.id === 's1-row')?.items || [])
+  .some((item) => item.id === 's1-exhibit-b');
+const ranking = {type:'table', columns:['Rank','Segment','Revenue pool'], rows: rows(12)};
+
+// Asked for by name, the halves are built: two panels, the rows in reading
+// order, both carrying the header.
+const explicit = page(ranking, {layout:'table-halves'});
+const row = explicit.items.find((item) => item.id === 's1-row');
+assert.equal(row.items.length, 2);
+assert.deepEqual(row.items[0].props.rows.map((r) => r[0]), ['1','2','3','4','5','6']);
+assert.deepEqual(row.items[1].props.rows.map((r) => r[0]), ['7','8','9','10','11','12']);
+assert.deepEqual(row.items[0].props.columns, row.items[1].props.columns);
+
+// Too few rows to be worth halving.
+assert.equal(halved(page({...ranking, rows: rows(8)}, {layout:'table-halves'})), true, 'by name, it still halves');
+// Left to the composer, a short table never reaches the shape at all.
+const short = page({...ranking, rows: rows(8)});
+assert.equal(halved(short), false);
+// Commentary means the page has something to arrange already.
+assert.equal(halved(page(ranking, {points:['one','two'], layout:'auto'})), false);
+// A fourth column, a long cell, a derived column, a total row, a treated
+// column or a typed cell each keep the table whole.
+const keepsWhole = [
+  {...ranking, columns:['Rank','Segment','Revenue pool','Growth'], rows: rows(12).map((r) => [...r, '5%'])},
+  {...ranking, rows: rows(12).map((r, i) => i ? r : [r[0], 'A segment whose name runs past the halving limit', r[2]])},
+  {...ranking, derive:['share']},
+  {...ranking, total:true},
+  {...ranking, columns:['Rank','Segment',{label:'Revenue pool', unit:'$m', bar:true}]},
+  {...ranking, rows: rows(12).map((r, i) => i ? r : [r[0], r[1], {type:'heatmap', value:3}])},
+];
+for (const [at, exhibit] of keepsWhole.entries()) {
+  assert.equal(halved(page(exhibit)), false, `case ${at} should not halve`);
+}
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result["ok"])
