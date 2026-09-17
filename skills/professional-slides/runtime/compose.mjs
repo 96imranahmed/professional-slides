@@ -24,7 +24,7 @@
 // "quadrants", "swot", "compare", "phase-table", "rows".
 import fs from "node:fs";
 import path from "node:path";
-import { measureText } from "./text-layout.mjs";
+import { measureText, accentRuns } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount, EVIDENCE_CALLOUT_BAND } from "./chart-annotations.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { measureTable } from "./tables.mjs";
@@ -689,18 +689,124 @@ function soWhatItem(text, id) {
   return { id, component: "insight", props: { text, variant: "tonal" }, size: HUG };
 }
 
-function chooseLayout(slide) {
+/**
+ * The page shapes the composer can build, and what each one wants.
+ *
+ * Measured against the corpus, a reference client deck runs about five distinct
+ * page shapes per ten analytical pages and never lets one shape past a quarter
+ * of the deck. A deck built on the old chooser ran 1.3 shapes per ten pages with
+ * 69% on one of them, because a single branch - one exhibit plus any commentary
+ * - returned `exhibit-left` and caught almost every page.
+ *
+ * So the choice is scored rather than short-circuited. `fit` says how well a
+ * shape suits what the page carries; a shape the page cannot support scores 0
+ * and is never chosen. Among the shapes that fit, the one used least recently
+ * wins, which is what spreads a section across its repertoire.
+ */
+const PAGE_SHAPES = {
+  // One exhibit, commentary beside it. The workhorse, and the one that used to
+  // be the whole repertoire.
+  "exhibit-left": { fit: (s, ex) => (ex.length === 1 && hasCommentary(s) && !needsFullWidth(ex[0]) ? 3 : 0) },
+  // The mirror. The reference decks alternate sides down a section; reading
+  // the commentary first suits a page whose exhibit confirms a claim.
+  "exhibit-right": { fit: (s, ex) => (ex.length === 1 && hasCommentary(s) && !s.photo && !s.kpi && !needsFullWidth(ex[0]) ? 3 : 0) },
+  // The exhibit across the full width with the commentary in columns beneath
+  // it: the commonest reference shape, and the right one when the exhibit is
+  // wide (many categories) or the commentary divides into parallel points.
+  "exhibit-top": {
+    fit: (s, ex) => {
+      if (ex.length !== 1 || !Array.isArray(s.points) || s.points.length < 2 || s.points.length > 4) return 0;
+      if (s.photo || s.kpi || s.insight || s.insights) return 0;
+      // A `compare` exhibit is already two columns arguing with each other; its
+      // commentary belongs beside it, not stacked underneath.
+      if (["compare", "quadrants", "swot", "matrix"].includes(ex[0].type)) return 0;
+      // It fits as well as the side column does, never better: a page composed
+      // on its own keeps the established shape, and the variety comes from
+      // alternating across the deck rather than from a new monoculture.
+      return 3;
+    },
+  },
+  // One enormous figure with its explanation, one supporting exhibit beside it.
+  // For the page whose whole argument is a single number.
+  "hero-number": { fit: (s, ex) => (s.kpi && ex.length === 1 && !s.photo ? (s.points?.length ? 3 : 4) : 0) },
+  // Half the page on a tinted ground, half on the canvas: a comparison that
+  // genuinely has two sides, rather than evidence and its meaning.
+  "split-tone": {
+    fit: (s, ex) => (ex.length === 2 && !s.points?.length && !s.kpi
+      && ex.every((e) => typeof e.caption === "string" && e.caption.trim()) ? 4 : 0),
+  },
+  // Two exhibits side by side, each captioned, no shared column.
+  "two-up-contrast": { fit: (s, ex) => (ex.length === 2 && !s.points?.length && !s.kpi ? 3 : 0) },
+  "two-up": { fit: (s, ex) => (ex.length >= 2 ? 3 : 0) },
+  // Stacking halves each panel's height, which a chart with an annotation band
+  // cannot always take. It is reachable from `arrange: "stack"` and from the
+  // auto-stack rule above (two charts on one category set), both of which know
+  // the panels fit - so it is never chosen on score alone.
+  "stack": { fit: () => 0 },
+  "grid": { fit: (s, ex) => (ex.length >= 4 ? 4 : 0) },
+  "exhibit-full": { fit: (s, ex) => (ex.length === 1 && (!hasCommentary(s) || needsFullWidth(ex[0])) ? 3 : 0) },
+  "text": { fit: (s, ex) => (ex.length === 0 ? 3 : 0) },
+};
+
+export const PAGE_SHAPE_NAMES = Object.freeze(Object.keys(PAGE_SHAPES));
+
+const TABLE_LIKE_TYPES = ["table", "rows", "compare", "phase-table"];
+const hasCommentary = (s) => Boolean(s.points?.length || s.insight || s.insights?.length || s.kpi);
+
+/**
+ * An exhibit that cannot survive being narrowed to two thirds of the page.
+ *
+ * A five-column table of sentences needs the full measure: squeezed into a
+ * side-column layout its header words stop fitting their cells, which the
+ * measurer refuses outright. The chooser has to know that before it picks the
+ * shape, or a page that would have composed simply fails.
+ */
+function needsFullWidth(ex) {
+  if (!ex) return false;
+  // A timeline with many periods, a matrix, a map: exhibits whose horizontal
+  // axis is the content and cannot be compressed.
+  if (["gantt", "timeline", "roadmap", "map", "heatmap", "marimekko"].includes(ex.type)) return true;
+  if (!TABLE_LIKE_TYPES.includes(ex.type)) return false;
+  const columns = ex.columns || [];
+  if (columns.length >= 5) return true;
+  const cells = (ex.rows || []).flatMap((row) => (Array.isArray(row) ? row : row?.cells || []));
+  const longest = Math.max(0, ...cells.map((cell) => String(cell?.text ?? cell ?? "").length));
+  // Sentence-length cells starve the narrow label column when the table is
+  // squeezed, and the header word stops fitting before the cell text does.
+  return columns.length >= 3 && longest > 60;
+}
+
+function chooseLayout(slide, recent = []) {
   if (slide.layout && slide.layout !== "auto") return slide.layout;
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
+  // An explicit arrangement is the author overriding the choice, not a hint.
   if (slide.arrange === "stack") return "stack";
-  if (slide.arrange === "row") return "two-up";
+  if (slide.arrange === "row") return exhibits.length === 2 && !slide.points?.length ? "two-up-contrast" : "two-up";
   if (slide.arrange === "grid" || exhibits.length >= 4) return "grid";
-  // Auto-stack: two charts on one category set with points beside them stack
-  // in the hero column rather than shrinking into a three-way row.
+  // Two charts on one category set with points beside them stack in the hero
+  // column rather than shrinking into a three-way row.
   if (exhibits.length === 2 && slide.points?.length && exhibits.every((ex) => String(ex.type).startsWith("chart.")) && JSON.stringify(exhibits[0].categories) === JSON.stringify(exhibits[1].categories)) return "stack";
-  if (exhibits.length >= 2) return "two-up";
-  if (exhibits.length === 1) return slide.points?.length || slide.insight || slide.insights?.length || slide.kpi ? "exhibit-left" : "exhibit-full";
-  return "text";
+
+  const scored = Object.entries(PAGE_SHAPES)
+    .map(([name, shape]) => [name, shape.fit(slide, exhibits)])
+    .filter(([, score]) => score > 0);
+  if (!scored.length) return exhibits.length ? "exhibit-full" : "text";
+  const best = Math.max(...scored.map(([, score]) => score));
+  // Shapes within one point of the best all suit the page, so the tie is broken
+  // on variety: the one used longest ago. `recent` is most-recent-first.
+  const viable = scored.filter(([, score]) => score >= best - 1).map(([name]) => name);
+  if (viable.length === 1) return viable[0];
+  // Staleness is how many pages ago the shape was used, capped so that "never
+  // used" is a finite number and the comparison stays deterministic. The order
+  // is: least recently used, then best fit, then the order declared above - so
+  // a page composed on its own always resolves the same way, and a deck spreads
+  // across its repertoire.
+  const unused = recent.length + 1;
+  const staleness = (name) => { const at = recent.indexOf(name); return at === -1 ? unused : at; };
+  const score = (name) => scored.find(([n]) => n === name)[1];
+  const declared = (name) => PAGE_SHAPE_NAMES.indexOf(name);
+  return viable.slice().sort((a, b) =>
+    staleness(b) - staleness(a) || score(b) - score(a) || declared(a) - declared(b))[0];
 }
 
 /**
@@ -1160,7 +1266,7 @@ const SLIDE_PASSES = [
 /** The pass names, in order - what the composer does to a slide and when. */
 export const PASS_NAMES = Object.freeze(SLIDE_PASSES.map(([name]) => name));
 
-export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1) {
+export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1, recent = []) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   assertKnownSlideKeys(slide, id);
   const ctx = { id, baseDir, fill, elements, tileColumn: null, tilePoints: [] };
@@ -1182,7 +1288,8 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     }
   }
   const { tileColumn, tilePoints } = ctx;
-  const layout = chooseLayout(slide);
+  const layout = chooseLayout(slide, recent);
+  if (Array.isArray(recent)) recent.unshift(layout);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   const items = [];
   const metricsBelow = slide.metricsPosition === "bottom";
@@ -1303,6 +1410,64 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     const photo = photoStrip(slide, `${id}-photo`, baseDir);
     const ordered = layout === "exhibit-left" ? [hero, chevron, side] : [side, chevron, hero];
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [...ordered.filter(Boolean), ...(photo ? [photo] : [])] });
+  } else if (layout === "exhibit-top") {
+    // The exhibit across the full width, its commentary in columns beneath it.
+    // A wide exhibit - ten categories, a twelve-row table - has no width to
+    // give a side column, and three findings read better as three columns than
+    // as three stacked paragraphs in a 360px gutter.
+    const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 1 }, height: "fill" });
+    if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
+    // A point's lead becomes the column's heading only when its sentence can
+    // stand without it. Points are often written to run on from the lead ("Core
+    // regionals carry the most activity" + "with 54 use cases in ideation"),
+    // and hoisting the lead into a heading leaves the column starting mid
+    // sentence - so those join back into one paragraph instead.
+    const standsAlone = (text) => /^[A-Z0-9"“(]/.test(String(text).trim());
+    const columns = slide.points.map((point, at) => {
+      const entry = typeof point === "string" ? { text: point } : point;
+      const hoist = entry.lead && standsAlone(entry.text);
+      const text = hoist ? entry.text : [entry.lead, entry.text].filter(Boolean).join(" ");
+      // A lead that stays in the sentence still leads it: it runs in bold, the
+      // way the reference pages set the phrase that carries the finding.
+      const runs = !hoist && entry.lead
+        ? accentRuns(text, [entry.lead], { bold: true, strict: false })
+        : null;
+      return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
+        ...(hoist ? { heading: entry.lead } : {}),
+        items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text, ...(runs ? { runs } : {}) }, size: HUG }] };
+    });
+    // The columns share one heading, the way the side column does: without it
+    // the page drops straight from the plot into three paragraphs with nothing
+    // saying what they are. `pointsHeading: false` suppresses it.
+    const belowHeading = slide.pointsHeading === false ? null : slide.pointsHeading || "What it means";
+    items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
+      headedPanel(exhibits[0], item, `${id}-exhibit`, false),
+      { id: `${id}-below`, ...(belowHeading ? { heading: belowHeading } : {}), layout: "flow.row", size: HUG, items: columns },
+    ] });
+  } else if (layout === "hero-number") {
+    // One figure carries the page: the number set large with its explanation,
+    // the exhibit beside it as the proof rather than as the subject.
+    const kpi = { id: `${id}-kpi`, component: "metric",
+      props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" },
+      size: { width: { fr: 1 }, height: slide.points?.length ? 150 : "fill" } };
+    const sideItems = [kpi];
+    if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true));
+    const hero = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" });
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
+      { id: `${id}-side`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, leftover: slide.points?.length ? "distribute" : "center", items: sideItems },
+      headedPanel(exhibits[0], hero, `${id}-exhibit`, false),
+    ] });
+  } else if (layout === "split-tone") {
+    // A comparison with two genuine sides: each exhibit on its own ground, the
+    // left tinted so the page reads as two halves rather than as evidence and
+    // commentary.
+    const half = (ex, at) => {
+      const panel = exhibitItem(ex, `${id}-exhibit-${at}`, baseDir, { width: { fr: 1 }, height: "fill" });
+      return { id: `${id}-half-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
+        ...(at === 0 ? { treatment: "muted" } : {}),
+        items: [headedPanel(ex, panel, `${id}-exhibit-${at}`, true)] };
+    };
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 2).map(half) });
   } else if (layout === "stack") {
     // Exhibits stacked in the hero column, points beside them.
     // A value table under a chart hugs its rows and carries no heading band.
@@ -1321,7 +1486,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     const panels = exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE }, `${id}-exhibit-${i}`));
     items.push({ id: `${id}-grid`, layout: "flow.column", size: SIZE, items: [{ id: `${id}-row-a`, layout: "flow.row", size: SIZE, items: panels.slice(0, 2) }, { id: `${id}-row-b`, layout: "flow.row", size: SIZE, items: panels.slice(2, 4) }] });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`));
-  } else if (layout === "two-up") {
+  } else if (layout === "two-up" || layout === "two-up-contrast") {
+    // `two-up-contrast` is the same row with each panel carrying its own
+    // caption and no shared column: the page's commentary sits under the panel
+    // it belongs to, so neither exhibit is the subject and the other the proof.
+    if (layout === "two-up-contrast") for (const ex of exhibits) if (ex.caption === undefined && ex.heading) ex.caption = undefined;
     // Peer tables share one density: a row with a text-heavy table steps every
     // table in it to compact together, so type stays uniform across the row.
     const tables = exhibits.filter((ex) => ex.type === "table");
@@ -1500,7 +1669,14 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   // deck's own `weight` wins, then the house profile a template produced, then
   // the fill level.
   const weight = resolveWeight(spec, fill);
-  for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) slides.push(composeSlide(page, slides.length, baseDir, fill, weight.elements));
+  // The shapes the last few analytical pages took, most recent first: the
+  // chooser breaks a tie on variety, so a section spreads across its repertoire
+  // instead of repeating whichever shape fitted first.
+  const recent = [];
+  for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) {
+    slides.push(composeSlide(page, slides.length, baseDir, fill, weight.elements, recent));
+    recent.splice(4);
+  }
   return {
     id: spec.id,
     palette: spec.palette || "mckinsey",

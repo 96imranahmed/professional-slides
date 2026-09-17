@@ -178,6 +178,9 @@ THRESHOLDS = {
     "families_min": 3,         # distinct page families in a deck of ten pages or more
     "sections_from": 12,       # analytical pages beyond which a deck needs sections and a tracker
     "deck_shape_from": 8,      # analytical pages beyond which a deck needs a heavy page among the light ones
+    "shape_variety_from": 10,   # analytical pages beyond which the deck needs more than one page architecture
+    "shapes_per_ten_min": 3.0,  # distinct architectures per ten pages (the reference decks run about five)
+    "shape_share_max": 0.40,    # share of pages on the commonest architecture (the reference median is 0.23)
 }
 
 
@@ -329,6 +332,7 @@ GATE_CODES = {
     "HERO_EXHIBIT": "an analytical page with no dominant exhibit carrying ink",
     "LAYOUT_MONOTONY": "one layout signature across most of the deck",
     "PAGE_VARIETY": "too few page families across the deck",
+    "PAGE_SHAPE_FLAT": "the deck is built from too few page architectures",
     "EVIDENCE_MIX": "too few analytical pages carry a measured exhibit",
     "IMAGE_BUDGET": "photographs on too many analytical pages",
     "IMAGE_RUN": "photographs on too many consecutive pages",
@@ -1370,6 +1374,84 @@ def layout_signature(slide):
     return f"{'+'.join(components)}|{shape}"
 
 
+def page_architecture(slide):
+    """The page's shape with the exhibit types abstracted away.
+
+    `layout_signature` names the components, so a bar chart beside a column of
+    points and a line chart beside a column of points are two signatures - and a
+    deck can run 69% of its pages on one architecture while LAYOUT_MONOTONY sees
+    nothing. This is the coarser reading: what the page is *made of* (a measured
+    exhibit, a table, a diagram, a picture, text) and how those blocks are
+    arranged, which is what a reader sees from across the room.
+    """
+    family = {
+        "chart": "measure", "table": "table", "rows": "table", "compare": "table",
+        "phase-table": "table", "metric": "measure", "image-frame": "picture",
+        "bullet-list": "text", "paragraph": "text", "insight": "text", "callout": "text",
+    }
+
+    def kind(component):
+        name = str(component or "")
+        if name.startswith("chart."):
+            return "measure"
+        for prefix, value in family.items():
+            if name == prefix:
+                return value
+        return "diagram"
+
+    instances = [c for c in top_level_instances(slide) if is_exhibit(c)]
+    if not instances:
+        return None
+    rows = {}
+    for instance in instances:
+        frame = instance.get("frame") or {}
+        band = int(float(frame.get("y", 0)) // 120)
+        rows.setdefault(band, []).append(kind(instance.get("component")))
+    shape = ";".join(
+        "+".join(sorted(members)) for _, members in sorted(rows.items())
+    )
+    return shape
+
+
+def gate_page_shape_flat(slides, content_indexes, findings, fill):
+    """PAGE_SHAPE_FLAT, deck level.
+
+    Measured over the reference client decks, a deck runs about five distinct
+    page architectures per ten analytical pages and never lets one architecture
+    past a quarter of them. A deck built before the composer scored its shapes
+    ran 1.3 per ten with 69% on one, which no page-level gate could see.
+    """
+    # A catalogue declares itself airy: every page there exists to show one
+    # encoding, so one architecture repeated is the point, not the defect.
+    if fill == "airy":
+        return
+    shapes = [page_architecture(slides[i]) for i in content_indexes]
+    shapes = [s for s in shapes if s]
+    if len(shapes) < THRESHOLDS["shape_variety_from"]:
+        return
+    counts = {}
+    for shape in shapes:
+        counts[shape] = counts.get(shape, 0) + 1
+    per_ten = 10.0 * len(counts) / len(shapes)
+    top_shape, top_count = max(counts.items(), key=lambda kv: kv[1])
+    top_share = top_count / float(len(shapes))
+    if per_ten >= THRESHOLDS["shapes_per_ten_min"] and top_share <= THRESHOLDS["shape_share_max"]:
+        return
+    findings.append(finding(
+        None, "PAGE_SHAPE_FLAT",
+        {"shapesPerTen": round(per_ten, 1), "commonest": top_shape,
+         "commonestShare": round(top_share, 2), "pages": len(shapes)},
+        f"{THRESHOLDS['shapes_per_ten_min']} distinct architectures per ten pages, none past {int(THRESHOLDS['shape_share_max'] * 100)}%",
+        "The deck is built from too few page shapes, so it reads as one page "
+        "repeated. Reference client decks run about five architectures per ten "
+        "pages: an exhibit with its commentary beside it, the same exhibit full "
+        "width with the commentary in columns beneath, two exhibits contrasted, "
+        "one hero number with its proof, a full-bleed table. Let the composer "
+        "choose (drop the explicit `layout` on these pages) or set different "
+        "shapes yourself.",
+    ))
+
+
 def gate_layout_monotony(slides, content_indexes, findings):
     """LAYOUT_MONOTONY, deck level. No signature over 40% of content slides."""
     counts = {}
@@ -1497,6 +1579,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         gate_deck_structure(slides, content_indexes, findings)
     if not gates or "DECK_FLAT" in gates:
         gate_deck_shape(slides, content_indexes, findings, fill)
+    if not gates or "PAGE_SHAPE_FLAT" in gates:
+        gate_page_shape_flat(slides, content_indexes, findings, fill)
 
     # A density report beside the findings: the numbers this review is about, so
     # a regression shows up as a number rather than as a screenshot.
