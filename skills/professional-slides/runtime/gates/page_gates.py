@@ -34,6 +34,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nice_ticks import is_nice_tick, nice_axis, parse_number  # noqa: E402
@@ -731,10 +732,8 @@ def page_text_words(slide):
     """Every word printed on the page: title, labels, table cells, footnotes.
     The same thing `pdftotext` counts, so our pages can be compared with the
     reference decks rather than with our own idea of a page."""
-    total = 0
-    for node in text_nodes(slide):
-        total += word_count(source_text(node))
-    return total
+    bands = page_bands(slide)
+    return bands.body + bands.footer + bands.title_band
 
 
 # The bands of the page. Measured over 137 analytical reference slides, their
@@ -748,12 +747,26 @@ TITLE_BAND_ROLES = {"kicker", "page-tag", "page-tag-pill", "tracker-label", "tra
                     "tracker-compact-label", "tracker-compact-marker-label", "action-subtitle"}
 
 
-def body_bands(slide):
-    """(body words, footer words, title-band words) for one page, split by role
-    first and by position second, so a note dropped in the body still counts as
-    a note and a label near the footer still counts as body."""
+class PageText(NamedTuple):
+    """One page's text, split into the three bands.
+
+    `page_text_words` and `body_bands` used to walk the page and classify its
+    nodes separately, which is two answers to one question and two places to
+    change when the role vocabulary moves. This is the one measurement; both
+    read it."""
+    text_nodes: list
+    body: int
+    footer: int
+    title_band: int
+
+
+def page_bands(slide):
+    """Split the page's words into its three bands, by role first and position
+    second, so a note dropped in the body still counts as a note and a label
+    near the footer still counts as body."""
+    nodes = [n for n in slide.get("nodes", []) if n.get("type") == "text"]
     body = footer = band = 0
-    for node in text_nodes(slide):
+    for node in nodes:
         words = word_count(source_text(node))
         if not words:
             continue
@@ -778,7 +791,13 @@ def body_bands(slide):
             band += words
         else:
             body += words
-    return body, footer, band
+    return PageText(nodes, body, footer, band)
+
+
+def body_bands(slide):
+    """(body words, footer words, title-band words) for one page."""
+    bands = page_bands(slide)
+    return bands.body, bands.footer, bands.title_band
 
 
 def side_columns(slide):
@@ -807,6 +826,25 @@ def nodes_inside(slide, frame, predicate=None):
     return out
 
 
+def thin_remedy(where="The page"):
+    """The one repair for a page carrying less than the deck said it would.
+
+    THIN_PAGE reports it on the rendered page, THIN_PLAN reports it from the
+    spec before the page exists and DECK_FLAT reports it across the deck. They
+    are three moments of one shortfall, so they give one answer; an author who
+    acts on the plan-time message has acted on the render-time one too.
+    """
+    return (
+        f"{where} is under-carrying where it matters. The floor counts the "
+        "body alone - the title, the source and the notes do not stand in "
+        "for evidence. Deepen the exhibit: more categories or rows, a "
+        "derived column (rank, share, change), a value on every mark, a "
+        "second line in the measure cell, the second cut of the same "
+        "measure, and points that run to a sentence each. Reference client "
+        f"pages carry {REFERENCE_PAGE_BANDS['body']} words in the body."
+    )
+
+
 def gate_thin_page(slide_no, slide, findings):
     """THIN_PAGE. A content page carrying less than the deck's weight floor of
     page text. Not a style rule: a reader who gets three bullets and a chart has
@@ -816,16 +854,7 @@ def gate_thin_page(slide_no, slide, findings):
         return
     body, footer, _band = body_bands(slide)
     if body < floor:
-        findings.append(finding(
-            slide_no, "THIN_PAGE", body, floor,
-            "The page is under-carrying where it matters. The floor counts the "
-            "body alone - the title, the source and the notes do not stand in "
-            "for evidence. Deepen the exhibit: more categories or rows, a "
-            "derived column (rank, share, change), a value on every mark, a "
-            "second line in the measure cell, the second cut of the same "
-            "measure, and points that run to a sentence each. Reference client "
-            f"pages carry {REFERENCE_PAGE_BANDS['body']} words in the body.",
-        ))
+        findings.append(finding(slide_no, "THIN_PAGE", body, floor, thin_remedy()))
         return
     # A page that clears the floor on the strength of its notes has padded the
     # wrong band: the reference footer is 19 words against a 128-word body.
@@ -1293,10 +1322,11 @@ def gate_deck_shape(slides, analytical, findings, fill):
         {"median": median, "p80": top, "heaviest": counts[-1], "pagesAtReferenceP75": heavy},
         f"one page in the deck at {REFERENCE_PAGE_WORDS['p75']}+ words, or a p80 a third above the median",
         "Every page carries the same weight, which reads as a deck with no "
-        "detail behind it. Give the argument its evidence page: a findings "
-        "matrix (`matrix`) of rows against two or three columns of bulleted "
-        "findings, or a deep table with its measures grouped and its basis in "
-        "numbered notes.",
+        "detail behind it. Give the argument its heavy page: set `shape` to "
+        "`findings-matrix` (rows against two or three columns of bulleted "
+        "findings) or to `measure-table` (measures grouped under their units, "
+        "with the basis in numbered notes). "
+        + thin_remedy("That page"),
     ))
 
 
