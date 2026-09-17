@@ -300,7 +300,7 @@ console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result["accepted"])
 
-    def test_the_side_column_fills_its_track_unless_the_deck_is_airy(self):
+    def test_the_side_column_fills_its_track_on_every_deck(self):
         result = run_node('''
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
@@ -309,7 +309,9 @@ const side=(slide,fill)=>composeSlide(slide,0,process.cwd(),fill).items.find(i=>
 const page={title:'T',exhibit:chart,points:['one','two','three']};
 assert.equal(side(page,'balanced').items[0].props.distribute,true,'a balanced column spreads its points');
 assert.equal(side(page,'full').items[0].props.distribute,true);
-assert.equal(side(page,'airy').items[0].props.distribute,undefined,'an airy deck keeps its air');
+// An airy deck spreads too. White space *between* the points is what airy
+// means; the same space pooled under the last one is an unfinished page.
+assert.equal(side(page,'airy').items[0].props.distribute,true,'an airy deck puts its air between the points');
 // A thin column narrows and gives the width to the exhibit.
 assert.equal(side(page,'balanced').size.width.fr,0.8);
 const deep={title:'T',exhibit:chart,points:[

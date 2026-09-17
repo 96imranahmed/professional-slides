@@ -271,11 +271,14 @@ export function metricNodes({ id, frame, props }) {
   if (ink_) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, INK, "none", "radius.none"));
   else if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));
   else if (props.tone === "tint") nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, TINT, "none", "radius.small"));
-  // The hairline is a divider *between* tiles, so n tiles carry n-1 rules and
-  // the first carries none. Drawn on the leading edge of every tile it fences
-  // each one off instead of separating them, which is not the reference row
-  // ("51 | 443 | 39") it is named after. `leads: true` marks the first.
-  if (ruled && props.leads !== true) nodes.push(linePrimitive({ id: stableId(id, "rule"), role: "metric-rule", x1: frame.x, y1: frame.y + 4, x2: frame.x, y2: frame.y + frame.height - 4, style: { stroke: RULE, lineWidth: token("line.hairline"), dash: "solid" } }));
+  // No hairline before the tile. The rule was drawn as a divider between tiles
+  // - n tiles, n-1 rules - and on a row whose values are left-aligned over a
+  // label it does not read as a divider at all: it sits hard against the number
+  // that follows it and reads as a left border on that card. The tiles are
+  // already a row of three peers on one baseline with a gap between them, which
+  // is what makes them read as a set; a fence between them adds a device and
+  // says nothing. `tone: "rule"` keeps what actually distinguishes it - the
+  // value in the accent, left-aligned, on no tile.
   // `tone: "hero"`: the one big number beside a chart, in the accent, left-aligned, top-anchored.
   const hero = props.tone === "hero";
   const ink = ink_ ? ACCENT : dark ? WHITE : hero || ruled ? ACCENT : PRIMARY, grey = dark ? WHITE : hero || ruled ? INK : SECONDARY;

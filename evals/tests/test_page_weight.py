@@ -113,24 +113,33 @@ assert.throws(()=>resolveFill({fill:'packed'}),/Unknown fill/);
 const chart={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
 const points=['one','two','three'];
 const list=(fill)=>composeSlide({title:'T',exhibit:chart,points},0,undefined,fill).items.find(i=>i.id==='s01-row').items.find(i=>i.id==='s01-side').items[0];
-// Any deck that is not airy spreads its points down the column; an airy deck
-// keeps its air, which is what the reader is there for.
+// Every deck spreads its points down the column, airy included. White space
+// *between* the points is what airy means; the same space pooled under the
+// last one is an unfinished page. The gap opens to its cap and the list
+// centres whatever the cap leaves over, so airy is the same block with air
+// around and between it rather than a list hugging the top of its track.
 assert.equal(list('full').props.distribute,true);
 assert.equal(list('full').size.height,'fill');
 assert.equal(list('balanced').props.distribute,true);
 assert.equal(list('balanced').size.height,'fill');
-assert.equal(list('airy').props.distribute,undefined);
-assert.equal(list('airy').size.height,'hug');
+assert.equal(list('airy').props.distribute,true);
+assert.equal(list('airy').size.height,'fill');
 // The deck plan carries the resolved fill so the gates can read it.
 assert.equal(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',density:'pre-read',slides:[{title:'T',points}]}).fill,'full');
-// Distribution spreads the rows without moving the first one.
+// Distribution opens the gaps to the cap and then centres what the cap leaves
+// over, so the block sits in the middle of its track rather than hugging the
+// top with every spare pixel banked under the last row. The first row moves
+// down by exactly what the last row leaves at the foot.
 const registry=createRegistry();
 const frame={x:0,y:0,width:360,height:420};
 const props={variant:'body',items:points};
 const hugged=registry.get('bullet-list').render({id:'l',frame,props}).nodes.filter(n=>n.role==='list-item');
 const spread=registry.get('bullet-list').render({id:'l',frame,props:{...props,distribute:true}}).nodes.filter(n=>n.role==='list-item');
-assert.equal(hugged[0].frame.y,spread[0].frame.y);
-assert.ok(spread.at(-1).frame.y>hugged.at(-1).frame.y+40);
+assert.ok(spread[0].frame.y>hugged[0].frame.y,'the block no longer hugs the top');
+assert.ok(spread.at(-1).frame.y>hugged.at(-1).frame.y+40,'and the rows still spread apart');
+const top=spread[0].frame.y-frame.y;
+const bottom=(frame.y+frame.height)-(spread.at(-1).frame.y+spread.at(-1).frame.height);
+assert.ok(Math.abs(top-bottom)<=1,`the leftover is split top and bottom (${top} vs ${bottom})`);
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])

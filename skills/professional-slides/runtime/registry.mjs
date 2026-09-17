@@ -581,12 +581,18 @@ function bodyListNodes({ id, frame, props }) {
   // in it. A column that still ends high wants another point, not more air -
   // which is what the column and page floors ask for.
   const extraGap = props.distribute === true && layout.measured.length > 1 ? Math.min(spare / (layout.measured.length - 1), 24) : 0;
+  // Whatever the cap leaves over is split above and below the list rather than
+  // dropped under it. A column that opens its gaps to the cap and then hugs the
+  // top still ends two fifths up the track, with all the slack in one band at
+  // the foot - which reads as an unfinished page, not as air. Centred, the same
+  // leftover reads as the margin around a block. The gap does the reading work;
+  // the centring stops the remainder pooling in one place.
   // On a dark or primary panel the list reads in white: white text, white markers,
   // reversed number discs.
   const inverse = props.tone === "inverse";
   if (props.tone !== undefined && !["standard", "inverse"].includes(props.tone)) throw new Error(`Unknown bullet-list tone: ${props.tone}`);
   const INK_ = inverse ? WHITE : INK;
-  let y = frame.y;
+  let y = frame.y + (extraGap > 0 ? Math.max(0, spare - extraGap * (layout.measured.length - 1)) / 2 : 0);
   const nodes = [];
   layout.measured.forEach((m, index) => {
     const first = m.lead ?? m.text;
@@ -1324,15 +1330,38 @@ function registerCore(registry) {
       // on it, for a right-hand column that runs full bleed (a toned panel, a
       // photograph) where a floating disc would have nothing to sit against.
       if (variant === "divider-chevron") {
+        // The dashed rule with the disc sitting on it, broken around the disc.
+        // It takes the orientation of the frame it is given: down a gutter
+        // between two columns, or across the page between a row of measures and
+        // what follows from them. The chevron points down either way - it is
+        // the same device saying the same thing, and "therefore" reads
+        // downwards on a page whatever direction the rule runs.
+        const across = frame.width > frame.height;
         const diameter = Math.min(props.size ?? tokenValue(token("icon.large")), frame.width, frame.height);
-        const centerX = frame.x + frame.width / 2, top = frame.y, bottom = frame.y + frame.height;
+        const centerX = frame.x + frame.width / 2;
         const gap = diameter / 2 + tokenValue(token("space.2"));
+        const start = across ? frame.x : frame.y, end = across ? frame.x + frame.width : frame.y + frame.height;
+        const middle = across ? centerX : centerY;
+        const segment = (suffix, from, to) => linePrimitive({
+          id: stableId(id, suffix), role: "relationship-divider",
+          x1: across ? from : centerX, y1: across ? centerY : from,
+          x2: across ? to : centerX, y2: across ? centerY : to,
+          style: { stroke: RULE, lineWidth: HAIRLINE, dash: "dash" }, data: { relation: "implies", orientation: across ? "horizontal" : "vertical" },
+        });
+        // The chevron points the way the argument runs: along a vertical gutter
+        // it points across to the meaning beside it, and on a rule drawn across
+        // the page it points down, at what follows from the row above.
+        const chevron = across
+          ? [[centerX - diameter / 4, centerY - diameter / 8, centerX, centerY + diameter / 8],
+             [centerX, centerY + diameter / 8, centerX + diameter / 4, centerY - diameter / 8]]
+          : [[centerX - diameter / 8, centerY - diameter / 4, centerX + diameter / 8, centerY],
+             [centerX + diameter / 8, centerY, centerX - diameter / 8, centerY + diameter / 4]];
         return { nodes: [
-          linePrimitive({ id: stableId(id, "rule-top"), role: "relationship-divider", x1: centerX, y1: top, x2: centerX, y2: Math.max(top, centerY - gap), style: { stroke: RULE, lineWidth: HAIRLINE, dash: "dash" }, data: { relation: "implies" } }),
-          linePrimitive({ id: stableId(id, "rule-bottom"), role: "relationship-divider", x1: centerX, y1: Math.min(bottom, centerY + gap), x2: centerX, y2: bottom, style: { stroke: RULE, lineWidth: HAIRLINE, dash: "dash" }, data: { relation: "implies" } }),
+          segment("rule-top", start, Math.max(start, middle - gap)),
+          segment("rule-bottom", Math.min(end, middle + gap), end),
           ellipsePrimitive({ id: stableId(id, "disc"), role: "relationship-disc", frame: { x: centerX - diameter / 2, y: centerY - diameter / 2, width: diameter, height: diameter }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")), data: { relation: "implies", arrowVariant: variant } }),
-          openLine(stableId(id, "chevron-top"), centerX - diameter / 8, centerY - diameter / 4, centerX + diameter / 8, centerY, "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 1 }),
-          openLine(stableId(id, "chevron-bottom"), centerX + diameter / 8, centerY, centerX - diameter / 8, centerY + diameter / 4, "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 2 })
+          openLine(stableId(id, "chevron-top"), ...chevron[0], "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 1 }),
+          openLine(stableId(id, "chevron-bottom"), ...chevron[1], "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 2 })
         ] };
       }
       if (variant === "disc-chevron") {

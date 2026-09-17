@@ -903,7 +903,7 @@ function niceCeiling(value) {
 function metricsStrip(metrics, id, tone) {
   const tiles = metrics.map((m) => (typeof m === "string" ? { value: m } : m));
   const prominent = tone === "ink" || tone === "rule";
-  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...(i === 0 ? { leads: true } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
+  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
 }
 
 /**
@@ -1092,12 +1092,17 @@ function resolvePointsStyle(slide, points, recentStyles = []) {
 }
 
 function pointsItem(points, id, tone, fill, inColumn = false, style = null) {
-  // The side column is a track, not a shelf: its points spread down it unless
-  // the deck is airy, where the white space is the point. A list that hugs the
-  // top of a 500px column leaves two fifths of it empty, which is how a page
-  // that carries real content still reads as thin. A list under a row of
+  // The side column is a track, not a shelf: its points spread down it. A list
+  // that hugs the top of a 500px column leaves two fifths of it empty, which is
+  // how a page carrying real content still reads as thin. A list under a row of
   // exhibits hugs instead — there it is a footer, not a column.
-  const distribute = inColumn && fill !== "airy" && points.length > 1;
+  //
+  // This used to be off on an airy deck, on the reading that white space is the
+  // point there. It is, but white space between the points is what "airy"
+  // means; all of it pooled under the last one is just an unfinished page. The
+  // gap opens to its cap on every deck now, and the list centres what the cap
+  // leaves over, so an airy column is the same block with more air in it.
+  const distribute = inColumn && points.length > 1;
   const shape = style && POINT_STYLES[style] ? POINT_STYLES[style] : {};
   return { id, component: "bullet-list", props: { variant: "body", items: points, ...shape, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}), ...(distribute ? { distribute: true } : {}) }, size: distribute ? { width: { fr: 1 }, height: "fill" } : HUG };
 }
@@ -1207,6 +1212,16 @@ const PAGE_SHAPES = {
   "stack": { fit: () => 0 },
   "grid": { fit: (s, ex) => (ex.length >= 4 ? 4 : 0) },
   "exhibit-full": { fit: (s, ex) => (ex.length === 1 && (!hasCommentary(s) || needsFullWidth(ex[0])) ? 3 : 0) },
+  // A row of measures across the top, and the evidence they summarise beneath.
+  // The composer has always drawn this page - the strip goes above whatever the
+  // layout puts below it - but it had no name, so it was recorded as
+  // `exhibit-full`, the chooser could not spread a deck across it and a plan
+  // could not ask for it. What sits underneath is *any* exhibit: it is as much
+  // a chart given the full width and the leftover height as it is a table.
+  "metrics-over-exhibit": {
+    fit: (s, ex) => (ex.length === 1 && Array.isArray(s.metrics) && s.metrics.length
+      && s.metricsPosition !== "bottom" && !hasCommentary(s) ? 4 : 0),
+  },
   // A long, narrow table cut down the middle and set as two panels side by
   // side, each with its own header: the reference deck's ranking page. Twelve
   // rows down the centre of a 1160px body leaves half the page empty and makes
@@ -1833,7 +1848,16 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     throw new Error(`${id}: ${layout} cannot place insight/insights/kpi; choose an exhibit-left or exhibit-right layout`);
   }
   const metricsBelow = slide.metricsPosition === "bottom";
-  if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
+  if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) {
+    items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
+    // `implication: true` draws the marker across the page, between the
+    // measures and what follows from them: the same dashed rule and disc the
+    // gutter carries between an exhibit and its meaning, turned on its side.
+    // Off unless asked for - a page that puts numbers above their own detail is
+    // not making an inference, and a chevron on every metrics page is a device
+    // that has stopped meaning anything.
+    if (slide.implication === true) items.push({ id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: { fr: 1 }, height: 32 } });
+  }
   if (tileColumn) {
     const tiles = { id: `${id}-tiles`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: tileColumn.map((m, i) => ({ id: `${id}-tile-${i}`, component: "metric", props: { ...m, variant: "prominent" }, size: { width: { fr: 1 }, height: "fill" } })) };
     const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle)] };
@@ -1849,11 +1873,14 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   // and handed the whole body it spreads into small islands with a hundred
   // pixels of nothing between them. They hug and centre, like the icon cards.
   const centredFigure = (ex) => ["steps", "cycle", "chevron-process"].includes(ex?.type);
-  if (layout === "exhibit-full" && (centredCards(exhibits[0]) || centredFigure(exhibits[0]))) {
+  // `metrics-over-exhibit` is `exhibit-full` with the measures above it: the
+  // exhibit still takes the whole width and the height the strip leaves.
+  const fullWidth = layout === "exhibit-full" || layout === "metrics-over-exhibit";
+  if (fullWidth && (centredCards(exhibits[0]) || centredFigure(exhibits[0]))) {
     // Icon cards with a line each hug their content and sit centred in the
     // space above the takeaway; header and numbered cards fill the page as columns.
     items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { ...SIZE, centre: true }));
-  } else if (layout === "exhibit-full") {
+  } else if (fullWidth) {
     const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
     if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
     items.push(item);

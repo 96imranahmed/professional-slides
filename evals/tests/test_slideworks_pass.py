@@ -97,7 +97,12 @@ const metric=registry.get('metric');
 const ink=metric.render({id:'m',frame:{x:0,y:0,width:240,height:120},props:{value:'1.6x',label:'Volatility',tone:'ink'}}).nodes;
 assert.ok(ink.some(n=>n.role==='metric-surface'));
 const rule=metric.render({id:'m',frame:{x:0,y:0,width:240,height:120},props:{value:'443',label:'Consultants',tone:'rule'}}).nodes;
-assert.ok(rule.some(n=>n.role==='metric-rule'));assert.equal(rule.find(n=>n.role==='metric-value').style.align,'left');
+// No hairline before the tile, on any tile. Drawn as a divider between tiles
+// it still sat hard against the value that followed it and read as a left
+// border on that card; the gap between three peers on one baseline is what
+// makes them a row. `rule` is now the tone with no tile: accent value, left.
+assert.equal(rule.filter(n=>n.role==='metric-rule').length,0);
+assert.equal(rule.find(n=>n.role==='metric-value').style.align,'left');
 assert.throws(()=>metric.render({id:'m',frame:{x:0,y:0,width:240,height:120},props:{value:'1',tone:'neon'}}),/metric tone/);
 const strip=composeSlide({title:'T',metrics:[{value:'51',label:'Partners'},{value:'443',label:'Consultants'}],metricsTone:'rule',points:['p','q','r']},0);
 assert.deepEqual(strip.items[0].items.map(i=>i.props.tone),['rule','rule']);
