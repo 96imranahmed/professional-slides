@@ -63,12 +63,16 @@ assert.equal(unit.style.color.tokenId,'color.chartUnit');
 assert.equal(unit.style.bold,false);
 assert.ok(Math.abs(unit.frame.y-heading.frame.y)<2,'one line');
 assert.ok(unit.frame.x>heading.frame.x+heading.data.textLayout.width-2,'the unit follows the measured heading');
-const stacked=title.render({id:'t',frame,props}).nodes.find(n=>n.role==='chart-unit');
-assert.equal(title.render({id:'t',frame,props}).nodes.find(n=>n.role==='section-heading').text,props.heading);
+// The stacked unit line belongs to the heading that carries no rule (the
+// `unit` variant): under a ruled heading a second line pushes the rule down and
+// no two panels in a row share it, so a ruled heading takes the unit inline.
+const unruled={...props,variant:'unit'};
+const stacked=title.render({id:'t',frame,props:unruled}).nodes.find(n=>n.role==='chart-unit');
+assert.equal(title.render({id:'t',frame,props:unruled}).nodes.find(n=>n.role==='section-heading').text,props.heading);
 assert.equal(stacked.style.fontSize.tokenId,'type.compact');
 assert.ok(stacked.frame.y>heading.frame.y+10,'the stacked unit sits under the heading');
 // The inline band is shorter than the stacked one, so peers can share it.
-assert.ok(title.measureContent({frame,props:{...props,unitPlacement:'inline'}}).height<title.measureContent({frame,props}).height);
+assert.ok(title.measureContent({frame,props:{...props,unitPlacement:'inline'}}).height<title.measureContent({frame,props:unruled}).height);
 // A unit that will not fit beside its heading falls back to the compact line.
 const long={heading:'Revenue by business line and geography across the group',unit:'$B, constant currency, excluding disposals',unitPlacement:'inline'};
 const fallback=title.render({id:'t',frame:{x:0,y:0,width:420,height:110},props:long}).nodes.find(n=>n.role==='chart-unit');

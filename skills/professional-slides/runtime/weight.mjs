@@ -20,7 +20,7 @@
  */
 
 export const WEIGHT_KEYS = Object.freeze([
-  "pageWords",     // words of page text (everything, furniture included) a content page must carry
+  "pageWords",     // words in the page BODY - the title band, source and notes do not count
   "columnFill",    // share of its own height the side column must reach
   "plotSpan",      // share of the exhibit frame the marks must span
   "pointWords",    // mean words per point in a side column
@@ -33,8 +33,8 @@ export const WEIGHT_KEYS = Object.freeze([
  * meant to carry one chart and three words, and the deck says so.
  */
 export const WEIGHT_BY_FILL = Object.freeze({
-  full: Object.freeze({ pageWords: 150, columnFill: 0.68, plotSpan: 0.60, pointWords: 10, tableFill: 0.55, elements: 2 }),
-  balanced: Object.freeze({ pageWords: 105, columnFill: 0.55, plotSpan: 0.52, pointWords: 8, tableFill: 0.45, elements: 1 }),
+  full: Object.freeze({ pageWords: 120, columnFill: 0.68, plotSpan: 0.60, pointWords: 10, tableFill: 0.55, elements: 2 }),
+  balanced: Object.freeze({ pageWords: 95, columnFill: 0.55, plotSpan: 0.52, pointWords: 8, tableFill: 0.45, elements: 1 }),
   airy: Object.freeze({ pageWords: 0, columnFill: 0, plotSpan: 0, pointWords: 0, tableFill: 0, elements: 1 }),
 });
 
@@ -74,3 +74,5 @@ export function resolveWeight(spec = {}, fill = "balanced") {
  * floor is not a target, and a page that clears it is not yet a firm page.
  */
 export const REFERENCE_PAGE_WORDS = Object.freeze({ p25: 127, median: 196, p75: 282, pages: 1832 });
+// The same corpus measured slide by slide, split into the page's three bands.
+export const REFERENCE_PAGE_BANDS = Object.freeze({ titleBand: 20, body: 128, footer: 19, pages: 137 });

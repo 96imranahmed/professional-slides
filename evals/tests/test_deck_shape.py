@@ -232,7 +232,7 @@ class WeightContractTests(unittest.TestCase):
     def test_the_floors_follow_the_fill_level(self):
         slides = [page(1, ["chart.bar"], texts=["short"])]
         balanced = page_gates.run_gates(self.scene(slides))
-        self.assertEqual(balanced["weight"]["pageWords"], 105)
+        self.assertEqual(balanced["weight"]["pageWords"], 95)
         airy = page_gates.run_gates(self.scene(slides, fill="airy"))
         self.assertEqual(airy["weight"]["pageWords"], 0)
         self.assertNotIn("THIN_PAGE", codes(airy))
@@ -265,8 +265,9 @@ class WeightContractTests(unittest.TestCase):
         slides = [page(1, ["chart.bar"], texts=["a b c"])]
         report = page_gates.run_gates(deck(slides))
         density = report["density"]
-        self.assertEqual(density["pageWords"]["floor"], 105)
-        self.assertEqual(density["pageWords"]["referenceMedian"], 196)
+        self.assertEqual(density["bodyWords"]["floor"], 95)
+        self.assertEqual(density["bodyWords"]["referenceMedian"], 128)
+        self.assertIn("footerWords", density)
         self.assertIn("columnFill", density)
         self.assertIn("plotSpan", density)
 
@@ -855,6 +856,90 @@ assert.equal(nativeChartSpec('chart.column',{...base,categoryNotes:['n=412']},fr
 assert.ok(nativeChartSpec('chart.column',base,frame));
 // One entry per category, in category order.
 assert.throws(()=>build({...base,categoryNotes:['a','b','c','d']}),/one entry per category/);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+
+class BodyFloorTests(unittest.TestCase):
+    """The floor counts the body. The title band, the source and the notes are
+    not evidence, and a page that clears a page-wide floor on the strength of a
+    third note has padded the band the reference decks keep shortest."""
+
+    def test_the_floor_ignores_the_title_band_and_the_footer(self):
+        body = " ".join(["evidence"] * 96)
+        slide = page(1, ["chart.bar"], texts=[body])
+        self.assertNotIn("THIN_PAGE", codes(page_gates.run_gates(deck([slide]))))
+        # The same page with its body moved into notes is thin, not full.
+        noted = page(1, ["chart.bar"], texts=[" ".join(["evidence"] * 20)])
+        noted["nodes"].append({"type": "text", "role": "source-text", "text": " ".join(["basis"] * 90)})
+        found = codes(page_gates.run_gates(deck([noted])))
+        self.assertIn("THIN_PAGE", found)
+        # And a page whose footer runs past a third of its text is reported.
+        heavy = page(2, ["chart.bar"], texts=[body])
+        heavy["nodes"].append({"type": "text", "role": "footnote-text", "text": " ".join(["basis"] * 60)})
+        self.assertIn("NOTE_HEAVY", codes(page_gates.run_gates(deck([heavy]))))
+
+    def test_the_density_report_carries_both_bands(self):
+        report = page_gates.run_gates(deck([page(1, ["chart.bar"], texts=[" ".join(["evidence"] * 96)])]))
+        density = report["density"]
+        self.assertEqual(density["bodyWords"]["referenceMedian"], 128)
+        self.assertEqual(density["footerWords"]["referenceMedian"], 19)
+
+
+class DerivedColumnTests(unittest.TestCase):
+    """Columns computed from the table's own numbers: the cheapest honest
+    density a page can carry, and where a reference measure table finds its
+    fifth and sixth columns."""
+
+    def test_share_rank_and_change_are_computed_from_the_table(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+const styled=styleTable({type:'table',treatment:'open',derive:['share','rank','change'],
+  deriveFrom:'Jobs, 2019',deriveAgainst:'Jobs, 2014',total:true,
+  columns:[{label:'Subsector',type:'text'},{label:'Jobs, 2014',type:'text',align:'right'},{label:'Jobs, 2019',type:'text',align:'right'}],
+  rows:[['Transit','8600','10200'],['Couriers','1200','1600'],['Rail','1600','1580']]});
+assert.deepEqual(styled.columns.map(c=>c.label),['Subsector','Jobs, 2014','Jobs, 2019','Share','Rank','Change']);
+assert.deepEqual(styled.columns.slice(3).map(c=>c.unit),['% of total','of 3','%']);
+const body=styled.rows.filter(r=>Array.isArray(r));
+// Share of the measure's total, rank on it, and the change against the earlier
+// column - the change reads in green or red, as a signed change always does.
+const cell=(value)=>typeof value==='string'?value:value.text;
+assert.deepEqual(body[0].slice(3).map(cell),['76','1','+19']);
+assert.deepEqual(body[1].slice(3).map(cell),['12','2','+33']);
+assert.deepEqual(body[2].slice(3).map(cell),['12','3','\u22121.3']);
+assert.equal(body[2][5].tone,'negative');
+// Four-figure counts read with a separator, and the total row closes the table.
+assert.equal(body[0][2],'10,200');
+const total=styled.rows.find(r=>!Array.isArray(r)&&r.style==='total');
+assert.equal(total.cells[0],'Total');
+assert.equal(total.cells[2],'13,380');
+assert.equal(total.cells[3],'100');
+assert.equal(total.cells[4],' ');
+// A derived name that is not one of the four, and a table with nothing to
+// derive from, are errors rather than silent omissions.
+assert.throws(()=>styleTable({type:'table',derive:['median'],columns:['A','B'],rows:[['x','1']]}),/Unknown derived column/);
+assert.throws(()=>styleTable({type:'table',derive:['share'],columns:['A','B'],rows:[['x','y']]}),/needs a column of numbers/);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_a_measure_cell_carries_its_qualifier_under_it(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck, component} from './skills/professional-slides/runtime/core.mjs';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const REGISTRY=createRegistry(), frame={x:0,y:0,width:900,height:300};
+const props={treatment:'open',columns:[{label:'Subsector',type:'text'},{label:'Jobs',type:'text',align:'right'}],
+  rows:[['Transit',{text:'10,156',sub:'+18% since 2014',align:'right'}]]};
+const nodes=compileDeck({slides:[{id:'s',frame,composition:component({id:'t',component:'table',frame,props})}]},REGISTRY).slides[0].nodes;
+const value=nodes.find(n=>n.text==='10,156'), sub=nodes.find(n=>n.role==='table-cell-sub');
+assert.ok(sub,'the qualifier prints');
+assert.equal(sub.text,'+18% since 2014');
+assert.equal(sub.style.fontSize.tokenId,'type.label');
+assert.equal(sub.style.color.tokenId,'color.textSecondary');
+assert.ok(sub.frame.y >= value.frame.y + value.frame.height - 0.01,'under the measure, not beside it');
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

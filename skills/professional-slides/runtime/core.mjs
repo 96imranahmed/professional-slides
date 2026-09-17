@@ -138,6 +138,8 @@ export const TOKENS = Object.freeze({
   "style.titleRule": keyword("--style-title-rule", "none"),            // none | rule (hairline under the title) | band (tinted title band)
   "style.tagPlacement": keyword("--style-tag-placement", "top-right"), // top-right | below-title (accent pill) | above-title (accent label)
   "style.chartHeading": keyword("--style-chart-heading", "text"),      // text | band (filled grey band)
+  // A bullet unless the house explicitly sets a dash: the marker is a dot in
+  // the published decks, and a hyphen reads as a sentence fragment.
   "style.listMarker": keyword("--style-list-marker", "dot"),           // dot | dash
   "style.tableRows": keyword("--style-table-rows", "rules"),           // rules | zebra
   "style.labelWeight": keyword("--style-label-weight", "bold"),        // bold | regular (chart value labels)

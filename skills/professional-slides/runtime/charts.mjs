@@ -573,7 +573,12 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const chartProps = { ...props, highlights };
   const showLegend = props.legend !== false && series.length > 1;
   const values = series.flatMap((item) => item.values);
-  const showDataLabels = props.dataLabels === true || stackLabels.totals.size > 0 || stackLabels.secondary.size > 0 || (props.dataLabels !== false && series.length === 1);
+  // Every mark carries its value while the marks are countable: the reference
+  // pages print twelve labels as readily as four, and a labelled mark is a
+  // block of evidence where an axis is a lookup table. `dataLabels: false`
+  // still declines, and a dense chart falls back to the axis.
+  const markCount = series.length * categories.length;
+  const showDataLabels = props.dataLabels === true || stackLabels.totals.size > 0 || stackLabels.secondary.size > 0 || (props.dataLabels !== false && (series.length === 1 || markCount <= 12));
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   const barLabelGap = tokenValue(token("space.3"));
   const barLabelWidth = Math.max(50, ...values.map(value => Math.ceil(measureText(formatValue(value, props), 300, {fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1}).width)));
@@ -1092,7 +1097,7 @@ function lineChart({ id, frame, props, area = false }) {
   const endLabels = props.directLabels === "end" || props.endLabels === true;
   const showLegend = !endLabels && props.legend !== false && series.length > 1;
   const values = series.flatMap((item) => item.values);
-  const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length < 6);
+  const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length <= 8);
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
   const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y", tight: !showValueAxis && props.gridlines !== true });

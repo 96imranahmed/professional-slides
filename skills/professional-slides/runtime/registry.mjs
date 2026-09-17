@@ -385,7 +385,11 @@ function chartTitleLayout(frame, props) {
   // compact size — when the heading wraps or the pair will not fit on the line.
   const inlineGap = tokenValue(token("space.2"));
   const measureUnit = (size) => props.unit ? measureText(props.unit, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(size), wrapWidthRatio: 1 }) : null;
-  const wanted = props.unitPlacement === "inline" && !band && heading.lines.length === 1;
+  // A ruled heading always takes the unit inline: a second line under the
+  // heading pushes the rule down, and then no two panels in a row share a rule.
+  // The stacked unit line belongs to headings that carry no rule.
+  const underlined = resolveChartTitleVariant(props) === "underlined" && !band;
+  const wanted = (props.unitPlacement === "inline" || underlined) && !band && heading.lines.length === 1;
   const inlineHeading = wanted ? measureHeading(`${headingText},`) : null;
   const inlineMeasure = wanted ? measureUnit(token("type.heading")) : null;
   const inline = Boolean(inlineMeasure) && inlineHeading.lines.length === 1 && inlineMeasure.lines.length === 1 && inlineHeading.width + inlineGap + inlineMeasure.width <= frame.width - 2 * padX;
@@ -408,7 +412,7 @@ function chartTitleLayout(frame, props) {
   // unit and the pair would not fit — a heading that wraps, or a unit carrying
   // a qualification that belongs in the note — the band silently becomes two
   // lines, so the fallback is recorded and the page gates report it.
-  const wrapped = !band && props.unitPlacement === "inline" && (heading.lines.length > 1 || (unit && !inline));
+  const wrapped = !band && (props.unitPlacement === "inline" || underlined) && (heading.lines.length > 1 || (unit && !inline));
   return { heading, unit, unitSize, unitGap, inline, inlineGap, unitPlacement: unit ? (inline ? "inline" : "stacked") : "none", wrapped, block, bandHeight, ruleGap, contentHeight: bandHeight, ruled, variant, height, band, padX, padY };
 }
 function chartTitleNodes({ id, frame, props }) {
@@ -526,7 +530,11 @@ function bodyListNodes({ id, frame, props }) {
   // the answer to a column that still ends early is more content or a narrower
   // column, not more air.
   const spare = Math.max(0, frame.height - layout.height);
-  const extraGap = props.distribute === true && layout.measured.length > 1 ? Math.min(spare / (layout.measured.length - 1), 56) : 0;
+  // The spread opens a reading gap, not a chasm: past about a line of text the
+  // points stop reading as one column and start reading as three labels adrift
+  // in it. A column that still ends high wants another point, not more air -
+  // which is what the column and page floors ask for.
+  const extraGap = props.distribute === true && layout.measured.length > 1 ? Math.min(spare / (layout.measured.length - 1), 24) : 0;
   // On a dark or primary panel the list reads in white: white text, white markers,
   // reversed number discs.
   const inverse = props.tone === "inverse";
@@ -860,7 +868,7 @@ function registerCore(registry) {
     }),
     component({
       id: "slide-chrome", category: "shared", role: "slide-chrome",
-      tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.accent", "color.onPrimary", "color.surfaceMuted", "font.display", "font.body", "type.source", "type.actionTitle", "type.actionTitleLong", "layout.titleContentGap", "space.2", "space.4", "radius.small", "radius.none", ...STYLE_TOKENS, ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
+      tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.accent", "color.onPrimary", "color.surfaceMuted", "color.textSecondary", "font.display", "font.body", "type.source", "type.compact", "type.heading", "type.actionTitle", "type.actionTitleLong", "layout.titleContentGap", "space.2", "space.4", "radius.small", "radius.none", ...STYLE_TOKENS, ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
       preferredSize: { width: SLIDE.width, height: SLIDE.height },
       sample: { title: "(Insert action title)", source: "Source: (Insert source)", footerRight: "(Insert company name)", pageNumber: 7 },
       render: ({ id, frame, props }) => {
@@ -888,6 +896,11 @@ function registerCore(registry) {
             data: { textLayout: measured }
           }));
         }
+        // `subtitle`: the standfirst under the action title - what the page
+        // measures, over what population, for what period ("Employment, growth
+        // and specialization by subsector"). The reference title band carries
+        // twenty words against our fourteen, and this line is the difference.
+        const subtitleText = typeof props.subtitle === "string" && props.subtitle.trim() ? props.subtitle.trim() : null;
         const tagPlacement = props.tag ? houseStyle("style.tagPlacement") : "top-right";
         // An above-title tag (a small accent label, as in a country or section spotlight) sits in the title's top margin.
         const titles = titleNodes({ id, frame, props: { text: props.title, lead: props.titleLead, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker || kicker.length ? 58 : CHROME.titleTop }, chrome: true });
@@ -911,6 +924,19 @@ function registerCore(registry) {
           } else {
             titles.push(textPrimitive({ id: stableId(id, "tag"), role: "page-tag", frame: { x: frame.x + frame.width - CHROME.right - Math.ceil(tag.width) - 2, y: frame.y + 22, width: Math.ceil(tag.width) + 2, height: tag.height }, text, style: { ...textStyle(SOURCE, SECONDARY, false, "right", "top"), lineHeight: tag.lineHeight, wrap: false }, data: { textLayout: tag, tag: text } }));
           }
+        }
+        if (subtitleText) {
+          const measured = measureText(subtitleText, page.titleWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 });
+          if (measured.lines.length > 2) throw new Error("A subtitle runs to at most two lines; it names the measure, not the finding");
+          const y = titleBottom + tokenValue(token("space.2"));
+          titles.push(textPrimitive({
+            id: stableId(id, "subtitle"), role: "action-subtitle",
+            frame: { x: frame.x + CHROME.left, y, width: page.titleWidth, height: measured.height },
+            text: measured.text,
+            style: { ...textStyle(BODY, SECONDARY, false, "left", "top"), lineHeight: measured.lineHeight, wrap: false },
+            data: { textLayout: measured }
+          }));
+          titleBottom = y + measured.height;
         }
         // A tinted title band (the house style `band`) runs from the page top to just under the title.
         if (houseStyle("style.titleRule") === "band" && props.titleVariant === undefined) {
@@ -1110,10 +1136,14 @@ function registerCore(registry) {
     } }),
     component({ id: "footnote", category: "shared", role: "footnote", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 600, height: 34 }, sample: { text: "Note: (Insert note)" }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "footnote-text", frame, text: props.text, style: textStyle(SOURCE, SECONDARY, false, "left", "top") })] }) }),
     component({ id: "page-number", category: "shared", role: "page-number", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 48, height: 24 }, sample: { value: 7 }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "page-number", frame, text: String(props.value), style: textStyle(SOURCE, SECONDARY, false, "right") })] }) }),
-    component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "color.ink"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => {
+    component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "type.compact", "color.ink", "color.textSecondary"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => {
       if (typeof props.text !== "string" || !props.text.trim()) throw new Error(`paragraph ${id} requires a non-empty text string; keep geometry in the component frame`);
       const width = paragraphMeasure(frame.width, props);
-      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: "paragraph", frame: { ...frame, width }, text: props.text, ...(props.runs?{runs:props.runs}:{}), style: textStyle(BODY, INK, false, props.align || "left", "top") })] };
+      // `variant: "caption"` is the line under a panel: compact, secondary, the
+      // finding this panel carries. The reference captions every panel in a row
+      // instead of closing the page with one shared so-what.
+      const caption = props.variant === "caption";
+      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: caption ? "panel-caption" : "paragraph", frame: { ...frame, width }, text: props.text, ...(props.runs?{runs:props.runs}:{}), style: textStyle(caption ? COMPACT : BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") })] };
     } }),
     component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.accent", "color.componentPrimary", "color.onPrimary", "space.1", "space.3", "space.4", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "circle" }) }) }),
     component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.3", "space.4", "space.5", "space.6", "line.hairline", "line.standard", "radius.small", "radius.round", "icon.medium"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),

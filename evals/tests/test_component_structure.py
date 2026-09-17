@@ -449,8 +449,9 @@ const chart = REGISTRY.get('chart-title').render({
   frame: {x: 60, y: 188, width: 770, height: 76},
   props: {heading: 'Q2 2026 year-over-year Search growth', unit: '%'}
 }).nodes;
-// The row rule: the compiler hands every panel in a row the tallest header band
-// (here the chart's two-line heading + unit), so the rules share one line.
+// The row rule: the compiler hands every panel in a row the tallest header band,
+// so the rules share one line. A ruled heading carries its unit inline - a
+// second line under the heading would push its rule off the row's.
 const band = REGISTRY.get('chart-title').measureHeader({frame: {x: 60, y: 188, width: 770, height: 76}, props: {heading: 'Q2 2026 year-over-year Search growth', unit: '%'}}).height;
 const rail = REGISTRY.get('content-rail').render({
   id: 'takeaways',
@@ -468,8 +469,9 @@ console.log(JSON.stringify({chart: select(chart), rail: select(rail)}));
         section = result["chart"]
         rail = result["rail"]
         self.assertAlmostEqual(section["heading"]["frame"]["y"], rail["heading"]["frame"]["y"], places=3, msg="both headings sit on the band's top line")
-        self.assertLess(section["heading"]["frame"]["y"], section["unit"]["frame"]["y"], "chart heading sits above its unit line")
-        self.assertLess(section["unit"]["frame"]["y"] + section["unit"]["frame"]["height"], rail["rule"]["frame"]["y"], "the unit line stays above the shared rule")
+        self.assertAlmostEqual(section["heading"]["frame"]["y"], section["unit"]["frame"]["y"], delta=2, msg="a ruled heading carries its unit on the heading's line")
+        self.assertGreater(section["unit"]["frame"]["x"], section["heading"]["frame"]["x"], "the unit follows the heading")
+        self.assertLess(section["unit"]["frame"]["y"] + section["unit"]["frame"]["height"], rail["rule"]["frame"]["y"], "the heading band stays above the shared rule")
         self.assertEqual(section["heading"]["style"]["fontSize"], rail["heading"]["style"]["fontSize"])
         self.assertEqual(section["heading"]["style"]["color"], rail["heading"]["style"]["color"])
         self.assertEqual(section["rule"]["frame"]["y"], rail["rule"]["frame"]["y"])

@@ -9,7 +9,7 @@ export const PALETTES = Object.freeze({
       "color.chartSeries1": "#051C2C", "color.chartSeries2": "#2251FF", "color.chartSeries3": "#00A9F4",
       "color.chartSeries4": "#034B6F", "color.chartSeries5": "#99C4FF", "color.chartSeries6": "#B3D9F5",
       "font.display": "Georgia",
-      "style.titleWeight": "bold", "style.titleRule": "rule", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dash", "style.tableRows": "zebra", "style.labelWeight": "regular"
+      "style.titleWeight": "bold", "style.titleRule": "rule", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "zebra", "style.labelWeight": "regular"
     }
   },
   bcg: {

@@ -552,6 +552,11 @@ function contentLayout(cell, width, props, used) {
   // evidence under it. The reference matrix page sets every cell this way.
   const leadText = cell.type === "bullets" && typeof cell.lead === "string" && cell.lead.trim() ? cell.lead.trim() : null;
   const lead = leadText ? measureRuns(leadText, cell.accent, inner, true, size) : null;
+  // `sub`: the qualifier under a measure, in the small type - "10,156" over
+  // "+18% since 2014". Blocks without another column, which is how a reference
+  // measure column carries two readings in one width.
+  const subText = typeof cell.sub === "string" && cell.sub.trim() ? cell.sub.trim() : null;
+  const sub = subText ? measure(subText, inner - offset, false, "type.label") : null;
   // `accent`: the phrase inside the cell that reads in the house colour.
   // (`highlight: true` is the older flag that marks a whole cell.)
   if (cell.accent !== undefined && cell.accent !== null) {
@@ -563,7 +568,7 @@ function contentLayout(cell, width, props, used) {
   }
   const blockHeight = (blocks.length
     ? sum(blocks.map((b) => b.height)) + (blocks.length - 1) * gap
-    : 0) + (lead ? lead.height + gap : 0);
+    : 0) + (lead ? lead.height + gap : 0) + (sub ? sub.height : 0);
   const numberMarker =
     cell.type === "number" && cell.numberDisplay !== "plain"
       ? Math.max(
@@ -585,6 +590,7 @@ function contentLayout(cell, width, props, used) {
     offset,
     blocks,
     lead,
+    sub,
     bold,
     size,
     marker,
@@ -1327,6 +1333,15 @@ function renderTableAt({ id, frame, props }) {
             );
             y += block.height + m.gap;
           });
+          if (l.sub)
+            putText(
+              stableId(id, "cell-sub", r, c),
+              "table-cell-sub",
+              { x: inner.x + l.offset, y: y - m.gap, width: inner.width - l.offset },
+              l.sub,
+              textStyle(false, t("color.textSecondary"), cell.align ?? "left", l.size === "type.label" ? "type.label" : "type.label"),
+              data,
+            );
         }
       }
       if (cell.sectionNumber !== undefined) {

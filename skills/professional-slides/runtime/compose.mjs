@@ -135,6 +135,19 @@ function tableAlias(ex) {
 }
 
 function exhibitItem(exIn, id, baseDir, size = SIZE) {
+  // `caption`: the finding under this panel. In a two-up or a grid the
+  // reference captions every panel rather than closing with one shared
+  // so-what, because each panel answers its own question.
+  if (exIn && typeof exIn.caption === "string" && exIn.caption.trim()) {
+    const { caption, captionHeight, ...rest } = exIn;
+    const panel = exhibitItem(rest, id, baseDir, { width: { fr: 1 }, height: "fill" });
+    // The caption is the panel's finding, set as a statement box under it - a
+    // bare grey line under a plot reads as a stray label. Peers share one box
+    // height, so the plots above them keep one baseline.
+    return { id: `${id}-captioned`, layout: "flow.column", gap: "space.3", size,
+      items: [panel, { id: `${id}-caption`, component: "insight", props: { text: caption.trim(), variant: "neutral", align: "center" },
+        size: captionHeight ? { width: { fr: 1 }, height: captionHeight } : HUG }] };
+  }
   const ex = tableAlias(exIn);
   const { type, layout: _l, ...rest } = ex;
   if (type === "image") return { id, component: "image-frame", props: { ...imageProps(ex.path ? ex : ex.image, baseDir), ...(ex.fit ? { fit: ex.fit } : {}) }, size };
@@ -255,7 +268,143 @@ function withDefaultScales(ex, rowsIn) {
   return { rows, ...(used || ex.scales ? { scales } : {}) };
 }
 
+/**
+ * Derived columns: `derive: ["rank", "share", "change", "index"]` on a table of
+ * counts adds columns computed from the table's own numbers - never invented.
+ *   rank    the row's position on the named measure, 1 = highest
+ *   share   the row's share of that measure's total, to a whole percent
+ *   change  the change from an earlier numeric column to the measure column
+ *   index   the measure rebased to 100 at the highest row
+ * `deriveFrom` names the measure column (default: the first numeric one), and a
+ * total row is left out of the arithmetic and carries the totals instead.
+ * Ten rows and one derived column is ten more blocks of evidence and a second
+ * reading of the same data, which is how a reference measure table gets to six
+ * columns without a second source.
+ */
+const DERIVATIONS = ["rank", "share", "change", "index"];
+const cellText = (cell) => String((cell && typeof cell === "object" ? cell.text ?? cell.value : cell) ?? "").trim();
+const numberOf = (cell) => {
+  const text = cellText(cell).replace(/[,\s]/g, "").replace(/[$£€]/g, "").replace(/%$/, "");
+  if (!/^-?\d*\.?\d+$/.test(text)) return null;
+  return Number(text);
+};
+function deriveColumns(ex) {
+  const wanted = Array.isArray(ex.derive) ? ex.derive : ex.derive ? [ex.derive] : [];
+  if (!wanted.length) return ex;
+  for (const name of wanted) if (!DERIVATIONS.includes(name)) throw new Error(`Unknown derived column "${name}"; use ${DERIVATIONS.join(", ")}`);
+  const columns = ex.columns.map((column) => (typeof column === "string" ? { label: column } : { ...column }));
+  const rowsIn = ex.rows.map((row) => (Array.isArray(row) ? { cells: row } : { ...row }));
+  const body = rowsIn.filter((row) => row.style !== "total" && row.style !== "group");
+  const indexOfLabel = (label) => columns.findIndex((column) => String(column.label ?? "").trim().toLowerCase() === String(label).trim().toLowerCase());
+  let measure = ex.deriveFrom ? indexOfLabel(ex.deriveFrom) : -1;
+  if (ex.deriveFrom !== undefined && measure < 0) throw new Error(`deriveFrom "${ex.deriveFrom}" is not a column label`);
+  if (measure < 0) measure = columns.findIndex((column, index) => index > 0 && body.every((row) => numberOf(row.cells[index]) !== null));
+  if (measure < 0) throw new Error("A derived column needs a column of numbers to derive from");
+  const values = body.map((row) => numberOf(row.cells[measure]));
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const highest = Math.max(...values);
+  const ordered = [...values].sort((a, b) => b - a);
+  // `change` needs an earlier numeric column to measure against.
+  const priorIndex = wanted.includes("change")
+    ? (ex.deriveAgainst ? indexOfLabel(ex.deriveAgainst) : columns.findIndex((column, index) => index > 0 && index !== measure && body.every((row) => numberOf(row.cells[index]) !== null)))
+    : -1;
+  if (wanted.includes("change") && priorIndex < 0) throw new Error("A change column needs a second column of numbers to measure against");
+  const measureLabel = String(columns[measure].label ?? "").trim();
+  const heads = { rank: "Rank", share: "Share", change: "Change", index: "Index" };
+  const units = { rank: `of ${body.length}`, share: "% of total", change: "%", index: "highest = 100" };
+  const cellFor = (name, at) => {
+    const value = values[at];
+    if (name === "rank") return String(ordered.indexOf(value) + 1);
+    if (name === "share") {
+      if (!total) return "n/a";
+      const share = (value / total) * 100;
+      return share > 0 && share < 0.5 ? "<1" : String(Math.round(share));
+    }
+    if (name === "index") return highest ? String(Math.round((value / highest) * 100)) : "n/a";
+    const prior = numberOf(body[at].cells[priorIndex]);
+    if (!prior) return "n/a";
+    const change = ((value - prior) / Math.abs(prior)) * 100;
+    return `${change >= 0 ? "+" : "−"}${Math.abs(change) < 10 ? Math.abs(change).toFixed(1) : Math.round(Math.abs(change))}`;
+  };
+  // Derived columns are appended, so they can only share the measure's group
+  // band when that group is the last one: a band that reappears after another
+  // is two different things and the table refuses it.
+  const trailingGroup = columns[columns.length - 1].group ?? null;
+  const group = columns[measure].group && columns[measure].group === trailingGroup ? columns[measure].group : null;
+  const derivedColumns = wanted.map((name) => ({
+    label: heads[name], unit: units[name], type: "text", align: "right",
+    ...(group ? { group } : {}), derived: name,
+  }));
+  let at = -1;
+  const rows = rowsIn.map((row) => {
+    const derivable = row.style !== "total" && row.style !== "group";
+    if (derivable) at += 1;
+    const position = at;
+    const cells = [...row.cells, ...wanted.map((name) => (derivable ? cellFor(name, position) : name === "share" ? "100" : " "))];
+    return row.style ? { ...row, cells } : cells;
+  });
+  const { derive: _d, deriveFrom: _f, deriveAgainst: _a, ...rest } = ex;
+  return { ...rest, columns: [...columns, ...derivedColumns], rows, derivedMeasure: measureLabel };
+}
+
+// A column of bare four-figure counts reads with a thousands separator, the way
+// every published table prints it. Only whole numbers, only where the whole
+// column is numeric, so a code or a year is left alone.
+function groupNumericColumns(ex) {
+  const rowsIn = ex.rows.map((row) => (Array.isArray(row) ? { cells: row, plain: true } : { ...row }));
+  const body = rowsIn.filter((row) => row.style !== "group");
+  const count = ex.columns.length;
+  const grouped = new Set();
+  for (let i = 1; i < count; i++) {
+    const values = body.map((row) => numberOf(row.cells[i]));
+    if (values.some((value) => value === null)) continue;
+    if (!values.some((value) => Math.abs(value) >= 1000 && Number.isInteger(value))) continue;
+    if (body.some((row) => /^(19|20)\d{2}$/.test(cellText(row.cells[i])))) continue;  // years
+    grouped.add(i);
+  }
+  if (!grouped.size) return ex;
+  const group = (text) => text.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const rows = rowsIn.map((row) => {
+    const cells = row.cells.map((cell, i) => {
+      if (!grouped.has(i)) return cell;
+      const value = numberOf(cell);
+      if (value === null || Math.abs(value) < 1000) return cell;
+      const text = group(String(value));
+      return cell && typeof cell === "object" ? { ...cell, text } : text;
+    });
+    const { plain, ...rest } = row;
+    return plain ? cells : { ...rest, cells };
+  });
+  return { ...ex, rows };
+}
+
+/**
+ * `total: true` closes a table of counts with the column sums, which is how a
+ * reference measure table ends. Numeric columns sum; a share column sums to 100;
+ * anything the arithmetic cannot reach stays blank rather than guessing.
+ */
+function totalRow(ex) {
+  if (ex.total !== true) return ex;
+  const rows = ex.rows.map((row) => (Array.isArray(row) ? { cells: row, plain: true } : { ...row }));
+  const body = rows.filter((row) => row.style !== "total" && row.style !== "group");
+  if (!body.length) return ex;
+  if (rows.some((row) => row.style === "total")) throw new Error("The table already carries a total row");
+  const label = typeof ex.totalLabel === "string" && ex.totalLabel.trim() ? ex.totalLabel.trim() : "Total";
+  const cells = ex.columns.map((column, index) => {
+    if (index === 0) return label;
+    const derived = typeof column === "object" ? column.derived : null;
+    if (derived === "rank" || derived === "index" || derived === "change") return " ";
+    if (derived === "share") return "100";
+    const values = body.map((row) => numberOf(row.cells[index]));
+    if (values.some((value) => value === null)) return " ";
+    return String(Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10);
+  });
+  const { total: _t, totalLabel: _l, ...rest } = ex;
+  return { ...rest, rows: [...rows.map((row) => (row.plain ? row.cells : row)), { style: "total", cells }] };
+}
+
 export function styleTable(ex) {
+  ex = groupNumericColumns(totalRow(deriveColumns(ex)));
   // An object column (one that names a `group`, a `unit`, an alignment) still
   // gets its width from what it holds, unless it sets one: otherwise adding a
   // unit to a header would silently reweight every column to equal shares and
@@ -738,6 +887,32 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   // columns are the chart's categories.
   // A deck whose weight asks for two elements a page gets the second one offered
   // rather than demanded: a chart of six categories or fewer, with no table, no
+  // A page that names its measure in the standfirst does not name it again over
+  // the plot: with one exhibit, the subtitle is the chart's title, and the
+  // exhibit's own heading band would print it twice. The unit joins the
+  // standfirst when the standfirst does not already carry it. Panels in a row
+  // keep their headings - those name the series, not the measure.
+  if (slide.subtitle && slide.exhibit && !slide.exhibits && slide.exhibit.heading
+      && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi) {
+    const unit = typeof slide.exhibit.unit === "string" ? slide.exhibit.unit.trim() : "";
+    const carries = unit && slide.subtitle.toLowerCase().includes(unit.toLowerCase());
+    const { heading: _h, unit: _u, ...exhibit } = slide.exhibit;
+    slide = { ...slide, subtitle: unit && !carries ? `${slide.subtitle}, ${unit}` : slide.subtitle, exhibit };
+  }
+  // `split: true` on a multi-series chart sets it as small multiples: one panel
+  // per series, each headed by the series name, sharing one value scale and one
+  // category axis. A legend and twelve marks becomes three headings and twelve
+  // labelled marks - the reference's way of showing three cuts of one measure.
+  if (slide.exhibit && slide.exhibit.split === true && !slide.exhibits) {
+    const { split: _s, series, ...rest } = slide.exhibit;
+    if (!Array.isArray(series) || series.length < 2 || series.length > 4) throw new Error("A split chart needs two to four series");
+    // Every panel keeps the unit, so the peers share one value scale and the
+    // comparison holds; the measure itself moves to the page's standfirst.
+    const measure = [rest.heading, rest.unit].filter(Boolean).join(", ");
+    slide = { ...slide, exhibit: undefined,
+      ...(slide.subtitle || !measure ? {} : { subtitle: measure }),
+      exhibits: series.map((entry) => ({ ...rest, heading: entry.name, series: [entry], legend: false })) };
+  }
   // metrics and no second exhibit, tabulates itself underneath. `dataTable:
   // false` declines it. A single labelled series is not offered one - its table
   // would print the same five numbers a second time.
@@ -931,6 +1106,19 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       // open listing rather than mixing a filled tracker with plain rules.
       if (new Set(tables.map(tableSignature)).size > 1) for (const ex of tables) { ex.variant = "plain"; ex.treatment = "open"; }
     }
+    // Captions in a row are measured together and given one height, so the
+    // panels above them keep one baseline.
+    const captioned = exhibits.filter((ex) => typeof ex.caption === "string" && ex.caption.trim());
+    if (captioned.length) {
+      // The captions are the page's commentary. A points column under them
+      // squeezes the page's own conclusion into whatever is left, so a page
+      // captions its panels or carries a list, not both.
+      if (slide.points?.length) throw new Error(`${id}: panel captions are the commentary; drop the page's points or the captions`);
+      const width = Math.max(160, (BODY_WIDTH - COLUMN_GAP * (exhibits.length - 1)) / exhibits.length);
+      const padding = 32;
+      const height = Math.max(...captioned.map((ex) => measureText(ex.caption.trim(), width - padding, { fontFamily: "Arial", fontSize: 14, wrapWidthRatio: 1 }).height)) + padding;
+      for (const ex of captioned) ex.captionHeight = Math.ceil(height);
+    }
     // Peer charts with one unit share one value scale, or the comparison lies.
     const charts = exhibits.filter((ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.series));
     if (charts.length >= 2 && charts.every((ex) => ex.unit === charts[0].unit && ex.yMax === undefined)) {
@@ -1005,7 +1193,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   const noteLine = Array.isArray(slide.note)
     ? (slide.note.length ? `Notes: ${slide.note.map((item, index) => `${index + 1}. ${String(item).trim().replace(/^\d+\.\s*/, "")}`).join("   ")}` : null)
     : prefixed("Note", slide.note);
-  return { id, title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
+  return { id, title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }
 
 /**
@@ -1070,7 +1258,16 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   // The tracker is on by default once a deck has sections: pills above the title
   // unless the deck tracks by repeating its contents page (`agenda`).
   const tabs = spec.sectionTabs ?? (!spec.agenda && spec.slides.filter((s) => s.kind === "section").length >= 2);
-  const pages = agendaPages(tabs ? sectionTabs(spec.slides) : spec.slides, spec.agenda, spec.agendaStyle);
+  // `appendix: [...]`: the source pages behind the story - the model grid, the
+  // full table, the survey instrument - set at `density: "appendix"` behind an
+  // Appendix divider. The corpus keeps its densest pages here, and a page that
+  // belongs in the appendix stops crowding the page that carries the argument.
+  const appendix = Array.isArray(spec.appendix) && spec.appendix.length
+    ? [{ kind: "section", title: "Appendix", summary: "The workings behind the story" },
+       ...spec.appendix.map((page) => ({ density: "appendix", ...page }))]
+    : [];
+  const storySlides = appendix.length ? [...spec.slides, ...appendix] : spec.slides;
+  const pages = agendaPages(tabs ? sectionTabs(storySlides) : storySlides, spec.agenda, spec.agendaStyle);
   const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140)) / 508)) : 1;
   const fill = resolveFill(spec);
   // The weight contract: what a page of this deck is expected to carry. The
@@ -1144,4 +1341,106 @@ export function toDeckPlan(specIn, baseDir) {
   if (isV3(spec)) return composeDeck(spec, baseDir);
   if (spec?.deckPlan) return spec.deckPlan;
   throw new Error("Spec must be professional-slides.deck/v3 or carry a deckPlan");
+}
+
+/**
+ * The page budget, read from the spec before anything is laid out.
+ *
+ * A gate that fires on a rendered page tells the author their page is thin; it
+ * cannot tell them what to do about it, because by then the data is a scene. At
+ * plan time the data is still data, so the budget can name the remedy: this
+ * chart carries five of the nine categories you supplied, this table has no
+ * derived column, this page carries one evidence element where the deck's
+ * weight asks for two.
+ *
+ * Returns findings in the page-gates shape, so preflight prints them beside the
+ * story gates. `THIN_PLAN` is the estimate; `THIN_PAGE` remains the measurement.
+ */
+const PLAN_WORD = (value) => (typeof value === "string" ? value.trim().split(/\s+/).filter(Boolean).length : 0);
+
+function planWords(slide) {
+  let words = 0;
+  const text = (value) => { words += PLAN_WORD(value); };
+  const point = (item) => { if (typeof item === "string") text(item); else if (item && typeof item === "object") { text(item.lead); text(item.text); } };
+  (slide.points || []).forEach(point);
+  (Array.isArray(slide.insights) ? slide.insights : slide.insight ? [slide.insight] : []).forEach((entry) => { if (typeof entry === "string") text(entry); else if (entry) { text(entry.heading); text(entry.text); } });
+  text(slide.soWhat);
+  text(slide.subtitle);
+  if (slide.callout) { text(typeof slide.callout === "string" ? slide.callout : `${slide.callout.lead || ""} ${slide.callout.text || ""}`); }
+  if (slide.kpi) { text(slide.kpi.value); text(slide.kpi.label); text(slide.kpi.sublabel); }
+  (slide.metrics || []).forEach((metric) => { text(metric.value); text(metric.label); text(metric.sublabel); text(metric.delta); });
+  const rowsOf = (rows) => (rows || []).forEach((row) => {
+    if (Array.isArray(row)) { row.forEach((cell) => text(typeof cell === "string" ? cell : cell?.text ?? cell?.value)); return; }
+    text(row.label);
+    text(row.text);
+    (row.points || []).forEach(point);
+    (row.cells || []).forEach((cell) => {
+      if (typeof cell === "string") { text(cell); return; }
+      if (Array.isArray(cell)) { cell.forEach(point); return; }
+      if (!cell) return;
+      text(cell.text); text(cell.lead);
+      (cell.points || cell.items || []).forEach(point);
+    });
+  });
+  rowsOf(slide.rows);
+  (slide.columns || []).forEach((column) => text(typeof column === "string" ? column : column?.label));
+  for (const exhibit of [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean)) {
+    text(exhibit.heading); text(exhibit.panelHeading); text(exhibit.unit);
+    (exhibit.categories || []).forEach(text);
+    (exhibit.categoryNotes || []).forEach(text);
+    (exhibit.series || []).forEach((series) => { text(series.name); words += (series.values || []).length; });
+    (exhibit.columns || []).forEach((column) => { if (typeof column === "string") text(column); else if (column) { text(column.label); text(column.unit); text(column.group); } });
+    rowsOf(exhibit.rows);
+    (exhibit.items || []).forEach((item) => { if (typeof item === "string") text(item); else if (item) { text(item.label); text(item.text); text(item.detail); text(item.title); (item.points || []).forEach(point); } });
+    (exhibit.annotations || []).forEach((annotation) => text(annotation?.text));
+    (exhibit.periods || []).forEach((period) => text(period?.label));
+    (exhibit.events || []).forEach((event) => text(event?.label));
+  }
+  return words;
+}
+
+/** What this page could carry, given the data it already holds. */
+function planRemedies(slide, elements) {
+  const out = [];
+  const exhibits = [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean);
+  const hero = exhibits[0];
+  const points = slide.points || [];
+  if (!slide.subtitle) out.push("name the measure, the population and the period in a `subtitle`");
+  if (hero && String(hero.type || "").startsWith("chart.")) {
+    const categories = (hero.categories || []).length;
+    const series = (hero.series || []).length;
+    if (categories && categories < 8) out.push(`the page holds a dozen categories and the chart shows ${categories}: show the rest, or the second cut of the same measure`);
+    if (series === 1 && hero.dataTable === undefined) out.push("tabulate the series under the chart (`dataTable: true`)");
+    if (!hero.categoryNotes) out.push("name the base under each category (`categoryNotes: [\"n=412\", …]`)");
+    if (!hero.annotations && !hero.periods && !hero.events && hero.change === undefined && !hero.cagr) out.push("annotate the chart: bracket the periods, flag the event, or carry the change");
+  }
+  const tableLike = exhibits.find((exhibit) => exhibit.type === "table" || exhibit.type === "rows");
+  if (tableLike) {
+    const rows = (tableLike.rows || []).length;
+    if (rows && rows < 8) out.push(`the page holds around fourteen rows and the table shows ${rows}: show the rows behind the summary`);
+    if (tableLike.type === "table" && !tableLike.derive) out.push("add a derived column (`derive: [\"share\", \"rank\", \"change\"]`) - the numbers are already in the table");
+  }
+  if (points.length && points.length < 5) out.push(`carry five or six points in the column, not ${points.length}`);
+  if (exhibits.length < elements) out.push(`the deck's weight asks for ${elements} evidence elements and the page carries ${exhibits.length}`);
+  return out;
+}
+
+export function budgetFindings(spec) {
+  if (!isV3(spec) || !Array.isArray(spec.slides)) return [];
+  const weight = resolveWeight(spec, resolveFill(spec));
+  const floor = weight.pageWords || 0;
+  if (floor <= 0) return [];
+  const out = [];
+  spec.slides.forEach((slide, index) => {
+    if (slide.kind && slide.kind !== "content") return;                 // covers, dividers, statements, takeaways
+    if (!slide.title) return;
+    const estimate = planWords(slide);
+    if (estimate >= floor) return;
+    const remedies = planRemedies(slide, weight.elements || 1);
+    out.push({
+      slide: index + 1, code: "THIN_PLAN", measured: estimate, threshold: floor,
+      repair: `This page plans to carry about ${estimate} words of body text against a floor of ${floor}. From this page's own data: ${remedies.slice(0, 3).join("; ") || "deepen the evidence"}.`,
+    });
+  });
+  return out;
 }

@@ -55,9 +55,14 @@ import assert from 'node:assert/strict';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const title=REGISTRY.get('chart-title'),frame={x:60,y:180,width:500,height:90};
 const plain=title.render({id:'title',frame,props:{heading:'Current mix'}}).nodes;
-const unit=title.render({id:'title',frame,props:{heading:'Current mix',unit:'Revenue share, %'}}).nodes;
+// A ruled heading carries its unit inline; the stacked line is the unruled
+// `unit` variant, where no rule can be pushed out of a row.
+const unit=title.render({id:'title',frame,props:{heading:'Current mix',unit:'Revenue share, %',variant:'unit'}}).nodes;
+const ruled=title.render({id:'title',frame,props:{heading:'Current mix',unit:'Revenue share, %'}}).nodes;
+assert.equal(ruled.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
+assert.equal(ruled.find(n=>n.role==='section-heading').text,'Current mix,');
 assert.equal(plain.filter(n=>n.role==='section-heading-rule').length,1);
-assert.equal(unit.filter(n=>n.role==='section-heading-rule').length,1);
+assert.equal(ruled.filter(n=>n.role==='section-heading-rule').length,1);
 assert.equal(unit.find(n=>n.role==='chart-unit').style.color.tokenId,'color.chartUnit');
 assert.equal(unit.find(n=>n.role==='chart-unit').style.bold,false);
 // The unit is the second line of the heading, in grey compact type, inside the band.
@@ -66,8 +71,11 @@ assert.equal(unit.find(n=>n.role==='section-heading').text,'Current mix');
 assert.equal(unit.find(n=>n.role==='chart-unit').text,'Revenue share, %');
 assert.equal(unit.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'stacked');
 assert.equal(unit.find(n=>n.role==='chart-unit').frame.x,unit.find(n=>n.role==='section-heading').frame.x);
-assert.ok(unit.find(n=>n.role==='chart-unit').frame.y+unit.find(n=>n.role==='chart-unit').frame.height<unit.find(n=>n.role==='section-heading-rule').frame.y,'unit sits above the rule');
-assert.deepEqual(plain[0].style,unit[0].style);
+// The unruled variant has no rule to sit above; the ruled one keeps its unit on
+// the heading's line, so the rule follows the single band.
+assert.equal(unit.filter(n=>n.role==='section-heading-rule').length,0);
+assert.ok(ruled.find(n=>n.role==='chart-unit').frame.y+ruled.find(n=>n.role==='chart-unit').frame.height<=ruled.find(n=>n.role==='section-heading-rule').frame.y,'the band sits above the rule');
+assert.deepEqual(plain[0].style,ruled[0].style);
 assert.throws(()=>title.render({id:'title',frame,props:{heading:'Mix',variant:'unit'}}),/unit/);
 const borderless=title.render({id:'title',frame,props:{heading:'Current mix',unit:'%',variant:'unit'}}).nodes;
 assert.equal(borderless.filter(n=>n.role==='section-heading-rule').length,0);

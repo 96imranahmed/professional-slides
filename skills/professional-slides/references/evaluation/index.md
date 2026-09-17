@@ -25,12 +25,15 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | One number over a table | `METRIC_STACK` | a lone tile belongs beside its evidence |
 | Sections and tracker | `NO_SECTIONS` | required past twelve analytical pages |
 | Label punctuation | `DOT_SEPARATOR` | no bullet or middle dot joining two labels |
-| Page text floor | `THIN_PAGE` | the deck's `weight.pageWords` (105 balanced, 150 full); reference client slides run a median of 185, lower quintile 104 |
+| Body text floor | `THIN_PAGE` | the deck's `weight.pageWords`, counted in the body alone (95 balanced, 120 full); reference client slides carry 128 body words |
+| Notes carrying the page | `NOTE_HEAVY` | the footer stays under a third of the page's text |
+| Plan-time shortfall | `THIN_PLAN` | preflight: what the page will carry against the floor, with the remedy its own data offers |
+| Chart annotation | `UNANNOTATED` | a bracket, a flag, a change bubble, a base or an observation on any plot of three marks or more |
 | Deck shape | `DECK_FLAT` | past eight analytical pages, one page carries the detail: 282+ words, or a p80 a third above the median |
 | Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |
 | Marks in the exhibit | `PLOT_SPAN` | marks span `weight.plotSpan` of the exhibit frame (annotated and peer-aligned charts exempt) |
 | Table against its budget | `THIN_TABLE` | uses `weight.tableFill` of the page's row budget |
-| Values printed | `NUMBERS_ON_MARKS` | at least three numeric data labels on an exhibit page |
+| Values printed | `NUMBERS_ON_MARKS` | every mark while a chart has twelve or fewer, three otherwise |
 | Evidence elements | `THIN_EVIDENCE` | `weight.elements` (2 on a document-weight deck) |
 | Axis ticks | `NICE_TICKS` | nice numbers |
 | Coverage | `MISSING_EVIDENCE` | every ranked criterion has a comparative exhibit across all options |

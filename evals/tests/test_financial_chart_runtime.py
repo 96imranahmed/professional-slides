@@ -165,11 +165,15 @@ const waterfall=REGISTRY.get('chart.waterfall');
 const change=waterfall.render({id:'waterfall',frame,props:{...waterfall.sample,...waterfall.examples['end-to-end-construction'].props}}).nodes;
 assert.ok(change.filter(n=>n.role==='data-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 assert.ok(change.filter(n=>n.role==='annotation-text').every(n=>n.style.fontSize.tokenId==='type.chartAnnotation'));
-const title=REGISTRY.get('chart-title').render({id:'title',frame:{x:60,y:60,width:800,height:90},props:{heading:'Performance',unit:'USD millions, 2026'}}).nodes;
+// The stacked unit line is the unruled `unit` variant; a ruled heading takes
+// the unit inline so its rule stays on the row's line.
+const title=REGISTRY.get('chart-title').render({id:'title',frame:{x:60,y:60,width:800,height:90},props:{heading:'Performance',unit:'USD millions, 2026',variant:'unit'}}).nodes;
 assert.equal(title.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.compact');
 assert.equal(title.find(n=>n.role==='chart-unit').style.color.tokenId,'color.chartUnit');
 assert.equal(title.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'stacked');
-assert.equal(title.filter(n=>n.role==='section-heading-rule').length,1);
+const ruledTitle=REGISTRY.get('chart-title').render({id:'title',frame:{x:60,y:60,width:800,height:90},props:{heading:'Performance',unit:'USD millions, 2026'}}).nodes;
+assert.equal(ruledTitle.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
+assert.equal(ruledTitle.filter(n=>n.role==='section-heading-rule').length,1);
 const cover=REGISTRY.get('cover').render({id:'cover',frame:{x:0,y:0,width:1280,height:720},props:{title:'Strategy',subtitle:'Priorities for the planning cycle'}}).nodes;
 assert.equal(cover.find(n=>n.role==='cover-subtitle').style.fontSize.tokenId,'type.heading');
 console.log(JSON.stringify({accepted:true}));

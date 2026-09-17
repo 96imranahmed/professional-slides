@@ -511,7 +511,12 @@ class Emitter:
             values = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
             fractional = [v for v in values if abs(v - round(v)) > 1e-9]
             decimals = 1 if fractional and max(abs(v) for v in fractional) < 10 else 0
-        number_format = "0" if decimals == 0 else "0." + "0" * decimals
+        # Four figures and up read with a thousands separator, the way the drawn
+        # charts write them and every published page prints them.
+        values_all = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
+        grouped = any(abs(v) >= 1000 for v in values_all)
+        base = "#,##0" if grouped else "0"
+        number_format = base if decimals == 0 else base + "." + "0" * decimals
         if kind not in ("pie", "donut", "scatter"):
             # Bar weight follows the category count, as in the drawn charts:
             # few categories take fat bars, many take thinner ones.

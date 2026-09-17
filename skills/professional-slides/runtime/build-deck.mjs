@@ -11,7 +11,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { planDeck } from "./planner.mjs";
-import { toDeckPlan, coverageFindings } from "./compose.mjs";
+import { toDeckPlan, coverageFindings, budgetFindings } from "./compose.mjs";
 import { metricsBackend } from "./font-metrics.mjs";
 import { runProcess, lastJson } from "./process.mjs";
 
@@ -41,6 +41,11 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   result.preflight = { ...(await readJson(preflightReport)), report: preflightReport, passed: pre.code === 0 };
   const coverage = coverageFindings(spec);
   if (coverage.length) { result.preflight.findings = [...(result.preflight.findings || []), ...coverage]; result.preflight.passed = false; result.preflight.accepted = false; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), MISSING_EVIDENCE: coverage.length }; }
+  // The page budget: what each page plans to carry, and the remedy that page's
+  // own data offers. Advisory - it reads the spec, not the rendered page - so it
+  // reports without failing the preflight.
+  const budget = budgetFindings(spec);
+  if (budget.length) { result.preflight.findings = [...(result.preflight.findings || []), ...budget]; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), THIN_PLAN: budget.length }; }
   await fs.writeFile(preflightReport, JSON.stringify(result.preflight, null, 2) + "\n");
   if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory); }
 
@@ -71,6 +76,22 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     result.gates = { ...(await readJson(gateReport)), report: gateReport, passed: gated.code === 0 };
     result.timings.gatesMs = Date.now() - t4;
   }
+  // The deck's budget, in one block: what its pages carry against what the
+  // reference corpus carries, so a regression is a number in the build output
+  // rather than a screenshot somebody notices later.
+  const density = result.gates?.density;
+  if (density) {
+    result.budget = {
+      bodyWords: density.bodyWords?.median ?? null,
+      bodyFloor: density.bodyWords?.floor ?? null,
+      referenceBodyWords: density.bodyWords?.referenceMedian ?? null,
+      footerWords: density.footerWords?.median ?? null,
+      referenceFooterWords: density.footerWords?.referenceMedian ?? null,
+      columnFill: density.columnFill?.median ?? null,
+      plotSpan: density.plotSpan?.median ?? null,
+      plannedShortfalls: (result.preflight?.countsByCode || {}).THIN_PLAN || 0,
+    };
+  }
   const readbackOk = result.readback?.accepted === true;
   result.status = result.preflight.passed && readbackOk && (result.gates?.passed ?? true) ? "built" : "built-with-findings";
   return finish(result, directory);
@@ -91,7 +112,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const pythonIndex = args.indexOf("--python");
     if (pythonIndex >= 0 && (!args[pythonIndex + 1] || args[pythonIndex + 1].startsWith("--"))) throw new Error("--python requires an executable");
     const result = await buildDeck(path.resolve(args[0]), path.resolve(args[1]), { preflight: args.includes("--preflight"), render: !args.includes("--no-render"), python: pythonIndex < 0 ? undefined : args[pythonIndex + 1] });
-    console.log(JSON.stringify({ status: result.status, pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, readback: result.readback?.accepted, timings: result.timings }));
+    console.log(JSON.stringify({ status: result.status, pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, timings: result.timings }));
     process.exit(result.status === "built" || result.status === "preflight-passed" ? 0 : 2);
   } catch (error) {
     console.error(error.stack || error.message);

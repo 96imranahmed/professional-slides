@@ -104,6 +104,19 @@
      460,
      490,
      400
+    ],
+    "categoryNotes": [
+     "NYC or SF",
+     "NYC or SF",
+     "SF only",
+     "SF only"
+    ],
+    "annotations": [
+     {
+      "category": "Anthropic Labs",
+      "text": "The only NYC role inside model work",
+      "treatment": "callout"
+     }
     ]
    },
    "points": [
@@ -118,6 +131,10 @@
     {
      "text": "Pay bands overlap; the role, not the salary, separates the offers",
      "highlight": "the role, not the salary"
+    },
+    {
+     "text": "Anthropic Labs pays the widest band, $385-460k, and is the only NYC role inside model work",
+     "highlight": "$385-460k"
     }
    ],
    "soWhat": "In interviews, establish which decisions you own and which researchers you sit with; a lab name alone proves nothing.",
@@ -126,7 +143,9 @@
     "role"
    ],
    "tag": "Illustrative",
-   "note": "Published base-salary bands; total compensation is not disclosed"
+   "note": "Published base-salary bands; total compensation is not disclosed",
+   "subtitle": "Published base-salary bands for product roles at both labs, $k, September 2026",
+   "density": "pre-read"
   },
   {
    "title": "NYC schools beat their peers by 7–12 points; the SF pair is a preference",
@@ -191,6 +210,14 @@
    "source": "NYC Public Schools 2024-25 School Quality Snapshots; California School Dashboard 2025. Scales are not comparable across states.",
    "serves": [
     "education"
+   ],
+   "note": [
+    "New York and California scales are set separately and are not comparable"
+   ],
+   "points": [
+    "Both NYC schools clear their peer group by 7 to 12 points",
+    "Alvarado's Spanish immersion is why its English score reads low",
+    "The two state scales are set separately and are not comparable"
    ]
   },
   {
@@ -218,18 +245,32 @@
     ],
     "valueFormat": {
      "decimals": 0
-    }
+    },
+    "categoryNotes": [
+     "pop 60k",
+     "pop 809k",
+     "pop 121k",
+     "pop 8.3m"
+    ]
    },
    "points": [
     "Noe Valley and Inner Sunset rank among SF's lower-rate neighborhoods",
     "Felony-assault counts rose in the two NYC precincts examined; get the rates before signing a lease",
-    "Berkeley pedestrian robberies fell from 205 to 106 in 2024"
+    "Berkeley pedestrian robberies fell from 205 to 106 in 2024",
+    "Hoboken's rate is a quarter of New York City's and a third of Berkeley's",
+    "Rates are citywide: the precinct and the block decide what you actually walk",
+    "Berkeley's rate sits between the two cities, and its trend is improving"
    ],
    "soWhat": "Safety is your #2 priority and the evidence is citywide: walk the actual streets in daylight and at night before choosing a block.",
    "source": "HomeSnacks compilation of FBI 2024 data; NYPD precinct reports; SFPD neighborhood rankings; Berkeley PD 2024",
    "serves": [
     "safety",
     "walkability"
+   ],
+   "subtitle": "Violent crime per 100,000 residents on the matched FBI measure, 2024",
+   "density": "pre-read",
+   "note": [
+    "Rates are citywide on the FBI matched measure, 2024"
    ]
   },
   {
@@ -292,12 +333,27 @@
       "value": 45,
       "label": "45-minute limit"
      }
+    ],
+    "categoryNotes": [
+     "2/3 express",
+     "1/2/3 local",
+     "J Church",
+     "PATH",
+     "BART"
     ]
    },
    "soWhat": "Ride time is not the constraint; waiting and walking are. Berkeley's 15-minute wait already halves the published 30-minute headway.",
    "source": "Rome2Rio station-to-station estimates; walk and wait times are assumptions, not measured routes",
    "serves": [
     "commute"
+   ],
+   "subtitle": "Door-to-door journey to a central office, minutes, weekday morning peak",
+   "points": [
+    "Ride time is the smallest segment in every journey except Berkeley",
+    "Waiting and walking add 18 to 30 minutes and decide which locations qualify",
+    "Berkeley's 15-minute headway halves the published service and fails the gate by ten minutes",
+    "Park Slope clears the limit with 17 minutes of slack, the most of any location",
+    "Hoboken clears it by four minutes, which a single service change would erase"
    ]
   },
   {
@@ -322,6 +378,11 @@
         78
        ]
       }
+     ],
+     "categoryNotes": [
+      "Hoboken",
+      "Park Slope",
+      "Noe Valley"
      ]
     },
     {
@@ -382,8 +443,13 @@
     "housing"
    ],
    "note": [
-    "Gross salary is published base pay; total compensation is not disclosed",
-    "State and city income tax is not modelled: New York City, New Jersey and California differ by several points of gross"
+    "Gross salary is published base pay; total compensation is not disclosed"
+   ],
+   "subtitle": "Annual rent and its share of gross salary at three monthly budgets",
+   "points": [
+    "A $1,500 monthly premium is $18,000 a year before tax",
+    "Rent moves five points of gross pay across the shortlist, not twenty",
+    "State and city income tax between NY, NJ and CA moves more than the rent does"
    ]
   },
   {
@@ -413,10 +479,6 @@
         67
        ]
       }
-     ],
-     "categoryNotes": [
-      "n=61 tested",
-      "n=59 tested"
      ]
     },
     {
@@ -464,6 +526,15 @@
     "education",
     "housing",
     "safety"
+   ],
+   "points": [
+    "Connors trails its district by 2 points in both subjects",
+    "Hoboken saves roughly $12,000 a year against Park Slope",
+    "It qualifies only if the office is reachable by PATH"
+   ],
+   "note": [
+    "Tested cohorts: 61 pupils in English and 59 in Math",
+    "Asks are current listings, not signed leases"
    ]
   },
   {

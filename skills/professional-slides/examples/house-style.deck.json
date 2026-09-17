@@ -2,6 +2,9 @@
  "schema": "professional-slides.deck/v3",
  "id": "house-style",
  "palette": "bcg",
+ "weight": {
+  "pageWords": 70
+ },
  "footer": "Investor pulse, Q4",
  "agenda": "once",
  "cover": {
@@ -68,7 +71,16 @@
    "note": [
     "n=412 institutional investors; respondents ranked their top three factors",
     "Change is against the June wave of the same panel"
-   ]
+   ],
+   "subtitle": "Investors ranking each factor in their top three, %, October wave against June",
+   "points": [
+    "Rates lead for the sixth survey running, on 77% of top-three rankings",
+    "Geopolitics rose 14 points, the largest move in the series",
+    "Wage and cost inflation fell 11 points as the labour market cooled",
+    "Liquidity and private credit remain bottom of the list",
+    "Asset valuations and public debt sit mid-table and moved little"
+   ],
+   "density": "pre-read"
   },
   {
    "title": "Most workers feel burned out, and 43% are at risk of quitting",
@@ -149,7 +161,13 @@
    "callout": {
     "lead": "How to read",
     "text": "Agreement is the top two boxes; the strongly-agree share is the group that leaves first, and it is the one retention work has to reach."
-   }
+   },
+   "subtitle": "Agreement with each statement, % of workers surveyed, 2025",
+   "note": [
+    "Agreement is the top two boxes of a five-point scale",
+    "Base: 2,140 workers across eleven markets, September 2025"
+   ],
+   "density": "pre-read"
   },
   {
    "title": "Investors want companies to keep investing while delivering on guidance",
@@ -174,7 +192,13 @@
     "tone": "outline",
     "text": "While investors have consistently supported investing in the business at the expense of EPS, they now also expect companies to fully deliver on guidance and consensus."
    },
-   "source": "Investor pulse, October 10–13, 2026"
+   "source": "Investor pulse, October 10–13, 2026",
+   "subtitle": "Investor preference between investing in the business and delivering EPS, 2025",
+   "points": [
+    "Investors back investment over EPS by a wide margin",
+    "They now expect guidance to be met as well",
+    "The two expectations are held at once, which is new"
+   ]
   },
   {
    "title": "Despite record investment, the rate of start-up creation slowed in 2025",
@@ -214,7 +238,8 @@
      "",
      "",
      "part year"
-    ]
+    ],
+    "dataTable": true
    },
    "kpi": {
     "value": "80%",
@@ -232,6 +257,10 @@
     {
      "lead": "Investor trends",
      "text": "Investors prefer to fund scale-ups and later-stage rounds"
+    },
+    {
+     "lead": "Capital concentration",
+     "text": "Later-stage rounds absorb the capital that used to seed new companies"
     }
    ],
    "pointsHeading": "Potential hypotheses on the slowdown",
@@ -239,7 +268,8 @@
    "note": [
     "Founding year is the year of incorporation, not of first funding",
     "2025 is a part year to 30 September and is not annualised"
-   ]
+   ],
+   "subtitle": "Start-ups founded per year and why the rate has slowed, 2019 to 2025"
   },
   {
    "title": "The year featured comparatively big deals, with four new entrants in the top ten",
@@ -329,14 +359,19 @@
       "149",
       "2025"
      ]
-    ]
+    ],
+    "derive": [
+     "rank"
+    ],
+    "deriveFrom": "Deal size"
    },
    "note": [
     "Disclosed primary rounds only; secondary transactions and debt facilities are excluded",
     "New entrants are companies that did not appear in the 2023 top ten"
    ],
    "source": "Crunchbase; PitchBook",
-   "soWhat": "Hardware manufacturing takes six of the ten largest rounds, so the capital is still buying machines rather than applications."
+   "soWhat": "Hardware manufacturing takes six of the ten largest rounds, so the capital is still buying machines rather than applications.",
+   "subtitle": "The ten largest disclosed rounds, by company, segment and year"
   },
   {
    "title": "E-commerce needs to accelerate to reach the 2028 ambition",
@@ -364,7 +399,8 @@
        ]
       }
      ],
-     "change": "steps"
+     "change": "steps",
+     "dataTable": true
     },
     {
      "type": "chart.column",
@@ -422,7 +458,8 @@
    "callout": {
     "lead": "Reading the steps",
     "text": "The brackets are year-on-year growth; the step after 2027 is the one the plan has not yet earned."
-   }
+   },
+   "subtitle": "Revenue by segment against the 2028 ambition, $B"
   }
  ]
 }
