@@ -933,6 +933,28 @@
       "soWhat": "Move the 40 accounts sitting at 10 seats onto Growth; each one is a price cut that pays for itself in expansion."
     },
     {
+      "title": "The harbour site clears on access; the terrace site clears on cost",
+      "subtitle": "Two shortlisted sites for the 2027 distribution centre",
+      "pictures": [
+        {
+          "path": "assets/harbour.jpg",
+          "alt": "The harbour site",
+          "credit": "Synthetic render, professional-slides examples",
+          "label": "Harbour site",
+          "text": "Deep-water berth and two-lane road access on both approaches, at £4.2m more to acquire and a 14-month planning path."
+        },
+        {
+          "path": "assets/terraces.jpg",
+          "alt": "The terrace site",
+          "credit": "Synthetic render, professional-slides examples",
+          "label": "Terrace site",
+          "text": "Consented already and £4.2m cheaper, on one single-lane approach that caps inbound movements at 40 loads a day."
+        }
+      ],
+      "soWhat": "Above 40 loads a day the harbour site is the only one that works; below it the terrace site is £4.2m of capital the programme keeps.",
+      "source": "Site appraisal, August 2026"
+    },
+    {
       "kind": "section",
       "title": "More evidence pages",
       "summary": "Composition, trajectory, bridge, KPIs and a map"
@@ -1424,6 +1446,35 @@
         "Nothing sits in the low-impact half"
       ],
       "source": "Workshop scoring, September 2026"
+    },
+    {
+      "title": "Each shortlisted site is one constraint away from working",
+      "subtitle": "Binding constraint per site, and what clears it",
+      "pictures": [
+        {
+          "path": "assets/harbour.jpg",
+          "alt": "The harbour site",
+          "credit": "Synthetic render, professional-slides examples",
+          "label": "Harbour",
+          "text": "Access is solved; acquisition binds, at £4.2m over the envelope."
+        },
+        {
+          "path": "assets/terraces.jpg",
+          "alt": "The terrace site",
+          "credit": "Synthetic render, professional-slides examples",
+          "label": "Terrace",
+          "text": "Cost is solved; a single-lane approach binds at 40 loads a day."
+        },
+        {
+          "path": "assets/hills.jpg",
+          "alt": "The ridge site",
+          "credit": "Synthetic render, professional-slides examples",
+          "label": "Ridge",
+          "text": "Both are solved; the grid connection is quoted at 29 months."
+        }
+      ],
+      "soWhat": "Each constraint is cleared before the lease is signed or it is not cleared at all, which puts all three decisions in the next quarter.",
+      "source": "Site appraisal, August 2026"
     },
     {
       "kind": "section",

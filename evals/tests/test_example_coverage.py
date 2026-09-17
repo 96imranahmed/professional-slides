@@ -189,6 +189,12 @@ console.log(JSON.stringify({styles:[...POINT_STYLE_NAMES]}));
     def test_the_speech_callout_is_drawn(self):
         self.assertOnSomePage('"treatment": "speech"', "a speech-bubble chart annotation")
 
+    def test_the_picture_led_pages_are_drawn(self):
+        # The plan gate can tell a page to depict the things it names; these are
+        # where it sends one. A shape that only exists in a unit test is a shape
+        # no gate has seen emitted, rendered, read back and measured.
+        self.assertOnSomePage('"pictures"', "a picture-led page")
+
     def test_the_halved_table_is_drawn(self):
         # The composer reaches this one by rotation, which no single deck can
         # guarantee, so a page asks for it by name.
