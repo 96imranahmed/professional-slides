@@ -242,51 +242,114 @@ class KnownBadDeckTests(unittest.TestCase):
         self.assertIn("DOT_SEPARATOR", [f["code"] for f in cover_findings])
 
 
-class InkDefersToWordsTests(unittest.TestCase):
-    """A text page is measured by its words, not by how much ink type puts down.
+class TextPageInkFloorTests(unittest.TestCase):
+    """A page of type is held to the ink its own words produce.
 
-    INK_COVERAGE's 0.115 floor is calibrated on pages with a chart on them. An
-    executive summary carrying five findings, four metrics and a takeaway
-    measures about 0.096 - it is a full page of argument that happens to be set
-    in type - and the gate reported it as "mostly empty" with a repair ("give
-    the hero exhibit the leftover height") for an exhibit the page does not
-    have. The page is already measured by THIN_PAGE, which counts what it
-    carries, so ink defers there when there is no exhibit. A genuinely empty
-    text page still fails, at the word floor.
+    `ink_min` is calibrated on pages with an exhibit: the careful sample's ink
+    first quartile is 0.121 over 137 analytical slides, and the balanced floor
+    of 0.115 sits just under it. A page of body type cannot reach that at any
+    honest length. Rendering text pages from 93 to 185 words gives a straight
+    line at 0.00052 ink per word, so 0.115 needs about 220 words of body against
+    a reference body of 128 - the floor was not a high bar for those pages, it
+    was an impossible one, and an executive summary of five findings, four
+    metrics and a takeaway measured 0.096 and was reported as "mostly empty".
+
+    The floor for those pages is now the ink their own `pageWords` produces, so
+    the two gates agree by construction and a genuinely thin text page still
+    fails both.
+    """
+
+    def test_the_floor_follows_the_deck_word_floor(self):
+        page_gates.configure("balanced")
+        floor = page_gates.text_page_ink_floor()
+        words = page_gates.WEIGHT["pageWords"]
+        self.assertAlmostEqual(floor, 0.00052 * 0.9 * words, places=6)
+        # Well under the exhibit floor, and reachable by a page at its word floor:
+        # 95 words measured 0.0556 against this.
+        self.assertLess(floor, page_gates.THRESHOLDS["ink_min"])
+        self.assertLess(floor, 0.0556)
+
+    def test_a_denser_deck_asks_a_text_page_for_more_ink(self):
+        page_gates.configure("full")
+        full = page_gates.text_page_ink_floor()
+        page_gates.configure("balanced")
+        balanced = page_gates.text_page_ink_floor()
+        self.assertGreater(full, balanced)
+
+    def test_a_text_page_at_its_word_floor_passes_and_a_thin_one_fails(self):
+        page_gates.configure("balanced")
+        floor = page_gates.text_page_ink_floor()
+        canvas = float(page_gates.CANVAS_W * page_gates.CANVAS_H)
+
+        def rows_for(fraction):
+            rows = [0] * page_gates.CANVAS_H
+            per = int(fraction * canvas) // page_gates.FOOTER_TOP
+            for y in range(page_gates.FOOTER_TOP):
+                rows[y] = per
+            return rows
+
+        # 0.0556 is what a rendered 95-word text page actually measured.
+        findings = []
+        page_gates.gate_ink_and_dead_band(2, rows_for(0.0556), findings, text_page=True)
+        self.assertNotIn("INK_COVERAGE", [f["code"] for f in findings])
+        # A third of the word floor is a page that asserts and does not show.
+        findings = []
+        page_gates.gate_ink_and_dead_band(2, rows_for(0.018), findings, text_page=True)
+        ink = [f for f in findings if f["code"] == "INK_COVERAGE"]
+        self.assertEqual(len(ink), 1)
+        self.assertAlmostEqual(ink[0]["threshold"], round(floor, 4), places=4)
+        self.assertIn("word floor", ink[0]["repair"])
+
+    def test_a_page_with_an_exhibit_keeps_the_exhibit_floor(self):
+        # The deferral is only for pages with no exhibit. A chart page that
+        # renders nearly blank is still a chart page that renders nearly blank.
+        page_gates.configure("balanced")
+        findings = []
+        page_gates.gate_ink_and_dead_band(
+            2, page_gates.load_ink_rows(RENDER / "slide-2.png"), findings)
+        ink = [f for f in findings if f["code"] == "INK_COVERAGE"]
+        self.assertEqual(len(ink), 1)
+        self.assertEqual(ink[0]["threshold"], page_gates.THRESHOLDS["ink_min"])
+
+
+class ShapeConstraintTests(unittest.TestCase):
+    """PAGE_SHAPE_FLAT says which of the two causes it found.
+
+    A deck can be flat because its pages name an explicit `layout`, which is
+    fixable by deleting a line, or because its pages carry one exhibit and no
+    commentary, which leaves the composer one viable shape and is not a layout
+    problem at all. Told the wrong one, an author goes looking for a shape that
+    does not exist - the Marvel rebuild ran 23 of 31 pages that way.
     """
 
     def setUp(self):
         self.scene = load_scene()
 
-    def text_page(self, words):
-        """A page with no exhibit carrying `words` words of body text."""
-        slide = copy.deepcopy(self.scene["slides"][1])
-        slide["componentInstances"] = [c for c in slide.get("componentInstances", [])
-                                       if not page_gates.is_exhibit(c)]
-        return slide, words
+    def test_a_closing_line_under_the_exhibit_is_not_commentary(self):
+        # Every shape has room for a full-width band at the foot, so a page
+        # with one exhibit and a so-what still has one shape to take.
+        exhibit = {"component": "chart.bar", "frame": {"x": 60, "y": 160, "width": 1160, "height": 380}}
+        under = {"component": "insight", "frame": {"x": 60, "y": 560, "width": 1160, "height": 60}}
+        beside = {"component": "bullet-list", "frame": {"x": 820, "y": 180, "width": 400, "height": 300}}
+        self.assertTrue(page_gates.shape_constrained({"componentInstances": [exhibit, under]}))
+        self.assertFalse(page_gates.shape_constrained({"componentInstances": [exhibit, beside]}))
 
-    def test_a_text_page_over_the_word_floor_is_not_reported_as_empty(self):
-        slide, _ = self.text_page(0)
-        self.assertFalse(any(page_gates.is_exhibit(c) for c in slide.get("componentInstances", [])),
-                         "the fixture page still carries an exhibit")
-        # The deferral is exactly "what would THIN_PAGE say": over the floor, ink
-        # keeps quiet; under it, THIN_PAGE speaks instead.
-        thin = page_gates.gate_findings(page_gates.gate_thin_page, 2, slide)
-        self.assertEqual([f["code"] for f in thin], ["THIN_PAGE"] if thin else [])
+    def test_two_exhibits_are_never_constrained(self):
+        pair = [{"component": "chart.bar", "frame": {"x": 60, "y": 160, "width": 560, "height": 380}},
+                {"component": "chart.line", "frame": {"x": 660, "y": 160, "width": 560, "height": 380}}]
+        self.assertFalse(page_gates.shape_constrained({"componentInstances": pair}))
 
-    def test_gate_findings_runs_a_gate_without_reporting_it(self):
-        slide = copy.deepcopy(self.scene["slides"][1])
-        collected = []
-        page_gates.gate_thin_page(2, slide, collected)
-        self.assertEqual(page_gates.gate_findings(page_gates.gate_thin_page, 2, slide), collected)
-
-    def test_a_page_with_an_exhibit_is_still_judged_on_its_ink(self):
-        # The deferral is for pages with no exhibit. A chart page that renders
-        # nearly blank is still a chart page that renders nearly blank.
+    def test_the_finding_names_the_constrained_pages(self):
+        page_gates.configure("balanced")
+        exhibit = {"component": "table", "frame": {"x": 60, "y": 160, "width": 1160, "height": 380}}
+        flat = [{"componentInstances": [exhibit]} for _ in range(12)]
         findings = []
-        page_gates.gate_ink_and_dead_band(
-            2, page_gates.load_ink_rows(RENDER / "slide-2.png"), findings)
-        self.assertIn("INK_COVERAGE", [f["code"] for f in findings])
+        page_gates.gate_page_shape_flat(flat, list(range(12)), findings, "balanced")
+        self.assertEqual(len(findings), 1)
+        measured = findings[0]["measured"]
+        self.assertEqual(len(measured["constrainedPages"]), 12)
+        self.assertIn("one exhibit and no commentary", findings[0]["repair"])
+        self.assertIn("no layout change will reach it", findings[0]["repair"])
 
 
 class ProfileTests(unittest.TestCase):

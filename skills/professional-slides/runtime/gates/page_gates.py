@@ -144,6 +144,10 @@ FILL_LEVELS = CONTRACT["geometryByFill"]
 # with covers, dividers, back matter and portrait proposal documents excluded,
 # decomposed band by band and block by block. `corpus` is the wide sample.
 REFERENCE_PAGE = CONTRACT["reference"]["slides"]
+# Ink a page of body type puts on the canvas per word, measured by rendering
+# text pages and reading the coverage back off the PNG. It sets the ink floor
+# for a page with no exhibit, where the exhibit-calibrated floor is unreachable.
+INK_PER_WORD = CONTRACT["inkPerWord"]
 DEFAULT_FILL = CONTRACT["defaultFill"]
 
 # What a page of this deck is expected to carry. The deck's `weight` (its own,
@@ -478,15 +482,40 @@ def render_path(render_dir, slide_number):
 # --- gates -----------------------------------------------------------------
 
 
-def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None):
+def text_page_ink_floor():
+    """The ink a page of type alone must show: what its required words produce.
+
+    `ink_min` is calibrated on pages with an exhibit - the careful sample's ink
+    first quartile is 0.121 over 137 analytical slides, and the balanced floor
+    of 0.115 sits just under it. A page of body type cannot reach that at any
+    honest length: rendering text pages from 93 to 185 words gives a straight
+    line at 0.00052 ink per word, so 0.115 would need about 220 words of body
+    against a reference body of 128. The floor was not a high bar for those
+    pages, it was an impossible one.
+
+    So a text page is held to the ink its own word floor produces, which makes
+    the two gates agree by construction: whatever `pageWords` the deck's weight
+    contract sets, this follows it. A text page at the word floor passes with
+    room; one carrying a third of it still fails here as well as at THIN_PAGE.
+    """
+    return INK_PER_WORD["value"] * INK_PER_WORD["tolerance"] * (WEIGHT.get("pageWords") or 0)
+
+
+def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=False):
     """INK_COVERAGE and DEAD_BAND. COVER_EXEMPT. Needs the render.
-    `rows` counts ink; `occupied` (default: rows) counts designed surfaces too."""
+    `rows` counts ink; `occupied` (default: rows) counts designed surfaces too.
+    `text_page` holds a page with no exhibit to the type floor instead."""
     ink = sum(rows[:FOOTER_TOP])
     content_rows = (occupied or rows)[:FOOTER_TOP]
     fraction = ink / float(CANVAS_W * CANVAS_H)
-    if fraction < THRESHOLDS["ink_min"]:
+    floor = min(text_page_ink_floor(), THRESHOLDS["ink_min"]) if text_page else THRESHOLDS["ink_min"]
+    if fraction < floor:
         findings.append(finding(
-            slide_no, "INK_COVERAGE", round(fraction, 4), THRESHOLDS["ink_min"],
+            slide_no, "INK_COVERAGE", round(fraction, 4), round(floor, 4),
+            "The page carries less type than its own word floor would put on it. "
+            "Add the evidence the title claims - points that run to a sentence "
+            "each, a kpi or metrics row where the story has a number."
+            if text_page else
             "The page is mostly empty. Give the hero exhibit the leftover height "
             "(leftover: fill) or add the evidence the title claims.",
         ))
@@ -1473,6 +1502,39 @@ def layout_signature(slide):
     return f"{'+'.join(components)}|{shape}"
 
 
+def shape_constrained(slide):
+    """A page with nothing to arrange.
+
+    One exhibit and no commentary leaves the composer one viable shape, and it
+    should: there is no second block on the page to put anywhere. A deck of
+    these pages is flat because of what its pages carry, not because of how
+    they are laid out, and telling its author to vary the layout sends them
+    looking for a shape that does not exist. This is how the flatness finding
+    tells the two cases apart.
+    """
+    instances = [c for c in top_level_instances(slide) if is_exhibit(c)]
+    if len(instances) != 1:
+        return False
+    exhibit = instances[0]
+    frame = exhibit.get("frame") or {}
+    bottom = float(frame.get("y", 0)) + float(frame.get("height", 0))
+    # Commentary is a text block the shape has to find room for: a points
+    # column, a paragraph, a callout, a metrics strip, an insight beside the
+    # exhibit. A closing line *under* the exhibit is not - every shape has room
+    # for a full-width band at the foot, so a page carrying one exhibit and a
+    # so-what still has exactly one shape to take.
+    commentary = {"bullet-list", "paragraph", "callout", "insight", "metric", "metrics", "takeaways"}
+    for instance in top_level_instances(slide):
+        if instance is exhibit:
+            continue
+        if str(instance.get("component") or "") not in commentary:
+            continue
+        other = instance.get("frame") or {}
+        if float(other.get("y", 0)) < bottom - 1:
+            return False
+    return True
+
+
 def page_architecture(slide):
     """The page's shape with the exhibit types abstracted away.
 
@@ -1600,23 +1662,42 @@ def gate_page_shape_flat(slides, content_indexes, findings, fill):
     top_share = top_count / float(len(shapes))
     if per_ten >= THRESHOLDS["shapes_per_ten_min"] and top_share <= THRESHOLDS["shape_share_max"]:
         return
+    # Which pages had a choice to make. A page carrying one exhibit and no
+    # commentary has one viable shape, so a deck built from those is flat for a
+    # reason no layout change can reach - and the remedy has to say so, with the
+    # pages named, or the author goes looking for a shape that does not exist.
+    constrained = [content_indexes[i] + 1 for i, slide in enumerate(slides[j] for j in content_indexes)
+                   if page_architecture(slide) and shape_constrained(slide)]
+    constrained_share = len(constrained) / float(len(shapes))
+    if constrained_share >= 0.5:
+        remedy = (
+            f"{len(constrained)} of {len(shapes)} pages carry one exhibit and no "
+            "commentary, which leaves the composer one shape to choose from - so "
+            "the deck is flat because of what its pages hold, not how they are "
+            "laid out, and no layout change will reach it. Give those pages what "
+            "a reference page carries: two to four points of commentary beside "
+            "or beneath the exhibit, a kpi where the story has a number, a "
+            "second cut of the same data. The shapes follow the content. Pages: "
+            + ", ".join(str(n) for n in constrained[:20])
+            + ("…" if len(constrained) > 20 else "")
+        )
+    else:
+        remedy = (
+            "The deck is built from too few page shapes, so it reads as one page "
+            "repeated. Reference client decks run about five architectures per "
+            "ten pages: an exhibit with its commentary beside it, the same "
+            "exhibit full width with the commentary in columns beneath, two "
+            "exhibits contrasted, one hero number with its proof, a full-bleed "
+            "table. Drop any explicit `layout` on these pages and let the "
+            "composer choose, which rotates through the shapes that fit."
+        )
     findings.append(finding(
         None, "PAGE_SHAPE_FLAT",
         {"shapesPerTen": round(per_ten, 1), "commonest": top_shape,
-         "commonestShare": round(top_share, 2), "pages": len(shapes)},
+         "commonestShare": round(top_share, 2), "pages": len(shapes),
+         "constrainedPages": constrained},
         f"{THRESHOLDS['shapes_per_ten_min']} distinct architectures per ten pages, none past {int(THRESHOLDS['shape_share_max'] * 100)}%",
-        "The deck is built from too few page shapes, so it reads as one page "
-        "repeated. Reference client decks run about five architectures per ten "
-        "pages: an exhibit with its commentary beside it, the same exhibit full "
-        "width with the commentary in columns beneath, two exhibits contrasted, "
-        "one hero number with its proof, a full-bleed table. First drop any "
-        "explicit `layout` on these pages and let the composer choose. If they "
-        "are already unset, the shape is not the cause: a page carrying one wide "
-        "exhibit and no commentary has one shape available and should, because "
-        "there is nothing else on it to arrange. Give those pages what a "
-        "reference page carries - two to four points of commentary beside or "
-        "beneath the exhibit, a kpi where the story has a number, a second cut "
-        "of the same data - and the shapes follow the content.",
+        remedy,
     ))
 
 
@@ -1646,22 +1727,32 @@ def gate_layout_monotony(slides, content_indexes, findings):
 # --- driver ----------------------------------------------------------------
 
 
-def run_gates(scene, render_dir=None, profile=None, gates=None):
-    if profile is not None and profile not in PROFILES:
-        raise ValueError(f"Unknown density profile: {profile}")
-    fill = scene.get("fill") or DEFAULT_FILL
+def configure(fill=None, declared=None):
+    """Set the module's thresholds and weight floors for one deck.
+
+    The geometric thresholds move with the deck's fill level and the word floors
+    come from its weight contract - its own, or the one a template's house
+    profile measured, falling back to the fill level's. Several gates read both,
+    and one (the text page's ink floor) is derived from them, so this is the one
+    place either is set.
+    """
+    fill = fill or DEFAULT_FILL
     if fill not in FILL_LEVELS:
         raise ValueError(f"Unknown fill level: {fill}")
     THRESHOLDS.update(FILL_LEVELS[fill])
-    # The deck's weight contract: its own, or the one a template's house profile
-    # measured, falling back to the fill level's floors.
     WEIGHT.clear()
     WEIGHT.update(WEIGHT_BY_FILL.get(fill, WEIGHT_BY_FILL[DEFAULT_FILL]))
-    declared = scene.get("weight")
     if isinstance(declared, dict):
         for key, value in declared.items():
             if key in WEIGHT and isinstance(value, (int, float)):
                 WEIGHT[key] = value
+    return fill
+
+
+def run_gates(scene, render_dir=None, profile=None, gates=None):
+    if profile is not None and profile not in PROFILES:
+        raise ValueError(f"Unknown density profile: {profile}")
+    fill = configure(scene.get("fill"), scene.get("weight"))
     slides = scene.get("slides", [])
     findings = []
     content_indexes = []
@@ -1690,7 +1781,11 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                     rows = load_ink_rows(path)
                     occupied = load_ink_rows(path, SURFACE_LUMINANCE)
                     page = []
-                    gate_ink_and_dead_band(slide_no, rows, page, occupied)
+                    # A page with no exhibit is held to the type floor: the ink
+                    # its own word floor puts on the canvas, not the ink a chart
+                    # page shows.
+                    text_page = not any(is_exhibit(c) for c in slide.get("componentInstances", []))
+                    gate_ink_and_dead_band(slide_no, rows, page, occupied, text_page=text_page)
                     if THRESHOLDS["column_void_max"] < 1.0 and wanted("COLUMN_VOID"):
                         gate_column_void(slide_no, load_ink_matrix(path, SURFACE_LUMINANCE), page)
                     # A page carried by a qualifying hero exhibit is not empty,
@@ -1700,19 +1795,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                     gate_hero_exhibit(slide_no, slide, hero, path)
                     has_exhibit = any(is_exhibit(c) for c in slide.get("componentInstances", []))
                     has_hero = has_exhibit and not hero
-                    # The same argument, for the page at the other end. A text
-                    # page - an executive summary, a set of findings - carries
-                    # its evidence as words, and words put little ink on a
-                    # 1280x720 canvas however much they say. Five findings, four
-                    # metrics and a takeaway measure 0.096 against a 0.115 floor
-                    # calibrated on pages with a chart in them. That page is
-                    # already measured, by the word floor that counts what it
-                    # actually carries, so INK_COVERAGE defers to THIN_PAGE
-                    # here - and a text page that is genuinely empty still fails
-                    # there, where the remedy is the one an author can act on.
-                    carried_by_words = not has_exhibit and not gate_findings(gate_thin_page, slide_no, slide)
                     findings.extend(f for f in page if wanted(f["code"])
-                                    and not (f["code"] == "INK_COVERAGE" and (has_hero or carried_by_words)))
+                                    and not (f["code"] == "INK_COVERAGE" and has_hero))
             if wanted("WORDS"):
                 gate_words(slide_no, slide, findings, slide_profile)
             if wanted("HERO_EXHIBIT"):

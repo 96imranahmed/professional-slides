@@ -8,7 +8,7 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 
 | Gate | Code | Threshold |
 | --- | --- | --- |
-| Ink coverage | `INK_COVERAGE` | at least 8% of the content area (10% on a `full` deck, 4% on an `airy` one) |
+| Ink coverage | `INK_COVERAGE` | at least 11.5% of the content area (14% on a `full` deck, 5% on an `airy` one) — calibrated on pages with an exhibit, where the reference sample's first quartile is 12.1%. A page with **no** exhibit is held instead to the ink its own word floor produces (0.00052 per word, measured by rendering: 4.4% at the balanced 95-word floor), because a page of type cannot reach 11.5% at any honest length |
 | Trailing dead band | `DEAD_BAND` | at most 8% (6% full, 14% airy) |
 | Internal void | `INTERNAL_VOID` | at most 22% between two content blocks (16% full, 32% airy) |
 | Right column stops short | `COLUMN_VOID` | at most 20% of the page, `full` decks only |
@@ -31,7 +31,7 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Notes carrying the page | `NOTE_HEAVY` | the footer stays under a third of the page's text |
 | Plan-time shortfall | `THIN_PLAN` | preflight: what the page will carry against the floor, with the remedy its own data offers |
 | Chart annotation | `UNANNOTATED` | a bracket, a flag, a change bubble, a base or an observation on any plot of three marks or more |
-| Page architecture | `PAGE_SHAPE_FLAT` | at least three distinct page architectures per ten analytical pages, none past 40% (reference decks run about five per ten, commonest 23%) |
+| Page architecture | `PAGE_SHAPE_FLAT` | at least three distinct page architectures per ten analytical pages, none past 40% (reference decks run about five per ten, commonest 23%). The finding reports `constrainedPages`: pages carrying one exhibit and no commentary beside or above it, which leave the composer one viable shape. Where those are most of the deck, the repair names them and asks for commentary rather than for a different layout |
 | Commentary column | `COLUMN_MONOTONY` | at most three consecutive pages marked with the same device (icon, numbered disc, hairline, prose) |
 | Deck shape | `DECK_FLAT` | past eight analytical pages, one page carries the detail: 282+ words, or a p80 a third above the median |
 | Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |

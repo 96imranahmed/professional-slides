@@ -24,10 +24,20 @@
     "airy": { "pageWords": 0, "columnFill": 0, "plotSpan": 0, "pointWords": 0, "tableFill": 0, "elements": 1 }
   },
   "geometryByFill": {
-    "$comment": "The three geometric thresholds that move with fill; nothing else does.",
+    "$comment": "The three geometric thresholds that move with fill; nothing else does. `ink_min` is calibrated on pages with an exhibit - the careful sample's ink first quartile is 0.121 over 137 analytical slides. A page of type alone cannot reach it at any honest length: see inkPerWord, which sets that page's floor instead.",
     "full": { "ink_min": 0.14, "dead_band_max": 0.06, "internal_void_max": 0.16, "column_void_max": 0.20 },
     "balanced": { "ink_min": 0.115, "dead_band_max": 0.08, "internal_void_max": 0.22, "column_void_max": 1.0 },
     "airy": { "ink_min": 0.05, "dead_band_max": 0.14, "internal_void_max": 0.32, "column_void_max": 1.0 }
+  },
+  "inkPerWord": {
+    "$comment": "Ink a page of body type puts on the canvas, per word, measured by rendering text pages of 93 to 185 words at three and five points and reading the coverage back off the PNG. The relationship is linear: 95 words measured 0.0556, 128 words 0.0687, 185 words 0.0962. A text page's ink floor is this times the deck's own pageWords, so the ink a page must show is the ink its required words produce, and the two gates cannot disagree.",
+    "value": 0.00052,
+    "tolerance": 0.9,
+    "measured": {
+      "pages": 10,
+      "words": [93, 185],
+      "ink": [0.0528, 0.0962]
+    }
   },
   "reference": {
     "$comment": "Published McKinsey, BCG and Bain client decks, measured two ways. `slides` is the careful sample: 137 landscape analytical slides, with covers, dividers, back matter and portrait proposal documents excluded, decomposed band by band and block by block. `corpus` is the wide sample: 1,832 pages of page text with no band split. When the two disagree, the slides sample is the one the floors are set against.",
