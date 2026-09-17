@@ -869,6 +869,10 @@ const PAGE_SHAPES = {
       // A `compare` exhibit is already two columns arguing with each other; its
       // commentary belongs beside it, not stacked underneath.
       if (["compare", "quadrants", "swot", "matrix"].includes(ex[0].type)) return 0;
+      // exhibit-top trades height for width. A chart that places its labels by
+      // searching for a clear position - a scatter, a bubble plot - runs out of
+      // positions when the plot shortens, so it keeps the taller frame.
+      if (["chart.scatter", "chart.bubble", "chart.bubble-grid"].includes(ex[0].type)) return 0;
       // It fits as well as the side column does, never better: a page composed
       // on its own keeps the established shape, and the variety comes from
       // alternating across the deck rather than from a new monoculture.

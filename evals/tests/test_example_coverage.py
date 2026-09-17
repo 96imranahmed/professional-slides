@@ -79,5 +79,35 @@ console.log(JSON.stringify({decks:out}));
             self.assertGreater(pages, 0, name)
 
 
+
+class ExampleBuildTests(unittest.TestCase):
+    """Every example deck composes AND renders its scene.
+
+    `test_every_example_deck_composes` stops at the plan. A page can plan
+    cleanly and then fail to draw - a scatter whose labels have nowhere to go in
+    a shorter frame - and a build loop that reads a report file left over from a
+    previous run will not notice. This walks the whole compile.
+    """
+
+    def test_every_example_deck_compiles_to_a_scene(self):
+        result = run_node('''
+import {readdirSync, readFileSync} from 'node:fs';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const dir='./skills/professional-slides/examples';
+const out={};
+for (const name of readdirSync(dir).filter((n)=>n.endsWith('.deck.json'))) {
+  // The same two calls the builder makes before it emits: planDeck compiles
+  // every page's components, which is where a page that plans but cannot draw
+  // actually fails.
+  const {deck}=planDeck(toDeckPlan(JSON.parse(readFileSync(`${dir}/${name}`,'utf8')),dir));
+  out[name]=deck.slides.length;
+}
+console.log(JSON.stringify({decks:out}));
+''')
+        for name, pages in result["decks"].items():
+            self.assertGreater(pages, 0, name)
+
+
 if __name__ == "__main__":
     unittest.main()

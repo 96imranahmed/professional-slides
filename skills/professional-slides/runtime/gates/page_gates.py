@@ -1350,7 +1350,7 @@ def gate_deck_structure(slides, analytical, findings):
     ))
 
 
-def gate_deck_front_matter(slides, analytical, findings):
+def gate_deck_front_matter(slides, analytical, findings, fill):
     """NO_CONTENTS and NO_SUMMARY, deck level.
 
     A long sectioned deck says what it covers before it starts, and an
@@ -1359,7 +1359,9 @@ def gate_deck_front_matter(slides, analytical, findings):
     contents and the tracker having been one setting - and its summary page was
     assembled by hand because nothing said to write one.
     """
-    if len(analytical) < THRESHOLDS["front_matter_from"]:
+    # A catalogue declares itself airy: it has no argument to summarise and no
+    # sections to announce, so neither page is missing from it.
+    if fill == "airy" or len(analytical) < THRESHOLDS["front_matter_from"]:
         return
     kinds = [str(s.get("kind") or "") for s in slides]
     if "divider" in kinds and not any(
@@ -1727,7 +1729,7 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
     if not gates or "NO_SECTIONS" in gates:
         gate_deck_structure(slides, content_indexes, findings)
     if not gates or "NO_CONTENTS" in gates or "NO_SUMMARY" in gates:
-        gate_deck_front_matter(slides, content_indexes, findings)
+        gate_deck_front_matter(slides, content_indexes, findings, fill)
     if not gates or "DECK_FLAT" in gates:
         gate_deck_shape(slides, content_indexes, findings, fill)
     if not gates or "PAGE_SHAPE_FLAT" in gates:
