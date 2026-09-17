@@ -39,6 +39,22 @@
       "ink": [0.0528, 0.0962]
     }
   },
+  "plan": {
+    "$comment": "Thresholds for the plan gates, which judge the dot-dash before a page is drawn. The mix bands and the entropy floor are calibrated on the example decks and are GUIDELINES - move them with judgement as real plans are measured against them. The shapes of the tests are not guidelines: charts and tables get separate bands because merging them into one 45% floor is what let a deck of 43% tables pass more comfortably than a balanced one.",
+    "from": 8,
+    "measuredMin": 0.45,
+    "runMax": 2,
+    "entropyMin": 0.7,
+    "entropyObserved": [0.67, 0.78, 0.88, 0.92],
+    "titleWords": { "target": 12, "overShareMax": 0.35 },
+    "anchor": { "itemsFrom": 2, "itemsTo": 6 },
+    "mix": {
+      "chart": { "min": 0.35 },
+      "table": { "max": 0.25 },
+      "diagram": { "min": 0.07 },
+      "picture": { "min": 0.05 }
+    }
+  },
   "reference": {
     "$comment": "Published McKinsey, BCG and Bain client decks, measured two ways. `slides` is the careful sample: 137 landscape analytical slides, with covers, dividers, back matter and portrait proposal documents excluded, decomposed band by band and block by block. `corpus` is the wide sample: 1,832 pages of page text with no band split. When the two disagree, the slides sample is the one the floors are set against.",
     "slides": {

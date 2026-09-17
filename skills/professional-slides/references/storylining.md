@@ -89,10 +89,38 @@ The **dot** is the exact proposed title of one slide. The **dash** is the eviden
 
 Present it as one table, one row per slide:
 
-| # | Dot: exact title | Dash: argument and evidence | Exhibit and why this encoding | Sources and data | Criterion served |
-| --- | --- | --- | --- | --- | --- |
+| # | Dot: exact title | Dash: argument and evidence | Exhibit | Shape | Anchors | Insight | Sources | Criterion |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 Every analytical row names its key insight and links the underlying data or source, not just a bibliography at the end. Keep planning language out of the rendered deck: `Key insight` is a column here, never a label on the page.
+
+**The dot-dash is the design document, not only the content plan.** Four of the columns above are design decisions, and they are there because a deck is far cheaper to judge before it is built than after. Two decks written without them came out 55% tables with no photograph, no icon and no insight on any page — and every gate that judged the *rendered* deck passed them, because by then the only remedy was a rewrite.
+
+- **Exhibit.** The encoding, chosen from the shape of the evidence — see the table below. Write the variant too where it matters (`table/heat`, `chart.column/stacked`).
+- **Shape.** The page architecture: `exhibit-left`, `exhibit-right`, `exhibit-top`, `hero-number`, `two-up`, `split-tone`, `grid`, `exhibit-full`, `picture-pair`, `table-halves`, `text`. A deck built from two shapes reads as one page repeated; the plan gates measure the spread as entropy and cannot measure it at all when this column is blank. Where a run of pages is one template on purpose — six use-cases, eight market profiles — name the run in this column as `series: <name>` and the gates count it once instead of punishing a deliberate decision.
+- **Anchors.** One visual anchor per named thing, and the form follows the thing: a **photograph** where it is depictable (a character, a city, a product, a person), an **icon** where it is a category or a concept. Write `none` where the page is deliberately unanchored. This is the column that keeps a deck from becoming a wall of tables: most two-column qualitative tables are "five categories and what each means", which is an icon list, not a matrix.
+- **Insight.** `filled`, `outline` or `none` — whether the page closes with its conclusion in a band, and in which treatment.
+
+**Choose the exhibit from the shape of the evidence.**
+
+| The evidence is | The encoding is |
+| --- | --- |
+| A magnitude over time | `chart.column`, or `chart.line` past about eight periods |
+| A ranking | `chart.bar`, sorted |
+| A composition | `chart.stacked-column`, `chart.marimekko`, `chart.waffle` |
+| A relationship between two measures | `chart.scatter`, `chart.bubble` |
+| A process or sequence of stages | `steps`, `cycle`, `timeline`, `gantt` |
+| A structure or set of relations | `framework`, `relationship-network`, `tree` |
+| Two named, depictable things | `picture-pair` — images side by side, the comparison as cards beneath |
+| A set of named categories | `cards` or `rows`, one icon per category |
+| A comparison across three or more dimensions | `table` |
+| One number that carries the page | `metrics` with a `kpi` |
+
+**A table is the answer only when the content is genuinely a matrix.** It is the container that accepts anything without thought, which is exactly why it becomes the default: two columns of sentences is a comparison panel, a rows list with an icon per category, or a chart — not a table. Reference decks run about 13% tables; a plan past 25% is reported.
+
+**Titles set on one line.** Target eight to twelve words. The page gate's fourteen-word limit is a ceiling, not a target, and a plan written to it makes two-line titles the norm — which is what makes the title band, its rule and the content beneath sit differently on every page.
+
+Run `node runtime/gates/plan_gates.mjs deck.plan.json` over the machine-readable plan before writing any page. It answers in under a second.
 
 **Title spine test.** Read the dots alone. A decision deck should read as a clear executive memo; an explanatory deck as a coherent account. Titles state supported conclusions; explanatory headings may name a mechanism or distinction when a takeaway would overstate the page. Remove repeated claims, topic labels and unsupported certainty.
 
