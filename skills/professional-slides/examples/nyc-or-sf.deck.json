@@ -107,9 +107,18 @@
     ]
    },
    "points": [
-    "Research and Core Models put you inside model decisions; Labs and API Agents build founder skills",
-    "The two OpenAI roles are SF-only, so an OpenAI offer is a reason to move west",
-    "Pay bands overlap; the role, not the salary, separates the offers"
+    {
+     "text": "Research and Core Models put you inside model decisions; Labs and API Agents build founder skills",
+     "highlight": "inside model decisions"
+    },
+    {
+     "text": "The two OpenAI roles are SF-only, so an OpenAI offer is a reason to move west",
+     "highlight": "SF-only"
+    },
+    {
+     "text": "Pay bands overlap; the role, not the salary, separates the offers",
+     "highlight": "the role, not the salary"
+    }
    ],
    "soWhat": "In interviews, establish which decisions you own and which researchers you sit with; a lab name alone proves nothing.",
    "source": "Anthropic and OpenAI job postings retrieved 8 Sep 2026; API Agents band estimated from adjacent listings",
@@ -319,29 +328,50 @@
      "type": "table",
      "panelHeading": "Rent as a share of gross salary",
      "columns": [
-      "Monthly rent",
-      "$305k salary",
-      "$385k salary",
-      "$460k salary"
+      {
+       "label": "Monthly rent",
+       "type": "text"
+      },
+      {
+       "group": "Share of gross salary",
+       "label": "$305k",
+       "unit": "%",
+       "type": "text",
+       "align": "right"
+      },
+      {
+       "group": "Share of gross salary",
+       "label": "$385k",
+       "unit": "%",
+       "type": "text",
+       "align": "right"
+      },
+      {
+       "group": "Share of gross salary",
+       "label": "$460k",
+       "unit": "%",
+       "type": "text",
+       "align": "right"
+      }
      ],
      "rows": [
       [
        "$4,000",
-       "15.7%",
-       "12.5%",
-       "10.4%"
+       "15.7",
+       "12.5",
+       "10.4"
       ],
       [
        "$5,500",
-       "21.6%",
-       "17.1%",
-       "14.3%"
+       "21.6",
+       "17.1",
+       "14.3"
       ],
       [
        "$6,500",
-       "25.6%",
-       "20.3%",
-       "17.0%"
+       "25.6",
+       "20.3",
+       "17.0"
       ]
      ]
     }
@@ -350,6 +380,10 @@
    "source": "Zillow two-bedroom asks, 8 Sep 2026; salary bands from posted roles; gross-pay arithmetic, no tax modeled",
    "serves": [
     "housing"
+   ],
+   "note": [
+    "Gross salary is published base pay; total compensation is not disclosed",
+    "State and city income tax is not modelled: New York City, New Jersey and California differ by several points of gross"
    ]
   },
   {
@@ -379,15 +413,31 @@
         67
        ]
       }
+     ],
+     "categoryNotes": [
+      "n=61 tested",
+      "n=59 tested"
      ]
     },
     {
      "type": "table",
      "panelHeading": "Two-bedroom asks",
      "columns": [
-      "Listing",
-      "Size",
-      "Rent"
+      {
+       "label": "Listing",
+       "type": "text"
+      },
+      {
+       "label": "Size",
+       "unit": "bath / sq ft",
+       "type": "text"
+      },
+      {
+       "label": "Rent",
+       "unit": "$ a month",
+       "type": "text",
+       "align": "right"
+      }
      ],
      "rows": [
       [
@@ -417,37 +467,154 @@
    ]
   },
   {
+   "title": "Every gate resolves on evidence except the role, which only the interview can settle",
+   "columns": [
+    "Gate",
+    "What the evidence showed",
+    "What it means for the decision"
+   ],
+   "rows": [
+    {
+     "label": "School evidence",
+     "icon": "checklist",
+     "cells": [
+      {
+       "lead": "The NYC pair leads its peers on both measures",
+       "points": [
+        "P.S. 321 reads 89% against 79% for its peer group, and Alvarado sits on the California scale, which is not comparable",
+        "Jefferson leads Alvarado by 3 and 11 points on the measures that are comparable"
+       ],
+       "highlight": "89%"
+      },
+      {
+       "lead": "Decided, and it favours New York",
+       "points": [
+        "Only the district, not the city, settles this: the SF pair is a preference rather than a result"
+       ]
+      }
+     ]
+    },
+    {
+     "label": "Safety",
+     "icon": "shield",
+     "cells": [
+      {
+       "lead": "Hoboken is safest on the matched 2024 rate",
+       "points": [
+        "189 per 100k against 671 citywide in New York and 597 in Noe Valley",
+        "Berkeley robberies fell 48%, which moves the trend but not the level"
+       ],
+       "highlight": "189 per 100k"
+      },
+      {
+       "lead": "Decided at neighbourhood level, not city level",
+       "points": [
+        "Walk the actual streets by day and after dark before signing a lease"
+       ]
+      }
+     ]
+    },
+    {
+     "label": "Commute",
+     "icon": "clock",
+     "cells": [
+      {
+       "lead": "Four of five shortlisted commutes fit the 45-minute gate",
+       "points": [
+        "Park Slope rides 28 minutes with 17 minutes of slack; Berkeley fails by 10",
+        "Waiting and walking, not ride time, decide which locations qualify"
+       ],
+       "highlight": "fails by 10"
+      },
+      {
+       "lead": "Decided, and it removes Berkeley",
+       "points": [
+        "Time the door-to-door journey on a weekday at the hour you would travel"
+       ]
+      }
+     ]
+    },
+    {
+     "label": "Housing",
+     "icon": "money",
+     "cells": [
+      {
+       "lead": "Rent moves five points of gross pay across the shortlist",
+       "points": [
+        "A $1,500 monthly premium is $18,000 a year before state and city income tax",
+        "Hoboken saves roughly $12,000 a year against Park Slope"
+       ],
+       "highlight": "five points"
+      },
+      {
+       "lead": "A comfort decision, not a viability one",
+       "points": [
+        "Every option clears the budget; none of them decides the city"
+       ]
+      }
+     ]
+    },
+    {
+     "label": "Role",
+     "icon": "target",
+     "cells": [
+      {
+       "lead": "Both cities offer the role; the bands overlap",
+       "points": [
+        "Published bands run $305-385k and $385-460k in New York, $347-490k in San Francisco",
+        "The two OpenAI roles are San Francisco only"
+       ],
+       "highlight": "overlap"
+      },
+      {
+       "lead": "Open: only the interview settles it",
+       "points": [
+        "Establish which decisions you own and which researchers you sit with",
+        "A lab name alone proves nothing about the work"
+       ]
+      }
+     ]
+    }
+   ],
+   "note": [
+    "Bands are published base salary; total compensation is not disclosed"
+   ],
+   "source": "NYC Public Schools 2024-25; CA Dashboard 2025; HomeSnacks/FBI 2024; Zillow; Anthropic and OpenAI postings",
+   "serves": [
+    "education",
+    "safety",
+    "commute",
+    "housing",
+    "role"
+   ]
+  },
+  {
    "title": "Rent for stage one, book two visits, and fix the school before entry year",
    "exhibits": [
     {
-     "type": "table",
+     "type": "process",
      "panelHeading": "Sequence the commitments",
-     "columns": [
-      "Stage",
-      "When",
-      "Decision at that point"
-     ],
-     "rows": [
-      [
-       "1. Move alone",
-       "Year 1",
-       "Rent a one-bedroom near the actual office; keep it reversible"
-      ],
-      [
-       "2. Partner joins",
-       "Year 2–3",
-       "Re-size the home; compare moving with staying larger from the start"
-      ],
-      [
-       "3. School entry",
-       "Year 3",
-       "Confirm address priority (NYC) or assignment (SF) for the entry year"
-      ],
-      [
-       "4. Business option",
-       "Year 5–10",
-       "A tie-breaker between equal offers, not a reason to pick a city now"
-      ]
+     "items": [
+      {
+       "label": "Move alone",
+       "period": "Year 1",
+       "detail": "Rent a one-bedroom near the actual office; keep it reversible"
+      },
+      {
+       "label": "Partner joins",
+       "period": "Year 2-3",
+       "detail": "Re-size the home; compare moving with staying larger"
+      },
+      {
+       "label": "School entry",
+       "period": "Year 3",
+       "detail": "Confirm address priority (NYC) or assignment (SF)"
+      },
+      {
+       "label": "Business option",
+       "period": "Year 5-10",
+       "detail": "A tie-breaker between equal offers, not a reason to pick now"
+      }
      ]
     },
     {
@@ -482,7 +649,8 @@
    "serves": [
     "housing",
     "education"
-   ]
+   ],
+   "arrange": "stack"
   }
  ],
  "criteria": [

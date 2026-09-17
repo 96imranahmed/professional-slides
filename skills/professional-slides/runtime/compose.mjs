@@ -86,6 +86,45 @@ function tableAlias(ex) {
     return { type: "table", treatment: "dimensions", variant: "standard", headerShape: "chevron", columns: [{ label: "", type: "category", width: labelWidth }, ...phases.map((ph) => ({ label: typeof ph === "string" ? ph : ph.label, type: "text", width: 200 }))], rows, density: ex.density };
   }
   if (ex.type === "rows") {
+    // A row may carry several content columns (`cells`), which is the reference
+    // deck's densest page: findings down the left with a numbered disc and an
+    // icon, two or three columns across, each cell a short bulleted list under
+    // a bold lead. Four hundred words of structured evidence, no chart.
+    if ((ex.rows || []).some((row) => Array.isArray(row.cells))) {
+      const rowsIn = ex.rows;
+      const count = Math.max(...rowsIn.map((row) => (row.cells || []).length));
+      if (!(count >= 1 && count <= 3)) throw new Error("A row matrix carries one to three content columns per row");
+      const labels = (Array.isArray(ex.columns) ? ex.columns : []).map((column) => String(typeof column === "string" ? column : column?.label || ""));
+      // `columns` heads the label column first, then the content columns; a
+      // list as long as the content columns heads those alone.
+      const headLabel = labels.length > count ? labels[0] : "";
+      const headContent = labels.length > count ? labels.slice(1) : labels;
+      const cellOf = (value) => {
+        if (value === undefined || value === null) return { type: "text", text: " " };
+        if (Array.isArray(value)) return { type: "bullets", items: value };
+        if (typeof value === "string") return { type: "text", text: value };
+        const { lead, points, text, highlight, ...rest } = value;
+        // `highlight` names the phrase the cell sets in the accent; the table
+        // calls that `accent`, because a cell's `highlight: true` is the older
+        // flag that marks the whole cell.
+        const accent = highlight === undefined || highlight === null ? {} : { accent: highlight };
+        if (Array.isArray(points) && points.length) return { type: "bullets", items: points, ...(lead ? { lead } : {}), ...accent, ...rest };
+        if (typeof text === "string" && text.trim()) return { type: "text", text: lead ? `${lead}. ${text}` : text, ...accent, ...rest };
+        if (typeof lead === "string" && lead.trim()) return { type: "text", text: lead, bold: true, ...accent, ...rest };
+        throw new Error("A row matrix cell needs text or points");
+      };
+      const numbered = ex.numbered !== false;
+      const rows = rowsIn.map((row, index) => [
+        { type: "category", text: String(row.label ?? ""), surface: "plain",
+          ...(numbered ? { sectionNumber: row.number ?? index + 1 } : {}),
+          ...(row.icon ? { icon: row.icon } : {}) },
+        ...Array.from({ length: count }, (_, at) => cellOf((row.cells || [])[at]))
+      ]);
+      return { type: "table", treatment: "categories", variant: "plain", density: ex.density || "compact",
+        columns: [{ label: headLabel, type: "category", width: 220 },
+                  ...Array.from({ length: count }, (_, at) => ({ label: headContent[at] || "", type: "text", width: 420 }))],
+        rows };
+    }
     const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label, ...(row.number ? { sectionNumber: row.number } : {}), ...(row.icon ? { icon: row.icon } : {}) }, Array.isArray(row.points) ? { type: "bullets", items: row.points } : row.text]);
     // `columns: ["What we found", "What it means"]` heads the two tracks. The
     // reference pages label them; an unlabelled ledger keeps the blank band.
@@ -217,7 +256,13 @@ function withDefaultScales(ex, rowsIn) {
 }
 
 export function styleTable(ex) {
-  const columns = ex.columns.map((c, i) => typeof c === "string" ? { label: c, type: "text", bold: i === 0, width: columnWeight(ex, i) } : { ...c });
+  // An object column (one that names a `group`, a `unit`, an alignment) still
+  // gets its width from what it holds, unless it sets one: otherwise adding a
+  // unit to a header would silently reweight every column to equal shares and
+  // squeeze the one column that needed the room.
+  const columns = ex.columns.map((c, i) => typeof c === "string"
+    ? { label: c, type: "text", bold: i === 0, width: columnWeight(ex, i) }
+    : { width: columnWeight(ex, i), ...c });
   const scaled = withDefaultScales(ex, ex.rows.map((r) => Array.isArray(r) ? r.map((cell, i) => verdictCell(cell, columnLabel(ex.columns[i]))) : r));
   const rowsIn = scaled.rows;
   if (scaled.scales) ex = { ...ex, scales: scaled.scales };
@@ -694,10 +739,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   // A deck whose weight asks for two elements a page gets the second one offered
   // rather than demanded: a chart of six categories or fewer, with no table, no
   // metrics and no second exhibit, tabulates itself underneath. `dataTable:
-  // false` declines it.
+  // false` declines it. A single labelled series is not offered one - its table
+  // would print the same five numbers a second time.
   if (elements >= 2 && slide.exhibit && !slide.exhibits && String(slide.exhibit.type).startsWith("chart.")
       && slide.exhibit.dataTable === undefined && Array.isArray(slide.exhibit.series) && Array.isArray(slide.exhibit.categories)
-      && slide.exhibit.categories.length <= 6 && slide.exhibit.series.length <= 3
+      && slide.exhibit.categories.length <= 6 && slide.exhibit.series.length >= 2 && slide.exhibit.series.length <= 3
       && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi && !thinChart(slide.exhibit)) {
     slide = { ...slide, exhibit: { ...slide.exhibit, dataTable: true } };
   }

@@ -636,8 +636,15 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     centerPlot: !horizontal && !showValueAxis
   });
   const categoryLayouts = horizontal ? [] : categories.map(category => measureText(category, plot.width/categories.length-8, {fontFamily:tokenValue(FONT),fontSize:tokenValue(AXIS_LABEL)}));
+  // One note per category, in category order; `null` or a missing entry leaves
+  // that category with its label alone.
+  if (props.categoryNotes !== undefined && (!Array.isArray(props.categoryNotes) || props.categoryNotes.length > categories.length)) throw new Error("categoryNotes takes one entry per category, in category order");
+  const categoryNotes = categories.map((_, index) => {
+    const note = (props.categoryNotes || [])[index];
+    return typeof note === "string" && note.trim() ? note.trim() : null;
+  });
   if(!horizontal) {
-    plot.categoryLabelHeight=Math.max(...categoryLayouts.map(label=>label.height));
+    plot.categoryLabelHeight=Math.max(...categoryLayouts.map(label=>label.height)) + (categoryNotes.some(Boolean) ? Math.max(...categoryLayouts.map(label=>label.lineHeight)) : 0);
     plot.height-=Math.max(0,plot.categoryLabelHeight-28);
     if(plot.height<100)throw new Error("Category labels leave insufficient plot height");
   }
@@ -891,15 +898,39 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
         data: { category, anchor: "stack-total", value: stackLabels.totals.get(category).value, endpoint }
       }));
     }
+    // `categoryNotes`: a second line under the category label - the base of the
+    // measure ("n=412"), the year, the unit of that column. The reference charts
+    // carry it and it is most of what separates their label band from ours.
+    const noteText = hideCategoryLabels ? null : categoryNotes[categoryIndex];
+    const noteLayout = noteText ? measureText(noteText, Math.max(40, horizontal ? horizontalCategoryLabelWidth : categorySpan - 8), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }) : null;
+    // With a note under it, a bar's label stops being a box centred on the bar
+    // and becomes the first line of a two-line block, measured and placed.
+    const barLabelLayout = horizontal && noteLayout ? measureText(category, horizontalCategoryLabelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }) : null;
+    const barBlockTop = barLabelLayout ? categoryStart + (groupSpan - barLabelLayout.height - noteLayout.height) / 2 : 0;
+    if (noteLayout) {
+      // The label and its note read as one block: on a bar chart the pair sits
+      // centred on the bar, on a column chart the note takes the line under the
+      // label.
+      nodes.push(textPrimitive({
+        id: stableId(id, "category-note", category),
+        role: "category-note",
+        frame: horizontal
+          ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: barBlockTop + barLabelLayout.height, width: horizontalCategoryLabelWidth, height: noteLayout.height }
+          : { x: categoryMap.get(category).labelCenter - (categorySpan - 8) / 2, y: plot.y + plot.height + (regionHighlight ? 18 : 8) + categoryLayouts[categoryIndex].height, width: categorySpan - 8, height: noteLayout.height },
+        text: noteLayout.text,
+        style: { ...textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), valign: "top", lineHeight: noteLayout.lineHeight, wrap: false },
+        data: { category, textLayout: noteLayout, note: true }
+      }));
+    }
     if (!hideCategoryLabels) nodes.push(textPrimitive({
       id: stableId(id, "category", category),
       role: "category-label",
       frame: horizontal
-        ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: categoryStart, width: horizontalCategoryLabelWidth, height: groupSpan }
+        ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: barLabelLayout ? barBlockTop : categoryStart, width: horizontalCategoryLabelWidth, height: barLabelLayout ? barLabelLayout.height : groupSpan }
         : { x: categoryMap.get(category).labelCenter-(categorySpan-8)/2, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: categorySpan-8, height: categoryLayouts[categoryIndex].height },
-      text: horizontal ? category : categoryLayouts[categoryIndex].text,
-      style: { ...textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), ...(!horizontal ? {valign:"top",lineHeight:categoryLayouts[categoryIndex].lineHeight,wrap:false} : {}) },
-      data: {category,...(!horizontal ? {textLayout:categoryLayouts[categoryIndex]} : {})}
+      text: horizontal ? (barLabelLayout ? barLabelLayout.text : category) : categoryLayouts[categoryIndex].text,
+      style: { ...textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), ...(!horizontal ? {valign:"top",lineHeight:categoryLayouts[categoryIndex].lineHeight,wrap:false} : barLabelLayout ? {valign:"top",lineHeight:barLabelLayout.lineHeight,wrap:false} : {}) },
+      data: {category,...(!horizontal ? {textLayout:categoryLayouts[categoryIndex]} : barLabelLayout ? {textLayout:barLabelLayout} : {})}
     }));
   });
   for(const [i,group] of categoryGroups.entries()) {

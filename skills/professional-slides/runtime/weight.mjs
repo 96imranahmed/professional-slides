@@ -33,8 +33,8 @@ export const WEIGHT_KEYS = Object.freeze([
  * meant to carry one chart and three words, and the deck says so.
  */
 export const WEIGHT_BY_FILL = Object.freeze({
-  full: Object.freeze({ pageWords: 130, columnFill: 0.68, plotSpan: 0.60, pointWords: 10, tableFill: 0.55, elements: 2 }),
-  balanced: Object.freeze({ pageWords: 95, columnFill: 0.55, plotSpan: 0.52, pointWords: 8, tableFill: 0.45, elements: 1 }),
+  full: Object.freeze({ pageWords: 150, columnFill: 0.68, plotSpan: 0.60, pointWords: 10, tableFill: 0.55, elements: 2 }),
+  balanced: Object.freeze({ pageWords: 105, columnFill: 0.55, plotSpan: 0.52, pointWords: 8, tableFill: 0.45, elements: 1 }),
   airy: Object.freeze({ pageWords: 0, columnFill: 0, plotSpan: 0, pointWords: 0, tableFill: 0, elements: 1 }),
 });
 

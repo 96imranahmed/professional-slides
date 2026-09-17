@@ -64,7 +64,11 @@
     "tone": "outline",
     "text": "Geopolitical risk jumped 14 points, the largest move in the series; rates stayed first for the sixth survey running."
    },
-   "source": "Investor pulse, October 10–13, 2026; n = 116"
+   "source": "Investor pulse, October 10–13, 2026; n = 116",
+   "note": [
+    "n=412 institutional investors; respondents ranked their top three factors",
+    "Change is against the June wave of the same panel"
+   ]
   },
   {
    "title": "Most workers feel burned out, and 43% are at risk of quitting",
@@ -201,7 +205,16 @@
       ]
      }
     ],
-    "change": false
+    "change": false,
+    "categoryNotes": [
+     "",
+     "",
+     "",
+     "",
+     "",
+     "",
+     "part year"
+    ]
    },
    "kpi": {
     "value": "80%",
@@ -222,18 +235,42 @@
     }
    ],
    "pointsHeading": "Potential hypotheses on the slowdown",
-   "source": "Crunchbase; PitchBook"
+   "source": "Crunchbase; PitchBook",
+   "note": [
+    "Founding year is the year of incorporation, not of first funding",
+    "2025 is a part year to 30 September and is not annualised"
+   ]
   },
   {
    "title": "The year featured comparatively big deals, with four new entrants in the top ten",
    "exhibit": {
     "type": "table",
     "columns": [
-     "Company",
-     "Country",
-     "Segment",
-     "Deal size, $M",
-     "Deal year"
+     {
+      "label": "Company",
+      "type": "text"
+     },
+     {
+      "label": "Country",
+      "type": "text"
+     },
+     {
+      "label": "Segment",
+      "type": "text"
+     },
+     {
+      "group": "Largest disclosed round",
+      "label": "Deal size",
+      "unit": "$m",
+      "type": "text",
+      "align": "right"
+     },
+     {
+      "group": "Largest disclosed round",
+      "label": "Deal year",
+      "type": "text",
+      "align": "right"
+     }
     ],
     "rows": [
      [
@@ -294,8 +331,12 @@
      ]
     ]
    },
-   "note": "Quantinuum crosses all segments after its 2021 merger",
-   "source": "Crunchbase; PitchBook"
+   "note": [
+    "Disclosed primary rounds only; secondary transactions and debt facilities are excluded",
+    "New entrants are companies that did not appear in the 2023 top ten"
+   ],
+   "source": "Crunchbase; PitchBook",
+   "soWhat": "Hardware manufacturing takes six of the ten largest rounds, so the capital is still buying machines rather than applications."
   },
   {
    "title": "E-commerce needs to accelerate to reach the 2028 ambition",

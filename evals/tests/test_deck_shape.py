@@ -232,7 +232,7 @@ class WeightContractTests(unittest.TestCase):
     def test_the_floors_follow_the_fill_level(self):
         slides = [page(1, ["chart.bar"], texts=["short"])]
         balanced = page_gates.run_gates(self.scene(slides))
-        self.assertEqual(balanced["weight"]["pageWords"], 95)
+        self.assertEqual(balanced["weight"]["pageWords"], 105)
         airy = page_gates.run_gates(self.scene(slides, fill="airy"))
         self.assertEqual(airy["weight"]["pageWords"], 0)
         self.assertNotIn("THIN_PAGE", codes(airy))
@@ -265,7 +265,7 @@ class WeightContractTests(unittest.TestCase):
         slides = [page(1, ["chart.bar"], texts=["a b c"])]
         report = page_gates.run_gates(deck(slides))
         density = report["density"]
-        self.assertEqual(density["pageWords"]["floor"], 95)
+        self.assertEqual(density["pageWords"]["floor"], 105)
         self.assertEqual(density["pageWords"]["referenceMedian"], 196)
         self.assertIn("columnFill", density)
         self.assertIn("plotSpan", density)
@@ -617,11 +617,13 @@ console.log(JSON.stringify({accepted:true}));
         result = run_node('''
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
-const chart={type:'chart.column',heading:'Revenue',unit:'$m',categories:['FY21','FY22','FY23','FY24','FY25'],
-  series:[{name:'Revenue',values:[44,49,52,58,61]}]};
+const chart={type:'chart.column',heading:'Revenue and cost',unit:'$m',categories:['FY21','FY22','FY23','FY24','FY25'],
+  series:[{name:'Revenue',values:[44,49,52,58,61]},{name:'Cost',values:[40,44,47,51,55]}]};
 const kinds=(page)=>{const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
   return page.items.flatMap(find).map(i=>i.component);};
-// elements: 1 - the chart is the page's only evidence element.
+// elements: 1 - the chart is the page's only evidence element. (A single
+// labelled series is never offered a table of its own: it would print the same
+// five numbers twice.)
 const light=composeSlide({title:'T',exhibit:JSON.parse(JSON.stringify(chart)),points:['a b c d e','f g h i j']},0,'.', 'balanced',1);
 assert.ok(!kinds(light).includes('table'));
 // elements: 2 - the cheapest second element is the chart's own numbers.
@@ -680,3 +682,179 @@ console.log(JSON.stringify(measured));
         self.assertGreaterEqual(result["blocks"], 30, "the page has lost its furniture: labels, units, notes")
         self.assertGreaterEqual(result["numeric"], 14, "the evidence has stopped carrying numbers")
         self.assertGreaterEqual(result["small"], 16, "the small type - labels, units, notes - has gone")
+
+
+class HeavyPageTests(unittest.TestCase):
+    """The page shapes the reference decks carry and we did not: the findings
+    matrix, the grouped measure table, the accent phrase inside a sentence, the
+    icon list, and the deck-level finding that asks for a heavy page at all."""
+
+    def test_a_row_matrix_carries_bulleted_cells_under_a_lead(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const page=composeSlide({title:'Five challenges shape the sector',
+  columns:['Challenge','A - Pre-COVID trends','B - Impacts'],
+  rows:[{label:'Health of transit',icon:'people',cells:[
+          {lead:'Strong base, declining ridership',points:['34% of workers commute by transit','15% decline in rail ridership'],highlight:'34%'},
+          {lead:'Ridership drop and funding gaps',points:['38% of pre-COVID Metrobus ridership']}]},
+        {label:'Managing the curbside',cells:[
+          {lead:'Pressure from delivery',points:['10,000 new rideshare drivers a year']},
+          'Continued rise of e-commerce']}],
+  source:'US Census'},0);
+const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
+const table=page.items.flatMap(find).find(i=>i.component==='table');
+assert.deepEqual(table.props.columns.map(c=>c.label),['Challenge','A - Pre-COVID trends','B - Impacts']);
+// The label column numbers its rows and keeps its own icon; it is not a filled box.
+const [label,first,second]=table.props.rows[0];
+assert.equal(label.sectionNumber,1);
+assert.equal(label.icon,'people');
+assert.equal(label.surface,'plain');
+// Each content cell is a bulleted list under a bold lead, and the phrase the
+// row turns on is set in the accent.
+assert.equal(first.type,'bullets');
+assert.equal(first.lead,'Strong base, declining ridership');
+assert.deepEqual(first.items,['34% of workers commute by transit','15% decline in rail ridership']);
+assert.equal(first.accent,'34%');
+assert.equal(second.type,'bullets');
+// A plain string cell is a text cell, and the second row numbers itself.
+assert.equal(table.props.rows[1][2].type,'text');
+assert.equal(table.props.rows[1][0].sectionNumber,2);
+// One to three content columns; four is a table, not a matrix.
+assert.throws(()=>composeSlide({title:'T',rows:[{label:'a',cells:['a','b','c','d']}]},0),/one to three/);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_a_table_groups_its_measures_and_units_its_columns(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck, component} from './skills/professional-slides/runtime/core.mjs';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const REGISTRY=createRegistry(), frame={x:0,y:0,width:1160,height:400};
+const props={treatment:'open',
+  columns:[{label:'Subsector',type:'text'},
+           {group:'Size',label:'Jobs, 2019',unit:'#',type:'text',align:'right'},
+           {group:'Growth',label:'CAGR 2014-19',unit:'%',type:'text',align:'right'},
+           {group:'Growth',label:'CAGR 2019-24',unit:'%',type:'text',align:'right'}],
+  rows:[['Transit and ground passenger','10,156','18%','-4%'],['Rail transportation','1,580','-2%','-4%']]};
+const nodes=compileDeck({slides:[{id:'s1',frame,composition:component({id:'t',component:'table',frame,props})}]},REGISTRY).slides[0].nodes;
+const groups=nodes.filter(n=>n.role==='table-group-text');
+// One band per contiguous run, so the two CAGR columns share one "Growth".
+assert.deepEqual(groups.map(n=>n.text),['Size','Growth']);
+const growth=groups.find(n=>n.text==='Growth'), size=groups.find(n=>n.text==='Size');
+assert.ok(growth.frame.x > size.frame.x);
+assert.equal(nodes.filter(n=>n.role==='table-group-rule').length,2);
+// The unit sits under its own column label, not in the cells.
+const units=nodes.filter(n=>n.role==='table-header-unit');
+assert.deepEqual(units.map(n=>n.text),['#','%','%']);
+const label=nodes.find(n=>n.role==='table-header-text'&&n.text==='Jobs, 2019');
+const unit=units[0];
+assert.ok(unit.frame.y >= label.frame.y + label.frame.height - 0.01);
+// A group that reappears further along is two different things.
+assert.throws(()=>compileDeck({slides:[{id:'s2',frame,composition:component({id:'t2',component:'table',frame,
+  props:{...props,columns:[{group:'A',label:'x',type:'text'},{group:'B',label:'y',type:'text'},{group:'A',label:'z',type:'text'},{label:'w',type:'text'}]}})}]},REGISTRY),/contiguous/);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_a_highlight_sets_its_phrase_in_the_accent(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {accentRuns} from './skills/professional-slides/runtime/text-layout.mjs';
+import {compileDeck, component} from './skills/professional-slides/runtime/core.mjs';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+assert.deepEqual(accentRuns('Improved quality of care for patients','Improved quality of care'),
+  [{text:'Improved quality of care',bold:true,accent:true},{text:' for patients',bold:false}]);
+// A phrase that is not in the sentence is a typo, not a silent no-op.
+assert.throws(()=>accentRuns('Easier access for residents','Cheaper access'),/does not occur/);
+assert.equal(accentRuns('No highlight here',undefined),null);
+const REGISTRY=createRegistry(), frame={x:0,y:0,width:520,height:300};
+const props={variant:'body',items:[{text:'Improved quality of care for patients',highlight:'Improved quality of care'},
+                                   {text:'Easier access to behavioral health services',highlight:'Easier access'}]};
+const nodes=compileDeck({slides:[{id:'s1',frame,composition:component({id:'l',component:'bullet-list',frame,props})}]},REGISTRY).slides[0].nodes;
+const items=nodes.filter(n=>n.role==='list-item');
+assert.equal(items.length,2);
+assert.ok(items[0].runs.some(run=>run.accent),'the phrase carries the accent');
+assert.equal(items[0].runs.map(r=>r.text).join(''),items[0].text);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_an_all_icon_list_sets_plain_accent_glyphs_on_the_first_line(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck, component} from './skills/professional-slides/runtime/core.mjs';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const REGISTRY=createRegistry(), frame={x:0,y:0,width:520,height:400};
+const build=(props)=>compileDeck({slides:[{id:'s1',frame,composition:component({id:'l',component:'bullet-list',frame,props})}]},REGISTRY).slides[0].nodes;
+const items=[{icon:'people',text:'Improved quality of care for patients across every site in the network'},
+             {icon:'money',text:'Decreased operational costs to employers'}];
+const plain=build({variant:'body',items});
+// No ring: the glyph alone, in the accent, on the first line of its item.
+assert.equal(plain.filter(n=>n.role==='list-icon-ring').length,0);
+const glyphs=plain.filter(n=>n.role==='list-icon-glyph');
+assert.equal(glyphs.length,2);
+assert.equal(glyphs[0].style.stroke.tokenId,'color.accent');
+const [firstItem,secondItem]=plain.filter(n=>n.role==='list-item');
+// The glyph is taller than a line, so it sits at the top of its item rather
+// than floating in the middle of a four-line block.
+assert.ok(Math.abs(glyphs[0].frame.y - firstItem.frame.y) < 4, 'the glyph tops out with its item');
+assert.ok(glyphs[1].frame.y >= secondItem.frame.y - 4);
+// Rows are set apart: a reading gap, not the tight list spacing.
+assert.ok(secondItem.frame.y - (firstItem.frame.y + firstItem.frame.height) >= 12);
+// The ringed marker is still available for a list that wants it.
+const ringed=build({variant:'body',items,marker:'icon-ring'});
+assert.equal(ringed.filter(n=>n.role==='list-icon-ring').length,2);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_a_deck_of_identical_weight_pages_is_reported(self):
+        # Ten pages that all carry the same modest page text: every page passes
+        # THIN_PAGE and the deck still has nothing behind the argument.
+        body = " ".join(["evidence"] * 120)
+        flat = [page(index, ["chart.bar"], texts=[body]) for index in range(1, 11)]
+        found = page_gates.run_gates(deck(flat))
+        self.assertIn("DECK_FLAT", codes(found))
+        # One page that carries the detail is what the finding asks for.
+        heavy = flat[:-1] + [page(10, ["table"], texts=[" ".join(["evidence"] * 300)])]
+        self.assertNotIn("DECK_FLAT", codes(page_gates.run_gates(deck(heavy))))
+        # An airy deck is not asked for a heavy page at all.
+        self.assertNotIn("DECK_FLAT", codes(page_gates.run_gates(deck(flat, fill="airy"))))
+
+
+class CategoryNoteTests(unittest.TestCase):
+    """A second line under the category label: the base of the measure, the year,
+    the unit of that column. The reference charts carry it; ours did not."""
+
+    def test_a_category_note_takes_the_line_under_its_label(self):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck, component, nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const REGISTRY=createRegistry(), frame={x:0,y:0,width:900,height:420};
+const base={heading:'Institutions ranking the factor first',unit:'%',
+  categories:['Productivity','Business needs','Compliance'],series:[{name:'Share',values:[41,26,18]}]};
+const build=(props,componentId='chart.column')=>compileDeck({slides:[{id:'s1',frame,
+  composition:component({id:'c',component:componentId,frame,props})}]},REGISTRY).slides[0].nodes;
+const withNotes=build({...base,categoryNotes:['n=412','n=388','n=401']});
+const notes=withNotes.filter(n=>n.role==='category-note');
+assert.deepEqual(notes.map(n=>n.text),['n=412','n=388','n=401']);
+const labels=withNotes.filter(n=>n.role==='category-label');
+// The note sits under its own label, at label size and in secondary ink.
+assert.ok(notes[0].frame.y >= labels[0].frame.y + labels[0].frame.height - 0.01);
+assert.equal(notes[0].style.fontSize.tokenId,'type.chartLabel');
+assert.equal(notes[0].style.color.tokenId,'color.textSecondary');
+// On a bar chart the pair is one block, the label above the note.
+const bars=build({...base,categoryNotes:['n=412','n=388','n=401']},'chart.bar');
+const barNote=bars.filter(n=>n.role==='category-note')[0], barLabel=bars.filter(n=>n.role==='category-label')[0];
+assert.ok(barNote.frame.y >= barLabel.frame.y + barLabel.frame.height - 0.01);
+// PowerPoint places its own category axis, so a chart with notes is drawn.
+assert.equal(nativeChartSpec('chart.column',{...base,categoryNotes:['n=412']},frame),null);
+assert.ok(nativeChartSpec('chart.column',base,frame));
+// One entry per category, in category order.
+assert.throws(()=>build({...base,categoryNotes:['a','b','c','d']}),/one entry per category/);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])

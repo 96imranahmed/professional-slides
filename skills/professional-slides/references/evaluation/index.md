@@ -15,7 +15,7 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Action title | `TITLE_TOO_LONG`, `HEDGED_TITLE` | at most two lines, within 14 words, no hedge lexicon |
 | Body type | `TYPE_RANGE` | 10 to 14 pt body, 8 to 11 pt chart furniture, 20 to 26 pt titles |
 | Characters per line | `CPL` | 35 to 90 |
-| Body words, exhibit page | `WORDS` | at most 100 (density profile moves it) |
+| Body words, exhibit page | `WORDS` | at most 100 prose words (`pre-read` 160, `appendix` 200; table cells and chart furniture are evidence, not prose) |
 | Hero exhibit, analytical page | `HERO_EXHIBIT` | at least 40% of the content area, carrying ink |
 | Layout repetition | `LAYOUT_MONOTONY` | no layout signature on more than 35% of content pages |
 | Page families | `PAGE_VARIETY` | at least three families across ten pages or more |
@@ -25,7 +25,8 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | One number over a table | `METRIC_STACK` | a lone tile belongs beside its evidence |
 | Sections and tracker | `NO_SECTIONS` | required past twelve analytical pages |
 | Label punctuation | `DOT_SEPARATOR` | no bullet or middle dot joining two labels |
-| Page text floor | `THIN_PAGE` | the deck's `weight.pageWords` (95 balanced, 130 full); reference client pages run a median of 196 |
+| Page text floor | `THIN_PAGE` | the deck's `weight.pageWords` (105 balanced, 150 full); reference client slides run a median of 185, lower quintile 104 |
+| Deck shape | `DECK_FLAT` | past eight analytical pages, one page carries the detail: 282+ words, or a p80 a third above the median |
 | Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |
 | Marks in the exhibit | `PLOT_SPAN` | marks span `weight.plotSpan` of the exhibit frame (annotated and peer-aligned charts exempt) |
 | Table against its budget | `THIN_TABLE` | uses `weight.tableFill` of the page's row budget |

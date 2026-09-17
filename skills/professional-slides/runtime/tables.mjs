@@ -13,7 +13,7 @@ import {
   chartAnnotationStyle,
   houseStyle,
 } from "./core.mjs";
-import { measureText } from "./text-layout.mjs";
+import { measureText, measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
 import { numberMarker, stateMarker, iconMarker, MARK_TOKENS } from "./marks.mjs";
 
@@ -125,6 +125,17 @@ const measure = (text, width, bold = false, size = "type.body") =>
     bold,
     wrapWidthRatio: 1,
   });
+// A cell may carry `highlight`: the phrase inside it that reads in the house
+// accent, the way a reference table marks the figure that decides the row.
+const measureRuns = (text, highlight, width, bold = false, size = "type.body") => {
+  const runs = accentRuns(String(text), highlight, { bold: true, strict: false });
+  if (!runs) return measure(text, width, bold, size);
+  return measureTextRuns(runs.map((run) => ({ ...run, bold: run.accent ? true : bold })), width, {
+    fontFamily: v("font.body"),
+    fontSize: v(size),
+    wrapWidthRatio: 1,
+  });
+};
 const line = (id, x1, y1, x2, y2, role = "table-rule", data = {}) =>
   linePrimitive({
     id,
@@ -178,6 +189,20 @@ function normalize(props) {
   );
   if (new Set(columns.map((c) => c.id)).size !== columns.length)
     throw new Error("Duplicate table column id");
+  // `group`: the band above the header that names what a run of columns
+  // measures ("Size", "Growth", "Specialization"); `unit`: the measure's unit
+  // under the label, so the cells carry the number alone. Groups must be
+  // contiguous - a band that reappears further along is two different things.
+  const seenGroups = new Set();
+  let runningGroup = null;
+  for (const column of columns) {
+    const group = column.group === undefined || column.group === null ? null : String(column.group);
+    if (group !== runningGroup) {
+      if (group && seenGroups.has(group)) throw new Error(`Table column group "${group}" is not contiguous`);
+      if (group) seenGroups.add(group);
+      runningGroup = group;
+    }
+  }
   const rows = props.rows.map((row) =>
     Array.isArray(row) ? { cells: row } : row,
   );
@@ -512,12 +537,33 @@ function contentLayout(cell, width, props, used) {
   }
   // A numbered section marker sits at the left of its category cell, on the
   // label's centre line, whatever the surface; the label starts after it.
+  // A row label carries a numbered disc, an icon, or both: the reference matrix
+  // numbers its rows and gives each one its own mark, and the label starts after
+  // whatever is there.
   const inlineSectionMarker = cell.sectionNumber !== undefined || (cell.type === "category" && cell.icon);
-  if (inlineSectionMarker) offset = (cell.icon && cell.sectionNumber === undefined ? Math.round(v("icon.medium") * 1.5) : v("icon.medium")) + gap;
-  const blocks = texts.map((s) => measure(s, inner - offset, bold, size));
-  const blockHeight = blocks.length
+  const iconInline = cell.type === "category" && Boolean(cell.icon);
+  if (inlineSectionMarker) {
+    const disc = cell.sectionNumber !== undefined ? v("icon.medium") + gap : 0;
+    const glyph = iconInline ? Math.round(v("icon.medium") * 1.5) + gap : 0;
+    offset = disc + glyph;
+  }
+  const blocks = texts.map((s) => measureRuns(s, cell.accent, inner - offset, bold, size));
+  // A bullets cell may open with a bold lead line: the finding, then the
+  // evidence under it. The reference matrix page sets every cell this way.
+  const leadText = cell.type === "bullets" && typeof cell.lead === "string" && cell.lead.trim() ? cell.lead.trim() : null;
+  const lead = leadText ? measureRuns(leadText, cell.accent, inner, true, size) : null;
+  // `accent`: the phrase inside the cell that reads in the house colour.
+  // (`highlight: true` is the older flag that marks a whole cell.)
+  if (cell.accent !== undefined && cell.accent !== null) {
+    const phrases = Array.isArray(cell.accent) ? cell.accent : [cell.accent];
+    const everything = [leadText, ...texts].filter(Boolean).join("\u0000");
+    for (const phrase of phrases) {
+      if (!everything.includes(String(phrase))) throw new Error(`Table cell accent "${phrase}" does not occur in the cell`);
+    }
+  }
+  const blockHeight = (blocks.length
     ? sum(blocks.map((b) => b.height)) + (blocks.length - 1) * gap
-    : 0;
+    : 0) + (lead ? lead.height + gap : 0);
   const numberMarker =
     cell.type === "number" && cell.numberDisplay !== "plain"
       ? Math.max(
@@ -538,6 +584,7 @@ function contentLayout(cell, width, props, used) {
     padding,
     offset,
     blocks,
+    lead,
     bold,
     size,
     marker,
@@ -629,8 +676,28 @@ export function measureTable({ frame, props }) {
   const headers = model.columns.map((c, i) =>
     c.label ? measure(c.label, widths[i] - 2 * padding - 2 * chevronInset, true, textSize) : null,
   );
+  // A unit sits under its column's label at label size: "Jobs, 2019" over "#",
+  // so every cell in the column prints the number and nothing else.
+  const units = model.columns.map((c, i) =>
+    c.unit ? measure(String(c.unit), widths[i] - 2 * padding, false, "type.label") : null,
+  );
+  const unitHeight = units.some(Boolean) ? Math.max(...units.map((u) => u?.height ?? 0)) + v("space.1") : 0;
+  // The group band runs above the header over each contiguous run of columns
+  // that share a `group`, with its own rule under it.
+  const groupRuns = [];
+  model.columns.forEach((column, i) => {
+    const group = column.group === undefined || column.group === null ? null : String(column.group);
+    const last = groupRuns.at(-1);
+    if (last && last.group === group) last.end = i;
+    else groupRuns.push({ group, start: i, end: i });
+  });
+  const groups = groupRuns.filter((run) => run.group).map((run) => ({
+    ...run,
+    layout: measure(run.group, sum(widths.slice(run.start, run.end + 1)) - 2 * padding, true, textSize),
+  }));
+  const groupHeight = groups.length ? Math.max(...groups.map((g) => g.layout.height)) + paddingY + v("space.1") : 0;
   const headerHeight = headers.some(Boolean)
-    ? Math.max(...headers.map((h) => h?.height ?? 0)) + 2 * paddingY + (chevronInset ? paddingY : 0)
+    ? Math.max(...headers.map((h) => h?.height ?? 0)) + unitHeight + 2 * paddingY + (chevronInset ? paddingY : 0) + groupHeight
     : 0;
   const layouts = model.cells.map((row) =>
     row.map((cell) =>
@@ -731,6 +798,10 @@ export function measureTable({ frame, props }) {
     textSize,
     widths,
     headers,
+    units,
+    unitHeight,
+    groups,
+    groupHeight,
     headerHeight,
     layouts,
     heights,
@@ -788,6 +859,7 @@ function renderTableAt({ id, frame, props }) {
         role,
         frame: { ...area, height: layout.height },
         text: layout.text,
+        ...(layout.runs && layout.runs.some((run) => run.accent) ? { runs: layout.runs } : {}),
         style: { ...style, lineHeight: layout.lineHeight },
         data: { ...data, textLayout: layout },
       }),
@@ -795,6 +867,34 @@ function renderTableAt({ id, frame, props }) {
   const header = props.treatment ?? "open";
   if (!["open", "standard", "dimensions", "categories"].includes(header))
     throw new Error("Unknown table header treatment");
+  // The group band: what a run of columns measures, over its own rule. The
+  // reference wide table heads four measures with three groups this way, so a
+  // reader takes the table in two passes instead of reading six labels.
+  if (m.headerHeight && m.groups.length) {
+    for (const group of m.groups) {
+      const x = xs[group.start];
+      const width = sum(m.widths.slice(group.start, group.end + 1)) - m.gap;
+      putText(
+        stableId(id, "group-text", group.start),
+        "table-group-text",
+        { x: x + m.padding, y: frame.y + v("space.1"), width: width - 2 * m.padding },
+        group.layout,
+        textStyle(true, ink, "left", m.textSize),
+        { columnGroup: group.group },
+      );
+      nodes.push(
+        line(
+          stableId(id, "group-rule", group.start),
+          x,
+          frame.y + m.groupHeight - v("space.1"),
+          x + width,
+          frame.y + m.groupHeight - v("space.1"),
+          "table-group-rule",
+          { columnGroup: group.group },
+        ),
+      );
+    }
+  }
   m.columns.forEach((column, c) => {
     if (!m.headerHeight) return;
     const filledHeader = header === "standard" || (header === "dimensions" && column.type !== "category");
@@ -830,12 +930,13 @@ function renderTableAt({ id, frame, props }) {
     if (m.headers[c]) {
       const chevron = filledHeader && props.headerShape === "chevron";
       const inset = chevron ? m.headerHeight / 2 : 0;
+      const labelY = frame.y + m.paddingY + m.groupHeight;
       putText(
         stableId(id, "header-text", c),
         "table-header-text",
         {
           x: xs[c] + m.padding + inset,
-          y: frame.y + m.paddingY,
+          y: labelY,
           width: m.widths[c] - 2 * m.padding - 2 * inset,
         },
         m.headers[c],
@@ -846,6 +947,18 @@ function renderTableAt({ id, frame, props }) {
           m.textSize,
         ),
       );
+      if (m.units[c])
+        putText(
+          stableId(id, "header-unit", c),
+          "table-header-unit",
+          {
+            x: xs[c] + m.padding + inset,
+            y: labelY + m.headers[c].height,
+            width: m.widths[c] - 2 * m.padding - 2 * inset,
+          },
+          m.units[c],
+          textStyle(false, filledHeader ? white : t("color.textSecondary"), chevron ? "center" : column.align ?? "left", "type.label"),
+        );
     }
     // One continuous header rule unless a column is an implication arrow or
     // the header sits over a chevron/category run whose slits are by design.
@@ -1170,7 +1283,18 @@ function renderTableAt({ id, frame, props }) {
             textStyle(true, foreground(primary), "center", l.size),
             numberData,
           );
-        } else
+        } else {
+          if (l.lead) {
+            putText(
+              stableId(id, "cell-lead", r, c),
+              "table-cell-text",
+              { x: inner.x, y, width: inner.width },
+              l.lead,
+              textStyle(true, color, cell.align ?? "left", l.size),
+              data,
+            );
+            y += l.lead.height + m.gap;
+          }
           l.blocks.forEach((block, k) => {
             if (cell.type === "bullets")
               nodes.push(
@@ -1203,6 +1327,7 @@ function renderTableAt({ id, frame, props }) {
             );
             y += block.height + m.gap;
           });
+        }
       }
       if (cell.sectionNumber !== undefined) {
         // The deck's one numbered disc, at the left of the cell on the label's
@@ -1220,10 +1345,12 @@ function renderTableAt({ id, frame, props }) {
           data: { ...data, sectionNumber: cell.sectionNumber, placement: "inline-start" },
         }));
       }
-      if (cell.type === "category" && cell.icon && cell.sectionNumber === undefined) {
-        // An icon in place of the numbered disc, on the same left edge and centre line.
+      if (cell.type === "category" && cell.icon) {
+        // The icon sits where the label starts: alone at the cell's left edge,
+        // or just after the numbered disc when the row carries both.
         const size = Math.round(m.sectionMarkerSize * 1.5);
-        nodes.push(...iconMarker({ id: stableId(cellId, "icon"), role: "table-cell-icon", x: inner.x, y: inner.y + inner.height / 2 - size / 2, size, icon: cell.icon, tone: fill === primary ? "inverse" : "outline", data: { ...data, icon: cell.icon } }));
+        const x = inner.x + (cell.sectionNumber !== undefined ? m.sectionMarkerSize + m.gap : 0);
+        nodes.push(...iconMarker({ id: stableId(cellId, "icon"), role: "table-cell-icon", x, y: inner.y + inner.height / 2 - size / 2, size, icon: cell.icon, tone: fill === primary ? "inverse" : "accent", data: { ...data, icon: cell.icon } }));
       }
       if (cell.type !== "implication" && r + cell.rowSpan < m.rows.length) {
         // One continuous rule per row unless the row is a run of filled

@@ -117,10 +117,10 @@ HEDGES = (
 PROFILES = {
     "live-pitch": {"words_exhibit": 70, "words_text": 100},
     "executive": {"words_exhibit": 100, "words_text": 140},
-    "pre-read": {"words_exhibit": 130, "words_text": 180},
+    "pre-read": {"words_exhibit": 160, "words_text": 220},
     # Source-rich support behind the story, set in the smallest approved type:
     # it carries more words in the same frame, by design.
-    "appendix": {"words_exhibit": 160, "words_text": 220},
+    "appendix": {"words_exhibit": 200, "words_text": 280},
 }
 DEFAULT_PROFILE = "executive"
 
@@ -147,8 +147,8 @@ DEFAULT_FILL = "balanced"
 # is a floor, never a ceiling — the ceiling on prose is WORDS, and density is
 # only a defect when the content is not.
 WEIGHT_BY_FILL = {
-    "full": {"pageWords": 130, "columnFill": 0.68, "plotSpan": 0.60, "pointWords": 10, "tableFill": 0.55, "elements": 2},
-    "balanced": {"pageWords": 95, "columnFill": 0.55, "plotSpan": 0.52, "pointWords": 8, "tableFill": 0.45, "elements": 1},
+    "full": {"pageWords": 150, "columnFill": 0.68, "plotSpan": 0.60, "pointWords": 10, "tableFill": 0.55, "elements": 2},
+    "balanced": {"pageWords": 105, "columnFill": 0.55, "plotSpan": 0.52, "pointWords": 8, "tableFill": 0.45, "elements": 1},
     "airy": {"pageWords": 0, "columnFill": 0.0, "plotSpan": 0.0, "pointWords": 0, "tableFill": 0.0, "elements": 1},
 }
 # 1,832 pages of published McKinsey, BCG and Bain client decks: median 196 words
@@ -174,6 +174,7 @@ THRESHOLDS = {
     "data_pages_min": 0.45,    # pages whose evidence is a chart, a table or measured tiles
     "families_min": 3,         # distinct page families in a deck of ten pages or more
     "sections_from": 12,       # analytical pages beyond which a deck needs sections and a tracker
+    "deck_shape_from": 8,      # analytical pages beyond which a deck needs a heavy page among the light ones
 }
 
 
@@ -1064,6 +1065,36 @@ def gate_deck_structure(slides, analytical, findings):
     ))
 
 
+def gate_deck_shape(slides, analytical, findings, fill):
+    """DECK_FLAT, deck level. The reference client decks do not carry the same
+    page twice: their page text runs from 104 words at the lower quintile to 278
+    at the upper, and two pages in five carry 200 words or more. A deck whose
+    pages all weigh the same has not decided which pages matter - and the way to
+    fix it is a page that carries the detail (a findings matrix, a deep measure
+    table), not a sentence added to every page."""
+    if fill == "airy" or len(analytical) < THRESHOLDS["deck_shape_from"]:
+        return
+    counts = sorted(page_text_words(slides[index]) for index in analytical)
+    if not counts:
+        return
+    middle = len(counts) // 2
+    median = counts[middle] if len(counts) % 2 else (counts[middle - 1] + counts[middle]) / 2
+    top = counts[int(round(0.8 * (len(counts) - 1)))]
+    heavy = sum(1 for value in counts if value >= REFERENCE_PAGE_WORDS["p75"])
+    if heavy or (median and top / median >= 1.35):
+        return
+    findings.append(finding(
+        None, "DECK_FLAT",
+        {"median": median, "p80": top, "heaviest": counts[-1], "pagesAtReferenceP75": heavy},
+        f"one page in the deck at {REFERENCE_PAGE_WORDS['p75']}+ words, or a p80 a third above the median",
+        "Every page carries the same weight, which reads as a deck with no "
+        "detail behind it. Give the argument its evidence page: a findings "
+        "matrix (`matrix`) of rows against two or three columns of bulleted "
+        "findings, or a deep table with its measures grouped and its basis in "
+        "numbered notes.",
+    ))
+
+
 def layout_signature(slide):
     """Sorted multiset of top-level component ids plus the row/column shape."""
     instances = [c for c in top_level_instances(slide)]
@@ -1227,6 +1258,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         gate_evidence_mix(slides, content_indexes, findings)
     if not gates or "NO_SECTIONS" in gates:
         gate_deck_structure(slides, content_indexes, findings)
+    if not gates or "DECK_FLAT" in gates:
+        gate_deck_shape(slides, content_indexes, findings, fill)
 
     # A density report beside the findings: the numbers this review is about, so
     # a regression shows up as a number rather than as a screenshot.

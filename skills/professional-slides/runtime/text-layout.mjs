@@ -81,3 +81,37 @@ export function measureTextRuns(runs, width, { fontFamily = activeDesignTokens()
   const lineHeight = lineBox(fontSize);
   return { source, sourceRuns: merge(runs), text: lines.join('\n'), lines, runs: measuredRuns.length ? measuredRuns : [{text:'',bold:false}], width: Math.max(...lineRuns.map(runWidth)), lineHeight, height: lines.length * lineHeight };
 }
+
+/**
+ * Split a sentence into runs at the phrases the page wants to carry in the
+ * accent. This is the reference decks' commonest emphasis: the figure or the
+ * finding is set in the house colour inside a sentence that otherwise reads as
+ * ink ("Improved quality of care for patients"), rather than bolded whole or
+ * split onto its own line. `phrases` is one string or several; each is matched
+ * in order of appearance, once. Unmatched phrases throw: a highlight that does
+ * not occur in the text is a typo, and silently dropping it hides the typo.
+ */
+export function accentRuns(text, phrases, { bold = true, accent = true, strict = true } = {}) {
+  const list = (Array.isArray(phrases) ? phrases : phrases === undefined || phrases === null ? [] : [phrases])
+    .map((phrase) => String(phrase ?? "").trim()).filter(Boolean);
+  const source = String(text ?? "");
+  if (!list.length) return null;
+  // `strict: false` is for a block that is one of several (the items of a table
+  // cell): the phrase belongs to one of them, and the caller checks that it
+  // matched somewhere rather than in every block.
+  if (!strict && !list.some((phrase) => source.includes(phrase))) return null;
+  for (const phrase of list) {
+    if (strict && !source.includes(phrase)) throw new Error(`highlight "${phrase}" does not occur in "${source}"`);
+  }
+  const runs = [];
+  let rest = source;
+  while (rest.length) {
+    const hits = list.map((phrase) => ({ phrase, at: rest.indexOf(phrase) })).filter((hit) => hit.at >= 0).sort((a, b) => a.at - b.at);
+    if (!hits.length) { runs.push({ text: rest, bold: false }); break; }
+    const { phrase, at } = hits[0];
+    if (at > 0) runs.push({ text: rest.slice(0, at), bold: false });
+    runs.push({ text: phrase, bold, ...(accent ? { accent: true } : {}) });
+    rest = rest.slice(at + phrase.length);
+  }
+  return runs.filter((run) => run.text.length);
+}

@@ -315,12 +315,45 @@
    "exhibit": {
     "type": "table",
     "columns": [
-     "Urban area",
-     "Delay, hours",
-     "Rank",
-     "Travel time index",
-     "Excess fuel, gallons",
-     "Cost, $"
+     {
+      "label": "Urban area",
+      "type": "text"
+     },
+     {
+      "group": "Congestion",
+      "label": "Delay",
+      "unit": "hours a year",
+      "type": "text",
+      "align": "right"
+     },
+     {
+      "group": "Congestion",
+      "label": "Rank",
+      "unit": "of 101 areas",
+      "type": "text",
+      "align": "right"
+     },
+     {
+      "group": "Congestion",
+      "label": "Travel time index",
+      "unit": "peak / free flow",
+      "type": "text",
+      "align": "right"
+     },
+     {
+      "group": "Cost to the commuter",
+      "label": "Excess fuel",
+      "unit": "gallons",
+      "type": "text",
+      "align": "right"
+     },
+     {
+      "group": "Cost to the commuter",
+      "label": "Cost",
+      "unit": "$ a year",
+      "type": "text",
+      "align": "right"
+     }
     ],
     "rows": [
      [
@@ -413,11 +446,12 @@
    "source": "Texas A&M Urban Mobility Report, 2017",
    "footnotes": [
     {
-     "on": "Delay, hours",
-     "text": "Yearly delay per auto commuter; excludes freight and transit riders"
+     "on": "Travel time index",
+     "text": "Ratio of peak-period travel time to free-flow travel time"
     },
     {
-     "text": "Travel time index is the peak-hour journey against the same trip at free flow"
+     "on": "Washington DC-VA-MD",
+     "text": "Includes the Virginia and Maryland commuter shed"
     }
    ]
   },
@@ -427,11 +461,33 @@
    "exhibit": {
     "type": "table",
     "columns": [
-     "Sector",
-     "2023 deal value, $B",
-     "YoY change",
-     "Outlook",
-     "Key drivers"
+     {
+      "label": "Sector",
+      "type": "text"
+     },
+     {
+      "group": "2023",
+      "label": "Deal value",
+      "unit": "$B",
+      "type": "text",
+      "align": "right"
+     },
+     {
+      "group": "2023",
+      "label": "YoY change",
+      "unit": "%",
+      "type": "text",
+      "align": "right"
+     },
+     {
+      "label": "Outlook",
+      "type": "text",
+      "align": "center"
+     },
+     {
+      "label": "Key drivers",
+      "type": "text"
+     }
     ],
     "rows": [
      [
@@ -636,6 +692,108 @@
    "source": "US Census ACS 2019; DDOT"
   },
   {
+   "kicker": "Year in review",
+   "title": "Four conditions decide whether the 2024 recovery holds",
+   "columns": [
+    "Condition",
+    "What 2023 showed",
+    "What has to be true in 2024"
+   ],
+   "rows": [
+    {
+     "label": "Dry powder",
+     "icon": "money",
+     "cells": [
+      {
+       "lead": "Capital is available and ageing",
+       "points": [
+        "Dry powder remains at a record after two slow deployment years",
+        "Funds raised in 2021 reach the end of their investment periods in 2024"
+       ],
+       "highlight": "record"
+      },
+      {
+       "lead": "Deployment restarts at 2019 pace",
+       "points": [
+        "Average cheque size returns to $60-80m from the $40m of 2023",
+        "Buyouts keep the share of deals they took in healthcare and manufacturing"
+       ],
+       "highlight": "$60-80m"
+      }
+     ]
+    },
+    {
+     "label": "Valuations",
+     "icon": "target",
+     "cells": [
+      {
+       "lead": "Mismatches stalled the mid-market",
+       "points": [
+        "New-age tech investments fell ~65% as sentiment hit business-model viability",
+        "Scale assets stayed funded, so sellers had no pressure to reprice"
+       ],
+       "highlight": "~65%"
+      },
+      {
+       "lead": "Sellers accept the 2019 multiple",
+       "points": [
+        "Secondary and continuation vehicles clear the 2021 vintage at a discount",
+        "Public comparables hold, so the private mark stops moving against the seller"
+       ]
+      }
+     ]
+    },
+    {
+     "label": "Exit window",
+     "icon": "rocket",
+     "cells": [
+      {
+       "lead": "Exits waited for the listing market",
+       "points": [
+        "IPO windows opened only briefly, and strategics stayed on the sidelines",
+        "Hold periods extended past five years across the 2018-19 vintages"
+       ],
+       "highlight": "five years"
+      },
+      {
+       "lead": "Two consecutive open quarters",
+       "points": [
+        "A listing window that stays open long enough to price a second cohort",
+        "Strategic buyers return with balance sheets rather than paper"
+       ]
+      }
+     ]
+    },
+    {
+     "label": "Sector mix",
+     "icon": "growth",
+     "cells": [
+      {
+       "lead": "Traditional sectors carried the year",
+       "points": [
+        "Traditional sectors held ~75% of investments as investors backed proven models",
+        "Healthcare and advanced manufacturing grew while IT services reset"
+       ],
+       "highlight": "~75%"
+      },
+      {
+       "lead": "The reset sectors stop falling",
+       "points": [
+        "IT/ITeS deal value stabilises after a 65% decline",
+        "New-age tech clears its funding overhang rather than repricing again"
+       ],
+       "highlight": "65%"
+      }
+     ]
+    }
+   ],
+   "note": [
+    "Dry powder measured as uncalled capital in India-focused funds at year end",
+    "2023 figures are announced enterprise values and may not sum"
+   ],
+   "source": "Venture Intelligence; Bain analysis"
+  },
+  {
    "kind": "section",
    "title": "Survey",
    "summary": "GenAI use cases in credit are moving from pilot to deployment",
@@ -668,7 +826,13 @@
       ]
      }
     ],
-    "dataTable": true
+    "dataTable": true,
+    "categoryNotes": [
+     "n=412",
+     "n=388",
+     "n=401",
+     "n=290"
+    ]
    },
    "pointsTone": "tint",
    "pointsHeading": false,
@@ -918,6 +1082,11 @@
       "category": "EMEA",
       "style": "bar"
      }
+    ],
+    "categoryNotes": [
+     "3 hubs",
+     "2 hubs",
+     "1 hub"
     ]
    },
    "photo": {
@@ -941,7 +1110,10 @@
     }
    ],
    "source": "Internal staffing records, 2022",
-   "note": "Internal staffing records, 2022"
+   "note": [
+    "Staffing measured as consultants who billed a metals study in the last 12 months",
+    "Hub count is offices with a resident metals partner"
+   ]
   },
   {
    "title": "Investment themes: a return to fundamentals across sectors and geographies",
@@ -973,7 +1145,11 @@
      "text": "in healthcare and advanced manufacturing across sub-segments in 2024"
     }
    ],
-   "source": "Bain analysis"
+   "source": "Bain analysis",
+   "note": [
+    "Shares are of announced deal value in India-focused funds; 2023 figures may not sum",
+    "Advanced manufacturing includes EV supply chain, electronics and speciality chemicals"
+   ]
   },
   {
    "kind": "takeaways",
