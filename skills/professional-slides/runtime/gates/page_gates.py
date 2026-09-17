@@ -55,7 +55,7 @@ BODY_ROLES = {
     "table-cell-text", "table-cell", "table-header-text",
     "insight-body", "insight-heading", "evidence-note-text",
 }
-CHART_FURNITURE_ROLES = {"axis-label", "category-label", "data-label", "legend-label", "table-status-label", "table-lamp", "table-progress-label", "table-trend-glyph", "chart-bracket-label", "chart-delta-label", "chart-period-label", "chart-event-label", "chart-unit"}
+CHART_FURNITURE_ROLES = {"axis-label", "axis-title", "category-label", "data-label", "legend-label", "table-status-label", "table-lamp", "table-progress-label", "table-trend-glyph", "chart-bracket-label", "chart-delta-label", "chart-period-label", "chart-event-label", "chart-unit"}
 TITLE_ROLES = {"action-title"}
 SOURCE_ROLES = {"source-text", "source", "footnote", "footnote-text"}
 NON_BODY_ROLES = SOURCE_ROLES | CHART_FURNITURE_ROLES | TITLE_ROLES | {
@@ -683,13 +683,23 @@ def gate_hero_exhibit(slide_no, slide, findings, image=None):
 
 
 def axis_groups(slide):
-    """Axis labels grouped by the chart instance that owns them."""
+    """Axis tick labels grouped by the axis that owns them.
+
+    A chart with two quantitative dimensions - a scatter, a bubble - carries two
+    axes, and its x ticks are not a continuation of its y ticks: read together
+    they are always "uneven steps", which is a finding about nothing. The
+    renderer marks each tick with the axis it belongs to, and an untagged chart
+    has one axis, so `(instance, axis)` is the group.
+
+    Axis *titles* carry the role `axis-title` and are not ticks.
+    """
     groups = {}
     for node in text_nodes(slide):
         if node.get("role") != "axis-label":
             continue
-        owner = (node.get("data") or {}).get("componentInstance") or "axis"
-        groups.setdefault(owner, []).append(node)
+        data = node.get("data") or {}
+        owner = data.get("componentInstance") or "axis"
+        groups.setdefault(f"{owner}:{data.get('axis') or 'value'}", []).append(node)
     return groups
 
 

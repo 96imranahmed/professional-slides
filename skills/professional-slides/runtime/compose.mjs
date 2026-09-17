@@ -1,6 +1,6 @@
 // deck/v3 → planner deckPlan. The author writes content and intent (~10 fields per
 // slide); everything geometric — layout, sizes, density, section nesting — is derived
-// here from what the page carries. See deep-audit-and-revamp.md item 4.
+// here from what the page carries.
 //
 // {
 //   "schema": "professional-slides.deck/v3",
@@ -29,6 +29,7 @@ import { chartAnnotationBands, evidenceAnnotationTopBandCount, EVIDENCE_CALLOUT_
 import { legendRowCount } from "./legends.mjs";
 import { measureTable } from "./tables.mjs";
 import { resolveWeight, normalizeWeight } from "./weight.mjs";
+import { groupThousands } from "./draw.mjs";
 
 const V3 = "professional-slides.deck/v3";
 const SIZE = { width: { fr: 1 }, height: "fill" };
@@ -134,6 +135,9 @@ function tableAlias(ex) {
   return ex;
 }
 
+/** Components whose render is the table renderer, reached by their own id. */
+const TABLE_RENDERERS = ["trend-rows", "comparison-table", "heatmap"];
+
 function exhibitItem(exIn, id, baseDir, size = SIZE) {
   // `caption`: the finding under this panel. In a two-up or a grid the
   // reference captions every panel rather than closing with one shared
@@ -156,6 +160,13 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
   if (type === "table") {
     const styled = styleTable(rest);
     return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
+  }
+  // The other table renderers reach the page by their component id rather than
+  // through the `table` alias, and used to lose the one thing the alias does
+  // for them: a table in a full-height frame spreads its rows down the frame
+  // instead of hugging the top and leaving the page empty under it.
+  if (TABLE_RENDERERS.includes(type)) {
+    return { id, component: type, props: { ...rest, fillHeight: size.height === "fill" }, size };
   }
   // A metrics exhibit: one row up to four tiles, a grid of equal rows beyond
   // (the McKinsey "Impact to date" 3x3 of navy tiles). `tone` sets every tile.
@@ -363,13 +374,12 @@ function groupNumericColumns(ex) {
     grouped.add(i);
   }
   if (!grouped.size) return ex;
-  const group = (text) => text.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const rows = rowsIn.map((row) => {
     const cells = row.cells.map((cell, i) => {
       if (!grouped.has(i)) return cell;
       const value = numberOf(cell);
       if (value === null || Math.abs(value) < 1000) return cell;
-      const text = group(String(value));
+      const text = groupThousands(String(value));
       return cell && typeof cell === "object" ? { ...cell, text } : text;
     });
     const { plain, ...rest } = row;

@@ -6,6 +6,7 @@
 import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
+import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 
 const PRIMARY = token("color.componentPrimary"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), ACCENT = token("color.accent");
 const SURFACE = token("color.surface"), MUTED = token("color.surfaceMuted"), RULE = token("color.rule"), TINT = token("color.componentPrimaryTint");
@@ -16,9 +17,9 @@ const ACCENT_OR_PRIMARY = () => token("color.accent");
 export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
 const text = (size, color = INK, bold = false, align = "left") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
-const measure = (value, width, size, bold = false) => measureText(String(value), width, { fontFamily: tokenValue(FONT), fontSize: v(size), bold, wrapWidthRatio: 1 });
-const rect = (id, role, frame, fill, stroke = "none", radius = "radius.none") => rectPrimitive({ id, role, frame, style: { fill, stroke, lineWidth: token("line.hairline"), radius: token(radius) } });
-const label = (id, role, frame, layout, style) => textPrimitive({ id, role, frame: { ...frame, height: layout.height }, text: layout.text, style: { ...style, lineHeight: layout.lineHeight }, data: { textLayout: layout } });
+const measure = (value, width, size, bold = false) => measureAt(value, width, { size, bold });
+const rect = (id, role, frame, fill, stroke = "none", radius = "radius.none") => fillRect(id, role, frame, fill, { stroke, radius });
+const label = measuredLabel;
 
 /* ------------------------------------------------------------------ cards */
 

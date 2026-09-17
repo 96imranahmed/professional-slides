@@ -42,7 +42,7 @@ Row and column plans, including nested sections, declare `gap` as a spacing toke
 | What does this evidence imply? | Evidence beside developed explanation | Mechanism, significance, material qualification |
 | Is the recommendation robust? | Decision table plus sensitivity | Explicit criteria, economics, sensitivity, countercase |
 
-`runtime/composition-recipes.mjs` supplies these as executable structures - paired evidence, trend above drivers, decision terms above sensitivity, evidence and explanation, label and prose rows, parallel domains, claim and proof paragraphs, and a complete evidence matrix. `retrieveRecipes({question, density})` ranks by question type and reading depth; `composeRecipe` arranges supplied exhibits. `selectComposition({slide, deckContext, candidates})` compiles up to six arrangements at the requested typography and returns the measured viable ones with a recommendation.
+Write these as the deck spec describes them: the composition is the shape of the slide's keys, not a call into a second builder. The four heavy shapes have names the composer knows - `shape: "findings-matrix" | "measure-table" | "model-page" | "half-and-half"` - and everything else is the exhibit, the points and the arrangement.
 
 Worked patterns:
 

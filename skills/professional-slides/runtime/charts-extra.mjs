@@ -9,9 +9,10 @@ import { contrastRatio } from "./palettes.mjs";
 import { formatValue } from "./value-format.mjs";
 import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle, labelBold, legendRowsFor, lineStyle, numericBounds, textStyle, topLegend } from "./charts.mjs";
 import { TOKENS } from "./core.mjs";
+import { measureAt } from "./draw.mjs";
 
 const ACCENT = token("color.accent");
-const measure = (text, width, { bold = false, size = CHART_LABEL } = {}) => measureText(String(text), width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(size), bold, wrapWidthRatio: 1 });
+const measure = (text, width, { bold = false, size = CHART_LABEL } = {}) => measureAt(text, width, { size, bold, font: FONT });
 const norm = (frame, x, y) => [Number(((x - frame.x) / frame.width).toFixed(6)), Number(((y - frame.y) / frame.height).toFixed(6))];
 const probe = (frame) => (Number.isFinite(frame.height) ? frame : { ...frame, height: 400 });
 // Intrinsic heights answer a hug measurement from the width (a plot wants

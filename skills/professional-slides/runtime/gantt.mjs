@@ -12,16 +12,17 @@
 // }
 import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, shapePrimitive } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
+import { measureAt, fillRect } from "./draw.mjs";
 
 const v = (id) => tokenValue(token(id));
 const INK = token("color.ink"), WHITE = token("color.onPrimary"), PRIMARY = token("color.componentPrimary"), SECOND = token("color.chartSeries2"), ACCENT = token("color.accent");
 const RULE = token("color.rule"), MUTED = token("color.surfaceMuted"), GREY = token("color.textSecondary"), FONT = token("font.body");
 export const GANTT_TOKENS = Object.freeze(["color.ink", "color.onPrimary", "color.componentPrimary", "color.chartSeries2", "color.accent", "color.rule", "color.surfaceMuted", "color.textSecondary", "font.body", "type.body", "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "line.hairline", "line.standard", "radius.none", "radius.small"]);
 
-const measure = (text, width, size = "type.compact", bold = false) => measureText(String(text), width, { fontFamily: v("font.body"), fontSize: v(size), bold, wrapWidthRatio: 1 });
+const measure = (text, width, size = "type.compact", bold = false) => measureAt(text, width, { size, bold });
 const style = (size, color = INK, bold = false, align = "left") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
 const text = (id, role, frame, layout, st, data = {}) => textPrimitive({ id, role, frame: { ...frame, height: layout.height }, text: layout.text, style: { ...st, lineHeight: layout.lineHeight }, data: { ...data, textLayout: layout } });
-const rect = (id, role, frame, fill, radius = "radius.none", data = {}) => rectPrimitive({ id, role, frame, style: { fill, stroke: "none", lineWidth: token("line.hairline"), radius: token(radius) }, data });
+const rect = (id, role, frame, fill, radius = "radius.none", data = {}) => fillRect(id, role, frame, fill, { radius, data });
 const rule = (id, x1, y1, x2, y2, stroke = RULE, data = {}) => linePrimitive({ id, role: "gantt-rule", x1, y1, x2, y2, style: { stroke, lineWidth: token("line.hairline") }, data });
 
 function normalize(props) {

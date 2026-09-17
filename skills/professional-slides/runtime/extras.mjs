@@ -7,6 +7,7 @@ import { token, tokenValue, stableId, textPrimitive, rectPrimitive, ellipsePrimi
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker, markerSize } from "./marks.mjs";
 import { mediaNode } from "./media.mjs";
+import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 
 const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary");
 const SURFACE = token("color.surface"), RULE = token("color.rule");
@@ -16,9 +17,9 @@ const v = (id) => tokenValue(token(id));
 export const EXTRA_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.textSecondary", "color.rule", "font.display", "type.heading", "type.body", "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
 const text = (size, color = INK, bold = false, align = "left", font = FONT) => ({ fontFamily: font, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
-const measure = (value, width, size, bold = false, font = FONT) => measureText(String(value), width, { fontFamily: tokenValue(font), fontSize: v(size), bold, wrapWidthRatio: 1 });
-const rect = (id, role, frame, fill, stroke = "none", radius = "radius.none") => rectPrimitive({ id, role, frame, style: { fill, stroke, lineWidth: token("line.hairline"), radius: token(radius) } });
-const label = (id, role, frame, layout, style) => textPrimitive({ id, role, frame: { ...frame, height: layout.height }, text: layout.text, style: { ...style, lineHeight: layout.lineHeight }, data: { textLayout: layout } });
+const measure = (value, width, size, bold = false, font = FONT) => measureAt(value, width, { size, bold, font });
+const rect = (id, role, frame, fill, stroke = "none", radius = "radius.none") => fillRect(id, role, frame, fill, { stroke, radius });
+const label = measuredLabel;
 const clean = (value) => (typeof value === "string" && value.trim() ? value.trim() : null);
 
 /** An open or closed polyline in absolute coordinates, packed into an iconPath shape. */

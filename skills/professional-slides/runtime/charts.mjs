@@ -253,6 +253,7 @@ export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showV
       nodes.push(textPrimitive({
         id: stableId(id, "axis-label", index),
         role: "axis-label",
+        data: { axis: "y" },
         frame: { x: plot.x - labelWidth - 8, y: y - 12, width: labelWidth, height: 24 },
         // Labels describe the actual tick, not a rounded neighbouring value.
         text: axisTickText(yMin, yMax, index, steps),
@@ -1658,13 +1659,13 @@ function scatter({ id, frame, props, bubble = false }) {
   // Both quantitative dimensions need a visible scale, even without point labels.
   for (let index = 0; index <= 4; index++) {
     const value = xBounds.min + xBounds.span * index / 4;
-    nodes.push(textPrimitive({ id: stableId(id, "x-axis-label", index), role: "axis-label", frame: { x: xScale(value) - (index === 0 ? 0 : index === 4 ? 64 : 32), y: plot.y + plot.height + 20, width: 64, height: 28 }, text: String(Number(value.toFixed(2))), style: textStyle(AXIS_LABEL, SECONDARY, false, index === 0 ? "left" : index === 4 ? "right" : "center") }));
+    nodes.push(textPrimitive({ id: stableId(id, "x-axis-label", index), role: "axis-label", frame: { x: xScale(value) - (index === 0 ? 0 : index === 4 ? 64 : 32), y: plot.y + plot.height + 20, width: 64, height: 28 }, text: String(Number(value.toFixed(2))), style: textStyle(AXIS_LABEL, SECONDARY, false, index === 0 ? "left" : index === 4 ? "right" : "center"), data: { axis: "x" } }));
   }
   if (props.yTickLabels) {
     for (let index = nodes.length - 1; index >= 0; index--) if (nodes[index].role === "axis-label" && !nodes[index].id.includes("x-axis-label")) nodes.splice(index, 1);
     for (const [index, tick] of props.yTickLabels.entries()) {
       if (!Number.isFinite(tick.value) || typeof tick.label !== "string") throw new Error("Scatter yTickLabels require finite values and text labels");
-      nodes.push(textPrimitive({ id: stableId(id, "category-axis-label", index), role: "axis-label", frame: { x: plot.x - 54, y: yScale(tick.value) - 14, width: 48, height: 28 }, text: tick.label, style: textStyle(AXIS_LABEL, SECONDARY, false, "right") }));
+      nodes.push(textPrimitive({ id: stableId(id, "category-axis-label", index), role: "axis-label", frame: { x: plot.x - 54, y: yScale(tick.value) - 14, width: 48, height: 28 }, text: tick.label, style: textStyle(AXIS_LABEL, SECONDARY, false, "right"), data: { axis: "y" } }));
     }
   }
   const pointMap = new Map();

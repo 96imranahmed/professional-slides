@@ -6,15 +6,16 @@
 // pyramid: { variant: "pyramid", tiers: [{ label, text? }] }   (apex first, 3–5 tiers)
 import { token, tokenValue, stableId, textPrimitive, rectPrimitive, shapePrimitive } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
+import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 
 const v = (id) => tokenValue(token(id));
 const INK = token("color.ink"), WHITE = token("color.onPrimary"), PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), SECOND = token("color.chartSeries2"), TINT = token("color.componentPrimaryTint"), MUTED = token("color.surfaceMuted"), FONT = token("font.body");
 export const FRAMEWORK_TOKENS = Object.freeze(["color.ink", "color.onPrimary", "color.componentPrimary", "color.accent", "color.chartSeries2", "color.componentPrimaryTint", "color.surfaceMuted", "font.body", "type.heading", "type.body", "type.compact", "space.1", "space.2", "space.3", "space.4", "line.hairline", "radius.none", "radius.small"]);
 
-const measure = (text, width, size, bold = false) => measureText(String(text), width, { fontFamily: v("font.body"), fontSize: v(size), bold, wrapWidthRatio: 1 });
+const measure = (text, width, size, bold = false) => measureAt(text, width, { size, bold });
 const style = (size, color, bold = false, align = "center") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
-const label = (id, role, frame, layout, st) => textPrimitive({ id, role, frame: { ...frame, height: layout.height }, text: layout.text, style: { ...st, lineHeight: layout.lineHeight }, data: { textLayout: layout } });
-const box = (id, role, frame, fill, radius = "radius.none") => rectPrimitive({ id, role, frame, style: { fill, stroke: "none", lineWidth: token("line.hairline"), radius: token(radius) } });
+const label = measuredLabel;
+const box = (id, role, frame, fill, radius = "radius.none") => fillRect(id, role, frame, fill, { radius });
 
 function houseNodes({ id, frame, props }) {
   const pillars = props.pillars;

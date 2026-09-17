@@ -16,6 +16,7 @@ import {
 import { measureText, measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
 import { numberMarker, stateMarker, iconMarker, MARK_TOKENS } from "./marks.mjs";
+import { measureAt } from "./draw.mjs";
 
 // One table compiler. Columns select defaults; individual cells may override the
 // encoding (e.g. options as columns with prose and rating rows in the same table).
@@ -118,13 +119,7 @@ const textStyle = (
   valign: "top",
   wrap: false,
 });
-const measure = (text, width, bold = false, size = "type.body") =>
-  measureText(String(text), width, {
-    fontFamily: v("font.body"),
-    fontSize: v(size),
-    bold,
-    wrapWidthRatio: 1,
-  });
+const measure = (text, width, bold = false, size = "type.body") => measureAt(text, width, { size, bold });
 // A cell may carry `highlight`: the phrase inside it that reads in the house
 // accent, the way a reference table marks the figure that decides the row.
 const measureRuns = (text, highlight, width, bold = false, size = "type.body") => {

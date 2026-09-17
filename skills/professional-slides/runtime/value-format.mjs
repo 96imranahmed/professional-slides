@@ -1,11 +1,12 @@
 // Shared numeric label formatting; encoding continues to use the raw value.
+import { groupThousands } from "./draw.mjs";
 export function formatValue(value, props) {
   const format = props.valueFormat;
   // Without a declared format, labels round the way a reader reads them: whole
   // numbers from ten up, one decimal below ten. Marks keep the raw value.
   // Four figures and up read with a thousands separator, the way every
   // published page prints them: 10,156 rather than 10156.
-  const group = (text) => text.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const group = groupThousands;
   if (!format) {
     const rounded = Number.isInteger(value) ? value : Math.abs(value) >= 10 ? Math.round(value) : Math.round(value * 10) / 10;
     const [whole, fraction] = String(rounded).split(".");
