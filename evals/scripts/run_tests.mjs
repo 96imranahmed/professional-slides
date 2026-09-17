@@ -4,7 +4,6 @@
  *
  *   node evals/scripts/run_tests.mjs                unit tests
  *   node evals/scripts/run_tests.mjs --release      reference-image golden check
- *   node evals/scripts/run_tests.mjs --dependencies runtime lock check
  *
  * `evals/run.sh` is the fuller version: it also prints the page-gate numbers for
  * the fixture deck. Both work without a Codex runtime cache and without a
@@ -45,12 +44,12 @@ function run(command, args) {
   });
 }
 
-if (process.argv.includes("--release")) {
+const args = process.argv.slice(2);
+if (args.some(arg => arg !== "--release")) throw new Error("Usage: run_tests.mjs [--release]");
+if (args.includes("--release")) {
   // Item 17: the release gate is a pixel comparison against accepted
   // reference images, not a source hash.
   await run(runtime.RUNTIME_PYTHON, ["evals/scripts/check_release.py"]);
-} else if (process.argv.includes("--dependencies")) {
-  await run(runtime.RUNTIME_NODE, ["evals/scripts/runtime_lock.mjs"]);
 } else {
   await run(runtime.RUNTIME_PYTHON, ["-m", "unittest", "discover", "-s", "evals/tests", "-p", "test_*.py"]);
 }

@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runtime = path.resolve(here, "..", "..", "skills", "professional-slides", "runtime");
 const { planDeck } = await import(path.join(runtime, "planner.mjs"));
+const { toDeckPlan } = await import(path.join(runtime, "compose.mjs"));
 const { metricsBackend } = await import(path.join(runtime, "font-metrics.mjs"));
 
 const [, , specPath, outPath] = process.argv;
@@ -24,7 +25,9 @@ if (!specPath || !outPath) {
 }
 const spec = JSON.parse(fs.readFileSync(specPath, "utf8"));
 const started = Date.now();
-const { deck } = planDeck(spec.deckPlan ?? spec);
+const plan = spec.schema === "professional-slides.deck/v3" || spec.deckPlan
+  ? toDeckPlan(spec, path.dirname(path.resolve(specPath))) : spec;
+const { deck } = planDeck(plan);
 console.log([
   `metrics backend: ${metricsBackend()}`,
   `slides: ${deck.slides.length}`,

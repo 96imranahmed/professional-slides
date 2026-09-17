@@ -212,7 +212,8 @@ BODY_ROW = 4
 
 def analyse(path: Path, base: str) -> dict:
     prs = Presentation(str(path))
-    scale = PAGE_W / (prs.slide_width / 914400 * 96)
+    scale_x = PAGE_W / (prs.slide_width / 914400 * 96)
+    scale_y = PAGE_H / (prs.slide_height / 914400 * 96)
     observations: list[str] = []
     theme_colors, theme_fonts = read_theme(theme_part(prs))
 
@@ -224,7 +225,7 @@ def analyse(path: Path, base: str) -> dict:
     master_shapes = list(master.shapes) + [s for layout in master.slide_layouts for s in layout.shapes]
     for shape in master_shapes:
         kind = placeholder_kind(shape)
-        frame = (px(shape.left or 0, scale), px(shape.top or 0, scale), px(shape.width or 0, scale), px(shape.height or 0, scale))
+        frame = (px(shape.left or 0, scale_x), px(shape.top or 0, scale_y), px(shape.width or 0, scale_x), px(shape.height or 0, scale_y))
         if kind in ("title", "center_title", "ctrtitle"):
             title_frames.append(frame)
             if title_style_bold is None:
@@ -271,14 +272,14 @@ def analyse(path: Path, base: str) -> dict:
             kind = placeholder_kind(shape)
             # Footer copy repeated on most pages (a document title, a company
             # name) sits in the bottom tenth of the page.
-            if shape.top is not None and px(shape.top, scale) > PAGE_H * 0.9:
+            if shape.top is not None and px(shape.top, scale_y) > PAGE_H * 0.9:
                 ft = text_of(shape).strip()
                 if ft and not re.fullmatch(r"[\d\s|/–-]+", ft) and len(ft) < 80:
                     footer_texts[ft] += 1
-            if kind in ("title", "center_title", "ctrtitle") and shape.width and shape.top is not None and px(shape.top, scale) < PAGE_H * 0.35:
-                slide_title_frames.append((px(shape.left or 0, scale), px(shape.top, scale), px(shape.width, scale), px(shape.height or 0, scale)))
+            if kind in ("title", "center_title", "ctrtitle") and shape.width and shape.top is not None and px(shape.top, scale_y) < PAGE_H * 0.35:
+                slide_title_frames.append((px(shape.left or 0, scale_x), px(shape.top, scale_y), px(shape.width, scale_x), px(shape.height or 0, scale_y)))
             elif kind in ("body", "obj", "object") and shape.width and shape.top is not None:
-                slide_body_frames.append((px(shape.left or 0, scale), px(shape.top, scale), px(shape.width, scale), px(shape.height or 0, scale)))
+                slide_body_frames.append((px(shape.left or 0, scale_x), px(shape.top, scale_y), px(shape.width, scale_x), px(shape.height or 0, scale_y)))
             if getattr(shape, "has_chart", False) and shape.has_chart:
                 charts += 1
             if getattr(shape, "has_table", False) and shape.has_table:
@@ -299,8 +300,8 @@ def analyse(path: Path, base: str) -> dict:
             grouping = shape.shape_type is not None and "GROUP" in str(shape.shape_type)
             carries = bool(text.strip()) or getattr(shape, "has_chart", False) or getattr(shape, "has_table", False) or (shape.shape_type is not None and "PICTURE" in str(shape.shape_type)) or solid_fill_hex(shape)
             if shape.width and shape.height and shape.top is not None and carries and not grouping:
-                x0, y0 = px(shape.left or 0, scale), px(shape.top, scale)
-                x1, y1 = x0 + px(shape.width, scale), y0 + px(shape.height, scale)
+                x0, y0 = px(shape.left or 0, scale_x), px(shape.top, scale_y)
+                x1, y1 = x0 + px(shape.width, scale_x), y0 + px(shape.height, scale_y)
                 if (x1 - x0) * (y1 - y0) > PAGE_W * PAGE_H * 0.55:
                     x1 = x0  # a background or a full-page frame is not coverage
                 for gx in range(max(0, int(x0 // GRID)), min(GRID_COLUMNS, int(x1 // GRID) + 1)):

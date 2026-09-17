@@ -34,7 +34,7 @@ Register every rendering variant with representative props and size. New registr
 
 `npm run check` runs syntax/whitespace checks and fast tests. `check:syntax` is not a semantic linter. These tests do not require regenerating cached visual reports after each edit. `npm run check:release` still requires a hash-verified golden set, including both render images for every fixture.
 
-Rendering dependencies are pinned in `package.json` and their resolved transitive manifests in `evals/runtime-lock.json`. The lock records the Codex bundle, Node version and platform used for acceptance, including private packages unavailable through public npm. Run `"$RUNTIME_NODE" evals/scripts/runtime_lock.mjs` before rendering. A different bundle/platform requires a reviewed lock refresh and new visual acceptance, not a silent upgrade. Never modify bundled dependencies.
+Install the Node development dependencies with `npm ci` using `package-lock.json`. The export pipeline requires Python with python-pptx, Pillow and NumPy, plus LibreOffice and `pdftoppm` for rendering. Set `RUNTIME_PYTHON` when those packages live in a separate environment. Renderer or dependency changes require new visual acceptance.
 
 The table compiler uses Prettier 3.6.2 formatting; keep normalization, measurement and rendering in separate named helpers.
 

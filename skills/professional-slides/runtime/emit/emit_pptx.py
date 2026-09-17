@@ -528,7 +528,7 @@ class Emitter:
                 plot.overlap = 100
             va = chart.value_axis
             va.has_major_gridlines = bool(spec.get("gridlines"))
-            va.visible = False if spec.get("dataLabels", True) else True
+            va.visible = spec.get("showValueAxis", not spec.get("dataLabels", True))
             va.tick_labels.font.size = Pt(10)  # chart furniture floor is 10 pt
             if spec.get("yMin") is not None:
                 va.minimum_scale = spec["yMin"]
@@ -607,11 +607,18 @@ class Emitter:
                     sdl.font.color.rgb = rgb(self.colors.get("color.ink", "#000000"))
                     if kind in ("column", "bar"):
                         sdl.position = XL_LABEL_POSITION.OUTSIDE_END
+                if kind in ("column", "bar", "stacked-column", "stacked-bar") and single:
+                    two_mark_contrast = kind in ("column", "bar") and len(spec["categories"]) == 2 and idx is None and not highlight_indices
                     for j, pt in enumerate(ser.points):
+                        point_color = None
                         if j in highlight_indices and accent:
-                            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(accent)
-                        elif forecast_index is not None and forecast_index >= 0 and j >= forecast_index and forecast:
-                            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(forecast)
+                            point_color = accent
+                        elif kind in ("column", "bar") and forecast_index is not None and forecast_index >= 0 and j >= forecast_index and forecast:
+                            point_color = forecast
+                        elif two_mark_contrast:
+                            point_color = self.colors.get("color.componentPrimary" if j == 0 else "color.chartComparator", color)
+                        if point_color:
+                            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(point_color)
                 if kind == "line" and spec.get("endLabels"):
                     # Series name at the last point instead of a legend.
                     last = len(spec["series"][i]["values"]) - 1

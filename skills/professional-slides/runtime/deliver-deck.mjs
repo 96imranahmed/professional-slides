@@ -11,11 +11,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { deckStem } from "./artifact-path.mjs";
+import { assertOutputDirectory } from "./output-path.mjs";
 import { buildDeck } from "./build-deck.mjs";
 import { runReview, validateReview, reviewOutcome } from "./reviewer.mjs";
 
 export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto", model, reviewFile, skipBuild = false, brief, answer } = {}) {
-  const directory = path.resolve(outputDirectory);
+  const directory = await assertOutputDirectory(outputDirectory);
   const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
   brief = brief ?? spec.brief ?? spec.context?.originalBrief ?? "";
   answer = answer ?? spec.answer ?? spec.context?.governingAnswer ?? "";
@@ -28,6 +29,7 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   const build = skipBuild ? JSON.parse(await fs.readFile(path.join(directory, "build-result.json"), "utf8")) : await buildDeck(specPath, directory);
   const report = { accepted: false, stage: "build", build: { status: build.status, pptx: build.pptxPath, montage: build.montagePath } };
   const blockers = [];
+  if (build.gates?.passed !== true) blockers.push({ slide: null, code: "MISSING_RENDERED_GATES", severity: "blocker", reason: "Delivery requires passing rendered page gates", repair: "Rebuild with rendering enabled before delivery" });
   if (build.readback && build.readback.accepted !== true) blockers.push(...(build.readback.findings || []).slice(0, 20).map((f) => ({ slide: f.slide ?? null, code: "BROKEN_GEOMETRY", severity: "blocker", reason: `readback ${f.code} on ${f.shape || ""}`, repair: "Fix the emitter or the scene so the saved file matches the scene" })));
   if (build.gates && build.gates.passed === false) blockers.push(...(build.gates.findings || []).map((f) => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: `gate ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
   if (build.preflight?.passed === false) blockers.push(...(build.preflight.findings || []).map(f => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: f.reason || `preflight ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));

@@ -16,6 +16,7 @@ import { metricsBackend } from "./font-metrics.mjs";
 import { runProcess, lastJson } from "./process.mjs";
 
 import { deckStem } from "./artifact-path.mjs";
+import { assertOutputDirectory } from "./output-path.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,7 +25,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
   const stem = deckStem(spec);
   const baseDir = path.dirname(path.resolve(specPath));
-  const directory = path.resolve(outputDirectory);
+  const directory = await assertOutputDirectory(outputDirectory);
   await fs.mkdir(directory, { recursive: true });
   // Every report this build is about to write, removed before anything that can
   // throw. A deck that fails to compose leaves no output of its own, so whatever
@@ -99,7 +100,9 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     };
   }
   const readbackOk = result.readback?.accepted === true;
-  result.status = result.preflight.passed && readbackOk && (result.gates?.passed ?? true) ? "built" : "built-with-findings";
+  result.status = result.preflight.passed && readbackOk
+    ? (result.gates?.passed === true ? "built" : render ? "built-with-findings" : "built-unrendered")
+    : "built-with-findings";
   return finish(result, directory);
 }
 
@@ -131,7 +134,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (pythonIndex >= 0 && (!args[pythonIndex + 1] || args[pythonIndex + 1].startsWith("--"))) throw new Error("--python requires an executable");
     const result = await buildDeck(path.resolve(args[0]), path.resolve(args[1]), { preflight: args.includes("--preflight"), render: !args.includes("--no-render"), python: pythonIndex < 0 ? undefined : args[pythonIndex + 1] });
     console.log(JSON.stringify({ status: result.status, pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, timings: result.timings }));
-    process.exit(result.status === "built" || result.status === "preflight-passed" ? 0 : 2);
+    process.exit(["built", "built-unrendered", "preflight-passed"].includes(result.status) ? 0 : 2);
   } catch (error) {
     console.error(error.stack || error.message);
     process.exit(1);

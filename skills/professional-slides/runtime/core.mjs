@@ -750,7 +750,7 @@ function seriesValues(props = {}) {
 }
 
 /** Data an emitter needs for a native chart. Types outside NATIVE_CHART_TYPES keep shapes. */
-export function nativeChartSpec(componentId, props = {}, frame) {
+export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   const type = NATIVE_CHART_TYPES[componentId];
   if (!type) return null;
   // Reference lines and annotations need the plot scale; PowerPoint does not
@@ -785,6 +785,13 @@ export function nativeChartSpec(componentId, props = {}, frame) {
     : Array.isArray(props.values) ? [{ name: props.name || "", values: [...props.values] }] : [];
   const forecastIndex = props.forecastFrom !== undefined ? categories.indexOf(props.forecastFrom) : -1;
   const labelBold = houseStyle("style.labelWeight") !== "regular";
+  // Use the actual scene's resolved visibility (dense charts can omit direct
+  // labels by default), so the native axes follow the same decision.
+  const dataLabels = renderedNodes
+    ? renderedNodes.some(node => node.role === "data-label") : props.dataLabels !== false;
+  const showValueAxis = renderedNodes
+    ? renderedNodes.some(node => node.role === "axis-label")
+    : props.showValueAxis ?? (props.gridlines === true || !dataLabels);
   return {
     labelBold,
     type,
@@ -799,7 +806,8 @@ export function nativeChartSpec(componentId, props = {}, frame) {
     unit: props.unit ?? null,
     yMin: props.yMin ?? null,
     yMax: props.yMax ?? null,
-    dataLabels: props.dataLabels !== false,
+    dataLabels,
+    showValueAxis,
     legend: props.legend === true || (series.length > 1 && props.legend !== false && !(type === "line" && props.endLabels !== false) && type !== "range"),
     gridlines: props.gridlines === true,
     valueFormat: props.valueFormat ?? null,
@@ -948,7 +956,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
         tokens: definition.tokens,
         // Chart data travels with the instance so an emitter can write a native,
         // workbook-backed chart object in this frame instead of loose shapes.
-        ...(String(definition.id).startsWith("chart.") ? { nativeChart: nativeChartSpec(definition.id, props, frame) } : {})
+        ...(String(definition.id).startsWith("chart.") ? { nativeChart: nativeChartSpec(definition.id, props, frame, rendered.nodes) } : {})
       });
     }
     assertUniqueIds(nodes);

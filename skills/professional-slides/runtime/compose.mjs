@@ -2079,7 +2079,7 @@ export function applyTemplate(spec, baseDir = process.cwd()) {
   if (!spec.chrome && house.chrome) out.chrome = house.chrome;
   if (!spec.pageTemplate && house.pageTemplate) out.pageTemplate = house.pageTemplate;
   if (!spec.density && house.density) out.density = house.density;
-  if (!spec.footer && house.footer) out.footer = house.footer;
+  if (!Object.hasOwn(spec, "footer") && house.footer) out.footer = house.footer;
   // A template deck also sets how full its pages read: the importer measures the
   // template's own words, elements and body coverage and writes them as `fill`
   // and `weight`, so a deck built on a dense house is judged by that house.

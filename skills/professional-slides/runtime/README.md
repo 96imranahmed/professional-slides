@@ -26,3 +26,8 @@ deliver-deck.mjs   build → gates must pass → review → <id>-DELIVERED.pptx 
 Component contract: `render({ id, frame, props }) → { nodes }` with frames in canvas px (1280×720); `measureContent({ frame, props })` returns the natural height at a width — components without it fall back to `preferredSize`, and `evals/tests/test_measure_vs_preferred.py` reports the list. Chart components expose `nativeChart` on their instance so the emitter can write a workbook-backed chart; charts with reference lines, annotations or highlights stay as grouped shapes.
 
 Adding a component: register it in `registry.mjs` with `tokens`, `preferredSize`, `sample`, `render` and `measureContent`; the golden gallery (`evals/scripts/golden_reference.py`) and the measurement test pick it up.
+
+`build-deck.mjs --no-render` produces a `built-unrendered` result when planning
+and readback pass (exit 0). It is useful for inspecting the editable file, but
+delivery requires a `built` result with passing rendered page gates. Rebuild
+without `--no-render` before using `deliver-deck.mjs --skip-build`.
