@@ -337,8 +337,12 @@ const borderless=line.render({id:'borderless',frame,props:{...base,annotations:[
 assert.equal(borderless.find(n=>n.role==='annotation-surface').style.stroke,'none');
 const straight=borderless.find(n=>n.role==='annotation-leader');
 assert.equal(straight.data.x1,straight.data.x2);
-assert.equal(straight.data.endArrow,true);
-assert.equal(straight.data.endArrowType,'triangle');
+// Every leader ends in a dot on the coordinate it keys. An arrowhead landing on
+// a data point covers the point it is identifying and reads as a second mark on
+// the plot, so the callout takes the terminator the orthogonal treatment used.
+assert.equal(straight.data.endArrow,false);
+assert.equal(straight.data.endpoint,'dot');
+assert.ok(borderless.some(n=>n.role==='annotation-endpoint'),'the callout leader ends in a dot');
 assert.equal(straight.style.lineWidth.tokenId,'line.standard');
 const component=REGISTRY.get('chart-callout');
 const compact=component.render({id:'compact',frame,props:{...component.sample,...component.variants.borderless.props}}).nodes;
@@ -357,7 +361,16 @@ const horizontalLeader=horizontal.find(n=>n.role==='annotation-leader'&&n.data.a
 assert.equal(horizontalLeader.data.y1,horizontalLeader.data.y2);
 assert.equal(horizontalLeader.data.endArrow,false);
 assert.equal(horizontal.filter(n=>n.role==='annotation-endpoint').length,1);
-assert.throws(()=>line.render({id:'bad-treatment',frame,props:{...base,annotations:[{category:'Q3',text:'Bad',treatment:'speech'}]}}),/Unknown chart evidence annotation treatment/);
+// `speech` is the third treatment: a filled bubble, white text, no outline.
+const speech=line.render({id:'speech',frame,props:{...base,annotations:[{category:'Q3',text:'+18% on the quarter',treatment:'speech'}]}}).nodes;
+const bubble=speech.find(n=>n.role==='annotation-surface'&&n.id.includes('annotation-box'));
+assert.equal(bubble.style.fill.tokenId,'color.ink');
+assert.equal(bubble.style.radius.tokenId,'radius.small');
+assert.equal(speech.find(n=>n.role==='annotation-text').style.color.tokenId,'color.onPrimary');
+// Close to its mark it closes the gap with a tapered tail; far from it, the
+// same dotted leader, because a stretched wedge stops reading as a taper.
+assert.ok(speech.some(n=>n.geometry==='polygon')||speech.some(n=>n.role==='annotation-endpoint'));
+assert.throws(()=>line.render({id:'bad-treatment',frame,props:{...base,annotations:[{category:'Q3',text:'Bad',treatment:'shout'}]}}),/Unknown chart evidence annotation treatment/);
 assert.throws(()=>line.render({id:'bad-orientation',frame,props:{...base,annotations:[{category:'Q3',text:'Bad',treatment:'orthogonal-dot',orientation:'diagonal'}]}}),/Unknown orthogonal chart annotation orientation/);
 const cramped={categories:['Q1','Q2'],series:[{name:'Measure',values:[30,40]}],yMax:50,dataLabels:true,legend:false,highlights:[],referenceLines:[],annotations:[{category:'Q1',text:'No corridor',treatment:'orthogonal-dot',orientation:'horizontal',side:'left'}]};
 assert.throws(()=>line.render({id:'cramped',frame:{x:60,y:150,width:390,height:360},props:cramped}),/insufficient clearance for a horizontal orthogonal-dot annotation/);

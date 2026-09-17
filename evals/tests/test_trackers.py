@@ -139,5 +139,47 @@ console.log(JSON.stringify({accepted:true}));
         self.assertTrue(result["accepted"])
 
 
+class DeckTrackerChoiceTests(unittest.TestCase):
+    """Four trackers, and three of them anchored left.
+
+    `trackers.mjs` has drawn the number strip, the breadcrumb and the plain
+    section label all along; the composer hard-coded `compact-pills`, so the
+    only tracker a deck could ask for was the one that hugs the right of the
+    title band. These are the same component with the construction the spec
+    names, and the left-anchored ones start at the page's left margin.
+    """
+
+    def test_each_tracker_draws_where_that_tracker_belongs(self):
+        result = run_node(r"""
+import assert from 'node:assert/strict';
+import {toDeckPlan, TRACKER_NAMES} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const page=(n)=>({id:'s'+n,title:`A page that says something measurable here ${n}`,
+  points:['one point that runs to a full sentence','a second point that also runs on']});
+const slides=[{kind:'section',title:'Where the value is'},page(1),
+  {kind:'section',title:'What it would take'},page(2),
+  {kind:'section',title:'How we would know'},page(3)];
+const build=(tracker,pages=slides)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'t',tracker,slides:pages},'.')).deck;
+const left=(deck)=>{
+  const nodes=deck.slides.flatMap(s=>(s.nodes||[])).filter(n=>String(n.role||'').startsWith('tracker'));
+  assert.ok(nodes.length,'the deck drew a tracker');
+  return Math.min(...nodes.map(n=>n.frame?n.frame.x:n.x1).filter(x=>x!==undefined));
+};
+assert.deepEqual([...TRACKER_NAMES],['pills','label','breadcrumb','number-strip']);
+// Pills hug the right of the title band, which the chrome reserves for them.
+assert.ok(left(build('pills'))>600,'pills sit right');
+// The other three are the left-anchored tracker, at the page's left margin.
+for (const name of ['label','breadcrumb','number-strip']) {
+  assert.equal(left(build(name)),60,`${name} sits at the left margin`);
+}
+// A rail of two markers is not a position; a label of one section still is.
+assert.throws(()=>build('number-strip',slides.slice(0,4)),/three sections/);
+assert.ok(left(build('label',slides.slice(0,4)))===60,'two sections still take a label');
+assert.throws(()=>toDeckPlan({schema:'professional-slides.deck/v3',id:'t',tracker:'nope',slides},'.'),/Unknown tracker/);
+console.log(JSON.stringify({ok:true}));
+""")
+        self.assertTrue(result["ok"])
+
+
 if __name__ == "__main__":
     unittest.main()

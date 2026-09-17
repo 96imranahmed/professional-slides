@@ -77,9 +77,15 @@ function box(fill, stroke = fill, lineWidth = HAIRLINE, radius = NONE) {
   return { fill, stroke, lineWidth, radius };
 }
 
+// The compact trackers that print the selected section and nothing else: two
+// sections is a real position for them, where a rail of two markers or a
+// full-page tracker of two rows is not a tracker at all.
+const SELECTED_ONLY = new Set(["compact-label", "compact-breadcrumb"]);
+
 function trackerItems(props) {
-  // Pill tabs work from two sections; the full-page trackers need three.
-  const minimum = props.construction === "compact-pills" ? 2 : 3;
+  // Pill tabs and the selected-label constructions work from two sections; a
+  // rail and the full-page trackers need three.
+  const minimum = props.construction === "compact-pills" || SELECTED_ONLY.has(props.construction) ? 2 : 3;
   if (!Array.isArray(props.items) || props.items.length < minimum || props.items.length > 11) throw new Error(`Tracker requires ${minimum === 2 ? "two" : "three"} to eleven items`);
   const items = props.items.map((item, index) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(`Tracker item ${index + 1} must be an object`);

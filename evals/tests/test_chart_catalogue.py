@@ -49,5 +49,40 @@ console.log(JSON.stringify({ok:true}));
         self.assertTrue(result["ok"])
 
 
+class NegativeBarTests(unittest.TestCase):
+    """A bar chart with a negative value is drawn, not emitted natively.
+
+    PowerPoint hangs a horizontal bar chart's category axis off the zero line.
+    All-positive bars put zero at the left, where the runtime reserved the label
+    gutter, and the two agree by accident. Add one negative value and zero moves
+    right: PowerPoint prints "Payments" on top of the Payments bar while the
+    gutter the runtime measured sits empty. The gallery page that cut cycle
+    times rendered exactly that - five of six category labels invisible - and
+    nothing failed, because the scene was right and only the native chart was
+    wrong.
+    """
+
+    def test_a_negative_value_takes_a_horizontal_bar_chart_off_the_native_path(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
+const frame={x:0,y:0,width:760,height:420};
+const cats=['Payments','Identity','Ledger'];
+const of=(id,values)=>nativeChartSpec(id,{categories:cats,series:[{name:'Change',values}]},frame);
+// All positive: the axis sits where the gutter is, and native is fine.
+assert.ok(of('chart.bar',[6.2,5.1,0.4]),'an all-positive bar chart stays native');
+// One negative, and the axis moves under the labels.
+assert.equal(of('chart.bar',[-6.2,-5.1,0.4]),null,'a negative bar chart is drawn');
+assert.equal(of('chart.stacked-bar',[-1,2,3]),null,'a negative stacked bar is drawn');
+// A column chart is unaffected: its category axis is horizontal, and a
+// negative column moves the labels off the bar rather than onto it.
+assert.ok(of('chart.column',[-6.2,5.1,0.4]),'a negative column chart stays native');
+// `values` instead of `series` is the same chart written another way.
+assert.equal(nativeChartSpec('chart.bar',{categories:cats,values:[-1,2,3]},frame),null);
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result["ok"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -133,3 +133,42 @@ assert.equal(lp.endLabels,true);assert.equal(lp.legend,false);assert.equal(lp.da
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
+
+
+class TextPageColumnTests(unittest.TestCase):
+    """Five findings in two columns are one list, numbered one to five.
+
+    A text page with more than four points splits them into two columns. The
+    split built two independent lists: each restarted its numbering at 1, so the
+    executive summary's five findings read as "1 2 3" beside "1 2" - two
+    unrelated sets rather than one ranked argument. The split also dropped the
+    page's `pointsStyle` on the floor, because neither half was handed it.
+    """
+
+    def test_a_split_list_keeps_one_run_of_numbers_and_the_page_style(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const points = ['one','two','three','four','five'].map((n, i) => ({lead: `Finding ${n}`, text: `what the ${n} finding rests on, in a sentence long enough to wrap`}));
+// `layout: "text"` is what the executive-summary shape sets; points with
+// leads and no layout become a ledger table instead, which is a different page.
+const page = composeSlide({id:'s01', layout:'text', title:'Five findings, and the one that decides it', pointsStyle:'numbered', points}, 0);
+const row = page.items.find((item) => item.id === 's01-row');
+assert.ok(row, 'five points split into two columns');
+const [left, right] = row.items;
+// One run of numbers across the two columns.
+assert.deepEqual(left.props.items.map((i) => i.number), [1, 2, 3]);
+assert.deepEqual(right.props.items.map((i) => i.number), [4, 5]);
+// Both halves are the style the page asked for.
+assert.equal(left.props.marker, 'number');
+assert.equal(right.props.marker, 'number');
+// The columns own the track rather than hugging the top of the page.
+assert.equal(row.size.height, 'fill');
+// A style that is not numbered does not acquire numbers it never asked for.
+const ruled = composeSlide({id:'s02', layout:'text', title:'Five findings, and the one that decides it', pointsStyle:'ruled', points}, 1);
+const ruledRow = ruled.items.find((item) => item.id === 's02-row');
+assert.equal(ruledRow.items[0].props.marker, 'rule');
+assert.ok(ruledRow.items[1].props.items.every((i) => i.number === undefined));
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result["ok"])

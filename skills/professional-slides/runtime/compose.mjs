@@ -471,7 +471,13 @@ function columnTreatments(ex) {
     return marks[i].heat ? { ...rest, type: "heatmap" } : rest;
   });
   const asNumber = (cell) => {
+    // A typed cell carries no `text`, and `String({})` is "[object Object]",
+    // which strips to "" and reads as 0 - a cell silently at the bottom of the
+    // scale. The column writes its own cells, so a cell that already has a type
+    // is the author saying two different things at once.
+    if (cell && typeof cell === "object" && cell.text === undefined) return null;
     const raw = String(cell?.text ?? cell ?? "").replace(/[^0-9.+-]/g, "");
+    if (!raw) return null;
     const value = Number(raw);
     return Number.isFinite(value) ? value : null;
   };
@@ -1742,10 +1748,27 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [column, photoStrip(slide, `${id}-photo`, baseDir, 1)] });
   } else {
     const points = slide.points || [];
+    const tone = sideTreatment(slide);
     if (points.length > 4) {
       const half = Math.ceil(points.length / 2);
-      items.push({ id: `${id}-row`, layout: "flow.row", size: HUG, items: [pointsItem(points.slice(0, half), `${id}-points-a`), pointsItem(points.slice(half), `${id}-points-b`)] });
-    } else if (points.length) items.push(pointsItem(points, `${id}-points`));
+      // Two columns, one list. A numbered list that restarts at 1 in the right
+      // column reads as two unrelated lists of points rather than one ranked
+      // set of five, so the numbers are fixed to each point's place in the
+      // whole before the list is cut in half.
+      const ordered = pointsStyle === "numbered"
+        ? points.map((point, at) => {
+            const item = typeof point === "string" ? { text: point } : { ...point };
+            return item.number === undefined ? { ...item, number: at + 1 } : item;
+          })
+        : points;
+      // The two columns own the track they sit in. Hugging the top of a text
+      // page leaves a third of it empty under the shorter column, which is the
+      // void the ink gate reports on a page that carries five real findings.
+      items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
+        pointsItem(ordered.slice(0, half), `${id}-points-a`, tone, fill, true, pointsStyle),
+        pointsItem(ordered.slice(half), `${id}-points-b`, tone, fill, true, pointsStyle),
+      ] });
+    } else if (points.length) items.push(pointsItem(points, `${id}-points`, tone, fill, false, pointsStyle));
     for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
   }
   // A reading note sits at the top of the side column when there is one,
@@ -1784,15 +1807,50 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
  * section they are in is reading a pile of pages — and `sectionTabs: false`
  * takes them off (use `agenda` instead, which tracks by repeating the contents).
  */
-export function sectionTabs(slidesIn) {
+/**
+ * The four trackers, and where each one sits.
+ *
+ * `pills` hug the right of the title row - the right 20% of the band is
+ * reserved for exactly this - and the other three are drawn from the left
+ * margin, which is the left-anchored tracker the reference decks run down the
+ * side of a section. They are the same component: only the construction
+ * changes, and each says where you are in a different amount of space.
+ */
+const TRACKER_CONSTRUCTIONS = Object.freeze({
+  // Every section as a pill, the current one filled: the widest, and the only
+  // one that shows the sections you are not in.
+  pills: "compact-pills",
+  // The current section's name alone, at the left of the title row.
+  label: "compact-label",
+  // "Contents / Where the value is": the section under its parent.
+  breadcrumb: "compact-breadcrumb",
+  // 1 2 3 4 on a rail, the current one filled: position without the words, for
+  // a deck whose section titles are too long to set as pills.
+  "number-strip": "compact-number-strip",
+});
+export const TRACKER_NAMES = Object.freeze(Object.keys(TRACKER_CONSTRUCTIONS));
+
+export function sectionTabs(slidesIn, mode = "pills") {
+  const construction = TRACKER_CONSTRUCTIONS[mode];
+  if (!construction) throw new Error(`Unknown tracker: ${mode}; use ${TRACKER_NAMES.join(", ")}, "repeat-contents" or false`);
   const sections = slidesIn.filter((s) => s.kind === "section");
   if (sections.length < 2) return slidesIn;
+  // A rail of two markers is not a position, it is a pair of dots.
+  if (mode === "number-strip" && sections.length < 3) {
+    throw new Error('A number-strip tracker needs three sections; use tracker: "pills" or "label" for two');
+  }
   const items = sections.map((s, i) => ({ id: String(i + 1), label: s.title }));
   let current = 0;
   return slidesIn.map((slide) => {
     if (slide.kind === "section") { current = sections.indexOf(slide) + 1; return slide; }
     if (slide.kind || !current || slide.tracker) return slide;
-    return { ...slide, tracker: { trackerId: "deck-sections", items, selectedId: String(current), construction: "compact-pills" } };
+    return {
+      ...slide,
+      tracker: {
+        trackerId: "deck-sections", items, selectedId: String(current), construction,
+        ...(mode === "breadcrumb" ? { parentTitle: "Contents" } : {}),
+      },
+    };
   });
 }
 
@@ -1837,8 +1895,8 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   // to be one: `sectionTabs` defaulted to `!spec.agenda`, which is why a deck
   // that took the section pills silently had no contents page anywhere.
   const sections = spec.slides.filter((s) => s.kind === "section").length;
-  if (spec.tracker !== undefined && !["pills", "repeat-contents", false].includes(spec.tracker)) {
-    throw new Error(`Unknown tracker: ${spec.tracker}; use "pills", "repeat-contents" or false`);
+  if (spec.tracker !== undefined && ![...TRACKER_NAMES, "repeat-contents", false].includes(spec.tracker)) {
+    throw new Error(`Unknown tracker: ${spec.tracker}; use ${TRACKER_NAMES.map((n) => `"${n}"`).join(", ")}, "repeat-contents" or false`);
   }
   if (spec.contents !== undefined && ![true, false, "once"].includes(spec.contents)) {
     throw new Error(`Unknown contents: ${spec.contents}; use true, "once" or false`);
@@ -1846,7 +1904,7 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   // `agenda` is the old spelling of the pair and still resolves to it.
   const trackerMode = spec.tracker ?? (spec.sectionTabs === false ? false : spec.agenda ? "repeat-contents" : "pills");
   const contentsMode = spec.contents ?? (spec.agenda === "once" ? "once" : spec.agenda ? true : sections >= 2);
-  const tabs = spec.sectionTabs ?? (trackerMode === "pills" && sections >= 2);
+  const tabs = spec.sectionTabs ?? (TRACKER_NAMES.includes(trackerMode) && sections >= 2);
   // `appendix: [...]`: the source pages behind the story - the model grid, the
   // full table, the survey instrument - set at `density: "appendix"` behind an
   // Appendix divider. The corpus keeps its densest pages here, and a page that
@@ -1859,7 +1917,8 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   // The contents page leads the deck; `repeat-contents` also reprints it in
   // front of every later section, which is the other way a deck tracks.
   const agendaMode = trackerMode === "repeat-contents" ? true : contentsMode === "once" || contentsMode === true ? "once" : false;
-  const pages = agendaPages(tabs ? sectionTabs(storySlides) : storySlides, contentsMode === false ? false : agendaMode, spec.agendaStyle);
+  const trackerStyle = TRACKER_NAMES.includes(trackerMode) ? trackerMode : "pills";
+  const pages = agendaPages(tabs ? sectionTabs(storySlides, trackerStyle) : storySlides, contentsMode === false ? false : agendaMode, spec.agendaStyle);
   const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140)) / 508)) : 1;
   const fill = resolveFill(spec);
   // The weight contract: what a page of this deck is expected to carry. The

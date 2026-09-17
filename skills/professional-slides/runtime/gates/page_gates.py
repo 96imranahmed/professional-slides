@@ -857,6 +857,18 @@ def thin_remedy(where="The page"):
     )
 
 
+def gate_findings(gate, *args):
+    """What one gate would report, without reporting it.
+
+    A gate that defers to another has to ask that other gate what it found -
+    INK_COVERAGE defers to the hero exhibit and to the word floor - and asking
+    means running it into a list of its own.
+    """
+    out = []
+    gate(*args, out)
+    return out
+
+
 def gate_thin_page(slide_no, slide, findings):
     """THIN_PAGE. A content page carrying less than the deck's weight floor of
     page text. Not a style rule: a reader who gets three bullets and a chart has
@@ -1681,8 +1693,21 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                     # then defers to the hero and band gates.
                     hero = []
                     gate_hero_exhibit(slide_no, slide, hero, path)
-                    has_hero = any(is_exhibit(c) for c in slide.get("componentInstances", [])) and not hero
-                    findings.extend(f for f in page if wanted(f["code"]) and not (f["code"] == "INK_COVERAGE" and has_hero))
+                    has_exhibit = any(is_exhibit(c) for c in slide.get("componentInstances", []))
+                    has_hero = has_exhibit and not hero
+                    # The same argument, for the page at the other end. A text
+                    # page - an executive summary, a set of findings - carries
+                    # its evidence as words, and words put little ink on a
+                    # 1280x720 canvas however much they say. Five findings, four
+                    # metrics and a takeaway measure 0.096 against a 0.115 floor
+                    # calibrated on pages with a chart in them. That page is
+                    # already measured, by the word floor that counts what it
+                    # actually carries, so INK_COVERAGE defers to THIN_PAGE
+                    # here - and a text page that is genuinely empty still fails
+                    # there, where the remedy is the one an author can act on.
+                    carried_by_words = not has_exhibit and not gate_findings(gate_thin_page, slide_no, slide)
+                    findings.extend(f for f in page if wanted(f["code"])
+                                    and not (f["code"] == "INK_COVERAGE" and (has_hero or carried_by_words)))
             if wanted("WORDS"):
                 gate_words(slide_no, slide, findings, slide_profile)
             if wanted("HERO_EXHIBIT"):

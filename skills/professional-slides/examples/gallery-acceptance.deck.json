@@ -1427,8 +1427,8 @@
     },
     {
       "kind": "section",
-      "title": "Statistical charts",
-      "summary": "The distribution, composition and profile encodings"
+      "title": "The chart catalogue",
+      "summary": "Distribution, composition and profile encodings, then area, scatter, bubble, pie, donut and horizons"
     },
     {
       "title": "Wealth is the fastest-growing business line while corporate revenue slipped over five years",
@@ -1940,11 +1940,6 @@
         "B scenarios assume failed containment",
         "Recovery timing drives the revenue gap"
       ]
-    },
-    {
-      "kind": "section",
-      "title": "The rest of the chart catalogue",
-      "summary": "Area, scatter, bubble, pie, donut and horizons"
     },
     {
       "title": "Support volume grew every quarter, with self-serve absorbing the increase from Q3",
@@ -2717,6 +2712,529 @@
         ]
       },
       "source": "Initiative screen, June 2026"
+    },
+    {
+      "kind": "section",
+      "title": "Commentary and column treatments",
+      "summary": "The seven shapes a side column takes, and the three flags that treat a table column"
+    },
+    {
+      "title": "Platform margin gained eleven points, all of it after the 2022 repricing",
+      "subtitle": "Gross margin, platform product line, 2021-24",
+      "pointsStyle": "icon-lead",
+      "exhibit": {
+        "type": "chart.column",
+        "heading": "Gross margin by product line",
+        "unit": "%",
+        "categories": [
+          "2021",
+          "2022",
+          "2023",
+          "2024"
+        ],
+        "series": [
+          {
+            "name": "Platform",
+            "values": [
+              41,
+              44,
+              48,
+              52
+            ]
+          }
+        ]
+      },
+      "points": [
+        {
+          "icon": "money",
+          "lead": "Repricing did most of the work",
+          "text": "the December 2022 list revision lifted realised price 6% and cost nothing to deliver."
+        },
+        {
+          "icon": "gear",
+          "lead": "Hosting cost fell with scale",
+          "text": "unit infrastructure cost dropped 22% as the 2023 migration finished."
+        },
+        {
+          "icon": "people",
+          "lead": "Support load stayed flat",
+          "text": "tickets per account held at 1.4 a month while accounts grew 38%."
+        }
+      ],
+      "source": "Finance close, FY24"
+    },
+    {
+      "title": "Three conditions decide the FY25 plan; one is inside our control",
+      "subtitle": "Sensitivities on the FY25 margin plan",
+      "pointsStyle": "icon-framed",
+      "exhibit": {
+        "type": "chart.bar",
+        "heading": "Margin impact of each sensitivity",
+        "unit": "pp",
+        "categories": [
+          "List price holds",
+          "Cloud contract renews",
+          "Mix shifts to enterprise"
+        ],
+        "series": [
+          {
+            "name": "FY25 impact",
+            "values": [
+              4.1,
+              2.6,
+              1.8
+            ]
+          }
+        ]
+      },
+      "points": [
+        {
+          "icon": "money",
+          "lead": "List price holds",
+          "text": "Two competitors repriced down in Q3. A matching cut costs 4.1pp of FY25 margin and is the single largest exposure on the plan."
+        },
+        {
+          "icon": "shield",
+          "lead": "The cloud contract renews at terms",
+          "text": "The current agreement expires in March. The committed-spend discount is worth 2.6pp and the renewal has not been negotiated."
+        },
+        {
+          "icon": "growth",
+          "lead": "Mix keeps shifting to enterprise",
+          "text": "Enterprise carries 9pp more margin than mid-market. The shift added 1.8pp last year and depends on a pipeline we do control."
+        }
+      ],
+      "source": "FY25 plan, sensitivity pack"
+    },
+    {
+      "title": "The 2022 repricing changed the trend, not just the level",
+      "subtitle": "Gross margin, platform product line, 2021-24",
+      "pointsStyle": "prose",
+      "exhibit": {
+        "type": "chart.column",
+        "heading": "Gross margin by product line",
+        "unit": "%",
+        "categories": [
+          "2021",
+          "2022",
+          "2023",
+          "2024"
+        ],
+        "series": [
+          {
+            "name": "Platform",
+            "values": [
+              41,
+              44,
+              48,
+              52
+            ]
+          }
+        ]
+      },
+      "points": [
+        {
+          "lead": "What we changed",
+          "text": "List prices rose 6% in December 2022, the first revision in four years, applied at renewal so no account saw a mid-term increase."
+        },
+        {
+          "lead": "What it did",
+          "text": "Realised price followed within two quarters and has held. Churn ran at 4.1% against 3.8%, inside the band the pricing committee accepted."
+        },
+        {
+          "lead": "What it did not do",
+          "text": "Volume growth was unchanged either side, so the gain is price, not mix. The 2024 points come from infrastructure cost, and that source is nearly spent."
+        }
+      ],
+      "source": "Pricing committee minutes; finance close, FY24"
+    },
+    {
+      "title": "Four teams cut cycle time; the two that did not share one constraint",
+      "subtitle": "Median cycle time by team, days, Q1 vs Q4 2024",
+      "pointsStyle": "ruled",
+      "exhibit": {
+        "type": "chart.bar",
+        "heading": "Change in median cycle time",
+        "unit": "days",
+        "categories": [
+          "Payments",
+          "Identity",
+          "Billing",
+          "Search",
+          "Ledger",
+          "Reporting"
+        ],
+        "series": [
+          {
+            "name": "Q4 vs Q1",
+            "values": [
+              -6.2,
+              -5.1,
+              -4.4,
+              -3.9,
+              -0.3,
+              0.4
+            ]
+          }
+        ]
+      },
+      "points": [
+        {
+          "lead": "Four teams moved",
+          "text": "Payments, Identity, Billing and Search each cut four days or more, and all four had adopted trunk-based release by February."
+        },
+        {
+          "lead": "Two did not",
+          "text": "Ledger and Reporting are the only teams still releasing behind a monthly change board, and both are flat within noise."
+        },
+        {
+          "lead": "The constraint is the board, not the team",
+          "text": "Ledger runs the same practices as Payments on every other measure, which leaves the release gate as the difference that matters."
+        }
+      ],
+      "source": "Delivery metrics, Q4 2024"
+    },
+    {
+      "title": "Three ways to close the capacity gap, and they are not combinable",
+      "subtitle": "Options assessed against the FY26 volume forecast",
+      "pointsStyle": "lettered",
+      "exhibit": {
+        "type": "chart.bar",
+        "heading": "Capacity added by option",
+        "unit": "k units/month",
+        "categories": [
+          "Third shift",
+          "Second line",
+          "Contract manufacture"
+        ],
+        "series": [
+          {
+            "name": "FY26",
+            "values": [
+              18,
+              44,
+              31
+            ]
+          }
+        ]
+      },
+      "points": [
+        {
+          "lead": "Run a third shift",
+          "text": "18k units a month, live in eleven weeks, and it needs 60 operators in a market where we filled 19 of 40 roles last year."
+        },
+        {
+          "lead": "Commission the second line",
+          "text": "44k units a month and the lowest unit cost of the three, but $12m of capital and nothing before Q3 FY26."
+        },
+        {
+          "lead": "Contract the overflow out",
+          "text": "31k units a month at a 23% cost premium, available in six weeks, and it puts the quality system outside our audit boundary."
+        }
+      ],
+      "source": "Operations capacity study, October 2024"
+    },
+    {
+      "title": "The migration runs in four steps; step two can stop it",
+      "subtitle": "Sequence for the Q2 platform migration",
+      "pointsStyle": "numbered",
+      "exhibit": {
+        "type": "chart.bar",
+        "heading": "Working days per step",
+        "unit": "days",
+        "categories": [
+          "Freeze schema",
+          "Backfill",
+          "Cut reads over",
+          "Retire the old store"
+        ],
+        "series": [
+          {
+            "name": "Elapsed",
+            "values": [
+              3,
+              21,
+              2,
+              4
+            ]
+          }
+        ]
+      },
+      "points": [
+        {
+          "number": 1,
+          "lead": "Freeze the schema",
+          "text": "Three days, and it blocks every other team's migrations while it runs."
+        },
+        {
+          "number": 2,
+          "lead": "Backfill the store",
+          "text": "Twenty-one days at the current write rate, and the only step with no tested rollback."
+        },
+        {
+          "number": 3,
+          "lead": "Cut reads over",
+          "text": "Two days behind a flag, reversible in minutes."
+        },
+        {
+          "number": 4,
+          "lead": "Retire the old store",
+          "text": "Four days, after a fortnight of both stores running in parallel."
+        }
+      ],
+      "source": "Platform migration plan, v4"
+    },
+    {
+      "title": "Adoption is highest where the workflow was already digital",
+      "subtitle": "Share of eligible users active in the last 30 days, by function",
+      "pointsStyle": "bulleted",
+      "exhibit": {
+        "type": "chart.bar",
+        "heading": "Active share by function",
+        "unit": "%",
+        "categories": [
+          "Finance",
+          "Operations",
+          "Sales",
+          "Legal",
+          "Field service"
+        ],
+        "series": [
+          {
+            "name": "Active",
+            "values": [
+              78,
+              71,
+              64,
+              41,
+              29
+            ]
+          }
+        ]
+      },
+      "points": [
+        "Finance and Operations ran their approvals in a system before the rollout and were above 70% within a month.",
+        "Sales adopted more slowly but is still climbing, at 64% against 51% a quarter ago.",
+        "Legal and Field service worked on paper beforehand, and both sit under half with no trend.",
+        "No function has fallen back after adopting, which argues the gap is onboarding rather than fit."
+      ],
+      "source": "Product telemetry, 30 days to 31 December"
+    },
+    {
+      "title": "Vendor B wins every criterion that carries weight",
+      "subtitle": "Scored assessment against the four weighted criteria, February 2025",
+      "exhibit": {
+        "type": "table",
+        "columns": [
+          "Criterion",
+          "Weight",
+          {
+            "label": "Vendor A",
+            "heat": true
+          },
+          {
+            "label": "Vendor B",
+            "heat": true
+          },
+          {
+            "label": "Vendor C",
+            "heat": true
+          },
+          {
+            "label": "Verdict",
+            "implication": true
+          }
+        ],
+        "rows": [
+          [
+            "Functional fit",
+            "35%",
+            "3",
+            "5",
+            "3",
+            "B covers all nine must-haves"
+          ],
+          [
+            "Total cost, 5yr",
+            "30%",
+            "4",
+            "4",
+            "2",
+            "A and B within 3% of each other"
+          ],
+          [
+            "Implementation risk",
+            "25%",
+            "2",
+            "4",
+            "3",
+            "B has done two migrations our size"
+          ],
+          [
+            "Roadmap alignment",
+            "10%",
+            "4",
+            "2",
+            "5",
+            "The only row B loses, at a tenth of the weight"
+          ]
+        ],
+        "implicationStyle": "per-row"
+      },
+      "soWhat": "On the agreed weights B scores 4.3 against A's 3.2, and the single criterion A wins carries a tenth of the decision.",
+      "source": "Vendor assessment, February 2025"
+    },
+    {
+      "title": "Six of eight markets clear the hurdle; the two that miss, miss on price",
+      "subtitle": "Market entry screen, eight candidate markets, FY26 model",
+      "exhibit": {
+        "type": "table",
+        "columns": [
+          "Market",
+          {
+            "label": "Addressable volume",
+            "unit": "k units"
+          },
+          {
+            "label": "Achievable price",
+            "unit": "index"
+          },
+          {
+            "label": "Modelled IRR",
+            "unit": "%",
+            "bubble": true
+          },
+          {
+            "label": "Screen",
+            "implication": true
+          }
+        ],
+        "rows": [
+          [
+            "Germany",
+            "412",
+            "104",
+            "19.4",
+            "Enter in FY26"
+          ],
+          [
+            "France",
+            "338",
+            "101",
+            "17.2",
+            "Enter in FY26"
+          ],
+          [
+            "Netherlands",
+            "121",
+            "109",
+            "16.8",
+            "Enter in FY26"
+          ],
+          [
+            "Poland",
+            "244",
+            "88",
+            "15.1",
+            "Enter in FY27"
+          ],
+          [
+            "Sweden",
+            "96",
+            "112",
+            "14.6",
+            "Enter in FY27"
+          ],
+          [
+            "Spain",
+            "287",
+            "91",
+            "13.9",
+            "Enter in FY27"
+          ],
+          [
+            "Italy",
+            "301",
+            "79",
+            "9.2",
+            "Hold: price below model floor"
+          ],
+          [
+            "Portugal",
+            "74",
+            "83",
+            "7.6",
+            "Hold: price below model floor"
+          ]
+        ],
+        "implicationStyle": "single",
+        "highlightRow": "Germany"
+      },
+      "soWhat": "Volume is not the constraint - Italy is the third-largest market on the list and still fails, because achievable price sits 21 points under the model floor.",
+      "source": "Market entry model, FY26 base case"
+    },
+    {
+      "title": "Weekly active accounts doubled after the March release and held the gain",
+      "subtitle": "Weekly active accounts, thousands, 2024",
+      "exhibit": {
+        "type": "chart.line",
+        "heading": "Weekly active accounts",
+        "unit": "k",
+        "categories": [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug"
+        ],
+        "series": [
+          {
+            "name": "Active accounts",
+            "values": [
+              31,
+              33,
+              38,
+              57,
+              62,
+              64,
+              66,
+              69
+            ]
+          }
+        ],
+        "annotations": [
+          {
+            "category": "Aug",
+            "series": "Active accounts",
+            "text": "21% above the April step",
+            "treatment": "speech"
+          }
+        ],
+        "events": [
+          {
+            "at": "Mar",
+            "label": "Mar 18: self-serve onboarding ships"
+          }
+        ]
+      },
+      "points": [
+        {
+          "lead": "The step is the release, not the season",
+          "text": "April 2023 grew 4% on the same calendar; the difference is self-serve onboarding."
+        },
+        {
+          "lead": "It held",
+          "text": "Four months on, the level is 21% above the April peak rather than decaying back to trend."
+        },
+        {
+          "lead": "Growth has slowed to trend",
+          "text": "Since May the series adds about 2% a month, which is where it sat before the release."
+        }
+      ],
+      "source": "Product telemetry, weeks to 31 August 2024"
     }
   ],
   "fill": "airy"

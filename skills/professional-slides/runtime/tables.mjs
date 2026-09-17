@@ -1036,8 +1036,16 @@ function renderTableAt({ id, frame, props }) {
             id: cellId,
             role: bubble ? "table-bubble" : "table-cell",
             frame: bubble
-              // A pill hugs its text rather than filling the cell.
-              ? { x: area.x + m.padding - 8, y: area.y + m.gap / 2 + 2, width: Math.min(area.width - m.gap, area.width - 2 * m.padding + 16), height: area.height - m.gap - 4 }
+              // A pill hugs its text rather than filling the cell: sized from
+              // the measured line, with the same 8px either side of it, so a
+              // wide column heading does not stretch a three-character figure
+              // across the whole column. It never grows past the cell.
+              ? {
+                  x: area.x + m.padding - 8,
+                  y: area.y + m.gap / 2 + 2,
+                  width: Math.min((l.blocks?.[0]?.width ?? 0) + 16, area.width - m.gap, area.width - 2 * m.padding + 16),
+                  height: area.height - m.gap - 4,
+                }
               : {
                   ...area,
                   y: area.y + m.gap / 2,

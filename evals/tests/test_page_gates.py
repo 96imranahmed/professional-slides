@@ -242,6 +242,53 @@ class KnownBadDeckTests(unittest.TestCase):
         self.assertIn("DOT_SEPARATOR", [f["code"] for f in cover_findings])
 
 
+class InkDefersToWordsTests(unittest.TestCase):
+    """A text page is measured by its words, not by how much ink type puts down.
+
+    INK_COVERAGE's 0.115 floor is calibrated on pages with a chart on them. An
+    executive summary carrying five findings, four metrics and a takeaway
+    measures about 0.096 - it is a full page of argument that happens to be set
+    in type - and the gate reported it as "mostly empty" with a repair ("give
+    the hero exhibit the leftover height") for an exhibit the page does not
+    have. The page is already measured by THIN_PAGE, which counts what it
+    carries, so ink defers there when there is no exhibit. A genuinely empty
+    text page still fails, at the word floor.
+    """
+
+    def setUp(self):
+        self.scene = load_scene()
+
+    def text_page(self, words):
+        """A page with no exhibit carrying `words` words of body text."""
+        slide = copy.deepcopy(self.scene["slides"][1])
+        slide["componentInstances"] = [c for c in slide.get("componentInstances", [])
+                                       if not page_gates.is_exhibit(c)]
+        return slide, words
+
+    def test_a_text_page_over_the_word_floor_is_not_reported_as_empty(self):
+        slide, _ = self.text_page(0)
+        self.assertFalse(any(page_gates.is_exhibit(c) for c in slide.get("componentInstances", [])),
+                         "the fixture page still carries an exhibit")
+        # The deferral is exactly "what would THIN_PAGE say": over the floor, ink
+        # keeps quiet; under it, THIN_PAGE speaks instead.
+        thin = page_gates.gate_findings(page_gates.gate_thin_page, 2, slide)
+        self.assertEqual([f["code"] for f in thin], ["THIN_PAGE"] if thin else [])
+
+    def test_gate_findings_runs_a_gate_without_reporting_it(self):
+        slide = copy.deepcopy(self.scene["slides"][1])
+        collected = []
+        page_gates.gate_thin_page(2, slide, collected)
+        self.assertEqual(page_gates.gate_findings(page_gates.gate_thin_page, 2, slide), collected)
+
+    def test_a_page_with_an_exhibit_is_still_judged_on_its_ink(self):
+        # The deferral is for pages with no exhibit. A chart page that renders
+        # nearly blank is still a chart page that renders nearly blank.
+        findings = []
+        page_gates.gate_ink_and_dead_band(
+            2, page_gates.load_ink_rows(RENDER / "slide-2.png"), findings)
+        self.assertIn("INK_COVERAGE", [f["code"] for f in findings])
+
+
 class ProfileTests(unittest.TestCase):
     def test_density_profiles_only_move_the_word_budget(self):
         scene = load_scene()

@@ -24,10 +24,16 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
   const stem = deckStem(spec);
   const baseDir = path.dirname(path.resolve(specPath));
-  const deckPlan = toDeckPlan(spec, baseDir);
   const directory = path.resolve(outputDirectory);
   await fs.mkdir(directory, { recursive: true });
+  // Every report this build is about to write, removed before anything that can
+  // throw. A deck that fails to compose leaves no output of its own, so whatever
+  // is on disk afterwards is the *previous* run - and a build loop that reads
+  // gates.json after the build reads a pass that belongs to a deck that no
+  // longer exists. That masked a broken example deck here for four commits.
+  await clearReports(directory);
 
+  const deckPlan = toDeckPlan(spec, baseDir);
   const { deck, decisions } = planDeck(deckPlan);
   const scenePath = path.join(directory, "scene.json");
   await fs.writeFile(scenePath, JSON.stringify(deck));
@@ -98,6 +104,18 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
 }
 
 async function readJson(file) { try { return JSON.parse(await fs.readFile(file, "utf8")); } catch { return {}; } }
+
+// The build's own outputs, in the order it writes them. Nothing else in the
+// directory is touched: the renders keep their own folder and a spec sitting
+// beside its build is the author's.
+export const BUILD_REPORTS = Object.freeze([
+  "scene.json", "planning.json", "preflight-gates.json",
+  "readback.json", "gates.json", "build-result.json",
+]);
+
+async function clearReports(directory) {
+  await Promise.all(BUILD_REPORTS.map((name) => fs.rm(path.join(directory, name), { force: true })));
+}
 
 async function finish(result, directory) {
   result.timings.totalMs = Object.values(result.timings).reduce((a, b) => a + b, 0);

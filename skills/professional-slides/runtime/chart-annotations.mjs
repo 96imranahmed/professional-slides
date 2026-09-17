@@ -12,7 +12,7 @@ import {
 import { measureText } from "./text-layout.mjs";
 
 export const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label", "end-bubble"]);
-export const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot"]);
+export const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot", "speech"]);
 // Keep a full label-height gap between the observation box and the plot. The
 // chart reserves this band before calculating marks, so value labels remain
 // readable instead of tucking under the annotation surface.
@@ -32,6 +32,9 @@ const ANNOTATION = token("type.chartAnnotation");
 const HAIRLINE = token("line.hairline");
 const STANDARD = token("line.standard");
 const NONE_RADIUS = token("radius.none");
+// Past this reach a speech tail stops reading as a taper, and the bubble takes
+// a plain leader with a dot instead.
+const TAIL_REACH = 40;
 
 const EVIDENCE_BOX_WIDTH = 260;
 const EVIDENCE_BOX_HEIGHT = 56;
@@ -221,10 +224,79 @@ function standardPlacement({ annotation, index, target, plot, bandIndex, topBand
   };
 }
 
+/**
+ * The filled bubble with a pointed tail, drawn where the placement put the box.
+ *
+ * The tail replaces the leader line: it leaves the edge of the bubble the
+ * leader starts from and closes on the mark the leader ends at, so the bubble
+ * points at its evidence without a second rule crossing the plot.
+ */
+function speechNodes(id, placement, data) {
+  const { index, frame, leader } = placement;
+  const fill = INK, tail = 14;
+  const near = (a, b) => Math.abs(a - b) < 1.5;
+  const reach = Math.hypot(leader.x2 - leader.x1, leader.y2 - leader.y1);
+  // A tail is a tail only while it is short. Stretched across half the plot a
+  // 14px wedge stops tapering and reads as a filled bar, so past that reach the
+  // bubble keeps a plain leader ending in a dot on the mark - the same
+  // terminator every other annotation uses.
+  const tailed = reach <= TAIL_REACH;
+  // Which edge of the box the leader leaves from: the placement has already
+  // decided where the bubble sits relative to its mark.
+  const horizontal = near(leader.x1, frame.x) || near(leader.x1, frame.x + frame.width);
+  const base = horizontal
+    ? [[leader.x1, leader.y1 - tail / 2], [leader.x1, leader.y1 + tail / 2]]
+    : [[leader.x1 - tail / 2, leader.y1], [leader.x1 + tail / 2, leader.y1]];
+  const points = [...base, [leader.x2, leader.y2]];
+  const xs = points.map(([x]) => x), ys = points.map(([, y]) => y);
+  const minX = Math.min(...xs), minY = Math.min(...ys);
+  const width = Math.max(1, Math.max(...xs) - minX), height = Math.max(1, Math.max(...ys) - minY);
+  const measured = measureText(placement.annotation.text, frame.width - 16, {
+    fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1,
+  });
+  return [
+    tailed
+      ? shapePrimitive({
+          id: stableId(id, "annotation-tail", index), role: "annotation-surface", geometry: "polygon",
+          frame: { x: minX, y: minY, width, height },
+          style: { fill, stroke: fill, lineWidth: HAIRLINE },
+          data: { ...data, paths: [{ points: points.map(([x, y]) => [(x - minX) / width, (y - minY) / height]), closed: true }] },
+        })
+      : linePrimitive({
+          id: stableId(id, "annotation-leader", index), role: "annotation-leader", ...leader,
+          style: { stroke: fill, lineWidth: HAIRLINE, dash: "solid" },
+          data: { ...data, endArrow: false, endpoint: "dot" },
+        }),
+    rectPrimitive({
+      id: stableId(id, "annotation-box", index), role: "annotation-surface", frame,
+      style: { fill, stroke: fill, lineWidth: HAIRLINE, radius: token("radius.small"), opacity: 1 },
+      data,
+    }),
+    textPrimitive({
+      id: stableId(id, "annotation-text", index), role: "annotation-text",
+      frame: { x: frame.x + 8, y: frame.y + (frame.height - measured.height) / 2, width: frame.width - 16, height: measured.height },
+      text: measured.text,
+      style: { ...textStyle(ANNOTATION, ON_PRIMARY, true, "center"), lineHeight: measured.lineHeight },
+      data: { ...data, textLayout: measured, annotationStyle: "speech" },
+    }),
+    ...(tailed ? [] : [ellipsePrimitive({
+      id: stableId(id, "annotation-endpoint", index), role: "annotation-endpoint",
+      frame: { x: leader.x2 - ENDPOINT_DIAMETER / 2, y: leader.y2 - ENDPOINT_DIAMETER / 2, width: ENDPOINT_DIAMETER, height: ENDPOINT_DIAMETER },
+      style: { fill, stroke: fill, lineWidth: HAIRLINE, opacity: 1 },
+      data,
+    })]),
+  ];
+}
+
 function evidenceNodes(id, placement) {
   const { annotation, index, frame, leader } = placement;
   const callout = annotation.treatment === "callout";
   const dotEnded = annotation.treatment === "orthogonal-dot";
+  // `speech` is the filled bubble the reference decks put on a busy plot, where
+  // an outlined surface on a canvas ground disappears into the gridlines. It is
+  // the loudest of the three, so it carries one short phrase and no border of
+  // its own: the fill is the emphasis.
+  const speech = annotation.treatment === "speech";
   const data = {
     annotationKey: `${id}:evidence:${index}`,
     annotationTreatment: annotation.treatment,
@@ -233,13 +305,18 @@ function evidenceNodes(id, placement) {
     targetCategory: annotation.category,
     targetSeries: annotation.series ?? null
   };
+  if (speech) return speechNodes(id, placement, data);
   const nodes = [
     linePrimitive({
       id: stableId(id, "annotation-leader", index),
       role: "annotation-leader",
       ...leader,
+      // A leader points at a mark; it does not attack it. An arrowhead landing
+      // on a data point covers the point it is identifying and reads as a
+      // second mark on the plot, so every leader ends in the small filled dot
+      // the orthogonal treatment already used.
       style: { stroke: callout ? PRIMARY : RULE, lineWidth: callout ? STANDARD : HAIRLINE, dash: "solid" },
-      data: { ...data, endArrow: callout, ...(callout ? { endArrowType: "triangle" } : {}), endpoint: dotEnded ? "dot" : "arrow" }
+      data: { ...data, endArrow: false, endpoint: "dot" }
     }),
     rectPrimitive({
       id: stableId(id, "annotation-box", index),
@@ -257,7 +334,7 @@ function evidenceNodes(id, placement) {
       data
     })
   ];
-  if (dotEnded) nodes.push(ellipsePrimitive({
+  nodes.push(ellipsePrimitive({
     id: stableId(id, "annotation-endpoint", index),
     role: "annotation-endpoint",
     frame: { x: leader.x2 - ENDPOINT_DIAMETER / 2, y: leader.y2 - ENDPOINT_DIAMETER / 2, width: ENDPOINT_DIAMETER, height: ENDPOINT_DIAMETER },

@@ -742,6 +742,13 @@ const NATIVE_CHART_TYPES = Object.freeze({
   "chart.stacked-bar": "stacked-bar", "chart.line": "line", "chart.pie": "pie", "chart.donut": "donut",
   "chart.scatter": "scatter", "chart.area": "area", "chart.range": "range"
 });
+/** Every plotted value a chart's props carry, however the series are written. */
+function seriesValues(props = {}) {
+  if (Array.isArray(props.series)) return props.series.flatMap((item) => item?.values || []);
+  if (Array.isArray(props.values)) return props.values;
+  return [];
+}
+
 /** Data an emitter needs for a native chart. Types outside NATIVE_CHART_TYPES keep shapes. */
 export function nativeChartSpec(componentId, props = {}, frame) {
   const type = NATIVE_CHART_TYPES[componentId];
@@ -758,6 +765,12 @@ export function nativeChartSpec(componentId, props = {}, frame) {
   // chart that carries category notes is assembled as shapes.
   if (props.native === false || type === "scatter" || type === "range") return null;
   if (Array.isArray(props.categoryNotes) && props.categoryNotes.some((note) => typeof note === "string" && note.trim())) return null;
+  // The same reason, for a different chart: PowerPoint hangs the category axis
+  // of a horizontal bar chart off the zero line. With a negative value the zero
+  // line moves right and every label for a negative bar lands on top of the bar
+  // it names - the runtime measured a gutter for them at the left, and the
+  // native chart ignores it. Drawn, the labels stay in that gutter.
+  if ((type === "bar" || type === "stacked-bar") && seriesValues(props).some((value) => value < 0)) return null;
   // Keep named scatter points and rich value labels editable as scene shapes
   // until the native exporter can preserve their complete semantics.
   if (props.valueFormat && (typeof props.valueFormat !== "object" ||

@@ -1972,7 +1972,7 @@ export function registerCharts(registry) {
       "font.body", "type.heading", "type.body", "type.chartLabel", "type.chartAnnotation", "type.compact", "type.label", "type.source", "color.ink", "color.textSecondary",
       "font.bodySemibold", "weight.semibold",
       "color.chartGrid", "color.chartComparator", "color.componentPrimary", "color.componentPrimaryTint", "color.accent", "color.rule",
-      "color.canvas", "color.surface", "color.surfaceMuted", "color.onPrimary", "color.negative", "line.hairline", "line.standard", "radius.none",
+      "color.canvas", "color.surface", "color.surfaceMuted", "color.onPrimary", "color.negative", "line.hairline", "line.standard", "radius.none", "radius.small",
       ...SERIES.map((item) => item.tokenId), ...LEGEND_TOKENS, ...(chart.tokens || []), "color.accent", "color.accentTint", "color.negative", "color.negativeTint", "color.surfaceMuted", "color.onPrimary", "type.compact"
     ];
     registry.set(chart.id, {

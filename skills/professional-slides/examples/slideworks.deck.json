@@ -55,6 +55,11 @@
           "value": "39",
           "label": "Dedicated metals experts",
           "sublabel": "Of 533 consultants worldwide"
+        },
+        {
+          "value": "31 of 94",
+          "label": "Projects clearing the hurdle",
+          "sublabel": "Announced pipeline to 2030"
         }
       ],
       "points": [
@@ -73,6 +78,10 @@
         {
           "lead": "The window is two years",
           "text": "since projects sanctioned after 2026 arrive past the demand peak this base case describes"
+        },
+        {
+          "lead": "Jurisdiction is the live risk",
+          "text": "as the four countries holding the viable projects account for 71% of pipeline capacity, and two have changed their royalty regime since 2023"
         }
       ],
       "soWhat": "Read the supply pipeline before the demand forecast: the price case turns on which of the 31 viable projects actually land.",
@@ -1279,5 +1288,5 @@
       }
     }
   ],
-  "sectionTabs": true
+  "tracker": "breadcrumb"
 }
