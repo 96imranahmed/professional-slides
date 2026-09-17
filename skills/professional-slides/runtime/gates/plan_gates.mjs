@@ -57,7 +57,12 @@ const TEXT_LIKE = new Set(["text", "", undefined, null]);
 export function family(page) {
   if (page.kind && page.kind !== "content") return null;
   const exhibit = String(page.exhibit ?? "").trim();
-  if (anchorsOf(page).some(isPhoto) || PICTURE_LIKE.has(exhibit)) return "picture";
+  // The shape counts as well as the exhibit. A plan that writes `picture-pair`
+  // in the architecture column has said the page is photographs, whatever it
+  // then writes under exhibit - and the composer has three shapes that only a
+  // picture page can take, so the two columns cannot disagree.
+  const shape = String(page.architecture ?? page.layout ?? "").trim();
+  if (anchorsOf(page).some(isPhoto) || PICTURE_LIKE.has(exhibit) || PICTURE_LIKE.has(shape)) return "picture";
   if (exhibit.startsWith("chart.")) return "chart";
   if (exhibit === "metrics") return "chart";
   if (TABLE_LIKE.has(exhibit)) return "table";
@@ -282,7 +287,9 @@ function gateAnchors(pages, findings) {
       items,
       `This page names ${items} things and depicts ${anchors.length} of them. Give each one an anchor: a photograph ` +
       "where the thing is depictable (a character, a city, a product) and an icon where it is a category or a " +
-      "concept. Set `anchors: false` if the page is deliberately unanchored.",
+      "concept. The photographs have three architectures - `picture-hero` for one subject, `picture-pair` for two, " +
+      "`picture-strip` for three to five - and the icons go on `cards`, a `rows` list or an icon-led points column. " +
+      "Set `anchors: false` if the page is deliberately unanchored.",
     ));
   }
 }

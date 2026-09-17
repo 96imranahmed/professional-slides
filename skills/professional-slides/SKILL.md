@@ -119,6 +119,12 @@ A photograph earns its place when the picture is the thing being judged: the sto
 - A picture page still argues: it carries a `soWhat`, an `insight` or a points column saying what the pictures prove. A caption names what you are looking at, which is not the same thing.
 - Half the analytical pages or more should carry measurement - a chart, a table, measured tiles. When a claim seems unmeasurable, look again: scale, frequency, duration, cost and count almost always are.
 
+**Where a picture does belong, three shapes hold it.** `pictures` is a list of one to five, each `{ path, alt, credit, label, text }`: one picture gives `picture-hero` (the subject on one side, the argument beside it), two give `picture-pair` (the two things side by side, a card each underneath), three to five give `picture-strip` (the cast, the market set, the product range). The `label` and the `text` are the card, and they are where the page argues - *Rent at 62% of the New York figure* is a card, *London* alone is a caption. The pictures take the height the cards do not, so they are the page rather than a band across the top of it. `photo` is the older spelling of the same hero page and still works.
+
+**Where the pictures come from.** A picture is an authorized file beside the spec, registered with its source and rights, and `credit` points at that registration - the media component refuses a picture with no `alt` and no authorization, so an unregistered photograph cannot reach a page by accident. A `path` that does not resolve is an error, never a silent grey box. A picture you have not cleared yet is written as `{ alt: "what it will show", label, text }` with **no `path`**: it composes as the empty frame carrying that line, so the page lays out, measures and gates now and the gap is visible on the page instead of invisible in the plan. Where no picture is ever going to exist, the thing is not depictable after all - give the page icons instead, which need no rights at all, and say so in the plan with `anchors: false` or an icon name per item.
+
+A picture page is held to a word floor scaled by the body its pictures leave it (`weight.json`'s `picture.shareMax` caps the relief at 60%), so `THIN_PAGE` does not ask a photograph page for a table's word count - and does not let a page grow its photograph instead of making its argument.
+
 ## Write the page
 
 - Keep body copy to 100 words on an exhibit page and 140 on a text page. Beyond that the exhibit has stopped being the evidence.

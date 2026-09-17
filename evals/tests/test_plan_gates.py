@@ -132,6 +132,19 @@ class PlanGateTests(unittest.TestCase):
         declined = deck([page(1, exhibit="cards", points=5, insight="filled", anchors=False)])
         self.assertNotIn("PLAN_VISUAL_ANCHOR", self.codes(declined))
 
+    def test_a_picture_architecture_makes_the_page_a_picture_page(self):
+        # The plan's two design columns have to agree. An author who writes
+        # `picture-pair` in the shape column has said the page is photographs;
+        # counting it as whatever the exhibit column happens to say would put a
+        # picture page in the table share, which is the number the whole stage
+        # exists to move.
+        plan = deck([page(1, exhibit="compare", architecture="picture-pair", insight="filled")]
+                    + [page(i + 2, exhibit="chart.column", architecture="exhibit-left", insight="filled")
+                       for i in range(9)])
+        report = run_plan(plan, self.tmp)
+        self.assertEqual(report["statistics"]["mix"]["table"], 0.0)
+        self.assertGreater(report["statistics"]["mix"]["picture"], 0)
+
     def test_a_chart_needs_no_anchor(self):
         # The marks are the anchor; icons on a chart's categories are decoration.
         plan = deck([page(1, exhibit="chart.bar", points=5, insight="filled")])

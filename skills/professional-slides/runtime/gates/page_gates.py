@@ -150,6 +150,9 @@ REFERENCE_PAGE = CONTRACT["reference"]["slides"]
 # text pages and reading the coverage back off the PNG. It sets the ink floor
 # for a page with no exhibit, where the exhibit-calibrated floor is unreachable.
 INK_PER_WORD = CONTRACT["inkPerWord"]
+# How much relief a photograph buys a page's word floor. See the contract note:
+# the floor follows the body the picture leaves, and stops following it here.
+PICTURE = CONTRACT["picture"]
 DEFAULT_FILL = CONTRACT["defaultFill"]
 
 # What a page of this deck is expected to carry. The deck's `weight` (its own,
@@ -900,11 +903,44 @@ def gate_findings(gate, *args):
     return out
 
 
+def picture_share(slide):
+    """How much of the page's body a photograph is holding.
+
+    A picture page substitutes the picture for the words - the reader is looking
+    at the subject rather than reading about it - so the type has only the body
+    beside or beneath the frame to fill. The floor follows that geometry, which
+    is the same move `inkPerWord` makes for a page of type alone, rather than a
+    second word floor nobody measured. It is capped by the contract, so growing
+    a photograph cannot buy a page out of carrying an argument.
+    """
+    frame = content_frame(slide)
+    area = float(frame.get("width") or 0) * float(frame.get("height") or 0)
+    if area <= 0:
+        return 0.0
+    covered = 0.0
+    for node in slide.get("nodes", []):
+        # A picture that has not been sourced yet draws as its empty frame, and
+        # that frame holds the same body the photograph will. Counting only the
+        # ones with a file would make the plan-time floor and the rendered floor
+        # disagree about the same page, which is the disagreement THIN_PLAN
+        # exists to avoid.
+        if node.get("type") != "image" and str(node.get("role") or "") != "image-frame":
+            continue
+        box = node.get("frame") or {}
+        box_area = float(box.get("width") or 0) * float(box.get("height") or 0)
+        if box_area >= PHOTO_MIN_AREA:
+            covered += box_area
+    return min(covered / area, PICTURE["shareMax"])
+
+
 def gate_thin_page(slide_no, slide, findings):
     """THIN_PAGE. A content page carrying less than the deck's weight floor of
     page text. Not a style rule: a reader who gets three bullets and a chart has
     been handed the analysis to do themselves."""
     floor = WEIGHT.get("pageWords") or 0
+    if floor <= 0:
+        return
+    floor = int(round(floor * (1.0 - picture_share(slide))))
     if floor <= 0:
         return
     body, footer, _band = body_bands(slide)

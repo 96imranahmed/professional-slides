@@ -28,7 +28,7 @@ import { measureText, accentRuns } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount, EVIDENCE_CALLOUT_BAND } from "./chart-annotations.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { measureTable } from "./tables.mjs";
-import { resolveWeight, normalizeWeight } from "./weight.mjs";
+import { resolveWeight, normalizeWeight, PICTURE_SHARE_MAX } from "./weight.mjs";
 import { groupThousands } from "./draw.mjs";
 
 const V3 = "professional-slides.deck/v3";
@@ -53,7 +53,17 @@ function imageDimensions(buffer) {
 
 function imageProps(ref, baseDir) {
   const file = path.resolve(baseDir, typeof ref === "string" ? ref : ref.path);
-  const buffer = fs.readFileSync(file);
+  let buffer;
+  try {
+    buffer = fs.readFileSync(file);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    // A named file that is not there is a mistake, never a placeholder: a typo
+    // that quietly became a grey box is how a deck goes out with a hole in it.
+    // A picture the author has not sourced yet is written without a `path` at
+    // all, and composes as the frame with its alt text inside.
+    throw new Error(`No picture at ${path.relative(baseDir, file) || file}. Pictures live beside the spec and are registered with their source and rights; a picture that has not been cleared yet is written as \`{ alt: "what it will show" }\` with no \`path\`, which composes as an empty frame carrying that line.`, { cause: error });
+  }
   const { width, height, mime } = imageDimensions(buffer);
   return { dataUri: `data:${mime};base64,${buffer.toString("base64")}`, width, height, alt: (typeof ref === "object" && ref.alt) || path.basename(file), ...(typeof ref === "object" && ref.credit ? { authorization: ref.credit } : {}) };
 }
@@ -920,6 +930,94 @@ function photoStrip(slide, id, baseDir, fr = 1) {
   return { id, component: "image-frame", props: { ...imageProps(slide.photo, baseDir), fit: "cover" }, size: { width: { fr }, height: "fill" } };
 }
 
+/**
+ * `pictures`: the page's photographs, one per named thing.
+ *
+ * The plan's anchor rule says a page that enumerates named things depicts each
+ * of them, and splits on what the thing is: an icon for a category or a
+ * concept, a photograph for something depictable - a character, a city, a
+ * product, a person. The icon half needed no new runtime, because cards, rows
+ * lists and icon-led point styles were all already built. The photograph half
+ * had nowhere to send a page: the rule could fire and the only architecture
+ * that could answer it was a comparison table with two pictures bolted above
+ * it. These three shapes are that answer.
+ *
+ * An entry is `{ path, alt, credit, label, text }`: the file, what it shows,
+ * whose it is, the thing's name and the line about it. `label` and `text`
+ * become the card under the picture, which is what makes a picture page an
+ * argument rather than a mood board.
+ *
+ * A picture with no `path` is not an error. It composes as the frame with its
+ * alt line inside it, so a page can be laid out, measured and gated before its
+ * pictures are cleared - the gap is then visible on the page instead of
+ * invisible in the plan. A `path` that does not resolve is an error (above).
+ */
+const PICTURES_MAX = 5;
+function normalizePictures(slide, id) {
+  const list = slide.pictures;
+  if (list === undefined) return [];
+  if (!Array.isArray(list) || !list.length) throw new Error(`${id}: \`pictures\` is a list of one to ${PICTURES_MAX} photographs`);
+  if (list.length > PICTURES_MAX) throw new Error(`${id}: ${list.length} pictures is a contact sheet, not a comparison; ${PICTURES_MAX} is the most one page can hold apart`);
+  if (slide.exhibit || slide.exhibits) throw new Error(`${id}: the pictures are the evidence on a picture page; move the exhibit to a page of its own`);
+  return list.map((entry, i) => {
+    const picture = typeof entry === "string" ? { path: entry } : { ...entry };
+    if (!picture.path && !picture.alt) throw new Error(`${id}: picture ${i + 1} names neither a file nor an \`alt\`; one of them has to say what the reader is looking at`);
+    return picture;
+  });
+}
+
+function pictureFrame(picture, id, baseDir, size) {
+  const props = picture.path
+    ? { ...imageProps(picture, baseDir), fit: picture.fit || "cover" }
+    : { alt: picture.alt };
+  return { id, component: "image-frame", props, size };
+}
+
+/**
+ * The cards under the pictures. Open cards, no edge: the photograph is already
+ * the frame, and a hairline box around its label makes two frames around one
+ * thing. They centre in whatever height is left, because a row of three-line
+ * cards hugging the top of a 280px track with the rest empty is the page that
+ * reads as unfinished.
+ */
+function pictureCards(pictures, id, size) {
+  const items = pictures.map((picture) => ({
+    title: picture.label,
+    ...(picture.text ? { text: picture.text } : {}),
+    ...(picture.icon ? { icon: picture.icon } : {}),
+    ...(picture.points ? { points: picture.points } : {}),
+  }));
+  return { id, component: "cards", props: { items, tone: "plain", valign: "middle" }, size };
+}
+
+/**
+ * The share of the body a picture page is assumed to hand its photographs, for
+ * the plan-time word floor.
+ *
+ * The rendered gate measures what the page actually drew; this is the estimate
+ * before there is a page to measure. It is deliberately the low end - the band
+ * takes the leftover height, so the real share is usually larger - which makes
+ * the plan-time floor the stricter of the two. That is the right way round: an
+ * author who acts on the plan-time message has acted on the rendered one too.
+ * `beside` is the older `photo` strip on a page that also carries an exhibit: a
+ * quarter of the row, not half the page.
+ */
+const PICTURE_BAND = Object.freeze({ pair: 0.46, strip: 0.38, hero: 0.45, beside: 0.25 });
+
+function planPictureShare(slide) {
+  const n = pictureCount(slide);
+  if (n) {
+    if (n === 1) return Math.min(PICTURE_BAND.hero, PICTURE_SHARE_MAX);
+    // Pictures with nothing said about them fill the body: the page is the
+    // photographs, and the floor is capped rather than computed.
+    const described = slide.pictures.some((p) => p && typeof p === "object" && (p.label || p.text));
+    if (!described) return PICTURE_SHARE_MAX;
+    return Math.min(n === 2 ? PICTURE_BAND.pair : PICTURE_BAND.strip, PICTURE_SHARE_MAX);
+  }
+  if (slide.photo) return Math.min(slide.exhibit || slide.exhibits ? PICTURE_BAND.beside : PICTURE_BAND.hero, PICTURE_SHARE_MAX);
+  return 0;
+}
+
 // The body frame a content page lays out into, and the furniture between its
 // columns: used to measure a side column against what it holds before the
 // planner turns fractions into pixels.
@@ -1114,8 +1212,22 @@ const PAGE_SHAPES = {
   // rows down the centre of a 1160px body leaves half the page empty and makes
   // the reader scan a column three times its natural length.
   "table-halves": { fit: (s, ex) => (ex.length === 1 && !hasCommentary(s) && halvable(ex[0]) ? 3 : 0) },
-  "text": { fit: (s, ex) => (ex.length === 0 ? 3 : 0) },
+  // The picture-led shapes. Two named things side by side, three to five across
+  // a strip, or one subject holding half the page: the architectures the plan's
+  // anchor rule sends a page to once it has decided the thing is depictable.
+  "picture-pair": { fit: (s) => (pictureCount(s) === 2 ? 4 : 0) },
+  "picture-strip": { fit: (s) => (pictureCount(s) >= 3 ? 4 : 0) },
+  // The photograph page has always drawn this way. What it did not have was a
+  // name, so the chooser recorded it as `text`, and a deck's variety measure
+  // never saw that one of its pages was a picture.
+  "picture-hero": {
+    fit: (s, ex) => (!ex.length && (pictureCount(s) === 1
+      || (s.photo && (s.points?.length || s.paragraphs?.length))) ? 4 : 0),
+  },
+  "text": { fit: (s, ex) => (ex.length === 0 && !pictureCount(s) && !s.photo ? 3 : 0) },
 };
+
+const pictureCount = (slide) => (Array.isArray(slide?.pictures) ? slide.pictures.length : 0);
 
 export const PAGE_SHAPE_NAMES = Object.freeze(Object.keys(PAGE_SHAPES));
 
@@ -1359,6 +1471,7 @@ export const SLIDE_KEYS = Object.freeze({
   rows: "a label-and-text table written at slide level",
   columns: "the headers for that table",
   photo: "a photograph beside the copy",
+  pictures: "one to five photographs, each with its label and line: the picture-led pages",
   image: "a full-bleed picture, on the fixed-shape pages",
   metrics: "a strip of measured tiles",
   metricsPosition: "top (the default) or bottom",
@@ -1671,7 +1784,7 @@ const SLIDE_PASSES = [
   // A text page whose points carry leads is a numbered ledger: label + text
   // rows with rules, filling the page, rather than a list floating at the top.
   ["led-points-become-a-ledger", (slide) => {
-    if (!(!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && (!slide.layout || slide.layout === "auto")
+    if (!(!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && !slide.pictures && (!slide.layout || slide.layout === "auto")
         && Array.isArray(slide.points) && slide.points.length >= 2 && slide.points.length <= 6
         && slide.points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && !pt.icon && pt.state == null))) return slide;
     return { ...slide, points: undefined, exhibit: { type: "rows", rows: slide.points.map((pt, i) => ({ label: pt.lead, text: pt.text, number: pt.number ?? i + 1 })) } };
@@ -1703,6 +1816,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     }
   }
   const { tileColumn, tilePoints } = ctx;
+  const pictures = normalizePictures(slide, id);
   const layout = chooseLayout(slide, recent);
   if (Array.isArray(recent)) recent.unshift(layout);
   // The column's shape, resolved once for the page and remembered, so
@@ -1715,7 +1829,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   const items = [];
   // Explicit layouts must preserve their author's commentary too. Side-only
   // fields cannot be silently dropped by a layout that has no side track.
-  if ((slide.insight || slide.insights?.length || slide.kpi) && !["exhibit-left", "exhibit-right", "hero-number", "stack"].includes(layout)) {
+  if ((slide.insight || slide.insights?.length || slide.kpi) && !["exhibit-left", "exhibit-right", "hero-number", "stack", "picture-hero"].includes(layout)) {
     throw new Error(`${id}: ${layout} cannot place insight/insights/kpi; choose an exhibit-left or exhibit-right layout`);
   }
   const metricsBelow = slide.metricsPosition === "bottom";
@@ -2019,13 +2133,51 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex) }, `${id}-exhibit-${i}`)) });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
-  } else if (slide.photo && (slide.points?.length || slide.paragraphs?.length)) {
-    // Text beside a photograph: the copy takes the left column (a toned panel
-    // when `pointsTone` says so), the photo the right, both full height.
+  } else if (layout === "picture-pair" || layout === "picture-strip") {
+    // Two named things side by side, or three to five across a strip, each with
+    // its card underneath. This is the page the reader can tell apart before
+    // reading a word of it, and it is what a two-column table of sentences
+    // about two characters, two cities or two products should have been.
+    const described = pictures.some((p) => p.label || p.text);
+    if (described && pictures.some((p) => !p.label)) {
+      throw new Error(`${id}: every picture on a ${layout} needs a \`label\` once any of them carries one; the labels are the row of cards under the pictures`);
+    }
+    // The cards hug what they say and the pictures take everything left over.
+    // The other way round - a fixed band with the cards spread under it - puts
+    // a hundred pixels of nothing above the cards and another hundred below
+    // them, and makes the row of cards the largest frame on a page whose
+    // subject is the photographs.
+    items.push({ id: `${id}-pictures`, layout: "flow.row", gap: "space.3", size: SIZE,
+      items: pictures.map((picture, i) => pictureFrame(picture, `${id}-picture-${i}`, baseDir, { width: { fr: 1 }, height: "fill" })) });
+    if (described) items.push(pictureCards(pictures, `${id}-picture-cards`, HUG));
+    if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
+  } else if (layout === "picture-hero") {
+    // One subject, the argument beside it: the copy takes the left column (a
+    // toned panel when `pointsTone` says so), the picture the right, both full
+    // height. `photo` is the older spelling of the same page and draws the same.
     const tone = sideTreatment(slide);
-    const copy = [...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })), ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle)] : [])];
+    const picture = pictures[0];
+    const insightSpecs = (Array.isArray(slide.insights) ? slide.insights : slide.insight !== undefined ? [slide.insight] : []).filter((entry) => entry != null);
+    const copy = [
+      ...(slide.kpi ? [{ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } }] : []),
+      ...insightSpecs.map((insight, at) => ({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insightSpecs.length > 1 && at === 0 ? "plain" : "tonal", ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG })),
+      ...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })),
+      ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle)] : []),
+    ];
     const column = { id: `${id}-side`, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: 1.2 }, height: "fill" }, items: copy };
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [column, photoStrip(slide, `${id}-photo`, baseDir, 1)] });
+    // The picture's own line sits under it as a statement box, the way a
+    // captioned panel does: naming the subject is the picture's job, not the
+    // argument's.
+    const frame = picture
+      ? pictureFrame(picture, `${id}-picture`, baseDir, { width: { fr: 1 }, height: "fill" })
+      : photoStrip(slide, `${id}-photo`, baseDir, 1);
+    const caption = picture && (picture.label || picture.text)
+      ? { id: `${id}-picture-caption`, component: "insight", props: { text: [picture.label, picture.text].filter(Boolean).join(" — "), variant: "neutral", align: "center" }, size: HUG }
+      : null;
+    const side = caption
+      ? { id: `${id}-picture-column`, layout: "flow.column", gap: "space.3", size: { width: { fr: 1 }, height: "fill" }, items: [{ ...frame, size: { width: { fr: 1 }, height: "fill" } }, caption] }
+      : frame;
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [column, side] });
   } else {
     const points = slide.points || [];
     const tone = sideTreatment(slide);
@@ -2332,6 +2484,7 @@ function planWords(slide) {
     });
   });
   rowsOf(slide.rows);
+  (slide.pictures || []).forEach((picture) => { if (picture && typeof picture === "object") { text(picture.label); text(picture.text); (picture.points || []).forEach(point); } });
   (slide.columns || []).forEach((column) => text(typeof column === "string" ? column : column?.label));
   for (const exhibit of [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean)) {
     text(exhibit.heading); text(exhibit.panelHeading); text(exhibit.unit);
@@ -2384,11 +2537,14 @@ export function budgetFindings(spec) {
     if (slide.kind && slide.kind !== "content") return;                 // covers, dividers, statements, takeaways
     if (!slide.title) return;
     const estimate = planWords(slide);
-    if (estimate >= floor) return;
+    // The picture takes the body the type would have filled, so the floor
+    // follows it here exactly as it does on the rendered page.
+    const pageFloor = Math.round(floor * (1 - planPictureShare(slide)));
+    if (pageFloor <= 0 || estimate >= pageFloor) return;
     const remedies = planRemedies(slide, weight.elements || 1);
     out.push({
-      slide: index + 1, code: "THIN_PLAN", measured: estimate, threshold: floor,
-      repair: `This page plans to carry about ${estimate} words of body text against a floor of ${floor}. From this page's own data: ${remedies.slice(0, 3).join("; ") || "deepen the evidence"}.`,
+      slide: index + 1, code: "THIN_PLAN", measured: estimate, threshold: pageFloor,
+      repair: `This page plans to carry about ${estimate} words of body text against a floor of ${pageFloor}. From this page's own data: ${remedies.slice(0, 3).join("; ") || "deepen the evidence"}.`,
     });
   });
   return out;

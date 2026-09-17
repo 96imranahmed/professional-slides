@@ -45,6 +45,13 @@ export const DEFAULT_FILL = CONTRACT.defaultFill;
 
 const RANGES = CONTRACT.ranges;
 
+/**
+ * The most of a page's word floor a photograph can stand in for. The floor
+ * follows the body the picture leaves; this is where it stops following it, so
+ * that a page cannot grow its picture instead of making its argument.
+ */
+export const PICTURE_SHARE_MAX = CONTRACT.picture.shareMax;
+
 /** Validate and merge an override block (from the spec or a house profile). */
 export function normalizeWeight(weight, where = "weight") {
   if (weight === undefined || weight === null) return {};

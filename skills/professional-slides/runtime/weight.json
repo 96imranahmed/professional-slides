@@ -39,6 +39,10 @@
       "ink": [0.0528, 0.0962]
     }
   },
+  "picture": {
+    "$comment": "A page whose evidence is a photograph carries fewer words, because the reader is looking at the subject rather than reading about it - and the body left for type is what sits beside or beneath the frame. So the word floor follows the geometry, exactly as inkPerWord makes a text page's ink floor follow its own word floor, rather than adding a second constant nobody measured: the floor is pageWords times the share of the body that is not photograph. shareMax caps the relief, so a page cannot buy its way out of carrying an argument by growing its picture; MISSING_ARGUMENT holds the other end and IMAGE_BUDGET caps how many pages may do this at all.",
+    "shareMax": 0.6
+  },
   "plan": {
     "$comment": "Thresholds for the plan gates, which judge the dot-dash before a page is drawn. The mix bands and the entropy floor are calibrated on the example decks and are GUIDELINES - move them with judgement as real plans are measured against them. The shapes of the tests are not guidelines: charts and tables get separate bands because merging them into one 45% floor is what let a deck of 43% tables pass more comfortably than a balanced one.",
     "from": 8,
