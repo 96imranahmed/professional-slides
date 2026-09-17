@@ -37,6 +37,8 @@ def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False) -> d
         pdf = Path(td) / (pptx.stem + ".pdf")
         if not pdf.exists():
             raise SystemExit(f"PDF conversion produced nothing for {pptx}")
+        saved_pdf = out_dir / (pptx.stem + ".pdf")
+        shutil.copyfile(pdf, saved_pdf)
         for old in out_dir.glob("slide-*.png"):
             old.unlink()
         subprocess.run(["pdftoppm", "-r", str(dpi), "-png", str(pdf), str(out_dir / "slide")], check=True, capture_output=True, timeout=300)
@@ -49,7 +51,7 @@ def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False) -> d
                 p.rename(target)
             files.append(str(target))
         files.sort(key=lambda s: int(Path(s).stem.split("-")[1]))
-    result = {"pptx": str(pptx), "renders": files, "dpi": dpi, "renderer": "libreoffice"}
+    result = {"pptx": str(pptx), "pdf": str(saved_pdf), "renders": files, "dpi": dpi, "renderer": "libreoffice"}
     if montage and files:
         from PIL import Image
         thumbs = [Image.open(f) for f in files]

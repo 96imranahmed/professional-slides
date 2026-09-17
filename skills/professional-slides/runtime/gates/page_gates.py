@@ -63,6 +63,8 @@ SOURCE_ROLES = {"source-text", "source", "footnote", "footnote-text"}
 NON_BODY_ROLES = SOURCE_ROLES | CHART_FURNITURE_ROLES | TITLE_ROLES | {
     "page-number", "notes", "tracker-label", "chart-unit",
     "cover-title", "cover-subtitle", "section-title",
+    "tracker-compact-label", "tracker-compact-marker-label", "category-note",
+    "chart-heading", "chart-title", "metric-value", "metric-label", "metric-sublabel",
 }
 PROSE_ROLES = {"paragraph", "body", "body-text"}
 # Table text is a lookup value, so it may be set one step below body type when
@@ -1377,7 +1379,9 @@ def gate_deck_structure(slides, analytical, findings):
     components = {component for slide in slides for component in all_components(slide)}
     roles = {str(node.get("role")) for slide in slides for node in slide.get("nodes", [])}
     sections = "section-divider" in components
-    tracker = bool(components & {"agenda", "tracker-page"}) or "tracker-label" in roles
+    tracker = bool(components & {"agenda", "tracker-page"}) or bool(roles & {
+        "tracker-label", "tracker-compact-label", "tracker-compact-marker-label",
+    })
     if sections and tracker:
         return
     findings.append(finding(
@@ -1560,7 +1564,12 @@ def page_architecture(slide):
                 return value
         return "diagram"
 
-    instances = [c for c in top_level_instances(slide) if is_exhibit(c)]
+    # Read the actual exhibit and commentary leaves, not section containers.
+    # Filtering to exhibits alone erased the text from chart-plus-commentary
+    # layouts and falsely classified every one as a lone chart.
+    commentary = {"bullet-list", "paragraph", "insight", "callout", "metric", "metrics"}
+    instances = [c for c in slide.get("componentInstances", [])
+                 if is_exhibit(c) or c.get("component") in commentary]
     if not instances:
         return None
     rows = {}
@@ -1657,7 +1666,12 @@ def gate_page_shape_flat(slides, content_indexes, findings, fill):
     counts = {}
     for shape in shapes:
         counts[shape] = counts.get(shape, 0) + 1
-    per_ten = 10.0 * len(counts) / len(shapes)
+    # Measure local variety in ten-page windows. Dividing the global number
+    # of shapes by total length penalized a varied 50-page deck solely for
+    # being longer than a ten-page deck using the same repertoire.
+    window = min(10, len(shapes))
+    per_ten = sum(len(set(shapes[i:i + window])) * 10.0 / window
+                  for i in range(len(shapes) - window + 1)) / (len(shapes) - window + 1)
     top_shape, top_count = max(counts.items(), key=lambda kv: kv[1])
     top_share = top_count / float(len(shapes))
     if per_ten >= THRESHOLDS["shapes_per_ten_min"] and top_share <= THRESHOLDS["shape_share_max"]:

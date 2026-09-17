@@ -55,7 +55,7 @@ export const SERIES = [
   token("color.chartSeries6")
 ];
 
-export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, periodBand = 0 } = {}) {
+export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, bottomInset = 56, periodBand = 0 } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
   leftInset = Math.max(leftInset, bands.left);
   // Peer charts in a row pass the row's tallest top band as topInset so their
@@ -64,7 +64,7 @@ export function chartFrame(frame, { topLegend = false, annotations = [], changeA
   const legendRows = topLegend === true ? 1 : Number(topLegend) || 0;
   const top = Math.max(Number(topInset) || 0, (legendRows ? 52 + (legendRows - 1) * 26 : 28) + totalLabelInset + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top + periodBand);
   // Reserve the actual last metric row plus a trailing theme gap, not another full row band.
-  const bottom = bands.bottom ? 40 + bands.bottom + tokenValue(token("space.3")) : 56;
+  const bottom = bands.bottom ? Math.max(bottomInset, 40 + bands.bottom + tokenValue(token("space.3"))) : bottomInset;
   const rightInset = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16);
   if (frame.height - bottom - top < 100) throw new Error("Chart annotation bands leave insufficient plot height; enlarge or split the exhibit");
   if (frame.width - leftInset - rightInset < 120) throw new Error("Chart has insufficient plot width; enlarge or split the exhibit");
@@ -625,6 +625,9 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   if (horizontal && (props.periods || props.events)) throw new Error("periods and events annotate vertical columns and lines, not horizontal bars");
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
+    // Horizontal categories live to the left; only an exposed value axis
+    // needs a bottom label band. The column-chart gutter left bars floating.
+    bottomInset: horizontal ? (showValueAxis ? 32 : 12) : 56,
     topLegend: showLegend ? legendRowsFor(series.map((item) => item.name), frame) : false,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
@@ -777,14 +780,16 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
           height: Math.max(1, Math.abs(endY - startY))
         };
       }
-      nodes.push(rectPrimitive({
+      if (!stacked || value !== 0) nodes.push(rectPrimitive({
         id: stableId(id, "series", item.name, category),
         role: "chart-mark",
         frame: bar,
         style: fillStyle(markColor),
         data: { category, categoryKey: category, series: item.name, seriesKey: item.name, colorIndex, highlighted: Boolean(selected), ...(barHighlight ? { highlightStyle: "bar" } : {}) }
       }));
-      if (showDataLabels) {
+      // A zero segment has no area in a stack. Printing its label inside a
+      // one-pixel placeholder both invents a visible segment and fails fit.
+      if (showDataLabels && (!stacked || value !== 0)) {
         let labelText = attachedLabelText(formatValue(value, props), stackLabels.secondary.get(`${category}:${item.name}`),props);
         const labelMetrics = measureDataLabel(labelText, stacked && !horizontal ? Math.max(1,bar.width-4) : 1000);
         labelText = labelMetrics.text;

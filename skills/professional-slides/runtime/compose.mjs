@@ -379,7 +379,13 @@ function groupNumericColumns(ex) {
       if (!grouped.has(i)) return cell;
       const value = numberOf(cell);
       if (value === null || Math.abs(value) < 1000) return cell;
-      const text = groupThousands(String(value));
+      // Add grouping to the numeric substring, never replace the authored
+      // display value: currency, percentage signs and decimal precision carry
+      // meaning even when the arithmetic parser ignores them.
+      const text = cellText(cell).replace(/\d[\d,]*(?:\.\d+)?/, (digits) => {
+        const [integer, fraction] = digits.replaceAll(",", "").split(".");
+        return groupThousands(integer) + (fraction === undefined ? "" : `.${fraction}`);
+      });
       return cell && typeof cell === "object" ? { ...cell, text } : text;
     });
     const { plain, ...rest } = row;
@@ -1049,7 +1055,7 @@ function chooseLayout(slide, recent = []) {
  * highlight takes one from the title when the title names a category.
  */
 function highlightFromTitle(ex, title) {
-  if (!ex || !["chart.column", "chart.bar", "chart.range"].includes(ex.type) || (ex.highlights || []).length) return ex;
+  if (!ex || !["chart.column", "chart.bar", "chart.range"].includes(ex.type) || ex.highlights !== undefined) return ex;
   if (ex.type !== "chart.range" && (!Array.isArray(ex.series) || ex.series.length !== 1)) return ex;
   const t = String(title || "").toLowerCase();
   // A category may carry a footnote marker ("2022\u00b9"); the title does not, so
@@ -1554,6 +1560,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   if (pointsStyle && Array.isArray(recentStyles)) recentStyles.unshift(pointsStyle);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   const items = [];
+  // Explicit layouts must preserve their author's commentary too. Side-only
+  // fields cannot be silently dropped by a layout that has no side track.
+  if ((slide.insight || slide.insights?.length || slide.kpi) && !["exhibit-left", "exhibit-right", "hero-number", "stack"].includes(layout)) {
+    throw new Error(`${id}: ${layout} cannot place insight/insights/kpi; choose an exhibit-left or exhibit-right layout`);
+  }
   const metricsBelow = slide.metricsPosition === "bottom";
   if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
   if (tileColumn) {
@@ -1756,8 +1767,13 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       return hug ? item : headedPanel(ex, item, `${id}-exhibit-${i}`);
     };
     const stacked = { id: `${id}-stack`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: exhibits.map(stackItem) };
-    if (slide.points?.length) {
-      const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle)] };
+    if (hasCommentary(slide)) {
+      const sideItems = [];
+      if (slide.kpi) sideItems.push({ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } });
+      const insights = slide.insights || (slide.insight ? [slide.insight] : []);
+      for (const [at, insight] of insights.entries()) sideItems.push({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insights.length > 1 && at === 0 ? "plain" : "tonal", ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG });
+      if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle));
+      const side = { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: sideTreatment(slide), size: { width: { fr: slide.kpi || insights.length ? 1.5 : 1 }, height: "fill" }, items: sideItems };
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
     } else items.push({ ...stacked, size: SIZE });
   } else if (layout === "grid") {
@@ -1863,6 +1879,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       ] });
     } else if (points.length) items.push(pointsItem(points, `${id}-points`, tone, fill, false, pointsStyle));
     for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
+  }
+  // These full-width/paired layouts used to discard supplied points. Keep
+  // them in a measured track below the evidence, just like the two-up recipe.
+  if (["exhibit-full", "table-halves", "split-tone"].includes(layout) && slide.points?.length) {
+    items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
   }
   // A reading note sits at the top of the side column when there is one,
   // otherwise as a full-width band above the content.

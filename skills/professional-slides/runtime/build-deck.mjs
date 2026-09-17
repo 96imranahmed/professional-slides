@@ -17,6 +17,7 @@ import { runProcess, lastJson } from "./process.mjs";
 
 import { deckStem } from "./artifact-path.mjs";
 import { assertOutputDirectory } from "./output-path.mjs";
+import { auditContent } from "./content-audit.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,6 +37,9 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
 
   const deckPlan = toDeckPlan(spec, baseDir);
   const { deck, decisions } = planDeck(deckPlan);
+  const contentAudit = auditContent(spec, deck);
+  await fs.writeFile(path.join(directory, "content-audit.json"), JSON.stringify(contentAudit, null, 2) + "\n");
+  if (!contentAudit.accepted) throw new Error(`Composition lost authored prose: ${JSON.stringify(contentAudit.findings)}`);
   const scenePath = path.join(directory, "scene.json");
   await fs.writeFile(scenePath, JSON.stringify(deck));
   await fs.writeFile(path.join(directory, "planning.json"), JSON.stringify(decisions, null, 2) + "\n");
@@ -112,7 +116,7 @@ async function readJson(file) { try { return JSON.parse(await fs.readFile(file, 
 // directory is touched: the renders keep their own folder and a spec sitting
 // beside its build is the author's.
 export const BUILD_REPORTS = Object.freeze([
-  "scene.json", "planning.json", "preflight-gates.json",
+  "scene.json", "planning.json", "preflight-gates.json", "content-audit.json",
   "readback.json", "gates.json", "build-result.json",
 ]);
 

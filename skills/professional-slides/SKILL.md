@@ -15,6 +15,12 @@ A deck is an argument that happens to be paginated. The reader gets the answer f
 4. Get that table approved. It is the ghost deck, and it is the only approval gate.
 5. Build, render, verify, deliver.
 
+Always generate PowerPoint through `runtime/build-deck.mjs` and deliver through
+`runtime/deliver-deck.mjs`, using the skill's standard emitter. If the pipeline
+fails, diagnose and repair its shared implementation or the invalid deck input,
+then rebuild and verify. Never substitute a task-local exporter or bypass a
+failed gate to produce a deliverable.
+
 ## Write the action title first
 
 An action title states the finding, not the subject. Use the formula:
