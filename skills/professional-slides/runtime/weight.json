@@ -10,24 +10,78 @@
     "elements": "evidence elements expected on an analytical page"
   },
   "ranges": {
-    "pageWords": [0, 400],
-    "columnFill": [0, 1],
-    "plotSpan": [0, 1],
-    "pointWords": [0, 60],
-    "tableFill": [0, 1],
-    "elements": [1, 4]
+    "pageWords": [
+      0,
+      400
+    ],
+    "columnFill": [
+      0,
+      1
+    ],
+    "plotSpan": [
+      0,
+      1
+    ],
+    "pointWords": [
+      0,
+      60
+    ],
+    "tableFill": [
+      0,
+      1
+    ],
+    "elements": [
+      1,
+      4
+    ]
   },
   "defaultFill": "balanced",
   "byFill": {
-    "full": { "pageWords": 120, "columnFill": 0.68, "plotSpan": 0.60, "pointWords": 10, "tableFill": 0.55, "elements": 2 },
-    "balanced": { "pageWords": 95, "columnFill": 0.55, "plotSpan": 0.52, "pointWords": 8, "tableFill": 0.45, "elements": 1 },
-    "airy": { "pageWords": 0, "columnFill": 0, "plotSpan": 0, "pointWords": 0, "tableFill": 0, "elements": 1 }
+    "full": {
+      "pageWords": 120,
+      "columnFill": 0.68,
+      "plotSpan": 0.6,
+      "pointWords": 10,
+      "tableFill": 0.55,
+      "elements": 2
+    },
+    "balanced": {
+      "pageWords": 95,
+      "columnFill": 0.55,
+      "plotSpan": 0.52,
+      "pointWords": 8,
+      "tableFill": 0.45,
+      "elements": 1
+    },
+    "airy": {
+      "pageWords": 0,
+      "columnFill": 0,
+      "plotSpan": 0,
+      "pointWords": 0,
+      "tableFill": 0,
+      "elements": 1
+    }
   },
   "geometryByFill": {
     "$comment": "The three geometric thresholds that move with fill; nothing else does. `ink_min` is calibrated on pages with an exhibit - the careful sample's ink first quartile is 0.121 over 137 analytical slides. A page of type alone cannot reach it at any honest length: see inkPerWord, which sets that page's floor instead.",
-    "full": { "ink_min": 0.14, "dead_band_max": 0.06, "internal_void_max": 0.16, "column_void_max": 0.20 },
-    "balanced": { "ink_min": 0.115, "dead_band_max": 0.08, "internal_void_max": 0.22, "column_void_max": 1.0 },
-    "airy": { "ink_min": 0.05, "dead_band_max": 0.14, "internal_void_max": 0.32, "column_void_max": 1.0 }
+    "full": {
+      "ink_min": 0.14,
+      "dead_band_max": 0.06,
+      "internal_void_max": 0.16,
+      "column_void_max": 0.2
+    },
+    "balanced": {
+      "ink_min": 0.115,
+      "dead_band_max": 0.08,
+      "internal_void_max": 0.22,
+      "column_void_max": 1.0
+    },
+    "airy": {
+      "ink_min": 0.05,
+      "dead_band_max": 0.14,
+      "internal_void_max": 0.32,
+      "column_void_max": 1.0
+    }
   },
   "inkPerWord": {
     "$comment": "Ink a page of body type puts on the canvas, per word, measured by rendering text pages of 93 to 185 words at three and five points and reading the coverage back off the PNG. The relationship is linear: 95 words measured 0.0556, 128 words 0.0687, 185 words 0.0962. A text page's ink floor is this times the deck's own pageWords, so the ink a page must show is the ink its required words produce, and the two gates cannot disagree.",
@@ -35,8 +89,14 @@
     "tolerance": 0.9,
     "measured": {
       "pages": 10,
-      "words": [93, 185],
-      "ink": [0.0528, 0.0962]
+      "words": [
+        93,
+        185
+      ],
+      "ink": [
+        0.0528,
+        0.0962
+      ]
     }
   },
   "picture": {
@@ -49,14 +109,61 @@
     "measuredMin": 0.45,
     "runMax": 2,
     "entropyMin": 0.7,
-    "entropyObserved": [0.67, 0.78, 0.88, 0.92],
-    "titleWords": { "target": 12, "overShareMax": 0.35 },
-    "anchor": { "itemsFrom": 2, "itemsTo": 6 },
+    "entropyObserved": [
+      0.67,
+      0.78,
+      0.88,
+      0.92
+    ],
+    "titleWords": {
+      "target": 12,
+      "overShareMax": 0.35
+    },
+    "anchor": {
+      "itemsFrom": 2,
+      "itemsTo": 6
+    },
     "mix": {
-      "chart": { "min": 0.35 },
-      "table": { "max": 0.25 },
-      "diagram": { "min": 0.07 },
-      "picture": { "min": 0.05 }
+      "chart": {
+        "min": 0.35
+      },
+      "table": {
+        "max": 0.25
+      },
+      "diagram": {
+        "min": 0.07
+      },
+      "picture": {
+        "min": 0.05
+      }
+    },
+    "craft": {
+      "$comment": "What the dot-dash has to record about the *craft* of a page, not only its evidence family. A generated 50-page deck passed every mix, entropy and anchor gate and still read as dry, because none of these were written down and so none were ever chosen: 10 tables with a median of 3 rows and not one treatment among them, 18 charts with not one annotation, 35 point lists with not one highlighted phrase. Every threshold here is measured off the four example decks, which are the only corpus in the repository.",
+      "tableRows": {
+        "min": 5,
+        "observedMedian": 6,
+        "observedRange": [
+          3,
+          12
+        ]
+      },
+      "tableTreated": {
+        "min": 0.25,
+        "observed": 0.47
+      },
+      "chartAnnotated": {
+        "min": 0.2,
+        "observed": 0.36
+      },
+      "exhibitVarietyPerTen": {
+        "min": 4.0,
+        "observed": [
+          7.1,
+          7.5,
+          7.5,
+          8.3
+        ]
+      }
     }
   },
   "reference": {
@@ -70,9 +177,18 @@
       "heavyShare": 0.42,
       "inkMedian": 0.19,
       "inkQ1": 0.121,
-      "bands": { "titleBand": 20, "body": 128, "footer": 19 },
+      "bands": {
+        "titleBand": 20,
+        "body": 128,
+        "footer": 19
+      },
       "textBlocks": 142,
-      "lineBlocks": { "label": 40, "phrase": 10.5, "sentence": 4, "total": 56 },
+      "lineBlocks": {
+        "label": 40,
+        "phrase": 10.5,
+        "sentence": 4,
+        "total": 56
+      },
       "numericTokens": 17,
       "drawings": 29
     },

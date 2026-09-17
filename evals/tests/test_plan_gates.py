@@ -56,10 +56,12 @@ class PlanGateTests(unittest.TestCase):
         shapes = ["exhibit-left", "exhibit-top", "two-up", "hero-number", "exhibit-full",
                   "picture-pair", "text", "exhibit-right"]
         # No two neighbours share an exhibit: a run of three is a finding, and
-        # rightly so.
+        # rightly so. The spread is wide as well as even - the craft gate counts
+        # distinct exhibits per ten pages, because a deck that runs three shapes
+        # evenly scores as well on entropy as one that runs twenty.
         kinds = ["chart.column", "table", "chart.bar", "cards", "chart.line", "table",
-                 "steps", "chart.column", "image", "chart.bar", "table", "cards",
-                 "chart.column", "chart.bar", "table", "chart.line"]
+                 "steps", "chart.waterfall", "image", "chart.lollipop", "table", "timeline",
+                 "chart.dumbbell", "chart.bar", "table", "chart.marimekko"]
         pages = []
         for i, kind in enumerate(kinds):
             extra = {}
@@ -67,6 +69,14 @@ class PlanGateTests(unittest.TestCase):
                 extra = {"anchors": ["photo:london", "photo:new-york"], "points": 2}
             elif kind == "cards":
                 extra = {"points": 3, "anchors": ["target", "gear", "shield"]}
+            # Craft, recorded: how deep each table runs and how it is treated,
+            # what is marked on each plot, and the phrase the page emphasises.
+            if kind == "table":
+                extra = {**extra, "rows": 8, "treatment": "heat"}
+            elif kind.startswith("chart."):
+                extra = {**extra, "annotation": "change bubble"}
+            if i == 0:
+                extra = {**extra, "highlight": "four and a half times"}
             pages.append(page(i + 1, exhibit=kind, architecture=shapes[i % len(shapes)],
                               insight="filled", **extra))
         report = run_plan(deck(pages), self.tmp)
@@ -166,6 +176,61 @@ class PlanGateTests(unittest.TestCase):
                        if f["code"] == "PLAN_TITLE_LENGTH")
         self.assertEqual(finding["measured"]["max"], 14)
         self.assertIn("ceiling, not a target", finding["repair"])
+
+    def test_the_craft_gates_see_what_the_mix_gates_cannot(self):
+        """A deck can pass every mix, entropy and anchor gate and still be dry.
+
+        The 50-page Marvel plan did exactly that - 44% charts, 22% tables, 0.888
+        entropy, nine architectures, pictures and icons and insights all present
+        - and rendered as ten three-row tables with no treatment among them,
+        eighteen charts with nothing marked on any plot, and not one highlighted
+        phrase. None of it was a failure of judgement: none of it was recorded,
+        so none of it was ever chosen.
+        """
+        # Wide enough to clear the variety floor, so only the craft codes fire.
+        kinds = ["chart.column", "table", "chart.bar", "cards", "chart.line", "table",
+                 "steps", "chart.waterfall", "chart.lollipop", "timeline",
+                 "chart.dumbbell", "table", "chart.marimekko", "chart.slope"]
+        bare = [page(i + 1, exhibit=k, architecture=["exhibit-left", "exhibit-top", "two-up",
+                     "hero-number", "exhibit-full", "text"][i % 6], insight="filled",
+                     anchors=["photo:a"] if i == 3 else ["target"])
+                for i, k in enumerate(kinds)]
+        codes = self.codes(deck(bare))
+        self.assertIn("PLAN_TABLE_DEPTH", codes, "an unrecorded table size is not a passing table size")
+        self.assertIn("PLAN_TABLE_MONOTONY", codes)
+        self.assertIn("PLAN_UNANNOTATED_CHARTS", codes)
+        self.assertIn("PLAN_NO_HIGHLIGHT", codes)
+        self.assertNotIn("PLAN_EXHIBIT_VARIETY", codes)
+
+        # A shallow table is a finding even when its depth *is* recorded.
+        shallow = [dict(p, rows=3, treatment="heat") if p["exhibit"] == "table" else p for p in bare]
+        self.assertIn("PLAN_TABLE_DEPTH", self.codes(deck(shallow)))
+        self.assertNotIn("PLAN_TABLE_MONOTONY", self.codes(deck(shallow)))
+
+        # Recorded and deep enough, treated, annotated, one phrase emphasised.
+        good = [dict(p) for p in bare]
+        for row in good:
+            if row["exhibit"] == "table":
+                row.update(rows=9, treatment="verdict column")
+            elif row["exhibit"].startswith("chart."):
+                row.update(annotation="reference line at the target")
+        good[0]["highlight"] = "four and a half times"
+        self.assertEqual(self.codes(deck(good)), set())
+
+    def test_variety_counts_the_repertoire_not_just_the_spread(self):
+        # Entropy normalises by how many exhibits were used, so three shapes
+        # used evenly score as well as twenty. The Marvel plan measured 0.908
+        # against the example decks' 0.93-0.97 while drawing on a third as many
+        # exhibits per page, which is the gap this counts.
+        pages = [page(i + 1, exhibit=["chart.bar", "chart.column", "table"][i % 3],
+                      architecture=["exhibit-left", "exhibit-top", "two-up", "text"][i % 4],
+                      insight="filled", rows=9, treatment="heat", annotation="bracket",
+                      highlight="x" if i == 0 else None)
+                 for i in range(21)]
+        report = run_plan(deck(pages), self.tmp)
+        self.assertGreater(report["statistics"]["styleEntropy"], 0.9, "evenly spread across four shapes")
+        self.assertLess(report["statistics"]["exhibitVarietyPerTen"], 2, "and drawing on three exhibits")
+        self.assertIn("PLAN_EXHIBIT_VARIETY", {f["code"] for f in report["findings"]})
 
     def test_every_finding_names_a_code_and_carries_a_repair(self):
         pages = [page(i + 1, exhibit="table", architecture="exhibit-full") for i in range(20)]

@@ -9,7 +9,7 @@ export const PALETTES = Object.freeze({
       "color.chartSeries1": "#051C2C", "color.chartSeries2": "#2251FF", "color.chartSeries3": "#00A9F4",
       "color.chartSeries4": "#034B6F", "color.chartSeries5": "#99C4FF", "color.chartSeries6": "#B3D9F5",
       "font.display": "Georgia",
-      "style.titleWeight": "bold", "style.titleRule": "rule", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "zebra", "style.labelWeight": "regular"
+      "style.titleWeight": "bold", "style.titleRule": "rule", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "zebra", "style.labelWeight": "bold"
     }
   },
   bcg: {
@@ -31,7 +31,7 @@ export const PALETTES = Object.freeze({
       "color.componentPrimaryTint": "#FAE8E9", "color.surfaceMuted": "#F2F2F2", "color.chartComparator": "#BFBFBF",
       "color.chartSeries1": "#8C8C8C", "color.chartSeries2": "#CC0000", "color.chartSeries3": "#4D4D4D",
       "color.chartSeries4": "#BFBFBF", "color.chartSeries5": "#7A0000", "color.chartSeries6": "#E6E6E6",
-      "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "top-right", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "regular"
+      "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "top-right", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold"
     }
   },
   deloitte: {
@@ -42,7 +42,7 @@ export const PALETTES = Object.freeze({
       "color.componentPrimaryTint": "#E8E8E8", "color.surfaceMuted": "#F2F2F2",
       "color.chartSeries1": "#86BC25", "color.chartSeries2": "#046A38", "color.chartSeries3": "#43B02A",
       "color.chartSeries4": "#0076A8", "color.chartSeries5": "#62B5E5", "color.chartSeries6": "#BBBCBC",
-      "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "regular"
+      "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold"
     }
   },
   "consulting-toolkit": { label: "Consulting toolkit reference", basis: "Retained reference palette", colors: {} }

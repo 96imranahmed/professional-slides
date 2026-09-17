@@ -40,6 +40,11 @@ export const PLAN_CODES = Object.freeze({
   PLAN_NO_PICTURES: "no page in the deck carries a photograph",
   PLAN_NO_ICONS: "no page in the deck carries an icon",
   PLAN_NO_INSIGHT: "no page states its conclusion in an insight",
+  PLAN_TABLE_DEPTH: "the tables are planned too shallow to be worth a page",
+  PLAN_TABLE_MONOTONY: "no table names a treatment, so every one of them is a plain grid",
+  PLAN_UNANNOTATED_CHARTS: "charts planned with nothing marked on the plot",
+  PLAN_NO_HIGHLIGHT: "no page names the phrase its reader should see first",
+  PLAN_EXHIBIT_VARIETY: "the deck draws on too few of the exhibits it could use",
 });
 
 const finding = (page, code, measured, threshold, repair) => {
@@ -294,6 +299,107 @@ function gateAnchors(pages, findings) {
   }
 }
 
+/**
+ * The craft gates: what the plan records about how a page is *made*, not which
+ * family its evidence belongs to.
+ *
+ * A generated 50-page deck passed every gate above - 44% charts, 22% tables,
+ * 0.888 entropy, nine architectures, pictures and icons and insights all
+ * present - and still read as dry. Measured against the example decks: its ten
+ * tables ran a median of three rows against six and carried not one treatment
+ * among them against 47%; its eighteen charts carried not one annotation
+ * against 36%; its thirty-five point lists named not one highlighted phrase;
+ * and it drew on thirteen distinct exhibits across forty-five pages, 2.9 per
+ * ten, against seven to eight.
+ *
+ * None of that was a failure of judgement. None of it was written down, so none
+ * of it was ever chosen - the same mechanism, one level finer, as the mix that
+ * made every page a table.
+ */
+const CRAFT = PLAN.craft;
+const tablePages = (pages) => pages.filter((p) => family(p) === "table");
+const chartPages = (pages) => pages.filter((p) => family(p) === "chart");
+/** The rows a page says its table carries: `rows: 8`, or "8x4" in `shape`. */
+function plannedRows(page) {
+  if (Number.isFinite(page.rows)) return page.rows;
+  const shape = String(page.shape ?? page.dataShape ?? "");
+  const match = shape.match(/(\d+)\s*[x\u00d7]\s*\d+/i);
+  return match ? Number(match[1]) : null;
+}
+const TREATMENTS = /\b(heat|bubble|bar|harvey|implication|verdict|highlight\w*|total|derive|rank|share|change|index|group|recommend\w*)\b/i;
+const ANNOTATIONS = /\b(annotat\w*|callout|bracket|flag|reference|baseline|target|band|cagr|change|growth|period|event|highlight\w*|focus)\b/i;
+const treated = (page) => TREATMENTS.test(String(page.treatment ?? page.variant ?? page.exhibitVariant ?? ""));
+const annotated = (page) => ANNOTATIONS.test(String(page.annotation ?? page.treatment ?? page.variant ?? page.exhibitVariant ?? ""));
+
+function gateCraft(pages, findings) {
+  const content = pages.filter((p) => !p.kind || p.kind === "content");
+  if (content.length < PLAN.from) return;
+  const tables = tablePages(content), charts = chartPages(content);
+
+  if (tables.length) {
+    const measured = tables.map(plannedRows).filter((n) => Number.isFinite(n));
+    if (!measured.length) {
+      findings.push(finding(null, "PLAN_TABLE_DEPTH",
+        { median: null, reason: "no table page records its size", tables: tables.length }, CRAFT.tableRows.min,
+        "How many rows each table carries is not recorded in this plan, so a three-row table and a twelve-row one " +
+        "are the same entry. Write the data shape - `rows x columns` - beside the exhibit. A table of three rows is " +
+        "usually a comparison panel or a list with an icon per category; the reference tables run " +
+        `${CRAFT.tableRows.observedRange.join(" to ")} rows and split across pages when they run past the budget.`));
+    } else {
+      const sorted = [...measured].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      if (median < CRAFT.tableRows.min) {
+        findings.push(finding(null, "PLAN_TABLE_DEPTH",
+          { median, tables: tables.length, measured: sorted }, CRAFT.tableRows.min,
+          `The tables are planned at a median of ${median} rows against ${CRAFT.craftMedian ?? CRAFT.tableRows.observedMedian} in the example decks. A table of ` +
+          "three rows spends a whole page saying what a comparison panel or an icon list says in a corner of one. " +
+          "Either deepen it - more rows, a derived column, a second cut of the same measure - or choose the " +
+          "exhibit the content actually is. A long table is not a problem: it paginates."));
+      }
+    }
+    const share = tables.filter(treated).length / tables.length;
+    if (share < CRAFT.tableTreated.min) {
+      findings.push(finding(null, "PLAN_TABLE_MONOTONY",
+        { share: round(share), treated: tables.filter(treated).length, of: tables.length }, CRAFT.tableTreated.min,
+        "Not one of these tables says how it is treated, so every one of them will draw as the same plain grid. " +
+        "The treatments exist and are content-led: a verdict or decision column takes the implication gutter, a " +
+        "scored table takes heat, a share column takes bubbles or an in-cell bar, a qualitative rating takes " +
+        `harvey balls, a table whose title names a winner highlights that column. Reference tables carry one on ${Math.round(CRAFT.tableTreated.observed * 100)}% ` +
+        "of them. Name the treatment in the plan and the page stops being a grid of sentences."));
+    }
+  }
+
+  if (charts.length) {
+    const share = charts.filter(annotated).length / charts.length;
+    if (share < CRAFT.chartAnnotated.min) {
+      findings.push(finding(null, "PLAN_UNANNOTATED_CHARTS",
+        { share: round(share), annotated: charts.filter(annotated).length, of: charts.length }, CRAFT.chartAnnotated.min,
+        "These charts plan no marks on the plot: no change bubble, no bracket between the two series the title " +
+        "compares, no reference line at the target, no period band, no flagged event, no highlighted category. A " +
+        "plot with nothing marked on it asks the reader to find the finding the title already states. Name the " +
+        `device beside the exhibit; the example decks carry one on ${Math.round(CRAFT.chartAnnotated.observed * 100)}% of their charts.`));
+    }
+  }
+
+  // Variety, counted as distinct exhibits per ten pages rather than as entropy.
+  // Entropy normalises by the number of exhibits used, so a deck that runs the
+  // same three shapes evenly scores as well as one that runs twenty: this deck
+  // measured 0.908 against the examples' 0.93-0.97 and looked fine, while using
+  // a third as many exhibits per page.
+  const kinds = new Set(content.map((p) => String(p.exhibit ?? "").trim()).filter(Boolean));
+  const perTen = content.length ? (kinds.size / content.length) * 10 : 0;
+  if (kinds.size && perTen < CRAFT.exhibitVarietyPerTen.min) {
+    findings.push(finding(null, "PLAN_EXHIBIT_VARIETY",
+      { perTen: round(perTen), distinct: kinds.size, pages: content.length }, CRAFT.exhibitVarietyPerTen.min,
+      `This deck draws on ${kinds.size} exhibits across ${content.length} pages - ${round(perTen)} per ten, against ` +
+      `${CRAFT.exhibitVarietyPerTen.observed.join(", ")} in the example decks. The catalogue is far wider than the ` +
+      "handful a plan reaches for by default: a sequence can be a timeline or a gantt rather than a fourth " +
+      "staircase, a composition can be a marimekko or a waffle, a ranking a lollipop, a distribution a boxplot or " +
+      "a dumbbell, two measures on one category a combo. Ask what each page's evidence actually is before " +
+      "reaching for the shape the last page used."));
+  }
+}
+
 function gateDeckWideDevices(pages, findings) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");
   if (content.length < PLAN.from) return;
@@ -313,6 +419,17 @@ function gateDeckWideDevices(pages, findings) {
       { pages: content.length, icons: 0 }, 1,
       "Not one page carries an icon, from a vocabulary of 48. Any page that enumerates named categories wants one " +
       "per category - the capability is already built into cards, rows lists and points columns.",
+    ));
+  }
+  const highlighted = content.filter((p) => String(p.highlight ?? "").trim() && String(p.highlight).trim() !== "none").length;
+  if (highlighted === 0) {
+    findings.push(finding(
+      null, "PLAN_NO_HIGHLIGHT",
+      { pages: content.length, highlighted: 0 }, 1,
+      "No page names the phrase its reader should see first. `highlight` sets one phrase inside a point in the " +
+      "house accent - \"**Improved quality of care** for patients\" - which is how a reference page emphasises the " +
+      "finding inside a sentence instead of bolding the whole line or breaking it onto its own. It is not wanted " +
+      "on every point, and a deck that uses it nowhere has left the emphasis to the reader.",
     ));
   }
   const insights = content.filter((p) => p.insight && p.insight !== "none").length;
@@ -343,6 +460,7 @@ export function runPlanGates(plan) {
   gateRuns(pages, findings);
   gateEntropy(pages, findings);
   gateAnchors(pages, findings);
+  gateCraft(pages, findings);
   gateDeckWideDevices(pages, findings);
   return report(plan, findings, pages);
 }
@@ -368,11 +486,14 @@ function report(plan, findings, pages) {
              picture: shareOf("picture"), text: shareOf("text") },
       styleEntropy: entropy.declared ? round(entropy.value) : null,
       architectures: entropy.declared ? entropy.distinct : null,
+      exhibitVarietyPerTen: content.length ? round((new Set(content.map((p) => String(p.exhibit ?? "").trim()).filter(Boolean)).size / content.length) * 10) : 0,
+      tablesTreated: tablePages(content).length ? round(tablePages(content).filter(treated).length / tablePages(content).length) : null,
+      chartsAnnotated: chartPages(content).length ? round(chartPages(content).filter(annotated).length / chartPages(content).length) : null,
       anchoredPages: content.filter((p) => Array.isArray(p.anchors) && p.anchors.length).length,
       insightPages: content.filter((p) => p.insight && p.insight !== "none").length,
     },
     reference: { mix: Object.fromEntries(Object.entries(PLAN.mix).map(([k, v]) => [k, v])),
-                 styleEntropy: PLAN.entropyMin, observed: PLAN.entropyObserved },
+                 styleEntropy: PLAN.entropyMin, observed: PLAN.entropyObserved, craft: PLAN.craft },
     accepted: findings.length === 0,
     countsByCode: counts,
     findings,
