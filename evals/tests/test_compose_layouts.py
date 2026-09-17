@@ -172,3 +172,44 @@ assert.ok(ruledRow.items[1].props.items.every((i) => i.number === undefined));
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])
+
+    def test_a_page_reads_in_one_grammar(self):
+        """A figure beside a table asks for two kinds of reading at once.
+
+        Two tables side by side are peers, and so are two charts and a chart
+        beside a table: each is read by finding a value in one and comparing it
+        with a value in the other. A staircase, a cycle or a framework is not
+        read that way at all - it carries its argument in its shape. Set one
+        beside a table and the page has a join down the middle where the first
+        kind of reading ends and the second begins.
+        """
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {splitReadingModes} from './skills/professional-slides/runtime/compose.mjs';
+const steps={type:'steps',items:[{label:'Introduce',text:'Earn attachment'},{label:'Connect',text:'Carry it forward'},{label:'Pay off',text:'Spend it'}]};
+const table={type:'table',columns:['Model','Reward','Cost'],rows:[['Connected','Accumulation','Homework'],['Standalone','Concentration','Reintroduction']]};
+const chart={type:'chart.column',categories:['a','b'],series:[{name:'s',values:[1,2]}]};
+const page=(exhibits,extra={})=>({id:'s01',title:'A title that states the finding',exhibits,points:['one','two'],...extra});
+
+// A figure and a table split; the commentary stays with the first page.
+const split=splitReadingModes(page([steps,table]));
+assert.equal(split.length,2);
+assert.deepEqual(split.map(p=>p.exhibit.type),['steps','table']);
+assert.ok(split.every(p=>p.exhibits===undefined));
+assert.match(split[0].title,/\\(1\\/2\\)$/);
+assert.deepEqual(split.map(p=>p.id),['s01-1','s01-2']);
+assert.ok(split[0].points&&split[1].points===undefined);
+
+// Peers stay on one page: two tables, two charts, a chart beside a table.
+for (const pair of [[table,table],[chart,chart],[chart,table]])
+  assert.equal(splitReadingModes(page(pair)).length,1,`${pair.map(e=>e.type)} are peers`);
+
+// `metrics` is a measured exhibit, not a figure: tiles beside a chart are peers.
+assert.equal(splitReadingModes(page([{type:'metrics',items:[{value:'4',label:'x'}]},chart])).length,1);
+
+// An explicit arrangement is the author overriding this on purpose.
+assert.equal(splitReadingModes(page([steps,table],{arrange:'row'})).length,1);
+assert.equal(splitReadingModes(page([steps,table],{layout:'two-up'})).length,1);
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result["ok"])

@@ -805,6 +805,41 @@ const tableSignature = (ex) => { const s = styleTable(ex); return `${s.variant}/
  * page and the so-what, being the pages' shared claim, with every page. An
  * explicit `layout` is left alone.
  */
+/**
+ * A page reads in one grammar.
+ *
+ * Two tables side by side are peers, and so are two charts, and a chart beside
+ * a table: all of them are read the same way, by finding a value in one and
+ * comparing it with a value in the other. A figure is not read that way at all.
+ * A staircase, a cycle, a framework carries its argument in its shape, and the
+ * reader takes it in whole rather than looking things up in it. Set one beside
+ * a table and the page asks for both kinds of reading at once, with a hard join
+ * down the middle where the first ends and the second begins - which is a page
+ * a reader has to be told how to read.
+ *
+ * So a row the composer chose for itself never mixes the two: the page splits,
+ * and each half keeps the grammar it was drawn in. An explicit `arrange` or
+ * `layout` is the author overriding this on purpose and is left alone.
+ */
+const FIGURE_TYPES = DIAGRAM_TYPES.filter((type) => type !== "metrics");
+const readingMode = (ex) => (FIGURE_TYPES.includes(String(ex?.type ?? "")) ? "figure" : "measured");
+
+export function splitReadingModes(slide) {
+  if (slide.layout && slide.layout !== "auto") return [slide];
+  if (slide.arrange) return [slide];
+  const exhibits = slide.exhibits || [];
+  if (exhibits.length < 2) return [slide];
+  if (new Set(exhibits.map(readingMode)).size < 2) return [slide];
+  return exhibits.map((ex, i) => {
+    const page = { ...slide, exhibit: ex, title: `${slide.title} (${i + 1}/${exhibits.length})` };
+    delete page.exhibits;
+    if (slide.id) page.id = `${slide.id}-${i + 1}`;
+    // The commentary belongs to the page that carries the evidence it reads.
+    if (i !== 0) delete page.points;
+    return page;
+  });
+}
+
 export function splitTables(slide) {
   if (slide.layout && slide.layout !== "auto") return [slide];
   const exhibits = slide.exhibits || [];
@@ -2406,7 +2441,7 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   // chooser breaks a tie on variety, so a section spreads across its repertoire
   // instead of repeating whichever shape fitted first.
   const recent = [], recentStyles = [];
-  for (const page of pages.flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) {
+  for (const page of pages.flatMap(splitReadingModes).flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) {
     slides.push(composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles));
     recent.splice(4);
     recentStyles.splice(3);
