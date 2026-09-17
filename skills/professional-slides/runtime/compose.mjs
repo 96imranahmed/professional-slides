@@ -1730,7 +1730,12 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   // A full-width table needs no heading of its own: the action title and the
   // header row already say what it is. Heading bands exist for the row rule only.
   const centredCards = (ex) => ex.type === "cards" && ex.tone !== "header" && ex.tone !== "numbered" && (ex.items || []).every((i) => i.icon && !(i.points || []).length);
-  if (layout === "exhibit-full" && centredCards(exhibits[0])) {
+  // A staircase, a cycle and a chevron process are all figures with a natural
+  // size: a three-step staircase wants about 230px whatever the page offers it,
+  // and handed the whole body it spreads into small islands with a hundred
+  // pixels of nothing between them. They hug and centre, like the icon cards.
+  const centredFigure = (ex) => ["steps", "cycle", "chevron-process"].includes(ex?.type);
+  if (layout === "exhibit-full" && (centredCards(exhibits[0]) || centredFigure(exhibits[0]))) {
     // Icon cards with a line each hug their content and sit centred in the
     // space above the takeaway; header and numbered cards fill the page as columns.
     items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { ...SIZE, centre: true }));

@@ -141,3 +141,41 @@ assert.throws(()=>owner.measureContent({frame,props:{variant:'body',items:[]}}),
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
+
+
+class StaircaseRiseTests(unittest.TestCase):
+    """A staircase is a shape, not a way of spending height.
+
+    The rise stretched to fill whatever frame it was given: three steps in a
+    470px body produced a 191px rise for a 44px tread, so the page read as three
+    small islands with a hundred and fifty pixels of nothing between them and
+    the whole top-left corner empty. It now rises by about what a tread and its
+    text need, and the figure centres in the leftover rather than smearing it
+    between every step.
+    """
+
+    def test_the_rise_is_capped_and_the_figure_centres(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const registry = createRegistry();
+const items = ['A relationship', 'A choice', 'A consequence'].map((label) => ({
+  label, text: 'A sentence of supporting detail that runs to about two lines at this width.' }));
+const measure = (height) => {
+  const frame = {x: 60, y: 140, width: 1160, height};
+  const nodes = registry.get('steps').render({id: 's', frame, props: {items}}).nodes;
+  const treads = nodes.filter((n) => n.role === 'step-block').map((n) => n.frame.y).sort((a, b) => a - b);
+  const top = Math.min(...nodes.map((n) => (n.frame ? n.frame.y : Infinity)));
+  const bottom = Math.max(...nodes.map((n) => (n.frame ? n.frame.y + (n.frame.height || 0) : 0)));
+  return {rise: treads[1] - treads[0], above: top - frame.y, below: frame.y + height - bottom};
+};
+const tall = measure(470), short = measure(300);
+// The rise no longer tracks the frame: a page half again as tall does not make
+// the staircase half again as loose.
+assert.ok(tall.rise < 110, `rise ${tall.rise} should stay compact in a tall frame`);
+assert.ok(tall.rise / short.rise < 1.6, `rise grew ${short.rise} -> ${tall.rise} with the frame`);
+// And the leftover is shared top and bottom rather than dumped in one place.
+assert.ok(Math.abs(tall.above - tall.below) < 40, `unbalanced: ${tall.above} above, ${tall.below} below`);
+console.log(JSON.stringify({ok: true}));
+''')
+        self.assertTrue(result["ok"])

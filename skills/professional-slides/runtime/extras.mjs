@@ -174,9 +174,19 @@ export function stepsNodes({ id, frame, props }) {
   const L = stepsLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`Steps need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the descriptions or use fewer steps`);
   const n = L.items.length;
-  // The staircase uses the frame's height: the rise stretches so the last tread sits near the top.
-  const rise = n > 1 ? Math.max(L.rise, (frame.height - L.tread - L.bodyHeight - v("space.3")) / (n - 1)) : L.rise;
-  const baseline = frame.y + frame.height;
+  // The rise is capped, and the staircase is centred in whatever is left.
+  //
+  // It used to stretch to fill the frame: three steps in a 470px body gave a
+  // 191px rise for a 44px tread, so the page was three small islands with a
+  // hundred and fifty pixels of nothing between them and the whole top-left
+  // corner empty. A staircase is a shape, not a way of spending height - it
+  // rises by about what a tread and its text need, and the leftover goes in one
+  // place rather than being smeared between every step.
+  const naturalRise = L.rise;
+  const stretched = n > 1 ? (frame.height - L.tread - L.bodyHeight - v("space.3")) / (n - 1) : naturalRise;
+  const rise = n > 1 ? Math.max(naturalRise, Math.min(stretched, naturalRise * STEP_RISE_STRETCH)) : naturalRise;
+  const figure = L.tread + rise * (n - 1) + L.bodyHeight + v("space.3");
+  const baseline = frame.y + frame.height - Math.max(0, (frame.height - figure) / 2);
   const nodes = [];
   nodes.push(linePrimitive({ id: stableId(id, "baseline"), role: "step-baseline", x1: frame.x, y1: baseline, x2: frame.x + frame.width, y2: baseline, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
   L.items.forEach((m, i) => {
@@ -197,6 +207,10 @@ export function stepsNodes({ id, frame, props }) {
 }
 
 /* ------------------------------------------------------------------ people */
+
+// How much a staircase may stretch past the height its content needs. Past
+// this the treads stop reading as steps and start reading as scattered blocks.
+const STEP_RISE_STRETCH = 1.45;
 
 const PORTRAIT = 72;
 
