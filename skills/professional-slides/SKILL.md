@@ -272,10 +272,13 @@ The heavy page is usually one of four, and each is a `shape` the composer will b
 
 | `shape` | What it is | What it needs |
 | --- | --- | --- |
+| `executive-summary` | the opening page: the measures the answer rests on, then the findings that carry them | `metrics` and two to five `points` |
 | `findings-matrix` | findings down the left, two or three columns of short bulleted evidence across; 300-500 words and no chart | `rows` with `cells` |
 | `measure-table` | ten to fifteen rows, four to six measures under grouped headers with their units, footnote markers on the cells that need a basis | a `table` exhibit, `derive`, `total` |
 | `model-page` | the assumptions grid behind a forecast | a chart plus its `dataTable` |
 | `half-and-half` | a chart with its own callout on one side, six icon-led points on the other | an exhibit and `points` |
+
+Write the `executive-summary` first: a deck of twelve analytical pages or more that opens with evidence instead of with its answer is reported as `NO_SUMMARY`, and one with sections and no contents page as `NO_CONTENTS`. `contents` and `tracker` are separate settings — the contents page says what the deck covers, the tracker says where you are in it — so a deck can have section pills *and* a contents page, which is what almost every reference deck does.
 
 Naming the shape sets the page's own weight and the defaults that shape needs, so a page that means to be the deck's heavy one does not have to be assembled key by key.
 

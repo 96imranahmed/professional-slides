@@ -24,6 +24,8 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Argument on a picture or comparison page | `MISSING_ARGUMENT` | an insight, a so-what or a points column |
 | One number over a table | `METRIC_STACK` | a lone tile belongs beside its evidence |
 | Sections and tracker | `NO_SECTIONS` | required past twelve analytical pages |
+| Contents page | `NO_CONTENTS` | a sectioned deck past twelve analytical pages says what its sections are |
+| Opening summary | `NO_SUMMARY` | the first content page states the answer (`shape: "executive-summary"`) |
 | Label punctuation | `DOT_SEPARATOR` | no bullet or middle dot joining two labels |
 | Body text floor | `THIN_PAGE` | the deck's `weight.pageWords`, counted in the body alone (95 balanced, 120 full); reference client slides carry 128 body words |
 | Notes carrying the page | `NOTE_HEAVY` | the footer stays under a third of the page's text |

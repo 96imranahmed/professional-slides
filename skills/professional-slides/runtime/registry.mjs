@@ -1131,15 +1131,27 @@ function registerCore(registry) {
       const numeralWidth = 64, gap = tokenValue(token("space.4"));
       const items = props.items.map((item) => { if (typeof item !== "string" || !item.trim()) throw new Error("Takeaways are text"); return measureText(item.trim(), width - numeralWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: 1 }); });
       const listTop = titleTop + title.height + gap + 12, listBottom = frame.y + frame.height - CHROME.bodyTop - 24;
-      const rowHeight = (listBottom - listTop) / items.length;
-      if (items.some((item) => item.height + 8 > rowHeight)) throw new Error("Takeaways exceed the page; shorten them or use fewer");
+      // Dividing the whole track by the item count gave three one-line messages
+      // a 150px row each and left the bottom half of the page empty. The rows
+      // take their own height plus a reading gap, the slack opens that gap up
+      // to about a line and a half, and whatever is still left over centres the
+      // block rather than stretching it.
+      const naturalHeights = items.map((item) => item.height + 8);
+      const natural = naturalHeights.reduce((sum, height) => sum + height, 0);
+      const track = listBottom - listTop;
+      if (natural > track) throw new Error("Takeaways exceed the page; shorten them or use fewer");
+      const spread = items.length > 1 ? Math.min((track - natural) / (items.length - 1), 56) : 0;
+      const block = natural + spread * (items.length - 1);
+      const top = listTop + Math.max(0, (track - block) / 2);
       const nodes = [
         rectPrimitive({ id: stableId(id, "surface"), role: "takeaways-surface", frame: { ...frame, width: panelWidth }, style: boxStyle(background, background, HAIRLINE, token("radius.none")) }),
         textPrimitive({ id: stableId(id, "title"), role: "takeaways-title", frame: { x, y: titleTop, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.sectionTitle"), foreground, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } }),
         openLine(stableId(id, "rule"), x, titleTop + title.height + gap / 2, x + width, titleTop + title.height + gap / 2, "takeaways-rule", inverse ? WHITE : RULE, HAIRLINE),
       ];
+      let rowY = top;
       items.forEach((item, index) => {
-        const y = listTop + index * rowHeight + (rowHeight - item.height) / 2;
+        const y = rowY + (naturalHeights[index] - item.height) / 2;
+        rowY += naturalHeights[index] + spread;
         nodes.push(textPrimitive({ id: stableId(id, "numeral", index), role: "takeaways-numeral", frame: { x, y: y - 6, width: numeralWidth - 12, height: item.height + 12 }, text: String(index + 1), style: { ...textStyle(token("type.deckTitle"), inverse ? WHITE : token("color.accent"), true, "left", "top"), fontFamily: DISPLAY, wrap: false } }));
         nodes.push(textPrimitive({ id: stableId(id, "item", index), role: "takeaways-item", frame: { x: x + numeralWidth, y, width: width - numeralWidth, height: item.height }, text: item.text, style: { ...textStyle(token("type.heading"), foreground, true, "left", "top"), lineHeight: item.lineHeight, wrap: false }, data: { textLayout: item } }));
       });

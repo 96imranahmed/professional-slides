@@ -182,6 +182,7 @@ THRESHOLDS = {
     "shape_variety_from": 10,   # analytical pages beyond which the deck needs more than one page architecture
     "shapes_per_ten_min": 3.0,  # distinct architectures per ten pages (the reference decks run about five)
     "shape_share_max": 0.40,    # share of pages on the commonest architecture (the reference median is 0.23)
+    "front_matter_from": 12,    # analytical pages beyond which a deck needs a contents page and an opening summary
     "numbers_per_page_min": 8,  # printed numeric tokens on a measured page (the reference median is 17)
     "column_run_max": 4,        # consecutive pages whose commentary column may share one device    # share of pages on the commonest architecture (the reference median is 0.23)
 }
@@ -338,6 +339,8 @@ GATE_CODES = {
     "PAGE_SHAPE_FLAT": "the deck is built from too few page architectures",
     "COLUMN_MONOTONY": "the commentary column is marked the same way page after page",
     "NUMBERS_ON_PAGE": "a measured page that prints too few of its measures",
+    "NO_CONTENTS": "a sectioned deck that never says what its sections are",
+    "NO_SUMMARY": "a deck that opens with evidence instead of with its answer",
     "EVIDENCE_MIX": "too few analytical pages carry a measured exhibit",
     "IMAGE_BUDGET": "photographs on too many analytical pages",
     "IMAGE_RUN": "photographs on too many consecutive pages",
@@ -1347,6 +1350,44 @@ def gate_deck_structure(slides, analytical, findings):
     ))
 
 
+def gate_deck_front_matter(slides, analytical, findings):
+    """NO_CONTENTS and NO_SUMMARY, deck level.
+
+    A long sectioned deck says what it covers before it starts, and an
+    analytical deck opens with the answer. The reviewed deck had section tabs on
+    every page and no contents page anywhere - a one-line consequence of the
+    contents and the tracker having been one setting - and its summary page was
+    assembled by hand because nothing said to write one.
+    """
+    if len(analytical) < THRESHOLDS["front_matter_from"]:
+        return
+    kinds = [str(s.get("kind") or "") for s in slides]
+    if "divider" in kinds and not any(
+        any(str(c.get("component") or "") == "agenda" for c in s.get("componentInstances", []))
+        for s in slides
+    ):
+        findings.append(finding(
+            None, "NO_CONTENTS", 0, "a contents page",
+            "The deck has sections and never says what they are. Set "
+            "`contents: true` (the default once a deck has two sections); it is "
+            "independent of `tracker`, so the page and the section pills can "
+            "both be on.",
+        ))
+    # The first analytical page carries the answer: measured tiles over a short
+    # ledger of findings, which is what `shape: "executive-summary"` builds.
+    first = slides[analytical[0]] if analytical else None
+    if first is not None:
+        metrics = sum(1 for c in first.get("componentInstances", []) if str(c.get("component") or "") == "metric")
+        if metrics < 2:
+            findings.append(finding(
+                None, "NO_SUMMARY", metrics, "an opening summary page",
+                "The deck starts with evidence instead of with its answer. Give "
+                "it a first page that states the finding: `shape: "
+                "\"executive-summary\"` with the measures in `metrics` and the "
+                "two to five findings that carry them in `points`.",
+            ))
+
+
 def gate_deck_shape(slides, analytical, findings, fill):
     """DECK_FLAT, deck level. The reference client decks do not carry the same
     page twice: their page text runs from 104 words at the lower quintile to 278
@@ -1685,6 +1726,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         gate_evidence_mix(slides, content_indexes, findings)
     if not gates or "NO_SECTIONS" in gates:
         gate_deck_structure(slides, content_indexes, findings)
+    if not gates or "NO_CONTENTS" in gates or "NO_SUMMARY" in gates:
+        gate_deck_front_matter(slides, content_indexes, findings)
     if not gates or "DECK_FLAT" in gates:
         gate_deck_shape(slides, content_indexes, findings, fill)
     if not gates or "PAGE_SHAPE_FLAT" in gates:

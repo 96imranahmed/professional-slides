@@ -84,7 +84,7 @@ console.log(JSON.stringify({{shapes:SHAPE_NAMES}}));
         skill = (pathlib.Path(__file__).resolve().parents[2] / "skills" / "professional-slides" / "SKILL.md").read_text(encoding="utf-8")
         for shape in result["shapes"]:
             self.assertIn(f"`{shape}`", skill, f"SKILL.md never names the {shape} shape")
-        self.assertEqual(len(result["shapes"]), 4)
+        self.assertGreaterEqual(len(result["shapes"]), 5)
 
     def test_a_shape_sets_what_that_shape_needs_and_yields_to_the_page(self):
         result = run_node(f'''

@@ -1276,6 +1276,26 @@ const SHAPES = {
     if (!ex || !String(ex.type).startsWith("chart.")) throw new Error("A model-page is a chart over its own data table");
     return { density: slide.density ?? "pre-read", exhibit: { ...ex, dataTable: ex.dataTable ?? true } };
   },
+  // The page that states the answer: the measures across the top, the findings
+  // that carry them as a numbered ledger, the close underneath. Your deck's
+  // page 2 was this page assembled by hand, and nothing said to write it.
+  "executive-summary": (slide) => {
+    const findings = slide.points || slide.rows;
+    if (!Array.isArray(findings) || findings.length < 2 || findings.length > 5) {
+      throw new Error("An executive summary carries two to five findings in `points`");
+    }
+    if (!Array.isArray(slide.metrics) || !slide.metrics.length) {
+      throw new Error("An executive summary opens with the measures the answer rests on, in `metrics`");
+    }
+    return {
+      density: slide.density ?? "pre-read",
+      points: findings,
+      pointsStyle: slide.pointsStyle ?? "numbered",
+      pointsHeading: slide.pointsHeading ?? false,
+      layout: slide.layout ?? "text",
+      rows: undefined,
+    };
+  },
   // A chart with its own commentary on one side, icon-led points on the other.
   "half-and-half": (slide) => {
     if (!slide.exhibit || !Array.isArray(slide.points) || !slide.points.length) {
@@ -1808,7 +1828,21 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   }
   // The tracker is on by default once a deck has sections: pills above the title
   // unless the deck tracks by repeating its contents page (`agenda`).
-  const tabs = spec.sectionTabs ?? (!spec.agenda && spec.slides.filter((s) => s.kind === "section").length >= 2);
+  // The contents page and the tracker answer different questions - what the
+  // deck covers, and where you are in it - so they are two settings. They used
+  // to be one: `sectionTabs` defaulted to `!spec.agenda`, which is why a deck
+  // that took the section pills silently had no contents page anywhere.
+  const sections = spec.slides.filter((s) => s.kind === "section").length;
+  if (spec.tracker !== undefined && !["pills", "repeat-contents", false].includes(spec.tracker)) {
+    throw new Error(`Unknown tracker: ${spec.tracker}; use "pills", "repeat-contents" or false`);
+  }
+  if (spec.contents !== undefined && ![true, false, "once"].includes(spec.contents)) {
+    throw new Error(`Unknown contents: ${spec.contents}; use true, "once" or false`);
+  }
+  // `agenda` is the old spelling of the pair and still resolves to it.
+  const trackerMode = spec.tracker ?? (spec.sectionTabs === false ? false : spec.agenda ? "repeat-contents" : "pills");
+  const contentsMode = spec.contents ?? (spec.agenda === "once" ? "once" : spec.agenda ? true : sections >= 2);
+  const tabs = spec.sectionTabs ?? (trackerMode === "pills" && sections >= 2);
   // `appendix: [...]`: the source pages behind the story - the model grid, the
   // full table, the survey instrument - set at `density: "appendix"` behind an
   // Appendix divider. The corpus keeps its densest pages here, and a page that
@@ -1818,7 +1852,10 @@ export function composeDeck(spec, baseDir = process.cwd()) {
        ...spec.appendix.map((page) => ({ density: "appendix", ...page }))]
     : [];
   const storySlides = appendix.length ? [...spec.slides, ...appendix] : spec.slides;
-  const pages = agendaPages(tabs ? sectionTabs(storySlides) : storySlides, spec.agenda, spec.agendaStyle);
+  // The contents page leads the deck; `repeat-contents` also reprints it in
+  // front of every later section, which is the other way a deck tracks.
+  const agendaMode = trackerMode === "repeat-contents" ? true : contentsMode === "once" || contentsMode === true ? "once" : false;
+  const pages = agendaPages(tabs ? sectionTabs(storySlides) : storySlides, contentsMode === false ? false : agendaMode, spec.agendaStyle);
   const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140)) / 508)) : 1;
   const fill = resolveFill(spec);
   // The weight contract: what a page of this deck is expected to carry. The

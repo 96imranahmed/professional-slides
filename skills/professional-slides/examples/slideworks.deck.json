@@ -37,6 +37,48 @@
       "subtext": "Three findings from the year in review"
     },
     {
+      "shape": "executive-summary",
+      "title": "Metals demand holds while the cost base resets, so the margin question is supply",
+      "subtitle": "Global metals and mining, 2024-2026",
+      "metrics": [
+        {
+          "value": "$2.1tn",
+          "label": "Global metals revenue pool",
+          "sublabel": "2024, all commodities"
+        },
+        {
+          "value": "+4.2%",
+          "label": "Demand growth to 2026",
+          "sublabel": "Compound annual, base case"
+        },
+        {
+          "value": "39",
+          "label": "Dedicated metals experts",
+          "sublabel": "Of 533 consultants worldwide"
+        }
+      ],
+      "points": [
+        {
+          "lead": "Demand is not the constraint",
+          "text": "with volumes growing 4.2% a year to 2026 across every major commodity in the base case, and no commodity below 2%"
+        },
+        {
+          "lead": "Cost has reset rather than fallen",
+          "text": "as energy and logistics normalise toward 2019 levels while labour and compliance hold the gains they made"
+        },
+        {
+          "lead": "Supply decides the margin",
+          "text": "because only 31 of the 94 projects in the pipeline clear their hurdle rate, and they sit in four jurisdictions"
+        },
+        {
+          "lead": "The window is two years",
+          "text": "since projects sanctioned after 2026 arrive past the demand peak this base case describes"
+        }
+      ],
+      "soWhat": "Read the supply pipeline before the demand forecast: the price case turns on which of the 31 viable projects actually land.",
+      "source": "IACPM/McKinsey survey, December 2024"
+    },
+    {
       "title": "PE-VC activity declined by ~35% between 2022 and 2023, returning to pre-pandemic levels",
       "exhibit": {
         "type": "chart.column",
