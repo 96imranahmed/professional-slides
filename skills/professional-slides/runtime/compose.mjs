@@ -471,7 +471,15 @@ function implicationColumn(ex) {
   const style = ex.implicationStyle || (rows.length >= 5 ? "single" : "per-row");
   if (!["per-row", "single"].includes(style)) throw new Error(`Unknown implicationStyle: ${style}; use per-row or single`);
   const middle = Math.floor((rows.length - 1) / 2);
-  const gutter = { label: "", type: "implication", width: 52 };
+  // Fixed pixels, not a weight. A column's `width` is a share of what is left
+  // after the fixed columns are reserved, and the composer weights the text
+  // columns by their measured content - numbers in the hundreds. Dropped into
+  // that pool as a bare 52 the gutter took 52/1289 of the table and came out at
+  // 47px, which is narrower than the disc it exists to hold: every table whose
+  // last column the verdict rule marked then failed to build rather than
+  // drawing the chevron. It is the one column on the page with a size of its
+  // own, so it says so.
+  const gutter = { label: "", type: "implication", width: { px: 52 } };
   const { implication: _flag, ...rest } = columns[at];
   const marked = { type: "text", ...rest };
   const nextColumns = [...columns.slice(0, at), gutter, marked, ...columns.slice(at + 1)];

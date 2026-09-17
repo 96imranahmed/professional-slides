@@ -1002,6 +1002,29 @@ function renderTableAt({ id, frame, props }) {
     if (!band) return;
     nodes.push(rectPrimitive({ id: stableId(id, "row-band", r), role: "table-row-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(band), data: { row: r, rowStyle: m.rows[r].style ?? props.rowStyle } }));
   });
+  // A bubble column is one pill repeated, not a pill per figure. Sized to its
+  // own text each pill made "6.7%" a visibly different object from "29.7%", and
+  // taking the row's height turned the pill into a tall capsule whose size read
+  // as a value it did not carry. Every pill in a column now takes the width of
+  // the widest figure in it and the height of one line of type - the same pill
+  // the change annotation puts a CAGR in - so the reader compares the numbers
+  // and not the shapes.
+  const isBubble = (cell) => cell && cell.type === "highlight" && cell.surface === "bubble";
+  const bubbleText = new Map();
+  m.cells.forEach((row, r) => row.forEach((cell, c) => {
+    if (!isBubble(cell)) return;
+    const block = m.layouts[r]?.[c]?.blocks?.[0];
+    if (!block) return;
+    const seen = bubbleText.get(c) ?? { width: 0, height: 0 };
+    bubbleText.set(c, { width: Math.max(seen.width, block.width), height: Math.max(seen.height, block.height) });
+  }));
+  const BUBBLE_PAD_X = v("space.3"), BUBBLE_PAD_Y = v("space.1");
+  const bubblePill = (c, area, height) => {
+    const text = bubbleText.get(c) ?? { width: 0, height: 0 };
+    const width = Math.min(text.width + 2 * BUBBLE_PAD_X, area.width - m.gap);
+    const pillHeight = Math.min(text.height + 2 * BUBBLE_PAD_Y, height - m.gap);
+    return { x: area.x + (area.width - m.gap - width) / 2, y: area.y + (height - pillHeight) / 2, width, height: pillHeight };
+  };
   m.cells.forEach((row, r) =>
     row.forEach((cell, c) => {
       if (!cell) return;
@@ -1043,16 +1066,7 @@ function renderTableAt({ id, frame, props }) {
             id: cellId,
             role: bubble ? "table-bubble" : "table-cell",
             frame: bubble
-              // A pill hugs its text rather than filling the cell: sized from
-              // the measured line, with the same 8px either side of it, so a
-              // wide column heading does not stretch a three-character figure
-              // across the whole column. It never grows past the cell.
-              ? {
-                  x: area.x + m.padding - 8,
-                  y: area.y + m.gap / 2 + 2,
-                  width: Math.min((l.blocks?.[0]?.width ?? 0) + 16, area.width - m.gap, area.width - 2 * m.padding + 16),
-                  height: area.height - m.gap - 4,
-                }
+              ? bubblePill(c, area, height)
               : {
                   ...area,
                   y: area.y + m.gap / 2,
@@ -1153,6 +1167,14 @@ function renderTableAt({ id, frame, props }) {
             }),
           ),
         );
+      } else if (bubble) {
+        // The figure sits centred in its pill, not on the cell's own alignment:
+        // a column of identical pills whose numbers are not on one centre line
+        // reads as a column of near-misses.
+        const pill = bubblePill(c, area, height);
+        putText(stableId(cellId, "bubble-label"), "table-bubble-label",
+          { x: pill.x, y: pill.y + (pill.height - l.blocks[0].height) / 2, width: pill.width },
+          l.blocks[0], textStyle(true, color, "center", l.size), data);
       } else if (cell.type === "bars") {
         const plot = inner.width - l.labelWidth - m.gap,
           scale = cell.scaleRecord,
