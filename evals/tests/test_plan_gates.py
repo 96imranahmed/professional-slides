@@ -77,8 +77,9 @@ class PlanGateTests(unittest.TestCase):
                 extra = {**extra, "annotation": "change bubble"}
             if i == 0:
                 extra = {**extra, "highlight": "four and a half times"}
+            # And why this exhibit, on the shapes a plan defaults to.
             pages.append(page(i + 1, exhibit=kind, architecture=shapes[i % len(shapes)],
-                              insight="filled", **extra))
+                              insight="filled", why="the shape of this evidence", **extra))
         report = run_plan(deck(pages), self.tmp)
         self.assertTrue(report["accepted"], json.dumps(report["findings"], indent=1))
 
@@ -215,6 +216,8 @@ class PlanGateTests(unittest.TestCase):
             elif row["exhibit"].startswith("chart."):
                 row.update(annotation="reference line at the target")
         good[0]["highlight"] = "four and a half times"
+        for row in good:
+            row["why"] = "the shape of this evidence"
         self.assertEqual(self.codes(deck(good)), set())
 
     def test_variety_counts_the_repertoire_not_just_the_spread(self):
@@ -231,6 +234,34 @@ class PlanGateTests(unittest.TestCase):
         self.assertGreater(report["statistics"]["styleEntropy"], 0.9, "evenly spread across four shapes")
         self.assertLess(report["statistics"]["exhibitVarietyPerTen"], 2, "and drawing on three exhibits")
         self.assertIn("PLAN_EXHIBIT_VARIETY", {f["code"] for f in report["findings"]})
+
+    def test_a_default_exhibit_has_to_say_why_it_was_chosen(self):
+        # 25 of the generated deck's 45 pages took one of four shapes. Each is
+        # often the right answer; choosing one is simply where a default hides,
+        # so it is the one place worth making the plan produce a sentence.
+        rows = [page(i + 1, exhibit=["table", "chart.column", "chart.bar", "steps"][i % 4],
+                     architecture=["exhibit-left", "exhibit-top", "two-up", "text"][i % 4],
+                     insight="filled", rows=9, treatment="heat", annotation="bracket",
+                     highlight="x" if i == 0 else None) for i in range(12)]
+        self.assertIn("PLAN_EXHIBIT_REASON", self.codes(deck(rows)))
+        explained = [dict(r, why="magnitude over time") for r in rows]
+        self.assertNotIn("PLAN_EXHIBIT_REASON", self.codes(deck(explained)))
+        # A phrase, not a shrug.
+        self.assertIn("PLAN_EXHIBIT_REASON", self.codes(deck([dict(r, why="yes") for r in rows])))
+        # An exhibit nobody defaults to needs no defence.
+        chosen = [dict(r, exhibit="chart.marimekko") for r in rows]
+        self.assertNotIn("PLAN_EXHIBIT_REASON", self.codes(deck(chosen)))
+
+    def test_the_variant_counts_toward_variety_where_it_is_recorded(self):
+        # Recording variants can only raise the measured variety, never lower
+        # it, so a plan written before this existed is judged as it was.
+        rows = [page(i + 1, exhibit="table", architecture=["exhibit-left", "two-up", "text"][i % 3],
+                     insight="filled", rows=9, treatment="heat", annotation="b",
+                     why="genuinely a matrix", highlight="x" if i == 0 else None) for i in range(12)]
+        flat = run_plan(deck(rows), self.tmp)["statistics"]["exhibitVarietyPerTen"]
+        varied = run_plan(deck([dict(r, variant=["heat", "bubble", "harvey", "verdict"][i % 4])
+                                for i, r in enumerate(rows)]), self.tmp)["statistics"]["exhibitVarietyPerTen"]
+        self.assertGreater(varied, flat)
 
     def test_every_finding_names_a_code_and_carries_a_repair(self):
         pages = [page(i + 1, exhibit="table", architecture="exhibit-full") for i in range(20)]

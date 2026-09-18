@@ -45,6 +45,7 @@ export const PLAN_CODES = Object.freeze({
   PLAN_UNANNOTATED_CHARTS: "charts planned with nothing marked on the plot",
   PLAN_NO_HIGHLIGHT: "no page names the phrase its reader should see first",
   PLAN_EXHIBIT_VARIETY: "the deck draws on too few of the exhibits it could use",
+  PLAN_EXHIBIT_REASON: "a page took a default exhibit without saying why",
 });
 
 const finding = (page, code, measured, threshold, repair) => {
@@ -328,6 +329,34 @@ function plannedRows(page) {
 }
 const TREATMENTS = /\b(heat|bubble|bar|harvey|implication|verdict|highlight\w*|total|derive|rank|share|change|index|group|recommend\w*)\b/i;
 const ANNOTATIONS = /\b(annotat\w*|callout|bracket|flag|reference|baseline|target|band|cagr|change|growth|period|event|highlight\w*|focus)\b/i;
+/**
+ * What the page is, at the grain a reader notices.
+ *
+ * Two pages both reading `table` may be a twelve-row heat matrix and a
+ * three-row grid; counted as one kind they make a deck look more varied than it
+ * is. Where the plan records the variant it counts, and where it does not the
+ * type stands alone - which means recording variants can only ever raise the
+ * measured variety, never lower it, and a plan that records none is judged
+ * exactly as it was before.
+ */
+const exhibitKey = (page) => {
+  const type = String(page.exhibit ?? "").trim();
+  if (!type) return "";
+  const variant = String(page.variant ?? page.exhibitVariant ?? "").trim().toLowerCase();
+  return variant ? `${type}/${variant}` : type;
+};
+
+/**
+ * The exhibits a plan reaches for when it has not decided anything.
+ *
+ * Measured on the generated deck: 8 column charts, 7 bars, 5 tables, 5
+ * staircases - 25 of 45 pages on four shapes. These are all fine exhibits and
+ * often the right one; the point is that choosing one of them is where a
+ * default hides, so it is the one place worth making the plan say why.
+ */
+const DEFAULT_EXHIBITS = new Set(["table", "chart.column", "chart.bar", "steps", "bullet-list", "text", "rows"]);
+const reasoned = (page) => String(page.why ?? page.reason ?? page.exhibitReason ?? "").trim().length >= 12;
+
 const treated = (page) => TREATMENTS.test(String(page.treatment ?? page.variant ?? page.exhibitVariant ?? ""));
 const annotated = (page) => ANNOTATIONS.test(String(page.annotation ?? page.treatment ?? page.variant ?? page.exhibitVariant ?? ""));
 
@@ -386,7 +415,7 @@ function gateCraft(pages, findings) {
   // same three shapes evenly scores as well as one that runs twenty: this deck
   // measured 0.908 against the examples' 0.93-0.97 and looked fine, while using
   // a third as many exhibits per page.
-  const kinds = new Set(content.map((p) => String(p.exhibit ?? "").trim()).filter(Boolean));
+  const kinds = new Set(content.map(exhibitKey).filter(Boolean));
   const perTen = content.length ? (kinds.size / content.length) * 10 : 0;
   if (kinds.size && perTen < CRAFT.exhibitVarietyPerTen.min) {
     findings.push(finding(null, "PLAN_EXHIBIT_VARIETY",
@@ -397,6 +426,22 @@ function gateCraft(pages, findings) {
       "staircase, a composition can be a marimekko or a waffle, a ranking a lollipop, a distribution a boxplot or " +
       "a dumbbell, two measures on one category a combo. Ask what each page's evidence actually is before " +
       "reaching for the shape the last page used."));
+  }
+
+  // Why this exhibit, on the pages where a default hides.
+  const defaulted = content.filter((p) => DEFAULT_EXHIBITS.has(String(p.exhibit ?? "").trim()));
+  const unexplained = defaulted.filter((p) => !reasoned(p));
+  if (defaulted.length >= 4 && unexplained.length / defaulted.length > CRAFT.reasonShareMax) {
+    findings.push(finding(
+      unexplained[0].n ?? null, "PLAN_EXHIBIT_REASON",
+      { unexplained: unexplained.length, of: defaulted.length, pages: unexplained.slice(0, 8).map((p) => p.n) },
+      CRAFT.reasonShareMax,
+      "These pages take one of the exhibits a plan reaches for when it has not decided anything - a table, a column " +
+      "or bar chart, a staircase, a list - and none of them says why. Each is often the right answer; the point is " +
+      "that choosing one is where a default hides, and writing the reason is where it gets noticed. One phrase " +
+      "against the exhibit is enough: \"magnitude over time\", \"ranking, sorted\", \"genuinely a matrix: three " +
+      "dimensions over the same rows\". A page that cannot produce the phrase has not chosen its exhibit yet.",
+    ));
   }
 }
 
@@ -486,7 +531,9 @@ function report(plan, findings, pages) {
              picture: shareOf("picture"), text: shareOf("text") },
       styleEntropy: entropy.declared ? round(entropy.value) : null,
       architectures: entropy.declared ? entropy.distinct : null,
-      exhibitVarietyPerTen: content.length ? round((new Set(content.map((p) => String(p.exhibit ?? "").trim()).filter(Boolean)).size / content.length) * 10) : 0,
+      exhibitVarietyPerTen: content.length ? round((new Set(content.map(exhibitKey).filter(Boolean)).size / content.length) * 10) : 0,
+      variantsRecorded: content.filter((p) => String(p.variant ?? p.exhibitVariant ?? "").trim()).length,
+      reasonsRecorded: content.filter(reasoned).length,
       tablesTreated: tablePages(content).length ? round(tablePages(content).filter(treated).length / tablePages(content).length) : null,
       chartsAnnotated: chartPages(content).length ? round(chartPages(content).filter(annotated).length / chartPages(content).length) : null,
       anchoredPages: content.filter((p) => Array.isArray(p.anchors) && p.anchors.length).length,
