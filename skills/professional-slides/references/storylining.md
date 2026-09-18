@@ -83,25 +83,83 @@ Then hide the title and remove decorative imagery. The remaining exhibit must le
 - question, tests, synthesis, recommendation - for hypothesis-led analysis;
 - concept, mechanism, worked example, limits, application - for teaching.
 
-## Write the dot-dash
+## Stage one: content design
 
-The **dot** is the exact proposed title of one slide. The **dash** is the evidence, exhibit, implication or open question that supports it. Represent every planned slide in production order with exactly one dot and at least one substantive dash. For an analytical slide the dot is the complete action title; for a structural slide it is the exact visible heading (`Executive summary`, `Contents`, `1 Financial context`); for the cover it is the deck title.
+**Nothing in this stage may name a component, an architecture or a variant.**
+There is nowhere to put one, and that is the point.
 
-Present it as one table, one row per slide:
+A 50-page deck once recorded thirteen page architectures, 0.93 style entropy and
+a stated reason on all fifty pages — the best layout numbers ever measured
+here — and carried one chart, twenty-eight pages opening with the literal word
+"Interpretation:", and eighteen tables on two invented schemas. A reader rated it
+2 out of 10. Layout planning passed with distinction; content design never
+happened. They were one artefact, so choosing a shape *felt* like choosing the
+evidence, and nothing noticed that the evidence had not been chosen.
 
-| # | Dot: exact title | Dash: argument and evidence | Exhibit | Variant | Why | Shape | Anchors | Insight | Sources | Criterion |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+Write `deck.content.json`. One entry per page, four fields:
 
-Every analytical row names its key insight and links the underlying data or source, not just a bibliography at the end. Keep planning language out of the rendered deck: `Key insight` is a column here, never a label on the page.
+```json
+{ "schema": "professional-slides.content/v1", "id": "rollout",
+  "question": "Which markets go first, and what opens the second wave?",
+  "answer": "Three markets whose data is ready, a gate at month seven, one owner per wave.",
+  "pages": [
+    { "n": 4,
+      "claim": "Start with the three markets whose data is ready; file Germany now",
+      "settles": { "kind": "count", "what": "markets clearing the four-point readiness assessment" },
+      "adds": "Filing Germany in month one is what makes a month-12 launch reachable at all",
+      "highlight": "three of twelve" }
+  ] }
+```
 
-**The dot-dash is the design document, not only the content plan.** Four of the columns above are design decisions, and they are there because a deck is far cheaper to judge before it is built than after. Two decks written without them came out 55% tables with no photograph, no icon and no insight on any page — and every gate that judged the *rendered* deck passed them, because by then the only remedy was a rewrite.
+- **`claim`** — the sentence this page proves. A topic label is not a claim:
+  "Origins" is a section name, "DC's foundational icons predate Marvel's defining
+  1960s ensemble" is a page. If it has no verb, the page has no argument yet.
+- **`settles`** — what settles the claim, and of what **kind**: `count`, `share`,
+  `rank`, `rate`, `sequence`, `comparison`, `structure`, `qualitative`. This is
+  the only field the layout stage reads, and the only bridge between the two
+  stages. A deck that writes `qualitative` on more than a third of its pages has
+  decided to draw boxes; the gate says so before a shape exists. The deck that
+  failed had twelve issues, twenty-two films, a thirty-year gap and two
+  billion-dollar grosses in its own prose, and drew every one of them as a diagram.
+- **`adds`** — what the commentary says that the exhibit *cannot*. This field did
+  not exist, and its absence is those twenty-eight "Interpretation:" pages: with
+  nowhere to record what the commentary was for, the commentary became a second
+  reading of the exhibit. If the honest answer is "nothing", the page does not
+  need a commentary column and the exhibit should have the width.
+- **`highlight`** — the phrase the reader should see first, set in the accent
+  inside a sentence.
 
-- **Exhibit.** The encoding, chosen from the shape of the evidence — see the table below.
-- **Variant.** How that exhibit is treated: `heat`, `bubble`, `bar`, `harvey`, `verdict column`, `stacked`, `sorted`, `grid`, `paginated`. Two pages both reading `table` may be a twelve-row heat matrix and a three-row grid; counted as one kind they make a deck look more varied than it is, and the variety gate counts `exhibit/variant` where the variant is recorded. This is also where a table stops being a plain grid: across ten tables in a generated deck, not one named a treatment and not one got one.
+Present it to the person as one block per page, not as a table. A table gives
+every field a cell the width of a phrase, and `adds` answered in a phrase is how
+"Interpretation:" gets written.
+
+```bash
+node runtime/gates/content_gates.mjs deck.content.json
+```
+
+Get this accepted before writing a single exhibit name.
+
+## Stage two: layout planning
+
+Now, and only now, decide what each page looks like. Read `settles.kind` and
+nothing else from stage one: the evidence has been chosen, and this stage serves
+it.
+
+One row per page — here a table is right, because these are all short fields:
+
+| # | Exhibit | Variant | Why | Architecture | Anchors | Insight |
+| --- | --- | --- | --- | --- | --- | --- |
+
+- **Exhibit.** The encoding, taken from `settles.kind` — see the table below.
+- **Variant.** How that exhibit is treated: `heat`, `bubble`, `bar`, `harvey`, `verdict column`, `stacked`, `sorted`, `grid`, `paginated`, and a table's size as `12×5`. Two pages both reading `table` may be a twelve-row heat matrix and a three-row grid; counted as one kind they make a deck look more varied than it is, and the variety gate counts `exhibit/variant` where the variant is recorded. This is also where a table stops being a plain grid: across ten tables in a generated deck, not one named a treatment and not one got one.
 - **Why.** One phrase saying what made this the exhibit — "magnitude over time", "ranking, sorted", "genuinely a matrix: three dimensions over the same rows". Required on the exhibits a plan reaches for when it has not decided anything (a table, a column or bar chart, a staircase, a list), because that is where a default hides. A page that cannot produce the phrase has not chosen its exhibit yet.
-- **Shape.** The page architecture: `exhibit-left`, `exhibit-right`, `exhibit-top`, `hero-number`, `two-up`, `split-tone`, `grid`, `exhibit-full`, `metrics-over-exhibit`, `picture-hero`, `picture-pair`, `picture-strip`, `table-halves`, `text`. A deck built from two shapes reads as one page repeated; the plan gates measure the spread as entropy and cannot measure it at all when this column is blank. Where a run of pages is one template on purpose — six use-cases, eight market profiles — name the run in this column as `series: <name>` and the gates count it once instead of punishing a deliberate decision.
+- **Architecture.** `exhibit-left`, `exhibit-top`, `hero-number`, `two-up`, `split-tone`, `grid`, `exhibit-full`, `metrics-over-exhibit`, `picture-hero`, `picture-pair`, `picture-strip`, `table-halves`, `text`. The evidence goes on the left and what it means on the right — `exhibit-right` exists but is never chosen for you, because a reading order a reader can rely on is worth more than the variety of not having one. A deck built from two architectures reads as one page repeated; the plan gates measure the spread as entropy and cannot measure it at all when this column is blank. Where a run of pages is one template on purpose — six use-cases, eight market profiles — name the run as `series: <name>` and the gates count it once instead of punishing a deliberate decision. **Variety belongs in the exhibit, not in which side of the page the table sits on.**
 - **Anchors.** One visual anchor per named thing, and the form follows the thing: a **photograph** where it is depictable (a character, a city, a product, a person), an **icon** where it is a category or a concept. Write `none` where the page is deliberately unanchored. This is the column that keeps a deck from becoming a wall of tables: most two-column qualitative tables are "five categories and what each means", which is an icon list, not a matrix. The two halves then have different homes: icons go into `cards`, a `rows` list or an icon-led points column, and photographs go into `picture-hero` (one subject), `picture-pair` (two) or `picture-strip` (three to five) — where each picture carries a `label` and a `text`, because a picture with a name under it and nothing else is a caption, not an argument. Name the photograph you intend to use, or write it as `alt` only: a picture with no file composes as its empty frame, so a page can be planned, laid out and gated before the picture has been cleared.
 - **Insight.** `filled`, `outline` or `none` — whether the page closes with its conclusion in a band, and in which treatment.
+
+Keep planning language out of the rendered deck. `adds` is a field in a file,
+never a label on a page: a sentence that reaches a reader starting
+"Interpretation:" is the plan showing through, and `PLANNING_VOICE` reports it.
 
 **Choose the exhibit from the shape of the evidence.**
 
@@ -177,35 +235,59 @@ Public figures adapted from [SlideScience's dot-dash guide](https://slidescience
 | Evidence | 3-5 | Establish the gap and test cost headroom. |
 | Action | 6 | Set the next decision gate. |
 
-**Complete dot-dash.**
+**Stage one — content.** `deck.content.json`, presented one block per page.
+Nothing here names a shape.
 
-1. **Dot:** Postal operator profitability recovery
-   - **Dash:** Cover with audience and reporting period.
-   - **Design:** Minimal cover, deck title plus a short audience and period line; no analytical sections.
+```json
+{ "schema": "professional-slides.content/v1", "id": "australia-post",
+  "question": "Can further cost reduction restore profitability?",
+  "answer": "Productivity is near its stated limits, so quantify revenue options before approving the plan.",
+  "pages": [
+    { "n": 3,
+      "claim": "Costs grew 9% against 5% revenue growth, moving FY22 into a $13bn loss",
+      "settles": { "kind": "rate", "what": "annual revenue and cost growth, FY15-FY22, and the profit endpoints" },
+      "adds": "No revenue scenario in the plan closes a gap of this shape without a network decision",
+      "highlight": "$13bn loss" },
+    { "n": 4,
+      "claim": "Workforce reduction lifted output per employee close to the stated ceiling",
+      "settles": { "kind": "comparison", "what": "workforce and mail per employee at FY19, FY22 and the stated ceiling" },
+      "adds": "Only 5,000 pieces of headroom remain, so the next cost programme cannot come from labour",
+      "highlight": "330,000 ceiling" },
+    { "n": 5,
+      "claim": "Processing and delivery unit costs already sit below the cited benchmarks",
+      "settles": { "kind": "comparison", "what": "cost per piece at baseline, current and benchmark, for two activities" },
+      "adds": "Beating the benchmark twice means the credible unit-cost case is exhausted, not that it is working",
+      "highlight": "below benchmark" },
+    { "n": 6,
+      "claim": "Quantify revenue options before approving the recovery plan",
+      "settles": { "kind": "structure", "what": "what each option must supply: contribution, feasibility, service impact, timing, owner, downside" },
+      "adds": "Pause the approval if the options do not reconcile to the residual gap",
+      "highlight": "reconcile to the residual gap" }
+  ] }
+```
 
-2. **Dot:** Executive summary
-   - **Dash:** Further cost action is unlikely to close the gap alone; quantify revenue options before approving the plan.
-   - **Design:** Executive synthesis with ordered developed sections for the financial gap, productivity limits and the revenue decision. Map evidence from slides 3-5 to those arguments and close with one action.
+Page 3's `adds` is the test to apply to every one of them. "Revenue grew 5% and
+costs 9%" would have been the chart read back; "no revenue scenario closes a gap
+of this shape" is what the chart cannot draw.
 
-3. **Dot:** Costs grew materially faster than revenue, moving annual profit into loss between 2015 and 2022
-   - **Dash:** Published annual revenue growth of 5% against cost growth of 9%.
-   - **Dash:** Published movement from positive 10 billion to negative 13 billion in annual profit or loss.
-   - **Design:** Two peer column charts with matched underlined headings - one comparing revenue and cost growth in percent, one comparing profit and loss endpoints in billions. Units stay separate, values are direct-labelled; the paired comparison establishes the widening gap.
+**Stage two — layout.** Only now, and reading `settles.kind`:
 
-4. **Dot:** Workforce reduction lifted output per employee close to the stated operating ceiling
-   - **Dash:** Workforce falling from 26,000 to 22,000 between 2019 and 2022.
-   - **Dash:** Mail per employee rising from 265,000 to 325,000 against a stated 330,000 ceiling.
-   - **Design:** One comparison table ordered 2019, 2022, stated ceiling, with workforce and productivity in separate labelled columns. Unavailable ceiling workforce data is marked as such. The ceiling comparison tests remaining headroom.
+| # | Exhibit | Variant | Why | Architecture | Anchors | Insight |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | — | — | cover | `cover` | photo: a delivery round | none |
+| 2 | `cards` | numbered, 3 | the answer, its proof and its condition | `exhibit-full` | icons: gap, ceiling, decision | filled |
+| 3 | `chart.combo` | growth bars, profit line, bracket on the crossing | `rate` over eight years with two measures on one category set | `exhibit-left` | none | filled |
+| 4 | `table` | harvey on headroom, 3×4 | `comparison` across three named states | `exhibit-left` | icons: workforce, output | outline |
+| 5 | `table` | bar column on cost per piece, 2×4 | `comparison` of two activities against one benchmark | `exhibit-left` | none | outline |
+| 6 | `framework` | six required inputs around the decision | `structure`: what an option owes before it is approved | `exhibit-top` | icons per input | filled |
 
-5. **Dot:** Processing and delivery unit costs improved beyond the cited industry benchmarks
-   - **Dash:** Processing cost per piece falling from 0.70 to 0.63.
-   - **Dash:** Delivery cost per piece falling from 0.34 to 0.29.
-   - **Design:** One comparison table with processing and delivery rows and baseline, current and benchmark columns. Source units and benchmark provenance are preserved; unresolved benchmark values are supplied before approval. The comparison tests whether further unit-cost reduction is credible.
-
-6. **Dot:** Quantify revenue options before approving the recovery plan
-   - **Dash:** Each option requires contribution, feasibility, service impact, timing, owner and downside case.
-   - **Dash:** Pause if the options do not reconcile to the residual gap.
-   - **Design:** One developed list grouped by option economics, feasibility and approval condition, with the required evidence assigned to each group and the residual-gap condition visible.
+Two things the pairing shows. Page 3's `rate` sends it to a combo rather than to
+the two peer column charts an earlier version of this example specified — the
+kind chose the exhibit, not the other way round. And pages 4 and 5 are both
+`comparison` and both tables, so the variant column has to do the work of
+telling them apart: harvey balls against a ceiling, an in-cell bar against a
+benchmark. Two tables with the same columns and no variant is
+`TABLE_SCHEMA_FLAT`.
 
 **Parallelism check.** Each slide has one dot and substantive support. The spine moves answer, evidence, action. The section map matches the sequence. The tracker decision matches the length of the story.
 
