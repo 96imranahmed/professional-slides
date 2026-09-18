@@ -905,7 +905,13 @@ function renderTableAt({ id, frame, props }) {
   }
   m.columns.forEach((column, c) => {
     if (!m.headerHeight) return;
-    const filledHeader = header === "standard" || (header === "dimensions" && column.type !== "category");
+    // The implication gutter carries no header, so it takes no header fill. The
+    // band used to run straight through it, which put a block of ink in the
+    // header with nothing in it and joined the verdict column to the evidence
+    // it is drawn from - the opposite of what the gutter is there to say. The
+    // band now breaks at the gutter, and the chevron is what crosses it.
+    const filledHeader = column.type !== "implication"
+      && (header === "standard" || (header === "dimensions" && column.type !== "category"));
     if (filledHeader && props.headerShape === "chevron")
       // Phase tables: each header is a chevron pointing along the sequence.
       nodes.push(

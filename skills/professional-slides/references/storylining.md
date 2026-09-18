@@ -109,7 +109,12 @@ Every analytical row names its key insight and links the underlying data or sour
 | A ranking | `chart.bar`, sorted |
 | A composition | `chart.stacked-column`, `chart.marimekko`, `chart.waffle` |
 | A relationship between two measures | `chart.scatter`, `chart.bubble` |
-| A process or sequence of stages | `steps`, `cycle`, `timeline`, `gantt` |
+| A sequence whose stages have dates | `timeline` — the dates are the axis |
+| A sequence whose stages have durations | `gantt` — length is the finding |
+| A sequence a subject moves through | `journey` — the stages happen to someone |
+| A strictly ordered process with no dates | `chevron-process` |
+| A sequence that accumulates, each stage keeping the last | `steps` — the staircase, and only here |
+| A sequence that returns to its start | `cycle` |
 | A structure or set of relations | `framework`, `relationship-network`, `tree` |
 | Two named, depictable things | `picture-pair` — images side by side, the comparison as cards beneath |
 | One named, depictable subject | `picture-hero` — the picture on one side, the argument beside it |
@@ -117,6 +122,19 @@ Every analytical row names its key insight and links the underlying data or sour
 | A set of named categories | `cards` or `rows`, one icon per category |
 | A comparison across three or more dimensions | `table` |
 | One number that carries the page | `metrics` with a `kpi` |
+
+**Put the two numbers the title compares next to each other.** A title that
+compares Marvel with DC, drawn as two bar groups of median and gross, makes the
+reader jump between groups to find the comparison it already stated. Exchange
+the category and the series — publisher as the category, measure as the series —
+and the two numbers sit adjacent. The encoding follows the sentence: whatever
+the title puts side by side, the chart puts side by side.
+
+**The staircase is for accumulation, not for sequence.** It says each stage
+keeps what the last one built. A sequence with dates is a timeline, with
+durations a gantt, with a subject moving through it a journey, and a strictly
+ordered process with neither is a chevron process. A deck that draws five
+staircases has used one shape for five different relationships.
 
 **A table is the answer only when the content is genuinely a matrix.** It is the container that accepts anything without thought, which is exactly why it becomes the default: two columns of sentences is a comparison panel, a rows list with an icon per category, or a chart — not a table. Reference decks run about 13% tables; a plan past 25% is reported.
 

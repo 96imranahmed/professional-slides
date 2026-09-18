@@ -184,7 +184,29 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
   const ex = tableAlias(exIn);
   const { type, layout: _l, ...rest } = ex;
   if (type === "image") return { id, component: "image-frame", props: { ...imageProps(ex.path ? ex : ex.image, baseDir), ...(ex.fit ? { fit: ex.fit } : {}) }, size };
-  if (type === "cards" || type === "quadrants") { const { centre, ...sz } = size; return { id, component: type, props: { ...rest, ...(centre ? { valign: "middle" } : {}) }, size: sz }; }
+  if (type === "cards" || type === "quadrants") {
+    const { centre, ...sz } = size;
+    // `columns: n` wraps the cards into rows of n - the grid variant of the
+    // same set. A list of five named things has three shapes, not one: down the
+    // page as an icon list, across the page as a row of cards, or as a grid
+    // when there are more of them than a row can hold at a readable width. The
+    // rows are separate `cards` components stacked, so each row keeps the
+    // shared heading band and one baseline, which is what makes a grid read as
+    // a grid rather than as two unrelated rows.
+    const perRow = Number.isInteger(rest.columns) ? rest.columns : 0;
+    const items = rest.items || [];
+    if (type === "cards" && perRow >= 2 && items.length > perRow) {
+      const rows = [];
+      for (let at = 0; at < items.length; at += perRow) rows.push(items.slice(at, at + perRow));
+      const { columns: _c, ...cardProps } = rest;
+      return { id, layout: "flow.column", gap: "space.4", size: sz, items: rows.map((row, r) => ({
+        id: `${id}-row-${r}`, component: "cards",
+        props: { ...cardProps, items: row, ...(centre ? { valign: "middle" } : {}) },
+        size: { width: { fr: 1 }, height: "fill" },
+      })) };
+    }
+    return { id, component: type, props: { ...rest, ...(centre ? { valign: "middle" } : {}) }, size: sz };
+  }
   if (type === "swot") return { id, component: "quadrants", props: { quadrants: ["Strengths", "Weaknesses", "Opportunities", "Threats"].map((title, i) => ({ title, points: [rest.strengths, rest.weaknesses, rest.opportunities, rest.threats][i] || [] })) }, size };
   if (type === "table") {
     const styled = styleTable(rest);
@@ -707,6 +729,65 @@ function numberBubbles(ex) {
  * "evidence, then verdict" once, and `implication: true` already builds it. The
  * header has been saying so all along; nothing was reading it.
  */
+/**
+ * A column of ratings is a column of harvey balls.
+ *
+ * Across ten tables in a generated 50-page deck not one column carried any
+ * treatment, and the commonest reason is that the content arrives as words -
+ * "High", "Partial", "None" - which read as a third column of text. They are
+ * not text: they are a four-point scale, and the reference decks draw a scale
+ * as a filled disc so a reader compares the fills down the column instead of
+ * reading five words to find the one that differs.
+ *
+ * It fires only when *every* cell in the column is one of the scale's words, so
+ * a column of prose that happens to contain "Strong" is left alone.
+ */
+const RATING_WORDS = new Map(Object.entries({
+  none: 0, no: 0, absent: 0, nil: 0, never: 0,
+  weak: 1, low: 1, limited: 1, poor: 1, minimal: 1, rare: 1,
+  partial: 2, medium: 2, moderate: 2, mixed: 2, some: 2, sometimes: 2, fair: 2,
+  strong: 3, high: 3, good: 3, often: 3, likely: 3,
+  full: 4, complete: 4, yes: 4, excellent: 4, always: 4, certain: 4,
+}));
+const RATING_HEADER = /\b(rating|score|strength|fit|maturity|readiness|capability|coverage|confidence|level|assessment|performance)\b/i;
+
+function harveyColumn(ex) {
+  const columns = ex.columns || [];
+  const rows = ex.rows || [];
+  // No `type` check: `styleTable` is handed the exhibit with its type already
+  // destructured off, so a pass that tests for it never runs at all.
+  if (columns.length < 3 || rows.length < 3) return ex;
+  const cellsOf = (row) => (Array.isArray(row) ? row : row?.cells || []);
+  const rated = [];
+  for (let c = 1; c < columns.length; c += 1) {
+    const column = columns[c];
+    if (column && typeof column === "object" && (column.heat || column.bubble || column.bar || column.harvey || column.implication)) continue;
+    const values = rows.map((row) => {
+      const cell = cellsOf(row)[c];
+      if (cell && typeof cell === "object" && cell.type) return null;
+      const text = String(cell?.text ?? cell ?? "").trim().toLowerCase();
+      // "very high" and "not applicable" reduce to their last word.
+      const word = text.split(/\s+/).filter(Boolean).at(-1) ?? "";
+      return RATING_WORDS.has(word) ? RATING_WORDS.get(word) : null;
+    });
+    if (values.every((v) => v !== null) && new Set(values).size > 1) rated.push([c, values]);
+  }
+  // One rating column is the finding; three of them is a scorecard the author
+  // should have declared, and inferring all three would redraw the whole table.
+  if (!rated.length || rated.length > 2) return ex;
+  const header = rated.every(([c]) => RATING_HEADER.test(columnLabel(columns[c])));
+  if (!header && rated.length !== 1) return ex;
+  const next = rows.map((row, r) => {
+    const cells = [...cellsOf(row)];
+    for (const [c, values] of rated) cells[c] = { type: "harvey", value: values[r] };
+    return Array.isArray(row) ? cells : { ...row, cells };
+  });
+  const nextColumns = columns.map((column, c) => (rated.some(([at]) => at === c)
+    ? { ...(typeof column === "string" ? { label: column } : column), harvey: true }
+    : column));
+  return { ...ex, columns: nextColumns, rows: next };
+}
+
 function verdictColumn(ex) {
   const columns = ex.columns || [];
   if (columns.length < 3) return ex;
@@ -723,7 +804,7 @@ export function styleTable(ex) {
   // as "the author set this column explicitly" and change the table's whole
   // treatment as a side effect.
   const authoredColumns = ex.columns;
-  ex = groupNumericColumns(totalRow(deriveColumns(implicationColumn(columnTreatments(iconColumn(numberBubbles(verdictColumn(ex))))))));
+  ex = groupNumericColumns(totalRow(deriveColumns(implicationColumn(columnTreatments(iconColumn(harveyColumn(numberBubbles(verdictColumn(ex)))))))));
   // An object column (one that names a `group`, a `unit`, an alignment) still
   // gets its width from what it holds, unless it sets one: otherwise adding a
   // unit to a header would silently reweight every column to equal shares and
@@ -1839,6 +1920,25 @@ const SLIDE_PASSES = [
     return { ...slide, metrics: undefined, kpi: { value: tile.value, ...(tile.label ? { label: tile.label } : {}), ...(tile.sublabel ? { sublabel: tile.sublabel } : {}) } };
   }],
 
+  // A page of named things that each carry an icon has three shapes, not one:
+  // down the page as an icon list, across it as a row of cards, or as a grid
+  // when there are more of them than a row holds at a readable width. It only
+  // ever drew the first, so every such page in a deck looked like every other.
+  // The count decides, which spreads a deck across all three without a rule
+  // anybody has to remember: three across, four to six as a grid of three, and
+  // the rest stay a list - two cards is a pair of labels and seven is a wall.
+  ["iconed-points-become-cards", (slide) => {
+    const points = slide.points || [];
+    if (!(!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && !slide.pictures
+        && !slide.kpi && !slide.insight && !slide.insights?.length
+        && (!slide.layout || slide.layout === "auto") && !slide.pointsStyle
+        && points.length >= 3 && points.length <= 6
+        && points.every((pt) => pt && typeof pt === "object" && pt.icon && pt.lead && pt.text))) return slide;
+    const items = points.map((pt) => ({ icon: pt.icon, title: pt.lead, text: pt.text }));
+    return { ...slide, points: undefined,
+      exhibit: { type: "cards", tone: "plain", items, ...(points.length > 3 ? { columns: 3 } : {}) } };
+  }],
+
   // A text page whose points carry leads is a numbered ledger: label + text
   // rows with rules, filling the page, rather than a list floating at the top.
   ["led-points-become-a-ledger", (slide) => {
@@ -2561,7 +2661,7 @@ function planWords(slide) {
     (exhibit.categories || []).forEach(text);
     (exhibit.categoryNotes || []).forEach(text);
     (exhibit.series || []).forEach((series) => { text(series.name); words += (series.values || []).length; });
-    (exhibit.columns || []).forEach((column) => { if (typeof column === "string") text(column); else if (column) { text(column.label); text(column.unit); text(column.group); } });
+    (Array.isArray(exhibit.columns) ? exhibit.columns : []).forEach((column) => { if (typeof column === "string") text(column); else if (column) { text(column.label); text(column.unit); text(column.group); } });
     rowsOf(exhibit.rows);
     (exhibit.items || []).forEach((item) => { if (typeof item === "string") text(item); else if (item) { text(item.label); text(item.text); text(item.detail); text(item.title); (item.points || []).forEach(point); } });
     (exhibit.annotations || []).forEach((annotation) => text(annotation?.text));
