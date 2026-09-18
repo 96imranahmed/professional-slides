@@ -33,6 +33,13 @@ export const CODES = Object.freeze({
   HEDGED_TITLE: "an action title that does not commit to a finding",
   TITLE_TOO_LONG: "an action title over two lines",
   INCONSISTENT_ENCODING: "the same measure encoded differently across pages",
+  // beautification - the pass a threshold cannot make
+  NO_VISUAL_ANCHOR: "a page names two to six things and depicts none of them",
+  UNANNOTATED_PLOT: "a plot with nothing marked on it: no bracket, band, reference line or change",
+  TABLE_MONOTONY: "a table drawn as a plain grid where its content is a scale, a share or a verdict",
+  MIXED_GRAMMAR: "a figure and a measured exhibit side by side, read two different ways",
+  DECORATION: "a rule, band or device that separates nothing and says nothing",
+  NARROW_REPERTOIRE: "the deck draws on a handful of exhibits where its evidence has many shapes",
   EDITORIAL: "a wording preference"
 });
 const BLOCKING = new Set(Object.keys(CODES).filter((c) => c !== "EDITORIAL"));
@@ -105,11 +112,55 @@ export async function buildReviewPacket({ outputDirectory, brief = "", answer = 
     gateFindings: (gates.findings || []).filter((f) => f.slide === s.id || f.slide === i + 1),
     image: path.join(dir, "rendered", `slide-${i + 1}.png`)
   }));
-  const packet = { brief, answer, montage: path.join(dir, "rendered", "montage.png"), titles: slides.map((s) => `${s.index}. ${s.title}`), slides, codes: CODES, schema: REVIEW_SCHEMA };
+  const statistics = designStatistics(scene);
+  const packet = { statistics, brief, answer, montage: path.join(dir, "rendered", "montage.png"), titles: slides.map((s) => `${s.index}. ${s.title}`), slides, codes: CODES, schema: REVIEW_SCHEMA };
   await fs.writeFile(path.join(packetDir, "packet.json"), JSON.stringify(packet, null, 2));
   await fs.writeFile(path.join(packetDir, "schema.json"), JSON.stringify(REVIEW_SCHEMA, null, 2));
   await fs.writeFile(path.join(packetDir, "prompt.md"), reviewPrompt(packet));
   return { packetDir, packet };
+}
+
+/**
+ * What the deck is made of, counted off the scene.
+ *
+ * The beautification pass is a judgement, and a judgement is easier to make
+ * against a number than against a feeling. A reviewer told that the deck draws
+ * on 2.9 exhibits per ten pages where the reference runs 7 is being handed the
+ * finding; a reviewer asked whether it "feels varied" is being asked to guess.
+ */
+export function designStatistics(scene) {
+  const TREATMENT = /^table-(bubble|bar|rating-|implication|column-band|row-band|status-pill|number-circle|lamp|dot|check|progress-)/;
+  const ANNOTATION = /^(annotation-|chart-(bracket|delta|event-|highlight|reference|band|callout|change))/;
+  const content = scene.slides.filter((s) => s.nodes.some((n) => n.role === "action-title"));
+  const kinds = new Set();
+  let tables = 0, treated = 0, charts = 0, annotated = 0, marks = 0;
+  for (const slide of content) {
+    const components = (slide.componentInstances || []).map((c) => String(c.component));
+    for (const c of components) if (!["chrome", "section", "page-template"].includes(c)) kinds.add(c);
+    const roles = slide.nodes.map((n) => String(n.role ?? ""));
+    // "Drawings", the way the corpus counts them: every primitive that is not
+    // type. A reference analytical page carries 29; a page of rules and text
+    // carries very few, which is the difference a reader feels first.
+    marks += slide.nodes.filter((n) => n.type !== "text").length;
+    if (components.some((c) => /^(table|comparison-table|heatmap|trend-rows)$/.test(c))) {
+      tables += 1;
+      if (roles.some((r) => TREATMENT.test(r))) treated += 1;
+    }
+    if (components.some((c) => c.startsWith("chart."))) {
+      charts += 1;
+      if (roles.some((r) => ANNOTATION.test(r))) annotated += 1;
+    }
+  }
+  const round = (n) => Math.round(n * 100) / 100;
+  return {
+    contentPages: content.length,
+    exhibitVarietyPerTen: content.length ? round((kinds.size / content.length) * 10) : 0,
+    distinctExhibits: kinds.size,
+    tables, tablesTreated: tables ? round(treated / tables) : null,
+    charts, chartsAnnotated: charts ? round(annotated / charts) : null,
+    drawingsPerPage: content.length ? round(marks / content.length) : 0,
+    reference: { exhibitVarietyPerTen: "7.1 to 8.3", tablesTreated: 0.47, chartsAnnotated: 0.36, drawingsPerPage: 29 },
+  };
 }
 
 export function reviewPrompt(packet) {
@@ -131,6 +182,21 @@ ${packet.slides.flatMap((s) => s.gateFindings.map((f) => `- slide ${s.index} ${f
 
 Slide images: ${packet.slides.map((s) => s.image).join(", ")}
 Montage: ${packet.montage}
+
+BEAUTIFICATION PASS. Look at the montage as one thing, then at each page, and ask these in order. They are the questions a threshold cannot answer, which is why you are being asked them.
+
+1. Flicking through the montage, how many genuinely different pages are there? A deck of fifty pages built from four constructions is a deck of four pages shown twelve times. NARROW_REPERTOIRE.
+2. Does any page name two to six things - categories, options, markets, characters - and depict none of them? Each should carry a photograph where it is depictable and an icon where it is a category. NO_VISUAL_ANCHOR.
+3. Does every plot carry a mark that states the finding - a bracket between the two series the title compares, a change bubble, a reference line at the target, a highlighted category, a period band? A bare plot asks the reader to find what the title already says. UNANNOTATED_PLOT.
+4. Is any table a plain grid whose content is not a matrix? A scale wants harvey balls, a share wants bubbles or an in-cell bar, a verdict wants the implication gutter, a scored table wants heat. TABLE_MONOTONY.
+5. Does any page set a figure - a staircase, a cycle, a framework - beside a table or chart? Those are read in two different ways and the page has a join down the middle. MIXED_GRAMMAR.
+6. Is any rule, band or tint separating nothing? Count the accent devices on the busiest page: a title rule, an eyebrow, panel rules, tile rules and a chevron gutter at once is five devices and no hierarchy. DECORATION.
+7. Is the type and space balanced - no block hugging the top of a track with the rest empty, no column ending two fifths up, nothing crammed against a frame edge?
+
+What this deck is made of, beside what a reference deck carries:
+${JSON.stringify(packet.statistics, null, 1)}
+
+A number below the reference is not automatically a defect - a short deck of one argument may honestly use three exhibits - but it is where to look first, and where it is a defect say so with the code above.
 
 Return ONLY JSON matching this schema: ${JSON.stringify(packet.schema)}
 Set accepted=false if any finding is major or blocker. The summary is two sentences: what the deck does well and what must change.`;

@@ -66,3 +66,47 @@ for(const variant of ['stepped','stepped-minimal']) for(const [key,value] of [['
 }
 console.log(JSON.stringify({accepted:true}));
 """)
+
+
+class BeautificationPassTests(unittest.TestCase):
+    """The pass a threshold cannot make.
+
+    Every other check in the skill is a number. This one is a look, and it is
+    the only thing that catches a deck which clears every number and still reads
+    as dry - which is exactly what a generated 50-page deck did. The reviewer
+    cannot be asked whether a deck "feels varied"; it has to be handed what the
+    deck is made of, beside what a reference deck carries.
+    """
+
+    def test_the_packet_carries_what_the_deck_is_made_of(self):
+        run_node('''
+import assert from 'node:assert/strict';
+import {designStatistics, CODES, reviewPrompt} from './skills/professional-slides/runtime/reviewer.mjs';
+const page=(components,roles)=>({id:'s',nodes:[{role:'action-title',type:'text',text:'A finding'},
+  ...roles.map(r=>({role:r,type:'rect'}))],componentInstances:components.map(c=>({component:c}))});
+const scene={slides:[
+  page(['table'],['table-rating-track','table-cell']),
+  page(['table'],['table-cell']),
+  page(['chart.column'],['chart-bracket']),
+  page(['chart.bar'],['chart-mark']),
+]};
+const s=designStatistics(scene);
+assert.equal(s.contentPages,4);
+assert.equal(s.tables,2); assert.equal(s.tablesTreated,0.5);
+assert.equal(s.charts,2); assert.equal(s.chartsAnnotated,0.5);
+assert.equal(s.distinctExhibits,3);
+assert.equal(s.exhibitVarietyPerTen,7.5);
+assert.ok(s.drawingsPerPage>0,'drawn elements are counted, not just chart marks');
+assert.ok(s.reference.drawingsPerPage===29,'and set beside what a reference page carries');
+// A slide with no action title is chrome, not a page to judge.
+assert.equal(designStatistics({slides:[{id:'c',nodes:[{role:'cover-title',type:'text'}],componentInstances:[]}]}).contentPages,0);
+
+// The beautification codes exist and the prompt actually asks the questions.
+for (const code of ['NO_VISUAL_ANCHOR','UNANNOTATED_PLOT','TABLE_MONOTONY','MIXED_GRAMMAR','DECORATION','NARROW_REPERTOIRE'])
+  assert.ok(CODES[code],`${code} is a reviewable code`);
+const prompt=reviewPrompt({statistics:s,titles:[],slides:[],codes:CODES,schema:{},montage:'m'});
+assert.match(prompt,/BEAUTIFICATION PASS/);
+assert.match(prompt,/NARROW_REPERTOIRE/);
+assert.ok(prompt.includes('"exhibitVarietyPerTen": 7.5'),'the numbers reach the reviewer');
+console.log(JSON.stringify({ok:true}));
+''')
