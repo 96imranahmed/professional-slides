@@ -503,7 +503,14 @@ function contentLayout(cell, width, props, used) {
         : [];
     offset = texts.length ? marker + gap : 0;
   } else if (cell.type === "harvey") {
-    texts = [missing(cell.value) ?? `${cell.value}/4`];
+    // The word the scale gives that value, not "3/4". The fraction reads as a
+    // score out of four, which is not what a rating on a named scale means, and
+    // it says the same thing the disc already says - so the column carried a
+    // number nobody asked for beside a picture of the same number. A cold run
+    // hit exactly this and went back to plain words, which is the right call
+    // against "3/4" and the wrong one against a scale you can scan.
+    const anchor = cell.scaleRecord?.anchors?.[cell.value];
+    texts = [missing(cell.value) ?? anchor ?? `${cell.value}/4`];
     offset = missing(cell.value) ? 0 : marker + gap;
   } else if (cell.type === "heatmap") {
     texts = [missing(cell.value) ?? String(cell.value)];

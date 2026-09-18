@@ -43,6 +43,7 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Numbers printed on the page | `NUMBERS_ON_PAGE` | at least 8 numeric tokens on a measured page (reference client pages carry 17) |
 | Axis ticks | `NICE_TICKS` | nice numbers |
 | Page did not render | `MISSING_RENDER` | every page the gates are asked to measure has a render |
+| Picture frame with no picture in it | `UNSOURCED_PICTURE` | a photograph written as `alt` with no `path` never reaches a reader |
 
 Two more findings share the shape but fire before the page is rendered, from the composer rather than the gates: `THIN_PLAN` (what the page will carry against its floor, with the remedy that page's own data offers) and `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
 

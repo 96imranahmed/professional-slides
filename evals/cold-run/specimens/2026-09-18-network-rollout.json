@@ -1,0 +1,73 @@
+{
+  "schema": "professional-slides.cold-run-specimen/v1",
+  "$comment": "The first cold run scored by this harness, and the reason the harness exists. A fresh agent was given briefs/network-rollout.md and the skill, nothing else - no examples, no corrections, no one watching - and produced a 21-page deck that cleared the plan gates with zero findings and every build bar. Then somebody looked at the montage, which is the pass no threshold makes, and found two defects the score could not see. Both are fixed and both are now measured; this specimen is what says so.",
+  "brief": "briefs/network-rollout.md",
+  "recorded": "2026-09-18",
+  "generatedBy": "professional-slides as of 28d0149, cold, no context, no corrections",
+  "score": {
+    "schema": "professional-slides.cold-run/v1",
+    "plan": {
+      "accepted": true,
+      "countsByCode": {},
+      "statistics": {
+        "mix": {
+          "chart": 0.467,
+          "table": 0.2,
+          "diagram": 0.267,
+          "picture": 0.067,
+          "text": 0
+        },
+        "styleEntropy": 0.904,
+        "architectures": 9,
+        "exhibitVarietyPerTen": 10,
+        "variantsRecorded": 15,
+        "reasonsRecorded": 15,
+        "tablesTreated": 1,
+        "chartsAnnotated": 0.714,
+        "anchoredPages": 5,
+        "insightPages": 6
+      },
+      "findings": []
+    },
+    "build": {
+      "statistics": {
+        "contentPages": 16,
+        "exhibitVarietyPerTen": 11.25,
+        "distinctExhibits": 18,
+        "unsourcedPictures": 2,
+        "tables": 3,
+        "tablesTreated": 0.67,
+        "charts": 6,
+        "chartsAnnotated": 0.67,
+        "drawingsPerPage": 33.06,
+        "reference": {
+          "exhibitVarietyPerTen": "7.1 to 8.3",
+          "tablesTreated": 0.47,
+          "chartsAnnotated": 0.36,
+          "drawingsPerPage": 29
+        }
+      },
+      "findings": [
+        {
+          "measure": "unsourcedPictures",
+          "measured": 2,
+          "ceiling": 0
+        }
+      ],
+      "accepted": false
+    },
+    "accepted": false
+  },
+  "foundByLooking": [
+    {
+      "defect": "The deck shipped two empty picture frames on a picture-pair page, and passed everything.",
+      "why": "A picture written as `alt` with no `path` composes as its frame so a page can be laid out before its photographs are cleared. Nothing stopped that frame reaching a reader: it counts as a picture everywhere a picture is counted.",
+      "fix": "UNSOURCED_PICTURE page gate, and unsourcedPictures as a build ceiling of zero."
+    },
+    {
+      "defect": "The run wrote its four-point readiness scale as plain words rather than harvey balls, deliberately.",
+      "why": "The harvey cell printed '3/4' beside the disc - a score out of four, saying what the disc already said - so plain words were the better call. The inference was working; the drawing was not.",
+      "fix": "The cell prints the scale's own anchor word (Full, Strong, Partial, Weak, None) beside the disc."
+    }
+  ]
+}

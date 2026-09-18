@@ -26,6 +26,25 @@ COLD = ROOT / "evals" / "cold-run"
 SCORE = COLD / "score.mjs"
 CONTRACT = json.loads((ROOT / "skills" / "professional-slides" / "runtime" / "weight.json").read_text(encoding="utf-8"))
 
+SHIPS_EMPTY_FRAMES = '''
+import assert from 'node:assert/strict';
+import {scoreBuild} from './evals/cold-run/score.mjs';
+const page=(roles)=>({id:'s',nodes:[{role:'action-title',type:'text'},
+  ...roles.map(r=>({role:r,type:'rect',frame:{x:0,y:0,width:400,height:300}})),
+  ...Array(20).fill({role:'m',type:'rect'})],componentInstances:[{component:'image-frame'}]});
+const shipped={slides:[page(['image-frame','image-frame']),page([]),page([]),page([]),page([]),page([])]};
+const s=scoreBuild(shipped);
+assert.equal(s.statistics.unsourcedPictures,2);
+assert.ok(s.findings.some(f=>f.measure==='unsourcedPictures'&&f.ceiling===0));
+assert.equal(s.accepted,false,'two grey boxes is not a deliverable deck');
+const sourced={slides:[{id:'s',nodes:[{role:'action-title',type:'text'},
+  {role:'image',type:'image',frame:{x:0,y:0,width:400,height:300}},...Array(20).fill({role:'m',type:'rect'})],
+  componentInstances:[{component:'image-frame'}]}]};
+assert.equal(scoreBuild(sourced).statistics.unsourcedPictures,0);
+console.log(JSON.stringify({ok:true}));
+'''
+
+
 
 def score(*args):
     out = subprocess.run(["node", str(SCORE), *args, "--json"], capture_output=True, text=True, cwd=ROOT)
@@ -77,6 +96,19 @@ assert.ok(variety.measured<1);
 assert.equal(s.accepted,false);
 console.log(JSON.stringify({ok:true}));
 ''')
+        self.assertTrue(result["ok"])
+
+    def test_a_deck_that_ships_empty_frames_is_not_accepted(self):
+        """Found by running the harness, which is the point of the harness.
+
+        A cold run planned a picture-pair of two servicing centres, wrote both
+        as uncleared, and the deck passed every gate while shipping two grey
+        boxes - because a frame counts as a picture everywhere a picture is
+        counted. Writing a picture as `alt` with no `path` is how a page gets
+        laid out before its photographs exist; this is what stops it reaching a
+        reader.
+        """
+        result = run_node(SHIPS_EMPTY_FRAMES)
         self.assertTrue(result["ok"])
 
     def test_the_plan_and_the_build_are_reported_apart(self):

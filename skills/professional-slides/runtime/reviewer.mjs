@@ -133,7 +133,7 @@ export function designStatistics(scene) {
   const ANNOTATION = /^(annotation-|chart-(bracket|delta|event-|highlight|reference|band|callout|change))/;
   const content = scene.slides.filter((s) => s.nodes.some((n) => n.role === "action-title"));
   const kinds = new Set();
-  let tables = 0, treated = 0, charts = 0, annotated = 0, marks = 0;
+  let tables = 0, treated = 0, charts = 0, annotated = 0, marks = 0, unsourced = 0;
   for (const slide of content) {
     const components = (slide.componentInstances || []).map((c) => String(c.component));
     for (const c of components) if (!["chrome", "section", "page-template"].includes(c)) kinds.add(c);
@@ -142,6 +142,10 @@ export function designStatistics(scene) {
     // type. A reference analytical page carries 29; a page of rules and text
     // carries very few, which is the difference a reader feels first.
     marks += slide.nodes.filter((n) => n.type !== "text").length;
+    // An empty picture frame: a photograph written as `alt` with no `path`. It
+    // is how a page gets laid out before its pictures are cleared, and it is
+    // not how a deck is delivered - so it is counted, not assumed away.
+    unsourced += slide.nodes.filter((n) => String(n.role ?? "") === "image-frame").length;
     if (components.some((c) => /^(table|comparison-table|heatmap|trend-rows)$/.test(c))) {
       tables += 1;
       if (roles.some((r) => TREATMENT.test(r))) treated += 1;
@@ -156,6 +160,7 @@ export function designStatistics(scene) {
     contentPages: content.length,
     exhibitVarietyPerTen: content.length ? round((kinds.size / content.length) * 10) : 0,
     distinctExhibits: kinds.size,
+    unsourcedPictures: unsourced,
     tables, tablesTreated: tables ? round(treated / tables) : null,
     charts, chartsAnnotated: charts ? round(annotated / charts) : null,
     drawingsPerPage: content.length ? round(marks / content.length) : 0,

@@ -48,6 +48,16 @@ export const BUILD_BARS = Object.freeze({
   drawingsPerPage: { min: 12, reference: CONTRACT.reference.slides.drawings },
 });
 
+/**
+ * Bars that are a count of something that should not be there at all, rather
+ * than a floor something has to reach. A cold run shipped two empty picture
+ * frames and passed everything, because a frame counts as a picture everywhere
+ * a picture is counted.
+ */
+export const BUILD_CEILINGS = Object.freeze({
+  unsourcedPictures: { max: 0 },
+});
+
 export function scoreBuild(scene) {
   const statistics = designStatistics(scene);
   const findings = [];
@@ -56,6 +66,10 @@ export function scoreBuild(scene) {
     // A deck with no tables cannot fail a bar about tables.
     if (measured === null || measured === undefined) continue;
     if (measured < bar.min) findings.push({ measure: key, measured, floor: bar.min, reference: bar.reference });
+  }
+  for (const [key, bar] of Object.entries(BUILD_CEILINGS)) {
+    const measured = statistics[key];
+    if (measured > bar.max) findings.push({ measure: key, measured, ceiling: bar.max });
   }
   return { statistics, findings, accepted: findings.length === 0 };
 }
@@ -103,6 +117,7 @@ export function report(result) {
     const s = result.build.statistics;
     out.push("BUILD");
     for (const [key, bar] of Object.entries(BUILD_BARS)) out.push(line(key, s[key], bar.min, bar.reference));
+    for (const [key, bar] of Object.entries(BUILD_CEILINGS)) out.push(`  ${s[key] <= bar.max ? "pass" : "FAIL"}  ${key.padEnd(22)} ${String(s[key]).padStart(7)}   ceiling ${String(bar.max).padStart(3)}`);
     out.push(`        ${s.contentPages} content pages, ${s.distinctExhibits} distinct exhibits, ${s.tables} tables, ${s.charts} charts`);
   }
   out.push(result.accepted ? "ACCEPTED" : "NOT ACCEPTED");

@@ -370,6 +370,7 @@ GATE_CODES = {
     "NICE_TICKS": "an axis on numbers a reader would not choose",
     "DECK_FLAT": "no page in the deck carries the detail",
     "MISSING_RENDER": "a page the gates could not measure because it did not render",
+    "UNSOURCED_PICTURE": "a picture frame drawn empty because its file was never cleared",
 }
 
 # Findings raised before the page is rendered: the composer's plan-time budget
@@ -931,6 +932,35 @@ def picture_share(slide):
         if box_area >= PHOTO_MIN_AREA:
             covered += box_area
     return min(covered / area, PICTURE["shareMax"])
+
+
+def gate_unsourced_picture(slide_no, slide, findings):
+    """UNSOURCED_PICTURE. A frame standing in for a photograph nobody supplied.
+
+    A picture written without a `path` composes as its empty frame carrying its
+    alt line, which is the right behaviour: a page can be laid out, measured and
+    gated before its pictures are cleared, and the gap is visible on the page
+    rather than invisible in the plan.
+
+    What was missing was the other end of that. A cold run planned a
+    `picture-pair` of two servicing centres, wrote both as uncleared, and the
+    deck passed every gate while shipping two grey boxes - because the frame
+    counts as a picture everywhere a picture is counted. The placeholder is for
+    work in progress; this is what stops it reaching a reader.
+    """
+    empty = [n for n in slide.get("nodes", [])
+             if str(n.get("role") or "") == "image-frame"
+             and (n.get("frame") or {}).get("width", 0) * (n.get("frame") or {}).get("height", 0) >= PHOTO_MIN_AREA]
+    if not empty:
+        return
+    findings.append(finding(
+        slide_no, "UNSOURCED_PICTURE", len(empty), 0,
+        "This page draws {} picture frame{} with no picture in {}. Writing a picture as `alt` with no "
+        "`path` is how a page gets laid out before its photographs are cleared, and it is not how a deck "
+        "is delivered: source the file and give it a `path`, or drop the picture and give the page the "
+        "icons, the exhibit or the width instead.".format(
+            len(empty), "" if len(empty) == 1 else "s", "it" if len(empty) == 1 else "them"),
+    ))
 
 
 def gate_thin_page(slide_no, slide, findings):
@@ -1860,6 +1890,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_missing_argument(slide_no, slide, findings)
             if wanted("THIN_PAGE"):
                 gate_thin_page(slide_no, slide, findings)
+            if wanted("UNSOURCED_PICTURE"):
+                gate_unsourced_picture(slide_no, slide, findings)
             if wanted("THIN_COLUMN") or wanted("POINT_DEPTH"):
                 page = []
                 gate_thin_column(slide_no, slide, page)
