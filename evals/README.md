@@ -6,6 +6,19 @@ real geometry.** Assertions about markdown prose, prompt substrings, repository
 ownership and the shape of the system's own JSON were deleted — they compared
 the system to itself and could never fail on a quality regression.
 
+## Cold runs
+
+`cold-run/` is the review loop as a command. A cold run is the skill used the
+way a stranger uses it — a brief, no context, no corrections — and every defect
+found here over two days of review was found by a person opening a PDF
+afterwards. `cold-run/score.mjs` scores the plan and the build separately and
+refuses to average them, because a plan that passes while its deck does not is a
+different problem from the reverse. See `cold-run/README.md`.
+
+```bash
+node evals/cold-run/score.mjs out/deck.plan.json out/
+```
+
 ## Commands
 
 ```bash

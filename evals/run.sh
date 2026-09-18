@@ -43,6 +43,22 @@ for code, count in report["countsByCode"].items():
     print(f"  {code:18} {count}")
 PY
 
+echo "== cold-run baseline =="
+# The same harness a cold run is scored with, pointed at the example decks. It
+# prints rather than fails: where a hand-authored deck misses a bar that is a
+# finding about the deck, and the number moving is the thing to notice.
+for deck in gallery-acceptance house-style nyc-or-sf slideworks; do
+  if [ -d "/tmp/ps-build-$deck" ]; then
+    printf '  %-20s ' "$deck"
+    # `|| true`: the scorer exits 2 on a deck that misses a bar, and under
+    # `set -e` with pipefail that would end the run at the first one - which is
+    # exactly the deck worth printing.
+    { "$NODE" evals/cold-run/score.mjs - "/tmp/ps-build-$deck" 2>/dev/null || true; } | sed -n 's/^ *\(pass\|FAIL\) *\([a-zA-Z]*\) *\([0-9.]*\).*/\2=\3/p' | tr '\n' ' '
+    echo
+  fi
+done
+[ -d /tmp/ps-build-gallery-acceptance ] || echo "  (build the example decks into /tmp/ps-build-<name> to populate this)"
+
 echo "== golden reference =="
 "$PYTHON" evals/scripts/check_release.py >/dev/null
 
