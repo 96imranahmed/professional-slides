@@ -45,6 +45,16 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Page did not render | `MISSING_RENDER` | every page the gates are asked to measure has a render |
 | Picture frame with no picture in it | `UNSOURCED_PICTURE` | a photograph written as `alt` with no `path` never reaches a reader |
 
+**What the page says.** Everything above measures how a page is drawn. A 50-page deck cleared all of it and was rated 2 out of 10 by the person who opened it: twenty-eight pages headed `Interpretation:`, fifty-nine lines saying what the evidence does not establish, eighteen tables on two invented schemas, one chart, and a comparison table whose two columns carried identical sentences in every row. These five measure the other half, and the example decks must stay clean on all of them — a content gate that fires on good work is one that gets switched off.
+
+| What is measured | Code | The bar |
+| --- | --- | --- |
+| Compared columns that agree | `TWIN_CELLS` | two or more rows, over 40% of the table, where two compared cells are the same words |
+| Commentary against its exhibit | `RESTATEMENT` | at most 55% of the commentary's content words already in the exhibit (reference decks run 25–36%) |
+| Planning language on the page | `PLANNING_VOICE` | no sentence opens `Interpretation:`, `Takeaway:`, `So what:` or `Key insight —` |
+| Limits against findings | `CAVEAT_HEAVY` | at most 2 caveat lines a page; a finding in contrastive form ("not X; it Y") is not a caveat |
+| The same table, repeated | `TABLE_SCHEMA_FLAT` | at most 3 tables in a deck open with the same column headers |
+
 Two more findings share the shape but fire before the page is rendered, from the composer rather than the gates: `THIN_PLAN` (what the page will carry against its floor, with the remedy that page's own data offers) and `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
 
 `page_gates.GATE_CODES` is the list this table is checked against — a code cannot be renamed in the gates without this table failing, and a gate cannot emit a code that is not in it.

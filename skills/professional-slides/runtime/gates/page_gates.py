@@ -194,6 +194,14 @@ THRESHOLDS = {
     "front_matter_from": 12,    # analytical pages beyond which a deck needs a contents page and an opening summary
     "numbers_per_page_min": 8,  # printed numeric tokens on a measured page (the reference median is 17)
     "column_run_max": 4,        # consecutive pages whose commentary column may share one device    # share of pages on the commonest architecture (the reference median is 0.23)
+    # What the page says. Calibrated on the four example decks, which are the
+    # only corpus in the repository - `--report` prints the measured value
+    # beside the floor so the number can be argued with.
+    "restatement_max": 0.55,    # share of the commentary's own content words already in the exhibit (corpus median 0.25-0.36, p90 0.47)
+    "restatement_words_min": 12,  # below this the overlap is noise, not a pattern
+    "caveats_max": 2,           # caveat lines per page; the reference decks run at most two, the deck that failed ran three plus a table row plus a note
+    "schema_repeat_max": 3,     # pages that may open their table with the same column headers (the deck that failed ran fourteen)
+    "schema_from": 6,           # tables in a deck before schema repetition is worth reporting
 }
 
 
@@ -371,6 +379,17 @@ GATE_CODES = {
     "DECK_FLAT": "no page in the deck carries the detail",
     "MISSING_RENDER": "a page the gates could not measure because it did not render",
     "UNSOURCED_PICTURE": "a picture frame drawn empty because its file was never cleared",
+    # What the page says, rather than how it is drawn. Every gate above this
+    # line measures geometry or typography, which is how a 50-page deck reached
+    # a reader carrying twenty-eight pages that open "Interpretation:", fifty-nine
+    # caveat lines, eighteen tables on two invented schemas, one chart, and seven
+    # comparison tables whose two columns say the same thing in the same words.
+    # It cleared every gate the repository owned.
+    "TWIN_CELLS": "a comparison table whose compared columns say the same thing",
+    "RESTATEMENT": "commentary that repeats the exhibit instead of reading it",
+    "PLANNING_VOICE": "planning language left on the page",
+    "CAVEAT_HEAVY": "a page spending more of itself on limits than on findings",
+    "TABLE_SCHEMA_FLAT": "the same table invented over and over across the deck",
 }
 
 # Findings raised before the page is rendered: the composer's plan-time budget
@@ -1340,6 +1359,234 @@ def gate_missing_argument(slide_no, slide, findings):
     ))
 
 
+# --- what the page says ----------------------------------------------------
+#
+# Everything above measures how a page is drawn. These five measure whether it
+# says anything, and they exist because a 50-page deck cleared every one of the
+# others while carrying twenty-eight pages headed "Interpretation:", one chart,
+# and seven comparison tables whose two columns held identical sentences.
+
+COMMENTARY_ROLES = {"list-item", "list-lead", "insight-body", "paragraph-text",
+                    "body-text", "callout-text", "callout-lead", "statement-text"}
+EXHIBIT_TEXT_ROLES = {"table-cell-text", "table-header-text", "table-group-text",
+                      "data-label", "category-label", "category-note", "annotation-text",
+                      "legend-label", "chart-unit", "metric-value", "metric-label",
+                      "card-title", "card-text", "node-label", "node-text",
+                      "step-title", "step-text", "phase-label", "table-status-label"}
+# Words that carry no argument, so two sentences sharing them share nothing.
+STOPWORDS = frozenset("""a an the and or but of to in on for with as is are was were be been being
+it its this that these those not no do does did can could may might will would should from by at
+into than then so such other their them they our we you your also more most each per over under
+between within has have had who whom which what when where how there here both either neither
+about across after before during through while because since although however therefore""".split())
+CAVEAT_RE = re.compile(
+    r"(\bdoes not\b|\bdo not\b|\bis not\b|\bare not\b|\bcannot\b|\bnot a\b|\bno[t]? (?:establish|imply|prove|measure|rank)\b"
+    r"|\brather than a\b|\blimit of inference\b|\bboundary\b|\bnot an? (?:exact|equivalence|estimate|ranking|verdict)\b)", re.I)
+# "Education does not decide the city; it decides the neighborhood" is a finding
+# in contrastive form, not a caveat. The negation sets up the positive clause
+# that follows it, and counting it as a hedge punishes the sharpest sentence on
+# the page - which it did, on a reference deck, the first time this gate ran.
+CONTRAST_RE = re.compile(r"(;\s*it\b|,\s*it\b|\bbut\b|\brather,|\binstead\b|\bwhat it does\b|\bit is\b)", re.I)
+# Planning language: the vocabulary of the dot-dash, which belongs in the plan.
+PLANNING_PREFIX_RE = re.compile(
+    r"^\s*(interpretation|takeaway|key insight|insight|implication|so what|dash|dot|note that|read this as|"
+    r"caveat|limitation|evidence state|inference limit|editorial stance)\s*[:—-]", re.I)
+
+
+def content_words(text):
+    return {w for w in re.findall(r"[a-z][a-z']+", str(text).lower())
+            if w not in STOPWORDS and len(w) > 3}
+
+
+def page_voices(slide):
+    """The page's two voices: what the exhibit says, and what is said about it."""
+    commentary, exhibit = [], []
+    for node in text_nodes(slide):
+        role = str(node.get("role") or "")
+        text = source_text(node)
+        if not text.strip():
+            continue
+        if role in COMMENTARY_ROLES:
+            commentary.append(text)
+        elif role in EXHIBIT_TEXT_ROLES:
+            exhibit.append(text)
+    return commentary, exhibit
+
+
+def gate_restatement(slide_no, slide, findings):
+    """RESTATEMENT. The commentary reads the exhibit back to the reader.
+
+    The page that named this ran, forty times: a sentence restating the exhibit,
+    a sentence beginning "Interpretation:", and a caveat. Its commentary reused
+    three-quarters of its own content words from the table beside it. A
+    commentary column is there to say what the exhibit does not - what follows,
+    what it costs, what to do - and a gate can tell the difference, because
+    restatement reuses the exhibit's vocabulary and a finding brings its own.
+    """
+    commentary, exhibit = page_voices(slide)
+    if not commentary or not exhibit:
+        return
+    said, shown = content_words(" ".join(commentary)), content_words(" ".join(exhibit))
+    if len(said) < THRESHOLDS["restatement_words_min"] or len(shown) < THRESHOLDS["restatement_words_min"]:
+        return
+    share = len(said & shown) / len(said)
+    if share <= THRESHOLDS["restatement_max"]:
+        return
+    findings.append(finding(
+        slide_no, "RESTATEMENT", round(share, 2), THRESHOLDS["restatement_max"],
+        "The commentary is built from the exhibit's own words, so the reader learns "
+        "nothing by reading it. Say what the exhibit cannot: what follows from the "
+        "number, what it costs, which option it settles, what would change it. If "
+        "the only honest sentence is the one already in the table, the page does "
+        "not need a commentary column.",
+    ))
+
+
+def gate_planning_voice(slide_no, slide, findings):
+    """PLANNING_VOICE. `Interpretation:`, `Takeaway:` — the dot-dash on the page.
+
+    The skill has always said to keep planning language out of the rendered deck.
+    It had never checked, and a deck reached a reader with twenty-eight of its
+    fifty pages opening a sentence with the literal word "Interpretation:".
+    """
+    offenders = []
+    for node in text_nodes(slide):
+        role = str(node.get("role") or "")
+        if role not in COMMENTARY_ROLES and role != "insight-body":
+            continue
+        for line in lines_of(node):
+            hit = PLANNING_PREFIX_RE.match(line)
+            if hit and line.strip()[:70] not in offenders:
+                offenders.append(line.strip()[:70])
+    for text in offenders[:3]:
+        findings.append(finding(
+            slide_no, "PLANNING_VOICE", text, "no planning label on the page",
+            "Delete the label and keep the sentence. \"Interpretation: the team can "
+            "generate drama before a villain arrives\" is a finding once the first "
+            "word goes; with it, the page is telling the reader which column of the "
+            "dot-dash they are reading.",
+        ))
+
+
+def gate_caveat_heavy(slide_no, slide, findings):
+    """CAVEAT_HEAVY. A page that spends itself on what it does not establish.
+
+    Scope discipline is a virtue and this is not an argument against it. But one
+    page ran three caveat lines in its commentary, a fourth as the table's last
+    row ("Comparison boundary"), and a fifth in the note - saying five times that
+    two dates do not settle which film is better. One caveat is a boundary; five
+    is the page.
+    """
+    commentary, _ = page_voices(slide)
+    lines = [ln for text in commentary for ln in str(text).split("\n") if ln.strip()]
+    hits = [ln.strip()[:70] for ln in lines if CAVEAT_RE.search(ln) and not CONTRAST_RE.search(ln)]
+    if len(hits) <= THRESHOLDS["caveats_max"]:
+        return
+    findings.append(finding(
+        slide_no, "CAVEAT_HEAVY", {"caveats": len(hits), "of": len(lines), "first": hits[:3]},
+        THRESHOLDS["caveats_max"],
+        "Keep one statement of what this evidence does not settle, in the note or "
+        "the insight, and give the commentary back to what it does settle. A page "
+        "that qualifies itself three times reads as a page with nothing to say.",
+    ))
+
+
+def gate_twin_cells(slide_no, slide, findings):
+    """TWIN_CELLS. A comparison table whose compared columns are identical.
+
+    Found by reading, not by any gate: an "Avengers | Justice League" table whose
+    two columns carried word-for-word identical text in all four rows, on a page
+    titled "Avengers and Justice League connect heroes with independent
+    identities". Six more pages in the same deck did it in at least one row. It
+    is the cheapest defect in this file to detect and the most expensive to
+    leave in: a comparison that compares nothing.
+    """
+    cells = {}
+    for node in text_nodes(slide):
+        if str(node.get("role") or "") != "table-cell-text":
+            continue
+        data = node.get("data") or {}
+        row, column = data.get("row"), data.get("column")
+        if row is None or column is None:
+            continue
+        cells[(int(row), int(column))] = source_text(node).strip()
+    if not cells:
+        return
+    columns = sorted({c for _, c in cells})
+    if len(columns) < 3:                       # a label column and one measure is not a comparison
+        return
+    twins = []
+    for row in sorted({r for r, _ in cells}):
+        values = [(c, cells.get((row, c), "")) for c in columns[1:]]
+        seen = {}
+        for c, text in values:
+            key = re.sub(r"\s+", " ", text).strip().lower()
+            if len(key) < 12:
+                continue
+            if key in seen:
+                twins.append({"row": row, "columns": [seen[key], c], "text": text[:60]})
+            seen[key] = c
+    # One twinned row is a fact about the data, not a defect: a funnel table
+    # whose "Owner" row gives customer success two consecutive stages is correct,
+    # and the example decks contain exactly that. A comparison stops comparing
+    # when it happens twice and across a good share of the table.
+    rows = len({r for r, _ in cells})
+    if len(twins) < 2 or not rows or len(twins) / rows < 0.4:
+        return
+    findings.append(finding(
+        slide_no, "TWIN_CELLS", {"rows": len(twins), "of": rows, "examples": twins[:3]}, 0,
+        "Two columns of this table say the same thing in the same words, so the row "
+        "compares nothing. Either the row is a shared premise - move it into the "
+        "title, the insight or a note above the table - or the comparison is real "
+        "and has not been written yet. A table is the answer only when the cells differ.",
+    ))
+
+
+def gate_table_schema_flat(slides, content_indexes, findings):
+    """TABLE_SCHEMA_FLAT, deck level. The same table, invented over and over.
+
+    `TABLE_MONOTONY` asks whether tables carry a treatment. This asks something
+    blunter: are they the same table? A 50-page deck opened fourteen of its
+    tables with the column header `Dimension` and four more with
+    `Element | Story mechanism` - two schemas over eighteen pages, each a
+    label column and two columns of sentences. Every one of them passed, because
+    nothing compared a table on one page with the table on the next.
+    """
+    schemas = {}
+    for index in content_indexes:
+        slide = slides[index]
+        headers = {}
+        for node in text_nodes(slide):
+            if str(node.get("role") or "") != "table-header-text":
+                continue
+            column = (node.get("data") or {}).get("column")
+            if column is None:
+                continue
+            headers[int(column)] = re.sub(r"\s+", " ", source_text(node)).strip().lower()
+        if len(headers) < 2:
+            continue
+        key = " | ".join(headers[c] for c in sorted(headers) if headers[c])
+        if key:
+            schemas.setdefault(key, []).append(index + 1)
+    if len(schemas) == 0 or sum(len(v) for v in schemas.values()) < THRESHOLDS["schema_from"]:
+        return
+    for key, pages in sorted(schemas.items(), key=lambda kv: -len(kv[1])):
+        if len(pages) <= THRESHOLDS["schema_repeat_max"]:
+            continue
+        findings.append(finding(
+            None, "TABLE_SCHEMA_FLAT",
+            {"headers": key[:70], "pages": pages[:12], "count": len(pages),
+             "tables": sum(len(v) for v in schemas.values())},
+            THRESHOLDS["schema_repeat_max"],
+            f"{len(pages)} tables in this deck open with the same columns. A schema "
+            "reused that often is not a schema, it is a container the content was "
+            "poured into: the columns came first and the evidence was written to fit "
+            "them. Ask what each page's evidence actually is - a ranking, a "
+            "sequence, a set of named categories, a scored comparison - and let the "
+            "table's columns come from that, or let the page stop being a table.",
+        ))
+
+
 def gate_metric_stack(slide_no, slide, findings):
     """METRIC_STACK. One or two big numbers parked above a table read as two
     pages glued together: the number floats in air and the table starts again
@@ -1910,6 +2157,14 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_heading_wraps(slide_no, slide, findings)
             if wanted("METRIC_STACK"):
                 gate_metric_stack(slide_no, slide, findings)
+            if wanted("RESTATEMENT"):
+                gate_restatement(slide_no, slide, findings)
+            if wanted("CAVEAT_HEAVY"):
+                gate_caveat_heavy(slide_no, slide, findings)
+            if wanted("TWIN_CELLS"):
+                gate_twin_cells(slide_no, slide, findings)
+        if wanted("PLANNING_VOICE"):
+            gate_planning_voice(slide_no, slide, findings)
         if wanted("DOT_SEPARATOR"):
             gate_dot_separators(slide_no, slide, findings)
         if wanted("TYPE_RANGE"):
@@ -1932,6 +2187,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         gate_page_shape_flat(slides, content_indexes, findings, fill)
     if not gates or "COLUMN_MONOTONY" in gates:
         gate_column_monotony(slides, content_indexes, findings)
+    if not gates or "TABLE_SCHEMA_FLAT" in gates:
+        gate_table_schema_flat(slides, content_indexes, findings)
 
     # A density report beside the findings: the numbers this review is about, so
     # a regression shows up as a number rather than as a screenshot.
