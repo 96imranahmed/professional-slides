@@ -12,10 +12,10 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Trailing dead band | `DEAD_BAND` | at most 8% (6% full, 14% airy) |
 | Internal void | `INTERNAL_VOID` | at most 22% between two content blocks (16% full, 32% airy) |
 | Right column stops short | `COLUMN_VOID` | at most 20% of the page, `full` decks only |
-| Action title | `TITLE_LINES`, `TITLE_WORDS`, `HEDGED_TITLE` | at most two lines, within 14 words, no hedge lexicon |
+| Action title | `TITLE_LINES`, `TITLE_WORDS` | at most two lines, within 14 words |
 | Body type | `TYPE_RANGE` | 10 to 14 pt body, 8 to 11 pt chart furniture, 20 to 26 pt titles |
 | Characters per line | `CPL` | 35 to 90 |
-| Body words, exhibit page | `WORDS` | at most 100 prose words (`pre-read` 160, `appendix` 200; table cells and chart furniture are evidence, not prose) |
+| Body words, exhibit page | `WORDS` | the measured body band, 128 prose words (`live-pitch` 77, `pre-read` 179, `appendix` 224). A text page is held to the 1,832-page corpus instead: 196 words, `live-pitch` 127, `pre-read` 282, `appendix` 352. Table cells and chart furniture are evidence, not prose |
 | Hero exhibit, analytical page | `HERO_EXHIBIT` | at least 40% of the content area, carrying ink |
 | Layout repetition | `LAYOUT_MONOTONY` | no layout signature on more than 35% of content pages |
 | Page families | `PAGE_VARIETY` | at least three families across ten pages or more |
@@ -26,7 +26,6 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Sections and tracker | `NO_SECTIONS` | required past twelve analytical pages |
 | Contents page | `NO_CONTENTS` | a sectioned deck past twelve analytical pages says what its sections are |
 | Opening summary | `NO_SUMMARY` | the first content page states the answer (`shape: "executive-summary"`) |
-| Label punctuation | `DOT_SEPARATOR` | no bullet or middle dot joining two labels |
 | Body text floor | `THIN_PAGE` | the deck's `weight.pageWords`, counted in the body alone (95 balanced, 120 full); reference client slides carry 128 body words |
 | Notes carrying the page | `NOTE_HEAVY` | the footer stays under a third of the page's text |
 | Plan-time shortfall | `THIN_PLAN` | preflight: what the page will carry against the floor, with the remedy its own data offers |

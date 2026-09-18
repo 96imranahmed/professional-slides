@@ -120,7 +120,6 @@ class SyntheticGoodPageTests(unittest.TestCase):
         cases = {
             "TITLE_LINES": lambda s: set_title(s, "a b", ["a", "b", "c"]),
             "TITLE_WORDS": lambda s: set_title(s, " ".join(f"word{i}" for i in range(20))),
-            "HEDGED_TITLE": lambda s: set_title(s, "The limit looks plausible for central journeys"),
             "TYPE_RANGE": lambda s: node(s, "p")["style"].update({"fontSize": {"value": 18}}),
             "CPL": lambda s: node(s, "p")["data"]["textLayout"].update(
                 {"lines": ["x" * 120, "y" * 110], "source": "x" * 120}),
@@ -183,16 +182,11 @@ class KnownBadDeckTests(unittest.TestCase):
         self.assertIn(30.0, sizes)   # action titles, allowed band is 20-26
         self.assertIn(16.1, sizes)   # body copy, allowed band is 10-14
 
-    def test_titles_are_hedged_on_the_pages_the_audit_named(self):
-        hedged = slides_with(self.report, "HEDGED_TITLE")
-        self.assertTrue(hedged)
-        titles = {}
-        for index, slide in enumerate(self.scene["slides"], start=1):
-            for node in slide.get("nodes", []):
-                if node.get("role") == "action-title":
-                    titles[index] = page_gates.source_text(node)
-        self.assertTrue(any("looks plausible" in titles[i] for i in hedged))
-        self.assertTrue(any("distinct combinations" in titles[i] for i in hedged))
+    # `HEDGED_TITLE` was a nine-entry word list applied to every title in every
+    # deck - a log of four offending titles, not a lexicon, and it failed
+    # "Three of five markets could fund the build from cash", which commits to a
+    # finding. Whether a title commits is real and is a judgement; it lives in
+    # the taste review now, and `reviewer.mjs` still raises the code.
 
     def test_hero_exhibit_and_ink_gates_fire_on_the_thin_pages(self):
         self.assertTrue(slides_with(self.report, "HERO_EXHIBIT"))
@@ -236,10 +230,9 @@ class KnownBadDeckTests(unittest.TestCase):
         # Story and geometry gates do not judge a structural page. Typography
         # does: type sizes and label punctuation are house rules everywhere, and
         # this fixture's cover carries "Imran · September 2026".
-        typographic = {"TYPE_RANGE", "DOT_SEPARATOR", "NICE_TICKS", "MISSING_RENDER"}
+        typographic = {"TYPE_RANGE", "NICE_TICKS", "MISSING_RENDER"}
         cover_findings = [f for f in self.report["findings"] if f["slide"] == 1]
         self.assertEqual([f["code"] for f in cover_findings if f["code"] not in typographic], [])
-        self.assertIn("DOT_SEPARATOR", [f["code"] for f in cover_findings])
 
 
 class TextPageInkFloorTests(unittest.TestCase):

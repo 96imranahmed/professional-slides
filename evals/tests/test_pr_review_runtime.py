@@ -69,11 +69,15 @@ console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
 
-    def test_density_footnotes_lexical_hedges_and_missing_renders(self):
+    def test_density_footnotes_and_missing_renders(self):
         slide=good_slide()
         slide['componentInstances']=[{'component':'slide-chrome'}]
         paragraph=next(n for n in slide['nodes'] if n['id']=='p')
-        paragraph['data']['textLayout']['source']=' '.join(['word']*110)
+        # 140 words: over `live-pitch` (127, the corpus p25) and under
+        # `pre-read` (282, the corpus p75). It was 110 against a bare ceiling of
+        # 100 - which sat below the corpus p25, so the gate taxed pages for
+        # carrying what the reference decks carry.
+        paragraph['data']['textLayout']['source']=' '.join(['word']*140)
         paragraph['text']=paragraph['data']['textLayout']['source']
         slide['density']='live-pitch'
         self.assertIn('WORDS',page_gates.run_gates({'slides':[slide]},gates={'WORDS'})['countsByCode'])
@@ -83,11 +87,11 @@ console.log(JSON.stringify({accepted:true}));
         slide['nodes']=[note]
         report=page_gates.run_gates({'slides':[slide]},gates={'WORDS','TYPE_RANGE'})
         self.assertNotIn('WORDS',report['countsByCode']);self.assertIn('TYPE_RANGE',report['countsByCode'])
-        slide=good_slide();title=slide['nodes'][0]
-        for text,expected in [('Awesome growth creates value',False),('Some growth creates value',True),('Growth may accelerate',True)]:
-            title['text']=text;title['data']['textLayout']={'source':text,'lines':[text]}
-            report=page_gates.run_gates({'slides':[slide]},gates={'HEDGED_TITLE'})
-            self.assertEqual('HEDGED_TITLE' in report['countsByCode'],expected)
+        # The lexical-hedge half of this test went with `HEDGED_TITLE`: it
+        # asserted that "Some growth creates value" hedges and "Awesome growth
+        # creates value" does not, which is a claim about two words rather than
+        # about whether a title commits to a finding.
+        slide=good_slide()
         with tempfile.TemporaryDirectory() as directory:
             report=page_gates.run_gates({'slides':[slide,{'nodes':[],'componentInstances':[{'component':'cover'}]}]},directory,gates={'WORDS'})
             self.assertEqual(report['countsByCode']['MISSING_RENDER'],2)

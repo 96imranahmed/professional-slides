@@ -81,7 +81,6 @@ question is optical, the rendered PNG. Exit 0 pass, 2 findings. Every finding is
 | `HERO_EXHIBIT` | largest chart/table/image frame ÷ content frame | ≥ 0.40 |
 | `LAYOUT_MONOTONY` | share of content slides sharing one layout signature | ≤ 0.40 |
 | `NICE_TICKS` | the axis as a whole: step on the 1/2/2.5/5 ladder, every tick a whole step | — |
-| `HEDGED_TITLE` | hedge lexicon hit in the action title | none |
 
 Whether a page needs additional interpretation is an editorial review decision. There is no mandatory closing-consequence gate: a necessary caveat may complete the evidence, and a separate `soWhat` is optional.
 

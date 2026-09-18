@@ -39,7 +39,6 @@ Deterministic, per page, before any model is consulted:
 - a page carried by photographs, or by two peer panels, saying what it means in an insight, a so-what or a points column (`MISSING_ARGUMENT`);
 - no lone metric tile stacked above a table (`METRIC_STACK`);
 - sections and a tracker past twelve analytical pages (`NO_SECTIONS`);
-- no bullet or middle dot joining two labels, on any page including the cover (`DOT_SEPARATOR`);
 - the deck's weight contract, which a template's house profile can set: page text at or above `weight.pageWords` (`THIN_PAGE`), the commentary column reaching `weight.columnFill` of its track with points averaging `weight.pointWords` (`THIN_COLUMN`, `POINT_DEPTH`), marks spanning `weight.plotSpan` of the exhibit (`PLOT_SPAN`), a table using `weight.tableFill` of its row budget (`THIN_TABLE`), three numeric labels on an exhibit page (`NUMBERS_ON_MARKS`) and `weight.elements` pieces of evidence (`THIN_EVIDENCE`); every one is a floor, and an `airy` deck switches them off;
 - axis ticks on nice numbers;
 - every object inside its resolved frame, with no unintended overlap;

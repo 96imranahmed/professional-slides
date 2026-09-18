@@ -70,7 +70,7 @@ Keep the analytical argument on the slide and put routine arithmetic, familiar m
 
 ## Punctuation and voice
 
-No dot separators. A bullet or middle dot joining two labels - `1939 • Marvel Comics #1`, `Anthropic · Research`, `Investor pulse · Q4`, `Sources: NYPD · 8 Sep 2026` - is a tic that spreads through every eyebrow, footer and caption in the deck until it reads as a menu. Write the qualifier in brackets, after a comma, on its own eyebrow line or as a column; separate sources with a semicolon. A bullet opens a list item and does nothing else (`DOT_SEPARATOR`).
+Watch dot separators. A bullet or middle dot joining two labels - `1939 • Marvel Comics #1`, `Investor pulse · Q4` - spreads through every eyebrow, footer and caption until the deck reads as a menu. Published decks do use it, so this is a matter of restraint rather than a rule: write the qualifier in brackets, after a comma, on its own eyebrow line or as a column, and separate sources with a semicolon.
 
 Audience-facing copy uses commas, full stops, parentheses and clear connectors in place of em dashes; a sourced quotation containing one is replaced by another exact excerpt or an attributed paraphrase. Use the punctuation a clear list, qualification or notation needs, and rewrite a sentence that collects colons, semicolons and parenthetical asides. Watch for repeated *not just X, but Y* constructions, false contrasts, rhetorical questions and unsupported superlatives such as *transformative*.
 

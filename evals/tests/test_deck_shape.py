@@ -117,25 +117,10 @@ class MetricStackTests(unittest.TestCase):
         self.assertNotIn("METRIC_STACK", codes(page_gates.run_gates(deck([slide]))))
 
 
-class SeparatorTests(unittest.TestCase):
-    def test_a_bullet_between_two_labels_is_reported(self):
-        slides = [page(1, ["chart.bar"], texts=["1939 • Marvel Comics #1"])]
-        report = page_gates.run_gates(deck(slides))
-        self.assertIn("DOT_SEPARATOR", codes(report))
-        self.assertEqual(next(f for f in report["findings"] if f["code"] == "DOT_SEPARATOR")["slide"], 2)
-
-    def test_a_middle_dot_in_a_source_line_is_reported(self):
-        slides = [page(1, ["chart.bar"], texts=["Sources: NYPD · 8 Sep 2026 · links in notes"])]
-        self.assertIn("DOT_SEPARATOR", codes(page_gates.run_gates(deck(slides))))
-
-    def test_an_interpunct_inside_a_word_is_left_alone(self):
-        # "kW·h" is a unit, not two labels joined.
-        slides = [page(1, ["chart.bar"], texts=["Storage cost per kW·h, 2019-2024"])]
-        self.assertNotIn("DOT_SEPARATOR", codes(page_gates.run_gates(deck(slides))))
-
-    def test_a_list_marker_is_not_a_separator(self):
-        slides = [page(1, ["chart.bar"], texts=["• Letters volume fell 8% a year\n• Parcels grew"])]
-        self.assertNotIn("DOT_SEPARATOR", codes(page_gates.run_gates(deck(slides))))
+# SeparatorTests removed with the `DOT_SEPARATOR` gate. "A bullet joining two
+# labels is a tic, not a structure" was asserted in a docstring with no
+# reference deck behind it, and published decks use exactly that construction in
+# eyebrow lines and source strings. A punctuation blacklist is not a measurement.
 
 
 class DeckStructureTests(unittest.TestCase):

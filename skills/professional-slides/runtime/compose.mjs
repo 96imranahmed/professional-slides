@@ -1325,16 +1325,34 @@ function soWhatItem(text, id) {
  *
  * So the choice is scored rather than short-circuited. `fit` says how well a
  * shape suits what the page carries; a shape the page cannot support scores 0
- * and is never chosen. Among the shapes that fit, the one used least recently
- * wins, which is what spreads a section across its repertoire.
+ * and is never chosen. Among the shapes that fit *equally well*, the one used
+ * least recently wins, which is what spreads a section across its repertoire.
+ *
+ * "Equally well" is the correction. Staleness used to be the primary key and
+ * fit the tie-break, so the chooser took the least recently used viable shape
+ * whatever its score: a shape fitting at 3 beat a shape fitting at 4 that had
+ * been used two pages earlier. That is how a work profile came out
+ * `picture-hero`, a dated sequence came out `picture-strip` and a boundary
+ * comparison came out `two-up` in a deck a reader rated 2 out of 10. Variety
+ * is worth having and it is not worth a page taking the wrong shape for it -
+ * and the variety a reader actually sees is in the *exhibit*, which
+ * `exhibitVarietyPerTen` measures, not in which side of the page the table
+ * sits on.
  */
 const PAGE_SHAPES = {
   // One exhibit, commentary beside it. The workhorse, and the one that used to
   // be the whole repertoire.
   "exhibit-left": { fit: (s, ex) => (ex.length === 1 && hasCommentary(s) && !needsFullWidth(ex[0]) ? 3 : 0) },
-  // The mirror. The reference decks alternate sides down a section; reading
-  // the commentary first suits a page whose exhibit confirms a claim.
-  "exhibit-right": { fit: (s, ex) => (ex.length === 1 && hasCommentary(s) && !s.photo && !s.kpi && !needsFullWidth(ex[0]) ? 3 : 0) },
+  // The mirror, and never chosen for you. The evidence goes on the left and
+  // what it means on the right, on every page, because a reading order a reader
+  // can rely on is worth more than the variety of not having one. Scored equal
+  // to `exhibit-left`, it was picked whenever `exhibit-left` was the staler of
+  // the two, so a deck of table pages mirrored itself down a section - and a
+  // reader opening it found the commentary on the left of one page and the
+  // right of the next with nothing in the content to explain the change. It
+  // stays authorable as `layout: "exhibit-right"` for the page that genuinely
+  // reads the other way.
+  "exhibit-right": { fit: () => 0 },
   // The exhibit across the full width with the commentary in columns beneath
   // it: the commonest reference shape, and the right one when the exhibit is
   // wide (many categories) or the commentary divides into parallel points.
@@ -1489,7 +1507,7 @@ function chooseLayout(slide, recent = []) {
   const score = (name) => scored.find(([n]) => n === name)[1];
   const declared = (name) => PAGE_SHAPE_NAMES.indexOf(name);
   return viable.slice().sort((a, b) =>
-    staleness(b) - staleness(a) || score(b) - score(a) || declared(a) - declared(b))[0];
+    score(b) - score(a) || staleness(b) - staleness(a) || declared(a) - declared(b))[0];
 }
 
 /**

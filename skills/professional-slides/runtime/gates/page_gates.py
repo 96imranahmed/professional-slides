@@ -100,9 +100,6 @@ PHOTO_MIN_AREA = 0.03 * CANVAS_W * CANVAS_H
 # second line. Only a line that starts with one is a list marker.
 # A space on at least one side: "1939 • Marvel Comics #1" is a separator, the
 # interpunct in a unit ("kW·h") is part of the word.
-DOT_SEPARATOR_RE = re.compile(
-    r"\S(?:[ \t]+[•·∙‧・][ \t]*|[ \t]*[•·∙‧・][ \t]+)\S"
-)
 
 TYPE_RANGES = {
     "body": (10.0, 14.0),
@@ -114,24 +111,6 @@ TYPE_RANGES = {
     "action-title": (20.0, 26.0),
     "source": (7.0, 9.0),
 }
-
-HEDGES = (
-    "looks plausible", "some ", "may ", "might ", "could ",
-    "distinct combinations", "offers a", "requires verification",
-    "is not a ranking",
-)
-
-# Density profiles change how much prose a page may carry; they never relax a
-# geometric or typographic threshold.
-PROFILES = {
-    "live-pitch": {"words_exhibit": 70, "words_text": 100},
-    "executive": {"words_exhibit": 100, "words_text": 140},
-    "pre-read": {"words_exhibit": 160, "words_text": 220},
-    # Source-rich support behind the story, set in the smallest approved type:
-    # it carries more words in the same frame, by design.
-    "appendix": {"words_exhibit": 200, "words_text": 280},
-}
-DEFAULT_PROFILE = "executive"
 
 # How full the deck means to read (`fill` on the spec, carried on the scene).
 # Emptiness is right for a live-pitch deck and wrong for a pre-read, so the
@@ -167,6 +146,42 @@ REFERENCE_PAGE_WORDS = CONTRACT["reference"]["corpus"]
 # The careful sample, split into the page's three bands: what a reference
 # analytical slide carries where.
 REFERENCE_PAGE_BANDS = dict(REFERENCE_PAGE["bands"], pages=REFERENCE_PAGE["pages"])
+
+# Density profiles change how much prose a page may carry; they never relax a
+# geometric or typographic threshold.
+#
+# Derived from the corpus rather than chosen. These were eight bare numbers -
+# 70/100, 100/140, 160/220, 200/280 - in a file where every neighbouring
+# threshold cites what it was measured against, and they sat *below* what the
+# reference decks carry: `executive` capped a text page at 140 words while the
+# 1,832-page corpus runs a median of 196 and the 137-slide sample a median of
+# 185. A ceiling under the median of the work you are imitating is not a
+# ceiling, it is a tax.
+#
+# A page whose evidence is an exhibit spends its area on the exhibit, so its
+# prose ceiling is the measured body band; a page whose evidence *is* its prose
+# may run to the corpus figure for its density.
+_BODY_BAND = REFERENCE_PAGE["bands"]["body"]          # 128 words, measured band by band
+PROFILES = {
+    # Read from a stage: the body band cut back, and the corpus's own lower quartile.
+    "live-pitch": {"words_exhibit": round(_BODY_BAND * 0.6), "words_text": REFERENCE_PAGE_WORDS["p25"]},
+    # The default, and the corpus at its middle.
+    "executive": {"words_exhibit": _BODY_BAND, "words_text": REFERENCE_PAGE_WORDS["median"]},
+    # Read at a desk: the corpus's upper quartile.
+    "pre-read": {"words_exhibit": round(_BODY_BAND * 1.4), "words_text": REFERENCE_PAGE_WORDS["p75"]},
+    # Source-rich support behind the story, set in the smallest approved type:
+    # it carries more words in the same frame, by design.
+    "appendix": {"words_exhibit": round(_BODY_BAND * 1.75), "words_text": round(REFERENCE_PAGE_WORDS["p75"] * 1.25)},
+}
+DEFAULT_PROFILE = "executive"
+
+# Which stacked row of the page a component sits in, for `page_architecture`.
+# This was a bare `// 120` deciding what counts as the same row - and the
+# thresholds it feeds (`shapes_per_ten_min`, `shape_share_max`) cite the corpus,
+# so a measured bar was sitting on an invented measurement. A page stacks at
+# most six bands of content between its title and its footer, so the band is the
+# canvas divided by six; the value is unchanged and now says where it comes from.
+ARCH_BAND = CANVAS_H // 6
 WEIGHT = dict(WEIGHT_BY_FILL[DEFAULT_FILL])
 
 THRESHOLDS = {
@@ -346,7 +361,6 @@ GATE_CODES = {
     "COLUMN_VOID": "the right column stops well above the footer",
     "TITLE_LINES": "an action title over two lines",
     "TITLE_WORDS": "an action title past the word budget",
-    "HEDGED_TITLE": "an action title that does not commit to a finding",
     "TYPE_RANGE": "type set outside the approved range for its role",
     "CPL": "a measure too narrow or too wide to read",
     "WORDS": "prose doing the work an exhibit should do",
@@ -364,7 +378,6 @@ GATE_CODES = {
     "MISSING_ARGUMENT": "a picture or comparison page with no argument on it",
     "METRIC_STACK": "one number parked above a table instead of beside it",
     "NO_SECTIONS": "a long deck with no sections and no tracker",
-    "DOT_SEPARATOR": "a bullet or middle dot joining two labels",
     "HEADING_WRAPS": "a heading that wraps where it should fit",
     "THIN_PAGE": "the page body carries less than the deck's weight contract",
     "NOTE_HEAVY": "the footer is carrying the page",
@@ -580,7 +593,15 @@ def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=Fa
 
 
 def gate_title(slide_no, slide, findings):
-    """TITLE_LINES, TITLE_WORDS, HEDGED_TITLE. COVER_EXEMPT."""
+    """TITLE_LINES, TITLE_WORDS. COVER_EXEMPT.
+
+    Whether a title *commits to a finding* was a nine-entry word list
+    ("some ", "may ", "could ", "offers a", "is not a ranking") applied to
+    every title in every deck. It was a log of four offending titles, not a
+    lexicon, and it failed "Three of five markets could fund the build from
+    cash" - a committed finding. A title that hedges is a real defect and a
+    word list cannot see it; the taste review reads the titles and says so.
+    """
     for node in text_nodes(slide):
         if node.get("role") not in TITLE_ROLES:
             continue
@@ -597,14 +618,6 @@ def gate_title(slide_no, slide, findings):
             findings.append(finding(
                 slide_no, "TITLE_WORDS", words, THRESHOLDS["title_words_max"],
                 "Rewrite the title as a claim of at most 14 words.",
-            ))
-        lowered = " " + text.lower()
-        hit = [h.strip() for h in HEDGES if re.search(r"\b" + re.escape(h.strip()).replace(r"\ ", r"\s+") + r"\b", lowered)]
-        if hit:
-            findings.append(finding(
-                slide_no, "HEDGED_TITLE", hit, list(h.strip() for h in HEDGES),
-                "Replace the hedge with the finding and its consequence; "
-                "move the uncertainty to the methodology footnote.",
             ))
 
 
@@ -1315,24 +1328,6 @@ def gate_thin_evidence(slide_no, slide, findings):
     ))
 
 
-def gate_dot_separators(slide_no, slide, findings):
-    """DOT_SEPARATOR. A bullet joining two labels — "1939 • Marvel Comics #1",
-    "SUPERMAN • Hope" — is a tic, not a structure. The house writes the qualifier
-    in brackets, on the second line, or as a column of its own."""
-    offenders = []
-    for node in text_nodes(slide):
-        for line in lines_of(node):
-            if DOT_SEPARATOR_RE.search(line) and line.strip() not in offenders:
-                offenders.append(line.strip()[:80])
-    for text in offenders[:3]:
-        findings.append(finding(
-            slide_no, "DOT_SEPARATOR", text, "no bullet between two labels",
-            "Drop the bullet: write \"Marvel Comics #1 (1939)\", or give the year "
-            "its own eyebrow line or column. Bullets start list items; they do "
-            "not join words.",
-        ))
-
-
 def gate_missing_argument(slide_no, slide, findings):
     """MISSING_ARGUMENT. A page of photographs, or a two-sided comparison, with
     no sentence that says what it means. A caption names what you are looking at;
@@ -1888,7 +1883,7 @@ def page_architecture(slide):
     rows = {}
     for instance in instances:
         frame = instance.get("frame") or {}
-        band = int(float(frame.get("y", 0)) // 120)
+        band = int(float(frame.get("y", 0)) // ARCH_BAND)
         rows.setdefault(band, []).append(kind(instance.get("component")))
     shape = ";".join(
         "+".join(sorted(members)) for _, members in sorted(rows.items())
@@ -2165,8 +2160,6 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_twin_cells(slide_no, slide, findings)
         if wanted("PLANNING_VOICE"):
             gate_planning_voice(slide_no, slide, findings)
-        if wanted("DOT_SEPARATOR"):
-            gate_dot_separators(slide_no, slide, findings)
         if wanted("TYPE_RANGE"):
             gate_type_range(slide_no, slide, findings, slide_profile)
         if wanted("NICE_TICKS"):
