@@ -1,143 +1,38 @@
-# Commercial Due Diligence
+# Commercial due diligence
 
 ## Mandate
 
-Use this template when the decision is whether to invest in, acquire, finance, or continue diligence on a business.
-
-State the engagement mode:
-
-- **Full commercial due diligence:** all core tests, primary research where required, an independent plan, and downside analysis.
-- **Red-flag commercial due diligence:** a bounded review of named risks and decision gates.
-- **Preliminary public-source commercial screen:** an early view based only on public evidence.
-
-Never silently downgrade a full commercial due diligence request because evidence is missing. Mark the branch unresolved and state what evidence is needed.
+Use when the decision is whether to invest in, acquire, finance or continue diligence on a business. State the engagement mode: **full** (all core tests, primary research where required, an independent plan, a downside case), **red-flag** (a bounded review of named risks and decision gates), or **preliminary public-source screen** (an early view from public evidence only). When evidence is missing for a full diligence, the branch stays unresolved and names the evidence it needs.
 
 ## Decision question
 
-The deck should answer:
+> Is the business commercially attractive, durable and financeable, and what must be true for the transaction to create value?
 
-> Is the business commercially attractive, durable, and financeable, and what must be true for the transaction to create value?
+## Page table
 
-Use five analytical tests, followed by the decision:
+| Page | Job | Exhibit | Evidence it owes |
+| --- | --- | --- | --- |
+| Cover | Name the target, buyer context and cutoff date | Cover | Decision cutoff date, perimeter, engagement mode |
+| Executive summary | Answer the decision question with its conditions | Executive synthesis, one page or several | The five tests, the recommendation, the condition that reverses it |
+| Method and baseline (optional) | State scope, sources and the independent plan's basis | Compact table | Perimeter, geography, primary-research scope, evidence available and unavailable |
+| Market attractiveness | Is the served market large, growing and structurally attractive? | Market trend, segment mix or profit-pool shift | Reachable market rather than headline TAM, demand drivers, regulation, adoption barriers |
+| Customer quality | Who buys, why, how they use it, whether they stay and expand | Cohort retention, concentration or segmentation exhibit | Cohorts, concentration, willingness to pay, satisfaction, primary research |
+| Competitive position | Why the target wins and how durable that is | Comparison table against real alternatives on buyer-relevant criteria | Current position separated from claimed differentiation; switching, substitution, partner dependence |
+| Commercial engine | How demand becomes revenue and contribution | Funnel, pricing or unit-economics exhibit | Funnel, pricing, sales motion, channels, conversion, acquisition efficiency, expansion |
+| Plan and downside | Does the plan hold, and what breaks it? | Driver-based plan with base case and downside | Drivers connected to market, customers, funnel, pricing, retention, cost-to-serve, capacity |
+| Decision and value creation | Invest, condition, pause or decline | Decision table with conditions, owners and timing | Each condition tied to evidence, ownership, timing and a decision consequence |
+| Appendix | Source record and reference schedules | Tables | Source IDs, sample sizes, dates, geography, material bias |
 
-1. Market attractiveness
-2. Customer quality
-3. Competitive position
-4. Commercial engine
-5. Plan and downside
-
-Follow these with **Decision and value creation**, the sixth section rather than a sixth analytical test.
-
-Keep all five analytical tests explicit in retrospective public-source commercial diligence. A missing-data statement does not count as the analysis itself.
-
-## Thesis and scope
-
-Before storylining, define:
-
-- buyer and transaction context;
-- decision cutoff date;
-- target perimeter and geography;
-- evidence available and unavailable;
-- primary-research scope;
-- independent-plan horizon;
-- value-creation and downside questions.
-
-A retrospective commercial diligence deck separates evidence available at the decision cutoff date from later validation and hindsight. Later facts may test the earlier thesis, but they must not be presented as if they were known at the cutoff.
-
-Maintain a template-coverage ledger. Mark each core job as retained, merged, omitted with a reason, or unresolved. Missing evidence never turns an unresolved branch into a completed one.
-
-## Story structure
-
-A full pre-read usually contains:
-
-1. cover;
-2. standalone executive summary;
-3. contents or chapter map only when it helps orientation;
-4. optional method and target baseline;
-5. the five analytical tests;
-6. decision, conditions, and value creation;
-7. appendix and source record.
-
-Convert these tests into assignment-specific hypotheses; preserve the retrospective cutoff and coverage ledger as explicit gates in the [pre-authoring contract](../storylining/pre-authoring-contract.md).
-
-Use the [executive-summary narrative contract](../components/copy.md#executive-summary-narrative) to synthesize the five tests and transaction decision.
-
-## Navigation
-
-Use the [tracker router](../components/trackers/index.md). For an eligible full pre-read, seed the label map with `Market attractiveness`, `Customer quality`, `Competitive position`, `Commercial engine`, `Plan and downside`, and `Decision and value creation`. Approved replacements become exact under the [template instantiation contract](index.md#instantiation-contract). The title spine may provide sufficient orientation without a tracker.
-
-## Analytical jobs
-
-### Market attractiveness
-
-Answer whether the served market is large, growing, and structurally attractive.
-
-Use the evidence that best proves the claim: market trend, segment mix, profit-pool shift, demand drivers, regulation, or adoption barriers. Do not substitute a large headline TAM for the reachable market.
-
-### Customer quality
-
-Answer who buys, why they buy, how they use the product, whether they stay, and whether they expand.
-
-Use cohort retention, concentration, segmentation, use cases, willingness to pay, satisfaction, or primary research. Public logos or anecdotes do not prove durable customer economics.
-
-### Competitive position
-
-Answer why the target wins and how durable that advantage is.
-
-Compare the target with real alternatives on buyer-relevant criteria. Separate current position from claimed differentiation. Test switching, substitution, partner dependence, and ecosystem trust where relevant.
-
-### Commercial engine
-
-Answer how demand becomes revenue and contribution.
-
-Show the funnel, pricing, sales motion, channels, conversion, acquisition efficiency, expansion, and product economics that matter to the business model. When data is unavailable, show the causal model and the exact measures required to underwrite it.
-
-### Plan and downside
-
-Build a driver-based independent plan. Connect market, customers, funnel, pricing, retention, cost-to-serve, and capacity to the forecast.
-
-Use a base case and decision-relevant downside. Add upside only when the base case works on its own. Show what breaks the plan and what the transaction structure should do about it.
-
-### Decision and value creation
-
-State invest, condition, pause, or decline. Tie every condition to evidence, ownership, timing, and a decision consequence.
-
-Show value-creation actions only when the deck has established the mechanism. Do not use strategic fit as a substitute for standalone commercial quality.
+Keep the five analytical tests visible even in a bounded screen; a missing-data statement records a gap rather than completing a test.
 
 ## Evidence
 
-Separate:
-
-- verified fact;
-- estimate;
-- management claim;
-- retrospective inference;
-- unresolved question.
-
-Cite every slide. State sample size, date, geography, and material bias for primary research. Claims supporting the recommendation, valuation, or downside case require two independent sources or an explicit single-source limitation.
-
-Do not invent revenue, customers, retention, margin, market share, valuation, or forecast data.
-
-## Page composition
-
-Apply [composition](../composition/index.md), [chart selection](../charts/index.md), and [deck rhythm](../design/index.md#deck-rhythm) to the five analytical jobs above.
-
-## Compression
-
-A shorter deck may merge related jobs, but it may not hide a failed test. Keep the five-test architecture visible in the hypothesis tree, coverage ledger, or section structure.
+Separate verified fact, estimate, management claim, retrospective inference and unresolved question. Cite every page. For primary research, state sample size, date, geography and material bias. Claims supporting the recommendation, the valuation or the downside case carry two independent sources or an explicit single-source limitation. A retrospective diligence separates evidence available at the cutoff date from later validation.
 
 ## Failure checks
 
-Reject the deck when:
-
-- the engagement mode is unclear;
-- public evidence is presented as transaction-grade proof;
-- customer, commercial-engine, or plan branches are replaced by generic missing-data cards;
-- the independent plan is absent;
-- the recommendation is stronger than the evidence;
-- later evidence is mixed with the decision-date record;
-- sources or uncertainty states are missing.
+Reject when: the engagement mode is unclear; public evidence is presented as transaction-grade proof; customer, commercial-engine or plan branches are replaced by missing-data cards; the independent plan is absent; the recommendation is stronger than the evidence; later evidence is mixed into the decision-date record; sources or uncertainty states are missing.
 
 ## Acceptance check
 
-The answer, five tests, independent plan, downside, decision gates, evidence states, and sources are explicit. The close follows from the analysis, and the exact final deck passes rendered QA.
+The answer, the five tests, the independent plan, the downside, the decision gates, the evidence states and the sources are all explicit, the close follows from the analysis, and the exported deck passes the page gates and the review.

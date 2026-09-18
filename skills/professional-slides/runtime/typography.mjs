@@ -2,8 +2,11 @@
 // on the same installed glyphs. Companies can replace all typography roles.
 export function resolveTypography(input = {}, tokens) {
   if (input.body && input.body !== "Arial" && !input.semibold) throw new Error("A company body font requires an explicit semibold face mapping");
+  // The palette may already have set a display face (a serif for a house that
+  // titles in one); an explicit typography block still wins.
+  const paletteDisplay = tokens?.["font.display"]?.value;
   const profile = {
-    body: input.body ?? "Arial", display: input.display ?? input.body ?? "Arial", serif: input.serif ?? "Georgia",
+    body: input.body ?? "Arial", display: input.display ?? (paletteDisplay && paletteDisplay !== "Arial" ? paletteDisplay : input.body ?? "Arial"), serif: input.serif ?? "Georgia",
     semibold: input.semibold ?? { family: "Arial", nativeBold: true, effectiveWeight: 700 }
   };
   for (const key of ["body", "display", "serif"]) {

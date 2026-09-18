@@ -20,7 +20,7 @@ The runtime currently produces editable PowerPoint primitives, including charts.
 
 ## Distribution and user files
 
-Build a clean package with `python3 evals/scripts/package_plugin.py`. The installable directory is `output/package/professional-slides`; point the marketplace entry or local install source there, never at a used working checkout. The allowlist includes reusable skills, runtime, validators and tests, with a hash inventory. It excludes local research, generated decks, scratch, dependencies and personal configuration. Installation does no generation.
+Build a clean package with `python3 evals/scripts/package_plugin.py`. The installable directory is `dist/professional-slides`; point the marketplace entry or local install source there, never at a used working checkout. Reserve `output/` and `outputs/` for generated task artifacts from Claude, Codex and other tools; clearing them must not remove the install source. The allowlist includes reusable skills, runtime, validators and tests, with a hash inventory. It excludes local research, generated decks, scratch, dependencies and personal configuration. Installation does no generation.
 
 Users create task artifacts in `output/<task>/` in their own project, outside the installed plugin. The canonical export runtime rejects plugin-local writes, including symlink aliases. A developer checkout may write only under its own `output/`. Retain the latest useful output and required rebuild/QA inputs; remove superseded task-owned intermediates rather than copying them into a release. See [artifact lifecycle](skills/professional-slides/references/tools/artifact-lifecycle.md).
 
@@ -34,7 +34,7 @@ Register every rendering variant with representative props and size. New registr
 
 `npm run check` runs syntax/whitespace checks and fast tests. `check:syntax` is not a semantic linter. These tests do not require regenerating cached visual reports after each edit. `npm run check:release` still requires a hash-verified golden set, including both render images for every fixture.
 
-Rendering dependencies are pinned in `package.json` and their resolved transitive manifests in `evals/runtime-lock.json`. The lock records the Codex bundle, Node version and platform used for acceptance, including private packages unavailable through public npm. Run `"$RUNTIME_NODE" evals/scripts/runtime_lock.mjs` before rendering. A different bundle/platform requires a reviewed lock refresh and new visual acceptance, not a silent upgrade. Never modify bundled dependencies.
+Install the Node development dependencies with `npm ci` using `package-lock.json`. The export pipeline requires Python with python-pptx, Pillow and NumPy, plus LibreOffice and `pdftoppm` for rendering. Set `RUNTIME_PYTHON` when those packages live in a separate environment. Renderer or dependency changes require new visual acceptance.
 
 The table compiler uses Prettier 3.6.2 formatting; keep normalization, measurement and rendering in separate named helpers.
 

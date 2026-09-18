@@ -1,8 +1,21 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class ReviewRegressionTests(unittest.TestCase):
+    def test_single_chart_has_one_analytical_heading_owner(self):
+        self.check_js("""
+const chart={id:'assets',job:'compare segment assets',component:'chart.bar',props:{heading:'Managed assets, FY2012',unit:'$B',categories:['SMB','PLE'],series:[{name:'Assets',values:[.8,2.1]}]}};
+const group={id:'segments',job:'show segment scale',heading:'Managed assets span commercial customers',items:[chart]};
+const slide={id:'financing',title:'Financing serves distinct segments',items:[group]};
+assert.throws(()=>validateSlidePlan(slide),/redundant heading levels/);
+delete group.heading;
+assert.doesNotThrow(()=>validateSlidePlan(slide));
+group.heading='Commercial financing';
+group.items.push({...chart,id:'other',props:{...chart.props,heading:'Originations, FY2012'}});
+assert.doesNotThrow(()=>validateSlidePlan(slide));
+""")
+
     def check_js(self, script):
         result = run_node("""
 import assert from 'node:assert/strict';
@@ -76,7 +89,7 @@ assert.throws(()=>legendNodes({id:'legend',frame,props:{variant:'state',items:[{
         self.check_js("""
 const sample=REGISTRY.get('matrix').sample;
 const nodes=render('matrix',sample);
-assert.equal(nodes.filter(n=>n.role==='matrix-axis-label').length,2);
+assert.equal(nodes.filter(n=>n.role==='matrix-axis-label').length,6); // two titles and four end labels
 assert.throws(()=>render('matrix',{points:sample.points}),/xAxis/);
 const stages=render('funnel',{stages:[{label:'Start',value:100},{label:'Half',value:50},{label:'None',value:0}]});
 const marks=stages.filter(n=>n.role==='funnel-stage');

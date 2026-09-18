@@ -35,7 +35,7 @@ export const INSIGHT_TREE_TABLE_GUIDANCE = Object.freeze({
   useWhen: "a root finding branches through named drivers into leaf evidence, and each leaf needs an aligned interpretation or implication",
   why: "the tree preserves causal or hierarchical logic while the aligned rows make each leaf-to-insight relationship auditable",
   actionTitle: "state the governing branch logic and the consequence it creates; do not merely label the page as an insight tree",
-  extension: "one to three branches normally use executive density; four branches or six to seven leaves promote the complete page to pre-read density so titles, headers, nodes, rows, legends, and annotations step down together"
+  extension: "four branches or six to seven leaves suggest pre-read only when page density is unspecified; preserve an explicit family density and enforce measured fit for the complete hierarchy"
 });
 
 export const INSIGHT_TREE_TABLE_SAMPLE = Object.freeze({

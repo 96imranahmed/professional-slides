@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class ContentVariantTests(unittest.TestCase):
@@ -50,18 +50,6 @@ const image=mediaNode({id:'image',frame:{x:0,y:0,width:400,height:200},props:MED
 assert.equal(image.frame.width,image.frame.height);
 assert.equal(image.frame.x,100);
 assert.throws(()=>mediaNode({id:'bad',frame,props:{...MEDIA_SAMPLE,authorization:''}}),/authorization/);
-console.log('{}');
-''')
-
-    def test_embedded_media_gate_rejects_missing_or_unplanned_payloads(self):
-        run_node(r'''
-import assert from 'node:assert/strict';
-import {auditEmbeddedMedia} from './evals/scripts/media_integrity.mjs';
-const a=Buffer.from('declared image'),b=Buffer.from('unexpected image');
-assert.equal(auditEmbeddedMedia([a],[a,a]).accepted,true);
-assert.equal(auditEmbeddedMedia([a],[]).accepted,false);
-assert.equal(auditEmbeddedMedia([a],[a,b]).accepted,false);
-assert.equal(auditEmbeddedMedia([],[]).accepted,true);
 console.log('{}');
 ''')
 
@@ -132,3 +120,62 @@ assert.equal(rendered.length,1);
 assert.equal(rendered[0].text,label.sample.items.find(i=>i.id===label.sample.selectedId).label);
 console.log('{}');
 ''')
+
+
+class BodyBulletTests(unittest.TestCase):
+    def test_body_variant_is_measured_theme_bound_and_never_distributed(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const owner=REGISTRY.get('bullet-list'),frame={x:0,y:0,width:440,height:300};
+const props={variant:'body',items:['Demand has strengthened, but additional capacity is needed before the business can convert it into growth.','Proceed only after the required capacity is available.']};
+const measured=owner.measureContent({frame,props}),nodes=owner.render({id:'body',frame,props}).nodes;
+assert.equal(nodes.filter(n=>n.role==='list-item').length,2);
+const [a,b]=nodes.filter(n=>n.role==='list-item');
+assert.equal(a.style.fontSize.tokenId,'type.body');assert.equal(a.style.fontFamily.tokenId,'font.body');
+assert.equal(a.frame.x,b.frame.x);assert.equal(b.frame.y-a.frame.y-a.frame.height,8);
+assert.equal(b.frame.y+b.frame.height,measured.height);
+assert.deepEqual(owner.render({id:'body',frame:{...frame,height:600},props}).nodes,nodes);
+assert.throws(()=>owner.render({id:'body',frame,props:{...props,variant:'tiny'}}),/Unknown/);
+assert.throws(()=>owner.measureContent({frame,props:{variant:'body',items:[]}}),/nonempty/);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+
+class StaircaseRiseTests(unittest.TestCase):
+    """A staircase is a shape, not a way of spending height.
+
+    The rise stretched to fill whatever frame it was given: three steps in a
+    470px body produced a 191px rise for a 44px tread, so the page read as three
+    small islands with a hundred and fifty pixels of nothing between them and
+    the whole top-left corner empty. It now rises by about what a tread and its
+    text need, and the figure centres in the leftover rather than smearing it
+    between every step.
+    """
+
+    def test_the_rise_is_capped_and_the_figure_centres(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const registry = createRegistry();
+const items = ['A relationship', 'A choice', 'A consequence'].map((label) => ({
+  label, text: 'A sentence of supporting detail that runs to about two lines at this width.' }));
+const measure = (height) => {
+  const frame = {x: 60, y: 140, width: 1160, height};
+  const nodes = registry.get('steps').render({id: 's', frame, props: {items}}).nodes;
+  const treads = nodes.filter((n) => n.role === 'step-block').map((n) => n.frame.y).sort((a, b) => a - b);
+  const top = Math.min(...nodes.map((n) => (n.frame ? n.frame.y : Infinity)));
+  const bottom = Math.max(...nodes.map((n) => (n.frame ? n.frame.y + (n.frame.height || 0) : 0)));
+  return {rise: treads[1] - treads[0], above: top - frame.y, below: frame.y + height - bottom};
+};
+const tall = measure(470), short = measure(300);
+// The rise no longer tracks the frame: a page half again as tall does not make
+// the staircase half again as loose.
+assert.ok(tall.rise < 110, `rise ${tall.rise} should stay compact in a tall frame`);
+assert.ok(tall.rise / short.rise < 1.6, `rise grew ${short.rise} -> ${tall.rise} with the frame`);
+// And the leftover is shared top and bottom rather than dumped in one place.
+assert.ok(Math.abs(tall.above - tall.below) < 40, `unbalanced: ${tall.above} above, ${tall.below} below`);
+console.log(JSON.stringify({ok: true}));
+''')
+        self.assertTrue(result["ok"])

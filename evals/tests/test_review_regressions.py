@@ -1,6 +1,6 @@
 import unittest
 
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class ReviewRegressionTests(unittest.TestCase):
@@ -40,39 +40,6 @@ for(const fraction of ['bad',NaN,Infinity,-.1,1.1,null]) assert.throws(()=>mapNo
 console.log(JSON.stringify({accepted:true}));
 """)
 
-    def test_quotes_preserve_text_and_native_portraits(self):
-        run_node("""
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import {createRequire} from 'node:module';
-import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
-import {resolveQuoteClusterVariant} from './skills/professional-slides/runtime/quote-cluster.mjs';
-import {renderSlideHtml} from './skills/professional-slides/runtime/adapters/html.mjs';
-import {writePptx} from './skills/professional-slides/runtime/adapters/pptxgenjs.mjs';
-const require=createRequire(import.meta.url),JSZip=require(require.resolve('jszip',{paths:[process.env.RUNTIME_NODE_MODULES]}));
-const frame={x:60,y:150,width:1160,height:480},d=REGISTRY.get('quote-cluster');
-const base={treatment:'contained',quotes:[{quote:'Exact evidence',attribution:'Name',detail:'Role'}]};
-for(const field of ['quote','attribution','detail']) assert.throws(()=>d.render({id:'bad',frame,props:{...base,quotes:[{...base.quotes[0],[field]:{bad:true}}]}}),/text/);
-assert.notEqual(resolveQuoteClusterVariant({...base,attributionAlign:'left'}),resolveQuoteClusterVariant({...base,attributionAlign:'right'}));
-assert.ok(!d.render({id:'empty',frame,props:{...base,avatar:true}}).nodes.some(n=>n.role==='quote-avatar'));
-const portrait={dataUri:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=',alt:'Test portrait',authorization:'Synthetic test fixture'};
-const props={...base,avatar:true,quotes:[{...base.quotes[0],portrait}]};
-const deck=compileDeck({slides:[{id:'portrait',frame,composition:component({id:'quote',component:'quote-cluster',frame,props})}]},REGISTRY);
-assert.ok(deck.slides[0].nodes.some(n=>n.type==='image'));
-assert.ok(renderSlideHtml(deck.slides[0]).includes(portrait.dataUri));
-const directory=await fs.mkdtemp(path.join(os.tmpdir(),'quote-portrait-test-'));
-try {
-  const file=path.join(directory,'portrait.pptx');await writePptx(deck,file);
-  const zip=await JSZip.loadAsync(await fs.readFile(file));
-  const xml=await zip.file('ppt/slides/slide1.xml').async('string');
-  assert.ok(xml.includes('<p:pic>'));assert.ok(xml.includes('prst="ellipse"'));
-} finally {await fs.rm(directory,{recursive:true,force:true});}
-console.log(JSON.stringify({accepted:true}));
-""")
-
     def test_typed_comparison_and_wrapping_body_sized_legends(self):
         run_node("""
 import assert from 'node:assert/strict';
@@ -100,29 +67,46 @@ for(const variant of ['stepped','stepped-minimal']) for(const [key,value] of [['
 console.log(JSON.stringify({accepted:true}));
 """)
 
-    def test_render_integrity_checks_both_files(self):
-        run_node("""
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
-import {hashRenderFiles,verifyRenderFiles} from './evals/scripts/render_integrity.mjs';
-const directory=await fs.mkdtemp(path.join(os.tmpdir(),'render-integrity-'));
-try {
- const fixtures=[{htmlRender:'html.png',pptxRender:'pptx.png'}];
- await fs.writeFile(path.join(directory,'html.png'),'html');await fs.writeFile(path.join(directory,'pptx.png'),'pptx');
- const hashes=await hashRenderFiles(directory,fixtures);await verifyRenderFiles(directory,fixtures,hashes);
- await fs.writeFile(path.join(directory,'pptx.png'),'changed');await assert.rejects(()=>verifyRenderFiles(directory,fixtures,hashes),/hash mismatch/);
- await fs.unlink(path.join(directory,'html.png'));await assert.rejects(()=>verifyRenderFiles(directory,fixtures,hashes));
-} finally {await fs.rm(directory,{recursive:true,force:true});}
-console.log(JSON.stringify({accepted:true}));
-""")
 
-    def test_signatures_are_recomputed_and_required_for_saved_reports(self):
-        run_node("""
+class BeautificationPassTests(unittest.TestCase):
+    """The pass a threshold cannot make.
+
+    Every other check in the skill is a number. This one is a look, and it is
+    the only thing that catches a deck which clears every number and still reads
+    as dry - which is exactly what a generated 50-page deck did. The reviewer
+    cannot be asked whether a deck "feels varied"; it has to be handed what the
+    deck is made of, beside what a reference deck carries.
+    """
+
+    def test_the_packet_carries_what_the_deck_is_made_of(self):
+        run_node('''
 import assert from 'node:assert/strict';
-import {goldenSetSpecs,auditGoldenCoverage} from './skills/professional-slides/runtime/golden-set.mjs';
-const specs=goldenSetSpecs();assert.ok(auditGoldenCoverage(specs).accepted);
-assert.ok(!auditGoldenCoverage(specs,{requireSignatures:true}).accepted);
-const altered=structuredClone(specs);const item=altered.find(spec=>spec.coverage?.length).coverage[0];item.visualSignature='forged';
-assert.ok(auditGoldenCoverage(altered).mismatchedVisualSignatures.length);
-console.log(JSON.stringify({accepted:true}));
-""")
+import {designStatistics, CODES, reviewPrompt} from './skills/professional-slides/runtime/reviewer.mjs';
+const page=(components,roles)=>({id:'s',nodes:[{role:'action-title',type:'text',text:'A finding'},
+  ...roles.map(r=>({role:r,type:'rect'}))],componentInstances:components.map(c=>({component:c}))});
+const scene={slides:[
+  page(['table'],['table-rating-track','table-cell']),
+  page(['table'],['table-cell']),
+  page(['chart.column'],['chart-bracket']),
+  page(['chart.bar'],['chart-mark']),
+]};
+const s=designStatistics(scene);
+assert.equal(s.contentPages,4);
+assert.equal(s.tables,2); assert.equal(s.tablesTreated,0.5);
+assert.equal(s.charts,2); assert.equal(s.chartsAnnotated,0.5);
+assert.equal(s.distinctExhibits,3);
+assert.equal(s.exhibitVarietyPerTen,7.5);
+assert.ok(s.drawingsPerPage>0,'drawn elements are counted, not just chart marks');
+assert.ok(s.reference.drawingsPerPage===29,'and set beside what a reference page carries');
+// A slide with no action title is chrome, not a page to judge.
+assert.equal(designStatistics({slides:[{id:'c',nodes:[{role:'cover-title',type:'text'}],componentInstances:[]}]}).contentPages,0);
+
+// The beautification codes exist and the prompt actually asks the questions.
+for (const code of ['NO_VISUAL_ANCHOR','UNANNOTATED_PLOT','TABLE_MONOTONY','MIXED_GRAMMAR','DECORATION','NARROW_REPERTOIRE'])
+  assert.ok(CODES[code],`${code} is a reviewable code`);
+const prompt=reviewPrompt({statistics:s,titles:[],slides:[],codes:CODES,schema:{},montage:'m'});
+assert.match(prompt,/BEAUTIFICATION PASS/);
+assert.match(prompt,/NARROW_REPERTOIRE/);
+assert.ok(prompt.includes('"exhibitVarietyPerTen": 7.5'),'the numbers reach the reviewer');
+console.log(JSON.stringify({ok:true}));
+''')

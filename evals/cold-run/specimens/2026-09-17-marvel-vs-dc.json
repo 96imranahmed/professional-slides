@@ -1,0 +1,144 @@
+{
+  "schema": "professional-slides.cold-run-specimen/v1",
+  "$comment": "A recorded cold run: what the skill produced from evals/cold-run/briefs/marvel-vs-dc.md on 17 September 2026, with no context and no corrections. The plan is not stored here - it is 118KB and would rot - only what scoring it produced. The point of keeping it is that a change to the gates shows up as a diff against a run nobody can re-argue: this deck passed every gate the skill had at the time and still read as dry, and these are the numbers that say why.",
+  "brief": "briefs/marvel-vs-dc.md",
+  "recorded": "2026-09-17",
+  "generatedBy": "professional-slides as of a27e2d6, cold, no context",
+  "planScore": {
+    "accepted": false,
+    "countsByCode": {
+      "PLAN_TABLE_DEPTH": 1,
+      "PLAN_TABLE_MONOTONY": 1,
+      "PLAN_UNANNOTATED_CHARTS": 1,
+      "PLAN_NO_HIGHLIGHT": 1,
+      "PLAN_EXHIBIT_VARIETY": 1,
+      "PLAN_EXHIBIT_REASON": 1
+    },
+    "statistics": {
+      "mix": {
+        "chart": 0.444,
+        "table": 0.222,
+        "diagram": 0.267,
+        "picture": 0.067,
+        "text": 0
+      },
+      "styleEntropy": 0.888,
+      "architectures": 9,
+      "exhibitVarietyPerTen": 2.889,
+      "variantsRecorded": 0,
+      "reasonsRecorded": 0,
+      "tablesTreated": 0,
+      "chartsAnnotated": 0,
+      "anchoredPages": 10,
+      "insightPages": 14
+    },
+    "findings": [
+      {
+        "code": "PLAN_TABLE_DEPTH",
+        "page": null,
+        "measured": {
+          "median": null,
+          "reason": "no table page records its size",
+          "tables": 10
+        }
+      },
+      {
+        "code": "PLAN_TABLE_MONOTONY",
+        "page": null,
+        "measured": {
+          "share": 0,
+          "treated": 0,
+          "of": 10
+        }
+      },
+      {
+        "code": "PLAN_UNANNOTATED_CHARTS",
+        "page": null,
+        "measured": {
+          "share": 0,
+          "annotated": 0,
+          "of": 20
+        }
+      },
+      {
+        "code": "PLAN_EXHIBIT_VARIETY",
+        "page": null,
+        "measured": {
+          "perTen": 2.889,
+          "distinct": 13,
+          "pages": 45
+        }
+      },
+      {
+        "code": "PLAN_EXHIBIT_REASON",
+        "page": 3,
+        "measured": {
+          "unexplained": 29,
+          "of": 29,
+          "pages": [
+            3,
+            12,
+            13,
+            14,
+            17,
+            18,
+            19,
+            20
+          ]
+        }
+      },
+      {
+        "code": "PLAN_NO_HIGHLIGHT",
+        "page": null,
+        "measured": {
+          "pages": 45,
+          "highlighted": 0
+        }
+      }
+    ]
+  },
+  "deckAsBuilt": {
+    "$comment": "Measured off the 50-page deck this plan produced. The plan scored nine architectures and 0.888 entropy; the deck it produced is the second column, which is the disagreement the harness exists to show.",
+    "tables": 10,
+    "tableRowsMedian": 3,
+    "tableRowsRange": [
+      2,
+      6
+    ],
+    "tablesTreated": 0.0,
+    "charts": 18,
+    "chartsAnnotated": 0.0,
+    "objectPoints": 88,
+    "pointsWithHighlight": 0,
+    "pointsWithIcon": 0,
+    "distinctExhibits": 13,
+    "contentPages": 45,
+    "exhibitVarietyPerTen": 2.9,
+    "stepsPages": [
+      11,
+      12,
+      28,
+      30,
+      35,
+      46
+    ]
+  },
+  "referenceCorpus": {
+    "$comment": "The four example decks in the repository, measured the same way. The only corpus that is actually in the tree, which is why every floor is set from it and why widening it is on the list.",
+    "tableRowsMedian": 6,
+    "tableRowsRange": [
+      3,
+      12
+    ],
+    "tablesTreated": 0.47,
+    "chartsAnnotated": 0.36,
+    "exhibitVarietyPerTen": [
+      7.1,
+      7.5,
+      7.5,
+      8.3
+    ],
+    "pointsWithHighlight": 0.05,
+    "pointsWithIcon": 0.07
+  }
+}

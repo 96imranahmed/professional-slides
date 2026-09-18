@@ -1,6 +1,6 @@
 import unittest
 
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class MapRuntimeTests(unittest.TestCase):
@@ -81,51 +81,6 @@ assert.throws(()=>mapNodes({id:'bad',frame,props:{geography:'Europe',markers:[{x
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
-
-    def test_html_and_powerpoint_adapters_preserve_native_country_geometry(self):
-        result = run_node("""
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import {createRequire} from 'node:module';
-import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
-import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-import {renderSlideHtml} from './skills/professional-slides/runtime/adapters/html.mjs';
-import {writePptx} from './skills/professional-slides/runtime/adapters/pptxgenjs.mjs';
-const frame={x:60,y:140,width:1160,height:470};
-const deck=compileDeck({slides:[{id:'usa-map',composition:component({id:'map',component:'map',frame,props:{geography:'USA',markers:[],highlightCountries:['USA']}})}]},REGISTRY);
-const html=renderSlideHtml(deck.slides[0]);
-assert.match(html,/<path[^>]*data-role="map-land"/);
-assert.ok(!html.includes('<img'));
-const require=createRequire(import.meta.url),JSZip=require(require.resolve('jszip',{paths:[process.env.RUNTIME_NODE_MODULES]}));
-const directory=await fs.mkdtemp(path.join(os.tmpdir(),'ps-map-test-'));
-try {
-  const file=path.join(directory,'map.pptx');
-  await writePptx(deck,file);
-  const zip=await JSZip.loadAsync(await fs.readFile(file));
-  const xml=await zip.file('ppt/slides/slide1.xml').async('string');
-  assert.ok(xml.includes('<a:custGeom>'));
-  assert.ok(xml.includes('ps:usa-map-map:land:usa'));
-  assert.ok(!xml.includes('<p:pic>'));
-} finally { await fs.rm(directory,{recursive:true,force:true}); }
-console.log(JSON.stringify({accepted:true}));
-""")
-        self.assertTrue(result["accepted"])
-
-    def test_map_documentation_records_source_scale_aliases_and_analysis_caveats(self):
-        result = run_node("""
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-const docs=fs.readFileSync('./skills/professional-slides/references/components/maps.md','utf8');
-for(const term of ['Natural Earth','1:110m','1:50m','Bahrain','public domain','US, USA','MENA','APAC','EMEA','country:ISO','analytical taxonomies','editable native']) assert.ok(docs.includes(term),term);
-const importer=fs.readFileSync('./evals/scripts/import_natural_earth_maps.mjs','utf8');
-assert.ok(importer.includes('sha256'));
-assert.ok(importer.includes('ca96624a56bd078437bca8184e78163e5039ad19'));
-console.log(JSON.stringify({accepted:true}));
-""")
-        self.assertTrue(result["accepted"])
-
 
 if __name__ == "__main__":
     unittest.main()

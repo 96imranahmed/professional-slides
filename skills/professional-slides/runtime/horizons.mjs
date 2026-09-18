@@ -16,6 +16,7 @@ const PRIMARY = token("color.componentPrimary");
 const STANDARD = token("line.standard");
 const BODY = token("type.body");
 const HEADING = token("type.heading");
+const AXIS_TITLE = token("type.chartLabel");
 const SERIES = [
   token("color.chartSeries1"),
   token("color.chartSeries2"),
@@ -30,6 +31,7 @@ const VARIANT_CAPACITY = Object.freeze({ curves: 5, stepped: 5, "stepped-minimal
 export const HORIZONS_TOKENS = Object.freeze([
   "color.surfaceMuted", "color.onPrimary", "radius.none",
   "font.body",
+  "type.chartLabel",
   "type.heading",
   "type.body",
   "type.label",
@@ -180,8 +182,8 @@ function renderCurves({ id, frame, props, horizons }) {
       style: { stroke: INK, lineWidth: STANDARD },
       data: { axis: "y", endArrow: true, endArrowType: "triangle", label: props.yLabel || "Value" }
     }),
-    measuredTextNode({ id: stableId(id, "axis-label", "x"), role: "axis-label", frame: { x: plot.x + plot.width - 90, y: bottom + 12, width: 90, height: 28 }, text: props.xLabel || "Time", style: textStyle(HEADING, INK, true, "right", "top"), data: { axis: "x" } }),
-    measuredTextNode({ id: stableId(id, "axis-label", "y"), role: "axis-label", frame: { x: frame.x, y: plot.y + 2, width: 74, height: 28 }, text: props.yLabel || "Value", style: textStyle(HEADING, INK, true, "right", "top"), data: { axis: "y" } })
+    measuredTextNode({ id: stableId(id, "axis-label", "x"), role: "axis-title", frame: { x: plot.x + plot.width - 90, y: bottom + 12, width: 90, height: 28 }, text: props.xLabel || "Time", style: textStyle(AXIS_TITLE, INK, true, "right", "top"), data: { axis: "x" } }),
+    measuredTextNode({ id: stableId(id, "axis-label", "y"), role: "axis-title", frame: { x: frame.x, y: plot.y + 2, width: 74, height: 28 }, text: props.yLabel || "Value", style: textStyle(AXIS_TITLE, INK, true, "right", "top"), data: { axis: "y" } })
   );
 
   const bandHeight = plot.height * 0.94 / horizons.length;

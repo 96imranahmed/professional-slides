@@ -19,7 +19,8 @@ function svgStyle(style) {
   const width = style.lineWidth ? cssBinding(style.lineWidth) : 0;
   const dash = style.dash === "dash" ? "8 6" : "none";
   const opacity = style.opacity ?? 1;
-  return `fill:${fill};stroke:${stroke};stroke-width:${width};stroke-dasharray:${dash};opacity:${opacity}`;
+  const caps = style.lineCap === "round" ? ";stroke-linecap:round;stroke-linejoin:round" : "";
+  return `fill:${fill};stroke:${stroke};stroke-width:${width};stroke-dasharray:${dash};opacity:${opacity}${caps}`;
 }
 
 function polar(cx, cy, radius, angle) {
@@ -68,6 +69,10 @@ function customPolygonPath(frame, data) {
   }).join(" ");
 }
 
+function iconPathD(frame, data) {
+  return (data.paths || []).map((path) => path.points.map(([x, y], index) => `${index ? "L" : "M"} ${frame.x + Number(x) * frame.width} ${frame.y + Number(y) * frame.height}`).join(" ") + (path.closed ? " Z" : "")).join(" ");
+}
+
 const SHAPE_POINTS = Object.freeze({
   snip1Rect: [[0, 0], [0.88, 0], [1, 0.12], [1, 1], [0, 1]],
   notchedRightArrow: [[0, 0], [0.78, 0], [1, 0.5], [0.78, 1], [0, 1], [0.18, 0.5]],
@@ -96,7 +101,7 @@ function polygonPoints(frame, geometry) {
 function svgNode(node) {
   const { frame, style, data } = node;
   if (node.type === "image") {
-    if (!data.circular) return `<image data-node-id="${escapeHtml(node.id)}" data-role="${escapeHtml(node.role)}" x="${frame.x}" y="${frame.y}" width="${frame.width}" height="${frame.height}" preserveAspectRatio="none" href="${escapeHtml(data.dataUri)}"><title>${escapeHtml(data.alt)}</title></image>`;
+    if (!data.circular) return `<image data-node-id="${escapeHtml(node.id)}" data-role="${escapeHtml(node.role)}" x="${frame.x}" y="${frame.y}" width="${frame.width}" height="${frame.height}" preserveAspectRatio="${data.fit === "cover" ? "xMidYMid slice" : "none"}" href="${escapeHtml(data.dataUri)}"><title>${escapeHtml(data.alt)}</title></image>`;
     const clipId = `portrait-${escapeHtml(node.id)}`;
     return `<defs><clipPath id="${clipId}"><ellipse cx="${frame.x + frame.width / 2}" cy="${frame.y + frame.height / 2}" rx="${frame.width / 2}" ry="${frame.height / 2}"/></clipPath></defs><image data-node-id="${escapeHtml(node.id)}" data-role="${escapeHtml(node.role)}" x="${frame.x}" y="${frame.y}" width="${frame.width}" height="${frame.height}" href="${escapeHtml(data.dataUri)}" clip-path="url(#${clipId})"><title>${escapeHtml(data.alt)}</title></image>`;
   }
@@ -107,7 +112,7 @@ function svgNode(node) {
   }
   if (node.type === "ellipse") return `<ellipse ${common} cx="${frame.x + frame.width / 2}" cy="${frame.y + frame.height / 2}" rx="${frame.width / 2}" ry="${frame.height / 2}"/>`;
   if (node.type === "line") {
-    const marker = data.endArrow ? ' marker-end="url(#arrowhead)"' : "";
+    const marker = (data.endArrow ? ' marker-end="url(#arrowhead)"' : "") + (data.startArrow ? ' marker-start="url(#arrowhead-start)"' : "");
     return `<line ${common} x1="${data.x1}" y1="${data.y1}" x2="${data.x2}" y2="${data.y2}"${marker}/>`;
   }
   if (node.type === "wedge") return `<path ${common} d="${wedgePath(frame, data.startAngle, data.endAngle)}"/>`;
@@ -122,6 +127,7 @@ function svgNode(node) {
     const transform = transforms.length ? ` transform="${transforms.join(" ")}"` : "";
     if (data.geometry === "quoteCallout") return `<path ${common}${transform} d="${quoteCalloutPath(frame, data)}"/>`;
     if (data.geometry === "customPolygon") return `<path ${common}${transform} d="${customPolygonPath(frame, data)}"/>`;
+    if (data.geometry === "iconPath") return `<path ${common}${transform} d="${iconPathD(frame, data)}"/>`;
     return `<polygon ${common}${transform} points="${polygonPoints(frame, data.geometry)}"/>`;
   }
   return "";
@@ -139,7 +145,10 @@ function textNode(node) {
   const color = cssBinding(style.color);
   const layoutStyle = `${style.lineHeight ? `line-height:${style.lineHeight}px;` : ""}${style.wrap === false ? "white-space:pre;" : ""}`;
   const nativeBold = style.fontWeight ? style.fontFamily.nativeBold : style.bold;
-  return `<div class="text-node" data-node-id="${escapeHtml(node.id)}" data-role="${escapeHtml(node.role)}" style="left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px;justify-content:${justify};align-items:${alignItems};text-align:${textAlign};font-family:${fontFamily};font-size:${fontSize};font-weight:${nativeBold ? 700 : 400};color:${color};${layoutStyle}"><span>${escapeHtml(node.text)}</span></div>`;
+  const content = node.runs ? node.runs.map(run => `<span style="font-weight:${run.bold ? 700 : 400}${run.accent ? ';color:var(--accent)' : ''}">${escapeHtml(run.text)}</span>`).join('') : escapeHtml(node.text);
+  const rotate = Number(node.style?.rotate || 0);
+  const rotateStyle = rotate ? `transform:rotate(${rotate}deg);transform-origin:center;` : "";
+  return `<div class="text-node" data-node-id="${escapeHtml(node.id)}" data-role="${escapeHtml(node.role)}" style="left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px;justify-content:${justify};align-items:${alignItems};text-align:${textAlign};font-family:${fontFamily};font-size:${fontSize};font-weight:${nativeBold ? 700 : 400};color:${color};${rotateStyle}${layoutStyle}"><span>${content}</span></div>`;
 }
 
 export function renderSlideHtml(slide, { title = slide.id } = {}) {
@@ -165,7 +174,7 @@ html,body{margin:0;width:${SLIDE.width}px;height:${SLIDE.height}px;overflow:hidd
 <body>
 <main class="slide" data-scene-schema="professional-slides.scene/v1">
 <svg class="scene" viewBox="0 0 ${SLIDE.width} ${SLIDE.height}" aria-hidden="true">
-<defs><marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 Z" fill="context-stroke"/></marker></defs>
+<defs><marker id="arrowhead" markerWidth="3" markerHeight="3" refX="3" refY="1.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L3,1.5 L0,3 Z" fill="context-stroke"/></marker><marker id="arrowhead-start" markerWidth="3" markerHeight="3" refX="3" refY="1.5" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M0,0 L3,1.5 L0,3 Z" fill="context-stroke"/></marker></defs>
 ${shapes}
 </svg>
 ${text}

@@ -12,29 +12,40 @@ import {
   rectPrimitive,
   primitive,
   resolveTitleVariant,
+  STYLE_TOKENS,
   shapePrimitive,
   stableId,
+  houseStyle,
   textPrimitive,
   token,
   tokenValue,
   wedgePrimitive
 } from "./core.mjs";
+import { renderPhaseWorkstreams, measurePhaseWorkstreams, PHASE_WORKSTREAM_TOKENS, PHASE_WORKSTREAM_VARIANTS } from "./phase-workstreams.mjs";
+import { renderQualitativeFunnel, measureQualitativeFunnel, renderPhaseHierarchy, measurePhaseHierarchy, QUALITATIVE_TOPOLOGY_TOKENS, QUALITATIVE_FUNNEL_SAMPLE, PHASE_HIERARCHY_SAMPLE } from './qualitative-topology.mjs';
+import { timeGrid, datedLanes, SCHEDULE_TOKENS, SCHEDULE_VARIANTS } from "./schedules.mjs";
 import { registerSegmentedEvidence } from "./segmented-evidence.mjs";
 import { registerMedia } from "./media.mjs";
 import { registerCharts } from "./charts.mjs";
 import { renderTable, measureTable, TABLE_TOKENS } from "./tables.mjs";
 import { TABLE_VARIANTS } from "./table-fixtures.mjs";
-import { measureText } from "./text-layout.mjs";
+import { measureText, measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { routeConnector } from "./routing.mjs";
-import { legendNodes, LEGEND_TOKENS, LEGEND_VARIANTS, LEGEND_PLACEMENTS } from "./legends.mjs";
+import { legendNodes, LEGEND_TOKENS, LEGEND_VARIANTS, LEGEND_PLACEMENTS, QUANTITATIVE_LEGEND_SAMPLE } from "./legends.mjs";
 import { registerChartGroup } from "./chart-group.mjs";
 import { contrastRatio } from "./palettes.mjs";
 import { renderChartCallout } from "./chart-annotations.mjs";
 import { PAGE_RULES, PAGE_BRANDING, PAGE_TEMPLATE_TOKENS, pageTemplateLayout, renderPageTemplate, resolvePageTemplate } from "./page-template.mjs";
 import { TRACKER_TOKENS, registerTrackers, trackerLabelNodes } from "./trackers.mjs";
+import { registerRelationshipNetwork } from "./relationship-network.mjs";
 import { registerQuoteCluster } from "./quote-cluster.mjs";
-import { CUSTOM_MAP_SAMPLE, MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
+import { CUSTOM_MAP_SAMPLE, CHOROPLETH_MAP_SAMPLE, MAP_GUIDANCE, MAP_PRESET_IDS, MAP_TOKENS, mapNodes, resolveGeography } from "./maps.mjs";
 import { registerInsightTreeTable } from "./insight-tree-table.mjs";
+import { MARK_TOKENS, markerSize, numberMarker, iconMarker, stateMarker } from "./marks.mjs";
+import { registerPanels } from "./panels.mjs";
+import { registerExtras } from "./extras.mjs";
+import { registerGantt } from "./gantt.mjs";
+import { registerFramework } from "./framework.mjs";
 
 const FONT = token("font.body");
 const DISPLAY = token("font.display");
@@ -53,7 +64,7 @@ const BODY = token("type.body");
 const COMPACT = token("type.compact");
 const LABEL = token("type.label");
 const SOURCE = token("type.source");
-const SECTION_HEADING_TOKENS = ["color.componentPrimary", "color.ink", "color.onPrimary", "font.body", "type.heading", "line.hairline", "space.2", "space.3"];
+const SECTION_HEADING_TOKENS = ["color.componentPrimary", "color.ink", "color.onPrimary", "font.body", "type.heading", "line.hairline", "space.1", "space.2", "space.3", "space.4"];
 
 const textStyle = (size = BODY, color = INK, bold = false, align = "left", valign = "mid") => ({
   fontFamily: FONT,
@@ -82,7 +93,7 @@ const openLine = (id, x1, y1, x2, y2, role = "rule", stroke = RULE, lineWidth = 
   data
 });
 
-const component = ({ id, category, role = category, tokens, preferredSize, sample, variants, defaultVariant, render }) => ({
+const component = ({ id, category, role = category, tokens, preferredSize, sample, variants, defaultVariant, render, measureContent }) => ({
   id,
   version: "2.0.0",
   category,
@@ -91,35 +102,110 @@ const component = ({ id, category, role = category, tokens, preferredSize, sampl
   preferredSize,
   sample,
   ...(variants ? { variants, defaultVariant } : {}),
-  render
+  render,
+  ...(measureContent ? { measureContent } : {})
 });
 
+/** Body copy never runs wider than ≈ 80 characters (item 6, measure cap). */
+function paragraphMeasure(frameWidth, props = {}) {
+  if (props.maxMeasure === false) return frameWidth;
+  return Math.min(frameWidth, Math.round(tokenValue(BODY) * 96 / 72 * 0.47 * 80));
+}
+
+// Degradation ladder for measured text: fit at the token size; otherwise step the
+// size down in 0.5pt steps to a floor of 80% (never below 9pt) and record the step.
+// Only when the floor still overflows does the component refuse, naming the overflow.
+export function fitText({ text, runs, width, height, fontFamily, fontSize, bold, minScale = 0.8, floorPt = 9 }) {
+  const measure = (size) => runs ? measureTextRuns(runs, width, { fontFamily, fontSize: size, wrapWidthRatio: 1 }) : measureText(text, width, { fontFamily, fontSize: size, bold, wrapWidthRatio: 1 });
+  let size = fontSize, layout = measure(size);
+  const floor = Math.max(floorPt, Math.round(fontSize * minScale * 2) / 2);
+  while (height !== undefined && layout.height > height && size - 0.5 >= floor) { size -= 0.5; layout = measure(size); }
+  return { layout, fontSize: size, stepped: size !== fontSize, overflow: height !== undefined && layout.height > height ? layout.height - height : 0 };
+}
+
 function measuredTextNode(input) {
-  const textLayout = measureText(input.text, input.frame.width, { fontFamily: tokenValue(input.style.fontFamily), fontSize: tokenValue(input.style.fontSize), bold: input.style.bold, wrapWidthRatio: 1 });
-  if (textLayout.height > input.frame.height) throw new Error(`${input.id} exceeds its allocated text height`);
-  return textPrimitive({ ...input, text: textLayout.text, style: { ...input.style, lineHeight: textLayout.lineHeight, wrap: false }, data: { ...input.data, textLayout } });
+  if(input.runs && input.runs.map(r=>r.text).join("")!==input.text)throw new Error("Paragraph emphasis must preserve exact text");
+  const fit = fitText({ text: input.text, runs: input.runs, width: input.frame.width, height: input.frame.height, fontFamily: tokenValue(input.style.fontFamily), fontSize: tokenValue(input.style.fontSize), bold: input.style.bold });
+  if (fit.overflow > 0) throw new Error(`${input.id} overflows its ${input.frame.height}px box by ${Math.ceil(fit.overflow)}px even at ${fit.fontSize}pt; split the page or cut the copy`);
+  const textLayout = fit.layout;
+  const style = { ...input.style, lineHeight: textLayout.lineHeight, wrap: false, ...(fit.stepped ? { fontSize: { tokenId: input.style.fontSize.tokenId ?? "type.body", kind: "fontSizePt", value: fit.fontSize } } : {}) };
+  return textPrimitive({ ...input, text: textLayout.text, ...(textLayout.runs?{runs:textLayout.runs}:{}), style, data: { ...input.data, textLayout, ...(fit.stepped ? { fitStep: fit.fontSize } : {}) } });
 }
 
 function insightLayout(frame, props) {
-  if (typeof props.text !== "string" || !props.text.trim()) throw new Error("Insight requires a nonempty synthesis sentence");
+  // `items`: the closing block as two or three square-bulleted findings on the
+  // band rather than one sentence running across it. The reference decks close
+  // a dense table this way - each line carries its own finding, and the reader
+  // can take them one at a time.
+  const list = Array.isArray(props.items) ? props.items.map((item) => String(item ?? "").trim()).filter(Boolean) : null;
+  if (list && !list.length) throw new Error("Insight items need nonempty text");
+  if (!list && (typeof props.text !== "string" || !props.text.trim())) throw new Error("Insight requires a nonempty synthesis sentence");
   if (props.align !== undefined && !["left", "center"].includes(props.align)) throw new Error("Insight alignment must be left or center");
-  const paddingX = tokenValue(token("space.5")), paddingY = tokenValue(token(props.text.includes("\n\n") ? "space.6" : "space.4"));
-  const width = frame.width - 2 * paddingX;
+  // A takeaway band: 16 px side padding, 12 px above and below one or two lines
+  // of semibold body text, left-aligned (the gallery's grey band). The primary
+  // variant carries a chevron disc at the left and reserves its width.
+  // `plain` is the statement with no box around it: the label that sits above a
+  // boxed takeaway. With no surface there is nothing to inset it from, so it
+  // sits flush with the column and keeps only the reading gap under it.
+  const plain = props.variant === "plain";
+  const paddingX = plain ? 0 : tokenValue(token("space.4"));
+  const paddingY = plain ? tokenValue(token("space.2")) : tokenValue(token(!list && props.text.includes("\n\n") ? "space.5" : "space.3"));
+  const marker = (props.variant ?? "tonal") === "primary" || props.marker === "chevron" ? tokenValue(token("icon.medium")) : 0;
+  const markerGap = marker ? tokenValue(token("space.3")) : 0;
+  const width = frame.width - 2 * paddingX - marker - markerGap;
   if (width <= 0) throw new Error("Insight width cannot contain its theme padding");
   const options = { fontFamily: tokenValue(FONT), wrapWidthRatio: 1 };
-  const body = measureText(props.text, width, { ...options, fontSize: tokenValue(BODY), bold: false });
   const heading = props.heading ? measureText(props.heading, width, { ...options, fontSize: tokenValue(token("type.heading")), bold: true }) : null;
   const gap = heading ? tokenValue(token("space.2")) : 0;
+  if (list) {
+    const bulletGap = tokenValue(token("space.3"));
+    const indent = tokenValue(token("space.4"));
+    const rowGap = tokenValue(token("space.2"));
+    const lines = list.map((text) => measureText(text, width - indent, { ...options, fontSize: tokenValue(BODY), bold: true }));
+    const listHeight = lines.reduce((sum, line) => sum + line.height, 0) + rowGap * (lines.length - 1);
+    const contentHeight = listHeight + (heading?.height ?? 0) + gap;
+    return { body: null, lines, indent, bulletGap, rowGap, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: Math.max(contentHeight, marker) + 2 * paddingY };
+  }
+  const body = measureText(props.text, width, { ...options, fontSize: tokenValue(BODY), bold: true });
   const contentHeight = body.height + (heading?.height ?? 0) + gap;
-  return { body, heading, width, paddingX, paddingY, gap, contentHeight, height: contentHeight + 2 * paddingY };
+  return { body, lines: null, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: Math.max(contentHeight, marker) + 2 * paddingY };
+}
+
+// A reading note: the cream box a consulting page carries top-right to say how
+// to read it, or to flag a caveat. Compact type, hairline caution border.
+function calloutLayout(frame, props) {
+  if (typeof props.text !== "string" || !props.text.trim()) throw new Error("Callout requires text");
+  // `outline`: the insight box of the modern survey deck, an accent outline
+  // with semibold accent copy at body size; otherwise a quiet cream note.
+  const outline = props.tone === "outline";
+  const paddingX = tokenValue(token(outline ? "space.4" : "space.3")), paddingY = tokenValue(token(outline ? "space.4" : "space.2"));
+  const width = frame.width - 2 * paddingX;
+  if (width <= 0) throw new Error("Callout has no text width");
+  const options = { fontFamily: tokenValue(FONT), fontSize: tokenValue(outline ? BODY : COMPACT), wrapWidthRatio: 1 };
+  const lead = props.lead?.trim() ? measureText(props.lead, width, { ...options, bold: true }) : null;
+  const body = measureText(props.text, width, { ...options, bold: outline });
+  const gap = lead ? tokenValue(token("space.2")) / 2 : 0;
+  return { lead, body, paddingX, paddingY, gap, outline, height: (lead?.height ?? 0) + gap + body.height + 2 * paddingY };
+}
+
+function calloutNodes({ id, frame, props }) {
+  const layout = calloutLayout(frame, props);
+  if (layout.height > frame.height + 0.01) throw new Error(`Callout overflows its ${frame.height}px box; shorten the note`);
+  const height = layout.outline && props.fill ? frame.height : layout.height;
+  const color = layout.outline ? token("color.accent") : INK;
+  const nodes = [rectPrimitive({ id: stableId(id, "surface"), role: "callout-surface", frame: { ...frame, height }, style: layout.outline ? boxStyle(SURFACE, token("color.accent"), HAIRLINE, token("radius.none")) : boxStyle(token("color.calloutTint"), props.tone === "caution" ? token("color.caution") : "none", HAIRLINE, token("radius.none")) })];
+  let y = frame.y + layout.paddingY;
+  if (layout.lead) { nodes.push(textPrimitive({ id: stableId(id, "lead"), role: "callout-lead", frame: { x: frame.x + layout.paddingX, y, width: frame.width - 2 * layout.paddingX, height: layout.lead.height }, text: layout.lead.text, style: { ...textStyle(layout.outline ? BODY : COMPACT, color, true, "left", "top"), lineHeight: layout.lead.lineHeight, wrap: false }, data: { textLayout: layout.lead } })); y += layout.lead.height + layout.gap; }
+  nodes.push(textPrimitive({ id: stableId(id, "text"), role: "callout-text", frame: { x: frame.x + layout.paddingX, y, width: frame.width - 2 * layout.paddingX, height: layout.body.height }, text: layout.body.text, style: { ...textStyle(layout.outline ? BODY : COMPACT, color, layout.outline, "left", "top"), lineHeight: layout.body.lineHeight, wrap: false }, data: { textLayout: layout.body } }));
+  return nodes;
 }
 
 function insightNodes({ id, frame, props }) {
   const layout = insightLayout(frame, props), variant = props.variant ?? "tonal";
-  if (layout.height > frame.height) throw new Error("Insight exceeds its frame; enlarge the box or edit the sentence, never shrink type");
+  if (layout.height > frame.height) throw new Error(`Insight overflows its ${frame.height}px box by ${Math.ceil(layout.height - frame.height)}px; give it the space or shorten the sentence`);
   const fill = variant === "primary" ? PRIMARY : variant === "neutral" ? MUTED_SURFACE : variant === "dotted" ? "none" : PRIMARY_TINT;
   const foreground = variant === "primary" ? WHITE : INK;
-  const nodes = [rectPrimitive({ id: stableId(id, "surface"), role: "insight-surface", frame, style: boxStyle(fill, "none", HAIRLINE, SMALL_RADIUS) })];
+  const nodes = variant === "plain" ? [] : [rectPrimitive({ id: stableId(id, "surface"), role: "insight-surface", frame, style: boxStyle(fill, "none", HAIRLINE, SMALL_RADIUS) })];
   if (variant === "dotted") {
     // Native renderers collapse hairline dash presets into solid borders.
     // Resolve editable dots once so every adapter receives identical geometry.
@@ -136,23 +222,69 @@ function insightNodes({ id, frame, props }) {
     }
   }
   let y = frame.y + (frame.height - layout.contentHeight) / 2;
+  const textX = frame.x + layout.paddingX + layout.marker + layout.markerGap;
+  if (layout.marker) {
+    // Chevron disc: reversed on the primary band, primary on a tinted band.
+    const size = layout.marker, mx = frame.x + layout.paddingX, my = frame.y + (frame.height - size) / 2;
+    const discFill = variant === "primary" ? WHITE : PRIMARY, chevron = variant === "primary" ? PRIMARY : WHITE;
+    nodes.push(ellipsePrimitive({ id: stableId(id, "marker"), role: "insight-marker", frame: { x: mx, y: my, width: size, height: size }, style: boxStyle(discFill, discFill, HAIRLINE, token("radius.round")) }));
+    nodes.push(shapePrimitive({ id: stableId(id, "marker-chevron"), role: "insight-marker-glyph", geometry: "iconPath", frame: { x: mx + size * 0.3, y: my + size * 0.28, width: size * 0.4, height: size * 0.44 }, style: { fill: "none", stroke: chevron, lineWidth: token("line.standard"), lineCap: "round" }, data: { paths: [{ points: [[0.2, 0], [0.8, 0.5], [0.2, 1]], closed: false }] } }));
+  }
+  if (layout.lines) {
+    if (layout.heading) {
+      nodes.push(textPrimitive({ id: stableId(id, "heading"), role: "insight-heading", frame: { x: textX, y, width: layout.width, height: layout.heading.height }, text: layout.heading.text, style: { ...textStyle(token("type.heading"), foreground, true, props.align ?? "left", "top"), lineHeight: layout.heading.lineHeight }, data: { textLayout: layout.heading } }));
+      y += layout.heading.height + layout.gap;
+    }
+    const square = tokenValue(token("space.1"));
+    layout.lines.forEach((line, index) => {
+      nodes.push(rectPrimitive({ id: stableId(id, "bullet", index), role: "insight-bullet", frame: { x: textX, y: y + line.lineHeight / 2 - square / 2, width: square, height: square }, style: boxStyle(foreground, foreground, HAIRLINE, token("radius.none")) }));
+      nodes.push(textPrimitive({ id: stableId(id, "item", index), role: "insight-text", frame: { x: textX + layout.indent, y, width: layout.width - layout.indent, height: line.height }, text: line.text, style: { ...textStyle(BODY, foreground, true, "left", "top"), lineHeight: line.lineHeight }, data: { textLayout: line } }));
+      y += line.height + layout.rowGap;
+    });
+    return nodes;
+  }
   for (const [part, measured] of [["heading", layout.heading], ["body", layout.body]]) {
     if (!measured) continue;
-    nodes.push(textPrimitive({ id: stableId(id, part), role: `insight-${part}`, frame: { x: frame.x + layout.paddingX, y, width: layout.width, height: measured.height }, text: measured.text,
-      style: { ...textStyle(part === "heading" ? token("type.heading") : BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, part === "heading", props.align ?? "center", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
+    nodes.push(textPrimitive({ id: stableId(id, part), role: `insight-${part}`, frame: { x: textX, y, width: layout.width, height: measured.height }, text: measured.text,
+      style: { ...textStyle(part === "heading" ? token("type.heading") : BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, true, props.align ?? "left", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
     y += measured.height + layout.gap;
   }
   return nodes;
 }
 
 function titleNodes({ id, frame, props, section = false, chrome = false }) {
-  const variant = resolveTitleVariant(props);
+  // The house style decides the title's weight and whether a hairline runs under
+  // it: a palette's `style.titleWeight` / `style.titleRule` unless the page says.
+  const houseRule = chrome && !section && props.variant === undefined && props.rule === undefined && houseStyle("style.titleRule") === "rule";
+  const variant = houseRule ? "with-line" : resolveTitleVariant(props);
+  const titleBold = houseStyle("style.titleWeight") !== "regular";
   const ruleGap = tokenValue(token("space.2"));
   const size = section ? token("type.sectionTitle") : token("type.actionTitle");
   const baseTextFrame = chrome
     ? { x: frame.x + CHROME.left, y: frame.y + (props.titleTop ?? CHROME.titleTop), width: props.availableTitleWidth ?? frame.width - CHROME.left - CHROME.right, height: CHROME.titleHeight }
     : { x: frame.x, y: frame.y, width: frame.width, height: frame.height - ruleGap };
-  const textLayout = measureText(props.text, baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(size), bold: true, wrapWidthRatio: 1 });
+  // Fit ladder: the action title is set at 24pt; a title that needs a third line
+  // is retried at 22pt. Beyond that the page gate (TITLE_LINES) reports it.
+  // An optional lead-in ("Why", "Drive") is set in the accent colour as a run.
+  const lead = typeof props.lead === "string" && props.lead.trim() && props.text.startsWith(props.lead) ? props.lead : null;
+  // The house decides how a lead reads: in the accent before the rest (McKinsey
+  // "South Korea: …"), or as "Topic | statement" with the topic in bold, a pipe,
+  // and the statement in the title weight (BCG 2023; the bright BCG accent is
+  // too light for running text). The pipe replaces a colon or dash after the lead.
+  const pipe = lead && chrome && houseStyle("style.titleLead") === "pipe";
+  const restOf = (text) => pipe ? text.slice(lead.length).replace(/^\s*[:\-–—|]?\s*/, "") : text.slice(lead.length);
+  const runsFor = () => pipe
+    ? [{ text: lead, bold: true }, { text: " | ", bold: false }, { text: restOf(props.text), bold: titleBold }]
+    : [{ text: lead, bold: titleBold, accent: true }, { text: props.text.slice(lead.length), bold: titleBold }];
+  const measureTitle = (fontSize) => lead
+    ? measureTextRuns(runsFor(), baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, wrapWidthRatio: 0.98 })
+    : measureText(props.text, baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, bold: titleBold, wrapWidthRatio: 0.98 });
+  let fontSize = tokenValue(size), textLayout = measureTitle(fontSize);
+  if (chrome && !section && textLayout.lines.length > 2) {
+    const long = tokenValue(token("type.actionTitleLong"));
+    const retry = measureTitle(long);
+    if (retry.lines.length < textLayout.lines.length) { fontSize = long; textLayout = retry; }
+  }
   const textFrame = chrome ? { ...baseTextFrame, height: Math.max(baseTextFrame.height, textLayout.height) } : baseTextFrame;
   const ruleY = textFrame.y + textLayout.height + ruleGap;
   if (!chrome && textLayout.height > textFrame.height) throw new Error(`Title ${id} exceeds its allocated height; shorten it or allocate more space`);
@@ -161,8 +293,9 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
     role: section ? "section-title" : "action-title",
     frame: textFrame,
     text: textLayout.text,
-    style: { ...textStyle(size, INK, true), fontFamily: DISPLAY, valign: "top", lineHeight: textLayout.lineHeight, wrap: false },
-    data: { titleVariant: variant, textLayout, ruleGap }
+    ...(lead ? { runs: textLayout.runs } : {}),
+    style: { ...textStyle(fontSize === tokenValue(size) ? size : token("type.actionTitleLong"), INK, titleBold), fontFamily: DISPLAY, valign: "top", lineHeight: textLayout.lineHeight, wrap: false },
+    data: { titleVariant: variant, textLayout, ruleGap, ...(lead ? { lead } : {}) }
   })];
   if (TITLE_VARIANTS[variant].rule) nodes.push(openLine(stableId(id, chrome ? "title-rule" : "rule"), textFrame.x, ruleY, textFrame.x + textFrame.width, ruleY, "title-rule", RULE, HAIRLINE, { titleVariant: variant }));
   return nodes;
@@ -173,8 +306,12 @@ function headingLayout(frame, props = {}) {
   const headingWidth = frame.width;
   const heading = measureText(props.heading || props.text || "", headingWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true });
   const bandHeight = Math.max(heading.height, props.headerBandHeight || 0);
-  const ruleGap = tokenValue(token("space.2"));
-  const contentGap = tokenValue(token("space.3"));
+  // Row rule: peers in a row share one band. Every heading sits on the band's
+  // top line (so a heading beside a chart heading reads on the same line) and
+  // the rule sits under the band, one baseline unit below its bottom; the body
+  // sits a clear step below the rule.
+  const ruleGap = tokenValue(token("space.1"));
+  const contentGap = tokenValue(token("space.4"));
   return { heading, headingWidth, bandHeight, ruleGap, height: bandHeight + (props.rule === false ? 0 : ruleGap) + contentGap };
 }
 
@@ -187,7 +324,7 @@ function sectionHeadingNodes({ id, frame, props = {} }) {
   const nodes = [textPrimitive({
     id: stableId(id, "heading"),
     role: "section-heading",
-    frame: { x: frame.x, y: frame.y + bandHeight - heading.height, width: headingWidth, height: heading.height },
+    frame: { x: frame.x, y: frame.y, width: headingWidth, height: heading.height },
     text: heading.text,
     style: { ...textStyle(token("type.heading"), color, true, "left", "top"), lineHeight: heading.lineHeight, wrap: false },
     data: { textLayout: heading, headerTop: frame.y, headerBandHeight: bandHeight, ruleGap }
@@ -200,6 +337,23 @@ function contentRailInsets(props = {}) {
   return props.treatment === "open"
     ? { top: 0, right: 18, bottom: 18, left: 18 }
     : 18;
+}
+
+/** Boxed sections pad on all sides; open sections keep the grid's left and right edges. */
+function sectionPadding(props = {}) {
+  if (props.padding !== undefined) return normalizeInsets(props.padding);
+  const treatment = props.treatment || "open";
+  // A filled panel breathes: the firm panels set their copy a full gutter off
+  // every edge, not the four pixels a tint can get away with.
+  const value = tokenValue(token("space.5"));
+  return treatment === "open" ? { top: 0, right: 0, bottom: 0, left: 0 } : { top: value, right: value, bottom: value, left: value };
+}
+
+function sectionContentInsets(frame, props = {}) {
+  const padding = sectionPadding(props);
+  const headerFrame = insetFrame(frame, padding);
+  const header = props.heading ? headingLayout(headerFrame, { ...props, rule: props.treatment !== "muted" && props.treatment !== "tint" }).height : 0;
+  return { ...padding, top: padding.top + header };
 }
 
 function resolveChartTitleVariant(props = {}) {
@@ -218,57 +372,112 @@ function assertChartTitleCopy(props = {}) {
     if (typeof value !== "string") continue;
     let copy = value.normalize("NFKC");
     const year = "(?:19|20)\\d{2}";
-    const period = `(?:FY\\s*${year}|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
+    const fiscalYear = `(?:${year}|\\d{2})`;
+    const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
+    copy = copy.replace(new RegExp(`\\bindex(?:ed)?\\b[^\\d]*${year}\\s*=\\s*100\\b`, "gi"), "index base"); // "Index, 2021 = 100" names the base, not a result
+    copy = copy.replace(/\b[nN]\s*=\s*[\d,.]+\b/g, "sample size"); // "n = 240" is the population, not a result
     copy = copy.replace(new RegExp(`\\b${period}\\b(?![\\d.%])`, "gi"), "period");
-    copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
+    copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|to|versus|vs\\.?|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
     copy = copy.replace(new RegExp(`([,(]\\s*)${year}(?=\\s*(?:$|[,) ;]))`, "g"), "$1period");
-    if (field === "unit") {
-      // Scale denominators describe units, not observed values.
-      copy = copy.replace(/\bper\s+(?:100[,. ]?000|1[,. ]?000|100|1)\b/gi, "per population");
-    }
-    if (/\p{N}/u.test(copy) || /\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|doubled|tripled|halved)\b/i.test(copy)) {
+    copy = copy.replace(new RegExp(`^\\s*${year}(?=\\s*(?:$|[,;) ]))`), "period"); // a unit line that opens with its period
+    // A bounded observation window describes the measure. Mask only the
+    // complete duration phrase so adjoining result values still reject.
+    copy = copy.replace(/\bwithin\s+(?:one|1)\s+year\b/gi, "within observation period");
+    // Scale denominators and named budgets/thresholds describe the measure, not a result.
+    copy = copy.replace(/\bper\s+(?:100[,. ]?000|100k|1[,. ]?000|1k|100|10|1)\b(?:\s+(?:residents|people|employees|units|capita))?/gi, "per population");
+    copy = copy.replace(/\b\d+(?:\.\d+)?\s*(?:-|–)\s*(?:minute|min|hour|day|week|month|year)\b/gi, "duration"); // "45-minute limit" names a threshold
+    const numberWords = "(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)";
+    // A number word is a result only when it quantifies a change or share ("twenty percent", "one point"),
+    // not when it counts things the chart shows ("three monthly budgets").
+    if (/\p{N}/u.test(copy) || /\b(?:doubled|tripled|halved)\b/i.test(copy) || new RegExp(`\\b${numberWords}\\s+(?:percent|per\\s*cent|points?|pts|x|times|fold|percentage)`, "i").test(copy)) {
       throw new Error(`Chart title ${field} must not contain statistics or chart results: ${JSON.stringify(value)}. Use a descriptive measure/population heading and explicit period; move values and changes to chart labels or annotations.`);
     }
   }
 }
+// A chart heading is two lines: the measure in semibold, then the unit and
+// period in grey compact type ("$B, annual run rate"). Both sit inside the
+// heading band, so a peer panel's rule lines up with this one (row rule).
 function chartTitleLayout(frame, props) {
   const variant = resolveChartTitleVariant(props);
-  const layout = headingLayout(frame, { ...props, rule: variant === "underlined" });
-  const unit = props.unit ? measureText(props.unit, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), wrapWidthRatio: 1 }) : null;
+  // The house style `band` sets the heading in white on a filled grey band with
+  // side padding; the unit line then sits under the band.
+  const band = houseStyle("style.chartHeading") === "band";
+  const padX = band ? tokenValue(token("space.3")) : 0, padY = band ? tokenValue(token("space.2")) : 0;
+  const rawHeading = String(props.heading || props.text || "").trimEnd();
+  const headingText = props.unit ? rawHeading.replace(/,\s*$/, "") : rawHeading;
+  const measureHeading = (text) => measureText(text, frame.width - 2 * padX, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: !band });
+  let heading = measureHeading(headingText);
+  // The stacked unit line is compact grey under the heading; the inline unit
+  // sits on the heading's line at the heading's size, after a comma in the heading.
+  // The inline unit is tried first and falls back to the stacked line — at the
+  // compact size — when the heading wraps or the pair will not fit on the line.
+  const inlineGap = tokenValue(token("space.2"));
+  const measureUnit = (size) => props.unit ? measureText(props.unit, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(size), wrapWidthRatio: 1 }) : null;
+  // A ruled heading always takes the unit inline: a second line under the
+  // heading pushes the rule down, and then no two panels in a row share a rule.
+  // The stacked unit line belongs to headings that carry no rule.
+  const underlined = resolveChartTitleVariant(props) === "underlined" && !band;
+  const wanted = (props.unitPlacement === "inline" || underlined) && !band && heading.lines.length === 1;
+  const inlineHeading = wanted ? measureHeading(`${headingText},`) : null;
+  const inlineMeasure = wanted ? measureUnit(token("type.heading")) : null;
+  const inline = Boolean(inlineMeasure) && inlineHeading.lines.length === 1 && inlineMeasure.lines.length === 1 && inlineHeading.width + inlineGap + inlineMeasure.width <= frame.width - 2 * padX;
+  if (inline) heading = inlineHeading;
+  const unitSize = inline ? token("type.heading") : COMPACT;
+  const unit = inline ? inlineMeasure : measureUnit(COMPACT);
   if (unit && unit.lines.length !== 1) throw new Error("Chart unit must fit on one line");
-  const inlineHeading = unit && layout.heading.lines.length === 1 ? measureText(`${layout.heading.text},`, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: 1 }) : null;
-  const inlineUnit = unit ? measureText(` ${props.unit}`, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), wrapWidthRatio: 1 }) : null;
-  const inlineHeadingWidth = inlineHeading ? Math.ceil(inlineHeading.width) : layout.heading.width;
-  const unitPlacement = unit && layout.heading.lines.length === 1 && inlineHeadingWidth + inlineUnit.width <= frame.width * 0.97 ? "inline" : unit ? "stacked" : "none";
-  const unitGap = unitPlacement === "stacked" ? tokenValue(token("space.1")) : 0;
-  const contentHeight = layout.bandHeight + (unitPlacement === "stacked" ? unitGap + unit.height : 0);
-  const ruled = variant === "underlined";
-  const height = contentHeight + (ruled ? layout.ruleGap : 0) + tokenValue(token("space.3"));
-  return { ...layout, variant, unit, inlineHeading, inlineUnit, inlineHeadingWidth, unitPlacement, unitGap, contentHeight, ruled, height };
+  // `unitPlacement: "inline"` (the composer's choice for a chart beside a text
+  // column) sets the unit after the heading on the same line, in grey, so the
+  // heading band is one line and level with the side column's heading. It
+  // falls back to the stacked unit line when the heading wraps or the unit
+  // would not fit beside it.
+  const unitGap = unit && !inline ? (band ? tokenValue(token("space.2")) : tokenValue(token("space.1")) / 2) : 0;
+  const block = heading.height + 2 * padY + (unit && !inline ? unitGap + unit.height : 0);
+  const bandHeight = Math.max(block, props.headerBandHeight || 0);
+  const ruled = variant === "underlined" && !band;
+  const ruleGap = tokenValue(token("space.1")), contentGap = tokenValue(token("space.3"));
+  const height = bandHeight + (ruled ? ruleGap : 0) + contentGap;
+  // A hero chart's banner is one line. When the composer asked for the inline
+  // unit and the pair would not fit — a heading that wraps, or a unit carrying
+  // a qualification that belongs in the note — the band silently becomes two
+  // lines, so the fallback is recorded and the page gates report it.
+  const wrapped = !band && (props.unitPlacement === "inline" || underlined) && (heading.lines.length > 1 || (unit && !inline));
+  return { heading, unit, unitSize, unitGap, inline, inlineGap, unitPlacement: unit ? (inline ? "inline" : "stacked") : "none", wrapped, block, bandHeight, ruleGap, contentHeight: bandHeight, ruled, variant, height, band, padX, padY };
 }
 function chartTitleNodes({ id, frame, props }) {
   const layout = chartTitleLayout(frame, props);
   if (layout.height > frame.height) throw new Error(`Chart title ${id} exceeds its allocated height`);
-  const inline = layout.unitPlacement === "inline";
-  const nodes = [textPrimitive({
+  const blockTop = frame.y + layout.padY;
+  const nodes = [];
+  if (layout.band) nodes.push(rectPrimitive({ id: stableId(id, "band"), role: "chart-heading-band", frame: { x: frame.x, y: frame.y, width: frame.width, height: layout.heading.height + 2 * layout.padY }, style: boxStyle(SECONDARY, "none", HAIRLINE, token("radius.none")) }));
+  nodes.push(textPrimitive({
     id: stableId(id, "heading"),
     role: "section-heading",
-    frame: { x: frame.x, y: frame.y + layout.bandHeight - layout.heading.height, width: inline ? layout.inlineHeadingWidth : frame.width, height: layout.heading.height },
-    text: inline ? layout.inlineHeading.text : layout.heading.text,
-    style: { ...textStyle(token("type.heading"), INK, true, "left", "top"), lineHeight: layout.heading.lineHeight, wrap: false },
-    data: { textLayout: inline ? layout.inlineHeading : layout.heading, headerTop: frame.y, headerBandHeight: layout.bandHeight, ruleGap: layout.ruleGap, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }
-  })];
+    frame: { x: frame.x + layout.padX, y: blockTop, width: frame.width - 2 * layout.padX, height: layout.heading.height },
+    text: layout.heading.text,
+    style: { ...textStyle(token("type.heading"), layout.band ? WHITE : INK, !layout.band, "left", "top"), lineHeight: layout.heading.lineHeight, wrap: false },
+    data: { textLayout: layout.heading, headerTop: frame.y, headerBandHeight: layout.bandHeight, ruleGap: layout.ruleGap, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement, ...(layout.wrapped ? { headingWrapped: true } : {}) }
+  }));
   if (layout.unit) nodes.push(textPrimitive({
     id: stableId(id, "unit"),
     role: "chart-unit",
-    frame: inline
-      ? { x: frame.x + layout.inlineHeadingWidth, y: frame.y + layout.bandHeight - layout.inlineUnit.height, width: frame.width - layout.inlineHeadingWidth, height: layout.inlineUnit.height }
-      : { x: frame.x, y: frame.y + layout.bandHeight + layout.unitGap, width: frame.width, height: layout.unit.height },
-    text: inline ? ` ${props.unit}` : props.unit,
-    style: { ...textStyle(token("type.heading"), token("color.chartUnit"), false, "left", "top"), lineHeight: (inline ? layout.inlineUnit : layout.unit).lineHeight, wrap: false },
-    data: { textLayout: inline ? layout.inlineUnit : layout.unit, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }
+    frame: layout.inline
+      ? { x: frame.x + layout.padX + layout.heading.width + layout.inlineGap, y: blockTop, width: Math.max(layout.unit.width + 4, frame.width - layout.padX - layout.heading.width - layout.inlineGap), height: layout.unit.height }
+      : { x: frame.x, y: blockTop + layout.heading.height + layout.padY + layout.unitGap, width: frame.width, height: layout.unit.height },
+    text: props.unit,
+    style: { ...textStyle(layout.unitSize, token("color.chartUnit"), false, "left", "top"), lineHeight: layout.unit.lineHeight, wrap: false },
+    data: { textLayout: layout.unit, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }
   }));
-  if (layout.ruled) nodes.push(openLine(stableId(id, "rule"), frame.x, frame.y + layout.contentHeight + layout.ruleGap, frame.x + frame.width, frame.y + layout.contentHeight + layout.ruleGap, "section-heading-rule", INK, HAIRLINE, { chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement }));
+  if (props.badge) {
+    // A right-aligned statistic pill on the heading line ("CAGR 2024–30: +13%").
+    const badge = measureText(String(props.badge), frame.width * 0.5, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: true, wrapWidthRatio: 1 });
+    if (badge.lines.length === 1) {
+      const pad = tokenValue(token("space.2")), w = Math.ceil(badge.width) + 2 * pad, h = badge.height + tokenValue(token("space.1"));
+      const bx = frame.x + frame.width - w, by = frame.y + (layout.heading.height - h) / 2;
+      nodes.push(rectPrimitive({ id: stableId(id, "badge-surface"), role: "chart-badge-surface", frame: { x: bx, y: by, width: w, height: h }, style: boxStyle(token("color.accent"), "none", HAIRLINE, token("radius.round")) }));
+      nodes.push(textPrimitive({ id: stableId(id, "badge"), role: "chart-badge", frame: { x: bx + pad, y: by + (h - badge.height) / 2, width: w - 2 * pad, height: badge.height }, text: badge.text, style: { ...textStyle(COMPACT, WHITE, true, "center", "top"), lineHeight: badge.lineHeight, wrap: false }, data: { textLayout: badge } }));
+    }
+  }
+  if (layout.ruled) nodes.push(openLine(stableId(id, "rule"), frame.x, frame.y + layout.bandHeight + layout.ruleGap, frame.x + frame.width, frame.y + layout.bandHeight + layout.ruleGap, "section-heading-rule", INK, HAIRLINE, { chartTitleVariant: layout.variant }));
   return nodes;
 }
 
@@ -277,26 +486,156 @@ function estimatedLines(text, width) {
   return String(text).split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0);
 }
 
-function bodyListLayout(frame, items) {
-  if (!Array.isArray(items) || !items.length || items.some(item => typeof item !== "string" || !item.trim())) throw new Error("Body bullet list needs nonempty text items");
-  const offset = tokenValue(token("space.4")), gap = tokenValue(token("space.2")), markerSize = tokenValue(token("space.1"));
+/**
+ * Body list items are strings or { lead?, text?, icon?, state?, number? }. The
+ * marker is one of: dot (a small ink square), number (the deck's numbered disc),
+ * icon (a line icon in a ring), check (green tick / red cross by `state`).
+ * "auto" picks number when any item carries a lead, dot otherwise.
+ */
+export function normalizeListItems(items) {
+  if (!Array.isArray(items) || !items.length) throw new Error("Body bullet list needs nonempty text items");
+  return items.map((item, index) => {
+    const o = typeof item === "string" ? { text: item } : item && typeof item === "object" ? { ...item } : null;
+    if (!o) throw new Error("Body bullet list needs nonempty text items");
+    const lead = typeof o.lead === "string" && o.lead.trim() ? o.lead.trim() : null;
+    const text = typeof o.text === "string" && o.text.trim() ? o.text.trim() : null;
+    if (!lead && !text) throw new Error("Body bullet list needs nonempty text items");
+    // `highlight`: the phrase (or phrases) inside the point that reads in the
+    // house colour, which is how the reference pages emphasise the finding
+    // inside a sentence rather than bolding the whole line.
+    const highlight = o.highlight === undefined || o.highlight === null ? null : o.highlight;
+    return { lead, text, icon: o.icon ?? null, state: o.state ?? null, highlight, number: o.number ?? index + 1 };
+  });
+}
+
+export function resolveListMarker(props) {
+  const items = normalizeListItems(props.items);
+  const marker = props.marker ?? "auto";
+  // The plain marker follows the house style: a square dot, or a short dash.
+  if (marker === "auto") return items.some((i) => i.icon) ? "icon" : items.some((i) => i.state !== null) ? "check" : items.some((i) => i.lead) ? "number" : houseStyle("style.listMarker") === "dash" ? "dash" : "dot";
+  // `none` is the prose column (a bold lead and its paragraph, nothing in the
+  // gutter), `rule` separates items with a hairline instead of marking them,
+  // and `letter` is A / B / C for options rather than steps - the devices the
+  // reference decks use where we only ever reached for the numbered disc.
+  if (!["dot", "dash", "number", "letter", "icon", "icon-ring", "check", "none", "rule"].includes(marker)) throw new Error(`Unknown list marker: ${marker}`);
+  return marker;
+}
+
+function bodyListLayout(frame, itemsIn, props = {}) {
+  const items = normalizeListItems(itemsIn);
+  const marker = resolveListMarker({ ...props, items: itemsIn });
+  const disc = markerSize();
+  // The reference icon list sets the glyph alone in the house colour, about
+  // twice the text line, with the text beside it and room between the rows -
+  // not a small icon in a ring. `marker: "icon-ring"` keeps the ringed marker.
+  const ringed = marker === "icon-ring";
+  const iconSize = Math.round(disc * (ringed ? 1.5 : 1.75));
+  const iconList = marker === "icon" || ringed;
+  const plain = marker === "dot" || marker === "dash";
+  // A prose or ruled column has nothing in its gutter, so the text starts at
+  // the frame edge and the space goes to the measure instead of the marker.
+  const bare = marker === "none" || marker === "rule";
+  const markerWidth = plain || bare ? 0 : iconList ? iconSize : disc;
+  const offset = bare ? 0 : plain ? tokenValue(token("space.4")) : markerWidth + tokenValue(token(iconList && !ringed ? "space.4" : "space.3"));
+  const gap = tokenValue(token(marker === "rule" ? "space.4" : plain ? "space.2" : iconList && !ringed ? "space.4" : "space.3"));
+  const leadGap = tokenValue(token("space.1"));
+  const markerSquare = tokenValue(token("space.1"));
   if (frame.width <= offset) throw new Error("Body bullet list has no text width");
-  const measured = items.map(text => measureText(text, frame.width - offset, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }));
-  return { offset, gap, markerSize, measured, height: measured.reduce((sum, text) => sum + text.height, 0) + gap * (items.length - 1) };
+  const width = frame.width - offset;
+  const font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 };
+  // `inlineLead`: the lead runs *into* the sentence in the house accent rather
+  // than sitting above it in bold - the way the reference icon lists set the
+  // phrase that carries the finding. The item then measures as one block.
+  const inlineLead = props.inlineLead === true;
+  const measured = items.map((item) => {
+    if (inlineLead && item.lead && item.text) {
+      const joined = `${item.lead} ${item.text}`;
+      const runs = accentRuns(joined, [item.lead], { bold: true, accent: true, strict: false })
+        || [{ text: joined }];
+      const block = measureTextRuns(runs, width, font);
+      return { item, lead: null, text: block, textHeight: block.height, height: Math.max(block.height, markerWidth) };
+    }
+    // A highlight inside the lead is set in the accent on the lead's own line;
+    // inside the text it flows with the sentence.
+    const leadRuns = item.lead ? accentRuns(item.lead, item.highlight, { bold: true }) : null;
+    const textRuns = item.text && !(leadRuns && leadRuns.some((run) => run.accent)) ? accentRuns(item.text, item.highlight, { bold: houseStyle("style.labelWeight") !== "regular" }) : null;
+    const lead = item.lead ? (leadRuns && leadRuns.some((run) => run.accent) ? measureTextRuns(leadRuns.map((run) => ({ ...run, bold: true })), width, font) : measureText(item.lead, width, { ...font, bold: true })) : null;
+    const text = item.text ? (textRuns ? measureTextRuns(textRuns, width, font) : measureText(item.text, width, font)) : null;
+    const textHeight = (lead?.height ?? 0) + (lead && text ? leadGap : 0) + (text?.height ?? 0);
+    return { item, lead, text, textHeight, height: Math.max(textHeight, markerWidth) };
+  });
+  return { marker, offset, gap, leadGap, ringed, markerSize: plain ? markerSquare : markerWidth, measured, height: measured.reduce((sum, m) => sum + m.height, 0) + gap * (items.length - 1) };
 }
 
 function bodyListNodes({ id, frame, props }) {
-  const layout = bodyListLayout(frame, props.items);
-  if (layout.height > frame.height) throw new Error(`${id} body bullets exceed the allocated height; allocate space or edit copy, never shrink type`);
-  let y = frame.y;
-  return layout.measured.flatMap((text, index) => {
-    const nodes = [
-      rectPrimitive({ id: stableId(id, "marker", index), role: "list-marker", frame: { x: frame.x, y: y + (text.lineHeight - layout.markerSize) / 2, width: layout.markerSize, height: layout.markerSize }, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) }),
-      textPrimitive({ id: stableId(id, "item", index), role: "list-item", frame: { x: frame.x + layout.offset, y, width: frame.width - layout.offset, height: text.height }, text: text.text, style: { ...textStyle(BODY, INK, false, "left", "top"), lineHeight: text.lineHeight, wrap: false }, data: { textLayout: text } })
-    ];
-    y += text.height + layout.gap;
-    return nodes;
+  const layout = bodyListLayout(frame, props.items, props);
+  if (layout.height > frame.height + 0.01) throw new Error(`${id} body bullets exceed the allocated height; allocate space or edit copy, never shrink type`);
+  // `distribute: true` (a side column on any deck that is not airy) spreads the
+  // rows down the frame instead of stacking them at the top. The gap is capped
+  // near the height of a two-line item: past that the list reads as a menu, and
+  // the answer to a column that still ends early is more content or a narrower
+  // column, not more air.
+  const spare = Math.max(0, frame.height - layout.height);
+  // The spread opens a reading gap, not a chasm: past about a line of text the
+  // points stop reading as one column and start reading as three labels adrift
+  // in it. A column that still ends high wants another point, not more air -
+  // which is what the column and page floors ask for.
+  const extraGap = props.distribute === true && layout.measured.length > 1 ? Math.min(spare / (layout.measured.length - 1), 24) : 0;
+  // Whatever the cap leaves over is split above and below the list rather than
+  // dropped under it. A column that opens its gaps to the cap and then hugs the
+  // top still ends two fifths up the track, with all the slack in one band at
+  // the foot - which reads as an unfinished page, not as air. Centred, the same
+  // leftover reads as the margin around a block. The gap does the reading work;
+  // the centring stops the remainder pooling in one place.
+  // On a dark or primary panel the list reads in white: white text, white markers,
+  // reversed number discs.
+  const inverse = props.tone === "inverse";
+  if (props.tone !== undefined && !["standard", "inverse"].includes(props.tone)) throw new Error(`Unknown bullet-list tone: ${props.tone}`);
+  const INK_ = inverse ? WHITE : INK;
+  // `centre: false` keeps the block at the top of its track. The leftover is
+  // only a margin when the list owns the track: under a kpi or an insight it
+  // reads as a gap between the two, and in a two-column split it lands the
+  // halves on different tops.
+  const centred = props.centre !== false;
+  let y = frame.y + (centred && extraGap > 0 ? Math.max(0, spare - extraGap * (layout.measured.length - 1)) / 2 : 0);
+  const nodes = [];
+  layout.measured.forEach((m, index) => {
+    const first = m.lead ?? m.text;
+    const lineCentre = y + first.lineHeight / 2;
+    const mid = y + m.height / 2;
+    if (layout.marker === "dot") {
+      nodes.push(rectPrimitive({ id: stableId(id, "marker", index), role: "list-marker", frame: { x: frame.x, y: lineCentre - layout.markerSize / 2, width: layout.markerSize, height: layout.markerSize }, style: boxStyle(INK_, INK_, HAIRLINE, token("radius.none")) }));
+    } else if (layout.marker === "dash") {
+      nodes.push(rectPrimitive({ id: stableId(id, "marker", index), role: "list-marker", frame: { x: frame.x, y: lineCentre - 0.5, width: tokenValue(token("space.2")), height: 1 }, style: boxStyle(INK_, INK_, HAIRLINE, token("radius.none")) }));
+    } else if (layout.marker === "number" || layout.marker === "letter") {
+      // `state: "open"` hollows the disc: the reference ledger runs solid discs
+      // for what is done and outlined ones for what is not, on one list.
+      const hollow = m.item.state === "open";
+      const label = layout.marker === "letter" ? String.fromCharCode(64 + Number(m.item.number || index + 1)) : m.item.number;
+      nodes.push(...numberMarker({ id: stableId(id, "marker", index), role: "list-marker", x: frame.x, y: Math.max(y, lineCentre - layout.markerSize / 2), size: layout.markerSize, number: label, reverse: inverse || hollow }));
+    } else if (layout.marker === "rule") {
+      // A hairline between items, not a mark beside them.
+      if (index > 0) nodes.push(rectPrimitive({ id: stableId(id, "rule", index), role: "list-rule", frame: { x: frame.x, y: y - layout.gap / 2, width: frame.width, height: 1 }, style: boxStyle(RULE, RULE, HAIRLINE, token("radius.none")) }));
+    } else if (layout.marker === "none") {
+      // Nothing in the gutter; the lead carries the item.
+    } else if (layout.marker === "check") {
+      nodes.push(...stateMarker({ id: stableId(id, "marker", index), role: "list-marker", x: frame.x, y: Math.max(y, lineCentre - layout.markerSize / 2), size: layout.markerSize, state: m.item.state ?? "yes" }));
+    } else {
+      // A ringed icon centres on the item block, as on a feature row. A plain
+      // glyph sits on the first line, the way a reference icon list reads down
+      // a column whose items run to three and four lines.
+      const iconY = layout.ringed ? mid - layout.markerSize / 2 : Math.max(y, lineCentre - layout.markerSize / 2);
+      nodes.push(...iconMarker({ id: stableId(id, "marker", index), role: "list-icon", x: frame.x, y: iconY, size: layout.markerSize, icon: m.item.icon || "info", tone: inverse ? "inverse" : layout.ringed ? "outline" : "accent" }));
+    }
+    let ty = layout.ringed && m.textHeight < m.height ? y + (m.height - m.textHeight) / 2 : y;
+    if (m.lead) {
+      nodes.push(textPrimitive({ id: stableId(id, "lead", index), role: "list-lead", frame: { x: frame.x + layout.offset, y: ty, width: frame.width - layout.offset, height: m.lead.height }, text: m.lead.text, ...(m.lead.runs && m.lead.runs.some((run) => run.accent) && !inverse ? { runs: m.lead.runs } : {}), style: { ...textStyle(BODY, INK_, true, "left", "top"), lineHeight: m.lead.lineHeight }, data: { textLayout: m.lead } }));
+      ty += m.lead.height + (m.text ? layout.leadGap : 0);
+    }
+    if (m.text) nodes.push(textPrimitive({ id: stableId(id, "item", index), role: "list-item", frame: { x: frame.x + layout.offset, y: ty, width: frame.width - layout.offset, height: m.text.height }, text: m.text.text, ...(m.text.runs && m.text.runs.some((run) => run.accent) && !inverse ? { runs: m.text.runs } : {}), style: { ...textStyle(BODY, INK_, false, "left", "top"), lineHeight: m.text.lineHeight }, data: { textLayout: m.text } }));
+    y += m.height + layout.gap + extraGap;
   });
+  return nodes;
 }
 
 function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY, marker = "circle", distribute = false, rolePrefix = "list" }) {
@@ -344,17 +683,27 @@ function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY,
 
 function processNodes({ id, frame, props, roadmap = false, journey = false }) {
   const items = props.items;
+  if (!Array.isArray(items) || !items.length) throw new Error(`${id} requires ordered stages`);
   const nodes = [];
   const span = frame.width / items.length;
   const railY = frame.y + frame.height * (roadmap ? 0.32 : 0.48);
   nodes.push(openLine(stableId(id, "rail"), frame.x + span * 0.35, railY, frame.x + frame.width - span * 0.35, railY, "process-rail", PRIMARY, STANDARD));
   items.forEach((item, index) => {
+    if (typeof item.label !== "string" || !item.label.trim()) throw new Error(`${id} stage ${index + 1} requires a label`);
     const center = frame.x + span * (index + 0.5);
     const active = props.active === index;
     nodes.push(ellipsePrimitive({ id: stableId(id, "step-marker", index), role: "process-marker", frame: { x: center - 18, y: railY - 18, width: 36, height: 36 }, style: boxStyle(active ? PRIMARY : SURFACE, PRIMARY, STANDARD, token("radius.round")) }));
     nodes.push(textPrimitive({ id: stableId(id, "step-number", index), role: "process-number", frame: { x: center - 18, y: railY - 18, width: 36, height: 36 }, text: String(index + 1), style: textStyle(LABEL, active ? WHITE : PRIMARY, true, "center") }));
-    nodes.push(textPrimitive({ id: stableId(id, "step-label", index), role: "process-label", frame: { x: frame.x + span * index + 6, y: railY + 28, width: span - 12, height: 58 }, text: item.label || item, style: textStyle(COMPACT, INK, true, "center", "top") }));
-    if (roadmap) nodes.push(rectPrimitive({ id: stableId(id, "phase-band", index), role: "roadmap-phase", frame: { x: frame.x + span * index + 10, y: frame.y + frame.height * 0.58, width: span - 20, height: frame.height * 0.24 }, style: boxStyle(index % 2 ? MUTED_SURFACE : PRIMARY_TINT, RULE, HAIRLINE, SMALL_RADIUS) }));
+    const inset = tokenValue(token("space.2"));
+    const label = [item.label || item, item.period, item.maturity, item.detail].filter(value => value !== undefined && value !== null && value !== "").join("\n");
+    const labelWidth = span - (roadmap ? 20 + 2 * inset : 12);
+    const measured = measureText(label, labelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: true });
+    const bandTop = railY + 28;
+    const bandHeight = Math.max(frame.height * 0.24, measured.height + 2 * inset);
+    const labelTop = roadmap ? bandTop + (bandHeight - measured.height) / 2 : bandTop;
+    if (labelWidth <= 0 || (roadmap ? bandTop + bandHeight : labelTop + measured.height) > frame.y + frame.height) throw new Error(`${id} stage ${index + 1} needs more room for its complete label`);
+    if (roadmap) nodes.push(rectPrimitive({ id: stableId(id, "phase-band", index), role: "roadmap-phase", frame: { x: frame.x + span * index + 10, y: bandTop, width: span - 20, height: bandHeight }, style: boxStyle(index % 2 ? MUTED_SURFACE : PRIMARY_TINT, RULE, HAIRLINE, SMALL_RADIUS) }));
+    nodes.push(textPrimitive({ id: stableId(id, "step-label", index), role: "process-label", frame: { x: center - labelWidth / 2, y: labelTop, width: labelWidth, height: measured.height }, text: measured.text, style: { ...textStyle(COMPACT, INK, true, "center", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
     if (journey) nodes.push(textPrimitive({ id: stableId(id, "touchpoint", index), role: "journey-touchpoint", frame: { x: frame.x + span * index + 8, y: frame.y + 14, width: span - 16, height: 42 }, text: item.touchpoint || "Touchpoint", style: textStyle(LABEL, SECONDARY, false, "center") }));
   });
   return nodes;
@@ -439,21 +788,52 @@ function initiativeRolloutNodes({ id, frame, props }) {
   return nodes;
 }
 
-function waveRoadmapNodes({ id, frame, props }) {
+function waveRoadmapLayout(frame, props) {
   const items = props.items || [];
-  const span = frame.width / items.length;
-  const railY = frame.y + frame.height * 0.40;
+  if (!Array.isArray(items) || !items.length) throw new Error("Wave roadmap requires at least one stage");
+  const span = frame.width / items.length, inset = tokenValue(token("space.2"));
+  const width = span - 2 * inset, gap = tokenValue(token("space.4"));
+  const markerSize = tokenValue(token("icon.medium"));
+  const measure = (value, size, bold = false) => value ? measureText(value, width, { fontSize: tokenValue(size), bold }) : null;
+  const list = (label, values) => {
+    if (values !== undefined && !Array.isArray(values)) throw new Error(`Roadmap ${label} must be an array`);
+    return values?.length ? `${label}\n${values.map(value => `▪  ${value}`).join("\n")}` : "";
+  };
+  const cells = items.map((item, index) => ({
+    range: measure(item.range || "", COMPACT, true),
+    heading: measure(item.heading || item.label || `Wave ${index + 1}`, token("type.heading"), true),
+    activities: measure(list("Key activities", item.activities), COMPACT),
+    deliverables: measure(list("Main deliverables", item.deliverables), COMPACT)
+  }));
+  const maximum = key => Math.max(0, ...cells.map(cell => cell[key]?.height ?? 0));
+  const rangeHeight = maximum("range"), headingHeight = maximum("heading");
+  const headingTop = rangeHeight ? rangeHeight + tokenValue(token("space.3")) : 0;
+  const railY = headingTop + headingHeight + gap + markerSize / 2;
+  const activitiesTop = railY + markerSize / 2 + gap;
+  const activitiesHeight = maximum("activities"), deliverablesHeight = maximum("deliverables");
+  const deliverablesTop = activitiesTop + activitiesHeight + (activitiesHeight && deliverablesHeight ? gap : 0);
+  const height = (deliverablesHeight ? deliverablesTop + deliverablesHeight : activitiesHeight ? activitiesTop + activitiesHeight : railY + markerSize / 2) + inset;
+  return { cells, span, inset, width, markerSize, rangeHeight, headingTop, headingHeight, railY, activitiesTop, deliverablesTop, height };
+}
+
+function waveRoadmapNodes({ id, frame, props }) {
+  const layout = waveRoadmapLayout(frame, props);
+  if (layout.height > frame.height) throw new Error(`Roadmap ${id} complete activity and deliverable rows need ${layout.height.toFixed(1)}px, but only ${frame.height}px is allocated; widen, regroup or split the stages`);
+  const railY = frame.y + layout.railY;
   const nodes = [openLine(stableId(id, "rail"), frame.x, railY, frame.x + frame.width, railY, "roadmap-rail", RULE, STANDARD, { endArrow: true })];
-  items.forEach((item, index) => {
-    const x = frame.x + index * span;
-    const center = x + span / 2;
-    nodes.push(textPrimitive({ id: stableId(id, "range", index), role: "roadmap-range", frame: { x: x + 8, y: frame.y, width: span - 16, height: 28 }, text: item.range || "(Insert time range)", style: textStyle(COMPACT, SECONDARY, true, "center") }));
-    const heading = measureText(item.heading || item.label || `Wave ${index + 1}`, span - 16, { fontSize: tokenValue(token("type.heading")), bold: true });
-    if (frame.y + 42 + heading.height > railY - 20) throw new Error("Roadmap heading exceeds its band; enlarge the component or shorten the copy");
-    nodes.push(textPrimitive({ id: stableId(id, "heading", index), role: "roadmap-heading", frame: { x: x + 8, y: frame.y + 42, width: span - 16, height: heading.height }, text: heading.text, style: { ...textStyle(token("type.heading"), INK, true, "center", "top"), lineHeight: heading.lineHeight, wrap: false }, data: { textLayout: heading } }));
-    nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: "roadmap-marker", frame: { x: center - 15, y: railY - 15, width: 30, height: 30 }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }));
-    nodes.push(textPrimitive({ id: stableId(id, "activities", index), role: "roadmap-activities", frame: { x: x + 8, y: railY + 36, width: span - 16, height: 112 }, text: `Key activities\n${(item.activities || []).map((value) => `▪  ${value}`).join("\n")}`, style: textStyle(COMPACT, INK, false, "left", "top") }));
-    nodes.push(textPrimitive({ id: stableId(id, "deliverables", index), role: "roadmap-deliverables", frame: { x: x + 8, y: railY + 176, width: span - 16, height: frame.height - (railY - frame.y) - 178 }, text: `Main deliverables\n${(item.deliverables || []).map((value) => `▪  ${value}`).join("\n")}`, style: textStyle(COMPACT, INK, false, "left", "top") }));
+  layout.cells.forEach((cell, index) => {
+    const x = frame.x + index * layout.span, center = x + layout.span / 2;
+    for (const [key, y, size, color, bold, align] of [
+      ["range", layout.rangeHeight - (cell.range?.height ?? 0), COMPACT, SECONDARY, true, "center"],
+      ["heading", layout.headingTop + layout.headingHeight - cell.heading.height, token("type.heading"), INK, true, "center"],
+      ["activities", layout.activitiesTop, COMPACT, INK, false, "left"],
+      ["deliverables", layout.deliverablesTop, COMPACT, INK, false, "left"]
+    ]) {
+      const text = cell[key];
+      if (!text) continue;
+      nodes.push(textPrimitive({ id: stableId(id, key, index), role: `roadmap-${key}`, frame: { x: x + layout.inset, y: frame.y + y, width: layout.width, height: text.height }, text: text.text, style: { ...textStyle(size, color, bold, align, "top"), lineHeight: text.lineHeight, wrap: false }, data: { textLayout: text } }));
+    }
+    nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: "roadmap-marker", frame: { x: center - layout.markerSize / 2, y: railY - layout.markerSize / 2, width: layout.markerSize, height: layout.markerSize }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }));
   });
   return nodes;
 }
@@ -475,30 +855,46 @@ function highlightStripNodes({ id, frame, props }) {
 
 function matrixNodes({ id, frame, props }) {
   for (const axis of ["xAxis", "yAxis"]) {
-    if (!["label", "minLabel", "maxLabel"].every(key => typeof props[axis]?.[key] === "string" && props[axis][key].trim())) throw new Error(`Matrix ${axis} requires label, minLabel, and maxLabel`);
+    if (!["label", "minLabel", "maxLabel"].every(key => typeof props[axis]?.[key] === "string" && props[axis][key].trim()) ) throw new Error(`Matrix ${axis} requires label, minLabel, and maxLabel`);
   }
   const nodes = [];
-  const axisText = (axis, direction) => `${axis.label}: ${axis.minLabel} to ${axis.maxLabel} (${direction})`;
-  for (const [axis, y, direction] of [[props.yAxis, frame.y, "bottom to top"], [props.xAxis, frame.y + frame.height - 32, "left to right"]]) {
-    const text = axisText(axis, direction);
-    const measured = measureText(text, frame.width, { fontSize: tokenValue(LABEL) });
-    if (measured.height > 32) throw new Error("Matrix axis label needs more space");
-    nodes.push(textPrimitive({ id: stableId(id, direction, "label"), role: "matrix-axis-label", frame: { x: frame.x, y, width: frame.width, height: 32 }, text, style: textStyle(LABEL, INK, false, "center") }));
+  // The 2x2: four tinted cells with a slit between, the axis titles along the
+  // left (rotated) and the foot, the end labels at the corners, optional
+  // quadrant names in the cell corners, and named points with their labels.
+  const left = 44, bottom = 44, gap = 4, endLabel = 22;
+  const plot = { x: frame.x + left, y: frame.y + endLabel, width: frame.width - left - 8, height: frame.height - bottom - endLabel };
+  const quadrants = ["topLeft", "topRight", "bottomLeft", "bottomRight"];
+  const cellFrame = (q) => ({ x: plot.x + (q.endsWith("Right") ? plot.width / 2 + gap / 2 : 0), y: plot.y + (q.startsWith("bottom") ? plot.height / 2 + gap / 2 : 0), width: plot.width / 2 - gap / 2, height: plot.height / 2 - gap / 2 });
+  for (const q of quadrants) {
+    const highlighted = props.highlightQuadrant === q;
+    nodes.push(rectPrimitive({ id: stableId(id, "cell", q), role: highlighted ? "matrix-highlight" : "matrix-cell", frame: cellFrame(q), style: boxStyle(highlighted ? token("color.accentTint") : MUTED_SURFACE, "none", HAIRLINE, token("radius.none")), data: { quadrant: q, highlighted } }));
+    const name = props.quadrantLabels?.[q];
+    if (typeof name === "string" && name.trim()) {
+      const c = cellFrame(q);
+      const measured = measureText(name, c.width - 24, { fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 });
+      nodes.push(textPrimitive({ id: stableId(id, "cell-label", q), role: "matrix-quadrant-label", frame: { x: c.x + 12, y: q.startsWith("top") ? c.y + 8 : c.y + c.height - 8 - measured.height, width: c.width - 24, height: measured.height }, text: measured.text, style: { ...textStyle(LABEL, SECONDARY, true, q.endsWith("Right") ? "right" : "left", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { quadrant: q, textLayout: measured } }));
+    }
   }
-  const plotInset = 54;
-  const plot = { x: frame.x + plotInset, y: frame.y + 50, width: frame.width - plotInset - 28, height: frame.height - 100 };
-  if (props.highlightQuadrant === "topRight") nodes.push(rectPrimitive({ id: stableId(id, "quadrant-highlight"), role: "matrix-highlight", frame: { x: plot.x + plot.width / 2, y: plot.y, width: plot.width / 2, height: plot.height / 2 }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.none")) }));
+  // Axis titles and end labels.
+  const yTitle = props.yAxis.label, xTitle = props.xAxis.label;
+  nodes.push(textPrimitive({ id: stableId(id, "y-title"), role: "matrix-axis-label", frame: { x: frame.x - plot.height / 2 + 12, y: plot.y + plot.height / 2 - 12, width: plot.height, height: 24 }, text: yTitle, style: { ...textStyle(LABEL, INK, true, "center"), rotate: -90 } }));
+  nodes.push(textPrimitive({ id: stableId(id, "y-max"), role: "matrix-axis-label", frame: { x: frame.x, y: plot.y - endLabel, width: left + 60, height: endLabel }, text: props.yAxis.maxLabel, style: textStyle(LABEL, SECONDARY, false, "left") }));
+  nodes.push(textPrimitive({ id: stableId(id, "y-min"), role: "matrix-axis-label", frame: { x: frame.x, y: plot.y + plot.height + 4, width: left + 60, height: endLabel }, text: props.yAxis.minLabel, style: textStyle(LABEL, SECONDARY, false, "left") }));
+  nodes.push(textPrimitive({ id: stableId(id, "x-title"), role: "matrix-axis-label", frame: { x: plot.x, y: plot.y + plot.height + bottom - 24, width: plot.width, height: 24 }, text: xTitle, style: textStyle(LABEL, INK, true, "center") }));
+  nodes.push(textPrimitive({ id: stableId(id, "x-min"), role: "matrix-axis-label", frame: { x: plot.x + 4, y: plot.y + plot.height + 4, width: 120, height: endLabel }, text: props.xAxis.minLabel, style: textStyle(LABEL, SECONDARY, false, "left") }));
+  nodes.push(textPrimitive({ id: stableId(id, "x-max"), role: "matrix-axis-label", frame: { x: plot.x + plot.width - 120, y: plot.y + plot.height + 4, width: 120, height: endLabel }, text: props.xAxis.maxLabel, style: textStyle(LABEL, SECONDARY, false, "right") }));
   nodes.push(openLine(stableId(id, "x-axis"), plot.x, plot.y + plot.height, plot.x + plot.width, plot.y + plot.height, "matrix-axis", INK, STANDARD));
   nodes.push(openLine(stableId(id, "y-axis"), plot.x, plot.y, plot.x, plot.y + plot.height, "matrix-axis", INK, STANDARD));
-  nodes.push(openLine(stableId(id, "vertical-split"), plot.x + plot.width / 2, plot.y, plot.x + plot.width / 2, plot.y + plot.height, "matrix-boundary", RULE, HAIRLINE));
-  nodes.push(openLine(stableId(id, "horizontal-split"), plot.x, plot.y + plot.height / 2, plot.x + plot.width, plot.y + plot.height / 2, "matrix-boundary", RULE, HAIRLINE));
   props.points.forEach((point, index) => {
     const x = plot.x + point.x * plot.width;
     const y = plot.y + (1 - point.y) * plot.height;
     const size = point.size || (props.bubbles ? 76 : 18);
-    const color = point.state === "positive" ? token("color.positive") : point.state === "caution" ? token("color.caution") : point.state === "negative" ? token("color.negative") : index === props.highlight ? PRIMARY : token("color.chartSeries2");
+    const color = point.state === "positive" ? token("color.positive") : point.state === "caution" ? token("color.caution") : point.state === "negative" ? token("color.negative") : index === props.highlight ? token("color.accent") : PRIMARY;
     nodes.push(ellipsePrimitive({ id: stableId(id, "point", index), role: "matrix-point", frame: { x: x - size / 2, y: y - size / 2, width: size, height: size }, style: boxStyle(color, SURFACE, HAIRLINE, token("radius.round")) }));
-    nodes.push(textPrimitive({ id: stableId(id, "point-label", index), role: "matrix-point-label", frame: props.bubbles ? { x: x - size * 0.4, y: y - size * 0.32, width: size * 0.8, height: size * 0.64 } : { x: x + 12, y: y - 10, width: 94, height: 22 }, text: point.label, style: textStyle(LABEL, props.bubbles ? WHITE : INK, true, props.bubbles ? "center" : "left") }));
+    // Labels sit to the right of the point, or to the left near the right edge.
+    const labelWidth = Math.min(150, Math.max(80, plot.width * 0.22));
+    const right = x + 12 + labelWidth <= plot.x + plot.width;
+    nodes.push(textPrimitive({ id: stableId(id, "point-label", index), role: "matrix-point-label", frame: props.bubbles ? { x: x - size * 0.4, y: y - size * 0.32, width: size * 0.8, height: size * 0.64 } : { x: right ? x + 12 : x - 12 - labelWidth, y: y - 10, width: labelWidth, height: 22 }, text: point.label, style: textStyle(LABEL, props.bubbles ? WHITE : INK, true, props.bubbles ? "center" : right ? "left" : "right") }));
   });
   return nodes;
 }
@@ -538,39 +934,133 @@ function registerCore(registry) {
     }),
     component({
       id: "slide-chrome", category: "shared", role: "slide-chrome",
-      tokens: ["color.canvas", "color.ink", "font.display", "type.actionTitle", "type.actionTitleLong", "layout.titleContentGap", ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
+      tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.accent", "color.onPrimary", "color.surfaceMuted", "color.textSecondary", "font.display", "font.body", "type.source", "type.compact", "type.heading", "type.actionTitle", "type.actionTitleLong", "layout.titleContentGap", "space.2", "space.4", "radius.small", "radius.none", ...STYLE_TOKENS, ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
       preferredSize: { width: SLIDE.width, height: SLIDE.height },
       sample: { title: "(Insert action title)", source: "Source: (Insert source)", footerRight: "(Insert company name)", pageNumber: 7 },
       render: ({ id, frame, props }) => {
         const page = renderPageTemplate({ id, frame, props });
         const tracker = props.tracker ? trackerLabelNodes({ id: stableId(id, "tracker"), frame: { x: frame.x + CHROME.left, y: frame.y + 30, width: page.titleWidth, height: 20 }, props: props.tracker }) : [];
-        const titles = titleNodes({ id, frame, props: { text: props.title, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker ? 58 : CHROME.titleTop }, chrome: true });
+        // `kicker`: the small label above the title that says what part of the
+        // argument this page belongs to ("People", "Commercial evidence"). The
+        // reference pages carry a dozen words of this band furniture against our
+        // four, and it shares the tracker's row: kicker left, pills right.
+        const kickerText = typeof props.kicker === "string" && props.kicker.trim() ? props.kicker.trim() : null;
+        const kicker = [];
+        if (kickerText) {
+          const measured = measureText(kickerText, 420, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.compact")), bold: true, wrapWidthRatio: 1 });
+          if (measured.lines.length > 1) throw new Error("A kicker must fit on one line");
+          // Pill trackers hug the right margin, so the kicker keeps the left of
+          // that row. A left-anchored tracker (label, breadcrumb, number strip)
+          // already names the section, so it wins the slot and the kicker drops.
+          const trackerLeft = tracker.reduce((min, node) => Math.min(min, node.frame ? node.frame.x : Math.min(node.x1 ?? Infinity, node.x2 ?? Infinity)), Infinity);
+          const kickerRight = frame.x + CHROME.left + Math.ceil(measured.width) + 2 + tokenValue(token("space.4"));
+          if (kickerRight <= trackerLeft) kicker.push(textPrimitive({
+            id: stableId(id, "kicker"), role: "kicker",
+            frame: { x: frame.x + CHROME.left, y: frame.y + 30, width: Math.ceil(measured.width) + 2, height: measured.height },
+            text: kickerText,
+            style: { ...textStyle(token("type.compact"), token("color.accent"), true, "left", "top"), lineHeight: measured.lineHeight, wrap: false },
+            data: { textLayout: measured }
+          }));
+        }
+        // `subtitle`: the standfirst under the action title - what the page
+        // measures, over what population, for what period ("Employment, growth
+        // and specialization by subsector"). The reference title band carries
+        // twenty words against our fourteen, and this line is the difference.
+        const subtitleText = typeof props.subtitle === "string" && props.subtitle.trim() ? props.subtitle.trim() : null;
+        const tagPlacement = props.tag ? houseStyle("style.tagPlacement") : "top-right";
+        // An above-title tag (a small accent label, as in a country or section spotlight) sits in the title's top margin.
+        const titles = titleNodes({ id, frame, props: { text: props.title, lead: props.titleLead, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker || kicker.length ? 58 : CHROME.titleTop }, chrome: true });
         const title = titles.find((node) => node.role === "action-title");
-        const titleBottom = title.frame.y + title.data.textLayout.height;
+        let titleBottom = title.frame.y + title.data.textLayout.height;
+        // Page tag: PRELIMINARY, ILLUSTRATIVE, CONFIDENTIAL, Exhibit 3. The house
+        // style places it: small caps top-right, an accent pill under the title
+        // (a survey date), or an accent label above the title (a spotlight).
+        if (props.tag) {
+          const pill = tagPlacement === "below-title";
+          const text = pill || tagPlacement === "above-title" ? String(props.tag).trim() : String(props.tag).trim().toUpperCase();
+          const tag = measureText(text, 320, { fontFamily: tokenValue(FONT), fontSize: tokenValue(SOURCE), bold: pill || tagPlacement === "above-title", wrapWidthRatio: 1 });
+          if (tag.lines.length > 1) throw new Error("Page tag must fit on one line");
+          if (pill) {
+            const padX = tokenValue(token("space.2")), h = tag.height + 4, y = titleBottom + tokenValue(token("space.2"));
+            titles.push(rectPrimitive({ id: stableId(id, "tag-pill"), role: "page-tag-pill", frame: { x: title.frame.x, y, width: Math.ceil(tag.width) + 2 * padX, height: h }, style: boxStyle(token("color.accent"), "none", HAIRLINE, token("radius.small")) }));
+            titles.push(textPrimitive({ id: stableId(id, "tag"), role: "page-tag", frame: { x: title.frame.x + padX, y: y + 2, width: Math.ceil(tag.width) + 2, height: tag.height }, text, style: { ...textStyle(SOURCE, WHITE, true, "left", "top"), lineHeight: tag.lineHeight, wrap: false }, data: { textLayout: tag, tag: text } }));
+            titleBottom = y + h;
+          } else if (tagPlacement === "above-title") {
+            titles.push(textPrimitive({ id: stableId(id, "tag"), role: "page-tag", frame: { x: title.frame.x, y: title.frame.y - tag.height - 2, width: Math.ceil(tag.width) + 2, height: tag.height }, text, style: { ...textStyle(SOURCE, token("color.accent"), true, "left", "top"), lineHeight: tag.lineHeight, wrap: false }, data: { textLayout: tag, tag: text } }));
+          } else {
+            titles.push(textPrimitive({ id: stableId(id, "tag"), role: "page-tag", frame: { x: frame.x + frame.width - CHROME.right - Math.ceil(tag.width) - 2, y: frame.y + 22, width: Math.ceil(tag.width) + 2, height: tag.height }, text, style: { ...textStyle(SOURCE, SECONDARY, false, "right", "top"), lineHeight: tag.lineHeight, wrap: false }, data: { textLayout: tag, tag: text } }));
+          }
+        }
+        if (subtitleText) {
+          const measured = measureText(subtitleText, page.titleWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 });
+          if (measured.lines.length > 2) throw new Error("A subtitle runs to at most two lines; it names the measure, not the finding");
+          // A rule and a standfirst do the same job - they close the title band
+          // and separate it from the page - so a page takes one or the other,
+          // never both. The standfirst carries the measure and the rule carries
+          // nothing, so the standfirst wins and the rule is dropped. A page
+          // with no standfirst keeps its house rule.
+          const ruleIndex = titles.findIndex((node) => node.role === "title-rule");
+          if (ruleIndex >= 0) titles.splice(ruleIndex, 1);
+          const y = titleBottom + tokenValue(token("space.2"));
+          titles.push(textPrimitive({
+            id: stableId(id, "subtitle"), role: "action-subtitle",
+            frame: { x: frame.x + CHROME.left, y, width: page.titleWidth, height: measured.height },
+            text: measured.text,
+            style: { ...textStyle(BODY, SECONDARY, false, "left", "top"), lineHeight: measured.lineHeight, wrap: false },
+            data: { textLayout: measured }
+          }));
+          titleBottom = y + measured.height;
+        }
+        // A tinted title band (the house style `band`) runs from the page top to just under the title.
+        if (houseStyle("style.titleRule") === "band" && props.titleVariant === undefined) {
+          titles.unshift(rectPrimitive({ id: stableId(id, "title-band"), role: "title-band", frame: { x: frame.x, y: frame.y, width: frame.width, height: titleBottom + tokenValue(token("space.4")) }, style: boxStyle(MUTED_SURFACE, "none", HAIRLINE, token("radius.none")) }));
+        }
         const baseBottom = page.contentFrame.y + page.contentFrame.height;
-        const contentTop = Math.max(page.contentFrame.y, titleBottom + tokenValue(token("layout.titleContentGap")));
+        // One content top for the whole deck: the body starts at CHROME.bodyTop whether
+        // the title takes one line or two. Only a three-line title pushes it down.
+        const gap = tokenValue(token("space.5"));
+        // A tracker above the title (pill tabs, a label) sits in the same band as
+        // the title, so the body starts a step lower to keep it off the content.
+        const trackerGap = tracker.length || kicker.length ? tokenValue(token("space.3")) : 0;
+        const contentTop = Math.max(CHROME.bodyTop + trackerGap, titleBottom + gap + trackerGap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
         const contentFrame = { ...page.contentFrame, y: contentTop, height: baseBottom - contentTop };
         if (contentFrame.height <= 0) throw new Error("Action title leaves no room for slide content; shorten the title or split the slide");
-        return { ...page, contentFrame, nodes: [...tracker, ...titles, ...page.nodes] };
+        // The rule belongs to the content, not to the title. Hung under the
+        // title it tracked the title's height while the body stayed pinned at
+        // `bodyTop`: a one-line title left 52px of nothing beneath the rule and
+        // a two-line title left 16px, so the same band read differently on
+        // every page. Dropping it to a fixed gap above the content makes that
+        // distance constant and lets the title float in whatever height it
+        // needs. It never rises above where the title leaves it.
+        const ruleGap = tokenValue(token("space.3"));
+        for (const node of titles) {
+          if (node.role !== "title-rule" || !node.frame) continue;
+          node.frame = { ...node.frame, y: Math.max(node.frame.y, contentTop - ruleGap) };
+        }
+        // The title band paints first; the tracker sits on it, above the title.
+        const band = titles.filter((n) => n.role === "title-band"), rest = titles.filter((n) => n.role !== "title-band");
+        return { ...page, contentFrame, nodes: [...band, ...tracker, ...kicker, ...rest, ...page.nodes] };
       }
     }),
     component({ id: "page-template", category: "shared", role: "page-template", tokens: PAGE_TEMPLATE_TOKENS,
       preferredSize: { ...SLIDE }, sample: { source: "Source: (Insert source)", companyName: "(Insert company name)", pageNumber: 7 }, render: renderPageTemplate }),
     component({
-      id: "section", category: "structure", role: "section", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "space.4", "space.5", "line.standard", "radius.none", "radius.small", ...SECTION_HEADING_TOKENS], preferredSize: { width: 520, height: 300 }, sample: { treatment: "open", heading: "(Insert section heading)" },
+      id: "section", category: "structure", role: "section", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "color.ink", "color.accentTint", "color.onPrimary", "space.4", "space.5", "line.standard", "radius.none", "radius.small", ...SECTION_HEADING_TOKENS], preferredSize: { width: 520, height: 300 }, sample: { treatment: "open", heading: "(Insert section heading)" },
       render: ({ id, frame, props }) => {
         const treatment = props.treatment || "open";
         const edge = props.edge || "contained";
         if(!["contained","full-bleed"].includes(edge))throw new Error("Unknown section edge treatment");
-        const padding = normalizeInsets(props.padding ?? token("space.4"));
-        const fill = treatment === "muted" ? MUTED_SURFACE : treatment === "primary" ? PRIMARY : SURFACE;
+        if (!["open", "muted", "primary", "dark", "tint"].includes(treatment)) throw new Error(`Unknown section treatment: ${treatment}`);
+        const padding = sectionPadding(props);
+        // Side panels from the 2020–24 decks: a navy "Key insights" column (dark),
+        // a grey commentary column (muted) and an accent-tinted message column (tint).
+        const fill = treatment === "muted" ? MUTED_SURFACE : treatment === "primary" ? PRIMARY : treatment === "dark" ? INK : treatment === "tint" ? token("color.accentTint") : SURFACE;
         const stroke = treatment === "open" ? RULE : fill;
         const nodes = [];
         const headerFrame = { x: frame.x + padding.left, y: frame.y + padding.top, width: frame.width - padding.left - padding.right, height: frame.height };
-        const headerProps = { ...props, variant: treatment === "primary" ? "inverse" : "standard", rule: treatment !== "muted" };
+        const headerProps = { ...props, variant: treatment === "primary" || treatment === "dark" ? "inverse" : "standard", rule: treatment !== "muted" && treatment !== "tint" };
         if (props.heading) nodes.push(...sectionHeadingNodes({ id: stableId(id, "header"), frame: headerFrame, props: headerProps }));
-        const top = padding.top + (props.heading ? headingLayout(headerFrame, headerProps).height : 0);
-        const contentFrame = { x: frame.x + padding.left, y: frame.y + top, width: frame.width - padding.left - padding.right, height: frame.height - top - padding.bottom };
+        const contentFrame = insetFrame(frame, sectionContentInsets(frame, props));
         if (treatment !== "open") nodes.unshift(rectPrimitive({ id: stableId(id, "surface"), role: "section-surface", frame, style: boxStyle(fill, stroke, treatment === "primary" ? STANDARD : HAIRLINE, edge === "full-bleed" ? token("radius.none") : SMALL_RADIUS), data: { edge, contentFrame } }));
         return { nodes, contentFrame };
       }
@@ -578,40 +1068,164 @@ function registerCore(registry) {
     component({ id: "section-heading", category: "shared", role: "section-heading", tokens: SECTION_HEADING_TOKENS, preferredSize: { width: 720, height: 52 }, sample: { heading: "(Insert section heading)", rule: true }, render: ({ id, frame, props }) => ({ nodes: sectionHeadingNodes({ id, frame, props }) }) }),
     component({ id: "action-title", category: "shared", role: "title", tokens: ["font.display", "type.actionTitle", "color.ink", "color.rule", "line.hairline", "space.2"], preferredSize: { width: 1136, height: 86 }, sample: { text: "(Insert action title)" }, render: ({ id, frame, props }) => ({ nodes: titleNodes({ id, frame, props }) }) }),
     component({ id: "section-title", category: "shared", role: "title", tokens: ["font.display", "type.sectionTitle", "color.ink", "color.rule", "line.hairline", "space.2"], preferredSize: { width: 720, height: 64 }, sample: { text: "(Insert section title)" }, render: ({ id, frame, props }) => ({ nodes: titleNodes({ id, frame, props, section: true }) }) }),
-    component({ id: "cover", category: "navigation", role: "cover", tokens: ["color.ink", "color.textSecondary", "font.display", "font.body", "type.deckTitle", "type.body", "space.5"], preferredSize: { width: 1280, height: 720 }, sample: { title: "(Insert presentation title)", subtitle: "(Insert subtitle)" }, render: ({ id, frame, props }) => {
+    component({ id: "cover", category: "navigation", role: "cover", tokens: ["color.ink", "color.canvas", "color.onPrimary", "color.textSecondary", "color.componentPrimary", "color.chartSeries4", "color.accentTint", "font.display", "font.body", "type.deckTitle", "type.heading", "type.body", "type.compact", "space.2", "space.5", "line.hairline", "line.standard", "radius.none"], preferredSize: { width: 1280, height: 720 }, sample: { title: "(Insert presentation title)", subtitle: "(Insert subtitle)" }, render: ({ id, frame, props }) => {
       if (typeof props.title !== "string" || !props.title.trim()) throw new Error("Cover requires a deck title");
       if (props.subtitle !== undefined && typeof props.subtitle !== "string") throw new Error("Cover subtitle must be text");
       // The compiler supplies headerBandHeight to every component as layout metadata.
-      if (Object.keys(props).some(key => !["title", "subtitle", "headerBandHeight"].includes(key))) throw new Error("Cover supports only title and subtitle; use the page template for other furniture");
-      const width = frame.width - CHROME.left - CHROME.right;
+      if (Object.keys(props).some(key => !["title", "subtitle", "date", "logo", "tone", "headerBandHeight"].includes(key))) throw new Error("Cover supports title, subtitle, date, logo and tone; use the page template for other furniture");
+      // Dark tone is the gallery default: navy full bleed, title block in the
+      // lower third, a logo slot top-left, a date line under the subtitle.
+      const dark = (props.tone ?? "dark") === "dark";
+      // On navy the subtitle takes the accent tint when it reads (BCG's fourth
+      // series is dark green), white otherwise.
+      const tint = token("color.accentTint");
+      const ink = dark ? WHITE : INK, secondary = dark ? (contrastRatio(tokenValue(INK), tokenValue(tint)) >= 4.5 ? tint : WHITE) : SECONDARY;
+      const width = Math.min(frame.width - CHROME.left - CHROME.right, frame.width * 0.72);
       const title = measureText(props.title, width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")), bold: true, wrapWidthRatio: 1 });
-      const subtitle = props.subtitle?.trim() ? measureText(props.subtitle, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
-      const gap = subtitle ? tokenValue(token("space.5")) : 0, height = title.height + gap + (subtitle?.height || 0);
-      if (title.lines.length > 2 || subtitle?.lines.length > 2 || height > frame.height - 2 * CHROME.left) throw new Error("Cover text exceeds its allocated space; shorten the title or subtitle");
-      const x = frame.x + CHROME.left, y = frame.y + (frame.height - height) / 2;
-      const nodes = [textPrimitive({ id: stableId(id, "title"), role: "cover-title", frame: { x, y, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.deckTitle"), INK, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } })];
-      if (subtitle) nodes.push(textPrimitive({ id: stableId(id, "subtitle"), role: "cover-subtitle", frame: { x, y: y + title.height + gap, width, height: subtitle.height }, text: subtitle.text, style: { ...textStyle(BODY, SECONDARY, false, "left", "top"), lineHeight: subtitle.lineHeight, wrap: false }, data: { textLayout: subtitle } }));
+      const subtitle = props.subtitle?.trim() ? measureText(props.subtitle, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), wrapWidthRatio: 1 }) : null;
+      const date = props.date?.trim() ? measureText(props.date, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 }) : null;
+      const gap = tokenValue(token("space.5")), small = tokenValue(token("space.2"));
+      const height = title.height + (subtitle ? gap + subtitle.height : 0) + (date ? gap + date.height : 0);
+      if (title.lines.length > 3 || subtitle?.lines.length > 2 || height > frame.height * 0.6) throw new Error("Cover text exceeds its allocated space; shorten the title or subtitle");
+      const x = frame.x + CHROME.left;
+      // Anchor the block so its bottom sits at 78% of the page; a taller block grows upward.
+      let y = frame.y + frame.height * 0.78 - height;
+      const nodes = [];
+      if (dark) nodes.push(rectPrimitive({ id: stableId(id, "surface"), role: "cover-surface", frame, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) }));
+      // Accent rule above the title: the one graphic element on a text cover.
+      nodes.push(openLine(stableId(id, "accent"), x, y - gap, x + 72, y - gap, "cover-accent", PRIMARY, token("line.standard")));
+      if (props.logo?.trim()) {
+        const logo = measureText(props.logo, 320, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: 1 });
+        nodes.push(textPrimitive({ id: stableId(id, "logo"), role: "cover-logo", frame: { x, y: frame.y + CHROME.titleTop, width: 320, height: logo.height }, text: logo.text, style: { ...textStyle(token("type.heading"), ink, true, "left", "top"), fontFamily: DISPLAY, lineHeight: logo.lineHeight, wrap: false }, data: { textLayout: logo } }));
+      }
+      nodes.push(textPrimitive({ id: stableId(id, "title"), role: "cover-title", frame: { x, y, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.deckTitle"), ink, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } }));
+      y += title.height;
+      if (subtitle) { y += gap; nodes.push(textPrimitive({ id: stableId(id, "subtitle"), role: "cover-subtitle", frame: { x, y, width, height: subtitle.height }, text: subtitle.text, style: { ...textStyle(token("type.heading"), secondary, false, "left", "top"), lineHeight: subtitle.lineHeight, wrap: false }, data: { textLayout: subtitle } })); y += subtitle.height; }
+      if (date) { y += gap; nodes.push(textPrimitive({ id: stableId(id, "date"), role: "cover-date", frame: { x, y, width, height: date.height }, text: date.text, style: { ...textStyle(BODY, secondary, false, "left", "top"), lineHeight: date.lineHeight, wrap: false }, data: { textLayout: date } })); }
       return { nodes };
     } }),
-    component({ id: "section-divider", category: "navigation", role: "divider", tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.onPrimary", "font.display", "type.deckTitle", "type.sectionNumber", "line.hairline", "radius.none", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { title: "(Insert section title)" }, render: ({ id, frame, props }) => {
+    component({ id: "section-divider", category: "navigation", role: "divider", tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.onPrimary", "color.accent", "font.display", "font.body", "type.deckTitle", "type.heading", "type.sectionNumber", "line.hairline", "radius.none", "space.3", "space.4", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { title: "(Insert section title)" }, render: ({ id, frame, props }) => {
       if (typeof props.title !== "string" || !props.title.trim()) throw new Error("Section divider requires a section title");
-      for (const key of Object.keys(props)) if (!["title", "sectionId", "style", "mode", "pageTemplate", "source", "note", "companyName", "pageNumber", "footerLeft", "footerRight", "headerBandHeight"].includes(key)) throw new Error(`Unknown section-divider setting: ${key}; dividers have one title, an optional section id, and page furniture`);
+      for (const key of Object.keys(props)) if (!["title", "subtitle", "sectionId", "style", "mode", "pageTemplate", "source", "note", "companyName", "pageNumber", "footerLeft", "footerRight", "headerBandHeight", "panelWidth"].includes(key)) throw new Error(`Unknown section-divider setting: ${key}; dividers have one title, an optional subtitle and section id, and page furniture`);
       const inverse = (props.mode ?? "dark") === "dark";
       const dividerStyle = props.style ?? "plain";
       if (!["plain", "numbered"].includes(dividerStyle)) throw new Error(`Unknown section-divider style: ${dividerStyle}`);
       if (dividerStyle === "numbered" && !String(props.sectionId ?? "").trim()) throw new Error("Numbered section divider requires sectionId");
       const page = renderPageTemplate({ id: stableId(id, "page"), frame, props: { ...props, inverse } });
-      const width = dividerStyle === "numbered" ? frame.width * 0.58 - CHROME.left : frame.width - CHROME.left - CHROME.right;
+      // With a photograph beside it (media.mjs) the divider keeps a left panel of
+      // `panelWidth`; the numeral then sits above the title instead of at the right.
+      const panelWidth = props.panelWidth ?? null;
+      const surfaceFrame = panelWidth ? { ...frame, width: panelWidth } : frame;
+      const width = panelWidth ? panelWidth - CHROME.left - 24 : dividerStyle === "numbered" ? frame.width * 0.58 - CHROME.left : frame.width - CHROME.left - CHROME.right;
       const title = measureText(props.title, width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")), bold: true, wrapWidthRatio: 1 });
-      if (title.lines.length > 2 || title.height > frame.height - 2 * CHROME.bodyTop) throw new Error("Section divider title exceeds its allocated space");
+      if (title.lines.length > (panelWidth ? 3 : 2) || title.height > frame.height - 2 * CHROME.bodyTop) throw new Error("Section divider title exceeds its allocated space");
       const background = inverse ? INK : token("color.canvas"), foreground = inverse ? WHITE : INK;
       if (contrastRatio(tokenValue(background), tokenValue(foreground)) < 4.5) throw new Error("Section divider title contrast must be at least 4.5:1");
+      // A short accent rule above the title and the section's one-line summary
+      // below it, in the same block, so the divider says what the section shows.
+      if (props.subtitle !== undefined && typeof props.subtitle !== "string") throw new Error("Section divider subtitle must be text");
+      const subtitle = typeof props.subtitle === "string" && props.subtitle.trim() ? measureText(props.subtitle.trim(), width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), wrapWidthRatio: 1 }) : null;
+      const ruleGap = tokenValue(token("space.4")), subGap = tokenValue(token("space.3"));
+      // The title holds the page's centre line; the accent bar sits above it and the summary below.
+      const titleTop = frame.y + (frame.height - title.height) / 2;
       return { ...page, nodes: [
-        rectPrimitive({ id: stableId(id, "surface"), role: "divider-surface", frame, style: boxStyle(background, background, HAIRLINE, token("radius.none")) }),
-        textPrimitive({ id: stableId(id, "title"), role: "divider-title", frame: { x: frame.x + CHROME.left, y: frame.y + (frame.height - title.height) / 2, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.deckTitle"), foreground, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } }),
-        ...(dividerStyle === "numbered" ? [textPrimitive({ id: stableId(id, "number"), role: "divider-number", frame: { x: frame.x + frame.width * 0.67, y: frame.y + 110, width: frame.width * 0.25, height: frame.height - 220 }, text: String(props.sectionId), style: { ...textStyle(token("type.sectionNumber"), inverse ? WHITE : PRIMARY, true, "center", "mid"), fontFamily: DISPLAY }, data: { sectionId: String(props.sectionId), dividerStyle } })] : []),
+        rectPrimitive({ id: stableId(id, "surface"), role: "divider-surface", frame: surfaceFrame, style: boxStyle(background, background, HAIRLINE, token("radius.none")) }),
+        rectPrimitive({ id: stableId(id, "accent-bar"), role: "divider-accent", frame: { x: frame.x + CHROME.left, y: titleTop - ruleGap - 4, width: 64, height: 4 }, style: boxStyle(token("color.accent"), "none", HAIRLINE, token("radius.none")) }),
+        textPrimitive({ id: stableId(id, "title"), role: "divider-title", frame: { x: frame.x + CHROME.left, y: titleTop, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.deckTitle"), foreground, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } }),
+        ...(subtitle ? [textPrimitive({ id: stableId(id, "subtitle"), role: "divider-subtitle", frame: { x: frame.x + CHROME.left, y: titleTop + title.height + subGap, width, height: subtitle.height }, text: subtitle.text, style: { ...textStyle(token("type.heading"), foreground, false, "left", "top"), lineHeight: subtitle.lineHeight, wrap: false }, data: { textLayout: subtitle } })] : []),
+        ...(dividerStyle === "numbered" && panelWidth ? [textPrimitive({ id: stableId(id, "number"), role: "divider-number", frame: { x: frame.x + CHROME.left, y: frame.y + 48, width, height: Math.max(80, titleTop - ruleGap - 24 - (frame.y + 48)) }, text: String(props.sectionId), style: { ...textStyle(token("type.sectionNumber"), inverse ? WHITE : PRIMARY, true, "left", "bottom"), fontFamily: DISPLAY }, data: { sectionId: String(props.sectionId), dividerStyle } })] : []),
+        ...(dividerStyle === "numbered" && !panelWidth ? [textPrimitive({ id: stableId(id, "number"), role: "divider-number", frame: { x: frame.x + frame.width * 0.67, y: frame.y + 110, width: frame.width * 0.25, height: frame.height - 220 }, text: String(props.sectionId), style: { ...textStyle(token("type.sectionNumber"), inverse ? WHITE : PRIMARY, true, "center", "mid"), fontFamily: DISPLAY }, data: { sectionId: String(props.sectionId), dividerStyle } })] : []),
         ...page.nodes
       ] };
+    } }),
+    // The closing page of the 2022 McKinsey decks: navy, "Key takeaways", the
+    // three or four messages as big serif numerals with bold copy, an optional
+    // photograph on the right (media.mjs). Structural, like a divider.
+    component({ id: "takeaways", category: "navigation", role: "takeaways", tokens: ["color.canvas", "color.ink", "color.onPrimary", "color.accent", "color.rule", "font.display", "font.body", "type.deckTitle", "type.heading", "type.sectionTitle", "type.body", "line.hairline", "radius.none", "space.3", "space.4", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { title: "Key takeaways", items: ["(Insert takeaway 1)", "(Insert takeaway 2)", "(Insert takeaway 3)"] }, render: ({ id, frame, props }) => {
+      for (const key of Object.keys(props)) if (!["title", "items", "mode", "panelWidth", "pageTemplate", "source", "note", "companyName", "pageNumber", "footerLeft", "footerRight", "headerBandHeight"].includes(key)) throw new Error(`Unknown takeaways setting: ${key}`);
+      if (!Array.isArray(props.items) || props.items.length < 2 || props.items.length > 5) throw new Error("Takeaways take two to five messages");
+      const inverse = (props.mode ?? "dark") === "dark";
+      const page = renderPageTemplate({ id: stableId(id, "page"), frame, props: { ...props, inverse } });
+      const background = inverse ? INK : token("color.canvas"), foreground = inverse ? WHITE : INK;
+      const panelWidth = props.panelWidth ?? frame.width;
+      const x = frame.x + CHROME.left, width = panelWidth - CHROME.left - (props.panelWidth ? 32 : CHROME.right);
+      const title = measureText(props.title || "Key takeaways", width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.sectionTitle")), bold: true, wrapWidthRatio: 1 });
+      const titleTop = frame.y + CHROME.titleTop + 8;
+      const numeralWidth = 64, gap = tokenValue(token("space.4"));
+      const items = props.items.map((item) => { if (typeof item !== "string" || !item.trim()) throw new Error("Takeaways are text"); return measureText(item.trim(), width - numeralWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: 1 }); });
+      const listTop = titleTop + title.height + gap + 12, listBottom = frame.y + frame.height - CHROME.bodyTop - 24;
+      // Dividing the whole track by the item count gave three one-line messages
+      // a 150px row each and left the bottom half of the page empty. The rows
+      // take their own height plus a reading gap, the slack opens that gap up
+      // to about a line and a half, and whatever is still left over centres the
+      // block rather than stretching it.
+      const naturalHeights = items.map((item) => item.height + 8);
+      const natural = naturalHeights.reduce((sum, height) => sum + height, 0);
+      const track = listBottom - listTop;
+      if (natural > track) throw new Error("Takeaways exceed the page; shorten them or use fewer");
+      const spread = items.length > 1 ? Math.min((track - natural) / (items.length - 1), 56) : 0;
+      const block = natural + spread * (items.length - 1);
+      const top = listTop + Math.max(0, (track - block) / 2);
+      const nodes = [
+        rectPrimitive({ id: stableId(id, "surface"), role: "takeaways-surface", frame: { ...frame, width: panelWidth }, style: boxStyle(background, background, HAIRLINE, token("radius.none")) }),
+        textPrimitive({ id: stableId(id, "title"), role: "takeaways-title", frame: { x, y: titleTop, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.sectionTitle"), foreground, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } }),
+        openLine(stableId(id, "rule"), x, titleTop + title.height + gap / 2, x + width, titleTop + title.height + gap / 2, "takeaways-rule", inverse ? WHITE : RULE, HAIRLINE),
+      ];
+      let rowY = top;
+      items.forEach((item, index) => {
+        const y = rowY + (naturalHeights[index] - item.height) / 2;
+        rowY += naturalHeights[index] + spread;
+        nodes.push(textPrimitive({ id: stableId(id, "numeral", index), role: "takeaways-numeral", frame: { x, y: y - 6, width: numeralWidth - 12, height: item.height + 12 }, text: String(index + 1), style: { ...textStyle(token("type.deckTitle"), inverse ? WHITE : token("color.accent"), true, "left", "top"), fontFamily: DISPLAY, wrap: false } }));
+        nodes.push(textPrimitive({ id: stableId(id, "item", index), role: "takeaways-item", frame: { x: x + numeralWidth, y, width: width - numeralWidth, height: item.height }, text: item.text, style: { ...textStyle(token("type.heading"), foreground, true, "left", "top"), lineHeight: item.lineHeight, wrap: false }, data: { textLayout: item } }));
+      });
+      return { ...page, nodes: [...nodes, ...page.nodes] };
+    }, measureContent: ({ frame, props }) => {
+      const width = (props.panelWidth ?? frame.width) - CHROME.left - CHROME.right;
+      const title = measureText(props.title || "Key takeaways", width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.sectionTitle")), bold: true, wrapWidthRatio: 1 });
+      const items = (Array.isArray(props.items) ? props.items : []).map((item) => measureText(String(item), width - 64, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: 1 }));
+      return { height: CHROME.titleTop + 8 + title.height + tokenValue(token("space.4")) + 12 + items.reduce((sum, item) => sum + item.height + 16, 0) };
+    } }),
+    // The statement page (e-Conomy, Bain keynotes): one sentence set large and
+    // centred, its key phrase in the accent (bold white on navy), a short accent
+    // rule above; with a photograph (media.mjs) the sentence sits on a navy card.
+    component({ id: "statement", category: "navigation", role: "statement", tokens: ["color.canvas", "color.ink", "color.onPrimary", "color.accent", "font.display", "font.body", "type.deckTitle", "type.heading", "line.hairline", "line.standard", "radius.none", "space.4", "space.5", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { text: "The pandemic has been a catalyst for existing digital users to adopt new online services.", accent: ["adopt new online services"] }, render: ({ id, frame, props }) => {
+      for (const key of Object.keys(props)) if (!["text", "accent", "subtext", "mode", "card", "pageTemplate", "source", "note", "companyName", "pageNumber", "footerLeft", "footerRight", "headerBandHeight"].includes(key)) throw new Error(`Unknown statement setting: ${key}`);
+      if (typeof props.text !== "string" || !props.text.trim()) throw new Error("Statement requires text");
+      const inverse = (props.mode ?? "light") === "dark";
+      const page = renderPageTemplate({ id: stableId(id, "page"), frame, props: { ...props, inverse } });
+      const phrases = (Array.isArray(props.accent) ? props.accent : props.accent ? [props.accent] : []).filter((p) => typeof p === "string" && p.trim());
+      // Split the sentence into runs at each accent phrase, in order of appearance.
+      const runs = [];
+      let rest = props.text.trim();
+      while (rest.length) {
+        const hits = phrases.map((p) => ({ p, at: rest.indexOf(p) })).filter((h) => h.at >= 0).sort((a, b) => a.at - b.at);
+        if (!hits.length) { runs.push({ text: rest, bold: false }); break; }
+        const { p, at } = hits[0];
+        if (at > 0) runs.push({ text: rest.slice(0, at), bold: false });
+        runs.push({ text: p, bold: true, ...(inverse ? {} : { accent: true }) });
+        rest = rest.slice(at + p.length);
+      }
+      const card = props.card ?? null;
+      const width = card ? card.width - 2 * tokenValue(token("space.5")) : Math.round(frame.width * 0.72);
+      const fontSize = tokenValue(token("type.deckTitle"));
+      const layout = measureTextRuns(runs, width, { fontFamily: tokenValue(DISPLAY), fontSize, wrapWidthRatio: 1 });
+      if (layout.lines.length > 5) throw new Error("Statement runs to more than five lines; shorten it");
+      const sub = typeof props.subtext === "string" && props.subtext.trim() ? measureText(props.subtext.trim(), width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), wrapWidthRatio: 1 }) : null;
+      const gap = tokenValue(token("space.4"));
+      const blockHeight = 4 + gap + layout.height + (sub ? gap + sub.height : 0);
+      const cx = card ? card.x + card.width / 2 : frame.x + frame.width / 2;
+      const top = card ? card.y + (card.height - blockHeight) / 2 : frame.y + (frame.height - blockHeight) / 2;
+      const background = inverse ? INK : token("color.canvas"), foreground = inverse || card ? WHITE : INK;
+      const nodes = [];
+      if (!card) nodes.push(rectPrimitive({ id: stableId(id, "surface"), role: "statement-surface", frame, style: boxStyle(background, background, HAIRLINE, token("radius.none")) }));
+      nodes.push(rectPrimitive({ id: stableId(id, "accent-bar"), role: "divider-accent", frame: { x: cx - 32, y: top, width: 64, height: 4 }, style: boxStyle(token("color.accent"), "none", HAIRLINE, token("radius.none")) }));
+      nodes.push(textPrimitive({ id: stableId(id, "text"), role: "statement-text", frame: { x: cx - width / 2, y: top + 4 + gap, width, height: layout.height }, text: layout.text, runs: layout.runs, style: { ...textStyle(token("type.deckTitle"), foreground, false, "center", "top"), fontFamily: DISPLAY, lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
+      if (sub) nodes.push(textPrimitive({ id: stableId(id, "subtext"), role: "statement-subtext", frame: { x: cx - width / 2, y: top + 4 + gap + layout.height + gap, width, height: sub.height }, text: sub.text, style: { ...textStyle(token("type.heading"), foreground, false, "center", "top"), lineHeight: sub.lineHeight, wrap: false }, data: { textLayout: sub } }));
+      return { ...page, nodes: [...nodes, ...page.nodes] };
+    }, measureContent: ({ frame, props }) => {
+      const width = Math.round(frame.width * 0.72);
+      const layout = measureText(String(props.text ?? ""), width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")), wrapWidthRatio: 1 });
+      return { height: 4 + 2 * tokenValue(token("space.4")) + layout.height };
     } }),
     component({ id: "source", category: "shared", role: "source", tokens: ["font.body", "type.source", "color.textSecondary", "color.rule", "line.hairline"], preferredSize: { width: 920, height: 26 }, sample: { text: "Source: (Insert source)" }, render: ({ id, frame, props }) => {
       const variant = resolveTitleVariant(props);
@@ -619,13 +1233,19 @@ function registerCore(registry) {
     } }),
     component({ id: "footnote", category: "shared", role: "footnote", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 600, height: 34 }, sample: { text: "Note: (Insert note)" }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "footnote-text", frame, text: props.text, style: textStyle(SOURCE, SECONDARY, false, "left", "top") })] }) }),
     component({ id: "page-number", category: "shared", role: "page-number", tokens: ["font.body", "type.source", "color.textSecondary"], preferredSize: { width: 48, height: 24 }, sample: { value: 7 }, render: ({ id, frame, props }) => ({ nodes: [textPrimitive({ id: stableId(id, "text"), role: "page-number", frame, text: String(props.value), style: textStyle(SOURCE, SECONDARY, false, "right") })] }) }),
-    component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "color.ink"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => {
+    component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "type.compact", "color.ink", "color.textSecondary"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => {
       if (typeof props.text !== "string" || !props.text.trim()) throw new Error(`paragraph ${id} requires a non-empty text string; keep geometry in the component frame`);
-      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: "paragraph", frame, text: props.text, style: textStyle(BODY, INK, false, props.align || "left", "top") })] };
+      const width = paragraphMeasure(frame.width, props);
+      // `variant: "caption"` is the line under a panel: compact, secondary, the
+      // finding this panel carries. The reference captions every panel in a row
+      // instead of closing the page with one shared so-what.
+      const caption = props.variant === "caption";
+      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: caption ? "panel-caption" : "paragraph", frame: { ...frame, width }, text: props.text, ...(props.runs?{runs:props.runs}:{}), style: textStyle(caption ? COMPACT : BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") })] };
     } }),
-    component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.componentPrimary", "color.onPrimary", "space.1", "space.3", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "circle" }) }) }),
-    component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.4", "space.5", "space.6", "line.hairline", "radius.small"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
-    component({ id: "evidence-note", category: "section", role: "evidence-note", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.4", "space.5", "space.6", "line.hairline", "radius.small"], preferredSize: { width: 1160, height: 150 }, sample: { heading: "Measurement basis", text: "(Insert scope, period or scenario assumptions)" }, render: input => { if (!input.props.heading || !input.props.text) throw new Error("Evidence note requires heading and body"); return { nodes: insightNodes({...input, props:{...input.props, variant:"neutral", align:"left"}}).map(node => ({...node, role:node.role.replace("insight-", "evidence-note-")})) }; } }),
+    component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.accent", "color.componentPrimary", "color.onPrimary", "color.rule", "space.1", "space.3", "space.4", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "circle" }) }) }),
+    component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.3", "space.4", "space.5", "space.6", "line.hairline", "line.standard", "radius.small", "radius.round", "icon.medium"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
+    component({ id: "callout", category: "section", role: "callout", tokens: ["color.calloutTint", "color.caution", "color.accent", "color.surface", "color.ink", "font.body", "type.compact", "type.body", "space.2", "space.3", "space.4", "line.hairline", "radius.none"], preferredSize: { width: 360, height: 72 }, sample: { text: "(Insert reading note)" }, render: input => ({ nodes: calloutNodes(input) }) }),
+    component({ id: "evidence-note", category: "section", role: "evidence-note", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.3", "space.4", "space.5", "space.6", "line.hairline", "line.standard", "radius.small", "radius.round", "icon.medium"], preferredSize: { width: 1160, height: 150 }, sample: { heading: "Measurement basis", text: "(Insert scope, period or scenario assumptions)" }, render: input => { if (!input.props.heading || !input.props.text) throw new Error("Evidence note requires heading and body"); return { nodes: insightNodes({...input, props:{...input.props, variant:"neutral", align:"left"}}).map(node => ({...node, role:node.role.replace("insight-", "evidence-note-")})) }; } }),
     component({ id: "panel", category: "section", role: "panel", tokens: ["color.surface", "color.surfaceMuted", "color.componentPrimary", "color.rule", "color.ink", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "radius.none", ...[1, 2, 3, 4, 5, 6].map(index => `color.chartSeries${index}`)], preferredSize: { width: 400, height: 240 }, sample: { heading: "(Insert panel heading)", text: "(Insert panel description)" }, render: ({ id, frame, props, tokens = TOKENS }) => {
       const tone = props.tone || "open";
       const seriesColorIndex = props.seriesColorIndex;
@@ -641,7 +1261,7 @@ function registerCore(registry) {
     component({ id: "legend", category: "data", role: "legend", tokens: LEGEND_TOKENS, preferredSize: { width: 420, height: 44 }, sample: { items: ["Actual", "Forecast", "Target"] }, render: input => ({ nodes: legendNodes(input) }) }),
     component({
       id: "chart-callout", category: "data", role: "annotation",
-      tokens: ["color.surface", "color.rule", "color.componentPrimary", "color.ink", "font.body", "font.bodySemibold", "weight.semibold", "type.chartAnnotation", "line.hairline", "line.standard", "radius.none"],
+      tokens: ["color.surface", "color.rule", "color.componentPrimary", "color.ink", "color.onPrimary", "font.body", "font.bodySemibold", "weight.semibold", "type.chartAnnotation", "line.hairline", "line.standard", "radius.none", "radius.small"],
       preferredSize: { width: 260, height: 90 },
       sample: { text: "(Insert evidence annotation)", direction: "down" },
       variants: { bordered: {}, borderless: { props: { border: false } } },
@@ -660,9 +1280,14 @@ function registerCore(registry) {
       if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(props.dataUri) || !props.alt?.trim() || !props.authorization?.trim()) throw new Error("Image requires embedded PNG/JPEG, alt text and authorization");
       return { nodes: [primitive({ type: "image", id: stableId(id, "image"), role: "image", frame, data: { dataUri: props.dataUri, alt: props.alt, authorization: props.authorization, circular: false } })] };
     } return ({ nodes: [rectPrimitive({ id: stableId(id, "frame"), role: "image-frame", frame, style: boxStyle(MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS), data: { alt: props.alt } }), textPrimitive({ id: stableId(id, "alt"), role: "image-alt", frame: { x: frame.x + 24, y: frame.y + frame.height / 2 - 18, width: frame.width - 48, height: 36 }, text: props.alt, style: textStyle(LABEL, SECONDARY, true, "center") })] }); } }),
-    component({ id: "icon", category: "media", role: "icon", tokens: ["color.componentPrimary", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.label", "line.hairline", "radius.round"], preferredSize: { width: 90, height: 90 }, sample: { symbol: "✓", label: "(Insert label)" }, render: ({ id, frame, props }) => {
-      const size = Math.min(frame.width, frame.height * 0.62);
-      return { nodes: [ellipsePrimitive({ id: stableId(id, "surface"), role: "icon-surface", frame: { x: frame.x + (frame.width - size) / 2, y: frame.y, width: size, height: size }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }), textPrimitive({ id: stableId(id, "symbol"), role: "icon-symbol", frame: { x: frame.x + (frame.width - size) / 2, y: frame.y, width: size, height: size }, text: props.symbol, style: textStyle(token("type.heading"), WHITE, true, "center") }), textPrimitive({ id: stableId(id, "label"), role: "icon-label", frame: { x: frame.x, y: frame.y + size + 8, width: frame.width, height: frame.height - size - 8 }, text: props.label, style: textStyle(LABEL, INK, true, "center", "top") })] };
+    component({ id: "icon", category: "media", role: "icon", tokens: ["color.componentPrimary", "color.onPrimary", "color.ink", "color.surface", "font.body", "type.heading", "type.compact", "type.label", "line.hairline", "line.standard", "radius.round", "icon.medium"], preferredSize: { width: 90, height: 90 }, sample: { icon: "target", label: "(Insert label)" }, render: ({ id, frame, props }) => {
+      // A line icon in a ring (the deck's one icon treatment) with a label under
+      // it. `symbol` (a glyph) is honoured for backwards compatibility.
+      const size = Math.min(frame.width, props.label ? frame.height * 0.62 : frame.height);
+      const x = frame.x + (frame.width - size) / 2;
+      const nodes = iconMarker({ id: stableId(id, "mark"), role: "icon", x, y: frame.y, size, icon: props.icon || props.symbol, tone: props.tone || "outline" });
+      if (props.label) nodes.push(textPrimitive({ id: stableId(id, "label"), role: "icon-label", frame: { x: frame.x, y: frame.y + size + 8, width: frame.width, height: frame.height - size - 8 }, text: props.label, style: textStyle(LABEL, INK, true, "center", "top") }));
+      return { nodes };
     } }),
     component({ id: "logo", category: "media", role: "logo", tokens: ["color.surface", "color.rule", "color.ink", "font.display", "type.heading", "line.hairline", "radius.small"], preferredSize: { width: 220, height: 90 }, sample: { text: "(Insert logo)" }, render: ({ id, frame, props }) => ({ nodes: [rectPrimitive({ id: stableId(id, "backing"), role: "logo-backing", frame, style: boxStyle() }), textPrimitive({ id: stableId(id, "text"), role: "logo-text", frame: insetFrame(frame, 12), text: props.text, style: { ...textStyle(token("type.heading"), INK, true, "center"), fontFamily: DISPLAY } })] }) }),
     component({ id: "process", category: "relationship", role: "process", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 900, height: 280 }, sample: { items: ["(Insert step 1)", "(Insert step 2)", "(Insert step 3)", "(Insert step 4)"], active: 2 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props: { ...props, items: props.items.map((label) => typeof label === "string" ? { label } : label) } }) }) }),
@@ -689,7 +1314,7 @@ function registerCore(registry) {
     component({ id: "journey", category: "relationship", role: "journey", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 960, height: 300 }, sample: { items: [{ label: "(Insert stage 1)", touchpoint: "(Insert touchpoint 1)" }, { label: "(Insert stage 2)", touchpoint: "(Insert touchpoint 2)" }, { label: "(Insert stage 3)", touchpoint: "(Insert touchpoint 3)" }, { label: "(Insert stage 4)", touchpoint: "(Insert touchpoint 4)" }], active: 3 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props, journey: true }) }) }),
     component({ id: "tree", category: "relationship", role: "tree", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert root question)", children: ["(Insert branch 1)", "(Insert branch 2)", "(Insert branch 3)", "(Insert branch 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props }) }) }),
     component({ id: "organization", category: "relationship", role: "organization", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.none", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert parent role)", children: ["(Insert role 1)", "(Insert role 2)", "(Insert role 3)", "(Insert role 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props, organization: true }) }) }),
-    component({ id: "matrix", category: "relationship", role: "matrix", tokens: ["color.componentPrimary", "color.chartSeries2", "color.surface", "color.rule", "color.ink", "color.positive", "color.caution", "color.negative", "color.onPrimary", "font.body", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 720, height: 410 }, sample: { xAxis: { label: "Effort", minLabel: "Low", maxLabel: "High" }, yAxis: { label: "Impact", minLabel: "Low", maxLabel: "High" }, points: [{ label: "A", x: 0.24, y: 0.35 }, { label: "B", x: 0.56, y: 0.62 }, { label: "C", x: 0.76, y: 0.82 }], highlight: 2 }, render: ({ id, frame, props }) => ({ nodes: matrixNodes({ id, frame, props }) }) }),
+    component({ id: "matrix", category: "relationship", role: "matrix", tokens: ["color.componentPrimary", "color.accent", "color.accentTint", "color.surfaceMuted", "color.textSecondary", "color.chartSeries2", "color.surface", "color.rule", "color.ink", "color.positive", "color.caution", "color.negative", "color.onPrimary", "font.body", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 720, height: 410 }, sample: { xAxis: { label: "Effort", minLabel: "Low", maxLabel: "High" }, yAxis: { label: "Impact", minLabel: "Low", maxLabel: "High" }, points: [{ label: "A", x: 0.24, y: 0.35 }, { label: "B", x: 0.56, y: 0.62 }, { label: "C", x: 0.76, y: 0.82 }], highlight: 2 }, render: ({ id, frame, props }) => ({ nodes: matrixNodes({ id, frame, props }) }) }),
     component({ id: "map", category: "relationship", role: "map", tokens: MAP_TOKENS, preferredSize: { width: 920, height: 440 }, sample: { geography: "world", markers: [{ label: "Americas", x: 0.2, y: 0.45, fraction: 0.75 }, { label: "Europe", x: 0.5, y: 0.34, fraction: 0.5 }, { label: "Asia", x: 0.77, y: 0.44, fraction: 0.25 }] }, render: ({ id, frame, props }) => ({ nodes: mapNodes({ id, frame, props }) }) }),
     component({ id: "funnel", category: "relationship", role: "funnel", tokens: ["color.componentPrimary", "color.chartSeries2", "color.chartSeries3", "color.chartSeries4", "color.onPrimary", "color.ink", "font.body", "type.compact", "line.hairline", "radius.small"], preferredSize: { width: 700, height: 360 }, sample: { stages: [{ label: "Market", value: 100 }, { label: "Qualified", value: 62 }, { label: "Engaged", value: 38 }, { label: "Won", value: 18 }] }, render: ({ id, frame, props, tokens = TOKENS }) => {
       const colors = [PRIMARY, token("color.chartSeries2"), token("color.chartSeries3"), token("color.chartSeries4")];
@@ -703,11 +1328,49 @@ function registerCore(registry) {
         return [...(width > 0 ? [rectPrimitive({ id: stableId(id, "stage", index), role: "funnel-stage", frame: { x, y: frame.y + index * height + 3, width, height: height - 6 }, style: boxStyle(fill, fill, HAIRLINE, SMALL_RADIUS) })] : []), textPrimitive({ id: stableId(id, "label", index), role: "funnel-label", frame: { x: frame.x + plotWidth + 12, y: frame.y + index * height + 3, width: frame.width - plotWidth - 12, height: height - 6 }, text: `${stage.label}  ${stage.value}`, style: textStyle(COMPACT, INK, true, "left") })];
       }) };
     } }),
-    component({ id: "connector", category: "relationship", role: "connector", tokens: ["color.componentPrimary", "color.onPrimary", "font.body", "type.label", "line.standard", "line.hairline", "icon.medium", "radius.round"], preferredSize: { width: 360, height: 90 }, sample: { label: "therefore", variant: "labelled-line" }, render: ({ id, frame, props }) => {
+    component({ id: "connector", category: "relationship", role: "connector", tokens: ["color.componentPrimary", "color.onPrimary", "font.body", "type.label", "color.rule", "line.standard", "line.hairline", "icon.medium", "icon.large", "space.2", "radius.round"], preferredSize: { width: 360, height: 90 }, sample: { label: "therefore", variant: "labelled-line" }, render: ({ id, frame, props }) => {
       const variant = props.variant ?? (props.label ? "labelled-line" : "disc-chevron"), centerY = frame.y + frame.height / 2;
       if (variant === "chevron") return { nodes: [lightChevronNode(id, frame)] };
+      // `divider-chevron`: a dashed rule down the gutter with the disc centred
+      // on it, for a right-hand column that runs full bleed (a toned panel, a
+      // photograph) where a floating disc would have nothing to sit against.
+      if (variant === "divider-chevron") {
+        // The dashed rule with the disc sitting on it, broken around the disc.
+        // It takes the orientation of the frame it is given: down a gutter
+        // between two columns, or across the page between a row of measures and
+        // what follows from them. The chevron points down either way - it is
+        // the same device saying the same thing, and "therefore" reads
+        // downwards on a page whatever direction the rule runs.
+        const across = frame.width > frame.height;
+        const diameter = Math.min(props.size ?? tokenValue(token("icon.large")), frame.width, frame.height);
+        const centerX = frame.x + frame.width / 2;
+        const gap = diameter / 2 + tokenValue(token("space.2"));
+        const start = across ? frame.x : frame.y, end = across ? frame.x + frame.width : frame.y + frame.height;
+        const middle = across ? centerX : centerY;
+        const segment = (suffix, from, to) => linePrimitive({
+          id: stableId(id, suffix), role: "relationship-divider",
+          x1: across ? from : centerX, y1: across ? centerY : from,
+          x2: across ? to : centerX, y2: across ? centerY : to,
+          style: { stroke: RULE, lineWidth: HAIRLINE, dash: "dash" }, data: { relation: "implies", orientation: across ? "horizontal" : "vertical" },
+        });
+        // The chevron points the way the argument runs: along a vertical gutter
+        // it points across to the meaning beside it, and on a rule drawn across
+        // the page it points down, at what follows from the row above.
+        const chevron = across
+          ? [[centerX - diameter / 4, centerY - diameter / 8, centerX, centerY + diameter / 8],
+             [centerX, centerY + diameter / 8, centerX + diameter / 4, centerY - diameter / 8]]
+          : [[centerX - diameter / 8, centerY - diameter / 4, centerX + diameter / 8, centerY],
+             [centerX + diameter / 8, centerY, centerX - diameter / 8, centerY + diameter / 4]];
+        return { nodes: [
+          segment("rule-top", start, Math.max(start, middle - gap)),
+          segment("rule-bottom", Math.min(end, middle + gap), end),
+          ellipsePrimitive({ id: stableId(id, "disc"), role: "relationship-disc", frame: { x: centerX - diameter / 2, y: centerY - diameter / 2, width: diameter, height: diameter }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")), data: { relation: "implies", arrowVariant: variant } }),
+          openLine(stableId(id, "chevron-top"), ...chevron[0], "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 1 }),
+          openLine(stableId(id, "chevron-bottom"), ...chevron[1], "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 2 })
+        ] };
+      }
       if (variant === "disc-chevron") {
-        const diameter = tokenValue(token("icon.medium")), centerX = frame.x + frame.width / 2;
+        const diameter = Math.min(props.size ?? tokenValue(token("icon.large")), frame.width, frame.height), centerX = frame.x + frame.width / 2;
         return { nodes: [
           ellipsePrimitive({ id: stableId(id, "disc"), role: "relationship-disc", frame: { x: centerX - diameter / 2, y: centerY - diameter / 2, width: diameter, height: diameter }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")), data: { relation: "implies", arrowVariant: variant, arrowPart: 0 } }),
           openLine(stableId(id, "chevron-top"), centerX - diameter / 8, centerY - diameter / 4, centerX + diameter / 8, centerY, "relationship-chevron", WHITE, STANDARD, { relation: "implies", arrowVariant: variant, arrowPart: 1 }),
@@ -733,7 +1396,12 @@ function registerCore(registry) {
     } }),
   ];
   for (const definition of definitions) {
+    if (["process", "roadmap", "timeline", "journey"].includes(definition.id)) {
+      definition.tokens.push("space.2");
+      definition.version = "2.1.0";
+    }
     if (["table", "comparison-table", "heatmap", "trend-rows"].includes(definition.id)) {
+      definition.version = "3.2.0";
       definition.tokens = TABLE_TOKENS;
       const normalize = props => {
         if (definition.id === "heatmap") return { ...props, columns: props.columns.map((label,index)=>({label,type:index?'heatmap':'text',scale:index?'score':undefined})), rows: props.rows.map(row=>row.map((value,index)=>index?{value}:value)), scales: {score:{type:'heatmap',label:'Assessment',min:1,max:5,anchors:{1:'Low',3:'Medium',5:'High'}}} };
@@ -763,12 +1431,12 @@ function registerCore(registry) {
         definition.render=input=>{if(!Object.hasOwn(TABLE_VARIANTS,definition.resolveVariant(input.props)))throw new Error('Unknown table variant');return render(input);};
       }
     }
-    const axes = { section: ["treatment", ["open", "muted", "primary"]], panel: ["tone", ["open", "muted", "primary", "dark"]], "content-rail": ["treatment", ["muted", "open"]], roadmap: ["variant", ["process", "wave-columns"]], "section-heading": ["variant", ["standard", "accent", "inverse"]] };
+    const axes = { section: ["treatment", ["open", "muted", "primary", "dark", "tint"]], panel: ["tone", ["open", "muted", "primary", "dark"]], "content-rail": ["treatment", ["muted", "open"]], roadmap: ["variant", ["process", "wave-columns"]], "section-heading": ["variant", ["standard", "accent", "inverse"]] };
     axes["section-boundary"] = ["variant", ["related", "inference", "inference-chevron", "subsection"]];
     axes.metric = ["variant", ["default", "prominent"]];
-    axes.connector = ["variant", ["disc-chevron", "chevron", "line", "labelled-line"]];
+    axes.connector = ["variant", ["disc-chevron", "divider-chevron", "chevron", "line", "labelled-line"]];
     axes["bullet-list"] = ["variant", ["compact", "body"]];
-    axes.insight = ["variant", ["tonal", "neutral", "dotted", "primary"]];
+    axes.insight = ["variant", ["tonal", "neutral", "dotted", "primary", "plain"]];
     if (axes[definition.id]) {
       const [prop, choices] = axes[definition.id];
       definition.variants = Object.fromEntries(choices.map(choice => [choice, {}]));
@@ -782,21 +1450,71 @@ function registerCore(registry) {
       const render = definition.render;
       definition.render = input => { definition.resolveVariant(input.props); return render(input); };
     }
-    if (definition.id === "roadmap") definition.variants["wave-columns"] = { preferredSize: { width: 1160, height: 480 }, props: { items: [1, 2, 3].map((index) => ({ heading: `(Insert wave ${index} heading)`, range: `(Insert time range ${index})`, activities: ["(Insert activity)"], deliverables: ["(Insert deliverable)"] })) } };
+    if (definition.id === "timeline") {
+      definition.version = "2.2.0";
+      definition.tokens = [...new Set([...definition.tokens, ...SCHEDULE_TOKENS])];
+      definition.variants = { process: {}, ...SCHEDULE_VARIANTS, "phase-hierarchy": { preferredSize:{width:1160,height:380}, props:{...PHASE_HIERARCHY_SAMPLE,items:undefined} } };
+      definition.tokens = [...new Set([...definition.tokens,...QUALITATIVE_TOPOLOGY_TOKENS])];
+      definition.version = "2.3.0";
+      definition.defaultVariant = "process";
+      definition.variantProp = "variant";
+      definition.resolveVariant = (props = {}) => {
+        const variant = props.variant ?? "process";
+        if (!Object.hasOwn(definition.variants, variant)) throw new Error(`Unknown timeline variant: ${variant}`);
+        return variant;
+      };
+      const render = definition.render;
+      const schedule = input => definition.resolveVariant(input.props) === "phase-hierarchy" ? renderPhaseHierarchy(input) : definition.resolveVariant(input.props) === "time-grid" ? timeGrid(input) : datedLanes(input);
+      definition.render = input => definition.resolveVariant(input.props) === "process" ? render(input) : schedule(input);
+      definition.measureIntrinsic = input => definition.resolveVariant(input.props) === "process" ? null : schedule({ ...input, id: input.id ?? "measure", frame: { ...input.frame, height: input.frame.height ?? Number.MAX_SAFE_INTEGER } });
+    }
+    if (definition.id === "funnel") {
+      definition.version = "2.0.0";
+      definition.tokens = [...new Set([...definition.tokens,...QUALITATIVE_TOPOLOGY_TOKENS])];
+      definition.variants = { quantitative:{}, qualitative:{preferredSize:{width:1160,height:480},props:QUALITATIVE_FUNNEL_SAMPLE} };
+      definition.defaultVariant = "quantitative"; definition.variantProp = "variant";
+      definition.resolveVariant = (props={}) => {const variant=props.variant??"quantitative";if(!Object.hasOwn(definition.variants,variant))throw new Error(`Unknown funnel variant: ${variant}`);return variant;};
+      const render = definition.render;
+      definition.render = input => definition.resolveVariant(input.props)==="qualitative" ? renderQualitativeFunnel(input) : render(input);
+      definition.measureIntrinsic = input => definition.resolveVariant(input.props)==="qualitative" ? measureQualitativeFunnel(input) : null;
+    }
+    if (definition.id === "roadmap") {
+      definition.version = "2.2.0";
+      definition.tokens.push("space.2", "space.3", "space.4", "icon.medium");
+      definition.variants["wave-columns"] = { preferredSize: { width: 1160, height: 480 }, props: { items: [1, 2, 3].map((index) => ({ heading: `(Insert wave ${index} heading)`, range: `(Insert time range ${index})`, activities: ["(Insert activity)"], deliverables: ["(Insert deliverable)"] })) } };
+      definition.version = "2.3.0";
+      definition.tokens = [...new Set([...definition.tokens, ...PHASE_WORKSTREAM_TOKENS])];
+      Object.assign(definition.variants, PHASE_WORKSTREAM_VARIANTS);
+      const priorResolve = definition.resolveVariant;
+      definition.resolveVariant = props => props?.variant === "phase-workstreams" ? "phase-workstreams" : priorResolve(props);
+      const priorRender = definition.render;
+      definition.render = input => definition.resolveVariant(input.props) === "phase-workstreams" ? renderPhaseWorkstreams(input) : priorRender(input);
+      definition.measureIntrinsic = ({ frame, props }) => definition.resolveVariant(props) === "phase-workstreams" ? measurePhaseWorkstreams({frame,props}) : definition.resolveVariant(props) === "wave-columns" ? waveRoadmapLayout(frame, props) : null;
+    }
     if (definition.id === "bullet-list") {
-      definition.tokens.push("type.body", "space.2", "space.4");
+      definition.tokens.push("type.body", "space.2", "space.4", ...MARK_TOKENS, "color.positive", "color.negative");
       const render = definition.render;
       definition.render = input => definition.resolveVariant(input.props) === "body" ? { nodes: bodyListNodes(input) } : render(input);
       definition.measureContent = ({ frame, props }) => {
         if (definition.resolveVariant(props) !== "body") throw new Error("Content measurement requires the body bullet-list variant");
-        return bodyListLayout(frame, props.items);
+        return bodyListLayout(frame, props.items, props);
       };
+      definition.measureIntrinsic = input => definition.resolveVariant(input.props) === "body" ? definition.measureContent(input) : null;
     }
+    if (definition.id === "paragraph") definition.measureContent = ({ frame, props }) => {
+      // Geometry-only layout probes have no copy yet; rendering still requires it.
+      if (!Object.hasOwn(props ?? {}, "text")) return null;
+      if (typeof props.text !== "string" || !props.text.trim()) throw new Error("paragraph requires a non-empty text string for measurement");
+      if(props.runs && props.runs.map(r=>r.text).join("")!==props.text)throw new Error("Paragraph emphasis must preserve exact text");
+      return (props.runs?measureTextRuns:measureText)(props.runs||props.text, paragraphMeasure(frame.width, props), { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false, wrapWidthRatio: 1 });
+    };
+    if (definition.id === "section") definition.measureInsets = ({ frame, props }) => sectionContentInsets(frame, props);
     if (definition.id === "section-heading") definition.variants.inverse = { backdrop: "primary" };
-    if (definition.id === "insight") definition.measureContent = ({ frame, props }) => { definition.resolveVariant(props); return insightLayout(frame, props); };
+    if (["insight", "evidence-note"].includes(definition.id)) definition.measureContent = ({ frame, props }) => { definition.resolveVariant(props); return insightLayout(frame, props); };
+    if (definition.id === "callout") definition.measureContent = ({ frame, props }) => calloutLayout(frame, props);
     if (definition.id === "section-boundary") definition.variants.subsection = { preferredSize: { width: 520, height: 24 } };
     if (definition.id === "map") {
-      definition.version = "3.0.0";
+      definition.version = "3.1.0";
       definition.variants = Object.fromEntries(MAP_PRESET_IDS.map((geography) => [geography, { props: { geography, markers: [] } }]));
       definition.defaultVariant = "world";
       definition.variantProp = "geography";
@@ -805,14 +1523,17 @@ function registerCore(registry) {
       const render = definition.render;
       definition.render = input => { definition.resolveVariant(input.props); return render(input); };
       definition.examples = {
+        "quantitative-regions": { props: {...CHOROPLETH_MAP_SAMPLE, highlightCountries:undefined, markers:undefined}, preferredSize: {width:600,height:400} },
         "imported-geometry": { props: { geography: CUSTOM_MAP_SAMPLE, highlightCountries: ["DEU"], markers: [{longitude:13.4,latitude:52.5,label:"Berlin",size:14}] } },
         "world-country-highlight": { props: { geography: "world", markers: [], highlightCountries: ["USA", "DEU", "CHN"] } },
         "country-marker-anchor": { props: { geography: "europe", markers: [{ country: "GBR", label: "United Kingdom", fraction: 1 }] } }
       };
     }
     if (definition.id === "legend") {
+      definition.version = "2.1.0";
       const visuallyDistinctPlacements = LEGEND_PLACEMENTS.filter(placement => placement !== "inline");
-      definition.variants = Object.fromEntries(Object.keys(LEGEND_VARIANTS).flatMap(mark => visuallyDistinctPlacements.map(placement => [`${mark}-${placement}`, { props: { variant: mark, placement, items: [{ label: "Actual", state: "actual" }, { label: "Forecast", state: "forecast" }, { label: "Target", state: "target" }] }, preferredSize: { width: 540, height: placement === "right" ? 120 : 44 } }])));
+      definition.variants = Object.fromEntries(Object.keys(LEGEND_VARIANTS).filter(mark => mark !== "quantitative-scale").flatMap(mark => visuallyDistinctPlacements.map(placement => [`${mark}-${placement}`, { props: { variant: mark, placement, items: [{ label: "Actual", state: "actual" }, { label: "Forecast", state: "forecast" }, { label: "Target", state: "target" }] }, preferredSize: { width: 540, height: placement === "right" ? 120 : 44 } }])));
+      definition.variants["quantitative-scale-top"] = {props: {...QUANTITATIVE_LEGEND_SAMPLE, items:undefined, placement:"top"}, preferredSize:{width:540,height:64}};
       definition.defaultVariant = "swatch-top";
       definition.resolveVariant = (props = {}) => `${props.variant ?? "swatch"}-${props.placement ?? "top"}`;
     }
@@ -821,8 +1542,12 @@ function registerCore(registry) {
       definition.defaultVariant = DEFAULT_TITLE_VARIANT;
       definition.variantProp = definition.id === "slide-chrome" ? "titleVariant" : "variant";
       definition.resolveVariant = definition.id === "slide-chrome"
-        ? (props = {}) => resolveTitleVariant({ variant: props.titleVariant, rule: props.titleRule })
+        ? (props = {}) => props.titleVariant === undefined && props.titleRule === undefined ? (houseStyle("style.titleRule") === "rule" ? "with-line" : DEFAULT_TITLE_VARIANT) : resolveTitleVariant({ variant: props.titleVariant, rule: props.titleRule })
         : resolveTitleVariant;
+    }
+    if (definition.id === "slide-chrome") {
+      definition.version = "2.1.0";
+      definition.examples = { "compact-content-spacing": { props: { pageTemplate: { contentSpacing: "compact" } } } };
     }
     if (definition.id === "source") {
       definition.variants = TITLE_VARIANTS; definition.defaultVariant = DEFAULT_TITLE_VARIANT;
@@ -871,12 +1596,16 @@ function registerCore(registry) {
         const ruled = rail ? props.treatment === "open" : props.rule !== false && props.treatment !== "muted";
         return { top: headerFrame.y, ruled, height: headingLayout(headerFrame, { ...props, rule: ruled }).bandHeight };
       };
+      if (definition.id === "section-heading") definition.measureIntrinsic = ({ frame = {}, props = {} }) => {
+        const measured = definition.measureHeader({ frame: { x: 0, y: 0, height: Number.MAX_SAFE_INTEGER, ...frame }, props });
+        return { height: measured?.height ?? 0 };
+      };
     }
     registry.set(definition.id, definition);
   }
   registry.set("chart-title", {
     id: "chart-title", version: "2.1.0", category: "shared", role: "chart-title",
-    tokens: [...SECTION_HEADING_TOKENS, "color.chartUnit", "space.1"],
+    tokens: [...SECTION_HEADING_TOKENS, "color.chartUnit", "color.accent", "color.textSecondary", "color.onPrimary", "type.compact", "space.1", "space.2", "space.3", "radius.round", "radius.none", ...STYLE_TOKENS],
     preferredSize: { width: 540, height: 76 }, sample: { heading: "(Insert chart title)", unit: "(Insert unit)" },
     variants: { underlined: {}, unit: { props: { unit: "Revenue share, %" } } }, defaultVariant: "underlined", variantProp: "variant", resolveVariant: resolveChartTitleVariant,
     measureContent: ({ frame, props }) => chartTitleLayout(frame, props),
@@ -890,7 +1619,7 @@ function registerCore(registry) {
 }
 
 export function createRegistry() {
-  return registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map()))))))));
+  return registerFramework(registerGantt(registerExtras(registerPanels(registerRelationshipNetwork(registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map())))))))))))));
 }
 
 export const REGISTRY = createRegistry();

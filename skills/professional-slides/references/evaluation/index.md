@@ -1,137 +1,83 @@
 # Evaluation
 
-Use this guide to decide whether a deck is ready. Keep generated decks, renders, plans, and review reports in one task-owned `output/` directory outside the installed plugin, never in committed source.
+A deck is ready when the deterministic page gates pass, the review accepts it, and the exported file renders as intended. Keep generated decks, renders, plans and review reports in one task-owned `output/` directory.
 
-For an evaluation, create a fresh output subdirectory and preserve the inputs and review evidence there. Keep control and treatment independent.
+## Page gates
+
+Measured on the rendered page, before any model is consulted. Each is a blocking result.
+
+| Gate | Code | Threshold |
+| --- | --- | --- |
+| Ink coverage | `INK_COVERAGE` | at least 11.5% of the content area (14% on a `full` deck, 5% on an `airy` one) — calibrated on pages with an exhibit, where the reference sample's first quartile is 12.1%. A page with **no** exhibit is held instead to the ink its own word floor produces (0.00052 per word, measured by rendering: 4.4% at the balanced 95-word floor), because a page of type cannot reach 11.5% at any honest length |
+| Trailing dead band | `DEAD_BAND` | at most 8% (6% full, 14% airy) |
+| Internal void | `INTERNAL_VOID` | at most 22% between two content blocks (16% full, 32% airy) |
+| Right column stops short | `COLUMN_VOID` | at most 20% of the page, `full` decks only |
+| Action title | `TITLE_LINES`, `TITLE_WORDS`, `HEDGED_TITLE` | at most two lines, within 14 words, no hedge lexicon |
+| Body type | `TYPE_RANGE` | 10 to 14 pt body, 8 to 11 pt chart furniture, 20 to 26 pt titles |
+| Characters per line | `CPL` | 35 to 90 |
+| Body words, exhibit page | `WORDS` | at most 100 prose words (`pre-read` 160, `appendix` 200; table cells and chart furniture are evidence, not prose) |
+| Hero exhibit, analytical page | `HERO_EXHIBIT` | at least 40% of the content area, carrying ink |
+| Layout repetition | `LAYOUT_MONOTONY` | no layout signature on more than 35% of content pages |
+| Page families | `PAGE_VARIETY` | at least three families across ten pages or more |
+| Measured pages | `EVIDENCE_MIX` | at least 45% of analytical pages carry a chart, a table or measured tiles |
+| Photographs | `IMAGE_BUDGET`, `IMAGE_RUN` | at most 30% of analytical pages, never more than two running |
+| Argument on a picture or comparison page | `MISSING_ARGUMENT` | an insight, a so-what or a points column |
+| One number over a table | `METRIC_STACK` | a lone tile belongs beside its evidence |
+| Sections and tracker | `NO_SECTIONS` | required past twelve analytical pages |
+| Contents page | `NO_CONTENTS` | a sectioned deck past twelve analytical pages says what its sections are |
+| Opening summary | `NO_SUMMARY` | the first content page states the answer (`shape: "executive-summary"`) |
+| Label punctuation | `DOT_SEPARATOR` | no bullet or middle dot joining two labels |
+| Body text floor | `THIN_PAGE` | the deck's `weight.pageWords`, counted in the body alone (95 balanced, 120 full); reference client slides carry 128 body words |
+| Notes carrying the page | `NOTE_HEAVY` | the footer stays under a third of the page's text |
+| Plan-time shortfall | `THIN_PLAN` | preflight: what the page will carry against the floor, with the remedy its own data offers |
+| Chart annotation | `UNANNOTATED` | a bracket, a flag, a change bubble, a base or an observation on any plot of three marks or more |
+| Page architecture | `PAGE_SHAPE_FLAT` | at least three distinct page architectures per ten analytical pages, none past 40% (reference decks run about five per ten, commonest 23%). The finding reports `constrainedPages`: pages carrying one exhibit and no commentary beside or above it, which leave the composer one viable shape. Where those are most of the deck, the repair names them and asks for commentary rather than for a different layout |
+| Commentary column | `COLUMN_MONOTONY` | at most three consecutive pages marked with the same device (icon, numbered disc, hairline, prose) |
+| Deck shape | `DECK_FLAT` | past eight analytical pages, one page carries the detail: 282+ words, or a p80 a third above the median |
+| Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |
+| Marks in the exhibit | `PLOT_SPAN` | marks span `weight.plotSpan` of the exhibit frame (annotated and peer-aligned charts exempt) |
+| Table against its budget | `THIN_TABLE` | uses `weight.tableFill` of the page's row budget |
+| Values printed | `NUMBERS_ON_MARKS` | every mark while a chart has twelve or fewer, three otherwise |
+| Evidence elements | `THIN_EVIDENCE` | `weight.elements` (2 on a document-weight deck) |
+| Heading fit | `HEADING_WRAPS` | a heading that wraps where the frame could hold it on one line |
+| Numbers printed on the page | `NUMBERS_ON_PAGE` | at least 8 numeric tokens on a measured page (reference client pages carry 17) |
+| Axis ticks | `NICE_TICKS` | nice numbers |
+| Page did not render | `MISSING_RENDER` | every page the gates are asked to measure has a render |
+| Picture frame with no picture in it | `UNSOURCED_PICTURE` | a photograph written as `alt` with no `path` never reaches a reader |
+
+Two more findings share the shape but fire before the page is rendered, from the composer rather than the gates: `THIN_PLAN` (what the page will carry against its floor, with the remedy that page's own data offers) and `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
+
+`page_gates.GATE_CODES` is the list this table is checked against — a code cannot be renamed in the gates without this table failing, and a gate cannot emit a code that is not in it.
+
+## Review codes
+
+The model review reads each rendered page together with its text, layout roles, mapped evidence and the deck question, and receives that page's gate measurements as inputs. It may block with these codes:
+
+`FACTUAL_ERROR`, `UNSUPPORTED_CLAIM`, `MISLEADING_COMPARISON`, `MISSING_EVIDENCE`, `MISSING_ARGUMENT`, `UNREADABLE`, `OVERFLOW`, `BROKEN_GEOMETRY`, `PROVENANCE`.
+
+Design defects block too, and carry their own codes: `DEAD_SPACE`, `LAYOUT_MONOTONY`, `NO_HERO_EXHIBIT`, `OVERSIZED_TYPE`, `WALL_OF_TEXT`, `BURIED_NUMBER`, `HEDGED_TITLE`, `TITLE_TOO_LONG`, `INCONSISTENT_ENCODING`. `EDITORIAL` is the advisory one.
+
+Every blocking finding names the exact defect and a repair that is a sentence a person can act on. Findings without one of these codes are advisory and settle within the bounded repair pass. `runtime/reviewer.mjs` holds the vocabulary — it is the schema the review is validated against, so a code that is not there cannot be raised — and `rules.json` holds the rule IDs, severities and which of these codes are material.
+
+## Review dimensions
+
+**Story.** The deck answers the brief and has one governing thought. The title spine reads as an executive memo, or as a coherent explanatory progression. Each page has one job and one dominant exhibit, every decisive case maps to visible proof, and the close follows from the evidence. Missing data is explicit and counts as a gap rather than as completed analysis.
+
+**Evidence.** Claims reconcile with their exhibits and sources; facts, estimates and inferences stay distinguishable; charts use the correct scale, units, labels and series; every plotted coordinate encodes a real measure, calculation or named category position; requested annotations appear in the render; focal marks separate from comparators in colour and in greyscale.
+
+**Design.** The exported file and its full-size renders match the declared theme, colour ledger and treatment ledger. The composition fits the evidence and keeps one dominant exhibit, deck rhythm passes separately from style consistency, and labels sit beside the content they name.
+
+**Platform.** The requested editable format opens, native objects stay editable, fonts, charts, tables, notes and sources survive export, and the output directory contains only the requested deliverables.
 
 ## Per-deck self-review
 
-For skill-development tests, independently review the story before judging rendering. `evals/scripts/validate_story_plan.py` takes the original brief, proposed plan, and all supporting evidence/assumption ledgers via `--support`. It requires at least 90 in each of six story dimensions and no major or blocker finding. Preserve exact input hashes and adjudicate findings against the complete packet; a missing judge input is a harness defect, not an author failure.
-
-Test reusable changes with fresh-context authors on materially different communication jobs. Give them only the brief, raw evidence, and frozen skill, not earlier answers or reviewer repairs. Keep the first candidate and all review results; distinguish first-pass acceptance from later repaired delivery. Passing a small holdout set supports those tested cases, not a universal quality claim.
-
-Review the exact final editable artifact, not only the source code or an intermediate render.
-
 1. Render every slide.
-2. Review the full montage for story, rhythm, and repetition.
+2. Review the montage for story, rhythm and repetition.
 3. Inspect every slide at full size.
-4. Check titles, evidence, sources, and uncertainty.
-5. Check clipping, overlap, broken assets, and unreadable text.
-6. Apply the deletion test.
-7. For PowerPoint, require the four accepted artifacts in [PowerPoint reports](#powerpoint-reports); follow the linked platform owners for commands and repair loops.
+4. Check titles, evidence, sources and uncertainty.
+5. Check clipping, overlap, broken assets and unreadable text.
+6. Apply the deletion test to every page.
 
-Every planned slide maps to exactly one sequenced dot. New decks and structural revisions require a validated pre-authoring contract. Every full deck or recreation must include an executive summary in the approved dot-dash and final artifact. Bounded individual-slide edits preserve their authorized scope.
+## Comparing against a reference deck
 
-## Hard release gates
-
-Release only when all apply:
-
-### Story
-
-- The deck answers the brief and has one governing thought.
-- The title spine fulfils the [communication job](../storylining/index.md#write-the-title-spine): a clear executive memo for a decision, or a coherent explanatory progression for teaching.
-- Each slide has one narrative job and one dominant exhibit.
-- The mandatory executive summary and dot-dash pass the [standalone argument and evidence test](../storylining/dot-dash.md#standalone-argument-and-evidence-test). The summary preserves the approved governing branches and overall action and passes the [standalone narrative test](../components/copy.md#executive-summary-narrative).
-- The close follows from the evidence. Use implication chevrons at only one or two deliberate emphasis points; other supported relationships use clear grouping and reading order. Reject automatic chevrons on every insight.
-- Every decisive case maps to visible proof, including dedicated evidence slides where needed. Reject table-heavy synthesis that lacks the graphs needed to test its numerical claims, and statistics unrelated to the slide’s criterion.
-- Missing data is explicit; a missing-data statement never counts as completed analysis.
-
-### Evidence
-
-- Claims reconcile with their exhibits and sources.
-- Every page passes the [no-recap and new-deduction gate](../components/copy.md#no-recap-and-new-deduction-gate). Graph/table narration in any supporting copy and non-deductive insight boxes are release-blocking defects, not minor copy suggestions. The final review records explicit per-slide copy evidence.
-- Facts, estimates, claims, and inferences are distinguishable.
-- Charts use the correct scale, units, labels, and series. The [meaningful-position gate](../charts/index.md#meaningful-position-gate) is mandatory: inspect source transformations as well as renders and reject arbitrary within-category offsets, jitter, or scatter axes without two meaningful measures. Visual scores cannot override this evidence defect.
-- The final render contains each requested [change, gap, or threshold annotation](../components/chart-callouts.md#authoring-decision), and focal marks pass the [primary/comparator contrast check](../charts/index.md#focus-and-comparator-colours).
-- Tables are composed exhibits rather than raw spreadsheet grids.
-- No evidence is invented.
-
-### Design
-
-- The exact editable artifact and full-size renders pass the declared [theme](../theming/index.md), colour ledger, treatment ledger, and [design](../design/index.md) checks with no unexplained drift.
-- Status tables and heatmaps pass [comparison indicators](../components/comparison-indicators.md); navigation passes [trackers](../components/trackers/index.md).
-- Audience text passes [copy](../components/copy.md), and detached synthesis passes the [insight-box](../components/insight-box.md) cardinality and treatment checks.
-- The chosen [composition](../composition/index.md) fits the evidence, keeps one dominant exhibit, and leaves no under-composed analytical canvas.
-- [Deck rhythm](../design/index.md#deck-rhythm) passes separately from style consistency; repetitive chart runs and empty closing cards need an analytical reason, not a matching palette.
-- Every slide passes the full-size anti-slop audit with no unexplained object, label, treatment, or inconsistency.
-
-### Substance and grouping rejection checks
-
-Record a per-slide verdict with the exact claim, visible premises, inference limit, and any failed grouping in the review evidence. Apply the [claim-to-proof check](../components/copy.md#claim-to-proof-check) before layout and again to the exact render. A slide fails when its title exceeds the evidence, a comparative claim supplies only one side, a conclusion replaces evidence with imagery, or material statistical context is absent. Missing research is an unresolved gap, not permission to use unsupported rhetoric.
-
-Reject dangling headings, unaligned name/value text, detached qualifications, and side rails whose items have no visible parent or evidence relationship. Check actual label-to-content proximity and alignment at full size, not only whether the objects exist. Apply [analytical composites](../design/slide-layouts.md#analytical-composites) and [category visuals](../components/icons-and-logos.md#category-icons-and-images).
-
-At montage scale, reject an unjustified repeated image-plus-text silhouette, images on every analytical page, or a repair that turns every page into the same table or card template. Structural covers may be sparse; analytical pages must earn their space with readable evidence and reasoning. Passing geometry checks does not establish any of these semantic or visual gates.
-
-### Platform
-
-- The requested editable format exists and opens.
-- Native objects remain editable where expected.
-- Fonts, charts, tables, notes, and sources survive export.
-- PowerPoint and Google Slides are checked separately when both are requested.
-- The final output directory contains only requested deliverables.
-
-## PowerPoint validation owner
-
-All PowerPoint contract, semantic, exported-file, per-slide visual, and cross-slide consistency gates are subcommands of `evals/scripts/validate_pptx.py`. The script reads the canonical storylining, composition, design, component, chart, and evaluation owners through its `SKILL_REFERENCE_MAP`; do not create a parallel validator rulebook or another `validate_pptx*.py` entrypoint.
-
-## PowerPoint reports
-
-Every final PowerPoint candidate requires four acceptance artifacts bound to the same exact PPTX hash and governing inputs:
-
-- an accepted canonical generation receipt proving that the deck used the shared planner, scene, registry, theme tokens, HTML observer, PptxGenJS adapter, and Artifact Tool observer rather than a parallel builder;
-- an accepted deterministic hard report from [PowerPoint hard acceptance](../tools/powerpoint/acceptance.md);
-- an accepted per-slide visual report from [PowerPoint rendering and QA](../tools/powerpoint/rendering.md#independent-visual-reports);
-- an accepted cross-slide consistency report from the same rendering owner, using a different approved judge model.
-
-Every slide and deck dimension must score at least 90, every comparison group must accept, and no blocker or major finding may remain. The platform owners define commands, inspection scope, and rejection handling; this evaluation owner defines the release requirement.
-
-Run `python evals/scripts/validate_pptx.py provenance <deck.pptx> --receipt <canonical-generation-receipt.json> --generation-script <builder.mjs> --require-planning` for ordinary net-new decks. The gate recomputes the canonical runtime hash, reconciles the scene and design manifest, matches every scene node to the exact native PowerPoint object, binds the authoring script, and rejects direct PptxGenJS calls. Visual similarity cannot substitute for this proof.
-
-## Component-runtime gate
-
-After changing layout, tokens, components, charts, or adapters, run `npm run check` and then the golden runtime gate with the bundled workspace paths. The golden deck places compatible variants of one component on paginated grid boards, keeps dense or full-frame variants isolated, and includes a curated non-duplicative composition set. The exhaustive layout suite remains in regression tests. The report records every default and non-default component instance as an explicit coverage key, independent of slide count, and rejects duplicate visual branches that differ only by a variant name. Release validation uses the canonical McKinsey palette; other supported palette inputs remain fast contract checks rather than duplicate visual decks. The validator renders the HTML observer and exact saved PPTX, imports the PPTX with Artifact Tool, and rejects missing names, theme drift, or visual disagreement. Review both contact sheets and the lowest-scoring individual fixtures before accepting the report.
-
-Require the overlap gate in component reports. It checks rendered HTML line boxes and visible SVG geometry, then checks imported PPTX frames, paint order, recovered text, and explicit line counts. Reject text clipping, accidental text/text, text/rule, shape/shape, and connector collisions, and unequal peer heading clearances. A text backing must precede its text in native paint order. The imported-frame check does not replace exact-PPTX image review. Intentional containment and masking must match `runtime/overlap-policy.mjs`; a shared component, chart, or overlay alone never exempts a collision. Keep per-slide coverage and named violations, and test the gate with deliberately broken fixtures.
-
-## Defects
-
-The authoring term `critical` maps to the reporting severity `blocker`. Critical defects include corrupt or missing artifacts, invented evidence, misleading charts, unreadable renders, wrong platforms, and reference-fidelity breaches.
-
-Major defects include missing required structure, a bypassed pre-authoring gate, wrong navigation, broken assets, unsupported titles, generic copy, repeated decorative components, raw tables, under-resolved exhibits, inconsistent headers, and typography or spacing drift.
-
-Do not average defects away. One critical defect fails the deck. One major defect blocks release. The mean cannot compensate for a weak dimension.
-
-## Skill-effectiveness evaluation
-
-Self-review proves only that a deck is deliverable. It does not prove that the skill improves performance.
-
-For a release comparison:
-
-1. use the same brief, inputs, runtime, budget, and platform for control and treatment;
-2. keep the arms independent;
-3. blind reviewers to the arm;
-4. score the configured dimensions;
-5. record critical, major, and minor defects;
-6. compare overall and per-dimension results;
-7. declare acceptance thresholds before reviewing results.
-
-The treatment passes only when it clears the absolute threshold, improves by the required amount, and does not create a material dimension regression.
-
-## Result contract
-
-Each result records:
-
-- case ID and arm;
-- artifact and render paths;
-- pre-authoring review for self and treatment;
-- dimension scores;
-- critical, major, and minor defects;
-- anti-slop review with one audit record per slide;
-- deck-consistency review with material theme-manifest, treatment-ledger, and audit paths, full-deck comparison, palette-role verification, tracker-map verification, repeated-component verification, and zero unresolved findings;
-- the four [PowerPoint acceptance artifacts](#powerpoint-reports) for every self or treatment PPTX, with material paths, the same exact candidate hash, approved distinct judge models for visual and consistency review, iteration counts, and `accepted: true`;
-- reference comparison when required;
-- fresh-run preparation evidence;
-- reviewer notes.
-
-Keep the exact candidate, renders, governing inputs, and validator reports together. Do not claim acceptance from a narrative summary alone.
+Inspect every source page and every candidate render at full size, record the page mappings including deliberate consolidations and splits, and normalize type size against the source's visible crop. For each exhibit, identify the source's strongest analytical device and show how the candidate preserves or improves its function. Keeping every word and number does not pass when the reader must reconstruct a grouping the source made visible.
