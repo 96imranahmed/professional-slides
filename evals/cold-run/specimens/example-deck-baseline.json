@@ -1,71 +1,71 @@
 {
-  "schema": "professional-slides.cold-run-baseline/v1",
-  "$comment": "What the four example decks measure, scored by the same harness that scores a cold run. These are hand-authored decks that pass every page gate, so they are the closest thing in the tree to a target - and the harness is only trustworthy if it says so. Where one of them misses a bar, that is a finding about the deck, not a reason to move the bar: slideworks treats one table in six against a reference of about half, and it should treat more.",
-  "recorded": "2026-09-18",
-  "decks": {
-    "gallery-acceptance": {
-      "contentPages": 80,
-      "exhibitVarietyPerTen": 6.88,
-      "distinctExhibits": 55,
-      "tables": 14,
-      "tablesTreated": 0.5,
-      "charts": 30,
-      "chartsAnnotated": 0.33,
-      "drawingsPerPage": 22.69,
-      "reference": {
-        "exhibitVarietyPerTen": "7.1 to 8.3",
-        "tablesTreated": 0.47,
-        "chartsAnnotated": 0.36,
-        "drawingsPerPage": 29
-      }
-    },
-    "house-style": {
-      "contentPages": 6,
-      "exhibitVarietyPerTen": 18.33,
-      "distinctExhibits": 11,
-      "tables": 2,
-      "tablesTreated": 0,
-      "charts": 4,
-      "chartsAnnotated": 0.75,
-      "drawingsPerPage": 26.83,
-      "reference": {
-        "exhibitVarietyPerTen": "7.1 to 8.3",
-        "tablesTreated": 0.47,
-        "chartsAnnotated": 0.36,
-        "drawingsPerPage": 29
-      }
-    },
-    "nyc-or-sf": {
-      "contentPages": 9,
-      "exhibitVarietyPerTen": 11.11,
-      "distinctExhibits": 10,
-      "tables": 5,
-      "tablesTreated": 0.4,
-      "charts": 6,
-      "chartsAnnotated": 0.67,
-      "drawingsPerPage": 26.78,
-      "reference": {
-        "exhibitVarietyPerTen": "7.1 to 8.3",
-        "tablesTreated": 0.47,
-        "chartsAnnotated": 0.36,
-        "drawingsPerPage": 29
-      }
-    },
-    "slideworks": {
-      "contentPages": 16,
-      "exhibitVarietyPerTen": 10,
-      "distinctExhibits": 16,
-      "tables": 6,
-      "tablesTreated": 0.17,
-      "charts": 9,
-      "chartsAnnotated": 0.33,
-      "drawingsPerPage": 23.75,
-      "reference": {
-        "exhibitVarietyPerTen": "7.1 to 8.3",
-        "tablesTreated": 0.47,
-        "chartsAnnotated": 0.36,
-        "drawingsPerPage": 29
-      }
-    }
+ "schema": "professional-slides.cold-run-baseline/v1",
+ "$comment": "What the four example decks measure, scored by the same harness that scores a cold run. These are hand-authored decks that pass every page gate, so they are the closest thing in the tree to a target - and the harness is only trustworthy if it says so. Re-recorded after the floors were re-derived from 670 published decks (evals/corpus): tablesTreated rose everywhere because an untreated table past five rows now bands its own rows, and chartsAnnotated did not move at all. Two of these decks sit under the measured floor of 0.45, and that is a finding about the decks: gallery-acceptance draws thirty charts and marks the finding on ten of them, while published client decks mark 63%.",
+ "recorded": "2026-09-18",
+ "decks": {
+  "gallery-acceptance": {
+   "contentPages": 80,
+   "exhibitVarietyPerTen": 6.88,
+   "distinctExhibits": 55,
+   "tables": 14,
+   "tablesTreated": 0.79,
+   "charts": 30,
+   "chartsAnnotated": 0.33,
+   "drawingsPerPage": 22.25,
+   "reference": {
+    "exhibitVarietyPerTen": "7.1 to 8.3",
+    "tablesTreated": 0.89,
+    "chartsAnnotated": 0.63,
+    "drawingsPerPage": 32
+   }
+  },
+  "house-style": {
+   "contentPages": 6,
+   "exhibitVarietyPerTen": 20,
+   "distinctExhibits": 12,
+   "tables": 2,
+   "tablesTreated": 0.5,
+   "charts": 4,
+   "chartsAnnotated": 0.75,
+   "drawingsPerPage": 25,
+   "reference": {
+    "exhibitVarietyPerTen": "7.1 to 8.3",
+    "tablesTreated": 0.89,
+    "chartsAnnotated": 0.63,
+    "drawingsPerPage": 32
+   }
+  },
+  "nyc-or-sf": {
+   "contentPages": 9,
+   "exhibitVarietyPerTen": 11.11,
+   "distinctExhibits": 10,
+   "tables": 5,
+   "tablesTreated": 0.8,
+   "charts": 6,
+   "chartsAnnotated": 0.67,
+   "drawingsPerPage": 26.78,
+   "reference": {
+    "exhibitVarietyPerTen": "7.1 to 8.3",
+    "tablesTreated": 0.89,
+    "chartsAnnotated": 0.63,
+    "drawingsPerPage": 32
+   }
+  },
+  "slideworks": {
+   "contentPages": 10,
+   "exhibitVarietyPerTen": 14,
+   "distinctExhibits": 14,
+   "tables": 5,
+   "tablesTreated": 0.4,
+   "charts": 6,
+   "chartsAnnotated": 0.33,
+   "drawingsPerPage": 27.3,
+   "reference": {
+    "exhibitVarietyPerTen": "7.1 to 8.3",
+    "tablesTreated": 0.89,
+    "chartsAnnotated": 0.63,
+    "drawingsPerPage": 32
+   }
   }
+ }
 }
