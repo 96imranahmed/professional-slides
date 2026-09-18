@@ -30,6 +30,28 @@ echo "== unit tests =="
 suite_status=0
 "$PYTHON" -m unittest discover -s evals/tests -p "test_*.py" || suite_status=$?
 
+echo "== content stage (example plans) =="
+# The stage that decides whether a deck measures anything, run over whatever
+# example decks carry one. `plan_gates.mjs` and `content_gates.mjs` spent weeks
+# wired into nothing: a grep for either returned one hit, a sentence in a
+# reference document, while the deck they would have caught reached a reader.
+found=0
+for plan in skills/professional-slides/examples/*.content.json; do
+  [ -e "$plan" ] || continue
+  found=1
+  printf '  %-28s ' "$(basename "$plan")"
+  "$NODE" skills/professional-slides/runtime/gates/content_gates.mjs "$plan" --json \
+    | "$PYTHON" -c '
+import json, sys
+r = json.load(sys.stdin)
+kinds = ",".join(f"{n}:{c}" for n, c in r["statistics"]["kinds"].items() if c)
+state = "accepted" if r["accepted"] else "REJECTED " + ",".join(r["countsByCode"])
+print("%s | %d pages, %d%% measured, kinds %s"
+      % (state, r["pages"], round(100 * r["statistics"]["measured"]), kinds))
+' || true
+done
+[ "$found" = 1 ] || echo "  none: no example deck carries its content stage"
+
 echo "== page gates (fixture deck) =="
 # The audited fixture deck is expected to fail; this prints the counts so a
 # change in the runtime shows up as a change in the numbers.

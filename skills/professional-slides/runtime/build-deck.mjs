@@ -18,6 +18,8 @@ import { runProcess, lastJson } from "./process.mjs";
 import { deckStem } from "./artifact-path.mjs";
 import { assertOutputDirectory } from "./output-path.mjs";
 import { auditContent } from "./content-audit.mjs";
+import { runContentGates } from "./gates/content_gates.mjs";
+import { runPlanGates } from "./gates/plan_gates.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +37,37 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // longer exists. That masked a broken example deck here for four commits.
   await clearReports(directory);
 
+  // The stages before this one, gated - and, when they are absent, said to be
+  // absent.
+  //
+  // `content_gates.mjs` and `plan_gates.mjs` were wired into nothing: a grep for
+  // either returned one hit, a sentence in a reference file. A gate nobody runs
+  // on a file nobody writes is not a gate, and that is how a deck reached a
+  // reader with one chart in fifty pages while the gate that measures exactly
+  // that sat in the repository, passing, unrun.
+  //
+  // So the build looks for them beside the spec, runs whichever it finds, and
+  // records `absent` for whichever it does not. A deck built with no content
+  // plan is allowed - not every page of a rebuild needs one - but the build
+  // output says so, which is the difference between a stage that was skipped
+  // and a stage that does not exist.
+  const result = { status: "planned", outputDirectory: directory, timings: {}, stages: {} };
+  for (const [stage, suffix, run] of [["content", ".content.json", runContentGates],
+                                      ["plan", ".plan.json", runPlanGates]]) {
+    const at = path.join(baseDir, `${stem}${suffix}`);
+    const raw = await fs.readFile(at, "utf8").catch(() => null);
+    if (raw === null) { result.stages[stage] = { state: "absent", expectedAt: at }; continue; }
+    const report = run(JSON.parse(raw));
+    const reportAt = path.join(directory, `${stage}-gates.json`);
+    await fs.writeFile(reportAt, JSON.stringify(report, null, 2) + "\n");
+    result.stages[stage] = { state: report.accepted ? "accepted" : "rejected", report: reportAt,
+                             countsByCode: report.countsByCode ?? {} };
+    if (!report.accepted) {
+      throw new Error(`${stage} gates rejected ${path.basename(at)}: `
+        + `${JSON.stringify(report.countsByCode)}. See ${reportAt}.`);
+    }
+  }
+
   const deckPlan = toDeckPlan(spec, baseDir);
   const { deck, decisions } = planDeck(deckPlan);
   const contentAudit = auditContent(spec, deck);
@@ -43,7 +76,8 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   const scenePath = path.join(directory, "scene.json");
   await fs.writeFile(scenePath, JSON.stringify(deck));
   await fs.writeFile(path.join(directory, "planning.json"), JSON.stringify(decisions, null, 2) + "\n");
-  const result = { status: "planned", outputDirectory: directory, scenePath, slides: deck.slides.length, metrics: metricsBackend(), timings: { planMs: Date.now() - started } };
+  Object.assign(result, { scenePath, slides: deck.slides.length, metrics: metricsBackend() });
+  result.timings.planMs = Date.now() - started;
 
   // Story gates need only the scene (titles, words, hedges, monotony).
   const gates = path.join(runtime, "gates", "page_gates.py");
@@ -137,7 +171,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const pythonIndex = args.indexOf("--python");
     if (pythonIndex >= 0 && (!args[pythonIndex + 1] || args[pythonIndex + 1].startsWith("--"))) throw new Error("--python requires an executable");
     const result = await buildDeck(path.resolve(args[0]), path.resolve(args[1]), { preflight: args.includes("--preflight"), render: !args.includes("--no-render"), python: pythonIndex < 0 ? undefined : args[pythonIndex + 1] });
-    console.log(JSON.stringify({ status: result.status, pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, timings: result.timings }));
+    console.log(JSON.stringify({ status: result.status, stages: Object.fromEntries(Object.entries(result.stages || {}).map(([k, v]) => [k, v.state])), pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, timings: result.timings }));
     process.exit(["built", "built-unrendered", "preflight-passed"].includes(result.status) ? 0 : 2);
   } catch (error) {
     console.error(error.stack || error.message);

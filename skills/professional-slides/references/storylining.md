@@ -137,7 +137,12 @@ every field a cell the width of a phrase, and `adds` answered in a phrase is how
 node runtime/gates/content_gates.mjs deck.content.json
 ```
 
-Get this accepted before writing a single exhibit name.
+Get this accepted before writing a single exhibit name. **Name the file
+`<stem>.content.json` beside the deck spec** and `build-deck.mjs` runs the gate
+itself, before it composes anything — a rejected content plan stops the build
+with no scene written. A build with no content plan beside it still runs, and
+says `stages: { content: "absent" }` in its output, because a stage that was
+skipped and a stage that does not exist should not look the same.
 
 ## Stage two: layout planning
 
@@ -201,7 +206,7 @@ staircases has used one shape for five different relationships.
 
 **Titles set on one line.** Target eight to twelve words. The page gate's fourteen-word limit is a ceiling, not a target, and a plan written to it makes two-line titles the norm — which is what makes the title band, its rule and the content beneath sit differently on every page.
 
-Run `node runtime/gates/plan_gates.mjs deck.plan.json` over the machine-readable plan before writing any page. It answers in under a second.
+Run `node runtime/gates/plan_gates.mjs deck.plan.json` over the machine-readable plan before writing any page. It answers in under a second, and named `<stem>.plan.json` beside the spec the build runs it for you.
 
 **Title spine test.** Read the dots alone. A decision deck should read as a clear executive memo; an explanatory deck as a coherent account. Titles state supported conclusions; explanatory headings may name a mechanism or distinction when a takeaway would overstate the page. Remove repeated claims, topic labels and unsupported certainty.
 
