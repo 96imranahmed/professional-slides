@@ -115,16 +115,18 @@ TYPE_RANGES = {
 # How full the deck means to read (`fill` on the spec, carried on the scene).
 # Emptiness is right for a live-pitch deck and wrong for a pre-read, so the
 # three geometric thresholds move with it; nothing else does.
-# Ink is calibrated against the corpus, not against taste: 192 sampled pages of
-# published client decks run a median ink share of 19% with a lower quartile of
-# 12%. A balanced page floors just under that quartile; a document-weight page
-# at it; an airy page is allowed to be a poster.
+# Ink is calibrated against the corpus, not against taste: 2,125 rendered pages
+# of published client decks run a median ink share of 0.191, a first quartile of
+# 0.112 and a tenth percentile of 0.077. A document-weight page floors at the
+# quartile, a balanced page at the tenth percentile, an airy page below both.
+# The ladder that ran 0.14 / 0.115 failed 36% and 26% of published pages.
 FILL_LEVELS = CONTRACT["geometryByFill"]
-# The reference corpus, measured two ways. `slides` is the careful sample: 137
-# landscape analytical slides of published McKinsey, BCG and Bain client work,
-# with covers, dividers, back matter and portrait proposal documents excluded,
-# decomposed band by band and block by block. `corpus` is the wide sample.
+# The reference corpus, measured three ways by evals/corpus/measure_corpus.py.
+# `slides` is the pixel sample: 2,125 pages from 426 published decks rendered
+# onto this same 1280x720 canvas. `corpus` is the wide text sample, 16,334
+# analytical pages. `judged` is a vision pass over 264 pages, one per deck.
 REFERENCE_PAGE = CONTRACT["reference"]["slides"]
+REFERENCE_JUDGED = CONTRACT["reference"]["judged"]
 # Ink a page of body type puts on the canvas per word, measured by rendering
 # text pages and reading the coverage back off the PNG. It sets the ink floor
 # for a page with no exhibit, where the exhibit-calibrated floor is unreachable.
@@ -185,9 +187,9 @@ ARCH_BAND = CANVAS_H // 6
 WEIGHT = dict(WEIGHT_BY_FILL[DEFAULT_FILL])
 
 THRESHOLDS = {
-    "ink_min": 0.08,   # a 12pt text page with 120 words sits near 9%; waived when a qualifying hero exhibit carries the page (a line chart is ink-light by nature)
-    "dead_band_max": 0.08,
-    "internal_void_max": 0.22,   # 158px of nothing between two content blocks; a centred icon row keeps its air
+    "ink_min": 0.077,  # the corpus's tenth percentile over 2,125 rendered pages; waived when a qualifying hero exhibit carries the page (a line chart is ink-light by nature)
+    "dead_band_max": 0.08,       # fires on 6% of published pages; the corpus p90 is 0.049
+    "internal_void_max": 0.13,   # 94px of nothing between two content blocks; the corpus p90 is 0.069
     "exhibit_ink_min": 0.02,     # a hero frame must carry ink, not just area (a line chart sits near 2-3%, a 12pt table near 5-6%)
     "title_lines_max": 2,
     "title_words_max": 14,
@@ -207,7 +209,8 @@ THRESHOLDS = {
     "shapes_per_ten_min": 3.0,  # distinct architectures per ten pages (the reference decks run about five)
     "shape_share_max": 0.40,    # share of pages on the commonest architecture (the reference median is 0.23)
     "front_matter_from": 12,    # analytical pages beyond which a deck needs a contents page and an opening summary
-    "numbers_per_page_min": 8,  # printed numeric tokens on a measured page (the reference median is 17)
+    "numbers_per_page_min": 6,   # printed numeric tokens on any page carrying an exhibit that has values to print
+    "numbers_per_chart_page_min": 14,  # a chart page: the corpus median is 27, its lower quartile 16
     "column_run_max": 4,        # consecutive pages whose commentary column may share one device    # share of pages on the commonest architecture (the reference median is 0.23)
     # What the page says. Calibrated on the four example decks, which are the
     # only corpus in the repository - `--report` prints the measured value
@@ -1254,17 +1257,31 @@ def gate_unannotated(slide_no, slide, findings):
 def gate_numbers_on_page(slide_no, slide, findings):
     """NUMBERS_ON_PAGE. A measured page prints its measures.
 
-    The reference client pages carry a median of 17 numeric tokens - values on
-    marks, table cells, shares in the commentary, the base under a category. A
-    deck about box-office receipts that carries nine has put its evidence in the
-    notes, or left it in the data. This is a floor on printed numbers, not on
-    precision: rounding a figure does not cost it its token.
+    The floor follows the exhibit, because the corpus does. Published pages
+    carrying a chart print a median of 27 numeric tokens and a lower quartile of
+    16; pages carrying a table print 11; pages carrying a diagram print 4. One
+    floor of eight applied to every exhibit page rejected 29% of published
+    exhibit pages, nearly all of them process chains and structural matrices
+    whose evidence is the structure. So a chart page is held to a chart's floor,
+    a data page to a lower one, and a page whose exhibit has no values to print
+    is not held to either.
+
+    This is a floor on printed numbers, not on precision: rounding a figure does
+    not cost it its token.
     """
     floor = WEIGHT.get("pageWords")
     if not floor:
         return
-    if not [c for c in slide.get("componentInstances", []) if is_exhibit(c)]:
+    exhibits = [c for c in slide.get("componentInstances", []) if is_exhibit(c)]
+    if not exhibits:
         return
+    components = {str(c.get("component") or "") for c in exhibits}
+    if any(name.startswith("chart.") for name in components):
+        want, family = THRESHOLDS["numbers_per_chart_page_min"], "chart"
+    elif components & DATA_COMPONENTS:
+        want, family = THRESHOLDS["numbers_per_page_min"], "table"
+    else:
+        return                  # a diagram or a photograph argues from its shape
     numeric = 0
     for node in text_nodes(slide):
         role = str(node.get("role") or "")
@@ -1273,15 +1290,15 @@ def gate_numbers_on_page(slide_no, slide, findings):
         for word in re.split(r"\s+", source_text(node)):
             if NUMERIC_TOKEN.match(word):
                 numeric += 1
-    want = THRESHOLDS["numbers_per_page_min"]
     if numeric >= want:
         return
+    observed = REFERENCE_PAGE["numericByFamily"][family]
     findings.append(finding(
         slide_no, "NUMBERS_ON_PAGE", numeric, want,
-        "The page argues from measures it does not print. Reference client "
-        f"pages carry {REFERENCE_PAGE['numericTokens']} numeric tokens: a value "
-        "on every mark, the base under each category, the share beside the "
-        "count, the figure inside the sentence rather than the adjective. "
+        "The page argues from measures it does not print. Published client "
+        f"pages carrying this kind of exhibit print {observed} numeric tokens: "
+        "a value on every mark, the base under each category, the share beside "
+        "the count, the figure inside the sentence rather than the adjective. "
         "`dataTable: true` under a chart, `derive` on a table and "
         "`categoryNotes` each print numbers the page already holds.",
     ))

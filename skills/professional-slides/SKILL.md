@@ -282,21 +282,23 @@ When the client or the firm supplies a template `.pptx`, read it first and let t
 
 ## How full a page reads
 
-A full page is not a crowded page. Published McKinsey, BCG and Bain client decks - 137 analytical slides measured page by page, with covers, dividers, back matter and portrait proposal documents excluded - run like this, against our own:
+A full page is not a crowded page. 16,334 analytical slides of published client work from twelve firms - McKinsey, BCG, Bain, Accenture, Deloitte, PwC/Strategy&, LEK, EY, KPMG, AT Kearney, Booz Allen and Alvarez & Marsal, with covers, dividers, back matter, prose reports and portrait documents excluded - run like this:
 
-| Per analytical page | Reference | Ours today |
+| Per analytical page | Published client decks | What the gate does with it |
 | --- | --- | --- |
-| Ink on the page | 19% (quartiles 12% and 32%) | 20% |
-| Words of page text | 185 (p20 104, p80 278) | 163 |
-| - in the title band | 20 | 18 |
-| - **in the body** | **128** | **110** |
-| - in the footer, source and notes | 19 | 24 |
-| Text blocks | 142 (56 line-blocks, 40 of them labels of 1-3 words) | 127 |
-| Numeric tokens | 17 | 23 |
-| Drawn objects (marks, rules, brackets) | 29 | 31 |
-| Pages carrying 200+ words | 42% | 9% |
+| Ink on the page | median 19%, quartiles 11% and 37% | `INK_COVERAGE` floors at a percentile of this: 11% for a deck that declares `full`, 8% for `balanced`, 5% for `airy` |
+| Words of page text | 195 (p20 103, p80 318) | `WORDS` caps, by profile |
+| - in the title band | 17 | `TITLE_LINES`, `TITLE_WORDS` |
+| - **in the body** | **154** | `THIN_PAGE` floors the body alone |
+| - in the footer, source and notes | 12 | `NOTE_HEAVY` |
+| Numeric tokens | 11 overall - but 27 on a page carrying a chart, 11 on a table, 4 on a diagram | `NUMBERS_ON_PAGE`, by exhibit family |
+| Drawn objects (marks, rules, brackets) | median 32 (p25 11, p75 88) | the cold-run scorer's `drawingsPerPage` |
+| Pages carrying 186+ words | 53% | `DECK_FLAT`: a deck of uniformly light pages has not chosen |
+| Pages carrying no exhibit at all | 30% | a page of type is a real page; `plan.mix.text` caps it at 35% |
+| Charts carrying an annotation | 63% | `plan.craft.chartAnnotated` floors at 45% |
+| Tables carrying a treatment | 89% | `plan.craft.tableTreated` floors at 60% |
 
-Those numbers are not prose: they live in `runtime/weight.json`, which the composer and the gates both read, and this table is checked against that file.
+Those numbers are not prose: they live in `runtime/weight.json`, which the composer and the gates both read, this table is checked against that file, and `evals/corpus/` holds the script that measured them and the README that says what the measurement cannot see.
 
 **The floor counts the body.** The title band, the source and the notes are not evidence, and a page that clears a page-wide floor on the strength of a third note has padded the wrong band: `THIN_PAGE` measures the body alone, and `NOTE_HEAVY` reports a page whose footer runs past a third of its text.
 

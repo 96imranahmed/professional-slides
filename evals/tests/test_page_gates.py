@@ -258,7 +258,16 @@ class KnownBadDeckTests(unittest.TestCase):
         findings = []
         page_gates.gate_ink_and_dead_band(
             6, page_gates.load_ink_rows(RENDER / "slide-6.png"), findings)
-        self.assertEqual(findings, [])
+        self.assertNotIn("INK_COVERAGE", [f["code"] for f in findings])
+        self.assertNotIn("DEAD_BAND", [f["code"] for f in findings])
+        # But it does trip INTERNAL_VOID at 0.142, and it should: the two chart
+        # panels stop 100px above the note and leave a band of nothing across
+        # the page. The old ceiling of 0.22 sat in the corpus's worst 0.6% and
+        # never fired; 0.13 sits in its worst 2%, and the first thing it caught
+        # was a page of our own that reads empty through the middle. Left
+        # standing on purpose - the repair belongs in the composer's track
+        # sizing, not in the threshold.
+        self.assertIn("INTERNAL_VOID", [f["code"] for f in findings])
 
     def test_the_cover_is_exempt_from_the_page_gates(self):
         # Story and geometry gates do not judge a structural page. Typography

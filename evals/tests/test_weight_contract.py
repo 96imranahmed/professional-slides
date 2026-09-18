@@ -74,11 +74,35 @@ console.log(JSON.stringify({byFill: WEIGHT_BY_FILL, keys: WEIGHT_KEYS, bands: RE
         # standing as a second, older record of the same thing.
         skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
         slides = CONTRACT["reference"]["slides"]
-        self.assertIn(f"{slides['pages']} analytical slides", skill)
+        wide = CONTRACT["reference"]["corpus"]
+        self.assertIn(f"{wide['pages']:,} analytical slides", skill)
         for value in (slides["words"], slides["bands"]["titleBand"], slides["bands"]["body"],
-                      slides["bands"]["footer"], slides["textBlocks"]):
+                      slides["bands"]["footer"], slides["drawings"],
+                      slides["numericByFamily"]["chart"]):
             self.assertRegex(skill, rf"\|[^|\n]*\b{value}\b", f"SKILL.md's corpus table has lost {value}")
         self.assertIn(f"{round(slides['heavyShare'] * 100)}%", skill)
+        # And the craft rates the plan gates now floor against.
+        craft = CONTRACT["plan"]["craft"]
+        for key in ("chartAnnotated", "tableTreated"):
+            self.assertIn(f"{round(craft[key]['observed'] * 100)}%", skill,
+                          f"SKILL.md does not say what the corpus does for {key}")
+
+    def test_no_floor_is_stricter_than_the_corpus_it_claims_to_come_from(self):
+        """A floor that most published pages fail is a preference, not a floor.
+
+        Every geometric threshold records the share of the 2,125 rendered corpus
+        pages it would flag. None of them may flag more than a third, and the
+        ink ladder has to rise with fill rather than crossing over.
+        """
+        flagged = CONTRACT["reference"]["slides"]["exceedance"]
+        levels = CONTRACT["geometryByFill"]
+        for fill in ("airy", "balanced", "full"):
+            share = flagged["inkBelow"][str(levels[fill]["ink_min"])]
+            self.assertLess(share, 0.34, f"{fill} ink floor rejects {share:.0%} of published pages")
+        self.assertLess(levels["airy"]["ink_min"], levels["balanced"]["ink_min"])
+        self.assertLess(levels["balanced"]["ink_min"], levels["full"]["ink_min"])
+        for fill in ("airy", "balanced", "full"):
+            self.assertLess(flagged["internalVoidAbove"][str(levels[fill]["internal_void_max"])], 0.05)
 
 
 class GateVocabularyTests(unittest.TestCase):

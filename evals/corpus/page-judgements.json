@@ -1,0 +1,4480 @@
+[
+{
+"page": 1,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 5,
+"tableTreated": true,
+"sourceLine": true,
+"note": "flag icons and banded rows in table"
+},
+{
+"page": 2,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "choropleth map with four callout boxes"
+},
+{
+"page": 3,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": ""
+},
+{
+"page": 4,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "five-stage pathway chain with crossing links"
+},
+{
+"page": 5,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "three takeaways over full-bleed photo"
+},
+{
+"page": 6,
+"kind": "content",
+"family": "table",
+"families": [
+"table",
+"text"
+],
+"exhibits": 3,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 10,
+"tableTreated": true,
+"sourceLine": true,
+"note": "two ranked tables plus two stat circles"
+},
+{
+"page": 7,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "bar chart, pictogram block, quote panel"
+},
+{
+"page": 8,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "numbered points 2-5 continue from prior page"
+},
+{
+"page": 9,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "remarks bar and sample sizes under chart"
+},
+{
+"page": 10,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "three stat figures on rendered background"
+},
+{
+"page": 11,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "equation-style definition diagram, icon rows below"
+},
+{
+"page": 12,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 15,
+"tableTreated": true,
+"sourceLine": true,
+"note": "colour-coded rank heatmap grid"
+},
+{
+"page": 13,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "numbered section page with pull-stat card"
+},
+{
+"page": 14,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "three prose columns with boxed sidebar"
+},
+{
+"page": 15,
+"kind": "divider"
+},
+{
+"page": 16,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "paired dumbbell bars, today vs 2023"
+},
+{
+"page": 17,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "coloured standfirst serves as the headline"
+},
+{
+"page": 18,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "single donut stat figure beside prose"
+},
+{
+"page": 19,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "two numbered recommendation blocks with icons"
+},
+{
+"page": 20,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "four donuts as one small-multiple figure"
+},
+{
+"page": 21,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "three framework boxes on illustrative axes"
+},
+{
+"page": 22,
+"kind": "divider"
+},
+{
+"page": 23,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "dotted box marks Cyber Champions bar"
+},
+{
+"page": 24,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "red box highlights top two rows"
+},
+{
+"page": 25,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "pull quote plus eight numbered skills on tinted cards"
+},
+{
+"page": 26,
+"kind": "divider"
+},
+{
+"page": 27,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "two prose columns on gradient with photo"
+},
+{
+"page": 28,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "case story with ruled pull-out quote"
+},
+{
+"page": 29,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "callout box and trend-tab navigation strip"
+},
+{
+"page": 30,
+"kind": "divider"
+},
+{
+"page": 31,
+"kind": "divider"
+},
+{
+"page": 32,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "red and green boxes group industries"
+},
+{
+"page": 33,
+"kind": "backmatter"
+},
+{
+"page": 34,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": ""
+},
+{
+"page": 35,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": ""
+},
+{
+"page": 36,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"table"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": 17,
+"tableTreated": true,
+"sourceLine": true,
+"note": "Heatmap grid sits beside bar chart in Figure 13"
+},
+{
+"page": 37,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "No page headline; figure title carries the claim"
+},
+{
+"page": 38,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": ""
+},
+{
+"page": 39,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 5,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Five small-multiple maps with pictogram counts"
+},
+{
+"page": 40,
+"kind": "backmatter"
+},
+{
+"page": 41,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Foreword with author headshot and signature block"
+},
+{
+"page": 42,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Full methodology appendix, not just an appendix marker"
+},
+{
+"page": 43,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Template guidance text left visible at foot"
+},
+{
+"page": 44,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Survey item checklist across three columns"
+},
+{
+"page": 45,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": ""
+},
+{
+"page": 46,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 47,
+"kind": "content",
+"family": "mixed",
+"families": [
+"picture",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Two stock photos head two trend text blocks"
+},
+{
+"page": 48,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Label title; claim sits in subhead below"
+},
+{
+"page": 49,
+"kind": "content",
+"family": "mixed",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Half-page stock photo beside two prose columns"
+},
+{
+"page": 50,
+"kind": "backmatter"
+},
+{
+"page": 51,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 15,
+"tableTreated": true,
+"sourceLine": true,
+"note": "Colour-shaded heatmap of monthly country indicators"
+},
+{
+"page": 52,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Ranking chips row paired beneath the bars"
+},
+{
+"page": 53,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 54,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "House-shaped framework with seven numbered dimensions"
+},
+{
+"page": 55,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 3,
+"tableTreated": true,
+"sourceLine": false,
+"note": "Danish text; harvey ball in one cell"
+},
+{
+"page": 56,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 57,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Iceland bar picked out in red against peers"
+},
+{
+"page": 58,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 3,
+"tableTreated": true,
+"sourceLine": true,
+"note": "German text; sticky-note annotation over the header"
+},
+{
+"page": 59,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Tinted stat chips coded bullish, neutral, bearish"
+},
+{
+"page": 60,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 12,
+"tableTreated": true,
+"sourceLine": true,
+"note": "Twelve survey columns with colour-coded difference column"
+},
+{
+"page": 61,
+"kind": "content",
+"family": "table",
+"families": [
+"table",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 5,
+"tableTreated": true,
+"sourceLine": true,
+"note": "Highlighter-styled quote block above the table"
+},
+{
+"page": 62,
+"kind": "agenda"
+},
+{
+"page": 63,
+"kind": "content",
+"family": "mixed",
+"families": [
+"picture",
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Full-height photo beside stacked share bars"
+},
+{
+"page": 64,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Draft for discussion stamp at page foot"
+},
+{
+"page": 65,
+"kind": "content",
+"family": "mixed",
+"families": [
+"picture",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Illustrated calls to action beside case-study sidebar"
+},
+{
+"page": 66,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Map with five mini bar chart callouts"
+},
+{
+"page": 67,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Present-vs-future bullet columns joined by dotted arrows"
+},
+{
+"page": 68,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "TGI index band under each chart; highlighted green bars"
+},
+{
+"page": 69,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Dark-background small multiples, no source line"
+},
+{
+"page": 70,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 14,
+"tableTreated": true,
+"sourceLine": true,
+"note": "Flags plus two-colour check marks with legend"
+},
+{
+"page": 71,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 4,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 7,
+"tableTreated": true,
+"sourceLine": true,
+"note": "Four heatmap grids with colour key and side takeaway panel"
+},
+{
+"page": 72,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Numbered four-step loop plus two example panels"
+},
+{
+"page": 73,
+"kind": "agenda"
+},
+{
+"page": 74,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Client foreword letter, no headline and no exhibit"
+},
+{
+"page": 75,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "All percentages coloured inside prose bullets"
+},
+{
+"page": 76,
+"kind": "backmatter"
+},
+{
+"page": 77,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Decorative illustration left; two implication boxes below"
+},
+{
+"page": 78,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Donut plus stat rows with flag icons and one callout"
+},
+{
+"page": 79,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Case study: two tinted text cards plus impact panel"
+},
+{
+"page": 80,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Stacked bars with pp deltas and three-note side column"
+},
+{
+"page": 81,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"picture"
+],
+"exhibits": 4,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Bar chart with bracket annotation beside three news clippings"
+},
+{
+"page": 82,
+"kind": "content",
+"family": "mixed",
+"families": [
+"table",
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": 10,
+"tableTreated": true,
+"sourceLine": true,
+"note": "Ranked top-ten list with top row tinted; bars right"
+},
+{
+"page": 83,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"table",
+"text"
+],
+"exhibits": 6,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": 4,
+"tableTreated": true,
+"sourceLine": true,
+"note": "Survey demographics page: grid, bubble map, icon stats"
+},
+{
+"page": 84,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Chevron of three icon circles feeding three outcome boxes"
+},
+{
+"page": 85,
+"kind": "backmatter"
+},
+{
+"page": 86,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Three mode columns with decorative illustrations"
+},
+{
+"page": 87,
+"kind": "backmatter"
+},
+{
+"page": 88,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 12,
+"tableTreated": true,
+"sourceLine": true,
+"note": "Origin-destination matrix, heat shaded, total row set apart"
+},
+{
+"page": 89,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Thin women-only segments given boxed labels for legibility"
+},
+{
+"page": 90,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Three big multiples with arrows and icons; uneven type sizes"
+},
+{
+"page": 91,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 7,
+"tableTreated": true,
+"sourceLine": false,
+"note": "Label-and-statement grid with red banner takeaway below"
+},
+{
+"page": 92,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Stacked bars with derived row below; four verbatim quotes right"
+},
+{
+"page": 93,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Two prose columns above chart; grouped brackets under axis"
+},
+{
+"page": 94,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"diagram",
+"picture"
+],
+"exhibits": 4,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Two bar sets, a question-box chain, and a photo panel"
+},
+{
+"page": 95,
+"kind": "agenda"
+},
+{
+"page": 96,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 4,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Four bar panels with CAGR step arrows between columns"
+},
+{
+"page": 97,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 4,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Weighted-average reference line on the middle bar chart"
+},
+{
+"page": 98,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Four prose blocks under coloured subheads, no exhibit"
+},
+{
+"page": 99,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 2,
+"tableTreated": true,
+"sourceLine": false,
+"note": "Included-versus-excluded scope grid with coloured row labels"
+},
+{
+"page": 100,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "12-cell icon-and-label grid, no exhibit"
+},
+{
+"page": 101,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "red takeaway bar under the chain"
+},
+{
+"page": 102,
+"kind": "content",
+"family": "picture",
+"families": [
+"picture",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "storyboard sketch plus phone prototype screens"
+},
+{
+"page": 103,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"picture",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 104,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "dot plot with call-for-action arrows"
+},
+{
+"page": 105,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 106,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "word cloud beside decorative stock photo"
+},
+{
+"page": 107,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "conceptual axes, not plotted to scale"
+},
+{
+"page": 108,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "rating gauges beside substantiation list"
+},
+{
+"page": 109,
+"kind": "content",
+"family": "mixed",
+"families": [
+"picture",
+"text"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "three photo-plus-bullet rows"
+},
+{
+"page": 110,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 40,
+"tableTreated": true,
+"sourceLine": false,
+"note": "two-page company listing spread"
+},
+{
+"page": 111,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "magazine spread, no page headline"
+},
+{
+"page": 112,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 113,
+"kind": "agenda"
+},
+{
+"page": 114,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 21,
+"tableTreated": true,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 115,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "verbatim quotes and Key points panel"
+},
+{
+"page": 116,
+"kind": "backmatter"
+},
+{
+"page": 117,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "running prose spread, no page headline"
+},
+{
+"page": 118,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "flag markers on least-to-most scales"
+},
+{
+"page": 119,
+"kind": "backmatter"
+},
+{
+"page": 120,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "claim carried by blue subhead"
+},
+{
+"page": 121,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"diagram",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "bar chart plus milestone timeline"
+},
+{
+"page": 122,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "shaded era bands across the line chart"
+},
+{
+"page": 123,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"table",
+"text"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": 8,
+"tableTreated": true,
+"sourceLine": false,
+"note": "two pies plus key-projects table"
+},
+{
+"page": 124,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 6,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "prose page facing six scenario charts"
+},
+{
+"page": 125,
+"kind": "content",
+"family": "picture",
+"families": [
+"picture",
+"text"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "three tool screenshots with bullet captions"
+},
+{
+"page": 126,
+"kind": "backmatter"
+},
+{
+"page": 127,
+"kind": "content",
+"family": "mixed",
+"families": [
+"picture",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "slide-thumbnail montage with labelled callouts"
+},
+{
+"page": 128,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 129,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "delta brackets and average lines on bars"
+},
+{
+"page": 130,
+"kind": "content",
+"family": "table",
+"families": [
+"table",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 6,
+"tableTreated": true,
+"sourceLine": true,
+"note": "harvey balls plus boxed EU recommendation"
+},
+{
+"page": 131,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "prose spread, tinted pull quote, no headline"
+},
+{
+"page": 132,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "further-reading list in three columns"
+},
+{
+"page": 133,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Flags placed on qualitative usage scales"
+},
+{
+"page": 134,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Tinted WINNERS box under the text column"
+},
+{
+"page": 135,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 3,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "No headline; survey questions act as titles"
+},
+{
+"page": 136,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Decorative target icon only"
+},
+{
+"page": 137,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 138,
+"kind": "agenda"
+},
+{
+"page": 139,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Company logos embedded in the diagram"
+},
+{
+"page": 140,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 6,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Six small-multiple bar charts in two groups"
+},
+{
+"page": 141,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Latest values sit in a dotted callout circle"
+},
+{
+"page": 142,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Forecast band marked off with dotted rule"
+},
+{
+"page": 143,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Choropleth world map with five-key legend"
+},
+{
+"page": 144,
+"kind": "divider"
+},
+{
+"page": 145,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Yellow boxes ring the two leading bars"
+},
+{
+"page": 146,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Seven tinted quote cards with attributions"
+},
+{
+"page": 147,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Dark-background page with nav rail"
+},
+{
+"page": 148,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 149,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Four outlined label cards summarise the bullets"
+},
+{
+"page": 150,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Two columns of unbroken prose"
+},
+{
+"page": 151,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Stacked bars unlabelled; donut labelled"
+},
+{
+"page": 152,
+"kind": "content",
+"family": "mixed",
+"families": [
+"text",
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "No headline; coloured pull quote carries the takeaway"
+},
+{
+"page": 153,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Three scenario cards sit under the chart"
+},
+{
+"page": 154,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Three columns of prose and bold-led bullets"
+},
+{
+"page": 155,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Waterfall ending in a stacked total column"
+},
+{
+"page": 156,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 3,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Two donuts plus an unshaded reference map"
+},
+{
+"page": 157,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Long notes block under the exhibits"
+},
+{
+"page": 158,
+"kind": "content",
+"family": "mixed",
+"families": [
+"table",
+"diagram"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 15,
+"tableTreated": true,
+"sourceLine": false,
+"note": "Eyebrow typo 'GLOBAL MOEDL'; dense flow diagram"
+},
+{
+"page": 159,
+"kind": "content",
+"family": "mixed",
+"families": [
+"text",
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 4,
+"tableTreated": true,
+"sourceLine": true,
+"note": "Figures colour-coded green and teal by column"
+},
+{
+"page": 160,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Pasted Statistics Canada map; source inside image"
+},
+{
+"page": 161,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Giant typographic stats beside a donut"
+},
+{
+"page": 162,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"table"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": 5,
+"tableTreated": false,
+"sourceLine": false,
+"note": "Icon-led sector table and insights panel"
+},
+{
+"page": 163,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "One big stat plus label-value lists"
+},
+{
+"page": 164,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "Single pull quote with decorative image"
+},
+{
+"page": 165,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "Leader lines tie donut to stacked bar segments"
+},
+{
+"page": 166,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "decorative donut ring sits behind the combo chart"
+},
+{
+"page": 167,
+"kind": "content",
+"family": "mixed",
+"families": [
+"text",
+"diagram"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "trend radar locator plus impact/adoption scales"
+},
+{
+"page": 168,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "decorative banner image, nav rail of section links"
+},
+{
+"page": 169,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 170,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "data and commentary panels labelled explicitly"
+},
+{
+"page": 171,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "three headed bullet columns over a photo background"
+},
+{
+"page": 172,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "five numbered tinted cards stepped over a photo"
+},
+{
+"page": 173,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "methodology page; N=227 and boxed date emphasised"
+},
+{
+"page": 174,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "claim sits under a topic banner; yellow pull-out panel"
+},
+{
+"page": 175,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "numbered demographic blocks plus chevron band of survey areas"
+},
+{
+"page": 176,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "network schematic drawn over a geographic map"
+},
+{
+"page": 177,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "takeaway opener with boxed claim, pull quote, stock photos"
+},
+{
+"page": 178,
+"kind": "backmatter"
+},
+{
+"page": 179,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "two ranked lists with proportional bar strips"
+},
+{
+"page": 180,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "text column cross-references Exhibits 4 and 5"
+},
+{
+"page": 181,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "three donuts, survey question printed at foot"
+},
+{
+"page": 182,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "stat circles, portrait and pull quote; no page headline"
+},
+{
+"page": 183,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "three prose columns, portrait and bold pull quote"
+},
+{
+"page": 184,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "foreword prose beside a full-bleed stock photo"
+},
+{
+"page": 185,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "values list with coloured labels; brand mark and photo"
+},
+{
+"page": 186,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "tinted commitment bar and shaded case-study block"
+},
+{
+"page": 187,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "large blue pull quote; footnote refers to appendix"
+},
+{
+"page": 188,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "icon-plus-label rows with coloured lead-in phrases"
+},
+{
+"page": 189,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"table"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": 8,
+"tableTreated": true,
+"sourceLine": true,
+"note": "question headline; rank chips in banded country grid"
+},
+{
+"page": 190,
+"kind": "backmatter"
+},
+{
+"page": 191,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "nine icon credential cards, key phrases in green bold"
+},
+{
+"page": 192,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": ""
+},
+{
+"page": 193,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "shaded callout inside plot; interview quotes in commentary"
+},
+{
+"page": 194,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "growth pills, arrows and callout balloons on both charts"
+},
+{
+"page": 195,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"table"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": 2,
+"tableTreated": true,
+"sourceLine": true,
+"note": "target/bidder logo grid aligned under the bars"
+},
+{
+"page": 196,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "sector icons placed on a negative-to-positive spectrum arrow"
+},
+{
+"page": 197,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 7,
+"tableTreated": true,
+"sourceLine": true,
+"note": "three calendar grids with colour-coded key dates"
+},
+{
+"page": 198,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "bracket marks developed vs developing; bilingual labels"
+},
+{
+"page": 199,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"table"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": 3,
+"tableTreated": true,
+"sourceLine": true,
+"note": "line chart plus small shaded case-count table"
+},
+{
+"page": 200,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "all-bullet executive summary, lower half empty"
+},
+{
+"page": 201,
+"kind": "content",
+"family": "mixed",
+"families": [
+"diagram",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "tree of three stock-photo panels with dates"
+},
+{
+"page": 202,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "three icon-plus-sentence rows, no structure"
+},
+{
+"page": 203,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "inputs converging on a central circle"
+},
+{
+"page": 204,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "paired 100% stacked bars under a kicker line"
+},
+{
+"page": 205,
+"kind": "content",
+"family": "mixed",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "logo pairs with arrows plus tinted comment cards"
+},
+{
+"page": 206,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "range plot plus combo line-bar with two callouts"
+},
+{
+"page": 207,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": 3,
+"tableTreated": false,
+"sourceLine": true,
+"note": "stacked bars with attached CAGR/margin table"
+},
+{
+"page": 208,
+"kind": "content",
+"family": "mixed",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "logo timeline over dense bullets, numbered impacts column"
+},
+{
+"page": 209,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "lettered themes with interview-quote evidence column"
+},
+{
+"page": 210,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 4,
+"tableTreated": true,
+"sourceLine": true,
+"note": "domain icons, heavy bolding inside description cells"
+},
+{
+"page": 211,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "bracketed groupings, tie lines and circled adoption pills"
+},
+{
+"page": 212,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "callout box with leader line; draft watermark"
+},
+{
+"page": 213,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 3,
+"tableTreated": true,
+"sourceLine": true,
+"note": "from/to table, numbered badges, bottom third empty"
+},
+{
+"page": 214,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 5,
+"tableTreated": true,
+"sourceLine": true,
+"note": "icons per row, every statistic coloured blue"
+},
+{
+"page": 215,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "five unbroken prose paragraphs under a CONTEXT label"
+},
+{
+"page": 216,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 7,
+"tableTreated": true,
+"sourceLine": false,
+"note": "value ellipses, orange total row ruled apart"
+},
+{
+"page": 217,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "annual-report spread, four donuts beside prose columns"
+},
+{
+"page": 218,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "no headline; two prose columns reversed on black"
+},
+{
+"page": 219,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 7,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "seven small-multiple lollipop rankings by region"
+},
+{
+"page": 220,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "three-line series, every point labelled, prose column left"
+},
+{
+"page": 221,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 10,
+"tableTreated": false,
+"sourceLine": true,
+"note": "deal list; red takeaway paragraph carries the argument"
+},
+{
+"page": 222,
+"kind": "content",
+"family": "mixed",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "magazine spread: quote, big stat, silhouette, one donut"
+},
+{
+"page": 223,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 2,
+"tableTreated": true,
+"sourceLine": false,
+"note": "ESG matrix, colour-coded headers and pink row banners"
+},
+{
+"page": 224,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "tinted cards paired with green/orange verdict boxes"
+},
+{
+"page": 225,
+"kind": "divider"
+},
+{
+"page": 226,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "conclusion spread, red standfirst and pull quote"
+},
+{
+"page": 227,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "crossed chevron value chains over faded photo"
+},
+{
+"page": 228,
+"kind": "divider"
+},
+{
+"page": 229,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "five colour-coded banner cards of bulleted figures"
+},
+{
+"page": 230,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "dense logo network, shape and arrow-colour legend"
+},
+{
+"page": 231,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart"
+],
+"exhibits": 4,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "four stacked-bar pairs with growth arrows, shared legend"
+},
+{
+"page": 232,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "full-bleed orange panel, two bullet columns"
+},
+{
+"page": 233,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "donut gauges plus percentage tile grid"
+},
+{
+"page": 234,
+"kind": "content",
+"family": "mixed",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "two pull quotes with headshots, half-page photo"
+},
+{
+"page": 235,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "numbered badge list, every line a claim"
+},
+{
+"page": 236,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"picture"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "combo bar/line with two CAGR arrows, red banner takeaway"
+},
+{
+"page": 237,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "CAGR pill; only two bars carry labels"
+},
+{
+"page": 238,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 20,
+"tableTreated": false,
+"sourceLine": false,
+"note": "ranking table on black, hairline rules only"
+},
+{
+"page": 239,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 2,
+"titleIsClaim": true,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "waffle linked by dashed leader to paired bars"
+},
+{
+"page": 240,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "prose spread with three coloured CEO quotes"
+},
+{
+"page": 241,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 2,
+"tableTreated": true,
+"sourceLine": false,
+"note": "definitions table, banded rows"
+},
+{
+"page": 242,
+"kind": "backmatter"
+},
+{
+"page": 243,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "executive summary prose, photo strip right"
+},
+{
+"page": 244,
+"kind": "content",
+"family": "mixed",
+"families": [
+"picture",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "numbered section opener over photo, three text columns"
+},
+{
+"page": 245,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "three unlabelled bar charts, bullet column left"
+},
+{
+"page": 246,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 3,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "two maps, bar chart with icon column, labelled pie"
+},
+{
+"page": 247,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "plain two-level bullet page"
+},
+{
+"page": 248,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "ministerial quote plus three numbered pillars"
+},
+{
+"page": 249,
+"kind": "content",
+"family": "table",
+"families": [
+"table"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": 3,
+"tableTreated": true,
+"sourceLine": true,
+"note": "four-column matrix, orange header band, banded rows"
+},
+{
+"page": 250,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": true,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "shaded bands and two callouts; Insights bar beneath"
+},
+{
+"page": 251,
+"kind": "content",
+"family": "mixed",
+"families": [
+"picture",
+"diagram",
+"text"
+],
+"exhibits": 3,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "stock word cloud plus two clip-art frameworks"
+},
+{
+"page": 252,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "100% stacked bars; chevron navigator is deck furniture"
+},
+{
+"page": 253,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "prose with photo column and 31% stat block"
+},
+{
+"page": 254,
+"kind": "backmatter"
+},
+{
+"page": 255,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "overlapping circles with six labelled annotations"
+},
+{
+"page": 256,
+"kind": "content",
+"family": "diagram",
+"families": [
+"diagram",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "dense two-track process flow, commentary both flanks"
+},
+{
+"page": 257,
+"kind": "content",
+"family": "mixed",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 1,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "five numbered points, half-page photo"
+},
+{
+"page": 258,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": true,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "three stat-and-label items, very sparse"
+},
+{
+"page": 259,
+"kind": "content",
+"family": "mixed",
+"families": [
+"text",
+"chart"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": true,
+"chartAnnotated": false,
+"chartValues": false,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "three prose columns, one area chart, summary box"
+},
+{
+"page": 260,
+"kind": "content",
+"family": "text",
+"families": [
+"text",
+"picture"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": false,
+"note": "mosaic of tinted stat cards with photo chips"
+},
+{
+"page": 261,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text",
+"picture"
+],
+"exhibits": 2,
+"titleIsClaim": false,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": false,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "three-slice pie, prose column, full-bleed photo"
+},
+{
+"page": 262,
+"kind": "content",
+"family": "text",
+"families": [
+"text"
+],
+"exhibits": 0,
+"titleIsClaim": false,
+"hasCommentary": false,
+"highlightedPhrase": false,
+"chartAnnotated": null,
+"chartValues": null,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "bullets under two bold claim headings"
+},
+{
+"page": 263,
+"kind": "content",
+"family": "chart",
+"families": [
+"chart",
+"text"
+],
+"exhibits": 1,
+"titleIsClaim": true,
+"hasCommentary": true,
+"highlightedPhrase": false,
+"chartAnnotated": true,
+"chartValues": true,
+"tableRows": null,
+"tableTreated": null,
+"sourceLine": true,
+"note": "growth triangles, final bar recoloured, bracketed callout"
+},
+{
+"page": 264,
+"kind": "backmatter"
+}
+]

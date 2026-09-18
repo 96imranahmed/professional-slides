@@ -1,0 +1,377 @@
+{
+  "$comment": "Measured from the professional-slides corpus of published client decks. `wide` is every analytical page of every landscape presentation (pdftotext geometry); `pixels` is a sampled render through the same instrument page_gates.py uses; `judged` is a vision pass over 264 pages, one per deck. See evals/corpus/README.md for method and limits.",
+  "generated": "2026-09-18",
+  "wide": {
+    "decks": 518,
+    "analyticalPages": 16334,
+    "firms": [
+      [
+        "Accenture",
+        84
+      ],
+      [
+        "PwC / Strategy&",
+        77
+      ],
+      [
+        "BCG",
+        73
+      ],
+      [
+        "Booz Allen Hamilton, Alvarez & Marsal and others",
+        66
+      ],
+      [
+        "LEK",
+        48
+      ],
+      [
+        "Deloitte",
+        47
+      ],
+      [
+        "McKinsey",
+        28
+      ],
+      [
+        "EY",
+        24
+      ],
+      [
+        "Bain & Co.",
+        22
+      ],
+      [
+        "AT Kearney",
+        21
+      ],
+      [
+        "Bain",
+        14
+      ],
+      [
+        "KPMG",
+        14
+      ]
+    ],
+    "words": {
+      "n": 16334,
+      "p10": 65.0,
+      "p25": 120.0,
+      "median": 195.0,
+      "p75": 289.0,
+      "p90": 404.0,
+      "max": 1845
+    },
+    "titleBandWords": {
+      "n": 16334,
+      "p10": 3.0,
+      "p25": 8.0,
+      "median": 17.0,
+      "p75": 27.0,
+      "p90": 39.0,
+      "max": 219
+    },
+    "bodyBandWords": {
+      "n": 16334,
+      "p10": 42.0,
+      "p25": 85.0,
+      "median": 154.0,
+      "p75": 244.0,
+      "p90": 357.0,
+      "max": 1825
+    },
+    "footerBandWords": {
+      "n": 16334,
+      "p10": 1.0,
+      "p25": 5.0,
+      "median": 12.0,
+      "p75": 26.0,
+      "p90": 44.0,
+      "max": 409
+    },
+    "numericTokens": {
+      "n": 16334,
+      "p10": 2.0,
+      "p25": 4.0,
+      "median": 11.0,
+      "p75": 27.0,
+      "p90": 47.0,
+      "max": 1006
+    },
+    "heavyShare": 0.532
+  },
+  "pixels": {
+    "pages": 2125,
+    "decks": 426,
+    "ink": {
+      "n": 2125,
+      "p10": 0.0771,
+      "p25": 0.1123,
+      "median": 0.191,
+      "p75": 0.3663,
+      "p90": 0.7827,
+      "max": 0.9167
+    },
+    "surface": {
+      "n": 2125,
+      "p10": 0.0935,
+      "p25": 0.1437,
+      "median": 0.2592,
+      "p75": 0.5218,
+      "p90": 0.8965,
+      "max": 0.9167
+    },
+    "deadBand": {
+      "n": 2125,
+      "p10": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0069,
+      "p90": 0.0486,
+      "max": 0.4458
+    },
+    "internalVoid": {
+      "n": 2125,
+      "p10": 0.0,
+      "p25": 0.0,
+      "median": 0.0194,
+      "p75": 0.0417,
+      "p90": 0.0694,
+      "max": 0.7097
+    },
+    "columnVoid": {
+      "n": 2125,
+      "p10": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0292,
+      "p90": 0.1069,
+      "max": 1.0
+    }
+  },
+  "judged": {
+    "pagesJudged": 264,
+    "contentPages": 237,
+    "kinds": {
+      "backmatter": 14,
+      "divider": 8,
+      "agenda": 5,
+      "content": 237
+    },
+    "dominantFamily": {
+      "chart": 0.371,
+      "table": 0.11,
+      "diagram": 0.076,
+      "text": 0.3,
+      "mixed": 0.135,
+      "picture": 0.008
+    },
+    "familyPresent": {
+      "chart": 0.447,
+      "table": 0.156,
+      "diagram": 0.11,
+      "text": 0.608,
+      "picture": 0.118
+    },
+    "byFamily": {
+      "chart": {
+        "share": 0.371,
+        "words": {
+          "n": 88,
+          "p25": 121.0,
+          "median": 196.0,
+          "p75": 261.0
+        },
+        "bodyBandWords": {
+          "n": 88,
+          "p25": 83.25,
+          "median": 136.5,
+          "p75": 212.25
+        },
+        "numericTokens": {
+          "n": 88,
+          "p25": 16.5,
+          "median": 27.0,
+          "p75": 38.25
+        },
+        "ink": {
+          "n": 88,
+          "p25": 0.1103,
+          "median": 0.1576,
+          "p75": 0.27
+        },
+        "titleIsClaim": 0.761,
+        "hasCommentary": 0.727,
+        "highlightedPhrase": 0.33
+      },
+      "table": {
+        "share": 0.11,
+        "words": {
+          "n": 26,
+          "p25": 188.5,
+          "median": 245.0,
+          "p75": 349.5
+        },
+        "bodyBandWords": {
+          "n": 26,
+          "p25": 126.0,
+          "median": 211.5,
+          "p75": 307.75
+        },
+        "numericTokens": {
+          "n": 26,
+          "p25": 4.0,
+          "median": 11.0,
+          "p75": 39.75
+        },
+        "ink": {
+          "n": 26,
+          "p25": 0.1575,
+          "median": 0.2208,
+          "p75": 0.4623
+        },
+        "titleIsClaim": 0.423,
+        "hasCommentary": 0.308,
+        "highlightedPhrase": 0.423
+      },
+      "diagram": {
+        "share": 0.076,
+        "words": {
+          "n": 18,
+          "p25": 75.25,
+          "median": 104.5,
+          "p75": 220.75
+        },
+        "bodyBandWords": {
+          "n": 18,
+          "p25": 46.0,
+          "median": 82.5,
+          "p75": 168.25
+        },
+        "numericTokens": {
+          "n": 18,
+          "p25": 2.25,
+          "median": 3.5,
+          "p75": 6.5
+        },
+        "ink": {
+          "n": 18,
+          "p25": 0.1346,
+          "median": 0.1817,
+          "p75": 0.3373
+        },
+        "titleIsClaim": 0.722,
+        "hasCommentary": 0.556,
+        "highlightedPhrase": 0.278
+      },
+      "text": {
+        "share": 0.3,
+        "words": {
+          "n": 71,
+          "p25": 147.0,
+          "median": 264.0,
+          "p75": 372.5
+        },
+        "bodyBandWords": {
+          "n": 71,
+          "p25": 136.0,
+          "median": 224.0,
+          "p75": 337.0
+        },
+        "numericTokens": {
+          "n": 71,
+          "p25": 2.0,
+          "median": 6.0,
+          "p75": 10.5
+        },
+        "ink": {
+          "n": 71,
+          "p25": 0.0932,
+          "median": 0.231,
+          "p75": 0.4768
+        },
+        "titleIsClaim": 0.282,
+        "hasCommentary": 0.042,
+        "highlightedPhrase": 0.493
+      },
+      "mixed": {
+        "share": 0.135,
+        "words": {
+          "n": 32,
+          "p25": 143.75,
+          "median": 204.0,
+          "p75": 329.5
+        },
+        "bodyBandWords": {
+          "n": 32,
+          "p25": 108.75,
+          "median": 165.5,
+          "p75": 293.5
+        },
+        "numericTokens": {
+          "n": 32,
+          "p25": 6.25,
+          "median": 14.0,
+          "p75": 33.0
+        },
+        "ink": {
+          "n": 32,
+          "p25": 0.1191,
+          "median": 0.1896,
+          "p75": 0.3774
+        },
+        "titleIsClaim": 0.562,
+        "hasCommentary": 0.469,
+        "highlightedPhrase": 0.531
+      },
+      "picture": {
+        "share": 0.008,
+        "words": {
+          "n": 2,
+          "p25": 180.5,
+          "median": 199.0,
+          "p75": 217.5
+        },
+        "bodyBandWords": {
+          "n": 2,
+          "p25": 126.5,
+          "median": 150.0,
+          "p75": 173.5
+        },
+        "numericTokens": {
+          "n": 2,
+          "p25": 1.75,
+          "median": 2.5,
+          "p75": 3.25
+        },
+        "ink": {
+          "n": 2,
+          "p25": 0.1453,
+          "median": 0.1532,
+          "p75": 0.1612
+        },
+        "titleIsClaim": 1.0,
+        "hasCommentary": 1.0,
+        "highlightedPhrase": 0.5
+      }
+    },
+    "chartAnnotated": 0.632,
+    "chartValuesPrinted": 0.792,
+    "chartPages": 106,
+    "tableTreated": 0.892,
+    "tablePages": 37,
+    "tableRows": {
+      "n": 37,
+      "p25": 3.0,
+      "median": 7.0,
+      "p75": 12.0
+    },
+    "titleIsClaim": 0.553,
+    "hasCommentary": 0.43,
+    "highlightedPhrase": 0.414,
+    "sourceLine": 0.557,
+    "exhibitsPerPage": 1.23,
+    "noExhibitShare": 0.257
+  }
+}

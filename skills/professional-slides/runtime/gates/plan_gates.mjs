@@ -190,7 +190,7 @@ function gateMix(pages, findings) {
       PLAN.mix.table.max,
       "A table is the right answer when the content is genuinely a matrix - three or more dimensions compared across " +
       "the same rows. It is the wrong answer, and the commonest default, for two columns of sentences: that is a " +
-      "comparison panel, a rows list with an icon per category, or a chart. Reference decks run about 13% tables.",
+      "comparison panel, a rows list with an icon per category, or a chart. Published client decks run 11% tables.",
     ));
   }
   const measured = share("chart") + share("table");
@@ -203,19 +203,37 @@ function gateMix(pages, findings) {
     ));
   }
   for (const [name, band] of Object.entries(PLAN.mix)) {
-    if (name === "table") continue; // reported above with its own code
+    if (name === "table" || name.startsWith("$")) continue; // table is reported above with its own code
     const value = share(name);
     if (band.min !== undefined && value < band.min) {
       findings.push(finding(
         null, "PLAN_EXHIBIT_MIX",
-        { family: name, share: round(value), pages: count(name), of: total, direction: "below" },
+        { family: name, share: round(value), pages: count(name), of: total, direction: "below",
+          published: band.observedDominant },
         band.min,
-        `The deck carries too few ${name} pages. These bands are calibrated on the example decks and are guidelines: ` +
-        "move them with judgement, but a family at zero is a family nobody considered.",
+        `The deck carries too few ${name} pages. Published client decks run ${pc(band.observedDominant)} ` +
+        `${name} pages; the floor sits under that so a real deck would pass it. A family at zero is a family ` +
+        "nobody considered.",
+      ));
+    }
+    if (band.max !== undefined && value > band.max) {
+      findings.push(finding(
+        null, "PLAN_EXHIBIT_MIX",
+        { family: name, share: round(value), pages: count(name), of: total, direction: "above",
+          published: band.observedDominant },
+        band.max,
+        name === "text"
+          ? `${count(name)} of ${total} pages carry no exhibit at all. Published decks run ` +
+            `${pc(band.observedDominant)} pages of type alone - that is a real page, not a failure - but past ` +
+            "this the deck is an essay with a template around it. Give the argument something to stand on."
+          : `The deck leans on ${name} pages. Published client decks run ${pc(band.observedDominant)}.`,
       ));
     }
   }
 }
+
+/** A share as the finding prints it: 0.371 -> "37%". */
+const pc = (value) => (value === undefined ? "few" : `${Math.round(value * 100)}%`);
 
 function gateRuns(pages, findings) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");

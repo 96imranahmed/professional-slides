@@ -251,7 +251,7 @@ class WeightContractTests(unittest.TestCase):
         report = page_gates.run_gates(deck(slides))
         density = report["density"]
         self.assertEqual(density["bodyWords"]["floor"], 95)
-        self.assertEqual(density["bodyWords"]["referenceMedian"], 128)
+        self.assertEqual(density["bodyWords"]["referenceMedian"], 154)
         self.assertIn("footerWords", density)
         self.assertIn("columnFill", density)
         self.assertIn("plotSpan", density)
@@ -399,12 +399,26 @@ class CorpusCalibrationTests(unittest.TestCase):
     carry the furniture that corpus carries."""
 
     def test_ink_floors_track_the_measured_corpus(self):
-        # 192 sampled pages of published client decks: median ink 19%, lower
-        # quartile 12%. A balanced page floors just under that quartile.
-        self.assertGreaterEqual(page_gates.FILL_LEVELS["balanced"]["ink_min"], 0.11)
-        self.assertGreaterEqual(page_gates.FILL_LEVELS["full"]["ink_min"], 0.13)
-        self.assertLess(page_gates.FILL_LEVELS["airy"]["ink_min"], 0.11)
-        self.assertEqual(page_gates.REFERENCE_PAGE["inkMedian"], 0.19)
+        """Each fill level is a percentile of the corpus, not a taste.
+
+        2,125 rendered pages of published client decks: median ink 0.191, first
+        quartile 0.112, tenth percentile 0.077. So an `airy` deck promises to
+        beat the emptiest 3% of published pages, a `balanced` deck the emptiest
+        10%, a `full` deck the emptiest quarter. The old ladder floored
+        `balanced` at 0.115 and `full` at 0.14, which rejected 26% and 36% of
+        the corpus - a floor that fails a third of published work is measuring
+        something other than emptiness.
+        """
+        levels = page_gates.FILL_LEVELS
+        self.assertEqual(levels["full"]["ink_min"], page_gates.REFERENCE_PAGE["inkQ1"])
+        self.assertEqual(levels["balanced"]["ink_min"], page_gates.REFERENCE_PAGE["inkP10"])
+        self.assertLess(levels["airy"]["ink_min"], levels["balanced"]["ink_min"])
+        self.assertEqual(page_gates.REFERENCE_PAGE["inkMedian"], 0.191)
+        # And the ladder is monotone with what it costs: each step up flags more
+        # of the corpus than the step below it.
+        flagged = page_gates.REFERENCE_PAGE["exceedance"]["inkBelow"]
+        self.assertLess(flagged["0.05"], flagged["0.077"])
+        self.assertLess(flagged["0.077"], flagged["0.112"])
 
     def test_a_small_image_is_a_mark_not_a_photograph(self):
         # The reference pages carry a small image on about half their pages
@@ -916,8 +930,8 @@ class BodyFloorTests(unittest.TestCase):
     def test_the_density_report_carries_both_bands(self):
         report = page_gates.run_gates(deck([page(1, ["chart.bar"], texts=[" ".join(["evidence"] * 96)])]))
         density = report["density"]
-        self.assertEqual(density["bodyWords"]["referenceMedian"], 128)
-        self.assertEqual(density["footerWords"]["referenceMedian"], 19)
+        self.assertEqual(density["bodyWords"]["referenceMedian"], 154)
+        self.assertEqual(density["footerWords"]["referenceMedian"], 12)
 
 
 class DerivedColumnTests(unittest.TestCase):

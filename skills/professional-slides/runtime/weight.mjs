@@ -73,17 +73,19 @@ export function resolveWeight(spec = {}, fill = DEFAULT_FILL) {
 }
 
 /**
- * The reference corpus, for the record. `slides` is the careful sample - 137
- * landscape analytical slides of published McKinsey, BCG and Bain client work,
- * with covers, dividers, back matter and portrait proposal documents excluded -
- * measured band by band and block by block. `corpus` is the wide sample: 1,832
- * pages of page text with no band split. The floors above sit deliberately
- * below both medians; a floor is not a target, and a page that clears it is not
- * yet a firm page.
+ * The reference corpus, measured rather than asserted - see evals/corpus. `slides`
+ * is the pixel sample: 2,125 pages from 426 published decks rendered onto the same
+ * 1280x720 canvas the gates read. `corpus` is the wide sample: 16,334 analytical
+ * pages of twelve firms' published work, measured off the text layer. `judged` is
+ * a vision pass over 264 pages, one per deck, which is where the family shares and
+ * the craft rates come from. The floors above sit deliberately below these
+ * medians; a floor is not a target, and a page that clears it is not yet a firm
+ * page.
  */
 export const REFERENCE = Object.freeze({
-  slides: Object.freeze({ ...CONTRACT.reference.slides, bands: Object.freeze({ ...CONTRACT.reference.slides.bands }), lineBlocks: Object.freeze({ ...CONTRACT.reference.slides.lineBlocks }) }),
+  slides: Object.freeze({ ...CONTRACT.reference.slides, bands: Object.freeze({ ...CONTRACT.reference.slides.bands }), numericByFamily: Object.freeze({ ...CONTRACT.reference.slides.numericByFamily }) }),
   corpus: Object.freeze({ ...CONTRACT.reference.corpus }),
+  judged: Object.freeze({ ...CONTRACT.reference.judged, byFamily: Object.freeze({ ...CONTRACT.reference.judged.byFamily }) }),
 });
 
 /** The page's three bands, as a reference analytical slide carries them. */
