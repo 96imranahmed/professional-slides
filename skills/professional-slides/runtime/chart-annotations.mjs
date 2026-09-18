@@ -36,8 +36,16 @@ const NONE_RADIUS = token("radius.none");
 // a plain leader with a dot instead.
 const TAIL_REACH = 40;
 
+// The cap a callout wraps at and the tallest it is allowed to grow, not the
+// size it always is: `evidenceBoxSize` fits the box to its own text within
+// these. The band above the plot is reserved from the height, so a box that
+// comes out shorter keeps its foot where the leader expects it.
 const EVIDENCE_BOX_WIDTH = 260;
 const EVIDENCE_BOX_HEIGHT = 56;
+const EVIDENCE_BOX_MIN_WIDTH = 96;
+const EVIDENCE_BOX_MIN_HEIGHT = 32;
+const EVIDENCE_PAD_X = 16;
+const EVIDENCE_PAD_Y = 14;
 const ORTHOGONAL_GAP = 28;
 const ENDPOINT_DIAMETER = 8;
 const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label"]);
@@ -149,27 +157,49 @@ function clearLeader(x1, y1, x2, y2, target, obstacles) {
   return obstacles.every((node) => pointInsideFrame(target, node.frame, 1) || !overlaps(corridor, node.frame, 1));
 }
 
-function assertEvidenceTextFits(annotation) {
-  const measured = measureText(annotation.text, EVIDENCE_BOX_WIDTH - 16, {
+function measureEvidenceText(annotation) {
+  return measureText(annotation.text, EVIDENCE_BOX_WIDTH - EVIDENCE_PAD_X, {
     fontFamily: tokenValue(token("font.bodySemibold")),
     fontSize: tokenValue(ANNOTATION),
     bold: true,
     wrapWidthRatio: 1
   });
-  if (measured.height > EVIDENCE_BOX_HEIGHT - 14) throw new Error(`Chart evidence annotation for ${annotation.category} is too long for its body-sized box`);
+}
+
+/**
+ * The box is the size of what it says.
+ *
+ * 260x56 was the size of every callout whatever it carried, so "$46m, 11-month
+ * filing" - one short line - arrived as a rectangle two and a half times its
+ * own text with a leader dropping out of the empty half. A reader reads that as
+ * an unfinished box, not as a note. The width now closes on the longest laid
+ * line and the height on the lines themselves; 260 is the cap it wraps at, and
+ * `EVIDENCE_BOX_MIN_WIDTH` keeps a two-word note from shrinking to a stamp.
+ */
+function evidenceBoxSize(annotation) {
+  const measured = measureEvidenceText(annotation);
+  return {
+    width: Math.min(EVIDENCE_BOX_WIDTH, Math.max(EVIDENCE_BOX_MIN_WIDTH, Math.ceil(measured.width) + EVIDENCE_PAD_X)),
+    height: Math.max(EVIDENCE_BOX_MIN_HEIGHT, Math.ceil(measured.height) + EVIDENCE_PAD_Y),
+  };
+}
+
+function assertEvidenceTextFits(annotation) {
+  if (measureEvidenceText(annotation).height > EVIDENCE_BOX_HEIGHT - EVIDENCE_PAD_Y) throw new Error(`Chart evidence annotation for ${annotation.category} is too long for its body-sized box`);
 }
 
 function horizontalPlacement({ annotation, index, target, plot, obstacles, placements, id }) {
-  const y = Math.max(plot.y, Math.min(plot.y + plot.height - EVIDENCE_BOX_HEIGHT, target.y - EVIDENCE_BOX_HEIGHT / 2));
+  const { width, height } = evidenceBoxSize(annotation);
+  const y = Math.max(plot.y, Math.min(plot.y + plot.height - height, target.y - height / 2));
   const candidates = {
     right: {
       side: "right",
-      frame: { x: target.x + ORTHOGONAL_GAP, y, width: EVIDENCE_BOX_WIDTH, height: EVIDENCE_BOX_HEIGHT },
+      frame: { x: target.x + ORTHOGONAL_GAP, y, width, height },
       leader: { x1: target.x + ORTHOGONAL_GAP, y1: target.y, x2: target.x, y2: target.y }
     },
     left: {
       side: "left",
-      frame: { x: target.x - ORTHOGONAL_GAP - EVIDENCE_BOX_WIDTH, y, width: EVIDENCE_BOX_WIDTH, height: EVIDENCE_BOX_HEIGHT },
+      frame: { x: target.x - ORTHOGONAL_GAP - width, y, width, height },
       leader: { x1: target.x - ORTHOGONAL_GAP, y1: target.y, x2: target.x, y2: target.y }
     }
   };
@@ -182,11 +212,15 @@ function horizontalPlacement({ annotation, index, target, plot, obstacles, place
 }
 
 function verticalPlacement({ annotation, index, target, plot, bandIndex, topBandCount, obstacles, placements, id }) {
+  const { width, height } = evidenceBoxSize(annotation);
   const frame = {
-    x: target.x - EVIDENCE_BOX_WIDTH / 2,
-    y: plot.y - (topBandCount - bandIndex) * EVIDENCE_CALLOUT_BAND,
-    width: EVIDENCE_BOX_WIDTH,
-    height: EVIDENCE_BOX_HEIGHT
+    x: target.x - width / 2,
+    // The band reserves `EVIDENCE_BOX_HEIGHT`; a shorter box sits on the foot of
+    // that reservation rather than floating at the top of it, which would just
+    // trade an empty box for a longer leader.
+    y: plot.y - (topBandCount - bandIndex) * EVIDENCE_CALLOUT_BAND + (EVIDENCE_BOX_HEIGHT - height),
+    width,
+    height
   };
   const leader = { x1: target.x, y1: frame.y + frame.height, x2: target.x, y2: target.y };
   if (frame.x < plot.x || frame.x + frame.width > plot.x + plot.width || !clearLeader(leader.x1, leader.y1, leader.x2, leader.y2, target, [...obstacles, ...placements.map((placement) => ({ frame: placement.frame }))])) {
@@ -199,11 +233,12 @@ function verticalPlacement({ annotation, index, target, plot, bandIndex, topBand
 function standardPlacement({ annotation, index, target, plot, bandIndex, topBandCount, obstacles, placements, id }) {
   const targetX = target.leaderX ?? target.x;
   const targetY = target.leaderY ?? target.y;
+  const { width, height } = evidenceBoxSize(annotation);
   const frame = {
-    x: Math.max(plot.x - 12, Math.min(plot.x + plot.width + 12 - EVIDENCE_BOX_WIDTH, targetX - EVIDENCE_BOX_WIDTH / 2)),
-    y: plot.y - (topBandCount - bandIndex) * EVIDENCE_CALLOUT_BAND,
-    width: EVIDENCE_BOX_WIDTH,
-    height: EVIDENCE_BOX_HEIGHT
+    x: Math.max(plot.x - 12, Math.min(plot.x + plot.width + 12 - width, targetX - width / 2)),
+    y: plot.y - (topBandCount - bandIndex) * EVIDENCE_CALLOUT_BAND + (EVIDENCE_BOX_HEIGHT - height),
+    width,
+    height
   };
   const leader = {
     x1: Math.max(frame.x, Math.min(frame.x + frame.width, targetX)),

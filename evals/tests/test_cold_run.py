@@ -171,6 +171,24 @@ class SpecimenTests(unittest.TestCase):
                 self.assertGreaterEqual(statistics["exhibitVarietyPerTen"],
                                         CONTRACT["plan"]["craft"]["exhibitVarietyPerTen"]["min"], name)
 
+    def test_a_specimen_records_what_looking_at_it_found(self):
+        """The part of a cold run the score does not produce.
+
+        The rollout run cleared every plan gate and every build bar and was
+        still wrong in eight places. If that pass leaves no record, the next
+        person has only the numbers - which is exactly the failure this
+        directory exists to catch.
+        """
+        recorded = self.specimen("2026-09-18-network-rollout.json")
+        self.assertTrue(recorded["score"]["plan"]["accepted"], "the plan passed, which is the point")
+        found = recorded["foundByLooking"]
+        self.assertGreaterEqual(len(found), 8)
+        for entry in found:
+            with self.subTest(defect=entry.get("defect", "")[:40]):
+                # What was seen, why it happened, and what was done about it.
+                for field in ["defect", "why", "fix"]:
+                    self.assertTrue(entry.get(field, "").strip(), field)
+
     def test_every_brief_says_what_it_is_there_to_catch(self):
         # A brief nobody can say the purpose of is a brief that gets run once.
         briefs = sorted((COLD / "briefs").glob("*.md"))

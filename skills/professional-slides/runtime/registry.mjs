@@ -592,7 +592,12 @@ function bodyListNodes({ id, frame, props }) {
   const inverse = props.tone === "inverse";
   if (props.tone !== undefined && !["standard", "inverse"].includes(props.tone)) throw new Error(`Unknown bullet-list tone: ${props.tone}`);
   const INK_ = inverse ? WHITE : INK;
-  let y = frame.y + (extraGap > 0 ? Math.max(0, spare - extraGap * (layout.measured.length - 1)) / 2 : 0);
+  // `centre: false` keeps the block at the top of its track. The leftover is
+  // only a margin when the list owns the track: under a kpi or an insight it
+  // reads as a gap between the two, and in a two-column split it lands the
+  // halves on different tops.
+  const centred = props.centre !== false;
+  let y = frame.y + (centred && extraGap > 0 ? Math.max(0, spare - extraGap * (layout.measured.length - 1)) / 2 : 0);
   const nodes = [];
   layout.measured.forEach((m, index) => {
     const first = m.lead ?? m.text;

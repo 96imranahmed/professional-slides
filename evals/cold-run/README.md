@@ -65,6 +65,16 @@ bar today, and that is a finding about those decks rather than a reason to move
 the bar: `slideworks` treats one table in six against a reference of about half,
 and `house-style` treats none of its one table.
 
+A specimen also carries `foundByLooking`: what step 3 found that the score did
+not. `2026-09-18-network-rollout.json` records eight entries against a run that
+cleared every plan gate and every build bar — a list centred half a line away
+from its neighbour, a rating column that refused to draw because two of its
+twelve rows honestly said "Open", a chevron that read as a verdict on France, a
+callout two and a half times the size of its own sentence. None of them is a
+number out of range, which is the argument for step 3. Each has a test in
+`evals/tests/test_cold_run_defects.py`, so the entry is a claim the suite keeps
+rather than a note.
+
 ## What this cannot do
 
 It cannot run the model. Generating a deck is not deterministic and does not

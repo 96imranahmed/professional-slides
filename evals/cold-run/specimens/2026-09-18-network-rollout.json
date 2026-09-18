@@ -1,6 +1,6 @@
 {
   "schema": "professional-slides.cold-run-specimen/v1",
-  "$comment": "The first cold run scored by this harness, and the reason the harness exists. A fresh agent was given briefs/network-rollout.md and the skill, nothing else - no examples, no corrections, no one watching - and produced a 21-page deck that cleared the plan gates with zero findings and every build bar. Then somebody looked at the montage, which is the pass no threshold makes, and found two defects the score could not see. Both are fixed and both are now measured; this specimen is what says so.",
+  "$comment": "The first cold run scored by this harness, and the reason the harness exists. A fresh agent was given briefs/network-rollout.md and the skill, nothing else - no examples, no corrections, no one watching - and produced a 21-page deck that cleared the plan gates with zero findings and every build bar. Then somebody looked at the montage, which is the pass no threshold makes. Eight defects came out of that looking, and not one of them is a number out of range: a page can carry every measure this repository knows how to take and still be wrong in the eye. Every entry in foundByLooking is fixed and has a test in evals/tests/test_cold_run_defects.py; this specimen is what says so.",
   "brief": "briefs/network-rollout.md",
   "recorded": "2026-09-18",
   "generatedBy": "professional-slides as of 28d0149, cold, no context, no corrections",
@@ -68,6 +68,42 @@
       "defect": "The run wrote its four-point readiness scale as plain words rather than harvey balls, deliberately.",
       "why": "The harvey cell printed '3/4' beside the disc - a score out of four, saying what the disc already said - so plain words were the better call. The inference was working; the drawing was not.",
       "fix": "The cell prints the scale's own anchor word (Full, Strong, Partial, Weak, None) beside the disc."
+    },
+    {
+      "page": 4,
+      "defect": "Five findings split into two columns of three and two, each column starting at a different height.",
+      "why": "A list in a column centres what the gap cap leaves over, so the shorter half centred its own larger leftover and dropped half a line. Two lists, not one set of five.",
+      "fix": "`centre: false` on both halves of a split list; the leftover pools below instead."
+    },
+    {
+      "pages": [9, 11],
+      "defect": "A list under a kpi floated away from it, leaving a void between the number and the first thing said about it.",
+      "why": "Same centring, applied where the list does not own its track. Under a kpi or an insight the leftover reads as a gap between two blocks rather than as a margin.",
+      "fix": "The composer passes `centre: false` wherever the points share their column with a kpi, an insight or a paragraph."
+    },
+    {
+      "page": 5,
+      "defect": "The twelve-market readiness column stayed plain text even after the anchor-word fix.",
+      "why": "Two of the twelve markets honestly read 'Open' - the brief required unknowns to stay visible as open rather than be scored as zero - and the rule wanted every cell to be a scale word. The ten that were rated lost their scale because two were not.",
+      "fix": "A rating column tolerates a minority of explicit unknowns (up to a third), which keep the author's own word as text beside the discs."
+    },
+    {
+      "page": 5,
+      "defect": "In a dense table the harvey disc overlapped the word beside it.",
+      "why": "The measurement reserved the small marker and the cell drew the medium one. Invisible until a table was both dense and rated, which is the table the treatment exists for.",
+      "fix": "The cell draws the marker the layout measured."
+    },
+    {
+      "pages": [5, 18],
+      "defect": "On a twelve-row scorecard the single implication chevron sat on the France row and read as a verdict on France.",
+      "why": "At five rows or more the gutter is drawn once, and 'once' was implemented as 'on the middle row'. A mark inside a row belongs to that row.",
+      "fix": "A column-level dashed rule down the gutter with the disc centred on it - the same marker the gutter between an exhibit and its commentary carries. The rule spans the evidence and stops above a total row."
+    },
+    {
+      "pages": [12, 16],
+      "defect": "'$46m, 11-month filing' arrived in a box two and a half times the size of its own sentence, with the leader dropping out of the empty half.",
+      "why": "Every callout was 260x56 whatever it carried.",
+      "fix": "The box closes on its longest laid line and on the lines themselves; 260 is the cap it wraps at, and its foot stays where the leader expects it."
     }
   ]
 }

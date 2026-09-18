@@ -492,7 +492,12 @@ function implicationColumn(ex) {
   const rows = ex.rows || [];
   const style = ex.implicationStyle || (rows.length >= 5 ? "single" : "per-row");
   if (!["per-row", "single"].includes(style)) throw new Error(`Unknown implicationStyle: ${style}; use per-row or single`);
-  const middle = Math.floor((rows.length - 1) / 2);
+  // At five rows or more the gutter is drawn once, as a device belonging to the
+  // whole table rather than to a row: a dashed rule down its own column with the
+  // disc centred on it. Drawn as a chevron on the middle row it read as a mark
+  // against that row - on a twelve-market scorecard, a verdict on France - which
+  // is the opposite of "all of this evidence, therefore all of that".
+  const asDivider = style === "single";
   // Fixed pixels, not a weight. A column's `width` is a share of what is left
   // after the fixed columns are reserved, and the composer weights the text
   // columns by their measured content - numbers in the hundreds. Dropped into
@@ -501,14 +506,15 @@ function implicationColumn(ex) {
   // last column the verdict rule marked then failed to build rather than
   // drawing the chevron. It is the one column on the page with a size of its
   // own, so it says so.
-  const gutter = { label: "", type: "implication", width: { px: 52 } };
+  const gutter = { label: "", type: "implication", width: { px: 52 }, ...(asDivider ? { divider: true } : {}) };
   const { implication: _flag, ...rest } = columns[at];
   const marked = { type: "text", ...rest };
   const nextColumns = [...columns.slice(0, at), gutter, marked, ...columns.slice(at + 1)];
-  const nextRows = rows.map((row, index) => {
+  const nextRows = rows.map((row) => {
     const cells = Array.isArray(row) ? row : row.cells || [];
-    // A blank cell in the gutter on the rows that carry no chevron.
-    const draw = style === "per-row" || index === middle;
+    // Every gutter cell is blank under the divider: the column draws itself once.
+    // Per-row, every row carries its own chevron.
+    const draw = !asDivider;
     const mark = { type: "implication", relation: "implies", ...(draw ? {} : { draw: false }) };
     const next = [...cells.slice(0, at), mark, ...cells.slice(at)];
     return Array.isArray(row) ? next : { ...row, cells: next };
@@ -642,7 +648,7 @@ function iconColumn(ex) {
   const columns = (ex.columns || []).map((c, i) => (i === 0
     ? (typeof c === "object" && c ? { ...c, type: "category" } : { label: String(c ?? ""), type: "category" })
     : c));
-  const nextRows = rows.map((row, index) => {
+  const nextRows = rows.map((row) => {
     const cells = Array.isArray(row) ? row : row.cells || [];
     const icon = listed ? listed[index] : row?.icon;
     if (!icon) return row;
@@ -750,6 +756,18 @@ const RATING_WORDS = new Map(Object.entries({
   full: 4, complete: 4, yes: 4, excellent: 4, always: 4, certain: 4,
 }));
 const RATING_HEADER = /\b(rating|score|strength|fit|maturity|readiness|capability|coverage|confidence|level|assessment|performance)\b/i;
+/**
+ * A cell that says "we do not know", which is not the same as a zero.
+ *
+ * The brief that found this asked for exactly it: ten markets rated on a
+ * four-point scale and two with no local data at all, which had to "stay
+ * visible as open rather than being scored as zero". The rule required every
+ * cell to be a scale word, so the column stayed text and the ten that *were*
+ * rated lost their scale. An unknown is left blank in its disc - the harvey
+ * cell already draws a missing value that way - so the column reads as ten
+ * ratings and two gaps, which is what the page means.
+ */
+const RATING_UNKNOWN = /^(open|n\/?a|tbd|unknown|unassessed|not assessed|pending|—|–|-|\?)$/i;
 
 function harveyColumn(ex) {
   const columns = ex.columns || [];
@@ -765,12 +783,19 @@ function harveyColumn(ex) {
     const values = rows.map((row) => {
       const cell = cellsOf(row)[c];
       if (cell && typeof cell === "object" && cell.type) return null;
-      const text = String(cell?.text ?? cell ?? "").trim().toLowerCase();
+      const text = String(cell?.text ?? cell ?? "").trim();
+      // An explicit unknown keeps its row and draws an empty disc.
+      if (RATING_UNKNOWN.test(text)) return "unknown";
       // "very high" and "not applicable" reduce to their last word.
-      const word = text.split(/\s+/).filter(Boolean).at(-1) ?? "";
+      const word = text.toLowerCase().split(/\s+/).filter(Boolean).at(-1) ?? "";
       return RATING_WORDS.has(word) ? RATING_WORDS.get(word) : null;
     });
-    if (values.every((v) => v !== null) && new Set(values).size > 1) rated.push([c, values]);
+    const scored = values.filter((v) => typeof v === "number");
+    const unknown = values.filter((v) => v === "unknown").length;
+    // Every cell accounted for, enough of them actually rated to be a scale,
+    // and the unknowns a minority - a column of mostly blanks is not a rating.
+    if (values.every((v) => v !== null) && scored.length >= 3
+        && unknown <= values.length / 3 && new Set(scored).size > 1) rated.push([c, values]);
   }
   // One rating column is the finding; three of them is a scorecard the author
   // should have declared, and inferring all three would redraw the whole table.
@@ -779,7 +804,14 @@ function harveyColumn(ex) {
   if (!header && rated.length !== 1) return ex;
   const next = rows.map((row, r) => {
     const cells = [...cellsOf(row)];
-    for (const [c, values] of rated) cells[c] = { type: "harvey", value: values[r] };
+    for (const [c, values] of rated) {
+      const value = values[r];
+      // An unknown keeps the word the author wrote. "Open" and "Not assessed"
+      // say something "N/A" does not, and the difference between "not assessed"
+      // and "assessed at zero" is what a page like this turns on - so the cell
+      // is left exactly as it arrived, as text, beside the discs.
+      if (value !== "unknown") cells[c] = { type: "harvey", value };
+    }
     return Array.isArray(row) ? cells : { ...row, cells };
   });
   const nextColumns = columns.map((column, c) => (rated.some(([at]) => at === c)
@@ -1215,7 +1247,7 @@ function resolvePointsStyle(slide, points, recentStyles = []) {
   return viable.slice().sort((a, b) => staleness(b) - staleness(a) || viable.indexOf(a) - viable.indexOf(b))[0];
 }
 
-function pointsItem(points, id, tone, fill, inColumn = false, style = null) {
+function pointsItem(points, id, tone, fill, inColumn = false, style = null, centre = true) {
   // The side column is a track, not a shelf: its points spread down it. A list
   // that hugs the top of a 500px column leaves two fifths of it empty, which is
   // how a page carrying real content still reads as thin. A list under a row of
@@ -1226,9 +1258,15 @@ function pointsItem(points, id, tone, fill, inColumn = false, style = null) {
   // means; all of it pooled under the last one is just an unfinished page. The
   // gap opens to its cap on every deck now, and the list centres what the cap
   // leaves over, so an airy column is the same block with more air in it.
+  //
+  // `centre` is false where the list does not own its track. Centring the
+  // leftover under a kpi or an insight opens a void between that block and the
+  // first point - the list floats away from the thing it is reading from - and
+  // in a two-column split it lands the two halves on different tops, which is
+  // two lists rather than one. Both were visible on the first cold run.
   const distribute = inColumn && points.length > 1;
   const shape = style && POINT_STYLES[style] ? POINT_STYLES[style] : {};
-  return { id, component: "bullet-list", props: { variant: "body", items: points, ...shape, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}), ...(distribute ? { distribute: true } : {}) }, size: distribute ? { width: { fr: 1 }, height: "fill" } : HUG };
+  return { id, component: "bullet-list", props: { variant: "body", items: points, ...shape, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}), ...(distribute ? { distribute: true, ...(centre ? {} : { centre: false }) } : {}) }, size: distribute ? { width: { fr: 1 }, height: "fill" } : HUG };
 }
 
 /**
@@ -2058,7 +2096,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // band and the points start level with the plot, not with the heading text.
     // `pointsAlign: "middle"` centres the points on the exhibit instead.
     const tone = sideTreatment(slide);
-    const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle) : null;
+    // The list centres its leftover only when it owns the track. Under a kpi or
+    // an insight, centring opens a void between that block and the first point
+    // - the list floats away from the thing it is reading from.
+    const sharesColumn = Boolean(slide.kpi) || Boolean(slide.insight) || Boolean(slide.insights?.length);
+    const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle, !sharesColumn) : null;
     // `kpi: { value, label }`: the one big number the chart proves, in the accent
     // at the top of the side column, above the points.
     const kpiTile = slide.kpi ? { id: `${id}-kpi`, component: "metric", props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } } : null;
@@ -2227,7 +2269,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       if (slide.kpi) sideItems.push({ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } });
       const insights = slide.insights || (slide.insight ? [slide.insight] : []);
       for (const [at, insight] of insights.entries()) sideItems.push({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insights.length > 1 && at === 0 ? "plain" : "tonal", ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG });
-      if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle));
+      if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle, sideItems.length === 0));
       const side = { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: sideTreatment(slide), size: { width: { fr: slide.kpi || insights.length ? 1.5 : 1 }, height: "fill" }, items: sideItems };
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
     } else items.push({ ...stacked, size: SIZE });
@@ -2332,7 +2374,8 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       ...(slide.kpi ? [{ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } }] : []),
       ...insightSpecs.map((insight, at) => ({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insightSpecs.length > 1 && at === 0 ? "plain" : "tonal", ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG })),
       ...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })),
-      ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle)] : []),
+      ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle,
+        !slide.kpi && !insightSpecs.length && !(slide.paragraphs || []).length)] : []),
     ];
     const column = { id: `${id}-side`, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: 1.2 }, height: "fill" }, items: copy };
     // The picture's own line sits under it as a statement box, the way a
@@ -2367,8 +2410,8 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       // page leaves a third of it empty under the shorter column, which is the
       // void the ink gate reports on a page that carries five real findings.
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
-        pointsItem(ordered.slice(0, half), `${id}-points-a`, tone, fill, true, pointsStyle),
-        pointsItem(ordered.slice(half), `${id}-points-b`, tone, fill, true, pointsStyle),
+        pointsItem(ordered.slice(0, half), `${id}-points-a`, tone, fill, true, pointsStyle, false),
+        pointsItem(ordered.slice(half), `${id}-points-b`, tone, fill, true, pointsStyle, false),
       ] });
     } else if (points.length) items.push(pointsItem(points, `${id}-points`, tone, fill, false, pointsStyle));
     for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });

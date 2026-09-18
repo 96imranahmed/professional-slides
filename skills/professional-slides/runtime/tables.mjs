@@ -1015,6 +1015,42 @@ function renderTableAt({ id, frame, props }) {
     if (!band) return;
     nodes.push(rectPrimitive({ id: stableId(id, "row-band", r), role: "table-row-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(band), data: { row: r, rowStyle: m.rows[r].style ?? props.rowStyle } }));
   });
+  // The implication gutter as one device for the whole table: a dashed rule down
+  // its own column with the disc centred on it, rather than a chevron sitting on
+  // whichever row happens to be halfway down. On a twelve-market scorecard that
+  // chevron read as a mark against France. It is the same marker the gutter
+  // between an exhibit and its commentary carries, which is the point: the
+  // reader has already learned what it means.
+  m.columns.forEach((column, c) => {
+    if (!column || column.type !== "implication" || column.divider !== true) return;
+    const centreX = xs[c] + (m.widths[c] - m.gap) / 2;
+    // The rule spans the evidence, and a total is not evidence: it is the same
+    // rows added up. Drawn to the foot of the table the hairline crossed the
+    // dark total band and the disc came to rest one row low, against "Open
+    // markets" rather than between the six rows it reads from.
+    let last = m.rows.length - 1;
+    while (last > 0 && (m.rows[last].style ?? props.rowStyle) === "total") last -= 1;
+    const top = frame.y + m.headerHeight + m.gap / 2;
+    const bottom = ys[last] + m.heights[last] - m.gap / 2;
+    const diameter = Math.min(v("icon.medium"), m.widths[c] - m.gap);
+    const centreY = (top + bottom) / 2, reach = diameter / 2 + v("space.2");
+    const data = { column: c, relation: "implies", arrowVariant: "divider-chevron" };
+    for (const [suffix, y1, y2] of [["top", top, centreY - reach], ["bottom", centreY + reach, bottom]]) {
+      if (y2 <= y1) continue;
+      nodes.push(linePrimitive({ id: stableId(id, "implication-rule", c, suffix), role: "table-implication",
+        x1: centreX, y1, x2: centreX, y2,
+        style: { stroke: t("color.rule"), lineWidth: t("line.hairline"), dash: "dash" }, data }));
+    }
+    nodes.push(ellipsePrimitive({ id: stableId(id, "implication-disc", c), role: "table-implication",
+      frame: { x: centreX - diameter / 2, y: centreY - diameter / 2, width: diameter, height: diameter },
+      style: box(primary), data: { ...data, arrowPart: 0 } }));
+    [[centreX - diameter * 0.11, centreY - diameter * 0.23, centreX + diameter * 0.12, centreY],
+     [centreX + diameter * 0.12, centreY, centreX - diameter * 0.11, centreY + diameter * 0.23],
+    ].forEach(([x1, y1, x2, y2], part) => nodes.push(linePrimitive({
+      id: stableId(id, "implication-chevron", c, part), role: "table-implication", x1, y1, x2, y2,
+      style: { stroke: foreground(primary), lineWidth: t("line.standard") }, data: { ...data, arrowPart: part + 1 } })));
+  });
+
   // A bubble column is one pill repeated, not a pill per figure. Sized to its
   // own text each pill made "6.7%" a visibly different object from "29.7%", and
   // taking the row's height turned the pill into a tall capsule whose size read
@@ -1273,11 +1309,16 @@ function renderTableAt({ id, frame, props }) {
           );
         }
         if (cell.type === "harvey" && !missing(cell.value)) {
+          // The same size the measurement reserved. A dense table reserves the
+          // small marker and this drew the medium one, so the disc overlapped
+          // the word beside it - visible the moment a twelve-row scorecard got
+          // a rating column, which is the table this treatment is for.
+          const discSize = l.marker ?? v("icon.medium");
           const disc = {
             x: inner.x,
             y,
-            width: v("icon.medium"),
-            height: v("icon.medium"),
+            width: discSize,
+            height: discSize,
           };
           nodes.push(
             ellipsePrimitive({
