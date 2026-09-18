@@ -1762,7 +1762,29 @@ def gate_deck_structure(slides, analytical, findings):
         return
     components = {component for slide in slides for component in all_components(slide)}
     roles = {str(node.get("role")) for slide in slides for node in slide.get("nodes", [])}
-    sections = "section-divider" in components
+    # A section can begin on an analytical page. A stable, selected section
+    # label on every analytical page is navigation too; requiring extra divider
+    # pages rejects a valid fixed-length deck with a contents page and tracker.
+    selected_by_page = []
+    for index in analytical:
+        selected_by_page.append({
+            (str(node["data"]["trackerId"]), str(node["data"]["sectionId"]))
+            for node in slides[index].get("nodes", [])
+            if str(node.get("role", "")).startswith("tracker-")
+            and node.get("data", {}).get("selected") is True
+            and node.get("data", {}).get("trackerId")
+            and node.get("data", {}).get("sectionId")
+            and source_text(node).strip()
+        })
+    tracked_sections = False
+    tracker_ids = {tracker_id for page in selected_by_page for tracker_id, _ in page}
+    for tracker_id in tracker_ids:
+        states = [{section_id for tid, section_id in page if tid == tracker_id}
+                  for page in selected_by_page]
+        if all(len(state) == 1 for state in states) and len(set.union(*states)) >= 2:
+            tracked_sections = True
+            break
+    sections = "section-divider" in components or tracked_sections
     tracker = bool(components & {"agenda", "tracker-page"}) or bool(roles & {
         "tracker-label", "tracker-compact-label", "tracker-compact-marker-label",
     })

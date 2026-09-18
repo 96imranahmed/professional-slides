@@ -5,6 +5,23 @@ from node_probe import run_node
 
 
 class ComposeLayoutTests(unittest.TestCase):
+    def test_a_short_text_page_uses_its_body_track_without_losing_content(self):
+        run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const points=['The first finding establishes the premise.','The second finding explains its consequence.'];
+const page=composeSlide({title:'Two findings support the decision',layout:'text',points},0);
+const list=page.items.find(i=>i.component==='bullet-list');
+assert.equal(list.size.height,'fill');
+assert.equal(list.props.distribute,true);
+assert.equal(list.props.centre,false);
+assert.deepEqual(list.props.items,points);
+const shared=composeSlide({title:'Two findings support the decision',layout:'text',points,paragraphs:['An authored qualification remains alongside the findings.']},0);
+assert.equal(shared.items.find(i=>i.component==='bullet-list').size.height,'hug');
+assert.ok(shared.items.some(i=>i.component==='paragraph'));
+console.log(JSON.stringify({ok:true}));
+''')
+
     def test_aliases_and_layouts_resolve_to_components(self):
         result = run_node('''
 import assert from 'node:assert/strict';

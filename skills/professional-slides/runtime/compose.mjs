@@ -2451,7 +2451,14 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
         pointsItem(ordered.slice(0, half), `${id}-points-a`, tone, fill, true, pointsStyle, false),
         pointsItem(ordered.slice(half), `${id}-points-b`, tone, fill, true, pointsStyle, false),
       ] });
-    } else if (points.length) items.push(pointsItem(points, `${id}-points`, tone, fill, false, pointsStyle));
+    } else if (points.length) {
+      // A text page's sole list owns the remaining body track. Letting it hug
+      // pins it below a metrics strip (or above a closing band), pooling all
+      // the spare height into one internal void. A list followed by authored
+      // paragraphs still shares the track and keeps its natural height.
+      items.push(pointsItem(points, `${id}-points`, tone, fill,
+        !(slide.paragraphs || []).length, pointsStyle, false));
+    }
     for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
   }
   // These full-width/paired layouts used to discard supplied points. Keep

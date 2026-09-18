@@ -90,6 +90,40 @@ def good_slide():
     }
 
 
+class SelectedSectionNavigationTests(unittest.TestCase):
+    def slides(self):
+        return [{"nodes": [{"type": "text", "role": "tracker-compact-label",
+                            "text": "Origins" if i < 6 else "Adaptations",
+                            "data": {"trackerId": "sections", "sectionId": "a" if i < 6 else "b", "selected": True}}]}
+                for i in range(12)]
+
+    def findings(self, slides):
+        findings = []
+        page_gates.gate_deck_structure(slides, list(range(len(slides))), findings)
+        return findings
+
+    def test_selected_sections_do_not_require_extra_divider_pages(self):
+        self.assertEqual(self.findings(self.slides()), [])
+
+    def test_missing_selected_page_still_fails(self):
+        slides = self.slides()
+        slides[3]["nodes"] = []
+        self.assertTrue(self.findings(slides))
+
+    def test_one_section_or_unselected_labels_do_not_supply_navigation(self):
+        for change in ({"sectionId": "a"}, {"selected": False}, {"trackerId": ""}):
+            with self.subTest(change=change):
+                slides = self.slides()
+                for slide in slides:
+                    slide["nodes"][0]["data"].update(change)
+                self.assertTrue(self.findings(slides))
+
+    def test_inconsistent_tracker_ids_do_not_form_one_navigation(self):
+        slides = self.slides()
+        slides[0]["nodes"][0]["data"]["trackerId"] = "other"
+        self.assertTrue(self.findings(slides))
+
+
 class SyntheticGoodPageTests(unittest.TestCase):
     def test_a_page_that_meets_every_threshold_produces_no_findings(self):
         scene = {"slides": [{"id": "s01", "nodes": [], "componentInstances": [
