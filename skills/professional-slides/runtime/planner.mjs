@@ -7,6 +7,8 @@ import {
   component as componentNode,
   flow,
   grid,
+  isTokenReference,
+  normalizeInsets,
   overlay,
   resolveTitleVariant,
   section,
@@ -105,6 +107,118 @@ export function validateSlidePlan(plan, registry = REGISTRY) {
   return { density };
 }
 
+/* --------------------------------------------------------------- row rules */
+
+/**
+ * What a section holds, leaf by leaf. A section's family is decided by its
+ * contents rather than by its name: the composer's ids are its own business.
+ */
+function leafComponents(item, out = []) {
+  if (Array.isArray(item.items)) for (const child of item.items) leafComponents(child, out);
+  else if (item.component) out.push(item.component);
+  return out;
+}
+
+// The components a commentary column is built from. Anything else in a section
+// is evidence, and a section holding evidence is a panel.
+const COMMENTARY_COMPONENTS = new Set([
+  "paragraph", "bullet-list", "insight", "evidence-note", "callout", "metric",
+  "connector", "source", "section-boundary", "legend", "section-heading"
+]);
+const isPanel = (item) => Array.isArray(item.items) && leafComponents(item).some((id) => !COMMENTARY_COMPONENTS.has(id));
+
+/** A section's padding before the section() default fills it in. */
+const rawPadding = (item) => item.padding ?? ((item.treatment || "open") === "open" ? 0 : token("space.4"));
+function insetSpecs(item) {
+  const raw = rawPadding(item);
+  if (typeof raw === "number" || isTokenReference(raw)) return { top: raw, right: raw, bottom: raw, left: raw };
+  return { top: raw.top ?? raw.y ?? 0, right: raw.right ?? raw.x ?? 0, bottom: raw.bottom ?? raw.y ?? 0, left: raw.left ?? raw.x ?? 0 };
+}
+// Only ever used to order two paddings against each other. The spacing tokens
+// scale with the page's density, so the winner is carried as its own spec and
+// never as the pixel count read here.
+const paddingTop = (item) => normalizeInsets(rawPadding(item)).top;
+
+/**
+ * Panels in a row are drawn the same way and start on the same line.
+ *
+ * Two panels side by side are read across, so a tinted panel beside a plain one
+ * says one of the two matters more - and says it by accident, because the
+ * surface is what a composer reached for to tell the halves apart. Worse, the
+ * surface pads its contents inward and the plain panel does not, so the tables
+ * inside them start at different heights and the row stops reading across at
+ * all. Both halves of that are fixed here, where the row is built.
+ *
+ * Peers are the sections in the row that carry evidence. A commentary rail
+ * beside an exhibit is not a peer of it and keeps whatever ground the page gave
+ * it (`pointsTone`), because it is read down, not across.
+ *
+ * Differing treatments hold only when every peer names its own: that is the
+ * page deciding which side is highlighted. Where one peer names a ground and
+ * another takes the default, the difference is an alternation rather than a
+ * decision, and the row falls back to the open ground. Whatever the grounds,
+ * the peers take one top inset, so their headings and their tables begin on one
+ * line.
+ */
+function alignRowPanels(items) {
+  const panels = items.filter(isPanel);
+  if (panels.length < 2) return items;
+  const named = panels.every((panel) => panel.treatment !== undefined);
+  const mixed = new Set(panels.map((panel) => panel.treatment || "open")).size > 1;
+  let resolved = mixed && !named ? panels.map((panel) => ({ ...panel, treatment: "open" })) : panels;
+  const tallest = resolved.reduce((deepest, panel) => (paddingTop(panel) > paddingTop(deepest) ? panel : deepest));
+  const top = insetSpecs(tallest).top;
+  resolved = resolved.map((panel) => (paddingTop(panel) === paddingTop(tallest) ? panel : { ...panel, padding: { ...insetSpecs(panel), top } }));
+  const aligned = new Map(panels.map((panel, index) => [panel, resolved[index]]));
+  return items.map((item) => aligned.get(item) ?? item);
+}
+
+/**
+ * A row whose every column is a section holding nothing but prose: the shape
+ * the composer builds when a page's commentary goes under its exhibit rather
+ * than beside it. A bare pair of paragraphs in a row is a label and its body
+ * (the `rows` exhibit), which is one point read across, not three read down.
+ */
+const isProseRow = (items) => items.length >= 2 && items.every((item) => {
+  const leaves = leafComponents(item);
+  return Array.isArray(item.items) && leaves.length > 0 && leaves.every((id) => id === "paragraph");
+});
+
+// About one line of a column in a three-up under a full-width exhibit (360px of
+// 14px Arial), and the widest a column may be before it reads as a sentence
+// rather than as one of three parallel answers.
+const PARALLEL_LINE = 64;
+// A one-word column beside a full line is not a set, however short both are.
+const PARALLEL_RATIO = 3;
+
+/**
+ * Three columns across the foot of a page say: here are three parallel answers
+ * to one question. Three sentences that happen to number three say no such
+ * thing, and setting them in columns claims a structure the writing has not
+ * got - "the series ran from 1992 to 1995" beside "interpretation: the format
+ * offers repeated encounters" is a list, drawn as a comparison.
+ *
+ * So the columns must be built the same way. Either every one carries its own
+ * lead - the lead becomes the column's heading, and three headings are three
+ * parallel answers - or none does and every column is a short phrase of
+ * comparable length: at most a line, and none more than three times another.
+ * Anything else stacks as ordinary points, which is what it is.
+ */
+function parallelProse(items) {
+  const headed = items.filter((item) => item.heading).length;
+  if (headed === items.length) return true;
+  if (headed) return false;
+  const lengths = items.map((item) => leafText(item).length);
+  if (Math.max(...lengths) > PARALLEL_LINE) return false;
+  return Math.max(...lengths) <= Math.min(...lengths) * PARALLEL_RATIO;
+}
+
+function leafText(item, out = []) {
+  if (Array.isArray(item.items)) for (const child of item.items) leafText(child, out);
+  else if (typeof item.props?.text === "string") out.push(item.props.text);
+  return out.join(" ");
+}
+
 function layoutKind(plan, items) {
   if (plan.layout && plan.layout !== "auto") return plan.layout;
   if (items.some((item) => item.frame)) return "absolute";
@@ -150,16 +264,26 @@ function makeComposition(plan, items, { root = false } = {}) {
   if (kind === "absolute") return absolute({ id: `${plan.id}-absolute`, children: items.map((item, index) => makeItem(item, index)) });
   if (kind === "overlay") return overlay({ id: `${plan.id}-overlay`, children: items.map((item, index) => makeItem(item, index)) });
   if (kind === "flow.row" || kind === "flow.column") {
+    let direction = kind.endsWith("row") ? "row" : "column";
+    let children = items;
+    if (direction === "row") {
+      children = alignRowPanels(children);
+      // A row of prose that is not parallel is a list, and a list reads down.
+      if (isProseRow(children) && !parallelProse(children)) {
+        direction = "column";
+        children = children.map((item) => ({ ...item, size: { width: { fr: 1 }, height: "hug" } }));
+      }
+    }
     // A slide body whose blocks all hug their content claims less than the frame.
     // Without a policy the remainder is abandoned below the last block, which is
     // what produces a dead band across the lower third of the page.
-    const bodyColumn = root && kind === "flow.column";
+    const bodyColumn = root && direction === "column";
     return flow({
-      id: `${plan.id}-${kind.replace(".", "-")}`,
-      direction: kind.endsWith("row") ? "row" : "column",
+      id: `${plan.id}-flow-${direction}`,
+      direction,
       gap: token(plan.gap ?? "space.4"),
       leftover: plan.leftover ?? (bodyColumn ? "distribute" : "start"),
-      children: items.map((item, index) => makeItem(item, index))
+      children: children.map((item, index) => makeItem(item, index))
     });
   }
   if (kind === "section-split-50-50") {

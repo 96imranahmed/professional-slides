@@ -411,8 +411,14 @@ function alignPeerHeaders(children, widths, registry, group = () => 0) {
   }));
   return children.map((node, index) => {
     const own = headers[index];
-    if (!own?.ruled) return node;
-    const peers = headers.filter((header, i) => header?.ruled && group(children[i]) === group(node) && Math.abs(header.top - own.top) < 0.01);
+    // A heading band is shared by every peer that starts where this one does,
+    // whether or not it inks a rule. A panel on a ground does its separating
+    // with the ground and draws no rule; that is a decision about what is
+    // drawn, and it used to drop the panel out of the row's shared band, so a
+    // heading that wrapped beside it left the two panels' contents on
+    // different lines.
+    if (!own) return node;
+    const peers = headers.filter((header, i) => header && group(children[i]) === group(node) && Math.abs(header.top - own.top) < 0.01);
     const headerBandHeight = Math.max(own.height, ...peers.map(header => header.height));
     return node.nodeType === "section" ? { ...node, headerBandHeight } : { ...node, props: { ...node.props, headerBandHeight } };
   });
@@ -878,9 +884,11 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
       const measure = ({ node, frame }) => registry.get(node.nodeType === "section" ? "section" : node.component)?.measureHeader?.({ frame, props: placementProps(node) });
       const own = measure(placement);
       if (!own) return undefined;
-      // Ruled peers sharing a top guide share a bottom-aligned text band. Longer
-      // headings increase the band; neither adapter may shrink or invent wraps.
-      const peers = own.ruled ? placements.map(measure).filter((peer) => peer?.ruled && Math.abs(peer.top - own.top) < 0.01) : [own];
+      // Peers sharing a top guide share a bottom-aligned text band, whether or
+      // not they ink a rule: a panel on a ground separates with the ground, and
+      // it is still a panel in the row. Longer headings increase the band;
+      // neither adapter may shrink or invent wraps.
+      const peers = placements.map(measure).filter((peer) => peer && Math.abs(peer.top - own.top) < 0.01);
       return Math.max(own.height, ...peers.map((peer) => peer.height));
     };
     for (const { node, frame, ancestors = [] } of placements) {

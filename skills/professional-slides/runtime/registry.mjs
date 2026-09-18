@@ -310,17 +310,30 @@ function headingLayout(frame, props = {}) {
   // top line (so a heading beside a chart heading reads on the same line) and
   // the rule sits under the band, one baseline unit below its bottom; the body
   // sits a clear step below the rule.
+  // The gap is reserved whether or not the rule is inked. Panels in a row are
+  // read across, and a panel whose ground does the separating (muted, tint) or
+  // whose band is blank would otherwise start its contents one baseline unit
+  // above its neighbour's - four pixels of drift down a row of tables, which is
+  // enough to see and impossible to explain. What is drawn in the band is a
+  // question about the ground; how tall the band is, is a question about the
+  // row.
   const ruleGap = tokenValue(token("space.1"));
   const contentGap = tokenValue(token("space.4"));
-  return { heading, headingWidth, bandHeight, ruleGap, height: bandHeight + (props.rule === false ? 0 : ruleGap) + contentGap };
+  return { heading, headingWidth, bandHeight, ruleGap, height: bandHeight + ruleGap + contentGap };
 }
 
 function sectionHeadingNodes({ id, frame, props = {} }) {
   const variant = props.variant || "standard";
   const color = variant === "inverse" ? WHITE : variant === "accent" ? PRIMARY : INK;
-  const showRule = props.rule !== false;
   const layout = headingLayout(frame, props);
   const { heading, headingWidth, bandHeight, ruleGap } = layout;
+  // A blank heading is the row rule's doing: a panel whose neighbour is named
+  // keeps an empty band of the same height so the two start their content on
+  // one line. The band is space, not a heading - so it prints nothing, and a
+  // rule under nothing is a rule under nothing. The height stays reserved
+  // either way, which is the whole reason the blank band exists.
+  if (!String(props.heading ?? props.text ?? "").trim()) return [];
+  const showRule = props.rule !== false;
   const nodes = [textPrimitive({
     id: stableId(id, "heading"),
     role: "section-heading",

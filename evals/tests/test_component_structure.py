@@ -93,7 +93,14 @@ console.log(JSON.stringify({
             self.assertEqual(chrome["title"]["x"], 60)
             self.assertEqual(chrome["title"]["width"], 1160)
             self.assertGreaterEqual(chrome["title"]["y"], chrome["textBottom"] + 8)
-            self.assertEqual(chrome["footer"], {"x": 60, "y": 680, "width": 1160, "height": 0})
+            # y 680 -> 674: the footer band now keeps a third of the page's side
+            # margin (FOOTER_EDGE_MARGIN_RATIO, 20px of 60) clear of the bottom
+            # edge instead of the 14px CHROME.footerTop happened to leave, and
+            # the rule rides with the row it closes. The band lifts as a whole,
+            # so its distance to the footer text is unchanged, and the lift
+            # comes out of the footer's own clearance: the content frame is the
+            # same height it was.
+            self.assertEqual(chrome["footer"], {"x": 60, "y": 674, "width": 1160, "height": 0})
 
     def test_cover_is_dark_by_default_with_a_lower_third_title_block(self):
         result = run_node("""

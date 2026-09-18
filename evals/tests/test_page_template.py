@@ -61,6 +61,67 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
+    def test_footer_keeps_a_share_of_the_side_margin_and_pads_the_page_number(self):
+        """The footer is inset by the page's own margin, and the number is fixed width.
+
+        Measured on a rendered 50-page deck, the page number's baseline sat
+        13.5pt from the bottom edge against a 45pt side margin - furniture
+        jammed against the edge in a way nothing else on the page was - and it
+        was unpadded, so a single digit started 4.4pt right of a double digit
+        and the footer changed width as the deck ran on.
+        """
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {pageTemplateLayout,FOOTER_EDGE_MARGIN_RATIO,PAGE_NUMBER_MIN_DIGITS} from './skills/professional-slides/runtime/page-template.mjs';
+import {CHROME,configureChrome} from './skills/professional-slides/runtime/core.mjs';
+const frame={x:0,y:0,width:1280,height:720};
+const layout=props=>pageTemplateLayout(frame,{source:'Source: Company data',companyName:'Company Name',...props});
+const number=props=>layout(props).slots.find(s=>s.role==='page-number');
+// The row's own 22px carries the 12px of source type with 5px of slack under
+// it, so the ink clears the page edge by the padding plus that slack.
+const ROW_SLACK=5;
+const padding=()=>Math.round(Math.min(CHROME.left,CHROME.right)*FOOTER_EDGE_MARGIN_RATIO);
+const edge=n=>frame.height-(n.frame.y+n.frame.height);
+const seven=number({pageNumber:7});
+assert.equal(padding(),20);                     // a third of the 60px side margin
+assert.equal(edge(seven),padding()+ROW_SLACK);  // 25px: was 19px under a 14px row padding
+// The padding is the margin's, not a number of its own: widen the page's
+// margins and the footer's clearance widens with them, while the body keeps
+// every pixel of the height it had - the lift comes out of the footer band.
+const standardHeight=layout({pageNumber:7}).contentFrame.height;
+configureChrome({left:90,right:90});
+try {
+ assert.equal(padding(),30);
+ assert.equal(edge(number({pageNumber:7})),35);
+ assert.equal(layout({pageNumber:7}).contentFrame.height,standardHeight);
+ // A template that already seats the footer higher than the padding asks for
+ // keeps its own placement: the padding is a floor on the clearance.
+ configureChrome({left:90,right:90,footerTop:620});
+ assert.ok(edge(number({pageNumber:7}))>padding()+ROW_SLACK);
+} finally { configureChrome(null); }
+assert.equal(standardHeight,528);
+// Fixed-width furniture: every page of a deck sets its number in the digits of
+// the deck's highest page, so the numeral neither moves nor changes width.
+assert.equal(PAGE_NUMBER_MIN_DIGITS,2);
+assert.equal(number({pageNumber:7}).text,'07');
+assert.equal(number({pageNumber:7,pageTemplate:{pageCount:50}}).text,'07');
+assert.equal(number({pageNumber:50,pageTemplate:{pageCount:50}}).text,'50');
+assert.equal(number({pageNumber:7,pageTemplate:{pageCount:150}}).text,'007');
+assert.equal(number({pageNumber:7,pageCount:150}).text,'007');
+const [single,double]=[number({pageNumber:7,pageTemplate:{pageCount:50}}),number({pageNumber:50,pageTemplate:{pageCount:50}})];
+assert.deepEqual(single.frame,double.frame);
+assert.equal(single.text.length,double.text.length);
+// An author's own label is left as written, and a count that is not a count fails closed.
+assert.equal(number({pageNumber:'A-1'}).text,'A-1');
+assert.throws(()=>layout({pageNumber:7,pageTemplate:{pageCount:0}}),/positive whole number/);
+assert.throws(()=>layout({pageNumber:7,pageCount:12.5}),/positive whole number/);
+console.log(JSON.stringify({accepted:true,edge:edge(seven),padding:padding(),text:seven.text}));
+""")
+        self.assertTrue(result["accepted"])
+        self.assertEqual(result["edge"], 25)
+        self.assertEqual(result["padding"], 20)
+        self.assertEqual(result["text"], "07")
+
     def test_wrapped_sources_notes_and_invalid_input_fail_closed(self):
         result = run_node("""
 import assert from 'node:assert/strict';
@@ -98,7 +159,11 @@ for(const [i,s] of deck.slides.entries()) {
  const title=s.nodes.find(n=>n.role==='action-title'),logo=s.componentInstances.find(n=>n.id.endsWith(':logo'));
  assert.ok(logo);assert.equal(logo.frame.x,1040);assert.equal(logo.frame.y,44);
  assert.ok(title.frame.x+title.frame.width<logo.frame.x);
- assert.equal(s.nodes.find(n=>n.role==='page-number').text,String(i+1));
+ // '1' -> '01': page numbers are fixed-width furniture, zero-padded to the
+ // digits of the deck's highest page (PAGE_NUMBER_MIN_DIGITS when the deck
+ // does not declare a pageCount), so the numeral does not change width under
+ // the reader and matches how the contents page numbers its sections.
+ assert.equal(s.nodes.find(n=>n.role==='page-number').text,String(i+1).padStart(2,'0'));
  assert.equal(s.nodes.filter(n=>n.role==='source-text').length,1);
  assert.ok(!s.nodes.some(n=>n.role==='footer-right'||n.role==='source-rule'));
  assert.ok(renderSlideHtml(s).includes('Company name'));

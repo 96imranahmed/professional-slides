@@ -11,7 +11,10 @@ const slide={id:'chapter',kind:'tracker',title:'Commercial outlook',pageNumber:3
 const {deck,decisions}=planDeck({id:'navigation',slides:[slide]});
 assert.equal(deck.slides[0].nodes.filter(n=>n.text===slide.title).length,1);
 assert.equal(deck.slides[0].nodes.filter(n=>n.role==='action-title').length,0);
-assert.equal(deck.slides[0].nodes.find(n=>n.role==='page-number').text,'3');
+// '3' -> '03': the page number is fixed-width furniture, zero-padded to the
+// digits of the deck's highest page (two by default), so a tracker page reads
+// the same width as every other page's number.
+assert.equal(deck.slides[0].nodes.find(n=>n.role==='page-number').text,'03');
 assert.equal(decisions[0].kind,'tracker');
 assert.throws(()=>planDeck({id:'bad',slides:[{...slide,title:'Unmatched chapter'}]}),/selected chapter label/);
 assert.throws(()=>planDeck({id:'bad',slides:[{...slide,items:[]}]}),/trackerPage/);
