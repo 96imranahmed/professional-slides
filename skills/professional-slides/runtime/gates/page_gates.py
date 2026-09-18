@@ -403,6 +403,7 @@ GATE_CODES = {
     "PLANNING_VOICE": "planning language left on the page",
     "CAVEAT_HEAVY": "a page spending more of itself on limits than on findings",
     "TABLE_SCHEMA_FLAT": "the same table invented over and over across the deck",
+    "CONTRADICTED_SHARE": "a percentage in the prose the page's own counts do not give",
 }
 
 # Findings raised before the page is rendered: the composer's plan-time budget
@@ -1537,6 +1538,81 @@ def gate_twin_cells(slide_no, slide, findings):
     ))
 
 
+WORD_SHARES = {"half": 0.5, "a third": 1 / 3, "one third": 1 / 3, "two thirds": 2 / 3,
+               "a quarter": 0.25, "three quarters": 0.75, "a fifth": 0.2, "two fifths": 0.4,
+               "three fifths": 0.6, "four fifths": 0.8, "two in five": 0.4, "three in five": 0.6,
+               "four in five": 0.8, "one in five": 0.2, "one in four": 0.25, "three in four": 0.75,
+               "one in three": 1 / 3, "two in three": 2 / 3, "one in two": 0.5}
+OF_COUNT_RE = re.compile(r"\b(\d{1,4})\s+of\s+(\d{1,4})\b")
+PERCENT_RE = re.compile(r"(\d{1,3}(?:\.\d)?)\s?%")
+
+
+def gate_contradicted_share(slide_no, slide, findings):
+    """CONTRADICTED_SHARE. A percentage the page's own counts do not give.
+
+    Found on a *reference* deck, by a reader rather than by anything here. A
+    page printed four rings - 80% have access, 52% require guidelines, 38% limit
+    tools, 12% have no access - over a bar chart labelled "17 of 33", "12 of 33",
+    "4 of 33". 17 + 12 = 29 of 33 is 88%, and the page's own 12% is what makes
+    80% provably wrong: 100 - 12 = 88. Two bullets beside it were wrong the same
+    way, one claiming two thirds where the chart gave 17 of 33.
+
+    Where a page states its counts as "N of M" it has published its own
+    denominator, so every share on that page must be some subset of those counts
+    over M. That is the whole rule, and it is exact: no tolerance beyond the
+    rounding the page itself does.
+    """
+    counts, denominators = [], set()
+    for node in text_nodes(slide):
+        for value, total in OF_COUNT_RE.findall(source_text(node)):
+            counts.append(int(value))
+            denominators.add(int(total))
+    # One published denominator, or the page is not making this claim about itself.
+    if len(denominators) != 1 or len(counts) < 2:
+        return
+    total = denominators.pop()
+    if total <= 0:
+        return
+    counts = sorted(set(counts))
+    reachable = {0}
+    for count in counts:
+        reachable |= {r + count for r in list(reachable) if r + count <= total}
+    # A share is honest when some subset of the page's own counts rounds to it.
+    ok = {round(100 * r / total) for r in reachable}
+    stated, bad = [], []
+    for node in text_nodes(slide):
+        role = str(node.get("role") or "")
+        if role not in COMMENTARY_ROLES and role not in {"metric-value", "metric-label", "insight-body"}:
+            continue
+        text = source_text(node)
+        for raw in PERCENT_RE.findall(text):
+            stated.append((f"{raw}%", round(float(raw))))
+        lowered = " " + text.lower()
+        for phrase, fraction in WORD_SHARES.items():
+            if f" {phrase} " in lowered or lowered.rstrip().endswith(" " + phrase):
+                stated.append((phrase, round(100 * fraction)))
+    # The page's own resolution is one count: with 33 institutions, one of them
+    # is three percentage points, and a share inside that is the author rounding
+    # or a second question over the same base rather than a contradiction. Eight
+    # points out on a base of 33 is not rounding - it is a different number.
+    unit = 100 / total
+    for label, value in stated:
+        if not any(abs(value - candidate) <= unit for candidate in ok):
+            bad.append({"said": label, "nearest": min(ok, key=lambda c: abs(c - value))})
+    if not bad:
+        return
+    findings.append(finding(
+        slide_no, "CONTRADICTED_SHARE",
+        {"claimed": bad[:4], "counts": counts, "of": total},
+        f"a subset of {counts} over {total}",
+        "This page publishes its own denominator and then states a share it does "
+        "not give. Recompute every percentage from the counts on the page and "
+        "print the derivation in the note, or drop the counts if the shares come "
+        "from a different base - a reader who can do the arithmetic will, and "
+        "one number that does not reconcile costs the page every other number on it.",
+    ))
+
+
 def gate_table_schema_flat(slides, content_indexes, findings):
     """TABLE_SCHEMA_FLAT, deck level. The same table, invented over and over.
 
@@ -2158,6 +2234,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_caveat_heavy(slide_no, slide, findings)
             if wanted("TWIN_CELLS"):
                 gate_twin_cells(slide_no, slide, findings)
+            if wanted("CONTRADICTED_SHARE"):
+                gate_contradicted_share(slide_no, slide, findings)
         if wanted("PLANNING_VOICE"):
             gate_planning_voice(slide_no, slide, findings)
         if wanted("TYPE_RANGE"):

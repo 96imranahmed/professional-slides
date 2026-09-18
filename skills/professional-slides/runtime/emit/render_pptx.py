@@ -66,7 +66,49 @@ def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False) -> d
         mp = out_dir / "montage.png"
         sheet.save(mp)
         result["montage"] = str(mp)
+        # Spreads: the same pages at reading size, four to a sheet.
+        #
+        # The montage is the whole deck at half size on one image, which is how
+        # a fifty-page deck gets looked at and nothing gets found. Every defect
+        # this repository has caught by eye was caught at reading size in groups
+        # of four, and half a line of misalignment is one pixel on a montage. So
+        # the render also writes spreads, and burns each page's number into its
+        # corner so a review can cite what it saw.
+        result["spreads"] = write_spreads(files, out_dir)
     return result
+
+
+SPREAD_COLUMNS = 2
+SPREAD_ROWS = 2
+SPREAD_GUTTER = 16
+
+
+def write_spreads(files, out_dir: Path) -> list:
+    from PIL import Image, ImageDraw
+    for old in out_dir.glob("spread-*.png"):
+        old.unlink()
+    per = SPREAD_COLUMNS * SPREAD_ROWS
+    written = []
+    for index in range(0, len(files), per):
+        group = files[index:index + per]
+        pages = [Image.open(f) for f in group]
+        w, h = pages[0].size
+        rows = (len(pages) + SPREAD_COLUMNS - 1) // SPREAD_COLUMNS
+        sheet = Image.new("RGB", (SPREAD_COLUMNS * w + (SPREAD_COLUMNS + 1) * SPREAD_GUTTER,
+                                  rows * h + (rows + 1) * SPREAD_GUTTER), "#C8CCD0")
+        draw = ImageDraw.Draw(sheet)
+        for i, im in enumerate(pages):
+            r, c = divmod(i, SPREAD_COLUMNS)
+            x = SPREAD_GUTTER + c * (w + SPREAD_GUTTER)
+            y = SPREAD_GUTTER + r * (h + SPREAD_GUTTER)
+            sheet.paste(im, (x, y))
+            number = Path(group[i]).stem.split("-")[1]
+            draw.rectangle([x, y, x + 46, y + 22], fill="#0B1F33")
+            draw.text((x + 8, y + 6), f"p{number}", fill="#FFFFFF")
+        target = out_dir / f"spread-{index // per + 1}.png"
+        sheet.save(target)
+        written.append(str(target))
+    return written
 
 
 def main(argv=None):

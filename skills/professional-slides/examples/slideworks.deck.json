@@ -953,7 +953,7 @@
       "title": "Most institutions have access to external GenAI tools but half require internal guidelines first",
       "metrics": [
         {
-          "value": "80%",
+          "value": "88%",
           "label": "have access to external GenAI solutions"
         },
         {
@@ -996,11 +996,11 @@
         ]
       },
       "points": [
-        "Access is broad but governed: most institutions gate use behind guideline training",
-        "Data-security training is the second most common prerequisite",
-        "A third limit tools to specific areas rather than the whole workflow",
-        "The few without access cite regulatory uncertainty, not capability",
-        "Two thirds of institutions restrict tools to named teams rather than opening them to all"
+        "Access is broad but governed: 29 of 33 institutions have access and 52% gate it behind guideline training",
+        "Only 12 institutions open the tools to almost all colleagues; the rest keep them inside named teams",
+        "38% limit tools to specific areas rather than the whole workflow",
+        "The four without access cite regulatory uncertainty, not capability",
+        "Governance, not availability, is what decides how far a deployment reaches inside an institution"
       ],
       "source": "IACPM/McKinsey survey, December 2024 (n = 33)",
       "footnotes": [

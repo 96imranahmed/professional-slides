@@ -215,10 +215,60 @@ class TableSchemaTests(unittest.TestCase):
         self.assertEqual(run(page_gates.gate_table_schema_flat, slides, list(range(len(slides)))), [])
 
 
+class ContradictedShareTests(unittest.TestCase):
+    """A percentage the page's own counts do not give.
+
+    Found on a *reference* deck by a reader, not by anything in this repository
+    - which is the point. `slideworks` printed four rings (80% have access, 52%
+    require guidelines, 38% limit tools, 12% have no access) over a bar chart
+    labelled "17 of 33", "12 of 33", "4 of 33". 17 + 12 = 29 of 33 is 88%, and
+    the page's own 12% is what makes 80% provably wrong. Two bullets beside it
+    were wrong the same way. Every threshold in this repository is calibrated
+    against four decks, and one of them could not add up.
+    """
+
+    def page_with(self, *lines, counts=("17 of 33", "12 of 33", "4 of 33")):
+        nodes = [text("category-note", c) for c in counts]
+        nodes += [text("metric-value", line) if line.endswith("%") else text("list-item", line)
+                  for line in lines]
+        return page(nodes)
+
+    def test_a_share_the_counts_do_not_give_is_reported(self):
+        findings = run(page_gates.gate_contradicted_share, 16, self.page_with("80%"))
+        self.assertEqual([f["code"] for f in findings], ["CONTRADICTED_SHARE"])
+        self.assertEqual(findings[0]["measured"]["claimed"][0], {"said": "80%", "nearest": 88})
+
+    def test_the_shares_the_counts_do_give_pass(self):
+        # 4, 12, 17 over 33 reach 12%, 36%, 48%, 52%, 64%, 88%, 100%.
+        for share in ["88%", "52%", "12%", "64%", "36%"]:
+            with self.subTest(share=share):
+                self.assertEqual(run(page_gates.gate_contradicted_share, 16, self.page_with(share)), [])
+
+    def test_a_share_within_one_count_is_the_author_rounding(self):
+        """38% against a reachable 36% is one institution out of 33.
+
+        The first version of this gate flagged it, and it is a second survey
+        question over the same base rather than a contradiction. Eight points out
+        is not rounding; three is.
+        """
+        self.assertEqual(run(page_gates.gate_contradicted_share, 16, self.page_with("38%")), [])
+
+    def test_shares_written_as_words_are_read_too(self):
+        findings = run(page_gates.gate_contradicted_share, 16, self.page_with("Three quarters of institutions gate access"))
+        self.assertEqual([f["code"] for f in findings], ["CONTRADICTED_SHARE"])
+
+    def test_a_page_that_publishes_no_denominator_is_not_measured(self):
+        self.assertEqual(run(page_gates.gate_contradicted_share, 1, page([text("list-item", "80% have access")])), [])
+        # Two different bases on one page: the page is not making this claim.
+        mixed = page([text("category-note", "17 of 33"), text("category-note", "9 of 40"), text("metric-value", "80%")])
+        self.assertEqual(run(page_gates.gate_contradicted_share, 1, mixed), [])
+
+
 class FalsifiabilityTests(unittest.TestCase):
     """A content gate that fires on good work is one that gets switched off."""
 
-    CONTENT_CODES = {"RESTATEMENT", "PLANNING_VOICE", "CAVEAT_HEAVY", "TWIN_CELLS", "TABLE_SCHEMA_FLAT"}
+    CONTENT_CODES = {"RESTATEMENT", "PLANNING_VOICE", "CAVEAT_HEAVY", "TWIN_CELLS",
+                     "TABLE_SCHEMA_FLAT", "CONTRADICTED_SHARE"}
 
     def test_the_audited_fixture_deck_is_clean_on_content(self):
         """The NYC/SF deck is the deck the whole audit was written about.

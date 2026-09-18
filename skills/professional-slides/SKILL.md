@@ -242,6 +242,30 @@ node runtime/deliver-deck.mjs deck.json out/             # + review; hands over 
 
 Build takes a few seconds; the render is the slow step (LibreOffice, ~3 s for ten pages). Delivery refuses a deck that fails the page gates or the review and writes `out/REJECTED.md` with the blockers instead of a deliverable. In an agent session the review runs as a packet: read `out/review-packet/prompt.md` and the renders, write `out/review.json` to its schema, then rerun delivery with `--review out/review.json`. Flags and gate thresholds are in [production](references/tools/production.md).
 
+## Look at it before you ship it
+
+The build ends with `rendered/spread-N.png`: the deck at reading size, four pages
+to a sheet, each page's number in its corner. **Open them.** Every defect this
+skill has caught that mattered was caught by a person looking at rendered pages,
+and never by a threshold — the gates found the geometry and a reader found that
+the deck said nothing.
+
+Then run the taste review: **one** subagent, one pass over the spreads, one
+report back. Not a loop, not a page at a time — a reviewer who sees four pages
+together sees the deck's grammar, which is where the damage is.
+
+```
+Read every spread in <out>/rendered/. Follow
+skills/professional-slides/references/taste-review.md and references/design.md.
+Return the JSON described there and nothing else.
+```
+
+It returns a rating out of ten, what the titles alone argue, the worst page, the
+pages that could be deleted, and findings with page numbers. Treat `blocker` as a
+build failure and `major` as fix-before-delivery, exactly like a gate finding.
+Three decks in this repository passed every numeric gate and were rated 2 to 4
+out of 10 by a first reader; the montage is what shows you which one you built.
+
 ## House style
 
 The palette carries a house style, taken from the firms' 2022–24 published decks, so one deck reads as one house: `mckinsey` sets serif titles on a hairline rule, electric-blue accents, dash bullets and zebra tables; `bcg` sets regular-weight titles on a light grey band, a green pill for the page tag, grey chart-heading bands and green bar families; `bain` sets light titles, grey bars with the answer in red and regular value labels; `deloitte` sets black ink with the signature green. The style is a set of tokens (`style.titleWeight`, `style.titleRule`, `style.tagPlacement`, `style.chartHeading`, `style.listMarker`, `style.tableRows`, `style.labelWeight`) that components read; a deck's `typography` block still overrides the faces.
@@ -345,6 +369,7 @@ Both the gates and the runtime read the same `runtime/weight.json`, so a change 
 ## Further detail
 
 [Storylining](references/storylining.md) - hypothesis trees, the dot-dash, the Australia Post worked example.
+[Taste review](references/taste-review.md) - the pass no threshold makes, as one subagent call over the rendered spreads.
 [Charts](references/charts.md) - per-encoding data contracts and construction rules.
 [Components](references/components.md) - the registered component set, props and when to use each.
 [Copy](references/copy.md) - titles, body, labels, decision closes.
