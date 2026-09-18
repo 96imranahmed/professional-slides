@@ -169,6 +169,35 @@ class PlanGateTests(unittest.TestCase):
         self.assertIn("PLAN_NO_ICONS", codes)
         self.assertIn("PLAN_NO_INSIGHT", codes)
 
+    def test_an_anchor_is_a_photograph_however_the_plan_spells_it(self):
+        """Found on a hand-written 50-page plan that put artwork on every page.
+
+        `isPhoto` read the *value* against /^photo/, so `{photo: "Superman"}` -
+        the obvious encoding, where the key is the claim - counted as no
+        photograph, and the plan was told it carried none. A deck-wide device
+        gate that reports zero when the author wrote fifty is worse than no
+        gate: it is the kind of finding an author reads as settled.
+        """
+        for anchor in ["photo: Superman", "image: skyline.jpg",
+                       {"photo": "Superman"}, {"image": "skyline.jpg"},
+                       {"kind": "photo", "photo": "Superman"},
+                       {"kind": "image", "image": "skyline.jpg"}]:
+            with self.subTest(anchor=anchor):
+                pages = [page(i + 1, exhibit="chart.bar", insight="filled",
+                              architecture="exhibit-left" if i % 2 else "two-up",
+                              anchors=[anchor]) for i in range(12)]
+                codes = self.codes(deck(pages))
+                self.assertNotIn("PLAN_NO_PICTURES", codes)
+                self.assertIn("PLAN_NO_ICONS", codes, "and a photograph is not an icon")
+        for anchor in ["target", {"icon": "target"}, {"kind": "icon", "icon": "target"}]:
+            with self.subTest(anchor=anchor):
+                pages = [page(i + 1, exhibit="chart.bar", insight="filled",
+                              architecture="exhibit-left" if i % 2 else "two-up",
+                              anchors=[anchor]) for i in range(12)]
+                codes = self.codes(deck(pages))
+                self.assertNotIn("PLAN_NO_ICONS", codes)
+                self.assertIn("PLAN_NO_PICTURES", codes, "and an icon is not a photograph")
+
     def test_titles_written_to_the_ceiling_are_reported(self):
         long = " ".join(f"word{i}" for i in range(14))
         pages = [page(i + 1, title=long, architecture="exhibit-left" if i % 2 else "two-up",

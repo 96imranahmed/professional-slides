@@ -79,9 +79,22 @@ export function family(page) {
 /** The page's anchors, where `false` means "deliberately none" and is not a list. */
 const anchorsOf = (page) => (Array.isArray(page.anchors) ? page.anchors : []);
 
+/**
+ * Does this anchor say "photograph"?
+ *
+ * The key is the claim. `{ photo: "the Bucharest servicing centre" }` is the
+ * obvious way to write one, and it read the *value* against /^photo/ - so the
+ * natural encoding, and `{ image: "skyline.jpg" }` with it, counted as no
+ * photograph at all. Only a bare string or an object carrying both `kind` and
+ * the matching key passed. A plan that put a photograph on all fifty pages was
+ * then told it had none, which is worse than not having the gate: the deck-wide
+ * device gates are exactly the ones an author reads as settled.
+ */
 const isPhoto = (anchor) => {
-  const value = typeof anchor === "string" ? anchor : anchor?.photo ?? anchor?.image;
-  return typeof value === "string" && /^(photo|image)\b/i.test(String(anchor?.kind ?? value));
+  if (typeof anchor === "string") return /^(photo|image)\b/i.test(anchor);
+  if (!anchor || typeof anchor !== "object") return false;
+  if (typeof anchor.photo === "string" || typeof anchor.image === "string") return true;
+  return /^(photo|image)\b/i.test(String(anchor.kind ?? ""));
 };
 const isIcon = (anchor) => {
   if (typeof anchor === "string") return !/^(photo|image)\b/i.test(anchor);
