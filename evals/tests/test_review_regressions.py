@@ -97,7 +97,8 @@ assert.equal(s.charts,2); assert.equal(s.chartsAnnotated,0.5);
 assert.equal(s.distinctExhibits,3);
 assert.equal(s.exhibitVarietyPerTen,7.5);
 assert.ok(s.drawingsPerPage>0,'drawn elements are counted, not just chart marks');
-assert.ok(s.reference.drawingsPerPage===29,'and set beside what a reference page carries');
+assert.ok(s.reference.drawingsPerPage===32,'and set beside what a published page carries');
+assert.ok(s.reference.tablesTreated===0.89&&s.reference.chartsAnnotated===0.63,'measured, not guessed');
 // A slide with no action title is chrome, not a page to judge.
 assert.equal(designStatistics({slides:[{id:'c',nodes:[{role:'cover-title',type:'text'}],componentInstances:[]}]}).contentPages,0);
 

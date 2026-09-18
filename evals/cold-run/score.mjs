@@ -38,8 +38,8 @@ const CRAFT = CONTRACT.plan.craft;
  *
  * These are the same numbers the plan gates use, applied to what was actually
  * drawn rather than to what was promised. `drawings` is the corpus figure: a
- * reference analytical page carries about 29 primitives that are not type, and
- * a page of rules and paragraphs carries a fraction of that.
+ * published analytical page carries a median of 32 primitives that are not
+ * type, and a page of rules and paragraphs carries a fraction of that.
  */
 export const BUILD_BARS = Object.freeze({
   exhibitVarietyPerTen: { min: CRAFT.exhibitVarietyPerTen.min, reference: CRAFT.exhibitVarietyPerTen.observed },

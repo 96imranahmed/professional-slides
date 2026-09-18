@@ -830,6 +830,38 @@ function verdictColumn(ex) {
   return { ...ex, columns: [...columns.slice(0, -1), { ...(typeof last === "object" && last ? last : { label: String(last ?? "") }), implication: true }] };
 }
 
+const TREATED_CELL = new Set(["heatmap", "bars", "harvey", "highlight", "category", "status", "icon",
+                              "lamp", "dot", "check", "progress", "rating", "number-circle"]);
+const TREATED_COLUMN = ["heat", "bubble", "bar", "harvey", "implication", "icon"];
+
+/**
+ * Did every treatment pass decline this table?
+ *
+ * Read after the chain, off what will actually be drawn: a column that asks for
+ * one, a cell that carries a type, a highlighted row or column, a derived
+ * column or a total band. `rows` counts the body, so a five-row table with a
+ * header is six lines of grid.
+ */
+function untreatedGrid(ex, columns, rows, extra) {
+  if (rows.length < 5) return false;
+  if (ex.zebra !== undefined) return false;           // the author has decided
+  if (ex.bubbleColumn !== undefined) return false;
+  if (extra.highlightColumn !== undefined || ex.highlightRow !== undefined) return false;
+  if (columns.some((c) => TREATED_COLUMN.some((key) => c?.[key]) || TREATED_CELL.has(String(c?.type ?? "")))) return false;
+  // `derive` and a total row are not in conflict with banding: a computed share
+  // column is a treatment of the numbers, not of the grid, and a total band is
+  // one row. What rules banding out is a device already running down the rows.
+  return !rows.some((row) => {
+    if (!Array.isArray(row)) {
+      const style = String(row?.style ?? "");
+      if (style === "total") return false;
+      if (!Array.isArray(row?.cells)) return true;
+      return row.cells.some((cell) => cell && typeof cell === "object" && TREATED_CELL.has(String(cell.type ?? "")));
+    }
+    return row.some((cell) => cell && typeof cell === "object" && TREATED_CELL.has(String(cell.type ?? "")));
+  });
+}
+
 export function styleTable(ex) {
   // What the author wrote, read before any pass rewrites it: a treatment pass
   // that turns a string column into an object would otherwise read downstream
@@ -851,6 +883,13 @@ export function styleTable(ex) {
   const recommended = ex.recommended !== undefined ? columns.findIndex((c) => String(c.label).trim().toLowerCase() === String(ex.recommended).trim().toLowerCase()) : -1;
   if (ex.recommended !== undefined && recommended < 0) throw new Error(`Table recommended column "${ex.recommended}" is not a column label`);
   const extra = { ...(recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {}), ...(ex.scales ? { scales: ex.scales } : {}) };
+  // A table that ends the chain with no treatment at all is a plain grid, and a
+  // plain grid past five rows is where a reader loses their place. 89% of
+  // tables in published client decks carry a treatment of some kind
+  // (evals/corpus), and the commonest by far is a banded row - it costs the
+  // page nothing and it is the only device that works on a table of words. So
+  // banding is what an untreated table falls back to, rather than nothing.
+  if (untreatedGrid(ex, columns, rowsIn, extra)) extra.zebra = true;
   // A "Total …" row at the end is the accent total band.
   rowsIn.forEach((r, i) => {
     if (Array.isArray(r) && i === rowsIn.length - 1 && /^total\b/i.test(String(r[0]?.text ?? r[0] ?? ""))) rowsIn[i] = { style: "total", cells: r };

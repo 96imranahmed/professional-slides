@@ -411,7 +411,7 @@ function gateCraft(pages, findings) {
       if (median < CRAFT.tableRows.min) {
         findings.push(finding(null, "PLAN_TABLE_DEPTH",
           { median, tables: tables.length, measured: sorted }, CRAFT.tableRows.min,
-          `The tables are planned at a median of ${median} rows against ${CRAFT.craftMedian ?? CRAFT.tableRows.observedMedian} in the example decks. A table of ` +
+          `The tables are planned at a median of ${median} rows against ${CRAFT.craftMedian ?? CRAFT.tableRows.observedMedian} in published client decks. A table of ` +
           "three rows spends a whole page saying what a comparison panel or an icon list says in a corner of one. " +
           "Either deepen it - more rows, a derived column, a second cut of the same measure - or choose the " +
           "exhibit the content actually is. A long table is not a problem: it paginates."));
@@ -424,7 +424,7 @@ function gateCraft(pages, findings) {
         "Not one of these tables says how it is treated, so every one of them will draw as the same plain grid. " +
         "The treatments exist and are content-led: a verdict or decision column takes the implication gutter, a " +
         "scored table takes heat, a share column takes bubbles or an in-cell bar, a qualitative rating takes " +
-        `harvey balls, a table whose title names a winner highlights that column. Reference tables carry one on ${Math.round(CRAFT.tableTreated.observed * 100)}% ` +
+        `harvey balls, a table whose title names a winner highlights that column. Published client tables carry one on ${Math.round(CRAFT.tableTreated.observed * 100)}% ` +
         "of them. Name the treatment in the plan and the page stops being a grid of sentences."));
     }
   }
@@ -437,7 +437,7 @@ function gateCraft(pages, findings) {
         "These charts plan no marks on the plot: no change bubble, no bracket between the two series the title " +
         "compares, no reference line at the target, no period band, no flagged event, no highlighted category. A " +
         "plot with nothing marked on it asks the reader to find the finding the title already states. Name the " +
-        `device beside the exhibit; the example decks carry one on ${Math.round(CRAFT.chartAnnotated.observed * 100)}% of their charts.`));
+        `device beside the exhibit; published client decks carry one on ${Math.round(CRAFT.chartAnnotated.observed * 100)}% of their charts.`));
     }
   }
 

@@ -125,7 +125,11 @@ Write `deck.content.json`. One entry per page, four fields:
   not exist, and its absence is those twenty-eight "Interpretation:" pages: with
   nowhere to record what the commentary was for, the commentary became a second
   reading of the exhibit. If the honest answer is "nothing", the page does not
-  need a commentary column and the exhibit should have the width.
+  need a commentary column and the exhibit should have the width. A commentary
+  column is not the house default: measured over 264 published client pages, 73%
+  of chart pages carry one, 56% of diagram pages, 31% of table pages and **4% of
+  pages that are type alone**. Leaving it off is the commonest choice on the
+  commonest page.
 - **`highlight`** — the phrase the reader should see first, set in the accent
   inside a sentence.
 

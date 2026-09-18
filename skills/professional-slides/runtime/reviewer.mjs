@@ -129,7 +129,11 @@ export async function buildReviewPacket({ outputDirectory, brief = "", answer = 
  * finding; a reviewer asked whether it "feels varied" is being asked to guess.
  */
 export function designStatistics(scene) {
-  const TREATMENT = /^table-(bubble|bar|rating-|implication|column-band|row-band|status-pill|number-circle|lamp|dot|check|progress-)/;
+  // A treatment is anything a reader can see that a plain grid does not do.
+  // Published client tables carry one 89% of the time (evals/corpus), and the
+  // commonest is the banded row, so a zebra band counts here as much as a
+  // harvey ball does.
+  const TREATMENT = /^table-(bubble|bar|rating-|implication|column-band|row-band|zebra-band|harvey|status-pill|number-circle|lamp|dot|check|progress-)/;
   const ANNOTATION = /^(annotation-|chart-(bracket|delta|event-|highlight|reference|band|callout|change))/;
   const content = scene.slides.filter((s) => s.nodes.some((n) => n.role === "action-title"));
   const kinds = new Set();
@@ -139,7 +143,7 @@ export function designStatistics(scene) {
     for (const c of components) if (!["chrome", "section", "page-template"].includes(c)) kinds.add(c);
     const roles = slide.nodes.map((n) => String(n.role ?? ""));
     // "Drawings", the way the corpus counts them: every primitive that is not
-    // type. A reference analytical page carries 29; a page of rules and text
+    // type. A published analytical page carries 32 (p25 11, p75 88); a page of rules and text
     // carries very few, which is the difference a reader feels first.
     marks += slide.nodes.filter((n) => n.type !== "text").length;
     // An empty picture frame: a photograph written as `alt` with no `path`. It
@@ -164,7 +168,7 @@ export function designStatistics(scene) {
     tables, tablesTreated: tables ? round(treated / tables) : null,
     charts, chartsAnnotated: charts ? round(annotated / charts) : null,
     drawingsPerPage: content.length ? round(marks / content.length) : 0,
-    reference: { exhibitVarietyPerTen: "7.1 to 8.3", tablesTreated: 0.47, chartsAnnotated: 0.36, drawingsPerPage: 29 },
+    reference: { exhibitVarietyPerTen: "7.1 to 8.3", tablesTreated: 0.89, chartsAnnotated: 0.63, drawingsPerPage: 32 },
   };
 }
 
