@@ -69,3 +69,54 @@ assert.throws(()=>normalizeQuantitativeScale({...props.choropleth.scale,semantic
 console.log(JSON.stringify({ok:true}));
 """)
         self.assertTrue(result['ok'])
+
+
+class AnnotatedMapTests(unittest.TestCase):
+    """The map as the page, not as a picture beside one.
+
+    The label lane has always carried the feature's name and nothing else, so a
+    page whose subject was five named places had to put the sentences in a
+    column next to a contextual photograph and leave the reader to match them
+    up. With a note per region the map carries the boundary, the value and what
+    it means, keyed by a leader to the region it is about.
+    """
+
+    def test_a_region_note_travels_to_its_lane(self):
+        run_node('''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {CHOROPLETH_MAP_SAMPLE} from './skills/professional-slides/runtime/maps.mjs';
+const map=REGISTRY.get('map'), frame={x:0,y:0,width:1160,height:480};
+const withNotes=structuredClone(CHOROPLETH_MAP_SAMPLE);
+withNotes.choropleth.values[0].note='Rent at 62% of the eastern figure, and a shorter commute.';
+withNotes.choropleth.values[1].note='Pay is 34% higher and the tax bill takes a third of it back.';
+const nodes=map.render({id:'m',frame,props:withNotes}).nodes;
+const notes=nodes.filter(n=>n.role==='map-note');
+assert.equal(notes.length,2,'one note per region');
+assert.ok(notes.every(n=>n.style.wrap===true),'a sentence wraps; a name does not');
+assert.ok(notes.every(n=>n.data.featureId),'each note is keyed to its region');
+// The name goes bold once it is heading a sentence rather than standing alone.
+const labels=nodes.filter(n=>n.role==='map-label');
+assert.ok(labels.every(n=>n.style.bold===true));
+// Each note sits under its own label, in the same lane.
+for (const note of notes) {
+  const label=labels.find(l=>l.data.featureId===note.data.featureId);
+  assert.equal(note.frame.x,label.frame.x);
+  assert.ok(note.frame.y>=label.frame.y+label.frame.height);
+}
+// A leader still runs from the region to the lane.
+assert.ok(nodes.filter(n=>n.role==='map-label-leader').length>=2);
+
+// Without notes nothing changes: names only, unbolded, and a narrower lane.
+const bare=map.render({id:'m',frame,props:CHOROPLETH_MAP_SAMPLE}).nodes;
+assert.equal(bare.filter(n=>n.role==='map-note').length,0);
+assert.ok(bare.filter(n=>n.role==='map-label').every(n=>!n.style.bold));
+const laneOf=(ns)=>ns.find(n=>n.role==='map-label').frame.width;
+assert.ok(laneOf(nodes)>laneOf(bare),'the lane widens to hold a sentence');
+
+// A note has to be a sentence, not an empty string.
+const blank=structuredClone(CHOROPLETH_MAP_SAMPLE);
+blank.choropleth.values[0].note='   ';
+assert.throws(()=>map.render({id:'m',frame,props:blank}),/sentence about that region/);
+console.log(JSON.stringify({ok:true}));
+''')

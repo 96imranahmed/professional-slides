@@ -343,18 +343,30 @@ function choroplethNodes({id,frame,props,geography}) {
   const spec=props.choropleth,scale=normalizeQuantitativeScale(spec.scale);
   if ((props.highlightCountries||[]).length || (props.markers||[]).length) throw new Error('Choropleth cannot combine quantitative fill with highlights or markers');
   if (!Array.isArray(spec.values)) throw new Error('Choropleth requires one value for every feature');
-  const values=new Map();
+  const values=new Map(),notes=new Map();
   for (const item of spec.values) {
     if (!item || typeof item.featureId!=='string'||values.has(item.featureId)||!geography.countries.some(c=>c.id===item.featureId)) throw new Error('Choropleth value needs a unique known featureId');
     quantitativeScaleColor(scale,item.value);
     values.set(item.featureId,item.value);
+    // `note`: what this region's sentence says. The lane has always carried the
+    // feature's name and nothing else, so a page whose subject was five named
+    // places had to put the sentences in a column beside a photograph and leave
+    // the reader to match them up. With the note the map *is* the page: the
+    // boundary, the value and what it means, keyed by a leader to the region.
+    if (item.note!==undefined) {
+      if (typeof item.note!=='string'||!item.note.trim()) throw new Error('A choropleth note is a sentence about that region');
+      notes.set(item.featureId,item.note.trim());
+    }
   }
   if (values.size!==geography.countries.length) throw new Error('Choropleth requires one value for every feature; missing regions cannot be silently neutral');
   if (spec.labels?.placement!==undefined && spec.labels.placement!=='external') throw new Error('Choropleth labels support external placement');
   const fontSize=tokenValue(LABEL),gap=tokenValue(token('space.2'));
   const legendHeight=measureText('0',1000,{fontSize:tokenValue(token('type.chartLabel'))}).height+20;
   const mapFrame={...frame,y:frame.y+legendHeight+gap,height:frame.height-legendHeight-gap};
-  const labelWidth=Math.min(112,frame.width*.27);
+  // A name fits in 112px; a sentence does not. The lane widens when any region
+  // carries a note, and the map gives up the width - which is the right trade,
+  // because an annotated map is read at the annotations.
+  const labelWidth=notes.size?Math.min(240,frame.width*.30):Math.min(112,frame.width*.27);
   const centerFrame={x:frame.x+labelWidth+gap,y:mapFrame.y,width:frame.width-2*(labelWidth+gap),height:mapFrame.height};
   if (centerFrame.width<80 || centerFrame.height<100) throw new Error('Choropleth frame cannot fit geography and external labels');
   const projected=projection(centerFrame,geography.bounds);
@@ -373,17 +385,20 @@ function choroplethNodes({id,frame,props,geography}) {
     if (!node) throw new Error(`Choropleth feature ${country.id} is not visible at this scale`);
     nodes.push(node);
     const [x,y]=projected.project(country.label),side=x<centerFrame.x+centerFrame.width/2?'left':'right';
-    const measured=measureText(country.labelText ?? country.name,labelWidth,{fontSize,wrapWidthRatio:1});
-    labels.push({country,x,y,side,measured});
+    const measured=measureText(country.labelText ?? country.name,labelWidth,{fontSize,bold:Boolean(notes.size),wrapWidthRatio:1});
+    const note=notes.get(country.id);
+    const noteLayout=note?measureText(note,labelWidth,{fontSize}):null;
+    const height=measured.height+(noteLayout?gap/2+noteLayout.height:0);
+    labels.push({country,x,y,side,measured,noteLayout,height});
   }
   for (const side of ['left','right']) {
     const lane=labels.filter(l=>l.side===side).sort((a,b)=>a.y-b.y);
-    const required=lane.reduce((sum,l)=>sum+l.measured.height,0)+Math.max(0,lane.length-1)*gap;
+    const required=lane.reduce((sum,l)=>sum+l.height,0)+Math.max(0,lane.length-1)*gap;
     if (required>mapFrame.height) throw new Error('Choropleth external labels do not fit; enlarge map or recompose');
     let cursor=mapFrame.y;
-    for (const label of lane) {label.top=Math.max(cursor,label.y-label.measured.height/2);cursor=label.top+label.measured.height+gap;}
+    for (const label of lane) {label.top=Math.max(cursor,label.y-label.height/2);cursor=label.top+label.height+gap;}
     let bottom=mapFrame.y+mapFrame.height;
-    for (const label of [...lane].reverse()) {label.top=Math.min(label.top,bottom-label.measured.height);bottom=label.top-gap;}
+    for (const label of [...lane].reverse()) {label.top=Math.min(label.top,bottom-label.height);bottom=label.top-gap;}
     for (const label of lane) {
       const x=side==='left'?frame.x:frame.x+frame.width-labelWidth;
       const edge=side==='left'?x+labelWidth:x;
@@ -391,7 +406,9 @@ function choroplethNodes({id,frame,props,geography}) {
       const elbow=side==='left'?centerFrame.x:centerFrame.x+centerFrame.width;
       nodes.push(linePrimitive({id:stableId(id,'feature-label-leader',label.country.id,'anchor'),role:'map-label-leader',x1:label.x,y1:label.y,x2:elbow,y2:label.y,style:{stroke:SECONDARY,lineWidth:HAIRLINE},data}));
       nodes.push(linePrimitive({id:stableId(id,'feature-label-leader',label.country.id,'lane'),role:'map-label-leader',x1:elbow,y1:label.y,x2:edge,y2:label.top+label.measured.height/2,style:{stroke:SECONDARY,lineWidth:HAIRLINE},data}));
-      nodes.push(textPrimitive({id:stableId(id,'feature-label',label.country.id),role:'map-label',frame:{x,y:label.top,width:labelWidth,height:label.measured.height},text:label.measured.text,style:{fontFamily:FONT,fontSize:LABEL,color:INK,align:side==='left'?'right':'left',valign:'top',lineHeight:label.measured.lineHeight,wrap:false},data:{...data,textLayout:label.measured}}));
+      const align=side==='left'?'right':'left';
+      nodes.push(textPrimitive({id:stableId(id,'feature-label',label.country.id),role:'map-label',frame:{x,y:label.top,width:labelWidth,height:label.measured.height},text:label.measured.text,style:{fontFamily:FONT,fontSize:LABEL,color:INK,bold:Boolean(notes.size),align,valign:'top',lineHeight:label.measured.lineHeight,wrap:false},data:{...data,textLayout:label.measured}}));
+      if (label.noteLayout) nodes.push(textPrimitive({id:stableId(id,'feature-note',label.country.id),role:'map-note',frame:{x,y:label.top+label.measured.height+gap/2,width:labelWidth,height:label.noteLayout.height},text:label.noteLayout.text,style:{fontFamily:FONT,fontSize:LABEL,color:SECONDARY,align,valign:'top',lineHeight:label.noteLayout.lineHeight,wrap:true},data:{...data,note:true,textLayout:label.noteLayout}}));
     }
   }
   nodes.push(...quantitativeLegendNodes({id:stableId(id,'legend'),frame:{x:frame.x,y:frame.y,width:frame.width,height:legendHeight},props:{scale}}));

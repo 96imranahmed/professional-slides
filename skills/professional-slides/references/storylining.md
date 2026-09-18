@@ -121,6 +121,7 @@ Every analytical row names its key insight and links the underlying data or sour
 | Two named, depictable things | `picture-pair` — images side by side, the comparison as cards beneath |
 | One named, depictable subject | `picture-hero` — the picture on one side, the argument beside it |
 | Three to five depictable things | `picture-strip` — the pictures across the page, a card under each |
+| Named places, regions or territories | `map` with a choropleth and a `note` per region — the annotated map |
 | A set of named categories | `cards` or `rows`, one icon per category |
 | A comparison across three or more dimensions | `table` |
 | One number that carries the page | `metrics` with a `kpi` |
