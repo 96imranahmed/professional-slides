@@ -1539,6 +1539,14 @@ const CHANGE_TYPES = ["chart.column", "chart.bar", "chart.line", "chart.area", "
 const fmtNumber = (n) => { const a = Math.abs(n); return a >= 10 ? String(Math.round(n)) : n.toFixed(1).replace(/\.0$/, ""); };
 const signed = (n, suffix = "") => `${n >= 0 ? "+" : "−"}${fmtNumber(Math.abs(n))}${suffix}`;
 /** `percent: true` on a stacked chart re-expresses each category as shares of its total (100% stack). */
+// A chart whose categories run down the side, not along the bottom. A data
+// table stacked under one of these has columns that align with nothing: a
+// reference deck shipped "Consultants 110 221 112" in a row beneath three
+// horizontal bars, so each number sat under empty plot. The table is only ever
+// readable under a chart whose category axis is the x axis.
+const SIDEWAYS_CATEGORIES = new Set(["chart.bar", "chart.stacked-bar", "chart.lollipop",
+  "chart.dumbbell", "chart.bullet", "chart.range"]);
+
 export function percentStack(ex) {
   if (!ex || !ex.percent || !["chart.stacked-column", "chart.stacked-bar"].includes(ex.type) || !Array.isArray(ex.series) || !Array.isArray(ex.categories)) return ex;
   const totals = ex.categories.map((_, i) => ex.series.reduce((sum, sr) => sum + (sr.values[i] || 0), 0));
@@ -1900,9 +1908,16 @@ const SLIDE_PASSES = [
     if (!(slide.subtitle && slide.exhibit && !slide.exhibits && slide.exhibit.heading
         && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi)) return slide;
     const unit = typeof slide.exhibit.unit === "string" ? slide.exhibit.unit.trim() : "";
-    const carries = unit && slide.subtitle.toLowerCase().includes(unit.toLowerCase());
+    // A unit may carry a reading note after a semicolon - "$B; column width =
+    // revenue" - and the standfirst usually already names the measure. Testing
+    // the whole string meant the measure got appended a second time: a
+    // reference deck shipped "…, 2025, $B, $B; column width = revenue". Test the
+    // measure, and append only what the standfirst does not already say.
+    const [measure, ...rest] = unit.split(";").map((part) => part.trim());
+    const carries = measure && slide.subtitle.toLowerCase().includes(measure.toLowerCase());
+    const addition = carries ? rest.join("; ") : unit;
     const { heading: _h, unit: _u, ...exhibit } = slide.exhibit;
-    return { ...slide, subtitle: unit && !carries ? `${slide.subtitle}, ${unit}` : slide.subtitle, exhibit };
+    return { ...slide, subtitle: addition ? `${slide.subtitle}${carries ? "; " : ", "}${addition}` : slide.subtitle, exhibit };
   }],
 
   // `split: true` on a multi-series chart sets it as small multiples: one
@@ -1931,7 +1946,8 @@ const SLIDE_PASSES = [
     if (!(elements >= 2 && slide.exhibit && !slide.exhibits && String(slide.exhibit.type).startsWith("chart.")
         && slide.exhibit.dataTable === undefined && Array.isArray(slide.exhibit.series) && Array.isArray(slide.exhibit.categories)
         && slide.exhibit.categories.length <= 6 && slide.exhibit.series.length >= 2 && slide.exhibit.series.length <= 3
-        && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi && !thinChart(slide.exhibit))) return slide;
+        && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi && !thinChart(slide.exhibit)
+        && !SIDEWAYS_CATEGORIES.has(String(slide.exhibit.type)))) return slide;
     return { ...slide, exhibit: { ...slide.exhibit, dataTable: true } };
   }],
 
@@ -1946,6 +1962,10 @@ const SLIDE_PASSES = [
   // The chart stacks over a compact table whose columns are its categories.
   ["stack-the-data-table", (slide) => {
     if (!(slide.exhibit && Array.isArray(slide.exhibit.dataTable) && slide.exhibit.dataTable.length && !slide.exhibits)) return slide;
+    if (SIDEWAYS_CATEGORIES.has(String(slide.exhibit.type))) {
+      const { dataTable: _drop, ...exhibit } = slide.exhibit;
+      return { ...slide, exhibit };
+    }
     const chart = { ...slide.exhibit }; const rowsIn = chart.dataTable; delete chart.dataTable;
     const table = { type: "table", density: "compact", treatment: "open", variant: "plain", columns: [{ label: "", type: "text", bold: true, width: 120 }, ...(chart.categories || []).map(() => ({ label: "", type: "text", align: "center", width: 80 }))], rows: rowsIn.map((r) => [r.label, ...(r.values || []).map(String)]) };
     return { ...slide, exhibit: undefined, exhibits: [chart, table], arrange: "stack", stackWeights: [4, 1] };
