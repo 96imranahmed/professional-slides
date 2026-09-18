@@ -2,11 +2,11 @@
   "schema": "professional-slides.deck/v3",
   "id": "slideworks",
   "palette": "mckinsey",
-  "footer": "Urban mobility and PE review, 2026",
+  "footer": "Private capital and financial institutions review, 2026",
   "agenda": "once",
   "agendaStyle": "columns",
   "cover": {
-    "title": "Cities, capital and the return to fundamentals",
+    "title": "Private capital and financial institutions: the 2023 review",
     "subtitle": "Discussion document",
     "date": "September 2026",
     "logo": "Financial Institutions Practice",
@@ -20,75 +20,19 @@
   "slides": [
     {
       "kind": "section",
-      "title": "Year in review",
-      "summary": "Deal activity returned to pre-pandemic levels",
-      "image": {
-        "path": "assets/hills.jpg",
-        "alt": "Hills at dusk",
-        "credit": "Synthetic render, professional-slides examples"
-      }
+      "title": "Indian private capital",
+      "summary": "Investment fell to 2018 levels, and the mix reverted with it"
     },
     {
       "kind": "statement",
-      "text": "Dealmaking has returned to pre-pandemic levels, and the capital that stayed on the sidelines is coming back to fundamentals.",
+      "text": "Dealmaking fell back to 2018 levels, and the capital that stepped aside is waiting on price, not on opportunity",
       "accent": [
         "coming back to fundamentals"
       ],
-      "subtext": "Three findings from the year in review"
+      "subtext": "Four conditions decide whether 2024 recovers"
     },
     {
-      "shape": "executive-summary",
-      "title": "Metals demand holds while the cost base resets, so the margin question is supply",
-      "subtitle": "Global metals and mining, 2024-2026",
-      "metrics": [
-        {
-          "value": "$2.1tn",
-          "label": "Global metals revenue pool",
-          "sublabel": "2024, all commodities"
-        },
-        {
-          "value": "+4.2%",
-          "label": "Demand growth to 2026",
-          "sublabel": "Compound annual, base case"
-        },
-        {
-          "value": "39",
-          "label": "Dedicated metals experts",
-          "sublabel": "Of 533 consultants worldwide"
-        },
-        {
-          "value": "31 of 94",
-          "label": "Projects clearing the hurdle",
-          "sublabel": "Announced pipeline to 2030"
-        }
-      ],
-      "points": [
-        {
-          "lead": "Demand is not the constraint",
-          "text": "with volumes growing 4.2% a year to 2026 across every major commodity in the base case, and no commodity below 2%"
-        },
-        {
-          "lead": "Cost has reset rather than fallen",
-          "text": "as energy and logistics normalise toward 2019 levels while labour and compliance hold the gains they made"
-        },
-        {
-          "lead": "Supply decides the margin",
-          "text": "because only 31 of the 94 projects in the pipeline clear their hurdle rate, and they sit in four jurisdictions"
-        },
-        {
-          "lead": "The window is two years",
-          "text": "since projects sanctioned after 2026 arrive past the demand peak this base case describes"
-        },
-        {
-          "lead": "Jurisdiction is the live risk",
-          "text": "as the four countries holding the viable projects account for 71% of pipeline capacity, and two have changed their royalty regime since 2023"
-        }
-      ],
-      "soWhat": "Read the supply pipeline before the demand forecast: the price case turns on which of the 31 viable projects actually land.",
-      "source": "IACPM/McKinsey survey, December 2024"
-    },
-    {
-      "title": "PE-VC activity declined by ~35% between 2022 and 2023, returning to pre-pandemic levels",
+      "title": "PE-VC activity declined by ~36% in 2023, to $39bn: 2018 levels, not 2019",
       "exhibit": {
         "type": "chart.column",
         "heading": "Annual PE-VC investments in India",
@@ -155,8 +99,8 @@
       "pointsHeading": "Key insights",
       "points": [
         {
-          "lead": "Investments returned to pre-pandemic levels",
-          "text": "as global macro headwinds, high interest rates and valuation mismatches slowed dealmaking"
+          "lead": "Investments returned to 2018 levels",
+          "text": "not to 2019's $47.5bn, so a full recovery is a further 21% climb from here"
         },
         {
           "lead": "VC saw the sharper decline",
@@ -244,11 +188,11 @@
       "pointsHeading": "Investment trends",
       "points": [
         {
-          "lead": "New-age tech investments declined ~65%",
+          "lead": "New-age tech investments declined ~57%",
           "text": "over 2022-23 as cautionary investor sentiment hit business-model viability"
         },
         {
-          "lead": "SaaS dealmaking corrected",
+          "lead": "Software and SaaS fell ~65%",
           "text": "as most scale assets were well funded post-2021 and valuation mismatches persisted"
         },
         {
@@ -268,256 +212,6 @@
         }
       ],
       "subtitle": "Announced investment by sector, India, $B, 2021 to 2023"
-    },
-    {
-      "title": "South Korea limited spread through rapid cluster investigation and scaled testing",
-      "exhibit": {
-        "type": "chart.line",
-        "heading": "Incremental cases per day in South Korea",
-        "unit": "Number of reported cases",
-        "categories": [
-          "Feb 16",
-          "Feb 18",
-          "Feb 20",
-          "Feb 22",
-          "Feb 24",
-          "Feb 26",
-          "Feb 28",
-          "Mar 1",
-          "Mar 3",
-          "Mar 5",
-          "Mar 7",
-          "Mar 9",
-          "Mar 11",
-          "Mar 13",
-          "Mar 15",
-          "Mar 17",
-          "Mar 19",
-          "Mar 21"
-        ],
-        "series": [
-          {
-            "name": "New cases",
-            "values": [
-              1,
-              15,
-              53,
-              229,
-              231,
-              284,
-              571,
-              1062,
-              600,
-              438,
-              483,
-              248,
-              242,
-              110,
-              76,
-              84,
-              152,
-              98
-            ]
-          }
-        ],
-        "events": [
-          {
-            "at": "Feb 18",
-            "label": "Patient 31 identified in Daegu"
-          },
-          {
-            "at": "Feb 24",
-            "label": "Drive-through testing begins"
-          },
-          {
-            "at": "Mar 1",
-            "label": "Daegu church cluster peaks"
-          },
-          {
-            "at": "Mar 9",
-            "label": "Mask rationing introduced"
-          }
-        ]
-      },
-      "pointsTone": "muted",
-      "pointsHeading": false,
-      "points": [
-        {
-          "lead": "Test kits approved early",
-          "text": "after 16 reported cases, with 180,000 individuals tested by Mar 9"
-        },
-        {
-          "lead": "Clusters isolated fast",
-          "text": "as Daegu residents cleared streets and the church congregation was traced"
-        },
-        {
-          "lead": "Surveillance remained necessary",
-          "text": "as localised outbreaks continued past the peak"
-        },
-        {
-          "lead": "Daily cases fell back fast",
-          "text": "from a 909-case peak on Feb 29 to under 100 by Mar 20, without a national lockdown"
-        }
-      ],
-      "source": "KCDC situation reports",
-      "soWhat": "Testing capacity and contact tracing, not movement restrictions, did the work in the first wave.",
-      "footnotes": [
-        {
-          "on": "Mar 9",
-          "text": "The date the 180,000th test was recorded, not the peak of new cases"
-        }
-      ],
-      "subtitle": "Reported cases per day, South Korea, 16 February to 20 March 2020"
-    },
-    {
-      "title": "Washington DC ranks third among very large US urban areas for congestion delay",
-      "exhibit": {
-        "type": "table",
-        "columns": [
-          {
-            "label": "Urban area",
-            "type": "text"
-          },
-          {
-            "group": "Congestion",
-            "label": "Delay",
-            "unit": "hours a year",
-            "type": "text",
-            "align": "right"
-          },
-          {
-            "group": "Congestion",
-            "label": "Rank",
-            "unit": "of 101 areas",
-            "type": "text",
-            "align": "right"
-          },
-          {
-            "group": "Congestion",
-            "label": "Travel time index",
-            "unit": "peak / free flow",
-            "type": "text",
-            "align": "right"
-          },
-          {
-            "group": "Cost to the commuter",
-            "label": "Excess fuel",
-            "unit": "gallons",
-            "type": "text",
-            "align": "right"
-          },
-          {
-            "group": "Cost to the commuter",
-            "label": "Cost",
-            "unit": "$ a year",
-            "type": "text",
-            "align": "right"
-          }
-        ],
-        "rows": [
-          [
-            "Los Angeles-Long Beach-Anaheim CA",
-            "119",
-            "1",
-            "1.51",
-            "35",
-            "2,676"
-          ],
-          [
-            "San Francisco-Oakland CA",
-            "103",
-            "2",
-            "1.50",
-            "39",
-            "2,619"
-          ],
-          [
-            "Washington DC-VA-MD",
-            "102",
-            "3",
-            "1.35",
-            "38",
-            "2,015"
-          ],
-          [
-            "Boston MA-NH-RI",
-            "80",
-            "6",
-            "1.30",
-            "31",
-            "1,580"
-          ],
-          [
-            "Seattle WA",
-            "78",
-            "8",
-            "1.30",
-            "31",
-            "1,551"
-          ],
-          [
-            "Atlanta GA",
-            "77",
-            "8",
-            "1.30",
-            "30",
-            "1,580"
-          ],
-          [
-            "Houston TX",
-            "75",
-            "9",
-            "1.34",
-            "32",
-            "1,508"
-          ],
-          [
-            "Chicago IL-IN",
-            "73",
-            "10",
-            "1.30",
-            "30",
-            "1,431"
-          ],
-          [
-            "Miami FL",
-            "69",
-            "12",
-            "1.31",
-            "32",
-            "1,412"
-          ],
-          [
-            "Dallas-Fort Worth-Arlington TX",
-            "67",
-            "13",
-            "1.26",
-            "25",
-            "1,272"
-          ]
-        ],
-        "highlightRow": "Washington DC-VA-MD",
-        "derive": [
-          "share"
-        ],
-        "deriveFrom": "Delay"
-      },
-      "callout": {
-        "lead": "What congestion means to you",
-        "text": "102 hours of yearly delay per auto commuter and $2,015 of congestion cost; excess fuel follows the same ranking"
-      },
-      "source": "Texas A&M Urban Mobility Report, 2017",
-      "footnotes": [
-        {
-          "on": "Travel time index",
-          "text": "Ratio of peak-period travel time to free-flow travel time"
-        },
-        {
-          "on": "Washington DC-VA-MD",
-          "text": "Includes the Virginia and Maryland commuter shed"
-        }
-      ],
-      "subtitle": "Congestion and its cost to the commuter, very large US urban areas, 2017"
     },
     {
       "title": "Sector outlook: healthcare and manufacturing stay strong while IT stays soft",
@@ -626,6 +320,150 @@
       "subtitle": "Deal value, year-on-year change and outlook by sector, India, 2023"
     },
     {
+      "title": "Four conditions decide whether the 2024 recovery holds",
+      "columns": [
+        "Condition",
+        "What 2023 showed",
+        "What has to be true in 2024"
+      ],
+      "rows": [
+        {
+          "label": "Dry powder",
+          "icon": "money",
+          "cells": [
+            {
+              "lead": "Capital is available and ageing",
+              "points": [
+                "Dry powder remains at a record after two slow deployment years",
+                "Funds raised in 2021 reach the end of their investment periods in 2024"
+              ],
+              "highlight": "record"
+            },
+            {
+              "lead": "Deployment restarts at 2019 pace",
+              "points": [
+                "Average cheque size returns to $60-80m from the $40m of 2023",
+                "Buyouts keep the share of deals they took in healthcare and manufacturing"
+              ],
+              "highlight": "$60-80m"
+            }
+          ]
+        },
+        {
+          "label": "Valuations",
+          "icon": "target",
+          "cells": [
+            {
+              "lead": "Mismatches stalled the mid-market",
+              "points": [
+                "Software and SaaS investment fell ~65% as sentiment hit business-model viability",
+                "Scale assets stayed funded, so sellers had no pressure to reprice"
+              ],
+              "highlight": "~65%"
+            },
+            {
+              "lead": "Sellers accept the 2019 multiple",
+              "points": [
+                "Secondary and continuation vehicles clear the 2021 vintage at a discount",
+                "Public comparables hold, so the private mark stops moving against the seller"
+              ]
+            }
+          ]
+        },
+        {
+          "label": "Exit window",
+          "icon": "rocket",
+          "cells": [
+            {
+              "lead": "Exits waited for the listing market",
+              "points": [
+                "IPO windows opened only briefly, and strategics stayed on the sidelines",
+                "Hold periods extended past five years across the 2018-19 vintages"
+              ],
+              "highlight": "five years"
+            },
+            {
+              "lead": "Two consecutive open quarters",
+              "points": [
+                "A listing window that stays open long enough to price a second cohort",
+                "Strategic buyers return with balance sheets rather than paper"
+              ]
+            }
+          ]
+        },
+        {
+          "label": "Sector mix",
+          "icon": "growth",
+          "cells": [
+            {
+              "lead": "Traditional sectors carried the year",
+              "points": [
+                "Traditional sectors held ~75% of investments as investors backed proven models",
+                "Healthcare and advanced manufacturing grew while IT services reset"
+              ],
+              "highlight": "~75%"
+            },
+            {
+              "lead": "The reset sectors stop falling",
+              "points": [
+                "IT/ITeS deal value stabilises after a 65% decline",
+                "New-age tech clears its funding overhang rather than repricing again"
+              ],
+              "highlight": "65%"
+            }
+          ]
+        }
+      ],
+      "note": [
+        "Dry powder measured as uncalled capital in India-focused funds at year end",
+        "2023 figures are announced enterprise values and may not sum"
+      ],
+      "source": "Venture Intelligence; Bain analysis",
+      "subtitle": "What 2023 showed and what 2024 needs, by condition"
+    },
+    {
+      "title": "Investment themes: a return to fundamentals across sectors and geographies",
+      "pointsTone": "muted",
+      "points": [
+        {
+          "lead": "Traditional sectors have shown resilience",
+          "text": "and gained share, with ~75% of investments in 2023 against ~60% in 2022"
+        },
+        {
+          "lead": "Healthcare investments hit a record",
+          "text": "of ~$5.5 billion in 2023, driven by a threefold increase in provider deal value"
+        },
+        {
+          "lead": "IT/ITeS deal activity continued to taper",
+          "text": "to $2.2bn, declining ~65% as valuations reset and end markets normalised"
+        },
+        {
+          "lead": "Advanced manufacturing grew ~20% a year",
+          "text": "on supply chain diversification, government incentives and scale assets"
+        },
+        {
+          "lead": "Strong deal activity is expected",
+          "text": "in healthcare and advanced manufacturing across sub-segments in 2024"
+        },
+        {
+          "lead": "Geographic mix is widening",
+          "text": "with tier-two cities taking a larger share of new commitments"
+        }
+      ],
+      "source": "Bain analysis",
+      "note": [
+        "Shares are of announced deal value in India-focused funds; 2023 figures may not sum",
+        "Advanced manufacturing includes EV supply chain, electronics and speciality chemicals"
+      ],
+      "subtitle": "Investment themes for 2024, across sectors and geographies",
+      "density": "pre-read"
+    },
+    {
+      "kind": "section",
+      "title": "Financial institutions",
+      "summary": "Where the revenue pool sits, and what the credit institutions are doing with generative AI"
+    },
+    {
       "title": "Retail and corporate banking hold two thirds of the revenue pool, mostly domestic",
       "exhibit": {
         "type": "chart.marimekko",
@@ -698,196 +536,6 @@
         "Revenue pool is 2025 estimated net revenue after funding costs"
       ],
       "soWhat": "Retail and Corporate carry the pool, so a domestic rate move matters more to the plan than any international build."
-    },
-    {
-      "title": "Transit commutes track income and place of work across the District's wards",
-      "exhibit": {
-        "type": "chart.bar",
-        "paired": true,
-        "categories": [
-          "Ward 1",
-          "Ward 2",
-          "Ward 3",
-          "Ward 4",
-          "Ward 5",
-          "Ward 6",
-          "Ward 7",
-          "Ward 8"
-        ],
-        "series": [
-          {
-            "name": "Commute by public transport",
-            "values": [
-              41,
-              28,
-              22,
-              35,
-              38,
-              36,
-              44,
-              47
-            ]
-          },
-          {
-            "name": "Low-income households",
-            "values": [
-              18,
-              9,
-              6,
-              17,
-              26,
-              20,
-              38,
-              46
-            ]
-          },
-          {
-            "name": "Work outside the District",
-            "values": [
-              14,
-              11,
-              16,
-              19,
-              22,
-              15,
-              31,
-              34
-            ]
-          }
-        ],
-        "unit": "%",
-        "categoryNotes": [
-          "n=74k",
-          "n=79k",
-          "n=85k",
-          "n=81k",
-          "n=77k",
-          "n=83k",
-          "n=70k",
-          "n=72k"
-        ]
-      },
-      "points": [
-        "Wards 7 and 8 combine the highest transit share with the lowest incomes",
-        "A third of their workers commute outside the District, which doubles the exposure",
-        "Improving cross-boundary transit reaches the riders who depend on it most",
-        "Ward 3 is the mirror image: lowest transit share, highest incomes"
-      ],
-      "source": "US Census ACS 2019; DDOT",
-      "subtitle": "Share of commuters, households and workers by ward, Washington DC, 2019"
-    },
-    {
-      "kicker": "Year in review",
-      "title": "Four conditions decide whether the 2024 recovery holds",
-      "columns": [
-        "Condition",
-        "What 2023 showed",
-        "What has to be true in 2024"
-      ],
-      "rows": [
-        {
-          "label": "Dry powder",
-          "icon": "money",
-          "cells": [
-            {
-              "lead": "Capital is available and ageing",
-              "points": [
-                "Dry powder remains at a record after two slow deployment years",
-                "Funds raised in 2021 reach the end of their investment periods in 2024"
-              ],
-              "highlight": "record"
-            },
-            {
-              "lead": "Deployment restarts at 2019 pace",
-              "points": [
-                "Average cheque size returns to $60-80m from the $40m of 2023",
-                "Buyouts keep the share of deals they took in healthcare and manufacturing"
-              ],
-              "highlight": "$60-80m"
-            }
-          ]
-        },
-        {
-          "label": "Valuations",
-          "icon": "target",
-          "cells": [
-            {
-              "lead": "Mismatches stalled the mid-market",
-              "points": [
-                "New-age tech investments fell ~65% as sentiment hit business-model viability",
-                "Scale assets stayed funded, so sellers had no pressure to reprice"
-              ],
-              "highlight": "~65%"
-            },
-            {
-              "lead": "Sellers accept the 2019 multiple",
-              "points": [
-                "Secondary and continuation vehicles clear the 2021 vintage at a discount",
-                "Public comparables hold, so the private mark stops moving against the seller"
-              ]
-            }
-          ]
-        },
-        {
-          "label": "Exit window",
-          "icon": "rocket",
-          "cells": [
-            {
-              "lead": "Exits waited for the listing market",
-              "points": [
-                "IPO windows opened only briefly, and strategics stayed on the sidelines",
-                "Hold periods extended past five years across the 2018-19 vintages"
-              ],
-              "highlight": "five years"
-            },
-            {
-              "lead": "Two consecutive open quarters",
-              "points": [
-                "A listing window that stays open long enough to price a second cohort",
-                "Strategic buyers return with balance sheets rather than paper"
-              ]
-            }
-          ]
-        },
-        {
-          "label": "Sector mix",
-          "icon": "growth",
-          "cells": [
-            {
-              "lead": "Traditional sectors carried the year",
-              "points": [
-                "Traditional sectors held ~75% of investments as investors backed proven models",
-                "Healthcare and advanced manufacturing grew while IT services reset"
-              ],
-              "highlight": "~75%"
-            },
-            {
-              "lead": "The reset sectors stop falling",
-              "points": [
-                "IT/ITeS deal value stabilises after a 65% decline",
-                "New-age tech clears its funding overhang rather than repricing again"
-              ],
-              "highlight": "65%"
-            }
-          ]
-        }
-      ],
-      "note": [
-        "Dry powder measured as uncalled capital in India-focused funds at year end",
-        "2023 figures are announced enterprise values and may not sum"
-      ],
-      "source": "Venture Intelligence; Bain analysis",
-      "subtitle": "What 2023 showed and what 2024 needs, by condition"
-    },
-    {
-      "kind": "section",
-      "title": "Survey",
-      "summary": "GenAI use cases in credit are moving from pilot to deployment",
-      "image": {
-        "path": "assets/hills.jpg",
-        "alt": "Hills at dusk",
-        "credit": "Synthetic render, professional-slides examples"
-      }
     },
     {
       "title": "Institutions prioritise productivity improvement when initiating GenAI use cases",
@@ -1015,61 +663,6 @@
       "density": "pre-read"
     },
     {
-      "title": "The global spread is accelerating with more reports of local transmission",
-      "exhibit": {
-        "type": "metrics",
-        "tone": "dark",
-        "items": [
-          {
-            "value": ">380,000",
-            "label": "Reported confirmed cases"
-          },
-          {
-            "value": ">16,000",
-            "label": "Deaths"
-          },
-          {
-            "value": "194",
-            "label": "Countries or territories with reported cases"
-          },
-          {
-            "value": ">115",
-            "label": "Countries or territories with evidence of local transmission"
-          },
-          {
-            "value": ">75",
-            "label": "Countries or territories with more than 100 reported cases"
-          },
-          {
-            "value": "0.4%",
-            "label": "China's share of new reported cases, March 18–24"
-          },
-          {
-            "value": ">160%",
-            "label": "Increase in reported cases March 18–24 from Europe"
-          },
-          {
-            "value": "35",
-            "label": "New countries or territories with cases, March 18–24"
-          },
-          {
-            "value": "3.5x",
-            "label": "Growth in daily cases outside China over two weeks"
-          }
-        ]
-      },
-      "pointsTone": "muted",
-      "pointsHeading": "Impact to date",
-      "points": [
-        "Latest as of March 25, 2020",
-        "Europe now accounts for the greatest share of recent cases while US cases accelerate",
-        "Some Asian countries have kept incremental cases low and are restarting economies",
-        "Case counts lag testing capacity, so the level understates the spread"
-      ],
-      "source": "WHO situation reports; Johns Hopkins University",
-      "subtitle": "Reported cases, deaths and countries affected, to 25 March 2020"
-    },
-    {
       "title": "Most institutions are testing GenAI use cases, with super regionals leading deployment",
       "exhibit": {
         "type": "chart.bubble-grid",
@@ -1144,148 +737,12 @@
       "subtitle": "Use cases by institution type and development stage, December 2024"
     },
     {
-      "title": "Our community of metals experts extends across the world",
-      "metrics": [
-        {
-          "value": "51",
-          "label": "Partners"
-        },
-        {
-          "value": "443",
-          "label": "Consultants staffed on metals studies"
-        },
-        {
-          "value": "39",
-          "label": "Metals experts"
-        },
-        {
-          "value": "533",
-          "label": "Total"
-        },
-        {
-          "value": "6",
-          "label": "Hubs"
-        }
-      ],
-      "metricsTone": "rule",
-      "exhibit": {
-        "type": "chart.bar",
-        "heading": "Metals consultants staffed by region",
-        "unit": "consultants",
-        "categories": [
-          "Americas",
-          "EMEA",
-          "Asia/Pacific"
-        ],
-        "series": [
-          {
-            "name": "Consultants",
-            "values": [
-              110,
-              221,
-              112
-            ]
-          }
-        ],
-        "highlights": [
-          {
-            "category": "EMEA",
-            "style": "bar"
-          }
-        ],
-        "categoryNotes": [
-          "3 hubs",
-          "2 hubs",
-          "1 hub"
-        ],
-        "dataTable": true
-      },
-      "photo": {
-        "path": "assets/hills.jpg",
-        "alt": "Hills at dusk",
-        "credit": "Synthetic render, professional-slides examples"
-      },
-      "pointsHeading": false,
-      "points": [
-        {
-          "lead": "~50% of expertise sits in EMEA",
-          "text": "with core locations in Brussels, Dusseldorf and Moscow serving the European mills"
-        },
-        {
-          "lead": "Americas and Asia/Pacific each hold ~25%",
-          "text": "from Sao Paolo, Gurgaon and Shanghai, which covers both growth regions"
-        },
-        {
-          "lead": "Every hub pairs partners with experts",
-          "text": "so a study staffs from one community rather than from one office"
-        },
-        {
-          "lead": "533 consultants in total",
-          "text": "of whom 39 are dedicated metals experts working across all three regions"
-        }
-      ],
-      "source": "Internal staffing records, 2022",
-      "note": [
-        "Staffing measured as consultants who billed a metals study in the last 12 months",
-        "Hub count is offices with a resident metals partner"
-      ],
-      "subtitle": "Metals consultants by region and hub, internal staffing records, 2022",
-      "density": "pre-read"
-    },
-    {
-      "title": "Investment themes: a return to fundamentals across sectors and geographies",
-      "photo": {
-        "path": "assets/hills.jpg",
-        "alt": "Hills at dusk",
-        "credit": "Synthetic render, professional-slides examples"
-      },
-      "pointsTone": "muted",
-      "points": [
-        {
-          "lead": "Traditional sectors have shown resilience",
-          "text": "and gained share, with ~75% of investments in 2023 against ~60% in 2022"
-        },
-        {
-          "lead": "Healthcare investments hit a record",
-          "text": "of ~$5.5 billion in 2023, driven by a threefold increase in provider deal value"
-        },
-        {
-          "lead": "IT/ITeS deal activity continued to taper",
-          "text": "declining by ~65% as valuations reset and end markets normalised"
-        },
-        {
-          "lead": "Advanced manufacturing grew ~20% a year",
-          "text": "on supply chain diversification, government incentives and scale assets"
-        },
-        {
-          "lead": "Strong deal activity is expected",
-          "text": "in healthcare and advanced manufacturing across sub-segments in 2024"
-        },
-        {
-          "lead": "Geographic mix is widening",
-          "text": "with tier-two cities taking a larger share of new commitments"
-        }
-      ],
-      "source": "Bain analysis",
-      "note": [
-        "Shares are of announced deal value in India-focused funds; 2023 figures may not sum",
-        "Advanced manufacturing includes EV supply chain, electronics and speciality chemicals"
-      ],
-      "subtitle": "Investment themes for 2024, across sectors and geographies",
-      "density": "pre-read"
-    },
-    {
       "kind": "takeaways",
       "points": [
-        "Optimise the supply chain and secure strategic materials before the next price cycle",
-        "Combine traditional improvement levers with an end-to-end digital transformation",
-        "Identify and co-develop fit-for-region low-CO2 technology opportunities with partners"
-      ],
-      "image": {
-        "path": "assets/hills.jpg",
-        "alt": "Hills at dusk",
-        "credit": "Synthetic render, professional-slides examples"
-      }
+        "Underwrite Indian private capital to 2018 levels, not 2019: a full recovery is a further 21% climb",
+        "Back the three sectors policy or demographics support - healthcare, manufacturing, energy - and wait on technology",
+        "In credit, governance decides reach: most institutions have the tools and half gate them behind guideline training"
+      ]
     }
   ],
   "tracker": "breadcrumb"
