@@ -121,3 +121,38 @@ console.log(JSON.stringify(table.scales['gross-bar']));
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TitleCountTests(unittest.TestCase):
+    """A title that counts is a title a reader checks, in about a second."""
+
+    @staticmethod
+    def quadrants(headings, title="Three of four common tastes point at DC; the fourth carries the money"):
+        nodes = [{"type": "text", "role": "action-title", "text": title}]
+        nodes.extend({"type": "text", "role": "quadrant-title", "text": heading} for heading in headings)
+        return {"id": "s30", "componentInstances": [{"id": "q", "component": "quadrants"}], "nodes": nodes}
+
+    HEADINGS = ["One great thing in one evening: DC", "A long story that pays off: Marvel",
+                "An argument about power: DC", "Company and comedy: Marvel"]
+
+    def test_a_title_its_own_exhibit_contradicts_is_reported(self):
+        findings = run(page_gates.gate_title_count, 30, self.quadrants(self.HEADINGS))
+        self.assertEqual([f["code"] for f in findings], ["TITLE_COUNT"])
+        self.assertEqual(findings[0]["measured"]["counted"], 2)
+        self.assertEqual(findings[0]["threshold"], 3)
+
+    def test_a_title_the_exhibit_supports_passes(self):
+        headings = list(self.HEADINGS)
+        headings[1] = "A long story that pays off: DC"
+        self.assertEqual(run(page_gates.gate_title_count, 30, self.quadrants(headings)), [])
+
+    def test_a_count_of_something_the_page_does_not_name_is_not_measured(self):
+        # "Four of the six measures are countable" over panels that say neither
+        # "measures" nor anything else countable: there is nothing to count, and
+        # a gate that guesses here is a gate that fires on good work.
+        self.assertEqual(run(page_gates.gate_title_count, 5, self.quadrants(
+            self.HEADINGS, title="Three of four common tastes point at Neither house")), [])
+
+    def test_a_title_that_states_no_count_is_left_alone(self):
+        self.assertEqual(run(page_gates.gate_title_count, 30, self.quadrants(
+            self.HEADINGS, title="Common tastes point at DC more often than at Marvel")), [])

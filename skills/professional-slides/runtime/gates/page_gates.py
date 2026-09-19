@@ -444,6 +444,7 @@ GATE_CODES = {
     "CONTRADICTED_SHARE": "a percentage in the prose the page's own counts do not give",
     "DECK_CRAFT": "the deck emphasises, sources or comments at a rate real client decks do not",
     "UNSCALED_FIGURE": "a figure drawn to a scale its own printed numbers contradict",
+    "TITLE_COUNT": "the title states a count the page's own exhibit does not show",
 }
 
 # Findings raised before the page is rendered: the composer's plan-time budget
@@ -1348,6 +1349,78 @@ def gate_unscaled_figure(slide_no, slide, findings):
                 "use a chart here instead: this figure cannot draw them.",
             ))
             break
+
+
+# "Three of four", "five of the six": a title that counts is a title a reader
+# checks, in about a second, against the thing underneath it.
+NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12}
+COUNT_CLAIM = re.compile(
+    r"\b(?P<part>one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})\s+"
+    r"of\s+(?:the\s+)?(?P<whole>one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})\b", re.I)
+TITLE_STOPWORDS = frozenset("""the a an and or but of to in on for at by with from this that these those
+it its their they we our you your is are was were be been""".split())
+
+
+def _count_word(text):
+    lowered = str(text).lower()
+    return NUMBER_WORDS.get(lowered, int(lowered) if lowered.isdigit() else None)
+
+
+def gate_title_count(slide_no, slide, findings):
+    """TITLE_COUNT. The title counts, and the page shows a different number.
+
+    A cold-run page was titled "Three of four common tastes point at DC" over a
+    2x2 whose four panels ended DC, Marvel, DC, Marvel - two, not three - with
+    the page's own callout repeating the error. A reader counts to two in one
+    second and stops trusting every other number in the deck. Nothing could see
+    it: the title gate measures length, and the share gate reads percentages.
+
+    Only a title that names both parts of a count is measured, and only against
+    a set of peers the page actually draws - four panel headings, six rows, ten
+    cards. Where the named thing appears in none of them there is nothing to
+    count and the page passes.
+    """
+    title = ""
+    for node in text_nodes(slide):
+        if str(node.get("role") or "") == "action-title":
+            title = source_text(node)
+            break
+    if not title:
+        return
+    claim = COUNT_CLAIM.search(title)
+    if not claim:
+        return
+    part, whole = _count_word(claim.group("part")), _count_word(claim.group("whole"))
+    if not part or not whole or part > whole or whole < 2 or whole > 12:
+        return
+    # The named thing: a capitalised word the title uses that is not its first.
+    words = re.findall(r"[A-Za-z][\w'’-]*", title)
+    terms = [word for word in words[1:] if word[0].isupper() and word.lower() not in TITLE_STOPWORDS]
+    if not terms:
+        return
+    groups = {}
+    for node in text_nodes(slide):
+        role = str(node.get("role") or "")
+        if role in TITLE_ROLES or role in SOURCE_ROLES:
+            continue
+        groups.setdefault(role, []).append(source_text(node))
+    for term in terms:
+        for role, texts in groups.items():
+            if len(texts) != whole:
+                continue
+            found = sum(1 for text in texts if re.search(rf"\b{re.escape(term)}\b", text))
+            if not found or found == part:
+                continue
+            findings.append(finding(
+                slide_no, "TITLE_COUNT", {"title": title[:70], "term": term, "counted": found, "of": whole},
+                part,
+                f"The title says {claim.group(0)} and the page draws {found} of {whole} carrying "
+                f"\"{term}\". A reader checks a count like this without meaning to, in about a second, and a "
+                "title its own exhibit contradicts costs the page every other number on it. Count it off "
+                "the exhibit and rewrite whichever is wrong.",
+            ))
+            return
 
 
 def gate_heading_wraps(slide_no, slide, findings):
@@ -2484,6 +2557,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_unsourced_picture(slide_no, slide, findings)
             if wanted("UNSCALED_FIGURE"):
                 gate_unscaled_figure(slide_no, slide, findings)
+            if wanted("TITLE_COUNT"):
+                gate_title_count(slide_no, slide, findings)
             if wanted("THIN_COLUMN") or wanted("POINT_DEPTH"):
                 page = []
                 gate_thin_column(slide_no, slide, page)

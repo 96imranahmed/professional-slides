@@ -42,6 +42,7 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Axis ticks | `NICE_TICKS` | nice numbers |
 | Page did not render | `MISSING_RENDER` | every page the gates are asked to measure has a render |
 | Picture frame with no picture in it | `UNSOURCED_PICTURE` | a photograph written as `alt` with no `path` never reaches a reader |
+| A count the exhibit does not show | `TITLE_COUNT` | where a title says "three of four", the page draws three of the four |
 | A figure its own numbers contradict | `UNSCALED_FIGURE` | where a figure draws a baseline and blocks of one size, the quantities printed on those blocks stay within half as much again of each other |
 
 **What the page says.** Everything above measures how a page is drawn. A 50-page deck cleared all of it and was rated 2 out of 10 by the person who opened it: twenty-eight pages headed `Interpretation:`, fifty-nine lines saying what the evidence does not establish, eighteen tables on two invented schemas, one chart, and a comparison table whose two columns carried identical sentences in every row. These five measure the other half, and the example decks must stay clean on all of them — a content gate that fires on good work is one that gets switched off.
