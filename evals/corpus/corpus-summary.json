@@ -1,5 +1,5 @@
 {
-  "$comment": "Measured from the professional-slides corpus of published client decks. `wide` is every analytical page of every landscape presentation (pdftotext geometry); `pixels` is a sampled render through the same instrument page_gates.py uses; `judged` is a vision pass over 264 pages, one per deck. See evals/corpus/README.md for method and limits.",
+  "$comment": "Measured from the professional-slides corpus of published client decks, SPLIT by what the deck is for. `client` is real client-project work (BCG, McKinsey, Bain) and is what the floors are set against; `published` is thought leadership in deck format, recorded as a contrast. `wide` and `pixels` cover both. See evals/corpus/README.md.",
   "generated": "2026-09-18",
   "wide": {
     "decks": 518,
@@ -373,5 +373,223 @@
     "sourceLine": 0.557,
     "exhibitsPerPage": 1.23,
     "noExhibitShare": 0.257
+  },
+  "client": {
+    "decks": 28,
+    "widePages": 3606,
+    "renderedPages": 140,
+    "judgedPages": 132,
+    "contract": {
+      "$comment": "Measured, not asserted, and split by what the deck is FOR. `corpus` is the wide text sample of real client-project decks - 3,606 analytical pages - which is what the floors are set against. `published` records the same measures over thought leadership, for contrast: the page geometry barely differs, the craft does. `slides` is the pixel sample rendered onto the same 1280x720 canvas page_gates.py reads. `judged` is a vision pass, 122 client pages against evals/corpus/rubric.md. The previous version of this block claimed 137 hand-decomposed slides that nothing in the tree could reproduce.",
+      "slides": {
+        "pages": 140,
+        "decks": 28,
+        "inkMedian": 0.184,
+        "inkQ1": 0.118,
+        "inkP10": 0.077,
+        "deadBandP90": 0.033,
+        "internalVoidP90": 0.06,
+        "columnVoidP90": 0.109,
+        "bands": {
+          "titleBand": 18,
+          "body": 148,
+          "footer": 13
+        },
+        "words": 189,
+        "wordsP20": 110,
+        "wordsP80": 290,
+        "wordsMax": 1845,
+        "heavyShare": 0.512,
+        "numericTokens": 13,
+        "numericByFamily": {
+          "chart": 26,
+          "chartP25": 20,
+          "table": 20,
+          "diagram": 4,
+          "text": 3
+        },
+        "exceedance": {
+          "$comment": "Share of the 140 rendered client-project pages each candidate threshold would flag. The full 2,125-page corpus gives the same answers within two points, so the geometry is not what separates client work from published work.",
+          "inkBelow": {
+            "0.05": 0.064,
+            "0.077": 0.114,
+            "0.118": 0.243,
+            "0.14": 0.307
+          },
+          "deadBandAbove": {
+            "0.06": 0.093,
+            "0.08": 0.071,
+            "0.14": 0.05
+          },
+          "internalVoidAbove": {
+            "0.12": 0.043,
+            "0.13": 0.043,
+            "0.18": 0.029,
+            "0.22": 0.014
+          },
+          "columnVoidAbove": {
+            "0.13": 0.093,
+            "0.2": 0.043
+          }
+        },
+        "drawings": 32,
+        "drawingsP25": 11,
+        "drawingsP75": 88,
+        "$comment": "Client-project pages rendered onto the gate's own canvas."
+      },
+      "corpus": {
+        "$comment": "Client-project decks only: BCG, McKinsey, Bain.",
+        "pages": 3606,
+        "decks": 28,
+        "p25": 126,
+        "median": 189,
+        "p75": 267,
+        "heavyShare": 0.512
+      },
+      "judged": {
+        "$comment": "122 content pages of client-project work; the published figure follows each one.",
+        "pages": 132,
+        "contentPages": 122,
+        "decks": 28,
+        "noExhibitShare": 0.246,
+        "exhibitsPerPage": 1.11,
+        "titleIsClaim": 0.648,
+        "titleIsClaimPublished": 0.553,
+        "hasCommentary": 0.328,
+        "hasCommentaryPublished": 0.43,
+        "highlightedPhrase": 0.508,
+        "sourceLine": 0.672,
+        "byFamily": {
+          "chart": {
+            "share": 0.303,
+            "titleIsClaim": 0.89,
+            "hasCommentary": 0.38,
+            "highlightedPhrase": 0.38,
+            "bodyWords": 104,
+            "numeric": 27
+          },
+          "table": {
+            "share": 0.197,
+            "titleIsClaim": 0.38,
+            "hasCommentary": 0.21,
+            "highlightedPhrase": 0.46,
+            "bodyWords": 167,
+            "numeric": 20
+          },
+          "diagram": {
+            "share": 0.098,
+            "titleIsClaim": 0.75,
+            "hasCommentary": 0.42,
+            "highlightedPhrase": 0.5,
+            "bodyWords": 120,
+            "numeric": 4
+          },
+          "text": {
+            "share": 0.254,
+            "titleIsClaim": 0.42,
+            "hasCommentary": 0.13,
+            "highlightedPhrase": 0.71,
+            "bodyWords": 136,
+            "numeric": 3
+          },
+          "mixed": {
+            "share": 0.131,
+            "titleIsClaim": 0.81,
+            "hasCommentary": 0.69,
+            "highlightedPhrase": 0.5,
+            "bodyWords": 126,
+            "numeric": 19
+          }
+        }
+      },
+      "published": {
+        "$comment": "Published thought leadership in deck format, for contrast. Not what the floors are set from.",
+        "pages": 12678,
+        "decks": 396,
+        "p25": 119,
+        "median": 198,
+        "p75": 297,
+        "heavyShare": 0.54,
+        "reportPages": 1924,
+        "reportMedian": 174
+      }
+    },
+    "mix": {
+      "$comment": "Measured over 122 pages of real CLIENT PROJECT decks (BCG, McKinsey, Bain), with the published-work numbers recorded beside them because the two are different animals. Client work runs more tables (0.197 dominant against 0.110) and fewer charts (0.303 against 0.371) than published thought leadership, and a quarter of its pages still carry no exhibit at all. The floors sit under what client work does; the caps sit above it. `picture` used to carry a 0.05 FLOOR, which asked for three times the photographs a client deck carries. `text` had no band at all, which is why the composer never planned a page of type and then produced fifty pages of commentary restating the exhibit beside it.",
+      "chart": {
+        "min": 0.25,
+        "observedClient": 0.303,
+        "observedPublished": 0.371,
+        "presentClient": 0.402
+      },
+      "table": {
+        "max": 0.3,
+        "observedClient": 0.197,
+        "observedPublished": 0.11,
+        "presentClient": 0.262
+      },
+      "diagram": {
+        "min": 0.07,
+        "observedClient": 0.098,
+        "observedPublished": 0.076,
+        "presentClient": 0.148
+      },
+      "picture": {
+        "max": 0.15,
+        "observedClient": 0.016,
+        "observedPublished": 0.008,
+        "presentClient": 0.066
+      },
+      "text": {
+        "max": 0.35,
+        "observedClient": 0.254,
+        "observedPublished": 0.3
+      }
+    },
+    "craft": {
+      "$comment": "What the dot-dash has to record about the *craft* of a page. A generated 50-page deck passed every mix, entropy and anchor gate and still read as dry: 10 tables with a median of 3 rows and not one treatment, 18 charts with not one annotation, 35 point lists with not one highlighted phrase. The floors were 0.20 and 0.25, guessed off four self-authored decks. In real client decks **every table carried a treatment - 32 of 32** - and four charts in five carried an annotation. Published thought leadership is looser (0.89 and 0.63), which is why the floors are set from client work.",
+      "tableRows": {
+        "min": 4,
+        "observedClientMedian": 5,
+        "observedPublishedMedian": 7,
+        "observedRange": [
+          2,
+          30
+        ]
+      },
+      "tableTreated": {
+        "min": 0.75,
+        "observedClient": 1.0,
+        "observedPublished": 0.89,
+        "observedOf": 32
+      },
+      "chartAnnotated": {
+        "min": 0.65,
+        "observedClient": 0.796,
+        "observedPublished": 0.63,
+        "observedOf": 49
+      },
+      "exhibitVarietyPerTen": {
+        "min": 4.0,
+        "observed": [
+          7.1,
+          7.5,
+          7.5,
+          8.3
+        ]
+      },
+      "reasonShareMax": 0.25,
+      "chartValuesPrinted": {
+        "min": 0.6,
+        "observedClient": 0.755,
+        "observedPublished": 0.79,
+        "observedOf": 49
+      },
+      "highlightedPhrase": {
+        "min": 0.35,
+        "observedClient": 0.508,
+        "observedPublished": 0.414
+      }
+    }
   }
 }

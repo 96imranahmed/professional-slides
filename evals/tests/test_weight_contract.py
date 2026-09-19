@@ -75,17 +75,17 @@ console.log(JSON.stringify({byFill: WEIGHT_BY_FILL, keys: WEIGHT_KEYS, bands: RE
         skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
         slides = CONTRACT["reference"]["slides"]
         wide = CONTRACT["reference"]["corpus"]
-        self.assertIn(f"{wide['pages']:,} analytical slides", skill)
+        self.assertIn(f"{wide['pages']:,} analytical pages", skill)
         for value in (slides["words"], slides["bands"]["titleBand"], slides["bands"]["body"],
                       slides["bands"]["footer"], slides["drawings"],
-                      slides["numericByFamily"]["chart"]):
+                      slides["numericByFamily"]["chart"]):  # noqa: E501
             self.assertRegex(skill, rf"\|[^|\n]*\b{value}\b", f"SKILL.md's corpus table has lost {value}")
         self.assertIn(f"{round(slides['heavyShare'] * 100)}%", skill)
         # And the craft rates the plan gates now floor against.
         craft = CONTRACT["plan"]["craft"]
         for key in ("chartAnnotated", "tableTreated"):
-            self.assertIn(f"{round(craft[key]['observed'] * 100)}%", skill,
-                          f"SKILL.md does not say what the corpus does for {key}")
+            self.assertIn(f"{round(craft[key]['observedClient'] * 100)}%", skill,
+                          f"SKILL.md does not say what client decks do for {key}")
 
     def test_no_floor_is_stricter_than_the_corpus_it_claims_to_come_from(self):
         """A floor that most published pages fail is a preference, not a floor.

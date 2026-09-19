@@ -210,7 +210,7 @@ THRESHOLDS = {
     "shape_share_max": 0.40,    # share of pages on the commonest architecture (the reference median is 0.23)
     "front_matter_from": 12,    # analytical pages beyond which a deck needs a contents page and an opening summary
     "numbers_per_page_min": 6,   # printed numeric tokens on any page carrying an exhibit that has values to print
-    "numbers_per_chart_page_min": 14,  # a chart page: the corpus median is 27, its lower quartile 16
+    "numbers_per_chart_page_min": 18,  # a chart page: client decks print a median of 26, lower quartile 20
     "column_run_max": 4,        # consecutive pages whose commentary column may share one device    # share of pages on the commonest architecture (the reference median is 0.23)
     # What the page says. Calibrated on the four example decks, which are the
     # only corpus in the repository - `--report` prints the measured value

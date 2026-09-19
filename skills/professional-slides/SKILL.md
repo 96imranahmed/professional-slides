@@ -282,21 +282,25 @@ When the client or the firm supplies a template `.pptx`, read it first and let t
 
 ## How full a page reads
 
-A full page is not a crowded page. 16,334 analytical slides of published client work from twelve firms - McKinsey, BCG, Bain, Accenture, Deloitte, PwC/Strategy&, LEK, EY, KPMG, AT Kearney, Booz Allen and Alvarez & Marsal, with covers, dividers, back matter, prose reports and portrait documents excluded - run like this:
+A full page is not a crowded page. The floors come from **real client-project decks** - 3,606 analytical pages from 28 BCG, McKinsey and Bain engagement decks, with covers, dividers, back matter and portrait documents excluded. Published thought leadership is measured beside them (12,678 pages, twelve firms) and recorded as a contrast, not as the bar: its page geometry is almost identical, its craft is looser.
 
-| Per analytical page | Published client decks | What the gate does with it |
-| --- | --- | --- |
-| Ink on the page | median 19%, quartiles 11% and 37% | `INK_COVERAGE` floors at a percentile of this: 11% for a deck that declares `full`, 8% for `balanced`, 5% for `airy` |
-| Words of page text | 195 (p20 103, p80 318) | `WORDS` caps, by profile |
-| - in the title band | 17 | `TITLE_LINES`, `TITLE_WORDS` |
-| - **in the body** | **154** | `THIN_PAGE` floors the body alone |
-| - in the footer, source and notes | 12 | `NOTE_HEAVY` |
-| Numeric tokens | 11 overall - but 27 on a page carrying a chart, 11 on a table, 4 on a diagram | `NUMBERS_ON_PAGE`, by exhibit family |
-| Drawn objects (marks, rules, brackets) | median 32 (p25 11, p75 88) | the cold-run scorer's `drawingsPerPage` |
-| Pages carrying 186+ words | 53% | `DECK_FLAT`: a deck of uniformly light pages has not chosen |
-| Pages carrying no exhibit at all | 30% | a page of type is a real page; `plan.mix.text` caps it at 35% |
-| Charts carrying an annotation | 63% | `plan.craft.chartAnnotated` floors at 45% |
-| Tables carrying a treatment | 89% | `plan.craft.tableTreated` floors at 60% |
+| Per analytical page | Client decks | Published work | What the gate does with it |
+| --- | --- | --- | --- |
+| Ink on the page | median 18%, quartiles 12% and 27% | 19% | `INK_COVERAGE` floors at a percentile of this: 11% for a deck that declares `full`, 8% for `balanced`, 5% for `airy` |
+| Words of page text | 189 (p20 110, p80 290) | 198 | `WORDS` caps, by profile |
+| - in the title band | 18 | 17 | `TITLE_LINES`, `TITLE_WORDS` |
+| - **in the body** | **148** | 157 | `THIN_PAGE` floors the body alone |
+| - in the footer, source and notes | 13 | 12 | `NOTE_HEAVY` |
+| Numeric tokens | 13 overall - 26 on a chart page, 20 on a table, 4 on a diagram | 11 | `NUMBERS_ON_PAGE`, by exhibit family |
+| Drawn objects (marks, rules, brackets) | median 32 (p25 11, p75 88) | - | the cold-run scorer's `drawingsPerPage` |
+| Pages carrying 186+ words | 51% | 54% | `DECK_FLAT`: a deck of uniformly light pages has not chosen |
+| Pages carried by a chart | 30% | 37% | `plan.mix.chart` floors at 25% |
+| Pages carried by a table | 20% | 11% | `plan.mix.table` caps at 30% - client work tables more than published work does |
+| Pages carrying no exhibit at all | 25% | 30% | a page of type is a real page; `plan.mix.text` caps it at 35% |
+| Titles that state a claim | 65% (89% on chart pages, 38% on table pages) | 55% | the house rule is every page; this is the gap to close |
+| Pages with a commentary column | 33% (13% on pages of type) | 43% | it is not the default - see `storylining.md` |
+| Charts carrying an annotation | **80%** | 63% | `plan.craft.chartAnnotated` floors at 65% |
+| Tables carrying a treatment | **100%** (32 of 32) | 89% | `plan.craft.tableTreated` floors at 75% |
 
 Those numbers are not prose: they live in `runtime/weight.json`, which the composer and the gates both read, this table is checked against that file, and `evals/corpus/` holds the script that measured them and the README that says what the measurement cannot see.
 

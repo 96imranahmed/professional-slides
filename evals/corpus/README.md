@@ -31,73 +31,114 @@ Three instruments, in rising cost and falling sample size:
 `page-judgements.json` the per-page rows behind the vision pass, and
 `measure_corpus.py` re-runs all three.
 
+## Two corpora, not one
+
+The 670 PDFs are not one population. The index separates **client-project work** —
+decks made for an engagement, by BCG, McKinsey and Bain — from **published
+thought leadership** in deck format, which is most of what is publicly
+downloadable. They behave differently, so the floors come from the first and the
+second is recorded beside it as a contrast.
+
+| | client projects | published work |
+|---|---|---|
+| decks / analytical pages | 28 / 3,606 | 396 / 12,678 |
+| words a page (p25 / median / p75) | 126 / **189** / 267 | 119 / 198 / 297 |
+| body band | **148** | 157 |
+| ink (q1 / median) | 0.118 / **0.184** | 0.112 / 0.191 |
+| internal void p90 | 0.060 | 0.069 |
+| pages carried by a chart | **30%** | 37% |
+| pages carried by a table | **20%** | 11% |
+| pages with no exhibit | **25%** | 30% |
+| titles that state a claim | **65%** | 55% |
+| pages with a commentary column | **33%** | 43% |
+| charts carrying an annotation | **80%** | 63% |
+| tables carrying a treatment | **100%** (32 of 32) | 89% |
+| table rows (median) | **5** | 7 |
+| numeric tokens on a chart page | **26** | 27 |
+
+**The page geometry is the same; the craft is not.** Words, bands, ink and void
+differ by a few per cent between the two — which is why the geometric floors can
+be trusted from either sample. Everything a reader would call craft differs
+sharply: client decks annotate four charts in five and treat *every* table, write
+a claim into two titles in three, and use a commentary column on only a third of
+pages. Published work is looser on all four, and its 30% text-page share is
+inflated by forewords, prose spreads and quote pages that no client deck carries.
+
+A page of type is real in both (25% and 30%), but a client text page is 166 words
+against a published one's 264: it is a numbered argument on tinted cards, not an
+essay. It highlights a phrase 71% of the time.
+
 ## What it says
 
-**The wide word numbers were right.** Median 195 words a page against the 196 the
-file already claimed, p25 120 against 127, p75 289 against 282. Whatever produced
-those, they hold.
+**The wide word numbers were right.** Client decks run a median of 189 words a page
+against the 196 the file already claimed, p25 126 against 127, p75 267 against 282.
+Whatever produced those, they hold.
 
-**The band split was not.** The body band runs to a median of 154 words, not 128;
-the title band to 17, not 20; the footer to 12, not 19. Every profile in
-`page_gates.py` derives from `bands.body`, so all four were about 20% tight.
+**The band split was not.** In client decks the body band runs to a median of 148
+words, not 128; the title band to 18, not 20; the footer to 13, not 19. Every
+profile in `page_gates.py` derives from `bands.body`, so all four were tight.
 
-**Ink: the median was right and the floor was not.** Published pages run a median
-ink share of 0.191 — the file said 0.19. But the first quartile is 0.112, so the
-`full` floor of 0.14 rejects **36%** of published client pages and `balanced` at
-0.115 rejects 26%. A floor that fails a third of the corpus is not measuring
-emptiness. At 0.08 it fails 11%, and on pages with a chart, 10%.
+**Ink: the median was right and the floor was not.** Client pages run a median ink
+share of 0.184 — the file said 0.19. But the first quartile is 0.118, so the `full`
+floor of 0.14 rejects **31%** of them and `balanced` at 0.115 rejects 22%. A floor
+that fails a third of real client work is not measuring emptiness.
 
 **Emptiness gates were far too loose in the other direction.** Real pages leave
-almost nothing trailing: dead band median 0.000, p90 0.049 against a 0.06–0.08
-ceiling; internal void median 0.019, p90 0.069 against a 0.16–0.32 ceiling. The
-void ceilings could tighten by a factor of three before they touched a real page.
+almost nothing trailing: dead band median 0.000, p90 0.033 on client work; internal
+void median 0.021, p90 0.060 against a ceiling of 0.16 to 0.32 that fired on 1.4%
+of them. The void ceilings could tighten by a factor of three before they touched a
+real page.
 
-**Charts and tables are worked much harder than the plan gates ask.** Of pages
-carrying a chart, **63%** annotate it — a callout, a bracket, a CAGR pill, a shaded
-band, a recoloured mark — and **79%** print values on the marks. Of pages carrying a
-table, **89%** treat it: banded rows, colour-coded cells, harvey balls, icons,
-in-cell bars, a total row set apart. The plan gates asked for 0.20 and 0.25. The
-50-page deck that shipped 18 unannotated charts and 10 untreated tables passed
-both, comfortably.
+**Charts and tables are worked much harder than the plan gates ask.** In client
+decks **80%** of pages carrying a chart annotate it — a callout, a bracket, a CAGR
+pill, a shaded band, a recoloured mark — and **every one** of the 32 pages carrying
+a table treats it: banded rows, colour-coded cells, harvey balls, icons, in-cell
+bars, a total row set apart. Not one plain grid. The plan gates asked for 0.20 and
+0.25, which is how the 50-page deck that shipped 18 unannotated charts and 10
+untreated tables passed both comfortably.
 
-**A third of published pages carry no exhibit at all.** 30% of content pages are
-type alone, and they behave nothing like exhibit pages: 264 words against 196,
-six numeric tokens against 27, a claim in the title 28% of the time against 76%,
-and a commentary column **4%** of the time against 73%. The skill has no such page
-in its vocabulary. It builds every page as an exhibit with a commentary column
-beside it, which is how a deck ends up with fifty pages of commentary restating
-the exhibit next to it.
+**A quarter of client pages carry no exhibit at all**, and they behave nothing
+like exhibit pages: a commentary column **13%** of the time against 38% on chart
+pages, three numeric tokens against 26, a claim in the title 42% of the time
+against 89%. They highlight a phrase 71% of the time — the emphasis does the work
+the exhibit would. The skill has no such page in its vocabulary. It builds every
+page as an exhibit with a commentary column beside it, which is how a deck ends up
+with fifty pages of commentary restating the exhibit next to it.
 
-**Numbers on a page are a chart's obligation, not every page's.** Chart pages
-carry a median of 27 numeric tokens (p25 16.5). Diagram pages carry 3.5. The
-single `numbers_per_page_min: 8` applied to any page with an exhibit rejects 29%
-of published exhibit pages, almost all of them diagrams and structural tables.
+**The commentary column is not the house default.** Only a third of client pages
+carry one at all, and on a page of type it is rare enough to be a mistake.
 
-**Pictures are not a quota.** `plan.mix.picture.min` asks for 5% of pages to be
-carried by a photograph. 0.8% of published pages are. Pictures appear on 11.8% of
-pages, always as support.
+**Numbers on a page are a chart's obligation, not every page's.** Client chart
+pages carry a median of 26 numeric tokens (p25 20); diagram pages carry 4 and text
+pages 3. The single `numbers_per_page_min: 8` applied to any page with an exhibit
+rejected 29% of published exhibit pages, almost all of them process chains and
+structural matrices whose evidence is the structure.
+
+**Pictures are not a quota.** `plan.mix.picture.min` asked for 5% of pages to be
+carried by a photograph. 1.6% of client pages are, and only 7% carry one at all.
 
 ### The table
 
-| what the skill said | where it said it | what the corpus says |
-|---|---|---|
-| body band 128 words | `reference.slides.bands.body` | 154 (p25 85, p75 244) |
-| title band 20 / footer 19 | same | 17 / 12 |
-| words p25 127, median 196, p75 282 | `reference.corpus` | 120 / 195 / 289 |
-| numeric tokens 17 | `reference.slides` | 11 over all pages; 27 on chart pages, 3.5 on diagrams |
-| ink median 0.19, q1 0.121 | `reference.slides` | 0.191, 0.112 |
-| heavy share 0.42 | `reference.slides` | 0.53 |
-| ink floor 0.14 / 0.115 / 0.05 | `geometryByFill` | fails 36% / 26% / 3% of published pages |
-| dead band ≤ 0.06–0.14 | `geometryByFill` | real p90 0.049 |
-| internal void ≤ 0.16–0.32 | `geometryByFill` | real p90 0.069 |
-| chart annotated ≥ 0.20 | `plan.craft` | 0.63 |
-| table treated ≥ 0.25 | `plan.craft` | 0.89 |
-| table rows median 6 | `plan.craft` | 7 (p25 3, p75 12) |
-| chart share ≥ 0.35 | `plan.mix` | 0.37 dominant, 0.45 present |
-| table share ≤ 0.25 | `plan.mix` | 0.11 dominant, 0.16 present |
-| diagram share ≥ 0.07 | `plan.mix` | 0.08 dominant, 0.11 present |
-| picture share ≥ 0.05 | `plan.mix` | 0.008 dominant |
-| — no band at all — | `plan.mix` | text pages are 0.30 of the deck |
+| what the skill said | where it said it | client projects | published work |
+|---|---|---|---|
+| body band 128 words | `reference.slides.bands.body` | **148** | 157 |
+| title band 20 / footer 19 | same | **18 / 13** | 17 / 12 |
+| words p25 127, median 196, p75 282 | `reference.corpus` | **126 / 189 / 267** | 119 / 198 / 297 |
+| numeric tokens 17 | `reference.slides` | **13**; 26 on a chart page, 4 on a diagram | 11; 27 / 3.5 |
+| ink median 0.19, q1 0.121 | `reference.slides` | **0.184 / 0.118** | 0.191 / 0.112 |
+| heavy share 0.42 | `reference.slides` | **0.51** | 0.54 |
+| ink floor 0.14 / 0.115 / 0.05 | `geometryByFill` | fails **31% / 22% / 6%** | 36% / 26% / 3% |
+| internal void ≤ 0.16–0.32 | `geometryByFill` | p90 **0.060** | p90 0.069 |
+| chart annotated ≥ 0.20 | `plan.craft` | **0.80** | 0.63 |
+| table treated ≥ 0.25 | `plan.craft` | **1.00** | 0.89 |
+| table rows median 6 | `plan.craft` | **5** (p25 3) | 7 |
+| chart share ≥ 0.35 | `plan.mix` | **0.30** dominant, 0.40 present | 0.37 / 0.45 |
+| table share ≤ 0.25 | `plan.mix` | **0.20** dominant, 0.26 present | 0.11 / 0.16 |
+| diagram share ≥ 0.07 | `plan.mix` | **0.10** dominant | 0.08 |
+| picture share ≥ 0.05 | `plan.mix` | **0.016** dominant, 0.07 present | 0.008 / 0.118 |
+| — no band at all — | `plan.mix` | text pages are **0.25** of the deck | 0.30 |
+| — never measured — | — | titles that state a claim **0.65** | 0.55 |
+| — never measured — | — | pages with a commentary column **0.33** | 0.43 |
 
 ## What this is not
 

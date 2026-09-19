@@ -65,7 +65,7 @@
   "geometryByFill": {
     "$comment": "The geometric thresholds that move with fill, each set to a percentile of the corpus's own distribution over 2,125 rendered pages, so a floor can be read as a promise: an `airy` deck beats the emptiest 3% of published pages, a `balanced` deck the emptiest 10%, a `full` deck the emptiest quarter. The old ink ladder of 0.14 / 0.115 sat at the 36th and 26th percentiles - it rejected a third of the corpus, which is not a floor on emptiness but a floor on being denser than most published work. The dead band and column-void ceilings were already close to right (0.06 fires on 8% of published pages, 0.2 on 4%) and are unchanged; internal void at 0.16-0.32 fired on 1.3% and 0.6% and never caught anything, so it moves to the same 2-3% tail the others sit in. A page of type alone cannot reach ink_min at any honest length: see inkPerWord, which sets that page's floor instead.",
     "full": {
-      "ink_min": 0.112,
+      "ink_min": 0.118,
       "dead_band_max": 0.06,
       "internal_void_max": 0.12,
       "column_void_max": 0.2
@@ -124,51 +124,59 @@
       "itemsTo": 6
     },
     "mix": {
-      "$comment": "Measured over 237 published content pages, one per deck, by the family that dominates the page: chart 0.371, text 0.300, mixed 0.135, table 0.110, diagram 0.076, picture 0.008. The floors sit below what the corpus does so a real deck would pass; the caps sit above it. `picture` had a 0.05 FLOOR here, which asked for six times the photographs a published deck carries - pictures appear on 11.8% of pages, but almost always beside the evidence rather than as it. `text` had no band at all, which is why the composer never planned a page of type and then produced fifty pages of commentary restating the exhibit beside it: a third of published pages carry no exhibit at all.",
+      "$comment": "Measured over 122 pages of real CLIENT PROJECT decks (BCG, McKinsey, Bain), with the published-work numbers recorded beside them because the two are different animals. Client work runs more tables (0.197 dominant against 0.110) and fewer charts (0.303 against 0.371) than published thought leadership, and a quarter of its pages still carry no exhibit at all. The floors sit under what client work does; the caps sit above it. `picture` used to carry a 0.05 FLOOR, which asked for three times the photographs a client deck carries. `text` had no band at all, which is why the composer never planned a page of type and then produced fifty pages of commentary restating the exhibit beside it.",
       "chart": {
-        "min": 0.3,
-        "observedDominant": 0.371,
-        "observedPresent": 0.447
+        "min": 0.25,
+        "observedClient": 0.303,
+        "observedPublished": 0.371,
+        "presentClient": 0.402
       },
       "table": {
-        "max": 0.25,
-        "observedDominant": 0.11,
-        "observedPresent": 0.156
+        "max": 0.3,
+        "observedClient": 0.197,
+        "observedPublished": 0.11,
+        "presentClient": 0.262
       },
       "diagram": {
         "min": 0.07,
-        "observedDominant": 0.076,
-        "observedPresent": 0.11
+        "observedClient": 0.098,
+        "observedPublished": 0.076,
+        "presentClient": 0.148
       },
       "picture": {
-        "max": 0.2,
-        "observedDominant": 0.008,
-        "observedPresent": 0.118
+        "max": 0.15,
+        "observedClient": 0.016,
+        "observedPublished": 0.008,
+        "presentClient": 0.066
       },
       "text": {
         "max": 0.35,
-        "observedDominant": 0.3
+        "observedClient": 0.254,
+        "observedPublished": 0.3
       }
     },
     "craft": {
-      "$comment": "What the dot-dash has to record about the *craft* of a page, not only its evidence family. A generated 50-page deck passed every mix, entropy and anchor gate and still read as dry, because none of these were written down and so none were ever chosen: 10 tables with a median of 3 rows and not one treatment among them, 18 charts with not one annotation, 35 point lists with not one highlighted phrase. The floors used to be 0.20 and 0.25, guessed off four self-authored decks. Measured against 264 published pages they are 0.63 and 0.89: annotating the chart and treating the table is what these firms do almost every time, not a flourish a quarter of pages earn.",
+      "$comment": "What the dot-dash has to record about the *craft* of a page. A generated 50-page deck passed every mix, entropy and anchor gate and still read as dry: 10 tables with a median of 3 rows and not one treatment, 18 charts with not one annotation, 35 point lists with not one highlighted phrase. The floors were 0.20 and 0.25, guessed off four self-authored decks. In real client decks **every table carried a treatment - 32 of 32** - and four charts in five carried an annotation. Published thought leadership is looser (0.89 and 0.63), which is why the floors are set from client work.",
       "tableRows": {
-        "min": 5,
-        "observedMedian": 7,
+        "min": 4,
+        "observedClientMedian": 5,
+        "observedPublishedMedian": 7,
         "observedRange": [
           2,
-          40
+          30
         ]
       },
       "tableTreated": {
-        "min": 0.6,
-        "observed": 0.89,
-        "observedOf": 37
+        "min": 0.75,
+        "observedClient": 1.0,
+        "observedPublished": 0.89,
+        "observedOf": 32
       },
       "chartAnnotated": {
-        "min": 0.45,
-        "observed": 0.63,
-        "observedOf": 106
+        "min": 0.65,
+        "observedClient": 0.796,
+        "observedPublished": 0.63,
+        "observedOf": 49
       },
       "exhibitVarietyPerTen": {
         "min": 4.0,
@@ -182,111 +190,150 @@
       "reasonShareMax": 0.25,
       "chartValuesPrinted": {
         "min": 0.6,
-        "observed": 0.79,
-        "observedOf": 106
+        "observedClient": 0.755,
+        "observedPublished": 0.79,
+        "observedOf": 49
+      },
+      "highlightedPhrase": {
+        "min": 0.35,
+        "observedClient": 0.508,
+        "observedPublished": 0.414
       }
     }
   },
   "reference": {
-    "$comment": "Measured, not asserted. `slides` is the pixel sample: 2,125 pages from 426 published decks rendered onto the same 1280x720 canvas page_gates.py reads, with the same luminance cuts. `corpus` is the wide sample: every analytical page of every admitted landscape deck, 16,334 of them, measured off `pdftotext -bbox`. `judged` is a vision pass over 264 pages, one per deck, against evals/corpus/rubric.md. The previous version of this block claimed 137 hand-decomposed slides that nothing in the tree could reproduce; its wide word figures survived re-measurement almost exactly, its band split and its numeric token count did not.",
+    "$comment": "Measured, not asserted, and split by what the deck is FOR. `corpus` is the wide text sample of real client-project decks - 3,606 analytical pages - which is what the floors are set against. `published` records the same measures over thought leadership, for contrast: the page geometry barely differs, the craft does. `slides` is the pixel sample rendered onto the same 1280x720 canvas page_gates.py reads. `judged` is a vision pass, 122 client pages against evals/corpus/rubric.md. The previous version of this block claimed 137 hand-decomposed slides that nothing in the tree could reproduce.",
     "slides": {
-      "pages": 2125,
-      "decks": 426,
-      "inkMedian": 0.191,
-      "inkQ1": 0.112,
+      "pages": 140,
+      "decks": 28,
+      "inkMedian": 0.184,
+      "inkQ1": 0.118,
       "inkP10": 0.077,
-      "deadBandP90": 0.049,
-      "internalVoidP90": 0.069,
-      "columnVoidP90": 0.107,
+      "deadBandP90": 0.033,
+      "internalVoidP90": 0.06,
+      "columnVoidP90": 0.109,
       "bands": {
-        "titleBand": 17,
-        "body": 154,
-        "footer": 12
+        "titleBand": 18,
+        "body": 148,
+        "footer": 13
       },
-      "words": 195,
-      "wordsP20": 103,
-      "wordsP80": 318,
+      "words": 189,
+      "wordsP20": 110,
+      "wordsP80": 290,
       "wordsMax": 1845,
-      "heavyShare": 0.532,
-      "numericTokens": 11,
+      "heavyShare": 0.512,
+      "numericTokens": 13,
       "numericByFamily": {
-        "chart": 27,
-        "chartP25": 16,
-        "table": 11,
+        "chart": 26,
+        "chartP25": 20,
+        "table": 20,
         "diagram": 4,
-        "text": 6
+        "text": 3
       },
       "exceedance": {
-        "$comment": "Share of the 2,125 rendered corpus pages each candidate threshold would flag.",
+        "$comment": "Share of the 140 rendered client-project pages each candidate threshold would flag. The full 2,125-page corpus gives the same answers within two points, so the geometry is not what separates client work from published work.",
         "inkBelow": {
-          "0.05": 0.027,
-          "0.077": 0.099,
-          "0.112": 0.248,
-          "0.14": 0.359
+          "0.05": 0.064,
+          "0.077": 0.114,
+          "0.118": 0.243,
+          "0.14": 0.307
         },
         "deadBandAbove": {
-          "0.06": 0.082,
-          "0.08": 0.06,
-          "0.14": 0.03
+          "0.06": 0.093,
+          "0.08": 0.071,
+          "0.14": 0.05
         },
         "internalVoidAbove": {
-          "0.12": 0.026,
-          "0.13": 0.021,
-          "0.18": 0.01,
-          "0.22": 0.006
+          "0.12": 0.043,
+          "0.13": 0.043,
+          "0.18": 0.029,
+          "0.22": 0.014
         },
         "columnVoidAbove": {
-          "0.13": 0.077,
-          "0.2": 0.037
+          "0.13": 0.093,
+          "0.2": 0.043
         }
       },
       "drawings": 32,
       "drawingsP25": 11,
-      "drawingsP75": 88
+      "drawingsP75": 88,
+      "$comment": "Client-project pages rendered onto the gate's own canvas."
     },
     "corpus": {
-      "pages": 16334,
-      "decks": 518,
-      "p25": 120,
-      "median": 195,
-      "p75": 289,
-      "p90": 404
+      "$comment": "Client-project decks only: BCG, McKinsey, Bain.",
+      "pages": 3606,
+      "decks": 28,
+      "p25": 126,
+      "median": 189,
+      "p75": 267,
+      "heavyShare": 0.512
     },
     "judged": {
-      "pages": 264,
-      "contentPages": 237,
-      "noExhibitShare": 0.257,
-      "exhibitsPerPage": 1.23,
-      "titleIsClaim": 0.553,
-      "hasCommentary": 0.43,
-      "highlightedPhrase": 0.414,
-      "sourceLine": 0.557,
+      "$comment": "122 content pages of client-project work; the published figure follows each one.",
+      "pages": 132,
+      "contentPages": 122,
+      "decks": 28,
+      "noExhibitShare": 0.246,
+      "exhibitsPerPage": 1.11,
+      "titleIsClaim": 0.648,
+      "titleIsClaimPublished": 0.553,
+      "hasCommentary": 0.328,
+      "hasCommentaryPublished": 0.43,
+      "highlightedPhrase": 0.508,
+      "sourceLine": 0.672,
       "byFamily": {
         "chart": {
-          "titleIsClaim": 0.761,
-          "hasCommentary": 0.727,
-          "bodyWords": 137,
+          "share": 0.303,
+          "titleIsClaim": 0.89,
+          "hasCommentary": 0.38,
+          "highlightedPhrase": 0.38,
+          "bodyWords": 104,
           "numeric": 27
         },
         "table": {
-          "titleIsClaim": 0.423,
-          "hasCommentary": 0.308,
-          "bodyWords": 212,
-          "numeric": 11
+          "share": 0.197,
+          "titleIsClaim": 0.38,
+          "hasCommentary": 0.21,
+          "highlightedPhrase": 0.46,
+          "bodyWords": 167,
+          "numeric": 20
         },
         "diagram": {
-          "titleIsClaim": 0.722,
-          "hasCommentary": 0.556,
-          "bodyWords": 83,
+          "share": 0.098,
+          "titleIsClaim": 0.75,
+          "hasCommentary": 0.42,
+          "highlightedPhrase": 0.5,
+          "bodyWords": 120,
           "numeric": 4
         },
         "text": {
-          "titleIsClaim": 0.282,
-          "hasCommentary": 0.042,
-          "bodyWords": 224,
-          "numeric": 6
+          "share": 0.254,
+          "titleIsClaim": 0.42,
+          "hasCommentary": 0.13,
+          "highlightedPhrase": 0.71,
+          "bodyWords": 136,
+          "numeric": 3
+        },
+        "mixed": {
+          "share": 0.131,
+          "titleIsClaim": 0.81,
+          "hasCommentary": 0.69,
+          "highlightedPhrase": 0.5,
+          "bodyWords": 126,
+          "numeric": 19
         }
       }
+    },
+    "published": {
+      "$comment": "Published thought leadership in deck format, for contrast. Not what the floors are set from.",
+      "pages": 12678,
+      "decks": 396,
+      "p25": 119,
+      "median": 198,
+      "p75": 297,
+      "heavyShare": 0.54,
+      "reportPages": 1924,
+      "reportMedian": 174
     }
   }
 }

@@ -53,8 +53,13 @@ class PlanGateTests(unittest.TestCase):
         return set(run_plan(plan, self.tmp)["countsByCode"])
 
     def test_a_balanced_plan_passes(self):
+        # `picture-pair` is not in the rotation: a picture architecture makes the
+        # page a picture page whatever its exhibit says, and handing it out round
+        # robin gave a sixteen-page plan three photograph pages. Real client
+        # decks carry a photograph on 7% of pages and are *carried* by one on
+        # 1.6%, so the shape goes only to the page that actually has photographs.
         shapes = ["exhibit-left", "exhibit-top", "two-up", "hero-number", "exhibit-full",
-                  "picture-pair", "text", "exhibit-right"]
+                  "stack", "text", "exhibit-right"]
         # No two neighbours share an exhibit: a run of three is a finding, and
         # rightly so. The spread is wide as well as even - the craft gate counts
         # distinct exhibits per ten pages, because a deck that runs three shapes
@@ -66,7 +71,8 @@ class PlanGateTests(unittest.TestCase):
         for i, kind in enumerate(kinds):
             extra = {}
             if kind == "image":
-                extra = {"anchors": ["photo:london", "photo:new-york"], "points": 2}
+                extra = {"anchors": ["photo:london", "photo:new-york"], "points": 2,
+                         "architecture": "picture-pair"}
             elif kind == "cards":
                 extra = {"points": 3, "anchors": ["target", "gear", "shield"]}
             # Craft, recorded: how deep each table runs and how it is treated,
@@ -78,7 +84,8 @@ class PlanGateTests(unittest.TestCase):
             if i == 0:
                 extra = {**extra, "highlight": "four and a half times"}
             # And why this exhibit, on the shapes a plan defaults to.
-            pages.append(page(i + 1, exhibit=kind, architecture=shapes[i % len(shapes)],
+            shape = extra.pop("architecture", shapes[i % len(shapes)])
+            pages.append(page(i + 1, exhibit=kind, architecture=shape,
                               insight="filled", why="the shape of this evidence", **extra))
         report = run_plan(deck(pages), self.tmp)
         self.assertTrue(report["accepted"], json.dumps(report["findings"], indent=1))
