@@ -42,18 +42,19 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Axis ticks | `NICE_TICKS` | nice numbers |
 | Page did not render | `MISSING_RENDER` | every page the gates are asked to measure has a render |
 | Picture frame with no picture in it | `UNSOURCED_PICTURE` | a photograph written as `alt` with no `path` never reaches a reader |
+| A figure its own numbers contradict | `UNSCALED_FIGURE` | where a figure draws a baseline and blocks of one size, the quantities printed on those blocks stay within half as much again of each other |
 
 **What the page says.** Everything above measures how a page is drawn. A 50-page deck cleared all of it and was rated 2 out of 10 by the person who opened it: twenty-eight pages headed `Interpretation:`, fifty-nine lines saying what the evidence does not establish, eighteen tables on two invented schemas, one chart, and a comparison table whose two columns carried identical sentences in every row. These five measure the other half, and the example decks must stay clean on all of them — a content gate that fires on good work is one that gets switched off.
 
 | What is measured | Code | The bar |
 | --- | --- | --- |
 | Compared columns that agree | `TWIN_CELLS` | two or more rows, over 40% of the table, where two compared cells are the same words |
-| Commentary against its exhibit | `RESTATEMENT` | at most 55% of the commentary's content words already in the exhibit (reference decks run 25–36%) |
+| Commentary against its exhibit | `RESTATEMENT` | at most 47% of the column's content words already in the exhibit (reference decks run 25–36%), and at most 66% of any one block's - a column does not average out the block a reader stops at |
 | Planning language on the page | `PLANNING_VOICE` | no sentence opens `Interpretation:`, `Takeaway:`, `So what:` or `Key insight —` |
 | Limits against findings | `CAVEAT_HEAVY` | at most 2 caveat lines a page; a finding in contrastive form ("not X; it Y") is not a caveat |
 | The same table, repeated | `TABLE_SCHEMA_FLAT` | at most 3 tables in a deck open with the same column headers |
 | A share the page's own counts do not give | `CONTRADICTED_SHARE` | where a page prints "N of M", every percentage on it is a subset of those counts over M, within one count |
-| What the deck does, page after page | `DECK_CRAFT` | a phrase emphasised on at least 35% of pages (client decks run 51%), a source on at least 50% (they run 67%), and at least 11 drawn elements a page (the corpus median is 32) |
+| What the deck does, page after page | `DECK_CRAFT` | a phrase emphasised on at least 35% of pages (client decks run 51%), a source on at least 50% (they run 67%), at least 11 drawn elements a page (the corpus median is 32), and no single table device on more than 60% of the tables |
 
 Two more findings share the shape but fire before the page is rendered, from the composer rather than the gates: `THIN_PLAN` (what the page will carry against its floor, with the remedy that page's own data offers) and `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
 

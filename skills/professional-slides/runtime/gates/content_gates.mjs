@@ -47,6 +47,7 @@ export const CONTENT_CODES = Object.freeze({
   CONTENT_CLAIM_REPEATS: "two pages make the same claim",
   CONTENT_LAYOUT_LEAK: "the content file decides how a page looks",
   CONTENT_ANSWER_UNCARRIED: "the deck's own answer is not carried by any of its claims",
+  CONTENT_ANSWER_CONTRADICTED: "a page recommends something the deck's unconditional answer rules out",
 });
 
 /** What a page settles, and what kind of thing that is. */
@@ -95,6 +96,43 @@ export const CONTENT_THRESHOLDS = Object.freeze({
   answerCoverageMin: 0.6,
   answerCarriedMin: 0.35,
 });
+
+// The words a recommendation is made in, and the words that make one
+// conditional. An answer that says "start with Marvel" and a page that says
+// "start with The Dark Knight" are not two findings, they are one unresolved
+// question - unless the answer says who each is for.
+const RECOMMENDS = /\b(start with|begin with|recommend|choose|pick|go with|watch first|buy|adopt|select|the answer is|should watch|should start|best entry|entry point)\b/i;
+const CONDITIONAL = /\b(unless|except|if you|for the|for a|for those|whereas|while|but only|depending|either)\b/i;
+/**
+ * The pages that recommend something other than what the deck's answer
+ * recommends, while the answer names no condition.
+ *
+ * The named things in a sentence are its capitalised words, less the ones that
+ * also appear in lower case somewhere in the deck - which is what tells
+ * "Marvel" apart from a "Start" that is only capitalised because it opens a
+ * sentence. A claim that puts forward a different name is not wrong, and the
+ * deck is usually right to make it; what is wrong is an answer that does not
+ * admit it. Consulting writes that as the condition: "Marvel, unless you have
+ * one evening, in which case The Dark Knight."
+ */
+function contradictions(answer, pages) {
+  if (!RECOMMENDS.test(answer) || CONDITIONAL.test(answer)) return [];
+  const corpus = [answer, ...pages.map((p) => String(p.claim ?? ""))].join(" ");
+  const lowercased = new Set(corpus.match(/\b[a-z][a-z']+\b/g) ?? []);
+  const names = (text) => new Set((String(text ?? "").match(/\b[A-Z][A-Za-z']{2,}\b/g) ?? [])
+    .filter((word) => !STOPWORDS.has(word.toLowerCase()) && !lowercased.has(word.toLowerCase())));
+  const answerNames = names(answer);
+  if (!answerNames.size) return [];
+  const against = [];
+  for (const page of pages) {
+    const claim = String(page.claim ?? "");
+    if (!RECOMMENDS.test(claim)) continue;
+    const claimed = names(claim);
+    if (!claimed.size || [...claimed].some((name) => answerNames.has(name))) continue;
+    against.push({ page: page.n ?? null, claim: claim.slice(0, 80), recommends: [...claimed].slice(0, 3) });
+  }
+  return against;
+}
 
 // A field that decides how the page looks has no home here.
 const LAYOUT_FIELDS = ["exhibit", "variant", "architecture", "layout", "shape", "anchors", "insight", "chart", "component"];
@@ -227,6 +265,16 @@ export function runContentGates(content) {
           : "No single page states the answer. The claims between them cover it, which means "
             + "the reader can assemble it - but a deck leads with its answer rather than "
             + "leaving it to be inferred from twenty pages. Write the page that says it."));
+    }
+    const against = contradictions(answer, pages);
+    if (against.length) {
+      findings.push(finding(against[0].page, "CONTENT_ANSWER_CONTRADICTED",
+        { answer: answer.slice(0, 70), pages: against.slice(0, 3) }, "one answer, or a condition on it",
+        "The answer is stated flat, and these pages recommend something else. A reader who "
+        + "reaches them stops trusting the first page. Either they are wrong and the deck "
+        + "should not make them, or the answer is conditional and has to say so: "
+        + "\"X, unless <the condition>, in which case Y\" - written on the answer page and in "
+        + "the closing takeaway, not left for page 45 to reveal."));
     }
   }
 

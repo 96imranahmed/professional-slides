@@ -196,8 +196,15 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
     const perRow = Number.isInteger(rest.columns) ? rest.columns : 0;
     const items = rest.items || [];
     if (type === "cards" && perRow >= 2 && items.length > perRow) {
+      // Even rows, not a remainder. Four cards at three across used to compose
+      // as a row of three and a row of one - which the card renderer refuses,
+      // correctly, because one card in a row is not a row - and the page died
+      // with "Cards take two to six items" and no hint that the count was the
+      // problem. Four across two rows is two and two.
+      const rowCount = Math.ceil(items.length / perRow);
+      const base = Math.floor(items.length / rowCount), over = items.length % rowCount;
       const rows = [];
-      for (let at = 0; at < items.length; at += perRow) rows.push(items.slice(at, at + perRow));
+      for (let at = 0, r = 0; r < rowCount; r += 1) { const take = base + (r < over ? 1 : 0); rows.push(items.slice(at, at + take)); at += take; }
       const { columns: _c, ...cardProps } = rest;
       return { id, layout: "flow.column", gap: "space.4", size: sz, items: rows.map((row, r) => ({
         id: `${id}-row-${r}`, component: "cards",
@@ -450,6 +457,22 @@ function groupNumericColumns(ex) {
  * reference measure table ends. Numeric columns sum; a share column sums to 100;
  * anything the arithmetic cannot reach stays blank rather than guessing.
  */
+/**
+ * Whether a column's numbers are quantities, which add up, or measures of one
+ * row against another, which do not. Counts, amounts and durations total; a
+ * multiple, a ratio, a rate, a percentage, a score, an average or an index is a
+ * statement about a row, and stacking those statements is not a statement about
+ * the table.
+ */
+const NOT_ADDITIVE = /(multiple|ratio|rate|score|rating|average|avg|median|mean|index|margin|share|percent|yield|per\b|cagr|growth|utilisation|utilization|efficiency|density|likelihood|probability)/i;
+const NOT_ADDITIVE_UNIT = /^(x|%|pt|pts|bps|:1|\/|per\b)/i;
+function addsUp(column) {
+  const label = typeof column === "string" ? column : String(column?.label ?? "");
+  const unit = typeof column === "object" ? String(column?.unit ?? "") : "";
+  if (/\(\s*x\b|\bx\s*\)|\bx budget\b/i.test(label)) return false;
+  return !NOT_ADDITIVE.test(label) && !NOT_ADDITIVE_UNIT.test(unit.trim());
+}
+
 function totalRow(ex) {
   if (ex.total !== true) return ex;
   const rows = ex.rows.map((row) => (Array.isArray(row) ? { cells: row, plain: true } : { ...row }));
@@ -462,6 +485,14 @@ function totalRow(ex) {
     const derived = typeof column === "object" ? column.derived : null;
     if (derived === "rank" || derived === "index" || derived === "change") return " ";
     if (derived === "share") return "100";
+    // Only quantities add up. A multiple, a ratio, a rate, a score or an
+    // average summed down its column produces a number that means nothing -
+    // "41.4" under a column of budget multiples - and a total row is exactly
+    // where a reader trusts the arithmetic without checking it. Those columns
+    // carry the weighted figure where the table holds the two quantities it is
+    // drawn from, and otherwise nothing. The row keeps the cell empty rather
+    // than printing a figure the table cannot justify.
+    if (!addsUp(column)) return " ";
     const values = body.map((row) => numberOf(row.cells[index]));
     if (values.some((value) => value === null)) return " ";
     return String(Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10);
@@ -538,6 +569,53 @@ function implicationColumn(ex) {
  * writing `{type: "bars", values: [41], scale: "share"}` in every row. The
  * column's own numbers say all of that, so the flag reads them.
  */
+/** A bar cell's number, or null when the cell is not one. A typed cell carries
+ *  no `text`, and `String({})` is "[object Object]", which strips to "" and
+ *  reads as 0 - a cell silently at the bottom of the scale. */
+function barNumber(cell) {
+  if (cell && typeof cell === "object" && cell.text === undefined) return null;
+  const raw = String(cell?.text ?? cell ?? "").replace(/[^0-9.+-]/g, "");
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+const barScaleId = (label) => `${String(label).toLowerCase().replace(/[^a-z0-9]+/g, "-")}-bar`;
+/** Zero (or below zero) to a round number above the largest value, so the bars
+ *  are proportional to the measure rather than to each other, and a column of
+ *  41/33/30 does not draw its smallest bar as nothing. */
+function barScaleRecord(label, unit, values) {
+  const top = Math.max(...values, 0), bottom = Math.min(...values, 0);
+  const step = Math.pow(10, Math.floor(Math.log10(Math.max(1e-9, top - bottom)))) / 2;
+  return {
+    type: "bars", label, unit, series: [label],
+    min: bottom < 0 ? Math.floor(bottom / step) * step : 0,
+    max: Math.ceil(top / step) * step,
+  };
+}
+
+/**
+ * Every bar column's scale, read off the whole table.
+ *
+ * A table long enough to split is styled once per page, and each page used to
+ * read its bar scale off the rows it happened to receive: a $440m bar on the
+ * second page drew longer than a $1,148m bar on the first, which is the kind of
+ * page that makes a reader doubt every number in the deck. The scale belongs to
+ * the column, so it is computed before the split and handed to both halves.
+ */
+export function barScales(ex) {
+  const scales = {};
+  for (const [index, column] of (ex?.columns || []).entries()) {
+    if (!column || typeof column !== "object" || column.bar !== true) continue;
+    const label = String(column.label ?? "").trim(), unit = String(column.unit ?? "").trim();
+    if (!label || !unit) continue; // styleTable says what is missing, and better.
+    const values = (ex.rows || [])
+      .map((row) => (Array.isArray(row) ? row : row.cells || [])[index])
+      .map(barNumber).filter((n) => Number.isFinite(n));
+    if (values.length) scales[barScaleId(label)] = barScaleRecord(label, unit, values);
+  }
+  return scales;
+}
+
 function columnTreatments(ex) {
   const columns = ex.columns || [];
   const flag = (c, name) => c && typeof c === "object" && c[name] === true;
@@ -560,20 +638,12 @@ function columnTreatments(ex) {
     if (!label) throw new Error("A bar column needs a label; it names the scale its bars share");
     const unit = String(rest.unit ?? "").trim();
     if (!unit) throw new Error(`The "${label}" bar column needs a unit: a bar without one is a length, not a measure`);
-    barScales[i] = { id: `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-bar`, label, unit };
+    barScales[i] = { id: barScaleId(label), label, unit };
     return { ...rest, type: "bars" };
   });
-  const asNumber = (cell) => {
-    // A typed cell carries no `text`, and `String({})` is "[object Object]",
-    // which strips to "" and reads as 0 - a cell silently at the bottom of the
-    // scale. The column writes its own cells, so a cell that already has a type
-    // is the author saying two different things at once.
-    if (cell && typeof cell === "object" && cell.text === undefined) return null;
-    const raw = String(cell?.text ?? cell ?? "").replace(/[^0-9.+-]/g, "");
-    if (!raw) return null;
-    const value = Number(raw);
-    return Number.isFinite(value) ? value : null;
-  };
+  // The column writes its own cells, so a cell that already has a type is the
+  // author saying two different things at once.
+  const asNumber = barNumber;
   const nextRows = (ex.rows || []).map((row) => {
     const cells = Array.isArray(row) ? row : row.cells || [];
     const next = cells.map((cell, i) => {
@@ -599,21 +669,15 @@ function columnTreatments(ex) {
     });
     return Array.isArray(row) ? next : { ...row, cells: next };
   });
-  // The scale each bar column shares, read off the column's own numbers: zero
-  // to a round number above the largest, so the bars are proportional to the
-  // measure rather than to each other, and a column of 41/33/30 does not draw
-  // its smallest bar as nothing.
+  // The scale each bar column shares, read off the column's own numbers. A
+  // scale already on the exhibit under this id is kept: that is either the
+  // author's own, or the one `paginateTable` computed over every row before it
+  // split the table, and a half-table must not rescale itself.
   const scales = { ...(ex.scales || {}) };
   for (const [index, record] of Object.entries(barScales)) {
     const values = nextRows.map((row) => (Array.isArray(row) ? row : row.cells)[index]).map((cell) => cell?.values?.[0]).filter((n) => Number.isFinite(n));
     if (!values.length) throw new Error(`The "${record.label}" bar column has no numbers to scale`);
-    const top = Math.max(...values, 0), bottom = Math.min(...values, 0);
-    const step = Math.pow(10, Math.floor(Math.log10(Math.max(1e-9, top - bottom)))) / 2;
-    scales[record.id] = {
-      type: "bars", label: record.label, unit: record.unit, series: [record.label],
-      min: bottom < 0 ? Math.floor(bottom / step) * step : 0,
-      max: Math.ceil(top / step) * step,
-    };
+    if (!scales[record.id]) scales[record.id] = barScaleRecord(record.label, record.unit, values);
   }
   return { ...ex, columns: nextColumns, rows: nextRows, bubbleColumn: undefined, ...(Object.keys(barScales).length ? { scales } : {}) };
 }
@@ -1064,13 +1128,18 @@ export function paginateTable(slide, bodyScale = 1) {
   const perRow = Math.max(20, heightAt(densest) / Math.max(1, ex.rows.length));
   const rowsPerPage = Math.max(3, Math.floor(available / perRow));
   const pages = Math.ceil(ex.rows.length / rowsPerPage), per = Math.ceil(ex.rows.length / pages);
+  // One scale for the whole table, fixed before it is cut: the halves are two
+  // views of one measure, and a bar on page two means what it means on page one.
+  const shared = barScales(ex);
   return Array.from({ length: pages }, (_, i) => {
     const rows = ex.rows.slice(i * per, (i + 1) * per);
     // A highlighted row travels with the page that holds it; other pages drop the key.
     const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
     const keeps = ex.highlightRow === undefined ? false : Number.isInteger(ex.highlightRow) ? ex.highlightRow >= i * per && ex.highlightRow < (i + 1) * per : rows.some((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
     const { highlightRow, ...rest } = ex;
-    const page = { ...slide, exhibit: { ...rest, density: densest, rows, ...(keeps ? { highlightRow: Number.isInteger(highlightRow) ? highlightRow - i * per : highlightRow } : {}) }, title: `${slide.title} (${i + 1}/${pages})` };
+    const page = { ...slide, exhibit: { ...rest, density: densest, rows,
+      ...(Object.keys(shared).length ? { scales: { ...shared, ...(rest.scales || {}) } } : {}),
+      ...(keeps ? { highlightRow: Number.isInteger(highlightRow) ? highlightRow - i * per : highlightRow } : {}) }, title: `${slide.title} (${i + 1}/${pages})` };
     if (slide.id) page.id = `${slide.id}-${i + 1}`;
     if (i !== 0) delete page.points;
     return page;
@@ -1347,8 +1416,16 @@ function sideTreatment(slide) {
  * table, each carrying its own finding, rather than one long band that says
  * three things in a row.
  */
-function soWhatItem(text, id, highlight) {
+function soWhatItem(text, id, highlight, tinted = true) {
   const accent = highlight === undefined || highlight === null ? {} : { highlight };
+  // One tinted box per page. A callout is already a tinted box saying "read
+  // this"; a second one underneath in a different tint reads as two competing
+  // boxes rather than as a page with a close, which is what a reviewer sees
+  // first and cannot explain.
+  if (!tinted) {
+    const plain = Array.isArray(text) ? { items: text } : { text };
+    return { id, component: "insight", props: { ...plain, variant: "plain", ...accent }, size: HUG };
+  }
   if (Array.isArray(text)) {
     if (!text.length) throw new Error("A soWhat list needs at least one line");
     if (text.length > 3) throw new Error("A soWhat list carries at most three lines; the rest belongs in the page");
@@ -1470,7 +1547,7 @@ const pictureCount = (slide) => (Array.isArray(slide?.pictures) ? slide.pictures
 export const PAGE_SHAPE_NAMES = Object.freeze(Object.keys(PAGE_SHAPES));
 
 const TABLE_LIKE_TYPES = ["table", "rows", "compare", "phase-table"];
-const hasCommentary = (s) => Boolean(s.points?.length || s.insight || s.insights?.length || s.kpi);
+const hasCommentary = (s) => Boolean(s.points?.length || s.insight || s.insights?.length || s.kpi || s.paragraphs?.length);
 
 /**
  * An exhibit that cannot survive being narrowed to two thirds of the page.
@@ -1811,6 +1888,8 @@ export const SLIDE_KEYS = Object.freeze({
   active: "which agenda entry the deck is on",
   summary: "the line under a section divider's title",
   number: "a section divider's number",
+  contents: "the deck's sections, listed down a divider with this one banded",
+  contentsActive: "which of those sections the divider opens",
   // the footer
   source: "where the numbers came from",
   note: "the footnote line, or a list of numbered notes",
@@ -1914,6 +1993,7 @@ const KINDS = {
     ...(slide.tone === "light" ? { mode: "light" } : {}) }),
   section: (slide) => ({ kind: "divider", title: slide.title,
     ...(slide.summary ? { subtitle: slide.summary } : {}),
+    ...(Array.isArray(slide.contents) ? { contents: slide.contents, contentsActive: slide.contentsActive } : {}),
     ...(slide.number !== undefined ? { number: slide.number } : {}) }),
   agenda: (slide, { id }) => ({ title: slide.title || "Contents", layout: "flow.column",
     items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items,
@@ -2055,6 +2135,52 @@ function highlightThePhrase(slide) {
   return next;
 }
 
+/**
+ * The treatment a verdict table takes, rotated across the deck.
+ *
+ * Every pass inside `styleTable` reads one table and decides it well; nothing
+ * reads the deck. A last column headed "Verdict", "So what" or "Implication"
+ * becomes a chevron gutter every time, which on a deck that argues by verdict
+ * was nine tables in fourteen - and a device on every page stops being a
+ * device. The three treatments are all correct for the same table, so the page
+ * takes whichever the last few tables did not:
+ *
+ *   gutter      chevrons between the evidence and the conclusion
+ *   tinted      the conclusion cell on the house tint, no gutter
+ *   categories  the first column as filled category cells, verdict plain
+ *
+ * An author who names a treatment, writes an object column or sets a variant
+ * has decided, and this leaves the table alone.
+ */
+const TABLE_TREATMENTS = ["table-gutter", "table-tinted", "table-categories"];
+function rotateTableTreatment(slide, recentStyles) {
+  const ex = slide.exhibit;
+  if (!ex || ex.type !== "table" || !Array.isArray(ex.columns) || ex.columns.length < 3) return slide;
+  if (ex.treatment || ex.variant || ex.recommended !== undefined) return slide;
+  if (ex.columns.some((column) => column && typeof column === "object")) return slide;
+  if (!Array.isArray(ex.rows) || !ex.rows.length || !ex.rows.every((row) => Array.isArray(row))) return slide;
+  if (!VERDICT_HEADER.test(String(ex.columns[ex.columns.length - 1] ?? "").toLowerCase())) return slide;
+  const recent = Array.isArray(recentStyles) ? recentStyles : [];
+  const unused = recent.length + 1;
+  const staleness = (name) => { const at = recent.indexOf(name); return at === -1 ? unused : at; };
+  const choice = [...TABLE_TREATMENTS].sort((a, b) => staleness(b) - staleness(a))[0];
+  if (Array.isArray(recentStyles)) recentStyles.unshift(choice);
+  if (choice === "table-gutter") return slide;
+  const last = ex.columns.length - 1;
+  const text = (cell) => String(cell?.text ?? cell ?? "");
+  if (choice === "table-tinted") {
+    // `implication: false` is the column saying it has already been decided,
+    // which is what keeps the gutter pass off it.
+    const columns = ex.columns.map((column, i) => (i === last ? { label: String(column), implication: false } : column));
+    const rows = ex.rows.map((row) => row.map((cell, i) => (i === last ? { type: "highlight", text: text(cell) } : cell)));
+    return { ...slide, exhibit: { ...ex, columns, rows } };
+  }
+  const columns = ex.columns.map((column, i) => (i === 0 ? { label: String(column), type: "category" }
+    : i === last ? { label: String(column), implication: false } : column));
+  const rows = ex.rows.map((row) => row.map((cell, i) => (i === 0 ? { type: "category", text: text(cell) } : cell)));
+  return { ...slide, exhibit: { ...ex, columns, rows } };
+}
+
 const SLIDE_PASSES = [
   ["highlight-the-phrase", (slide) => highlightThePhrase(slide)],
   ["footnotes", (slide) => applyFootnotes(slide)],
@@ -2166,6 +2292,8 @@ const SLIDE_PASSES = [
     ? { ...slide, exhibit: { type: "rows", rows: slide.rows, ...(Array.isArray(slide.columns) ? { columns: slide.columns } : {}) } }
     : slide)],
 
+  ["rotate-the-table-treatment", (slide, ctx) => rotateTableTreatment(slide, ctx.recentStyles)],
+
   // One big number parked above a table reads as two pages glued together: the
   // tile floats in air and the table starts again under it. A lone metric over
   // a table is the hero number of the side column instead, beside its evidence.
@@ -2208,6 +2336,7 @@ const SLIDE_PASSES = [
     const points = slide.points || [];
     if (!(!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && !slide.pictures
         && (!slide.layout || slide.layout === "auto") && !slide.pointsStyle
+        && !slide.paragraphs?.length
         && points.length >= 3 && points.length <= 6
         && points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && pt.state == null))) return slide;
     const items = points.map((pt, index) => ({
@@ -2226,7 +2355,7 @@ export const PASS_NAMES = Object.freeze(SLIDE_PASSES.map(([name]) => name));
 export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = []) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   assertKnownSlideKeys(slide, id);
-  const ctx = { id, baseDir, fill, elements, tileColumn: null, tilePoints: [] };
+  const ctx = { id, baseDir, fill, elements, tileColumn: null, tilePoints: [], recentStyles };
 
   // The first three passes run for every page; the fixed-shape pages then take
   // their own route and the rest go on through the pipeline.
@@ -2333,7 +2462,12 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // an insight, centring opens a void between that block and the first point
     // - the list floats away from the thing it is reading from.
     const sharesColumn = Boolean(slide.kpi) || Boolean(slide.insight) || Boolean(slide.insights?.length);
-    const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle, !sharesColumn) : null;
+    // Nor when a heading sits above it. Centring the leftover put a hand's
+    // width of blank between "What it means" and the first thing it meant, on
+    // every headed column in the deck: a heading is where the eye starts, so
+    // the first point belongs under its rule and the slack belongs at the foot.
+    const headed = slide.pointsHeading !== false && !sharesColumn;
+    const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle, !sharesColumn && !headed) : null;
     // `kpi: { value, label }`: the one big number the chart proves, in the accent
     // at the top of the side column, above the points.
     const kpiTile = slide.kpi ? { id: `${id}-kpi`, component: "metric", props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } } : null;
@@ -2354,8 +2488,15 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
         props: typeof entry === "string" ? { text: entry, variant, ...accent } : { variant, ...accent, ...entry }, size: HUG };
     });
     const insightBox = insightBoxes[0] ?? null;
-    if (!list && !insightBox && !kpiTile) throw new Error(`${id}: a side column needs points, an insight or a kpi`);
-    const sideItems = [kpiTile, ...insightBoxes, list].filter(Boolean);
+    if (!list && !insightBox && !kpiTile && !(slide.paragraphs || []).length) throw new Error(`${id}: a side column needs points, an insight or a kpi`);
+    // Authored prose belongs in the column too. `paragraphs` reached the page
+    // only on a text page and beside a photograph, so a page that wrote two
+    // sentences of commentary next to its chart lost them without a word - and
+    // the content audit reported the loss as MISSING_AUTHORED_CONTENT with
+    // nothing to point at.
+    const prose = (slide.paragraphs || []).map((text, at) => (
+      { id: `${id}-p${at}`, component: "paragraph", props: { text }, size: HUG }));
+    const sideItems = [kpiTile, ...insightBoxes, ...prose, list].filter(Boolean);
     // "What it means" above three lines of text is a label on a mostly empty
     // column. The heading earns its line when the column holds a list; a column
     // that is one number or one box takes the blank band and keeps the rule.
@@ -2395,9 +2536,13 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // column keeps its top - the heading is what the eye starts from.
     const shortList = list && !heading && Array.isArray(slide.points)
       && slide.points.length >= 2 && slide.points.length <= 3 && sideItems.length <= 1;
-    const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && fill !== "full"
+    // A headed column starts under its own heading. Centring the block as well
+    // left a hand's width of blank between the rule and the first line, on a
+    // page whose heading says "What it means" and then appears to mean it two
+    // inches lower.
+    const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && fill !== "full" && !heading
       && (boxesOnly || sideItems.length <= 1)
-      && (unheaded(exhibits[0]) || (insightBox && !list) || (tone !== "open" && !heading) || shortList));
+      && (unheaded(exhibits[0]) || (insightBox && !list) || tone !== "open" || shortList));
     // A toned panel is always a section (it needs a surface); it takes the
     // heading unless the author suppresses it with `pointsHeading: false`.
     // A column of several blocks (a number, a box, the points) spreads them down
@@ -2453,17 +2598,39 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       const runs = !hoist && entry.lead
         ? accentRuns(text, [entry.lead], { bold: true, strict: false })
         : null;
+      // `rule: false`: the block above already carries one under "What it
+      // means". A hairline under each of three sub-headings as well turns one
+      // divided idea into four ruled boxes, and the reader reads the rules
+      // before the words.
       return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
-        ...(hoist ? { heading: entry.lead } : {}),
+        ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
         items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text, ...(runs ? { runs } : {}) }, size: HUG }] };
     });
     // The columns share one heading, the way the side column does: without it
     // the page drops straight from the plot into three paragraphs with nothing
     // saying what they are. `pointsHeading: false` suppresses it.
     const belowHeading = slide.pointsHeading === false ? null : slide.pointsHeading || "What it means";
+    // One exhibit over three headed paragraphs is a good page and a bad deck:
+    // the cold-run deck built it eight times and a reviewer read seven of the
+    // forty-four content pages as one construction repeated. The content is the
+    // same either way, so the band under the exhibit takes the form it has not
+    // taken recently - three paragraphs, or the same three findings as tinted
+    // cards. `recentStyles` is the same staleness memory the point styles use.
+    const lastBelow = (recentStyles || []).find((name) => name === "below-columns" || name === "below-cards");
+    const cardsTurn = slide.belowStyle ? slide.belowStyle === "cards" : lastBelow === "below-columns";
+    const below = cardsTurn && columns.every((c) => c.heading)
+      ? [{ id: `${id}-below-cards`, component: "cards", size: HUG,
+           props: { tone: "plain", columns: Math.min(3, columns.length),
+                    items: slide.points.map((point, at) => {
+                      const entry = typeof point === "string" ? { text: point } : point;
+                      return { title: entry.lead ?? `Finding ${at + 1}`, text: entry.text, number: at + 1 };
+                    }) } }]
+      : columns;
+    if (Array.isArray(recentStyles)) recentStyles.unshift(below === columns ? "below-columns" : "below-cards");
     items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
       headedPanel(exhibits[0], item, `${id}-exhibit`, false),
-      { id: `${id}-below`, ...(belowHeading ? { heading: belowHeading } : {}), layout: "flow.row", size: HUG, items: columns },
+      { id: `${id}-below`, ...(belowHeading ? { heading: belowHeading } : {}),
+        layout: below === columns ? "flow.row" : "flow.column", size: HUG, items: below },
     ] });
   } else if (layout === "hero-number") {
     // One figure carries the page: the number set large with its explanation,
@@ -2662,6 +2829,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   if (["exhibit-full", "table-halves", "split-tone"].includes(layout) && slide.points?.length) {
     items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
   }
+  // Authored prose on a full-width page goes under the evidence, for the same
+  // reason the points do: the page was given the words, so the page prints them.
+  if (["exhibit-full", "metrics-over-exhibit", "table-halves", "split-tone", "exhibit-top"].includes(layout)) {
+    for (const [at, text] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${at}`, component: "paragraph", props: { text }, size: HUG });
+  }
   // A reading note sits at the top of the side column when there is one,
   // otherwise as a full-width band above the content.
   if (Array.isArray(slide.metrics) && slide.metrics.length && metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
@@ -2672,7 +2844,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     if (at >= 0) row.items[at] = { id: `${id}-side-column`, layout: "flow.column", size: row.items[at].size, items: [note, { ...row.items[at], size: { width: { fr: 1 }, height: "fill" } }] };
     else items.push(note); // full-width pages: the reading aid sits under the exhibit, above the takeaway
   }
-  if (slide.soWhat) items.push(soWhatItem(slide.soWhat, `${id}-sowhat`, slide.highlight));
+  if (slide.soWhat) items.push(soWhatItem(slide.soWhat, `${id}-sowhat`, slide.highlight, !slide.callout));
   if (!items.length) throw new Error(`${id}: a slide needs an exhibit, points, paragraphs or a soWhat`);
   // A chart's unit joins its heading on one line, on every architecture. It was
   // set on `exhibit-top` alone, so the majority of chart pages - every
@@ -2759,8 +2931,21 @@ export function agendaPages(slidesIn, agenda, agendaStyle) {
   let seen = 0;
   for (const slide of slidesIn) {
     if (slide.kind === "section") {
-      if (seen === 0 || agenda !== "once") out.push({ kind: "agenda", id: `agenda-${seen + 1}`, title: seen === 0 ? "Contents" : "Agenda", items, active: seen, ...(agendaStyle ? { style: agendaStyle } : {}) });
-      out.push({ ...slide, number: numbered.get(slide) });
+      // A contents page shown once is an overview and marks nothing: the grey
+      // band on section one is a position indicator that never moves, and a
+      // reader who meets it at the front and never again reads it as "you are
+      // here" for the whole deck. A repeated contents page marks the section it
+      // introduces, which is the only reason to repeat it.
+      const repeats = agenda !== "once";
+      if (seen === 0 || repeats) {
+        out.push({ kind: "agenda", id: `agenda-${seen + 1}`, title: seen === 0 ? "Contents" : "Agenda",
+                   items, ...(repeats ? { active: seen } : {}), ...(agendaStyle ? { style: agendaStyle } : {}) });
+      }
+      // The divider carries the same list, the band one row lower each time:
+      // the contents page the reader met at the front, kept up to date. A
+      // repeated contents page already does this, so the divider leaves it be.
+      out.push({ ...slide, number: numbered.get(slide),
+                 ...(repeats ? {} : { contents: items.map((i) => i.label), contentsActive: seen }) });
       seen += 1;
     } else out.push(slide);
   }
@@ -2798,7 +2983,12 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     throw new Error(`Unknown contents: ${spec.contents}; use true, "once" or false`);
   }
   // `agenda` is the old spelling of the pair and still resolves to it.
-  const trackerMode = spec.tracker ?? (spec.sectionTabs === false ? false : spec.agenda ? "repeat-contents" : "pills");
+  // `agenda: "once"` asks for the contents page once, at the front. It used to
+  // be read here as "this deck tracks by repeating its contents page", which
+  // set `repeat-contents` and printed the page in front of every section - the
+  // opposite of what the author wrote, and of what SKILL.md says it does.
+  const trackerMode = spec.tracker ?? (spec.sectionTabs === false ? false
+    : spec.agenda && spec.agenda !== "once" ? "repeat-contents" : "pills");
   const contentsMode = spec.contents ?? (spec.agenda === "once" ? "once" : spec.agenda ? true : sections >= 2);
   const tabs = spec.sectionTabs ?? (TRACKER_NAMES.includes(trackerMode) && sections >= 2);
   // `appendix: [...]`: the source pages behind the story - the model grid, the
@@ -2828,7 +3018,7 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   for (const page of pages.flatMap(splitReadingModes).flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) {
     slides.push(composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles));
     recent.splice(4);
-    recentStyles.splice(3);
+    recentStyles.splice(9);
   }
   return {
     id: spec.id,
@@ -2913,6 +3103,24 @@ export function toDeckPlan(specIn, baseDir) {
  */
 const PLAN_WORD = (value) => (typeof value === "string" ? value.trim().split(/\s+/).filter(Boolean).length : 0);
 
+// The keys that name a thing rather than say something: an id, a type, a file,
+// a colour. Everything else an exhibit holds is words on the page.
+const NOT_PROSE = new Set(["id", "type", "kind", "icon", "path", "image", "src", "component", "variant",
+  "tone", "style", "surface", "palette", "scale", "scales", "colour", "color", "layout", "shape", "fit",
+  "align", "valign", "density", "treatment", "orientation", "position", "placement", "series", "unit"]);
+function deepWords(value, depth = 0) {
+  if (depth > 6 || value == null) return 0;
+  if (typeof value === "string") return PLAN_WORD(value);
+  if (Array.isArray(value)) return value.reduce((sum, entry) => sum + deepWords(entry, depth + 1), 0);
+  if (typeof value !== "object") return 0;
+  let words = 0;
+  for (const [key, entry] of Object.entries(value)) {
+    if (NOT_PROSE.has(key) || /(Style|Color|Colour|Id)$/.test(key)) continue;
+    words += deepWords(entry, depth + 1);
+  }
+  return words;
+}
+
 function planWords(slide) {
   let words = 0;
   const text = (value) => { words += PLAN_WORD(value); };
@@ -2940,17 +3148,16 @@ function planWords(slide) {
   rowsOf(slide.rows);
   (slide.pictures || []).forEach((picture) => { if (picture && typeof picture === "object") { text(picture.label); text(picture.text); (picture.points || []).forEach(point); } });
   (slide.columns || []).forEach((column) => text(typeof column === "string" ? column : column?.label));
+  (slide.paragraphs || []).forEach(text);
+  text(slide.text);
+  // The exhibit is walked rather than enumerated. Enumerating the fields meant
+  // reading `items` and `rows` and nothing else, so a page of quadrants, a
+  // framework of pillars, a compare of two columns and a tree of nodes each
+  // counted as zero words and were reported as thin while carrying a hundred
+  // - which taught an author to distrust the gate rather than the page.
   for (const exhibit of [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean)) {
-    text(exhibit.heading); text(exhibit.panelHeading); text(exhibit.unit);
-    (exhibit.categories || []).forEach(text);
-    (exhibit.categoryNotes || []).forEach(text);
-    (exhibit.series || []).forEach((series) => { text(series.name); words += (series.values || []).length; });
-    (Array.isArray(exhibit.columns) ? exhibit.columns : []).forEach((column) => { if (typeof column === "string") text(column); else if (column) { text(column.label); text(column.unit); text(column.group); } });
-    rowsOf(exhibit.rows);
-    (exhibit.items || []).forEach((item) => { if (typeof item === "string") text(item); else if (item) { text(item.label); text(item.text); text(item.detail); text(item.title); (item.points || []).forEach(point); } });
-    (exhibit.annotations || []).forEach((annotation) => text(annotation?.text));
-    (exhibit.periods || []).forEach((period) => text(period?.label));
-    (exhibit.events || []).forEach((event) => text(event?.label));
+    (exhibit.series || []).forEach((series) => { words += (series.values || []).length; });
+    words += deepWords(exhibit);
   }
   return words;
 }

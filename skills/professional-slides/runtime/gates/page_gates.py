@@ -33,6 +33,7 @@ import math
 import os
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import NamedTuple
 
@@ -221,6 +222,20 @@ THRESHOLDS = {
     # about a tail is for.
     "restatement_max": 0.47,
     "restatement_words_min": 12,  # below this the overlap is noise, not a pattern
+    # One block is read on its own, so it is judged on its own, and a sentence
+    # is shorter than a column: six content words is a sentence with something
+    # in it. The bar is higher than the column's, because a short sentence that
+    # names two categories shares their words by naming them - "asset
+    # valuations and public debt sit mid-table and moved little" is a reading,
+    # not a restatement, and runs 0.57 on a reference page. Past two thirds
+    # there is nothing left in the sentence that the exhibit did not supply.
+    "restatement_block_words_min": 6,
+    "restatement_block_max": 0.66,
+    # One table device on more than three quarters of a deck's tables is one
+    # decision made once. Measured where there are enough tables to have a
+    # pattern at all.
+    "table_device_share_max": 0.6,
+    "table_device_from": 4,
     "caveats_max": 2,           # caveat lines per page; the reference decks run at most two, the deck that failed ran three plus a table row plus a note
     "schema_repeat_max": 3,     # pages that may open their table with the same column headers (the deck that failed ran fourteen)
     # What a deck DOES, measured over its own pages against 122 pages of real
@@ -428,6 +443,7 @@ GATE_CODES = {
     "TABLE_SCHEMA_FLAT": "the same table invented over and over across the deck",
     "CONTRADICTED_SHARE": "a percentage in the prose the page's own counts do not give",
     "DECK_CRAFT": "the deck emphasises, sources or comments at a rate real client decks do not",
+    "UNSCALED_FIGURE": "a figure drawn to a scale its own printed numbers contradict",
 }
 
 # Findings raised before the page is rendered: the composer's plan-time budget
@@ -1275,6 +1291,65 @@ def gate_unannotated(slide_no, slide, findings):
     ))
 
 
+# A figure that draws a baseline or an axis has said it is a plot, and a plot's
+# marks are read as sizes. `steps`, `funnel`, `process` and the rest draw equal
+# blocks on purpose - they say order, not magnitude - which is right until the
+# author prints quantities on them.
+FIGURE_GROUND = re.compile(r"^([a-z]+)-(baseline|axis|rail)$")
+QUANTITY = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(min(?:ute)?s?|hours?|hrs?|days?|weeks?|months?|years?"
+                      r"|%|bn|m|k|pts?|points?|films?|people|staff|sites?|stores?)\b", re.I)
+
+
+def gate_unscaled_figure(slide_no, slide, findings):
+    """UNSCALED_FIGURE. Equal blocks under an axis, with unequal numbers on them.
+
+    Page 37 of a cold run: a five-step staircase inside a plot frame with a
+    baseline, its blocks all 76px tall, labelled 126, 143, 136, 148 and 330
+    minutes. The 330-minute payoff was drawn the same size as the 126-minute
+    opener. Every gate passed it, because no gate asked whether a figure's
+    geometry agrees with its own labels - and a reader who notices reads every
+    other figure in the deck twice.
+
+    The answer is not to scale a staircase: a staircase says sequence. It is to
+    take the quantities off it and draw them where size means something, or to
+    drop the plot furniture so the figure stops claiming to be one.
+    """
+    nodes = slide.get("nodes", [])
+    families = {m.group(1) for m in (FIGURE_GROUND.match(str(n.get("role") or "")) for n in nodes) if m}
+    for family in sorted(families):
+        blocks = [n for n in nodes if str(n.get("role") or "") == f"{family}-block" and n.get("type") != "text"]
+        if len(blocks) < 3:
+            continue
+        sizes = {(round((n.get("frame") or {}).get("width", 0)), round((n.get("frame") or {}).get("height", 0)))
+                 for n in blocks}
+        if len(sizes) > 1:
+            continue  # the figure draws its marks to something
+        values = {}
+        for node in nodes:
+            role = str(node.get("role") or "")
+            if not role.startswith(f"{family}-") or node.get("type") != "text":
+                continue
+            match = QUANTITY.search(source_text(node))
+            if match:
+                values.setdefault(match.group(2).lower(), []).append(float(match.group(1).replace(",", "")))
+        for unit, found in values.items():
+            if len(found) < 3 or min(found) <= 0:
+                continue
+            if max(found) / min(found) < 1.5:
+                continue
+            findings.append(finding(
+                slide_no, "UNSCALED_FIGURE",
+                {"figure": family, "blocks": len(blocks), "values": sorted(found)[:6], "unit": unit},
+                f"{max(found):g} drawn larger than {min(found):g}",
+                f"This figure draws {len(blocks)} blocks at one size and prints {min(found):g} on one and "
+                f"{max(found):g} on another, under its own baseline. A reader reads size as quantity, so the "
+                "page says two different things at once. Either take the quantities off the figure and let it "
+                "say what it is for - the order of the steps - and draw the numbers as a chart beside it, or "
+                "use a chart here instead: this figure cannot draw them.",
+            ))
+            break
+
+
 def gate_heading_wraps(slide_no, slide, findings):
     """HEADING_WRAPS. The exhibit banner is one line: the measure, the population
     and the period, with the unit inline after it. Two lines means the heading is
@@ -1421,14 +1496,32 @@ def gate_restatement(slide_no, slide, findings):
     commentary, exhibit = page_voices(slide)
     if not commentary or not exhibit:
         return
-    said, shown = content_words(" ".join(commentary)), content_words(" ".join(exhibit))
-    if len(said) < THRESHOLDS["restatement_words_min"] or len(shown) < THRESHOLDS["restatement_words_min"]:
+    shown = content_words(" ".join(exhibit))
+    if len(shown) < THRESHOLDS["restatement_words_min"]:
         return
-    share = len(said & shown) / len(said)
-    if share <= THRESHOLDS["restatement_max"]:
+    # Pooled, a column dilutes itself: three sentences of restatement and a
+    # fourth that says something new average out under the threshold, and the
+    # page ships with a block headed "Six of the twelve are DC" beside a chart
+    # whose labels are tagged "(DC)". A commentary block is read on its own, so
+    # it is measured on its own, and the page is reported on its worst one.
+    said = content_words(" ".join(commentary))
+    share = len(said & shown) / len(said) if said else 0.0
+    quoted = " ".join(commentary)[:70]
+    pooled = len(said) >= THRESHOLDS["restatement_words_min"] and share > THRESHOLDS["restatement_max"]
+    # Pooled, a column dilutes itself: three blocks that say something new and
+    # one that reads the table back average out under the threshold, and the
+    # page ships with the one block a reader stops at. A block is read on its
+    # own, so it is also measured on its own, against a higher bar.
+    blocks = [(block, content_words(block)) for block in commentary]
+    measurable = [(block, words) for block, words in blocks
+                  if len(words) >= THRESHOLDS["restatement_block_words_min"]]
+    worst = max(measurable, key=lambda entry: len(entry[1] & shown) / len(entry[1]), default=None)
+    if worst and len(worst[1] & shown) / len(worst[1]) > THRESHOLDS["restatement_block_max"] and not pooled:
+        share, quoted = len(worst[1] & shown) / len(worst[1]), worst[0][:70]
+    elif not pooled:
         return
     findings.append(finding(
-        slide_no, "RESTATEMENT", round(share, 2), THRESHOLDS["restatement_max"],
+        slide_no, "RESTATEMENT", {"share": round(share, 2), "block": quoted}, THRESHOLDS["restatement_max"],
         "The commentary is built from the exhibit's own words, so the reader learns "
         "nothing by reading it. Say what the exhibit cannot: what follows from the "
         "number, what it costs, which option it settles, what would change it. If "
@@ -1816,14 +1909,33 @@ def gate_deck_craft(slides, analytical, findings):
     treated = rate(tables, TREATED_ROLE)
     annotated = rate(charts, ANNOTATED_ROLE, recoloured=True)
 
+    # Treated is not the same as varied. A deck can carry a device on every
+    # table and still read as one table repeated, because the device is the
+    # same one: nine of fourteen tables in the cold run drew the implication
+    # gutter, and the reader stopped seeing it. The vocabulary is wide - a
+    # gutter, a tinted conclusion, filled category cells, banded rows, status
+    # pills, harvey balls, in-cell bars - and a deck that uses one of them
+    # everywhere has chosen once.
+    # Banding is not a choice: a grid past five rows bands itself so the reader
+    # keeps their place, and client work bands nearly everything. What counts
+    # here is the device the author chose - the gutter, the pills, the balls,
+    # the bars, the filled category cells.
+    chosen = []
+    for slide in tables:
+        used = {TREATED_ROLE.match(r).group(0) for r in roles(slide) if TREATED_ROLE.match(r)}
+        chosen.extend(sorted(d for d in used if not d.endswith(("zebra-band", "row-band"))))
+    commonest = max(Counter(chosen).values()) / float(len(tables)) if chosen and tables else None
+
     craft = CONTRACT["plan"]["craft"]
     measured = {"highlight": round(highlighted, 3), "source": round(sourced, 3),
                 "marksPerPage": round(marks, 1),
                 "tablesTreated": None if treated is None else round(treated, 3),
-                "chartsAnnotated": None if annotated is None else round(annotated, 3)}
+                "chartsAnnotated": None if annotated is None else round(annotated, 3),
+                "commonestTableDevice": None if commonest is None else round(commonest, 3)}
     want = {"highlight": THRESHOLDS["highlight_share_min"], "source": THRESHOLDS["source_share_min"],
             "marksPerPage": THRESHOLDS["marks_per_page_min"],
-            "tablesTreated": craft["tableTreated"]["min"], "chartsAnnotated": craft["chartAnnotated"]["min"]}
+            "tablesTreated": craft["tableTreated"]["min"], "chartsAnnotated": craft["chartAnnotated"]["min"],
+            "commonestTableDevice": THRESHOLDS["table_device_share_max"]}
     client = REFERENCE_JUDGED
     short = []
     if highlighted < want["highlight"]:
@@ -1845,6 +1957,12 @@ def gate_deck_craft(slides, analytical, findings):
             f"{annotated:.0%} of the charts carry a mark that states the finding against "
             f"{craft['chartAnnotated']['observedClient']:.0%} in client work. A bracket between the two series the "
             "title compares, a change bubble, a reference line at the target, a shaded period, a recoloured category")
+    if (commonest is not None and len(tables) >= THRESHOLDS["table_device_from"]
+            and commonest > want["commonestTableDevice"]):
+        short.append(
+            f"{commonest:.0%} of the {len(tables)} tables carry the same device. A treatment repeated on every "
+            "table is furniture: rotate the vocabulary - the implication gutter on one, the conclusion cell "
+            "tinted on the next, filled category cells on the third, banded rows where the table is a list")
     if marks < want["marksPerPage"]:
         short.append(
             f"{marks:.0f} drawn elements a page against a corpus median of {REFERENCE_PAGE['drawings']}. A page "
@@ -2364,6 +2482,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_thin_page(slide_no, slide, findings)
             if wanted("UNSOURCED_PICTURE"):
                 gate_unsourced_picture(slide_no, slide, findings)
+            if wanted("UNSCALED_FIGURE"):
+                gate_unscaled_figure(slide_no, slide, findings)
             if wanted("THIN_COLUMN") or wanted("POINT_DEPTH"):
                 page = []
                 gate_thin_column(slide_no, slide, page)

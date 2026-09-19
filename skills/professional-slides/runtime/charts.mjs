@@ -202,7 +202,10 @@ const REGION_HIGHLIGHT_BLOCK_PAD = 12;
 function normalizedHighlights(props, { categories = [], series = [], allowBar = false } = {}) {
   const highlights = props.highlights || [];
   if (!Array.isArray(highlights)) throw new Error("Chart highlights must be an array");
-  if (highlights.length > 1) throw new Error("Use one primary chart highlight mechanism");
+  // One highlight, on purpose: a chart that marks three categories has marked
+  // none of them. To draw attention to several, sort the chart so they group,
+  // or name each one with `annotations`, which says why it is worth looking at.
+  if (highlights.length > 1) throw new Error("Use one primary chart highlight mechanism: one `highlights` entry marks the category the page is about. For several, sort the chart so they group, or name each with `annotations`");
   const seriesNames = series.map(item => typeof item === "string" ? item : item.name);
   return highlights.map((highlight) => {
     if (!highlight || typeof highlight.category !== "string" || !categories.includes(highlight.category)) throw new Error("Chart highlight references an unknown category");
@@ -1251,6 +1254,15 @@ function waterfall({ id, frame, props }) {
   // Reserve a label row below negative endpoints, above category labels.
   plot.height -= 30;
   if (plot.height < 100) throw new Error("Waterfall needs room for endpoint labels");
+  // The category labels are measured against the slot they have and wrap into
+  // it. Set unmeasured at the slot's width, a label longer than its slot prints
+  // straight over its neighbours - which is how "Superman (2025)", "Other DC
+  // features" and "All DC features" became one unreadable line - and the band
+  // below the plot has to be as tall as the labels that go in it.
+  const categorySpan = plot.width / props.categories.length;
+  const categoryLayouts = props.categories.map((category) => measureText(String(category), categorySpan - 10, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }));
+  plot.height -= Math.max(0, Math.max(...categoryLayouts.map((layout) => layout.height)) - 28);
+  if (plot.height < 100) throw new Error("Waterfall category labels leave no room for the plot; shorten them or use fewer steps");
   const running = [];
   let total = 0;
   props.values.forEach((value, index) => {
@@ -1282,7 +1294,8 @@ function waterfall({ id, frame, props }) {
     pointMap.set(`value:${category}`, point);
     pointMap.set(`category:${category}`, point);
     categoryMap.set(category, { x: bar.x, y: plot.y, width: bar.width, height: plot.height });
-    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * span, y: plot.y + plot.height + 38, width: span, height: 28 }, text: category, style: textStyle(AXIS_LABEL, INK) }));
+    const layout = categoryLayouts[index];
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * span + 5, y: plot.y + plot.height + 38, width: span - 10, height: layout.height }, text: layout.text, style: { ...textStyle(AXIS_LABEL, INK, false, "center"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
     previous = end;
   });
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale });

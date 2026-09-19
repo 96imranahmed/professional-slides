@@ -343,7 +343,7 @@ function sectionHeadingNodes({ id, frame, props = {} }) {
   // rule under nothing is a rule under nothing. The height stays reserved
   // either way, which is the whole reason the blank band exists.
   if (!String(props.heading ?? props.text ?? "").trim()) return [];
-  const showRule = props.rule !== false;
+  const showRule = props.rule !== false && props.headingRule !== false;
   const nodes = [textPrimitive({
     id: stableId(id, "heading"),
     role: "section-heading",
@@ -641,8 +641,11 @@ function bodyListNodes({ id, frame, props }) {
       const label = layout.marker === "letter" ? String.fromCharCode(64 + Number(m.item.number || index + 1)) : m.item.number;
       nodes.push(...numberMarker({ id: stableId(id, "marker", index), role: "list-marker", x: frame.x, y: Math.max(y, lineCentre - layout.markerSize / 2), size: layout.markerSize, number: label, reverse: inverse || hollow }));
     } else if (layout.marker === "rule") {
-      // A hairline between items, not a mark beside them.
-      if (index > 0) nodes.push(rectPrimitive({ id: stableId(id, "rule", index), role: "list-rule", frame: { x: frame.x, y: y - layout.gap / 2, width: frame.width, height: 1 }, style: boxStyle(RULE, RULE, HAIRLINE, token("radius.none")) }));
+      // Nothing. This style used to draw a hairline between every item, with a
+      // full item gap either side of it, so three sentences came out as three
+      // ruled boxes with more rule than reason. The gap already separates them;
+      // the rule only adds noise and the extra air makes the page read loose.
+
     } else if (layout.marker === "none") {
       // Nothing in the gutter; the lead carries the item.
     } else if (layout.marker === "check") {
@@ -652,7 +655,17 @@ function bodyListNodes({ id, frame, props }) {
       // glyph sits on the first line, the way a reference icon list reads down
       // a column whose items run to three and four lines.
       const iconY = layout.ringed ? mid - layout.markerSize / 2 : Math.max(y, lineCentre - layout.markerSize / 2);
-      nodes.push(...iconMarker({ id: stableId(id, "marker", index), role: "list-icon", x: frame.x, y: iconY, size: layout.markerSize, icon: m.item.icon || "info", tone: inverse ? "inverse" : layout.ringed ? "outline" : "accent" }));
+      // A RINGED marker is a marker, not the finding. Drawn in the house
+      // primary it is a column of blue discs down the left of three sentences,
+      // louder than the highlighted phrase inside them and saying nothing - so
+      // the ring is a hairline and its glyph secondary. A bare glyph with no
+      // ring keeps the accent: there it is the only mark the item has - but
+      // only where the author named it. An item with no icon of its own falls
+      // back to an "i" in a circle, and three of those down a column in the
+      // house accent are three blue marks louder than the phrase they sit
+      // beside, saying nothing the list did not already say. Unauthored, the
+      // fallback is secondary.
+      nodes.push(...iconMarker({ id: stableId(id, "marker", index), role: "list-icon", x: frame.x, y: iconY, size: layout.markerSize, icon: m.item.icon || "info", tone: inverse ? "inverse" : layout.ringed || !m.item.icon ? "muted" : "accent" }));
     }
     let ty = layout.ringed && m.textHeight < m.height ? y + (m.height - m.textHeight) / 2 : y;
     if (m.lead) {
@@ -1131,9 +1144,9 @@ function registerCore(registry) {
       if (date) { y += gap; nodes.push(textPrimitive({ id: stableId(id, "date"), role: "cover-date", frame: { x, y, width, height: date.height }, text: date.text, style: { ...textStyle(BODY, secondary, false, "left", "top"), lineHeight: date.lineHeight, wrap: false }, data: { textLayout: date } })); }
       return { nodes };
     } }),
-    component({ id: "section-divider", category: "navigation", role: "divider", tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.onPrimary", "color.accent", "font.display", "font.body", "type.deckTitle", "type.heading", "type.sectionNumber", "line.hairline", "radius.none", "space.3", "space.4", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { title: "(Insert section title)" }, render: ({ id, frame, props }) => {
+    component({ id: "section-divider", category: "navigation", role: "divider", tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.onPrimary", "color.accent", "color.chartGrid", "color.componentPrimaryTint", "color.textSecondary", "font.display", "font.body", "type.deckTitle", "type.heading", "type.body", "type.sectionNumber", "line.hairline", "radius.none", "radius.small", "space.3", "space.4", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { title: "(Insert section title)" }, render: ({ id, frame, props }) => {
       if (typeof props.title !== "string" || !props.title.trim()) throw new Error("Section divider requires a section title");
-      for (const key of Object.keys(props)) if (!["title", "subtitle", "sectionId", "style", "mode", "pageTemplate", "source", "note", "companyName", "pageNumber", "footerLeft", "footerRight", "headerBandHeight", "panelWidth"].includes(key)) throw new Error(`Unknown section-divider setting: ${key}; dividers have one title, an optional subtitle and section id, and page furniture`);
+      for (const key of Object.keys(props)) if (!["title", "subtitle", "sectionId", "style", "mode", "contents", "contentsActive", "pageTemplate", "source", "note", "companyName", "pageNumber", "footerLeft", "footerRight", "headerBandHeight", "panelWidth"].includes(key)) throw new Error(`Unknown section-divider setting: ${key}; dividers have one title, an optional subtitle and section id, the deck's contents, and page furniture`);
       const inverse = (props.mode ?? "dark") === "dark";
       const dividerStyle = props.style ?? "plain";
       if (!["plain", "numbered"].includes(dividerStyle)) throw new Error(`Unknown section-divider style: ${dividerStyle}`);
@@ -1143,7 +1156,18 @@ function registerCore(registry) {
       // `panelWidth`; the numeral then sits above the title instead of at the right.
       const panelWidth = props.panelWidth ?? null;
       const surfaceFrame = panelWidth ? { ...frame, width: panelWidth } : frame;
-      const width = panelWidth ? panelWidth - CHROME.left - 24 : dividerStyle === "numbered" ? frame.width * 0.58 - CHROME.left : frame.width - CHROME.left - CHROME.right;
+      // The deck's contents down the right, the section this page opens on a
+      // band: a reader who met the contents page at the front sees the same
+      // list again with the band one row lower. A tracker that never moves is
+      // not a tracker, and a contents page shown once and never again leaves
+      // the reader to keep the place themselves. With a photograph beside the
+      // divider there is no room for it, and it is dropped.
+      const contents = !panelWidth && Array.isArray(props.contents) && props.contents.length >= 2
+        ? props.contents.map((entry) => String(entry?.label ?? entry ?? "").trim()).filter(Boolean) : [];
+      const contentsActive = Number.isInteger(props.contentsActive) ? props.contentsActive : -1;
+      const railX = frame.x + Math.round(frame.width * 0.62), railWidth = frame.width - railX - CHROME.right;
+      const width = contents.length ? railX - CHROME.left - frame.x - 48
+        : panelWidth ? panelWidth - CHROME.left - 24 : dividerStyle === "numbered" ? frame.width * 0.58 - CHROME.left : frame.width - CHROME.left - CHROME.right;
       const title = measureText(props.title, width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")), bold: true, wrapWidthRatio: 1 });
       if (title.lines.length > (panelWidth ? 3 : 2) || title.height > frame.height - 2 * CHROME.bodyTop) throw new Error("Section divider title exceeds its allocated space");
       const background = inverse ? INK : token("color.canvas"), foreground = inverse ? WHITE : INK;
@@ -1155,13 +1179,28 @@ function registerCore(registry) {
       const ruleGap = tokenValue(token("space.4")), subGap = tokenValue(token("space.3"));
       // The title holds the page's centre line; the accent bar sits above it and the summary below.
       const titleTop = frame.y + (frame.height - title.height) / 2;
+      const rail = [];
+      if (contents.length) {
+        const rowGap = 10, muted = inverse ? token("color.chartGrid") : SECONDARY;
+        const measured = contents.map((label, index) => measureText(label, railWidth - 24, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.body")), bold: index === contentsActive, wrapWidthRatio: 1 }));
+        const heights = measured.map((m) => m.height + 14);
+        const block = heights.reduce((sum, h) => sum + h, 0) + rowGap * (contents.length - 1);
+        let rowY = frame.y + (frame.height - block) / 2;
+        contents.forEach((label, index) => {
+          const active = index === contentsActive, rid = stableId(id, "contents", index);
+          if (active) rail.push(rectPrimitive({ id: stableId(rid, "band"), role: "divider-contents-active", frame: { x: railX - 12, y: rowY, width: railWidth + 12, height: heights[index] }, style: boxStyle(inverse ? token("color.componentPrimaryTint") : PRIMARY_TINT, "none", HAIRLINE, token("radius.small")), data: { index } }));
+          rail.push(textPrimitive({ id: stableId(rid, "label"), role: "divider-contents", frame: { x: railX, y: rowY + 7, width: railWidth - 24, height: measured[index].height }, text: measured[index].text, style: { ...textStyle(token("type.body"), active ? INK : muted, active, "left", "top"), lineHeight: measured[index].lineHeight, wrap: false }, data: { index, active, textLayout: measured[index] } }));
+          rowY += heights[index] + rowGap;
+        });
+      }
       return { ...page, nodes: [
         rectPrimitive({ id: stableId(id, "surface"), role: "divider-surface", frame: surfaceFrame, style: boxStyle(background, background, HAIRLINE, token("radius.none")) }),
         rectPrimitive({ id: stableId(id, "accent-bar"), role: "divider-accent", frame: { x: frame.x + CHROME.left, y: titleTop - ruleGap - 4, width: 64, height: 4 }, style: boxStyle(token("color.accent"), "none", HAIRLINE, token("radius.none")) }),
         textPrimitive({ id: stableId(id, "title"), role: "divider-title", frame: { x: frame.x + CHROME.left, y: titleTop, width, height: title.height }, text: title.text, style: { ...textStyle(token("type.deckTitle"), foreground, true, "left", "top"), fontFamily: DISPLAY, lineHeight: title.lineHeight, wrap: false }, data: { textLayout: title } }),
         ...(subtitle ? [textPrimitive({ id: stableId(id, "subtitle"), role: "divider-subtitle", frame: { x: frame.x + CHROME.left, y: titleTop + title.height + subGap, width, height: subtitle.height }, text: subtitle.text, style: { ...textStyle(token("type.heading"), foreground, false, "left", "top"), lineHeight: subtitle.lineHeight, wrap: false }, data: { textLayout: subtitle } })] : []),
-        ...(dividerStyle === "numbered" && panelWidth ? [textPrimitive({ id: stableId(id, "number"), role: "divider-number", frame: { x: frame.x + CHROME.left, y: frame.y + 48, width, height: Math.max(80, titleTop - ruleGap - 24 - (frame.y + 48)) }, text: String(props.sectionId), style: { ...textStyle(token("type.sectionNumber"), inverse ? WHITE : PRIMARY, true, "left", "bottom"), fontFamily: DISPLAY }, data: { sectionId: String(props.sectionId), dividerStyle } })] : []),
-        ...(dividerStyle === "numbered" && !panelWidth ? [textPrimitive({ id: stableId(id, "number"), role: "divider-number", frame: { x: frame.x + frame.width * 0.67, y: frame.y + 110, width: frame.width * 0.25, height: frame.height - 220 }, text: String(props.sectionId), style: { ...textStyle(token("type.sectionNumber"), inverse ? WHITE : PRIMARY, true, "center", "mid"), fontFamily: DISPLAY }, data: { sectionId: String(props.sectionId), dividerStyle } })] : []),
+        ...(dividerStyle === "numbered" && (panelWidth || contents.length) ? [textPrimitive({ id: stableId(id, "number"), role: "divider-number", frame: { x: frame.x + CHROME.left, y: frame.y + 48, width, height: Math.max(80, titleTop - ruleGap - 24 - (frame.y + 48)) }, text: String(props.sectionId), style: { ...textStyle(token("type.sectionNumber"), inverse ? WHITE : PRIMARY, true, "left", "bottom"), fontFamily: DISPLAY }, data: { sectionId: String(props.sectionId), dividerStyle } })] : []),
+        ...(dividerStyle === "numbered" && !panelWidth && !contents.length ? [textPrimitive({ id: stableId(id, "number"), role: "divider-number", frame: { x: frame.x + frame.width * 0.67, y: frame.y + 110, width: frame.width * 0.25, height: frame.height - 220 }, text: String(props.sectionId), style: { ...textStyle(token("type.sectionNumber"), inverse ? WHITE : PRIMARY, true, "center", "mid"), fontFamily: DISPLAY }, data: { sectionId: String(props.sectionId), dividerStyle } })] : []),
+        ...rail,
         ...page.nodes
       ] };
     } }),

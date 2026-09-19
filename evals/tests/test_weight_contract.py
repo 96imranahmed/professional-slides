@@ -114,9 +114,15 @@ class GateVocabularyTests(unittest.TestCase):
     def test_no_document_names_a_gate_that_does_not_exist(self):
         # The model reviewer keeps its own vocabulary, read from its module.
         reviewer = set(re.findall(r"^  ([A-Z][A-Z_]{3,}):", (SKILL / "runtime" / "reviewer.mjs").read_text(encoding="utf-8"), re.M))
+        # The plan and content stages keep their vocabularies in their own
+        # modules, and the docs that teach those stages name them.
+        stages = set()
+        for module in ("plan_gates.mjs", "content_gates.mjs"):
+            source = (SKILL / "runtime" / "gates" / module).read_text(encoding="utf-8")
+            stages |= set(re.findall(r"^  ([A-Z][A-Z_]{3,}):", source, re.M))
         # Runtime constants that are named in the docs and are not codes.
         constants = {"LABEL_HEADROOM", "RUNTIME_PYTHON"}
-        allowed = set(page_gates.GATE_CODES) | set(page_gates.COMPOSE_CODES) | reviewer | constants
+        allowed = set(page_gates.GATE_CODES) | set(page_gates.COMPOSE_CODES) | reviewer | stages | constants
         shaped = re.compile(r"`([A-Z][A-Z_]{3,})`")
         for path in sorted(SKILL.rglob("*.md")):
             named = set(shaped.findall(path.read_text(encoding="utf-8")))

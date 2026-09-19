@@ -121,7 +121,23 @@ class RestatementTests(unittest.TestCase):
                 text("list-item", "The surviving ensemble responds to consequences already established.")]
         findings = run(page_gates.gate_restatement, 35, page(self.EXHIBIT + said))
         self.assertEqual([f["code"] for f in findings], ["RESTATEMENT"])
-        self.assertGreater(findings[0]["measured"], page_gates.THRESHOLDS["restatement_max"])
+        self.assertGreater(findings[0]["measured"]["share"], page_gates.THRESHOLDS["restatement_max"])
+        # The page is reported on the block a reader would read, not on a pooled
+        # average over the column.
+        self.assertIn("Marvel describes", findings[0]["measured"]["block"])
+
+    def test_one_restating_block_is_not_diluted_by_the_ones_around_it(self):
+        """Three sentences that bring their own words and one that reads the
+        table back pooled out to 0.33 and passed. A reader does not average a
+        column; they read the block, and the block says nothing."""
+        said = [text("list-item", "Twenty-two films of prior investment is the price of admission, "
+                                  "and it is charged to every newcomer who arrives at the finale first."),
+                text("list-item", "Budget the onboarding: a viewer who starts here needs ninety minutes "
+                                  "of catch-up before the opening scene lands."),
+                text("list-item", "Thanos's earlier action supplies the problem confronting the remaining Avengers.")]
+        findings = run(page_gates.gate_restatement, 35, page(self.EXHIBIT + said))
+        self.assertEqual([f["code"] for f in findings], ["RESTATEMENT"])
+        self.assertIn("Thanos", findings[0]["measured"]["block"])
 
     def test_commentary_that_brings_its_own_words_passes(self):
         said = [text("list-item", "Twenty-two films of prior investment is the price of admission, "

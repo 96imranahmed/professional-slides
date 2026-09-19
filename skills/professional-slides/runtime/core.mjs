@@ -361,8 +361,8 @@ export function assertSectionHeadingProps(props = {}) {
 export function section(options) {
   assertSectionHeadingProps(options);
   // Open sections keep the grid's left and right edges; boxed sections pad inward.
-  const { id, treatment = "open", edge = "contained", heading = null, padding = treatment === "open" ? 0 : token("space.4"), children = [], composition = null, size = {}, cell = null, frame = null } = options;
-  return { nodeType: "section", id, treatment, edge, heading, padding, children, composition, size, cell, frame };
+  const { id, treatment = "open", edge = "contained", heading = null, headingRule, padding = treatment === "open" ? 0 : token("space.4"), children = [], composition = null, size = {}, cell = null, frame = null } = options;
+  return { nodeType: "section", id, treatment, edge, heading, headingRule, padding, children, composition, size, cell, frame };
 }
 
 function resolveLength(value, available, preferred = 0) {
@@ -400,7 +400,9 @@ function gridTrackPreferences(node, axis, registry, widths = null) {
 function placementProps(node) {
   if (node.nodeType !== "section") return node.props || {};
   assertSectionHeadingProps(node);
-  return { treatment: node.treatment, edge: node.edge, heading: node.heading, padding: node.padding, headerBandHeight: node.headerBandHeight };
+  return { treatment: node.treatment, edge: node.edge, heading: node.heading,
+           ...(node.headingRule === false ? { headingRule: false } : {}),
+           padding: node.padding, headerBandHeight: node.headerBandHeight };
 }
 
 // Shared heading baselines consume real height. Measure that shared band before

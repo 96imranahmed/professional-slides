@@ -80,7 +80,8 @@ class DeckCraftTests(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         measured = findings[0]["measured"]
         self.assertEqual(sorted(measured),
-                         ["chartsAnnotated", "highlight", "marksPerPage", "source", "tablesTreated"])
+                         ["chartsAnnotated", "commonestTableDevice", "highlight",
+                          "marksPerPage", "source", "tablesTreated"])
         for phrase in ("emphasised", "carry a source", "drawn elements", "states the finding"):
             self.assertIn(phrase, findings[0]["repair"])
 

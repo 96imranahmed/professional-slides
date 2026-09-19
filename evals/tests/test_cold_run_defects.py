@@ -62,8 +62,13 @@ const withKpi=composeSlide({title:'T',exhibit,kpi:{value:'$232m',label:'Annual c
 assert.equal(find(withKpi.items,i=>i.id==='s01-points').props.centre,false);
 const withInsight=composeSlide({title:'T',exhibit,insight:'Where cost and prize disagree, readiness settles it.',points},0);
 assert.equal(find(withInsight.items,i=>i.id==='s01-points').props.centre,false);
-// Alone in the track the list still spreads and centres what is left over.
-const alone=composeSlide({title:'T',exhibit,points},0);
+// Under the column's own heading it also starts at the top: the points read
+// down from "What it means", and the slack belongs at the foot rather than
+// half of it between the heading rule and the first line.
+const headed=composeSlide({title:'T',exhibit,points},0);
+assert.equal(find(headed.items,i=>i.id==='s01-points').props.centre,false);
+// Alone in an unheaded track the list still spreads and centres the leftover.
+const alone=composeSlide({title:'T',exhibit,points,pointsHeading:false},0);
 const list=find(alone.items,i=>i.id==='s01-points');
 assert.equal(list.props.distribute,true); assert.equal(list.props.centre,undefined);
 console.log('{}');

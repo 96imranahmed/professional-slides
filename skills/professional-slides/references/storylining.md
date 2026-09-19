@@ -210,6 +210,50 @@ staircases has used one shape for five different relationships.
 
 **Titles set on one line.** Target eight to twelve words. The page gate's fourteen-word limit is a ceiling, not a target, and a plan written to it makes two-line titles the norm — which is what makes the title band, its rule and the content beneath sit differently on every page.
 
+### The plan file the gates read
+
+The table above is how a plan is *read*; `<stem>.plan.json` beside the spec is
+how it is *checked*, and the build runs the gates over it automatically. One
+object per page, in deck order. Every field is optional except `n` - a plan that
+records less is judged on less, never punished for the blank.
+
+```json
+{
+  "schema": "professional-slides.plan/v1",
+  "noPictures": "Every subject is a trademarked character; the deck anchors on icons instead",
+  "pages": [
+    { "n": 1, "kind": "cover" },
+    { "n": 4, "title": "Marvel's ordered run reaches a payoff DC has no equivalent for",
+      "exhibit": "chart.column", "variant": "sorted, annotated", "why": "magnitude over time",
+      "architecture": "exhibit-left", "anchors": [{ "icon": "timeline" }], "insight": "filled",
+      "highlight": "eleven hours", "rows": 8, "items": 4, "series": "market profiles" }
+  ]
+}
+```
+
+| Field | What it is | Which gate reads it |
+| --- | --- | --- |
+| `n` | the page number, matching the spec | every finding is reported against it |
+| `kind` | `cover`, `section`, `agenda`, `takeaways`; absent or `content` for an analytical page | all of them - only content pages are measured |
+| `title` | the action title you intend to write | `PLAN_TITLE_LENGTH` |
+| `exhibit` | the encoding, from the table above | `PLAN_EXHIBIT_MIX`, `PLAN_EXHIBIT_RUN`, `PLAN_EXHIBIT_VARIETY` |
+| `variant` (or `exhibitVariant`) | how it is treated: `heat`, `bubble`, `bar`, `harvey`, `verdict column`, `sorted`, `12x5` | the variety count, and `PLAN_TABLE_MONOTONY` |
+| `why` (or `reason`, `exhibitReason`) | the phrase that chose the exhibit, twelve characters or more | `PLAN_EXHIBIT_REASON`, on defaulted exhibits |
+| `architecture` (or `layout`) | `exhibit-left`, `exhibit-top`, `two-up`, `grid`, `hero-number`, … | `PLAN_STYLE_ENTROPY` |
+| `anchors` | one entry per named thing: `{ "photo": "the Bucharest centre" }` or `{ "icon": "growth" }`; `false` where the page is unanchored on purpose | `PLAN_VISUAL_ANCHOR`, `PLAN_NO_PICTURES`, `PLAN_NO_ICONS` |
+| `insight` | `filled`, `outline` or `none` | `PLAN_NO_INSIGHT` |
+| `highlight` | the phrase the reader should see first | `PLAN_NO_HIGHLIGHT` |
+| `rows` (or `shape: "8x4"`) | how deep the table is | `PLAN_TABLE_DEPTH` |
+| `items` (or `points`) | how many named things the page enumerates | `PLAN_VISUAL_ANCHOR` |
+| `treatment`, `annotation` | named table treatments and chart annotations, when they are not in `variant` | `PLAN_TABLE_MONOTONY`, `PLAN_UNANNOTATED_CHARTS` |
+| `series` | a run of pages that is one template on purpose | `PLAN_EXHIBIT_RUN`, `PLAN_STYLE_ENTROPY` - counted once |
+| `noPictures` (deck level) | why this deck carries no photograph, in a sentence | excuses `PLAN_NO_PICTURES` |
+
+`noPictures` is the honest way out of the picture floor, and the only one. A
+deck whose subjects are trademarked, confidential or abstract says so once and
+is not asked again; what it must not do is draw an empty frame and explain on
+the page that the frame stands in for a picture nobody could supply.
+
 Run `node runtime/gates/plan_gates.mjs deck.plan.json` over the machine-readable plan before writing any page. It answers in under a second, and named `<stem>.plan.json` beside the spec the build runs it for you.
 
 **Title spine test.** Read the dots alone. A decision deck should read as a clear executive memo; an explanatory deck as a coherent account. Titles state supported conclusions; explanatory headings may name a mechanism or distinction when a takeaway would overstate the page. Remove repeated claims, topic labels and unsupported certainty.

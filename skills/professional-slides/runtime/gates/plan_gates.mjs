@@ -476,17 +476,32 @@ function gateCraft(pages, findings) {
   }
 }
 
-function gateDeckWideDevices(pages, findings) {
+/**
+ * The deck-wide devices, and the one honest way out of the first of them.
+ *
+ * `noPictures` is a sentence saying why this deck carries none - the subjects
+ * are trademarked, the site is confidential, there is nothing to photograph. A
+ * deck that has a reason states it once and is not asked again. A deck that has
+ * none is asked, because the alternative to asking is what the cold run did:
+ * an author who could not photograph Marvel characters drew an empty gradient
+ * rectangle, and wrote beside it that the frame stands in for a specimen image.
+ * A placeholder with an apology beside it is worse than a page of type.
+ */
+function gateDeckWideDevices(pages, findings, plan = {}) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");
   if (content.length < PLAN.from) return;
   const anchors = content.flatMap(anchorsOf);
-  if (!anchors.some(isPhoto)) {
+  const excused = String(plan.noPictures ?? "").trim().split(/\s+/).filter(Boolean).length >= 3;
+  if (!anchors.some(isPhoto) && !excused) {
     findings.push(finding(
       null, "PLAN_NO_PICTURES",
       { pages: content.length, photographs: 0 }, 1,
       "Not one page carries a photograph. A reference page averages 29 drawn elements; a deck of type and rules " +
       "averages very few. Cover, section dividers and any page whose subject is a real place, product or person " +
-      "are the cheapest places to start.",
+      "are the cheapest places to start. If this deck genuinely has nothing it can photograph - trademarked " +
+      "subjects, a confidential site, a subject that is a number - write `noPictures` on the plan in a sentence saying why, and put " +
+      "the drawn elements into icons, marks and treated tables instead. Do not draw an empty frame and explain " +
+      "it on the page.",
     ));
   }
   if (!anchors.some(isIcon)) {
@@ -537,7 +552,7 @@ export function runPlanGates(plan) {
   gateEntropy(pages, findings);
   gateAnchors(pages, findings);
   gateCraft(pages, findings);
-  gateDeckWideDevices(pages, findings);
+  gateDeckWideDevices(pages, findings, plan);
   return report(plan, findings, pages);
 }
 

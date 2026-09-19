@@ -6,7 +6,7 @@ import { token, tokenValue, stableId, textPrimitive, ellipsePrimitive, shapePrim
 import { measureText } from "./text-layout.mjs";
 import { iconDefinition } from "./icons.mjs";
 
-export const MARK_TOKENS = Object.freeze(["color.componentPrimary", "color.accent", "color.onPrimary", "color.ink", "color.surface", "font.body", "type.compact", "type.label", "icon.medium", "line.standard", "line.hairline", "radius.round"]);
+export const MARK_TOKENS = Object.freeze(["color.componentPrimary", "color.accent", "color.onPrimary", "color.ink", "color.surface", "color.rule", "color.textSecondary", "font.body", "type.compact", "type.label", "icon.medium", "line.standard", "line.hairline", "radius.round"]);
 
 const PRIMARY = token("color.componentPrimary"), WHITE = token("color.onPrimary"), INK = token("color.ink"), SURFACE = token("color.surface");
 
@@ -35,12 +35,17 @@ export function numberMarker({ id, role = "marker", labelRole = `${role}-label`,
 export function iconMarker({ id, role = "icon", x, y, size, icon, tone = "outline", data = {} }) {
   const nodes = [];
   // outline: ring + primary glyph; filled: primary disc + white glyph; plain:
-  // primary glyph alone; inverse: white glyph alone (on a filled field).
+  // primary glyph alone; inverse: white glyph alone (on a filled field);
+  // muted: a hairline ring and a secondary glyph, for a marker that is only
+  // telling the reader where the item starts.
   const ring = tone !== "plain" && tone !== "inverse" && tone !== "accent";
   // `accent`: the glyph alone in the house accent, so an icon list reads in the
   // same colour as the phrases it highlights.
-  const strokeColor = tone === "filled" || tone === "inverse" ? WHITE : tone === "accent" ? token("color.accent") : PRIMARY;
-  if (ring) nodes.push(ellipsePrimitive({ id: stableId(id, "ring"), role: `${role}-ring`, frame: { x, y, width: size, height: size }, style: { fill: tone === "filled" ? PRIMARY : SURFACE, stroke: PRIMARY, lineWidth: token("line.standard"), radius: token("radius.round") }, data: { ...data, icon, tone } }));
+  const strokeColor = tone === "filled" || tone === "inverse" ? WHITE
+    : tone === "accent" ? token("color.accent")
+    : tone === "muted" ? token("color.textSecondary") : PRIMARY;
+  const ringStroke = tone === "muted" ? token("color.rule") : PRIMARY;
+  if (ring) nodes.push(ellipsePrimitive({ id: stableId(id, "ring"), role: `${role}-ring`, frame: { x, y, width: size, height: size }, style: { fill: tone === "filled" ? PRIMARY : SURFACE, stroke: ringStroke, lineWidth: token("line.standard"), radius: token("radius.round") }, data: { ...data, icon, tone } }));
   const definition = iconDefinition(icon);
   const inset = ring ? size * 0.24 : size * 0.06;
   const box = { x: x + inset, y: y + inset, width: size - 2 * inset, height: size - 2 * inset };
