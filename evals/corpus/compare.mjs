@@ -37,6 +37,11 @@ const TITLE_ROLES = new Set(["action-title", "section-title", "kicker", "page-ta
 const CHART = (c) => String(c).startsWith("chart.");
 const TABLE = (c) => /^(table|comparison-table|heatmap|trend-rows|insight-tree-table|matrix)$/.test(String(c));
 const PICTURE = (c) => /^(image-frame|logo-collage|people|logos)$/.test(String(c));
+// The rubric's own words: a page of type is "prose, bullets, quote blocks,
+// numbered points, tinted cards of type". So a `cards` page is a page of type,
+// and a process chain or a framework is not - the difference is whether the
+// shape carries the argument or just holds the words.
+const TYPE_IN_A_CONTAINER = (c) => /^(paragraph|bullet-list|insight|callout|statement|takeaways|cards|quote-cluster|evidence-note|panel)$/.test(String(c));
 
 const median = (values) => {
   if (!values.length) return null;
@@ -81,7 +86,7 @@ export function measureDeck(directory) {
     if (components.some(TABLE)) return "table";
     if (components.some(PICTURE)) return "picture";
     if (components.some((c) => !["chrome", "slide-chrome", "section", "page-template"].includes(c)
-                              && !/^(paragraph|bullet-list|insight|callout|statement|takeaways)$/.test(c))) return "diagram";
+                              && !TYPE_IN_A_CONTAINER(c))) return "diagram";
     return "text";
   });
   const share = (name) => families.filter((f) => f === name).length / families.length;

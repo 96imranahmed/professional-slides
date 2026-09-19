@@ -2184,25 +2184,39 @@ const SLIDE_PASSES = [
   // The count decides, which spreads a deck across all three without a rule
   // anybody has to remember: three across, four to six as a grid of three, and
   // the rest stay a list - two cards is a pair of labels and seven is a wall.
-  ["iconed-points-become-cards", (slide) => {
+  // A page whose evidence is its own prose is a page, not a grid.
+  //
+  // A quarter of published client pages carry no exhibit at all (evals/corpus),
+  // and they are a different page rather than an exhibit page with the exhibit
+  // missing: 166 words against 168, three numeric tokens against 21, a
+  // commentary column 13% of the time against 38%, and a highlighted phrase
+  // **71%** of the time. The emphasis does the work the exhibit would.
+  //
+  // The composer had no such page. Two passes stood where it should have been:
+  // one that wanted an icon AND a lead AND a text on every point - eleven
+  // conjuncts, so it essentially never fired - and one that turned led points
+  // into a `rows` table. So every page of type in every deck we make came out
+  // as a two-column grid, our text-page share reads 0% against the corpus's
+  // 25%, and `plan.mix.text` is a band nothing can satisfy.
+  //
+  // One pass now. Three to six points with a lead become cards: three across
+  // the page, four or more in a grid, icons used when the author wrote them and
+  // not required. The page keeps its standfirst and its so-what, which is what
+  // a client text page is - a numbered argument on tinted cards. Two led points
+  // are not a page of type; they are a thin page, and THIN_PAGE says so.
+  ["a-page-of-type-is-cards", (slide) => {
     const points = slide.points || [];
     if (!(!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && !slide.pictures
-        && !slide.kpi && !slide.insight && !slide.insights?.length
         && (!slide.layout || slide.layout === "auto") && !slide.pointsStyle
         && points.length >= 3 && points.length <= 6
-        && points.every((pt) => pt && typeof pt === "object" && pt.icon && pt.lead && pt.text))) return slide;
-    const items = points.map((pt) => ({ icon: pt.icon, title: pt.lead, text: pt.text }));
+        && points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && pt.state == null))) return slide;
+    const items = points.map((pt, index) => ({
+      ...(pt.icon ? { icon: pt.icon } : {}),
+      title: pt.lead, text: pt.text, number: pt.number ?? index + 1,
+    }));
     return { ...slide, points: undefined,
-      exhibit: { type: "cards", tone: "plain", items, ...(points.length > 3 ? { columns: 3 } : {}) } };
-  }],
-
-  // A text page whose points carry leads is a numbered ledger: label + text
-  // rows with rules, filling the page, rather than a list floating at the top.
-  ["led-points-become-a-ledger", (slide) => {
-    if (!(!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && !slide.pictures && (!slide.layout || slide.layout === "auto")
-        && Array.isArray(slide.points) && slide.points.length >= 2 && slide.points.length <= 6
-        && slide.points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && !pt.icon && pt.state == null))) return slide;
-    return { ...slide, points: undefined, exhibit: { type: "rows", rows: slide.points.map((pt, i) => ({ label: pt.lead, text: pt.text, number: pt.number ?? i + 1 })) } };
+      exhibit: { type: "cards", tone: "plain", items,
+                 ...(points.length > 3 ? { columns: 3 } : {}) } };
   }],
 ];
 
