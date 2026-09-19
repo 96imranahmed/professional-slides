@@ -213,10 +213,33 @@ THRESHOLDS = {
     # What the page says. Calibrated on the four example decks, which are the
     # only corpus in the repository - `--report` prints the measured value
     # beside the floor so the number can be argued with.
-    "restatement_max": 0.55,    # share of the commentary's own content words already in the exhibit (corpus median 0.25-0.36, p90 0.47)
+    # Share of the commentary's own content words already printed in the exhibit
+    # beside it. The corpus runs a median of 0.25-0.36 and a p90 of 0.47; this
+    # sat at 0.55, ABOVE the ninetieth percentile of the work it imitates, so it
+    # could not fire - and until COMMENTARY_ROLES was corrected it could not see
+    # a paragraph either. At 0.47 it flags the worst tenth, which is what a gate
+    # about a tail is for.
+    "restatement_max": 0.47,
     "restatement_words_min": 12,  # below this the overlap is noise, not a pattern
     "caveats_max": 2,           # caveat lines per page; the reference decks run at most two, the deck that failed ran three plus a table row plus a note
     "schema_repeat_max": 3,     # pages that may open their table with the same column headers (the deck that failed ran fourteen)
+    # What a deck DOES, measured over its own pages against 122 pages of real
+    # client-project work (evals/corpus). These were not measured anywhere:
+    # client decks highlight a phrase on half their pages and ours managed a
+    # fifth.
+    #
+    # A fourth rate was tried and removed: commentary columns per page, capped
+    # at the corpus's 0.33. Our decks run 0.78 to 1.00 and would all have failed
+    # it - but their commentary's own overlap with the exhibit beside it runs a
+    # median of 0.17 to 0.30 against a corpus median of 0.25 to 0.36. They talk
+    # on most pages and they are not restating. The cap was measuring the wrong
+    # thing: the defect is commentary that says the exhibit again, and
+    # RESTATEMENT measures exactly that - so RESTATEMENT is where the threshold
+    # belongs, not here. One question, one instrument.
+    "highlight_share_min": 0.35,   # client work runs 0.51, and 0.71 on pages of type
+    "source_share_min": 0.50,      # client work runs 0.67
+    "marks_per_page_min": 11,      # the corpus first quartile; its median is 32
+    "craft_from": 5,               # pages before a deck-wide rate means anything
     "schema_from": 6,           # tables in a deck before schema repetition is worth reporting
 }
 
@@ -404,6 +427,7 @@ GATE_CODES = {
     "CAVEAT_HEAVY": "a page spending more of itself on limits than on findings",
     "TABLE_SCHEMA_FLAT": "the same table invented over and over across the deck",
     "CONTRADICTED_SHARE": "a percentage in the prose the page's own counts do not give",
+    "DECK_CRAFT": "the deck emphasises, sources or comments at a rate real client decks do not",
 }
 
 # Findings raised before the page is rendered: the composer's plan-time budget
@@ -1332,8 +1356,13 @@ def gate_missing_argument(slide_no, slide, findings):
 # this set - RESTATEMENT, PLANNING_VOICE, CAVEAT_HEAVY, CONTRADICTED_SHARE -
 # was blind to every paragraph in every deck. Two role vocabularies for one
 # node, one of them invented.
+# A callout is not commentary. It is a reading note fixed to the exhibit - a
+# legend, a basis, a "read this as" - so it shares the exhibit's vocabulary by
+# design, and counting it as the page's own sentences made a chart legend read
+# as a restatement of the chart. The commentary column is what the page says for
+# itself: its points, its paragraphs, its insight.
 COMMENTARY_ROLES = {"list-item", "list-lead", "insight-body", "paragraph",
-                    "panel-caption", "callout-text", "callout-lead", "statement-text"}
+                    "panel-caption", "statement-text"}
 EXHIBIT_TEXT_ROLES = {"table-cell-text", "table-header-text", "table-group-text",
                       "data-label", "category-label", "category-note", "annotation-text",
                       "legend-label", "chart-unit", "metric-value", "metric-label",
@@ -1693,6 +1722,70 @@ def gate_image_budget(slides, analytical, findings):
             "Break the run: put a chart, a table or a framework page between "
             "picture pages so the deck keeps arguing between illustrations.",
         ))
+
+
+def gate_deck_craft(slides, analytical, findings):
+    """DECK_CRAFT. What the deck does, over its own pages, against what client
+    decks do over theirs.
+
+    Every other deck-level gate here counts shapes - how many families, how many
+    architectures, how flat the word distribution is. None of them can see the
+    four things a reader notices first, and all four are a share of pages rather
+    than a property of one:
+
+      highlight   a phrase set in the accent inside a sentence. Client decks do
+                  this on half their pages and on seven pages of type in ten.
+                  Our example decks managed 0.05 to 0.22.
+      source      the line that says where the numbers came from. 0.67 in client
+                  work; a page without one is a page a reader cannot check.
+      marks       drawn primitives that are not type, per page. The corpus runs
+                  a median of 32 and a first quartile of 11.
+
+    One finding, three rates, so the report says what the deck is like rather
+    than repeating one complaint per page.
+    """
+    if len(analytical) < THRESHOLDS["craft_from"]:
+        return
+    pages = [slides[i] for i in analytical]
+    total = len(pages)
+
+    def share(test):
+        return sum(1 for slide in pages if test(slide)) / float(total)
+
+    def roles(slide):
+        return {str(n.get("role") or "") for n in slide.get("nodes", [])}
+
+    highlighted = share(lambda s: any(
+        n.get("runs") and any(r.get("accent") or r.get("bold") for r in n["runs"])
+        for n in s.get("nodes", [])))
+    sourced = share(lambda s: bool(roles(s) & SOURCE_ROLES))
+    marks = sum(len([n for n in s.get("nodes", []) if n.get("type") != "text"]) for s in pages) / float(total)
+
+    measured = {"highlight": round(highlighted, 3), "source": round(sourced, 3),
+                "marksPerPage": round(marks, 1)}
+    want = {"highlight": THRESHOLDS["highlight_share_min"], "source": THRESHOLDS["source_share_min"],
+            "marksPerPage": THRESHOLDS["marks_per_page_min"]}
+    client = REFERENCE_JUDGED
+    short = []
+    if highlighted < want["highlight"]:
+        short.append(
+            f"a phrase is emphasised on {highlighted:.0%} of pages against {client['highlightedPhrase']:.0%} in "
+            "client decks. Name the phrase the reader should see first and set it in the accent inside the "
+            "sentence - `highlight` on the page, or an accent run on the point")
+    if sourced < want["source"]:
+        short.append(
+            f"only {sourced:.0%} of pages carry a source against {client['sourceLine']:.0%}. A measured page "
+            "says where the measure came from")
+    if marks < want["marksPerPage"]:
+        short.append(
+            f"{marks:.0f} drawn elements a page against a corpus median of {REFERENCE_PAGE['drawings']}. A page "
+            "of rules and paragraphs is what a reader feels before reading a word")
+    if not short:
+        return
+    findings.append(finding(
+        None, "DECK_CRAFT", measured, want,
+        "This deck does not work its pages the way a client deck does: " + "; ".join(short) + ".",
+    ))
 
 
 def gate_evidence_mix(slides, analytical, findings):
@@ -2240,6 +2333,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         gate_image_budget(slides, content_indexes, findings)
     if not gates or gates & {"EVIDENCE_MIX", "PAGE_VARIETY"}:
         gate_evidence_mix(slides, content_indexes, findings)
+    if not gates or "DECK_CRAFT" in gates:
+        gate_deck_craft(slides, content_indexes, findings)
     if not gates or "NO_SECTIONS" in gates:
         gate_deck_structure(slides, content_indexes, findings)
     if not gates or "NO_CONTENTS" in gates or "NO_SUMMARY" in gates:

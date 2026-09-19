@@ -59,8 +59,18 @@ def page(n, **over):
     return base
 
 
+# The governing question and answer the claims above add up to. A content plan
+# without them is a set of proofs for a promise nobody wrote down, which is what
+# CONTENT_ANSWER_UNCARRIED exists to catch - so the fixture carries them, and
+# the gate's own test removes them deliberately.
+QUESTION = "Which markets go in the first wave, and what opens the second?"
+ANSWER = ("Readiness decides the first wave and three markets carry it; the committee approves a "
+          "gate at month seven rather than an eighteen-month sequence.")
+
+
 def deck(pages, **over):
-    return {"schema": "professional-slides.content/v1", "id": "t", "pages": pages, **over}
+    return {"schema": "professional-slides.content/v1", "id": "t",
+            "question": QUESTION, "answer": ANSWER, "pages": pages, **over}
 
 
 class ClaimTests(unittest.TestCase):
@@ -150,6 +160,25 @@ class SeparationTests(unittest.TestCase):
         report = gate(deck([page(i) for i in range(1, 13)]))
         self.assertEqual(report["findings"], [])
         self.assertTrue(report["accepted"])
+
+    def test_a_deck_whose_answer_no_claim_carries_is_reported(self):
+        """The deck promises something none of its pages proves.
+
+        This is what `slideworks` did: an answer naming a decline concentrated
+        in repriced technology and governance deciding a deployment's reach,
+        over nine claims that between them said neither word. Coverage 0.13.
+        """
+        report = gate(deck([page(i) for i in range(1, 13)],
+                           answer="Latency in the Bucharest servicing centre is what caps renewals"))
+        finding = next(f for f in report["findings"] if f["code"] == "CONTENT_ANSWER_UNCARRIED")
+        self.assertLess(finding["measured"]["coverage"], 0.6)
+        self.assertIn("promises something no page proves", finding["repair"])
+
+    def test_a_plan_with_no_question_or_answer_is_reported(self):
+        report = gate({"schema": "professional-slides.content/v1", "id": "t",
+                       "pages": [page(i) for i in range(1, 13)]})
+        finding = next(f for f in report["findings"] if f["code"] == "CONTENT_ANSWER_UNCARRIED")
+        self.assertEqual(finding["measured"], {"question": False, "answer": False})
 
     def test_a_file_without_pages_is_a_schema_finding(self):
         self.assertEqual([f["code"] for f in gate({"schema": "x"})["findings"]], ["CONTENT_SCHEMA"])

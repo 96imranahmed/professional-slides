@@ -1347,13 +1347,14 @@ function sideTreatment(slide) {
  * table, each carrying its own finding, rather than one long band that says
  * three things in a row.
  */
-function soWhatItem(text, id) {
+function soWhatItem(text, id, highlight) {
+  const accent = highlight === undefined || highlight === null ? {} : { highlight };
   if (Array.isArray(text)) {
     if (!text.length) throw new Error("A soWhat list needs at least one line");
     if (text.length > 3) throw new Error("A soWhat list carries at most three lines; the rest belongs in the page");
-    return { id, component: "insight", props: { items: text, variant: "tonal" }, size: HUG };
+    return { id, component: "insight", props: { items: text, variant: "tonal", ...accent }, size: HUG };
   }
-  return { id, component: "insight", props: { text, variant: "tonal" }, size: HUG };
+  return { id, component: "insight", props: { text, variant: "tonal", ...accent }, size: HUG };
 }
 
 /**
@@ -1706,6 +1707,7 @@ export const SLIDE_KEYS = Object.freeze({
   // the title band
   title: "the action title: the finding, not the subject",
   titleLead: "a lead-in phrase set before the title in the accent",
+  highlight: "the phrase the reader should see first, set in the accent wherever the page says it",
   subtitle: "the standfirst under the title: the measure, the population and the period",
   kicker: "the small label above the title naming the part of the argument",
   tag: "PRELIMINARY, ILLUSTRATIVE, Exhibit 3 - the page's badge",
@@ -1918,7 +1920,74 @@ export const SHAPE_NAMES = Object.freeze(Object.keys(SHAPES));
  * A pass that needs to hand something to the layout stage rather than to the
  * next pass writes it on `ctx`.
  */
+/**
+ * The page's own highlight, pushed down to whatever carries the page's prose.
+ *
+ * `highlight` existed on a point and on a table cell and nowhere else, so a
+ * phrase could only be emphasised by an author who was already writing points
+ * and knew to repeat it there. Meanwhile the content stage records exactly one
+ * highlight per page - "the phrase the reader should see first" - and threw it
+ * away: the stage was a checkpoint with no consequence.
+ *
+ * Client decks emphasise a phrase on half their pages, and on seven pages of
+ * type in ten. Ours managed 0.05 to 0.22 (DECK_CRAFT). So a page-level
+ * `highlight` is given to every point and every table cell whose text actually
+ * contains it, and to none that do not - the phrase is emphasised where it is
+ * said, not asserted where it is absent.
+ */
+function highlightThePhrase(slide) {
+  const declared = slide.highlight;
+  if (declared === undefined || declared === null) return slide;
+  const phrases = (Array.isArray(declared) ? declared : [declared])
+    .map((p) => String(p ?? "").trim()).filter(Boolean);
+  if (!phrases.length) return slide;
+  const inside = (text) => {
+    const haystack = String(text ?? "").toLowerCase();
+    return phrases.filter((p) => haystack.includes(p.toLowerCase()));
+  };
+  // The phrase stays on the slide: `soWhat` and the insight boxes are built
+  // later, from the slide, and they set it in the accent too.
+  const next = { ...slide };
+
+  if (Array.isArray(slide.points)) {
+    next.points = slide.points.map((point) => {
+      if (typeof point === "string") {
+        const found = inside(point);
+        return found.length ? { text: point, highlight: found } : point;
+      }
+      if (!point || typeof point !== "object" || point.highlight !== undefined) return point;
+      const found = inside(`${point.lead ?? ""} ${point.text ?? ""}`);
+      return found.length ? { ...point, highlight: found } : point;
+    });
+  }
+  // A table says it in a cell: the cell's own `highlight` is the accent phrase,
+  // which `exhibitItem` already knows how to read.
+  const markTable = (ex) => {
+    if (!ex || typeof ex !== "object" || !Array.isArray(ex.rows)) return ex;
+    let touched = false;
+    const rows = ex.rows.map((row) => {
+      const cells = Array.isArray(row) ? row : row?.cells;
+      if (!Array.isArray(cells)) return row;
+      const next = cells.map((cell) => {
+        if (cell && typeof cell === "object" && cell.highlight !== undefined) return cell;
+        const text = typeof cell === "string" ? cell : cell?.text;
+        const found = inside(text);
+        if (!found.length) return cell;
+        touched = true;
+        return typeof cell === "string" ? { text: cell, highlight: found }
+                                        : { ...cell, highlight: found };
+      });
+      return Array.isArray(row) ? next : { ...row, cells: next };
+    });
+    return touched ? { ...ex, rows } : ex;
+  };
+  if (next.exhibit) next.exhibit = markTable(next.exhibit);
+  if (Array.isArray(next.exhibits)) next.exhibits = next.exhibits.map(markTable);
+  return next;
+}
+
 const SLIDE_PASSES = [
+  ["highlight-the-phrase", (slide) => highlightThePhrase(slide)],
   ["footnotes", (slide) => applyFootnotes(slide)],
   ["paired-bars", (slide) => pairedBars(slide)],
 
@@ -2196,8 +2265,9 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // column read as two unrelated labels with a gap between them.
     const insightBoxes = insightSpecs.map((entry, at) => {
       const variant = insightSpecs.length > 1 && at === 0 ? "plain" : "tonal";
+      const accent = slide.highlight === undefined ? {} : { highlight: slide.highlight };
       return { id: insightSpecs.length > 1 ? `${id}-insight-${at + 1}` : `${id}-insight`, component: "insight",
-        props: typeof entry === "string" ? { text: entry, variant } : { variant, ...entry }, size: HUG };
+        props: typeof entry === "string" ? { text: entry, variant, ...accent } : { variant, ...accent, ...entry }, size: HUG };
     });
     const insightBox = insightBoxes[0] ?? null;
     if (!list && !insightBox && !kpiTile) throw new Error(`${id}: a side column needs points, an insight or a kpi`);
@@ -2348,7 +2418,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       const sideItems = [];
       if (slide.kpi) sideItems.push({ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } });
       const insights = slide.insights || (slide.insight ? [slide.insight] : []);
-      for (const [at, insight] of insights.entries()) sideItems.push({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insights.length > 1 && at === 0 ? "plain" : "tonal", ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG });
+      for (const [at, insight] of insights.entries()) sideItems.push({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insights.length > 1 && at === 0 ? "plain" : "tonal", ...(slide.highlight === undefined ? {} : { highlight: slide.highlight }), ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG });
       if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle, sideItems.length === 0));
       const side = { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: sideTreatment(slide), size: { width: { fr: slide.kpi || insights.length ? 1.5 : 1 }, height: "fill" }, items: sideItems };
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
@@ -2452,7 +2522,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     const insightSpecs = (Array.isArray(slide.insights) ? slide.insights : slide.insight !== undefined ? [slide.insight] : []).filter((entry) => entry != null);
     const copy = [
       ...(slide.kpi ? [{ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } }] : []),
-      ...insightSpecs.map((insight, at) => ({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insightSpecs.length > 1 && at === 0 ? "plain" : "tonal", ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG })),
+      ...insightSpecs.map((insight, at) => ({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insightSpecs.length > 1 && at === 0 ? "plain" : "tonal", ...(slide.highlight === undefined ? {} : { highlight: slide.highlight }), ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG })),
       ...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })),
       ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle,
         !slide.kpi && !insightSpecs.length && !(slide.paragraphs || []).length)] : []),
@@ -2518,7 +2588,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     if (at >= 0) row.items[at] = { id: `${id}-side-column`, layout: "flow.column", size: row.items[at].size, items: [note, { ...row.items[at], size: { width: { fr: 1 }, height: "fill" } }] };
     else items.push(note); // full-width pages: the reading aid sits under the exhibit, above the takeaway
   }
-  if (slide.soWhat) items.push(soWhatItem(slide.soWhat, `${id}-sowhat`));
+  if (slide.soWhat) items.push(soWhatItem(slide.soWhat, `${id}-sowhat`, slide.highlight));
   if (!items.length) throw new Error(`${id}: a slide needs an exhibit, points, paragraphs or a soWhat`);
   // A chart's unit joins its heading on one line, on every architecture. It was
   // set on `exhibit-top` alone, so the majority of chart pages - every

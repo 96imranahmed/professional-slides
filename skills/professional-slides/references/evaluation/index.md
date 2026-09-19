@@ -53,6 +53,7 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | Limits against findings | `CAVEAT_HEAVY` | at most 2 caveat lines a page; a finding in contrastive form ("not X; it Y") is not a caveat |
 | The same table, repeated | `TABLE_SCHEMA_FLAT` | at most 3 tables in a deck open with the same column headers |
 | A share the page's own counts do not give | `CONTRADICTED_SHARE` | where a page prints "N of M", every percentage on it is a subset of those counts over M, within one count |
+| What the deck does, page after page | `DECK_CRAFT` | a phrase emphasised on at least 35% of pages (client decks run 51%), a source on at least 50% (they run 67%), and at least 11 drawn elements a page (the corpus median is 32) |
 
 Two more findings share the shape but fire before the page is rendered, from the composer rather than the gates: `THIN_PLAN` (what the page will carry against its floor, with the remedy that page's own data offers) and `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
 

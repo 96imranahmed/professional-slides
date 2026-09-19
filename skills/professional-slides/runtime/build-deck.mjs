@@ -52,6 +52,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // output says so, which is the difference between a stage that was skipped
   // and a stage that does not exist.
   const result = { status: "planned", outputDirectory: directory, timings: {}, stages: {} };
+  const stages = {};
   for (const [stage, suffix, run] of [["content", ".content.json", runContentGates],
                                       ["plan", ".plan.json", runPlanGates]]) {
     const at = path.join(baseDir, `${stem}${suffix}`);
@@ -66,6 +67,22 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       throw new Error(`${stage} gates rejected ${path.basename(at)}: `
         + `${JSON.stringify(report.countsByCode)}. See ${reportAt}.`);
     }
+    if (stage === "content") stages.content = JSON.parse(raw);
+  }
+
+  // The content stage stops being a checkpoint and becomes an input.
+  //
+  // It records one highlight per page - "the phrase the reader should see
+  // first" - and the build gated the file and then discarded it, so the phrase
+  // reached nothing. A page that does not name its own highlight takes the one
+  // its content plan named, matched by position over the deck's content slides.
+  if (stages.content?.pages?.length) {
+    const content = spec.slides.filter((s) => (s.kind ?? "content") === "content");
+    stages.content.pages.forEach((page, index) => {
+      const slide = content[index];
+      const phrase = String(page?.highlight ?? "").trim();
+      if (slide && phrase && slide.highlight === undefined) slide.highlight = phrase;
+    });
   }
 
   const deckPlan = toDeckPlan(spec, baseDir);

@@ -63,7 +63,8 @@
         }
       ],
       "soWhat": "Fund the three lagging practices with the category 7 playbook before adding new ones.",
-      "source": "Practice survey, June 2026"
+      "source": "Practice survey, June 2026",
+      "highlight": "the category 7 playbook"
     },
     {
       "title": "The market reaches $1.65B by 2030 on a 13% CAGR, led by enterprise",
@@ -115,7 +116,8 @@
           "text": "Every 5% of erosion removes $80M from the endpoint."
         }
       ],
-      "source": "Company estimates; industry reports; expert interviews"
+      "source": "Company estimates; industry reports; expert interviews",
+      "highlight": "2026"
     },
     {
       "kind": "section",
@@ -194,7 +196,8 @@
         ]
       },
       "soWhat": "Alpha and Beta need the vendor decision this week; everything else holds its dates.",
-      "note": "Percent complete and dates are based on the latest available data"
+      "note": "Percent complete and dates are based on the latest available data",
+      "highlight": "everything else holds its dates"
     },
     {
       "title": "Sixteen weeks in three phases, with go-live in week 14",
@@ -305,7 +308,8 @@
           }
         ]
       },
-      "soWhat": "The design sprints must finish by week 8 or go-live slips a quarter."
+      "soWhat": "The design sprints must finish by week 8 or go-live slips a quarter.",
+      "highlight": "or go-live slips a quarter"
     },
     {
       "kind": "section",
@@ -357,7 +361,8 @@
         }
       ],
       "soWhat": "Prioritise self-serve mix and product scaling, funded by disciplined unit-cost takeout.",
-      "source": "Company analysis"
+      "source": "Company analysis",
+      "highlight": "disciplined unit-cost takeout"
     },
     {
       "kind": "section",
@@ -399,7 +404,8 @@
           }
         ]
       },
-      "soWhat": "Week 6 is the gate: no pilot starts without a validated blueprint."
+      "soWhat": "Week 6 is the gate: no pilot starts without a validated blueprint.",
+      "highlight": "no pilot starts without a validated blueprint"
     },
     {
       "title": "Each customer stage has one owner and two deliverables",
@@ -460,7 +466,8 @@
           }
         ]
       },
-      "soWhat": "Purchase is the only stage without a named success metric today; add win rate to the dashboard."
+      "soWhat": "Purchase is the only stage without a named success metric today; add win rate to the dashboard.",
+      "highlight": "add win rate to the dashboard"
     },
     {
       "title": "Improvement runs as a five-step cycle that repeats every quarter",
@@ -504,7 +511,8 @@
           "text": "Site 3 starts the cycle on the on-time delivery metric"
         }
       ],
-      "pointsHeading": "How it runs"
+      "pointsHeading": "How it runs",
+      "highlight": "it is named on the plan"
     },
     {
       "title": "Six milestones take the platform from pilot to full launch in 2027",
@@ -537,7 +545,8 @@
           }
         ]
       },
-      "soWhat": "Validation in Q2 is the go/no-go; everything after it is execution."
+      "soWhat": "Validation in Q2 is the go/no-go; everything after it is execution.",
+      "highlight": "everything after it is execution"
     },
     {
       "title": "The ambition rests on three levers over a shared data foundation",
@@ -571,7 +580,8 @@
         "foundation": "One customer data platform and a single pricing engine",
         "highlight": 1
       },
-      "soWhat": "New segments carry half the growth and none of the current capability; fund that pillar first."
+      "soWhat": "New segments carry half the growth and none of the current capability; fund that pillar first.",
+      "highlight": "fund that pillar first"
     },
     {
       "title": "Shared values sit at the centre of the seven elements",
@@ -670,7 +680,7 @@
         },
         {
           "lead": "The audit",
-          "text": "Scores each element 1–5 against the target state"
+          "text": "Scores each element 1\u20135 against the target state"
         }
       ],
       "pointsHeading": "Reading the model"
@@ -694,9 +704,9 @@
         "rows": [
           [
             "Strategic fit",
-            "✗",
-            "✓",
-            "✓"
+            "\u2717",
+            "\u2713",
+            "\u2713"
           ],
           [
             "Time to value",
@@ -724,7 +734,8 @@
           ]
         ]
       },
-      "soWhat": "Option B pays back its extra $2M of capex within its first year of run-cost savings."
+      "soWhat": "Option B pays back its extra $2M of capex within its first year of run-cost savings.",
+      "highlight": "within its first year"
     },
     {
       "title": "Strengths in product are offset by a thin bench in two regions",
@@ -747,7 +758,8 @@
           "Pricing pressure in enterprise"
         ]
       },
-      "soWhat": "Hire the two country leads before the mid-market push, or the growth lands on an empty bench."
+      "soWhat": "Hire the two country leads before the mid-market push, or the growth lands on an empty bench.",
+      "highlight": "the growth lands on an empty bench"
     },
     {
       "title": "The new operating model moves decisions from the centre to the regions",
@@ -794,7 +806,8 @@
           "text": "Every engagement since 2023 delivered on the agreed date with the agreed team."
         }
       ],
-      "soWhat": "The network is the differentiator: no other bidder has partners in all three markets."
+      "soWhat": "The network is the differentiator: no other bidder has partners in all three markets.",
+      "highlight": "partners in all three markets"
     },
     {
       "title": "The core team brings sector, technology and change experience",
@@ -835,7 +848,8 @@
           }
         ]
       },
-      "soWhat": "All four have worked together on a live migration; the team needs no forming time."
+      "soWhat": "All four have worked together on a live migration; the team needs no forming time.",
+      "highlight": "the team needs no forming time"
     },
     {
       "title": "Four capabilities carry the go-to-market plan",
@@ -865,7 +879,8 @@
           }
         ]
       },
-      "soWhat": "Revenue operations is the one capability nobody owns today; appoint the lead before the campaign launch."
+      "soWhat": "Revenue operations is the one capability nobody owns today; appoint the lead before the campaign launch.",
+      "highlight": "appoint the lead before the campaign launch"
     },
     {
       "title": "Three entry countries, three different reasons to go",
@@ -896,7 +911,7 @@
             "text": "The most digital market, with a gap left by a competitor's exit.",
             "points": [
               "Competitor exit in 2025",
-              "Pricing headroom of 10–15%",
+              "Pricing headroom of 10\u201315%",
               "Twelve months to first revenue"
             ]
           }
@@ -941,18 +956,19 @@
           "alt": "The harbour site",
           "credit": "Synthetic render, professional-slides examples",
           "label": "Harbour site",
-          "text": "Deep-water berth and two-lane road access on both approaches, at £4.2m more to acquire and a 14-month planning path."
+          "text": "Deep-water berth and two-lane road access on both approaches, at \u00a34.2m more to acquire and a 14-month planning path."
         },
         {
           "path": "assets/terraces.jpg",
           "alt": "The terrace site",
           "credit": "Synthetic render, professional-slides examples",
           "label": "Terrace site",
-          "text": "Consented already and £4.2m cheaper, on one single-lane approach that caps inbound movements at 40 loads a day."
+          "text": "Consented already and \u00a34.2m cheaper, on one single-lane approach that caps inbound movements at 40 loads a day."
         }
       ],
-      "soWhat": "Above 40 loads a day the harbour site is the only one that works; below it the terrace site is £4.2m of capital the programme keeps.",
-      "source": "Site appraisal, August 2026"
+      "soWhat": "Above 40 loads a day the harbour site is the only one that works; below it the terrace site is \u00a34.2m of capital the programme keeps.",
+      "source": "Site appraisal, August 2026",
+      "highlight": "below it the terrace site is \u00a34"
     },
     {
       "kind": "section",
@@ -1032,7 +1048,8 @@
         "SMB is flat by design; it is the acquisition funnel",
         "Mid-market grows with headcount, not price"
       ],
-      "source": "Company plan, September 2026"
+      "source": "Company plan, September 2026",
+      "highlight": "$125"
     },
     {
       "title": "Churn fell below 5% in Q3 for the first time since launch",
@@ -1069,7 +1086,8 @@
         "Usage alerts caught 60% of at-risk accounts in Q2",
         "Target is 4% by Q2 2027"
       ],
-      "source": "CRM extract, 1 October 2026"
+      "source": "CRM extract, 1 October 2026",
+      "highlight": "60% of at-risk"
     },
     {
       "title": "Price and mix explain most of the margin gain; volume was flat",
@@ -1121,7 +1139,7 @@
         {
           "value": "$31",
           "label": "Cost to serve per seat",
-          "delta": "−12%"
+          "delta": "\u221212%"
         }
       ],
       "exhibit": {
@@ -1252,7 +1270,8 @@
         "Margin gains come from mix, not price",
         "2026 plan already assumes the enterprise ramp"
       ],
-      "source": "Management accounts; 2026 plan"
+      "source": "Management accounts; 2026 plan",
+      "highlight": "2026"
     },
     {
       "title": "Enterprise is now the majority of revenue in every region but APAC",
@@ -1456,7 +1475,7 @@
           "alt": "The harbour site",
           "credit": "Synthetic render, professional-slides examples",
           "label": "Harbour",
-          "text": "Access is solved; acquisition binds, at £4.2m over the envelope."
+          "text": "Access is solved; acquisition binds, at \u00a34.2m over the envelope."
         },
         {
           "path": "assets/terraces.jpg",
@@ -1474,7 +1493,8 @@
         }
       ],
       "soWhat": "Each constraint is cleared before the lease is signed or it is not cleared at all, which puts all three decisions in the next quarter.",
-      "source": "Site appraisal, August 2026"
+      "source": "Site appraisal, August 2026",
+      "highlight": "puts all three decisions in the next quarter"
     },
     {
       "kind": "section",
@@ -1736,7 +1756,8 @@
         "Two lines hold 60% of the pool",
         "Wealth is small but the fastest growing",
         "Payments and insurance are scale plays"
-      ]
+      ],
+      "highlight": "60% of the"
     },
     {
       "title": "We lead peers on speed and scale but trail on talent and data",
@@ -1851,7 +1872,8 @@
         "Sector medians span 17 points",
         "Within-sector spread is twice the between-sector spread",
         "Company choices, not sector, decide returns"
-      ]
+      ],
+      "highlight": "17 points"
     },
     {
       "title": "Mobility drives battery demand, growing to nine tenths of the market by 2024",
@@ -1903,7 +1925,8 @@
         "Mobility grows fastest in absolute terms",
         "Storage doubles every two years",
         "Electronics is a rounding error by 2024"
-      ]
+      ],
+      "highlight": "2024"
     },
     {
       "title": "Six scenarios diverge from 2021: only virus-contained paths recover by year end",
@@ -2094,7 +2117,8 @@
           "lead": "Adoption is the lever, not price",
           "text": "No account above three modules renewed below 88%, regardless of discount level or contract length."
         }
-      ]
+      ],
+      "highlight": "88%"
     },
     {
       "title": "Two segments carry the growth and the margin; the rest are volume",
@@ -2322,18 +2346,18 @@
         "rows": [
           [
             "Usage-based pricing",
-            "• Revenue recognised on consumption\n• Forecasting moves to cohort models",
-            "• Two of the top five vendors repriced in 2025"
+            "\u2022 Revenue recognised on consumption\n\u2022 Forecasting moves to cohort models",
+            "\u2022 Two of the top five vendors repriced in 2025"
           ],
           [
             "Embedded distribution",
-            "• The platform becomes the channel\n• Partner margin replaces sales headcount",
-            "• Marketplace share up from 8% to 21%"
+            "\u2022 The platform becomes the channel\n\u2022 Partner margin replaces sales headcount",
+            "\u2022 Marketplace share up from 8% to 21%"
           ],
           [
             "Compliance as a feature",
-            "• Audit evidence ships with the product\n• Procurement cycles shorten",
-            "• Three vendors now publish continuous attestations"
+            "\u2022 Audit evidence ships with the product\n\u2022 Procurement cycles shorten",
+            "\u2022 Three vendors now publish continuous attestations"
           ]
         ]
       },
@@ -2493,7 +2517,8 @@
           "text": "Half of first meetings become proposals and half of proposals close, so the funnel below the meeting is healthy."
         }
       ],
-      "source": "CRM export, FY25"
+      "source": "CRM export, FY25",
+      "highlight": "the funnel below the meeting is healthy"
     },
     {
       "title": "Vendor C leads on three capabilities; only Vendor A matches it on security",
@@ -2607,7 +2632,8 @@
           ]
         }
       ],
-      "arrange": "stack"
+      "arrange": "stack",
+      "highlight": "renewal names nobody"
     },
     {
       "title": "Eight reference accounts span every segment we sell into",
@@ -2685,7 +2711,8 @@
           ]
         }
       ],
-      "arrange": "stack"
+      "arrange": "stack",
+      "highlight": "is why the migration has no single sponsor"
     },
     {
       "title": "The decision turns on one question: does the office move downtown?",
@@ -2812,7 +2839,8 @@
           "text": "tickets per account held at 1.4 a month while accounts grew 38%."
         }
       ],
-      "source": "Finance close, FY24"
+      "source": "Finance close, FY24",
+      "highlight": "2022"
     },
     {
       "title": "Three conditions decide the FY25 plan; one is inside our control",
@@ -2855,7 +2883,8 @@
           "text": "Enterprise carries 9pp more margin than mid-market. The shift added 1.8pp last year and depends on a pipeline we do control."
         }
       ],
-      "source": "FY25 plan, sensitivity pack"
+      "source": "FY25 plan, sensitivity pack",
+      "highlight": "2.6"
     },
     {
       "title": "The 2022 repricing changed the trend, not just the level",
@@ -2897,7 +2926,8 @@
           "text": "Volume growth was unchanged either side, so the gain is price, not mix. The 2024 points come from infrastructure cost, and that source is nearly spent."
         }
       ],
-      "source": "Pricing committee minutes; finance close, FY24"
+      "source": "Pricing committee minutes; finance close, FY24",
+      "highlight": "6% in"
     },
     {
       "title": "Four teams cut cycle time; the two that did not share one constraint",
@@ -2983,7 +3013,8 @@
           "text": "31k units a month at a 23% cost premium, available in six weeks, and it puts the quality system outside our audit boundary."
         }
       ],
-      "source": "Operations capacity study, October 2024"
+      "source": "Operations capacity study, October 2024",
+      "highlight": "18k units"
     },
     {
       "title": "The migration runs in four steps; step two can stop it",
@@ -3069,7 +3100,8 @@
         "Legal and Field service worked on paper beforehand, and both sit under half with no trend.",
         "No function has fallen back after adopting, which argues the gap is onboarding rather than fit."
       ],
-      "source": "Product telemetry, 30 days to 31 December"
+      "source": "Product telemetry, 30 days to 31 December",
+      "highlight": "70% within"
     },
     {
       "title": "Vendor B wins every criterion that carries weight",
@@ -3133,7 +3165,8 @@
         "implicationStyle": "per-row"
       },
       "soWhat": "On the agreed weights B scores 4.3 against A's 3.2, and the single criterion A wins carries a tenth of the decision.",
-      "source": "Vendor assessment, February 2025"
+      "source": "Vendor assessment, February 2025",
+      "highlight": "4.3"
     },
     {
       "title": "Six of eight markets clear the hurdle; the two that miss, miss on price",
@@ -3222,7 +3255,8 @@
         "highlightRow": "Germany"
       },
       "soWhat": "Volume is not the constraint - Italy is the third-largest market on the list and still fails, because achievable price sits 21 points under the model floor.",
-      "source": "Market entry model, FY26 base case"
+      "source": "Market entry model, FY26 base case",
+      "highlight": "21 points under the"
     },
     {
       "title": "Weekly active accounts doubled after the March release and held the gain",
@@ -3285,7 +3319,8 @@
           "text": "Since May the series adds about 2% a month, which is where it sat before the release."
         }
       ],
-      "source": "Product telemetry, weeks to 31 August 2024"
+      "source": "Product telemetry, weeks to 31 August 2024",
+      "highlight": "2023"
     },
     {
       "title": "Four segments carry 78% of the pool, and the fastest is the third largest",
@@ -3362,7 +3397,8 @@
         "implicationStyle": "single"
       },
       "soWhat": "Regulated verticals grow at 14.8% on a $560m pool where we hold fourth place, which is the only line on the table where the growth and the gap point the same way.",
-      "source": "Market model, 2024 base case"
+      "source": "Market model, 2024 base case",
+      "highlight": "14.8% on"
     },
     {
       "layout": "table-halves",
@@ -3439,7 +3475,8 @@
         ]
       },
       "soWhat": "The four largest segments hold 61% of the pool, and the order has not changed in two years.",
-      "source": "Market model, 2024 base case"
+      "source": "Market model, 2024 base case",
+      "highlight": "61% of the"
     }
   ],
   "fill": "airy"

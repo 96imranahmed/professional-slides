@@ -1,465 +1,471 @@
 {
- "schema": "professional-slides.deck/v3",
- "id": "house-style",
- "palette": "bcg",
- "weight": {
-  "pageWords": 70
- },
- "footer": "Investor pulse, Q4",
- "agenda": "once",
- "cover": {
-  "title": "Investor perspectives, Q4",
-  "subtitle": "Survey of leading investors",
-  "date": "November 2026",
-  "logo": "Professional slides"
- },
- "slides": [
-  {
-   "kind": "section",
-   "title": "What investors expect",
-   "summary": "Macro risks, company priorities and the outlook"
+  "schema": "professional-slides.deck/v3",
+  "id": "house-style",
+  "palette": "bcg",
+  "weight": {
+    "pageWords": 70
   },
-  {
-   "title": "Interest rates remain the number one macro risk; geopolitics rose most since June",
-   "tag": "Oct 10–13",
-   "exhibit": {
-    "type": "chart.bar",
-    "heading": "Most important macro factors",
-    "unit": "Investors ranking the factor in their top three, %",
-    "categories": [
-     "Interest rates and Fed policy",
-     "Geopolitical risks",
-     "Consumer price inflation",
-     "Cost and wage inflation",
-     "Public-sector debt",
-     "Asset valuations",
-     "Liquidity in capital markets",
-     "Private-sector credit"
-    ],
-    "series": [
-     {
-      "name": "Share",
-      "values": [
-       77,
-       53,
-       45,
-       29,
-       23,
-       21,
-       16,
-       9
-      ]
-     }
-    ],
-    "deltas": [
-     2,
-     14,
-     -2,
-     -11,
-     7,
-     -3,
-     1,
-     6
-    ],
-    "deltaThreshold": 5
-   },
-   "callout": {
-    "tone": "outline",
-    "text": "Geopolitical risk jumped 14 points, the largest move in the series; rates stayed first for the sixth survey running."
-   },
-   "source": "Investor pulse, October 10–13, 2026; n = 116",
-   "note": [
-    "n=412 institutional investors; respondents ranked their top three factors",
-    "Change is against the June wave of the same panel"
-   ],
-   "subtitle": "Investors ranking each factor in their top three, %, October wave against June",
-   "points": [
-    "Rates lead for the sixth survey running, on 77% of top-three rankings",
-    "Geopolitics rose 14 points, the largest move in the series",
-    "Wage and cost inflation fell 11 points as the labour market cooled",
-    "Liquidity and private credit remain bottom of the list",
-    "Asset valuations and public debt sit mid-table and moved little"
-   ],
-   "density": "pre-read"
+  "footer": "Investor pulse, Q4",
+  "agenda": "once",
+  "cover": {
+    "title": "Investor perspectives, Q4",
+    "subtitle": "Survey of leading investors",
+    "date": "November 2026",
+    "logo": "Professional slides"
   },
-  {
-   "title": "Most workers feel burned out, and 43% are at risk of quitting",
-   "exhibits": [
+  "slides": [
     {
-     "type": "chart.stacked-column",
-     "heading": "I feel burned out from work",
-     "unit": "% of respondents",
-     "categories": [
-      "All"
-     ],
-     "series": [
-      {
-       "name": "Strongly disagree",
-       "values": [
-        15
-       ]
-      },
-      {
-       "name": "Somewhat disagree",
-       "values": [
-        32
-       ]
-      },
-      {
-       "name": "Somewhat agree",
-       "values": [
-        34
-       ]
-      },
-      {
-       "name": "Strongly agree",
-       "values": [
-        19
-       ]
-      }
-     ],
-     "stackBracket": [
-      "Somewhat agree",
-      "Strongly agree"
-     ]
+      "kind": "section",
+      "title": "What investors expect",
+      "summary": "Macro risks, company priorities and the outlook"
     },
     {
-     "type": "chart.stacked-column",
-     "heading": "Looking for a new job",
-     "unit": "% of respondents",
-     "categories": [
-      "All"
-     ],
-     "series": [
-      {
-       "name": "Not looking",
-       "values": [
-        57
-       ]
+      "title": "Interest rates remain the number one macro risk; geopolitics rose most since June",
+      "tag": "Oct 10\u201313",
+      "exhibit": {
+        "type": "chart.bar",
+        "heading": "Most important macro factors",
+        "unit": "Investors ranking the factor in their top three, %",
+        "categories": [
+          "Interest rates and Fed policy",
+          "Geopolitical risks",
+          "Consumer price inflation",
+          "Cost and wage inflation",
+          "Public-sector debt",
+          "Asset valuations",
+          "Liquidity in capital markets",
+          "Private-sector credit"
+        ],
+        "series": [
+          {
+            "name": "Share",
+            "values": [
+              77,
+              53,
+              45,
+              29,
+              23,
+              21,
+              16,
+              9
+            ]
+          }
+        ],
+        "deltas": [
+          2,
+          14,
+          -2,
+          -11,
+          7,
+          -3,
+          1,
+          6
+        ],
+        "deltaThreshold": 5
       },
-      {
-       "name": "Passively looking",
-       "values": [
-        37
-       ]
+      "callout": {
+        "tone": "outline",
+        "text": "Geopolitical risk jumped 14 points, the largest move in the series; rates stayed first for the sixth survey running."
       },
-      {
-       "name": "Actively looking",
-       "values": [
-        6
-       ]
-      }
-     ],
-     "stackBracket": [
-      "Passively looking",
-      "Actively looking"
-     ]
+      "source": "Investor pulse, October 10\u201313, 2026; n = 116",
+      "note": [
+        "n=412 institutional investors; respondents ranked their top three factors",
+        "Change is against the June wave of the same panel"
+      ],
+      "subtitle": "Investors ranking each factor in their top three, %, October wave against June",
+      "points": [
+        "Rates lead for the sixth survey running, on 77% of top-three rankings",
+        "Geopolitics rose 14 points, the largest move in the series",
+        "Wage and cost inflation fell 11 points as the labour market cooled",
+        "Liquidity and private credit remain bottom of the list",
+        "Asset valuations and public debt sit mid-table and moved little"
+      ],
+      "density": "pre-read",
+      "highlight": "77% of top-three rankings"
+    },
+    {
+      "title": "Most workers feel burned out, and 43% are at risk of quitting",
+      "exhibits": [
+        {
+          "type": "chart.stacked-column",
+          "heading": "I feel burned out from work",
+          "unit": "% of respondents",
+          "categories": [
+            "All"
+          ],
+          "series": [
+            {
+              "name": "Strongly disagree",
+              "values": [
+                15
+              ]
+            },
+            {
+              "name": "Somewhat disagree",
+              "values": [
+                32
+              ]
+            },
+            {
+              "name": "Somewhat agree",
+              "values": [
+                34
+              ]
+            },
+            {
+              "name": "Strongly agree",
+              "values": [
+                19
+              ]
+            }
+          ],
+          "stackBracket": [
+            "Somewhat agree",
+            "Strongly agree"
+          ]
+        },
+        {
+          "type": "chart.stacked-column",
+          "heading": "Looking for a new job",
+          "unit": "% of respondents",
+          "categories": [
+            "All"
+          ],
+          "series": [
+            {
+              "name": "Not looking",
+              "values": [
+                57
+              ]
+            },
+            {
+              "name": "Passively looking",
+              "values": [
+                37
+              ]
+            },
+            {
+              "name": "Actively looking",
+              "values": [
+                6
+              ]
+            }
+          ],
+          "stackBracket": [
+            "Passively looking",
+            "Actively looking"
+          ]
+        }
+      ],
+      "soWhat": "Half the workforce is one offer away from leaving; retention is a manager problem before it is a pay problem.",
+      "source": "Future of work survey, October 2026; 4,985 deskless workers in four countries",
+      "callout": {
+        "lead": "How to read",
+        "text": "Agreement is the top two boxes; the strongly-agree share is the group that leaves first, and it is the one retention work has to reach."
+      },
+      "subtitle": "Agreement with each statement, % of workers surveyed, 2025",
+      "note": [
+        "Agreement is the top two boxes of a five-point scale",
+        "Base: 2,140 workers across eleven markets, September 2025"
+      ],
+      "density": "pre-read",
+      "highlight": "one offer away from leaving"
+    },
+    {
+      "title": "Investors want companies to keep investing while delivering on guidance",
+      "exhibit": {
+        "type": "cards",
+        "tone": "stat",
+        "question": "Should companies prioritize investments?",
+        "items": [
+          {
+            "value": "88%",
+            "title": "Investors that believe it is important to prioritize building business capabilities, even at the expense of delivering EPS",
+            "text": "Near the series average of 89%, and below the June survey result of 91%"
+          },
+          {
+            "value": "86%",
+            "title": "Investors that feel it is important to deliver on EPS guidance and consensus forecasts",
+            "text": "Near the series high of 87%, and above the February result of 71%"
+          }
+        ]
+      },
+      "callout": {
+        "tone": "outline",
+        "text": "While investors have consistently supported investing in the business at the expense of EPS, they now also expect companies to fully deliver on guidance and consensus."
+      },
+      "source": "Investor pulse, October 10\u201313, 2026",
+      "subtitle": "Investor preference between investing in the business and delivering EPS, 2025",
+      "points": [
+        "Investors back investment over EPS by a wide margin",
+        "They now expect guidance to be met as well",
+        "The two expectations are held at once, which is new"
+      ],
+      "highlight": "by a wide margin"
+    },
+    {
+      "title": "Despite record investment, the rate of start-up creation slowed in 2025",
+      "exhibit": {
+        "type": "chart.column",
+        "heading": "Number of start-ups founded per year",
+        "unit": "Count",
+        "categories": [
+          "2019",
+          "2020",
+          "2021",
+          "2022",
+          "2023",
+          "2024",
+          "2025"
+        ],
+        "series": [
+          {
+            "name": "Founded",
+            "values": [
+              31,
+              45,
+              58,
+              47,
+              41,
+              30,
+              19
+            ]
+          }
+        ],
+        "change": false,
+        "categoryNotes": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "part year"
+        ],
+        "dataTable": true
+      },
+      "kpi": {
+        "value": "80%",
+        "label": "of start-ups founded in the past three years are in one segment"
+      },
+      "points": [
+        {
+          "lead": "Lack of talent",
+          "text": "Most experienced specialists already work in a start-up"
+        },
+        {
+          "lead": "Few working use cases",
+          "text": "Application start-up creation is limited while use cases stay narrow"
+        },
+        {
+          "lead": "Investor trends",
+          "text": "Investors prefer to fund scale-ups and later-stage rounds"
+        },
+        {
+          "lead": "Capital concentration",
+          "text": "Later-stage rounds absorb the capital that used to seed new companies"
+        }
+      ],
+      "pointsHeading": "Potential hypotheses on the slowdown",
+      "source": "Crunchbase; PitchBook",
+      "note": [
+        "Founding year is the year of incorporation, not of first funding",
+        "2025 is a part year to 30 September and is not annualised"
+      ],
+      "subtitle": "Start-ups founded per year and why the rate has slowed, 2019 to 2025",
+      "highlight": "already work in a start-up"
+    },
+    {
+      "title": "The year featured comparatively big deals, with four new entrants in the top ten",
+      "exhibit": {
+        "type": "table",
+        "columns": [
+          {
+            "label": "Company",
+            "type": "text"
+          },
+          {
+            "label": "Country",
+            "type": "text"
+          },
+          {
+            "label": "Segment",
+            "type": "text"
+          },
+          {
+            "group": "Largest disclosed round",
+            "label": "Deal size",
+            "unit": "$m",
+            "type": "text",
+            "align": "right"
+          },
+          {
+            "group": "Largest disclosed round",
+            "label": "Deal year",
+            "type": "text",
+            "align": "right"
+          }
+        ],
+        "rows": [
+          [
+            "SandboxAQ",
+            "United States",
+            "Application software",
+            "500",
+            "2025"
+          ],
+          [
+            "PsiQuantum",
+            "United States",
+            "Hardware manufacturing",
+            "450",
+            "2024"
+          ],
+          [
+            "IonQ",
+            "United States",
+            "Hardware manufacturing",
+            "350",
+            "2024"
+          ],
+          [
+            "Rigetti Computing",
+            "United States",
+            "Hardware manufacturing",
+            "345",
+            "2025"
+          ],
+          [
+            "Arqit",
+            "United Kingdom",
+            "Hardware manufacturing",
+            "345",
+            "2024"
+          ],
+          [
+            "Quantinuum",
+            "United Kingdom",
+            "Vertically integrated",
+            "300",
+            "2024"
+          ],
+          [
+            "D-Wave Systems",
+            "Canada",
+            "Hardware manufacturing",
+            "300",
+            "2023"
+          ],
+          [
+            "Origin Quantum",
+            "China",
+            "Hardware manufacturing",
+            "149",
+            "2025"
+          ]
+        ],
+        "derive": [
+          "rank"
+        ],
+        "deriveFrom": "Deal size"
+      },
+      "note": [
+        "Disclosed primary rounds only; secondary transactions and debt facilities are excluded",
+        "New entrants are companies that did not appear in the 2023 top ten"
+      ],
+      "source": "Crunchbase; PitchBook",
+      "soWhat": "Hardware manufacturing takes six of the ten largest rounds, so the capital is still buying machines rather than applications.",
+      "subtitle": "The ten largest disclosed rounds, by company, segment and year",
+      "highlight": "still buying machines"
+    },
+    {
+      "title": "E-commerce needs to accelerate to reach the 2028 ambition",
+      "exhibits": [
+        {
+          "type": "chart.column",
+          "heading": "E-commerce",
+          "unit": "GMV, $B",
+          "categories": [
+            "2023",
+            "2024",
+            "2025",
+            "2027E",
+            "2028E"
+          ],
+          "series": [
+            {
+              "name": "GMV",
+              "values": [
+                8,
+                8,
+                9,
+                10,
+                15
+              ]
+            }
+          ],
+          "change": "steps",
+          "dataTable": true
+        },
+        {
+          "type": "chart.column",
+          "heading": "Online travel",
+          "unit": "GMV, $B",
+          "categories": [
+            "2023",
+            "2024",
+            "2025",
+            "2027E",
+            "2028E"
+          ],
+          "series": [
+            {
+              "name": "GMV",
+              "values": [
+                2,
+                4,
+                5,
+                7,
+                10
+              ]
+            }
+          ],
+          "change": "steps"
+        },
+        {
+          "type": "chart.column",
+          "heading": "Online media",
+          "unit": "GMV, $B",
+          "categories": [
+            "2023",
+            "2024",
+            "2025",
+            "2027E",
+            "2028E"
+          ],
+          "series": [
+            {
+              "name": "GMV",
+              "values": [
+                2,
+                2,
+                3,
+                3,
+                5
+              ]
+            }
+          ],
+          "change": "steps"
+        }
+      ],
+      "soWhat": "Travel carries the growth to 2027; e-commerce has to double its rate after that to hit the ambition.",
+      "source": "Company analysis",
+      "callout": {
+        "lead": "Reading the steps",
+        "text": "The brackets are year-on-year growth; the step after 2027 is the one the plan has not yet earned."
+      },
+      "subtitle": "Revenue by segment against the 2028 ambition, $B",
+      "highlight": "has to double its rate"
     }
-   ],
-   "soWhat": "Half the workforce is one offer away from leaving; retention is a manager problem before it is a pay problem.",
-   "source": "Future of work survey, October 2026; 4,985 deskless workers in four countries",
-   "callout": {
-    "lead": "How to read",
-    "text": "Agreement is the top two boxes; the strongly-agree share is the group that leaves first, and it is the one retention work has to reach."
-   },
-   "subtitle": "Agreement with each statement, % of workers surveyed, 2025",
-   "note": [
-    "Agreement is the top two boxes of a five-point scale",
-    "Base: 2,140 workers across eleven markets, September 2025"
-   ],
-   "density": "pre-read"
-  },
-  {
-   "title": "Investors want companies to keep investing while delivering on guidance",
-   "exhibit": {
-    "type": "cards",
-    "tone": "stat",
-    "question": "Should companies prioritize investments?",
-    "items": [
-     {
-      "value": "88%",
-      "title": "Investors that believe it is important to prioritize building business capabilities, even at the expense of delivering EPS",
-      "text": "Near the series average of 89%, and below the June survey result of 91%"
-     },
-     {
-      "value": "86%",
-      "title": "Investors that feel it is important to deliver on EPS guidance and consensus forecasts",
-      "text": "Near the series high of 87%, and above the February result of 71%"
-     }
-    ]
-   },
-   "callout": {
-    "tone": "outline",
-    "text": "While investors have consistently supported investing in the business at the expense of EPS, they now also expect companies to fully deliver on guidance and consensus."
-   },
-   "source": "Investor pulse, October 10–13, 2026",
-   "subtitle": "Investor preference between investing in the business and delivering EPS, 2025",
-   "points": [
-    "Investors back investment over EPS by a wide margin",
-    "They now expect guidance to be met as well",
-    "The two expectations are held at once, which is new"
-   ]
-  },
-  {
-   "title": "Despite record investment, the rate of start-up creation slowed in 2025",
-   "exhibit": {
-    "type": "chart.column",
-    "heading": "Number of start-ups founded per year",
-    "unit": "Count",
-    "categories": [
-     "2019",
-     "2020",
-     "2021",
-     "2022",
-     "2023",
-     "2024",
-     "2025"
-    ],
-    "series": [
-     {
-      "name": "Founded",
-      "values": [
-       31,
-       45,
-       58,
-       47,
-       41,
-       30,
-       19
-      ]
-     }
-    ],
-    "change": false,
-    "categoryNotes": [
-     "",
-     "",
-     "",
-     "",
-     "",
-     "",
-     "part year"
-    ],
-    "dataTable": true
-   },
-   "kpi": {
-    "value": "80%",
-    "label": "of start-ups founded in the past three years are in one segment"
-   },
-   "points": [
-    {
-     "lead": "Lack of talent",
-     "text": "Most experienced specialists already work in a start-up"
-    },
-    {
-     "lead": "Few working use cases",
-     "text": "Application start-up creation is limited while use cases stay narrow"
-    },
-    {
-     "lead": "Investor trends",
-     "text": "Investors prefer to fund scale-ups and later-stage rounds"
-    },
-    {
-     "lead": "Capital concentration",
-     "text": "Later-stage rounds absorb the capital that used to seed new companies"
-    }
-   ],
-   "pointsHeading": "Potential hypotheses on the slowdown",
-   "source": "Crunchbase; PitchBook",
-   "note": [
-    "Founding year is the year of incorporation, not of first funding",
-    "2025 is a part year to 30 September and is not annualised"
-   ],
-   "subtitle": "Start-ups founded per year and why the rate has slowed, 2019 to 2025"
-  },
-  {
-   "title": "The year featured comparatively big deals, with four new entrants in the top ten",
-   "exhibit": {
-    "type": "table",
-    "columns": [
-     {
-      "label": "Company",
-      "type": "text"
-     },
-     {
-      "label": "Country",
-      "type": "text"
-     },
-     {
-      "label": "Segment",
-      "type": "text"
-     },
-     {
-      "group": "Largest disclosed round",
-      "label": "Deal size",
-      "unit": "$m",
-      "type": "text",
-      "align": "right"
-     },
-     {
-      "group": "Largest disclosed round",
-      "label": "Deal year",
-      "type": "text",
-      "align": "right"
-     }
-    ],
-    "rows": [
-     [
-      "SandboxAQ",
-      "United States",
-      "Application software",
-      "500",
-      "2025"
-     ],
-     [
-      "PsiQuantum",
-      "United States",
-      "Hardware manufacturing",
-      "450",
-      "2024"
-     ],
-     [
-      "IonQ",
-      "United States",
-      "Hardware manufacturing",
-      "350",
-      "2024"
-     ],
-     [
-      "Rigetti Computing",
-      "United States",
-      "Hardware manufacturing",
-      "345",
-      "2025"
-     ],
-     [
-      "Arqit",
-      "United Kingdom",
-      "Hardware manufacturing",
-      "345",
-      "2024"
-     ],
-     [
-      "Quantinuum",
-      "United Kingdom",
-      "Vertically integrated",
-      "300",
-      "2024"
-     ],
-     [
-      "D-Wave Systems",
-      "Canada",
-      "Hardware manufacturing",
-      "300",
-      "2023"
-     ],
-     [
-      "Origin Quantum",
-      "China",
-      "Hardware manufacturing",
-      "149",
-      "2025"
-     ]
-    ],
-    "derive": [
-     "rank"
-    ],
-    "deriveFrom": "Deal size"
-   },
-   "note": [
-    "Disclosed primary rounds only; secondary transactions and debt facilities are excluded",
-    "New entrants are companies that did not appear in the 2023 top ten"
-   ],
-   "source": "Crunchbase; PitchBook",
-   "soWhat": "Hardware manufacturing takes six of the ten largest rounds, so the capital is still buying machines rather than applications.",
-   "subtitle": "The ten largest disclosed rounds, by company, segment and year"
-  },
-  {
-   "title": "E-commerce needs to accelerate to reach the 2028 ambition",
-   "exhibits": [
-    {
-     "type": "chart.column",
-     "heading": "E-commerce",
-     "unit": "GMV, $B",
-     "categories": [
-      "2023",
-      "2024",
-      "2025",
-      "2027E",
-      "2028E"
-     ],
-     "series": [
-      {
-       "name": "GMV",
-       "values": [
-        8,
-        8,
-        9,
-        10,
-        15
-       ]
-      }
-     ],
-     "change": "steps",
-     "dataTable": true
-    },
-    {
-     "type": "chart.column",
-     "heading": "Online travel",
-     "unit": "GMV, $B",
-     "categories": [
-      "2023",
-      "2024",
-      "2025",
-      "2027E",
-      "2028E"
-     ],
-     "series": [
-      {
-       "name": "GMV",
-       "values": [
-        2,
-        4,
-        5,
-        7,
-        10
-       ]
-      }
-     ],
-     "change": "steps"
-    },
-    {
-     "type": "chart.column",
-     "heading": "Online media",
-     "unit": "GMV, $B",
-     "categories": [
-      "2023",
-      "2024",
-      "2025",
-      "2027E",
-      "2028E"
-     ],
-     "series": [
-      {
-       "name": "GMV",
-       "values": [
-        2,
-        2,
-        3,
-        3,
-        5
-       ]
-      }
-     ],
-     "change": "steps"
-    }
-   ],
-   "soWhat": "Travel carries the growth to 2027; e-commerce has to double its rate after that to hit the ambition.",
-   "source": "Company analysis",
-   "callout": {
-    "lead": "Reading the steps",
-    "text": "The brackets are year-on-year growth; the step after 2027 is the one the plan has not yet earned."
-   },
-   "subtitle": "Revenue by segment against the 2028 ambition, $B"
-  }
- ]
+  ]
 }

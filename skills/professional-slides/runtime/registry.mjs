@@ -245,7 +245,17 @@ function insightNodes({ id, frame, props }) {
   }
   for (const [part, measured] of [["heading", layout.heading], ["body", layout.body]]) {
     if (!measured) continue;
+    // `highlight`: the phrase the reader should see first, set in the accent
+    // inside the sentence. Accent only, never bold - an insight body is already
+    // semibold, so the emphasis is colour and the measured width is unchanged.
+    const accented = part === "body" && props.highlight && variant !== "primary"
+      // `strict: false`: a page-level highlight is offered to every piece of the
+      // page's prose, and most of them will not contain it. A phrase that is not
+      // there is simply not emphasised - it is not an error.
+      ? accentRuns(measured.text, props.highlight, { bold: false, accent: true, strict: false })
+      : null;
     nodes.push(textPrimitive({ id: stableId(id, part), role: `insight-${part}`, frame: { x: textX, y, width: layout.width, height: measured.height }, text: measured.text,
+      ...(accented && accented.some((run) => run.accent) ? { runs: accented.map((run) => ({ ...run, bold: true })) } : {}),
       style: { ...textStyle(part === "heading" ? token("type.heading") : BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, true, props.align ?? "left", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
     y += measured.height + layout.gap;
   }
@@ -570,8 +580,12 @@ function bodyListLayout(frame, itemsIn, props = {}) {
     }
     // A highlight inside the lead is set in the accent on the lead's own line;
     // inside the text it flows with the sentence.
-    const leadRuns = item.lead ? accentRuns(item.lead, item.highlight, { bold: true }) : null;
-    const textRuns = item.text && !(leadRuns && leadRuns.some((run) => run.accent)) ? accentRuns(item.text, item.highlight, { bold: houseStyle("style.labelWeight") !== "regular" }) : null;
+    // `strict: false`: the page's own highlight is offered to every point, and
+    // a point that does not say the phrase simply does not emphasise it. Before
+    // a page-level highlight existed this threw, which was right when the only
+    // way to set one was to write it on the point that already said it.
+    const leadRuns = item.lead ? accentRuns(item.lead, item.highlight, { bold: true, strict: false }) : null;
+    const textRuns = item.text && !(leadRuns && leadRuns.some((run) => run.accent)) ? accentRuns(item.text, item.highlight, { bold: houseStyle("style.labelWeight") !== "regular", strict: false }) : null;
     const lead = item.lead ? (leadRuns && leadRuns.some((run) => run.accent) ? measureTextRuns(leadRuns.map((run) => ({ ...run, bold: true })), width, font) : measureText(item.lead, width, { ...font, bold: true })) : null;
     const text = item.text ? (textRuns ? measureTextRuns(textRuns, width, font) : measureText(item.text, width, font)) : null;
     const textHeight = (lead?.height ?? 0) + (lead && text ? leadGap : 0) + (text?.height ?? 0);

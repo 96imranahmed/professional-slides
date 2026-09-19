@@ -1,0 +1,173 @@
+"""What a deck does, page after page — and the stage that had no consequence.
+
+Two things landed together here.
+
+`DECK_CRAFT` measures three rates over a deck's own pages against 122 pages of
+real client-project work: a phrase emphasised (client 0.51), a source line
+(0.67), and drawn elements a page (corpus median 32). None of the three was
+measured anywhere, and our own example decks ran 0.05 to 0.22 on the first.
+
+The reason they ran that low is the second thing. `highlight` — "the phrase the
+reader should see first" — existed on a point and on a table cell and nowhere
+else, while the content stage recorded exactly one per page and the build gated
+the file and threw it away. The stage was a checkpoint with no consequence. Now
+the page's highlight reaches whatever carries the page's prose, and a phrase the
+page does not say is simply not emphasised rather than being an error.
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from node_probe import NODE, ROOT, run_node
+
+GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
+EXAMPLES = ROOT / "skills" / "professional-slides" / "examples"
+BUILD = ROOT / "skills" / "professional-slides" / "runtime" / "build-deck.mjs"
+sys.path.insert(0, str(GATES))
+import page_gates  # noqa: E402
+
+
+def text(role, value, **over):
+    return dict({"type": "text", "role": role, "text": value}, **over)
+
+
+def page(n, *, highlight=False, source=True, marks=14):
+    nodes = [text("action-title", f"Page {n} states a finding worth reading"),
+             text("list-item", "The second wave opens on a gate rather than on a date",
+                  **({"runs": [{"text": "The second wave opens on ", "bold": False},
+                               {"text": "a gate", "bold": True, "accent": True},
+                               {"text": " rather than on a date", "bold": False}]} if highlight else {}))]
+    if source:
+        nodes.append(text("source-text", "Source: engagement analysis, 2026"))
+    nodes.extend({"type": "rect", "role": "chart-mark"} for _ in range(marks))
+    return {"id": f"s{n:02d}", "componentInstances": [{"id": "chrome", "component": "slide-chrome"},
+                                                      {"id": f"s{n:02d}-0", "component": "chart.column"}],
+            "nodes": nodes}
+
+
+def deck(slides):
+    return {"slides": slides}
+
+
+def craft(slides):
+    findings = []
+    page_gates.gate_deck_craft(slides, list(range(len(slides))), findings)
+    return findings
+
+
+class DeckCraftTests(unittest.TestCase):
+    def test_a_deck_that_never_emphasises_a_phrase_is_reported(self):
+        findings = craft([page(i) for i in range(1, 9)])
+        self.assertEqual([f["code"] for f in findings], ["DECK_CRAFT"])
+        self.assertEqual(findings[0]["measured"]["highlight"], 0.0)
+        self.assertIn("client decks", findings[0]["repair"])
+
+    def test_a_deck_that_works_its_pages_passes(self):
+        self.assertEqual(craft([page(i, highlight=True) for i in range(1, 9)]), [])
+
+    def test_the_three_rates_are_one_finding(self):
+        """Not three codes and not one per page: a deck-level fact said once."""
+        findings = craft([page(i, source=False, marks=2) for i in range(1, 9)])
+        self.assertEqual(len(findings), 1)
+        measured = findings[0]["measured"]
+        self.assertEqual(sorted(measured), ["highlight", "marksPerPage", "source"])
+        for phrase in ("emphasised", "carry a source", "drawn elements"):
+            self.assertIn(phrase, findings[0]["repair"])
+
+    def test_a_short_deck_is_not_measured_on_a_rate(self):
+        # Four pages cannot have a rate. The floor exists so that one page does
+        # not decide what the deck is like.
+        self.assertEqual(craft([page(i) for i in range(1, 4)]), [])
+
+    def test_the_floors_come_from_client_work_not_from_us(self):
+        judged = page_gates.REFERENCE_JUDGED
+        self.assertLess(page_gates.THRESHOLDS["highlight_share_min"], judged["highlightedPhrase"])
+        self.assertLess(page_gates.THRESHOLDS["source_share_min"], judged["sourceLine"])
+        self.assertLess(page_gates.THRESHOLDS["marks_per_page_min"], page_gates.REFERENCE_PAGE["drawings"])
+
+
+class PageHighlightTests(unittest.TestCase):
+    """The page's own phrase, set in the accent wherever the page says it."""
+
+    def setUp(self):
+        if not NODE:
+            self.skipTest("Node.js is not available")
+
+    def test_a_page_highlight_reaches_the_points_that_say_it(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const slide = composeSlide({id:'s1', title:'Freight repricing took four points of margin',
+  highlight:'four points',
+  exhibit:{type:'table', columns:['Lane','Margin'], rows:[['North','12'],['South','8']]},
+  points:[{text:'Freight repricing took four points of margin off the northern lanes'},
+          {text:'The southern lanes were hedged into next year'}]}, {});
+const find = (node) => node?.component === 'bullet-list' ? node
+  : (node?.items ?? []).map(find).find(Boolean);
+const points = find({items: slide.items});
+console.log(JSON.stringify(points.props.items.map(p => p.highlight ?? null)));
+''')
+        self.assertEqual(result, [["four points"], None])
+
+    def test_a_phrase_the_page_does_not_say_is_not_asserted(self):
+        """A page-level highlight is offered to every piece of prose, and most
+        of them will not contain it. That is not an error - it is the normal
+        case, and making it one is what kept the phrase off the page."""
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const slide = composeSlide({id:'s1', title:'Freight repricing took four points of margin',
+  highlight:'a phrase this page never says',
+  exhibit:{type:'table', columns:['Lane','Margin'], rows:[['North','12'],['South','8']]},
+  points:[{text:'Freight repricing took four points of margin off the northern lanes'},
+          {text:'The southern lanes were hedged into next year'}]}, {});
+const find = (node) => node?.component === 'bullet-list' ? node
+  : (node?.items ?? []).map(find).find(Boolean);
+const points = find({items: slide.items});
+console.log(JSON.stringify(points.props.items.map(p => p.highlight ?? null)));
+''')
+        self.assertEqual(result, [None, None])
+
+
+class ContentStageReachesThePageTests(unittest.TestCase):
+    """A stage whose output nothing reads is a checkpoint, not a stage."""
+
+    def setUp(self):
+        if not NODE:
+            self.skipTest("Node.js is not available")
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def test_the_content_plans_highlight_is_set_on_the_page(self):
+        work = self.tmp / "examples"
+        work.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(EXAMPLES / "assets", work / "assets", dirs_exist_ok=True)
+        for name in ("nyc-or-sf.deck.json", "nyc-or-sf.content.json"):
+            shutil.copy(EXAMPLES / name, work / name)
+        out = self.tmp / "out" / "output"
+        result = subprocess.run(
+            [NODE, str(BUILD), str(work / "nyc-or-sf.deck.json"), str(out), "--no-render"],
+            cwd=ROOT, capture_output=True, text=True,
+            env={"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": "/tmp",
+                 "RUNTIME_NODE_MODULES": str(ROOT / "node_modules")})
+        self.assertIn(result.returncode, (0, 2), result.stderr[-600:])
+        scene = json.loads((out / "scene.json").read_text(encoding="utf-8"))
+        content = [s for s in scene["slides"]
+                   if any(n.get("role") == "action-title" for n in s["nodes"])]
+        accented = [s for s in content
+                    if any(n.get("runs") and any(r.get("accent") for r in n["runs"]) for n in s["nodes"])]
+        # The deck spec names no highlight of its own on these pages; every one
+        # of them comes from the content plan beside it.
+        self.assertGreaterEqual(len(accented) / len(content),
+                                page_gates.THRESHOLDS["highlight_share_min"])
+
+
+if __name__ == "__main__":
+    unittest.main()

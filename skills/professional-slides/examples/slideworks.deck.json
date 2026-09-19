@@ -32,7 +32,7 @@
       "subtext": "Four conditions decide whether 2024 recovers"
     },
     {
-      "title": "PE-VC activity declined by ~36% in 2023, to $39bn: 2018 levels, not 2019",
+      "title": "PE-VC activity fell ~36% in 2023, to $39bn: 2018 levels, not 2019",
       "exhibit": {
         "type": "chart.column",
         "heading": "Annual PE-VC investments in India",
@@ -128,7 +128,7 @@
       "subtitle": "Announced PE-VC investment in India, $B, 2013 to 2023"
     },
     {
-      "title": "Traditional sectors demonstrated resilience in an otherwise slowing market",
+      "title": "The decline is concentrated in repriced technology; traditional sectors held ~75% of the pool",
       "exhibit": {
         "type": "chart.stacked-column",
         "heading": "Annual PE-VC investments in India by sector",
@@ -312,12 +312,13 @@
       },
       "callout": {
         "lead": "Outlook legend",
-        "text": "↑ strong activity expected; → moderate; ↓ limited activity"
+        "text": "\u2191 strong activity expected; \u2192 moderate; \u2193 limited activity"
       },
       "source": "Venture Intelligence; Bain analysis",
-      "soWhat": "Healthcare and advanced manufacturing carry the 2024 pipeline; IT services need a valuation reset before deal flow returns.",
+      "soWhat": "The three sectors with a positive outlook are the three backed by policy or demographics rather than by funding conditions, so they turn before rates do.",
       "note": "Outlook reflects Bain's deal-team view of 2024 activity, not a forecast of returns",
-      "subtitle": "Deal value, year-on-year change and outlook by sector, India, 2023"
+      "subtitle": "Deal value, year-on-year change and outlook by sector, India, 2023",
+      "highlight": "policy or demographics"
     },
     {
       "title": "Four conditions decide whether the 2024 recovery holds",
@@ -598,7 +599,7 @@
       ]
     },
     {
-      "title": "Most institutions have access to external GenAI tools but half require internal guidelines first",
+      "title": "In credit, governance rather than availability decides how far a generative-AI programme reaches",
       "metrics": [
         {
           "value": "88%",

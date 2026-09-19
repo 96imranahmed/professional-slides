@@ -46,6 +46,7 @@ export const CONTENT_CODES = Object.freeze({
   CONTENT_NO_HIGHLIGHT: "no page names the phrase its reader should see first",
   CONTENT_CLAIM_REPEATS: "two pages make the same claim",
   CONTENT_LAYOUT_LEAK: "the content file decides how a page looks",
+  CONTENT_ANSWER_UNCARRIED: "the deck's own answer is not carried by any of its claims",
 });
 
 /** What a page settles, and what kind of thing that is. */
@@ -85,6 +86,14 @@ export const CONTENT_THRESHOLDS = Object.freeze({
   claimWordsMin: 6,       // "Origins" is a topic; a claim is a sentence
   claimOverlapMax: 0.7,   // two pages proving the same thing
   highlightMin: 1,
+  // The answer gate. `coverage` is the share of the answer's own content words
+  // that appear somewhere in the claims; `carried` is the best single claim's
+  // share of them. An answer nothing claims is a promise the deck does not
+  // keep, and an answer spread thinly over twenty pages with no page stating
+  // it is a deck with no lead. Measured on the example content plans, which
+  // run 0.75/0.55 and 0.80/0.44.
+  answerCoverageMin: 0.6,
+  answerCarriedMin: 0.35,
 });
 
 // A field that decides how the page looks has no home here.
@@ -182,6 +191,45 @@ export function runContentGates(content) {
       }
     }
   }
+  // The one question nothing asked: does the deck deliver its own answer?
+  //
+  // Every other gate here judges a page. This judges the deck: a governing
+  // answer is written at the top of the file, and unless the claims carry it,
+  // the reader gets twenty proofs of things nobody promised. It is also the
+  // cheapest place to catch it - before a page exists, against two fields the
+  // author has already written.
+  const answer = String(content.answer ?? "").trim();
+  const question = String(content.question ?? "").trim();
+  if (!answer || !question) {
+    findings.push(finding(null, "CONTENT_ANSWER_UNCARRIED", { question: Boolean(question), answer: Boolean(answer) },
+      "both", "The file needs the `question` the deck is asked and the `answer` it gives, in "
+      + "one sentence each. Without them there is nothing for the claims to add up to, and "
+      + "nothing to check them against."));
+  } else if (pages.length) {
+    const claims = pages.map((p) => String(p.claim ?? ""));
+    const answerWords = words(answer);
+    const union = new Set();
+    for (const claim of claims) for (const w of words(claim)) union.add(w);
+    let covered = 0;
+    for (const w of answerWords) if (union.has(w)) covered += 1;
+    const coverage = answerWords.size ? covered / answerWords.size : 0;
+    const carried = Math.max(0, ...claims.map((c) => overlap(answer, c)));
+    if (coverage < CONTENT_THRESHOLDS.answerCoverageMin || carried < CONTENT_THRESHOLDS.answerCarriedMin) {
+      const missing = [...answerWords].filter((w) => !union.has(w));
+      findings.push(finding(null, "CONTENT_ANSWER_UNCARRIED",
+        { coverage: round(coverage), carried: round(carried), unclaimed: missing.slice(0, 8) },
+        { coverage: CONTENT_THRESHOLDS.answerCoverageMin, carried: CONTENT_THRESHOLDS.answerCarriedMin },
+        coverage < CONTENT_THRESHOLDS.answerCoverageMin
+          ? "The answer promises something no page proves. Either a page has to claim it - "
+            + `nothing in this deck claims ${missing.slice(0, 4).map((w) => `"${w}"`).join(", ")} - `
+            + "or the answer is wider than the evidence and should be narrowed to what the "
+            + "deck can actually settle."
+          : "No single page states the answer. The claims between them cover it, which means "
+            + "the reader can assemble it - but a deck leads with its answer rather than "
+            + "leaving it to be inferred from twenty pages. Write the page that says it."));
+    }
+  }
+
   return report(content, findings, pages);
 }
 
@@ -207,7 +255,8 @@ function report(content, findings, pages) {
       withAdds: pages.filter((p) => String(p.adds ?? "").trim()).length,
       withHighlight: pages.filter((p) => String(p.highlight ?? "").trim()).length,
     },
-    reference: { qualitativeMax: CONTENT_THRESHOLDS.qualitativeMax },
+    reference: { qualitativeMax: CONTENT_THRESHOLDS.qualitativeMax,
+                 answerCoverageMin: CONTENT_THRESHOLDS.answerCoverageMin },
     countsByCode: counts,
     findings,
     accepted: findings.length === 0,
