@@ -403,13 +403,16 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
     if (highlight.style === "bar") continue;
     const target = categoryMap.get(highlight.category);
     if (!target) throw new Error(`${id} highlight references unknown category ${highlight.category}`);
-    // Nothing to point at: a category whose every value is zero draws no mark,
-    // and a full-height tint standing where the mark would have been is read as
-    // the largest value on the chart - which is what a page arguing that this
-    // one costs nothing does not need. The label carries the zero instead.
+    // Nothing to point at. A category at or near zero draws a mark of a few
+    // pixels, and the full-height tint standing where that mark would have
+    // been is 38 times its height: the largest object in the plot is an empty
+    // grey box, which on a page arguing that this one costs nothing is the
+    // opposite of the finding. Under a twelfth of the chart's largest value
+    // the band is dropped and the printed figure carries the emphasis.
     const at = [...categoryMap.keys()].indexOf(highlight.category);
     const values = (props.series || []).map((item) => item?.values?.[at]).filter((value) => Number.isFinite(value));
-    if (values.length && values.every((value) => value === 0)) continue;
+    const largest = Math.max(0, ...(props.series || []).flatMap((item) => (item?.values || []).map((value) => Math.abs(Number(value) || 0))));
+    if (values.length && largest > 0 && Math.max(...values.map((value) => Math.abs(value))) <= largest * 0.08) continue;
     const box = highlight.style === "region-box";
     const frame = target.height === plot.height
       ? {
@@ -1564,7 +1567,16 @@ function comboChart({ id, frame, props }) {
   const pointMap = new Map();
   const categoryMap = new Map();
   const linePoints = [];
-  const lineFormat = secondary && props.secondaryUnit ? { ...props, valueFormat: { ...(props.valueFormat || {}), suffix: props.secondaryUnit } } : props;
+  // A currency leads its figure: suffixed, "$m" gave "888$m" on a deck that
+  // writes "$878m" on every other page. The unit decides which end it goes on.
+  const secondaryCurrency = String(props.secondaryUnit ?? "").trim().match(/^([$£€¥₹])\s*(.*)$/);
+  const lineFormat = secondary && props.secondaryUnit
+    ? { ...props, valueFormat: { ...(props.valueFormat || {}),
+        ...(secondaryCurrency
+          ? { prefix: `${(props.valueFormat || {}).prefix || ""}${secondaryCurrency[1]}`, suffix: secondaryCurrency[2] }
+          : { suffix: props.secondaryUnit }),
+        grouping: (props.valueFormat || {}).grouping ?? true } }
+    : props;
   categories.forEach((category, index) => {
     const x = plot.x + categorySpan * index + categorySpan / 2;
     const barValueY = yScale(barSeries.values[index]);

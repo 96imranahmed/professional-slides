@@ -96,10 +96,19 @@ export function cardsNodes({ id, frame: frameIn, props }) {
   const L = cardsLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
   const nodes = nodes0;
-  const fill = frame.height >= L.height && props.valign !== "middle"; // cards fill the frame height so a row reads as one band
-  const cardHeight = fill ? frame.height : L.height;
+  // Cards fill their frame so a row reads as one band - but only so far. Given
+  // a body track and three short cards, filling meant three bordered boxes 55%
+  // empty, with the text sitting in the top third of each: a box two lines tall
+  // around one line of text is a defect, and three of them is a page. The band
+  // grows to half as much again as it needs and then centres in what is left.
+  const fill = frame.height >= L.height && props.valign !== "middle";
+  // An open column set is type in two tracks rather than a band of boxes, so
+  // it keeps its natural height and centres; boxed cards grow to half as much
+  // again as they need.
+  const cardHeight = fill ? Math.min(frame.height, L.height * (L.open ? 1 : 1.5)) : L.height;
   // Icon rows (`valign: "middle"`) keep their natural height and sit centred in the frame.
   if (props.valign === "middle" && frame.height > L.height) frame = { ...frame, y: frame.y + (frame.height - L.height) / 2, height: L.height };
+  else if (fill && cardHeight < frame.height) frame = { ...frame, y: frame.y + (frame.height - cardHeight) / 2, height: cardHeight };
   L.items.forEach((m, index) => {
     const x = frame.x + index * (L.width + L.gap), cid = stableId(id, "card", index);
     if (L.tone === "stat") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, MUTED, "none", "radius.none"));
@@ -130,7 +139,13 @@ export function cardsNodes({ id, frame: frameIn, props }) {
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, text("type.heading", INK, true)));
       const ry = y + m.title.height + v("space.2");
       nodes.push(linePrimitive({ id: stableId(cid, "title-rule"), role: "card-rule", x1: cx, y1: ry, x2: cx + L.inner, y2: ry, style: { stroke: INK, lineWidth: token("line.hairline") } }));
-      if (index) nodes.push(linePrimitive({ id: stableId(cid, "divider"), role: "card-divider", x1: x - L.gap / 2, y1: frame.y, x2: x - L.gap / 2, y2: frame.y + cardHeight, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
+      // The rule separates two columns of type, so it ends where the type
+      // does. Drawn to the card's height it ran a quarter of its length past
+      // the last line on both sides, dividing nothing.
+      if (index) {
+        const written = Math.max(...L.items.map((entry) => entry.height));
+        nodes.push(linePrimitive({ id: stableId(cid, "divider"), role: "card-divider", x1: x - L.gap / 2, y1: frame.y, x2: x - L.gap / 2, y2: frame.y + Math.min(cardHeight, written), style: { stroke: RULE, lineWidth: token("line.hairline") } }));
+      }
       y += m.titleHeight;
     } else if (L.tone === "stat") {
       // "88% | Investors that believe …": the figure in the heading role, a hairline
@@ -283,7 +298,10 @@ export function metricNodes({ id, frame, props }) {
   const hero = props.tone === "hero";
   const ink = ink_ ? ACCENT : dark ? WHITE : hero || ruled ? ACCENT : PRIMARY, grey = dark ? WHITE : hero || ruled ? INK : SECONDARY;
   const align = props.align ?? (hero || ruled ? "left" : "center");
-  let y = hero ? frame.y : frame.y + (frame.height - total) / 2;
+  // Peers in a row start on one line. Centred in its own track, a tile with
+  // three lines against its neighbours' four began ten pixels lower, and three
+  // numbers read across came out as a visible step down.
+  let y = hero || props.valign === "top" ? frame.y : frame.y + (frame.height - total) / 2;
   nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x + pad, y, width, height: value.height }, text: value.text, style: { fontFamily: DISPLAY, fontSize: token(valueSize), color: ink, bold: true, align, valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
   y += value.height;
   if (labelLayout) { y += gap; nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + pad, y, width }, labelLayout, text("type.compact", grey, false, align))); y += labelLayout.height; }

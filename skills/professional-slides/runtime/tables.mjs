@@ -1038,8 +1038,22 @@ function renderTableAt({ id, frame, props }) {
     const top = frame.y + m.headerHeight + m.gap / 2;
     const bottom = ys[last] + m.heights[last] - m.gap / 2;
     const diameter = Math.min(v("icon.medium"), m.widths[c] - m.gap);
-    const centreY = (top + bottom) / 2, reach = diameter / 2 + v("space.2");
     const data = { column: c, relation: "implies", arrowVariant: "divider-chevron" };
+    // The disc marks a row, or it marks nothing. Centred in the gutter it came
+    // to rest between two rows it was not about - "in the gap between Wonder
+    // Woman and Justice League, pointing at no particular verdict" - and a
+    // reader who sees that on a quarter of the deck reads it as furniture. So
+    // it sits on the table's emphasised row where there is one, and where
+    // there is none the dashed rule carries the boundary by itself, which is
+    // all the page needed.
+    const marked = m.rows.findIndex((row, index) => index <= last && (row.style ?? props.rowStyle) === "accented");
+    if (marked < 0) {
+      nodes.push(linePrimitive({ id: stableId(id, "implication-rule", c, "whole"), role: "table-implication",
+        x1: centreX, y1: top, x2: centreX, y2: bottom,
+        style: { stroke: t("color.rule"), lineWidth: t("line.hairline"), dash: "dash" }, data }));
+      return;
+    }
+    const centreY = ys[marked] + m.heights[marked] / 2 - m.gap / 2, reach = diameter / 2 + v("space.2");
     for (const [suffix, y1, y2] of [["top", top, centreY - reach], ["bottom", centreY + reach, bottom]]) {
       if (y2 <= y1) continue;
       nodes.push(linePrimitive({ id: stableId(id, "implication-rule", c, suffix), role: "table-implication",
@@ -1048,12 +1062,12 @@ function renderTableAt({ id, frame, props }) {
     }
     nodes.push(ellipsePrimitive({ id: stableId(id, "implication-disc", c), role: "table-implication",
       frame: { x: centreX - diameter / 2, y: centreY - diameter / 2, width: diameter, height: diameter },
-      style: box(primary), data: { ...data, arrowPart: 0 } }));
+      style: box(primary), data: { ...data, arrowPart: 0, row: marked } }));
     [[centreX - diameter * 0.11, centreY - diameter * 0.23, centreX + diameter * 0.12, centreY],
      [centreX + diameter * 0.12, centreY, centreX - diameter * 0.11, centreY + diameter * 0.23],
     ].forEach(([x1, y1, x2, y2], part) => nodes.push(linePrimitive({
       id: stableId(id, "implication-chevron", c, part), role: "table-implication", x1, y1, x2, y2,
-      style: { stroke: foreground(primary), lineWidth: t("line.standard") }, data: { ...data, arrowPart: part + 1 } })));
+      style: { stroke: foreground(primary), lineWidth: t("line.standard") }, data: { ...data, arrowPart: part + 1, row: marked } })));
   });
 
   // A bubble column is one pill repeated, not a pill per figure. Sized to its

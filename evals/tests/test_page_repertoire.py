@@ -124,13 +124,17 @@ import {{styleTable}} from '{COMPOSE}';
 import {{createRegistry}} from './skills/professional-slides/runtime/registry.mjs';
 const R=createRegistry();
 const rows=(n)=>Array.from({{length:n}},(_, i)=>[`Row ${{i}}`,'evidence','more','the verdict']);
-const draw=(n)=>{{
-  const t=styleTable({{type:'table',columns:['Criterion','Marvel','DC',{{label:'Verdict',implication:true}}],rows:rows(n)}});
+const draw=(n,highlightRow)=>{{
+  const t=styleTable({{type:'table',columns:['Criterion','Marvel','DC',{{label:'Verdict',implication:true}}],
+    rows:rows(n),...(highlightRow===undefined?{{}}:{{highlightRow}})}});
   const nodes=R.get('table').render({{id:'t',frame:{{x:0,y:0,width:1160,height:420}},props:{{...t,density:'body'}}}}).nodes;
   return nodes.filter((x)=>x.role==='table-implication'&&x.type==='ellipse').length;
 }};
 assert.equal(draw(3),3,'a short table marks every row');
-assert.equal(draw(6),1,'a long one says it once');
+// Past five rows it says it once - on the row the table emphasises, because a
+// disc centred in the gutter marks whichever row happens to be halfway down.
+assert.equal(draw(6,2),1,'a long one says it once, on the marked row');
+assert.equal(draw(6),0,'and says it with the rule alone where no row is marked');
 console.log(JSON.stringify({{ok:true}}));
 ''')
         self.assertTrue(result["ok"])

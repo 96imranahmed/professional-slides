@@ -172,17 +172,25 @@ const render=rows=>REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width:900
   .filter(n=>n.role==='table-implication');
 const dashed=nodes=>nodes.filter(n=>n.type==='line'&&n.style.dash==='dash');
 const span=rules=>[Math.min(...rules.map(r=>r.frame.y)),Math.max(...rules.map(r=>r.frame.y+r.frame.height))];
-const plain=render(body), rules=dashed(plain), disc=plain.find(n=>n.type==='ellipse');
-assert.equal(plain.filter(n=>n.type==='ellipse').length,1,'one disc for the whole table');
-assert.equal(rules.length,2,'the rule runs above and below the disc');
-const [top,foot]=span(rules), centre=disc.frame.y+disc.frame.height/2;
-assert.ok(Math.abs((top+foot)/2-centre)<1,'the disc is centred on what the rule spans');
+// With no row emphasised there is nothing for the disc to be about: centred,
+// it came to rest between two rows it was not about, and a reader meeting it
+// on a quarter of the deck reads it as furniture. The dashed rule carries the
+// boundary on its own.
+const plain=render(body), rules=dashed(plain);
+assert.equal(plain.filter(n=>n.type==='ellipse').length,0,'no disc without a row to mark');
+assert.equal(rules.length,1,'the rule runs the height of the evidence');
+const [top,foot]=span(rules);
+// Emphasise a row and the disc sits on it, with the rule broken around it.
+const marked=[...body]; marked[1]={cells:body[1],style:'accented'};
+const withMark=render(marked), disc=withMark.find(n=>n.type==='ellipse');
+assert.equal(withMark.filter(n=>n.type==='ellipse').length,1,'one disc, on the marked row');
+assert.equal(dashed(withMark).length,2,'the rule runs above and below it');
+const centre=disc.frame.y+disc.frame.height/2;
+assert.ok(centre<(top+foot)/2,'and it sits on the second row, not halfway down');
 // Add a total and the span shortens: a total is the same rows added up.
 const withTotal=render([...body,{cells:['Total',blank,'26'],style:'total'}]);
 const [,footWithTotal]=span(dashed(withTotal));
 assert.ok(Math.abs(footWithTotal-foot)<1,'the total row is outside the rule');
-const discWithTotal=withTotal.find(n=>n.type==='ellipse');
-assert.ok(Math.abs((discWithTotal.frame.y+discWithTotal.frame.height/2)-centre)<1,'and does not move the disc');
 console.log('{}');
 ''')
 

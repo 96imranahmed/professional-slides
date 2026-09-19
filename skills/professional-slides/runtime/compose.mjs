@@ -1191,7 +1191,7 @@ function niceCeiling(value) {
 function metricsStrip(metrics, id, tone) {
   const tiles = metrics.map((m) => (typeof m === "string" ? { value: m } : m));
   const prominent = tone === "ink" || tone === "rule";
-  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
+  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...(tiles.length > 1 ? { valign: "top" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
 }
 
 /**
@@ -2521,7 +2521,15 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // "What it means" above three lines of text is a label on a mostly empty
     // column. The heading earns its line when the column holds a list; a column
     // that is one number or one box takes the blank band and keeps the rule.
-    const heading = slide.pointsHeading === false || (insightBox && !slide.pointsHeading) || (!list && !slide.pointsHeading) ? null : slide.pointsHeading || "What it means";
+    // "What it means" earns its line over a column of plain points, where
+    // nothing else says what the column is. Over points that carry their own
+    // leads it is a label on labelled things, and it was on eighteen pages of
+    // forty-four: the same three words, naming no measure, no period and no
+    // question, while the leads under it named all three.
+    const ledPoints = Boolean(list) && (slide.points || []).every((point) => point && typeof point === "object" && point.lead);
+    const heading = slide.pointsHeading === false || (insightBox && !slide.pointsHeading)
+      || (!list && !slide.pointsHeading) || (ledPoints && !slide.pointsHeading)
+      ? null : slide.pointsHeading || "What it means";
     // The hero's blank heading band exists to line its content up with the
     // column's heading. With no heading beside it the band is an empty rule, so
     // the exhibit starts at the top of the body instead.
@@ -2661,7 +2669,8 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // is a label on a labelled thing, and it was the third of the deck's pages
     // carrying those same three words: twenty-three of forty-four, which a
     // reader flicking the spreads reads as one page coming round again.
-    const headBelow = below === columns ? belowHeading : slide.pointsHeading || null;
+    const headBelow = below === columns && !columns.every((column) => column.heading)
+      ? belowHeading : slide.pointsHeading || null;
     items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
       headedPanel(exhibits[0], item, `${id}-exhibit`, false),
       { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}),
