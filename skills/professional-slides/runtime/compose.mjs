@@ -648,8 +648,11 @@ function iconColumn(ex) {
   const columns = (ex.columns || []).map((c, i) => (i === 0
     ? (typeof c === "object" && c ? { ...c, type: "category" } : { label: String(c ?? ""), type: "category" })
     : c));
-  const nextRows = rows.map((row) => {
+  const nextRows = rows.map((row, index) => {
     const cells = Array.isArray(row) ? row : row.cells || [];
+    // `index` was never a parameter, so `icons: [...]` threw a ReferenceError
+    // every time it was used - which is why two cold-run decks of 39 tables
+    // carried not one icon between them, and why nobody noticed.
     const icon = listed ? listed[index] : row?.icon;
     if (!icon) return row;
     const first = cells[0];

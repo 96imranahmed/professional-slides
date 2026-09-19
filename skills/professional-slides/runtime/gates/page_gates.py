@@ -209,8 +209,6 @@ THRESHOLDS = {
     "shapes_per_ten_min": 3.0,  # distinct architectures per ten pages (the reference decks run about five)
     "shape_share_max": 0.40,    # share of pages on the commonest architecture (the reference median is 0.23)
     "front_matter_from": 12,    # analytical pages beyond which a deck needs a contents page and an opening summary
-    "numbers_per_page_min": 6,   # printed numeric tokens on any page carrying an exhibit that has values to print
-    "numbers_per_chart_page_min": 18,  # a chart page: client decks print a median of 26, lower quartile 20
     "column_run_max": 4,        # consecutive pages whose commentary column may share one device    # share of pages on the commonest architecture (the reference median is 0.23)
     # What the page says. Calibrated on the four example decks, which are the
     # only corpus in the repository - `--report` prints the measured value
@@ -372,7 +370,6 @@ GATE_CODES = {
     "PAGE_VARIETY": "too few page families across the deck",
     "PAGE_SHAPE_FLAT": "the deck is built from too few page architectures",
     "COLUMN_MONOTONY": "the commentary column is marked the same way page after page",
-    "NUMBERS_ON_PAGE": "a measured page that prints too few of its measures",
     "NO_CONTENTS": "a sectioned deck that never says what its sections are",
     "NO_SUMMARY": "a deck that opens with evidence instead of with its answer",
     "EVIDENCE_MIX": "too few analytical pages carry a measured exhibit",
@@ -1254,56 +1251,6 @@ def gate_unannotated(slide_no, slide, findings):
     ))
 
 
-def gate_numbers_on_page(slide_no, slide, findings):
-    """NUMBERS_ON_PAGE. A measured page prints its measures.
-
-    The floor follows the exhibit, because the corpus does. Published pages
-    carrying a chart print a median of 27 numeric tokens and a lower quartile of
-    16; pages carrying a table print 11; pages carrying a diagram print 4. One
-    floor of eight applied to every exhibit page rejected 29% of published
-    exhibit pages, nearly all of them process chains and structural matrices
-    whose evidence is the structure. So a chart page is held to a chart's floor,
-    a data page to a lower one, and a page whose exhibit has no values to print
-    is not held to either.
-
-    This is a floor on printed numbers, not on precision: rounding a figure does
-    not cost it its token.
-    """
-    floor = WEIGHT.get("pageWords")
-    if not floor:
-        return
-    exhibits = [c for c in slide.get("componentInstances", []) if is_exhibit(c)]
-    if not exhibits:
-        return
-    components = {str(c.get("component") or "") for c in exhibits}
-    if any(name.startswith("chart.") for name in components):
-        want, family = THRESHOLDS["numbers_per_chart_page_min"], "chart"
-    elif components & DATA_COMPONENTS:
-        want, family = THRESHOLDS["numbers_per_page_min"], "table"
-    else:
-        return                  # a diagram or a photograph argues from its shape
-    numeric = 0
-    for node in text_nodes(slide):
-        role = str(node.get("role") or "")
-        if role in FOOTER_ROLES or role in TITLE_ROLES:
-            continue
-        for word in re.split(r"\s+", source_text(node)):
-            if NUMERIC_TOKEN.match(word):
-                numeric += 1
-    if numeric >= want:
-        return
-    observed = REFERENCE_PAGE["numericByFamily"][family]
-    findings.append(finding(
-        slide_no, "NUMBERS_ON_PAGE", numeric, want,
-        "The page argues from measures it does not print. Published client "
-        f"pages carrying this kind of exhibit print {observed} numeric tokens: "
-        "a value on every mark, the base under each category, the share beside "
-        "the count, the figure inside the sentence rather than the adjective. "
-        "`dataTable: true` under a chart, `derive` on a table and "
-        "`categoryNotes` each print numbers the page already holds.",
-    ))
-
-
 def gate_heading_wraps(slide_no, slide, findings):
     """HEADING_WRAPS. The exhibit banner is one line: the measure, the population
     and the period, with the unit inline after it. Two lines means the heading is
@@ -1379,8 +1326,14 @@ def gate_missing_argument(slide_no, slide, findings):
 # others while carrying twenty-eight pages headed "Interpretation:", one chart,
 # and seven comparison tables whose two columns held identical sentences.
 
-COMMENTARY_ROLES = {"list-item", "list-lead", "insight-body", "paragraph-text",
-                    "body-text", "callout-text", "callout-lead", "statement-text"}
+# The roles a page's own sentences are drawn under. `paragraph-text` and
+# `body-text` were in this set and neither exists: the renderer draws a
+# paragraph under the role `paragraph` (registry.mjs). So every gate reading
+# this set - RESTATEMENT, PLANNING_VOICE, CAVEAT_HEAVY, CONTRADICTED_SHARE -
+# was blind to every paragraph in every deck. Two role vocabularies for one
+# node, one of them invented.
+COMMENTARY_ROLES = {"list-item", "list-lead", "insight-body", "paragraph",
+                    "panel-caption", "callout-text", "callout-lead", "statement-text"}
 EXHIBIT_TEXT_ROLES = {"table-cell-text", "table-header-text", "table-group-text",
                       "data-label", "category-label", "category-note", "annotation-text",
                       "legend-label", "chart-unit", "metric-value", "metric-label",

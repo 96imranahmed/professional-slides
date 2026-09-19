@@ -191,7 +191,7 @@ console.log(JSON.stringify({gaps: items.slice(1).map((n,i)=>Math.round(n.frame.y
 class GateVocabularyTests(unittest.TestCase):
     def test_the_new_deck_gates_are_registered_and_documented(self):
         index = (SKILL / "references" / "evaluation" / "index.md").read_text(encoding="utf-8")
-        for code in ("PAGE_SHAPE_FLAT", "COLUMN_MONOTONY", "NUMBERS_ON_PAGE", "NO_CONTENTS", "NO_SUMMARY"):
+        for code in ("PAGE_SHAPE_FLAT", "COLUMN_MONOTONY", "NO_CONTENTS", "NO_SUMMARY"):
             self.assertIn(code, page_gates.GATE_CODES, code)
             self.assertIn(f"`{code}`", index, f"{code} is not in the evaluation table")
 

@@ -291,7 +291,7 @@ A full page is not a crowded page. The floors come from **real client-project de
 | - in the title band | 18 | 17 | `TITLE_LINES`, `TITLE_WORDS` |
 | - **in the body** | **148** | 157 | `THIN_PAGE` floors the body alone |
 | - in the footer, source and notes | 13 | 12 | `NOTE_HEAVY` |
-| Numeric tokens | 13 overall - 26 on a chart page, 20 on a table, 4 on a diagram | 11 | `NUMBERS_ON_PAGE`, by exhibit family |
+| Numeric tokens | 13 overall - 26 on a chart page, 20 on a table, 4 on a diagram | 11 | `NUMBERS_ON_MARKS`: every mark carries its value |
 | Drawn objects (marks, rules, brackets) | median 32 (p25 11, p75 88) | - | the cold-run scorer's `drawingsPerPage` |
 | Pages carrying 186+ words | 51% | 54% | `DECK_FLAT`: a deck of uniformly light pages has not chosen |
 | Pages carried by a chart | 30% | 37% | `plan.mix.chart` floors at 25% |
