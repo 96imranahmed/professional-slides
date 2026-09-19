@@ -1114,6 +1114,13 @@
         "totals": [
           0,
           5
+        ],
+        "annotations": [
+          {
+            "category": "FY26",
+            "text": "Price and mix are the levers the plan can still move",
+            "treatment": "callout"
+          }
         ]
       },
       "points": [
@@ -1919,6 +1926,13 @@
               200
             ]
           }
+        ],
+        "annotations": [
+          {
+            "category": "2024",
+            "text": "One band takes almost all the growth",
+            "treatment": "callout"
+          }
         ]
       },
       "points": [
@@ -2088,12 +2102,6 @@
             "name": "Harbor",
             "x": 5,
             "y": 96
-          }
-        ],
-        "annotations": [
-          {
-            "category": "Harbor",
-            "text": "Five modules, 96% renewal"
           }
         ],
         "xScale": {

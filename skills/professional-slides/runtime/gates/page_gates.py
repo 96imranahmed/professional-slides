@@ -1724,6 +1724,17 @@ def gate_image_budget(slides, analytical, findings):
         ))
 
 
+# The roles that say a table was treated and a chart was marked. `reviewer.mjs`
+# carries the same two lists for the review packet; they are here as well
+# because the build has to be able to refuse a deck, and the build reads this
+# file. If one moves, move both - `test_deck_craft.py` holds them to each other.
+TREATED_ROLE = re.compile(r"^table-(bubble|bar|rating-|implication|column-band|row-band|zebra-band|harvey"
+                          r"|status-pill|number-circle|lamp|dot|check|progress-"
+                          r"|cell-icon|section-marker|section-number)")
+ANNOTATED_ROLE = re.compile(r"^(annotation-|chart-(bracket|delta|event-|highlight|reference|band|callout|change))")
+TABLE_COMPONENTS = {"table", "comparison-table", "heatmap", "trend-rows"}
+
+
 def gate_deck_craft(slides, analytical, findings):
     """DECK_CRAFT. What the deck does, over its own pages, against what client
     decks do over theirs.
@@ -1740,6 +1751,12 @@ def gate_deck_craft(slides, analytical, findings):
                   work; a page without one is a page a reader cannot check.
       marks       drawn primitives that are not type, per page. The corpus runs
                   a median of 32 and a first quartile of 11.
+      treated     tables carrying a device beyond a plain grid. 32 of 32 in
+                  client work - not one plain grid in 28 decks.
+      annotated   charts carrying a mark that states the finding. 0.80 in client
+                  work. These two had floors in `plan.craft` and the floors ran
+                  only when a plan file existed, so a deck could ship 33%
+                  annotated charts and pass its own build.
 
     One finding, three rates, so the report says what the deck is like rather
     than repeating one complaint per page.
@@ -1761,10 +1778,52 @@ def gate_deck_craft(slides, analytical, findings):
     sourced = share(lambda s: bool(roles(s) & SOURCE_ROLES))
     marks = sum(len([n for n in s.get("nodes", []) if n.get("type") != "text"]) for s in pages) / float(total)
 
+    def area(instance):
+        frame = instance.get("frame") or {}
+        return float(frame.get("width") or 0) * float(frame.get("height") or 0)
+
+    def carrying(test):
+        """Pages *carried by* this kind of exhibit, which is what the corpus
+        counted. A chart's own values printed as a one-row strip beneath it is
+        furniture, not a table the page has to treat - so an exhibit counts
+        only when it is the biggest one on its page."""
+        out = []
+        for slide in pages:
+            exhibits = [c for c in slide.get("componentInstances", [])
+                        if str(c.get("component") or "").startswith("chart.")
+                        or str(c.get("component") or "") in TABLE_COMPONENTS]
+            if not exhibits:
+                continue
+            biggest = max(exhibits, key=area)
+            if test(str(biggest.get("component") or "")):
+                out.append(slide)
+        return out
+
+    def rate(carriers, pattern, recoloured=False):
+        if not carriers:
+            return None
+        def marked(slide):
+            if any(pattern.match(r) for r in roles(slide)):
+                return True
+            # A recoloured category is the commonest mark of all and draws no
+            # node of its own: the bar keeps its role and carries `highlighted`.
+            return recoloured and any((n.get("data") or {}).get("highlighted")
+                                      for n in slide.get("nodes", []))
+        return sum(1 for s in carriers if marked(s)) / float(len(carriers))
+
+    tables = carrying(lambda c: c in TABLE_COMPONENTS)
+    charts = carrying(lambda c: c.startswith("chart."))
+    treated = rate(tables, TREATED_ROLE)
+    annotated = rate(charts, ANNOTATED_ROLE, recoloured=True)
+
+    craft = CONTRACT["plan"]["craft"]
     measured = {"highlight": round(highlighted, 3), "source": round(sourced, 3),
-                "marksPerPage": round(marks, 1)}
+                "marksPerPage": round(marks, 1),
+                "tablesTreated": None if treated is None else round(treated, 3),
+                "chartsAnnotated": None if annotated is None else round(annotated, 3)}
     want = {"highlight": THRESHOLDS["highlight_share_min"], "source": THRESHOLDS["source_share_min"],
-            "marksPerPage": THRESHOLDS["marks_per_page_min"]}
+            "marksPerPage": THRESHOLDS["marks_per_page_min"],
+            "tablesTreated": craft["tableTreated"]["min"], "chartsAnnotated": craft["chartAnnotated"]["min"]}
     client = REFERENCE_JUDGED
     short = []
     if highlighted < want["highlight"]:
@@ -1776,6 +1835,16 @@ def gate_deck_craft(slides, analytical, findings):
         short.append(
             f"only {sourced:.0%} of pages carry a source against {client['sourceLine']:.0%}. A measured page "
             "says where the measure came from")
+    if treated is not None and treated < want["tablesTreated"]:
+        short.append(
+            f"{treated:.0%} of the tables carry a treatment against {craft['tableTreated']['observedClient']:.0%} in "
+            f"client work - {len(tables)} tables here, and not one plain grid in the 28 client decks measured. "
+            "Shade the bands, code the cells, bubble the share, set the total row apart")
+    if annotated is not None and annotated < want["chartsAnnotated"]:
+        short.append(
+            f"{annotated:.0%} of the charts carry a mark that states the finding against "
+            f"{craft['chartAnnotated']['observedClient']:.0%} in client work. A bracket between the two series the "
+            "title compares, a change bubble, a reference line at the target, a shaded period, a recoloured category")
     if marks < want["marksPerPage"]:
         short.append(
             f"{marks:.0f} drawn elements a page against a corpus median of {REFERENCE_PAGE['drawings']}. A page "

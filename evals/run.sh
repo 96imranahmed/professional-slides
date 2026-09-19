@@ -81,6 +81,21 @@ for deck in gallery-acceptance house-style nyc-or-sf slideworks; do
 done
 [ -d /tmp/ps-build-gallery-acceptance ] || echo "  (build the example decks into /tmp/ps-build-<name> to populate this)"
 
+echo "== against the corpus =="
+# The question no gate answers: by how much, and in which direction. Same
+# instrument pointed at our decks and at the client-work numbers in the
+# contract. SKILL.md used to carry an "Ours today" column measured a different
+# way; it rotted and was deleted. This does not rot, because it is computed.
+built=""
+for deck in gallery-acceptance house-style nyc-or-sf slideworks; do
+  [ -f "/tmp/ps-build-$deck/scene.json" ] && built="$built /tmp/ps-build-$deck"
+done
+if [ -n "$built" ]; then
+  "$NODE" evals/corpus/compare.mjs $built || true
+else
+  echo "  (build the example decks into /tmp/ps-build-<name> to populate this)"
+fi
+
 echo "== golden reference =="
 "$PYTHON" evals/scripts/check_release.py >/dev/null
 

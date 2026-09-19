@@ -1557,6 +1557,75 @@ function chooseLayout(slide, recent = []) {
  * Highlight the answer: a single-series bar or column chart with no declared
  * highlight takes one from the title when the title names a category.
  */
+/**
+ * A chart nobody marked gets the mark its own data asks for.
+ *
+ * Four charts in five carry one in real client work (evals/corpus): a bracket,
+ * a change bubble, a reference line, a recoloured category. Ours carried one on
+ * a third of them, because every annotation had to be written by hand and the
+ * two rules that derive one - `highlightFromTitle` and `changeFromContent` -
+ * only fire on a column, a bar or a range whose title happens to name one of its
+ * own categories.
+ *
+ * So this is the chart's equivalent of an untreated table banding its own rows:
+ * when a categorical chart reaches the end of the derivation chain with nothing
+ * marked on it, the category the page's own `highlight` names is picked out, and
+ * failing that the largest one. The extreme is what the eye goes to anyway; the
+ * mark says the page meant it to.
+ *
+ * Never over an authored annotation, never on a chart with one category, and
+ * never on the plot types where a recoloured category means something else
+ * (a line's series, a scatter's points, a waterfall's bridge).
+ */
+// One series only for the bar family: a recoloured bar in a grouped or stacked
+// chart says "this category" where the reader reads "this series", and the
+// renderer refuses it. The waffle, the marimekko and the bubble grid are
+// single-subject by construction and take the mark on their own category.
+const MARKABLE = new Set(["chart.column", "chart.bar", "chart.lollipop",
+                          "chart.waffle", "chart.marimekko", "chart.bubble-grid"]);
+// Read AFTER the derivation chain, so this has to include what that chain
+// leaves behind as well as what an author writes: `cagr` becomes
+// `changeAnnotations`, and a forecast column is already saying something about
+// itself in its own colour.
+const AUTHORED_MARK = ["highlights", "annotations", "changeAnnotations", "periods", "events",
+                       "change", "cagr", "reference", "referenceLines", "band", "callout",
+                       "segmentGrowth", "stackBracket", "gap", "target", "forecastFrom",
+                       "threshold", "benchmark"];
+
+function markTheFinding(ex, slide) {
+  if (!ex || typeof ex !== "object" || !MARKABLE.has(String(ex.type))) return ex;
+  if (AUTHORED_MARK.some((key) => ex[key] !== undefined)) return ex;
+  const categories = Array.isArray(ex.categories) ? ex.categories
+    : Array.isArray(ex.rows) ? ex.rows.map((r) => (Array.isArray(r) ? r[0] : r?.label ?? r?.cells?.[0]))
+    : null;
+  if (!Array.isArray(categories) || categories.length < 2) return ex;
+  const oneSeries = !Array.isArray(ex.series) || ex.series.length === 1;
+  if (!oneSeries && !["chart.marimekko", "chart.bubble-grid"].includes(String(ex.type))) return ex;
+
+  const named = (() => {
+    const phrase = String(slide?.highlight ?? "").toLowerCase();
+    if (!phrase) return null;
+    return categories.find((c) => String(c ?? "").length >= 3
+      && phrase.includes(String(c).toLowerCase())) ?? null;
+  })();
+
+  const totals = categories.map((_, index) => {
+    if (Array.isArray(ex.series)) {
+      return ex.series.reduce((sum, series) => sum + (Number(series?.values?.[index]) || 0), 0);
+    }
+    if (Array.isArray(ex.values)) {
+      const row = ex.values[index];
+      return Array.isArray(row) ? row.reduce((sum, v) => sum + (Number(v) || 0), 0) : Number(row) || 0;
+    }
+    return 0;
+  });
+  const biggest = totals.some((t) => t > 0)
+    ? categories[totals.indexOf(Math.max(...totals))] : null;
+  const category = named ?? biggest;
+  if (category === null || category === undefined) return ex;
+  return { ...ex, highlights: [{ category, style: "bar" }] };
+}
+
 function highlightFromTitle(ex, title) {
   if (!ex || !["chart.column", "chart.bar", "chart.range"].includes(ex.type) || ex.highlights !== undefined) return ex;
   if (ex.type !== "chart.range" && (!Array.isArray(ex.series) || ex.series.length !== 1)) return ex;
@@ -1994,7 +2063,8 @@ const SLIDE_PASSES = [
   // Findings the exhibit's own data supports: a percent stack, the highlight
   // the title names, the change between the periods it compares.
   ["read-the-data", (slide) => {
-    const derive = (ex) => changeFromContent(highlightFromTitle(percentStack(ex), slide.title), slide.title);
+    const derive = (ex) => markTheFinding(
+      changeFromContent(highlightFromTitle(percentStack(ex), slide.title), slide.title), slide);
     if (slide.exhibit) return { ...slide, exhibit: derive(slide.exhibit) };
     if (slide.exhibits) return { ...slide, exhibits: slide.exhibits.map(derive) };
     return slide;

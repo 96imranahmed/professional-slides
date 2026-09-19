@@ -38,7 +38,7 @@ def text(role, value, **over):
     return dict({"type": "text", "role": role, "text": value}, **over)
 
 
-def page(n, *, highlight=False, source=True, marks=14):
+def page(n, *, highlight=False, source=True, marks=14, annotated=True):
     nodes = [text("action-title", f"Page {n} states a finding worth reading"),
              text("list-item", "The second wave opens on a gate rather than on a date",
                   **({"runs": [{"text": "The second wave opens on ", "bold": False},
@@ -46,7 +46,9 @@ def page(n, *, highlight=False, source=True, marks=14):
                                {"text": " rather than on a date", "bold": False}]} if highlight else {}))]
     if source:
         nodes.append(text("source-text", "Source: engagement analysis, 2026"))
-    nodes.extend({"type": "rect", "role": "chart-mark"} for _ in range(marks))
+    for index in range(marks):
+        nodes.append({"type": "rect", "role": "chart-mark",
+                      **({"data": {"highlighted": True}} if annotated and index == 0 else {})})
     return {"id": f"s{n:02d}", "componentInstances": [{"id": "chrome", "component": "slide-chrome"},
                                                       {"id": f"s{n:02d}-0", "component": "chart.column"}],
             "nodes": nodes}
@@ -72,14 +74,24 @@ class DeckCraftTests(unittest.TestCase):
     def test_a_deck_that_works_its_pages_passes(self):
         self.assertEqual(craft([page(i, highlight=True) for i in range(1, 9)]), [])
 
-    def test_the_three_rates_are_one_finding(self):
-        """Not three codes and not one per page: a deck-level fact said once."""
-        findings = craft([page(i, source=False, marks=2) for i in range(1, 9)])
+    def test_every_rate_is_one_finding(self):
+        """Not five codes and not one per page: a deck-level fact said once."""
+        findings = craft([page(i, source=False, marks=2, annotated=False) for i in range(1, 9)])
         self.assertEqual(len(findings), 1)
         measured = findings[0]["measured"]
-        self.assertEqual(sorted(measured), ["highlight", "marksPerPage", "source"])
-        for phrase in ("emphasised", "carry a source", "drawn elements"):
+        self.assertEqual(sorted(measured),
+                         ["chartsAnnotated", "highlight", "marksPerPage", "source", "tablesTreated"])
+        for phrase in ("emphasised", "carry a source", "drawn elements", "states the finding"):
             self.assertIn(phrase, findings[0]["repair"])
+
+    def test_the_craft_floors_apply_at_build_time_not_only_to_a_plan(self):
+        """`plan.craft` ran only when a `.plan.json` existed beside the spec, so
+        a deck could ship a third of its charts unmarked and pass its own
+        build. The floors are read from the same contract, on the scene."""
+        findings = craft([page(i, highlight=True, annotated=False) for i in range(1, 9)])
+        self.assertEqual(findings[0]["measured"]["chartsAnnotated"], 0.0)
+        self.assertEqual(findings[0]["threshold"]["chartsAnnotated"],
+                         page_gates.CONTRACT["plan"]["craft"]["chartAnnotated"]["min"])
 
     def test_a_short_deck_is_not_measured_on_a_rate(self):
         # Four pages cannot have a rate. The floor exists so that one page does

@@ -1298,6 +1298,23 @@ function waterfall({ id, frame, props }) {
  * by category, the count above each block and the category below. `percent:
  * true` draws a 10x10 block per category with `value` dots filled. Single series.
  */
+/**
+ * The category a chart was told to pick out, for the plot types that draw their
+ * own marks and cannot host a callout.
+ *
+ * `highlights` was honoured by the column, bar and range charts and silently
+ * ignored everywhere else, alongside `annotations`, which three plot types
+ * accepted and drew nothing from. A recoloured category is the commonest mark
+ * in published client work and the only one that costs a plot no layout, so it
+ * is the one these types get.
+ */
+function highlightedCategory(props) {
+  const first = (props.highlights || [])[0];
+  if (first === undefined || first === null) return null;
+  const name = typeof first === "string" ? first : first.category;
+  return name === undefined || name === null ? null : String(name);
+}
+
 function waffleLayout(frameIn, props) {
   // A hug measurement passes no height: size the dots from the width alone.
   const frame = Number.isFinite(frameIn.height) ? frameIn : { ...frameIn, height: 400 };
@@ -1324,7 +1341,10 @@ function waffleChart({ id, frame, props }) {
   const { categories, values, percent, plot, slot, columns, categoryLayouts, labelBand, categoryBand, cell, pitch, blockWidth, blockHeight } = waffleLayout(frame, props);
   const nodes = [];
   const fill = props.color ? token(props.color) : PRIMARY, empty = GRID;
+  const picked = highlightedCategory(props);
   categories.forEach((category, index) => {
+    const lit = picked !== null && String(category) === picked;
+    const dotFill = lit ? token("color.accent") : fill;
     const x0 = plot.x + index * slot + (slot - blockWidth) / 2;
     const y0 = plot.y + labelBand + (plot.height - labelBand - categoryBand - blockHeight) / 2;
     const count = values[index];
@@ -1334,7 +1354,7 @@ function waffleChart({ id, frame, props }) {
       // Percent blocks fill from the bottom-left, row by row, as a tally.
       const y = percent ? y0 + blockHeight - cell - r * pitch : y0 + r * pitch;
       const on = !percent || i < count;
-      nodes.push(ellipsePrimitive({ id: stableId(id, "dot", category, i), role: on ? "chart-mark" : "chart-unit-empty", frame: { x: x0 + c * pitch, y, width: cell, height: cell }, style: fillStyle(on ? fill : empty), data: { category, index: i, on } }));
+      nodes.push(ellipsePrimitive({ id: stableId(id, "dot", category, i), role: on ? "chart-mark" : "chart-unit-empty", frame: { x: x0 + c * pitch, y, width: cell, height: cell }, style: fillStyle(on ? dotFill : empty), data: { category, index: i, on, ...(lit && on ? { highlighted: true, highlightStyle: "bar" } : {}) } }));
     }
     nodes.push(textPrimitive({ id: stableId(id, "value", category), role: "data-label", frame: { x: plot.x + index * slot, y: y0 - labelBand + 2, width: slot, height: 24 }, text: percent ? `${count}%` : formatValue(count, props), style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
     const layout = categoryLayouts[index];
@@ -1378,7 +1398,8 @@ function bubbleGrid({ id, frame, props, tokens = TOKENS }) {
       const value = L.values[r][c];
       const cx = L.plot.x + c * L.cellW + L.cellW / 2;
       const d = value > 0 ? Math.max(14, L.maxDiameter * Math.sqrt(value / L.max)) : 0;
-      if (d) nodes.push(ellipsePrimitive({ id: stableId(id, "bubble", row, column), role: "chart-mark", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: fillStyle(fill), data: { row, column, value } }));
+      const lit = highlightedCategory(props) !== null && String(row) === highlightedCategory(props);
+      if (d) nodes.push(ellipsePrimitive({ id: stableId(id, "bubble", row, column), role: "chart-mark", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: fillStyle(lit ? token("color.accent") : fill), data: { row, column, value, ...(lit ? { highlighted: true, highlightStyle: "bar" } : {}) } }));
       const inside = d >= 24;
       nodes.push(textPrimitive({ id: stableId(id, "value", row, column), role: "data-label", frame: inside || !d ? { x: cx - Math.max(d, 48) / 2, y: cy - 10, width: Math.max(d, 48), height: 20 } : { x: cx - 24, y: cy - d / 2 - 22, width: 48, height: 20 }, text: formatValue(value, props), style: textStyle(CHART_LABEL, inside ? insideColor : INK, labelBold(), "center") }));
     });
@@ -1425,7 +1446,8 @@ function marimekko({ id, frame, props, tokens = TOKENS }) {
       const h = bodyH * v / total;
       if (h <= 0) return;
       const colorIndex = props.colorIndices?.[si] ?? si % SERIES.length;
-      nodes.push(rectPrimitive({ id: stableId(id, "segment", category, sr.name), role: "chart-mark", frame: { x, y, width: w, height: h }, style: fillStyle(SERIES[colorIndex], token("color.surface")), data: { category, series: sr.name, value: v, share: v / total, colorIndex } }));
+      const lit = highlightedCategory(props) !== null && String(category) === highlightedCategory(props);
+      nodes.push(rectPrimitive({ id: stableId(id, "segment", category, sr.name), role: "chart-mark", frame: { x, y, width: w, height: h }, style: fillStyle(SERIES[colorIndex], lit ? token("color.accent") : token("color.surface")), data: { category, series: sr.name, value: v, share: v / total, colorIndex, ...(lit ? { highlighted: true, highlightStyle: "column" } : {}) } }));
       const text = props.percentLabels === false ? formatValue(v, props) : `${Math.round(100 * v / total)}%`;
       const label = measureText(text, Math.max(20, w - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: labelBold(), wrapWidthRatio: 1 });
       if (h >= label.height + 4 && w >= label.width + 6) {

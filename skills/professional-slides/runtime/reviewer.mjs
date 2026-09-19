@@ -130,10 +130,11 @@ export async function buildReviewPacket({ outputDirectory, brief = "", answer = 
  */
 export function designStatistics(scene) {
   // A treatment is anything a reader can see that a plain grid does not do.
-  // Published client tables carry one 89% of the time (evals/corpus), and the
-  // commonest is the banded row, so a zebra band counts here as much as a
-  // harvey ball does.
-  const TREATMENT = /^table-(bubble|bar|rating-|implication|column-band|row-band|zebra-band|harvey|status-pill|number-circle|lamp|dot|check|progress-)/;
+  // Client tables carry one 100% of the time - 32 of 32 - so a zebra band
+  // counts as much as a harvey ball, and so do an icon on every row and a
+  // numbered category marker. `page_gates.py` holds the same list, because the
+  // build has to be able to refuse a deck and the build reads that file.
+  const TREATMENT = /^table-(bubble|bar|rating-|implication|column-band|row-band|zebra-band|harvey|status-pill|number-circle|lamp|dot|check|progress-|cell-icon|section-marker|section-number)/;
   const ANNOTATION = /^(annotation-|chart-(bracket|delta|event-|highlight|reference|band|callout|change))/;
   const content = scene.slides.filter((s) => s.nodes.some((n) => n.role === "action-title"));
   const kinds = new Set();
@@ -156,7 +157,10 @@ export function designStatistics(scene) {
     }
     if (components.some((c) => c.startsWith("chart."))) {
       charts += 1;
-      if (roles.some((r) => ANNOTATION.test(r))) annotated += 1;
+      // A recoloured category draws no node of its own - the mark keeps its
+      // role and carries `highlighted` - and it is the commonest mark there is.
+      const recoloured = slide.nodes.some((n) => n.data?.highlighted);
+      if (recoloured || roles.some((r) => ANNOTATION.test(r))) annotated += 1;
     }
   }
   const round = (n) => Math.round(n * 100) / 100;
