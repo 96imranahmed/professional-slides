@@ -326,10 +326,22 @@ const DEFAULT_SCALES = {
 function withDefaultScales(ex, rowsIn) {
   const scales = { ...(ex.scales || {}) };
   let used = false;
+  // Where every column carrying ticks asks its question in the header
+  // ("Resets?"), the key under the table is a sentence about nothing.
+  const asks = (index) => /\?\s*$/.test(columnLabel((ex.columns || [])[index] ?? "").trim());
+  const binaryColumns = new Set();
+  for (const row of rowsIn) {
+    const cells = Array.isArray(row) ? row : row?.cells;
+    if (!Array.isArray(cells)) continue;
+    cells.forEach((cell, index) => { if (cell && typeof cell === "object" && cell.type === "binary" && !cell.scale) binaryColumns.add(index); });
+  }
+  const selfEvident = binaryColumns.size > 0 && [...binaryColumns].every(asks);
   const rows = rowsIn.map((r) => Array.isArray(r) ? r.map((cell) => {
     if (!cell || typeof cell !== "object" || cell.scale || !["harvey", "binary", "heatmap"].includes(cell.type)) return cell;
     const id = cell.type === "harvey" ? "rating" : cell.type === "binary" ? "check" : "heat";
-    used = true; scales[id] = scales[id] || DEFAULT_SCALES[id];
+    used = true;
+    scales[id] = scales[id] || (id === "check" && selfEvident
+      ? { ...DEFAULT_SCALES.check, legend: false } : DEFAULT_SCALES[id]);
     // Binary states accept the words an author writes: positive/yes/true, negative/no/false.
     const value = cell.type === "binary" ? ({ positive: "yes", true: "yes", yes: "yes", negative: "no", false: "no", no: "no", missing: "missing", na: "missing" }[String(cell.value).toLowerCase()] ?? cell.value) : cell.value;
     return { ...cell, value, scale: id };
@@ -465,11 +477,20 @@ function groupNumericColumns(ex) {
  * the table.
  */
 const NOT_ADDITIVE = /(multiple|ratio|rate|score|rating|average|avg|median|mean|index|margin|share|percent|yield|per\b|cagr|growth|utilisation|utilization|efficiency|density|likelihood|probability)/i;
+// An ordinal is not a quantity either: a column of years summed to 12,103 in
+// the appendix of a deck whose numbers were otherwise right, and a reader who
+// sees that stops believing the two totals beside it.
+const ORDINAL = /^(year|yr|date|quarter|month|week|period|rank|position|order|no\.?|nr\.?|num|number|#|id|code|season|edition|wave|phase|stage)\b/i;
 const NOT_ADDITIVE_UNIT = /^(x|%|pt|pts|bps|:1|\/|per\b)/i;
-function addsUp(column) {
+function addsUp(column, values = []) {
   const label = typeof column === "string" ? column : String(column?.label ?? "");
   const unit = typeof column === "object" ? String(column?.unit ?? "") : "";
   if (/\(\s*x\b|\bx\s*\)|\bx budget\b/i.test(label)) return false;
+  if (ORDINAL.test(label.trim())) return false;
+  // And where the header says nothing, the numbers do: whole numbers that are
+  // all plausible years are a column of years whatever it is called.
+  const numbers = values.filter((value) => value !== null);
+  if (numbers.length >= 3 && numbers.every((value) => Number.isInteger(value) && value >= 1800 && value <= 2200)) return false;
   return !NOT_ADDITIVE.test(label) && !NOT_ADDITIVE_UNIT.test(unit.trim());
 }
 
@@ -492,8 +513,8 @@ function totalRow(ex) {
     // carry the weighted figure where the table holds the two quantities it is
     // drawn from, and otherwise nothing. The row keeps the cell empty rather
     // than printing a figure the table cannot justify.
-    if (!addsUp(column)) return " ";
     const values = body.map((row) => numberOf(row.cells[index]));
+    if (!addsUp(column, values)) return " ";
     if (values.some((value) => value === null)) return " ";
     return String(Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10);
   });
@@ -2565,7 +2586,16 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // with the disc centred on it. A short centred column (an insight box, two
     // lines) needs no divider: the disc alone joins the evidence to its meaning.
     const fullBleed = Boolean(heading) || tone !== "open" || Boolean(slide.photo);
-    const implication = slide.implication ?? true;
+    // The marked inference is an emphasis, and an emphasis on eighteen pages of
+    // forty-four is a rule. design.md reserves it for the one or two pages where
+    // the evidence genuinely implies the conclusion beside it; left on by
+    // default it became a filled navy disc halfway down a dashed rule on every
+    // page that had a column, pointing at whichever row happened to be in the
+    // middle. So the default rotates - a page takes it only when the last two
+    // did not - and `implication: true` still asks for it by hand.
+    const recentlyImplied = (recentStyles || []).slice(0, 6).includes("implication");
+    const implication = slide.implication ?? !recentlyImplied;
+    if (implication && Array.isArray(recentStyles)) recentStyles.unshift("implication");
     // The dashed rule runs through the disc on every page, not only where the
   // exhibit is full-bleed. A bare disc floating in an empty gutter reads as a
   // stray mark; the rule is what makes it a connector, and both variants have
@@ -2627,9 +2657,14 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
                     }) } }]
       : columns;
     if (Array.isArray(recentStyles)) recentStyles.unshift(below === columns ? "below-columns" : "below-cards");
+    // Cards name themselves. A shared "What it means" over three titled cards
+    // is a label on a labelled thing, and it was the third of the deck's pages
+    // carrying those same three words: twenty-three of forty-four, which a
+    // reader flicking the spreads reads as one page coming round again.
+    const headBelow = below === columns ? belowHeading : slide.pointsHeading || null;
     items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
       headedPanel(exhibits[0], item, `${id}-exhibit`, false),
-      { id: `${id}-below`, ...(belowHeading ? { heading: belowHeading } : {}),
+      { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}),
         layout: below === columns ? "flow.row" : "flow.column", size: HUG, items: below },
     ] });
   } else if (layout === "hero-number") {

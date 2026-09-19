@@ -26,3 +26,20 @@ export function formatValue(value, props) {
   const sign = format.sign === "always" && Number(raw) > 0 ? "+" : "";
   return `${format.prefix || ""}${sign}${number}${format.compactUnit || ""}${format.suffix || ""}`;
 }
+
+/**
+ * A formatted number with its unit, written the way the unit is written.
+ *
+ * "$m" after the figure gives "888$m", which no published page prints: a
+ * currency symbol leads and its magnitude trails, so the same unit gives
+ * "$888m". A percent closes up against the number, and everything else takes
+ * the space it needs.
+ */
+export function withUnit(text, unit) {
+  const trimmed = String(unit ?? "").trim();
+  if (!trimmed) return String(text);
+  const currency = trimmed.match(/^([$£€¥₹])\s*(.*)$/);
+  if (currency) return `${currency[1]}${text}${currency[2]}`;
+  if (/^[%‰]/.test(trimmed)) return `${text}${trimmed}`;
+  return `${text} ${trimmed}`;
+}

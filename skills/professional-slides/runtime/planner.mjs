@@ -449,12 +449,18 @@ export function instantiateSlideTemplate({ id, template, instances }) {
 export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
   if (!deckPlan?.id || !Array.isArray(deckPlan.slides)) throw new Error("Deck plan requires id and slides");
   const defaultTitleVariant = resolveTitleVariant({ variant: deckPlan.titleVariant });
-  const planned = deckPlan.slides.map((slide) => slide.kind === "cover"
+  // A page that carries an argument carries a page number. `slide-chrome`
+  // defaults one from the slide's position; the structural pages planned below
+  // it did not, so a deck's closing takeaways and its statements sat unnumbered
+  // in a numbered deck and the printed footer ran 45, 46, then nothing, then
+  // 49. A divider is the exception a reader expects: a full-bleed navy page
+  // with a numeral on it already says where it is.
+  const planned = deckPlan.slides.map((slide, index) => slide.kind === "cover"
     ? planCover(slide)
     : slide.kind === "tracker" ? planTracker(slide, registry)
     : slide.kind === "divider" ? planDivider(slide)
-    : slide.kind === "takeaways" ? planTakeaways(slide)
-    : slide.kind === "statement" ? planStatement(slide)
+    : slide.kind === "takeaways" ? planTakeaways({ pageNumber: index + 1, ...slide })
+    : slide.kind === "statement" ? planStatement({ pageNumber: index + 1, ...slide })
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
   const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, ...(deckPlan.chrome ? { chrome: deckPlan.chrome } : {}), ...(deckPlan.fill ? { fill: deckPlan.fill } : {}), ...(deckPlan.weight ? { weight: deckPlan.weight } : {}), slides: planned.map((item) => item.spec) }, registry, {slideCache});
   return {deck, decisions:planned.map(item=>item.decision)};

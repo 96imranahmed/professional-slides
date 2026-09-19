@@ -778,8 +778,13 @@ export function measureTable({ frame, props }) {
   for (const [id, scale] of used) {
     if (scale.legend !== false) continue;
     const columns = model.columns.filter((column, c) => model.cells.some(row => row[c]?.scale === id));
+    // A tick and a cross under a header that asks a question need no key, and
+    // the generic one - "Meets requirement: The option meets the requirement.
+    // Yes; No; Not assessed." - defines its own term with itself under a table
+    // that says neither "requirement" nor "option".
+    if (scale.type === "binary" && columns.length && columns.every(column => /\?\s*$/.test(String(column.label ?? "").trim()))) continue;
     if (scale.type !== "bars" || scale.series.length !== 1 || columns.some(column => !column.label.includes(scale.unit)))
-      throw new Error("Only single-series bar legends may be omitted, with their unit visible in every using column header");
+      throw new Error("Only single-series bar legends may be omitted, with their unit visible in every using column header, or a binary scale whose every column header asks a question");
   }
   const legends = [...used.entries()].filter(([, scale]) => scale.legend !== false).map(([id, scale]) =>
     layoutLegend(id, scale, frame.width, textSize, gap),

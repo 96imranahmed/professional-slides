@@ -1,4 +1,4 @@
-import { formatValue } from "./value-format.mjs";
+import { formatValue, withUnit } from "./value-format.mjs";
 export { formatValue } from "./value-format.mjs";
 import {
   ellipsePrimitive,
@@ -403,6 +403,13 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
     if (highlight.style === "bar") continue;
     const target = categoryMap.get(highlight.category);
     if (!target) throw new Error(`${id} highlight references unknown category ${highlight.category}`);
+    // Nothing to point at: a category whose every value is zero draws no mark,
+    // and a full-height tint standing where the mark would have been is read as
+    // the largest value on the chart - which is what a page arguing that this
+    // one costs nothing does not need. The label carries the zero instead.
+    const at = [...categoryMap.keys()].indexOf(highlight.category);
+    const values = (props.series || []).map((item) => item?.values?.[at]).filter((value) => Number.isFinite(value));
+    if (values.length && values.every((value) => value === 0)) continue;
     const box = highlight.style === "region-box";
     const frame = target.height === plot.height
       ? {
@@ -424,10 +431,19 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
             width: target.width + REGION_HIGHLIGHT_BLOCK_PAD * 2,
             height: target.height + REGION_HIGHLIGHT_BLOCK_PAD * 2
           };
+    // A region highlight says "this category", and it has to stop at the axis:
+    // twelve pixels of tint below the baseline reads as a bar that starts
+    // under the chart, and twelve to the left of a value axis crosses it.
+    const clipped = {
+      x: Math.max(frame.x, plot.x),
+      y: frame.y,
+      width: Math.min(frame.x + frame.width, plot.x + plot.width) - Math.max(frame.x, plot.x),
+      height: Math.min(frame.y + frame.height, plot.y + plot.height) - frame.y,
+    };
     underlay.push(rectPrimitive({
       id: stableId(id, "highlight", index),
       role: "chart-highlight",
-      frame,
+      frame: clipped,
       style: box
         ? { fill: "none", stroke: token("color.componentPrimary"), lineWidth: token("line.standard"), opacity: 1 }
         : { fill: token("color.surfaceMuted"), stroke: "none", lineWidth: token("line.hairline"), opacity: 0.8 },
@@ -528,7 +544,7 @@ function stackLabelPlan(props, categories, series, stacked) {
         const key = `${record.category}:${record.series ?? "stack-total"}`;
         if (secondary.has(key)) throw new Error("Duplicate secondary label anchor");
         if(props.secondaryLabelStyle === "parenthetical" && record.unit !== props.secondaryUnit) throw new Error("Secondary label unit differs from the shared unit");
-        secondary.set(key, props.secondaryLabelStyle === "parenthetical" ? formatValue(record.value, record) : `${formatValue(record.value, record)} ${record.unit}`);
+        secondary.set(key, props.secondaryLabelStyle === "parenthetical" ? formatValue(record.value, record) : withUnit(formatValue(record.value, record), record.unit));
       }
     }
   }

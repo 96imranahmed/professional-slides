@@ -454,7 +454,10 @@ const boxNodes=render({category:'B',style:'region-box'});
 const boxMarks=boxNodes.filter(n=>n.role==='chart-mark'&&n.data.category==='B');
 const boxLabel=boxNodes.find(n=>n.role==='category-label'&&n.text==='B');
 assert.ok(box.frame.y<Math.min(...boxMarks.map(n=>n.frame.y)));
-assert.ok(box.frame.y+box.frame.height>Math.max(...boxMarks.map(n=>n.frame.y+n.frame.height)));
+// The band stops at the baseline. Padded past it, twelve pixels of tint hang
+// below the axis and read as a bar that starts under the chart.
+const boxPlotBottom=Math.max(...boxMarks.map(n=>n.frame.y+n.frame.height));
+assert.ok(Math.abs(box.frame.y+box.frame.height-boxPlotBottom)<=0.01);
 assert.ok(boxLabel.frame.y>box.frame.y+box.frame.height);
 const tint=render({category:'B',style:'region-tint'}).find(n=>n.role==='chart-highlight');
 assert.equal(tint.style.fill.tokenId,'color.surfaceMuted');
@@ -466,7 +469,9 @@ for (const style of ['region-box','region-tint']) {
   const highlight=nodes.find(n=>n.role==='chart-highlight');
   const marks=nodes.filter(n=>n.role==='chart-mark'&&n.data.category==='C');
   for (const mark of marks) {
-    assert.ok(mark.frame.x-highlight.frame.x>=12);
+    // A horizontal bar starts at the value axis, so the band starts there too
+    // rather than twelve pixels to its left, across the axis line.
+    assert.ok(Math.abs(mark.frame.x-highlight.frame.x)<=0.01);
     assert.ok(highlight.frame.x+highlight.frame.width-mark.frame.x-mark.frame.width>=12-1e-8);
     assert.ok(mark.frame.y-highlight.frame.y>=12);
     assert.ok(highlight.frame.y+highlight.frame.height-mark.frame.y-mark.frame.height>=12);

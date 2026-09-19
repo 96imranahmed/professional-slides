@@ -1,3 +1,4 @@
+import { withUnit } from "./value-format.mjs";
 import { ellipsePrimitive, linePrimitive, rectPrimitive, stableId, textPrimitive, token, tokenValue } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 
@@ -25,7 +26,7 @@ export function quantitativeLegendNodes({id,frame,props}) {
   if (props.placement!==undefined && props.placement!=='top') throw new Error('Quantitative scale legend supports top placement');
   if (props.items!==undefined) throw new Error('Quantitative scale legend uses a domain rather than categorical items');
   const scale=normalizeQuantitativeScale(props.scale), size=tokenValue(token('type.chartLabel'));
-  const labels=scale.domain.map((v,i)=>`${scale.semantics==='relative-level'?(i?'High ':'Low '):''}${v.toFixed(scale.decimals)}${scale.unit==='%'?'':' '}${scale.unit}`);
+  const labels=scale.domain.map((v,i)=>`${scale.semantics==='relative-level'?(i?'High ':'Low '):''}${withUnit(v.toFixed(scale.decimals), scale.unit)}`);
   const measurements=labels.map(text=>measureText(text,frame.width,{fontSize:size,wrapWidthRatio:1}));
   const height=Math.max(...measurements.map(m=>m.height));
   if (measurements.some(m=>m.lines.length!==1)||measurements.reduce((s,m)=>s+m.width,0)+16>frame.width || height+20>frame.height) throw new Error('Quantitative legend does not fit its allocated frame');
