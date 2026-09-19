@@ -1,0 +1,168 @@
+{
+  "schema": "professional-slides.cold-run/v1",
+  "$comment": "The Marvel brief, run cold a second time. In September the same brief produced a deck its owner rated 2-3/10 that passed every gate the skill had. This run passes every gate too - and a taste review against references/taste-review.md rated it 5/10 and named six blockers, none of which any gate can see. That is the whole value of the record: the numbers moved and the gap that remains is a different gap.",
+  "brief": "evals/cold-run/briefs/marvel-vs-dc.md",
+  "ran": "2026-09-19",
+  "slides": 52,
+  "contentPages": 44,
+  "score": {
+    "content": {
+      "accepted": true,
+      "countsByCode": {}
+    },
+    "plan": {
+      "accepted": true,
+      "countsByCode": {}
+    },
+    "preflight": {
+      "accepted": true,
+      "countsByCode": {}
+    },
+    "rendered": {
+      "accepted": false,
+      "countsByCode": {
+        "INTERNAL_VOID": 4
+      }
+    }
+  },
+  "againstClientWork": {
+    "$comment": "The same vision rubric the 132 client pages were judged with, run over these 44 content pages.",
+    "titleIsClaim": {
+      "ours": 0.89,
+      "client": 0.648
+    },
+    "hasCommentary": {
+      "ours": 0.93,
+      "client": 0.328
+    },
+    "highlightedPhrase": {
+      "ours": 0.66,
+      "client": 0.508
+    },
+    "sourceLine": {
+      "ours": 0.98,
+      "client": 0.672
+    },
+    "chartAnnotated": {
+      "ours": 0.88,
+      "client": 0.796
+    },
+    "tableTreated": {
+      "ours": 1.0,
+      "client": 1.0
+    },
+    "noExhibitShare": {
+      "ours": 0.2,
+      "client": 0.246
+    },
+    "familyMix": {
+      "chart": 0.36,
+      "table": 0.32,
+      "text": 0.2,
+      "diagram": 0.09,
+      "mixed": 0.02
+    },
+    "familyMixClient": {
+      "chart": 0.3,
+      "text": 0.25,
+      "table": 0.2,
+      "mixed": 0.13,
+      "diagram": 0.1
+    },
+    "tableRowsMedian": {
+      "ours": 6,
+      "client": 5
+    }
+  },
+  "tasteReview": {
+    "rating": 5,
+    "previousRunRating": "2-3"
+  },
+  "foundByLooking": [
+    {
+      "pages": [
+        14,
+        15,
+        50,
+        51
+      ],
+      "code": "MISLEADING_COMPARISON",
+      "severity": "blocker",
+      "seen": "A table split over two pages draws its in-cell bars at two different scales - 0 to 1500 on the first half, 0 to 450 on the second - so a $440m bar is drawn longer than a $1,148m bar one page earlier. Repeated on the appendix pair.",
+      "gateable": "A split table's halves share one scale, or carry none. `paginateTable` already knows it split the rows; nothing makes it share the scale."
+    },
+    {
+      "pages": [
+        37
+      ],
+      "code": "UNSCALED_PLOT",
+      "severity": "blocker",
+      "seen": "A five-step staircase inside a plot frame with an axis, whose blocks are all 75px tall while the values printed on them are 126, 143, 136, 148 and 330 minutes. The 330-minute payoff is drawn the same size as the 126-minute opener.",
+      "gateable": "A mark carrying a printed value must be drawn to it. Nothing checks that a figure's geometry agrees with its own labels."
+    },
+    {
+      "pages": [
+        4,
+        39,
+        45,
+        46,
+        47
+      ],
+      "code": "ANSWER_CONTRADICTS_ITSELF",
+      "severity": "blocker",
+      "seen": "The answer page and the closing takeaway state the screen answer as Marvel unconditionally; three later pages recommend DC on screen for the one-evening reader.",
+      "gateable": "CONTENT_ANSWER_UNCARRIED checks the claims carry the answer. Nothing checks they do not contradict it."
+    },
+    {
+      "pages": [
+        17,
+        19,
+        25
+      ],
+      "code": "UNREADABLE",
+      "severity": "blocker",
+      "seen": "Three axis categories printed on top of one another ('Superman (2025)ther DC featuAlsDC features'); a period bracket rule struck through a legend; two-line category labels colliding into one seven-line block.",
+      "gateable": "Label collision is measurable off the scene's own frames - the renderer knows where it put every label."
+    },
+    {
+      "pages": [
+        50,
+        51
+      ],
+      "code": "FACTUAL_ERROR",
+      "severity": "major",
+      "seen": "Both halves of an appendix table carry a Total row that sums the 'Multiple (x budget)' column: 41.4 and 30.9. A sum of budget multiples is not a quantity.",
+      "gateable": "`totalRow` knows which columns it is summing. A ratio column has no total."
+    },
+    {
+      "pages": [
+        8
+      ],
+      "code": "DECORATION",
+      "severity": "blocker",
+      "seen": "Half a page is an empty gradient rectangle, with body text beside it explaining that the frame holds a specimen image because the characters are trademarked.",
+      "gateable": "PLAN_NO_PICTURES has no honest opt-out, so a deck about trademarked subjects is pushed into printing an apology for an empty box."
+    },
+    {
+      "pages": [
+        23,
+        34,
+        41
+      ],
+      "code": "COMMENTARY_RESTATES_EXHIBIT",
+      "severity": "major",
+      "seen": "Commentary blocks headed 'Six of the twelve are DC' beside a chart whose labels are tagged '(DC)'; bar sub-labels repeating the bar labels word for word.",
+      "gateable": "RESTATEMENT measures this and did not fire: 93% of these pages carry a commentary column against 33% in client work, and the overlap sits under the threshold because the column is long enough to dilute it."
+    }
+  ],
+  "skillGapsReportedByTheAuthor": [
+    "The plan stage has no schema and no example: SKILL.md never mentions .plan.json, storylining.md documents it as a markdown table, build-deck.mjs reads JSON, and plan_gates.mjs reads fields documented nowhere.",
+    "Most build failures are hard crashes with no sizing guidance ('Unbreakable text exceeds its width', 'Cards need 232px but have 217px'). Nothing states the width a side-column exhibit gets, so the method is guess-and-rebuild. ~70% of the author's iterations.",
+    "`agenda: \"once\"` does the opposite of what SKILL.md says and emitted six agenda pages.",
+    "`highlights` accepts exactly one entry while the plan gate's repair text asks for 'a highlighted category'.",
+    "`paragraphs` is silently dropped when points carry leads, then fails the build as MISSING_AUTHORED_CONTENT.",
+    "Four icon-led points cannot be composed: 'three across, four to six as a grid of three' produces rows of 3+1 and crashes on 'Cards take two to six items'.",
+    "THIN_PLAN's word count reads only `items`/`rows`, so quadrants, framework pillars, compare columns and trees count as zero words.",
+    "SKILL.md says a highlight that does not occur in the point 'is an error rather than a silent no-op'. It is a no-op, and it never reaches cards, framework pillars or compare columns."
+  ]
+}
