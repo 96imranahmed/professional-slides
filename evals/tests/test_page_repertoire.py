@@ -39,7 +39,7 @@ console.log(JSON.stringify({{ok:true}}));
 ''')
         self.assertTrue(result["ok"])
 
-    def test_consecutive_pages_spread_across_the_repertoire(self):
+    def test_consecutive_pages_vary_placement_without_inventing_order(self):
         result = run_node(f'''
 import {{composeSlide}} from '{COMPOSE}';
 const chart={{type:'chart.bar',heading:'Share',unit:'%',categories:['a','b','c','d','e','f'],series:[{{name:'s',values:[1,2,3,4,5,6]}}]}};
@@ -53,10 +53,9 @@ for (let i=0;i<6;i++) {{
 }}
 console.log(JSON.stringify({{shapes, styles}}));
 ''')
-        # Six identical pages must not all draw the same shape, nor mark their
-        # column the same way.
+        # Placement can vary, but unordered findings never acquire numbers.
         self.assertGreaterEqual(len(set(result["shapes"])), 2, result["shapes"])
-        self.assertGreaterEqual(len(set(result["styles"])), 2, result["styles"])
+        self.assertNotIn("numbered", result["styles"])
 
     def test_an_exhibit_that_needs_the_measure_keeps_it(self):
         # A gantt and a sentence-celled table cannot be narrowed to make room
@@ -134,7 +133,7 @@ assert.equal(draw(3),3,'a short table marks every row');
 // Past five rows it says it once - on the row the table emphasises, because a
 // disc centred in the gutter marks whichever row happens to be halfway down.
 assert.equal(draw(6,2),1,'a long one says it once, on the marked row');
-assert.equal(draw(6),0,'and says it with the rule alone where no row is marked');
+assert.equal(draw(6),1,'an explicit table-wide inference is centred independently of row focus');
 console.log(JSON.stringify({{ok:true}}));
 ''')
         self.assertTrue(result["ok"])
@@ -199,6 +198,15 @@ class GateVocabularyTests(unittest.TestCase):
             self.assertIn(code, page_gates.GATE_CODES, code)
             self.assertIn(f"`{code}`", index, f"{code} is not in the evaluation table")
 
+    def test_chart_plus_process_counts_as_composite_evidence(self):
+        chart = {"component": "chart.bar", "frame": {"x": 60, "y": 140, "width": 1160, "height": 220}}
+        process = {"component": "chevron-process", "frame": {"x": 60, "y": 400, "width": 1160, "height": 200}}
+        mixed = {"componentInstances": [chart, process]}
+        self.assertEqual(page_gates.page_architecture(mixed), "evidence-stack")
+        prose = {"component": "bullet-list", "frame": process["frame"]}
+        self.assertEqual(page_gates.page_architecture({"componentInstances": [chart, prose]}), "evidence-over-commentary")
+        self.assertEqual(page_gates.page_architecture({"componentInstances": [process]}), "chevron-process")
+
     def test_page_architecture_reads_past_the_exhibit_type(self):
         # LAYOUT_MONOTONY could not see the defect because a bar chart beside a
         # points column and a line chart beside a points column are two
@@ -209,8 +217,23 @@ class GateVocabularyTests(unittest.TestCase):
                 {"id": "s01-1", "component": "bullet-list", "frame": {"x": 800, "y": 162, "width": 360, "height": 400}}]}
         self.assertEqual(page_gates.page_architecture(slide("chart.bar")),
                          page_gates.page_architecture(slide("chart.line")))
-        self.assertNotEqual(page_gates.page_architecture(slide("chart.bar")),
+        self.assertEqual(page_gates.page_architecture(slide("chart.bar")),
                             page_gates.page_architecture(slide("table")))
+
+    def test_commentary_count_and_insight_do_not_invent_architectures(self):
+        def slide(count, cards=False, insight=False):
+            nodes = [{"component": "chart.bar", "frame": {"x": 60, "y": 140, "width": 1160, "height": 300}}]
+            nodes += [{"component": "cards" if cards else "paragraph", "frame": {"x": 60 + n * 350, "y": 470, "width": 330, "height": 90}} for n in range(count)]
+            if insight: nodes.append({"component": "insight", "frame": {"x": 60, "y": 610, "width": 1160, "height": 40}})
+            return {"componentInstances": nodes}
+        expected = page_gates.page_architecture(slide(2))
+        for count, cards, insight in [(3, False, False), (2, False, True), (3, True, True)]:
+            self.assertEqual(expected, page_gates.page_architecture(slide(count, cards, insight)))
+        findings = []
+        slides = [slide(2), slide(3), slide(3, True, True)] * 4
+        page_gates.gate_page_shape_flat(slides, list(range(12)), findings, "balanced")
+        self.assertTrue(any(f["code"] == "PAGE_SHAPE_FLAT" for f in findings))
+        self.assertNotIn("PAGE_SHAPE_FLAT", page_gates.ADVISORY_CODES)
 
 
 if __name__ == "__main__":

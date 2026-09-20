@@ -2,6 +2,57 @@
 
 Storylining turns a brief into an approved slide sequence before any page is drawn. It produces three things: a governing answer, a hypothesis tree that proves it, and a dot-dash the owner approves.
 
+## Planning contract
+
+For new work set `workflow: "new_deck"` in the deck spec. Before rendering, write `<id>.content.json` and `<id>.plan.json` beside `<id>.deck.json`. Revisions use `workflow: "existing_deck_revision"` and may retain unaffected plans; record the revised scope. Existing user authorization carries forward.
+
+Give each slide a stable `id` shared by the content record, design record and deck spec. Never join these records by their position. For new decks, content records cover main analytical slides and design records cover every authored main and appendix slide; exact claims/titles must match before composition. The content record holds the exact claim, evidence, basis, relationship and consequence; `adds: null` means commentary is unnecessary. The design record reads all those fields before choosing its exhibit, architecture and focus. A keyword or evidence-kind label alone cannot select the design. Focus is an explicit exact set or none; a count, largest value or neighbouring page does not choose it.
+
+An opening summary states the answer, decisive proof, consequence and action before the first chapter. Declare `role: "executive-summary"`; `shape: "executive-summary"` is an optional composition preset. Metrics are optional. Rows of bullets with strong leads can carry the whole summary; do not repeat the same figures in a metric strip above those bullets. A metric strip on an ordinary page is not a summary. Keep chapter tracking off this page.
+
+Use `{{page:stable-id}}` for cross-references in copy and source tables. Resolve them after pagination; a split slide resolves to its complete page range. Reconcile title counts and repeated recommendations before design and again after any consolidation.
+
+## Reconcile evidence before design
+
+For each reused measure, keep one source record: exact members, exclusions, period,
+units, observed inputs, calculation and rounding. Sum the members before drafting
+an aggregate. Derive means, shares, rates and durations from that record; retain
+unrounded inputs and round only for display. Generate the explanatory formula and
+its speaker-note operands from the same records; matching totals do not excuse
+mismatched line items. A grouped cell containing two items
+still counts as two. Reconcile every reuse in titles, summaries, charts, notes and
+the close whenever membership or an input changes.
+
+For a counted sequence or collection, enumerate its included ranges and extras before stating the length. Distinguish a complete named work, a selected arc, an author run and the larger continuing series. A familiar label is not a defined population; the displayed scope and the counted set must agree.
+
+Keep sample boundaries explicit: a historical sample is not a live census, a
+selected ranking is not a publisher or market total, and one film series is not
+necessarily a shared universe. Distinguish a measure from a proxy and an estimate
+from an observed input. If an aggregate cannot be itemized or traced, research it,
+remove that aggregate or label its limited basis; do not make it precise by repetition.
+
+An inherited distribution is not validated by plausible summary statistics. Retain
+the named observations, capture date, membership rule and quantile method; show
+sample counts. Do not borrow a cohort definition from another measure. A targeted
+refresh must identify its new observation date separately from the release or
+reporting cutoff, and update every reused statistic and source label.
+
+When a revision moves or replaces a page, reconcile its claim, sequence, evidence,
+architecture and design reason in the content and plan records before rebuilding.
+Keep stable IDs; regenerate numbering from the revised order. Do not let the
+rendered deck and its authoring contract tell different stories.
+
+Keep the executive summary, but challenge later preview scorecards: if subsequent
+pages prove every row, move any unique measure to its evidence page and cut the
+preview. Attach scope and denominator to the actual comparison. In a decision-led
+deck, detailed context belongs in the appendix when it does not change the choice;
+retain the bounded conclusion and a resolvable supporting reference in the body.
+
+A conditional recommendation names the reader preference or option attribute that
+changes the choice. Test whether each proposed reversal actually affects the named
+option. Check the strongest counterexample and keep artistic judgement separate
+from a numerical league table. Do not manufacture a winner or a causal mechanism.
+
 ## Define the communication job
 
 Write one sentence:
@@ -70,7 +121,10 @@ For modeled outcomes, distinguish an evidence-anchored estimate from a sensitivi
 
 Compare alternatives on the same decision axis and horizon. Distinguish the audience's requested decision, the authorized approver and the execution owner when they differ. Uncosted work and missing authority remain a further decision.
 
-**Claim-to-proof check.** Before choosing a layout, write the exact premises that make the proposed title reasonable. A comparative verdict needs comparable evidence for both sides on the stated criterion. One example, one favourable period or one attractive photograph establishes an instance, not a general result. Where quantitative evidence can test the claim, show the values, comparison basis, period, units and sample sizes; check whether a total reflects volume and whether an average hides a distribution. Where the claim is inherently qualitative, use specific comparable examples and explain the mechanism.
+**Claim-to-proof check.** Before choosing a layout, write the exact premises that make the proposed title reasonable. A comparative verdict needs comparable evidence for both sides on the stated criterion. One example, one favourable period or one attractive photograph establishes an instance, not a general result. Where quantitative evidence can test the claim, show the values, comparison basis, period, units and sample sizes; check whether a total reflects volume and whether an average hides a distribution. Where the claim is inherently qualitative, use specific comparable examples and explain the mechanism. Match explanatory depth across the alternatives: develop a case, decision and consequence for each mechanism being contrasted.
+
+A claim about visual craft requires visible evidence of that craft: use attributed artwork, product views or comparable specimens and identify observable features on the page. Tie the explanation to a visible region with a precise spatial description or a restrained local annotation; naming the artwork alone is not analysis. Text about style cannot substitute for showing it. Bound the inference to the displayed specimen; a cover does not establish interior storytelling or a publisher-wide house style. A mechanism diagram must carry an actual dependency, event or transformation through its stages; generic verbs alone do not explain the mechanism. At the closing-page review, retain only a decision, condition or next step that earlier pages have not already resolved.
+
 
 Then hide the title and remove decorative imagery. The remaining exhibit must let a reader reconstruct the argument. If it cannot, repair the reasoning before changing the spacing.
 
@@ -103,7 +157,7 @@ Write `deck.content.json`. One entry per page, four fields:
   "question": "Which markets go first, and what opens the second wave?",
   "answer": "Three markets whose data is ready, a gate at month seven, one owner per wave.",
   "pages": [
-    { "n": 4,
+    { "id": "readiness", "n": 4,
       "claim": "Start with the three markets whose data is ready; file Germany now",
       "settles": { "kind": "count", "what": "markets clearing the four-point readiness assessment" },
       "adds": "Filing Germany in month one is what makes a month-12 launch reachable at all",
@@ -116,11 +170,9 @@ Write `deck.content.json`. One entry per page, four fields:
   1960s ensemble" is a page. If it has no verb, the page has no argument yet.
 - **`settles`** — what settles the claim, and of what **kind**: `count`, `share`,
   `rank`, `rate`, `sequence`, `comparison`, `structure`, `qualitative`. This is
-  the only field the layout stage reads, and the only bridge between the two
-  stages. A deck that writes `qualitative` on more than a third of its pages has
-  decided to draw boxes; the gate says so before a shape exists. The deck that
-  failed had twelve issues, twenty-two films, a thirty-year gap and two
-  billion-dollar grosses in its own prose, and drew every one of them as a diagram.
+  read together with the claim, evidence members, denominator, `adds` and focus
+  when choosing the exhibit. A qualitative-heavy deck prompts a review of whether
+  available quantities have been hidden in prose; it does not require invented measurements.
 - **`adds`** — what the commentary says that the exhibit *cannot*. This field did
   not exist, and its absence is those twenty-eight "Interpretation:" pages: with
   nowhere to record what the commentary was for, the commentary became a second
@@ -131,7 +183,7 @@ Write `deck.content.json`. One entry per page, four fields:
   pages that are type alone**. Leaving it off is the commonest choice on the
   commonest page.
 - **`highlight`** — the phrase the reader should see first, set in the accent
-  inside a sentence.
+  inside a sentence, or `null` when no special emphasis is justified.
 
 Present it to the person as one block per page, not as a table. A table gives
 every field a cell the width of a phrase, and `adds` answered in a phrase is how
@@ -162,7 +214,7 @@ One row per page — here a table is right, because these are all short fields:
 - **Exhibit.** The encoding, taken from `settles.kind` — see the table below.
 - **Variant.** How that exhibit is treated: `heat`, `bubble`, `bar`, `harvey`, `verdict column`, `stacked`, `sorted`, `grid`, `paginated`, and a table's size as `12×5`. Two pages both reading `table` may be a twelve-row heat matrix and a three-row grid; counted as one kind they make a deck look more varied than it is, and the variety gate counts `exhibit/variant` where the variant is recorded. This is also where a table stops being a plain grid: across ten tables in a generated deck, not one named a treatment and not one got one.
 - **Why.** One phrase saying what made this the exhibit — "magnitude over time", "ranking, sorted", "genuinely a matrix: three dimensions over the same rows". Required on the exhibits a plan reaches for when it has not decided anything (a table, a column or bar chart, a staircase, a list), because that is where a default hides. A page that cannot produce the phrase has not chosen its exhibit yet.
-- **Architecture.** `exhibit-left`, `exhibit-top`, `hero-number`, `two-up`, `split-tone`, `grid`, `exhibit-full`, `metrics-over-exhibit`, `picture-hero`, `picture-pair`, `picture-strip`, `table-halves`, `text`. The evidence goes on the left and what it means on the right — `exhibit-right` exists but is never chosen for you, because a reading order a reader can rely on is worth more than the variety of not having one. A deck built from two architectures reads as one page repeated; the plan gates measure the spread as entropy and cannot measure it at all when this column is blank. Where a run of pages is one template on purpose — six use-cases, eight market profiles — name the run as `series: <name>` and the gates count it once instead of punishing a deliberate decision. **Variety belongs in the exhibit, not in which side of the page the table sits on.**
+- **Architecture.** `exhibit-left`, `exhibit-top`, `hero-number`, `two-up`, `split-tone`, `grid`, `exhibit-full`, `metrics-over-exhibit`, `picture-hero`, `picture-pair`, `picture-strip`, `table-halves`, `text`. The evidence goes on the left and what it means on the right — `exhibit-right` exists but is never chosen for you, because a reading order a reader can rely on is worth more than the variety of not having one. A deck built from two architectures reads as one page repeated; the plan gates measure the spread as entropy and cannot measure it at all when this column is blank. Where a run of pages is one template on purpose — six use-cases, eight market profiles — name the run as `series: <name>` and the gates count it once instead of punishing a deliberate decision. **Variety belongs in the evidence relationship, not in which side of the page the table sits on.** Count chart/table over two or three commentary columns, with or without an insight strip, as one architecture. Record an explicit architecture for every analytical page; `auto` is not a planned design. Test the normalized mix and dominant share before composing.
 - **Anchors.** One visual anchor per named thing, and the form follows the thing: a **photograph** where it is depictable (a character, a city, a product, a person), an **icon** where it is a category or a concept. Write `none` where the page is deliberately unanchored. This is the column that keeps a deck from becoming a wall of tables: most two-column qualitative tables are "five categories and what each means", which is an icon list, not a matrix. The two halves then have different homes: icons go into `cards`, a `rows` list or an icon-led points column, and photographs go into `picture-hero` (one subject), `picture-pair` (two) or `picture-strip` (three to five) — where each picture carries a `label` and a `text`, because a picture with a name under it and nothing else is a caption, not an argument. Name the photograph you intend to use, or write it as `alt` only: a picture with no file composes as its empty frame, so a page can be planned, laid out and gated before the picture has been cleared.
 - **Insight.** `filled`, `outline` or `none` — whether the page closes with its conclusion in a band, and in which treatment.
 
@@ -222,8 +274,8 @@ records less is judged on less, never punished for the blank.
   "schema": "professional-slides.plan/v1",
   "noPictures": "Every subject is a trademarked character; the deck anchors on icons instead",
   "pages": [
-    { "n": 1, "kind": "cover" },
-    { "n": 4, "title": "Marvel's ordered run reaches a payoff DC has no equivalent for",
+    { "id": "opening", "n": 1, "kind": "cover", "title": "Market entry" },
+    { "id": "readiness", "n": 4, "title": "Start with the three markets whose data is ready; file Germany now",
       "exhibit": "chart.column", "variant": "sorted, annotated", "why": "magnitude over time",
       "architecture": "exhibit-left", "anchors": [{ "icon": "timeline" }], "insight": "filled",
       "highlight": "eleven hours", "rows": 8, "items": 4, "series": "market profiles" }
@@ -233,7 +285,8 @@ records less is judged on less, never punished for the blank.
 
 | Field | What it is | Which gate reads it |
 | --- | --- | --- |
-| `n` | the page number, matching the spec | every finding is reported against it |
+| `id` | stable authored slide ID, independent of pagination | new-deck coverage, title parity and content transfer |
+| `n` | optional planning position | human-readable reporting only |
 | `kind` | `cover`, `section`, `agenda`, `takeaways`; absent or `content` for an analytical page | all of them - only content pages are measured |
 | `title` | the action title you intend to write | `PLAN_TITLE_LENGTH` |
 | `exhibit` | the encoding, from the table above | `PLAN_EXHIBIT_MIX`, `PLAN_EXHIBIT_RUN`, `PLAN_EXHIBIT_VARIETY` |
@@ -249,10 +302,7 @@ records less is judged on less, never punished for the blank.
 | `series` | a run of pages that is one template on purpose | `PLAN_EXHIBIT_RUN`, `PLAN_STYLE_ENTROPY` - counted once |
 | `noPictures` (deck level) | why this deck carries no photograph, in a sentence | excuses `PLAN_NO_PICTURES` |
 
-`noPictures` is the honest way out of the picture floor, and the only one. A
-deck whose subjects are trademarked, confidential or abstract says so once and
-is not asked again; what it must not do is draw an empty frame and explain on
-the page that the frame stands in for a picture nobody could supply.
+Mix, treatment, highlight, picture, icon and density counts are advisory reference diagnostics. Schema and a meaningful exhibit rationale remain blocking. Review whether each chosen device helps the argument; never add a photograph, tint, arrow or annotation to satisfy a corpus percentage. `noPictures` records an intentional choice when images would not help. Do not add empty placeholders for missing pictures.
 
 Run `node runtime/gates/plan_gates.mjs deck.plan.json` over the machine-readable plan before writing any page. It answers in under a second, and named `<stem>.plan.json` beside the spec the build runs it for you.
 
@@ -301,7 +351,7 @@ Nothing here names a shape.
       "settles": { "kind": "rate", "what": "annual revenue and cost growth, FY15-FY22, and the profit endpoints" },
       "adds": "No revenue scenario in the plan closes a gap of this shape without a network decision",
       "highlight": "$13bn loss" },
-    { "n": 4,
+    { "id": "readiness", "n": 4,
       "claim": "Workforce reduction lifted output per employee close to the stated ceiling",
       "settles": { "kind": "comparison", "what": "workforce and mail per employee at FY19, FY22 and the stated ceiling" },
       "adds": "Only 5,000 pieces of headroom remain, so the next cost programme cannot come from labour",
@@ -346,6 +396,8 @@ benchmark. Two tables with the same columns and no variant is
 
 ## Narrative QA
 
+Compare the commitment the reader is actually deciding on. When an initial trial and an optional full programme differ, show both on each side; a correctly labelled full-run comparison can still mislead an entry decision. In a small aggregate, identify the contributors on the page when the reader needs them to choose an item. An implication must state what the reader should do differently or what does not follow; repeating the measure's definition is not an implication.
+
 - one governing answer;
 - branches distinct and collectively sufficient;
 - one job per slide, and every slide earns its place;
@@ -354,3 +406,5 @@ benchmark. Two tables with the same columns and no variant is
 - synthesis and close agree in scope, authority and qualification;
 - navigation, when used, follows the story;
 - every authored title traceable to its approved dot.
+
+For a qualitative comparison, a named example is not yet evidence. Each cell should identify an observable choice, event or feature and its consequence on the shared criterion. Match editions explicitly; separate those facts from interpretation, and use the work or a specific primary guide as the source rather than a generic publisher label. Do not infer frequency or exclusivity from a selected set of examples. A process, taxonomy or continuity page must walk at least one named item through to the reader’s decision; dates, genre labels and metadata alone do not demonstrate that consequence.

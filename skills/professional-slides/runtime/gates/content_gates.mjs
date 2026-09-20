@@ -24,11 +24,9 @@
  *   adds       what the commentary says that the exhibit cannot
  *   highlight  the phrase the reader should see first
  *
- * `settles.kind` is the field the layout stage reads and the only bridge
- * between the two: `count` becomes a number or a bar, `sequence` becomes a
- * timeline or a gantt, `comparison` becomes a table or a paired exhibit. An
- * author who has written the kind has decided the evidence; an author who
- * writes `qualitative` forty-seven times has decided to draw boxes.
+ * Layout planning reads the whole content record: claim, evidence, commentary
+ * job and focus. `settles.kind` suggests an encoding; it does not replace the
+ * evidence or prescribe a quota of quantitative pages.
  *
  * `adds` is the field that did not exist. Its absence is the twenty-eight
  * "Interpretation:" pages: with nowhere to record what the commentary was for,
@@ -177,12 +175,12 @@ export function runContentGates(content) {
         + `so it has to be one of: ${EVIDENCE_KINDS.join(", ")}.`));
     }
     const adds = String(page.adds ?? "").trim();
-    if (!adds) {
+    if (!adds && page.adds !== null && page.adds !== "none") {
       findings.push(finding(at, "CONTENT_ADDS_NOTHING", "(empty)", "a sentence",
         "What does the commentary say that the exhibit cannot? If the answer is nothing, "
         + "this page does not need a commentary column and the exhibit should have the width. "
         + "A page with no answer to this question is where \"Interpretation: …\" comes from."));
-    } else {
+    } else if (adds && adds !== "none") {
       const against = `${page.claim ?? ""} ${page.settles?.what ?? ""}`;
       const share = overlap(adds, against);
       if (share > CONTENT_THRESHOLDS.addsOverlapMax) {
@@ -293,6 +291,10 @@ function report(content, findings, pages) {
     const n = findings.filter((f) => f.code === code).length;
     if (n) counts[code] = n;
   }
+  const reported = findings.map(f => ({...f, severity:
+    ["CONTENT_NO_HIGHLIGHT", "CONTENT_UNMEASURED"].includes(f.code)
+      || (f.code === "CONTENT_ANSWER_UNCARRIED" && f.measured?.coverage !== undefined)
+      ? "advisory" : "blocking"}));
   return {
     schema: "professional-slides.content-gates/v1",
     id: content?.id ?? null,
@@ -306,8 +308,8 @@ function report(content, findings, pages) {
     reference: { qualitativeMax: CONTENT_THRESHOLDS.qualitativeMax,
                  answerCoverageMin: CONTENT_THRESHOLDS.answerCoverageMin },
     countsByCode: counts,
-    findings,
-    accepted: findings.length === 0,
+    findings: reported,
+    accepted: reported.every(f => f.severity !== "blocking"),
   };
 }
 

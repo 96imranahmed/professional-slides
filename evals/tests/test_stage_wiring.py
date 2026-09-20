@@ -31,7 +31,7 @@ BUILD = ROOT / "skills" / "professional-slides" / "runtime" / "build-deck.mjs"
 
 def build(spec: Path, out: Path):
     result = subprocess.run(
-        [NODE, str(BUILD), str(spec), str(out), "--no-render"],
+        [NODE, str(BUILD), str(spec), str(out), "--no-render", "--python", sys.executable],
         cwd=ROOT, capture_output=True, text=True,
         env={"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": "/tmp",
              "RUNTIME_NODE_MODULES": str(ROOT / "node_modules")})

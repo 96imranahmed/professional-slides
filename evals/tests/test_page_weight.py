@@ -13,7 +13,7 @@ import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
 const registry=createRegistry();
 const chart={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
-const row=(slide)=>composeSlide(slide,0).items.find(i=>i.id==='s01-row');
+const row=(slide)=>composeSlide({implication:true,...slide},0).items.find(i=>i.id==='s01-row');
 const marker=(slide)=>row(slide).items.find(i=>i.component==='connector');
 // A headed column runs the body's height, so the marker is the dashed divider.
 assert.equal(marker({title:'T',exhibit:chart,points:['p','q']}).props.variant,'divider-chevron');

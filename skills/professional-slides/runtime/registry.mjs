@@ -279,23 +279,31 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
   const lead = typeof props.lead === "string" && props.lead.trim() && props.text.startsWith(props.lead) ? props.lead : null;
   // The house decides how a lead reads: in the accent before the rest (McKinsey
   // "South Korea: …"), or as "Topic | statement" with the topic in bold, a pipe,
-  // and the statement in the title weight (BCG 2023; the bright BCG accent is
-  // too light for running text). The pipe replaces a colon or dash after the lead.
+  // and the statement in the title weight. The pipe replaces a colon or dash
+  // after the lead while retaining a single title hierarchy.
   const pipe = lead && chrome && houseStyle("style.titleLead") === "pipe";
   const restOf = (text) => pipe ? text.slice(lead.length).replace(/^\s*[:\-–—|]?\s*/, "") : text.slice(lead.length);
   const runsFor = () => pipe
     ? [{ text: lead, bold: true }, { text: " | ", bold: false }, { text: restOf(props.text), bold: titleBold }]
     : [{ text: lead, bold: titleBold, accent: true }, { text: props.text.slice(lead.length), bold: titleBold }];
-  const measureTitle = (fontSize) => lead
-    ? measureTextRuns(runsFor(), baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, wrapWidthRatio: 0.98 })
-    : measureText(props.text, baseTextFrame.width, { fontFamily: tokenValue(DISPLAY), fontSize, bold: titleBold, wrapWidthRatio: 0.98 });
+  const measureTitle = (fontSize, width = baseTextFrame.width) => lead
+    ? measureTextRuns(runsFor(), width, { fontFamily: tokenValue(DISPLAY), fontSize, wrapWidthRatio: 0.98 })
+    : measureText(props.text, width, { fontFamily: tokenValue(DISPLAY), fontSize, bold: titleBold, wrapWidthRatio: 0.98 });
   let fontSize = tokenValue(size), textLayout = measureTitle(fontSize);
   if (chrome && !section && textLayout.lines.length > 2) {
     const long = tokenValue(token("type.actionTitleLong"));
     const retry = measureTitle(long);
     if (retry.lines.length < textLayout.lines.length) { fontSize = long; textLayout = retry; }
   }
-  const textFrame = chrome ? { ...baseTextFrame, height: Math.max(baseTextFrame.height, textLayout.height) } : baseTextFrame;
+  let titleWidth = baseTextFrame.width;
+  if (chrome && !section && !String(props.text).includes("\n") && textLayout.lines.length === 2 && textLayout.lines[1].trim().split(/\s+/).length === 1) {
+    for (const ratio of [.95, .9, .85, .8, .75, .7, .65, .6]) {
+      const width = baseTextFrame.width * ratio, balanced = measureTitle(fontSize, width);
+      if (balanced.lines.length > 2) break;
+      if (balanced.lines[1].trim().split(/\s+/).length >= 3) { titleWidth = width; textLayout = balanced; break; }
+    }
+  }
+  const textFrame = chrome ? { ...baseTextFrame, width: titleWidth, height: Math.max(baseTextFrame.height, textLayout.height) } : baseTextFrame;
   const ruleY = textFrame.y + textLayout.height + ruleGap;
   if (!chrome && textLayout.height > textFrame.height) throw new Error(`Title ${id} exceeds its allocated height; shorten it or allocate more space`);
   const nodes = [textPrimitive({
@@ -409,6 +417,7 @@ function assertChartTitleCopy(props = {}) {
     // Scale denominators and named budgets/thresholds describe the measure, not a result.
     copy = copy.replace(/\bper\s+(?:100[,. ]?000|100k|1[,. ]?000|1k|100|10|1)\b(?:\s+(?:residents|people|employees|units|capita))?/gi, "per population");
     copy = copy.replace(/\b\d+(?:\.\d+)?\s*(?:-|–)\s*(?:minute|min|hour|day|week|month|year)\b/gi, "duration"); // "45-minute limit" names a threshold
+    copy = copy.replace(/\b(?:above|below|under|over|at least|at most)\s+[$€£]?\d+(?:[.,]\d+)?\s*(?:bn|billion|million|m|k|%|hours?|minutes?)\b/gi, "population threshold");
     const numberWords = "(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)";
     // A number word is a result only when it quantifies a change or share ("twenty percent", "one point"),
     // not when it counts things the chart shows ("three monthly budgets").
@@ -573,7 +582,7 @@ function bodyListLayout(frame, itemsIn, props = {}) {
   const measured = items.map((item) => {
     if (inlineLead && item.lead && item.text) {
       const joined = `${item.lead} ${item.text}`;
-      const runs = accentRuns(joined, [item.lead], { bold: true, accent: true, strict: false })
+      const runs = accentRuns(joined, item.highlight ?? [item.lead], { bold: true, accent: true, strict: false })
         || [{ text: joined }];
       const block = measureTextRuns(runs, width, font);
       return { item, lead: null, text: block, textHeight: block.height, height: Math.max(block.height, markerWidth) };
@@ -742,7 +751,7 @@ function processNodes({ id, frame, props, roadmap = false, journey = false }) {
     const bandHeight = Math.max(frame.height * 0.24, measured.height + 2 * inset);
     const labelTop = roadmap ? bandTop + (bandHeight - measured.height) / 2 : bandTop;
     if (labelWidth <= 0 || (roadmap ? bandTop + bandHeight : labelTop + measured.height) > frame.y + frame.height) throw new Error(`${id} stage ${index + 1} needs more room for its complete label`);
-    if (roadmap) nodes.push(rectPrimitive({ id: stableId(id, "phase-band", index), role: "roadmap-phase", frame: { x: frame.x + span * index + 10, y: bandTop, width: span - 20, height: bandHeight }, style: boxStyle(index % 2 ? MUTED_SURFACE : PRIMARY_TINT, RULE, HAIRLINE, SMALL_RADIUS) }));
+    if (roadmap) nodes.push(rectPrimitive({ id: stableId(id, "phase-band", index), role: "roadmap-phase", frame: { x: frame.x + span * index + 10, y: bandTop, width: span - 20, height: bandHeight }, style: boxStyle(MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS) }));
     nodes.push(textPrimitive({ id: stableId(id, "step-label", index), role: "process-label", frame: { x: center - labelWidth / 2, y: labelTop, width: labelWidth, height: measured.height }, text: measured.text, style: { ...textStyle(COMPACT, INK, true, "center", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
     if (journey) nodes.push(textPrimitive({ id: stableId(id, "touchpoint", index), role: "journey-touchpoint", frame: { x: frame.x + span * index + 8, y: frame.y + 14, width: span - 16, height: 42 }, text: item.touchpoint || "Touchpoint", style: textStyle(LABEL, SECONDARY, false, "center") }));
   });
@@ -766,7 +775,17 @@ function treeNodes({ id, frame, props, organization = false }) {
       const fromY = from.y + from.height;
       const toX = to.x + to.width / 2;
       const toY = to.y;
-      const route = routeConnector({ x: fromX, y: fromY }, { x: toX, y: toY }, [...nodeFrames.values()]);
+      // Reserve a visible vertical port at both ends: a horizontal route along
+      // a box edge is covered by its fill and appears to land on a corner.
+      const obstacles = [...nodeFrames.values()];
+      const portAt = (x, y, direction) => {
+        const gaps = obstacles.filter(r => x > r.x && x < r.x + r.width)
+          .map(r => direction > 0 ? r.y - y : y - r.y - r.height).filter(gap => gap > 0.01);
+        return Math.min(tokenValue(token("space.4")), Math.min(...gaps) / 2);
+      };
+      const route = [{ x: fromX, y: fromY },
+        ...routeConnector({ x: fromX, y: fromY + portAt(fromX, fromY, 1) }, { x: toX, y: toY - portAt(toX, toY, -1) }, obstacles),
+        { x: toX, y: toY }];
       route.slice(1).forEach((point, segment) => nodes.push(openLine(stableId(id, "connector", index, segment), route[segment].x, route[segment].y, point.x, point.y, "tree-connector", SECONDARY, HAIRLINE, { from: connector.from, to: connector.to })));
     }
     for (const [index, node] of props.nodes.entries()) {
@@ -775,7 +794,15 @@ function treeNodes({ id, frame, props, organization = false }) {
       const fill = tone === "primary" ? PRIMARY : tone === "dark" ? INK : MUTED_SURFACE;
       const textColor = tone === "primary" || tone === "dark" ? WHITE : INK;
       nodes.push(rectPrimitive({ id: stableId(id, "node", node.id || index), role: "organization-node", frame: nodeFrame, style: boxStyle(fill, fill, HAIRLINE, token("radius.none")) }));
-      nodes.push(textPrimitive({ id: stableId(id, "node-text", node.id || index), role: "node-label", frame: insetFrame(nodeFrame, 5), text: node.label, style: textStyle(COMPACT, textColor, false, "center") }));
+      const content = insetFrame(nodeFrame, 8), font = token("type.body");
+      const label = measureText(node.label, content.width, { fontSize: tokenValue(font), bold: true });
+      const detail = node.detail ? measureText(node.detail, content.width, { fontSize: tokenValue(font) }) : null;
+      const gap = detail ? tokenValue(token("space.2")) : 0;
+      const height = label.height + gap + (detail?.height || 0);
+      if (height > content.height) throw new Error("Organization node needs more room for its complete label and detail");
+      const top = content.y + (content.height - height) / 2;
+      nodes.push(textPrimitive({ id: stableId(id, "node-text", node.id || index), role: "node-label", frame: { ...content, y: top, height: label.height }, text: label.text, style: textStyle(font, textColor, true, "center", "top"), data: { textLayout: label } }));
+      if (detail) nodes.push(textPrimitive({ id: stableId(id, "node-detail", node.id || index), role: "node-text", frame: { ...content, y: top + label.height + gap, height: detail.height }, text: detail.text, style: textStyle(font, textColor, false, "center", "top"), data: { textLayout: detail } }));
     }
     return nodes;
   }
@@ -1379,7 +1406,7 @@ function registerCore(registry) {
     component({ id: "timeline", category: "relationship", role: "timeline", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 920, height: 250 }, sample: { items: ["Q1", "Q2", "Q3", "Q4"], active: 2 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props: { ...props, items: props.items.map((label) => ({ label })) } }) }) }),
     component({ id: "journey", category: "relationship", role: "journey", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 960, height: 300 }, sample: { items: [{ label: "(Insert stage 1)", touchpoint: "(Insert touchpoint 1)" }, { label: "(Insert stage 2)", touchpoint: "(Insert touchpoint 2)" }, { label: "(Insert stage 3)", touchpoint: "(Insert touchpoint 3)" }, { label: "(Insert stage 4)", touchpoint: "(Insert touchpoint 4)" }], active: 3 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props, journey: true }) }) }),
     component({ id: "tree", category: "relationship", role: "tree", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert root question)", children: ["(Insert branch 1)", "(Insert branch 2)", "(Insert branch 3)", "(Insert branch 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props }) }) }),
-    component({ id: "organization", category: "relationship", role: "organization", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.none", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert parent role)", children: ["(Insert role 1)", "(Insert role 2)", "(Insert role 3)", "(Insert role 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props, organization: true }) }) }),
+    component({ id: "organization", category: "relationship", role: "organization", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "type.body", "space.2", "space.4", "line.hairline", "line.standard", "radius.none", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert parent role)", children: ["(Insert role 1)", "(Insert role 2)", "(Insert role 3)", "(Insert role 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props, organization: true }) }) }),
     component({ id: "matrix", category: "relationship", role: "matrix", tokens: ["color.componentPrimary", "color.accent", "color.accentTint", "color.surfaceMuted", "color.textSecondary", "color.chartSeries2", "color.surface", "color.rule", "color.ink", "color.positive", "color.caution", "color.negative", "color.onPrimary", "font.body", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 720, height: 410 }, sample: { xAxis: { label: "Effort", minLabel: "Low", maxLabel: "High" }, yAxis: { label: "Impact", minLabel: "Low", maxLabel: "High" }, points: [{ label: "A", x: 0.24, y: 0.35 }, { label: "B", x: 0.56, y: 0.62 }, { label: "C", x: 0.76, y: 0.82 }], highlight: 2 }, render: ({ id, frame, props }) => ({ nodes: matrixNodes({ id, frame, props }) }) }),
     component({ id: "map", category: "relationship", role: "map", tokens: MAP_TOKENS, preferredSize: { width: 920, height: 440 }, sample: { geography: "world", markers: [{ label: "Americas", x: 0.2, y: 0.45, fraction: 0.75 }, { label: "Europe", x: 0.5, y: 0.34, fraction: 0.5 }, { label: "Asia", x: 0.77, y: 0.44, fraction: 0.25 }] }, render: ({ id, frame, props }) => ({ nodes: mapNodes({ id, frame, props }) }) }),
     component({ id: "funnel", category: "relationship", role: "funnel", tokens: ["color.componentPrimary", "color.chartSeries2", "color.chartSeries3", "color.chartSeries4", "color.onPrimary", "color.ink", "font.body", "type.compact", "line.hairline", "radius.small"], preferredSize: { width: 700, height: 360 }, sample: { stages: [{ label: "Market", value: 100 }, { label: "Qualified", value: 62 }, { label: "Engaged", value: 38 }, { label: "Won", value: 18 }] }, render: ({ id, frame, props, tokens = TOKENS }) => {

@@ -812,7 +812,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     ...(type === "range" ? { low: [...(props.low || [])], high: [...(props.high || [])] } : {}),
     ...(Array.isArray(props.points) ? { points: props.points.map(p => ({ ...p })) } : {}),
     unit: props.unit ?? null,
-    yMin: props.yMin ?? null,
+    yMin: props.yMin ?? (["bar", "column", "stacked-bar", "stacked-column"].includes(type) && series.every(item => item.values.every(value => value >= 0)) ? 0 : null),
     yMax: props.yMax ?? null,
     dataLabels,
     showValueAxis,

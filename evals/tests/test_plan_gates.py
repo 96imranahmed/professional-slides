@@ -304,7 +304,7 @@ class PlanGateTests(unittest.TestCase):
         report = run_plan(deck(pages), self.tmp)
         self.assertTrue(report["findings"])
         for item in report["findings"]:
-            self.assertEqual(sorted(item), ["code", "measured", "page", "repair", "threshold"])
+            self.assertEqual(sorted(item), ["code", "measured", "page", "repair", "severity", "threshold"])
             self.assertGreaterEqual(len(item["repair"]), 60, item["code"])
 
     def test_the_report_carries_the_deck_statistics_beside_the_reference(self):

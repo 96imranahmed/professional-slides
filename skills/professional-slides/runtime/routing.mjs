@@ -6,6 +6,12 @@ export function routeConnector(start, end, obstacles, clearance = 8) {
   const blocked = (a, b) => obstacles.some((r) => a.x === b.x
     ? a.x > r.x + 0.01 && a.x < r.x + r.width - 0.01 && Math.max(a.y, b.y) > r.y + 0.01 && Math.min(a.y, b.y) < r.y + r.height - 0.01
     : a.y > r.y + 0.01 && a.y < r.y + r.height - 0.01 && Math.max(a.x, b.x) > r.x + 0.01 && Math.min(a.x, b.x) < r.x + r.width - 0.01);
+  // Prefer the centre of an unobstructed parent/child gap. Peers at the same
+  // level then share one branch junction rather than arbitrary shortest bends.
+  const midY = (start.y + end.y) / 2;
+  const centred = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end]
+    .filter((point, index, points) => !index || point.x !== points[index - 1].x || point.y !== points[index - 1].y);
+  if (centred.slice(1).every((point, index) => !blocked(centred[index], point))) return centred;
   const key = (x, y, direction) => `${x},${y},${direction}`;
   const first = { x: xs.indexOf(start.x), y: ys.indexOf(start.y), direction: "", cost: 0, path: [start] };
   const queue = [first], costs = new Map([[key(first.x, first.y, ""), 0]]);

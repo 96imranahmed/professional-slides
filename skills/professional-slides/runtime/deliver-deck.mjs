@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { deckStem } from "./artifact-path.mjs";
 import { assertOutputDirectory } from "./output-path.mjs";
 import { buildDeck } from "./build-deck.mjs";
-import { runReview, validateReview, reviewOutcome } from "./reviewer.mjs";
+import { runReview, validateReview, validateReviewBinding, reviewOutcome } from "./reviewer.mjs";
 
 export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto", model, reviewFile, skipBuild = false, brief, answer } = {}) {
   const directory = await assertOutputDirectory(outputDirectory);
@@ -49,10 +49,10 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
     review = run.review;
   }
   const slideIds = JSON.parse(await fs.readFile(path.join(directory, "scene.json"), "utf8")).slides.map((s) => s.id);
-  const errors = validateReview(review, slideIds);
+  const errors = [...validateReview(review, slideIds), ...await validateReviewBinding(review, directory, slideIds)];
   if (errors.length) return reject(report, directory, rejectedNote, "invalid review", errors.map((e) => ({ slide: null, code: "EDITORIAL", severity: "blocker", reason: `review record invalid: ${e}`, repair: "Return a review that matches the schema; this is a transport problem, not a deck defect" })));
   const outcome = reviewOutcome(review);
-  report.review = { accepted: outcome.accepted, summary: review.summary, findings: review.findings.length, blocking: outcome.blocking.length, file: path.join(directory, "review.json") };
+  report.review = { accepted: outcome.accepted, summary: review.summary, findings: review.findings.length, blocking: outcome.blocking.length, file: reviewFile ? path.resolve(reviewFile) : path.join(directory, "review.json") };
   if (!outcome.accepted) return reject(report, directory, rejectedNote, "review", outcome.blocking);
 
   await fs.copyFile(build.pptxPath, delivered);

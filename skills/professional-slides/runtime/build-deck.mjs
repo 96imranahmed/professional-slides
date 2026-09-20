@@ -23,6 +23,33 @@ import { runPlanGates } from "./gates/plan_gates.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
+// New work must retain its approved storyline through authoring. Revisions can
+// carry partial plans; they still transfer semantic fields by stable ID only.
+export function validateStageContract(spec, stages) {
+  if (spec.workflow !== "new_deck") return;
+  const pages = [...spec.slides, ...(spec.appendix || [])];
+  if (pages.some(s => !s.id) || new Set(pages.map(s => s.id)).size !== pages.length)
+    throw new Error("New decks require unique stable slide ids before composition");
+  for (const stage of ["content", "plan"]) {
+    const expected = stage === "content" ? spec.slides.filter(s => !s.kind || s.kind === "content") : pages;
+    const records = stages[stage]?.pages || [];
+    const byId = new Map(records.map(r => [r.id, r]));
+    if (records.some(r => !r.id) || byId.size !== records.length
+        || records.some(r => !pages.some(s => s.id === r.id)))
+      throw new Error(`${stage} plan requires unique known stable slide ids`);
+    for (const slide of expected) {
+      const record = byId.get(slide.id);
+      if (!record || record[stage === "content" ? "claim" : "title"] !== slide.title)
+        throw new Error(`${stage} plan is missing or has a changed title for ${slide.id}; reconcile the storyline before composition`);
+    }
+  }
+  const first = spec.slides.find(s => !s.kind || s.kind === "content");
+  const summary = s => s.role === "executive-summary" || s.shape === "executive-summary";
+  const section = spec.slides.findIndex(s => s.kind === "section" || s.kind === "divider");
+  if (!first || !summary(first) || (section >= 0 && spec.slides.indexOf(first) > section))
+    throw new Error("New decks require an opening executive summary before the first section");
+}
+
 export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = process.env.RUNTIME_PYTHON || "python3" } = {}) {
   const started = Date.now();
   const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
@@ -57,6 +84,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
                                       ["plan", ".plan.json", runPlanGates]]) {
     const at = path.join(baseDir, `${stem}${suffix}`);
     const raw = await fs.readFile(at, "utf8").catch(() => null);
+    if (raw === null && spec.workflow === "new_deck") throw new Error(`New decks require ${at} before composition`);
     if (raw === null) { result.stages[stage] = { state: "absent", expectedAt: at }; continue; }
     const report = run(JSON.parse(raw));
     const reportAt = path.join(directory, `${stage}-gates.json`);
@@ -67,22 +95,27 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       throw new Error(`${stage} gates rejected ${path.basename(at)}: `
         + `${JSON.stringify(report.countsByCode)}. See ${reportAt}.`);
     }
-    if (stage === "content") stages.content = JSON.parse(raw);
+    stages[stage] = JSON.parse(raw);
   }
+  validateStageContract(spec, stages);
 
   // The content stage stops being a checkpoint and becomes an input.
   //
   // It records one highlight per page - "the phrase the reader should see
   // first" - and the build gated the file and then discarded it, so the phrase
   // reached nothing. A page that does not name its own highlight takes the one
-  // its content plan named, matched by position over the deck's content slides.
+  // its content plan named, matched by stable ID so insertions cannot move emphasis to another slide.
   if (stages.content?.pages?.length) {
-    const content = spec.slides.filter((s) => (s.kind ?? "content") === "content");
-    stages.content.pages.forEach((page, index) => {
-      const slide = content[index];
-      const phrase = String(page?.highlight ?? "").trim();
-      if (slide && phrase && slide.highlight === undefined) slide.highlight = phrase;
-    });
+    const byId = new Map([...spec.slides, ...(spec.appendix || [])].filter(s => s.id).map(s => [s.id, s]));
+    const seen = new Set();
+    for (const page of stages.content.pages) {
+      if (!page.id) continue; // Legacy plans are audited but never transferred by position.
+      if (seen.has(page.id) || !byId.has(page.id)) throw new Error(`Content plan has duplicate or unknown slide id: ${page.id}`);
+      seen.add(page.id);
+      const slide = byId.get(page.id);
+      const phrase = String(page.highlight ?? "").trim();
+      if (phrase && slide.highlight === undefined) slide.highlight = phrase;
+    }
   }
 
   const deckPlan = toDeckPlan(spec, baseDir);

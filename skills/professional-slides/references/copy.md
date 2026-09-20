@@ -88,7 +88,20 @@ Separate what the audience decides now from later approvals, combine duplicate c
 
 1. Check every sentence against the relevance rule above.
 2. Check that each title is supported by its exhibit, verb for verb.
-3. Remove redundant labels and repeated framing.
+3. Remove redundant labels and repeated framing. Compare the slide subtitle with the chart heading by meaning, not just shared words: “Share of releases reaching 2.5 times budget” duplicates “Releases clearing the break-even multiple”. Keep the chart heading and its unit; move any unique basis into the note. A subtitle is optional, and tables or non-chart exhibits do not need an additional exhibit title.
 4. Re-read each page with its title and any detached conclusion hidden: the exhibit still carries the argument.
 5. Read insight and recommendation copy aloud; complete sentences sound natural rather than clipped or padded.
 6. Scan the final artifact for em dashes and repeat until there are none.
+
+## Consistency after a revision
+
+A corrected sentence is not a corrected argument. Search every title, commentary,
+callout, comparison, summary and closing recommendation for the same assertion.
+Remove stale absolute language such as “only”, “every” and “never” unless the
+stated population establishes it. Selected examples support scoped observations;
+a correlation does not prove a mechanism. A judgement label does not excuse
+mismatched media, unequal populations or unsupported certainty.
+
+Use one concise scope statement near the evidence, then explain what the evidence
+does establish. Do not replace overclaiming with several repeated caveats. Delete
+recap pages that add no new proof or decision; update cross-references afterwards.

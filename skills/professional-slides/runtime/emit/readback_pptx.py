@@ -48,6 +48,12 @@ def readback(scene: dict, pptx: Path, tol: float = 2.0) -> dict:
     if len(prs.slides) != len(scene["slides"]):
         findings.append({"code": "SLIDE_COUNT", "expected": len(scene["slides"]), "actual": len(prs.slides)})
     for si, (sl, slide) in enumerate(zip(scene["slides"], prs.slides), start=1):
+        canvas = sl.get("tokens", {}).get("color.canvas", {}).get("value") or scene.get("tokens", {}).get("color.canvas", {}).get("value")
+        if canvas:
+            saved = slide._element.find("./" + qn("p:cSld") + "/" + qn("p:bg") + "/" + qn("p:bgPr") + "/" + qn("a:solidFill") + "/" + qn("a:srgbClr"))
+            actual = saved.get("val") if saved is not None else None
+            if actual != canvas.lstrip("#").upper():
+                findings.append({"slide": si, "code": "CANVAS_COLOR", "expected": canvas, "actual": actual})
         by_name = {}
         roles = {f"ps:{n['id']}": n.get("role") for n in sl["nodes"]}
         for sh in walk(slide.shapes):

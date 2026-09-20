@@ -4,7 +4,7 @@ A deck is ready when the deterministic page gates pass, the review accepts it, a
 
 ## Page gates
 
-Measured on the rendered page, before any model is consulted. Each is a blocking result.
+Measured on the rendered page before review. The report records severity. `runtime/gates/page_gates.py` owns the exact advisory-code set. Ink, whitespace, density and decoration/mix statistics prompt visual review; they do not prescribe furniture. Schema, title/evidence contradictions, text fit, clipping, collisions, scales and provenance still block. An independent reviewer may reject an actual visual defect even where its numeric diagnostic is advisory.
 
 | Gate | Code | Threshold |
 | --- | --- | --- |
@@ -25,12 +25,12 @@ Measured on the rendered page, before any model is consulted. Each is a blocking
 | One number over a table | `METRIC_STACK` | a lone tile belongs beside its evidence |
 | Sections and tracker | `NO_SECTIONS` | required past twelve analytical pages |
 | Contents page | `NO_CONTENTS` | a sectioned deck past twelve analytical pages says what its sections are |
-| Opening summary | `NO_SUMMARY` | the first content page states the answer (`shape: "executive-summary"`) |
+| Opening summary | `NO_SUMMARY` | the first analytical page declares `role: "executive-summary"` before the first section; the shape preset is optional and metrics do not establish the role |
 | Body text floor | `THIN_PAGE` | the deck's `weight.pageWords`, counted in the body alone (95 balanced, 120 full); reference client slides carry 128 body words |
 | Notes carrying the page | `NOTE_HEAVY` | the footer stays under a third of the page's text |
 | Plan-time shortfall | `THIN_PLAN` | preflight: what the page will carry against the floor, with the remedy its own data offers |
 | Chart annotation | `UNANNOTATED` | a bracket, a flag, a change bubble, a base or an observation on any plot of three marks or more |
-| Page architecture | `PAGE_SHAPE_FLAT` | at least three distinct page architectures per ten analytical pages, none past 40% (reference decks run about five per ten, commonest 23%). The finding reports `constrainedPages`: pages carrying one exhibit and no commentary beside or above it, which leave the composer one viable shape. Where those are most of the deck, the repair names them and asks for commentary rather than for a different layout |
+| Page architecture | `PAGE_SHAPE_FLAT` | at least three distinct evidence relationships per ten analytical pages, none past 40%. Chart/table above two or three commentary columns, with or without an insight strip, counts once; mirrored arrangements also count once. The finding reports `constrainedPages` to locate evidence that needs redesign. Change the relationship when the argument warrants it; adding commentary or furniture does not create a new architecture |
 | Commentary column | `COLUMN_MONOTONY` | at most three consecutive pages marked with the same device (icon, numbered disc, hairline, prose) |
 | Deck shape | `DECK_FLAT` | past eight analytical pages, one page carries the detail: 282+ words, or a p80 a third above the median |
 | Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |
@@ -69,7 +69,7 @@ The model review reads each rendered page together with its text, layout roles, 
 
 Design defects block too, and carry their own codes: `DEAD_SPACE`, `LAYOUT_MONOTONY`, `NO_HERO_EXHIBIT`, `OVERSIZED_TYPE`, `WALL_OF_TEXT`, `BURIED_NUMBER`, `HEDGED_TITLE`, `TITLE_TOO_LONG`, `INCONSISTENT_ENCODING`. `EDITORIAL` is the advisory one.
 
-Every blocking finding names the exact defect and a repair that is a sentence a person can act on. Findings without one of these codes are advisory and settle within the bounded repair pass. `runtime/reviewer.mjs` holds the vocabulary — it is the schema the review is validated against, so a code that is not there cannot be raised — and `rules.json` holds the rule IDs, severities and which of these codes are material.
+Every finding names the exact defect and a repair that a person can act on. `runtime/reviewer.mjs` owns the review schema and suggested vocabulary; a precise new upper-case code is also allowed. Severity determines acceptance: major and blocker findings must be resolved before delivery, including findings with new codes. `rules.json` holds the deterministic rule IDs and severities; it does not limit what independent visual review can discover.
 
 ## Review dimensions
 
@@ -93,3 +93,32 @@ Every blocking finding names the exact defect and a repair that is a sentence a 
 ## Comparing against a reference deck
 
 Inspect every source page and every candidate render at full size, record the page mappings including deliberate consolidations and splits, and normalize type size against the source's visible crop. For each exhibit, identify the source's strongest analytical device and show how the candidate preserves or improves its function. Keeping every word and number does not pass when the reader must reconstruct a grouping the source made visible.
+
+A final review must use `runtime/reviewer.mjs`'s schema, including a rating,
+complete inspected-slide IDs and the hash binding of scene, PPTX and renders.
+Delivery rejects stale or incomplete review evidence. Precise new upper-case
+finding codes are allowed; major and blocker findings always prevent acceptance.
+
+`PLAN_STYLE_ENTROPY` and `PAGE_SHAPE_FLAT` block repeated page architectures. Normalize chart/table with two/three columns beneath, cards/prose, and optional closing insight into one family; mirror variants also count once. Measure actual evidence relationships after rendering, with a 40% dominant-family screen and local variety check. Decoration and whitespace distribution findings remain advisory; they cannot exempt architecture repetition.
+
+## Corpus calibration
+
+The calibration sample contains 3,606 analytical pages from 28 client engagement decks, with covers, dividers, back matter and portrait documents excluded. Published thought leadership is a separate contrast. These are descriptive distributions, not content or decoration quotas. The values come from `runtime/weight.json`; repository-only acquisition and measurement evidence lives in `evals/corpus/`.
+
+| Per analytical page | Client decks | Published work | What the gate does with it |
+| --- | --- | --- | --- |
+| Ink on the page | median 18%, quartiles 12% and 27% | 19% | `INK_COVERAGE` reports the active fill profile’s diagnostic threshold |
+| Words of page text | 189 (p20 110, p80 290) | 198 | `WORDS` caps, by profile |
+| - in the title band | 18 | 17 | `TITLE_LINES`, `TITLE_WORDS` |
+| - **in the body** | **148** | 157 | `THIN_PAGE` floors the body alone |
+| - in the footer, source and notes | 13 | 12 | `NOTE_HEAVY` |
+| Numeric tokens | 13 overall - 26 on a chart page, 20 on a table, 4 on a diagram | 11 | `NUMBERS_ON_MARKS`: every mark carries its value |
+| Drawn objects (marks, rules, brackets) | median 32 (p25 11, p75 88) | - | the cold-run scorer's `drawingsPerPage` |
+| Pages carrying 186+ words | 51% | 54% | `DECK_FLAT` prompts review of whether detail is missing |
+| Pages carried by a chart | 30% | 37% | advisory chart-mix comparison |
+| Pages carried by a table | 20% | 11% | advisory table-mix comparison |
+| Pages carrying no exhibit at all | 25% | 30% | advisory text-page comparison |
+| Titles that state a claim | 65% (89% on chart pages, 38% on table pages) | 55% | the house rule is every page; this is the gap to close |
+| Pages with a commentary column | 33% (13% on pages of type) | 43% | it is not the default - see `storylining.md` |
+| Charts carrying an annotation | **80%** | 63% | descriptive reference; no annotation quota |
+| Tables carrying a treatment | **100%** (32 of 32) | 89% | descriptive reference; treatment follows meaning |

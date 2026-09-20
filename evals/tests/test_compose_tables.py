@@ -22,8 +22,8 @@ assert.equal(numbered.treatment,'categories');assert.equal(numbered.rows[1][0].t
 // conclusion keeps the tint instead.
 const decision=styleTable({columns:['Visit','Verify','Then decide'],rows:[['NYC','Seats','Lead option']]});
 assert.equal(decision.treatment,'standard');
-assert.equal(decision.columns.length,4,'a gutter column is inserted before the verdict');
-assert.equal(decision.rows[0].filter(c=>c&&c.type==='implication').length,1);
+assert.equal(decision.columns.length,3,'a verdict alone does not invent an inference gutter');
+assert.equal(decision.rows[0].filter(c=>c&&c.type==='implication').length,0);
 const twoColumn=styleTable({columns:['Option','Verdict'],rows:[['A','Pick this'],['B','Not this']]});
 assert.equal(twoColumn.rows[0][1].type,'highlight');
 const scorecard=styleTable({columns:['Gate','A','B','C'],rows:[['School','x','y','z']]});
@@ -208,38 +208,20 @@ class InferredTreatmentTests(unittest.TestCase):
     one that differs.
     """
 
-    def test_a_column_of_ratings_becomes_harvey_balls(self):
-        run_node('''
+    def test_rating_words_remain_text_without_an_authored_rubric(self):
+        run_node("""
 import assert from 'node:assert/strict';
 import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
-const table=(rows,columns)=>styleTable({columns,rows});
-const columns=['Function','Data readiness','Process maturity','Owner'];
-const rows=[['Finance','Full','Strong','Group controller'],['Operations','Strong','Partial','COO office'],
-            ['Sales','Partial','Partial','Revenue ops'],['Legal','Weak','None','General counsel']];
-const styled=table(rows,columns);
-assert.equal(styled.columns[1].harvey,true);
-assert.equal(styled.columns[2].harvey,true);
-assert.deepEqual(styled.rows[0].slice(1,3).map(c=>c.value),[4,3]);
-assert.equal(styled.rows[3][2].value,0,'None is the empty disc, not a missing cell');
-// The first column is the row label and is never a rating, whatever it says.
-assert.notEqual(styled.columns[0].harvey,true);
-
-// Every cell has to be a scale word. One sentence in the column and it is prose.
-const prose=table([['Finance','Full','Strong readiness across the ledger','x'],
-                   ['Operations','Strong','Partial','y'],['Sales','Partial','Partial','z'],
-                   ['Legal','Weak','None','w']],columns);
-assert.notEqual(prose.columns[2].harvey,true);
-
-// A column that never varies is a constant, not a scale.
-const flat=table([['a','Full','Strong','x'],['b','Full','Partial','y'],
-                  ['c','Full','Partial','z'],['d','Full','None','w']],columns);
-assert.notEqual(flat.columns[1].harvey,true);
-
-// An authored treatment is left alone.
-const authored=styleTable({columns:['Function',{label:'Data readiness',bubble:true},'Process maturity','Owner'],rows});
-assert.notEqual(authored.columns[1].harvey,true);
-console.log(JSON.stringify({ok:true}));
-''')
+const columns=['Function','Recognition','Owner'];
+const rows=[['Finance','Full','A'],['Operations','Strong','B'],['Sales','Partial','C']];
+const neutral=styleTable({columns,rows});
+assert.equal(neutral.rows[0][1],'Full');
+assert.equal(neutral.scales,undefined);
+const rated=styleTable({columns:['Function',{label:'Readiness',scale:'r'},'Owner'],rows,
+ scales:{r:{type:'harvey',label:'Readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}}}});
+assert.deepEqual(rated.rows.map(r=>r[1].value),[4,3,2]);
+console.log('{}');
+""")
 
     def test_cards_wrap_into_a_grid(self):
         run_node('''

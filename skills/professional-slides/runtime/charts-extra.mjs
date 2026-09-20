@@ -216,9 +216,10 @@ export function treemapLayout(frameIn, props) {
 export function treemapChart({ id, frame, props, tokens = TOKENS }) {
   const { items, rects } = treemapLayout(frame, props);
   const total = items.reduce((s, it) => s + it.value, 0);
+  const hasFocus = items.some(item => highlighted(props, item.label));
   const nodes = [];
   rects.forEach(({ item, frame: r }, index) => {
-    const fill = highlighted(props, item.label) ? ACCENT : colorFor(props, Math.min(index, 5));
+    const fill = highlighted(props, item.label) ? ACCENT : hasFocus ? token("color.chartComparator") : colorFor(props, Math.min(index, 5));
     const gap = 2;
     const tile = { x: r.x + gap / 2, y: r.y + gap / 2, width: Math.max(0, r.width - gap), height: Math.max(0, r.height - gap) };
     nodes.push(rectPrimitive({ id: stableId(id, "tile", item.label), role: "chart-mark", frame: tile, style: fillStyle(fill, token("color.surface")), data: { label: item.label, value: item.value, share: item.value / total } }));

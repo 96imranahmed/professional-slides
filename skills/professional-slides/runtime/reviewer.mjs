@@ -7,6 +7,7 @@
 //             inside an agent session, where the agent *is* the reviewer.
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { runProcess } from "./process.mjs";
 
@@ -34,20 +35,22 @@ export const CODES = Object.freeze({
   TITLE_TOO_LONG: "an action title over two lines",
   INCONSISTENT_ENCODING: "the same measure encoded differently across pages",
   // beautification - the pass a threshold cannot make
-  NO_VISUAL_ANCHOR: "a page names two to six things and depicts none of them",
-  UNANNOTATED_PLOT: "a plot with nothing marked on it: no bracket, band, reference line or change",
-  TABLE_MONOTONY: "a table drawn as a plain grid where its content is a scale, a share or a verdict",
-  MIXED_GRAMMAR: "a figure and a measured exhibit side by side, read two different ways",
+  NO_VISUAL_ANCHOR: "recognition or visible evidence matters, but the page supplies no useful visual anchor",
+  UNANNOTATED_PLOT: "a necessary comparison or threshold is difficult to locate without an annotation",
+  TABLE_MONOTONY: "repeated table grammar obscures a meaningful difference in evidence relationships",
+  MIXED_GRAMMAR: "different evidence grammars share a page without a clear relationship or reading order",
   DECORATION: "a rule, band or device that separates nothing and says nothing",
   NARROW_REPERTOIRE: "the deck draws on a handful of exhibits where its evidence has many shapes",
   EDITORIAL: "a wording preference"
 });
-const BLOCKING = new Set(Object.keys(CODES).filter((c) => c !== "EDITORIAL"));
 
 export const REVIEW_SCHEMA = {
   type: "object", additionalProperties: false,
-  required: ["accepted", "summary", "findings"],
+  required: ["accepted", "summary", "findings", "binding", "inspectedSlides", "rating"],
   properties: {
+    binding: { type: "string", pattern: "^[a-f0-9]{64}$" },
+    inspectedSlides: { type: "array", items: { type: "string" } },
+    rating: { type: "number", minimum: 0, maximum: 10 },
     accepted: { type: "boolean" },
     summary: { type: "string", minLength: 20 },
     findings: {
@@ -57,7 +60,7 @@ export const REVIEW_SCHEMA = {
         required: ["slide", "code", "severity", "reason", "repair"],
         properties: {
           slide: { type: ["string", "null"] },
-          code: { type: "string", enum: Object.keys(CODES) },
+          code: { type: "string", pattern: "^[A-Z][A-Z0-9_]+$" },
           severity: { type: "string", enum: SEVERITIES },
           reason: { type: "string", minLength: 20 },
           repair: { type: "string" }
@@ -77,15 +80,37 @@ export function validateReview(review, slideIds) {
   for (const [i, f] of review.findings.entries()) {
     const at = `findings[${i}]`;
     if (f.slide !== null && !known.has(f.slide)) errors.push(`${at}: unknown slide ${f.slide}`);
-    if (!CODES[f.code]) errors.push(`${at}: unknown code ${f.code}`);
+    if (!/^[A-Z][A-Z0-9_]+$/.test(f.code ?? "")) errors.push(`${at}: invalid code ${f.code}`);
     if (!SEVERITIES.includes(f.severity)) errors.push(`${at}: unknown severity ${f.severity}`);
     if (["major", "blocker"].includes(f.severity)) {
-      if (!BLOCKING.has(f.code)) errors.push(`${at}: ${f.code} cannot be ${f.severity}`);
+      if (f.code === "EDITORIAL") errors.push(`${at}: EDITORIAL cannot be ${f.severity}`);
       if (typeof f.repair !== "string" || f.repair.trim().length < 40 || !/\b(add|replace|move|merge|cut|rewrite|split|show|plot|label|reduce|enlarge|use|drop|state|cite)\b/i.test(f.repair)) errors.push(`${at}: a ${f.severity} finding needs a concrete repair sentence`);
     }
   }
   const blocking = review.findings.some((f) => ["major", "blocker"].includes(f.severity));
   if (review.accepted && blocking) errors.push("accepted cannot be true with major or blocker findings");
+  return errors;
+}
+
+
+/** Bind a visual review to the exact editable file, scene and rendered pages. */
+export async function reviewBinding(directory) {
+  const scene = JSON.parse(await fs.readFile(path.join(directory, "scene.json"), "utf8"));
+  const result = JSON.parse(await fs.readFile(path.join(directory, "build-result.json"), "utf8"));
+  const files = ["scene.json", path.relative(directory, result.pptxPath),
+    ...scene.slides.map((_, i) => `rendered/slide-${i + 1}.png`)];
+  const hash = createHash("sha256");
+  for (const file of files) { hash.update(file); hash.update(await fs.readFile(path.join(directory, file))); }
+  return hash.digest("hex");
+}
+
+export async function validateReviewBinding(review, directory, slideIds) {
+  const errors = [];
+  if (review.binding !== await reviewBinding(directory)) errors.push("Review does not match the current PPTX, scene and renders");
+  const inspected = Array.isArray(review.inspectedSlides) ? review.inspectedSlides : [];
+  const seen = new Set(inspected);
+  if (inspected.length !== slideIds.length || seen.size !== slideIds.length || slideIds.some(id => !seen.has(id))) errors.push("Review must record inspection of every current slide");
+  if (!Number.isFinite(review.rating) || review.rating < 0 || review.rating > 10) errors.push("Review must provide a rating from zero to ten");
   return errors;
 }
 
@@ -113,7 +138,7 @@ export async function buildReviewPacket({ outputDirectory, brief = "", answer = 
     image: path.join(dir, "rendered", `slide-${i + 1}.png`)
   }));
   const statistics = designStatistics(scene);
-  const packet = { statistics, brief, answer, montage: path.join(dir, "rendered", "montage.png"), titles: slides.map((s) => `${s.index}. ${s.title}`), slides, codes: CODES, schema: REVIEW_SCHEMA };
+  const packet = { binding: await reviewBinding(dir), inspectedSlides: slides.map(s => s.id), statistics, brief, answer, montage: path.join(dir, "rendered", "montage.png"), titles: slides.map((s) => `${s.index}. ${s.title}`), slides, codes: CODES, schema: REVIEW_SCHEMA };
   await fs.writeFile(path.join(packetDir, "packet.json"), JSON.stringify(packet, null, 2));
   await fs.writeFile(path.join(packetDir, "schema.json"), JSON.stringify(REVIEW_SCHEMA, null, 2));
   await fs.writeFile(path.join(packetDir, "prompt.md"), reviewPrompt(packet));
@@ -185,7 +210,7 @@ GOVERNING ANSWER: ${packet.answer || "(not supplied)"}
 TITLES ALONE (read as a memo — does the argument flow?):
 ${packet.titles.join("\n")}
 
-For each slide, decide whether a reader gets the finding from the title and can verify it from the exhibit. A separate soWhat or closing strip is optional: the title and exhibit may already complete the argument. Two distinct insights can share a page when each is supported and clearly placed. Flag redundant propositions or competing summary boxes, not the absence of a footer conclusion or the mere presence of multiple insights. Report findings with these codes only:
+For each slide, decide whether a reader gets the finding from the title and can verify it from the exhibit. A separate soWhat or closing strip is optional: the title and exhibit may already complete the argument. Two distinct insights can share a page when each is supported and clearly placed. Flag redundant propositions or competing summary boxes, not the absence of a footer conclusion or the mere presence of multiple insights. Use these codes where appropriate, or a precise upper-case code for a newly observed defect:
 ${Object.entries(packet.codes).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
 
 Severity: blocker (must fix before any reader sees it), major (fix before delivery), minor (advisory), none. Design codes (DEAD_SPACE, LAYOUT_MONOTONY, NO_HERO_EXHIBIT, OVERSIZED_TYPE, WALL_OF_TEXT, BURIED_NUMBER, HEDGED_TITLE, TITLE_TOO_LONG, INCONSISTENT_ENCODING) may be major. A large empty band, one layout repeated across most pages, and prose where an exhibit belongs are defects, not preferences. Every major or blocker finding needs a repair sentence saying exactly what to add, replace, move, merge, cut, plot or rewrite.
@@ -196,20 +221,14 @@ ${packet.slides.flatMap((s) => s.gateFindings.map((f) => `- slide ${s.index} ${f
 Slide images: ${packet.slides.map((s) => s.image).join(", ")}
 Montage: ${packet.montage}
 
-BEAUTIFICATION PASS. Look at the montage as one thing, then at each page, and ask these in order. They are the questions a threshold cannot answer, which is why you are being asked them.
-
-1. Flicking through the montage, how many genuinely different pages are there? A deck of fifty pages built from four constructions is a deck of four pages shown twelve times. NARROW_REPERTOIRE.
-2. Does any page name two to six things - categories, options, markets, characters - and depict none of them? Each should carry a photograph where it is depictable and an icon where it is a category. NO_VISUAL_ANCHOR.
-3. Does every plot carry a mark that states the finding - a bracket between the two series the title compares, a change bubble, a reference line at the target, a highlighted category, a period band? A bare plot asks the reader to find what the title already says. UNANNOTATED_PLOT.
-4. Is any table a plain grid whose content is not a matrix? A scale wants harvey balls, a share wants bubbles or an in-cell bar, a verdict wants the implication gutter, a scored table wants heat. TABLE_MONOTONY.
-5. Does any page set a figure - a staircase, a cycle, a framework - beside a table or chart? Those are read in two different ways and the page has a join down the middle. MIXED_GRAMMAR.
-6. Is any rule, band or tint separating nothing? Count the accent devices on the busiest page: a title rule, an eyebrow, panel rules, tile rules and a chevron gutter at once is five devices and no hierarchy. DECORATION.
-7. Is the type and space balanced - no block hugging the top of a track with the rest empty, no column ending two fifths up, nothing crammed against a frame edge?
+VISUAL REVIEW. Read all spreads and inspect uncertain details at full size. Follow the semantic checks in references/design.md: coherent argument and counts; reconciled totals, periods, sample membership and durations; scoped comparisons, non-causal wording unless supported, and reversal conditions that affect the named option; focus that supports the claim; appropriate table category/dimension grammar; one chart heading owner; consistent qualifiers; vertically balanced sparse groups; meaningful arrows and rules; and cross-slide consistency. Neutral charts, joined verdicts, optional commentary and repeated comparison layouts are valid. Do not require pictures, icons, highlights or layout variety to meet quotas. Record concrete defects, not preferences.
 
 What this deck is made of, beside what a reference deck carries:
 ${JSON.stringify(packet.statistics, null, 1)}
 
 A number below the reference is not automatically a defect - a short deck of one argument may honestly use three exhibits - but it is where to look first, and where it is a defect say so with the code above.
+
+After inspecting them, record inspectedSlides from these IDs: ${JSON.stringify(packet.inspectedSlides)}. Bind this review to ${packet.binding}. Rate the actual deck out of ten independently of any requested target. A passing gate is not a taste score.
 
 Return ONLY JSON matching this schema: ${JSON.stringify(packet.schema)}
 Set accepted=false if any finding is major or blocker. The summary is two sentences: what the deck does well and what must change.`;

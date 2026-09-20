@@ -202,10 +202,11 @@ const REGION_HIGHLIGHT_BLOCK_PAD = 12;
 function normalizedHighlights(props, { categories = [], series = [], allowBar = false } = {}) {
   const highlights = props.highlights || [];
   if (!Array.isArray(highlights)) throw new Error("Chart highlights must be an array");
-  // One highlight, on purpose: a chart that marks three categories has marked
-  // none of them. To draw attention to several, sort the chart so they group,
-  // or name each one with `annotations`, which says why it is worth looking at.
-  if (highlights.length > 1) throw new Error("Use one primary chart highlight mechanism: one `highlights` entry marks the category the page is about. For several, sort the chart so they group, or name each with `annotations`");
+  // Several marks may express one comparison or set; they share one treatment.
+  if (new Set(highlights.map(h => h.style ?? "region-tint")).size > 1)
+    throw new Error("Use one coherent chart highlight treatment for the selected set");
+  if (new Set(highlights.map(h => h.category)).size !== highlights.length)
+    throw new Error("Chart highlights must name distinct categories");
   const seriesNames = series.map(item => typeof item === "string" ? item : item.name);
   return highlights.map((highlight) => {
     if (!highlight || typeof highlight.category !== "string" || !categories.includes(highlight.category)) throw new Error("Chart highlight references an unknown category");
@@ -238,6 +239,13 @@ export function axisLabelWidth(bounds) {
 }
 
 export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48 } = {}) {
+  // Preserve an explicit domain while selecting a readable tick interval. Four
+  // intervals on 0–6 printed 1.5 steps and failed the same runtime's tick gate.
+  const onLadder = count => {
+    const step = (yMax - yMin) / count, normalized = step / 10 ** Math.floor(Math.log10(step));
+    return [1, 2, 2.5, 5, 10].some(value => Math.abs(normalized - value) < 1e-9);
+  };
+  steps = [steps, 3, 5, 6, 2].find(onLadder) ?? steps;
   const nodes = [];
   if (showValueAxis) {
     for (let index = 0; index <= steps; index += 1) {
@@ -604,12 +612,12 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const showDataLabels = props.dataLabels === true || stackLabels.totals.size > 0 || stackLabels.secondary.size > 0 || (props.dataLabels !== false && (series.length === 1 || markCount <= 12));
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   const barLabelGap = tokenValue(token("space.3"));
-  const barLabelWidth = Math.max(50, ...values.map(value => Math.ceil(measureText(formatValue(value, props), 300, {fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1}).width)));
+  const barLabelWidth = Math.max(50, ...(props.comparisonDomain?.values ?? values).map(value => Math.ceil(measureText(formatValue(value, props), 300, {fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1}).width)));
   // `categoryLabels: false`: the right panel of a paired bar chart shares the
   // left panel's category column and draws none of its own.
   const hideCategoryLabels = horizontal && props.categoryLabels === false;
   const horizontalCategoryLabelWidth = horizontal && !hideCategoryLabels
-    ? Math.min(180, Math.max(72, Math.ceil(Math.max(...categories.map(category => measureText(category, 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width))) + 12))
+    ? Math.min(180, Math.max(72, Math.ceil(Math.max(...(props.comparisonDomain?.categories ?? categories).map(category => measureText(category, 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width))) + 12))
     : 0;
   const negativeLabelGutter = horizontal && !stacked && showDataLabels && values.some(v=>v<0) ? barLabelWidth + barLabelGap : 0;
   const totalTexts = new Map([...stackLabels.totals].map(([category, record]) => [category,
@@ -831,7 +839,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
           role: "data-label",
           frame: labelFrame,
           text: labelText,
-          style: textStyle(CHART_LABEL, stacked && contrastRatio(tokens[SERIES[colorIndex].tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[SERIES[colorIndex].tokenId].value, tokens["color.ink"].value) ? token("color.onPrimary") : INK, labelBold(), horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
+          style: textStyle(CHART_LABEL, stacked && contrastRatio(tokens[markColor.tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[markColor.tokenId].value, tokens["color.ink"].value) ? token("color.onPrimary") : INK, labelBold(), horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
           data: { category, series: item.name }
         }));
       }
@@ -863,9 +871,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       const record = deltas.get(category);
       if (record) {
         const size = 26, cx = plot.x + plot.width + deltaWidth - size - 4, cy = categoryStart + groupSpan / 2 - size / 2;
-        const positive = record.value > 0, neutral = record.value === 0;
-        const fill = neutral ? token("color.surfaceMuted") : (record.significant ? (positive ? token("color.accent") : token("color.negative")) : (positive ? token("color.accentTint") : token("color.negativeTint")));
-        const fg = record.significant && !neutral ? token("color.onPrimary") : INK;
+        const fill = token("color.surfaceMuted"), fg = INK;
         nodes.push(ellipsePrimitive({ id: stableId(id, "delta", category), role: "chart-delta", frame: { x: cx, y: cy, width: size, height: size }, style: fillStyle(fill), data: { category, delta: record.value } }));
         nodes.push(textPrimitive({ id: stableId(id, "delta-label", category), role: "chart-delta-label", frame: { x: cx - 4, y: cy + 1, width: size + 8, height: size - 2 }, text: `${record.value > 0 ? "+" : record.value < 0 ? "−" : ""}${formatValue(Math.abs(record.value), props)}`, style: textStyle(token("type.compact"), fg, true, "center"), data: { category, delta: record.value } }));
       }
@@ -1205,7 +1211,7 @@ function lineChart({ id, frame, props, area = false }) {
       if (series.length === 1) pointMap.set(`value:${point.category}`, mappedPoint);
       const categoryPoint = pointMap.get(`category:${point.category}`);
       if (!categoryPoint || mappedPoint.y < categoryPoint.y) pointMap.set(`category:${point.category}`, mappedPoint);
-      if (showDataLabels) {
+      if (showDataLabels && !(endLabels && point.category === categories.at(-1))) {
         const first = point.category === categories[0];
         const last = point.category === categories.at(-1);
         nodes.push(textPrimitive({
@@ -1305,7 +1311,7 @@ function waterfall({ id, frame, props }) {
     const top = Math.max(start, end);
     const bottom = Math.min(start, end);
     const bar = { x: plot.x + index * span + span * 0.2, y: yScale(top), width: span * 0.6, height: Math.max(2, yScale(bottom) - yScale(top)) };
-    const fill = isTotal ? PRIMARY : value >= 0 ? token("color.chartSeries2") : token("color.negative");
+    const fill = isTotal ? PRIMARY : value >= 0 ? token("color.chartSeries2") : token("color.chartSeries3");
     nodes.push(rectPrimitive({ id: stableId(id, "bar", category), role: "chart-mark", frame: bar, style: fillStyle(fill) }));
     nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`, style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
     if (index > 0) nodes.push(linePrimitive({ id: stableId(id, "connector", index), role: "chart-connector", x1: plot.x + (index - 1) * span + span * 0.8, y1: yScale(previous), x2: plot.x + index * span + span * 0.2, y2: yScale(previous), style: lineStyle(SECONDARY, token("line.hairline"), "dash") }));
@@ -1537,6 +1543,7 @@ function comboChart({ id, frame, props }) {
   const { categories, series } = normalizedCategoricalData(props, { seriesCount: 2 });
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
+    periodBand: periodBandHeight(props, categories),
     topLegend: true,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
@@ -1549,20 +1556,22 @@ function comboChart({ id, frame, props }) {
   const secondary = props.secondaryAxis === true;
   const barSeries = series[0];
   const lineSeries = series[1];
-  // With a secondary line the bars keep the lower two-thirds of the plot and the
-  // line floats in the band above them, so the two series never cross.
-  const barMax = Math.max(...barSeries.values, 0);
-  const bounds = numericBounds(secondary ? barSeries.values : series.flatMap(item => item.values), { min: props.yMin, max: props.yMax ?? (secondary && !showValueAxis ? barMax * 1.5 : undefined), axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  // Independent units get separate vertical fields on the same categories.
+  // Reserve their label clearance before scaling, including when the primary
+  // value axis is visible; padding its domain alone allowed the line to cross labels.
+  const barPlot = secondary ? { ...plot, y: plot.y + plot.height * 0.35 + 40, height: plot.height * 0.65 - 40 } : plot;
+  if (barPlot.height < 40) throw new Error("Combo chart needs more height for separate scales and labels");
+  const bounds = numericBounds(secondary ? barSeries.values : series.flatMap(item => item.values), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
   const lineBounds = secondary ? numericBounds(lineSeries.values, { min: props.y2Min, max: props.y2Max, axis: "y", tight: true }) : bounds;
-  const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
-  const lineBand = { top: plot.y + 44, height: plot.height * 0.3 };
+  const yScale = (value) => barPlot.y + barPlot.height - (value - bounds.min) / bounds.span * barPlot.height;
+  const lineBand = { top: plot.y + 30, height: Math.max(0, plot.height * 0.35 - 30) };
   const y2Scale = (value) => lineBand.top + lineBand.height - (value - lineBounds.min) / lineBounds.span * lineBand.height;
   const lineScale = secondary ? y2Scale : yScale;
   const categorySpan = plot.width / categories.length;
   const barWidth = categorySpan * 0.58;
   const nodes = [
     ...topLegend({ id, frame, items: series.map((item) => item.name) }),
-    ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })
+    ...axes(id, barPlot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })
   ];
   const pointMap = new Map();
   const categoryMap = new Map();
@@ -1570,12 +1579,13 @@ function comboChart({ id, frame, props }) {
   // A currency leads its figure: suffixed, "$m" gave "888$m" on a deck that
   // writes "$878m" on every other page. The unit decides which end it goes on.
   const secondaryCurrency = String(props.secondaryUnit ?? "").trim().match(/^([$£€¥₹])\s*(.*)$/);
-  const lineFormat = secondary && props.secondaryUnit
-    ? { ...props, valueFormat: { ...(props.valueFormat || {}),
-        ...(secondaryCurrency
-          ? { prefix: `${(props.valueFormat || {}).prefix || ""}${secondaryCurrency[1]}`, suffix: secondaryCurrency[2] }
-          : { suffix: props.secondaryUnit }),
-        grouping: (props.valueFormat || {}).grouping ?? true } }
+  const secondaryFormat = props.secondaryValueFormat ?? props.valueFormat ?? {};
+  const unitFormat = secondaryCurrency
+    ? { prefix: secondaryCurrency[1], suffix: secondaryCurrency[2] }
+    : props.secondaryUnit ? { prefix: "", suffix: props.secondaryUnit } : {};
+  const lineFormat = secondary
+    ? { ...props, valueFormat: { ...secondaryFormat, ...unitFormat,
+        ...props.secondaryValueFormat, grouping: secondaryFormat.grouping ?? true } }
     : props;
   categories.forEach((category, index) => {
     const x = plot.x + categorySpan * index + categorySpan / 2;
@@ -1606,7 +1616,7 @@ function comboChart({ id, frame, props }) {
     if (showDataLabels) {
       // The bar's value sits inside its top in white when the bar is tall enough, else above it;
       // the line's value sits above its point, clear of the bar label.
-      const inside = bar.height >= 40;
+      const inside = !secondary && bar.height >= 40;
       nodes.push(textPrimitive({ id: stableId(id, "value-label", barSeries.name, category), role: "data-label", frame: { x: bar.x, y: inside ? bar.y + 6 : bar.y - 26, width: bar.width, height: 24 }, text: formatValue(barSeries.values[index], props), style: textStyle(CHART_LABEL, inside ? token("color.onPrimary") : INK, true, "center"), data: { category, series: barSeries.name } }));
       const ly = Math.min(lineY - 30, inside ? bar.y - 26 : bar.y - 52);
       nodes.push(textPrimitive({ id: stableId(id, "value-label", lineSeries.name, category), role: "data-label", frame: { x: x - categorySpan / 2, y: ly, width: categorySpan, height: 24 }, text: formatValue(lineSeries.values[index], lineFormat), style: textStyle(CHART_LABEL, SERIES[1], true, "center"), data: { category, series: lineSeries.name } }));
@@ -2041,7 +2051,7 @@ export function registerCharts(registry) {
       "font.bodySemibold", "weight.semibold",
       "color.chartGrid", "color.chartComparator", "color.componentPrimary", "color.componentPrimaryTint", "color.accent", "color.rule",
       "color.canvas", "color.surface", "color.surfaceMuted", "color.onPrimary", "color.negative", "line.hairline", "line.standard", "radius.none", "radius.small",
-      ...SERIES.map((item) => item.tokenId), ...LEGEND_TOKENS, ...(chart.tokens || []), "color.accent", "color.accentTint", "color.negative", "color.negativeTint", "color.surfaceMuted", "color.onPrimary", "type.compact"
+      ...SERIES.map((item) => item.tokenId), ...LEGEND_TOKENS, ...(chart.tokens || []), "color.accent", "color.accentTint", "color.positive", "color.negative", "color.negativeTint", "color.surfaceMuted", "color.onPrimary", "type.compact"
     ];
     registry.set(chart.id, {
       id: chart.id,
@@ -2072,6 +2082,7 @@ export function registerCharts(registry) {
         return { top: frame.y, ruled: layout.ruled, height: layout.height };
       },
       render: ({ id, frame, props = {}, tokens }) => {
+        if (Array.isArray(props.series) && props.series.some(item => item.tone !== undefined)) throw new Error("Chart series cannot use status tone; positive/negative colours belong to short text labels or check/cross icons. Use chart palette series colours for marks.");
         if (!String(props.heading ?? "").trim()) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
           return { nodes: chart.render({ id, frame, tokens, props }) };

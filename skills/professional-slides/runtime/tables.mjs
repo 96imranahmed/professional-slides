@@ -436,7 +436,7 @@ function contentLayout(cell, width, props, used) {
     const labels = cell.values.map((n, i) => cell.labels?.[i] ?? formatValue(n, cell.scaleRecord));
     const size = bodySize(props);
     const labelWidth = Math.max(
-      ...labels.map((s) => measure(s, inner, true, size).width),
+      ...[...labels, ...(cell.scaleRecord.labelTexts || [])].map((s) => measure(s, inner, true, size).width),
       v("space.6"),
     );
     const rowHeight = Math.max(
@@ -989,7 +989,7 @@ function renderTableAt({ id, frame, props }) {
     // One continuous header rule unless a column is an implication arrow or
     // the header sits over a chevron/category run whose slits are by design.
     const continuousHeader = !m.columns.some((col) => col.type === "implication") && props.headerShape !== "chevron" && header !== "categories";
-    if (continuousHeader ? c === 0 : column.type !== "implication")
+    if (!(filledHeader && props.headerShape === "chevron") && (continuousHeader ? c === 0 : column.type !== "implication"))
       nodes.push(
         line(
           stableId(id, "header-rule", c),
@@ -1039,21 +1039,8 @@ function renderTableAt({ id, frame, props }) {
     const bottom = ys[last] + m.heights[last] - m.gap / 2;
     const diameter = Math.min(v("icon.medium"), m.widths[c] - m.gap);
     const data = { column: c, relation: "implies", arrowVariant: "divider-chevron" };
-    // The disc marks a row, or it marks nothing. Centred in the gutter it came
-    // to rest between two rows it was not about - "in the gap between Wonder
-    // Woman and Justice League, pointing at no particular verdict" - and a
-    // reader who sees that on a quarter of the deck reads it as furniture. So
-    // it sits on the table's emphasised row where there is one, and where
-    // there is none the dashed rule carries the boundary by itself, which is
-    // all the page needed.
-    const marked = m.rows.findIndex((row, index) => index <= last && (row.style ?? props.rowStyle) === "accented");
-    if (marked < 0) {
-      nodes.push(linePrimitive({ id: stableId(id, "implication-rule", c, "whole"), role: "table-implication",
-        x1: centreX, y1: top, x2: centreX, y2: bottom,
-        style: { stroke: t("color.rule"), lineWidth: t("line.hairline"), dash: "dash" }, data }));
-      return;
-    }
-    const centreY = ys[marked] + m.heights[marked] / 2 - m.gap / 2, reach = diameter / 2 + v("space.2");
+    // A table-level inference spans the evidence body. Row emphasis is independent.
+    const centreY = (top + bottom) / 2, reach = diameter / 2 + v("space.2");
     for (const [suffix, y1, y2] of [["top", top, centreY - reach], ["bottom", centreY + reach, bottom]]) {
       if (y2 <= y1) continue;
       nodes.push(linePrimitive({ id: stableId(id, "implication-rule", c, suffix), role: "table-implication",
@@ -1062,12 +1049,12 @@ function renderTableAt({ id, frame, props }) {
     }
     nodes.push(ellipsePrimitive({ id: stableId(id, "implication-disc", c), role: "table-implication",
       frame: { x: centreX - diameter / 2, y: centreY - diameter / 2, width: diameter, height: diameter },
-      style: box(primary), data: { ...data, arrowPart: 0, row: marked } }));
+      style: box(primary), data: { ...data, arrowPart: 0 } }));
     [[centreX - diameter * 0.11, centreY - diameter * 0.23, centreX + diameter * 0.12, centreY],
      [centreX + diameter * 0.12, centreY, centreX - diameter * 0.11, centreY + diameter * 0.23],
     ].forEach(([x1, y1, x2, y2], part) => nodes.push(linePrimitive({
       id: stableId(id, "implication-chevron", c, part), role: "table-implication", x1, y1, x2, y2,
-      style: { stroke: foreground(primary), lineWidth: t("line.standard") }, data: { ...data, arrowPart: part + 1, row: marked } })));
+      style: { stroke: foreground(primary), lineWidth: t("line.standard") }, data: { ...data, arrowPart: part + 1 } })));
   });
 
   // A bubble column is one pill repeated, not a pill per figure. Sized to its
@@ -1264,7 +1251,11 @@ function renderTableAt({ id, frame, props }) {
                   width: Math.abs(xScale(value) - zeroX),
                   height: barHeight,
                 },
-                style: box(barColor(scale, i)),
+                style: {
+                  ...box(barColor(scale, i)),
+                  ...((fill || band) && contrastRatio(tokenValue(barColor(scale, i)), tokenValue(fill || band)) < 3
+                    ? { stroke: foreground(fill || band), lineWidth: t("line.hairline") } : {}),
+                },
                 data: { ...data, series: i, value, zeroX, domain: [scale.min, scale.max] },
               }),
             );
@@ -1276,7 +1267,7 @@ function renderTableAt({ id, frame, props }) {
             label,
             {
               ...chartAnnotationStyle(),
-              ...textStyle(true, ink, "right", l.size),
+              ...textStyle(true, color, "right", l.size),
             },
             data,
           );

@@ -159,27 +159,19 @@ class ContentStageReachesThePageTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
 
     def test_the_content_plans_highlight_is_set_on_the_page(self):
-        work = self.tmp / "examples"
-        work.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(EXAMPLES / "assets", work / "assets", dirs_exist_ok=True)
-        for name in ("nyc-or-sf.deck.json", "nyc-or-sf.content.json"):
-            shutil.copy(EXAMPLES / name, work / name)
-        out = self.tmp / "out" / "output"
-        result = subprocess.run(
-            [NODE, str(BUILD), str(work / "nyc-or-sf.deck.json"), str(out), "--no-render"],
-            cwd=ROOT, capture_output=True, text=True,
-            env={"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": "/tmp",
-                 "RUNTIME_NODE_MODULES": str(ROOT / "node_modules")})
-        self.assertIn(result.returncode, (0, 2), result.stderr[-600:])
-        scene = json.loads((out / "scene.json").read_text(encoding="utf-8"))
-        content = [s for s in scene["slides"]
-                   if any(n.get("role") == "action-title" for n in s["nodes"])]
-        accented = [s for s in content
-                    if any(n.get("runs") and any(r.get("accent") for r in n["runs"]) for n in s["nodes"])]
-        # The deck spec names no highlight of its own on these pages; every one
-        # of them comes from the content plan beside it.
-        self.assertGreaterEqual(len(accented) / len(content),
-                                page_gates.THRESHOLDS["highlight_share_min"])
+        spec = {"schema": "professional-slides.deck/v3", "id": "bound", "slides": [
+            {"id": "inserted", "title": "Context precedes the evidence without changing its focus", "points": ["The context has no selected phrase."]},
+            {"id": "target", "title": "The selected evidence supports a focused reader decision", "points": [{"lead": "Decision", "text": "A reversible first step preserves the next choice."}]}]}
+        plan = {"schema": "professional-slides.content/v1", "id": "bound", "question": "Which step should the reader take?", "answer": "Take a reversible first step.", "pages": [{"id": "target", "claim": spec["slides"][1]["title"], "settles": {"kind": "qualitative", "what": "A reversible decision"}, "adds": None, "highlight": "reversible first step"}]}
+        (self.tmp / "bound.deck.json").write_text(json.dumps(spec))
+        (self.tmp / "bound.content.json").write_text(json.dumps(plan))
+        out = self.tmp / "output"
+        result = subprocess.run([NODE, str(BUILD), str(self.tmp / "bound.deck.json"), str(out), "--preflight", "--python", sys.executable], cwd=ROOT, capture_output=True, text=True)
+        self.assertIn(result.returncode, (0, 2), result.stderr)
+        scene = json.loads((out / "scene.json").read_text())
+        accents = {s["id"]: [r["text"] for n in s["nodes"] for r in n.get("runs", []) if r.get("accent")] for s in scene["slides"]}
+        self.assertIn("reversible first step", " ".join(accents["target"]))
+        self.assertEqual(accents["inserted"], [])
 
 
 if __name__ == "__main__":

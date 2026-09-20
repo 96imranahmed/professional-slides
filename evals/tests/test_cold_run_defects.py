@@ -70,7 +70,7 @@ assert.equal(find(headed.items,i=>i.id==='s01-points').props.centre,false);
 // Alone in an unheaded track the list still spreads and centres the leftover.
 const alone=composeSlide({title:'T',exhibit,points,pointsHeading:false},0);
 const list=find(alone.items,i=>i.id==='s01-points');
-assert.equal(list.props.distribute,true); assert.equal(list.props.centre,undefined);
+assert.equal(list.props.distribute,false); assert.equal(list.size.height,'hug');
 console.log('{}');
 ''')
 
@@ -86,7 +86,9 @@ class RatingColumnTests(unittest.TestCase):
         # scale - the deck's densest table drew no treatment at all.
         run_node('''
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable as rawStyleTable} from './skills/professional-slides/runtime/compose.mjs';
+const readiness={type:'harvey',label:'Data readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}};
+const styleTable=ex=>rawStyleTable({...ex,scales:{readiness},columns:ex.columns.map((c,i)=>i===1?{...(typeof c==='string'?{label:c}:c),scale:'readiness'}:c)});
 const markets=['Netherlands','Ireland','Sweden','Poland','Germany','France','Spain','Italy','Portugal','Czechia','Romania','Greece'];
 const ratings=['Full','Full','Full','Strong','Strong','Partial','Strong','Partial','Partial','Weak','Open','Open'];
 const ex={columns:['Market',{label:'Data readiness',unit:'four-point assessment'},'Cost to serve'],
@@ -95,19 +97,21 @@ const out=styleTable(ex);
 const cells=out.rows.map(r=>r[1]);
 assert.equal(cells.filter(c=>c&&c.type==='harvey').length,10);
 // The two unknowns keep the word the author wrote, beside the discs.
-assert.deepEqual(cells.slice(10),['Open','Open']);
+assert.deepEqual(cells.slice(10).map(c=>c.text),['Open','Open']);
 assert.equal(out.rows[0][1].value,4); assert.equal(out.rows[9][1].value,1);
-assert.equal(out.scales.rating.anchors['4'],'Full','the disc prints its anchor word, not "4/4"');
+assert.equal(out.scales.readiness.anchors['4'],'Full','the disc prints its anchor word, not "4/4"');
 console.log('{}');
 ''')
 
     def test_a_column_of_mostly_unknowns_is_not_a_rating(self):
         run_node('''
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable as rawStyleTable} from './skills/professional-slides/runtime/compose.mjs';
+const readiness={type:'harvey',label:'Data readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}};
+const styleTable=ex=>rawStyleTable({...ex,scales:{readiness},columns:ex.columns.map((c,i)=>i===1?{...(typeof c==='string'?{label:c}:c),scale:'readiness'}:c)});
 const rows=[['A','Full','1'],['B','Open','2'],['C','Open','3'],['D','N/A','4'],['E','Strong','5'],['F','TBD','6']];
 const out=styleTable({columns:['Market',{label:'Data readiness'},'Cost'],rows});
-assert.ok(out.rows.every(r=>typeof r[1]==='string'),'four blanks and two ratings is not a scale');
+assert.equal(out.rows.filter(r=>r[1].type==='harvey').length,2,'only known authored anchors become marks');
 console.log('{}');
 ''')
 
@@ -116,7 +120,9 @@ console.log('{}');
         # so on the twelve-row scorecard the disc sat on top of its own word.
         run_node('''
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable as rawStyleTable} from './skills/professional-slides/runtime/compose.mjs';
+const readiness={type:'harvey',label:'Data readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}};
+const styleTable=ex=>rawStyleTable({...ex,scales:{readiness},columns:ex.columns.map((c,i)=>i===1?{...(typeof c==='string'?{label:c}:c),scale:'readiness'}:c)});
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const words=['Full','Strong','Partial','Weak','Full','Strong','Partial','Weak','Full','Strong','Partial','Weak'];
 const ex=styleTable({columns:['Market',{label:'Data readiness'},'Cost to serve'],
@@ -177,8 +183,8 @@ const span=rules=>[Math.min(...rules.map(r=>r.frame.y)),Math.max(...rules.map(r=
 // on a quarter of the deck reads it as furniture. The dashed rule carries the
 // boundary on its own.
 const plain=render(body), rules=dashed(plain);
-assert.equal(plain.filter(n=>n.type==='ellipse').length,0,'no disc without a row to mark');
-assert.equal(rules.length,1,'the rule runs the height of the evidence');
+assert.equal(plain.filter(n=>n.type==='ellipse').length,1,'explicit table inference has one centred disc');
+assert.equal(rules.length,2,'the rule runs above and below the disc');
 const [top,foot]=span(rules);
 // Emphasise a row and the disc sits on it, with the rule broken around it.
 const marked=[...body]; marked[1]={cells:body[1],style:'accented'};
@@ -186,7 +192,7 @@ const withMark=render(marked), disc=withMark.find(n=>n.type==='ellipse');
 assert.equal(withMark.filter(n=>n.type==='ellipse').length,1,'one disc, on the marked row');
 assert.equal(dashed(withMark).length,2,'the rule runs above and below it');
 const centre=disc.frame.y+disc.frame.height/2;
-assert.ok(centre<(top+foot)/2,'and it sits on the second row, not halfway down');
+assert.ok(Math.abs(centre-(top+foot)/2)<0.01,'row emphasis does not move the table-wide disc');
 // Add a total and the span shortens: a total is the same rows added up.
 const withTotal=render([...body,{cells:['Total',blank,'26'],style:'total'}]);
 const [,footWithTotal]=span(dashed(withTotal));

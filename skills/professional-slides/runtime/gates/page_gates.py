@@ -447,6 +447,14 @@ GATE_CODES = {
     "TITLE_COUNT": "the title states a count the page's own exhibit does not show",
 }
 
+# Distribution and furniture statistics prompt human review; they do not
+# establish a defect without the page's semantic task and visual context.
+ADVISORY_CODES = {
+    "INK_COVERAGE", "THIN_PAGE", "DECK_FLAT", "DECK_CRAFT", "EVIDENCE_MIX", "PAGE_VARIETY",
+    "DEAD_BAND", "INTERNAL_VOID", "UNANNOTATED", "LAYOUT_MONOTONY",
+    "COLUMN_MONOTONY", "TABLE_SCHEMA_FLAT", "IMAGE_BUDGET", "IMAGE_RUN",
+}
+
 # Findings raised before the page is rendered: the composer's plan-time budget
 # and the deck's coverage check. They are not gates, but they share the shape.
 COMPOSE_CODES = {
@@ -2014,8 +2022,7 @@ def gate_deck_craft(slides, analytical, findings):
     if highlighted < want["highlight"]:
         short.append(
             f"a phrase is emphasised on {highlighted:.0%} of pages against {client['highlightedPhrase']:.0%} in "
-            "client decks. Name the phrase the reader should see first and set it in the accent inside the "
-            "sentence - `highlight` on the page, or an accent run on the point")
+            "client decks. Review whether the decisive comparison needs emphasis; neutral is valid")
     if sourced < want["source"]:
         short.append(
             f"only {sourced:.0%} of pages carry a source against {client['sourceLine']:.0%}. A measured page "
@@ -2023,19 +2030,17 @@ def gate_deck_craft(slides, analytical, findings):
     if treated is not None and treated < want["tablesTreated"]:
         short.append(
             f"{treated:.0%} of the tables carry a treatment against {craft['tableTreated']['observedClient']:.0%} in "
-            f"client work - {len(tables)} tables here, and not one plain grid in the 28 client decks measured. "
-            "Shade the bands, code the cells, bubble the share, set the total row apart")
+            f"client work. Review the {len(tables)} tables by their reading task; do not add treatment for its frequency")
     if annotated is not None and annotated < want["chartsAnnotated"]:
         short.append(
             f"{annotated:.0%} of the charts carry a mark that states the finding against "
             f"{craft['chartAnnotated']['observedClient']:.0%} in client work. A bracket between the two series the "
-            "title compares, a change bubble, a reference line at the target, a shaded period, a recoloured category")
+            "title compares may help, as may a reference line at a real target; use neither without a content reason")
     if (commonest is not None and len(tables) >= THRESHOLDS["table_device_from"]
             and commonest > want["commonestTableDevice"]):
         short.append(
             f"{commonest:.0%} of the {len(tables)} tables carry the same device. A treatment repeated on every "
-            "table is furniture: rotate the vocabulary - the implication gutter on one, the conclusion cell "
-            "tinted on the next, filled category cells on the third, banded rows where the table is a list")
+            "table can be right for the same task. Review whether each use expresses its category, sequence or inference")
     if marks < want["marksPerPage"]:
         short.append(
             f"{marks:.0f} drawn elements a page against a corpus median of {REFERENCE_PAGE['drawings']}. A page "
@@ -2044,7 +2049,7 @@ def gate_deck_craft(slides, analytical, findings):
         return
     findings.append(finding(
         None, "DECK_CRAFT", measured, want,
-        "This deck does not work its pages the way a client deck does: " + "; ".join(short) + ".",
+        "Reference-distribution differences for visual review, not decoration targets: " + "; ".join(short) + ".",
     ))
 
 
@@ -2133,9 +2138,8 @@ def gate_deck_front_matter(slides, analytical, findings, fill):
     contents and the tracker having been one setting - and its summary page was
     assembled by hand because nothing said to write one.
     """
-    # A catalogue declares itself airy: it has no argument to summarise and no
-    # sections to announce, so neither page is missing from it.
-    if fill == "airy" or len(analytical) < THRESHOLDS["front_matter_from"]:
+    # Density does not exempt a long analytical deck from its opening answer.
+    if len(analytical) < THRESHOLDS["front_matter_from"]:
         return
     kinds = [str(s.get("kind") or "") for s in slides]
     if "divider" in kinds and not any(
@@ -2149,19 +2153,12 @@ def gate_deck_front_matter(slides, analytical, findings, fill):
             "independent of `tracker`, so the page and the section pills can "
             "both be on.",
         ))
-    # The first analytical page carries the answer: measured tiles over a short
-    # ledger of findings, which is what `shape: "executive-summary"` builds.
     first = slides[analytical[0]] if analytical else None
-    if first is not None:
-        metrics = sum(1 for c in first.get("componentInstances", []) if str(c.get("component") or "") == "metric")
-        if metrics < 2:
-            findings.append(finding(
-                None, "NO_SUMMARY", metrics, "an opening summary page",
-                "The deck starts with evidence instead of with its answer. Give "
-                "it a first page that states the finding: `shape: "
-                "\"executive-summary\"` with the measures in `metrics` and the "
-                "two to five findings that carry them in `points`.",
-            ))
+    summary_indices = [i for i, slide in enumerate(slides) if slide.get("role") == "executive-summary"]
+    first_section = next((i for i, slide in enumerate(slides) if slide.get("kind") == "divider"), len(slides))
+    if first is not None and (first.get("role") != "executive-summary" or not summary_indices or summary_indices[0] > first_section):
+        findings.append(finding(None, "NO_SUMMARY", len(summary_indices), "an opening executive summary",
+            'Put the answer, its proof, consequence and action before the first section; declare role: "executive-summary". Metrics are optional and do not establish the role.'))
 
 
 def gate_deck_shape(slides, analytical, findings, fill):
@@ -2269,47 +2266,54 @@ def shape_constrained(slide):
 
 
 def page_architecture(slide):
-    """The page's shape with the exhibit types abstracted away.
+    """Count evidence relationships, not chart types or decorative variants.
 
-    `layout_signature` names the components, so a bar chart beside a column of
-    points and a line chart beside a column of points are two signatures - and a
-    deck can run 69% of its pages on one architecture while LAYOUT_MONOTONY sees
-    nothing. This is the coarser reading: what the page is *made of* (a measured
-    exhibit, a table, a diagram, a picture, text) and how those blocks are
-    arranged, which is what a reader sees from across the room.
+    Two/three commentary columns, cards/prose, and an optional closing insight
+    are the same architecture. Relative geometry survives subtitle removal and
+    density changes; absolute y bands did not.
     """
-    family = {
-        "chart": "measure", "table": "table", "rows": "table", "compare": "table",
-        "phase-table": "table", "metric": "measure", "image-frame": "picture",
-        "bullet-list": "text", "paragraph": "text", "insight": "text", "callout": "text",
-    }
-
-    def kind(component):
-        name = str(component or "")
-        if name.startswith("chart."):
-            return "measure"
-        for prefix, value in family.items():
-            if name == prefix:
-                return value
-        return "diagram"
-
-    # Read the actual exhibit and commentary leaves, not section containers.
-    # Filtering to exhibits alone erased the text from chart-plus-commentary
-    # layouts and falsely classified every one as a lone chart.
-    commentary = {"bullet-list", "paragraph", "insight", "callout", "metric", "metrics"}
-    instances = [c for c in slide.get("componentInstances", [])
-                 if is_exhibit(c) or c.get("component") in commentary]
-    if not instances:
-        return None
-    rows = {}
-    for instance in instances:
-        frame = instance.get("frame") or {}
-        band = int(float(frame.get("y", 0)) // ARCH_BAND)
-        rows.setdefault(band, []).append(kind(instance.get("component")))
-    shape = ";".join(
-        "+".join(sorted(members)) for _, members in sorted(rows.items())
-    )
-    return shape
+    instances = slide.get("componentInstances", [])
+    evidence = [c for c in instances if str(c.get("component", "")).startswith("chart.")
+                or c.get("component") in {"table", "rows", "compare", "phase-table"}]
+    # A process, tree or timeline beside a chart is a second form of evidence.
+    # Keep standalone diagrams' specific grammar below; include them here only
+    # in a composite so chart-plus-process cannot collapse into a lone chart.
+    diagram_components = {"steps", "cycle", "journey", "timeline", "process",
+                          "chevron-process", "flow", "roadmap", "tree",
+                          "organization", "matrix", "quadrants", "horizons"}
+    if evidence:
+        evidence += [c for c in instances if c.get("component") in diagram_components]
+    comments = [c for c in instances if c.get("component") in {"paragraph", "bullet-list", "cards", "callout"}]
+    metrics = [c for c in instances if c.get("component") in {"metric", "metrics"}]
+    def box(c):
+        f = c.get("frame") or {}
+        return tuple(float(f.get(k, 0)) for k in ("x", "y", "width", "height"))
+    if len(evidence) == 1:
+        x, y, w, h = box(evidence[0])
+        if any(box(c)[1] + box(c)[3] <= y + 4 for c in metrics):
+            return "metrics-over-evidence"
+        if any(box(c)[0] >= x + w - 4 or box(c)[0] + box(c)[2] <= x + 4 for c in metrics):
+            return "hero-number-with-evidence"
+        if any((box(c)[0] >= x + w - 4 or box(c)[0] + box(c)[2] <= x + 4)
+               and box(c)[1] < y + h and box(c)[1] + box(c)[3] > y for c in comments):
+            return "evidence-with-side-commentary"
+        if any(box(c)[1] >= y + h - 4 for c in comments):
+            return "evidence-over-commentary"
+        return "evidence-only"
+    if len(evidence) > 1:
+        if len(evidence) > 2:
+            return "evidence-grid"
+        first, second = sorted(evidence, key=lambda c: box(c)[1])
+        return "evidence-stack" if box(second)[1] >= box(first)[1] + box(first)[3] - 4 else "paired-evidence"
+    components = {str(c.get("component", "")) for c in instances}
+    if "image-frame" in components:
+        return "picture-led"
+    if "cards" in components:
+        return "card-grid"
+    if metrics:
+        return "metrics-with-text"
+    diagrams = sorted(components & diagram_components)
+    return "+".join(diagrams) if diagrams else ("text" if comments else None)
 
 
 def column_shape(slide):
@@ -2405,35 +2409,15 @@ def gate_page_shape_flat(slides, content_indexes, findings, fill):
     top_share = top_count / float(len(shapes))
     if per_ten >= THRESHOLDS["shapes_per_ten_min"] and top_share <= THRESHOLDS["shape_share_max"]:
         return
-    # Which pages had a choice to make. A page carrying one exhibit and no
-    # commentary has one viable shape, so a deck built from those is flat for a
-    # reason no layout change can reach - and the remedy has to say so, with the
-    # pages named, or the author goes looking for a shape that does not exist.
-    constrained = [content_indexes[i] + 1 for i, slide in enumerate(slides[j] for j in content_indexes)
-                   if page_architecture(slide) and shape_constrained(slide)]
-    constrained_share = len(constrained) / float(len(shapes))
-    if constrained_share >= 0.5:
-        remedy = (
-            f"{len(constrained)} of {len(shapes)} pages carry one exhibit and no "
-            "commentary, which leaves the composer one shape to choose from - so "
-            "the deck is flat because of what its pages hold, not how they are "
-            "laid out, and no layout change will reach it. Give those pages what "
-            "a reference page carries: two to four points of commentary beside "
-            "or beneath the exhibit, a kpi where the story has a number, a "
-            "second cut of the same data. The shapes follow the content. Pages: "
-            + ", ".join(str(n) for n in constrained[:20])
-            + ("…" if len(constrained) > 20 else "")
-        )
-    else:
-        remedy = (
-            "The deck is built from too few page shapes, so it reads as one page "
-            "repeated. Reference client decks run about five architectures per "
-            "ten pages: an exhibit with its commentary beside it, the same "
-            "exhibit full width with the commentary in columns beneath, two "
-            "exhibits contrasted, one hero number with its proof, a full-bleed "
-            "table. Drop any explicit `layout` on these pages and let the "
-            "composer choose, which rotates through the shapes that fit."
-        )
+    constrained = [i + 1 for i in content_indexes if shape_constrained(slides[i])]
+    remedy = (
+        "The same evidence relationship dominates the deck. Two or three commentary columns, "
+        "cards versus prose, and an optional insight strip count as one architecture. "
+        "Return to slide design: consider paired evidence on a shared basis, aligned small multiples, "
+        "a reconciled bridge, a metric with its proof, a sequence or an integrated comparison. "
+        "Select from the actual argument and reference examples; adding boxes, mirroring panels "
+        "or deleting necessary evidence does not repair repetition."
+    )
     findings.append(finding(
         None, "PAGE_SHAPE_FLAT",
         {"shapesPerTen": round(per_ten, 1), "commonest": top_shape,
@@ -2672,9 +2656,9 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         "slides": len(slides),
         "coverSlides": covers,
         "contentSlides": len(content_indexes),
-        "accepted": not findings,
+        "accepted": not any(f["code"] not in ADVISORY_CODES for f in findings),
         "countsByCode": dict(sorted(by_code.items())),
-        "findings": findings,
+        "findings": [{**f, "severity": "advisory" if f["code"] in ADVISORY_CODES else "blocker"} for f in findings],
     }
 
 

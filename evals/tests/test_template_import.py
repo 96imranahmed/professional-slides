@@ -36,7 +36,7 @@ class TemplateImportTests(unittest.TestCase):
         self.assertEqual(self.house["schema"], "professional-slides.house/v1")
         self.assertEqual(colors["color.ink"], "#212427")
         self.assertEqual(colors["color.componentPrimary"], "#0E7A5E")
-        self.assertIn(colors["color.accent"], {"#2FBF71", "#5FB08F"}, "a BCG green: the theme accent or the most used bright fill")
+        self.assertIn(colors["color.accent"], {"#16814B", "#5FB08F"}, "a BCG green: the theme accent or the most used bright fill")
         self.assertEqual(colors["color.chartSeries1"], "#0E7A5E")
         self.assertEqual(self.house["typography"]["body"], "Arial")
         chrome = self.house["chrome"]
@@ -72,7 +72,7 @@ fs.writeFileSync(path.join(dir,'house.json'),{json.dumps(house)});
 const spec={{schema:'professional-slides.deck/v3',id:'t',template:'house.json',slides:[{{title:'Revenue grew nine percent while costs held flat',points:['a','b','c']}}]}};
 const applied=applyTemplate(spec,dir);
 assert.equal(applied.template,undefined);
-assert.equal(applied.palette.base,'mckinsey');assert.ok(['#2FBF71','#5FB08F'].includes(applied.palette.colors['color.accent']));
+assert.equal(applied.palette.base,'mckinsey');assert.ok(['#16814B','#5FB08F'].includes(applied.palette.colors['color.accent']));
 assert.equal(applied.chrome.left,60);assert.equal(applied.footer,'House test');
 // An explicit palette on the spec wins over the template's.
 assert.equal(applyTemplate({{...spec,palette:'bain'}},dir).palette,'bain');

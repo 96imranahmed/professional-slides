@@ -31,6 +31,26 @@ def scene_fixture():
 
 
 class ExportReviewTests(unittest.TestCase):
+    def test_canvas_survives_export_and_readback_rejects_drift(self):
+        from readback_pptx import readback
+        from pptx.dml.color import RGBColor
+        scene = {'tokens': {'color.canvas': {'kind': 'color', 'value': '#FFF9F0'}}, 'slides': [
+            {'id': 'warm', 'tokens': {}, 'nodes': []},
+            {'id': 'inverse', 'tokens': {'color.canvas': {'kind': 'color', 'value': '#18212B'}}, 'nodes': []}
+        ]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'canvas.pptx'
+            Emitter(scene).run(path)
+            saved = Presentation(path)
+            self.assertEqual(str(saved.slides[0].background.fill.fore_color.rgb), 'FFF9F0')
+            self.assertEqual(str(saved.slides[1].background.fill.fore_color.rgb), '18212B')
+            self.assertTrue(readback(scene, path)['accepted'])
+            saved.slides[0].background.fill.fore_color.rgb = RGBColor(255, 255, 255)
+            saved.save(path)
+            report = readback(scene, path)
+            self.assertFalse(report['accepted'])
+            self.assertEqual(report['findings'][0]['code'], 'CANVAS_COLOR')
+
     @classmethod
     def setUpClass(cls):
         cls.tmp=tempfile.TemporaryDirectory();cls.path=Path(cls.tmp.name)/'review.pptx'
@@ -68,3 +88,16 @@ class ExportReviewTests(unittest.TestCase):
         chart=next(s.chart for s in self.prs.slides[0].shapes if s.has_chart)
         self.assertEqual(chart.font.name,'Georgia')
         self.assertEqual(chart.plots[0].data_labels.number_format,'0.0')
+
+class ZeroStackLabelTests(unittest.TestCase):
+    def test_zero_stack_point_keeps_data_but_suppresses_native_label(self):
+        scene=scene_fixture()
+        spec=scene['slides'][0]['componentInstances'][0]['nativeChart']
+        spec.update(type='stacked-bar',categories=['A','B'],series=[{'name':'First','values':[0,2]},{'name':'Second','values':[4,3]}])
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'zero.pptx';Emitter(scene).run(path)
+            prs=Presentation(path)
+            chart=next(s.chart for s in prs.slides[0].shapes if s.has_chart)
+            self.assertEqual(chart.series[0].values[0],0)
+            labels=chart.series[0]._element.findall('.//'+qn('c:dLbl'))
+            self.assertTrue(any(l.find(qn('c:idx')).get('val')=='0' and l.find(qn('c:delete')).get('val')=='1' for l in labels))

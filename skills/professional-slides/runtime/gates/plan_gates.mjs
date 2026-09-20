@@ -109,11 +109,15 @@ const isIcon = (anchor) => {
  */
 export function architecture(page) {
   if (page.kind && page.kind !== "content") return null;
-  return String(page.architecture || page.layout || `auto:${family(page)}`);
+  const shape = String(page.architecture || page.layout || `auto:${family(page)}`);
+  if (["exhibit-left", "exhibit-right"].includes(shape)) return "evidence-with-side-commentary";
+  if (shape === "exhibit-top" || /^(?:chart|table)[- /].*(?:two|three|2|3)[- ]col/i.test(shape)) return "evidence-over-commentary";
+  if (["two-up", "two-up-contrast", "split-tone"].includes(shape)) return "paired-evidence";
+  return shape;
 }
 
 /** Did the author actually choose a shape for this page, or is it inferred? */
-const declaresArchitecture = (page) => Boolean(page.architecture || page.layout);
+const declaresArchitecture = (page) => Boolean((page.architecture || page.layout) && (page.architecture || page.layout) !== "auto");
 
 // --- the entropy metric -----------------------------------------------------
 
@@ -146,7 +150,7 @@ export function styleEntropy(pages) {
   const counts = new Map();
   for (const shape of observations) counts.set(shape, (counts.get(shape) || 0) + 1);
   const n = observations.length, k = counts.size;
-  const declared = pages.some(declaresArchitecture);
+  const declared = pages.every(declaresArchitecture);
   if (n === 0 || k <= 1) return { value: 0, distinct: k, pages: n, counts, declared };
   let h = 0;
   for (const count of counts.values()) { const p = count / n; h -= p * Math.log(p); }
@@ -278,8 +282,8 @@ function gateEntropy(pages, findings) {
     ));
     return;
   }
-  if (entropy.value >= PLAN.entropyMin) return;
   const commonest = [...entropy.counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (entropy.value >= PLAN.entropyMin && (commonest?.[1] ?? 0) / entropy.pages <= 0.4) return;
   findings.push(finding(
     null, "PLAN_STYLE_ENTROPY",
     { entropy: round(entropy.value), architectures: entropy.distinct, observations: entropy.pages,
@@ -587,9 +591,9 @@ function report(plan, findings, pages) {
     },
     reference: { mix: Object.fromEntries(Object.entries(PLAN.mix).map(([k, v]) => [k, v])),
                  styleEntropy: PLAN.entropyMin, observed: PLAN.entropyObserved, craft: PLAN.craft },
-    accepted: findings.length === 0,
+    accepted: findings.every(f => !["PLAN_SCHEMA", "PLAN_EXHIBIT_REASON", "PLAN_STYLE_ENTROPY"].includes(f.code)),
     countsByCode: counts,
-    findings,
+    findings: findings.map(f => ({ ...f, severity: ["PLAN_SCHEMA", "PLAN_EXHIBIT_REASON", "PLAN_STYLE_ENTROPY"].includes(f.code) ? "blocker" : "advisory" })),
   };
 }
 

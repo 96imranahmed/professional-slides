@@ -10,7 +10,7 @@ Design makes the argument easier to see. Use the fewest visual rules that give t
 - Action title 24 pt, at most two lines, anchored at the same x and y on every analytical page. One-line and two-line titles start at the same point; dependent content moves down when the title wraps. The right 20% of the title band is reserved for a tracker label or sticker.
 - Section and exhibit headings 14-16 pt. Body 12-14 pt. Chart furniture - axis ticks, direct labels, legend rows - 9-10 pt. Source and footnotes 8 pt.
 - A hero exhibit occupies at least 40% of the content area on an analytical page.
-- At most 40% of the deck's pages share one layout.
+- Repeated layouts follow comparable reading tasks; review repetitive runs in context.
 - Trailing empty band below the content: 8% or less of the content area.
 - Spacing comes from the registered scale (`space.1` to `space.6`). Related objects align to common edges and baselines; padding, row rhythm and gaps stay constant within a component family.
 
@@ -43,7 +43,7 @@ Keep palette, type, anchors and component grammar constant while choosing page s
 
 Record a short structure description per page - dominant encoding, shared comparison axis or entity key, nesting, how supporting evidence attaches - and review them together before export. Repeated descriptions need a comparability reason.
 
-Match container height to content: size the container to the measured group and place that group deliberately in the field.
+Match container height to content: size the container to the measured group and place that group deliberately in the field. Open card grids centre as one group with natural gaps; do not centre each row in a separate oversized slot. A sole list on a text or executive-summary page centres as one measured group in its body track. A list beneath a metric strip or followed by other content stays attached to that content. A coloured surface should not dominate a few short lines. Remove duplicate qualifying boxes before adding more furniture.
 
 ## Sections, rules and boundaries
 
@@ -57,11 +57,11 @@ Choose one treatment per repeated slide family:
 
 Chart headings keep their rule; non-chart headings use it only when substantial content needs separating. Place a heading rule `space.2` below the measured last text line and reserve `space.3` after it. Give every visible line exactly one job: boundary, separator, leader or state accent.
 
-For a left exhibit and right interpretation, record the relationship first: a supported inference uses the inference boundary variant, adjacent context uses a dashed divider or a muted panel. Reserve marked inference arrows for one or two emphasis points in a deck. A child region is not a miniature slide: it has no second action title, footer, page number or source system.
+For a left exhibit and right interpretation, record the relationship first: a supported inference uses the inference boundary variant, adjacent context uses a dashed divider or a muted panel. Use marked inference arrows only where the authored relationship requires one; their frequency is not a quota. A child region is not a miniature slide: it has no second action title, footer, page number or source system.
 
 ## One heading owner per exhibit
 
-The slide title states the page's conclusion. Each distinct exhibit then gets one heading naming its measure, period or question. A section wrapping a single chart stays untitled and lets the chart own its heading, unit and rule. A parent heading earns its place when it groups several genuinely distinct child exhibits; the children then name only their own measures.
+The slide title states the page's conclusion. Each distinct chart gets one heading naming its measure and unit. Tables and non-chart exhibits normally need no extra heading; retain one only when it identifies a distinct comparison that the title and column labels do not identify. A section wrapping a single chart stays untitled and lets the chart own its heading, unit and rule. A parent heading earns its place when it groups several genuinely distinct child exhibits; the children then name only their own measures.
 
 Every supporting item has a visible relationship to its evidence: keyed annotations on the chart for observations about particular points, and a deliberately allocated section beneath or beside the exhibit for developed explanation. Attach qualifications to the evidence they qualify.
 
@@ -75,6 +75,10 @@ One identical component-primary swatch serves tracker emphasis, structural highl
 
 Body and compact text reach at least 4.5:1 contrast against their surface; large display text and essential graphical boundaries reach 3:1.
 
+Check embedded charts against their actual row surface, including totals. Keep
+the series colour; use a contrasting boundary when its fill merges into a band,
+and give the value label the row's readable foreground.
+
 ## Typography
 
 Use the registered roles: cover title, action title, section title, body, compact body, label, source. Keep the title role at one size across a slide family. Prefer one line; when two are needed, wrap at a meaningful phrase and avoid a lone final word.
@@ -87,31 +91,22 @@ Page furniture - titles, trackers, source lines, page numbers - keeps the deck's
 
 Use an image or icon when it improves meaning or recognition: a place, a product, a physical quality, a stable taxonomy. Keep one visual style and prefer editable vectors and real library icons. Apply the chosen treatment to every peer in a set. Evidence of safety, quality or performance comes from data, and illustrative imagery sits beside it rather than standing in for it.
 
-## The beautification pass
+## Visual review
 
-Every other check in this skill is a threshold. This one is a look, and it is the only pass that catches a deck which clears every number and still reads as dry. Run it on the rendered montage before delivery, in this order.
+Read the title sequence, then every rendered spread, then full-size pages wherever detail is uncertain. Distribution measurements describe the reference corpus; they do not prescribe a quota of charts, annotations, colours, photographs, icons, words or layouts. Do not add content or furniture to hit those distributions. Keep the same construction when the comparison job is the same.
 
-1. **How many genuinely different pages are there?** Flick through the montage. A deck of fifty pages built from four constructions is a deck of four pages shown twelve times. The reference decks draw on seven to eight distinct exhibits per ten pages; a generated deck measured 2.9.
-2. **Does every page that names things depict them?** Two to six categories, options, markets or characters, each with a photograph where it is depictable and an icon where it is a category.
-3. **Does every plot carry a mark that states the finding?** A bracket between the two series the title compares, a change bubble, a reference line at the target, a highlighted category, a period band. A bare plot asks the reader to find what the title already told them. The reference decks annotate about a third of their charts; a generated deck annotated none of eighteen.
-4. **Is any table a plain grid whose content is not a matrix?** A scale wants harvey balls, a share wants bubbles or an in-cell bar, a verdict wants the implication gutter, a scored table wants heat. Reference tables carry a treatment on about half of them; a generated deck carried one on none of ten.
-5. **Does any page set a figure beside a measured exhibit?** A staircase next to a table is two kinds of reading with a join down the middle.
-6. **Is any rule, band or tint separating nothing?** Count the accent devices on the busiest page. A title rule, an eyebrow, panel rules, tile rules and a chevron gutter at once is five devices and no hierarchy.
-7. **Is the space balanced?** No block hugging the top of a track with the rest empty, no column ending two fifths up, nothing crammed against a frame edge.
+Check in this order:
 
-A page carries a median of 32 drawn elements in the reference corpus (quartiles 11 and 88) — every primitive that is not type. A page of rules and paragraphs carries very few, and that gap is the one a reader feels before they have read a word. `reviewer.mjs` computes all of these off the scene and puts them in the review packet beside the reference, so the judgement is made against a number rather than against a feeling.
+1. **Argument and evidence.** Reconcile every count in a title, repeated recommendation, denominator, total and duration with its actual members and inputs. A box containing two films counts as two films. Cross-check the opening answer, body and close, including every condition and exception. A reversal condition must affect the actual recommended work or option. Selected examples do not establish universal claims; an observed association does not establish causality.
+2. **Focus.** Identify what the title asks the reader to compare. Every tint, coloured mark and highlighted phrase must support that exact comparison. Neutral is valid. A coherent set may contain several highlighted marks; never infer a focus from the largest value, the first title match or the neighbouring slide.
+3. **Table grammar.** Use filled category cells with white labels only for a dedicated column of distinct category labels, such as award classes. Repeated attributes such as DC / DC / Marvel / Marvel stay plain; a real grouped hierarchy may instead use one spanning category cell. Unordered categories do not get sequence numbers. Explicit good/bad verdicts may use positive/negative colours on short text labels or check/cross icons only (for example Cleared in green and Missed in red). Chart marks and backgrounds retain house palette colours, including charts whose series describe good/bad outcomes. Keep the words or symbols; identity and subjective preference do not imply a status. Parallel dimensions use dimension headers. A plain verdict is joined to the table with continuous row fills. Add a gutter only for an explicitly chosen inference arrow. A table-wide arrow sits at the centre of the evidence body, independent of row emphasis; per-row arrows are a separate explicit variant. Chevron headers have no underline. Number pills use one consistent size and only explicitly selected count columns. Harvey balls and heat scales require a defined rubric.
+4. **Heading ownership.** The action title states the claim. Each chart has one descriptive heading and its default underline; a slide subtitle does not suppress that heading. A subtitle is optional: remove it when it repeats the chart heading in meaning, even with different words. Keep each measure, population, period and unit in one appropriate place; preserve unique scope in the chart heading or source note. Tables and non-chart exhibits need no extra exhibit title by default; their slide action title and column labels carry the hierarchy. An established unruled house style may be retained as a deck-wide exception. Keep peer heading rules aligned.
+5. **Evidence qualifiers.** Use `evidenceStatus` for Judgement, Estimate or other evidence states: it occupies the shared subtitle band in the same typography on every applicable page. Qualify mixed evidence locally. Generic `tag` is page metadata governed by the house style, not a substitute for an evidence state. Do not add ad hoc text above the action title or move its anchor.
+6. **Commentary and spacing.** Commentary is optional. Retain only consequences, caveats, mechanisms or decisions the exhibit cannot show. Centre a sparse unheaded group vertically as one measured block, including at full density; keep natural gaps between its items. Align headed peer sections at their headings. Do not stretch bullets or invent a KPI to fill a column. Remove duplicate callouts and closing strips.
+7. **Relationships.** Arrows imply direction or inference. Chevron stages imply progression; use rectangular headers for parallel alternatives. Rules must separate actual fields. Surfaces must enclose an actual group.
+8. **Whole-deck consistency.** Compare common title anchors, evidence-state treatments, header grammar, number formatting, row rhythm and recurring families. A change of unit or explicit column alignment must not change unrelated table styling. Inserting an unrelated slide must not change focus, arrow semantics or table treatment on its neighbours.
 
-**One grammar per page.** Two tables side by side are peers, and so are two charts and a chart beside a table: each is read by finding a value in one and comparing it with a value in the other. A figure — a staircase, a cycle, a framework — is not read that way at all; it carries its argument in its shape and is taken in whole. A page that sets one beside a table asks for both kinds of reading at once, with a hard join where the first ends and the second begins, so the composer splits it rather than drawing it. Where the split leaves half a page that is not a page — a two-row table on its own — `THIN_PAGE` says so, and the remedy is to fold that half into the other page's commentary rather than to pair them again.
-
-**The photograph budget.** A photograph is evidence only where the picture is what the reader is judging. Keep them under a third of the analytical pages and never two pages running (`IMAGE_BUDGET`, `IMAGE_RUN`); covers, dividers and the closing statement are outside the count and are where a photograph does the most work. A grid of four pictures with captions is a mood board: if the pictures are examples of one claim, the claim is the page and the examples are a list beside it. Every picture page still carries a so-what, an insight or a points column (`MISSING_ARGUMENT`) - a caption names the subject, it does not argue about it. Within that budget the shape follows the count: `picture-hero` for one subject with the argument beside it, `picture-pair` for two side by side with a card each beneath, `picture-strip` for three to five across the page. The pictures take the height the cards leave, so they read as the page's evidence rather than as a band of decoration above it, and the page's word floor falls with the body they occupy (`weight.json`'s `picture` block) up to a capped share.
-
-**Density is evidence, not clutter.** Published client pages carry a median of 195 words of page text (quartiles 120 and 289, measured over 16,334 pages from twelve firms; `evals/corpus`), and 154 of those words sit in the body rather than in the title band or the footer. Fill the page with the rows behind the summary, the second cut of the measure, the values on the marks, the basis in a footnote and a commentary column written in sentences - and keep prose out of the space an exhibit should hold. The `weight` contract sets the floors and the `WORDS` gate keeps the ceiling.
-
-**The page mix.** Across a deck, at least three families of page (chart, table or scorecard, comparison, framework, picture) and at least 45% of analytical pages carrying a measurement (`PAGE_VARIETY`, `EVIDENCE_MIX`). A deck built from one construction is one page shown many times, whatever its titles say. Measured over 264 published pages, one per deck: 37% are carried by a chart, 30% by type alone, 11% by a table, 8% by a diagram and under 1% by a photograph.
-
-**The page of type alone is a real page.** Three published pages in ten carry no exhibit at all, and they are not exhibit pages with the exhibit missing — they are a different page. They run longer (264 words against 196), they print a quarter of the numbers (6 against 27), their title states a topic rather than a claim more often than not, and **4% of them carry a commentary column**, against 73% of chart pages. So a page of type is a page whose argument *is* its prose: the standfirst, the numbered points, the tinted cards, the pull quote. It does not get a second column beside it saying what the first column means. Plan it as a page (`plan.mix.text` caps it at 35% of the deck), give it the devices that make type read — a band, a card, a rule, a highlighted phrase in the accent, an icon per point — and hold it to its own ink floor rather than to an exhibit page's.
-
-**Say the finding on the exhibit.** 63% of published pages carrying a chart mark it — a callout, a bracket between the two series the title compares, a CAGR pill, a reference line, a shaded period band, a recoloured category. 89% of published pages carrying a table treat it — banded rows, colour-coded cells, harvey balls, icons, in-cell bars, a highlighted column, a total row set apart. Those are not flourishes a quarter of pages earn; they are what these firms do almost every time, and a bare plot or a plain grid is the exception that needs a reason. An untreated table past five rows now falls back to banded rows on its own, because a plain grid is where a reader loses their place.
+The review may find a substantive thin page even when counts pass. Its repair is a better argument, appropriate consolidation or a better use of space, not a decorative quota. Empty-band and ink measurements are advisory because deliberate centring can leave large margins. The visual reviewer still rejects visibly poor balance. Preserve text fit, collisions, clipping, truthful scales and content completeness as blocking checks.
 
 ## Working from a reference deck
 
@@ -133,3 +128,13 @@ Review the montage first, then every slide at full size:
 - object fills, lines and text colours resolving to declared semantic roles.
 
 When the same defect appears more than once, repair the rule that owns it.
+
+### Page architecture and repetition
+
+Count the relationship between evidence regions, not small style differences. A chart or table above two commentary columns, three commentary columns, cards or prose, with or without a closing insight strip, is one architecture: evidence over commentary. Mirroring evidence and commentary is also one architecture. Changing chart type, colour, markers or subtitle height does not create variety. A chart combined with a developed process, dependency diagram or decision structure is a composite evidence page: classify the relationship between both exhibits, rather than treating the diagram as commentary. The second exhibit must explain a different part of the claim.
+
+Review the planned sequence before composing: no one architecture should exceed 40% of analytical pages, and ten-page windows should show at least three genuinely different relationships. These are blocking repetition screens, not a recipe for rotating templates. A declared series exception needs a real repeated comparison task and reviewer justification. Inspect the resulting montage after rendering; the plan cannot certify the pixels.
+
+Use reference pages to choose meaningful alternatives: paired measures on a common basis; aligned small multiples; a full-width bridge with anchored explanations; shared quantitative rows; one decisive metric with its proof; an actual ordered route; a branching decision; an integrated qualitative comparison. A second panel must add evidence, not restate the first. Preserve shared scales and denominators; do not invent a chart, an icon or an image simply to increase variety. Tables and non-chart exhibits need an extra heading only when it distinguishes peer evidence regions.
+
+A menu of independent alternatives is not a sequence: omit numbered-step treatment unless order matters. An ordered route, independent options and individual trials must not share a quantitative ranking as equivalent packages. Name the work before its supporting duration or prerequisite; repeated “No prior” labels are metadata, not hero metrics.

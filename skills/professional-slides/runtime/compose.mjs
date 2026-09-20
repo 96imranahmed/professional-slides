@@ -80,7 +80,7 @@ function tableAlias(ex) {
     // names its side with `winner` ("left", "right" or a heading), and
     // `winner: false` leaves both columns plain when the page splits the verdict.
     const headings = [left.heading || "Before", right.heading || "After"];
-    let highlightColumn = 1;
+    let highlightColumn;
     if (ex.winner === false) highlightColumn = undefined;
     else if (ex.winner !== undefined) {
       const wanted = String(ex.winner).trim().toLowerCase();
@@ -94,7 +94,7 @@ function tableAlias(ex) {
     const phases = ex.phases || ex.columns || [];
     const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label }, ...phases.map((_, i) => { const cell = (row.cells || [])[i]; return Array.isArray(cell) ? { type: "bullets", items: cell } : cell ?? " "; })]);
     const labelWidth = Math.max(110, ...(ex.rows || []).map((row) => Math.ceil(measureText(String(row.label || ""), 400, { fontFamily: "Arial", fontSize: 14, bold: true, wrapWidthRatio: 1 }).width) + 32));
-    return { type: "table", treatment: "dimensions", variant: "standard", headerShape: "chevron", columns: [{ label: "", type: "category", width: labelWidth }, ...phases.map((ph) => ({ label: typeof ph === "string" ? ph : ph.label, type: "text", width: 200 }))], rows, density: ex.density };
+    return { type: "table", treatment: "dimensions", variant: "standard", headerShape: ex.headerShape ?? "chevron", columns: [{ label: "", type: "category", width: labelWidth }, ...phases.map((ph) => ({ label: typeof ph === "string" ? ph : ph.label, type: "text", width: 200 }))], rows, density: ex.density };
   }
   if (ex.type === "rows") {
     // A row may carry several content columns (`cells`), which is the reference
@@ -124,10 +124,10 @@ function tableAlias(ex) {
         if (typeof lead === "string" && lead.trim()) return { type: "text", text: lead, bold: true, ...accent, ...rest };
         throw new Error("A row matrix cell needs text or points");
       };
-      const numbered = ex.numbered !== false;
+      const numbered = ex.numbered === true;
       const rows = rowsIn.map((row, index) => [
         { type: "category", text: String(row.label ?? ""), surface: "plain",
-          ...(numbered ? { sectionNumber: row.number ?? index + 1 } : {}),
+          ...(numbered || row.number !== undefined ? { sectionNumber: row.number ?? index + 1 } : {}),
           ...(row.icon ? { icon: row.icon } : {}) },
         ...Array.from({ length: count }, (_, at) => cellOf((row.cells || [])[at]))
       ]);
@@ -206,10 +206,13 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
       const rows = [];
       for (let at = 0, r = 0; r < rowCount; r += 1) { const take = base + (r < over ? 1 : 0); rows.push(items.slice(at, at + take)); at += take; }
       const { columns: _c, ...cardProps } = rest;
-      return { id, layout: "flow.column", gap: "space.4", size: sz, items: rows.map((row, r) => ({
+      // Open rows form one measured group. Centring each row in an equal
+      // fraction of the page creates an empty band between related content.
+      const open = ["plain", "columns"].includes(rest.tone);
+      return { id, layout: "flow.column", gap: "space.4", ...(open ? { leftover: "center" } : {}), size: sz, items: rows.map((row, r) => ({
         id: `${id}-row-${r}`, component: "cards",
         props: { ...cardProps, items: row, ...(centre ? { valign: "middle" } : {}) },
-        size: { width: { fr: 1 }, height: "fill" },
+        size: { width: { fr: 1 }, height: open ? "hug" : "fill" },
       })) };
     }
     return { id, component: type, props: { ...rest, ...(centre ? { valign: "middle" } : {}) }, size: sz };
@@ -243,6 +246,8 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
     // and no per-point labels when there is more than one series.
     const line = type === "chart.line" || type === "chart.area";
     const props = { dataLabels: !(line && multi), legend: multi && !line, ...(line && multi ? { endLabels: true } : {}), highlights: [], annotations: [], referenceLines: [], ...rest };
+    // Switching off the default endpoint labels must retain series identity.
+    if (line && multi && !props.endLabels && props.directLabels !== "end" && rest.legend === undefined) props.legend = true;
     // Lines that finish close together need their end labels pushed apart, which
     // only the drawn chart can do; the native chart would stack them.
     if (line && multi && props.endLabels && props.native !== false) {
@@ -540,6 +545,7 @@ function implicationColumn(ex) {
   const columns = ex.columns || [];
   const at = columns.findIndex((c) => c && typeof c === "object" && c.implication === true);
   if (at < 0) return ex;
+  if (ex.implicationStyle === "none") return { ...ex, columns: columns.map(c => c && typeof c === "object" ? { ...c, implication: false } : c) };
   if (at === 0) throw new Error("An implication column follows the evidence it is drawn from; it cannot be the first column");
   const rows = ex.rows || [];
   const style = ex.implicationStyle || (rows.length >= 5 ? "single" : "per-row");
@@ -600,7 +606,7 @@ function barNumber(cell) {
   const value = Number(raw);
   return Number.isFinite(value) ? value : null;
 }
-const barScaleId = (label) => `${String(label).toLowerCase().replace(/[^a-z0-9]+/g, "-")}-bar`;
+const barScaleId = (label) => `${String(label).replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-bar`;
 /** Zero (or below zero) to a round number above the largest value, so the bars
  *  are proportional to the measure rather than to each other, and a column of
  *  41/33/30 does not draw its smallest bar as nothing. */
@@ -632,7 +638,11 @@ export function barScales(ex) {
     const values = (ex.rows || [])
       .map((row) => (Array.isArray(row) ? row : row.cells || [])[index])
       .map(barNumber).filter((n) => Number.isFinite(n));
-    if (values.length) scales[barScaleId(label)] = barScaleRecord(label, unit, values);
+    if (values.length) scales[barScaleId(label)] = { ...barScaleRecord(label, unit, values),
+      labelTexts: (ex.rows || []).map(row => {
+        const cell = (Array.isArray(row) ? row : row.cells || [])[index];
+        return String(cell?.text ?? cell ?? "");
+      }) };
   }
   return scales;
 }
@@ -748,175 +758,8 @@ function iconColumn(ex) {
   return { ...ex, columns, rows: nextRows, icons: undefined };
 }
 
-// A table small enough that its numbers carry the page, and short enough that a
-// pill fits round them. Past these the figures are a dataset, not a headline.
-// One vocabulary for "this column is the conclusion drawn from the others",
-// shared by the gutter pass and the fallback highlight so the two cannot
-// disagree about what a verdict is.
+// A verdict remains joined unless its author asks for an inference gutter.
 const VERDICT_HEADER = /\b(decide|decision|implication|so what|then\b|recommend|verdict|action|takeaway|what it means)/;
-
-const BUBBLE_ROWS_MAX = 4;
-const BUBBLE_VALUE_CHARS = 6;
-// A bare count or a percentage - the figures a two-row table is *about*.
-// Currency, long decimals and unit suffixes keep their own formatting: the
-// pill is emphasis, and emphasis that rewrites a value is not emphasis.
-const NUMBER_CELL = /^\d{1,3}(,\d{3})*(\.\d)?%?$|^\d+(\.\d)?%?$/;
-
-/**
- * A short table of short numbers sets them in bubbles.
- *
- * Two rows of "37 / 15" and "29.7% / 6.7%" in a plain grid is a spreadsheet
- * fragment: the figures are the whole point of the page and they read as the
- * quietest thing on it. The filled pill is the table's counterpart to the
- * chart's change bubble, and it is already built (`bubble: true`); this is the
- * composer reaching for it where the shape of the data asks.
- *
- * Deliberately narrow: few rows, a genuinely numeric column, short values, and
- * never more than one such column, because a table that bubbles every column
- * emphasises nothing.
- */
-function numberBubbles(ex) {
-  const columns = ex.columns || [], rows = ex.rows || [];
-  if (columns.length < 2 || columns.length > 4) return ex;
-  if (rows.length === 0 || rows.length > BUBBLE_ROWS_MAX) return ex;
-  if (columns.some((c) => typeof c === "object" && c && (c.heat || c.bubble || c.bar || c.implication || c.type))) return ex;
-  if ((ex.derive || []).length || ex.total === true) return ex;
-  const cellsAt = (i) => rows.map((row) => (Array.isArray(row) ? row : row?.cells || [])[i]);
-  const numeric = (i) => {
-    // A header that already earns a treatment keeps it: a Change column reads
-    // in green or red, an Outlook column becomes an arrow ring. A bubble on top
-    // of either would take a cell that already says something and say something
-    // else with it.
-    const header = String(columnLabel(columns[i]) ?? "").toLowerCase();
-    if (/(change|delta|yoy|y\/y|growth|variance|difference|outlook|trend|%\s*complete)/.test(header)) return false;
-    return cellsAt(i).every((cell) => {
-      if (cell === null || cell === undefined || (typeof cell === "object" && cell.text === undefined)) return false;
-      const text = String(cell?.text ?? cell).trim();
-      // A signed value is a change, whatever its header says, and changes are
-      // coloured rather than bubbled.
-      if (/^[+\-−]/.test(text)) return false;
-      return text.length > 0 && text.length <= BUBBLE_VALUE_CHARS && NUMBER_CELL.test(text);
-    });
-  };
-  // The first column labels the rows; a bubble belongs on a measure, not a name.
-  // Where several columns are numeric the last one wins: a table reads left to
-  // right and builds to the measure it concludes on ("Cohort | Films | Share"
-  // is a table about share). Only ever one, because bubbling every column
-  // emphasises nothing.
-  const candidates = columns.map((_, i) => i).filter((i) => i > 0 && numeric(i));
-  if (!candidates.length) return ex;
-  const at = candidates[candidates.length - 1];
-  // Recorded as an index rather than written onto the column: turning a string
-  // column into an object reads downstream as "the author set this column
-  // explicitly" and short-circuits the treatment the table would otherwise
-  // infer from its content.
-  return { ...ex, bubbleColumn: at };
-}
-
-/**
- * A last column headed "Verdict", "Implication", "So what" or "Recommendation"
- * is the conclusion drawn from the columns before it.
- *
- * It was set as a `highlight` cell - a tint, in a cell shaped exactly like the
- * evidence beside it, which is what the review objected to: a verdict flush
- * against the facts reads as one more fact. The gutter of chevrons says
- * "evidence, then verdict" once, and `implication: true` already builds it. The
- * header has been saying so all along; nothing was reading it.
- */
-/**
- * A column of ratings is a column of harvey balls.
- *
- * Across ten tables in a generated 50-page deck not one column carried any
- * treatment, and the commonest reason is that the content arrives as words -
- * "High", "Partial", "None" - which read as a third column of text. They are
- * not text: they are a four-point scale, and the reference decks draw a scale
- * as a filled disc so a reader compares the fills down the column instead of
- * reading five words to find the one that differs.
- *
- * It fires only when *every* cell in the column is one of the scale's words, so
- * a column of prose that happens to contain "Strong" is left alone.
- */
-const RATING_WORDS = new Map(Object.entries({
-  none: 0, no: 0, absent: 0, nil: 0, never: 0,
-  weak: 1, low: 1, limited: 1, poor: 1, minimal: 1, rare: 1,
-  partial: 2, medium: 2, moderate: 2, mixed: 2, some: 2, sometimes: 2, fair: 2,
-  strong: 3, high: 3, good: 3, often: 3, likely: 3,
-  full: 4, complete: 4, yes: 4, excellent: 4, always: 4, certain: 4,
-}));
-const RATING_HEADER = /\b(rating|score|strength|fit|maturity|readiness|capability|coverage|confidence|level|assessment|performance)\b/i;
-/**
- * A cell that says "we do not know", which is not the same as a zero.
- *
- * The brief that found this asked for exactly it: ten markets rated on a
- * four-point scale and two with no local data at all, which had to "stay
- * visible as open rather than being scored as zero". The rule required every
- * cell to be a scale word, so the column stayed text and the ten that *were*
- * rated lost their scale. An unknown is left blank in its disc - the harvey
- * cell already draws a missing value that way - so the column reads as ten
- * ratings and two gaps, which is what the page means.
- */
-const RATING_UNKNOWN = /^(open|n\/?a|tbd|unknown|unassessed|not assessed|pending|—|–|-|\?)$/i;
-
-function harveyColumn(ex) {
-  const columns = ex.columns || [];
-  const rows = ex.rows || [];
-  // No `type` check: `styleTable` is handed the exhibit with its type already
-  // destructured off, so a pass that tests for it never runs at all.
-  if (columns.length < 3 || rows.length < 3) return ex;
-  const cellsOf = (row) => (Array.isArray(row) ? row : row?.cells || []);
-  const rated = [];
-  for (let c = 1; c < columns.length; c += 1) {
-    const column = columns[c];
-    if (column && typeof column === "object" && (column.heat || column.bubble || column.bar || column.harvey || column.implication)) continue;
-    const values = rows.map((row) => {
-      const cell = cellsOf(row)[c];
-      if (cell && typeof cell === "object" && cell.type) return null;
-      const text = String(cell?.text ?? cell ?? "").trim();
-      // An explicit unknown keeps its row and draws an empty disc.
-      if (RATING_UNKNOWN.test(text)) return "unknown";
-      // "very high" and "not applicable" reduce to their last word.
-      const word = text.toLowerCase().split(/\s+/).filter(Boolean).at(-1) ?? "";
-      return RATING_WORDS.has(word) ? RATING_WORDS.get(word) : null;
-    });
-    const scored = values.filter((v) => typeof v === "number");
-    const unknown = values.filter((v) => v === "unknown").length;
-    // Every cell accounted for, enough of them actually rated to be a scale,
-    // and the unknowns a minority - a column of mostly blanks is not a rating.
-    if (values.every((v) => v !== null) && scored.length >= 3
-        && unknown <= values.length / 3 && new Set(scored).size > 1) rated.push([c, values]);
-  }
-  // One rating column is the finding; three of them is a scorecard the author
-  // should have declared, and inferring all three would redraw the whole table.
-  if (!rated.length || rated.length > 2) return ex;
-  const header = rated.every(([c]) => RATING_HEADER.test(columnLabel(columns[c])));
-  if (!header && rated.length !== 1) return ex;
-  const next = rows.map((row, r) => {
-    const cells = [...cellsOf(row)];
-    for (const [c, values] of rated) {
-      const value = values[r];
-      // An unknown keeps the word the author wrote. "Open" and "Not assessed"
-      // say something "N/A" does not, and the difference between "not assessed"
-      // and "assessed at zero" is what a page like this turns on - so the cell
-      // is left exactly as it arrived, as text, beside the discs.
-      if (value !== "unknown") cells[c] = { type: "harvey", value };
-    }
-    return Array.isArray(row) ? cells : { ...row, cells };
-  });
-  const nextColumns = columns.map((column, c) => (rated.some(([at]) => at === c)
-    ? { ...(typeof column === "string" ? { label: column } : column), harvey: true }
-    : column));
-  return { ...ex, columns: nextColumns, rows: next };
-}
-
-function verdictColumn(ex) {
-  const columns = ex.columns || [];
-  if (columns.length < 3) return ex;
-  const last = columns[columns.length - 1];
-  if (typeof last === "object" && last && (last.implication !== undefined || last.type)) return ex;
-  const label = String((typeof last === "object" && last ? last.label : last) ?? "").toLowerCase();
-  if (!VERDICT_HEADER.test(label)) return ex;
-  return { ...ex, columns: [...columns.slice(0, -1), { ...(typeof last === "object" && last ? last : { label: String(last ?? "") }), implication: true }] };
-}
 
 const TREATED_CELL = new Set(["heatmap", "bars", "harvey", "highlight", "category", "status", "icon",
                               "lamp", "dot", "check", "progress", "rating", "number-circle"]);
@@ -950,13 +793,44 @@ function untreatedGrid(ex, columns, rows, extra) {
   });
 }
 
+// An authored rubric maps its anchor words to marks. Words alone never invent a scale.
+function rubricColumns(ex) {
+  const selected = ex.columns.map(c => c && typeof c === "object" && c.scale && ex.scales?.[c.scale]?.type === "harvey" ? c.scale : null);
+  if (!selected.some(Boolean)) return ex;
+  const rows = ex.rows.map(row => {
+    const cells = Array.isArray(row) ? row : row.cells;
+    const next = cells.map((cell, index) => {
+      const id = selected[index]; if (!id || (cell && typeof cell === "object")) return cell;
+      const anchor = Object.entries(ex.scales[id].anchors || {}).find(([, label]) => String(label).toLowerCase() === String(cell).toLowerCase());
+      return anchor ? { type: "harvey", value: Number(anchor[0]), scale: id } : { type: "text", text: String(cell) };
+    });
+    return Array.isArray(row) ? next : { ...row, cells: next };
+  });
+  return { ...ex, rows, columns: ex.columns.map((c,i) => selected[i] ? { ...c, harvey: true } : c) };
+}
+
+function validateCategoryLabels(ex) {
+  // A category treatment distinguishes category labels, not repeated attributes.
+  // Validate before pagination so a repeated label cannot hide on another page.
+  ex.columns.forEach((column, index) => {
+    if (column?.type !== "category") return;
+    const seen = new Set();
+    for (const row of ex.rows) {
+      const cell = (Array.isArray(row) ? row : row.cells)[index];
+      const surface = cell?.surface ?? column.surface ?? (ex.variant === "plain" || ex.treatment === "dimensions" ? "plain" : "primary");
+      if (surface !== "primary" || cell === null || cell === undefined || (cell?.type && cell.type !== "category")) continue;
+      const label = String(cell?.text ?? cell).trim().toLowerCase();
+      if (!label) continue;
+      if (seen.has(label)) throw new Error(`Filled category column repeats "${label}"; use plain text for repeated attributes or one spanning category cell`);
+      seen.add(label);
+    }
+  });
+}
+
 export function styleTable(ex) {
-  // What the author wrote, read before any pass rewrites it: a treatment pass
-  // that turns a string column into an object would otherwise read downstream
-  // as "the author set this column explicitly" and change the table's whole
-  // treatment as a side effect.
-  const authoredColumns = ex.columns;
-  ex = groupNumericColumns(totalRow(deriveColumns(implicationColumn(columnTreatments(iconColumn(harveyColumn(numberBubbles(verdictColumn(ex)))))))));
+  validateCategoryLabels(ex);
+  if (ex.treatment === undefined && ex.columns.some(c => c?.type === "category")) ex = { ...ex, treatment: "categories" };
+  for (const transform of [rubricColumns, iconColumn, columnTreatments, implicationColumn, deriveColumns, totalRow, groupNumericColumns]) ex = transform(ex);
   // An object column (one that names a `group`, a `unit`, an alignment) still
   // gets its width from what it holds, unless it sets one: otherwise adding a
   // unit to a header would silently reweight every column to equal shares and
@@ -970,7 +844,7 @@ export function styleTable(ex) {
   // The recommended option's column is tinted end to end.
   const recommended = ex.recommended !== undefined ? columns.findIndex((c) => String(c.label).trim().toLowerCase() === String(ex.recommended).trim().toLowerCase()) : -1;
   if (ex.recommended !== undefined && recommended < 0) throw new Error(`Table recommended column "${ex.recommended}" is not a column label`);
-  const extra = { ...(recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {}), ...(ex.scales ? { scales: ex.scales } : {}) };
+  const extra = { ...(recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {}), ...(ex.scales ? { scales: ex.scales } : {}), ...(ex.columnWidths ? { columnWidths: ex.columnWidths } : {}) };
   // A table that ends the chain with no treatment at all is a plain grid, and a
   // plain grid past five rows is where a reader loses their place. 89% of
   // tables in published client decks carry a treatment of some kind
@@ -996,8 +870,8 @@ export function styleTable(ex) {
     columns[0] = { ...columns[0], type: "category", label: "", width: 48 };
     rowsIn.forEach((r, i) => { const row = Array.isArray(r) ? r : r.cells; if (/^\d+$/.test(String(row[0]?.text ?? row[0] ?? "").trim())) row[0] = { type: "category", text: "", surface: "plain", sectionNumber: Number(String(row[0]?.text ?? row[0]).trim()) }; });
   }
-  const explicit = ex.treatment || ex.variant || authoredColumns.some((c) => typeof c === "object");
-  if (explicit) return { variant: ex.variant || "plain", treatment: ex.treatment || "open", columns, rows: rowsIn, ...extra };
+  const explicit = ex.treatment || ex.variant;
+  if (explicit) return { variant: ex.variant || (ex.treatment && ex.treatment !== "open" ? "standard" : "plain"), treatment: ex.treatment || "open", columns, rows: rowsIn, ...extra };
   const first = rowsIn.map((r) => String(r[0]?.text ?? r[0] ?? ""));
   const numbered = first.length > 1 && first.every((v) => /^\s*\d+\s*[·.)\-–:]\s*\S/.test(v));
   const head0 = String(columns[0].label || "").toLowerCase();
@@ -1073,7 +947,7 @@ export function splitReadingModes(slide) {
   return exhibits.map((ex, i) => {
     const page = { ...slide, exhibit: ex, title: `${slide.title} (${i + 1}/${exhibits.length})` };
     delete page.exhibits;
-    if (slide.id) page.id = `${slide.id}-${i + 1}`;
+    if (slide.id) { page.id = `${slide.id}-${i + 1}`; page.sourceSlideId = slide.sourceSlideId ?? slide.id; }
     // The commentary belongs to the page that carries the evidence it reads.
     if (i !== 0) delete page.points;
     return page;
@@ -1090,7 +964,7 @@ export function splitTables(slide) {
   return exhibits.map((ex, i) => {
     const page = { ...slide, exhibit: ex, title: `${slide.title} (${i + 1}/${exhibits.length})` };
     delete page.exhibits;
-    if (slide.id) page.id = `${slide.id}-${i + 1}`;
+    if (slide.id) { page.id = `${slide.id}-${i + 1}`; page.sourceSlideId = slide.sourceSlideId ?? slide.id; }
     if (i !== 0) delete page.points;
     return page;
   });
@@ -1103,7 +977,7 @@ export function splitTables(slide) {
  */
 const MAX_ROWS = 8;
 export function paginateTable(slide, bodyScale = 1) {
-  if (slide.layout && slide.layout !== "auto") return [slide];
+  if (slide.layout && !["auto", "exhibit-full"].includes(slide.layout)) return [slide];
   const ex = slide.exhibit;
   if (!ex || ex.type !== "table" || !Array.isArray(ex.rows) || slide.exhibits) return [slide];
   // The page holds about 16 body lines of table (compact rows in the firm decks
@@ -1151,17 +1025,22 @@ export function paginateTable(slide, bodyScale = 1) {
   const pages = Math.ceil(ex.rows.length / rowsPerPage), per = Math.ceil(ex.rows.length / pages);
   // One scale for the whole table, fixed before it is cut: the halves are two
   // views of one measure, and a bar on page two means what it means on page one.
+  validateCategoryLabels(ex);
   const shared = barScales(ex);
+  // The same numeric domain is insufficient when auto-width changes the plot.
+  // Freeze column geometry from the whole table before slicing its rows.
+  const sharedColumns = ex.columns.map((column, index) => ({ width: columnWeight(ex, index),
+    ...(typeof column === "string" ? { label: column, bold: index === 0 } : column) }));
   return Array.from({ length: pages }, (_, i) => {
     const rows = ex.rows.slice(i * per, (i + 1) * per);
     // A highlighted row travels with the page that holds it; other pages drop the key.
     const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
     const keeps = ex.highlightRow === undefined ? false : Number.isInteger(ex.highlightRow) ? ex.highlightRow >= i * per && ex.highlightRow < (i + 1) * per : rows.some((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
     const { highlightRow, ...rest } = ex;
-    const page = { ...slide, exhibit: { ...rest, density: densest, rows,
+    const page = { ...slide, exhibit: { ...rest, columns: sharedColumns, density: densest, rows,
       ...(Object.keys(shared).length ? { scales: { ...shared, ...(rest.scales || {}) } } : {}),
       ...(keeps ? { highlightRow: Number.isInteger(highlightRow) ? highlightRow - i * per : highlightRow } : {}) }, title: `${slide.title} (${i + 1}/${pages})` };
-    if (slide.id) page.id = `${slide.id}-${i + 1}`;
+    if (slide.id) { page.id = `${slide.id}-${i + 1}`; page.sourceSlideId = slide.sourceSlideId ?? slide.id; }
     if (i !== 0) delete page.points;
     return page;
   });
@@ -1333,8 +1212,7 @@ function pointsHeight(points, width) {
  * among six, and it is used for a full-width ledger of one-line items rather
  * than for a three-item side column. A composer with one shape produced five
  * consecutive pages of identical numbered lists; these are the alternatives the
- * corpus actually uses, and `resolvePointsStyle` rotates through the ones that
- * suit the content.
+ * corpus actually uses. Markers follow the authored relationship.
  */
 const POINT_STYLES = {
   // Icon, then the lead running into the sentence in the house accent.
@@ -1357,10 +1235,9 @@ const POINT_STYLES = {
 export const POINT_STYLE_NAMES = Object.freeze(Object.keys(POINT_STYLES));
 
 /**
- * Which shape this column takes: what the author asked for, else what the
- * content is, else whichever suitable shape has been used least recently.
+ * Honour the author, then choose markers from the content semantics.
  */
-function resolvePointsStyle(slide, points, recentStyles = []) {
+function resolvePointsStyle(slide, points) {
   if (slide.pointsStyle) {
     if (!POINT_STYLES[slide.pointsStyle]) throw new Error(`Unknown pointsStyle: ${slide.pointsStyle}; use one of ${POINT_STYLE_NAMES.join(", ")}`);
     return slide.pointsStyle;
@@ -1371,12 +1248,8 @@ function resolvePointsStyle(slide, points, recentStyles = []) {
   if (entries.some((e) => e.state)) return "numbered";
   if (entries.every((e) => e.number !== undefined)) return "numbered";
   if (!entries.some((e) => e.lead)) return "bulleted";
-  // Otherwise the column is a set of parallel findings, and any of these suit
-  // it. Take the one used longest ago so a section does not repeat one shape.
-  const viable = ["icon-lead", "ruled", "prose", "numbered"];
-  const unused = recentStyles.length + 1;
-  const staleness = (name) => { const at = recentStyles.indexOf(name); return at === -1 ? unused : at; };
-  return viable.slice().sort((a, b) => staleness(b) - staleness(a) || viable.indexOf(a) - viable.indexOf(b))[0];
+  // Parallel findings have no implied order or invented icon.
+  return "prose";
 }
 
 function pointsItem(points, id, tone, fill, inColumn = false, style = null, centre = true) {
@@ -1619,6 +1492,7 @@ function halvable(ex) {
 }
 
 function chooseLayout(slide, recent = []) {
+  if (slide.layout === "text" && (slide.exhibit || slide.exhibits?.length)) throw new Error("A text layout cannot discard an authored exhibit; select an evidence layout");
   if (slide.layout && slide.layout !== "auto") return slide.layout;
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   // An explicit arrangement is the author overriding the choice, not a hint.
@@ -1652,90 +1526,6 @@ function chooseLayout(slide, recent = []) {
 }
 
 /**
- * Highlight the answer: a single-series bar or column chart with no declared
- * highlight takes one from the title when the title names a category.
- */
-/**
- * A chart nobody marked gets the mark its own data asks for.
- *
- * Four charts in five carry one in real client work (evals/corpus): a bracket,
- * a change bubble, a reference line, a recoloured category. Ours carried one on
- * a third of them, because every annotation had to be written by hand and the
- * two rules that derive one - `highlightFromTitle` and `changeFromContent` -
- * only fire on a column, a bar or a range whose title happens to name one of its
- * own categories.
- *
- * So this is the chart's equivalent of an untreated table banding its own rows:
- * when a categorical chart reaches the end of the derivation chain with nothing
- * marked on it, the category the page's own `highlight` names is picked out, and
- * failing that the largest one. The extreme is what the eye goes to anyway; the
- * mark says the page meant it to.
- *
- * Never over an authored annotation, never on a chart with one category, and
- * never on the plot types where a recoloured category means something else
- * (a line's series, a scatter's points, a waterfall's bridge).
- */
-// One series only for the bar family: a recoloured bar in a grouped or stacked
-// chart says "this category" where the reader reads "this series", and the
-// renderer refuses it. The waffle, the marimekko and the bubble grid are
-// single-subject by construction and take the mark on their own category.
-const MARKABLE = new Set(["chart.column", "chart.bar", "chart.lollipop",
-                          "chart.waffle", "chart.marimekko", "chart.bubble-grid"]);
-// Read AFTER the derivation chain, so this has to include what that chain
-// leaves behind as well as what an author writes: `cagr` becomes
-// `changeAnnotations`, and a forecast column is already saying something about
-// itself in its own colour.
-const AUTHORED_MARK = ["highlights", "annotations", "changeAnnotations", "periods", "events",
-                       "change", "cagr", "reference", "referenceLines", "band", "callout",
-                       "segmentGrowth", "stackBracket", "gap", "target", "forecastFrom",
-                       "threshold", "benchmark"];
-
-function markTheFinding(ex, slide) {
-  if (!ex || typeof ex !== "object" || !MARKABLE.has(String(ex.type))) return ex;
-  if (AUTHORED_MARK.some((key) => ex[key] !== undefined)) return ex;
-  const categories = Array.isArray(ex.categories) ? ex.categories
-    : Array.isArray(ex.rows) ? ex.rows.map((r) => (Array.isArray(r) ? r[0] : r?.label ?? r?.cells?.[0]))
-    : null;
-  if (!Array.isArray(categories) || categories.length < 2) return ex;
-  const oneSeries = !Array.isArray(ex.series) || ex.series.length === 1;
-  if (!oneSeries && !["chart.marimekko", "chart.bubble-grid"].includes(String(ex.type))) return ex;
-
-  const named = (() => {
-    const phrase = String(slide?.highlight ?? "").toLowerCase();
-    if (!phrase) return null;
-    return categories.find((c) => String(c ?? "").length >= 3
-      && phrase.includes(String(c).toLowerCase())) ?? null;
-  })();
-
-  const totals = categories.map((_, index) => {
-    if (Array.isArray(ex.series)) {
-      return ex.series.reduce((sum, series) => sum + (Number(series?.values?.[index]) || 0), 0);
-    }
-    if (Array.isArray(ex.values)) {
-      const row = ex.values[index];
-      return Array.isArray(row) ? row.reduce((sum, v) => sum + (Number(v) || 0), 0) : Number(row) || 0;
-    }
-    return 0;
-  });
-  const biggest = totals.some((t) => t > 0)
-    ? categories[totals.indexOf(Math.max(...totals))] : null;
-  const category = named ?? biggest;
-  if (category === null || category === undefined) return ex;
-  return { ...ex, highlights: [{ category, style: "bar" }] };
-}
-
-function highlightFromTitle(ex, title) {
-  if (!ex || !["chart.column", "chart.bar", "chart.range"].includes(ex.type) || ex.highlights !== undefined) return ex;
-  if (ex.type !== "chart.range" && (!Array.isArray(ex.series) || ex.series.length !== 1)) return ex;
-  const t = String(title || "").toLowerCase();
-  // A category may carry a footnote marker ("2022\u00b9"); the title does not, so
-  // the match is made on the bare label.
-  const bare = (value) => String(value).replace(/[\u00b9\u00b2\u00b3\u2074-\u2079]/g, "");
-  const hits = (ex.categories || []).filter((c) => bare(c).length >= 3 && new RegExp(`(^|[^a-z0-9])${bare(c).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9])`).test(t)).sort((a, b) => t.indexOf(bare(a).toLowerCase()) - t.indexOf(bare(b).toLowerCase()));
-  return hits.length ? { ...ex, highlights: [{ category: hits[0], style: "bar" }] } : ex;
-}
-
-/**
  * Growth indicators. A chart that measures a change carries the change on the
  * chart: an arrow with a bubble from the first to the last period of a single
  * series, or a bracket per category between two series when the title talks
@@ -1766,7 +1556,7 @@ export function percentStack(ex) {
 }
 
 export function changeFromContent(ex, title) {
-  if (!ex || !CHANGE_TYPES.includes(ex.type) || ex.change === false || (ex.changeAnnotations || []).length) return ex;
+  if (!ex || !CHANGE_TYPES.includes(ex.type) || ex.change === false || (!ex.change && !ex.cagr) || (ex.changeAnnotations || []).length) return ex;
   const categories = ex.categories || [], series = Array.isArray(ex.series) ? ex.series : [];
   if (categories.length < 2 || !series.length || !series.every((sr) => Array.isArray(sr.values) && sr.values.length === categories.length && sr.values.every(Number.isFinite))) return ex;
   const percentUnit = /%|percent|share|pts|points/i.test(String(ex.unit || ""));
@@ -1904,10 +1694,12 @@ export const SLIDE_KEYS = Object.freeze({
   insights: "two statements in that column: a plain one above a boxed one",
   callout: "a boxed aside beside the evidence",
   soWhat: "the page's close, under everything else",
-  implication: "false to drop the marker joining evidence to meaning",
+  implication: "true to request a marker joining evidence to meaning",
   items: "the entries on an agenda or takeaways page",
   active: "which agenda entry the deck is on",
   summary: "the line under a section divider's title",
+  role: "semantic page role, including executive-summary",
+  evidenceStatus: "evidence qualifier in the shared subtitle band",
   number: "a section divider's number",
   contents: "the deck's sections, listed down a divider with this one banded",
   contentsActive: "which of those sections the divider opens",
@@ -2059,9 +1851,6 @@ const SHAPES = {
     if (!Array.isArray(findings) || findings.length < 2 || findings.length > 5) {
       throw new Error("An executive summary carries two to five findings in `points`");
     }
-    if (!Array.isArray(slide.metrics) || !slide.metrics.length) {
-      throw new Error("An executive summary opens with the measures the answer rests on, in `metrics`");
-    }
     return {
       density: slide.density ?? "pre-read",
       points: findings,
@@ -2156,62 +1945,14 @@ function highlightThePhrase(slide) {
   return next;
 }
 
-/**
- * The treatment a verdict table takes, rotated across the deck.
- *
- * Every pass inside `styleTable` reads one table and decides it well; nothing
- * reads the deck. A last column headed "Verdict", "So what" or "Implication"
- * becomes a chevron gutter every time, which on a deck that argues by verdict
- * was nine tables in fourteen - and a device on every page stops being a
- * device. The three treatments are all correct for the same table, so the page
- * takes whichever the last few tables did not:
- *
- *   gutter      chevrons between the evidence and the conclusion
- *   tinted      the conclusion cell on the house tint, no gutter
- *   categories  the first column as filled category cells, verdict plain
- *
- * An author who names a treatment, writes an object column or sets a variant
- * has decided, and this leaves the table alone.
- */
-const TABLE_TREATMENTS = ["table-gutter", "table-tinted", "table-categories"];
-function rotateTableTreatment(slide, recentStyles) {
-  const ex = slide.exhibit;
-  if (!ex || ex.type !== "table" || !Array.isArray(ex.columns) || ex.columns.length < 3) return slide;
-  if (ex.treatment || ex.variant || ex.recommended !== undefined) return slide;
-  if (ex.columns.some((column) => column && typeof column === "object")) return slide;
-  if (!Array.isArray(ex.rows) || !ex.rows.length || !ex.rows.every((row) => Array.isArray(row))) return slide;
-  if (!VERDICT_HEADER.test(String(ex.columns[ex.columns.length - 1] ?? "").toLowerCase())) return slide;
-  const recent = Array.isArray(recentStyles) ? recentStyles : [];
-  const unused = recent.length + 1;
-  const staleness = (name) => { const at = recent.indexOf(name); return at === -1 ? unused : at; };
-  const choice = [...TABLE_TREATMENTS].sort((a, b) => staleness(b) - staleness(a))[0];
-  if (Array.isArray(recentStyles)) recentStyles.unshift(choice);
-  if (choice === "table-gutter") return slide;
-  const last = ex.columns.length - 1;
-  const text = (cell) => String(cell?.text ?? cell ?? "");
-  if (choice === "table-tinted") {
-    // `implication: false` is the column saying it has already been decided,
-    // which is what keeps the gutter pass off it.
-    const columns = ex.columns.map((column, i) => (i === last ? { label: String(column), implication: false } : column));
-    const rows = ex.rows.map((row) => row.map((cell, i) => (i === last ? { type: "highlight", text: text(cell) } : cell)));
-    return { ...slide, exhibit: { ...ex, columns, rows } };
-  }
-  const columns = ex.columns.map((column, i) => (i === 0 ? { label: String(column), type: "category" }
-    : i === last ? { label: String(column), implication: false } : column));
-  const rows = ex.rows.map((row) => row.map((cell, i) => (i === 0 ? { type: "category", text: text(cell) } : cell)));
-  return { ...slide, exhibit: { ...ex, columns, rows } };
-}
-
 const SLIDE_PASSES = [
   ["highlight-the-phrase", (slide) => highlightThePhrase(slide)],
   ["footnotes", (slide) => applyFootnotes(slide)],
   ["paired-bars", (slide) => pairedBars(slide)],
 
-  // Findings the exhibit's own data supports: a percent stack, the highlight
-  // the title names, the change between the periods it compares.
+  // Normalize an authored percent stack or explicitly requested change annotation.
   ["read-the-data", (slide) => {
-    const derive = (ex) => markTheFinding(
-      changeFromContent(highlightFromTitle(percentStack(ex), slide.title), slide.title), slide);
+    const derive = (ex) => changeFromContent(percentStack(ex), slide.title);
     if (slide.exhibit) return { ...slide, exhibit: derive(slide.exhibit) };
     if (slide.exhibits) return { ...slide, exhibits: slide.exhibits.map(derive) };
     return slide;
@@ -2225,27 +1966,6 @@ const SLIDE_PASSES = [
     if (!preset) throw new Error(`Unknown page shape: ${slide.shape}; use one of ${SHAPE_NAMES.join(", ")}`);
     const { shape: _s, ...rest } = slide;
     return { ...rest, ...preset(slide) };
-  }],
-
-  // A page that names its measure in the standfirst does not name it again
-  // over the plot: with one exhibit, the subtitle is the chart's title, and
-  // the exhibit's own heading band would print it twice. The unit joins the
-  // standfirst when the standfirst does not already carry it. Panels in a row
-  // keep their headings - those name the series, not the measure.
-  ["standfirst-carries-the-measure", (slide) => {
-    if (!(slide.subtitle && slide.exhibit && !slide.exhibits && slide.exhibit.heading
-        && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi)) return slide;
-    const unit = typeof slide.exhibit.unit === "string" ? slide.exhibit.unit.trim() : "";
-    // A unit may carry a reading note after a semicolon - "$B; column width =
-    // revenue" - and the standfirst usually already names the measure. Testing
-    // the whole string meant the measure got appended a second time: a
-    // reference deck shipped "…, 2025, $B, $B; column width = revenue". Test the
-    // measure, and append only what the standfirst does not already say.
-    const [measure, ...rest] = unit.split(";").map((part) => part.trim());
-    const carries = measure && slide.subtitle.toLowerCase().includes(measure.toLowerCase());
-    const addition = carries ? rest.join("; ") : unit;
-    const { heading: _h, unit: _u, ...exhibit } = slide.exhibit;
-    return { ...slide, subtitle: addition ? `${slide.subtitle}${carries ? "; " : ", "}${addition}` : slide.subtitle, exhibit };
   }],
 
   // `split: true` on a multi-series chart sets it as small multiples: one
@@ -2313,7 +2033,7 @@ const SLIDE_PASSES = [
     ? { ...slide, exhibit: { type: "rows", rows: slide.rows, ...(Array.isArray(slide.columns) ? { columns: slide.columns } : {}) } }
     : slide)],
 
-  ["rotate-the-table-treatment", (slide, ctx) => rotateTableTreatment(slide, ctx.recentStyles)],
+
 
   // One big number parked above a table reads as two pages glued together: the
   // tile floats in air and the table starts again under it. A lone metric over
@@ -2357,6 +2077,7 @@ const SLIDE_PASSES = [
     const points = slide.points || [];
     if (!(!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && !slide.pictures
         && (!slide.layout || slide.layout === "auto") && !slide.pointsStyle
+        && !slide.highlight && !points.some(pt => pt?.highlight)
         && !slide.paragraphs?.length
         && points.length >= 3 && points.length <= 6
         && points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && pt.state == null))) return slide;
@@ -2386,6 +2107,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}),
       ...(slide.notes ? { notes: slide.notes } : {}) };
   }
+  if (slide.evidenceStatus) slide = { ...slide, subtitle: [slide.evidenceStatus, slide.subtitle].filter(Boolean).join(" · ") };
   const slideIn = slide;
   for (const [name, run] of SLIDE_PASSES.slice(3)) {
     try {
@@ -2402,7 +2124,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   // consecutive pages do not all reach for the same device.
   // The tile pass moves a thin chart's points onto the context, so read both.
   const columnPoints = slide.points?.length ? slide.points : tilePoints;
-  const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints, recentStyles) : null;
+  const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints) : null;
   if (pointsStyle && Array.isArray(recentStyles)) recentStyles.unshift(pointsStyle);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   const items = [];
@@ -2443,7 +2165,10 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   if (fullWidth && (centredCards(exhibits[0]) || centredFigure(exhibits[0]))) {
     // Icon cards with a line each hug their content and sit centred in the
     // space above the takeaway; header and numbered cards fill the page as columns.
-    items.push(exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { ...SIZE, centre: true }));
+    items.push(centredFigure(exhibits[0])
+      ? { id: `${id}-figure-frame`, layout: "flow.column", leftover: "center", size: SIZE,
+          items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, HUG)] }
+      : exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { ...SIZE, centre: true }));
   } else if (fullWidth) {
     const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
     if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
@@ -2569,7 +2294,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // left a hand's width of blank between the rule and the first line, on a
     // page whose heading says "What it means" and then appears to mean it two
     // inches lower.
-    const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && fill !== "full" && !heading
+    const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && !heading
       && (boxesOnly || sideItems.length <= 1)
       && (unheaded(exhibits[0]) || (insightBox && !list) || tone !== "open" || shortList));
     // A toned panel is always a section (it needs a surface); it takes the
@@ -2581,34 +2306,14 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // slack (a points list, which spreads its own items). Statements alone have
     // nothing to absorb it, so distributing would pin them to opposite ends of
     // an empty track; they sit together, centred, instead.
+    if (centre && list) { list.size = HUG; list.props = { ...list.props, distribute: false }; }
     const spread = !centre && fill !== "airy" && sideItems.length > 1 && !boxesOnly ? "distribute" : null;
     const side = tone === "open" && centre && !heading
       ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: sideItems }
       : { id: `${id}-side`, ...(heading ? { heading } : {}), treatment: tone, layout: "flow.column", ...(centre ? { leftover: "center" } : spread ? { leftover: spread } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
-    // `implication`: the chevron disc between the exhibit and its consequences,
-    // the way the firm pages join evidence to implication. On by default for a
-    // headed open column beside an exhibit; `implication: false` removes it,
-    // `implication: true` adds it to a toned or unheaded column.
-    // A column that runs the body's full height — a toned box, or an open column
-    // headed by a title, or a page with a photo strip — takes the dashed divider
-    // with the disc centred on it. A short centred column (an insight box, two
-    // lines) needs no divider: the disc alone joins the evidence to its meaning.
-    const fullBleed = Boolean(heading) || tone !== "open" || Boolean(slide.photo);
-    // The marked inference is an emphasis, and an emphasis on eighteen pages of
-    // forty-four is a rule. design.md reserves it for the one or two pages where
-    // the evidence genuinely implies the conclusion beside it; left on by
-    // default it became a filled navy disc halfway down a dashed rule on every
-    // page that had a column, pointing at whichever row happened to be in the
-    // middle. So the default rotates - a page takes it only when the last two
-    // did not - and `implication: true` still asks for it by hand.
-    const recentlyImplied = (recentStyles || []).slice(0, 6).includes("implication");
-    const implication = slide.implication ?? !recentlyImplied;
-    if (implication && Array.isArray(recentStyles)) recentStyles.unshift("implication");
-    // The dashed rule runs through the disc on every page, not only where the
-  // exhibit is full-bleed. A bare disc floating in an empty gutter reads as a
-  // stray mark; the rule is what makes it a connector, and both variants have
-  // been drawn all along.
-  const chevron = implication ? { id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: 44, height: "fill" } } : null;
+    // The relationship is authored; adjacent slides cannot add or remove it.
+    const chevron = slide.implication === true
+      ? { id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: 44, height: "fill" } } : null;
     // `photo`: a photograph strip at the right edge, full body height, cropped
     // to fit (the 2022 McKinsey pattern: chart, commentary, photo).
     const photo = photoStrip(slide, `${id}-photo`, baseDir);
@@ -2763,6 +2468,17 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       const shared = niceCeiling(max);
       for (const ex of charts) { ex.yMin = ex.yMin ?? 0; ex.yMax = shared; }
     }
+    // Equal numerical limits alone do not make equal bar lengths: different
+    // category gutters and Office auto-layout change the pixels per unit.
+    // Compare horizontal peers in the shared editable scene coordinate system.
+    const horizontalPeers = charts.filter(ex => ["chart.bar", "chart.stacked-bar"].includes(ex.type));
+    if (horizontalPeers.length >= 2 && !slide.pairedWeights && horizontalPeers.every(ex => ex.unit === horizontalPeers[0].unit)) {
+      const minima = new Set(horizontalPeers.map(ex => ex.yMin ?? 0));
+      const maxima = new Set(horizontalPeers.map(ex => ex.yMax));
+      if (minima.size !== 1 || maxima.size !== 1) throw new Error(`${id}: peer bars with the same unit require matching numeric domains`);
+      const comparisonDomain = { categories: horizontalPeers.flatMap(ex => ex.categories), values: horizontalPeers.flatMap(ex => ex.series.flatMap(series => series.values)) };
+      for (const ex of horizontalPeers) { ex.yMin = ex.yMin ?? 0; ex.comparisonDomain = comparisonDomain; ex.native = false; }
+    }
     // One scale needs one plot frame: peers share the row's tallest top band
     // (legend, growth arrows, callouts), and when one peer must be drawn as
     // shapes (annotations), all of them are, so their baselines coincide.
@@ -2788,7 +2504,12 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       if (narrow(ex) && String(other?.type).startsWith("chart.")) return { width: { fr: 2 }, height: "fill" };
       return SIZE;
     };
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex) }, `${id}-exhibit-${i}`)) });
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 4).map((ex, i) => {
+      const panel = centredFigure(ex)
+        ? { id: `${id}-figure-${i}`, layout: "flow.column", leftover: "center", size: panelSize(ex), items: [exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, HUG)] }
+        : { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex) };
+      return headedPanel(ex, panel, `${id}-exhibit-${i}`);
+    }) });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
   } else if (layout === "picture-pair" || layout === "picture-strip") {
     // Two named things side by side, or three to five across a strip, each with
@@ -2864,7 +2585,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       // the spare height into one internal void. A list followed by authored
       // paragraphs still shares the track and keeps its natural height.
       items.push(pointsItem(points, `${id}-points`, tone, fill,
-        !(slide.paragraphs || []).length, pointsStyle, false));
+        !(slide.paragraphs || []).length, pointsStyle, items.length === 0));
     }
     for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
   }
@@ -2903,7 +2624,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   const noteLine = Array.isArray(slide.note)
     ? (slide.note.length ? `Notes: ${slide.note.map((item, index) => `${index + 1}. ${String(item).trim().replace(/^\d+\.\s*/, "")}`).join("   ")}` : null)
     : prefixed("Note", slide.note);
-  return { id, title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
+  return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }
 
 /**
@@ -2955,7 +2676,7 @@ export function sectionTabs(slidesIn, mode = "pills") {
   let current = 0;
   return slidesIn.map((slide) => {
     if (slide.kind === "section") { current = sections.indexOf(slide) + 1; return slide; }
-    if (slide.kind || !current || slide.tracker) return slide;
+    if (slide.kind || slide.role === "executive-summary" || slide.shape === "executive-summary" || !current || slide.tracker) return slide;
     return {
       ...slide,
       tracker: {
@@ -3059,7 +2780,24 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   // chooser breaks a tie on variety, so a section spreads across its repertoire
   // instead of repeating whichever shape fitted first.
   const recent = [], recentStyles = [];
-  for (const page of pages.flatMap(splitReadingModes).flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale))) {
+  const expanded = pages.flatMap(splitReadingModes).flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale));
+  const pageNumbers = new Map();
+  expanded.forEach((page, index) => {
+    for (const key of new Set([page.id, page.sourceSlideId].filter(Boolean))) {
+      const numbers = pageNumbers.get(key) || []; numbers.push(slides.length + index + 1); pageNumbers.set(key, numbers);
+    }
+  });
+  const resolveReferences = value => {
+    if (typeof value === "string") return value.replace(/\{\{page:([A-Za-z0-9_-]+)\}\}/g, (_, id) => {
+      const numbers = pageNumbers.get(id); if (!numbers) throw new Error(`Unknown page reference: ${id}`);
+      return numbers.length > 1 ? `${numbers[0]}–${numbers.at(-1)}` : String(numbers[0]);
+    });
+    if (Array.isArray(value)) return value.map(resolveReferences);
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, resolveReferences(v)]));
+    return value;
+  };
+  for (const raw of expanded) {
+    const { sourceSlideId, ...page } = resolveReferences(raw);
     slides.push(composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles));
     recent.splice(4);
     recentStyles.splice(9);

@@ -2,25 +2,25 @@
 export const PALETTES = Object.freeze({
   mckinsey: {
     label: "McKinsey", source: "https://www.mckinsey.com/featured-insights",
-    basis: "2023–24 published decks (Quantum Technology Monitor, Global Economics Intelligence): serif display titles on a hairline rule, deep navy with electric blue, dash bullets, zebra tables",
+    basis: "2023–24 published decks (Quantum Technology Monitor, Global Economics Intelligence): serif display titles on an open canvas, deep navy with electric blue, dash bullets, zebra tables",
     colors: {
       "color.ink": "#051C2C", "color.textSecondary": "#4D4D4D", "color.componentPrimary": "#051C2C", "color.accent": "#2251FF", "color.accentTint": "#DCE4FF",
       "color.componentPrimaryTint": "#E6E8EA", "color.surfaceMuted": "#F0F0F0",
       "color.chartSeries1": "#051C2C", "color.chartSeries2": "#2251FF", "color.chartSeries3": "#00A9F4",
       "color.chartSeries4": "#034B6F", "color.chartSeries5": "#99C4FF", "color.chartSeries6": "#B3D9F5",
       "font.display": "Georgia",
-      "style.titleWeight": "bold", "style.titleRule": "rule", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "zebra", "style.labelWeight": "bold"
+      "style.titleWeight": "bold", "style.titleRule": "none", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "zebra", "style.labelWeight": "bold"
     }
   },
   bcg: {
     label: "BCG", source: "https://www.bcg.com/publications",
-    basis: "2022–23 published slideshows (Investor Perspectives, Deskless Workers): regular-weight titles on a light band, green pill date tags, grey chart-heading bands, green bar families",
+    basis: "2022–23 published slideshows (Investor Perspectives, Deskless Workers): regular-weight titles on an open canvas, green pill date tags, plain chart headings with inline units, green bar families",
     colors: {
-      "color.ink": "#212427", "color.textSecondary": "#696969", "color.componentPrimary": "#0E7A5E", "color.accent": "#2FBF71", "color.accentTint": "#DFF6E8",
+      "color.ink": "#212427", "color.textSecondary": "#696969", "color.componentPrimary": "#0E7A5E", "color.accent": "#16814B", "color.accentTint": "#DFF6E8",
       "color.componentPrimaryTint": "#E3F3EC", "color.surfaceMuted": "#F2F2F2",
       "color.chartSeries1": "#0E7A5E", "color.chartSeries2": "#5FB08F", "color.chartSeries3": "#9FD4BB",
       "color.chartSeries4": "#1F3A2E", "color.chartSeries5": "#7A7A7A", "color.chartSeries6": "#C9C9C9",
-      "style.titleWeight": "regular", "style.titleRule": "band", "style.tagPlacement": "below-title", "style.chartHeading": "band", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold", "style.titleLead": "pipe"
+      "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "below-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold", "style.titleLead": "pipe"
     }
   },
   bain: {

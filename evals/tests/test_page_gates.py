@@ -176,7 +176,7 @@ class SyntheticGoodPageTests(unittest.TestCase):
         self.assertTrue(report["findings"])
         for item in report["findings"]:
             self.assertEqual(
-                sorted(item), ["code", "measured", "repair", "slide", "threshold"])
+                sorted(item), ["code", "measured", "repair", "severity", "slide", "threshold"])
             self.assertGreaterEqual(len(item["repair"]), 40, item)
             self.assertIn(" ", item["repair"].strip())
 
@@ -384,8 +384,8 @@ class ShapeConstraintTests(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         measured = findings[0]["measured"]
         self.assertEqual(len(measured["constrainedPages"]), 12)
-        self.assertIn("one exhibit and no commentary", findings[0]["repair"])
-        self.assertIn("no layout change will reach it", findings[0]["repair"])
+        self.assertIn("evidence relationship", findings[0]["repair"])
+        self.assertIn("adding boxes", findings[0]["repair"])
 
 
 class ProfileTests(unittest.TestCase):

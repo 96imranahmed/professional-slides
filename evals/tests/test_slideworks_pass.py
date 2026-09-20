@@ -46,9 +46,9 @@ assert.ok(periodBandHeight({periods:[{from:'2019',to:'2020',label:'Boom'}]},cats
 assert.ok(periodBandHeight({events:[{at:'2020',label:'Lockdown'}]},cats)>0);
 // Charts with periods or events are drawn, never native.
 assert.equal(nativeChartSpec('chart.column',{categories:cats,series:[{name:'s',values:[1,2,3,4]}],periods:[{from:'2019',to:'2020',label:'Boom'}]},{x:0,y:0,width:600,height:400}),null);
-// Implied growth: a trending series takes its arrow; a peaked series does not; adjacent columns take a bracket.
+// Change intervals are explicit, never inferred from a time axis or trend.
 const trend=changeFromContent({type:'chart.column',categories:cats,series:[{name:'s',values:[10,12,15,18]}]},'T');
-assert.equal(trend.changeAnnotations[0].style,'arrow');
+assert.equal(trend.changeAnnotations,undefined);
 const peaked=changeFromContent({type:'chart.line',categories:['Feb 1','Feb 8','Feb 15','Feb 22'],series:[{name:'s',values:[1,900,300,60]}]},'T');
 assert.equal(peaked.changeAnnotations,undefined);
 const adjacent=changeFromContent({type:'chart.column',categories:cats,series:[{name:'s',values:[10,12,15,9]}],change:{from:'2021',to:'2022'}},'T');

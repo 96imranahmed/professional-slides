@@ -9,12 +9,16 @@ class ComposeLayoutTests(unittest.TestCase):
         run_node('''
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
 const points=['The first finding establishes the premise.','The second finding explains its consequence.'];
 const page=composeSlide({title:'Two findings support the decision',layout:'text',points},0);
 const list=page.items.find(i=>i.component==='bullet-list');
 assert.equal(list.size.height,'fill');
 assert.equal(list.props.distribute,true);
-assert.equal(list.props.centre,false);
+assert.notEqual(list.props.centre,false);
+const rendered=createRegistry().get('bullet-list').render({id:'summary',frame:{x:60,y:140,width:1160,height:500},props:list.props}).nodes.filter(n=>n.type==='text');
+const top=Math.min(...rendered.map(n=>n.frame.y)),bottom=Math.max(...rendered.map(n=>n.frame.y+n.frame.height));
+assert.ok(Math.abs((top-140)-(640-bottom))<3,'a sparse sole list has balanced top and bottom space');
 assert.deepEqual(list.props.items,points);
 const shared=composeSlide({title:'Two findings support the decision',layout:'text',points,paragraphs:['An authored qualification remains alongside the findings.']},0);
 assert.equal(shared.items.find(i=>i.component==='bullet-list').size.height,'hug');
@@ -53,16 +57,16 @@ const chartSide=composeSlide({title:'T',exhibit:{type:'chart.bar',categories:['a
 // The implication chevron sits between the exhibit and its consequences, and
 // the column's width is negotiated against what it holds: one short point does
 // not earn a full track, three sentences do.
-assert.deepEqual(chartSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[2,'connector',0.8]);
+assert.deepEqual(chartSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[2,0.8]);
 const deepPoints=['Wealth nearly doubled on advisory fees while lending margins compressed across the book','Corporate slipped as the rate cycle ran and the book lost a fifth of its contribution','Retail held flat as deposit growth offset the fee decline in a falling market'];
 const fullColumn=composeSlide({title:'T',exhibit:{type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]},points:deepPoints},0);
-assert.deepEqual(fullColumn.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[2,'connector',1]);
+assert.deepEqual(fullColumn.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[2,1]);
 // A table's column starts at 3:2 and is measured the same way: the wider the
 // track, the more it has to carry to keep it.
 const tableSide=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:deepPoints},0);
-assert.deepEqual(tableSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[3,'connector',1.6]);
+assert.deepEqual(tableSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[3,1.6]);
 const tableSideFull=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:[...deepPoints,...deepPoints]},0);
-assert.deepEqual(tableSideFull.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[3,'connector',2]);
+assert.deepEqual(tableSideFull.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[3,2]);
 // Auto-stack: two charts on one category set with points.
 const stack=composeSlide({title:'T',exhibits:[{type:'chart.column',categories:['a','b'],series:[{name:'s',values:[1,2]}]},{type:'chart.line',categories:['a','b'],series:[{name:'m',values:[3,4]}]}],points:['p']},0);
 assert.ok(find(stack.items,i=>i.id==='s01-stack'));
@@ -109,9 +113,9 @@ const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=i
 // Highlight the answer: the title names Hoboken, so Hoboken's bar takes the accent.
 const bar=composeSlide({title:'Hoboken is the safest of the four',exhibit:{type:'chart.bar',categories:['Hoboken','San Francisco','Berkeley','New York City'],series:[{name:'v',values:[189,587,639,571]}]}},0);
 const chart=find(bar.items,i=>i.component==='chart.bar');
-assert.deepEqual(chart.props.highlights,[{category:'Hoboken',style:'bar'}]);
+assert.deepEqual(chart.props.highlights ?? [],[],'title text does not choose a chart focus');
 const spec=nativeChartSpec('chart.bar',chart.props,{x:0,y:0,width:700,height:400});
-assert.deepEqual(spec.highlightIndices,[0]);
+assert.deepEqual(spec.highlightIndices,[]);
 // A CAGR becomes the growth arrow with its rate in the bubble (years from the
 // category names); forecast shading is passed to the native chart when no
 // annotation forces shapes.
@@ -124,10 +128,10 @@ assert.equal(nativeChartSpec('chart.column',find(plain.items,i=>i.component==='c
 const nodes=REGISTRY.get('chart.column').render({id:'c',frame:{x:0,y:0,width:700,height:400},props:c.props}).nodes;
 assert.ok(nodes.some(n=>n.role==='annotation-text'&&n.text==='+21% p.a.'));
 assert.equal(nodes.find(n=>n.role==='chart-mark'&&n.data.category==='2026E').style.fill.tokenId,'color.chartSeries6');
-// Period categories get the first-to-last arrow; a gap title gets per-category brackets; bar rankings get nothing.
-const grow=composeSlide({title:'T',exhibit:{type:'chart.line',heading:'Sales',unit:'$m',categories:['2021','2022','2023','2024'],series:[{name:'s',values:[50,60,70,75]}]}},0);
+// Explicit requests select full-period and paired-series changes; unrequested rankings stay neutral.
+const grow=composeSlide({title:'T',exhibit:{type:'chart.line',heading:'Sales',unit:'$m',change:true,categories:['2021','2022','2023','2024'],series:[{name:'s',values:[50,60,70,75]}]}},0);
 assert.deepEqual(find(grow.items,i=>i.component==='chart.line').props.changeAnnotations,[{start:'2021',end:'2024',style:'end-bubble',text:'+50%'}]);
-const gap=composeSlide({title:'Schools beat their peers by 10 points',exhibit:{type:'chart.column',heading:'Share',unit:'%',categories:['English','Math'],series:[{name:'School',values:[89,90]},{name:'Peers',values:[79,80]}]}},0);
+const gap=composeSlide({title:'Schools beat their peers by 10 points',exhibit:{type:'chart.column',heading:'Share',unit:'%',change:true,categories:['English','Math'],series:[{name:'School',values:[89,90]},{name:'Peers',values:[79,80]}]}},0);
 assert.deepEqual(find(gap.items,i=>i.component==='chart.column').props.changeAnnotations.map(a=>a.text),['+10 pp','+10 pp']);
 const rank=composeSlide({title:'T',exhibit:{type:'chart.bar',heading:'Share',unit:'%',categories:['A','B','C','D'],series:[{name:'s',values:[1,2,3,4]}]}},0);
 assert.equal(find(rank.items,i=>i.component==='chart.bar').props.changeAnnotations,undefined);

@@ -132,7 +132,7 @@ const slide=compileDeck({slides:[planned.spec]},REGISTRY).slides[0];
 const tracker=slide.nodes.find(n=>n.role==='tracker-compact-label'),title=slide.nodes.find(n=>n.role==='action-title');
 assert.ok(tracker.frame.y+tracker.frame.height<title.frame.y);
 assert.equal(tracker.data.sectionId,'B');
-assert.equal(slide.componentInstances.find(n=>n.component==='slide-chrome').variant,'with-line');
+assert.equal(slide.componentInstances.find(n=>n.component==='slide-chrome').variant,'without-line');
 assert.equal(planned.decision.tracker.selectedId,'B');
 console.log(JSON.stringify({accepted:true}));
 """)

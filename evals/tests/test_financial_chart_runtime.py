@@ -482,7 +482,8 @@ for (const style of ['region-box','region-tint']) {
 const legacy=render({category:'B'}).find(n=>n.role==='chart-highlight');
 assert.equal(legacy.data.highlightStyle,'region-tint');
 assert.throws(()=>render({category:'B',style:'bar'}),/exactly one series/);
-assert.throws(()=>REGISTRY.get('chart.column').render({id:'bad',frame,props:{...base,highlights:[{category:'A'},{category:'B'}]}}),/one primary/);
+assert.ok(REGISTRY.get('chart.column').render({id:'set',frame,props:{...base,highlights:[{category:'A'},{category:'B'}]}}).nodes.length);
+assert.throws(()=>REGISTRY.get('chart.column').render({id:'bad',frame,props:{...base,highlights:[{category:'A',style:'region-box'},{category:'B',style:'region-tint'}]}}),/one coherent/);
 assert.throws(()=>render({category:'B',style:'glow'}),/Unknown chart highlight style/);
 assert.throws(()=>REGISTRY.get('chart.line').render({id:'line',frame,props:{categories:['A','B'],series:[{name:'Measure',values:[1,2]}],highlights:[{category:'B',style:'bar'}]}}),/single-bar highlight/);
 console.log(JSON.stringify({accepted:true}));
@@ -494,8 +495,14 @@ console.log(JSON.stringify({accepted:true}));
 import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-const deck=compileDeck({slides:[{id:'fractional',composition:component({id:'chart',component:'chart.column',frame:{x:60,y:160,width:1160,height:480},props:{categories:['2025','2026'],series:[{name:'Revenue',values:[13.624,24.768]}],yMax:30,showValueAxis:true}})}]},REGISTRY);
-assert.deepEqual(deck.slides[0].nodes.filter(n=>n.role==='axis-label').map(n=>n.text),['0','7.5','15','22.5','30']);
+for(const [values,yMax,expected] of [
+ [[13.624,24.768],30,['0','10','20','30']],
+ [[.13624,.24768],.3,['0','0.1','0.2','0.3']],
+ [[.4,.8],1,['0','0.25','0.5','0.75','1']]
+]) {
+ const deck=compileDeck({slides:[{id:'fractional',composition:component({id:'chart',component:'chart.column',frame:{x:60,y:160,width:1160,height:480},props:{categories:['2025','2026'],series:[{name:'Revenue',values}],yMax,showValueAxis:true}})}]},REGISTRY);
+ assert.deepEqual(deck.slides[0].nodes.filter(n=>n.role==='axis-label').map(n=>n.text),expected);
+}
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

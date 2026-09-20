@@ -463,5 +463,6 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
     : slide.kind === "statement" ? planStatement({ pageNumber: index + 1, ...slide })
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
   const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, ...(deckPlan.chrome ? { chrome: deckPlan.chrome } : {}), ...(deckPlan.fill ? { fill: deckPlan.fill } : {}), ...(deckPlan.weight ? { weight: deckPlan.weight } : {}), slides: planned.map((item) => item.spec) }, registry, {slideCache});
+  deck.slides.forEach((slide, index) => { if (deckPlan.slides[index].role) slide.role = deckPlan.slides[index].role; });
   return {deck, decisions:planned.map(item=>item.decision)};
 }

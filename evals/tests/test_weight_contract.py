@@ -5,7 +5,7 @@ The floors used to be a literal copy in `runtime/weight.mjs` and another in
 nothing caught a miss. Both now read `runtime/weight.json`. These tests hold
 that arrangement together: the composer and the gates must resolve the same
 numbers, the documented vocabulary must match the emitted one, and the table in
-SKILL.md must still be the corpus the floors were calibrated against.
+the evaluation reference must still be the corpus the floors were calibrated against.
 """
 from __future__ import annotations
 
@@ -54,9 +54,9 @@ console.log(JSON.stringify({byFill: WEIGHT_BY_FILL, keys: WEIGHT_KEYS, bands: RE
         for fill, values in CONTRACT["byFill"].items():
             self.assertEqual(sorted(values), sorted(CONTRACT["keys"]), fill)
             self.assertEqual(sorted(values), sorted(CONTRACT["ranges"]), fill)
-        skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+        skill = (SKILL / "references/theming.md").read_text(encoding="utf-8")
         for key in CONTRACT["keys"]:
-            self.assertIn(f"`{key}`", skill, f"SKILL.md never names the {key} floor")
+            self.assertIn(f"`{key}`", skill, f"The theming reference never names the {key} floor")
 
     def test_the_floors_stay_under_the_corpus_they_are_calibrated_against(self):
         # A floor is not a target. The body floor sits below the reference
@@ -69,23 +69,23 @@ console.log(JSON.stringify({byFill: WEIGHT_BY_FILL, keys: WEIGHT_KEYS, bands: RE
         self.assertLess(CONTRACT["byFill"]["balanced"]["pageWords"], CONTRACT["byFill"]["full"]["pageWords"])
 
     def test_the_skill_quotes_the_corpus_it_was_measured_from(self):
-        # The comparison table in SKILL.md is the argument for the floors. If
+        # The comparison table in the evaluation reference is the argument for the floors. If
         # the corpus is re-measured, the table moves with it rather than
         # standing as a second, older record of the same thing.
-        skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+        skill = (SKILL / "references/evaluation/index.md").read_text(encoding="utf-8")
         slides = CONTRACT["reference"]["slides"]
         wide = CONTRACT["reference"]["corpus"]
         self.assertIn(f"{wide['pages']:,} analytical pages", skill)
         for value in (slides["words"], slides["bands"]["titleBand"], slides["bands"]["body"],
                       slides["bands"]["footer"], slides["drawings"],
                       slides["numericByFamily"]["chart"]):  # noqa: E501
-            self.assertRegex(skill, rf"\|[^|\n]*\b{value}\b", f"SKILL.md's corpus table has lost {value}")
+            self.assertRegex(skill, rf"\|[^|\n]*\b{value}\b", f"the evaluation reference's corpus table has lost {value}")
         self.assertIn(f"{round(slides['heavyShare'] * 100)}%", skill)
         # And the craft rates the plan gates now floor against.
         craft = CONTRACT["plan"]["craft"]
         for key in ("chartAnnotated", "tableTreated"):
             self.assertIn(f"{round(craft[key]['observedClient'] * 100)}%", skill,
-                          f"SKILL.md does not say what client decks do for {key}")
+                          f"the evaluation reference does not say what client decks do for {key}")
 
     def test_no_floor_is_stricter_than_the_corpus_it_claims_to_come_from(self):
         """A floor that most published pages fail is a preference, not a floor.

@@ -169,7 +169,7 @@ assert.equal(strip.items[0].items.length,3);
 // A comparison tints the side it decides for.
 const find=(item)=>item.id==='s01-exhibit'?item:(item.items||[]).map(find).find(Boolean);
 const cmp=(extra)=>find(composeSlide({title:'T',exhibit:{type:'compare',left:{heading:'Marvel',points:['27 films']},right:{heading:'DC',points:['15 films']},...extra},points:['a','b']},0).items.find(i=>i.id==='s01-row'));
-assert.equal(cmp({}).props.highlightColumn,1,'before/after keeps the after column');
+assert.equal(cmp({}).props.highlightColumn,undefined,'comparison has no inferred winner');
 assert.equal(cmp({winner:'left'}).props.highlightColumn,0);
 assert.equal(cmp({winner:'DC'}).props.highlightColumn,1);
 assert.equal(cmp({winner:false}).props.highlightColumn,undefined);
@@ -475,8 +475,8 @@ const drawn=page.items.flatMap(find).find(i=>String(i.component||'').startsWith(
 // category still resolves, because inside an exhibit every occurrence is marked.
 assert.deepEqual(drawn.props.categories,['2019','2020','2021','2022\\u00b9','2023']);
 assert.equal(drawn.props.changeAnnotations[0].start,'2022\\u00b9');
-// The title still highlights the category it names, marker or not.
-assert.equal(drawn.props.highlights[0].category,'2022\\u00b9');
+// Naming a category in the title does not invent a chart highlight.
+assert.deepEqual(drawn.props.highlights ?? [],[]);
 // Nine is the limit, and a footnote needs text.
 assert.throws(()=>composeSlide({title:'T',points:['a'],footnotes:Array.from({length:10},()=>({text:'x'}))},0),/at most nine/);
 assert.throws(()=>composeSlide({title:'T',points:['a'],footnotes:[{on:'x'}]},0),/needs text/);
@@ -755,9 +755,9 @@ const page=composeSlide({title:'Five challenges shape the sector',
 const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
 const table=page.items.flatMap(find).find(i=>i.component==='table');
 assert.deepEqual(table.props.columns.map(c=>c.label),['Challenge','A - Pre-COVID trends','B - Impacts']);
-// The label column numbers its rows and keeps its own icon; it is not a filled box.
+// Unordered labels keep their own icons without invented sequence counters.
 const [label,first,second]=table.props.rows[0];
-assert.equal(label.sectionNumber,1);
+assert.equal(label.sectionNumber,undefined);
 assert.equal(label.icon,'people');
 assert.equal(label.surface,'plain');
 // Each content cell is a bulleted list under a bold lead, and the phrase the
@@ -767,9 +767,9 @@ assert.equal(first.lead,'Strong base, declining ridership');
 assert.deepEqual(first.items,['34% of workers commute by transit','15% decline in rail ridership']);
 assert.equal(first.accent,'34%');
 assert.equal(second.type,'bullets');
-// A plain string cell is a text cell, and the second row numbers itself.
+// A plain string cell stays text; the second row also remains unordered.
 assert.equal(table.props.rows[1][2].type,'text');
-assert.equal(table.props.rows[1][0].sectionNumber,2);
+assert.equal(table.props.rows[1][0].sectionNumber,undefined);
 // One to three content columns; four is a table, not a matrix.
 assert.throws(()=>composeSlide({title:'T',rows:[{label:'a',cells:['a','b','c','d']}]},0),/one to three/);
 console.log(JSON.stringify({accepted:true}));

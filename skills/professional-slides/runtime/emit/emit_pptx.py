@@ -579,6 +579,15 @@ class Emitter:
                 # invisible base: the bar floats from low to high
                 ser.format.fill.background(); ser.format.line.fill.background()
                 continue
+            if kind in ("stacked-column", "stacked-bar") and spec.get("dataLabels", True):
+                # A zero segment has no area. Preserve its workbook value,
+                # but do not let Office place a label on the category axis.
+                labels = ser._element.get_or_add_dLbls()
+                for j, value in enumerate(spec["series"][i]["values"]):
+                    if value == 0 and labels is not None:
+                        label = etree.SubElement(labels, qn("c:dLbl"))
+                        etree.SubElement(label, qn("c:idx")).set("val", str(j))
+                        etree.SubElement(label, qn("c:delete")).set("val", "1")
             if color and kind not in ("pie", "donut"):
                 fill = ser.format.fill
                 fill.solid(); fill.fore_color.rgb = rgb(color)
@@ -672,6 +681,9 @@ class Emitter:
         instances = {ci["instanceId"]: ci for ci in sl.get("componentInstances", [])}
         title_node = next((n for n in nodes if n["type"] == "text" and n.get("role") in ("action-title", "cover-title", "deck-title", "section-title")), None)
         slide = self.prs.slides.add_slide(self.title_layout if title_node else self.blank_layout)
+        canvas = sl.get("tokens", {}).get("color.canvas", {}).get("value") or self.colors.get("color.canvas", "#FFFFFF")
+        slide.background.fill.solid()
+        slide.background.fill.fore_color.rgb = rgb(canvas)
         skip_instances = set()
         if self.native_charts:
             for iid, ci in instances.items():

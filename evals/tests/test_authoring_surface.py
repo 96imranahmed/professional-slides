@@ -73,7 +73,7 @@ console.log(JSON.stringify({{ok:true}}));
 
 
 class PageShapeTests(unittest.TestCase):
-    """The four heavy-page shapes SKILL.md names are shapes the composer builds."""
+    """The composition presets the shared reference names are shapes the composer builds."""
 
     def test_every_documented_shape_exists(self):
         import pathlib
@@ -81,9 +81,9 @@ class PageShapeTests(unittest.TestCase):
 import {{SHAPE_NAMES}} from '{COMPOSE}';
 console.log(JSON.stringify({{shapes:SHAPE_NAMES}}));
 ''')
-        skill = (pathlib.Path(__file__).resolve().parents[2] / "skills" / "professional-slides" / "SKILL.md").read_text(encoding="utf-8")
+        skill = (pathlib.Path(__file__).resolve().parents[2] / "skills" / "professional-slides" / "references" / "composition.md").read_text(encoding="utf-8")
         for shape in result["shapes"]:
-            self.assertIn(f"`{shape}`", skill, f"SKILL.md never names the {shape} shape")
+            self.assertIn(f"`{shape}`", skill, f"The composition reference never names the {shape} shape")
         self.assertGreaterEqual(len(result["shapes"]), 5)
 
     def test_a_shape_sets_what_that_shape_needs_and_yields_to_the_page(self):

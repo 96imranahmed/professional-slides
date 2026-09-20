@@ -106,7 +106,7 @@ assert.equal(designStatistics({slides:[{id:'c',nodes:[{role:'cover-title',type:'
 for (const code of ['NO_VISUAL_ANCHOR','UNANNOTATED_PLOT','TABLE_MONOTONY','MIXED_GRAMMAR','DECORATION','NARROW_REPERTOIRE'])
   assert.ok(CODES[code],`${code} is a reviewable code`);
 const prompt=reviewPrompt({statistics:s,titles:[],slides:[],codes:CODES,schema:{},montage:'m'});
-assert.match(prompt,/BEAUTIFICATION PASS/);
+assert.match(prompt,/VISUAL REVIEW/);
 assert.match(prompt,/NARROW_REPERTOIRE/);
 assert.ok(prompt.includes('"exhibitVarietyPerTen": 7.5'),'the numbers reach the reviewer');
 console.log(JSON.stringify({ok:true}));
