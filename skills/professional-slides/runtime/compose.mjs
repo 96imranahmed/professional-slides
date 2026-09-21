@@ -2353,33 +2353,14 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // the page drops straight from the plot into three paragraphs with nothing
     // saying what they are. `pointsHeading: false` suppresses it.
     const belowHeading = slide.pointsHeading === false ? null : slide.pointsHeading || "What it means";
-    // One exhibit over three headed paragraphs is a good page and a bad deck:
-    // the cold-run deck built it eight times and a reviewer read seven of the
-    // forty-four content pages as one construction repeated. The content is the
-    // same either way, so the band under the exhibit takes the form it has not
-    // taken recently - three paragraphs, or the same three findings as tinted
-    // cards. `recentStyles` is the same staleness memory the point styles use.
-    const lastBelow = (recentStyles || []).find((name) => name === "below-columns" || name === "below-cards");
-    const cardsTurn = slide.belowStyle ? slide.belowStyle === "cards" : lastBelow === "below-columns";
-    const below = cardsTurn && columns.every((c) => c.heading)
-      ? [{ id: `${id}-below-cards`, component: "cards", size: HUG,
-           props: { tone: "plain", columns: Math.min(3, columns.length),
-                    items: slide.points.map((point, at) => {
-                      const entry = typeof point === "string" ? { text: point } : point;
-                      return { title: entry.lead ?? `Finding ${at + 1}`, text: entry.text, number: at + 1 };
-                    }) } }]
-      : columns;
-    if (Array.isArray(recentStyles)) recentStyles.unshift(below === columns ? "below-columns" : "below-cards");
-    // Cards name themselves. A shared "What it means" over three titled cards
-    // is a label on a labelled thing, and it was the third of the deck's pages
-    // carrying those same three words: twenty-three of forty-four, which a
-    // reader flicking the spreads reads as one page coming round again.
-    const headBelow = below === columns && !columns.every((column) => column.heading)
+    // Preserve authored prose. Cards can be authored as components; swapping
+    // them in based on earlier pages does not create a new evidence relationship.
+    const headBelow = !columns.every((column) => column.heading)
       ? belowHeading : slide.pointsHeading || null;
     items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
       headedPanel(exhibits[0], item, `${id}-exhibit`, false),
       { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}),
-        layout: below === columns ? "flow.row" : "flow.column", size: HUG, items: below },
+        layout: "flow.row", size: HUG, items: columns },
     ] });
   } else if (layout === "hero-number") {
     // One figure carries the page: the number set large with its explanation,

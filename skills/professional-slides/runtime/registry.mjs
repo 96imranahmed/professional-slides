@@ -402,6 +402,9 @@ function assertChartTitleCopy(props = {}) {
   for (const [field, value] of [["heading", props.heading || props.text], ["unit", props.unit]]) {
     if (typeof value !== "string") continue;
     let copy = value.normalize("NFKC");
+    // A complete index-scale definition may use a scenario baseline rather
+    // than a calendar year. Anchor the whole unit so appended results reject.
+    if (field === "unit" && /^(?:index\s*[,;:]?\s*)?(?:base|baseline)\s*=\s*(?:1|100)\s*$/i.test(copy.trim())) continue;
     const year = "(?:19|20)\\d{2}";
     const fiscalYear = `(?:${year}|\\d{2})`;
     const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;

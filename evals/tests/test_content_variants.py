@@ -3,6 +3,24 @@ from node_probe import run_node
 
 
 class ContentVariantTests(unittest.TestCase):
+    def test_exhibit_commentary_does_not_change_with_its_neighbours(self):
+        run_node(r'''
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const page=(id,n=2)=>({id,title:'Capacity serves the defined workload under fixed assumptions',layout:'exhibit-top',pointsHeading:false,pointsStyle:'prose',
+ exhibit:{type:'chart.bar',heading:'Service capacity',unit:'hours',categories:['Baseline','Scenario'],series:[{name:'Capacity',values:[100,120]}]},
+ points:Array.from({length:n},(_,i)=>({lead:`Finding ${i+1}`,text:'Review the workload boundary before expanding the deployment.'}))});
+const build=slides=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'t',tracker:false,slides})).deck.slides;
+const alone=build([page('target')])[0];
+const after=build([page('prior'),page('target'),page('single',1)]);
+assert.deepEqual(after[1].nodes.filter(n=>n.id.includes('target-col-')).map(n=>[n.id,n.text]),alone.nodes.filter(n=>n.id.includes('target-col-')).map(n=>[n.id,n.text]));
+assert.ok(after[1].nodes.some(n=>n.id.includes('target-col-')));
+assert.ok(!after.some(s=>s.nodes.some(n=>n.id.includes('below-cards'))));
+assert.doesNotThrow(()=>build([page('single',1)]));
+console.log('{}');
+''')
+
     def test_custom_geography_preserves_provenance_and_rejects_invalid_rings(self):
         run_node(r'''
 import assert from 'node:assert/strict';

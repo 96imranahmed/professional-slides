@@ -91,7 +91,7 @@ class ClaimTests(unittest.TestCase):
 
 
 class EvidenceKindTests(unittest.TestCase):
-    """The one field the layout stage reads, and the one-chart failure."""
+    """Evidence descriptions and relationships precede encoding choices."""
 
     def test_a_deck_that_settles_nothing_countable_is_reported(self):
         pages = [page(i, settles={"kind": "qualitative", "what": "a premise"}) for i in range(1, 11)]
@@ -116,7 +116,23 @@ class EvidenceKindTests(unittest.TestCase):
         stats = gate(deck(pages))["statistics"]
         self.assertEqual(stats["kinds"]["count"], 7)
         self.assertEqual(stats["kinds"]["qualitative"], 1)
-        self.assertEqual(stats["measured"], 0.875)
+        self.assertEqual(stats["quantitativeKindShare"], 0.875)
+        self.assertEqual(stats["structuredKindShare"], 0)
+
+    def test_structured_qualitative_evidence_is_not_reported_as_measured(self):
+        pages = [page(1, settles={"kind": "comparison", "what": "Named policy exceptions and permitted responses"}),
+                 page(2, settles={"kind": "sequence", "what": "Policy approval, publication and retrieval verification"})]
+        stats = gate(deck(pages))["statistics"]
+        self.assertEqual(stats["quantitativeKindShare"], 0)
+        self.assertEqual(stats["structuredKindShare"], 1)
+
+    def test_an_evidence_label_without_evidence_cannot_pass(self):
+        for settles in (None, {}, {"kind": "count"}, {"kind": "count", "what": "  "},
+                        {"kind": "count", "what": []}, {"what": "Named observations"}):
+            with self.subTest(settles=settles):
+                report = gate(deck([page(1, settles=settles)]))
+                self.assertFalse(report["accepted"])
+                self.assertIn("CONTENT_SCHEMA", report["countsByCode"])
 
 
 class AddsTests(unittest.TestCase):

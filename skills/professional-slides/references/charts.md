@@ -40,7 +40,7 @@ Resolve overlapping observations with transparency, explicit multiplicity labels
 
 ## Universal contract
 
-Every chart defines: the question and intended conclusion; categories, series, values, units, period and population; sort order and scale domain; the status of each value (actual, estimate, forecast, target or scenario); highlight and annotation targets; visible source plus calculation provenance. Reconcile the result before designing the visual, so data, labels, heading and source agree on basis and precision.
+Every chart defines: the question and intended conclusion; categories, series, values, units, period and population; sort order and scale domain; the status of each value (actual, estimate, forecast, target or scenario); highlight and annotation targets; visible source plus calculation provenance. Reconcile the result before designing the visual, so data, labels, heading and source agree on basis and precision. An index base defines the scale and belongs with the unit; it is not a chart result. Unequally spaced numerical scenarios need a numeric axis or discrete scenario bars, not equally spaced points on a continuous-looking line.
 
 Calculate from unrounded inputs and round for display; keep independently rounded source parts and totals as published, with a rounding note. A total that disagrees with its stated formula is a source conflict: show the reported figure and limit the conclusions that depend on it. Keep actuals, forecasts and sensitivities distinct, including scenario name, baseline, period, population and gross or net state.
 

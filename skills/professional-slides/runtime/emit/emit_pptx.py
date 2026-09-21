@@ -561,6 +561,11 @@ class Emitter:
             dl.number_format_is_linked = False
             if kind in ("column", "bar"):
                 dl.position = XL_LABEL_POSITION.OUTSIDE_END
+            elif kind == "line":
+                # Office's default right-of-point labels intersect rising
+                # segments. Values belong above the markers; explicit series
+                # end labels retain their separate right-side placement below.
+                dl.position = XL_LABEL_POSITION.ABOVE
             elif kind in ("pie", "donut"):
                 dl.position = XL_LABEL_POSITION.OUTSIDE_END if kind == "pie" else XL_LABEL_POSITION.CENTER
         # series colours from the palette (comparator series grey when the runtime would)

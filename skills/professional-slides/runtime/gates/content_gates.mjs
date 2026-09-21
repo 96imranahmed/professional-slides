@@ -39,7 +39,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 export const CONTENT_CODES = Object.freeze({
   CONTENT_SCHEMA: "the content file is not a readable record of what the deck says",
   CONTENT_NO_CLAIM: "a page names a topic instead of proving something",
-  CONTENT_UNMEASURED: "too much of the deck settles nothing you can count",
+  CONTENT_UNMEASURED: "many pages declare qualitative evidence; check its specificity",
   CONTENT_ADDS_NOTHING: "the commentary is planned as a second reading of the exhibit",
   CONTENT_NO_HIGHLIGHT: "no page names the phrase its reader should see first",
   CONTENT_CLAIM_REPEATS: "two pages make the same claim",
@@ -169,10 +169,15 @@ export function runContentGates(content) {
         + "If the page cannot produce a sentence with a verb in it, the page has no argument yet."));
     }
     const kind = String(page.settles?.kind ?? "").trim();
-    if (kind && !EVIDENCE_KINDS.includes(kind)) {
-      findings.push(finding(at, "CONTENT_SCHEMA", kind, EVIDENCE_KINDS.join(" | "),
-        `Unknown evidence kind. The layout stage reads this field and nothing else from here, `
-        + `so it has to be one of: ${EVIDENCE_KINDS.join(", ")}.`));
+    if (!EVIDENCE_KINDS.includes(kind)) {
+      findings.push(finding(at, "CONTENT_SCHEMA", kind || "(missing evidence kind)", EVIDENCE_KINDS.join(" | "),
+        `Declare one evidence relationship: ${EVIDENCE_KINDS.join(", ")}. `
+        + "Design reads this together with the claim, actual evidence, basis and consequence."));
+    }
+    if (typeof page.settles?.what !== "string" || !page.settles.what.trim()) {
+      findings.push(finding(at, "CONTENT_SCHEMA", "(missing evidence description)", "nonempty settles.what",
+        "Name the observations, comparison, worked case or mechanism that supports the claim. "
+        + "An evidence-kind label alone supplies no evidence to design."));
     }
     const adds = String(page.adds ?? "").trim();
     if (!adds && page.adds !== null && page.adds !== "none") {
@@ -200,19 +205,16 @@ export function runContentGates(content) {
     if (share > CONTENT_THRESHOLDS.qualitativeMax) {
       findings.push(finding(null, "CONTENT_UNMEASURED",
         { share: round(share), pages: qualitative, of: kinds.length }, CONTENT_THRESHOLDS.qualitativeMax,
-        "Most of this deck settles nothing a reader can count. A deck of qualitative pages is a "
-        + "deck of boxes, and it is decided here rather than at layout: a page whose evidence is "
-        + "`count`, `share`, `rank` or `rate` gets a plot, and a page whose evidence is "
-        + "`qualitative` cannot. Go back through the claims and ask what would actually settle "
-        + "each one - the deck that failed this had twelve issues, twenty-two films, a thirty-year "
-        + "gap and two billion-dollar grosses in its own prose, and drew all of them as diagrams."));
+        "Check whether these pages contain named examples, bounded comparisons or worked mechanisms. "
+        + "A qualitative label cannot establish evidence quality, and changing it to comparison "
+        + "does not add evidence. Plot quantities when they settle the question; do not invent "
+        + "numbers or impose a chart quota on an operating or qualitative argument."));
     }
     const highlighted = pages.filter((p) => String(p.highlight ?? "").trim()).length;
     if (highlighted < CONTENT_THRESHOLDS.highlightMin) {
       findings.push(finding(null, "CONTENT_NO_HIGHLIGHT", highlighted, CONTENT_THRESHOLDS.highlightMin,
-        "No page names the phrase its reader should see first. One phrase per page, set in the "
-        + "house accent inside a sentence, is how a reference page emphasises the finding without "
-        + "bolding the whole line."));
+        "Review whether a specific finding needs emphasis. Explicitly neutral pages are valid; "
+        + "add a highlight only where the claim identifies its exact target."));
     }
     for (let i = 0; i < pages.length; i += 1) {
       for (let j = i + 1; j < pages.length; j += 1) {
@@ -301,7 +303,9 @@ function report(content, findings, pages) {
     pages: pages.length,
     statistics: {
       kinds,
-      measured: pages.length ? round(1 - (kinds.qualitative / pages.length)) : 0,
+      // Declared relationships are not proof of quantitative or substantive evidence.
+      quantitativeKindShare: pages.length ? round((kinds.count + kinds.share + kinds.rank + kinds.rate) / pages.length) : 0,
+      structuredKindShare: pages.length ? round((kinds.sequence + kinds.comparison + kinds.structure) / pages.length) : 0,
       withAdds: pages.filter((p) => String(p.adds ?? "").trim()).length,
       withHighlight: pages.filter((p) => String(p.highlight ?? "").trim()).length,
     },

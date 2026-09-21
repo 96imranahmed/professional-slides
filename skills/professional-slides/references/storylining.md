@@ -18,6 +18,8 @@ Verify the brief's factual premise before decomposing it. For a transaction, pol
 
 For a requested page count, budget the entire delivered deck, including cover, summary, section pages and appendix, unless the brief specifies a different scope. Allocate distinct evidence questions before layouts; a fixed length does not justify splitting one insight into repetitive pages. Give alternative versions different reader questions, title sequences or evidence relationships before authoring; preserve any shared audience and decision required by the brief.
 
+Before accepting the dot-dash, compare adjacent pages' evidence and decision consequences. Combine elementary transformations of one model into a sensitivity matrix or joined comparison unless each changes a distinct decision. Use the released space for unresolved commercial or operating questions, worked cases and source-backed mechanisms. Develop a proposed mechanism against a named current alternative: show what changes, how outcomes would be measured and which result would reject it. A structurally valid plan with unique titles can still be repetitive; do not approve it on counts and source keys alone.
+
 For each reused measure, keep one source record: exact members, exclusions, period,
 units, observed inputs, calculation and rounding. Sum the members before drafting
 an aggregate. Derive means, shares, rates and durations from that record; retain
@@ -25,7 +27,7 @@ unrounded inputs and round only for display. Generate the explanatory formula an
 its speaker-note operands from the same records; matching totals do not excuse
 mismatched line items. A grouped cell containing two items
 still counts as two. Reconcile every reuse in titles, summaries, charts, notes and
-the close whenever membership or an input changes.
+the close whenever membership or an input changes. Cost and benefit drivers may have different denominators: a share of transactions is not a share of effort when cases take different amounts of time. Derive each from the same underlying records. When demand grows, state whether the intervention covers the added volume or a fixed original pool.
 
 For a counted sequence or collection, enumerate its included ranges and extras before stating the length. Distinguish a complete named work, a selected arc, an author run and the larger continuing series. A familiar label is not a defined population; the displayed scope and the counted set must agree.
 

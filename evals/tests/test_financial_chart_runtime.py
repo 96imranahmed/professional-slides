@@ -37,10 +37,10 @@ for(const heading of invalid) {
 for(const heading of ['NYPD reported homicides','Reported homicides in 2025','Revenue, 2025','Revenue (2025)','Revenue FY2025','Revenue Q1 2025','Revenue 2024–2025','Revenue FY14','FY14–FY17 average earnings impact','Revenue FY14–17','Revenue FY2014–2017']) {
  assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading,unit:'index'}}));
 }
-for(const unit of ['%','$B','USD millions, 2026','homicides per 100,000']) {
+for(const unit of ['%','$B','USD millions, 2026','homicides per 100,000','baseline = 100','index, base = 1']) {
  assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'Reported homicides',unit}}));
 }
-for(const unit of ['index, 382 to 305','−20.2%','35 per 100,000']) {
+for(const unit of ['index, 382 to 305','−20.2%','35 per 100,000','baseline = 100, result = 120','baseline = 100.5','baseline = 100%']) {
  assert.throws(()=>title.render({id:'title',frame,props:{heading:'Reported homicides',unit}}),/must not contain statistics/);
 }
 for(const heading of ['Net employment change to 2030, midpoint adoption','Reported Gini change versus 2016','Reported Gini change vs. 2016']) {

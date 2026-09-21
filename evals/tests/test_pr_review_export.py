@@ -90,6 +90,19 @@ class ExportReviewTests(unittest.TestCase):
         self.assertEqual(chart.plots[0].data_labels.number_format,'0.0')
 
 class ZeroStackLabelTests(unittest.TestCase):
+    def test_native_line_values_stay_above_markers_after_save(self):
+        from pptx.enum.chart import XL_LABEL_POSITION
+        scene = scene_fixture()
+        spec = scene['slides'][0]['componentInstances'][0]['nativeChart']
+        spec.update(type='line', categories=['A', 'B', 'C'],
+                    series=[{'name': 'Cash flow', 'values': [1.62, 1.94, 2.37]}])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'line.pptx'
+            Emitter(scene).run(path)
+            chart = next(s.chart for s in Presentation(path).slides[0].shapes if s.has_chart)
+            self.assertEqual(chart.plots[0].data_labels.position, XL_LABEL_POSITION.ABOVE)
+            self.assertEqual(tuple(chart.series[0].values), (1.62, 1.94, 2.37))
+
     def test_zero_stack_point_keeps_data_but_suppresses_native_label(self):
         scene=scene_fixture()
         spec=scene['slides'][0]['componentInstances'][0]['nativeChart']
