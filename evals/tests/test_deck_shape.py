@@ -952,12 +952,12 @@ assert.deepEqual(styled.columns.map(c=>c.label),['Subsector','Jobs, 2014','Jobs,
 assert.deepEqual(styled.columns.slice(3).map(c=>c.unit),['% of total','of 3','%']);
 const body=styled.rows.filter(r=>Array.isArray(r));
 // Share of the measure's total, rank on it, and the change against the earlier
-// column - the change reads in green or red, as a signed change always does.
+// column. Direction alone does not establish a favorable/adverse verdict.
 const cell=(value)=>typeof value==='string'?value:value.text;
 assert.deepEqual(body[0].slice(3).map(cell),['76','1','+19']);
 assert.deepEqual(body[1].slice(3).map(cell),['12','2','+33']);
 assert.deepEqual(body[2].slice(3).map(cell),['12','3','\u22121.3']);
-assert.equal(body[2][5].tone,'negative');
+assert.equal(body[2][5].tone,undefined);
 // Four-figure counts read with a separator, and the total row closes the table.
 assert.equal(body[0][2],'10,200');
 const total=styled.rows.find(r=>!Array.isArray(r)&&r.style==='total');

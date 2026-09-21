@@ -190,9 +190,9 @@ assert.equal(marks.length,4);
 const widthA=marks.find(n=>n.data.category==='A').frame.width, widthB=marks.find(n=>n.data.category==='B').frame.width;
 assert.ok(Math.abs(widthA/widthB-1.5)<0.01,'A is 60 wide to B 40');
 assert.ok(m.some(n=>n.role==='data-label'&&n.text==='50%'));
-// Trend cells and signed changes infer from headers; the ring tone draws an arc.
+// Outlook headings infer trend cells; numeric change stays neutral without a verdict.
 const t=styleTable({type:'table',columns:['Sector','YoY change','Outlook'],rows:[['H','+20%','up'],['I','-65%','↓']]});
-assert.deepEqual(t.rows[0][1],{type:'text',text:'+20%',tone:'positive'});assert.deepEqual(t.rows[1][2],{type:'trend',value:'down'});
+assert.equal(t.rows[0][1],'+20%');assert.deepEqual(t.rows[1][2],{type:'trend',value:'down'});
 const table=registry.get('table');
 const tn=table.render({id:'t',frame:{x:0,y:0,width:600,height:200},props:{...t,density:'body'}}).nodes;
 assert.equal(tn.filter(n=>n.role==='table-trend').length,2);

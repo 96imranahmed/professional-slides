@@ -132,11 +132,27 @@ if __name__ == '__main__':
 
 
 class StatusTableTests(unittest.TestCase):
+    def test_observed_use_and_signed_changes_remain_neutral_without_a_verdict(self):
+        run_node('''
+import assert from 'node:assert/strict';
+import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const ex={type:'table',columns:['Agent','Used draft?','Cost change'],rows:[['Control','Yes','+20%'],['Offer','No','-15%']]};
+const styled=styleTable(ex);
+assert.deepEqual(styled.rows,ex.rows);
+const {deck}=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'neutral',slides:[{id:'s',title:'Actual use does not identify the assigned arm',layout:'exhibit-full',exhibit:ex}]}));
+assert.ok(!deck.slides[0].nodes.some(n=>n.role==='table-check'));
+const explicit=styleTable({columns:['Case','Verdict','Cost change'],rows:[['A',{type:'check',value:'no'},{type:'text',text:'+20%',tone:'negative'}]]});
+assert.equal(explicit.rows[0][1].type,'check');
+assert.equal(explicit.rows[0][2].tone,'negative');
+console.log('{}');
+''')
+
     def test_verdict_cells_recommended_column_and_total_rows_are_inferred(self):
         result = run_node('''
 import assert from 'node:assert/strict';
 import {styleTable, paginateTable} from './skills/professional-slides/runtime/compose.mjs';
-const t=styleTable({columns:['#','Workstream','Overall status','% complete','Signed'],rows:[['1','Alpha','At risk','40%','✓'],['2','Beta','On track','100%','no'],['Total','','','62%','']]});
+const t=styleTable({columns:['#','Workstream','Overall status','% complete','Signed'],rows:[['1','Alpha','At risk','40%','✓'],['2','Beta','On track','100%',{type:'check',value:'no'}],['Total','','','62%','']]});
 assert.equal(t.rows[0][0].sectionNumber,1);assert.equal(t.rows[0][0].surface,'plain');
 assert.deepEqual(t.rows[0][2],{type:'rag',value:'at-risk',text:'At risk'});
 assert.deepEqual(t.rows[0][3],{type:'progress',value:40});

@@ -310,12 +310,12 @@ const RAG_WORDS = [
 function verdictCell(value, header) {
   if (typeof value !== "string") return value;
   const text = value.trim();
-  if (/^(✓|✔|yes|y|true)$/i.test(text)) return { type: "check", value: "yes" };
-  if (/^(✗|✘|✕|x|no|n|false)$/i.test(text)) return { type: "check", value: "no" };
+  if (/^(✓|✔)$/.test(text)) return { type: "check", value: "yes" };
+  if (/^(✗|✘|✕)$/.test(text)) return { type: "check", value: "no" };
   for (const [re, state] of RAG_WORDS) if (re.test(text)) return { type: "rag", value: state, text: /^(green|amber|yellow|red|ok)$/i.test(text) ? undefined : text };
   if (/^\d{1,3}\s*%$/.test(text) && /(complete|progress|done|achiev)/i.test(String(header || ""))) return { type: "progress", value: Number(text.replace(/[^\d]/g, "")) };
-  // Signed changes under a change heading read in green or red.
-  if (/(change|delta|yoy|y\/y|growth|vs\.?|variance|difference)/i.test(String(header || "")) && /^[+\-−–]\s?\d/.test(text)) return { type: "text", text, tone: /^[+]/.test(text) ? "positive" : "negative" };
+  // Presence, use and numeric direction do not establish a favorable outcome.
+  // Authors opt into evaluative colour with typed cells or explicit text tones.
   // Outlook columns: arrows or the outlook words become trend rings.
   if (/(outlook|trend|momentum|direction)/i.test(String(header || "")) && /^(↑|↗|up|positive|strong|improving|→|flat|neutral|moderate|stable|↓|↘|down|negative|weak|declining)$/i.test(text)) return { type: "trend", value: /^(↑|↗|up|positive|strong|improving)$/i.test(text) ? "up" : /^(↓|↘|down|negative|weak|declining)$/i.test(text) ? "down" : "flat" };
   return value;
@@ -2278,10 +2278,10 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" },
       size: { width: { fr: 1 }, height: slide.points?.length ? 150 : "fill" } };
     const sideItems = [kpi];
-    if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle));
+    if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
     const hero = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" });
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
-      { id: `${id}-side`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, leftover: slide.points?.length ? "distribute" : "center", items: sideItems },
+      { id: `${id}-side`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, leftover: "center", items: sideItems },
       headedPanel(exhibits[0], hero, `${id}-exhibit`, false),
     ] });
   } else if (layout === "split-tone") {
@@ -2349,14 +2349,19 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // Peer charts with one unit share one value scale, or the comparison lies.
     const charts = exhibits.filter((ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.series));
     if (charts.length >= 2 && charts.every((ex) => ex.unit === charts[0].unit && ex.yMax === undefined)) {
-      // A stack reaches its total, not its tallest segment: scaling a pair of
-      // 100% stacks to their largest segment puts the plot below the data.
-      const reach = (ex) => (["chart.stacked-column", "chart.stacked-bar"].includes(ex.type)
-        ? Math.max(...(ex.categories || []).map((_, i) => ex.series.reduce((sum, se) => sum + (se.values[i] || 0), 0)))
-        : Math.max(...ex.series.flatMap((se) => se.values)));
-      const max = Math.max(...charts.map(reach));
-      const shared = niceCeiling(max);
-      for (const ex of charts) { ex.yMin = ex.yMin ?? 0; ex.yMax = shared; }
+      // Stacks extend separately above and below zero: netting signed
+      // segments or forcing zero as the minimum truncates real evidence.
+      const extent = ex => ["chart.stacked-column", "chart.stacked-bar"].includes(ex.type)
+        ? (ex.categories || []).flatMap((_, i) => [
+          ex.series.reduce((sum, se) => sum + Math.min(0, se.values[i] || 0), 0),
+          ex.series.reduce((sum, se) => sum + Math.max(0, se.values[i] || 0), 0),
+        ])
+        : ex.series.flatMap(se => se.values);
+      const values = charts.flatMap(extent);
+      const min = Math.min(0, ...values), max = Math.max(0, ...values);
+      const sharedMin = min < 0 ? -niceCeiling(-min) : 0;
+      const sharedMax = max > 0 ? niceCeiling(max) : min < 0 ? 0 : 1;
+      for (const ex of charts) { ex.yMin = ex.yMin ?? sharedMin; ex.yMax = sharedMax; }
     }
     // Equal numerical limits alone do not make equal bar lengths: different
     // category gutters and Office auto-layout change the pixels per unit.

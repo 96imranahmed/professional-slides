@@ -3,6 +3,28 @@ from node_probe import run_node
 
 
 class FinancialChartRuntimeTests(unittest.TestCase):
+    def test_paired_signed_charts_share_the_complete_numeric_domain(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {composeSlide,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const walk=item=>[item,...(item.items||[]).flatMap(walk)];
+for(const [type,series,min,max] of [
+ ['chart.bar',[[{name:'Residual',values:[8,-12]}],[{name:'Residual',values:[39,19]}]],-12,39],
+ ['chart.bar',[[{name:'Change',values:[-8,-12]}],[{name:'Change',values:[-39,-19]}]],-39,0],
+ ['chart.stacked-column',[[{name:'A',values:[30,-5]},{name:'B',values:[-20,-8]}],[{name:'A',values:[10,15]},{name:'B',values:[-3,-9]}]],-20,30]
+]) {
+ const slide={id:'s',title:'Cash remaining depends on both the goal and the offer',layout:'two-up',exhibits:series.map((ss,i)=>({type,heading:'Scenario '+String.fromCharCode(65+i),unit:'£k',categories:['One','Two'],series:ss,native:false,dataTable:false}))};
+ const plan=composeSlide(slide,0),charts=walk(plan).filter(i=>i.component===type);
+ assert.equal(charts.length,2);
+ assert.equal(charts[0].props.yMin,charts[1].props.yMin);
+ assert.equal(charts[0].props.yMax,charts[1].props.yMax);
+ assert.ok(charts[0].props.yMin<=min&&charts[0].props.yMax>=max);
+ assert.doesNotThrow(()=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'signed',slides:[slide]})));
+}
+console.log('{}');
+""")
+
     def test_declared_chart_units_cannot_disappear_when_heading_is_empty(self):
         result = run_node(r"""
 import assert from 'node:assert/strict';

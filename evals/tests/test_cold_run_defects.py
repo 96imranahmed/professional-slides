@@ -48,6 +48,25 @@ assert.ok(top(centred,b.props.items)>top(centred,a.props.items));
 console.log('{}');
 ''')
 
+    def test_hero_number_and_its_explanation_stay_together(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+for (const count of [1,2]) {
+ const {deck}=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'hero',slides:[{id:'s',title:'Rent parity is a boundary rather than a recommendation',layout:'hero-number',kpi:{value:'$7,858',label:'Monthly rent at cash parity'},pointsStyle:'prose',points:Array.from({length:count},(_,i)=>({lead:'Condition '+i,text:'Keep the verified package and the financial boundary together.'})),exhibit:{type:'table',columns:['Input','Amount'],rows:[['Net pay','$189k'],['Target','$62k'],['Other costs','$33k']]}}]}));
+ const nodes=deck.slides[0].nodes;
+ const metric=nodes.filter(n=>n.role?.startsWith('metric-')&&n.frame);
+ const prose=nodes.filter(n=>n.id.includes('s-points')&&n.text&&n.frame);
+ assert.ok(metric.length&&prose.length);
+ const metricEnd=Math.max(...metric.map(n=>n.frame.y+n.frame.height));
+ const proseStart=Math.min(...prose.map(n=>n.frame.y));
+ assert.ok(proseStart>=metricEnd&&proseStart-metricEnd<120,'explanation stays beside the metric rather than dropping to the slide foot');
+ assert.ok(Math.min(...metric.map(n=>n.frame.y))>180,'compact group is centered in its body track');
+}
+console.log('{}');
+""")
+
     def test_a_list_under_a_kpi_stays_under_it(self):
         # Pages 9 and 11: a kpi with the points reading from it, and the points
         # centred in what the kpi left over - which opened a gap between the

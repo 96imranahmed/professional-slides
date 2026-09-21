@@ -2114,7 +2114,7 @@ def gate_deck_structure(slides, analytical, findings):
             break
     sections = "section-divider" in components or tracked_sections
     tracker = bool(components & {"agenda", "tracker-page"}) or bool(roles & {
-        "tracker-label", "tracker-compact-label", "tracker-compact-marker-label",
+        "tracker-label", "tracker-pill-label", "tracker-compact-label", "tracker-compact-marker-label",
     })
     if sections and tracker:
         return

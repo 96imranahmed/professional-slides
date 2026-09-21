@@ -105,6 +105,14 @@ class SelectedSectionNavigationTests(unittest.TestCase):
     def test_selected_sections_do_not_require_extra_divider_pages(self):
         self.assertEqual(self.findings(self.slides()), [])
 
+    def test_pill_labels_supply_the_same_selected_navigation(self):
+        slides = self.slides()
+        for slide in slides:
+            slide["nodes"][0]["role"] = "tracker-pill-label"
+        self.assertEqual(self.findings(slides), [])
+        slides[3]["nodes"][0]["data"]["selected"] = False
+        self.assertTrue(self.findings(slides))
+
     def test_missing_selected_page_still_fails(self):
         slides = self.slides()
         slides[3]["nodes"] = []
