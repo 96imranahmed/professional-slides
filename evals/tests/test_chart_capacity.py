@@ -3,6 +3,25 @@ from node_probe import run_node
 
 
 class ChartCapacityTests(unittest.TestCase):
+
+    def test_external_stack_labels_and_leaders_remain_one_editable_render(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
+const frame={x:0,y:0,width:800,height:400};
+const props={categories:['London','New York'],series:[{name:'Housing',values:[2750,3462]},{name:'Transport',values:[220,123]},{name:'Other',values:[1975,1977]}],dataLabels:true};
+const nodes=REGISTRY.get('chart.stacked-column').render({id:'stack',frame,props}).nodes;
+const external=nodes.filter(n=>n.role==='data-label'&&n.data?.external);
+assert.ok(external.length>0);
+assert.equal(nodes.filter(n=>n.role==='data-label-leader').length,external.length);
+assert.equal(nativeChartSpec('chart.stacked-column',props,frame,nodes),null);
+const simple={categories:['A','B'],series:[{name:'First',values:[50,50]},{name:'Second',values:[50,50]}],dataLabels:true};
+const plain=REGISTRY.get('chart.stacked-column').render({id:'plain',frame,props:simple}).nodes;
+assert.ok(nativeChartSpec('chart.stacked-column',simple,frame,plain));
+console.log('{}');
+""")
+
     def test_outside_reference_labels_reserve_gutter_and_unsupported_charts_reject(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';

@@ -772,6 +772,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // measured; PowerPoint draws its own category axis wherever it likes, so a
   // chart that carries category notes is assembled as shapes.
   if (props.native === false || type === "scatter" || type === "range") return null;
+  // External stack labels and their leaders use measured scene coordinates;
+  // Office repositioning the labels would detach those leaders from the text.
+  if (renderedNodes?.some(node => node.role === "data-label" && node.data?.external)) return null;
   if (Array.isArray(props.categoryNotes) && props.categoryNotes.some((note) => typeof note === "string" && note.trim())) return null;
   // The same reason, for a different chart: PowerPoint hangs the category axis
   // of a horizontal bar chart off the zero line. With a negative value the zero
