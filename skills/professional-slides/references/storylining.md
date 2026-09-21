@@ -22,6 +22,8 @@ Before accepting the dot-dash, compare adjacent pages' evidence and decision con
 
 For an operating proposal, define the approval unit: workflow, population, exposure, configuration and permission requested. Preparation, an offline test, live exposure and expansion are different decisions. Carry the same unit through the summary, protocol, readiness record and close. Replace a page that merely asks for a protocol with a worked proposed record and its explicit missing inputs; do not portray assumed test results as completed readiness evidence. Synthetic source records must include numerical examples and decision rehearsals as well as narrative fixtures, and their local paths must resolve from the delivered sidecar.
 
+For an investment decision, separate economic value, incremental cash and internal resource use before calculating returns or funding. Released capacity and reduced backlog can have opportunity value without reducing a budget payment; staff training consumes time without necessarily adding payroll. Recognize cash savings only against an explicit avoided expenditure, timing and owner. Reconcile the value-to-cash bridge through the summary, annual flows, NPV and funding close. A pilot recommendation names its proposed cohort, duration, cash cap, internal hours and staged release conditions; missing quotes or statistical inputs stay explicit within that proposal.
+
 For each reused measure, keep one source record: exact members, exclusions, period,
 units, observed inputs, calculation and rounding. Sum the members before drafting
 an aggregate. Derive means, shares, rates and durations from that record; retain

@@ -710,6 +710,14 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     ];
   });
   const bounds = numericBounds(stacked ? stackExtents : values, { min: horizontal ? (props.xMin ?? props.yMin) : props.yMin, max: horizontal ? (props.xMax ?? props.yMax) : props.yMax, axis: horizontal ? "x" : "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  // Reserve measured clearance below negative columns with direct labels.
+  // Only automatic unlabelled domains expand; explicit bounds stay authoritative.
+  if (!horizontal && !stacked && showDataLabels && !showValueAxis && props.gridlines !== true && props.yMin === undefined && values.some(value => value < 0)) {
+    const minimum = Math.min(...values);
+    const clearance = Math.max(24, ...values.filter(value => value < 0).map(value => measureDataLabel(formatValue(value, props), 1000).height)) + 6;
+    bounds.min = Math.min(bounds.min, (minimum * plot.height - clearance * bounds.max) / (plot.height - clearance));
+    bounds.span = bounds.max - bounds.min;
+  }
   const twoMarkContrast = !stacked && !barHighlight && props.colorIndices === undefined && categories.length * series.length === 2;
   const twoSeriesContrast = !stacked && !barHighlight && props.colorIndices === undefined && series.length === 2;
   const colorIndexFor = (seriesIndex, categoryIndex) => {
@@ -834,12 +842,14 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
             : value >= 0
               ? { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }
               : { x: bar.x - 10, y: Math.min(plot.y + plot.height - 24, bar.y + bar.height + 2), width: bar.width + 20, height: 24 };
+        // A fixed minimum may force an in-bar label; contrast against its fill.
+        const labelOnFill = stacked || (!horizontal && value < 0 && labelFrame.y < bar.y + bar.height);
         nodes.push(textPrimitive({
           id: stableId(id, "value-label", item.name, category),
           role: "data-label",
           frame: labelFrame,
           text: labelText,
-          style: textStyle(CHART_LABEL, stacked && contrastRatio(tokens[markColor.tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[markColor.tokenId].value, tokens["color.ink"].value) ? token("color.onPrimary") : INK, labelBold(), horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
+          style: textStyle(CHART_LABEL, labelOnFill && contrastRatio(tokens[markColor.tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[markColor.tokenId].value, tokens["color.ink"].value) ? token("color.onPrimary") : INK, labelBold(), horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
           data: { category, series: item.name }
         }));
       }

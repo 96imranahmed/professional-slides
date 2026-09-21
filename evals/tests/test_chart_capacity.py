@@ -7,13 +7,22 @@ class ChartCapacityTests(unittest.TestCase):
     def test_signed_columns_preserve_the_scene_instead_of_native_sign_drift(self):
         run_node(r"""
 import assert from 'node:assert/strict';
-import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
+import {nativeChartSpec,TOKENS} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const frame={x:60,y:120,width:1160,height:450};
 const props={categories:['First goal','Second goal'],series:[{name:'London',values:[7.8,-12.2]},{name:'New York',values:[38.8,18.8]}],dataLabels:true,valueFormat:{decimals:1},annotations:[],highlights:[],referenceLines:[]};
 const nodes=REGISTRY.get('chart.column').render({id:'signed',frame,props}).nodes;
 assert.equal(nativeChartSpec('chart.column',props,frame,nodes),null);
 assert.ok(nodes.some(n=>n.role==='data-label'&&n.text==='-12.2'));
+const label=nodes.find(n=>n.role==='data-label'&&n.text==='-12.2');
+const mark=nodes.find(n=>n.role==='chart-mark'&&n.data.series==='London'&&n.data.category==='Second goal');
+assert.ok(label.frame.y>=mark.frame.y+mark.frame.height+1,'automatic bounds reserve space beyond the negative bar');
+const fixed=REGISTRY.get('chart.column').render({id:'fixed',frame,props:{...props,yMin:-12.2,yMax:40}}).nodes;
+const fixedLabel=fixed.find(n=>n.role==='data-label'&&n.text==='-12.2');
+const {contrastRatio}=await import('./skills/professional-slides/runtime/palettes.mjs');
+const fixedMark=fixed.find(n=>n.role==='chart-mark'&&n.data.series==='London'&&n.data.category==='Second goal');
+assert.ok(contrastRatio(TOKENS[fixedLabel.style.color.tokenId].value,TOKENS[fixedMark.style.fill.tokenId].value)>=4.5,'a fixed domain keeps an in-bar label legible');
+
 const positive={...props,series:props.series.map(s=>({...s,values:s.values.map(Math.abs)}))};
 assert.equal(nativeChartSpec('chart.column',positive,frame).type,'column');
 console.log('{}');
