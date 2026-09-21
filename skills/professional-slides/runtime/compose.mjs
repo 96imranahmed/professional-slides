@@ -2328,10 +2328,9 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     const tables = exhibits.filter((ex) => ex.type === "table");
     if (tables.length >= 2) {
       if (tables.some(heavyTable)) for (const ex of tables) ex.density = ex.density || "compact";
-      // An explicit two-up keeps both tables on the page, so they share one
-      // design: when their inferred treatments differ, both fall back to the
-      // open listing rather than mixing a filled tracker with plain rules.
-      if (new Set(tables.map(tableSignature)).size > 1) for (const ex of tables) { ex.variant = "plain"; ex.treatment = "open"; }
+      // An authored pair shares typography, not necessarily semantic roles.
+      // Preserve each table's treatment: a category axis beside a record list
+      // must retain its meaning in the saved page.
     }
     // Captions in a row are measured together and given one height, so the
     // panels above them keep one baseline.

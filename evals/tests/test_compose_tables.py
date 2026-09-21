@@ -5,6 +5,28 @@ from node_probe import run_node
 
 
 class ComposeTableTests(unittest.TestCase):
+    def test_explicit_peer_tables_keep_their_semantic_treatments(self):
+        run_node('''
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const records={type:'table',columns:['Record','Content'],rows:[['Q01','Customer request'],['Q02','Source excerpt']]};
+const categories={type:'table',treatment:'categories',columns:[{label:'Evidence class',type:'category'},'Condition'],rows:[['Access','Scoped fields'],['Commitment','No invented approval']]};
+for(const layout of ['two-up','two-up-contrast']) for(const reverse of [false,true]) {
+ const exhibits=structuredClone(reverse?[categories,records]:[records,categories]);
+ const spec={schema:'professional-slides.deck/v3',id:'peer',tracker:false,slides:[{id:'s',title:'Records and evidence classes have different roles',layout,exhibits}]};
+ const result=planDeck(toDeckPlan(spec));
+ const nodes=result.deck.slides[0].nodes;
+ const categoryFills=nodes.filter(n=>n.role==='table-cell'&&n.data?.cellType==='category');
+ assert.equal(categoryFills.length,2,'every authored category cell keeps its fill');
+ assert.ok(categoryFills.every(n=>n.style.fill),'category cells remain visible surfaces');
+ assert.ok(categoryFills.every(n=>reverse?n.frame.x<640:n.frame.x>640),'treatment follows the table when the pair is reversed');
+ const recordFills=nodes.filter(n=>n.role==='table-cell'&&n.data?.column===0&&n.data?.cellType==='text');
+ assert.equal(recordFills.length,0,'record identifiers do not inherit category fills');
+}
+console.log('{}');
+''')
+
     def test_clock_times_and_decimal_labels_are_not_sequence_numbers(self):
         run_node('''
 import assert from 'node:assert/strict';
