@@ -5,6 +5,24 @@ from node_probe import run_node
 
 
 class ComposeTableTests(unittest.TestCase):
+    def test_clock_times_and_decimal_labels_are_not_sequence_numbers(self):
+        run_node('''
+import assert from 'node:assert/strict';
+import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+for (const labels of [['09:05 · Probe','09:12 · Replay'],['1.1 Component','1.2 Component']]) {
+ const table={columns:['Probe','Evidence'],rows:labels.map(label=>[label,'Version record'])};
+ const styled=styleTable(table);
+ assert.equal(styled.treatment,'open');
+ assert.deepEqual(styled.rows.map(row=>row[0]),labels);
+ assert.doesNotThrow(()=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'test',slides:[{id:'s',title:'Propagation needs an answer probe',layout:'exhibit-full',exhibit:{type:'table',...table}}]})));
+}
+const stages=styleTable({columns:['Probe','Evidence'],rows:[['1: Inspect','Record'],['2: Replay','Result']]});
+assert.equal(stages.treatment,'categories');
+assert.equal(stages.rows[1][0].sectionNumber,2);
+console.log('{}');
+''')
+
     def test_automatic_treatments_preserve_styled_rows_and_totals(self):
         run_node('''
 import assert from 'node:assert/strict';

@@ -827,6 +827,13 @@ function validateCategoryLabels(ex) {
   });
 }
 
+function numberedRowLabel(value) {
+  const text = String(value?.text ?? value ?? "");
+  // Clock times and decimal identifiers are data, not ordinal row prefixes.
+  if (/^\s*\d+[:.]\d/.test(text)) return null;
+  return text.match(/^\s*(\d+)\s*[·.)\-–:]\s*(.*\S)\s*$/);
+}
+
 const tableCells = row => Array.isArray(row) ? row : row.cells;
 const mapTableCells = (row, transform) => Array.isArray(row) ? transform(row) : { ...row, cells: transform(row.cells) };
 
@@ -876,7 +883,7 @@ export function styleTable(ex) {
   const explicit = ex.treatment || ex.variant;
   if (explicit) return { variant: ex.variant || (ex.treatment && ex.treatment !== "open" ? "standard" : "plain"), treatment: ex.treatment || "open", columns, rows: rowsIn, ...extra };
   const first = rowsIn.map((r) => String(tableCells(r)[0]?.text ?? tableCells(r)[0] ?? ""));
-  const numbered = first.length > 1 && first.every((v) => /^\s*\d+\s*[·.)\-–:]\s*\S/.test(v));
+  const numbered = first.length > 1 && first.every(v => numberedRowLabel(v));
   const head0 = String(columns[0].label || "").toLowerCase();
   const headLast = String(columns[columns.length - 1].label || "").toLowerCase();
   const sequence = numbered || /^(stage|step|phase|wave|horizon|priority|milestone)s?\b/.test(head0);
@@ -885,7 +892,7 @@ export function styleTable(ex) {
   if (sequence) {
     const cols = [{ ...columns[0], type: "category" }, ...columns.slice(1)];
     const rows = rowsIn.map((row, i) => row.style === "total" ? row : mapTableCells(row, r => {
-      const m = String(r[0]?.text ?? r[0]).match(/^\s*(\d+)\s*[·.)\-–:]\s*(.*)$/);
+      const m = numberedRowLabel(r[0]);
       const cell = { type: "category", text: m ? m[2] : String(r[0]?.text ?? r[0]), sectionNumber: m ? Number(m[1]) : i + 1 };
       return [cell, ...r.slice(1)];
     }));
