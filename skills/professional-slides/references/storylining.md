@@ -100,7 +100,7 @@ Summarize the resulting brief above the dot-dash: audience, intended outcome, de
 
 ## Organize the evidence
 
-For every material fact retain: source location, population or business boundary, measure, unit, period, reported precision, and evidence state - observed, source-modeled, supplied assumption, or analyst-derived. For a calculation retain its inputs and formula. For a qualitative fact retain the mechanism, condition or named example.
+For every material fact retain: source location, population or business boundary, measure, unit, period, reported precision, and evidence state - observed, source-modeled, supplied assumption, or analyst-derived. For a calculation retain its inputs and formula. If calculation code accompanies delivery, bundle its required inputs and verify it runs from the delivered folder without earlier iteration paths; compare the regenerated results with the plotted values. For a qualitative fact retain the mechanism, condition or named example.
 
 Record research requirements explicitly: criterion, status (`resolved`, `uncertain`, `unavailable`, `needs-user`, `unperformed`), the evidence that closes it, and the remaining limit. Distinguish information that was unavailable after a genuine lookup from research not yet undertaken; an honest "not yet investigated" answers a different question from the one the brief asked.
 
