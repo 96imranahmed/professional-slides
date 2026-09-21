@@ -2057,7 +2057,8 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   // size: a three-step staircase wants about 230px whatever the page offers it,
   // and handed the whole body it spreads into small islands with a hundred
   // pixels of nothing between them. They hug and centre, like the icon cards.
-  const centredFigure = (ex) => ["steps", "cycle", "chevron-process"].includes(ex?.type);
+  const centredFigure = (ex) => ["steps", "cycle", "chevron-process"].includes(ex?.type)
+    || (ex?.type === "roadmap" && ["phase-workstreams", "wave-columns"].includes(ex.variant));
   // `metrics-over-exhibit` is `exhibit-full` with the measures above it: the
   // exhibit still takes the whole width and the height the strip leaves.
   const fullWidth = layout === "exhibit-full" || layout === "metrics-over-exhibit";

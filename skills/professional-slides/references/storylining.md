@@ -20,6 +20,8 @@ For a requested page count, budget the entire delivered deck, including cover, s
 
 Before accepting the dot-dash, compare adjacent pages' evidence and decision consequences. Combine elementary transformations of one model into a sensitivity matrix or joined comparison unless each changes a distinct decision. Use the released space for unresolved commercial or operating questions, worked cases and source-backed mechanisms. Develop a proposed mechanism against a named current alternative: show what changes, how outcomes would be measured and which result would reject it. A structurally valid plan with unique titles can still be repetitive; do not approve it on counts and source keys alone.
 
+For an operating proposal, define the approval unit: workflow, population, exposure, configuration and permission requested. Preparation, an offline test, live exposure and expansion are different decisions. Carry the same unit through the summary, protocol, readiness record and close. Replace a page that merely asks for a protocol with a worked proposed record and its explicit missing inputs; do not portray assumed test results as completed readiness evidence. Synthetic source records must include numerical examples and decision rehearsals as well as narrative fixtures, and their local paths must resolve from the delivered sidecar.
+
 For each reused measure, keep one source record: exact members, exclusions, period,
 units, observed inputs, calculation and rounding. Sum the members before drafting
 an aggregate. Derive means, shares, rates and durations from that record; retain

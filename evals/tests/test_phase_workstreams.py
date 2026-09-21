@@ -3,6 +3,23 @@ from node_probe import run_node
 
 
 class PhaseWorkstreamsTests(unittest.TestCase):
+    def test_standalone_phase_roadmap_centres_its_measured_content(self):
+        run_node("""
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const exhibit={type:'roadmap',variant:'phase-workstreams',phases:['Prepare','Verify'].map((label,i)=>({
+ id:`p${i}`,label,workstreams:[{id:`w${i}`,label:'Accountable owner',activities:[{id:`a${i}`,text:'Inspect the named evidence before authorizing the next action.'}]}],
+ products:[{id:`e${i}`,workstreamId:`w${i}`,label:'Signed decision record'}]}))};
+const page=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'t',tracker:false,slides:[{id:'s',title:'The next action waits for its evidence',exhibit,layout:'exhibit-full'}]})).deck.slides[0];
+const nodes=page.nodes.filter(n=>n.role?.startsWith('roadmap-'));
+const top=Math.min(...nodes.map(n=>n.frame.y)),bottom=Math.max(...nodes.map(n=>n.frame.y+n.frame.height));
+assert.ok(top>230,'a compact roadmap should not be pinned beneath the action title');
+assert.ok(bottom<600,'content remains inside the slide body');
+assert.equal(nodes.filter(n=>n.role==='roadmap-activity').length,2);
+console.log('{}');
+""")
+
     def test_nested_relationships_and_shared_bands_survive_compile(self):
         result = run_node("""
 import assert from 'node:assert/strict';
