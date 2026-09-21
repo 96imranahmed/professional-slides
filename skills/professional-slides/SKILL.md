@@ -22,7 +22,7 @@ Read [Storylining](references/storylining.md) for the content/design sidecars an
 1. State the governing answer and what the audience should understand or decide.
 2. Write the exact title of every page. Read the sequence alone and remove pages that add neither proof nor a useful decision.
 3. Record each page's evidence, basis, consequence and explicit focus or none. Use numbers when the question is quantitative and named, scoped examples when it is qualitative.
-4. Choose the exhibit and architecture from that relationship. The opening executive summary is a semantic role; it may consist entirely of developed bullet rows, without metrics.
+4. Choose the exhibit and architecture from that relationship. The opening executive summary is a semantic role; it may consist entirely of developed bullet rows, without metrics. Choose its useful visual cues at the same time: category cells for a taxonomy, recognisable icons for parallel concepts, and a bottom insight for the decision consequence.
 5. Keep stable IDs across `<id>.content.json`, `<id>.plan.json` and `<id>.deck.json`. Reconcile titles, ordering, sources and calculations before building.
 
 ## Design from meaning

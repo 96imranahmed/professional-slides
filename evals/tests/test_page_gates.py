@@ -48,17 +48,20 @@ def slides_with(report, code):
 WEIGHT_OFF = {"pageWords": 0, "columnFill": 0, "plotSpan": 0, "pointWords": 0, "tableFill": 0, "elements": 1}
 
 
-class ExecutiveSummaryEvidenceTests(unittest.TestCase):
-    def test_summary_rows_need_no_metrics_but_other_roles_keep_evidence_contract(self):
-        page_gates.configure("full")
-        self.addCleanup(page_gates.configure, "balanced")
-        summary = {"role": "executive-summary", "componentInstances": [
-            {"id": "findings", "component": "points"}]}
-        findings = []
-        page_gates.gate_thin_evidence(2, summary, findings)
-        self.assertEqual(findings, [])
-        page_gates.gate_thin_evidence(3, {**summary, "role": "analysis"}, findings)
-        self.assertEqual([f["code"] for f in findings], ["THIN_EVIDENCE"])
+class EvidenceMultiplicityTests(unittest.TestCase):
+    def test_summary_and_single_exhibit_counts_do_not_waive_missing_argument(self):
+        from test_deck_shape import page, deck
+        gates = {"THIN_EVIDENCE", "MISSING_ARGUMENT"}
+        summary = {**page(1, ['points']), 'role': 'executive-summary'}
+        bridge = page(2, ['chart.waterfall'])
+        report = page_gates.run_gates(deck([summary, bridge], fill='full'), gates=gates)
+        self.assertTrue(report['accepted'])
+        self.assertEqual([f['measured'] for f in report['findings']], [0, 1])
+        self.assertTrue(all(f['severity'] == 'advisory' for f in report['findings']))
+        empty_comparison = page(3, ['image-frame', 'image-frame'], photos=2, texts=['London', 'New York'])
+        report = page_gates.run_gates(deck([empty_comparison], fill='full'), gates=gates)
+        self.assertFalse(report['accepted'])
+        self.assertTrue(any(f['code'] == 'MISSING_ARGUMENT' and f['severity'] == 'blocker' for f in report['findings']))
 
 
 def good_slide():

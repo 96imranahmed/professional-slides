@@ -74,9 +74,8 @@ assert.ok(of('chart.bar',[6.2,5.1,0.4]),'an all-positive bar chart stays native'
 // One negative, and the axis moves under the labels.
 assert.equal(of('chart.bar',[-6.2,-5.1,0.4]),null,'a negative bar chart is drawn');
 assert.equal(of('chart.stacked-bar',[-1,2,3]),null,'a negative stacked bar is drawn');
-// A column chart is unaffected: its category axis is horizontal, and a
-// negative column moves the labels off the bar rather than onto it.
-assert.ok(of('chart.column',[-6.2,5.1,0.4]),'a negative column chart stays native');
+// Native column renders can lose the negative direction as well as the sign.
+assert.equal(of('chart.column',[-6.2,5.1,0.4]),null,'a negative column preserves its signed scene');
 // `values` instead of `series` is the same chart written another way.
 assert.equal(nativeChartSpec('chart.bar',{categories:cats,values:[-1,2,3]},frame),null);
 console.log(JSON.stringify({ok:true}));

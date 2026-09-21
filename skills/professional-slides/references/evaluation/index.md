@@ -37,7 +37,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Marks in the exhibit | `PLOT_SPAN` | marks span `weight.plotSpan` of the exhibit frame (annotated and peer-aligned charts exempt) |
 | Table against its budget | `THIN_TABLE` | uses `weight.tableFill` of the page's row budget |
 | Values printed | `NUMBERS_ON_MARKS` | every mark while a chart has twelve or fewer, three otherwise |
-| Evidence elements | `THIN_EVIDENCE` | `weight.elements` (2 on a document-weight evidence page; an executive summary may use only developed bullet rows) |
+| Exhibit multiplicity | `THIN_EVIDENCE` | `weight.elements` (2 on a document-weight page) is a review diagnostic, not a proof quota; a single exhibit or developed bullet synthesis can carry the complete argument |
 | Heading fit | `HEADING_WRAPS` | a heading that wraps where the frame could hold it on one line |
 | Axis ticks | `NICE_TICKS` | nice numbers |
 | Page did not render | `MISSING_RENDER` | every page the gates are asked to measure has a render |

@@ -776,12 +776,11 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // Office repositioning the labels would detach those leaders from the text.
   if (renderedNodes?.some(node => node.role === "data-label" && node.data?.external)) return null;
   if (Array.isArray(props.categoryNotes) && props.categoryNotes.some((note) => typeof note === "string" && note.trim())) return null;
-  // The same reason, for a different chart: PowerPoint hangs the category axis
-  // of a horizontal bar chart off the zero line. With a negative value the zero
-  // line moves right and every label for a negative bar lands on top of the bar
-  // it names - the runtime measured a gutter for them at the left, and the
-  // native chart ignores it. Drawn, the labels stay in that gutter.
-  if ((type === "bar" || type === "stacked-bar") && seriesValues(props).some((value) => value < 0)) return null;
+  // Signed bars need the measured zero baseline and label gutters. Native
+  // horizontal axes can move category labels into the bars; native columns
+  // also lose negative signs/direction in the LibreOffice render. Preserve
+  // the signed comparison as editable shapes in either orientation.
+  if (["bar", "stacked-bar", "column", "stacked-column"].includes(type) && seriesValues(props).some((value) => value < 0)) return null;
   // Keep named scatter points and rich value labels editable as scene shapes
   // until the native exporter can preserve their complete semantics.
   if (props.valueFormat && (typeof props.valueFormat !== "object" ||

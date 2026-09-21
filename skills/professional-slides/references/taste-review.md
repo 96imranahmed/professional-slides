@@ -33,6 +33,8 @@ list.
 
 Check the factual premise and evidence state against dated sources and disclosed assumptions: distinguish an announced transaction from a completed one, platform usage from paid customers, and a modeled hurdle from a forecast. Apply the evidence reconciliation contract in [Storylining](storylining.md#reconcile-evidence-before-design).
 
+Treat exhibit-count diagnostics as prompts to inspect the argument: identify the exact missing premise, not a missing second component. A complete bridge, comparison or developed synthesis needs no extra exhibit to prove its substance.
+
 Then look at the pages. Reconcile every promised criterion with a page that actually develops it; listing a dimension in a scorecard is not coverage. Read appendix conclusions as claims too: an exhibit about one population cannot substantiate a claim about an unshown comparator. Reconcile reused totals, sample membership, denominators and durations before rating. Read the full argument again after a global correction: stale versions often survive in a chart comment, a summary or the close. A judgement label cannot excuse an unbounded claim. For each spread ask:
 
 1. **Where does the eye land first, and is that the finding?** If the first
@@ -55,7 +57,7 @@ Then look at the pages. Reconcile every promised criterion with a page that actu
 7. **Does the deck ever measure anything?** Count the pages carrying a plot. If
    a comparison is argued for fifty pages and charted on one, say so plainly.
 
-Before scoring, audit heading ownership on every page: does the subtitle merely paraphrase the chart heading? If so, remove it and preserve unique scope once. Tables and non-chart exhibits need no extra exhibit heading. Check that filled category cells distinguish category labels instead of repeating a membership attribute. Where the verdict explicitly means good/bad, confine status colour to short text labels or check/cross icons. Reject automatic red/green status mapping on chart marks, series swatches or backgrounds; ordinary house-palette colours remain valid. These are semantic checks even when lexical-overlap gates pass.
+Before scoring, audit heading ownership on every page: does the subtitle merely paraphrase the chart heading? If so, remove it and preserve unique scope once. Tables and non-chart exhibits need no extra exhibit heading. Check both omission and misuse of visual cues: an unstyled column of distinct event types or error classes should use category cells; repeated membership attributes and record IDs stay plain. For parallel concepts, consider whether recognisable icons improve scanning. Where a page develops evidence but leaves its decision consequence buried, use a concise insight box in the available closing band. Inspect these choices across the sequence without treating cosmetic changes as new architectures. Where the verdict explicitly means good/bad, confine status colour to short text labels or check/cross icons. Reject automatic red/green status mapping on chart marks, series swatches or backgrounds; ordinary house-palette colours remain valid. These are semantic checks even when lexical-overlap gates pass.
 
 Test the comparison against the reader's decision, not just its labels: initial commitment and full optional commitment must be comparable on both sides. Check whether a small aggregate needs named contributors on the page. A column labelled implication or decision must change the reader's choice or delimit an inference; a metric definition under that heading is still redundant.
 

@@ -423,7 +423,7 @@ GATE_CODES = {
     "POINT_DEPTH": "points that are labels rather than findings",
     "PLOT_SPAN": "marks spanning too little of the exhibit frame",
     "THIN_TABLE": "a table using too little of the page's row budget",
-    "THIN_EVIDENCE": "fewer evidence elements than the deck said it would carry",
+    "THIN_EVIDENCE": "fewer exhibit instances than the density reference",
     "NUMBERS_ON_MARKS": "marks carrying no printed value",
     "UNANNOTATED": "a plot with no bracket, flag, change bubble or base",
     "NICE_TICKS": "an axis on numbers a reader would not choose",
@@ -453,6 +453,7 @@ ADVISORY_CODES = {
     "INK_COVERAGE", "THIN_PAGE", "DECK_FLAT", "DECK_CRAFT", "EVIDENCE_MIX", "PAGE_VARIETY",
     "DEAD_BAND", "INTERNAL_VOID", "UNANNOTATED", "LAYOUT_MONOTONY",
     "COLUMN_MONOTONY", "TABLE_SCHEMA_FLAT", "IMAGE_BUDGET", "IMAGE_RUN",
+    "THIN_EVIDENCE",
 }
 
 # Findings raised before the page is rendered: the composer's plan-time budget
@@ -1450,15 +1451,11 @@ def gate_heading_wraps(slide_no, slide, findings):
 
 
 def gate_thin_evidence(slide_no, slide, findings):
-    """THIN_EVIDENCE. A deck that reads as a document (a pre-read, an appendix,
-    anything the weight contract sets to two elements) puts more than one piece
-    of evidence on a page: the chart and the table behind it, the chart and the
-    measured tiles, the two cuts of the same measure."""
-    # A summary synthesizes the proof on later pages. Its semantic role permits
-    # developed bullet rows without charts or metrics; NO_SUMMARY and the
-    # argument review still evaluate its presence and substance.
-    if slide.get("role") == "executive-summary":
-        return
+    """Report exhibit multiplicity for semantic review, not as a proof quota.
+
+    One bridge can reconcile six quantities; one table can develop several
+    premises. Conversely, two empty comparisons do not establish an argument.
+    """
     wanted = int(WEIGHT.get("elements") or 1)
     if wanted < 2:
         return
@@ -1471,10 +1468,10 @@ def gate_thin_evidence(slide_no, slide, findings):
         return
     findings.append(finding(
         slide_no, "THIN_EVIDENCE", elements, wanted,
-        "One exhibit on a page of a document-weight deck. Add the second piece "
-        "the argument already implies - the table behind the chart, the same "
-        "measure on another cut, a strip of measured tiles - or merge this page "
-        "with its neighbour.",
+        "Review whether the title's promised evidence is developed on this page. "
+        "Name any missing premise and repair its existing exhibit or content. "
+        "A complete standalone exhibit or developed synthesis needs no extra "
+        "component solely to meet this count.",
     ))
 
 
