@@ -139,6 +139,12 @@ class SelectedSectionNavigationTests(unittest.TestCase):
     def test_selected_sections_do_not_require_extra_divider_pages(self):
         self.assertEqual(self.findings(self.slides()), [])
 
+    def test_opening_summary_does_not_select_a_body_section(self):
+        slides = [{"role": "executive-summary", "nodes": []}] + self.slides()
+        self.assertEqual(self.findings(slides), [])
+        slides[4]["nodes"] = []
+        self.assertTrue(self.findings(slides))
+
     def test_pill_labels_supply_the_same_selected_navigation(self):
         slides = self.slides()
         for slide in slides:

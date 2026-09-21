@@ -30,9 +30,11 @@ export function numberMarker({ id, role = "marker", labelRole = `${role}-label`,
 /**
  * A line icon inside a circle. `tone`: "outline" (primary ring, primary strokes),
  * "filled" (primary disc, white strokes) or "plain" (no ring). Unknown icon
- * names draw the initial letter so a page never loses its marker.
+ * names fail rather than silently changing an icon into a letter.
  */
 export function iconMarker({ id, role = "icon", x, y, size, icon, tone = "outline", data = {} }) {
+  const definition = iconDefinition(icon);
+  if (!definition) throw new Error(`Unknown icon: ${String(icon)}; choose a name from runtime/icons.mjs ICON_NAMES.`);
   const nodes = [];
   // outline: ring + primary glyph; filled: primary disc + white glyph; plain:
   // primary glyph alone; inverse: white glyph alone (on a filled field);
@@ -46,16 +48,9 @@ export function iconMarker({ id, role = "icon", x, y, size, icon, tone = "outlin
     : tone === "muted" ? token("color.textSecondary") : PRIMARY;
   const ringStroke = tone === "muted" ? token("color.rule") : PRIMARY;
   if (ring) nodes.push(ellipsePrimitive({ id: stableId(id, "ring"), role: `${role}-ring`, frame: { x, y, width: size, height: size }, style: { fill: tone === "filled" ? PRIMARY : SURFACE, stroke: ringStroke, lineWidth: token("line.standard"), radius: token("radius.round") }, data: { ...data, icon, tone } }));
-  const definition = iconDefinition(icon);
   const inset = ring ? size * 0.24 : size * 0.06;
   const box = { x: x + inset, y: y + inset, width: size - 2 * inset, height: size - 2 * inset };
-  if (definition) {
-    nodes.push(shapePrimitive({ id: stableId(id, "glyph"), role: `${role}-glyph`, geometry: "iconPath", frame: box, style: { fill: "none", stroke: strokeColor, lineWidth: token("line.standard"), lineCap: "round" }, data: { ...data, icon, paths: definition.paths } }));
-  } else {
-    const letter = String(icon || "•").trim().charAt(0).toUpperCase() || "•";
-    const label = measureText(letter, size, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(token("type.compact")), bold: true, wrapWidthRatio: 1 });
-    nodes.push(textPrimitive({ id: stableId(id, "glyph"), role: `${role}-glyph`, frame: { x, y: y + (size - label.height) / 2, width: size, height: label.height }, text: letter, style: { fontFamily: token("font.body"), fontSize: token("type.compact"), color: strokeColor, bold: true, align: "center", valign: "top", wrap: false, lineHeight: label.lineHeight }, data: { ...data, icon, fallback: true, textLayout: label } }));
-  }
+  nodes.push(shapePrimitive({ id: stableId(id, "glyph"), role: `${role}-glyph`, geometry: "iconPath", frame: box, style: { fill: "none", stroke: strokeColor, lineWidth: token("line.standard"), lineCap: "round" }, data: { ...data, icon, paths: definition.paths } }));
   return nodes;
 }
 

@@ -16,6 +16,19 @@ from node_probe import NODE, REFERENCES, ROOT, RUNTIME, SKILL, read, run_node
 
 
 class ComponentStructureTests(unittest.TestCase):
+    def test_icon_markers_render_vectors_and_reject_unknown_names(self):
+        result = run_node("""
+import { iconMarker } from './skills/professional-slides/runtime/marks.mjs';
+const props = {id:'icon',x:0,y:0,size:32,icon:'people'};
+const glyph=iconMarker(props).find(n=>n.role==='icon-glyph');
+let error=null;
+try { iconMarker({...props,icon:'made-up-icon'}); } catch(e) { error=e.message; }
+console.log(JSON.stringify({geometry:glyph.data.geometry,paths:glyph.data.paths.length,error}));
+""")
+        self.assertEqual(result['geometry'], 'iconPath')
+        self.assertGreater(result['paths'], 0)
+        self.assertIn('Unknown icon: made-up-icon', result['error'])
+
     def test_process_headings_are_authored_and_absent_headings_release_space(self):
         result = run_node("""
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';

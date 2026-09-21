@@ -2095,6 +2095,10 @@ def gate_deck_structure(slides, analytical, findings):
     # pages rejects a valid fixed-length deck with a contents page and tracker.
     selected_by_page = []
     for index in analytical:
+        # The executive summary precedes the section argument and has no
+        # selected section. Require navigation on every governed body page.
+        if slides[index].get("role") == "executive-summary":
+            continue
         selected_by_page.append({
             (str(node["data"]["trackerId"]), str(node["data"]["sectionId"]))
             for node in slides[index].get("nodes", [])

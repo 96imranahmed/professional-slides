@@ -137,4 +137,6 @@ Review the planned sequence before composing: no one architecture should exceed 
 
 Use reference pages to choose meaningful alternatives: paired measures on a common basis; aligned small multiples; a full-width bridge with anchored explanations; shared quantitative rows; one decisive metric with its proof; an actual ordered route; a branching decision; a calendar of competing commitments; a network of dependencies; an integrated qualitative comparison. A second panel must add evidence, not restate the first. Preserve shared scales and denominators; do not invent a chart, an icon or an image simply to increase variety. Tables and non-chart exhibits need an extra heading only when it distinguishes peer evidence regions.
 
+On a calendar, make the decision-relevant phase boundary visible in the geometry or labels: a trial and optional continuation cannot be one uninterrupted band distinguished only in a footer. Proposed schedules must remain distinct from observed activity.
+
 A menu of independent alternatives is not a sequence: omit numbered-step treatment unless order matters. An ordered route, independent options and individual trials must not share a quantitative ranking as equivalent packages. Name the work before its supporting duration or prerequisite; repeated “No prior” labels are metadata, not hero metrics.

@@ -24,10 +24,10 @@ For an operating proposal, define the approval unit: workflow, population, expos
 
 For an investment decision, separate economic value, incremental cash and internal resource use before calculating returns or funding. Released capacity and reduced backlog can have opportunity value without reducing a budget payment; staff training consumes time without necessarily adding payroll. Recognize cash savings only against an explicit avoided expenditure, timing and owner. Reconcile the value-to-cash bridge through the summary, annual flows, NPV and funding close. A pilot recommendation names its proposed cohort, duration, cash cap, internal hours and staged release conditions; missing quotes or statistical inputs stay explicit within that proposal.
 
-For each reused measure, keep one source record: exact members, exclusions, period,
+For each reused measure or model parameter, keep one source record: definition, exact members, exclusions, period,
 units, observed inputs, calculation and rounding. Sum the members before drafting
 an aggregate. Derive means, shares, rates and durations from that record; retain
-unrounded inputs and round only for display. Generate the explanatory formula and
+unrounded inputs and round only for display. Name the input changed by each sensitivity, hold the others at their recorded base values, and derive legend labels from those same inputs. Generate the explanatory formula and
 its speaker-note operands from the same records; matching totals do not excuse
 mismatched line items. A grouped cell containing two items
 still counts as two. Reconcile every reuse in titles, summaries, charts, notes and
@@ -406,6 +406,8 @@ benchmark. Two tables with the same columns and no variant is
 `TABLE_SCHEMA_FLAT`.
 
 **Parallelism check.** Each slide has one dot and substantive support. The spine moves answer, evidence, action. The section map matches the sequence. The tracker decision matches the length of the story.
+
+When a source record names a local generator, bundle its inputs and verify reproduction from an isolated directory. Distinguish runnable fixture generators from historical authoring scripts; the latter are provenance, not a claim of portable reconstruction.
 
 ## Narrative QA
 
