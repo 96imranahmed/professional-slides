@@ -3,6 +3,20 @@ from node_probe import run_node
 
 
 class FinancialChartRuntimeTests(unittest.TestCase):
+
+    def test_signed_peer_bars_share_physical_scale_when_only_one_has_losses(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const slide={id:'s',title:'One offer cannot fund both savings goals',layout:'two-up',exhibits:[[8,-12],[39,8]].map((values,i)=>({type:'chart.bar',heading:i?'New York residual':'London residual',unit:'£k',categories:['First goal','Second goal'],series:[{name:'Residual',values}],dataTable:false,valueFormat:{decimals:1}}))};
+const {deck}=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'peer-bars',slides:[slide]}));
+const marks=deck.slides[0].nodes.filter(n=>n.role==='chart-mark'&&((n.data.componentInstance==='s:s-exhibit-0'&&n.data.category==='First goal')||(n.data.componentInstance==='s:s-exhibit-1'&&n.data.category==='Second goal')));
+assert.equal(marks.length,2);
+assert.ok(Math.abs(marks[0].frame.width-marks[1].frame.width)<.01,'equal monetary amounts occupy equal physical lengths despite a negative value in one peer');
+console.log('{}');
+""")
+
     def test_paired_signed_charts_share_the_complete_numeric_domain(self):
         run_node(r"""
 import assert from 'node:assert/strict';

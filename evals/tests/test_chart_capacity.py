@@ -4,6 +4,27 @@ from node_probe import run_node
 
 class ChartCapacityTests(unittest.TestCase):
 
+    def test_dumbbell_values_have_separate_gutters_from_category_labels(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {dumbbellLayout,dumbbellChart} from './skills/professional-slides/runtime/charts-extra.mjs';
+const frame={x:60,y:120,width:1160,height:450};
+for (const factor of [1,1000000]) {
+ const props={categories:['$3,000 rent','$4,500 rent','$8,000 rent'],series:[{name:'Annual',values:[200.2,228.6,303.1].map(v=>v*factor)},{name:'Three years',values:[204.5,233.7,308.1].map(v=>v*factor)}],valueFormat:{decimals:1}};
+ const nodes=dumbbellChart({id:'d',frame,props});const layout=dumbbellLayout(frame,props);
+ for(const category of props.categories){
+  const cat=nodes.find(n=>n.role==='category-label'&&n.text===category);
+  const values=nodes.filter(n=>n.role==='data-label'&&n.data.category===category);
+  for(const label of values){assert.ok(label.frame.x>=cat.frame.x+cat.frame.width+6);assert.ok(label.frame.x+label.frame.width<=frame.x+frame.width);}
+ }
+ const marks=nodes.filter(n=>n.role==='chart-mark');
+ const span=Math.max(...marks.map(n=>n.frame.x))-Math.min(...marks.map(n=>n.frame.x));
+ assert.ok(span/layout.plot.width>.6,'directly labelled values use the available comparison width');
+ const explicit=dumbbellLayout(frame,{...props,xMin:0,xMax:400*factor});assert.equal(explicit.bounds.min,0);assert.equal(explicit.bounds.max,400*factor);
+}
+console.log('{}');
+""")
+
     def test_external_stack_labels_and_leaders_remain_one_editable_render(self):
         run_node(r"""
 import assert from 'node:assert/strict';

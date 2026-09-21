@@ -109,23 +109,25 @@ export function dumbbellLayout(frameIn, props) {
   const frame = probe(frameIn);
   const { series, categories } = seriesOf(props, 2, 2);
   const labelWidth = Math.min(200, Math.max(72, ...categories.map((c) => Math.ceil(measure(c, 200).width) + 12)));
-  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: props.legend !== false ? legendRowsFor(series.map((s) => s.name), frame) : false, leftInset: labelWidth + 8, valueLabelInset: 64, centerPlot: false });
-  const bounds = numericBounds(series.flatMap((s) => s.values), { min: props.xMin, max: props.xMax, axis: "x", includeZero: props.includeZero === true });
+  const valueWidth = Math.max(40, ...series.flatMap(s => s.values).map(value => Math.ceil(measure(formatValue(value, props), 1000, { bold: labelBold() }).width) + 2));
+  const valueGutter = valueWidth + 12;
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: props.legend !== false ? legendRowsFor(series.map((s) => s.name), frame) : false, leftInset: labelWidth + 8 + valueGutter, valueLabelInset: valueGutter, centerPlot: false });
+  const bounds = numericBounds(series.flatMap((s) => s.values), { min: props.xMin, max: props.xMax, axis: "x", includeZero: props.includeZero === true, tight: true });
   const rowHeight = Math.min(80, (plot.height + 24) / categories.length);
-  return { series, categories, plot, bounds, labelWidth, rowHeight, height: rowsHeight(frame, plot, categories.length) };
+  return { series, categories, plot, bounds, labelWidth, valueWidth, valueGutter, rowHeight, height: rowsHeight(frame, plot, categories.length) };
 }
 export function dumbbellChart({ id, frame, props }) {
-  const { series, categories, plot, bounds, labelWidth, rowHeight } = dumbbellLayout(frame, props);
+  const { series, categories, plot, bounds, labelWidth, valueWidth, valueGutter, rowHeight } = dumbbellLayout(frame, props);
   const xAt = (v) => plot.x + (v - bounds.min) / bounds.span * plot.width;
   const nodes = props.legend !== false ? topLegend({ id, frame, items: series.map((s, i) => ({ label: s.name, colorIndex: props.colorIndices?.[i] ?? i })), variant: "marker" }) : [];
   categories.forEach((c, i) => {
     const y = plot.y + i * rowHeight + rowHeight / 2, a = series[0].values[i], b = series[1].values[i];
-    nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: plot.x - labelWidth - 8, y: y - 10, width: labelWidth, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, false, "right") }));
+    nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: plot.x - labelWidth - 8 - valueGutter, y: y - 10, width: labelWidth, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, false, "right") }));
     nodes.push(linePrimitive({ id: stableId(id, "bar", c), role: "chart-line", x1: xAt(a), y1: y, x2: xAt(b), y2: y, style: lineStyle(GRID, token("line.standard")), data: { category: c } }));
     [a, b].forEach((v, si) => {
       nodes.push(ellipsePrimitive({ id: stableId(id, "dot", c, series[si].name), role: "chart-mark", frame: { x: xAt(v) - 7, y: y - 7, width: 14, height: 14 }, style: fillStyle(colorFor(props, si)), data: { category: c, series: series[si].name, value: v } }));
       const leftMost = si === (a <= b ? 0 : 1);
-      nodes.push(textPrimitive({ id: stableId(id, "value", c, series[si].name), role: "data-label", frame: { x: leftMost ? xAt(v) - 12 - 60 : xAt(v) + 12, y: y - 10, width: 60, height: 20 }, text: formatValue(v, props), style: textStyle(CHART_LABEL, INK, labelBold(), leftMost ? "right" : "left"), data: { category: c, series: series[si].name } }));
+      nodes.push(textPrimitive({ id: stableId(id, "value", c, series[si].name), role: "data-label", frame: { x: leftMost ? xAt(v) - 12 - valueWidth : xAt(v) + 12, y: y - 10, width: valueWidth, height: 20 }, text: formatValue(v, props), style: textStyle(CHART_LABEL, INK, labelBold(), leftMost ? "right" : "left"), data: { category: c, series: series[si].name } }));
     });
   });
   return nodes;

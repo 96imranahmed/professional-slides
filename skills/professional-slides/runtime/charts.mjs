@@ -619,7 +619,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const horizontalCategoryLabelWidth = horizontal && !hideCategoryLabels
     ? Math.min(180, Math.max(72, Math.ceil(Math.max(...(props.comparisonDomain?.categories ?? categories).map(category => measureText(category, 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width))) + 12))
     : 0;
-  const negativeLabelGutter = horizontal && !stacked && showDataLabels && values.some(v=>v<0) ? barLabelWidth + barLabelGap : 0;
+  const negativeLabelGutter = horizontal && !stacked && showDataLabels && (props.comparisonDomain?.values ?? values).some(v=>v<0) ? barLabelWidth + barLabelGap : 0;
   const totalTexts = new Map([...stackLabels.totals].map(([category, record]) => [category,
     attachedLabelText(formatValue(record.value, props), stackLabels.secondary.get(`${category}:stack-total`),props)]));
   const totalMetrics = [...totalTexts.values()].map(text => measureDataLabel(text));
