@@ -106,7 +106,7 @@ Check in this order:
 7. **Relationships.** Arrows imply direction or inference. Chevron stages imply progression; use rectangular headers for parallel alternatives. Rules must separate actual fields. Surfaces must enclose an actual group.
 8. **Whole-deck consistency.** Compare common title anchors, evidence-state treatments, header grammar, number formatting, row rhythm and recurring families. A change of unit or explicit column alignment must not change unrelated table styling. Inserting an unrelated slide must not change focus, arrow semantics or table treatment on its neighbours.
 
-The review may find a substantive thin page even when counts pass. Its repair is a better argument, appropriate consolidation or a better use of space, not a decorative quota. Empty-band and ink measurements are advisory because deliberate centring can leave large margins. The visual reviewer still rejects visibly poor balance. Preserve text fit, collisions, clipping, truthful scales and content completeness as blocking checks.
+The review may find a substantive thin page even when counts pass. Its repair is a better argument, appropriate consolidation or a better use of space, not a decorative quota. Whitespace, exhibit-area and label-count measurements are advisory: a compact process or centered group can be complete, and a chart may communicate through a readable axis and selected value anchors. The visual reviewer still rejects visibly poor balance. Preserve text fit, collisions, clipping, truthful scales and content completeness as blocking checks.
 
 ## Working from a reference deck
 

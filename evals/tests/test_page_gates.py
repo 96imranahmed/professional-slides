@@ -49,6 +49,24 @@ WEIGHT_OFF = {"pageWords": 0, "columnFill": 0, "plotSpan": 0, "pointWords": 0, "
 
 
 class EvidenceMultiplicityTests(unittest.TestCase):
+    def test_area_and_label_counts_preserve_review_findings_without_forcing_filler(self):
+        from test_deck_shape import page, deck
+        process = page(1, ['chevron-process'])
+        process['contentFrame'] = {'x': 60, 'y': 152, 'width': 1160, 'height': 516}
+        process['componentInstances'] = [{'component': 'chevron-process', 'frame':
+            {'x': 60, 'y': 294, 'width': 1160, 'height': 172}}]
+        chart = page(2, ['chart.line'])
+        report = page_gates.run_gates(deck([process, chart], fill='full'),
+            gates={'HERO_EXHIBIT', 'NUMBERS_ON_MARKS'})
+        self.assertTrue(report['accepted'])
+        self.assertTrue({'HERO_EXHIBIT', 'NUMBERS_ON_MARKS'} <= codes(report))
+        self.assertTrue(all(f['severity'] == 'advisory' for f in report['findings']))
+        # Typography remains an independent blocking contract.
+        invalid = good_slide()
+        invalid['nodes'][0]['style']['fontSize']['value'] = 100
+        report = page_gates.run_gates({'slides': [invalid]}, gates={'TYPE_RANGE'})
+        self.assertFalse(report['accepted'])
+
     def test_summary_and_single_exhibit_counts_do_not_waive_missing_argument(self):
         from test_deck_shape import page, deck
         gates = {"THIN_EVIDENCE", "MISSING_ARGUMENT"}

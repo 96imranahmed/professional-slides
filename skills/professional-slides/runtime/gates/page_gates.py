@@ -453,7 +453,7 @@ ADVISORY_CODES = {
     "INK_COVERAGE", "THIN_PAGE", "DECK_FLAT", "DECK_CRAFT", "EVIDENCE_MIX", "PAGE_VARIETY",
     "DEAD_BAND", "INTERNAL_VOID", "UNANNOTATED", "LAYOUT_MONOTONY",
     "COLUMN_MONOTONY", "TABLE_SCHEMA_FLAT", "IMAGE_BUDGET", "IMAGE_RUN",
-    "THIN_EVIDENCE",
+    "THIN_EVIDENCE", "HERO_EXHIBIT", "COLUMN_VOID", "THIN_COLUMN", "NUMBERS_ON_MARKS",
 }
 
 # Findings raised before the page is rendered: the composer's plan-time budget
@@ -552,9 +552,9 @@ def gate_column_void(slide_no, matrix, findings):
         if band > THRESHOLDS["column_void_max"]:
             findings.append(finding(
                 slide_no, "COLUMN_VOID", round(band, 4), THRESHOLDS["column_void_max"],
-                "The right column stops well above the footer on a deck that reads "
-                "full. Add points, a kpi or a callout, or set the deck's fill to "
-                "balanced.",
+                "Inspect the right column for balance and a missing consequence. "
+                "A complete sparse group may remain centered; do not add content "
+                "merely to reach the footer.",
             ))
 
 
@@ -791,8 +791,8 @@ def gate_hero_exhibit(slide_no, slide, findings, image=None):
                 if density < THRESHOLDS["exhibit_ink_min"]:
                     findings.append(finding(
                         slide_no, "HERO_EXHIBIT", round(density, 4), THRESHOLDS["exhibit_ink_min"],
-                        "The hero frame is mostly empty. Use an exhibit that fills it "
-                        "(a table or chart with the page's numbers) or shrink the frame and add content.",
+                        "Inspect the exhibit at reading size for a clear finding and complete "
+                        "evidence. Low occupancy alone does not require more content.",
                     ))
         except Exception:
             pass
@@ -1092,10 +1092,9 @@ def gate_thin_column(slide_no, slide, findings):
         if floor > 0 and reach < floor:
             findings.append(finding(
                 slide_no, "THIN_COLUMN", round(reach, 3), floor,
-                "The commentary column stops early. Give it the content the page "
-                "already implies — a lead and a sentence per point, the number "
-                "the chart proves as a `kpi`, the consequence as `soWhat` — or "
-                "let the exhibit have the width.",
+                "Inspect whether the commentary develops a useful consequence. "
+                "Center a complete sparse group or give its space to evidence; "
+                "add material only when a specific premise is missing.",
             ))
         if depth <= 0:
             continue
@@ -1252,10 +1251,9 @@ def gate_numbers_on_marks(slide_no, slide, findings):
         return
     findings.append(finding(
         slide_no, "NUMBERS_ON_MARKS", len(numeric), wanted,
-        "Print the values on the marks (`dataLabels`), or label the endpoints "
-        "and the decisive category. The numbers are the evidence; an axis is a "
-        "lookup table. While a chart has twelve marks or fewer, every mark "
-        "carries its number.",
+        "Inspect whether values needed for the claim are readable through direct "
+        "labels, a quantitative axis or anchored annotations. Label decisive "
+        "values; a raw mark count does not require labelling every observation.",
     ))
 
 

@@ -4,7 +4,7 @@ A deck is ready when the deterministic page gates pass, the review accepts it, a
 
 ## Page gates
 
-Measured on the rendered page before review. The report records severity. `runtime/gates/page_gates.py` owns the exact advisory-code set. Ink, whitespace, density and decoration/mix statistics prompt visual review; they do not prescribe furniture. Schema, title/evidence contradictions, text fit, clipping, collisions, scales and provenance still block. An independent reviewer may reject an actual visual defect even where its numeric diagnostic is advisory.
+Measured on the rendered page before review. The report records severity. `runtime/gates/page_gates.py` owns the exact advisory-code set. Ink, whitespace, density, exhibit area, label counts and decoration/mix statistics prompt visual review; they do not prescribe furniture. A compact process or centered commentary can be complete, and a line chart can establish its claim through an axis and selected anchors. Keep these diagnostics visible for independent review; their count is not proof of a defect. Schema, title/evidence contradictions, text fit, clipping, collisions, scales and provenance still block. An independent reviewer may reject an actual visual defect even where its numeric diagnostic is advisory.
 
 | Gate | Code | Threshold |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |
 | Marks in the exhibit | `PLOT_SPAN` | marks span `weight.plotSpan` of the exhibit frame (annotated and peer-aligned charts exempt) |
 | Table against its budget | `THIN_TABLE` | uses `weight.tableFill` of the page's row budget |
-| Values printed | `NUMBERS_ON_MARKS` | every mark while a chart has twelve or fewer, three otherwise |
+| Values printed | `NUMBERS_ON_MARKS` | advisory count: every mark while a chart has twelve or fewer, three otherwise; review the values required by the claim against labels, axes and annotations |
 | Exhibit multiplicity | `THIN_EVIDENCE` | `weight.elements` (2 on a document-weight page) is a review diagnostic, not a proof quota; a single exhibit or developed bullet synthesis can carry the complete argument |
 | Heading fit | `HEADING_WRAPS` | a heading that wraps where the frame could hold it on one line |
 | Axis ticks | `NICE_TICKS` | nice numbers |
@@ -112,7 +112,7 @@ The calibration sample contains 3,606 analytical pages from 28 client engagement
 | - in the title band | 18 | 17 | `TITLE_LINES`, `TITLE_WORDS` |
 | - **in the body** | **148** | 157 | `THIN_PAGE` floors the body alone |
 | - in the footer, source and notes | 13 | 12 | `NOTE_HEAVY` |
-| Numeric tokens | 13 overall - 26 on a chart page, 20 on a table, 4 on a diagram | 11 | `NUMBERS_ON_MARKS`: every mark carries its value |
+| Numeric tokens | 13 overall - 26 on a chart page, 20 on a table, 4 on a diagram | 11 | `NUMBERS_ON_MARKS`: inspect claim-relevant labels and scales |
 | Drawn objects (marks, rules, brackets) | median 32 (p25 11, p75 88) | - | the cold-run scorer's `drawingsPerPage` |
 | Pages carrying 186+ words | 51% | 54% | `DECK_FLAT` prompts review of whether detail is missing |
 | Pages carried by a chart | 30% | 37% | advisory chart-mix comparison |
