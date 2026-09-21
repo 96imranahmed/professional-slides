@@ -1,10 +1,8 @@
 # evals
 
-Verification for `skills/professional-slides`. The rule this directory now
-follows, after the deep audit: **a test either measures the page or exercises
-real geometry.** Assertions about markdown prose, prompt substrings, repository
-ownership and the shape of the system's own JSON were deleted — they compared
-the system to itself and could never fail on a quality regression.
+Verification for `skills/professional-slides` covers content and plan contracts,
+composition, export, readback, rendered geometry and delivery-review bindings.
+Passing these checks does not establish editorial or visual taste.
 
 ## Cold runs
 
@@ -49,44 +47,22 @@ node evals/scripts/compile_scene.mjs spec.json scene.json
 python3 evals/scripts/pptx_scene_probe.py deck.pptx scene.json
 ```
 
-### package.json needs one edit (outside this directory's ownership)
-
-`evals/scripts/check_production_policy.mjs` — the prose-grep gate — has been
-deleted. Remove its script entry and its use in `check`:
-
-```diff
--    "check": "npm run check:syntax && npm run check:policy && npm test",
-+    "check": "npm run check:syntax && npm test",
--    "check:policy": "node evals/scripts/check_production_policy.mjs",
-+    "check:gates": "bash evals/run.sh",
-```
-
-`npm run check:release` already routes to the new reference-image golden check
-through `run_tests.mjs --release`; no change needed there.
-
 ## Page gates
 
 `runtime/gates/page_gates.py` measures the resolved scene and, where the
 question is optical, the rendered PNG. Exit 0 pass, 2 findings. Every finding is
 `{slide, code, measured, threshold, repair}`.
 
-| code | measured | threshold |
-| --- | --- | --- |
-| `INK_COVERAGE` | ink (luminance < 235) above the footer band, over the 1280×720 canvas | ≥ 0.12 |
-| `DEAD_BAND` | gap between the last content ink row and the footer band | ≤ 8% of 720 |
-| `TITLE_LINES` / `TITLE_WORDS` | laid-out lines / words of the action title | ≤ 2 / ≤ 14 |
-| `TYPE_RANGE` | `node.style.fontSize.value` by role | body 10–14, chart furniture 8–11, action title 20–26, source 7–9 pt |
-| `CPL` | longest laid-out line of a prose node | 35–90 characters (the floor applies only to a wrapped paragraph) |
-| `WORDS` | visible body words, excluding source, page number, notes and chart furniture | ≤ 100 with an exhibit, ≤ 140 without (executive profile) |
-| `HERO_EXHIBIT` | largest chart/table/image frame ÷ content frame | ≥ 0.40 |
-| `LAYOUT_MONOTONY` | share of content slides sharing one layout signature | ≤ 0.40 |
-| `NICE_TICKS` | the axis as a whole: step on the 1/2/2.5/5 ladder, every tick a whole step | — |
+See the [evaluation contract](../skills/professional-slides/references/evaluation/index.md)
+for blocking checks and advisory corpus statistics. Each generated report carries
+the thresholds actually used; the [page-gate implementation](../skills/professional-slides/runtime/gates/page_gates.py)
+owns the profile and role-specific rules.
 
 Whether a page needs additional interpretation is an editorial review decision. There is no mandatory closing-consequence gate: a necessary caveat may complete the evidence, and a separate `soWhat` is optional.
 
-The cover slide is exempt from the page-level gates. Density profiles move only
-the word budget (`live-pitch` 70/100, `executive` 100/140, `pre-read` 130/180);
-nothing relaxes a geometric or typographic threshold.
+Content-stage summaries distinguish quantitative evidence kinds from structured
+qualitative kinds. Neither share certifies that a claim is sourced or correct;
+the reviewer must inspect its evidence.
 
 ## Fixtures
 

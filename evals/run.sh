@@ -25,7 +25,6 @@ case "${1:-}" in
     ;;
 esac
 
-suite_status=0
 echo "== unit tests =="
 suite_status=0
 "$PYTHON" -m unittest discover -s evals/tests -p "test_*.py" || suite_status=$?
@@ -46,8 +45,9 @@ import json, sys
 r = json.load(sys.stdin)
 kinds = ",".join(f"{n}:{c}" for n, c in r["statistics"]["kinds"].items() if c)
 state = "accepted" if r["accepted"] else "REJECTED " + ",".join(r["countsByCode"])
-print("%s | %d pages, %d%% measured, kinds %s"
-      % (state, r["pages"], round(100 * r["statistics"]["measured"]), kinds))
+print("%s | %d pages, %d%% quantitative kinds, %d%% structured kinds, kinds %s"
+      % (state, r["pages"], round(100 * r["statistics"]["quantitativeKindShare"]),
+         round(100 * r["statistics"]["structuredKindShare"]), kinds))
 ' || true
 done
 [ "$found" = 1 ] || echo "  none: no example deck carries its content stage"
