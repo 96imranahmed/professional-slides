@@ -16,6 +16,22 @@ from node_probe import NODE, REFERENCES, ROOT, RUNTIME, SKILL, read, run_node
 
 
 class ComponentStructureTests(unittest.TestCase):
+    def test_process_headings_are_authored_and_absent_headings_release_space(self):
+        result = run_node("""
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const frame={x:0,y:0,width:1000,height:320};
+const render=items=>REGISTRY.get('chevron-process').render({id:'probe',frame,props:{items}}).nodes;
+const items=[{label:'Supply',details:['Eligible artifacts']},{label:'Use',details:['Accepted requests']}];
+const plain=render(items),dated=render(items.map((v,i)=>({...v,...(i===0?{heading:'September 2026'}:{})})));
+const role=(nodes,r)=>nodes.filter(n=>n.role===r);
+console.log(JSON.stringify({plainHeadings:role(plain,'process-heading'),datedHeadings:role(dated,'process-heading').map(n=>n.text),plainBands:role(plain,'process-band').map(n=>n.frame.y),datedBands:role(dated,'process-band').map(n=>n.frame.y),labels:role(plain,'process-label').map(n=>n.text)}));
+""")
+        self.assertEqual(result['plainHeadings'], [])
+        self.assertEqual(result['datedHeadings'], ['September 2026'])
+        self.assertEqual(result['plainBands'], [0, 0])
+        self.assertEqual(result['datedBands'], [42, 42])
+        self.assertEqual(result['labels'], ['Supply', 'Use'])
+
     def test_runtime_registry_fixtures_and_token_provenance_compile(self):
         result = run_node(
             """

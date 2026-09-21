@@ -1390,16 +1390,17 @@ function registerCore(registry) {
     component({ id: "chevron-process", category: "relationship", role: "process", tokens: ["color.ink", "color.componentPrimary", "color.surface", "color.surfaceMuted", "color.onPrimary", "font.body", "type.heading", "type.compact", "type.label", "line.hairline", "radius.none", "radius.round", "space.1", "space.3", "space.4"], preferredSize: { width: 1160, height: 360 }, sample: { items: [{ heading: "Phase 1", label: "(Insert phase 1)", details: ["(Insert activity 1)", "(Insert activity 2)"] }, { heading: "Phase 2", label: "(Insert phase 2)", details: ["(Insert activity 1)", "(Insert activity 2)"] }, { heading: "Phase 3", label: "(Insert phase 3)", details: ["(Insert activity 1)", "(Insert activity 2)"] }] }, render: ({ id, frame, props }) => {
       const items = props.items;
       const span = frame.width / items.length;
+      const headingHeight = items.some(item => item.heading?.trim()) ? 42 : 0;
       const nodes = [];
       items.forEach((item, index) => {
         const x = frame.x + index * span;
-        nodes.push(textPrimitive({ id: stableId(id, "heading", index), role: "process-heading", frame: { x: x + 8, y: frame.y, width: span - 16, height: 34 }, text: item.heading || `Phase ${index + 1}`, style: textStyle(token("type.heading"), INK, true, "left") }));
-        nodes.push(shapePrimitive({ id: stableId(id, "band", index), role: "process-band", geometry: "chevron", frame: { x, y: frame.y + 42, width: span + (index < items.length - 1 ? tokenValue(token("space.4")) : 0), height: 70 }, style: boxStyle(index === 0 && props.emphasizeFirst ? PRIMARY : INK, SURFACE, HAIRLINE, token("radius.none")) }));
+        if (item.heading?.trim()) nodes.push(textPrimitive({ id: stableId(id, "heading", index), role: "process-heading", frame: { x: x + 8, y: frame.y, width: span - 16, height: 34 }, text: item.heading, style: textStyle(token("type.heading"), INK, true, "left") }));
+        nodes.push(shapePrimitive({ id: stableId(id, "band", index), role: "process-band", geometry: "chevron", frame: { x, y: frame.y + headingHeight, width: span + (index < items.length - 1 ? tokenValue(token("space.4")) : 0), height: 70 }, style: boxStyle(index === 0 && props.emphasizeFirst ? PRIMARY : INK, SURFACE, HAIRLINE, token("radius.none")) }));
         const label = measureText(item.label, span - 72, { fontSize: tokenValue(token("type.heading")), bold: true });
         if (label.height > 64) throw new Error("Process label exceeds its band; enlarge the component or shorten the copy");
-        nodes.push(textPrimitive({ id: stableId(id, "label", index), role: "process-label", frame: { x: x + 36, y: frame.y + 77 - label.height / 2, width: span - 72, height: label.height }, text: label.text, style: { ...textStyle(token("type.heading"), WHITE, true, "center", "top"), lineHeight: label.lineHeight, wrap: false }, data: { textLayout: label } }));
+        nodes.push(textPrimitive({ id: stableId(id, "label", index), role: "process-label", frame: { x: x + 36, y: frame.y + headingHeight + 35 - label.height / 2, width: span - 72, height: label.height }, text: label.text, style: { ...textStyle(token("type.heading"), WHITE, true, "center", "top"), lineHeight: label.lineHeight, wrap: false }, data: { textLayout: label } }));
         const details = item.details || [];
-        nodes.push(...simpleList({ id: stableId(id, "details", index), frame: { x: x + 10, y: frame.y + 132, width: span - 26, height: frame.height - 136 }, items: details, numbered: props.detailStyle === "circled-number", marker: "circle", rolePrefix: "process-detail" }));
+        nodes.push(...simpleList({ id: stableId(id, "details", index), frame: { x: x + 10, y: frame.y + headingHeight + 90, width: span - 26, height: frame.height - headingHeight - 94 }, items: details, numbered: props.detailStyle === "circled-number", marker: "circle", rolePrefix: "process-detail" }));
       });
       return { nodes };
     } }),
