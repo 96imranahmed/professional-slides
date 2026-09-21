@@ -14,6 +14,10 @@ Use `{{page:stable-id}}` for cross-references in copy and source tables. Resolve
 
 ## Reconcile evidence before design
 
+Verify the brief's factual premise before decomposing it. For a transaction, policy change or launch, distinguish rumor, announcement, signed agreement, approval and completion using dated primary records. A user's example identifies the topic; it does not establish the event's status. Preserve differences between headline values, consideration, contingent payments, retention costs and enterprise value. Check whether a policy or rate source has been superseded before using it in a model.
+
+For a requested page count, budget the entire delivered deck, including cover, summary, section pages and appendix, unless the brief specifies a different scope. Allocate distinct evidence questions before layouts; a fixed length does not justify splitting one insight into repetitive pages. Give alternative versions different reader questions, title sequences or evidence relationships before authoring; preserve any shared audience and decision required by the brief.
+
 For each reused measure, keep one source record: exact members, exclusions, period,
 units, observed inputs, calculation and rounding. Sum the members before drafting
 an aggregate. Derive means, shares, rates and durations from that record; retain
@@ -196,22 +200,22 @@ node runtime/gates/content_gates.mjs deck.content.json
 Get this accepted before writing a single exhibit name. **Name the file
 `<stem>.content.json` beside the deck spec** and `build-deck.mjs` runs the gate
 itself, before it composes anything — a rejected content plan stops the build
-with no scene written. A build with no content plan beside it still runs, and
-says `stages: { content: "absent" }` in its output, because a stage that was
-skipped and a stage that does not exist should not look the same.
+with no scene written. New decks require the sidecars described in the planning
+contract. A revision without a content plan reports that stage as absent; this
+does not establish that its content has passed review.
 
 ## Stage two: layout planning
 
-Now, and only now, decide what each page looks like. Read `settles.kind` and
-nothing else from stage one: the evidence has been chosen, and this stage serves
-it.
+Now decide what each page looks like. Read the full content record: claim,
+evidence, basis, relationship, consequence and focus. `settles.kind` narrows the
+candidate encodings; the actual evidence and reader question determine the choice.
 
 One row per page — here a table is right, because these are all short fields:
 
 | # | Exhibit | Variant | Why | Architecture | Anchors | Insight |
 | --- | --- | --- | --- | --- | --- | --- |
 
-- **Exhibit.** The encoding, taken from `settles.kind` — see the table below.
+- **Exhibit.** The encoding that makes the evidence relationship visible — use the table below as a starting point.
 - **Variant.** How that exhibit is treated: `heat`, `bubble`, `bar`, `harvey`, `verdict column`, `stacked`, `sorted`, `grid`, `paginated`, and a table's size as `12×5`. Two pages both reading `table` may be a twelve-row heat matrix and a three-row grid; counted as one kind they make a deck look more varied than it is, and the variety gate counts `exhibit/variant` where the variant is recorded. This is also where a table stops being a plain grid: across ten tables in a generated deck, not one named a treatment and not one got one.
 - **Why.** One phrase saying what made this the exhibit — "magnitude over time", "ranking, sorted", "genuinely a matrix: three dimensions over the same rows". Required on the exhibits a plan reaches for when it has not decided anything (a table, a column or bar chart, a staircase, a list), because that is where a default hides. A page that cannot produce the phrase has not chosen its exhibit yet.
 - **Architecture.** `exhibit-left`, `exhibit-top`, `hero-number`, `two-up`, `split-tone`, `grid`, `exhibit-full`, `metrics-over-exhibit`, `picture-hero`, `picture-pair`, `picture-strip`, `table-halves`, `text`. The evidence goes on the left and what it means on the right — `exhibit-right` exists but is never chosen for you, because a reading order a reader can rely on is worth more than the variety of not having one. A deck built from two architectures reads as one page repeated; the plan gates measure the spread as entropy and cannot measure it at all when this column is blank. Where a run of pages is one template on purpose — six use-cases, eight market profiles — name the run as `series: <name>` and the gates count it once instead of punishing a deliberate decision. **Variety belongs in the evidence relationship, not in which side of the page the table sits on.** Count chart/table over two or three commentary columns, with or without an insight strip, as one architecture. Record an explicit architecture for every analytical page; `auto` is not a planned design. Test the normalized mix and dominant share before composing.
@@ -266,8 +270,9 @@ staircases has used one shape for five different relationships.
 
 The table above is how a plan is *read*; `<stem>.plan.json` beside the spec is
 how it is *checked*, and the build runs the gates over it automatically. One
-object per page, in deck order. Every field is optional except `n` - a plan that
-records less is judged on less, never punished for the blank.
+object per page, in deck order. New decks require stable `id` and exact `title`
+coverage under the planning contract above. `n` is a reporting position; the
+remaining design fields are checked when supplied.
 
 ```json
 {
@@ -373,7 +378,7 @@ Page 3's `adds` is the test to apply to every one of them. "Revenue grew 5% and
 costs 9%" would have been the chart read back; "no revenue scenario closes a gap
 of this shape" is what the chart cannot draw.
 
-**Stage two — layout.** Only now, and reading `settles.kind`:
+**Stage two — layout.** Choose the encoding from each page's evidence relationship:
 
 | # | Exhibit | Variant | Why | Architecture | Anchors | Insight |
 | --- | --- | --- | --- | --- | --- | --- |

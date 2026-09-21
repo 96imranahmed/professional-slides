@@ -31,6 +31,8 @@ Write down what you think the deck argues. If the titles do not add up to an
 argument, that is the first finding and it outranks everything else on this
 list.
 
+Check the factual premise and evidence state against dated sources and disclosed assumptions: distinguish an announced transaction from a completed one, platform usage from paid customers, and a modeled hurdle from a forecast. Apply the evidence reconciliation contract in [Storylining](storylining.md#reconcile-evidence-before-design).
+
 Then look at the pages. Reconcile every promised criterion with a page that actually develops it; listing a dimension in a scorecard is not coverage. Read appendix conclusions as claims too: an exhibit about one population cannot substantiate a claim about an unshown comparator. Reconcile reused totals, sample membership, denominators and durations before rating. Read the full argument again after a global correction: stale versions often survive in a chart comment, a summary or the close. A judgement label cannot excuse an unbounded claim. For each spread ask:
 
 1. **Where does the eye land first, and is that the finding?** If the first
