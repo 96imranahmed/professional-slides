@@ -37,6 +37,20 @@ For comparable options, draft all rows before deciding the page count. Split a l
 
 Resolve capacity with the actual longest labels and fullest rows, measured at the allocated width. When a component does not fit: remove duplicate copy, rebalance widths, regroup the evidence, or select a denser density profile for the whole family. Content keeps its qualifiers and its readable type.
 
+## Choose visual treatments during planning
+
+Make these decisions for every analytical page while its evidence is still editable. Use the existing plan fields (`why`, `treatment`, `anchors`, `highlight`, `insight`); no additional checklist file or schema is needed. A missing cue and a misused cue are both design defects.
+
+| Decision | Use the treatment when | Keep it plain when |
+| --- | --- | --- |
+| Category axis | One column names distinct classes and the other columns explain or compare them. Assignment, Availability, Evidence, Interaction and Outcome are trace-event classes: fill those category cells, not their whole rows. | Values repeat membership (DC, DC, Marvel), identify individual records or dates, or mix evidence rows with an editorial conclusion. |
+| Icons | Parallel concepts have recognisable, different meanings. A protocol can map population to `people`, treatment contrast to `scale`, analysis to `chart-bar` and data quality to `database`. Select supported names and retain text labels. | An icon would merely repeat a number, invent a sequence or decorate an unfamiliar record ID. |
+| Focus | The claim identifies an exact row, mark or coherent set whose emphasis helps the comparison. | No observation has a special role. The midpoint, largest value and arrow position do not select one. |
+| Closing insight | The page's evidence supports a decision consequence that is otherwise buried, and a closing band can carry it clearly. Reserve that band in the plan. | The sentence only repeats the title, summarizes the same rows or fills whitespace. Rebalance or centre the content instead. |
+| Heading and units | Each chart needs its descriptive measure, inline unit and rule. Keep any unique scope once. | A table or non-chart exhibit is already identified by the action title and labels. Remove a subtitle that repeats the chart heading, including semantic paraphrases. |
+
+Inspect the plan as a sequence after these choices, then verify each chosen treatment reached the actual render. For point lists, use the explicit icon treatment in [Composition](composition.md); a planned icon hidden by a prose style is still missing. Category fills, icons and insight bands improve recognition but do not count as different evidence relationships in the repetition review below.
+
 ## Deck rhythm
 
 Keep palette, type, anchors and component grammar constant while choosing page structures for different questions. Repetition is right for comparable markets, periods or options that share a scale. A long run of the same silhouette for different questions means the pages inherited a layout before their argument was developed.

@@ -21,8 +21,8 @@ Read [Storylining](references/storylining.md) for the content/design sidecars an
 
 1. State the governing answer and what the audience should understand or decide.
 2. Write the exact title of every page. Read the sequence alone and remove pages that add neither proof nor a useful decision.
-3. Record each page's evidence, basis, consequence and explicit focus or none. Use numbers when the question is quantitative and named, scoped examples when it is qualitative.
-4. Choose the exhibit and architecture from that relationship. The opening executive summary is a semantic role; it may consist entirely of developed bullet rows, without metrics. Choose its useful visual cues at the same time: category cells for a taxonomy, recognisable icons for parallel concepts, and a bottom insight for the decision consequence.
+3. Record each page's evidence, basis, consequence and explicit focus or none. Use numbers when the question is quantitative and named, scoped examples when it is qualitative. Keep identities, model parameters and evidence versions distinct; name which record supports the recommendation.
+4. Choose the exhibit and architecture from that relationship. The opening executive summary is a semantic role; it may consist entirely of developed bullet rows, without metrics. For every analytical page, make the [visual treatment decision](references/design.md#choose-visual-treatments-during-planning) before composition: category axis, useful icons, focus, heading ownership and closing consequence. These decisions belong in the existing plan, not a late decoration pass.
 5. Keep stable IDs across `<id>.content.json`, `<id>.plan.json` and `<id>.deck.json`. Reconcile titles, ordering, sources and calculations before building.
 
 ## Design from meaning
@@ -36,6 +36,12 @@ Read [Design](references/design.md) and [Composition](references/composition.md)
 - Use images when recognition or visible evidence matters; retain authorization, credit and scope. Do not invent a quantitative scale for a visual preference.
 
 Choose palettes, fonts, density and template inheritance through [Theming](references/theming.md). Unless the user requests cosmetic restyling, alternatives need different reader questions, narrative orders and evidence relationships that remain distinct with colour removed.
+
+## Improve the shared skill when iterating
+
+Before rebuilding a rejected candidate, identify why the existing skill allowed the defect. Correct the earliest owner: missing proof or inconsistent records in Storylining; an inappropriate encoding or omitted visual cue in Design; incorrect component behaviour in its shared runtime. Update the review question that should catch it. Editing only the generated deck does not complete a reusable-skill improvement request.
+
+Keep one rule at its owning layer and link to it instead of appending exceptions in several files. Use code for deterministic behaviour; use concise instructions and a concrete counterexample for semantic judgement. Check the rule against a second, materially different case: it must prompt a missing category treatment, icon or insight when useful and preserve a plain treatment when it is not. Record the shared change and its verification separately from the candidate's taste score.
 
 ## Build and verify
 

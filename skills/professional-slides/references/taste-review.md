@@ -5,7 +5,7 @@ was caught by a person opening the rendered pages and looking at them — the
 gates found the geometry, and a reader found that the deck said nothing. This is
 that reader, as a step in the build.
 
-Run one independent reviewer over the whole deck per iteration. Preserve each rendered candidate and its report. When the user requests iteration, repair the highest-impact findings at their earliest shared owner, rebuild, and run a fresh review. Do not tell the reviewer what score to produce. Stop only when the requested standard is actually met, with no unresolved major or blocker findings; disclose unavailable evidence.
+Run one independent reviewer over the whole deck per iteration. Preserve each rendered candidate and its report. When the user requests iteration, repair the highest-impact findings at their earliest shared owner, rebuild, and run a fresh review. Do not tell the reviewer what score to produce. Continue until the requested standard is met or the user ends iteration. If stopped early, report the last verified score and unresolved findings; do not relabel an unfinished candidate as delivered. Disclose unavailable evidence.
 
 ## Running it
 
@@ -15,8 +15,11 @@ subagent with the brief below and the spread paths. It reads the images itself;
 do not paste them into the prompt.
 
 ```
-Read every spread in <out>/rendered/. Follow <skill>/references/taste-review.md
-and <skill>/references/design.md. Return the JSON described there and nothing else.
+Read every original slide image and every spread in <out>/rendered/.
+Follow <skill>/references/taste-review.md and <skill>/references/design.md.
+Inspect strong comparable original pages from each requested reference deck.
+Return the bound JSON report and a companion record of reference coverage,
+concrete comparisons, best/worst pages and remaining limitations.
 ```
 
 The report lands at `out/taste-review.json`. Treat `blocker` findings as build
@@ -57,7 +60,9 @@ Then look at the pages. Reconcile every promised criterion with a page that actu
 7. **Does the deck ever measure anything?** Count the pages carrying a plot. If
    a comparison is argued for fifty pages and charted on one, say so plainly.
 
-Before scoring, audit heading ownership on every page: does the subtitle merely paraphrase the chart heading? If so, remove it and preserve unique scope once. Tables and non-chart exhibits need no extra exhibit heading. Check both omission and misuse of visual cues: an unstyled column of distinct event types or error classes should use category cells; repeated membership attributes and record IDs stay plain. For parallel concepts, consider whether recognisable icons improve scanning. Where a page develops evidence but leaves its decision consequence buried, use a concise insight box in the available closing band. Inspect these choices across the sequence without treating cosmetic changes as new architectures. Where the verdict explicitly means good/bad, confine status colour to short text labels or check/cross icons. Reject automatic red/green status mapping on chart marks, series swatches or backgrounds; ordinary house-palette colours remain valid. These are semantic checks even when lexical-overlap gates pass.
+Before scoring, compare every page with its [planned visual treatment](design.md#choose-visual-treatments-during-planning). Check omission as well as misuse: did a taxonomy remain an undifferentiated table, did a meaningful concept list lose its icons, or did a developed page bury its decision consequence? Also test the counterexample: repeated membership is not a category taxonomy, an icon is not proof, and an insight must add something beyond the title. Check chart heading ownership and semantic subtitle redundancy. These are semantic checks even when lexical-overlap gates pass. Where the verdict explicitly means good/bad, confine status colour to short text labels or check/cross icons; reject that status mapping on chart marks, swatches or backgrounds.
+
+Trace a revised claim from its raw record through the content plan, exhibit and close. A repair must show the expected and observed result at the failed boundary: preserving model identity does not establish provider identity. Keep a local prototype, integrated replay and original baseline visibly distinct; check which version actually governs the recommendation. Treat an unexplained change of state as an evidence defect even when each page's arithmetic is correct.
 
 Test the comparison against the reader's decision, not just its labels: initial commitment and full optional commitment must be comparable on both sides. Check whether a small aggregate needs named contributors on the page. A column labelled implication or decision must change the reader's choice or delimit an inference; a metric definition under that heading is still redundant.
 
@@ -96,7 +101,7 @@ Then, across the whole deck:
 
 ### What to return
 
-Use `runtime/reviewer.mjs` as the single transport schema: `accepted`, `summary`, `rating` (0–10), `binding`, `inspectedSlides`, and `findings` with `slide` (stable ID or null), `code`, `severity`, `reason`, and `repair`. A precise new upper-case code is allowed. Major and blocker findings prevent acceptance. Record the titles-only argument, best/worst pages and deletion candidates in a companion narrative if useful.
+Use `runtime/reviewer.mjs` as the single transport schema: `accepted`, `summary`, `rating` (0–10), `binding`, `inspectedSlides`, and `findings` with `slide` (stable ID or null), `code`, `severity`, `reason`, and `repair`. A precise new upper-case code is allowed. Major and blocker findings prevent acceptance. Each repair names the earliest owner (evidence/storyline, design selection or shared renderer), so the next iteration changes the reusable skill as well as the candidate. Record the titles-only argument, best/worst pages and deletion candidates in a companion narrative if useful.
 
 Compute `binding` with `reviewBinding(out)` only after inspecting the current files. It hashes the editable deck, scene and every render. `inspectedSlides` lists every current slide ID actually inspected. Delivery rejects a stale binding or incomplete coverage. Any subsequent build needs a fresh review.
 

@@ -123,4 +123,6 @@ Use `density` for a coherent page type scale, not local font shrinking. `exhibit
 
 `pointsStyle` supports `icon-lead` (inline lead beside an authored icon), `icon-framed` (ringed icon with separate lead), `prose` (lead plus paragraph), `ruled` (separated observations), `lettered` (labelled options), `numbered` (ordered items) and `bulleted` (unordered items). Choose markings for their meaning; they do not add architecture variety.
 
+For a planned icon list, supply a supported `icon` on each peer and choose `pointsStyle: "icon-lead"` or `"icon-framed"`. An explicit `"prose"` treatment suppresses markers even if the records contain icons. Inspect the rendered glyphs against the plan; icon metadata alone does not establish that the chosen treatment reached the page.
+
 `tracker` controls section navigation independently of the deck's `contents` page. On a section divider, `contents` lists sections and `contentsActive` identifies the current one. `kicker` is an optional structural label above the title; use `evidenceStatus` for qualifications such as Judgement in the shared subtitle band instead. `footnotes: [{on, text}]` attaches numbered scope notes to exact labels. `notes` stores speaker notes without putting them on the page.
