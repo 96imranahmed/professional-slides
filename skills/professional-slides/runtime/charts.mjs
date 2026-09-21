@@ -390,7 +390,16 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
   if (!yScale && xScale) {
     for (const [index, reference] of (props.referenceLines || []).entries()) {
       const x = xScale(reference.value);
-      underlay.push(linePrimitive({ id: stableId(id, "reference-line", index), role: "chart-reference-line", x1: x, y1: plot.y - 4, x2: x, y2: plot.y + plot.height, style: lineStyle(token("color.componentPrimary"), token("line.standard"), "dash") }));
+      // Interrupt the exact-value guide around direct labels, rather than
+      // drawing through a value near the threshold. Its x position is unchanged.
+      const gaps = obstacles.filter(node => node.role === "data-label" && x >= node.frame.x - 4 && x <= node.frame.x + node.frame.width + 4)
+        .map(node => [Math.max(plot.y - 4, node.frame.y - 4), Math.min(plot.y + plot.height, node.frame.y + node.frame.height + 4)])
+        .sort((a, b) => a[0] - b[0]);
+      let cursor = plot.y - 4, segment = 0;
+      for (const [start, end] of [...gaps, [plot.y + plot.height, plot.y + plot.height]]) {
+        if (start > cursor) underlay.push(linePrimitive({ id: stableId(id, "reference-line", index, segment++), role: "chart-reference-line", x1: x, y1: cursor, x2: x, y2: start, style: lineStyle(token("color.componentPrimary"), token("line.standard"), "dash") }));
+        cursor = Math.max(cursor, end);
+      }
       if (reference.label) {
         const measured = measureText(reference.label, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 });
         const left = Math.min(plot.x + plot.width - measured.width, x + 6);

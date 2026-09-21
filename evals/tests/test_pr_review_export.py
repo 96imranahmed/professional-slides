@@ -121,6 +121,19 @@ class ZeroStackLabelTests(unittest.TestCase):
             self.assertEqual(chart.plots[0].data_labels.position, XL_LABEL_POSITION.ABOVE)
             self.assertEqual(tuple(chart.series[0].values), (1.62, 1.94, 2.37))
 
+    def test_signed_native_line_categories_stay_below_plot_after_save(self):
+        from pptx.enum.chart import XL_TICK_LABEL_POSITION
+        scene = scene_fixture()
+        spec = scene['slides'][0]['componentInstances'][0]['nativeChart']
+        spec.update(type='line', categories=['0', '1', '2', '3', '4', '5'],
+                    series=[{'name': 'Contribution', 'values': [-250, -170, -90, -10, 70, 150]}])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'signed-line.pptx'
+            Emitter(scene).run(path)
+            chart = next(s.chart for s in Presentation(path).slides[0].shapes if s.has_chart)
+            self.assertEqual(chart.category_axis.tick_label_position, XL_TICK_LABEL_POSITION.LOW)
+            self.assertEqual(tuple(chart.series[0].values), (-250, -170, -90, -10, 70, 150))
+
     def test_zero_stack_point_keeps_data_but_suppresses_native_label(self):
         scene=scene_fixture()
         spec=scene['slides'][0]['componentInstances'][0]['nativeChart']

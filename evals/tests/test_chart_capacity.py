@@ -4,6 +4,22 @@ from node_probe import run_node
 
 class ChartCapacityTests(unittest.TestCase):
 
+    def test_horizontal_reference_guide_clears_nearby_value_labels(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const props={categories:['One month','Two months','Three months'],series:[{name:'Cost',values:[9045,13090,17135]}],valueFormat:{decimals:1},referenceLines:[{value:14000,label:'Reserve: 14000'}]};
+const nodes=REGISTRY.get('chart.bar').render({id:'reserve',frame:{x:60,y:160,width:680,height:400},props}).nodes;
+const guides=nodes.filter(n=>n.role==='chart-reference-line');
+assert.ok(guides.length>1,'a nearby label interrupts the guide');
+assert.ok(guides.every(n=>Math.abs(n.frame.x-guides[0].frame.x)<.001),'all segments retain the exact threshold');
+for(const label of nodes.filter(n=>n.role==='data-label')) for(const line of guides) {
+ const a=line.frame,b=label.frame;
+ assert.ok(a.x<b.x-3.9||a.x>b.x+b.width+3.9||a.y+a.height<=b.y-3.9||a.y>=b.y+b.height+3.9,'reference does not pierce a direct value');
+}
+console.log('{}');
+""")
+
     def test_signed_columns_preserve_the_scene_instead_of_native_sign_drift(self):
         run_node(r"""
 import assert from 'node:assert/strict';

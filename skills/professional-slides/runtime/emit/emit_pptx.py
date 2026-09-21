@@ -28,7 +28,7 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.dml.color import RGBColor
-from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION, XL_LABEL_POSITION, XL_AXIS_CROSSES, XL_TICK_MARK
+from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION, XL_LABEL_POSITION, XL_AXIS_CROSSES, XL_TICK_MARK, XL_TICK_LABEL_POSITION
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.oxml.ns import qn
@@ -544,6 +544,10 @@ class Emitter:
                     va.maximum_scale = _nice_ceiling(max(vals) * LABEL_HEADROOM)
             ca = chart.category_axis
             ca.tick_labels.font.size = Pt(10)
+            if kind not in ("bar", "stacked-bar", "range"):
+                # Keep category labels below the plot when zero crosses signed
+                # data; labels at the zero line collide with near-zero marks.
+                ca.tick_label_position = XL_TICK_LABEL_POSITION.LOW
             if kind in ("bar", "stacked-bar", "range"):
                 ca.reverse_order = True  # first category at the top, as authored
                 va.crosses = XL_AXIS_CROSSES.MAXIMUM if False else va.crosses
