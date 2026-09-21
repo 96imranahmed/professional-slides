@@ -129,7 +129,7 @@ Give each case that will be discussed individually a stable circular `sectionNum
 
 ## Combo
 
-`chart.combo` draws the first series as columns and the second as a line with markers, both labelled. On one scale the line reads against the bars (actual against plan); with `secondaryAxis: true` the line floats in the band above the bars on its own padded scale (a margin over a revenue) and `secondaryUnit` suffixes its labels. The heading's unit line names both units.
+`chart.combo` draws the first series as columns and the second as a line with markers, both labelled. On one scale the line reads against the bars (actual against plan); with `secondaryAxis: true` the line floats in the band above the bars on its own padded scale (a margin over a revenue) and `secondaryUnit` suffixes its labels. The chart heading names both units inline.
 
 ## Pie and donut
 

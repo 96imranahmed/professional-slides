@@ -827,6 +827,9 @@ function validateCategoryLabels(ex) {
   });
 }
 
+const tableCells = row => Array.isArray(row) ? row : row.cells;
+const mapTableCells = (row, transform) => Array.isArray(row) ? transform(row) : { ...row, cells: transform(row.cells) };
+
 export function styleTable(ex) {
   validateCategoryLabels(ex);
   if (ex.treatment === undefined && ex.columns.some(c => c?.type === "category")) ex = { ...ex, treatment: "categories" };
@@ -838,7 +841,7 @@ export function styleTable(ex) {
   const columns = ex.columns.map((c, i) => typeof c === "string"
     ? { label: c, type: "text", bold: i === 0, width: columnWeight(ex, i) }
     : { width: columnWeight(ex, i), ...c });
-  const scaled = withDefaultScales(ex, ex.rows.map((r) => Array.isArray(r) ? r.map((cell, i) => verdictCell(cell, columnLabel(ex.columns[i]))) : r));
+  const scaled = withDefaultScales(ex, ex.rows.map(row => mapTableCells(row, cells => cells.map((cell, i) => verdictCell(cell, columnLabel(ex.columns[i]))))));
   const rowsIn = scaled.rows;
   if (scaled.scales) ex = { ...ex, scales: scaled.scales };
   // The recommended option's column is tinted end to end.
@@ -872,7 +875,7 @@ export function styleTable(ex) {
   }
   const explicit = ex.treatment || ex.variant;
   if (explicit) return { variant: ex.variant || (ex.treatment && ex.treatment !== "open" ? "standard" : "plain"), treatment: ex.treatment || "open", columns, rows: rowsIn, ...extra };
-  const first = rowsIn.map((r) => String(r[0]?.text ?? r[0] ?? ""));
+  const first = rowsIn.map((r) => String(tableCells(r)[0]?.text ?? tableCells(r)[0] ?? ""));
   const numbered = first.length > 1 && first.every((v) => /^\s*\d+\s*[·.)\-–:]\s*\S/.test(v));
   const head0 = String(columns[0].label || "").toLowerCase();
   const headLast = String(columns[columns.length - 1].label || "").toLowerCase();
@@ -881,18 +884,17 @@ export function styleTable(ex) {
   const scorecard = columns.length >= 4 && /\b(gate|criteri|dimension|factor|requirement|measure|option)/.test(head0);
   if (sequence) {
     const cols = [{ ...columns[0], type: "category" }, ...columns.slice(1)];
-    const rows = rowsIn.map((r, i) => {
+    const rows = rowsIn.map((row, i) => row.style === "total" ? row : mapTableCells(row, r => {
       const m = String(r[0]?.text ?? r[0]).match(/^\s*(\d+)\s*[·.)\-–:]\s*(.*)$/);
       const cell = { type: "category", text: m ? m[2] : String(r[0]?.text ?? r[0]), sectionNumber: m ? Number(m[1]) : i + 1 };
       return [cell, ...r.slice(1)];
-    });
+    }));
     return { variant: "standard", treatment: "categories", columns: cols, rows, ...extra };
   }
   if (scorecard) return { variant: "standard", treatment: "standard", columns, rows: rowsIn, ...extra };
   if (decision) {
-    // Under three columns a gutter has nothing to separate, so the conclusion
-    // keeps the tint it always had.
-    const rows = rowsIn.map((r) => [...r.slice(0, -1), typeof r[r.length - 1] === "string" ? { text: r[r.length - 1], type: "highlight" } : r[r.length - 1]]);
+    // A plain verdict stays joined; only an authored inference adds a gutter.
+    const rows = rowsIn.map(row => mapTableCells(row, r => [...r.slice(0, -1), typeof r[r.length - 1] === "string" ? { text: r[r.length - 1], type: "highlight" } : r[r.length - 1]]));
     return { variant: "standard", treatment: "standard", columns, rows, ...extra };
   }
   return { variant: "plain", treatment: "open", columns, rows: rowsIn, ...extra };

@@ -5,6 +5,31 @@ from node_probe import run_node
 
 
 class ComposeTableTests(unittest.TestCase):
+    def test_automatic_treatments_preserve_styled_rows_and_totals(self):
+        run_node('''
+import assert from 'node:assert/strict';
+import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const decision={columns:['Work package','Hours','Decision output'],rows:[
+ ['Review',10,'Independent ratings'],{style:'accented',cells:['Adjudication',1.5,'Ruling']},['Total',11.5,'Review package']]};
+const styled=styleTable(decision);
+assert.equal(styled.rows[1].style,'accented');
+assert.equal(styled.rows[1].cells[2].text,'Ruling');
+assert.equal(styled.rows[2].style,'total');
+assert.equal(styled.rows[2].cells[1],11.5);
+const stages=styleTable({columns:['Stage','Evidence'],rows:[{style:'accented',cells:['Inspect','Record']},['Total','One record']]});
+assert.equal(stages.rows[0].cells[0].text,'Inspect');
+assert.equal(stages.rows[1].cells[0],'Total');
+assert.equal(stages.rows[1].style,'total');
+const statuses=styleTable({columns:['Item','Verdict'],rows:[{style:'accented',cells:['Probe','✓']}]});
+assert.equal(statuses.rows[0].cells[1].type,'check');
+assert.equal(statuses.rows[0].cells[1].value,'yes');
+const result=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'t',tracker:false,slides:[{id:'s',title:'Independent review includes adjudication',layout:'exhibit-full',exhibit:{type:'table',...decision}}]}));
+const texts=result.deck.slides[0].nodes.map(n=>n.text || '');
+assert.ok(texts.some(t=>String(t).includes('Review package')));
+console.log('{}');
+''')
+
     def test_treatment_follows_content_not_the_first_option(self):
         result = run_node('''
 import assert from 'node:assert/strict';
