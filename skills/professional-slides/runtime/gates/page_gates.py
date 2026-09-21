@@ -2280,7 +2280,8 @@ def page_architecture(slide):
     # in a composite so chart-plus-process cannot collapse into a lone chart.
     diagram_components = {"steps", "cycle", "journey", "timeline", "process",
                           "chevron-process", "flow", "roadmap", "tree",
-                          "organization", "matrix", "quadrants", "horizons"}
+                          "organization", "matrix", "quadrants", "horizons",
+                          "gantt", "relationship-network"}
     if evidence:
         evidence += [c for c in instances if c.get("component") in diagram_components]
     comments = [c for c in instances if c.get("component") in {"paragraph", "bullet-list", "cards", "callout"}]

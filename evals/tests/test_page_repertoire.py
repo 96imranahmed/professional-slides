@@ -192,6 +192,13 @@ console.log(JSON.stringify({gaps: items.slice(1).map((n,i)=>Math.round(n.frame.y
 
 
 class GateVocabularyTests(unittest.TestCase):
+    def test_calendar_and_network_evidence_remain_in_architecture_mix(self):
+        for component in ("gantt", "relationship-network"):
+            diagram = {"component": component, "frame": {"x": 60, "y": 140, "width": 550, "height": 400}}
+            self.assertEqual(page_gates.page_architecture({"componentInstances": [diagram]}), component)
+            chart = {"component": "chart.bar", "frame": {"x": 650, "y": 140, "width": 550, "height": 400}}
+            self.assertEqual(page_gates.page_architecture({"componentInstances": [diagram, chart]}), "paired-evidence")
+
     def test_the_new_deck_gates_are_registered_and_documented(self):
         index = (SKILL / "references" / "evaluation" / "index.md").read_text(encoding="utf-8")
         for code in ("PAGE_SHAPE_FLAT", "COLUMN_MONOTONY", "NO_CONTENTS", "NO_SUMMARY"):
