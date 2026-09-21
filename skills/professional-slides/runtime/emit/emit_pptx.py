@@ -609,6 +609,13 @@ class Emitter:
                     ser.format.line.color.rgb = rgb(color)
                     ser.format.line.width = Pt(2.25)
                     ser.smooth = False
+                    # A per-point endpoint override creates a series label block
+                    # in Office. Set its value policy before adding that override.
+                    sdl = ser.data_labels
+                    sdl.show_value = bool(spec.get("pointDataLabels", spec.get("dataLabels", True)))
+                    sdl.number_format = number_format; sdl.number_format_is_linked = False
+                    sdl.font.size = Pt(11); sdl.font.bold = bool(spec.get("labelBold", True))
+                    sdl.position = XL_LABEL_POSITION.ABOVE
                 if kind in ("column", "bar", "stacked-column", "stacked-bar") and single and spec.get("dataLabels", True):
                     # Series-level labels first (a per-point override otherwise
                     # creates a series block that hides the other labels), then
@@ -634,13 +641,15 @@ class Emitter:
                         if point_color:
                             pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(point_color)
                 if kind == "line" and spec.get("endLabels"):
-                    # Series name at the last point instead of a legend.
+                    # Preserve both the series identity and its endpoint value.
                     last = len(spec["series"][i]["values"]) - 1
                     if last >= 0:
                         lab = ser.points[last].data_label
                         lab.position = XL_LABEL_POSITION.RIGHT
                         tf = lab.text_frame
-                        tf.text = str(spec["series"][i].get("name") or "")
+                        value = spec["series"][i]["values"][last]
+                        decimals = (spec.get("valueFormat") or {}).get("decimals", 0)
+                        tf.text = f'{spec["series"][i].get("name") or ""} {value:,.{decimals}f}'
                         for p in tf.paragraphs:
                             for r in p.runs:
                                 r.font.size = Pt(10); r.font.bold = True; r.font.color.rgb = rgb(color)

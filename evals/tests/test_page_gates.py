@@ -48,6 +48,19 @@ def slides_with(report, code):
 WEIGHT_OFF = {"pageWords": 0, "columnFill": 0, "plotSpan": 0, "pointWords": 0, "tableFill": 0, "elements": 1}
 
 
+class ExecutiveSummaryEvidenceTests(unittest.TestCase):
+    def test_summary_rows_need_no_metrics_but_other_roles_keep_evidence_contract(self):
+        page_gates.configure("full")
+        self.addCleanup(page_gates.configure, "balanced")
+        summary = {"role": "executive-summary", "componentInstances": [
+            {"id": "findings", "component": "points"}]}
+        findings = []
+        page_gates.gate_thin_evidence(2, summary, findings)
+        self.assertEqual(findings, [])
+        page_gates.gate_thin_evidence(3, {**summary, "role": "analysis"}, findings)
+        self.assertEqual([f["code"] for f in findings], ["THIN_EVIDENCE"])
+
+
 def good_slide():
     """A page that satisfies every gate: one hero exhibit, tight prose, a title."""
 

@@ -1454,6 +1454,11 @@ def gate_thin_evidence(slide_no, slide, findings):
     anything the weight contract sets to two elements) puts more than one piece
     of evidence on a page: the chart and the table behind it, the chart and the
     measured tiles, the two cuts of the same measure."""
+    # A summary synthesizes the proof on later pages. Its semantic role permits
+    # developed bullet rows without charts or metrics; NO_SUMMARY and the
+    # argument review still evaluate its presence and substance.
+    if slide.get("role") == "executive-summary":
+        return
     wanted = int(WEIGHT.get("elements") or 1)
     if wanted < 2:
         return

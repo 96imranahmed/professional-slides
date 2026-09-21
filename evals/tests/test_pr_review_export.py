@@ -90,6 +90,24 @@ class ExportReviewTests(unittest.TestCase):
         self.assertEqual(chart.plots[0].data_labels.number_format,'0.0')
 
 class ZeroStackLabelTests(unittest.TestCase):
+    def test_native_line_endpoint_overrides_preserve_values_and_point_policy(self):
+        for point_labels in (True, False):
+            scene = scene_fixture()
+            scene['tokens']['color.chartSeries1'] = {'kind': 'color', 'value': '#06202E'}
+            spec = scene['slides'][0]['componentInstances'][0]['nativeChart']
+            spec.update(type='line', categories=['0', '12', '24', '36'],
+                        series=[{'name': 'Monthly support', 'values': [0, 6, 12, 18]}],
+                        endLabels=True, pointDataLabels=point_labels)
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / 'line.pptx'
+                Emitter(scene).run(path)
+                chart = next(s.chart for s in Presentation(path).slides[0].shapes if s.has_chart)
+                labels = chart.series[0]._element.find(qn('c:dLbls'))
+                self.assertEqual(labels.find(qn('c:showVal')).get('val'), '1' if point_labels else '0')
+                endpoint = labels.find(qn('c:dLbl'))
+                self.assertEqual(endpoint.find(qn('c:idx')).get('val'), '3')
+                self.assertEqual(''.join(t.text for t in endpoint.findall('.//' + qn('a:t'))), 'Monthly support 18.0')
+
     def test_native_line_values_stay_above_markers_after_save(self):
         from pptx.enum.chart import XL_LABEL_POSITION
         scene = scene_fixture()

@@ -4,6 +4,22 @@ from node_probe import run_node
 
 class ChartCapacityTests(unittest.TestCase):
 
+    def test_native_line_distinguishes_endpoint_and_intermediate_values(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const frame={x:60,y:120,width:1160,height:450};
+for(const dataLabels of [true,false]){
+ const props={categories:['0','12','24','36'],series:[{name:'Monthly support',values:[0,6,12,18]}],endLabels:true,dataLabels,valueFormat:{decimals:1}};
+ const nodes=REGISTRY.get('chart.line').render({id:'line',frame,props}).nodes;
+ const spec=nativeChartSpec('chart.line',props,frame,nodes);
+ assert.equal(spec.pointDataLabels,dataLabels);assert.equal(spec.endLabels,true);
+ assert.equal(nodes.find(n=>n.data?.labelKind==='series-end').text,'Monthly support 18.0');
+}
+console.log('{}');
+""")
+
     def test_dumbbell_values_have_separate_gutters_from_category_labels(self):
         run_node(r"""
 import assert from 'node:assert/strict';

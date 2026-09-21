@@ -1222,13 +1222,14 @@ function lineChart({ id, frame, props, area = false }) {
             : last ? { x: point.x + 8, y: point.y - 12, width: 60, height: 24 }
             : { x: point.x - 30, y: point.y - 27, width: 60, height: 24 },
           text: formatValue(point.value, props),
+          data: { series: item.name, category: point.category, value: point.value, labelKind: "point" },
           style: textStyle(CHART_LABEL, INK, labelBold(), first ? "right" : last ? "left" : "center")
         }));
       }
     });
     if (endLabels) {
       const point = points.at(-1);
-      pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 4, y: point.y - 12, text: `${item.name} ${formatValue(point.value, props)}`, color: SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length] });
+      pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 4, y: point.y - 12, text: `${item.name} ${formatValue(point.value, props)}`, data: { series: item.name, category: point.category, value: point.value, labelKind: "series-end" }, color: SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length] });
     }
   });
   // End labels of lines that finish close together push apart (22px minimum)
@@ -1239,7 +1240,7 @@ function lineChart({ id, frame, props, area = false }) {
     const overflow = sorted.at(-1).y + 24 - (plot.y + plot.height);
     if (overflow > 0) for (const label of sorted) label.y -= overflow;
     for (let i = sorted.length - 2; i >= 0; i--) sorted[i].y = Math.min(sorted[i].y, sorted[i + 1].y - step);
-    for (const label of pendingEndLabels) nodes.push(textPrimitive({ id: label.id, role: "data-label", frame: { x: label.x, y: label.y, width: 180, height: 24 }, text: label.text, style: textStyle(CHART_LABEL, label.color, true, "left") }));
+    for (const label of pendingEndLabels) nodes.push(textPrimitive({ id: label.id, role: "data-label", frame: { x: label.x, y: label.y, width: 180, height: 24 }, text: label.text, data: label.data, style: textStyle(CHART_LABEL, label.color, true, "left") }));
   }
   for (const [index, highlight] of (props.pointHighlights || []).entries()) {
     const target = pointMap.get(`${highlight.series || series[0].name}:${highlight.category}`)

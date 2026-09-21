@@ -810,7 +810,10 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     series,
     highlightIndices: highlights.map((h) => categories.indexOf(h.category)).filter((i) => i >= 0),
     forecastIndex,
-    endLabels: props.endLabels === true || (type === "line" && series.length > 1 && props.legend !== true && props.endLabels !== false),
+    endLabels: props.directLabels === "end" || props.endLabels === true || (type === "line" && series.length > 1 && props.legend !== true && props.endLabels !== false),
+    ...(type === "line" ? { pointDataLabels: renderedNodes
+      ? renderedNodes.some(node => node.role === "data-label" && node.data?.labelKind === "point")
+      : props.dataLabels !== false } : {}),
     center: props.center ?? null,
     ...(type === "range" ? { low: [...(props.low || [])], high: [...(props.high || [])] } : {}),
     ...(Array.isArray(props.points) ? { points: props.points.map(p => ({ ...p })) } : {}),
