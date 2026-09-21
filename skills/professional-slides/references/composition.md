@@ -29,6 +29,8 @@ A section may contain any other composition, including more sections. A slide ma
 - framed items become an absolute composition;
 - an explicit sequence becomes a row flow.
 
+Automatic composition allocates the authored content; it does not convert charts to metrics, prose to cards or add a duplicate data table. Author these alternatives when their reading task warrants them.
+
 An explicit sequence outranks the peer-count rule; framed and layered relationships outrank both, because they declare the coordinate system. Override the selection when reading order, density or a reference design calls for a different relationship, and record the reason in the slide plan.
 
 Row and column plans, including nested sections, declare `gap` as a spacing token - `space.2` for a tight heading-and-body group, `space.4` for peer sections. Choose the gap from the relationship.

@@ -44,14 +44,15 @@ const phase=composeSlide({title:'T',exhibit:{type:'phase-table',phases:['1. Asse
 assert.equal(phase.items[0].props.headerShape,'chevron');assert.equal(phase.items[0].props.rows[0][1].type,'bullets');assert.equal(phase.items[0].props.columns.length,3);
 const rows=composeSlide({title:'T',rows:[{label:'Background',text:'x'},{label:'Solution',points:['y']}]},0);
 assert.equal(rows.items[0].props.treatment,'categories');assert.equal(rows.items[0].props.rows[1][1].type,'bullets');
-// Metrics strip above an exhibit; a thin chart becomes a column of tiles beside the points.
+// Authored metrics form a strip; small charts retain their quantitative encoding.
 const metrics=composeSlide({title:'T',metrics:[{value:'$1B',label:'x'},{value:'12%',label:'y'}],exhibit:{type:'chart.column',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]}},0);
 assert.equal(metrics.items[0].id,'s01-metrics');assert.equal(metrics.items[0].items.length,2);
 const thin=composeSlide({title:'T',exhibit:{type:'chart.column',unit:'$k',categories:['$4,000','$5,500','$6,500'],series:[{name:'Rent',values:[48,66,78]}]},points:['p']},0);
-const tiles=find(thin.items,i=>i.id==='s01-tiles');
-assert.deepEqual(tiles.items.map(t=>t.props.value),['$48k','$66k','$78k']);
+const retained=find(thin.items,i=>i.component==='chart.column');
+assert.deepEqual(retained.props.series[0].values,[48,66,78]);
+assert.equal(retained.props.unit,'$k');
 assert.ok(find(thin.items,i=>i.id==='s01-side'));
-assert.equal(find(thin.items,i=>String(i.component||'').startsWith('chart.')),null);
+assert.equal(find(thin.items,i=>i.component==='metric'),null);
 // Side ratios: chart 2:1, table 3:2.
 const chartSide=composeSlide({title:'T',exhibit:{type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]},points:['p']},0);
 // The implication chevron sits between the exhibit and its consequences, and

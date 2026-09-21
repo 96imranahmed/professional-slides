@@ -238,12 +238,16 @@ assert.equal(block.items[0].props.columns,undefined,'the row does not re-wrap it
 const row=composeSlide({title:'A title that states the finding here',exhibit:{type:'cards',tone:'plain',items:items.slice(0,3),columns:3}},0);
 assert.equal(row.items.find(i=>i.id==='s01-exhibit').component,'cards');
 
-// Points that all carry an icon become cards, and the count picks the shape.
+// Icons and point count do not substitute cards for an authored list.
 const page=(n)=>composeSlide({title:'A title that states the finding here',
   points:[...Array(n)].map((_,i)=>({icon:'gear',lead:`Thing ${i}`,text:'What it means in a sentence.'}))},0);
-assert.equal(page(3).items.find(i=>i.id==='s01-exhibit').component,'cards','three go across');
-assert.equal(page(5).items.find(i=>i.id==='s01-exhibit').layout,'flow.column','five go in a grid');
-// Two is a pair of labels and seven is a wall: both stay a list.
-assert.equal(page(2).items.find(i=>i.id==='s01-points')?.component,'bullet-list');
+for (const n of [2,3,5,7]) {
+  const composed=page(n);
+  const leaves=item=>item.component?[item]:(item.items||[]).flatMap(leaves);
+  const components=composed.items.flatMap(leaves);
+  assert.ok(components.every(item=>item.component==='bullet-list'));
+  assert.deepEqual(components.flatMap(item=>item.props.items).map(item=>item.lead),
+    Array.from({length:n},(_,i)=>`Thing ${i}`));
+}
 console.log(JSON.stringify({ok:true}));
 ''')

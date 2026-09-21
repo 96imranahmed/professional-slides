@@ -3,6 +3,29 @@ from node_probe import run_node
 
 
 class ContentVariantTests(unittest.TestCase):
+    def test_auto_layout_preserves_evidence_and_only_authored_supplements(self):
+        run_node(r'''
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const chart={type:'chart.column',heading:'Workload volume',unit:'cases',categories:['A','B'],series:[{name:'Cases',values:[10,20]}]};
+const make=slide=>toDeckPlan({schema:'professional-slides.deck/v3',id:'t',tracker:false,slides:[{id:'s',title:'The comparison uses matching populations and periods',...slide}]});
+const components=value=>{const out=[];function walk(x){if(!x||typeof x!=='object')return;if(x.component)out.push(x.component);for(const v of Object.values(x))if(typeof v==='object')Array.isArray(v)?v.forEach(walk):walk(v);}walk(value);return out;};
+const small=make({exhibit:chart});
+assert.ok(components(small).includes('chart.column'));
+assert.ok(!components(small).includes('metric'));
+const multi={...chart,series:[...chart.series,{name:'Other',values:[15,25]}]};
+assert.ok(!components(make({exhibit:multi})).includes('table'));
+assert.ok(components(make({exhibit:{...multi,dataTable:true}})).includes('table'));
+const points=Array.from({length:3},(_,i)=>({lead:`Finding ${i+1}`,text:'The supporting evidence changes the next operating decision.'}));
+const prose=make({points});
+assert.ok(!components(prose).includes('cards'));
+assert.doesNotThrow(()=>planDeck(prose));
+assert.ok(components(make({exhibit:{type:'cards',tone:'plain',items:points.map(p=>({title:p.lead,text:p.text}))}})).includes('cards'));
+assert.ok(components(make({metrics:[{value:'20',label:'Cases'}],points})).includes('metric'));
+console.log('{}');
+''')
+
     def test_exhibit_commentary_does_not_change_with_its_neighbours(self):
         run_node(r'''
 import assert from 'node:assert/strict';

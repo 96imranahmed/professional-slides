@@ -663,7 +663,7 @@ console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result["accepted"])
 
-    def test_a_document_weight_deck_offers_a_small_chart_its_own_table(self):
+    def test_chart_data_tables_require_an_authored_request_at_any_deck_weight(self):
         result = run_node('''
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
@@ -671,14 +671,13 @@ const chart={type:'chart.column',heading:'Revenue and cost',unit:'$m',categories
   series:[{name:'Revenue',values:[44,49,52,58,61]},{name:'Cost',values:[40,44,47,51,55]}]};
 const kinds=(page)=>{const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
   return page.items.flatMap(find).map(i=>i.component);};
-// elements: 1 - the chart is the page's only evidence element. (A single
-// labelled series is never offered a table of its own: it would print the same
-// five numbers twice.)
+// Deck weight does not duplicate the chart's numbers in a second exhibit.
 const light=composeSlide({title:'T',exhibit:JSON.parse(JSON.stringify(chart)),points:['a b c d e','f g h i j']},0,'.', 'balanced',1);
 assert.ok(!kinds(light).includes('table'));
-// elements: 2 - the cheapest second element is the chart's own numbers.
 const document=composeSlide({title:'T',exhibit:JSON.parse(JSON.stringify(chart)),points:['a b c d e','f g h i j']},0,'.', 'full',2);
-assert.ok(kinds(document).includes('table'),'the chart tabulates itself');
+assert.ok(!kinds(document).includes('table'));
+const requested=composeSlide({title:'T',exhibit:{...chart,dataTable:true}},0,'.','full',2);
+assert.ok(kinds(requested).includes('table'),'explicit exact-value supplements remain supported');
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result["accepted"])

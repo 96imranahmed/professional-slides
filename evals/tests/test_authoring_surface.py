@@ -53,13 +53,11 @@ console.log(JSON.stringify({{passes:PASS_NAMES}}));
         passes = result["passes"]
         # Footnote markers are attached before anything reads the exhibit, the
         # shape preset runs before the passes whose defaults it sets, and the
-        # data table is offered before it is built and built before it is
-        # stacked. Reordering any of these silently changes what a page holds.
+        # explicitly requested data table is built before it is stacked.
         self.assertLess(passes.index("footnotes"), passes.index("read-the-data"))
-        self.assertLess(passes.index("shape"), passes.index("offer-a-data-table"))
-        self.assertLess(passes.index("offer-a-data-table"), passes.index("build-the-data-table"))
+        self.assertLess(passes.index("shape"), passes.index("build-the-data-table"))
         self.assertLess(passes.index("build-the-data-table"), passes.index("stack-the-data-table"))
-        self.assertLess(passes.index("split-into-small-multiples"), passes.index("offer-a-data-table"))
+        self.assertLess(passes.index("split-into-small-multiples"), passes.index("build-the-data-table"))
 
     def test_a_failing_pass_says_which_pass_and_which_page(self):
         result = run_node(f'''

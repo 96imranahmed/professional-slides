@@ -1073,24 +1073,6 @@ function metricsStrip(metrics, id, tone) {
   return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...(tiles.length > 1 ? { valign: "top" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
 }
 
-/**
- * Hero fitness: a single-series chart with three categories or fewer is not a
- * hero; it becomes a KPI strip (value tiles labelled by category) so the page
- * does not carry a plot that is mostly air.
- */
-function thinChart(ex) {
-  if (!ex || !String(ex.type).startsWith("chart.") || !Array.isArray(ex.series) || ex.series.length !== 1) return false;
-  const values = ex.series[0].values || [];
-  return values.length > 0 && values.length <= 3 && !ex.type.includes("waterfall") && !ex.type.includes("pie") && !ex.type.includes("donut");
-}
-function chartToMetrics(ex) {
-  // "$k" wraps the number ($48k); "%" and "pts" follow it (48%).
-  const unit = String(ex.unit || "").trim();
-  const m = unit.match(/^([^\w\s%]*)(.*)$/);
-  const prefix = m ? m[1] : "", suffix = m ? m[2] : unit;
-  return (ex.categories || []).map((c, i) => ({ value: `${prefix}${ex.series[0].values[i]}${suffix}`, label: c, tone: "dark" }));
-}
-
 /** `photo: { path, alt, credit }` on a content page: a cropped photograph column. */
 function photoStrip(slide, id, baseDir, fr = 1) {
   if (!slide.photo) return null;
@@ -1876,8 +1858,7 @@ export const SHAPE_NAMES = Object.freeze(Object.keys(SHAPES));
  *
  * Each pass reads the slide the last one produced and returns the slide the
  * next one sees, so the order is the pipeline and the names are what it does.
- * A pass that needs to hand something to the layout stage rather than to the
- * next pass writes it on `ctx`.
+ * The context provides the slide identifier, asset directory and density.
  */
 /**
  * The page's own highlight, pushed down to whatever carries the page's prose.
@@ -1985,23 +1966,7 @@ const SLIDE_PASSES = [
       exhibits: series.map((entry) => ({ ...rest, heading: entry.name, series: [entry], legend: false })) };
   }],
 
-  // A deck whose weight asks for two elements a page gets the second one
-  // offered rather than demanded: a chart of six categories or fewer, with no
-  // table, no metrics and no second exhibit, tabulates itself underneath.
-  // `dataTable: false` declines it. A single labelled series is not offered
-  // one - its table would print the same five numbers a second time.
-  ["offer-a-data-table", (slide, { elements }) => {
-    if (!(elements >= 2 && slide.exhibit && !slide.exhibits && String(slide.exhibit.type).startsWith("chart.")
-        && slide.exhibit.dataTable === undefined && Array.isArray(slide.exhibit.series) && Array.isArray(slide.exhibit.categories)
-        && slide.exhibit.categories.length <= 6 && slide.exhibit.series.length >= 2 && slide.exhibit.series.length <= 3
-        && !(Array.isArray(slide.metrics) && slide.metrics.length) && !slide.kpi && !thinChart(slide.exhibit)
-        && !SIDEWAYS_CATEGORIES.has(String(slide.exhibit.type)))) return slide;
-    return { ...slide, exhibit: { ...slide.exhibit, dataTable: true } };
-  }],
-
-  // `dataTable: true` tabulates the chart's own series under it: the same
-  // numbers, printed, which is the cheapest second element a page can carry
-  // and what the reference pages do under a column chart.
+  // An explicitly requested data table prints exact series values beneath the chart.
   ["build-the-data-table", (slide) => {
     if (!(slide.exhibit && slide.exhibit.dataTable === true && Array.isArray(slide.exhibit.series) && !slide.exhibits)) return slide;
     return { ...slide, exhibit: { ...slide.exhibit, dataTable: slide.exhibit.series.map((series) => ({ label: series.name, values: (series.values || []).map((value) => formatTableValue(value)) })) } };
@@ -2019,21 +1984,10 @@ const SLIDE_PASSES = [
     return { ...slide, exhibit: undefined, exhibits: [chart, table], arrange: "stack", stackWeights: [4, 1] };
   }],
 
-  // Hero fitness: a thin single-series chart becomes a column of KPI tiles
-  // (one per category) that stands in for the hero, points beside it.
-  ["thin-chart-becomes-tiles", (slide, ctx) => {
-    if (!((!slide.layout || slide.layout === "auto") && slide.exhibit && !slide.exhibits && thinChart(slide.exhibit) && !slide.metrics)) return slide;
-    ctx.tileColumn = chartToMetrics(slide.exhibit);
-    ctx.tilePoints = slide.points || [];
-    return { ...slide, exhibit: undefined, exhibits: undefined, points: undefined };
-  }],
-
   // `rows` at slide level is the label-and-text table.
   ["rows-become-a-table", (slide) => (slide.rows && !slide.exhibit && !slide.exhibits
     ? { ...slide, exhibit: { type: "rows", rows: slide.rows, ...(Array.isArray(slide.columns) ? { columns: slide.columns } : {}) } }
     : slide)],
-
-
 
   // One big number parked above a table reads as two pages glued together: the
   // tile floats in air and the table starts again under it. A lone metric over
@@ -2045,50 +1999,6 @@ const SLIDE_PASSES = [
     const tile = typeof slide.metrics[0] === "string" ? { value: slide.metrics[0] } : slide.metrics[0];
     return { ...slide, metrics: undefined, kpi: { value: tile.value, ...(tile.label ? { label: tile.label } : {}), ...(tile.sublabel ? { sublabel: tile.sublabel } : {}) } };
   }],
-
-  // A page of named things that each carry an icon has three shapes, not one:
-  // down the page as an icon list, across it as a row of cards, or as a grid
-  // when there are more of them than a row holds at a readable width. It only
-  // ever drew the first, so every such page in a deck looked like every other.
-  // The count decides, which spreads a deck across all three without a rule
-  // anybody has to remember: three across, four to six as a grid of three, and
-  // the rest stay a list - two cards is a pair of labels and seven is a wall.
-  // A page whose evidence is its own prose is a page, not a grid.
-  //
-  // A quarter of published client pages carry no exhibit at all (evals/corpus),
-  // and they are a different page rather than an exhibit page with the exhibit
-  // missing: 166 words against 168, three numeric tokens against 21, a
-  // commentary column 13% of the time against 38%, and a highlighted phrase
-  // **71%** of the time. The emphasis does the work the exhibit would.
-  //
-  // The composer had no such page. Two passes stood where it should have been:
-  // one that wanted an icon AND a lead AND a text on every point - eleven
-  // conjuncts, so it essentially never fired - and one that turned led points
-  // into a `rows` table. So every page of type in every deck we make came out
-  // as a two-column grid, our text-page share reads 0% against the corpus's
-  // 25%, and `plan.mix.text` is a band nothing can satisfy.
-  //
-  // One pass now. Three to six points with a lead become cards: three across
-  // the page, four or more in a grid, icons used when the author wrote them and
-  // not required. The page keeps its standfirst and its so-what, which is what
-  // a client text page is - a numbered argument on tinted cards. Two led points
-  // are not a page of type; they are a thin page, and THIN_PAGE says so.
-  ["a-page-of-type-is-cards", (slide) => {
-    const points = slide.points || [];
-    if (!(!slide.exhibit && !slide.exhibits && !slide.rows && !slide.photo && !slide.pictures
-        && (!slide.layout || slide.layout === "auto") && !slide.pointsStyle
-        && !slide.highlight && !points.some(pt => pt?.highlight)
-        && !slide.paragraphs?.length
-        && points.length >= 3 && points.length <= 6
-        && points.every((pt) => pt && typeof pt === "object" && pt.lead && pt.text && pt.state == null))) return slide;
-    const items = points.map((pt, index) => ({
-      ...(pt.icon ? { icon: pt.icon } : {}),
-      title: pt.lead, text: pt.text, number: pt.number ?? index + 1,
-    }));
-    return { ...slide, points: undefined,
-      exhibit: { type: "cards", tone: "plain", items,
-                 ...(points.length > 3 ? { columns: 3 } : {}) } };
-  }],
 ];
 
 /** The pass names, in order - what the composer does to a slide and when. */
@@ -2097,7 +2007,7 @@ export const PASS_NAMES = Object.freeze(SLIDE_PASSES.map(([name]) => name));
 export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = []) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   assertKnownSlideKeys(slide, id);
-  const ctx = { id, baseDir, fill, elements, tileColumn: null, tilePoints: [], recentStyles };
+  const ctx = { id, baseDir, fill };
 
   // The first three passes run for every page; the fixed-shape pages then take
   // their own route and the rest go on through the pipeline.
@@ -2116,14 +2026,10 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       throw new Error(`${id} (${name}): ${error.message}`, { cause: error });
     }
   }
-  const { tileColumn, tilePoints } = ctx;
   const pictures = normalizePictures(slide, id);
   const layout = chooseLayout(slide, recent);
   if (Array.isArray(recent)) recent.unshift(layout);
-  // The column's shape, resolved once for the page and remembered, so
-  // consecutive pages do not all reach for the same device.
-  // The tile pass moves a thin chart's points onto the context, so read both.
-  const columnPoints = slide.points?.length ? slide.points : tilePoints;
+  const columnPoints = slide.points;
   const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints) : null;
   if (pointsStyle && Array.isArray(recentStyles)) recentStyles.unshift(pointsStyle);
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
@@ -2143,13 +2049,6 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // not making an inference, and a chevron on every metrics page is a device
     // that has stopped meaning anything.
     if (slide.implication === true) items.push({ id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: { fr: 1 }, height: 32 } });
-  }
-  if (tileColumn) {
-    const tiles = { id: `${id}-tiles`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: tileColumn.map((m, i) => ({ id: `${id}-tile-${i}`, component: "metric", props: { ...m, variant: "prominent" }, size: { width: { fr: 1 }, height: "fill" } })) };
-    const side = { id: `${id}-side`, heading: slide.pointsHeading || "What it means", treatment: sideTreatment(slide), size: { width: { fr: 1 }, height: "fill" }, items: [pointsItem(tilePoints, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle)] };
-    // The tile column reads as the evidence, so the same implication marker joins it to the meaning.
-    const tileChevron = (slide.implication ?? true) && tilePoints.length ? { id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: 44, height: "fill" } } : null;
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: tilePoints.length ? [tiles, tileChevron, side].filter(Boolean) : [tiles] });
   }
   // A full-width table needs no heading of its own: the action title and the
   // header row already say what it is. Heading bands exist for the row rule only.
