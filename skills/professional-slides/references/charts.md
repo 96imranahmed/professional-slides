@@ -157,6 +157,8 @@ How a portfolio moves from the current core through emerging plays to future opt
 
 Default to compact large numbers - `k`, `m`, `bn`, usually one decimal - shared across peer charts, tables, metrics and annotations, so `8.3m` sits beside `0.8m`. Declare one `valueFormat.compactUnit` for peer charts; `decimals` defaults to one; `sign: always` adds a plus to positive values. Formatting changes labels only: marks retain the raw values, and growth is calculated before rounding.
 
+Name the resource and state in rate/allowance labels. On a financing page, a bare “budget” naturally reads as money; an import-day allowance, remaining volume or crew-hour limit needs its own quantity and unit. Label exhaustion as such rather than making the reader infer whether zero means remaining allowance, delivered rate or spending.
+
 For a same-page comparison of two exhibits, declare `comparison: {kind: "matched", unit}` with identical chart types, periods, domains and value formats on both sides. The `chart-group` component lays out two to four coordinated children with one shared legend.
 
 ## Acceptance
