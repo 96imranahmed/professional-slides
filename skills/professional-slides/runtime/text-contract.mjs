@@ -45,10 +45,10 @@ export function auditTextPlan(content, scene) {
     if (!actual.length) { findings.push({id:page.id,code:'TEXT_PAGE_MISSING',severity:'blocking'}); continue; }
     if (actual.length!==1 || actual[0].id!==page.id) { findings.push({id:page.id,code:'TEXT_PLAN_PAGINATION',pages:actual.map(s=>s.id),reason:'Reconcile split pages into individual dot-dash text plans and reference comparisons before export.',severity:'blocking'}); continue; }
     // Whitespace wrapping is immaterial; wording and repeated occurrences are not.
-    let text = normalizeText(actual.flatMap(s=>s.nodes.filter(n=>n.type==='text' && !/^(page-number|footer-|tracker-)/.test(n.role)).map(n=>n.data?.textLayout?.source ?? n.text)).join(' '));
+    let text = normalizeText(actual.flatMap(s=>s.nodes.filter(n=>n.type==='text').map(n=>n.data?.textLayout?.source ?? n.text)).join(' '));
     for (const block of [...(page.textPlan || [])].sort((a,b)=>b.text.length-a.text.length)) {
       const needle = normalizeText(resolvePages(block.text,scene)), at = text.indexOf(needle);
-      if (at<0 && block.role!=='furniture') findings.push({id:page.id,block:block.id,code:'TEXT_PLAN_LOST',text:block.text,severity:'blocking'});
+      if (at<0) findings.push({id:page.id,block:block.id,code:'TEXT_PLAN_LOST',text:block.text,severity:'blocking'});
       else if (at>=0) text = text.slice(0,at)+' '+text.slice(at+needle.length);
     }
     if (!findings.some(f=>f.id===page.id && f.severity==='blocking') && /[\p{L}\p{N}]/u.test(text)) findings.push({id:page.id,code:'TEXT_UNPLANNED',text:normalizeText(text),severity:'blocking'});
@@ -68,11 +68,11 @@ export function auditExportText(content, scene, pageTexts) {
     // and count repeated fragments, without requiring node order to persist.
     let actual = normalizeText(texts.join(' '));
     for (const block of [...(page.textPlan || [])].sort((a,b)=>b.text.length-a.text.length)) {
-      if (block.role==='furniture') continue;
       const needle = normalizeText(resolvePages(block.text,scene)), at = actual.indexOf(needle);
       if (at<0) findings.push({id:page.id,block:block.id,code:'TEXT_EXPORT_LOST',text:block.text,severity:'blocking'});
       else actual = actual.slice(0,at)+' '+actual.slice(at+needle.length);
     }
+    if (!findings.some(f=>f.id===page.id && f.severity==='blocking') && /[\p{L}\p{N}]/u.test(actual)) findings.push({id:page.id,code:'TEXT_EXPORT_UNPLANNED',text:normalizeText(actual),severity:'blocking'});
   }
   return {...check,stage:'saved-pdf',accepted:!findings.some(f=>f.severity==='blocking'),findings};
 }

@@ -58,6 +58,19 @@ assert.ok(auditExportText(content,scene,['$31m']).findings.some(f=>f.code==='TEX
 assert.deepEqual(auditExportText(content,scene,[page.textPlan.map(b=>b.text).join('\n')]).scores,checkTextPlan(content).scores);
 const duplicate=structuredClone(content);duplicate.pages[0].textPlan.push({id:'again',role:'exhibit',text:'$31m'});
 assert.ok(auditTextPlan(duplicate,scene).findings.some(f=>f.code==='TEXT_PLAN_LOST'));
+// Furniture is excluded only from the density score, never from all-text retention.
+const shell=structuredClone(content);
+shell.pages[0].textPlan.push({id:'footer',role:'furniture',text:'Board pre-read'},{id:'page',role:'furniture',text:'01'});
+const withShell=structuredClone(scene);
+withShell.slides[0].nodes.push({type:'text',role:'footer-right',text:'Board pre-read'},{type:'text',role:'page-number',text:'01'});
+assert.ok(auditTextPlan(shell,withShell).accepted);
+assert.deepEqual(checkTextPlan(shell).scores,checkTextPlan(content).scores);
+assert.ok(auditTextPlan(shell,scene).findings.some(f=>f.code==='TEXT_PLAN_LOST'));
+assert.ok(auditTextPlan(content,withShell).findings.some(f=>f.code==='TEXT_UNPLANNED'));
+const exported=shell.pages[0].textPlan.map(b=>b.text).join('\n');
+assert.ok(auditExportText(shell,withShell,[exported]).accepted);
+assert.ok(auditExportText(shell,withShell,[page.textPlan.map(b=>b.text).join('\n')]).findings.some(f=>f.code==='TEXT_EXPORT_LOST'));
+assert.ok(auditExportText(shell,withShell,[exported+'\nUnplanned status']).findings.some(f=>f.code==='TEXT_EXPORT_UNPLANNED'));
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result['ok'])
