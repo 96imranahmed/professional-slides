@@ -232,7 +232,7 @@ function layoutKind(plan, items) {
 function makeItem(item, index, cell = null) {
   const size = item.size || { width: { fr: item.weight || 1 }, height: (["paragraph", "insight", "evidence-note", "callout", "table"].includes(item.component) || item.component === "bullet-list" && item.props?.variant === "body") ? "hug" : "fill" };
   if (item.items) {
-    const nestedPlan = { id: item.id, layout: item.layout || "auto", gap: item.gap, leftover: item.leftover };
+    const nestedPlan = { id: item.id, layout: item.layout || "auto", gap: item.gap, leftover: item.leftover, textFlow: item.textFlow };
     const nested = makeComposition(nestedPlan, item.items);
     return section({
       id: item.id,
@@ -269,8 +269,11 @@ function makeComposition(plan, items, { root = false } = {}) {
     let children = items;
     if (direction === "row") {
       children = alignRowPanels(children);
-      // A row of prose that is not parallel is a list, and a list reads down.
-      if (isProseRow(children) && !parallelProse(children)) {
+      // A row of prose that is not parallel is a list, and a list reads down -
+      // unless it is one text set in columns, which reads down the first column
+      // and on into the next. A document page says so; reflowing its columns
+      // into one stack is what left report prose in a single narrow band.
+      if (plan.textFlow !== "columns" && isProseRow(children) && !parallelProse(children)) {
         direction = "column";
         children = children.map((item) => ({ ...item, size: { width: { fr: 1 }, height: "hug" } }));
       }

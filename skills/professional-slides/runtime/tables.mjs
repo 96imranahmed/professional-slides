@@ -24,6 +24,7 @@ import { textStyle as baseTextStyle } from "./text-style.mjs";
 export const CELL_TYPES = Object.freeze([
   "text",
   "logo",
+  "photo",
   "bullets",
   "category",
   "highlight",
@@ -40,6 +41,11 @@ export const CELL_TYPES = Object.freeze([
   "check",
   "trend",
 ]);
+// A photo cell's height: three body lines, which is where a thumbnail stops
+// being a sliver and starts showing what it is of.
+const PHOTO_CELL_HEIGHT = 64;
+// Cells that may lead with an icon before their label.
+const ICON_LED_CELLS = new Set(["category", "text"]);
 // Outlook cells (the Bain sector tables): an arrow in a ring, green up, grey flat, red down.
 export const TREND_STATES = Object.freeze({ up: { glyph: "↑", color: "color.positive" }, flat: { glyph: "→", color: "color.textSecondary" }, down: { glyph: "↓", color: "color.negative" } });
 // Status vocabularies. Pill labels are the canonical words; the composer maps
@@ -425,6 +431,14 @@ function contentLayout(cell, width, props, used) {
     if (node.frame.height < height - 0.01) throw new Error("Logo column must fit every logo at the shared body-height; widen the column");
     return {height, padding, mediaWidth:node.frame.width};
   }
+  if (cell.type === "photo") {
+    // A photograph leading a row: the corpus's component and category tables
+    // set a thumbnail of the thing the row describes, cropped to the column.
+    // A logo cell is held to one body line so marks share a height; a photo at
+    // that height is a sliver nobody can read, so it takes its own.
+    if (!cell.media) throw new Error("A photo cell needs an image");
+    return { height: PHOTO_CELL_HEIGHT, padding };
+  }
   if (cell.type === "implication") {
     if (cell.relation !== "implies")
       throw new Error("Arrow cells require relation: implies");
@@ -552,8 +566,13 @@ function contentLayout(cell, width, props, used) {
   // A row label carries a numbered disc, an icon, or both: the reference matrix
   // numbers its rows and gives each one its own mark, and the label starts after
   // whatever is there.
-  const inlineSectionMarker = cell.sectionNumber !== undefined || (cell.type === "category" && cell.icon);
-  const iconInline = cell.type === "category" && Boolean(cell.icon);
+  // A text cell may lead with an icon too. It was read only on category cells,
+  // so `{ text, icon }` in an ordinary row label set the label and dropped the
+  // mark without a word - the icon-led row a reference table uses for drivers,
+  // channels or trends could be authored and never appeared.
+  const leadsWithIcon = ICON_LED_CELLS.has(cell.type) && Boolean(cell.icon);
+  const inlineSectionMarker = cell.sectionNumber !== undefined || leadsWithIcon;
+  const iconInline = leadsWithIcon;
   if (inlineSectionMarker) {
     const disc = cell.sectionNumber !== undefined ? v("icon.medium") + gap : 0;
     const glyph = iconInline ? Math.round(v("icon.medium") * 1.5) + gap : 0;
@@ -1202,6 +1221,10 @@ function renderTableAt({ id, frame, props }) {
       } else if (cell.type === "check") {
         const { size, on } = l.mark, x0 = area.x + (area.width - m.gap - size) / 2, y0 = area.y + (height - size) / 2;
         nodes.push(...stateMarker({ id: stableId(cellId, "check"), role: "table-check", x: x0, y: y0, size, state: on ? "yes" : "no", data }));
+      } else if (cell.type === "photo") {
+        const photo = mediaNode({ id: stableId(cellId, "photo"), frame: { x: inner.x, y: area.y + (height - l.height) / 2, width: inner.width, height: l.height }, props: cell.media, role: "table-photo", fit: "cover" });
+        photo.data = { ...photo.data, ...data };
+        nodes.push(photo);
       } else if (cell.type === "logo") {
         const logo = mediaNode({id:stableId(cellId,"logo"),frame:{x:inner.x,y:area.y+(height-l.height)/2,width:inner.width,height:l.height},props:cell.media,role:"table-logo"});
         logo.data = {...logo.data,...data,sharedHeight:l.height};
@@ -1502,7 +1525,7 @@ function renderTableAt({ id, frame, props }) {
           data: { ...data, sectionNumber: cell.sectionNumber, placement: "inline-start" },
         }));
       }
-      if (cell.type === "category" && cell.icon) {
+      if (ICON_LED_CELLS.has(cell.type) && cell.icon) {
         // The icon sits where the label starts: alone at the cell's left edge,
         // or just after the numbered disc when the row carries both.
         const size = Math.round(m.sectionMarkerSize * 1.5);

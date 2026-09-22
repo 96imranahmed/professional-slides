@@ -148,7 +148,33 @@ function tableAlias(ex) {
 /** Components whose render is the table renderer, reached by their own id. */
 const TABLE_RENDERERS = ["trend-rows", "comparison-table", "heatmap"];
 
+// Keys under which a component expects embedded media rather than a file name.
+const MEDIA_KEYS = new Set(["media", "photo", "image", "logo"]);
+
+/**
+ * Turn `{path, alt, credit}` references inside an exhibit into embedded media.
+ *
+ * The page-level `photo` and a `compare` side's `image` were read from disk, but
+ * nothing else was: a person's headshot, an icon-trends column's picture and a
+ * table's logo cell all demanded an embedded data URI, which an author writing
+ * a spec cannot reasonably supply. So persona columns, logo rows and photo rows
+ * existed in the runtime and could not be reached from a deck. A reference that
+ * already carries a data URI, or names no file, is left alone.
+ */
+function resolveMediaRefs(value, baseDir, key = null) {
+  if (Array.isArray(value)) return value.map((entry) => resolveMediaRefs(entry, baseDir, key));
+  if (!value || typeof value !== "object") return value;
+  if (key && MEDIA_KEYS.has(key) && typeof value.path === "string" && !value.dataUri) {
+    const { path: _p, credit, ...rest } = value;
+    return { ...rest, ...imageProps(value, baseDir), authorization: credit ?? value.authorization };
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(value)) out[k] = resolveMediaRefs(v, baseDir, k);
+  return out;
+}
+
 function exhibitItem(exIn, id, baseDir, size = SIZE) {
+  exIn = resolveMediaRefs(exIn, baseDir);
   // A `compare` whose sides name an `image` sets the two pictures above the two
   // columns, aligned to them. A comparison of two named things - two
   // characters, two cities, two products - is a page the reader should be able
@@ -1106,6 +1132,44 @@ function metricsStrip(metrics, id, tone) {
   return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...(tiles.length > 1 ? { valign: "top" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
 }
 
+// Words of prose one column carries before a document page opens a second.
+// A client report page sets prose at 45 to 75 characters a line, and a full
+// width column of 180 words runs to eight lines of about 150 characters each,
+// which the CPL gate already refuses; a second column is the fix a report
+// designer reaches for.
+const DOCUMENT_COLUMN_WORDS = 170;
+const wordsIn = (text) => String(text ?? "").split(/\s+/).filter(Boolean).length;
+
+/**
+ * A text page carrying only prose: the paragraphs flow from the top, in one to
+ * three columns, as a report page sets them.
+ *
+ * Paragraphs were pushed one by one into the page's body column, which spreads
+ * leftover height between its items. Two paragraphs came out pinned to the top
+ * and the foot of the page with the body empty between them - the single most
+ * common page in the corpus, report-style prose, drawn as two stranded lines.
+ */
+function documentItem(slide, id, pointCount) {
+  const paragraphs = slide.paragraphs || [];
+  if (!paragraphs.length || pointCount) return null;
+  const total = paragraphs.reduce((sum, p) => sum + wordsIn(p), 0);
+  const asked = slide.textColumns;
+  if (asked !== undefined && ![1, 2, 3].includes(asked)) throw new Error(`${id}: textColumns is 1, 2 or 3`);
+  const count = Math.min(asked ?? Math.min(3, Math.ceil(total / DOCUMENT_COLUMN_WORDS)), paragraphs.length) || 1;
+  // Balance columns by words, keeping paragraphs whole and in reading order.
+  const columns = Array.from({ length: count }, () => []);
+  let at = 0, filled = 0;
+  for (const text of paragraphs) {
+    if (at < count - 1 && filled >= total * (at + 1) / count) at += 1;
+    columns[at].push(text); filled += wordsIn(text);
+  }
+  const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4",
+    size: { width: { fr: 1 }, height: "fill" },
+    items: texts.map((text, i) => ({ id: `${id}-doc-${c}-p${i}`, component: "paragraph", props: { text }, size: HUG })) });
+  return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6", size: SIZE,
+    items: columns.filter((texts) => texts.length).map(column) };
+}
+
 /** `photo: { path, alt, credit }` on a content page: a cropped photograph column. */
 function photoStrip(slide, id, baseDir, fr = 1) {
   if (!slide.photo) return null;
@@ -1555,6 +1619,18 @@ function halvable(ex) {
 
 function chooseLayout(slide, recent = []) {
   if (slide.layout === "text" && (slide.exhibit || slide.exhibits?.length)) throw new Error("A text layout cannot discard an authored exhibit; select an evidence layout");
+  // A photograph beside text is the picture-hero page, which is what the
+  // documentation promises a text page with a photo becomes. The text branch
+  // drew the copy and dropped the picture without a word, so an author who
+  // followed the docs got half a page of white where the photograph should be.
+  if (slide.layout === "text" && slide.photo) return "picture-hero";
+  // An evidence layout with no evidence failed deep in the row builder on
+  // `exhibits[0].type`, which named neither the page nor the missing piece.
+  if (["exhibit-left", "exhibit-right", "exhibit-top", "exhibit-full"].includes(slide.layout)
+      && !slide.exhibit && !slide.exhibits?.length) {
+    throw new Error(`${slide.layout} places an exhibit beside or above the commentary, and this page has none. `
+      + "Use layout: \"text\" for a page of commentary, with `photo` for a photograph beside it.");
+  }
   if (slide.layout && slide.layout !== "auto") return slide.layout;
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   // An explicit arrangement is the author overriding the choice, not a hint.
@@ -1750,6 +1826,7 @@ export const SLIDE_KEYS = Object.freeze({
   pointsTone: "open, dark, muted, tint or primary",
   pointsAlign: "middle to centre the points on the exhibit",
   paragraphs: "body prose, on a text page",
+  textColumns: "1, 2 or 3: how many columns a text page sets its paragraphs in (default by length)",
   text: "the sentence a statement page carries",
   subtext: "the line under that sentence",
   insight: "the so-what as a box in the side column",
@@ -2682,7 +2759,9 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       items.push(pointsItem(points, `${id}-points`, tone, fill,
         !(slide.paragraphs || []).length, pointsStyle, items.length === 0));
     }
-    for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
+    const document = documentItem(slide, id, points.length);
+    if (document) items.push(document);
+    else for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
   }
   // These full-width/paired layouts used to discard supplied points. Keep
   // them in a measured track below the evidence, just like the two-up recipe.

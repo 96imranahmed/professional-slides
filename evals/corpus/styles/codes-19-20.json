@@ -1,0 +1,16 @@
+{
+ "361":["X-numbered-rows",[]], "362":["K-infographic",["icon","illustration"]], "363":["C-paired",[]],
+ "364":["X-labeled-rows",["color-labels"]], "365":["X-quote",["photo"]], "366":["X-document",["image"]],
+ "367":["C-paired",["ranked","dark-sidebar"]], "368":["K-stat-list",["icon","photo-grid","dark"]], "369":["X-document",["photo"]],
+ "370":["T-text",["dark","dense"]], "371":["X-sidebar",["statement","dark-panel"]], "372":["T-plain",["paired"]],
+ "373":["X-columns",["dark"]], "374":["P-screenshot",["chart"]], "375":["D-process",["numbered-circles"]],
+ "376":["T-text",["dense","labeled"]], "377":["X-document",[]], "378":["P-screenshot",["row","labels"]],
+ "379":["T-plain",["empty"]], "380":["D-staircase",["icon-list","maturity"]],
+ "381":["X-columns",["arrow"]], "382":["X-exec",[]], "383":["X-bullets",["dark","photo"]],
+ "384":["T-text",["dense"]], "385":["D-flow",["scoring","matrix"]], "386":["K-tiles",["photo","stat-row"]],
+ "387":["C-paired",["flags","donut","dark"]], "388":["C-combo",["stack"]], "389":["C-stack",["horizontal","percent","callout-panel"]],
+ "390":["C-bump",["rank-table","flags"]], "391":["C-col",["clustered"]], "392":["X-document",["chart"]],
+ "393":["C-waterfall",["pills"]], "394":["X-before-after",["big-numbers"]], "395":["K-stat-list",["dark","paired"]],
+ "396":["X-document",["redacted"]], "397":["C-map",["flows"]], "398":["P-illustration",["graphic"]],
+ "399":["K-ring",["color-panel"]], "400":["X-document",[]]
+}
