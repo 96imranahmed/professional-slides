@@ -23,7 +23,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from node_probe import NODE, ROOT
+from node_probe import NODE, ROOT, requires_python_package
 
 EXAMPLES = ROOT / "skills" / "professional-slides" / "examples"
 BUILD = ROOT / "skills" / "professional-slides" / "runtime" / "build-deck.mjs"
@@ -38,6 +38,8 @@ def build(spec: Path, out: Path):
     return result
 
 
+# A full build runs the emitter, so it needs python-pptx (requirements.txt).
+@requires_python_package('pptx')
 class StageWiringTests(unittest.TestCase):
     def setUp(self):
         if not NODE:

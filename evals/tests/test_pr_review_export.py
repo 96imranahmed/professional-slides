@@ -6,14 +6,22 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from lxml import etree
-from PIL import Image
-from pptx import Presentation
-from pptx.oxml.ns import qn
-from node_probe import ROOT
+from node_probe import ROOT, requires_python_package
 
+# The emitter's dependencies are optional at test time (see requirements.txt).
+# Imported defensively so the module still loads and its classes skip with a
+# message naming what is missing, rather than failing collection.
 sys.path.insert(0,str(ROOT/'skills/professional-slides/runtime/emit'))
-from emit_pptx import Emitter
+try:
+    from lxml import etree
+    from PIL import Image
+    from pptx import Presentation
+    from pptx.oxml.ns import qn
+    from emit_pptx import Emitter
+except ImportError:  # pragma: no cover - exercised only without the packages
+    etree = Image = Presentation = qn = Emitter = None
+
+needs_emitter = requires_python_package('pptx', 'lxml', 'PIL')
 
 
 def scene_fixture():
@@ -30,6 +38,7 @@ def scene_fixture():
         'type':'column','frame':frame,'categories':['A','B'],'series':[{'name':'Sales','values':[1,2]}],'dataLabels':True,'legend':True,'valueFormat':{'decimals':1}}}]}]}
 
 
+@needs_emitter
 class ExportReviewTests(unittest.TestCase):
     def test_canvas_survives_export_and_readback_rejects_drift(self):
         from readback_pptx import readback
@@ -89,6 +98,7 @@ class ExportReviewTests(unittest.TestCase):
         self.assertEqual(chart.font.name,'Georgia')
         self.assertEqual(chart.plots[0].data_labels.number_format,'0.0')
 
+@needs_emitter
 class ZeroStackLabelTests(unittest.TestCase):
     def test_native_line_endpoint_overrides_preserve_values_and_point_policy(self):
         for point_labels in (True, False):

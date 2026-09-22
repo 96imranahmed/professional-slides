@@ -4,14 +4,21 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pptx import Presentation
-from node_probe import ROOT, run_node
+from node_probe import ROOT, run_node, requires_python_package
 
+# python-pptx is optional at test time (see requirements.txt); the emitter and
+# the readback both import it, so the class skips when it is absent rather than
+# failing collection.
 sys.path.insert(0, str(ROOT / 'skills/professional-slides/runtime/emit'))
-from emit_pptx import Emitter
-from readback_pptx import readback
+try:
+    from pptx import Presentation
+    from emit_pptx import Emitter
+    from readback_pptx import readback
+except ImportError:  # pragma: no cover - exercised only without python-pptx
+    Presentation = Emitter = readback = None
 
 
+@requires_python_package('pptx')
 class VisualTruthExportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

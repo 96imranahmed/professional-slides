@@ -1,0 +1,18 @@
+# Python side of the export pipeline. The Node layout engine needs none of
+# this; these are what the emitter, the renderer and the pixel gates import.
+#
+#   python3 -m pip install -r requirements.txt
+#
+# Two binaries are not installable from here and are needed for a full build:
+# LibreOffice (`soffice`, PPTX to PDF) and poppler's `pdftoppm` (PDF to PNG).
+# On macOS: `brew install --cask libreoffice` and `brew install poppler`.
+# Without them the build still writes the deck and the suite still runs; the
+# render, readback and ink gates skip and say so.
+#
+# Set RUNTIME_PYTHON when these live in an environment of their own.
+
+python-pptx>=0.6.21   # emit_pptx.py, readback_pptx.py: writes and reads the deck
+lxml>=4.9             # emit_pptx.py: the OOXML the python-pptx API does not reach
+Pillow>=10.0          # page_gates.py: ink coverage measured off the renders
+numpy>=1.24           # page_gates.py: the same measurement, per row
+pypdf>=3.9            # page_gates.py: page count and text off the rendered PDF

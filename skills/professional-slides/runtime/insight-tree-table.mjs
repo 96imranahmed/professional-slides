@@ -8,6 +8,7 @@ import {
   tokenValue
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
+import { textStyle as baseTextStyle, boxStyle as baseBoxStyle, measuredTextNode as baseMeasuredTextNode } from "./text-style.mjs";
 
 const INK = token("color.ink");
 const PRIMARY = token("color.componentPrimary");
@@ -77,16 +78,10 @@ export const INSIGHT_TREE_TABLE_FOUR_BRANCH_SAMPLE = Object.freeze({
 });
 
 const value = key => tokenValue(token(key));
-const boxStyle = (fill, stroke = "none", lineWidth = HAIRLINE, radius = NONE) => ({ fill, stroke, lineWidth, radius });
-const textStyle = (fontSize = BODY, color = INK, bold = false, align = "left") => ({
-  fontFamily: FONT,
-  fontSize,
-  color,
-  bold,
-  align,
-  valign: "top",
-  wrap: false
-});
+const boxStyle = (fill, stroke = "none", lineWidth = HAIRLINE, radius = NONE) => baseBoxStyle({ fill, stroke, lineWidth, radius });
+// This file's argument order and defaults, over the shared builders.
+const textStyle = (fontSize = BODY, color = INK, bold = false, align = "left") =>
+  baseTextStyle({ fontFamily: FONT, fontSize, color, bold, align, valign: "top", wrap: false });
 
 function requiredText(input, name) {
   if (typeof input !== "string" || !input.trim()) throw new Error(`Insight tree table ${name} requires nonempty text`);
@@ -132,16 +127,14 @@ function normalize(props = {}) {
   return { root, branches, leaves, rowTreatment, headers };
 }
 
-function measuredTextNode({ id, role, frame, text, style, data = {}, center = false }) {
-  const layout = measureText(text, frame.width, {
-    fontFamily: tokenValue(style.fontFamily),
-    fontSize: tokenValue(style.fontSize),
-    bold: style.bold,
-    wrapWidthRatio: 1
+// A tree row's height is measured from its leaves before the rows are placed,
+// so the frame is already sized to the text: measure once and refuse, and
+// always shrink the frame to the measured height so rows abut their neighbours.
+function measuredTextNode(input) {
+  return baseMeasuredTextNode({
+    ...input, fit: false, shrinkToText: true,
+    overflowMessage: (id) => `${id} exceeds its insight tree table text frame; enlarge the component or simplify the copy`,
   });
-  if (layout.height > frame.height) throw new Error(`${id} exceeds its insight tree table text frame; enlarge the component or simplify the copy`);
-  const y = center ? frame.y + (frame.height - layout.height) / 2 : frame.y;
-  return textPrimitive({ id, role, frame: { x: frame.x, y, width: frame.width, height: layout.height }, text: layout.text, style: { ...style, lineHeight: layout.lineHeight }, data: { ...data, textLayout: layout } });
 }
 
 function connector(nodes, id, x1, y1, x2, y2, data = {}) {

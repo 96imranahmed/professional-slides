@@ -29,6 +29,12 @@ RENDER = ROOT / "evals" / "golden" / "reference"
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
 
+from node_probe import requires_python_package  # noqa: E402
+
+# The three gates that read the renders need Pillow (see requirements.txt).
+# Everything else in this file works off the scene.
+needs_pixels = requires_python_package('PIL')
+
 
 def load_scene():
     return page_gates.load_scene(SCENE)
@@ -270,6 +276,7 @@ class KnownBadDeckTests(unittest.TestCase):
     # finding. Whether a title commits is real and is a judgement; it lives in
     # the taste review now, and `reviewer.mjs` still raises the code.
 
+    @needs_pixels
     def test_hero_exhibit_and_ink_gates_fire_on_the_thin_pages(self):
         self.assertTrue(slides_with(self.report, "HERO_EXHIBIT"))
         ink = slides_with(self.report, "INK_COVERAGE")
@@ -287,6 +294,7 @@ class KnownBadDeckTests(unittest.TestCase):
         self.assertGreater(finding["measured"]["share"], page_gates.THRESHOLDS["monotony_max"])
         self.assertGreaterEqual(len(finding["measured"]["slides"]), 8)
 
+    @needs_pixels
     def test_ink_is_measured_from_the_png_and_separates_thin_from_full_pages(self):
         coverage = {}
         for number in (2, 5, 6, 15):
@@ -384,6 +392,7 @@ class TextPageInkFloorTests(unittest.TestCase):
         self.assertAlmostEqual(ink[0]["threshold"], round(floor, 4), places=4)
         self.assertIn("word floor", ink[0]["repair"])
 
+    @needs_pixels
     def test_a_page_with_an_exhibit_keeps_the_exhibit_floor(self):
         # The deferral is only for pages with no exhibit. A chart page that
         # renders nearly blank is still a chart page that renders nearly blank.

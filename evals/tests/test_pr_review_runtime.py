@@ -7,11 +7,12 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from node_probe import run_node, NODE, ROOT
+from node_probe import run_node, NODE, ROOT, requires_python_package
 from test_page_gates import good_slide, page_gates
 
 RUNTIME = ROOT / 'skills/professional-slides/runtime'
 
+@requires_python_package('pptx')
 class RuntimeReviewTests(unittest.TestCase):
     def test_custom_markers_resolve_feature_ids_without_country_aliases(self):
         result = run_node('''

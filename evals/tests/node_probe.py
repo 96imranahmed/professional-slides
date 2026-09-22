@@ -32,6 +32,71 @@ NODE = os.environ.get("RUNTIME_NODE") or shutil.which("node")
 
 WORKER = Path(__file__).resolve().parent / "probe-worker.mjs"
 
+# The Python side of the export pipeline is optional at test time. The layout
+# engine, the composer and every gate that reads the scene are pure Node or
+# pure Python; only the emitter, the renderer and the pixel gates need these.
+# Without a guard they surfaced as twelve ERRORs on a clean checkout, which
+# reads as a broken suite rather than as an absent dependency - so a machine
+# with no LibreOffice reported the same thing as a machine with a real bug.
+# `requirements.txt` says how to install them.
+RUNTIME_PYTHON = os.environ.get("RUNTIME_PYTHON")
+
+
+def _importable(module: str) -> bool:
+    """Whether the runtime's interpreter can import `module`.
+
+    Asked of RUNTIME_PYTHON when it is set, because that is the interpreter the
+    emitter will actually run under; the suite's own interpreter may not be it.
+    """
+    if RUNTIME_PYTHON:
+        probe = subprocess.run([RUNTIME_PYTHON, "-c", f"import {module}"],
+                               capture_output=True, text=True)
+        return probe.returncode == 0
+    import importlib.util
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def requires_python_package(*modules: str):
+    """Skip the test or class unless every named package imports.
+
+    The message names the package and points at requirements.txt, so a skip
+    says what to install rather than only that something was absent.
+    """
+    missing = [m for m in modules if not _importable(m)]
+    return unittest.skipIf(
+        bool(missing),
+        f"needs {', '.join(missing)} (python3 -m pip install -r requirements.txt)",
+    )
+
+
+def requires_binary(*names: str):
+    """Skip unless every named executable is on PATH (or given by RUNTIME_BIN_DIR)."""
+    bin_dir = os.environ.get("RUNTIME_BIN_DIR")
+    def found(name: str) -> bool:
+        if bin_dir and (Path(bin_dir) / name).exists():
+            return True
+        return shutil.which(name) is not None
+    missing = [n for n in names if not found(n)]
+    return unittest.skipIf(bool(missing), f"needs {', '.join(missing)} on PATH")
+
+
+# LibreOffice registers under either name depending on the install.
+def _soffice() -> str | None:
+    for name in ("soffice", "libreoffice"):
+        found = shutil.which(name)
+        if found:
+            return found
+    mac = Path("/Applications/LibreOffice.app/Contents/MacOS/soffice")
+    return str(mac) if mac.exists() else None
+
+
+HAS_PPTX = _importable("pptx")
+HAS_PILLOW = _importable("PIL")
+HAS_RENDERER = _soffice() is not None and shutil.which("pdftoppm") is not None
+
 # `node --input-type=module --eval` names the anonymous module after cwd, and
 # probes that build a require() off import.meta.url rely on that. A data: module
 # has no such URL, so the specifier rewrite below pins the same value.

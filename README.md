@@ -34,7 +34,7 @@ Register every rendering variant with representative props and size. New registr
 
 `npm run check` runs syntax/whitespace checks and fast tests. `check:syntax` is not a semantic linter. These tests do not require regenerating cached visual reports after each edit. `npm run check:release` still requires a hash-verified golden set, including both render images for every fixture.
 
-Install the Node development dependencies with `npm ci` using `package-lock.json`. The export pipeline requires Python with python-pptx, Pillow and NumPy, plus LibreOffice and `pdftoppm` for rendering. Set `RUNTIME_PYTHON` when those packages live in a separate environment. Renderer or dependency changes require new visual acceptance.
+Install the Node development dependencies with `npm ci` using `package-lock.json`, and the Python side of the export pipeline with `python3 -m pip install -r requirements.txt`. Rendering additionally needs LibreOffice (`soffice`) and poppler's `pdftoppm`, which pip cannot install: on macOS, `brew install --cask libreoffice` and `brew install poppler`. Set `RUNTIME_PYTHON` when those packages live in a separate environment. None of this is needed to run the layout engine or the scene gates: `npm test` passes without any of it and reports what it skipped, and a gate report names the slides whose renders it could not measure in `pixelGatesSkipped`. Renderer or dependency changes require new visual acceptance.
 
 The table compiler uses Prettier 3.6.2 formatting; keep normalization, measurement and rendering in separate named helpers.
 

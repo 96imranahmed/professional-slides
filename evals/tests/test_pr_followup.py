@@ -8,12 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pptx import Presentation
-from pptx.oxml.ns import qn
-from pptx.util import Inches, Pt
-from node_probe import NODE, ROOT, RUNTIME, run_node
+from node_probe import NODE, ROOT, RUNTIME, run_node, requires_python_package
 from test_plugin_distribution import packager
-from test_pr_review_export import Emitter
 
 
 def load_module(name, file):
@@ -23,10 +19,22 @@ def load_module(name, file):
     return module
 
 
-probe = load_module('followup_probe', ROOT / 'evals/scripts/pptx_scene_probe.py')
-importer = load_module('followup_importer', RUNTIME / 'import-template.py')
+# python-pptx is optional at test time (see requirements.txt). Both the probe
+# and the template importer import it themselves, so they are loaded here only
+# when it is present; the class skips otherwise.
+needs_pptx = requires_python_package('pptx')
+try:
+    from pptx import Presentation
+    from pptx.oxml.ns import qn
+    from pptx.util import Inches, Pt
+    from test_pr_review_export import Emitter
+    probe = load_module('followup_probe', ROOT / 'evals/scripts/pptx_scene_probe.py')
+    importer = load_module('followup_importer', RUNTIME / 'import-template.py')
+except ImportError:  # pragma: no cover - exercised only without python-pptx
+    Presentation = qn = Inches = Pt = Emitter = probe = importer = None
 
 
+@needs_pptx
 class FollowupReviewTests(unittest.TestCase):
     def cli(self, *args):
         return subprocess.run([NODE, *map(str, args)], capture_output=True, text=True,

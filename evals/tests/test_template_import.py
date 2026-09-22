@@ -9,11 +9,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from node_probe import ROOT, RUNTIME, NODE, run_node
+from node_probe import ROOT, RUNTIME, NODE, run_node, requires_python_package
 
 SKILL = ROOT / "skills" / "professional-slides"
 
 
+@requires_python_package('pptx')
 class TemplateImportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

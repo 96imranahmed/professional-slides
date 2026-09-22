@@ -28,6 +28,7 @@ import { registerSegmentedEvidence } from "./segmented-evidence.mjs";
 import { registerMedia } from "./media.mjs";
 import { registerCharts } from "./charts.mjs";
 import { renderTable, measureTable, TABLE_TOKENS } from "./tables.mjs";
+import { fitText, textStyle as baseTextStyle, measuredTextNode } from "./text-style.mjs";
 import { TABLE_VARIANTS } from "./table-fixtures.mjs";
 import { measureText, measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { routeConnector } from "./routing.mjs";
@@ -66,14 +67,9 @@ const LABEL = token("type.label");
 const SOURCE = token("type.source");
 const SECTION_HEADING_TOKENS = ["color.componentPrimary", "color.ink", "color.onPrimary", "font.body", "type.heading", "line.hairline", "space.1", "space.2", "space.3", "space.4"];
 
-const textStyle = (size = BODY, color = INK, bold = false, align = "left", valign = "mid") => ({
-  fontFamily: FONT,
-  fontSize: size,
-  color,
-  bold,
-  align,
-  valign
-});
+// The registry's own argument order and defaults, over the shared builders.
+const textStyle = (size = BODY, color = INK, bold = false, align = "left", valign = "mid") =>
+  baseTextStyle({ fontFamily: FONT, fontSize: size, color, bold, align, valign });
 
 const boxStyle = (fill = SURFACE, stroke = RULE, lineWidth = HAIRLINE, radius = SMALL_RADIUS) => ({
   fill,
@@ -112,25 +108,12 @@ function paragraphMeasure(frameWidth, props = {}) {
   return Math.min(frameWidth, Math.round(tokenValue(BODY) * 96 / 72 * 0.47 * 80));
 }
 
-// Degradation ladder for measured text: fit at the token size; otherwise step the
-// size down in 0.5pt steps to a floor of 80% (never below 9pt) and record the step.
-// Only when the floor still overflows does the component refuse, naming the overflow.
-export function fitText({ text, runs, width, height, fontFamily, fontSize, bold, minScale = 0.8, floorPt = 9 }) {
-  const measure = (size) => runs ? measureTextRuns(runs, width, { fontFamily, fontSize: size, wrapWidthRatio: 1 }) : measureText(text, width, { fontFamily, fontSize: size, bold, wrapWidthRatio: 1 });
-  let size = fontSize, layout = measure(size);
-  const floor = Math.max(floorPt, Math.round(fontSize * minScale * 2) / 2);
-  while (height !== undefined && layout.height > height && size - 0.5 >= floor) { size -= 0.5; layout = measure(size); }
-  return { layout, fontSize: size, stepped: size !== fontSize, overflow: height !== undefined && layout.height > height ? layout.height - height : 0 };
-}
+// `fitText` and the measured node now live in text-style.mjs, beside the
+// style object they measure; re-exported here because this is where callers
+// have always found it.
+export { fitText };
 
-function measuredTextNode(input) {
-  if(input.runs && input.runs.map(r=>r.text).join("")!==input.text)throw new Error("Paragraph emphasis must preserve exact text");
-  const fit = fitText({ text: input.text, runs: input.runs, width: input.frame.width, height: input.frame.height, fontFamily: tokenValue(input.style.fontFamily), fontSize: tokenValue(input.style.fontSize), bold: input.style.bold });
-  if (fit.overflow > 0) throw new Error(`${input.id} overflows its ${input.frame.height}px box by ${Math.ceil(fit.overflow)}px even at ${fit.fontSize}pt; split the page or cut the copy`);
-  const textLayout = fit.layout;
-  const style = { ...input.style, lineHeight: textLayout.lineHeight, wrap: false, ...(fit.stepped ? { fontSize: { tokenId: input.style.fontSize.tokenId ?? "type.body", kind: "fontSizePt", value: fit.fontSize } } : {}) };
-  return textPrimitive({ ...input, text: textLayout.text, ...(textLayout.runs?{runs:textLayout.runs}:{}), style, data: { ...input.data, textLayout, ...(fit.stepped ? { fitStep: fit.fontSize } : {}) } });
-}
+
 
 function insightLayout(frame, props) {
   // `items`: the closing block as two or three square-bulleted findings on the

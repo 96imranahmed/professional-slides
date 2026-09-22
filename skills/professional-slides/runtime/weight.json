@@ -198,6 +198,31 @@
         "min": 0.35,
         "observedClient": 0.508,
         "observedPublished": 0.414
+      },
+      "sourceLine": {
+        "min": 0.5,
+        "observedClient": 0.672,
+        "$comment": "A page without a source line is a page a reader cannot check. Client work runs 0.672."
+      },
+      "marksPerPage": {
+        "min": 11,
+        "corpusFirstQuartile": 11,
+        "corpusMedian": 32,
+        "$comment": "Drawn primitives that are not type, per page. A page of rules and paragraphs is what a reader feels before reading a word."
+      },
+      "from": {
+        "min": 5,
+        "$comment": "Analytical pages before a deck-wide rate means anything."
+      },
+      "tableDevice": {
+        "shareMax": 0.6,
+        "from": 4,
+        "$comment": "One table device on more than three fifths of a deck's tables is one decision made once. Treated is not the same as varied: nine of fourteen tables in the cold run drew the implication gutter and the reader stopped seeing it."
+      },
+      "drawnBridge": {
+        "shareMax": 0.4,
+        "from": 5,
+        "$comment": "A drawn mark in the gutter between an exhibit and its commentary asserts an inference. The reference decks state that relation in the commentary's heading, in a headed panel or in a closing band far more often than they draw it; a deck that draws it on most such pages has stopped choosing."
       }
     }
   },

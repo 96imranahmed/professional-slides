@@ -10,6 +10,7 @@ import {
   tokenValue
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
+import { textStyle as baseTextStyle } from "./text-style.mjs";
 
 export const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label", "end-bubble"]);
 export const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot", "speech"]);
@@ -51,15 +52,11 @@ const ENDPOINT_DIAMETER = 8;
 const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label"]);
 const SCALAR_BUBBLE = /^(?:[~≈]?\s*[+−\-£$€¥]{0,2}\s*\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|pp|bps|x|×|bn|mn|[kKmMbBtT])?(?:\s*p\.a\.)?|N\/A)$/;
 
+// An annotation centres on the mark it points at, and its bold face is the
+// annotation face rather than the body bold. Over the shared builder.
 function textStyle(size, color, bold = false, align = "center") {
-  return {
-    ...(bold ? chartAnnotationStyle() : { fontFamily: token("font.body") }),
-    fontSize: size,
-    color,
-    bold,
-    align,
-    valign: "mid"
-  };
+  const face = bold ? chartAnnotationStyle() : { fontFamily: token("font.body") };
+  return { ...baseTextStyle({ fontSize: size, color, bold, align, valign: "mid" }), ...face };
 }
 
 function normalizeAnchor(anchor, field) {

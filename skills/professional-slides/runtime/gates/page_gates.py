@@ -231,17 +231,12 @@ THRESHOLDS = {
     # there is nothing left in the sentence that the exhibit did not supply.
     "restatement_block_words_min": 6,
     "restatement_block_max": 0.66,
-    # One table device on more than three quarters of a deck's tables is one
-    # decision made once. Measured where there are enough tables to have a
-    # pattern at all.
-    "table_device_share_max": 0.6,
-    "table_device_from": 4,
-    # A drawn gutter mark between an exhibit and its commentary asserts an
-    # inference. The reference decks state that relation in words far more often
-    # than they draw it; a deck that draws it on most such pages has stopped
-    # choosing. Measured where there are enough of these pages to have a pattern.
-    "drawn_bridge_share_max": 0.4,
-    "drawn_bridge_from": 5,
+    # DECK_CRAFT's own floors are not here: they live beside the observations
+    # they were calibrated from, in `weight.json` under `plan.craft`, and are
+    # read through CONTRACT. Two of the five already did, and `highlight` was
+    # carried in both places at 0.35 - one number, two homes, and nothing
+    # checking they agreed. `test_weight_contract` now asserts they cannot
+    # diverge again.
     "caveats_max": 2,           # caveat lines per page; the reference decks run at most two, the deck that failed ran three plus a table row plus a note
     "schema_repeat_max": 3,     # pages that may open their table with the same column headers (the deck that failed ran fourteen)
     # What a deck DOES, measured over its own pages against 122 pages of real
@@ -257,10 +252,6 @@ THRESHOLDS = {
     # thing: the defect is commentary that says the exhibit again, and
     # RESTATEMENT measures exactly that - so RESTATEMENT is where the threshold
     # belongs, not here. One question, one instrument.
-    "highlight_share_min": 0.35,   # client work runs 0.51, and 0.71 on pages of type
-    "source_share_min": 0.50,      # client work runs 0.67
-    "marks_per_page_min": 11,      # the corpus first quartile; its median is 32
-    "craft_from": 5,               # pages before a deck-wide rate means anything
     "schema_from": 6,           # tables in a deck before schema repetition is worth reporting
 }
 
@@ -497,13 +488,13 @@ def finding(slide_no, code, measured, threshold, repair):
 
 def load_ink_matrix(path, luminance=INK_LUMINANCE):
     """The 1280x720 ink mask as a numpy array (rows x columns of booleans), or
-    None when numpy is not installed. Column-aware gates need the grid; the
-    row gates take its row sums."""
+    None when numpy or Pillow is not installed. Column-aware gates need the
+    grid; the row gates take its row sums."""
     try:
         import numpy as np
+        from PIL import Image
     except ImportError:
         return None
-    from PIL import Image
 
     with Image.open(path) as image:
         grey = image.convert("L")
@@ -514,10 +505,21 @@ def load_ink_matrix(path, luminance=INK_LUMINANCE):
 
 def load_ink_rows(path, luminance=INK_LUMINANCE):
     """Return rows[y] = count of pixels darker than `luminance` on that row of the
-    1280x720 canvas. Ink uses INK_LUMINANCE; occupancy (for the dead-band and
-    void gates) uses SURFACE_LUMINANCE so a tinted card or band counts as
-    designed space rather than emptiness."""
-    from PIL import Image
+    1280x720 canvas, or None when Pillow is not installed. Ink uses
+    INK_LUMINANCE; occupancy (for the dead-band and void gates) uses
+    SURFACE_LUMINANCE so a tinted card or band counts as designed space rather
+    than emptiness.
+
+    Pillow is optional (see requirements.txt), and it is the only thing these
+    three gates need that the rest of the file does not. Crashing here took the
+    whole report down - every scene-level gate included - on a machine that was
+    missing one package, which is the wrong trade: the pixel gates are a
+    supplement to the scene gates, not a precondition for them. `load_ink_matrix`
+    already returned None for absent numpy; this matches it."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
 
     with Image.open(path) as image:
         grey = image.convert("L")
@@ -1934,7 +1936,7 @@ def gate_deck_craft(slides, analytical, findings):
     One finding, three rates, so the report says what the deck is like rather
     than repeating one complaint per page.
     """
-    if len(analytical) < THRESHOLDS["craft_from"]:
+    if len(analytical) < CONTRACT["plan"]["craft"]["from"]["min"]:
         return
     pages = [slides[i] for i in analytical]
     total = len(pages)
@@ -2043,11 +2045,11 @@ def gate_deck_craft(slides, analytical, findings):
                 "chartsAnnotated": None if annotated is None else round(annotated, 3),
                 "commonestTableDevice": None if commonest is None else round(commonest, 3),
                 "drawnBridges": None if drawnShare is None else round(drawnShare, 3)}
-    want = {"highlight": THRESHOLDS["highlight_share_min"], "source": THRESHOLDS["source_share_min"],
-            "marksPerPage": THRESHOLDS["marks_per_page_min"],
+    want = {"highlight": craft["highlightedPhrase"]["min"], "source": craft["sourceLine"]["min"],
+            "marksPerPage": craft["marksPerPage"]["min"],
             "tablesTreated": craft["tableTreated"]["min"], "chartsAnnotated": craft["chartAnnotated"]["min"],
-            "commonestTableDevice": THRESHOLDS["table_device_share_max"],
-            "drawnBridges": THRESHOLDS["drawn_bridge_share_max"]}
+            "commonestTableDevice": craft["tableDevice"]["shareMax"],
+            "drawnBridges": craft["drawnBridge"]["shareMax"]}
     client = REFERENCE_JUDGED
     short = []
     if highlighted < want["highlight"]:
@@ -2067,12 +2069,12 @@ def gate_deck_craft(slides, analytical, findings):
             f"{annotated:.0%} of the charts carry a mark that states the finding against "
             f"{craft['chartAnnotated']['observedClient']:.0%} in client work. A bracket between the two series the "
             "title compares may help, as may a reference line at a real target; use neither without a content reason")
-    if (commonest is not None and len(tables) >= THRESHOLDS["table_device_from"]
+    if (commonest is not None and len(tables) >= craft["tableDevice"]["from"]
             and commonest > want["commonestTableDevice"]):
         short.append(
             f"{commonest:.0%} of the {len(tables)} tables carry the same device. A treatment repeated on every "
             "table can be right for the same task. Review whether each use expresses its category, sequence or inference")
-    if (drawnShare is not None and len(joined) >= THRESHOLDS["drawn_bridge_from"]
+    if (drawnShare is not None and len(joined) >= craft["drawnBridge"]["from"]
             and drawnShare > want["drawnBridges"]):
         commonest_bridge = Counter(inferences).most_common(1)[0]
         short.append(
@@ -2539,6 +2541,10 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
     findings = []
     content_indexes = []
     covers = []
+    # Slides whose renders could not be measured because Pillow is absent. The
+    # report names them rather than quietly returning a pass for gates that
+    # never ran.
+    skipped_pixel_gates = set()
     for index, slide in enumerate(slides):
         slide_no = index + 1
         if render_dir and render_path(render_dir, slide_no) is None:
@@ -2563,11 +2569,17 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                     rows = load_ink_rows(path)
                     occupied = load_ink_rows(path, SURFACE_LUMINANCE)
                     page = []
+                    # No Pillow, no pixels: the renders cannot be measured, so
+                    # these three gates report nothing and the scene gates below
+                    # still run.
+                    if rows is None:
+                        skipped_pixel_gates.add(slide_no)
                     # A page with no exhibit is held to the type floor: the ink
                     # its own word floor puts on the canvas, not the ink a chart
                     # page shows.
                     text_page = not any(is_exhibit(c) for c in slide.get("componentInstances", []))
-                    gate_ink_and_dead_band(slide_no, rows, page, occupied, text_page=text_page)
+                    if rows is not None:
+                        gate_ink_and_dead_band(slide_no, rows, page, occupied, text_page=text_page)
                     if THRESHOLDS["column_void_max"] < 1.0 and wanted("COLUMN_VOID"):
                         gate_column_void(slide_no, load_ink_matrix(path, SURFACE_LUMINANCE), page)
                     # A page carried by a qualifying hero exhibit is not empty,
@@ -2709,6 +2721,7 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         "weight": dict(WEIGHT),
         "density": density,
         "slides": len(slides),
+        "pixelGatesSkipped": sorted(skipped_pixel_gates),
         "coverSlides": covers,
         "contentSlides": len(content_indexes),
         "accepted": not any(f["code"] not in ADVISORY_CODES for f in findings),

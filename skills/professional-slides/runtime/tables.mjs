@@ -17,6 +17,7 @@ import { measureText, measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
 import { numberMarker, stateMarker, iconMarker, MARK_TOKENS } from "./marks.mjs";
 import { measureAt } from "./draw.mjs";
+import { textStyle as baseTextStyle } from "./text-style.mjs";
 
 // One table compiler. Columns select defaults; individual cells may override the
 // encoding (e.g. options as columns with prose and rating rows in the same table).
@@ -105,20 +106,14 @@ const box = (fill) => ({
   lineWidth: t("line.hairline"),
   radius: t("radius.none"),
 });
+// A cell names what it is before how it looks, so this file puts `bold` first.
+// Over the shared builder.
 const textStyle = (
   bold = false,
   color = ink,
   align = "left",
   size = "type.body",
-) => ({
-  fontFamily: t("font.body"),
-  fontSize: t(size),
-  color,
-  bold,
-  align,
-  valign: "top",
-  wrap: false,
-});
+) => baseTextStyle({ fontFamily: t("font.body"), fontSize: t(size), color, bold, align, valign: "top", wrap: false });
 const measure = (text, width, bold = false, size = "type.body") => measureAt(text, width, { size, bold });
 // A cell may carry `highlight`: the phrase inside it that reads in the house
 // accent, the way a reference table marks the figure that decides the row.

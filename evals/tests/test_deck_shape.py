@@ -19,7 +19,7 @@ GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
 
-from node_probe import run_node  # noqa: E402
+from node_probe import run_node, requires_python_package  # noqa: E402
 
 
 def page(index, components=(), photos=0, texts=(), stacked=False):
@@ -188,6 +188,8 @@ console.log(JSON.stringify({accepted:true}));
         self.assertTrue(result["accepted"])
 
 
+# The native chart emitter writes through python-pptx (requirements.txt).
+@requires_python_package('pptx')
 class OutsideLabelTests(unittest.TestCase):
     def test_the_native_emitter_leaves_headroom_and_never_labels_inside_a_bar(self):
         sys.path.insert(0, str(ROOT / "skills" / "professional-slides" / "runtime" / "emit"))

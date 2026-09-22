@@ -8,6 +8,7 @@ import {
   tokenValue
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
+import { textStyle as baseTextStyle, measuredTextNode as baseMeasuredTextNode } from "./text-style.mjs";
 
 const BODY_FONT = token("font.body");
 const INK = token("color.ink");
@@ -79,26 +80,16 @@ export const HORIZONS_SAMPLE = Object.freeze({
   horizons: CURVE_SAMPLE_HORIZONS
 });
 
+// This file's argument order and defaults, over the shared builders.
 function textStyle(fontSize = BODY, color = INK, bold = false, align = "left", valign = "top") {
-  return { fontFamily: BODY_FONT, fontSize, color, bold, align, valign };
+  return baseTextStyle({ fontFamily: BODY_FONT, fontSize, color, bold, align, valign });
 }
 
-function measuredTextNode({ id, role, frame, text, style, data = {} }) {
-  const textLayout = measureText(text, frame.width, {
-    fontFamily: tokenValue(style.fontFamily),
-    fontSize: tokenValue(style.fontSize),
-    bold: style.bold,
-    wrapWidthRatio: 1
-  });
-  if (textLayout.height > frame.height) throw new Error(`${id} exceeds its allocated text height`);
-  return textPrimitive({
-    id,
-    role,
-    frame,
-    text: textLayout.text,
-    style: { ...style, lineHeight: textLayout.lineHeight, wrap: false },
-    data: { ...data, textLayout }
-  });
+// A horizon band's geometry is computed from the text it holds, so a smaller
+// size would not rescue a frame that is already the wrong height: measure once
+// and refuse.
+function measuredTextNode(input) {
+  return baseMeasuredTextNode({ ...input, fit: false });
 }
 
 function finiteUnitInterval(value, path) {

@@ -126,9 +126,20 @@ class DeckCraftTests(unittest.TestCase):
 
     def test_the_floors_come_from_client_work_not_from_us(self):
         judged = page_gates.REFERENCE_JUDGED
-        self.assertLess(page_gates.THRESHOLDS["highlight_share_min"], judged["highlightedPhrase"])
-        self.assertLess(page_gates.THRESHOLDS["source_share_min"], judged["sourceLine"])
-        self.assertLess(page_gates.THRESHOLDS["marks_per_page_min"], page_gates.REFERENCE_PAGE["drawings"])
+        craft = page_gates.CONTRACT["plan"]["craft"]
+        self.assertLess(craft["highlightedPhrase"]["min"], judged["highlightedPhrase"])
+        self.assertLess(craft["sourceLine"]["min"], judged["sourceLine"])
+        self.assertLess(craft["marksPerPage"]["min"], page_gates.REFERENCE_PAGE["drawings"])
+
+    def test_no_craft_floor_is_carried_in_two_places(self):
+        """`highlight` sat at 0.35 in both the Python dict and weight.json, with
+        nothing checking they agreed. The floors live beside the observations
+        they were calibrated from; THRESHOLDS keeps the page-level numbers."""
+        stray = [key for key in page_gates.THRESHOLDS
+                 if key in {"highlight_share_min", "source_share_min", "marks_per_page_min",
+                            "craft_from", "table_device_share_max", "table_device_from",
+                            "drawn_bridge_share_max", "drawn_bridge_from"}]
+        self.assertEqual(stray, [], "DECK_CRAFT floors belong in weight.json under plan.craft")
 
 
 class PageHighlightTests(unittest.TestCase):
