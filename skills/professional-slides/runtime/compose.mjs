@@ -694,7 +694,8 @@ function columnTreatments(ex) {
         if (value === null) throw new Error(`A bar column needs numeric cells; "${String(cell?.text ?? cell)}" is not one`);
         // The bar is drawn from the number; the label beside it is the figure
         // the author wrote, to the precision they wrote it in.
-        return { type: "bars", values: [value], labels: [text], scale: barScales[i].id };
+        return { type: "bars", values: [value], labels: [text], scale: barScales[i].id,
+          ...(cell?.markFocus !== undefined ? { markFocus: cell.markFocus } : {}) };
       }
       return cell;
     });

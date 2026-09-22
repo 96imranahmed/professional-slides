@@ -371,6 +371,10 @@ function scaleFor(cell, props, used) {
         "Bar cells require a shared finite domain containing zero and 1 to 6 named series",
       );
     requireText(scale.unit, "bar unit");
+    if (cell.markFocus !== undefined && typeof cell.markFocus !== "boolean")
+      throw new Error("Bar markFocus must be boolean");
+    if (cell.markFocus && scale.series.length !== 1)
+      throw new Error("Bar markFocus requires one series; preserve multi-series identity with a local annotation");
     if (
       !Array.isArray(cell.values) ||
       cell.values.length !== scale.series.length ||
@@ -1244,11 +1248,17 @@ function renderTableAt({ id, frame, props }) {
           scale = cell.scaleRecord,
           xScale = value => inner.x + plot * (value - scale.min) / (scale.max - scale.min),
           zeroX = xScale(0),
-          contentY = inner.y + (inner.height - l.height) / 2;
+          contentY = inner.y + (inner.height - l.height) / 2,
+          focusSurface = fill || band || (props.highlightColumn === c ? t("color.accentTint") : zebra && r % 2 ? t("color.surfaceMuted") : t("color.surface"));
         if (scale.min < 0) nodes.push(line(stableId(cellId, "zero"), zeroX, area.y, zeroX, area.y + height, "table-bar-axis", { ...data, domain: [scale.min, scale.max] }));
         cell.values.forEach((value, i) => {
           const y = contentY + i * (l.rowHeight + m.gap),
-            barHeight = v("space.4");
+            barHeight = v("space.4"),
+            markColor = cell.markFocus ? t("color.accent") : barColor(scale, i),
+            labelColor = cell.markFocus
+              ? contrastRatio(tokenValue(t("color.accent")), tokenValue(focusSurface)) >= 4.5 ? t("color.accent") : foreground(focusSurface)
+              : color,
+            markData = { ...data, ...(cell.markFocus ? { markFocus: true } : {}) };
           if (value !== 0)
             nodes.push(
               rectPrimitive({
@@ -1261,11 +1271,11 @@ function renderTableAt({ id, frame, props }) {
                   height: barHeight,
                 },
                 style: {
-                  ...box(barColor(scale, i)),
-                  ...((fill || band) && contrastRatio(tokenValue(barColor(scale, i)), tokenValue(fill || band)) < 3
-                    ? { stroke: foreground(fill || band), lineWidth: t("line.hairline") } : {}),
+                  ...box(markColor),
+                  ...((cell.markFocus || fill || band) && contrastRatio(tokenValue(markColor), tokenValue(cell.markFocus ? focusSurface : fill || band)) < 3
+                    ? { stroke: foreground(cell.markFocus ? focusSurface : fill || band), lineWidth: t("line.hairline") } : {}),
                 },
-                data: { ...data, series: i, value, zeroX, domain: [scale.min, scale.max] },
+                data: { ...markData, series: i, value, zeroX, domain: [scale.min, scale.max] },
               }),
             );
           const label = measure(cell.labels?.[i] ?? formatValue(value, scale), l.labelWidth, true, l.size);
@@ -1276,9 +1286,9 @@ function renderTableAt({ id, frame, props }) {
             label,
             {
               ...chartAnnotationStyle(),
-              ...textStyle(true, color, "right", l.size),
+              ...textStyle(true, labelColor, "right", l.size),
             },
-            data,
+            markData,
           );
         });
       } else {

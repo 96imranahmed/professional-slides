@@ -5,6 +5,34 @@ from node_probe import run_node
 
 
 class ComposeTableTests(unittest.TestCase):
+    def test_bar_focus_survives_composition_without_changing_scale_or_peer_marks(self):
+        run_node('''
+import assert from 'node:assert/strict';
+import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
+import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
+const table={type:'table',treatment:'open',columns:['Record',{label:'Change',unit:'units',bar:true}],rows:[['Large','8'],['Subject',{text:'-4',markFocus:true}],['Zero',{text:'0',markFocus:true}]]};
+const spec=exhibit=>({schema:'professional-slides.deck/v3',id:'focus',tracker:false,slides:[{id:'s',title:'The named subject falls while the larger peer rises',layout:'exhibit-full',exhibit}]});
+const get=exhibit=>planDeck(toDeckPlan(spec(exhibit))).deck.slides[0].nodes;
+const nodes=get(table), plain=structuredClone(table);plain.rows[1][1].markFocus=false;plain.rows[2][1].markFocus=false;
+const before=get(plain), bars=nodes.filter(n=>n.role==='table-bar'), oldBars=before.filter(n=>n.role==='table-bar');
+assert.deepEqual(bars.map(n=>n.frame),oldBars.map(n=>n.frame),'focus must preserve signed geometry and shared units');
+assert.equal(bars[0].style.fill.tokenId,oldBars[0].style.fill.tokenId,'unselected maximum remains neutral');
+assert.equal(bars[1].style.fill.tokenId,'color.accent');assert.equal(bars[1].data.markFocus,true);
+assert.deepEqual(nodes.filter(n=>['table-cell','table-row-band'].includes(n.role)),before.filter(n=>['table-cell','table-row-band'].includes(n.role)),'mark focus adds no background');
+const labels=nodes.filter(n=>n.role==='table-cell-text'&&n.data.cellType==='bars');
+assert.ok(labels.some(n=>n.text==='0'&&n.data.markFocus),'zero retains its focus label without fabricating a bar');
+const tokens=planDeck(toDeckPlan(spec(table))).deck.tokens;
+assert.ok(contrastRatio(tokens[labels.find(n=>n.text==='-4').style.color.tokenId].value,tokens['color.surfaceMuted'].value)>=4.5);
+const typed=styleTable(table);const focused=(Array.isArray(typed.rows[1])?typed.rows[1]:typed.rows[1].cells)[1];assert.equal(focused.markFocus,true);
+const scale=typed.scales[focused.scale];
+const multi=structuredClone(typed);multi.scales[focused.scale]={...scale,series:['Current','Prior']};multi.rows=typed.rows.map((row)=>({cells:(Array.isArray(row)?row:row.cells).map((cell,i)=>i===1?{...cell,values:[cell.values[0],cell.values[0]]}:cell)}));
+assert.throws(()=>renderTable({id:'multi',frame:{x:0,y:0,width:1160,height:500},props:multi}),/markFocus requires one series/);
+const invalid=structuredClone(table);invalid.rows[1][1].markFocus='yes';assert.throws(()=>get(invalid),/markFocus must be boolean/);
+console.log('{}');
+''')
+
     def test_explicit_peer_tables_keep_their_semantic_treatments(self):
         run_node('''
 import assert from 'node:assert/strict';
