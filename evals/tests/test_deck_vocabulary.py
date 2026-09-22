@@ -1,0 +1,151 @@
+"""What the deck draws, what shape its words are in, and which way it navigates.
+
+Three defects a fifty-one page deck shipped with, each of which passed every
+gate that existed at the time:
+
+  - it drew three of ten device families: no icon, no rating, no value pill, no
+    photograph, no growth annotation, no status pill
+  - its commentary was one block of 150 to 200 words per page, against a client
+    median of four blocks of about 56
+  - it set the same tracker pill on all fifty-one pages, 588 nodes of it
+
+None is visible on a single page, which is why per-page gates missed all three.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+import unittest
+
+from node_probe import ROOT, RUNTIME, run_node
+
+GATES = RUNTIME / "gates"
+sys.path.insert(0, str(GATES))
+import page_gates  # noqa: E402
+
+
+def text(role, value, **over):
+    return dict({"type": "text", "role": role, "text": value}, **over)
+
+
+def page(n, *, roles=()):
+    nodes = [text("action-title", f"Page {n} states a finding worth reading"),
+             text("list-item", "The second wave opens on a gate rather than on a date"),
+             text("source-text", "Source: engagement analysis, 2026")]
+    nodes += [{"type": "rect", "role": role} for role in roles]
+    nodes += [{"type": "rect", "role": "chart-mark"} for _ in range(12)]
+    return {"id": f"s{n:02d}",
+            "componentInstances": [{"id": f"s{n:02d}-0", "component": "chart.column"}],
+            "nodes": nodes}
+
+
+def vocabulary(slides):
+    findings = []
+    page_gates.gate_deck_vocabulary(slides, list(range(len(slides))), findings)
+    return findings
+
+
+class DeckVocabularyTests(unittest.TestCase):
+    def test_a_deck_that_draws_three_families_is_reported(self):
+        slides = [page(i, roles=["table-bar-fill", "chart-reference-line", "annotation-surface"])
+                  for i in range(1, 15)]
+        findings = vocabulary(slides)
+        self.assertEqual([f["code"] for f in findings], ["DECK_VOCABULARY"])
+        measured = findings[0]["measured"]
+        self.assertEqual(measured["families"], 3)
+        for absent in ("icon", "picture", "score", "valuePill", "state"):
+            self.assertIn(absent, measured["absent"])
+        self.assertIn("not chosen between them", findings[0]["repair"])
+
+    def test_a_deck_that_reaches_for_four_passes(self):
+        slides = [page(i, roles=["icon", "table-harvey-fill", "chart-reference-line", "table-status-pill"])
+                  for i in range(1, 15)]
+        self.assertEqual(vocabulary(slides), [])
+
+    def test_a_short_deck_is_not_measured_on_its_vocabulary(self):
+        # Eleven pages is below the floor: a short deck has fewer jobs to do.
+        slides = [page(i) for i in range(1, 12)]
+        self.assertEqual(vocabulary(slides), [])
+
+    def test_the_floor_is_recorded_as_a_vocabulary_floor_not_a_corpus_rate(self):
+        rule = page_gates.CONTRACT["plan"]["craft"]["vocabulary"]
+        self.assertIn("cannot be read off a render", rule["$comment"])
+        self.assertLessEqual(rule["familiesMin"], len(page_gates.DEVICE_FAMILIES) // 2)
+
+
+class TextFormTests(unittest.TestCase):
+    """A run of prose longer than client decks ever set is caught in the dot-dash."""
+
+    def plan(self, words):
+        body = " ".join(f"word{i}" for i in range(words))
+        return {
+            "schema": "professional-slides.content/v1", "id": "t", "textContract": "complete",
+            "question": "Q?", "answer": "A.",
+            "pages": [{
+                "id": "p1", "n": 1, "claim": "A page that proves something", "settles": {"kind": "count", "what": "x"},
+                "adds": None, "highlight": None,
+                "textPlan": [{"id": "t", "role": "title", "text": "A page that proves something"},
+                             {"id": "b", "role": "body", "text": body}],
+                "textReference": {"task": "t", "samples": [
+                    {"reference": "r.pdf", "page": 1, "sha256": "x" * 64, "bodyWords": 150, "totalWords": 160}]},
+            }],
+        }
+
+    def check(self, words):
+        return run_node(f'''
+import {{checkTextPlan}} from './skills/professional-slides/runtime/text-contract.mjs';
+const content = {json.dumps(self.plan(words))};
+const result = checkTextPlan(content);
+console.log(JSON.stringify({{codes: result.findings.map(f=>f.code), scores: result.scores}}));
+''')
+
+    def test_a_block_past_the_client_third_quartile_is_refused(self):
+        result = self.check(200)
+        self.assertIn("TEXT_BLOCK_TOO_LONG", result["codes"])
+
+    def test_a_block_inside_it_passes(self):
+        result = self.check(150)
+        self.assertNotIn("TEXT_BLOCK_TOO_LONG", result["codes"])
+
+    def test_the_score_records_the_shape_as_well_as_the_volume(self):
+        score = self.check(150)["scores"][0]
+        self.assertEqual(score["proseBlocks"], 1)
+        self.assertEqual(score["longestBlock"], 150)
+
+    def test_the_cap_comes_from_the_measured_corpus(self):
+        contract = json.loads((RUNTIME / "weight.json").read_text(encoding="utf-8"))
+        form = contract["plan"]["textForm"]
+        self.assertEqual(form["longestBlockMax"], form["longestBlock"]["q3"])
+        self.assertGreaterEqual(form["pagesMeasured"], 30)
+
+
+class TrackerChoiceTests(unittest.TestCase):
+    """The navigation construction is read off the section map, not fixed."""
+
+    def construction(self, titles):
+        sections = ",".join(
+            f'''{{id:'d{i}',kind:'section',title:{json.dumps(t)}}},
+                {{id:'p{i}',title:'A page that proves something about it',layout:'text',
+                  points:[{{text:'A developed point that carries this page on its own.'}}]}}'''
+            for i, t in enumerate(titles))
+        return run_node(f'''
+import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[
+  {{id:'sum',title:'The answer is stated first',role:'executive-summary',layout:'text',
+    points:[{{text:'A finding that carries the page and says something.'}}]}},
+  {sections}]}});
+const page = plan.slides.find(s=>s.tracker);
+console.log(JSON.stringify({{construction: page ? page.tracker.construction : null}}));
+''')["construction"]
+
+    def test_a_few_short_sections_take_pills(self):
+        self.assertEqual(self.construction(["Scale", "Floor", "Story"]), "compact-pills")
+
+    def test_many_sections_take_the_label(self):
+        self.assertEqual(
+            self.construction(["Claim", "Scale", "Floor", "Story", "Beyond film", "Against", "Verdict"]),
+            "compact-label")
+
+    def test_long_section_names_take_the_label(self):
+        self.assertEqual(self.construction(["Where the value is", "How we would capture it"]), "compact-label")

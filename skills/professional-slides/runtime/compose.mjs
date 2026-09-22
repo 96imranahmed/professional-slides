@@ -305,6 +305,18 @@ const RAG_WORDS = [
   [/^(behind|behind plan|delayed|amber|yellow|slipping|watch)$/i, "behind"],
   [/^(at[\s-]?risk|overdue|red|blocked|off[\s-]?track|critical)$/i, "at-risk"],
   [/^(not started|planned|pending|to do|todo)$/i, "not-started"],
+  // The verdict triad. A comparison scorecard's closing column says whether the
+  // subject won, drew or lost, and those are a positive, a middling and a
+  // negative state exactly as much as on-track/behind/at-risk are. They were
+  // setting as plain text, so the column that carries the page's answer looked
+  // like the columns that carry its inputs.
+  // Only words that are themselves an adjudication. "Yes", "first" and "best"
+  // are not: a column recording that an arm used the draft, or that a film came
+  // first by release order, states a fact, and colouring it would assert an
+  // outcome the page has not established. The neutrality rule below governs.
+  [/^(wins?|won)$/i, "won"],
+  [/^(ties?|tied|draws?|drawn)$/i, "drawn"],
+  [/^(loses?|lost)$/i, "lost"],
 ];
 /** Verdict cells: ✓/✗, status words and "45 %" under a progress heading become typed cells. */
 function verdictCell(value, header) {
@@ -2825,8 +2837,27 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   // be read here as "this deck tracks by repeating its contents page", which
   // set `repeat-contents` and printed the page in front of every section - the
   // opposite of what the author wrote, and of what SKILL.md says it does.
+  // Which navigation construction, when the deck does not name one.
+  //
+  // This defaulted to `pills` unconditionally, so every deck the skill produced
+  // carried the same row of section pills at the top right of every page -
+  // fifty-one pages, one construction, 588 nodes of it. Pills are the widest of
+  // the four and the only one that shows the sections you are not in, which
+  // earns them a deck of a few short section names; they are the wrong default
+  // for seven sections or for names too long to set as pills, and they were
+  // being taken by both.
+  //
+  // The rule reads the section map the deck actually has. A deck that wants
+  // something else says so with `tracker`, and all four remain available.
+  const sectionTitles = spec.slides.filter((s) => s.kind === "section").map((s) => String(s.title ?? ""));
+  const longestSection = Math.max(0, ...sectionTitles.map((title) => title.length));
+  const defaultTracker = sections >= 6 || longestSection > 14
+    // Too many to set side by side, or names too long: the current section's
+    // name alone, at the left above the title.
+    ? "label"
+    : sections >= 4 && longestSection > 10 ? "number-strip" : "pills";
   const trackerMode = spec.tracker ?? (spec.sectionTabs === false ? false
-    : spec.agenda && spec.agenda !== "once" ? "repeat-contents" : "pills");
+    : spec.agenda && spec.agenda !== "once" ? "repeat-contents" : defaultTracker);
   const contentsMode = spec.contents ?? (spec.agenda === "once" ? "once" : spec.agenda ? true : sections >= 2);
   const tabs = spec.sectionTabs ?? (TRACKER_NAMES.includes(trackerMode) && sections >= 2);
   // `appendix: [...]`: the source pages behind the story - the model grid, the

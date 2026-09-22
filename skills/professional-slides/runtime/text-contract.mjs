@@ -1,5 +1,20 @@
 // The dot-dash's visible copy is the source of truth through composition/export.
+import { readFileSync } from 'node:fs';
+
 const roles = new Set(['title', 'body', 'exhibit', 'qualification', 'source', 'furniture']);
+
+// How long a single run of prose may be, measured rather than chosen.
+//
+// The word-count contract asks whether a page says enough. It does not ask what
+// shape the words are in, and a deck answered every page with one 150-to-200
+// word paragraph, passed, and read as an essay with pictures. Over 37 analytic
+// pages of client-project decks the median page carries four text blocks of
+// about 56 words, and three pages in four keep every block under 152. That
+// number is the cap here: past it, the page is asking the reader to take a
+// wall of prose in one go, and the fix is two or three developed points rather
+// than a shorter sentence.
+const CONTRACT = JSON.parse(readFileSync(new URL('./weight.json', import.meta.url), 'utf8'));
+export const TEXT_FORM = CONTRACT.plan.textForm;
 export const normalizeText = value => String(value ?? '').normalize('NFKC').replace(/[\u00ad\u200b]/g, '').replace(/-\s*\r?\n\s*/g, '-').replace(/\s+/g, ' ').trim();
 export const textWords = value => normalizeText(value).split(/\s+/).filter(Boolean).length;
 const resolvePages = (value, scene) => String(value).replace(/\{\{page:([^}]+)\}\}/g, (_, id) => {
@@ -23,8 +38,18 @@ export function checkTextPlan(content, {required = false} = {}) {
     if (!ref?.task || !Array.isArray(ref.samples) || !ref.samples.length || ref.samples.some(s=>!s.reference || !Number.isInteger(s.page) || s.page<1 || !Number.isFinite(s.bodyWords) || s.bodyWords<0 || !Number.isFinite(s.totalWords) || s.totalWords<s.bodyWords || !s.sha256)) {
       fail('TEXT_REFERENCE_MISSING','Supply measured, inspected reference pages serving this reading task, including source hash and body/total word counts.'); continue;
     }
+    // Form, not just volume: the longest single run of prose on the page, and
+    // how many runs there are. Exhibit cells and furniture are not prose.
+    const prose = blocks.filter(b=>['body','qualification'].includes(b.role)).map(b=>textWords(b.text));
+    const longest = prose.length ? Math.max(...prose) : 0;
+    if (longest > TEXT_FORM.longestBlockMax) {
+      fail('TEXT_BLOCK_TOO_LONG',
+        `One run of ${longest} words; client decks keep every block under ${TEXT_FORM.longestBlockMax} `
+        + `(median block ${TEXT_FORM.wordsPerBlock.median} words, median page ${TEXT_FORM.blocksPerPage.median} blocks). `
+        + 'Split it into two or three points that each make their own claim, rather than shortening the sentence.');
+    }
     const median = quantile(ref.samples.map(s=>s.bodyWords),.5), floor = quantile(ref.samples.map(s=>s.bodyWords),.25);
-    const score = {id:page.id,page:page.n,task:ref.task,bodyWords,totalWords,referenceBodyMedian:median,referenceBodyLowerQuartile:floor,referenceTotalMedian:quantile(ref.samples.map(s=>s.totalWords),.5),textCoverageScore:median ? Math.round(bodyWords/median*100) : null,explanation:ref.rationale || null};
+    const score = {id:page.id,page:page.n,task:ref.task,bodyWords,totalWords,proseBlocks:prose.length,longestBlock:longest,referenceBodyMedian:median,referenceBodyLowerQuartile:floor,referenceTotalMedian:quantile(ref.samples.map(s=>s.totalWords),.5),textCoverageScore:median ? Math.round(bodyWords/median*100) : null,explanation:ref.rationale || null};
     scores.push(score);
     if (bodyWords<floor) {
       if (!ref.rationale?.trim()) fail('TEXT_COVERAGE_LOW',`Planned body has ${bodyWords} words; comparable reference lower quartile is ${floor}. Develop the missing explanation or document why this page's complete argument needs less text for editorial review.`);

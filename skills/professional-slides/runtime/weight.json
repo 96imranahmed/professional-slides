@@ -223,7 +223,36 @@
         "shareMax": 0.4,
         "from": 5,
         "$comment": "A drawn mark in the gutter between an exhibit and its commentary asserts an inference. The reference decks state that relation in the commentary's heading, in a headed panel or in a closing band far more often than they draw it; a deck that draws it on most such pages has stopped choosing."
+      },
+      "vocabulary": {
+        "familiesMin": 4,
+        "from": 12,
+        "$comment": "Device families a deck actually draws, measured on the composed scene. A vocabulary floor rather than a rate measured off client PDFs: what share of client pages carry a harvey ball cannot be read off a render. It asserts only that a deck of twelve analytical pages or more reached for more than a couple of the families it has."
       }
+    },
+    "textForm": {
+      "$comment": "How client decks shape a page's words. Measured over analytic pages of 5 client-project decks with pdftotext -layout; a block is a run of consecutive non-empty lines, title and source lines excluded, blocks under three words dropped as labels. A deck that answers every page with one long paragraph passes the word-count contract and still reads as an essay with pictures; these are the numbers that say so.",
+      "pagesMeasured": 37,
+      "blocksPerPage": {
+        "median": 4,
+        "q1": 2.0,
+        "q3": 5.0,
+        "min": 1,
+        "max": 9
+      },
+      "wordsPerBlock": {
+        "median": 55.8,
+        "q1": 41.3,
+        "q3": 86.5
+      },
+      "longestBlock": {
+        "median": 128,
+        "q3": 152.0,
+        "max": 374
+      },
+      "longestBlockMax": 152.0,
+      "blocksPerPageMin": 2,
+      "singleBlockPagesMax": 0.135
     }
   },
   "reference": {

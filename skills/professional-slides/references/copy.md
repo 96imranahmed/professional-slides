@@ -53,6 +53,23 @@ Separate a value's measurement period from its implementation timing, and keep a
 
 Numbers belong on marks. Replace a sentence that transcribes the chart with labelled endpoints and a title that carries the consequence.
 
+### How much prose in one run
+
+Word count is not shape. A deck can clear its text-coverage score with one long paragraph per page and still read as an essay with pictures, and one did: forty pages whose commentary was a single block of 150 to 200 words.
+
+Measured over 37 analytic pages of client-project decks (`evals/corpus/measure_text_form.py`):
+
+| | Client decks | Write to |
+| --- | --- | --- |
+| Text blocks per page | median 4 (quartiles 2 and 5) | two or three, more when the evidence has that many findings |
+| Words per block | median 56 (quartiles 41 and 87) | 40-90 |
+| Longest block on a page | median 128, third quartile 152 | never past 152 |
+| Pages with a single block | 5 of 37 | rare, and only when one finding is the whole page |
+
+`TEXT_BLOCK_TOO_LONG` fails a dot-dash whose longest planned run passes 152 words, and the same plan is checked again on the composed scene, so the shape cannot be lost between stages.
+
+The repair is not a shorter sentence. It is two or three points that each make their own claim: split the run at the place where it stops proving one thing and starts proving the next, and give the second half its own lead. A page whose commentary is one block is asserting that its evidence supports exactly one finding, which is sometimes true and usually not.
+
 ## Where each kind of sentence goes
 
 | Job | What to write | Where it belongs |

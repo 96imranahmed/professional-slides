@@ -444,6 +444,7 @@ GATE_CODES = {
     "TABLE_SCHEMA_FLAT": "the same table invented over and over across the deck",
     "CONTRADICTED_SHARE": "a percentage in the prose the page's own counts do not give",
     "DECK_CRAFT": "the deck emphasises, sources or comments at a rate real client decks do not",
+    "DECK_VOCABULARY": "the deck draws a couple of devices and leaves the rest of the vocabulary unused",
     "UNSCALED_FIGURE": "a figure drawn to a scale its own printed numbers contradict",
     "TITLE_COUNT": "the title states a count the page's own exhibit does not show",
 }
@@ -451,7 +452,7 @@ GATE_CODES = {
 # Distribution and furniture statistics prompt human review; they do not
 # establish a defect without the page's semantic task and visual context.
 ADVISORY_CODES = {
-    "INK_COVERAGE", "THIN_PAGE", "DECK_FLAT", "DECK_CRAFT", "EVIDENCE_MIX", "PAGE_VARIETY",
+    "INK_COVERAGE", "THIN_PAGE", "DECK_FLAT", "DECK_CRAFT", "DECK_VOCABULARY", "EVIDENCE_MIX", "PAGE_VARIETY",
     "DEAD_BAND", "INTERNAL_VOID", "UNANNOTATED", "LAYOUT_MONOTONY",
     "COLUMN_MONOTONY", "TABLE_SCHEMA_FLAT", "IMAGE_BUDGET", "IMAGE_RUN",
     "THIN_EVIDENCE", "HERO_EXHIBIT", "COLUMN_VOID", "THIN_COLUMN", "NUMBERS_ON_MARKS",
@@ -2036,6 +2037,59 @@ def gate_deck_craft(slides, analytical, findings):
     ))
 
 
+# What the deck actually drew, by device family.
+#
+# Each entry is a family of marks answering one job, and the roles the runtime
+# uses when it draws one. Measured on the composed scene rather than on the
+# plan, because a plan can record a treatment the page never renders: one deck's
+# plan declared six families and its scene drew none of them.
+DEVICE_FAMILIES = {
+    "icon": re.compile(r"^(icon|icon-label|list-icon|card-icon|table-cell-icon)$"),
+    "picture": re.compile(r"^(image|image-frame|cover-image|divider-image|statement-image|takeaways-image)$"),
+    "score": re.compile(r"^table-(harvey|rating-)"),
+    "valuePill": re.compile(r"^table-bubble"),
+    "cellBar": re.compile(r"^table-bar"),
+    "heat": re.compile(r"^table-heat"),
+    "state": re.compile(r"^(table-status-pill|status-marker|status-cue|chart-status-)"),
+    "growth": re.compile(r"^(chart-growth|chart-delta|chart-cagr|growth-)"),
+    "reference": re.compile(r"^chart-reference-"),
+    "annotation": re.compile(r"^(annotation-|chart-callout)"),
+}
+
+
+def gate_deck_vocabulary(slides, analytical, findings):
+    """DECK_VOCABULARY. Which of the available devices the deck ever drew.
+
+    Every other deck-level gate asks whether the pages vary in shape. None asks
+    whether the marks on them vary at all, and a fifty-one page deck drew no
+    icon, no rating, no value pill, no photograph and no growth annotation while
+    setting one tracker construction on every page. Each page passed alone; the
+    deck read as one page reprinted.
+    """
+    rule = CONTRACT["plan"]["craft"]["vocabulary"]
+    if len(analytical) < rule["from"]:
+        return
+    pages = [slides[index] for index in analytical]
+    present = {n.get("role") or "" for slide in pages for n in slide.get("nodes", [])}
+    used = sorted(name for name, pattern in DEVICE_FAMILIES.items()
+                  if any(pattern.match(role) for role in present))
+    absent = sorted(set(DEVICE_FAMILIES) - set(used))
+    if len(used) >= rule["familiesMin"]:
+        return
+    findings.append(finding(
+        None, "DECK_VOCABULARY",
+        {"families": len(used), "of": len(DEVICE_FAMILIES), "used": used, "absent": absent,
+         "pages": len(pages)},
+        rule["familiesMin"],
+        f"The deck draws {len(used)} of {len(DEVICE_FAMILIES)} device families across {len(pages)} pages; "
+        f"absent: {', '.join(absent)}. These are not decoration quotas and no page should acquire a rating "
+        "to satisfy one. But a deck this long that never draws an icon beside a named category, a value pill "
+        "on a count, a rating on a score, a reference line on a threshold or a photograph of its subject has "
+        "not chosen between them. Find the pages whose evidence is a score, a count, a named set or something "
+        "worth showing.",
+    ))
+
+
 def gate_evidence_mix(slides, analytical, findings):
     """EVIDENCE_MIX and PAGE_VARIETY, deck level. Most pages should carry
     measurement, and a deck of any length should be built from more than one
@@ -2591,6 +2645,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         gate_evidence_mix(slides, content_indexes, findings)
     if not gates or "DECK_CRAFT" in gates:
         gate_deck_craft(slides, content_indexes, findings)
+    if not gates or "DECK_VOCABULARY" in gates:
+        gate_deck_vocabulary(slides, content_indexes, findings)
     if not gates or "NO_SECTIONS" in gates:
         gate_deck_structure(slides, content_indexes, findings)
     if not gates or "NO_CONTENTS" in gates or "NO_SUMMARY" in gates:

@@ -19,6 +19,8 @@ Every reusable slide element is a registered component in `runtime/registry.mjs`
 | `chevron` | A light chevron, no disc | Between two open reasoning lists |
 | `line`, `labelled-line` | A rule, with an optional word on it | The relation has a name worth printing |
 
+A cell whose text is a delivery status (`on track`, `behind`, `at risk`, `complete`, `not started`) or a verdict (`wins`, `ties`, `loses`) becomes a coloured state pill without being asked. Presence and use do not: a column recording `Yes` against "Used the draft?", or `first` against a release order, states a fact, and colouring it would assert an outcome the page has not established.
+
 **`section`** (`open`, `muted`, `primary`, `dark`, `tint`) owns a surface, a gutter of padding on every side when filled, and a nested composition; the composer sets `dark` (navy, inverse heading, white list), `muted`, `tint` (accent tint) or `primary` on the side column from the spec's `pointsTone`, the way the 2020-24 decks run a "Key insights" column beside the chart. **`section-heading`** (`standard`, `accent`, `inverse`) is its heading leaf, text only.
 
 **`section-boundary`** takes `variant` alone: `inference` (quiet divider interrupted by a right-pointing disc chevron, for a supported inference), `inference-chevron` (dashed divider stopping above and below a centred shaftless chevron, sized to the bullet content), `related` (dashed divider for adjacent context) and `subsection` (horizontal separator between cohesive groups inside a panel).

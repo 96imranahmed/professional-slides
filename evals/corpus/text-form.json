@@ -1,0 +1,320 @@
+{
+  "$comment": "How client decks shape a page's words. Measured over analytic pages of 5 client-project decks with pdftotext -layout; a block is a run of consecutive non-empty lines, title and source lines excluded, blocks under three words dropped as labels.",
+  "pages": 37,
+  "blocksPerPage": {
+    "median": 4,
+    "q1": 2.0,
+    "q3": 5.0,
+    "min": 1,
+    "max": 9
+  },
+  "wordsPerBlock": {
+    "median": 55.8,
+    "q1": 41.3,
+    "q3": 86.5
+  },
+  "longestBlock": {
+    "median": 128,
+    "q3": 152.0,
+    "max": 374
+  },
+  "singleBlockPages": 5,
+  "samples": [
+    {
+      "reference": "international-comparison-of-australias-freight-and-supply-chain-performance.pdf",
+      "page": 21,
+      "blocks": 6,
+      "bodyWords": 140,
+      "wordsPerBlock": 23.3,
+      "longestBlock": 69
+    },
+    {
+      "reference": "international-comparison-of-australias-freight-and-supply-chain-performance.pdf",
+      "page": 22,
+      "blocks": 3,
+      "bodyWords": 150,
+      "wordsPerBlock": 50.0,
+      "longestBlock": 89
+    },
+    {
+      "reference": "international-comparison-of-australias-freight-and-supply-chain-performance.pdf",
+      "page": 23,
+      "blocks": 3,
+      "bodyWords": 129,
+      "wordsPerBlock": 43.0,
+      "longestBlock": 83
+    },
+    {
+      "reference": "international-comparison-of-australias-freight-and-supply-chain-performance.pdf",
+      "page": 24,
+      "blocks": 2,
+      "bodyWords": 208,
+      "wordsPerBlock": 104.0,
+      "longestBlock": 196
+    },
+    {
+      "reference": "international-comparison-of-australias-freight-and-supply-chain-performance.pdf",
+      "page": 25,
+      "blocks": 4,
+      "bodyWords": 215,
+      "wordsPerBlock": 53.8,
+      "longestBlock": 111
+    },
+    {
+      "reference": "international-comparison-of-australias-freight-and-supply-chain-performance.pdf",
+      "page": 26,
+      "blocks": 7,
+      "bodyWords": 146,
+      "wordsPerBlock": 20.9,
+      "longestBlock": 41
+    },
+    {
+      "reference": "international-comparison-of-australias-freight-and-supply-chain-performance.pdf",
+      "page": 31,
+      "blocks": 5,
+      "bodyWords": 263,
+      "wordsPerBlock": 52.6,
+      "longestBlock": 190
+    },
+    {
+      "reference": "international-comparison-of-australias-freight-and-supply-chain-performance.pdf",
+      "page": 32,
+      "blocks": 4,
+      "bodyWords": 228,
+      "wordsPerBlock": 57.0,
+      "longestBlock": 160
+    },
+    {
+      "reference": "international-comparison-of-australias-freight-and-supply-chain-performance.pdf",
+      "page": 36,
+      "blocks": 5,
+      "bodyWords": 296,
+      "wordsPerBlock": 59.2,
+      "longestBlock": 133
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 10,
+      "blocks": 2,
+      "bodyWords": 119,
+      "wordsPerBlock": 59.5,
+      "longestBlock": 115
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 19,
+      "blocks": 4,
+      "bodyWords": 160,
+      "wordsPerBlock": 40.0,
+      "longestBlock": 134
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 20,
+      "blocks": 2,
+      "bodyWords": 173,
+      "wordsPerBlock": 86.5,
+      "longestBlock": 168
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 21,
+      "blocks": 2,
+      "bodyWords": 201,
+      "wordsPerBlock": 100.5,
+      "longestBlock": 195
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 22,
+      "blocks": 1,
+      "bodyWords": 199,
+      "wordsPerBlock": 199.0,
+      "longestBlock": 199
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 23,
+      "blocks": 2,
+      "bodyWords": 158,
+      "wordsPerBlock": 79.0,
+      "longestBlock": 152
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 24,
+      "blocks": 2,
+      "bodyWords": 159,
+      "wordsPerBlock": 79.5,
+      "longestBlock": 156
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 25,
+      "blocks": 2,
+      "bodyWords": 198,
+      "wordsPerBlock": 99.0,
+      "longestBlock": 189
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 26,
+      "blocks": 1,
+      "bodyWords": 128,
+      "wordsPerBlock": 128.0,
+      "longestBlock": 128
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 27,
+      "blocks": 1,
+      "bodyWords": 139,
+      "wordsPerBlock": 139.0,
+      "longestBlock": 139
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 28,
+      "blocks": 2,
+      "bodyWords": 134,
+      "wordsPerBlock": 67.0,
+      "longestBlock": 126
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 29,
+      "blocks": 1,
+      "bodyWords": 139,
+      "wordsPerBlock": 139.0,
+      "longestBlock": 139
+    },
+    {
+      "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
+      "page": 30,
+      "blocks": 1,
+      "bodyWords": 143,
+      "wordsPerBlock": 143.0,
+      "longestBlock": 143
+    },
+    {
+      "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
+      "page": 23,
+      "blocks": 3,
+      "bodyWords": 234,
+      "wordsPerBlock": 78.0,
+      "longestBlock": 133
+    },
+    {
+      "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
+      "page": 24,
+      "blocks": 4,
+      "bodyWords": 216,
+      "wordsPerBlock": 54.0,
+      "longestBlock": 104
+    },
+    {
+      "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
+      "page": 25,
+      "blocks": 4,
+      "bodyWords": 212,
+      "wordsPerBlock": 53.0,
+      "longestBlock": 116
+    },
+    {
+      "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
+      "page": 26,
+      "blocks": 5,
+      "bodyWords": 220,
+      "wordsPerBlock": 44.0,
+      "longestBlock": 79
+    },
+    {
+      "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
+      "page": 34,
+      "blocks": 6,
+      "bodyWords": 248,
+      "wordsPerBlock": 41.3,
+      "longestBlock": 75
+    },
+    {
+      "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
+      "page": 35,
+      "blocks": 5,
+      "bodyWords": 279,
+      "wordsPerBlock": 55.8,
+      "longestBlock": 146
+    },
+    {
+      "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
+      "page": 36,
+      "blocks": 5,
+      "bodyWords": 257,
+      "wordsPerBlock": 51.4,
+      "longestBlock": 97
+    },
+    {
+      "reference": "assessing-the-impact-of-big-tech-on-venture-investment.pdf",
+      "page": 22,
+      "blocks": 3,
+      "bodyWords": 383,
+      "wordsPerBlock": 127.7,
+      "longestBlock": 374
+    },
+    {
+      "reference": "assessing-the-impact-of-big-tech-on-venture-investment.pdf",
+      "page": 23,
+      "blocks": 6,
+      "bodyWords": 218,
+      "wordsPerBlock": 36.3,
+      "longestBlock": 101
+    },
+    {
+      "reference": "mckinsey-purdue-high-impact-interventions-to-rapidly-address-market-access-challenges-2017.pdf",
+      "page": 25,
+      "blocks": 7,
+      "bodyWords": 248,
+      "wordsPerBlock": 35.4,
+      "longestBlock": 55
+    },
+    {
+      "reference": "mckinsey-purdue-high-impact-interventions-to-rapidly-address-market-access-challenges-2017.pdf",
+      "page": 26,
+      "blocks": 7,
+      "bodyWords": 113,
+      "wordsPerBlock": 16.1,
+      "longestBlock": 26
+    },
+    {
+      "reference": "mckinsey-purdue-high-impact-interventions-to-rapidly-address-market-access-challenges-2017.pdf",
+      "page": 27,
+      "blocks": 9,
+      "bodyWords": 133,
+      "wordsPerBlock": 14.8,
+      "longestBlock": 31
+    },
+    {
+      "reference": "mckinsey-purdue-high-impact-interventions-to-rapidly-address-market-access-challenges-2017.pdf",
+      "page": 28,
+      "blocks": 5,
+      "bodyWords": 128,
+      "wordsPerBlock": 25.6,
+      "longestBlock": 54
+    },
+    {
+      "reference": "mckinsey-purdue-high-impact-interventions-to-rapidly-address-market-access-challenges-2017.pdf",
+      "page": 30,
+      "blocks": 3,
+      "bodyWords": 173,
+      "wordsPerBlock": 57.7,
+      "longestBlock": 135
+    },
+    {
+      "reference": "mckinsey-purdue-high-impact-interventions-to-rapidly-address-market-access-challenges-2017.pdf",
+      "page": 31,
+      "blocks": 4,
+      "bodyWords": 163,
+      "wordsPerBlock": 40.8,
+      "longestBlock": 120
+    }
+  ]
+}

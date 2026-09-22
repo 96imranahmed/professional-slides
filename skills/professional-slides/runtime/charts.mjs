@@ -1741,6 +1741,18 @@ function scatter({ id, frame, props, bubble = false }) {
   if (new Set(props.points.map(point => point.name)).size !== props.points.length) throw new Error("Scatter point names must be unique");
   if (bubble && props.points.some(point => !Number.isFinite(point.size) || point.size <= 0)) throw new Error("Bubble charts require a positive finite size for every point");
   if (!bubble && props.sizeLegend !== undefined) throw new Error("Only bubble charts accept a size legend");
+  // `focus: ["name", ...]` sets the named points in the accent and the rest in
+  // the comparator grey. A scatter had no emphasis at all, so the one
+  // observation a page is about looked exactly like the eight it is measured
+  // against, and the reader had to find it by reading labels.
+  const focus = props.focus === undefined ? [] : Array.isArray(props.focus) ? props.focus : [props.focus];
+  if (focus.some(name => typeof name !== "string" || !props.points.some(point => point.name === name))) {
+    throw new Error("Scatter focus must name exact points on the chart");
+  }
+  if (focus.length && focus.length === props.points.length) {
+    throw new Error("Scatter focus marks the points a page is about; marking every point marks none");
+  }
+  const focused = new Set(focus);
   const declaredSeries = props.points.filter(point => typeof point.series === "string" && point.series.trim()).length;
   if (declaredSeries && declaredSeries !== props.points.length) throw new Error("Scatter points must either all declare a series or all use the default series");
   const seriesNames = [...new Set(props.points.map(point => point.series).filter(value => typeof value === "string" && value.trim()))];
@@ -1806,8 +1818,12 @@ function scatter({ id, frame, props, bubble = false }) {
     const x = xScale(point.x);
     const y = yScale(point.y);
     const seriesIndex = seriesNames.length ? seriesNames.indexOf(point.series) : 0;
-    nodes.push(ellipsePrimitive({ id: stableId(id, "point", point.name), role: "chart-marker", frame: { x: x - size / 2, y: y - size / 2, width: size, height: size }, style: fillStyle(SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length]), data: { series: point.series ?? null, sizeValue: bubble ? point.size : null } }));
-    if (point.showLabel !== false && props.dataLabels !== false) nodes.push(textPrimitive({ id: stableId(id, "label", point.name), role: "data-label", frame: { x: x + size / 2 + 4, y: y - 12, width: 96, height: 24 }, text: point.name, style: textStyle(CHART_LABEL, INK, false, "left") }));
+    const marked = focused.has(point.name);
+    const pointColor = focus.length
+      ? (marked ? token("color.accent") : token("color.chartComparator"))
+      : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
+    nodes.push(ellipsePrimitive({ id: stableId(id, "point", point.name), role: "chart-marker", frame: { x: x - size / 2, y: y - size / 2, width: size, height: size }, style: fillStyle(pointColor), data: { series: point.series ?? null, sizeValue: bubble ? point.size : null, ...(marked ? { highlighted: true } : {}) } }));
+    if (point.showLabel !== false && props.dataLabels !== false) nodes.push(textPrimitive({ id: stableId(id, "label", point.name), role: "data-label", frame: { x: x + size / 2 + 4, y: y - 12, width: 96, height: 24 }, text: point.name, style: textStyle(CHART_LABEL, marked ? token("color.accent") : INK, marked, "left") }));
     const mappedPoint = { x, y, changeX: x, changeY: y - 16 };
     pointMap.set(`value:${point.name}`, mappedPoint);
     pointMap.set(`${point.series || "value"}:${point.name}`, mappedPoint);

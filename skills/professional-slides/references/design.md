@@ -37,6 +37,27 @@ Every page that sets evidence against what is read off it has to join the two. T
 
 The last three assert an inference. Spend them where the inference is the page's work, not on every chart that happens to have commentary beside it: in a deck of fifty pages that is a handful, not every `exhibit-left`. `implication: false` is the default and is the right answer on most pages, because the heading, the panel or the words have already done the joining.
 
+### Reach past the first device that works
+
+The runtime carries ten families of mark. A deck that draws two of them has not chosen between them, and no per-page gate sees it: every page is individually fine and the deck reads as one page reprinted. `DECK_VOCABULARY` measures this on the composed scene, because a plan can record a treatment the page never draws.
+
+| Family | Draws | Reach for it when |
+| --- | --- | --- |
+| Icon | One mark per named category | A page enumerates named things: media, options, workstreams, categories |
+| Picture | A sourced photograph | The subject is something a reader would want to see; colour and variety are not decoration |
+| Score | Harvey balls on a declared scale | A cell is a rating, a percentage of a maximum, or a judged level |
+| Value pill | The figure in a filled pill | A column of counts, money or volumes where magnitude should read before the digits |
+| In-cell bar | A bar behind the figure | A column of magnitudes on a shared scale, read down |
+| Heat | A sequential fill per cell | A matrix whose pattern is the finding |
+| State | A coloured status or verdict pill | A cell adjudicates: on track, at risk, wins, ties, loses |
+| Growth | A CAGR or change badge on a chart | The rate between two periods is the claim, not the levels |
+| Reference | A line at a threshold, target or floor | The claim is a distance from a named value |
+| Annotation | A callout bound to an exact mark | The finding lives at one point, not across the series |
+
+Do not add a rating to a page to satisfy a count. Look instead for the pages whose evidence already is a score, a count, a named set or a subject worth showing, and which are currently setting all four as plain text.
+
+**A number column is not automatically a pill.** Counts, money and volumes read better in one; years, identifiers, ranks and scores out of a maximum do not, because the pill asserts a magnitude the number does not carry.
+
 ## Choose visual treatments during planning
 
 Use the existing `why`, `treatment`, `anchors`, `highlight`, `annotation` and `insight` fields. A composite identifies the intended treatment of each child. The table below is the semantic owner for these decisions; chart/component references own executable props.

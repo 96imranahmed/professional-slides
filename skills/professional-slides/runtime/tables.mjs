@@ -50,6 +50,13 @@ export const RAG_STATES = Object.freeze({
   behind: { label: "Behind plan", color: "color.caution" },
   "at-risk": { label: "At risk", color: "color.negative" },
   "not-started": { label: "Not started", color: "color.rule" },
+  // An adjudication rather than a delivery status: a scorecard whose last
+  // column says whether the subject won, drew or lost the comparison beside
+  // it. These were setting as plain grey text, so a reader had to read six
+  // words to learn what a colour says at a glance.
+  won: { label: "Wins", color: "color.positive" },
+  drawn: { label: "Ties", color: "color.caution" },
+  lost: { label: "Loses", color: "color.negative" },
 });
 export const LIGHT_STATES = Object.freeze({ green: "color.positive", amber: "color.caution", red: "color.negative" });
 export const TABLE_TOKENS = [
