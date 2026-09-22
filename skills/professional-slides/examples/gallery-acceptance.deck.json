@@ -3614,6 +3614,172 @@
       "id": "figure-spectrum"
     },
     {
+      "id": "figure-radial-bars",
+      "title": "Firms expect remote work to last more than their staff want it",
+      "layout": "exhibit-full",
+      "exhibit": {
+        "type": "radial-bars",
+        "items": [
+          {
+            "label": "Firms that think more jobs can be done remotely",
+            "value": 93
+          },
+          {
+            "label": "Firms that say they will cut business travel",
+            "value": 91
+          },
+          {
+            "label": "Employees who want to work from home more often",
+            "value": 77,
+            "highlight": true
+          }
+        ]
+      },
+      "source": "Employer and employee surveys, 2026"
+    },
+    {
+      "id": "figure-spectrum-segmented",
+      "title": "Two of four technology trends need a response within two years",
+      "layout": "exhibit-full",
+      "exhibit": {
+        "type": "spectrum",
+        "segments": 5,
+        "scale": [
+          "Very low",
+          "Low",
+          "Medium",
+          "High",
+          "Very high"
+        ],
+        "items": [
+          {
+            "left": "Hyper-personalisation",
+            "level": 5,
+            "text": "Mainstream in retail within two years"
+          },
+          {
+            "left": "Digital twins",
+            "level": 4,
+            "text": "Pilots at three of five peers"
+          },
+          {
+            "left": "Supply-chain ledgers",
+            "level": 2
+          },
+          {
+            "left": "Quantum optimisation",
+            "level": 1
+          }
+        ]
+      },
+      "source": "Trend assessment panel, 2026"
+    },
+    {
+      "id": "chart-column-deltas-icons",
+      "title": "Shopping gained most since 2020; maps is the only use to fall",
+      "exhibit": {
+        "type": "chart.column",
+        "heading": "Share of adults using each weekly",
+        "unit": "%",
+        "categories": [
+          "Messaging",
+          "Video",
+          "Shopping",
+          "Banking",
+          "Maps"
+        ],
+        "series": [
+          {
+            "name": "2026",
+            "values": [
+              82,
+              64,
+              57,
+              49,
+              41
+            ]
+          }
+        ],
+        "deltas": [
+          12,
+          8,
+          15,
+          3,
+          -2
+        ],
+        "deltasLabel": "Change vs. 2020, pp",
+        "categoryIcons": {
+          "Messaging": "mail",
+          "Video": "eye",
+          "Shopping": "truck",
+          "Banking": "money",
+          "Maps": "map-pin"
+        }
+      },
+      "points": [
+        {
+          "lead": "Shopping gained 15 points",
+          "text": "from the lowest 2020 base of the five."
+        },
+        {
+          "lead": "Maps fell two points",
+          "text": "as commuting days dropped."
+        }
+      ],
+      "source": "Consumer panel, 2020 and 2026"
+    },
+    {
+      "id": "chart-line-series-growth",
+      "title": "Lithium demand grows 20% a year to 2032, four times nickel's rate",
+      "layout": "exhibit-full",
+      "exhibit": {
+        "type": "chart.line",
+        "heading": "Demand by metal",
+        "unit": "kt",
+        "categories": [
+          "2020",
+          "2024",
+          "2028",
+          "2032"
+        ],
+        "series": [
+          {
+            "name": "Lithium",
+            "values": [
+              300,
+              700,
+              1500,
+              2600
+            ]
+          },
+          {
+            "name": "Nickel",
+            "values": [
+              2400,
+              3000,
+              3800,
+              4400
+            ]
+          },
+          {
+            "name": "Cobalt",
+            "values": [
+              140,
+              190,
+              240,
+              280
+            ]
+          }
+        ],
+        "directLabels": "end",
+        "seriesGrowth": {
+          "from": "2020",
+          "to": "2032"
+        }
+      },
+      "source": "Industry demand model, base case"
+    },
+    {
       "title": "Every capability rests on one data platform",
       "layout": "exhibit-full",
       "exhibit": {

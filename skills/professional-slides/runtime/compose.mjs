@@ -1507,6 +1507,12 @@ const PAGE_SHAPES = {
     fit: (s, ex) => {
       if (ex.length !== 1 || !Array.isArray(s.points) || s.points.length < 2 || s.points.length > 4) return 0;
       if (s.photo || s.kpi || s.insight || s.insights) return 0;
+      // The columns under the exhibit set each point as a paragraph with its
+      // lead, which carries no marker. A page that asked for icons, numbers,
+      // letters or boxes keeps the side column that draws them: chosen on
+      // variety, this shape dropped the icons of an icon-framed page whenever
+      // the page before it had used the side column.
+      if (["icon-lead", "icon-framed", "numbered", "lettered", "checklist"].includes(s.pointsStyle)) return 0;
       // A `compare` exhibit is already two columns arguing with each other; its
       // commentary belongs beside it, not stacked underneath.
       if (["compare", "quadrants", "swot", "matrix"].includes(ex[0].type)) return 0;

@@ -1011,11 +1011,12 @@ def gate_unsourced_picture(slide_no, slide, findings):
     """
     # A table's photo slot is a thumbnail, well under the size floor that keeps
     # an icon-sized frame out of this count - but it is still a photograph
-    # nobody supplied, so it is counted whatever its size.
+    # nobody supplied, so it is counted whatever its size. So is a chart's
+    # empty logo or flag slot beside a category.
     empty = [n for n in slide.get("nodes", [])
              if (str(n.get("role") or "") == "image-frame"
                  and (n.get("frame") or {}).get("width", 0) * (n.get("frame") or {}).get("height", 0) >= PHOTO_MIN_AREA)
-             or str(n.get("role") or "") == "table-photo-placeholder"]
+             or str(n.get("role") or "") in ("table-photo-placeholder", "category-logo-placeholder")]
     if not empty:
         return
     findings.append(finding(

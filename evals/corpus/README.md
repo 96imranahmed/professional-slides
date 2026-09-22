@@ -183,5 +183,13 @@ from `index.csv`. Nothing about the collection lives in the repository's
 `output/` folder, which is working space.
 
 The design-style inventory in `styles/` samples 300 of its pages alongside 100
-from the rest of the corpus; `style-classification.csv` at the corpus root holds
-the page-by-page result.
+from the rest of the corpus, classified into 85 styles (`classified.json`). A
+second draw of 200 pages from the firms' published and infographic reports
+(`sample-published.json`, `classified-published.json`) looked for styles client
+work lacks: 195 of its 198 content pages fitted the 85, and the three that did
+not were one new style, radial bars (`C-radial`). The same pages carried five
+devices the charts could not set, now drawn: delta pills over columns, icons or
+logos on a category axis, a growth column at the end of a line chart, a discrete
+assessment scale and the radial bars themselves. `style-classification.csv` at
+the corpus root holds the page-by-page result for all 600 pages, with a `sample`
+column saying which draw each came from.

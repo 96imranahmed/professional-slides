@@ -20,6 +20,7 @@ Decide what the page has to make the reader see, then take the slide type that s
 | A relationship between two measures | `chart.scatter`; `chart.bubble` when a third measure matters | A table of pairs |
 | Spread within groups | `chart.boxplot`, `chart.range` | An average alone |
 | A population share read as "six in ten" | `pictogram` | A single bar at 60% |
+| Two to six shares of different wholes as one figure, such as agreement with each survey statement | `radial-bars` | A pie of shares that do not add up |
 | Rank movement across periods | `rank-flow` | A table of ranks |
 | Quantities moving from one set to another | `sankey` | Two tables |
 | Where on a map | `map` (highlight, markers, choropleth) | A list of countries |
@@ -38,6 +39,7 @@ Decide what the page has to make the reader see, then take the slide type that s
 | Items sorted into categories | `placement` | A table with one column of ticks |
 | Two things judged on two axes | `matrix` with plotted items; `quadrants` when each box holds a list | A ranked list |
 | Position between two poles | `spectrum` | A 1-to-5 score nobody measured |
+| A judged grade on a named scale (impact very low to very high, years to mainstream) | `spectrum` with `segments` and `scale` | A slider claiming a precision the judgement lacks |
 | A hub and what depends on it | `relationship-network` hub-ring | A list of dependencies |
 | Two to five priorities as equals | `capsules`, `cards` | A paragraph |
 | Scenarios that each lead somewhere | `arrow-rows` | A table of scenarios |

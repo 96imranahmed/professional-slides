@@ -103,11 +103,14 @@ The skill's evaluations read the collection through `../index.csv`; the design
 style inventory (`evals/corpus/styles`) samples 300 of its pages.
 """, encoding="utf-8")
 
-    cells = "".join(
-        f"<tr><td>{html.escape(r['firm'])}</td><td>{html.escape(r['category'])}</td>"
-        f"<td>{'<a href=\"' + html.escape(r['library_path'].replace('slideworks/', '', 1)) + '\">' if r['library_path'] else ''}"
-        f"{html.escape(r['title'])}{'</a>' if r['library_path'] else ''}</td>"
-        f"<td>{r['pages'] or ''}</td><td>{html.escape(r['status'])}</td></tr>" for r in coverage)
+    def row(r):
+        title = html.escape(r["title"])
+        if r["library_path"]:
+            href = html.escape(r["library_path"].replace("slideworks/", "", 1))
+            title = f'<a href="{href}">{title}</a>'
+        return (f"<tr><td>{html.escape(r['firm'])}</td><td>{html.escape(r['category'])}</td>"
+                f"<td>{title}</td><td>{r['pages'] or ''}</td><td>{html.escape(r['status'])}</td></tr>")
+    cells = "".join(row(r) for r in coverage)
     (LIB / "index.html").write_text(
         "<!doctype html><html lang=en><head><meta charset=utf-8><title>Slideworks library</title>"
         "<style>body{font:14px/1.4 Arial,sans-serif;margin:24px;color:#17202a}table{border-collapse:collapse;width:100%}"

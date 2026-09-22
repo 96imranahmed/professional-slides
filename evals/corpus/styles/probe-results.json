@@ -83,5 +83,6 @@
  "S-divider": true,
  "S-agenda": true,
  "S-backmatter": true,
- "S-contact": true
+ "S-contact": true,
+ "C-radial": true
 }

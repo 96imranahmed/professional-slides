@@ -790,6 +790,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
       Object.keys(props.valueFormat).some(key => key !== "decimals"))) return null;
   // Stack totals and category groups are drawn by the runtime; PowerPoint has no native total label.
   if ((props.stackTotals || []).length || (props.categoryGroups || []).length || (props.secondaryLabels || []).length || (props.stackBracket || []).length || (props.deltas || []).length || (props.periods || []).length || (props.events || []).length || props.categoryLabels === false || props.segmentGrowth) return null;
+  // Category icons and a growth column are placed against the plot we
+  // measured; PowerPoint lays out its own axes, so they would float free.
+  if (props.categoryIcons || props.seriesGrowth) return null;
   if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
   const categories = [...(props.categories || props.labels || [])];
   const series = type === "range"

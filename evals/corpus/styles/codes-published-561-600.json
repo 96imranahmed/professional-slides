@@ -1,0 +1,17 @@
+{
+ "561":["C-stack",["paired"]], "562":["T-heat",["dense"]], "563":["C-stack",["percent","pie","growth-pill"]],
+ "564":["C-col",["ranked","rank-dots","flags"]], "565":["C-small-multiples",["lines"]], "566":["X-document",[]],
+ "567":["C-paired",["line","col"]], "568":["S-contact",["photos"]], "569":["P-photo-text",["document"]],
+ "570":["T-text",["dense","mini-stack"]], "571":["X-document",["dark"]], "572":["P-photo-text",[]],
+ "573":["S-backmatter",[]], "574":["S-backmatter",["dark","illustration"]], "575":["K-stat-list",["photo-backdrop"]],
+ "576":["D-cycle",["icon"]], "577":["X-cards",["photo","segmented-scale"]], "578":["T-text",["dense"]],
+ "579":["C-stack",["dark","share-labels"]], "580":["K-infographic",["word-cloud"]]
+,
+ "581":["C-scatter",["annotated-path"]], "582":["K-ring",["icon","dark-sidebar"]], "583":["C-col",["dark"]],
+ "584":["C-map",["callouts"]], "585":["P-illustration",["stats"]], "586":["X-worksheet",[]],
+ "587":["P-photo-tiles",["icon-header"]], "588":["C-bar-h",["document"]], "589":["T-text",["dark-sidebar","numbered"]],
+ "590":["K-stat-list",["paired-columns"]], "591":["T-plain",["highlight-bands"]], "592":["C-small-multiples",["lines"]],
+ "593":["P-photo-text",[]], "594":["C-waffle",["paired","dot-grid"]], "595":["P-photo-text",["color-panel"]],
+ "596":["T-icon-rows",["photo-circles","timeline"]], "597":["T-heat",["scenario-matrix"]], "598":["P-photo-tiles",[]],
+ "599":["C-col",["side-notes","takeaway-band"]], "600":["C-small-multiples",["dark","stacked"]]
+}

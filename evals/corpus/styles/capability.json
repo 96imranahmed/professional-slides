@@ -85,6 +85,7 @@
   "S-divider": "section",
   "S-agenda": "agenda",
   "S-backmatter": "text.document",
-  "S-contact": "people"
+  "S-contact": "people",
+  "C-radial": "radial-bars"
  }
 }

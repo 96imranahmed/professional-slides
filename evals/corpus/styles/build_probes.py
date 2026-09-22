@@ -51,6 +51,10 @@ PROBES = {
         "type": "table", "columns": [{"label": "Region"}, {"label": "Revenue", "bar": True, "unit": "$m"},
                                      {"label": "Margin", "bar": True, "unit": "%"}, {"label": "Growth", "bar": True, "unit": "%"}],
         "rows": [["North", 42, 18, 6], ["South", 35, 12, 9], ["East", 28, 21, 4], ["West", 19, 9, 11], ["Central", 12, 15, 3]]}),
+    "C-radial": page("Firms expect remote work to last more than their staff want it", layout="exhibit-full", exhibit={
+        "type": "radial-bars", "items": [{"label": "Firms that think more jobs can be done remotely", "value": 93},
+                                          {"label": "Firms that say they will cut business travel", "value": 91},
+                                          {"label": "Employees who want to work from home more often", "value": 77, "highlight": True}]}),
     "C-waffle": page("Institutions ranking each factor first", layout="exhibit-full", exhibit={
         "type": "chart.waffle", "heading": "Institutions ranking each factor first", "unit": "Number of institutions",
         "categories": ["Productivity", "Business needs", "Compliance", "Return"], "series": [{"name": "Institutions", "values": [16, 15, 8, 5]}]}),

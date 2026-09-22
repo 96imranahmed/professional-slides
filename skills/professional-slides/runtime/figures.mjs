@@ -207,8 +207,24 @@ export function flowNodes({ id, frame, props }) {
 // Sliders between two poles, one per dimension, with a marker where the subject
 // sits. The corpus uses them for mindsets and positioning: "fixed" to "growth",
 // "reactive" to "creative". The pole names carry the scale, so there are no ticks.
+//
+// `segments: 3–7` turns each track into a row of discrete steps with the one the
+// subject sits on filled: the published reports' assessment scale ("impact on
+// industry: very low … very high", "time to mainstream: 0–2 … 10+ years"). A
+// judged grade is not a point on a continuum, and a slider drawn at 0.62 claims
+// a precision the judgement does not have. `scale` names the steps once, above
+// the first row; a row then needs only its own name, `left`.
 function normalizeSpectrum(props) {
+  const segments = props.segments === undefined ? null : Number(props.segments);
+  if (segments !== null && !(Number.isInteger(segments) && segments >= 3 && segments <= 7)) throw new Error("A segmented spectrum takes 3 to 7 segments");
+  if (props.scale !== undefined && (segments === null || !Array.isArray(props.scale) || props.scale.length !== segments || props.scale.some((step) => !clean(step)))) throw new Error("A spectrum's scale names every segment, in order, and needs `segments`");
   return between(props.items, 2, 6, "A spectrum").map((item, i) => {
+    if (segments !== null) {
+      if (!clean(item?.left)) throw new Error(`Spectrum row ${i + 1} needs its name in \`left\``);
+      const level = Number(item.level);
+      if (!(Number.isInteger(level) && level >= 1 && level <= segments)) throw new Error(`Spectrum row ${i + 1} sits on a segment from 1 to ${segments}; give its \`level\``);
+      return { left: clean(item.left), right: clean(item.right), level, value: (level - 0.5) / segments, text: clean(item.text) };
+    }
     if (!clean(item?.left) || !clean(item?.right)) throw new Error(`Spectrum row ${i + 1} needs both poles named`);
     const value = Number(item.value);
     if (!(value >= 0 && value <= 1)) throw new Error(`Spectrum row ${i + 1} places its marker at a fraction from 0 to 1`);
@@ -218,17 +234,23 @@ function normalizeSpectrum(props) {
 
 export function spectrumLayout(frame, props) {
   const items = normalizeSpectrum(props);
+  const segments = props.segments === undefined ? null : Number(props.segments);
   const poleWidth = Math.min(200, frame.width * 0.2);
-  const trackWidth = frame.width - 2 * poleWidth - 2 * v("space.4");
+  // A segmented scale whose rows name no right-hand pole gives the track that column.
+  const rightPole = segments === null || items.some((item) => item.right);
+  const trackWidth = frame.width - (rightPole ? 2 : 1) * poleWidth - (rightPole ? 2 : 1) * v("space.4");
   if (trackWidth < 200) throw new Error("A spectrum is too narrow to show position; widen it");
   const rows = items.map((item) => {
-    const left = measure(item.left, poleWidth, "type.body", true), right = measure(item.right, poleWidth, "type.body", true);
+    const left = measure(item.left, poleWidth, "type.body", true), right = item.right ? measure(item.right, poleWidth, "type.body", true) : null;
     const text = item.text ? measure(item.text, trackWidth, "type.compact") : null;
-    const head = Math.max(left.height, right.height, 24);
+    const head = Math.max(left.height, right?.height ?? 0, 24);
     return { item, left, right, text, head, height: head + (text ? v("space.2") + text.height : 0) };
   });
   const gap = v("space.5");
-  return { rows, poleWidth, trackWidth, gap, height: rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
+  const segGap = 4, segWidth = segments ? (trackWidth - segGap * (segments - 1)) / segments : 0;
+  const scale = segments && props.scale ? props.scale.map((step) => measure(step, segWidth, "type.label")) : null;
+  const header = scale ? Math.max(...scale.map((m) => m.height)) + v("space.2") : 0;
+  return { rows, segments, segGap, segWidth, scale, header, rightPole, poleWidth, trackWidth, gap, height: header + rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
 }
 
 export function spectrumNodes({ id, frame, props }) {
@@ -237,13 +259,22 @@ export function spectrumNodes({ id, frame, props }) {
   const out = [];
   const room = frame.height - L.height;
   const gap = L.rows.length > 1 ? L.gap + Math.min(room / (L.rows.length - 1), L.gap * 2) : 0;
-  const used = L.rows.reduce((s, r) => s + r.height, 0) + gap * (L.rows.length - 1);
+  const used = L.header + L.rows.reduce((s, r) => s + r.height, 0) + gap * (L.rows.length - 1);
   let y = frame.y + Math.max(0, (frame.height - used) / 2);
   const trackX = frame.x + L.poleWidth + v("space.4");
+  const segX = (k) => trackX + k * (L.segWidth + L.segGap);
+  if (L.scale) L.scale.forEach((m, k) => out.push(label(stableId(id, "scale", k), "spectrum-scale", { x: segX(k), y: y + L.header - v("space.2") - m.height, width: L.segWidth }, m, style("type.label", SECONDARY, false, "center"))));
+  y += L.header;
   L.rows.forEach((r, i) => {
     const rid = stableId(id, "row", i), mid = y + r.head / 2, dot = 16;
     out.push(label(stableId(rid, "left"), "spectrum-pole", { x: frame.x, y: mid - r.left.height / 2, width: L.poleWidth }, r.left, style("type.body", INK, true, "right")));
-    out.push(label(stableId(rid, "right"), "spectrum-pole", { x: trackX + L.trackWidth + v("space.4"), y: mid - r.right.height / 2, width: L.poleWidth }, r.right, style("type.body", ACCENT, true, "left")));
+    if (r.right) out.push(label(stableId(rid, "right"), "spectrum-pole", { x: trackX + L.trackWidth + v("space.4"), y: mid - r.right.height / 2, width: L.poleWidth }, r.right, style("type.body", ACCENT, true, "left")));
+    if (L.segments) {
+      for (let k = 0; k < L.segments; k++) out.push(fillRect(stableId(rid, "segment", k), k === r.item.level - 1 ? "spectrum-level" : "spectrum-segment", { x: segX(k), y: mid - 7, width: L.segWidth, height: 14 }, k === r.item.level - 1 ? ACCENT : MUTED, { data: { level: k + 1, selected: k === r.item.level - 1 } }));
+      if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.compact", SECONDARY, false, "left")));
+      y += r.height + gap;
+      return;
+    }
     out.push(fillRect(stableId(rid, "track"), "spectrum-track", { x: trackX, y: mid - 3, width: L.trackWidth, height: 6 }, MUTED, { radius: "radius.round" }));
     out.push(fillRect(stableId(rid, "fill"), "spectrum-fill", { x: trackX, y: mid - 3, width: L.trackWidth * r.item.value, height: 6 }, TINT, { radius: "radius.round" }));
     out.push(ellipsePrimitive({ id: stableId(rid, "marker"), role: "spectrum-marker", frame: { x: trackX + L.trackWidth * r.item.value - dot / 2, y: mid - dot / 2, width: dot, height: dot }, style: { fill: ACCENT, stroke: WHITE, lineWidth: token("line.standard") }, data: { value: r.item.value } }));
@@ -921,6 +952,81 @@ export function sideStatementNodes({ id, frame, props }) {
   return out;
 }
 
+/* ------------------------------------------------------------- radial-bars */
+
+// Concentric arcs, one per item, each swept in proportion to its value: the
+// published reports' radial bar (three survey shares as rings, a nested set of
+// half-circles). Each arc runs clockwise from twelve o'clock over at most three
+// quarters of a turn, so the empty quarter holds every ring's figure and label
+// on the ring's own line. The rings are shares of different wholes read side by
+// side; a split of one whole belongs in a pie.
+const RADIAL_SWEEP = 270;
+function normalizeRadial(props) {
+  const max = props.max ?? 100;
+  if (!(Number.isFinite(max) && max > 0)) throw new Error("A radial bar's max must be a positive number");
+  const unit = props.unit ?? (max === 100 ? "%" : "");
+  return between(props.items, 2, 6, "A radial bar").map((item, i) => {
+    if (!clean(item?.label)) throw new Error(`Radial ring ${i + 1} needs a label`);
+    const value = Number(item.value);
+    if (!(value >= 0 && value <= max)) throw new Error(`Radial ring ${i + 1}: value must be between 0 and ${max}`);
+    return { label: clean(item.label), value, display: clean(item.display) ?? `${Number(value.toFixed(1))}${unit}`, highlight: item.highlight === true };
+  });
+}
+
+export function radialBarsLayout(frame, props) {
+  const items = normalizeRadial(props), max = props.max ?? 100;
+  const valueWidth = Math.max(...items.map((item) => measure(item.display, 400, "type.body", true).width)) + 2;
+  // Measured for its height, the figure asks for a 420px circle; placed, it takes
+  // the height it is given. In a narrow frame the circle gives up radius until
+  // every label sits on its own ring's line: a smaller figure that reads beats
+  // a larger one whose labels run into the ring below.
+  const widest = Math.floor(Math.min(Number.isFinite(frame.height) ? frame.height : 420, frame.width * 0.62) / 2);
+  let failure = null;
+  for (let R = widest; R >= 60; R -= 8) {
+    const hole = R * 0.26, band = (R - hole) / items.length, thickness = band * 0.72;
+    if (thickness < 10) { failure ??= "The radial bar is too small for its rings; enlarge it or drop a ring"; break; }
+    const labelMax = frame.width - R - valueWidth - v("space.3") - v("space.2");
+    if (labelMax < 90) { failure = "A radial bar needs room left of its centre for the ring labels; widen it"; continue; }
+    const rows = items.map((item) => ({ item, text: measure(item.label, labelMax, "type.compact"), sweep: RADIAL_SWEEP * item.value / max }));
+    const tall = rows.find((row) => row.text.height > band + 0.01);
+    if (tall) { failure = `Radial ring label "${tall.item.label}" needs ${Math.ceil(tall.text.height)}px and its ring has ${Math.floor(band)}px; shorten it`; continue; }
+    const labelWidth = Math.max(...rows.map((row) => row.text.width)) + 2;
+    const left = Math.max(R, labelWidth + valueWidth + v("space.3") + v("space.2"));
+    return { rows, R, hole, band, thickness, valueWidth, labelWidth, left, width: left + R, height: 2 * R };
+  }
+  throw new Error(failure ?? "The radial bar is too small for its rings; enlarge it or drop a ring");
+}
+
+// An annular sector as a polygon in the fractions of its square frame.
+function annulus(size, outer, inner, from, to) {
+  const c = size / 2, steps = Math.max(2, Math.ceil(Math.abs(to - from) / 3));
+  const at = (r, deg) => { const t = (deg - 90) * Math.PI / 180; return [Number(((c + r * Math.cos(t)) / size).toFixed(5)), Number(((c + r * Math.sin(t)) / size).toFixed(5))]; };
+  const outerArc = Array.from({ length: steps + 1 }, (_, i) => at(outer, from + (to - from) * i / steps));
+  const innerArc = Array.from({ length: steps + 1 }, (_, i) => at(inner, to - (to - from) * i / steps));
+  return [[...outerArc, ...innerArc]];
+}
+
+export function radialBarsNodes({ id, frame, props }) {
+  const L = radialBarsLayout(frame, props);
+  if (L.height > frame.height + 0.01 || L.width > frame.width + 0.01) throw new Error("The radial bar does not fit its frame");
+  const cx = frame.x + (frame.width - L.width) / 2 + L.left, cy = frame.y + (frame.height - L.height) / 2 + L.R;
+  const square = { x: cx - L.R, y: cy - L.R, width: 2 * L.R, height: 2 * L.R };
+  const size = 2 * L.R, out = [];
+  L.rows.forEach((row, i) => {
+    const rid = stableId(id, "ring", i), outer = L.R - i * L.band, inner = outer - L.thickness;
+    const fill = row.item.highlight ? ACCENT : PRIMARY;
+    if (row.sweep > 0.01) out.push(shapePrimitive({ id: stableId(rid, "arc"), role: "radial-arc", geometry: "customPolygon", frame: square, style: { fill, stroke: "none", lineWidth: token("line.hairline") }, data: { paths: annulus(size, outer, inner, 0, row.sweep), value: row.item.value, label: row.item.label } }));
+    if (row.sweep < RADIAL_SWEEP - 0.01) out.push(shapePrimitive({ id: stableId(rid, "track"), role: "radial-track", geometry: "customPolygon", frame: square, style: { fill: MUTED, stroke: "none", lineWidth: token("line.hairline") }, data: { paths: annulus(size, outer, inner, row.sweep, RADIAL_SWEEP) } }));
+    // The figure sits against the vertical through the centre, the label to its
+    // left, both centred on the ring's own band.
+    const mid = cy - outer + L.thickness / 2;
+    const value = measure(row.item.display, L.valueWidth, "type.body", true);
+    out.push(label(stableId(rid, "value"), "radial-value", { x: cx - v("space.2") - L.valueWidth, y: mid - value.height / 2, width: L.valueWidth }, value, style("type.body", row.item.highlight ? ACCENT : INK, true, "right")));
+    out.push(label(stableId(rid, "label"), "radial-label", { x: cx - v("space.2") - L.valueWidth - v("space.3") - L.labelWidth, y: mid - row.text.height / 2, width: L.labelWidth }, row.text, style("type.compact", SECONDARY, false, "right")));
+  });
+  return out;
+}
+
 /* ----------------------------------------------------------- registration */
 
 const SAMPLES = {
@@ -943,6 +1049,7 @@ const SAMPLES = {
   worksheet: { fields: [{ label: "(Insert field)", prompt: "(Insert the question it answers)", span: 3 }, { label: "(Insert field)", prompt: "(Insert the question)" }, { label: "(Insert field)", prompt: "(Insert the question)" }] },
   speech: { items: [{ speaker: "(Insert name)", quote: "(Insert what they said)" }, { speaker: "(Insert name)", quote: "(Insert what they said)" }] },
   "side-statement": { text: "(Insert the statement the page makes)", kicker: "(Insert a label)" },
+  "radial-bars": { items: [{ label: "(Insert what the first share counts)", value: 93 }, { label: "(Insert what the second share counts)", value: 91 }, { label: "(Insert what the third share counts)", value: 77, highlight: true }] },
 };
 
 const GUIDANCE = {
@@ -961,6 +1068,7 @@ const GUIDANCE = {
   "device-frame": { useWhen: "a product or document screenshot, shown as a customer sees it", why: "the device frame says the image is the working product, not an illustration", actionTitle: "state what the screen shows the customer can do" },
   worksheet: { useWhen: "handing a method over: the fields to complete and the question each answers", why: "labelled empty boxes make the method usable in the room", actionTitle: "state what completing the worksheet produces" },
   speech: { useWhen: "two to four people and what they said, when who said it matters", why: "bubbles above named speakers keep each line attached to its source", actionTitle: "state what the voices agree on or disagree about" },
+  "radial-bars": { useWhen: "two to six shares of different wholes, such as the percentage agreeing with each survey statement, on a page that wants a visual rather than a bar list", why: "rings of one length scale keep the shares comparable while reading as one figure; the figure and label sit on each ring's line", actionTitle: "state which share leads and by how much" },
   "side-statement": { useWhen: "the panel of a sidebar page: a question, claim or figure the content beside it supports", why: "a filled column in heading type reads first and holds the page's one idea", actionTitle: "let the panel carry the question and the title the answer" },
 };
 
@@ -981,6 +1089,7 @@ const RENDER = {
   worksheet: [worksheetNodes, worksheetLayout, { width: 1160, height: 440 }],
   speech: [speechNodes, speechLayout, { width: 1160, height: 400 }],
   "side-statement": [sideStatementNodes, sideStatementLayout, { width: 380, height: 508 }],
+  "radial-bars": [radialBarsNodes, radialBarsLayout, { width: 760, height: 420 }],
 };
 
 export const FIGURE_IDS = Object.freeze(Object.keys(RENDER));

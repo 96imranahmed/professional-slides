@@ -1,0 +1,17 @@
+{
+ "521":["D-arrows",["photo-circles"]], "522":["X-statement",["photo","definition"]], "523":["C-col",["photo-side","bubble-highlight"]],
+ "524":["C-paired",[]], "525":["S-contact",["photos"]], "526":["P-screenshot",["thumbnail-grid"]],
+ "527":["P-photo-text",["document"]], "528":["C-area",["document"]], "529":["T-plain",["paired","values"]],
+ "530":["D-cycle",["segmented"]], "531":["X-columns",["numbered"]], "532":["X-document",[]],
+ "533":["C-combo",["dual-axis"]], "534":["X-document",["dark","photo"]], "535":["C-map",["paired"]],
+ "536":["P-photo-text",[]], "537":["P-screenshot",["timeline"]], "538":["X-document",["photo","pull-quote"]],
+ "539":["C-col",["table-below"]], "540":["P-photo-full",["statement"]]
+,
+ "541":["C-line",["end-annotations"]], "542":["S-agenda",["photo-thumbnails"]], "543":["X-document",["charts"]],
+ "544":["C-pie",["paired","bars"]], "545":["T-text",["quotes","flags"]], "546":["X-icon-list",[]],
+ "547":["T-logo-rows",["matrix"]], "548":["D-hub",["takeaway-band"]], "549":["C-radial",["polar-rose"]],
+ "550":["C-col",["dark"]], "551":["X-numbered-rows",["bracket-summary"]], "552":["K-stat-list",["dark","quotes"]],
+ "553":["S-divider",[]], "554":["S-backmatter",[]], "555":["S-contact",["methodology"]],
+ "556":["X-statement",["circle-callout"]], "557":["S-other",[]], "558":["X-statement",["highlighted-numbers","bars"]],
+ "559":["C-stack",["icon-legend","end-cagr-column","highlights"]], "560":["P-screenshot",["paired"]]
+}

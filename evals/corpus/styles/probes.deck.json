@@ -3531,6 +3531,29 @@
     ]
    },
    "id": "s-contact"
+  },
+  {
+   "title": "Firms expect remote work to last more than their staff want it",
+   "layout": "exhibit-full",
+   "exhibit": {
+    "type": "radial-bars",
+    "items": [
+     {
+      "label": "Firms that think more jobs can be done remotely",
+      "value": 93
+     },
+     {
+      "label": "Firms that say they will cut business travel",
+      "value": 91
+     },
+     {
+      "label": "Employees who want to work from home more often",
+      "value": 77,
+      "highlight": true
+     }
+    ]
+   },
+   "id": "c-radial"
   }
  ]
 }

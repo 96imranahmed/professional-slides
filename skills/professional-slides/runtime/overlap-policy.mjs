@@ -60,6 +60,7 @@ export const OVERLAP_POLICY = Object.freeze({
     ["map-marker", "map-marker-fill", "fraction overlays its own map marker"],
     ["matrix-highlight", "matrix-point", "point is in the highlighted quadrant"],
     ["chart-segment", "chart-hole", "donut hole masks the segment center"],
+    ["radial-arc", "radial-track", "a ring's unfilled remainder abuts its arc"],
     ["chart-segment", "chart-segment", "adjacent segments share one chart origin and boundary"],
     ["chart-mark", "data-label-leader", "external data label leader terminates at its own mark"],
     ["chart-marker", "chart-point-highlight-label", "selected point label"],

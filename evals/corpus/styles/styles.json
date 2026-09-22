@@ -9,7 +9,7 @@
   "C-bubble": "Bubble chart or proportional circles", "C-scatter": "Scatter plot", "C-lollipop": "Lollipop or pin chart",
   "C-shared-rows": "Several bar columns sharing one set of row labels", "C-waffle": "Waffle or unit-square grid",
   "C-bubble-grid": "Grid of sized bubbles, rows by columns", "C-dot-plot": "Dot plot or dumbbell per row",
-  "C-over-photo": "Chart set over a full-bleed photograph", "C-pictogram": "Icon array, people or unit pictograms",
+  "C-over-photo": "Chart set over a full-bleed photograph", "C-radial": "Radial bars: concentric arcs, one share per ring", "C-pictogram": "Icon array, people or unit pictograms",
   "C-sankey": "Sankey or bipartite flow between two sets", "C-bump": "Rank table or bump chart across periods",
   "T-text": "Text matrix, rows by columns of prose", "T-bars": "Table with in-cell bars", "T-heat": "Heatmap table",
   "T-plain": "Plain data table", "T-rag": "Status or RAG table", "T-icon-rows": "Table whose rows lead with an icon",
