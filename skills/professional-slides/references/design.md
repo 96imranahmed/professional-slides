@@ -33,7 +33,9 @@ Use the existing `why`, `treatment`, `anchors`, `highlight`, `annotation` and `i
 | Closing insight | A supported consequence is otherwise buried and deserves a closing band. Write it before reserving space. | It paraphrases the title, rereads the rows or fills whitespace. |
 | Image | Recognition or visible features are necessary evidence: product, place, physical allocation or attributed specimen. Resolve usable assets before layout. | A named subject alone does not need a picture. Imagery cannot establish performance, safety or causality. |
 
-Review omission as well as misuse. A meaningful icon in metadata but suppressed in the image is still missing. Verify both classification (was the choice useful?) and handoff (did it render?). Do not increase treatment counts to meet a percentage.
+Resolve focus from the claim before selecting a palette. Record the exact subject keys and affected measures in `why`, then carry that focus coherently through corresponding marks or labels in a composite. For example, a district driving demand growth should be easy to find in both the level comparison and its aligned change strip; a source driving energy use should be identifiable in the contribution plot. Use the smallest sufficient cue: an accent mark, bold direct label or local annotation. Do not color an unrelated measure, override established series identity, or highlight the largest item merely because it is largest. A balanced comparison of peers can remain neutral.
+
+Review omission as well as misuse. Temporarily ignore category fills, zebra bands and totals: can the reader immediately locate the observation named in the title? A meaningful icon or focus recorded in metadata but suppressed in the image is still missing. Verify both classification (was the choice useful?) and handoff (did it render?). Do not increase treatment counts to meet a percentage.
 
 ## Put the comparison where it is used
 
