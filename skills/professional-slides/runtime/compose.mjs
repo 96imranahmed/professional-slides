@@ -320,8 +320,18 @@ const RAG_WORDS = [
 ];
 /** Verdict cells: ✓/✗, status words and "45 %" under a progress heading become typed cells. */
 function verdictCell(value, header) {
-  if (typeof value !== "string") return value;
-  const text = value.trim();
+  // A cell the highlight pass has already claimed arrives as {text, highlight}
+  // rather than as a string, and this returned early on anything that was not
+  // a string. So a scorecard whose highlight phrase was its own verdict word
+  // lost the pill on exactly the rows it named: "Wins" set as grey text beside
+  // "Ties" and "Loses" set as coloured pills. A state is worth more than an
+  // accent, and a pill emphasises the word more than the accent would, so the
+  // typed cell wins and the now-redundant accent is dropped.
+  const claimed = value !== null && typeof value === "object" && value.type === undefined
+    && typeof value.text === "string" && value.highlight !== undefined;
+  const source = claimed ? value.text : value;
+  if (typeof source !== "string") return value;
+  const text = source.trim();
   if (/^(✓|✔)$/.test(text)) return { type: "check", value: "yes" };
   if (/^(✗|✘|✕)$/.test(text)) return { type: "check", value: "no" };
   for (const [re, state] of RAG_WORDS) if (re.test(text)) return { type: "rag", value: state, text: /^(green|amber|yellow|red|ok)$/i.test(text) ? undefined : text };

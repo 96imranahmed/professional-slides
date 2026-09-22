@@ -208,3 +208,66 @@ console.log(JSON.stringify({{min: Math.min(...pts), count: pts.length}}));
 
     def test_the_floor_still_refuses_type_smaller_than_any_rung(self):
         self.assertGreater(page_gates.TYPE_RANGES["table-dense"][0], 7.0)
+
+
+class HighlightedVerdictTests(unittest.TestCase):
+    """A page may name its own verdict word as its highlight phrase.
+
+    `build-deck` transfers the content plan's highlight onto the slide, and the
+    highlight pass rewrites any cell containing the phrase from a string into
+    `{text, highlight}`. Verdict typing ran afterwards and returned early on
+    anything that was not a string, so a scorecard highlighting "Wins" got grey
+    text on its two winning rows and coloured pills on the four it lost - the
+    opposite emphasis to the one the page asked for.
+    """
+
+    ROWS = [["Recovery", "Largest rise after a rejected film", "Wins"],
+            ["Reach", "Share of gross outside North America", "Ties"],
+            ["Quality floor", "Lowest critic score in the run", "Loses"]]
+
+    def verdict_column(self, highlight):
+        """The last cell of every row, as the composer leaves it."""
+        return run_node(f'''
+import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[{{
+  id:'p', title:'A scorecard whose last column states the verdict',
+  layout:'exhibit-top', highlight:{json.dumps(highlight)},
+  exhibit:{{type:'table', columns:[
+    {{label:'Test', width:1.4}}, {{label:'Measure', width:2.2}}, {{label:'Verdict', width:1.0}}],
+    rows:{json.dumps(self.ROWS)}}},
+  points:[{{text:'A developed point that carries this page on its own and says something.'}}]}}]}});
+const table = JSON.parse(JSON.stringify(plan)).slides[0];
+const rows = JSON.stringify(table).match(/"rows":(\[\[.*?\]\])/)[1];
+console.log(JSON.stringify(JSON.parse(rows).map(r => r[r.length - 1])));
+''')
+
+    def states(self, highlight):
+        return [c.get("value") if isinstance(c, dict) else None
+                for c in self.verdict_column(highlight)]
+
+    def test_every_verdict_is_typed_when_none_is_highlighted(self):
+        self.assertEqual(self.states(None), ["won", "drawn", "lost"])
+
+    def test_the_highlighted_verdict_is_typed_like_the_rest(self):
+        self.assertEqual(self.states("Wins"), ["won", "drawn", "lost"])
+
+    def test_the_pill_replaces_the_accent_rather_than_carrying_both(self):
+        first = self.verdict_column("Wins")[0]
+        self.assertEqual(first["type"], "rag")
+        self.assertNotIn("highlight", first)
+
+    def test_a_highlight_on_an_ordinary_cell_still_marks_it(self):
+        marked = run_node(f'''
+import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[{{
+  id:'p', title:'A scorecard whose last column states the verdict',
+  layout:'exhibit-top', highlight:'Lowest critic score',
+  exhibit:{{type:'table', columns:[
+    {{label:'Test', width:1.4}}, {{label:'Measure', width:2.2}}, {{label:'Verdict', width:1.0}}],
+    rows:{json.dumps(self.ROWS)}}},
+  points:[{{text:'A developed point that carries this page on its own and says something.'}}]}}]}});
+const rows = JSON.stringify(plan).match(/"rows":(\[\[.*?\]\])/)[1];
+console.log(JSON.stringify(JSON.parse(rows)[2]));
+''')
+        self.assertEqual(marked[1]["highlight"], ["Lowest critic score"])
+        self.assertEqual(marked[2]["value"], "lost")
