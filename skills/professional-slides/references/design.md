@@ -76,3 +76,7 @@ For faithful reference transformation, inspect the whole supplied reference and 
 ## Visual review
 
 Use [Taste review](taste-review.md) for the independent reader pass. At design handoff inspect: claim-to-exhibit relation; useful or misplaced focus; field semantics; heading ownership; unique commentary; group balance; actual process dependencies; consistency across repeated families. Check both missing cues and inappropriate cues. Keep fit, clipping, collision and truthful scale failures blocking; use whitespace, ink and treatment counts as prompts, never decoration quotas. Repeated defects return to their shared owner.
+
+## Review the whole evidence region
+
+Before rendering, classify the whole page in the existing plan's `architecture` field. Multiple charts, a chart/table pair and a standalone diagram followed by detached explanatory prose all remain evidence-over-commentary. Count that arrangement before naming the individual devices. A local label, condition or annotation inside the evidence region is different from a separate commentary panel. Preserve necessary explanation while joining it to the exact asset, year, event, flow or case it explains. For example, align energy inputs and results by asset, spending and service by year, and staffing with installation on the same quarter axis. Do not repair a repeated reading task by moving the same paragraph from bottom to side.

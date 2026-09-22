@@ -10,7 +10,7 @@ node runtime/deliver-deck.mjs deck.json out/ [--reviewer auto|codex|claude|packe
 
 `build-deck.mjs` composes the deck/v3 spec into a plan, lays it out against measured text (bundled Arial-compatible metrics; no native dependencies), emits an editable PPTX with python-pptx, renders it with LibreOffice, reads the saved file back and runs the page gates. Exit 0 when the gates pass, 2 with findings (the deck is still written for inspection), 1 on a crash. `deliver-deck.mjs` builds, requires the gates and readback to pass, runs the review through the selected backend, and copies `out/<id>-DELIVERED.pptx` only when the review accepts; a rejection writes `out/REJECTED.md` and `delivery.json` with the blockers and removes any earlier deliverable. With `--reviewer packet` (the default when no `codex` or `claude` CLI is on the path) delivery writes `out/review-packet/` and exits 3; the calling agent reviews it and reruns with `--review out/review.json`.
 
-Environment: `python3` with `python-pptx` and Pillow, LibreOffice (`soffice`) and `pdftoppm` on the path; `RUNTIME_PYTHON` overrides the interpreter. No Codex runtime, no `@napi-rs/canvas`, no PptxGenJS.
+Environment: `python3` with `python-pptx`, Pillow and `pypdf`, LibreOffice (`soffice`) and `pdftoppm` on the path; `RUNTIME_PYTHON` overrides the interpreter. No Codex runtime, no `@napi-rs/canvas`, no PptxGenJS.
 
 ## Rendering
 

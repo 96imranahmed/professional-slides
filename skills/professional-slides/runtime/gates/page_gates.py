@@ -2279,22 +2279,24 @@ def page_architecture(slide):
     instances = slide.get("componentInstances", [])
     evidence = [c for c in instances if str(c.get("component", "")).startswith("chart.")
                 or c.get("component") in {"table", "rows", "compare", "phase-table"}]
-    # A process, tree or timeline beside a chart is a second form of evidence.
-    # Keep standalone diagrams' specific grammar below; include them here only
-    # in a composite so chart-plus-process cannot collapse into a lone chart.
+    # Count the entire evidence region before naming its constituent devices.
+    # Two exhibits or a standalone diagram can carry the same detached prose
+    # arrangement as one chart; component count must not hide that repetition.
     diagram_components = {"steps", "cycle", "journey", "timeline", "process",
                           "chevron-process", "flow", "roadmap", "tree",
                           "organization", "matrix", "quadrants", "horizons",
                           "gantt", "relationship-network"}
-    if evidence:
-        evidence += [c for c in instances if c.get("component") in diagram_components]
+    evidence += [c for c in instances if c.get("component") in diagram_components]
     comments = [c for c in instances if c.get("component") in {"paragraph", "bullet-list", "cards", "callout"}]
     metrics = [c for c in instances if c.get("component") in {"metric", "metrics"}]
     def box(c):
         f = c.get("frame") or {}
         return tuple(float(f.get(k, 0)) for k in ("x", "y", "width", "height"))
-    if len(evidence) == 1:
-        x, y, w, h = box(evidence[0])
+    if evidence:
+        boxes = [box(c) for c in evidence]
+        x, y = min(b[0] for b in boxes), min(b[1] for b in boxes)
+        w = max(b[0] + b[2] for b in boxes) - x
+        h = max(b[1] + b[3] for b in boxes) - y
         if any(box(c)[1] + box(c)[3] <= y + 4 for c in metrics):
             return "metrics-over-evidence"
         if any(box(c)[0] >= x + w - 4 or box(c)[0] + box(c)[2] <= x + 4 for c in metrics):
@@ -2304,6 +2306,9 @@ def page_architecture(slide):
             return "evidence-with-side-commentary"
         if any(box(c)[1] >= y + h - 4 for c in comments):
             return "evidence-over-commentary"
+    if len(evidence) == 1:
+        if evidence[0].get("component") in diagram_components:
+            return evidence[0]["component"]
         # A standalone bridge makes a base-to-result reconciliation visible.
         # This is a different reading task, not another category-chart style.
         # Commentary composites above remain normalized together.

@@ -214,6 +214,21 @@ class GateVocabularyTests(unittest.TestCase):
         self.assertEqual(page_gates.page_architecture({"componentInstances": [chart, prose]}), "evidence-over-commentary")
         self.assertEqual(page_gates.page_architecture({"componentInstances": [process]}), "chevron-process")
 
+    def test_multiple_exhibits_cannot_hide_detached_commentary(self):
+        chart = {"component": "chart.bar", "frame": {"x": 60, "y": 140, "width": 540, "height": 320}}
+        table = {"component": "table", "frame": {"x": 640, "y": 140, "width": 540, "height": 320}}
+        prose = {"component": "paragraph", "frame": {"x": 60, "y": 490, "width": 1120, "height": 100}}
+        diagram = {"component": "relationship-network", "frame": chart["frame"]}
+        for evidence in ([chart], [chart, table], [diagram]):
+            self.assertEqual(page_gates.page_architecture({"componentInstances": [*evidence, prose]}), "evidence-over-commentary")
+        self.assertEqual(page_gates.page_architecture({"componentInstances": [chart, table]}), "paired-evidence")
+        local = {"component": "paragraph", "frame": {"x": 150, "y": 220, "width": 200, "height": 70}}
+        self.assertEqual(page_gates.page_architecture({"componentInstances": [diagram, local]}), "relationship-network")
+        slides = [{"componentInstances": [chart, table, prose]} for _ in range(12)]
+        findings = []
+        page_gates.gate_page_shape_flat(slides, list(range(12)), findings, "balanced")
+        self.assertTrue(any(f["code"] == "PAGE_SHAPE_FLAT" for f in findings))
+
     def test_page_architecture_reads_past_the_exhibit_type(self):
         # LAYOUT_MONOTONY could not see the defect because a bar chart beside a
         # points column and a line chart beside a points column are two
