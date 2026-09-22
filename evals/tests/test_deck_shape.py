@@ -626,6 +626,67 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
+    def test_a_commentary_column_centres_on_how_much_of_its_track_it_fills(self):
+        """The count was a proxy for the slack, and it got one long prose point
+        wrong: the column hugged the top of a 500px track and left the bottom
+        half of the page blank. Measure the fill instead."""
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+const exhibit={type:'chart.column',heading:'Local supply by weather case',unit:'ML/day',
+  categories:['Highland','Central','East','Coast'],
+  series:[{name:'Normal',values:[40,65,42,48]},{name:'Design Dry',values:[28,47,27,33]}]};
+const side=(page)=>{const walk=(item)=>String(item.id||'').endsWith('-side')?[item]:(item.items||[]).flatMap(walk);
+  return page.items.flatMap(walk)[0];};
+const build=(points)=>side(composeSlide({id:'s',title:'Local supply falls together in the design drought',
+  layout:'exhibit-left',pointsHeading:false,pointsStyle:'prose',exhibit,points},0));
+// One prose point against a headed chart leaves most of the track empty, so it
+// is read across from the exhibit rather than down from the title.
+const sentence='Each weather state reduces several local sources together. No probability is assigned to the scenarios and the gaps between them are not confidence intervals.';
+assert.equal(build([{lead:'The model does not treat four districts as four independent hedges.',text:sentence}]).leftover,'center');
+// A column with enough body to fill its track starts at the top; the slack at
+// the foot is not a hole.
+const full=build(Array.from({length:5},(_,i)=>({lead:`Finding ${i+1}`,text:sentence})));
+assert.notEqual(full.leftover,'center');
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_the_gutter_mark_is_chosen_and_points_the_way_the_argument_runs(self):
+        """`implication` names one of a range the reference decks use, rather
+        than switching the dashed rule on. The block arrow is the loud end of
+        it: across a gutter between columns, down a band across the page."""
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const exhibit={type:'chart.column',heading:'Local supply by weather case',unit:'ML/day',
+  categories:['Highland','Central'],series:[{name:'Normal',values:[40,65]}]};
+const page=(id,implication,extra={})=>({id,title:'Local supply falls together in the design drought',
+  layout:'exhibit-left',implication,pointsHeading:false,pointsStyle:'prose',exhibit,
+  points:[{lead:'Four districts are not four hedges.',text:'Each weather state reduces several local sources together.'}],...extra});
+const build=(slides)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',tracker:false,slides})).deck;
+const marks=(slide)=>slide.nodes.filter(n=>String(n.id).includes('-implication'));
+const deck=build([page('a',false),page('b','rule'),page('c','arrow'),page('d','chevron'),page('e','divider-chevron')]);
+const [none,rule,arrow,chevron,dashed]=deck.slides;
+assert.equal(marks(none).length,0,'false draws nothing');
+assert.deepEqual(marks(rule).map(n=>n.role),['relationship-divider']);
+assert.equal(marks(rule)[0].style.dash,undefined,'the quiet rule is solid');
+// Down a gutter between two columns the arrow points across at the meaning.
+assert.equal(marks(arrow)[0].data.geometry,'rightArrow');
+assert.ok(marks(chevron).some(n=>n.role==='relationship-disc'));
+assert.equal(marks(chevron).filter(n=>n.role==='relationship-divider').length,0,'the disc stands alone');
+assert.equal(marks(dashed).find(n=>n.role==='relationship-divider').style.dash,'dash');
+// On a band drawn across the page it points down at what follows from the row.
+const band=build([{id:'f',title:'The four measures move together in the design drought',
+  layout:'exhibit-full',implication:'arrow',pointsHeading:false,pointsStyle:'prose',exhibit,
+  metrics:[{value:'40',label:'Highland'},{value:'65',label:'Central'}],
+  points:[{lead:'Four districts are not four hedges.',text:'Each weather state reduces several local sources together.'}]}]).slides[0];
+assert.equal(marks(band)[0].data.geometry,'downArrow');
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
     def test_a_column_of_statement_boxes_stacks_instead_of_spreading(self):
         result = run_node("""
 import assert from 'node:assert/strict';

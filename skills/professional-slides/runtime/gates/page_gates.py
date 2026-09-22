@@ -236,6 +236,12 @@ THRESHOLDS = {
     # pattern at all.
     "table_device_share_max": 0.6,
     "table_device_from": 4,
+    # A drawn gutter mark between an exhibit and its commentary asserts an
+    # inference. The reference decks state that relation in words far more often
+    # than they draw it; a deck that draws it on most such pages has stopped
+    # choosing. Measured where there are enough of these pages to have a pattern.
+    "drawn_bridge_share_max": 0.4,
+    "drawn_bridge_from": 5,
     "caveats_max": 2,           # caveat lines per page; the reference decks run at most two, the deck that failed ran three plus a table row plus a note
     "schema_repeat_max": 3,     # pages that may open their table with the same column headers (the deck that failed ran fourteen)
     # What a deck DOES, measured over its own pages against 122 pages of real
@@ -1983,6 +1989,36 @@ def gate_deck_craft(slides, analytical, findings):
     treated = rate(tables, TREATED_ROLE)
     annotated = rate(charts, ANNOTATED_ROLE, recoloured=True)
 
+    # The mark in the gutter between an exhibit and the commentary read off it.
+    # Every page that sets those two side by side has to join them, and the
+    # reference decks do it in words far more often than they draw it: a named
+    # heading ("As a result of..."), a headed panel ("Key facts" against
+    # "Perspectives"), a closing band, or nothing at all. Drawing it is the
+    # emphatic option and it is spent on the pages where the inference is the
+    # work. A deck that draws it on every such page has made the reader stop
+    # seeing it - and the pages where it was earned no longer stand out.
+    def joins_commentary(slide):
+        exhibits = [c for c in slide.get("componentInstances", [])
+                    if str(c.get("component") or "").startswith("chart.")
+                    or str(c.get("component") or "") in TABLE_COMPONENTS]
+        return bool(exhibits) and bool(roles(slide) & COMMENTARY_ROLES)
+
+    def gutter_mark(slide):
+        for node in slide.get("nodes", []):
+            if "-implication" not in str(node.get("id") or ""):
+                continue
+            data = node.get("data") or {}
+            if data.get("arrowVariant"):
+                return str(data["arrowVariant"])
+            if str(node.get("role") or "") == "relationship-divider":
+                return "divider-chevron" if data.get("relation") == "implies" else "rule"
+        return None
+
+    joined = [s for s in pages if joins_commentary(s)]
+    drawn = [gutter_mark(s) for s in joined]
+    inferences = [d for d in drawn if d]
+    drawnShare = len(inferences) / float(len(joined)) if joined else None
+
     # Treated is not the same as varied. A deck can carry a device on every
     # table and still read as one table repeated, because the device is the
     # same one: nine of fourteen tables in the cold run drew the implication
@@ -2005,11 +2041,13 @@ def gate_deck_craft(slides, analytical, findings):
                 "marksPerPage": round(marks, 1),
                 "tablesTreated": None if treated is None else round(treated, 3),
                 "chartsAnnotated": None if annotated is None else round(annotated, 3),
-                "commonestTableDevice": None if commonest is None else round(commonest, 3)}
+                "commonestTableDevice": None if commonest is None else round(commonest, 3),
+                "drawnBridges": None if drawnShare is None else round(drawnShare, 3)}
     want = {"highlight": THRESHOLDS["highlight_share_min"], "source": THRESHOLDS["source_share_min"],
             "marksPerPage": THRESHOLDS["marks_per_page_min"],
             "tablesTreated": craft["tableTreated"]["min"], "chartsAnnotated": craft["chartAnnotated"]["min"],
-            "commonestTableDevice": THRESHOLDS["table_device_share_max"]}
+            "commonestTableDevice": THRESHOLDS["table_device_share_max"],
+            "drawnBridges": THRESHOLDS["drawn_bridge_share_max"]}
     client = REFERENCE_JUDGED
     short = []
     if highlighted < want["highlight"]:
@@ -2034,6 +2072,15 @@ def gate_deck_craft(slides, analytical, findings):
         short.append(
             f"{commonest:.0%} of the {len(tables)} tables carry the same device. A treatment repeated on every "
             "table can be right for the same task. Review whether each use expresses its category, sequence or inference")
+    if (drawnShare is not None and len(joined) >= THRESHOLDS["drawn_bridge_from"]
+            and drawnShare > want["drawnBridges"]):
+        commonest_bridge = Counter(inferences).most_common(1)[0]
+        short.append(
+            f"{drawnShare:.0%} of the {len(joined)} pages that set an exhibit against its commentary draw a mark "
+            f"in the gutter, {commonest_bridge[1]} of them the same one ({commonest_bridge[0]}). The reference "
+            "decks carry that relation in the commentary's heading, in a headed panel, in a closing band or in "
+            "nothing at all, and draw it on the few pages where the inference is the page's work. Review which "
+            "of these pages is actually asserting an inference and let the words join the rest")
     if marks < want["marksPerPage"]:
         short.append(
             f"{marks:.0f} drawn elements a page against a corpus median of {REFERENCE_PAGE['drawings']}. A page "

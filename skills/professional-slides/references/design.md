@@ -17,7 +17,25 @@ For hard pages, sketch two plausible evidence structures at low fidelity; select
 
 When a small changed input governs the result, compare that input with its required level and capacity ceiling. Keep an unchanged large baseline as compact context if it otherwise dominates the page. For example, a warehouse's existing throughput may dwarf the small route increase that resolves its bottleneck; compare required route throughput with old and new route capacity, then reconcile the total locally.
 
-Prefer one primary chart or table with developed implications when it can carry the argument. A separate chart-plus-table pair is an uncommon, deliberate exception: specify what necessary relationship each contributes and why neither one exhibit nor local labels suffice. A chart of a total beside a table decomposing the same authority usually belongs in one table with interpretation. A compact data strip directly aligned to chart categories can instead be part of that chart. For an evidence-to-implication layout, use the established dashed separator and one arrow centred on the evidence body; focus rows never move it. Keep this an appropriate inference treatment, not a new layout quota, and retain varied mechanisms, sequences and comparisons elsewhere.
+Prefer one primary chart or table with developed implications when it can carry the argument. A separate chart-plus-table pair is an uncommon, deliberate exception: specify what necessary relationship each contributes and why neither one exhibit nor local labels suffice. A chart of a total beside a table decomposing the same authority usually belongs in one table with interpretation. A compact data strip directly aligned to chart categories can instead be part of that chart. For an evidence-to-implication layout, choose the bridge from the repertoire below rather than reaching for the same one each time; when the gutter does carry a mark, one arrow is centred on the evidence body and focus rows never move it. Keep this an appropriate inference treatment, not a new layout quota, and retain varied mechanisms, sequences and comparisons elsewhere.
+
+### How the page carries "therefore"
+
+Every page that sets evidence against what is read off it has to join the two. The reference decks do this five or six different ways and draw it in the gutter on very few pages; a deck that uses one device everywhere has chosen once, and by the fourth page the reader has stopped seeing it. Choose per page from what the relation actually is, and record the choice in the plan `why`.
+
+| Bridge | Spec | Use it when | Original |
+| --- | --- | --- | --- |
+| Words alone | `pointsHeading` naming the relation; nothing in the gutter | The commentary's heading can state the consequence - "As a result of piracy and internationalization", "What this costs to hold" | BCG, Media and Entertainment in NYC (2015) p19 |
+| Named panels | `pointsHeading` plus `pointsTone` (`muted`, `tint`, `dark`) | Evidence and interpretation are two standing categories the reader will meet again - "Key facts and data" against a bordered "Perspectives" | Bain, Syracuse diagnostic (2014) pp19-29; McKinsey, Purdue (2017) p22 |
+| Nothing | no heading, no mark, plain gutter | The points are read straight off the marks beside them and need no announcing | L.E.K., Australia freight comparison pp22, 24, 31 |
+| Closing band | `soWhat` | One sentence closes the page under everything on it, at the exhibit's own width | McKinsey, Purdue (2017) p25; BCG, NYCHA (2012) pp20, 30 |
+| Keyed callouts | numbered marks on the exhibit with `pointsStyle: "numbered"` | The commentary speaks to named points in the evidence rather than to the whole of it | Oliver Wyman, customer experience p12; Oliver Wyman, Big Tech venture investment p22 |
+| Quiet rule | `implication: "rule"` | The two columns need separating but no inference is being asserted | BCG, Media and Entertainment in NYC (2015) p19 |
+| Disc chevron | `implication: "chevron"` | A short centred column concludes from the exhibit and the disc has content to sit against | - |
+| Dashed gutter | `implication: "divider-chevron"` (or the legacy `true`) | A full-height column carries a genuinely authored inference and the page should say so | - |
+| Block arrow | `implication: "arrow"` | The page's own conclusion, said loudly - a shape read from across a room rather than punctuation in the gutter | Bain, UC Berkeley diagnostic pp38, 45; BCG, NYCHA (2012) p33; McKinsey, Purdue (2017) pp20-21 |
+
+The last three assert an inference. Spend them where the inference is the page's work, not on every chart that happens to have commentary beside it: in a deck of fifty pages that is a handful, not every `exhibit-left`. `implication: false` is the default and is the right answer on most pages, because the heading, the panel or the words have already done the joining.
 
 ## Choose visual treatments during planning
 

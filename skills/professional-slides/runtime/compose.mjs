@@ -1182,6 +1182,43 @@ function planPictureShare(slide) {
 // columns: used to measure a side column against what it holds before the
 // planner turns fractions into pixels.
 const BODY_WIDTH = 1160, BODY_HEIGHT = 508, CONNECTOR_WIDTH = 44, COLUMN_GAP = 16;
+// A commentary column filling two thirds of its track or less is read across
+// from the exhibit rather than down from the title, so it centres on the
+// exhibit. Above that it has enough body to start at the top and the slack at
+// the foot is not a hole.
+const SIDE_COLUMN_SLACK = 0.66;
+
+/**
+ * The bridge between the evidence and what is read off it, in the gutter.
+ *
+ * The reference decks carry this relation four or five different ways and draw
+ * it in the gutter on very few pages. BCG's NYC media pages set the right-hand
+ * heading to say the relation in words ("As a result of piracy and
+ * internationalization") and put nothing between the columns. Bain's Syracuse
+ * diagnostic runs "KEY FACTS AND DATA" against a bordered "PERSPECTIVES" panel,
+ * ten pages running, with no mark in the gutter at all. L.E.K.'s freight
+ * comparison leaves plain white space. McKinsey's Purdue pages close the
+ * exhibit with a filled band underneath it. The dashed rule with a disc on it
+ * is one member of that set, not the house style: a deck that draws it on every
+ * page has made the reader stop seeing it, and the pages where the inference is
+ * genuinely authored no longer stand out.
+ *
+ * So `implication` names which bridge the page wants rather than switching one
+ * on. `true` stays the dashed rule for specs written before the choice existed.
+ */
+const BRIDGE_VARIANTS = new Map([
+  [true, "divider-chevron"], ["divider-chevron", "divider-chevron"],
+  ["chevron", "disc-chevron"], ["rule", "divider"], ["arrow", "arrow"],
+  [false, null], ["none", null], [undefined, null], [null, null],
+]);
+function bridgeVariant(slide, id) {
+  const asked = slide.implication;
+  if (!BRIDGE_VARIANTS.has(asked)) {
+    throw new Error(`${id}: unknown implication ${JSON.stringify(asked)}; use "divider-chevron", "arrow", "chevron", "rule" or false. `
+      + "A relation stated in the commentary's heading, or in a `pointsTone` panel, or in a closing `soWhat` band, needs no gutter mark at all");
+  }
+  return BRIDGE_VARIANTS.get(asked);
+}
 const LIST_BODY_PX = 14, LIST_ITEM_GAP = 16, LIST_LEAD_GAP = 4, LIST_MARKER_OFFSET = 22;
 /** The height a points list wants at a given column width. */
 function pointsHeight(points, width) {
@@ -1687,7 +1724,7 @@ export const SLIDE_KEYS = Object.freeze({
   insights: "two statements in that column: a plain one above a boxed one",
   callout: "a boxed aside beside the evidence",
   soWhat: "the page's close, under everything else",
-  implication: "true to request a marker joining evidence to meaning",
+  implication: "the gutter mark joining evidence to meaning: \"divider-chevron\", \"chevron\", \"rule\", or false when the words carry it",
   items: "the entries on an agenda or takeaways page",
   active: "which agenda entry the deck is on",
   summary: "the line under a section divider's title",
@@ -2053,13 +2090,14 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
   const metricsBelow = slide.metricsPosition === "bottom";
   if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) {
     items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
-    // `implication: true` draws the marker across the page, between the
-    // measures and what follows from them: the same dashed rule and disc the
-    // gutter carries between an exhibit and its meaning, turned on its side.
+    // `implication` draws the marker across the page, between the measures and
+    // what follows from them: the same mark the gutter carries between an
+    // exhibit and its meaning, turned on its side, in the variant asked for.
     // Off unless asked for - a page that puts numbers above their own detail is
     // not making an inference, and a chevron on every metrics page is a device
     // that has stopped meaning anything.
-    if (slide.implication === true) items.push({ id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: { fr: 1 }, height: 32 } });
+    const acrossBridge = bridgeVariant(slide, id);
+    if (acrossBridge) items.push({ id: `${id}-implication`, component: "connector", props: { variant: acrossBridge }, size: { width: { fr: 1 }, height: 32 } });
   }
   // A full-width table needs no heading of its own: the action title and the
   // header row already say what it is. Heading bands exist for the row rule only.
@@ -2175,20 +2213,25 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // empty, and the exhibit beside it wanted that width anyway. A short column
     // narrows (its text then wraps to more lines, and the hero grows); a column
     // that would overrun widens.
+    const sideColumns = heroFr + baseSideFr + (slide.photo ? 1 : 0);
+    const sideTrack = (fr) => Math.max(140, (BODY_WIDTH - CONNECTOR_WIDTH - COLUMN_GAP * sideColumns) * (fr / (heroFr + fr + (slide.photo ? 1 : 0))));
+    const sideExtras = (kpiTile ? 126 : 0) + insightBoxes.length * 104 + (heading ? 44 : 0);
     const sideFr = (() => {
       if (fill === "airy" || !list) return baseSideFr;
-      const columns = heroFr + baseSideFr + (slide.photo ? 1 : 0);
-      const track = (fr) => Math.max(140, (BODY_WIDTH - CONNECTOR_WIDTH - COLUMN_GAP * columns) * (fr / (heroFr + fr + (slide.photo ? 1 : 0))));
-      const extras = (kpiTile ? 126 : 0) + insightBoxes.length * 104 + (heading ? 44 : 0);
-      const natural = extras + pointsHeight(slide.points, track(baseSideFr));
+      const natural = sideExtras + pointsHeight(slide.points, sideTrack(baseSideFr));
       // A photograph strip takes a quarter of the row, which leaves the
       // commentary a 267px gutter that nothing reads comfortably. The column
       // keeps a floor of 300px; the photograph gives up the width.
-      if (slide.photo && track(baseSideFr) < 300) return baseSideFr * 1.25;
+      if (slide.photo && sideTrack(baseSideFr) < 300) return baseSideFr * 1.25;
       if (natural < BODY_HEIGHT * 0.45) return baseSideFr * 0.8;
       if (natural > BODY_HEIGHT * 0.98) return baseSideFr * 1.2;
       return baseSideFr;
     })();
+    // How much of the track the column will actually occupy, at the width it
+    // ended up with. This is what decides whether the column is read down from
+    // the title or across from the exhibit; the point count was only ever a
+    // proxy for it, and it got the answer wrong for one long prose point.
+    const sideFill = (sideExtras + (list ? pointsHeight(slide.points, sideTrack(sideFr)) : 0)) / BODY_HEIGHT;
     // A column of statements and nothing else - one box, or a statement above a
     // box - is read against the exhibit beside it, so it centres on the exhibit
     // rather than hugging the top of the track. Anything with a list in it has
@@ -2199,8 +2242,13 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // hugging the top of a 500px track with the bottom half empty is the page
     // that reads as unfinished; centred, the two halves balance. A headed
     // column keeps its top - the heading is what the eye starts from.
-    const shortList = list && !heading && Array.isArray(slide.points)
-      && slide.points.length >= 2 && slide.points.length <= 3 && sideItems.length <= 1;
+    // Measured, not counted: a column that leaves more than a third of its
+    // track empty is read against the exhibit beside it, so it centres. One
+    // prose point under a headed chart hugged the top and left the bottom half
+    // of the page blank, which is the page that reads as unfinished - and the
+    // old test could not see it, because it asked how many points there were
+    // rather than how much of the column they filled.
+    const shortList = list && !heading && sideItems.length <= 1 && sideFill <= SIDE_COLUMN_SLACK;
     // A headed column starts under its own heading. Centring the block as well
     // left a hand's width of blank between the rule and the first line, on a
     // page whose heading says "What it means" and then appears to mean it two
@@ -2223,8 +2271,9 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: sideItems }
       : { id: `${id}-side`, ...(heading ? { heading } : {}), treatment: tone, layout: "flow.column", ...(centre ? { leftover: "center" } : spread ? { leftover: spread } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
     // The relationship is authored; adjacent slides cannot add or remove it.
-    const chevron = slide.implication === true
-      ? { id: `${id}-implication`, component: "connector", props: { variant: "divider-chevron" }, size: { width: 44, height: "fill" } } : null;
+    const bridge = bridgeVariant(slide, id);
+    const chevron = bridge
+      ? { id: `${id}-implication`, component: "connector", props: { variant: bridge }, size: { width: 44, height: "fill" } } : null;
     // `photo`: a photograph strip at the right edge, full body height, cropped
     // to fit (the 2022 McKinsey pattern: chart, commentary, photo).
     const photo = photoStrip(slide, `${id}-photo`, baseDir);
@@ -2243,6 +2292,15 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     // and hoisting the lead into a heading leaves the column starting mid
     // sentence - so those join back into one paragraph instead.
     const standsAlone = (text) => /^[A-Z0-9"“(]/.test(String(text).trim());
+    // A lone implication takes the exhibit's track: heading at the body's left
+    // margin, text reaching the same right edge as the last column above it.
+    // The 80-character measure cap is for sustained prose in a column; a close
+    // set under a full-width exhibit is a band, and the reference pages set the
+    // band to the width of the thing it is read off - McKinsey's Purdue pages
+    // end each chart with one, BCG's NYCHA pages run theirs the width of the
+    // page. Hugging its own measure and centring, this sat in the middle of an
+    // empty support region related to the table above it by nothing.
+    const loneBand = slide.points.length === 1;
     const columns = slide.points.map((point, at) => {
       const entry = typeof point === "string" ? { text: point } : point;
       const hoist = entry.lead && standsAlone(entry.text);
@@ -2256,9 +2314,18 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       // means". A hairline under each of three sub-headings as well turns one
       // divided idea into four ruled boxes, and the reader reads the rules
       // before the words.
-      return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: slide.points.length === 1 ? "hug" : { fr: 1 }, height: "fill" },
+      // One implication under a full-width exhibit takes the exhibit's width.
+      // Hugging its own measure and centring left it floating in the middle of
+      // the support region with a hand's width of blank either side, related to
+      // the table above it by nothing - the table ran the full body and the
+      // sentence drawn from it started a third of the way in. Set to the same
+      // track, its first word sits under the first column and its last under
+      // the last, which is how the reference pages close an exhibit: McKinsey's
+      // Purdue pages run the finding as a band the width of the chart it is
+      // read off, and BCG's NYCHA pages run it the width of the page.
+      return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
         ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
-        items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text, ...(runs ? { runs } : {}) }, size: HUG }] };
+        items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text, ...(runs ? { runs } : {}), ...(loneBand ? { maxMeasure: false } : {}) }, size: HUG }] };
     });
     // The columns share one heading, the way the side column does: without it
     // the page drops straight from the plot into three paragraphs with nothing
@@ -2271,7 +2338,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
       headedPanel(exhibits[0], item, `${id}-exhibit`, false),
       { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}),
-        layout: "flow.row", ...(columns.length === 1 ? { leftover: "center" } : {}), size: HUG, items: columns },
+        layout: "flow.row", size: HUG, items: columns },
     ] });
   } else if (layout === "hero-number") {
     // One figure carries the page: the number set large with its explanation,

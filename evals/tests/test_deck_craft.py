@@ -38,7 +38,7 @@ def text(role, value, **over):
     return dict({"type": "text", "role": role, "text": value}, **over)
 
 
-def page(n, *, highlight=False, source=True, marks=14, annotated=True):
+def page(n, *, highlight=False, source=True, marks=14, annotated=True, bridge=None):
     nodes = [text("action-title", f"Page {n} states a finding worth reading"),
              text("list-item", "The second wave opens on a gate rather than on a date",
                   **({"runs": [{"text": "The second wave opens on ", "bold": False},
@@ -49,6 +49,15 @@ def page(n, *, highlight=False, source=True, marks=14, annotated=True):
     for index in range(marks):
         nodes.append({"type": "rect", "role": "chart-mark",
                       **({"data": {"highlighted": True}} if annotated and index == 0 else {})})
+    if bridge:
+        # What the composer emits for `implication`: the gutter node carries the
+        # variant it drew, and its id names the page's implication.
+        nodes.append({"type": "line", "role": "relationship-divider",
+                      "id": f"s{n:02d}-implication:rule-top",
+                      "data": {"relation": "implies" if bridge == "divider-chevron" else "adjacent"}})
+        nodes.append({"type": "ellipse", "role": "relationship-disc",
+                      "id": f"s{n:02d}-implication:disc",
+                      "data": {"relation": "implies", "arrowVariant": bridge}})
     return {"id": f"s{n:02d}", "componentInstances": [{"id": "chrome", "component": "slide-chrome"},
                                                       {"id": f"s{n:02d}-0", "component": "chart.column"}],
             "nodes": nodes}
@@ -80,10 +89,26 @@ class DeckCraftTests(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         measured = findings[0]["measured"]
         self.assertEqual(sorted(measured),
-                         ["chartsAnnotated", "commonestTableDevice", "highlight",
-                          "marksPerPage", "source", "tablesTreated"])
+                         ["chartsAnnotated", "commonestTableDevice", "drawnBridges",
+                          "highlight", "marksPerPage", "source", "tablesTreated"])
         for phrase in ("emphasised", "carry a source", "drawn elements", "states the finding"):
             self.assertIn(phrase, findings[0]["repair"])
+
+    def test_a_deck_that_draws_the_same_gutter_mark_on_every_page_is_reported(self):
+        """The cold run set `implication: true` on all eight of its exhibit-left
+        pages, so the dashed rule and disc ran the length of the deck and stopped
+        meaning anything. The reference decks join evidence to its meaning in the
+        commentary's heading, in a headed panel or in a closing band far more
+        often than they draw it."""
+        findings = craft([page(i, highlight=True, bridge="divider-chevron") for i in range(1, 9)])
+        self.assertEqual(findings[0]["measured"]["drawnBridges"], 1.0)
+        self.assertIn("draw a mark in the gutter", findings[0]["repair"])
+        self.assertIn("divider-chevron", findings[0]["repair"])
+
+    def test_a_deck_that_spends_the_gutter_mark_on_a_few_pages_passes(self):
+        pages = [page(i, highlight=True, bridge="divider-chevron" if i <= 2 else None)
+                 for i in range(1, 9)]
+        self.assertEqual(craft(pages), [])
 
     def test_the_craft_floors_apply_at_build_time_not_only_to_a_plan(self):
         """`plan.craft` ran only when a `.plan.json` existed beside the spec, so

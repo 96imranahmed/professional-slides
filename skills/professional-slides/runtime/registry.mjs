@@ -1424,9 +1424,49 @@ function registerCore(registry) {
         return [...(width > 0 ? [rectPrimitive({ id: stableId(id, "stage", index), role: "funnel-stage", frame: { x, y: frame.y + index * height + 3, width, height: height - 6 }, style: boxStyle(fill, fill, HAIRLINE, SMALL_RADIUS) })] : []), textPrimitive({ id: stableId(id, "label", index), role: "funnel-label", frame: { x: frame.x + plotWidth + 12, y: frame.y + index * height + 3, width: frame.width - plotWidth - 12, height: height - 6 }, text: `${stage.label}  ${stage.value}`, style: textStyle(COMPACT, INK, true, "left") })];
       }) };
     } }),
-    component({ id: "connector", category: "relationship", role: "connector", tokens: ["color.componentPrimary", "color.onPrimary", "font.body", "type.label", "color.rule", "line.standard", "line.hairline", "icon.medium", "icon.large", "space.2", "radius.round"], preferredSize: { width: 360, height: 90 }, sample: { label: "therefore", variant: "labelled-line" }, render: ({ id, frame, props }) => {
+    component({ id: "connector", category: "relationship", role: "connector", tokens: ["color.componentPrimary", "color.onPrimary", "font.body", "type.label", "color.rule", "line.standard", "line.hairline", "icon.medium", "icon.large", "space.2", "radius.none", "radius.round"], preferredSize: { width: 360, height: 90 }, sample: { label: "therefore", variant: "labelled-line" }, render: ({ id, frame, props }) => {
       const variant = props.variant ?? (props.label ? "labelled-line" : "disc-chevron"), centerY = frame.y + frame.height / 2;
       if (variant === "chevron") return { nodes: [lightChevronNode(id, frame)] };
+      // `divider`: the quiet end of the range - one solid hairline down the
+      // gutter and nothing on it. It separates the evidence from what is read
+      // off it without asserting an inference, which is what most of the
+      // reference pages do when the right-hand heading already says "as a
+      // result". Reach for it whenever the relation is carried in the words.
+      // `arrow`: a filled block arrow pointing from the evidence at what
+      // follows from it. Where the disc is a small punctuation mark in the
+      // gutter, this is a shape the page can see from across a room, and the
+      // reference decks spend it on the page's own conclusion - Bain's Berkeley
+      // diagnostic drops one into the line that closes the page, BCG's NYCHA
+      // pages fan them from a model into what each function becomes. It points
+      // the way the argument runs: across a gutter between two columns, down a
+      // band drawn across the page.
+      if (variant === "arrow") {
+        // It points the way the argument runs, and so takes its direction from
+        // the frame the same way the divider chevron does: down a gutter
+        // between two columns it points across at the meaning beside it, and on
+        // a band drawn across the page it points down at what follows.
+        const across = frame.width > frame.height;
+        const thickness = Math.min(props.size ?? tokenValue(token("icon.large")), frame.width, frame.height);
+        const length = thickness * 1.1;
+        const width = across ? thickness : length, height = across ? length : thickness;
+        return { nodes: [shapePrimitive({
+          id: stableId(id, "arrow"), role: "relationship-arrow", geometry: across ? "downArrow" : "rightArrow",
+          frame: { x: frame.x + (frame.width - width) / 2, y: frame.y + (frame.height - height) / 2, width, height },
+          style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.none")),
+          data: { relation: "implies", arrowVariant: variant },
+        })] };
+      }
+      if (variant === "divider") {
+        const across = frame.width > frame.height;
+        const centerX = frame.x + frame.width / 2;
+        return { nodes: [linePrimitive({
+          id: stableId(id, "rule"), role: "relationship-divider",
+          x1: across ? frame.x : centerX, y1: across ? centerY : frame.y,
+          x2: across ? frame.x + frame.width : centerX, y2: across ? centerY : frame.y + frame.height,
+          style: { stroke: RULE, lineWidth: HAIRLINE },
+          data: { relation: "adjacent", orientation: across ? "horizontal" : "vertical" },
+        })] };
+      }
       // `divider-chevron`: a dashed rule down the gutter with the disc centred
       // on it, for a right-hand column that runs full bleed (a toned panel, a
       // photograph) where a floating disc would have nothing to sit against.
@@ -1535,7 +1575,7 @@ function registerCore(registry) {
     const axes = { section: ["treatment", ["open", "muted", "primary", "dark", "tint"]], panel: ["tone", ["open", "muted", "primary", "dark"]], "content-rail": ["treatment", ["muted", "open"]], roadmap: ["variant", ["process", "wave-columns"]], "section-heading": ["variant", ["standard", "accent", "inverse"]] };
     axes["section-boundary"] = ["variant", ["related", "inference", "inference-chevron", "subsection"]];
     axes.metric = ["variant", ["default", "prominent"]];
-    axes.connector = ["variant", ["disc-chevron", "divider-chevron", "chevron", "line", "labelled-line"]];
+    axes.connector = ["variant", ["disc-chevron", "divider-chevron", "divider", "arrow", "chevron", "line", "labelled-line"]];
     axes["bullet-list"] = ["variant", ["compact", "body"]];
     axes.insight = ["variant", ["tonal", "neutral", "dotted", "primary", "plain"]];
     if (axes[definition.id]) {
