@@ -38,10 +38,22 @@ function normalizeCards(props) {
  * the title), "plain" (no card edge; a column of icon + title + text).
  */
 export const CARD_TONES = Object.freeze(["outline", "header", "numbered", "plain", "disc", "big-number", "dark", "columns", "stat"]);
+// The tones whose card carries an icon. The rest set a band, a numeral or a
+// figure in that space and have nowhere to put one.
+export const ICON_CARD_TONES = Object.freeze(["dark", "outline", "plain", "disc"]);
 export function cardsLayout(frame, props) {
   const items = normalizeCards(props);
   const tone = props.tone ?? (items.some((i) => i.icon) ? "outline" : "numbered");
   if (!CARD_TONES.includes(tone)) throw new Error(`Unknown cards tone: ${tone}; use one of ${CARD_TONES.join(", ")}`);
+  // Only the tones below draw one. A deck asked for four cards with an icon
+  // each under `tone: "header"`, got four cards and no icons, and nothing said
+  // so - the page looked finished and the authored intent was gone. An icon a
+  // tone cannot draw is refused here rather than dropped.
+  if (!ICON_CARD_TONES.includes(tone) && items.some((item) => item.icon)) {
+    throw new Error(
+      `cards tone "${tone}" does not draw icons; use ${ICON_CARD_TONES.join(" or ")} for an icon per card, `
+      + "or drop the icon. A tone that cannot show one should not be handed one.");
+  }
   // Icon cards with a line of text each read centred (the "three principles" page).
   const centred = props.align === "center" || (props.align === undefined && ((tone === "outline" || tone === "plain") && items.every((i) => i.icon && !i.points.length) || tone === "disc" || tone === "dark"));
   const open = ["plain", "disc", "big-number", "columns"].includes(tone);
@@ -413,7 +425,7 @@ export function registerPanels(registry) {
   registry.set("cards", {
     id: "cards", version: "1.0.0", category: "section", role: "cards", tokens: [...PANEL_TOKENS], preferredSize: { width: 1160, height: 300 },
     sample: { items: [{ icon: "target", title: "(Insert pillar 1)", text: "(Insert one-line description)" }, { icon: "rocket", title: "(Insert pillar 2)", text: "(Insert one-line description)" }, { icon: "people", title: "(Insert pillar 3)", text: "(Insert one-line description)" }] },
-    variants: { outline: {}, header: { props: { tone: "header" } }, numbered: { props: { tone: "numbered" } }, plain: { props: { tone: "plain" } }, disc: { props: { tone: "disc" } }, "big-number": { props: { tone: "big-number", items: [{ title: "(Insert step 1)", text: "(Insert what happens)", points: ["(Insert activity)"] }, { title: "(Insert step 2)", text: "(Insert what happens)", points: ["(Insert activity)"] }, { title: "(Insert step 3)", text: "(Insert what happens)", points: ["(Insert activity)"] }] } }, dark: { props: { tone: "dark" } }, columns: { props: { tone: "columns", items: [{ title: "(Insert column 1)", points: ["(Insert point)"] }, { title: "(Insert column 2)", points: ["(Insert point)"] }, { title: "(Insert column 3)", points: ["(Insert point)"] }] } } }, defaultVariant: "outline", variantProp: "tone",
+    variants: { outline: {}, header: { props: { tone: "header", items: [{ title: "(Insert pillar 1)", text: "(Insert one-line description)" }, { title: "(Insert pillar 2)", text: "(Insert one-line description)" }, { title: "(Insert pillar 3)", text: "(Insert one-line description)" }] } }, numbered: { props: { tone: "numbered", items: [{ title: "(Insert pillar 1)", text: "(Insert one-line description)" }, { title: "(Insert pillar 2)", text: "(Insert one-line description)" }, { title: "(Insert pillar 3)", text: "(Insert one-line description)" }] } }, plain: { props: { tone: "plain" } }, disc: { props: { tone: "disc" } }, "big-number": { props: { tone: "big-number", items: [{ title: "(Insert step 1)", text: "(Insert what happens)", points: ["(Insert activity)"] }, { title: "(Insert step 2)", text: "(Insert what happens)", points: ["(Insert activity)"] }, { title: "(Insert step 3)", text: "(Insert what happens)", points: ["(Insert activity)"] }] } }, dark: { props: { tone: "dark" } }, columns: { props: { tone: "columns", items: [{ title: "(Insert column 1)", points: ["(Insert point)"] }, { title: "(Insert column 2)", points: ["(Insert point)"] }, { title: "(Insert column 3)", points: ["(Insert point)"] }] } } }, defaultVariant: "outline", variantProp: "tone",
     resolveVariant: (props = {}) => props.tone ?? (Array.isArray(props.items) && props.items.some((i) => i?.icon) ? "outline" : "numbered"),
     render: (input) => ({ nodes: cardsNodes(input) }),
     measureContent: ({ frame, props }) => cardsLayout(frame, props),

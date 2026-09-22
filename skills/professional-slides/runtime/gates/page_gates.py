@@ -2043,17 +2043,22 @@ def gate_deck_craft(slides, analytical, findings):
 # uses when it draws one. Measured on the composed scene rather than on the
 # plan, because a plan can record a treatment the page never renders: one deck's
 # plan declared six families and its scene drew none of them.
+# Verified against a scene composed from the gallery deck, which exercises the
+# whole vocabulary. The marker helpers suffix the role they are given
+# (`iconMarker` emits `<role>-ring` and `<role>-glyph`), so these match a prefix
+# rather than a whole role: the first version of this table looked for an exact
+# `card-icon` and would have scored every deck in the repository at zero icons.
 DEVICE_FAMILIES = {
-    "icon": re.compile(r"^(icon|icon-label|list-icon|card-icon|table-cell-icon)$"),
-    "picture": re.compile(r"^(image|image-frame|cover-image|divider-image|statement-image|takeaways-image)$"),
-    "score": re.compile(r"^table-(harvey|rating-)"),
+    "icon": re.compile(r"^(icon|list-icon|card-icon|table-cell-icon)(-|$)"),
+    "picture": re.compile(r"^(image|image-frame|cover-image|divider-image|statement-image|takeaways-image)(-|$)"),
+    "score": re.compile(r"^table-(harvey|rating)"),
     "valuePill": re.compile(r"^table-bubble"),
-    "cellBar": re.compile(r"^table-bar"),
+    "cellBar": re.compile(r"^(table-bar|gantt-bar)"),
     "heat": re.compile(r"^table-heat"),
-    "state": re.compile(r"^(table-status-pill|status-marker|status-cue|chart-status-)"),
-    "growth": re.compile(r"^(chart-growth|chart-delta|chart-cagr|growth-)"),
-    "reference": re.compile(r"^chart-reference-"),
-    "annotation": re.compile(r"^(annotation-|chart-callout)"),
+    "state": re.compile(r"^(table-status|status-marker|status-cue|status-label|chart-status)"),
+    "growth": re.compile(r"^(chart-growth|chart-delta|chart-cagr|metric-delta|growth-)"),
+    "reference": re.compile(r"^chart-reference"),
+    "annotation": re.compile(r"^(annotation-|chart-annotation|chart-callout)"),
 }
 
 

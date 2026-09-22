@@ -48,7 +48,7 @@ def vocabulary(slides):
 
 class DeckVocabularyTests(unittest.TestCase):
     def test_a_deck_that_draws_three_families_is_reported(self):
-        slides = [page(i, roles=["table-bar-fill", "chart-reference-line", "annotation-surface"])
+        slides = [page(i, roles=["table-bar", "chart-reference-line", "annotation-surface"])
                   for i in range(1, 15)]
         findings = vocabulary(slides)
         self.assertEqual([f["code"] for f in findings], ["DECK_VOCABULARY"])
@@ -59,7 +59,7 @@ class DeckVocabularyTests(unittest.TestCase):
         self.assertIn("not chosen between them", findings[0]["repair"])
 
     def test_a_deck_that_reaches_for_four_passes(self):
-        slides = [page(i, roles=["icon", "table-harvey-fill", "chart-reference-line", "table-status-pill"])
+        slides = [page(i, roles=["card-icon-glyph", "table-rating-sector", "chart-reference-line", "table-status-pill"])
                   for i in range(1, 15)]
         self.assertEqual(vocabulary(slides), [])
 
@@ -67,6 +67,19 @@ class DeckVocabularyTests(unittest.TestCase):
         # Eleven pages is below the floor: a short deck has fewer jobs to do.
         slides = [page(i) for i in range(1, 12)]
         self.assertEqual(vocabulary(slides), [])
+
+    def test_the_patterns_match_the_roles_the_runtime_actually_emits(self):
+        """The first version looked for an exact `card-icon` and would have
+        scored every deck at zero: the marker helpers suffix the role they are
+        given. These are the roles a scene composed from the gallery deck
+        carries."""
+        emitted = ["card-icon-glyph", "list-icon-glyph", "table-cell-icon-glyph", "image",
+                   "table-rating-sector", "table-bubble", "table-bar", "table-status-pill",
+                   "metric-delta", "chart-reference-line", "chart-annotation"]
+        for role in emitted:
+            with self.subTest(role=role):
+                self.assertTrue(any(p.match(role) for p in page_gates.DEVICE_FAMILIES.values()),
+                                f"{role} matches no device family")
 
     def test_the_floor_is_recorded_as_a_vocabulary_floor_not_a_corpus_rate(self):
         rule = page_gates.CONTRACT["plan"]["craft"]["vocabulary"]
