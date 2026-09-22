@@ -525,6 +525,12 @@ class Emitter:
         grouped = any(abs(v) >= 1000 for v in values_all)
         base = "#,##0" if grouped else "0"
         number_format = base if decimals == 0 else base + "." + "0" * decimals
+        # The drawn chart prints a one-decimal series as JavaScript rounds it:
+        # 35.8 beside 12, not 12.0. When every value already has at most one
+        # decimal and no format was declared, "General" prints exactly that.
+        if decimals == 1 and not (isinstance(fmt, dict) and "decimals" in fmt) and values_all \
+                and all(abs(v * 10 - round(v * 10)) < 1e-9 for v in values_all) and not grouped:
+            number_format = "General"
         if kind not in ("pie", "donut", "scatter"):
             # Bar weight follows the category count, as in the drawn charts:
             # few categories take fat bars, many take thinner ones.
