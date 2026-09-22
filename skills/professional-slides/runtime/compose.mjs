@@ -1211,10 +1211,20 @@ const BRIDGE_VARIANTS = new Map([
   ["chevron", "disc-chevron"], ["rule", "divider"], ["arrow", "arrow"],
   [false, null], ["none", null], [undefined, null], [null, null],
 ]);
+/**
+ * The values `implication` accepts, in the order the guidance presents them.
+ *
+ * Named here rather than spelled out again in the error message and a third
+ * time in the references: changing the set used to mean editing four files,
+ * and `test_authoring_surface` now checks the docs list exactly these.
+ */
+export const IMPLICATION_NAMES = Object.freeze(["divider-chevron", "arrow", "chevron", "rule"]);
+
 function bridgeVariant(slide, id) {
   const asked = slide.implication;
   if (!BRIDGE_VARIANTS.has(asked)) {
-    throw new Error(`${id}: unknown implication ${JSON.stringify(asked)}; use "divider-chevron", "arrow", "chevron", "rule" or false. `
+    throw new Error(`${id}: unknown implication ${JSON.stringify(asked)}; use `
+      + IMPLICATION_NAMES.map((name) => JSON.stringify(name)).join(", ") + " or false. "
       + "A relation stated in the commentary's heading, or in a `pointsTone` panel, or in a closing `soWhat` band, needs no gutter mark at all");
   }
   return BRIDGE_VARIANTS.get(asked);
@@ -2406,7 +2416,35 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [...ordered.filter(Boolean), ...(photo ? [photo] : [])] });
 }
 
+/**
+ * Compose one page, and say which page when it cannot.
+ *
+ * The runtime throws 849 times and 57 of those messages name the page they came
+ * from, so an author handed "A soWhat list needs at least one line" had to find
+ * the page themselves - across a fifty-page spec, from a message that names no
+ * page, no title and no field. Rewriting every throw would be 849 edits and 849
+ * chances to change what a message says; naming the page is one edit here,
+ * because this is the only place a slide is composed and the only place that
+ * knows both the id and the title.
+ *
+ * A message that already names its page keeps its own wording.
+ */
 export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = []) {
+  const id = slide?.id || `s${String(index + 1).padStart(2, "0")}`;
+  try {
+    return composePage(slide, index, baseDir, fill, elements, recent, recentStyles);
+  } catch (error) {
+    if (!(error instanceof Error) || error.composedPage) throw error;
+    const title = typeof slide?.title === "string" && slide.title.trim() ? ` ("${slide.title.trim()}")` : "";
+    const named = error.message.startsWith(`${id}:`) || error.message.includes(`${id} `);
+    const next = new Error(named ? error.message : `${id}${title}: ${error.message}`);
+    next.composedPage = id;
+    next.cause = error;
+    throw next;
+  }
+}
+
+function composePage(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = []) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   assertKnownSlideKeys(slide, id);
   const ctx = { id, baseDir, fill };
