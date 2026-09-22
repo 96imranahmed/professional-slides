@@ -50,6 +50,16 @@ class BlockExtractionTests(unittest.TestCase):
         self.assertEqual(density_profile.body_words(page), 12)
 
 
+class PopulationTests(unittest.TestCase):
+    def test_only_pages_that_carry_prose_are_set_against_the_block_benchmark(self):
+        # The text-form benchmark measured pages with commentary or prose; a
+        # chart-led page's blocks are its labels.
+        for task in ("chart-with-commentary", "table-with-commentary", "text-page", "mixed"):
+            self.assertTrue(density_profile.prose_task(task), task)
+        for task in ("chart-led", "table-led", "diagram-led", None):
+            self.assertFalse(density_profile.prose_task(task), task)
+
+
 class DensityReviewTests(unittest.TestCase):
     def test_every_flagged_page_needs_a_verdict_and_only_right_passes(self):
         result = run_node("""

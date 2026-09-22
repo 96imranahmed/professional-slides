@@ -4,7 +4,7 @@ Design owns the evidence relationship, attention, treatment and visual hierarchy
 
 ## Pick the slide type from what the page says
 
-Decide what the page has to make the reader see, then take the slide type that shows exactly that. A deck built this way is varied because its messages are, not because it rotates templates; one that reaches for a column chart and a table on every page has skipped this step. The catalogue below is the whole range, measured against 400 pages of client and published work (`evals/corpus/styles`): 77 of the 85 styles found there compose, covering 96% of those pages.
+Decide what the page has to make the reader see, then take the slide type that shows exactly that. A deck built this way is varied because its messages are, not because it rotates templates; one that reaches for a column chart and a table on every page has skipped this step. The catalogue below is the whole range, measured against 600 pages of client and published work (`evals/corpus/styles`): all 86 styles found there compose, covering every one of the 590 content pages.
 
 | The page has to show | Take | Not |
 | --- | --- | --- |

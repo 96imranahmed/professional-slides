@@ -70,6 +70,8 @@ Measured over 37 analytic pages of client-project decks (`evals/corpus/measure_t
 
 The repair is not a shorter sentence. It is two or three points that each make their own claim: split the run at the place where it stops proving one thing and starts proving the next, and give the second half its own lead. A page whose commentary is one block is asserting that its evidence supports exactly one finding, which is sometimes true and usually not.
 
+The opposite failure is the fragment: a bold lead and one sentence of twenty words, three to a column, each restating a value the exhibit already prints. It clears the word floor by adding points rather than developing them. A fifty-page evaluation deck written this way carried the client pages' word volume at 17 words a block against their 56, and its review called fourteen pages the wrong shape. Develop each point to 40-90 words: the finding, the mechanism or basis behind it (the sample it rests on, what drives it), and what the reader should do about it. Two developed points beat three fragments. The build's density profile measures the rendered blocks and the review's density pass judges the pages it flags ([Taste review](taste-review.md#density-pass)); the one-to-two-line limit on takeaway bands is a separate rule and still holds.
+
 ## Where each kind of sentence goes
 
 | Job | What to write | Where it belongs |

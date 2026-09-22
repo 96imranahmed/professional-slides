@@ -127,6 +127,10 @@ def band(value, low, high) -> str:
     return "below" if value < low else "above" if value > high else "within"
 
 
+def prose_task(task) -> bool:
+    return bool(task) and ("commentary" in task or task in ("text-page", "mixed"))
+
+
 def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
     planned = {p["id"]: p for p in (content or {}).get("pages", [])}
     pages = []
@@ -162,7 +166,15 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
             entry["flags"].append(f"blocks average {entry['wordsPerBlock']} words; client blocks run {TEXT_FORM['wordsPerBlock']['q1']} to {TEXT_FORM['wordsPerBlock']['q3']}")
         pages.append(entry)
 
-    measured = [p for p in pages if p["blocks"]]
+    # The text-form benchmark was measured on client pages that carry prose:
+    # charts with commentary, comparison tables and developed synthesis. A
+    # chart-led page's only blocks are its bar and axis labels, so setting all
+    # analytic pages against it read a deck of developed 52-word points as 19
+    # words a block. The deck comparison uses the same population; pages led by
+    # their exhibit alone are summarised beside it.
+    prose = [p for p in pages if p["blocks"] and prose_task(p["task"])]
+    led = [p for p in pages if p["blocks"] and not prose_task(p["task"])]
+    measured = prose or [p for p in pages if p["blocks"]]
 
     def compare(name, values, target, low, high):
         if not values:
@@ -170,10 +182,15 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
         value = round(st.median(values), 1)
         return {"measured": value, "target": target, "band": [low, high], "position": band(value, low, high)}
 
+    # Body words are compared per task, so every analytic page counts here.
     ratios = [p["bodyWordsVsTaskMedian"] for p in pages if p.get("bodyWordsVsTaskMedian") is not None]
     single = sum(1 for p in measured if p["blocks"] == 1) / len(measured) if measured else 0
     deck = {
         "analyticPages": len(pages),
+        "comparedPages": len(measured),
+        "exhibitLed": {"pages": len(led), "blocksPerPage": st.median([p["blocks"] for p in led]) if led else None,
+                       "wordsPerBlock": round(st.median([p["wordsPerBlock"] for p in led]), 1) if led else None,
+                       "note": "pages led by their exhibit alone; their blocks are labels, so they are not set against the text-form benchmark"},
         "blocksPerPage": compare("blocksPerPage", [p["blocks"] for p in measured], TEXT_FORM["blocksPerPage"]["median"],
                                  TEXT_FORM["blocksPerPage"]["q1"], TEXT_FORM["blocksPerPage"]["q3"]),
         "wordsPerBlock": compare("wordsPerBlock", [p["wordsPerBlock"] for p in measured], TEXT_FORM["wordsPerBlock"]["median"],
