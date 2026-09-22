@@ -9,6 +9,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { runProcess } from "./process.mjs";
 
 export const SEVERITIES = ["none", "minor", "major", "blocker"];
@@ -194,9 +195,10 @@ export function designStatistics(scene) {
 export function reviewPrompt(packet) {
   // Historical corpus aggregates remain available to analysis callers, not as review targets.
   const { reference: historicalReference, ...candidateStatistics } = packet.statistics || {};
+  const guidance = ["storylining", "design", "taste-review"].map(name => fileURLToPath(new URL(`../references/${name}.md`, import.meta.url)));
   return `You are reviewing a consulting deck against the client's brief. Look at every rendered slide image and the montage; read the text. Judge it the way an engagement manager would the night before a steering committee.
 
-Read references/storylining.md, references/design.md and references/taste-review.md before assessing. The taste-review guidance owns benchmark calibration and literal coverage. Do not consult prior candidate scores, repair lists or peer status summaries.
+Read these skill files before assessing: ${guidance.join(", ")}. The taste-review guidance owns benchmark calibration and literal coverage. Do not consult prior candidate scores, repair lists or peer status summaries.
 
 BRIEF: ${packet.brief || "(not supplied)"}
 GOVERNING ANSWER: ${packet.answer || "(not supplied)"}

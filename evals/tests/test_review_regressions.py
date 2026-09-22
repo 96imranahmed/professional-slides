@@ -114,6 +114,18 @@ assert.match(prompt,/Inspect every original page at full size, every spread/);
 assert.match(prompt,/every requested reference deck before scoring/);
 assert.match(prompt,/peer status summaries/);
 assert.ok(prompt.includes('references/taste-review.md'));
+// Reviewer subprocesses inherit arbitrary authoring directories; guidance is package-relative.
+const {mkdtempSync,existsSync,rmSync}=await import('node:fs');
+const {tmpdir}=await import('node:os');
+const {join,isAbsolute}=await import('node:path');
+const previousCwd=process.cwd(), temporary=mkdtempSync(join(tmpdir(),'review-portable-'));
+try {
+  process.chdir(temporary);
+  const portable=reviewPrompt({statistics:s,titles:[],slides:[],codes:CODES,schema:{},montage:'m'});
+  const paths=portable.split('Read these skill files before assessing: ')[1].split('. The taste-review')[0].split(', ');
+  assert.equal(paths.length,3);
+  assert.ok(paths.every(p=>isAbsolute(p)&&existsSync(p)),'all actual guide files resolve from an unrelated cwd');
+} finally {process.chdir(previousCwd);rmSync(temporary,{recursive:true,force:true});}
 assert.match(prompt,/most deletable page/);
 console.log(JSON.stringify({ok:true}));
 ''')
