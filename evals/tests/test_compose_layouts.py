@@ -6,7 +6,7 @@ from node_probe import run_node
 
 class ComposeLayoutTests(unittest.TestCase):
     def test_single_bottom_implication_runs_the_exhibit_width_without_widening_peers(self):
-        run_node('''
+        run_node(r'''
 import assert from 'node:assert/strict';
 import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
@@ -31,7 +31,7 @@ console.log('{}');
 ''')
 
     def test_a_short_text_page_uses_its_body_track_without_losing_content(self):
-        run_node('''
+        run_node(r'''
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
@@ -52,7 +52,7 @@ console.log(JSON.stringify({ok:true}));
 ''')
 
     def test_aliases_and_layouts_resolve_to_components(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
@@ -103,7 +103,7 @@ console.log(JSON.stringify({accepted:true}));
         self.assertTrue(result['accepted'])
 
     def test_cards_share_one_header_height_and_metric_tiles_measure(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
 class ChartRuleTests(unittest.TestCase):
     def test_highlight_from_title_cagr_badge_range_and_value_table(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
 import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
@@ -193,7 +193,7 @@ class TextPageColumnTests(unittest.TestCase):
     """
 
     def test_a_split_list_keeps_one_run_of_numbers_and_the_page_style(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
 const points = ['one','two','three','four','five'].map((n, i) => ({lead: `Finding ${n}`, text: `what the ${n} finding rests on, in a sentence long enough to wrap`}));
@@ -230,7 +230,7 @@ console.log(JSON.stringify({ok:true}));
         beside a table and the page has a join down the middle where the first
         kind of reading ends and the second begins.
         """
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {splitReadingModes} from './skills/professional-slides/runtime/compose.mjs';
 const steps={type:'steps',items:[{label:'Introduce',text:'Earn attachment'},{label:'Connect',text:'Carry it forward'},{label:'Pay off',text:'Spend it'}]};
@@ -243,7 +243,7 @@ const split=splitReadingModes(page([steps,table]));
 assert.equal(split.length,2);
 assert.deepEqual(split.map(p=>p.exhibit.type),['steps','table']);
 assert.ok(split.every(p=>p.exhibits===undefined));
-assert.match(split[0].title,/\\(1\\/2\\)$/);
+assert.match(split[0].title,/\(1\/2\)$/);
 assert.deepEqual(split.map(p=>p.id),['s01-1','s01-2']);
 assert.ok(split[0].points&&split[1].points===undefined);
 

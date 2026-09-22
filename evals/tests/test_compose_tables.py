@@ -6,7 +6,7 @@ from node_probe import run_node
 
 class ComposeTableTests(unittest.TestCase):
     def test_bar_focus_survives_composition_without_changing_scale_or_peer_marks(self):
-        run_node('''
+        run_node(r'''
 import assert from 'node:assert/strict';
 import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
@@ -34,7 +34,7 @@ console.log('{}');
 ''')
 
     def test_explicit_peer_tables_keep_their_semantic_treatments(self):
-        run_node('''
+        run_node(r'''
 import assert from 'node:assert/strict';
 import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
@@ -56,7 +56,7 @@ console.log('{}');
 ''')
 
     def test_clock_times_and_decimal_labels_are_not_sequence_numbers(self):
-        run_node('''
+        run_node(r'''
 import assert from 'node:assert/strict';
 import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
@@ -74,7 +74,7 @@ console.log('{}');
 ''')
 
     def test_automatic_treatments_preserve_styled_rows_and_totals(self):
-        run_node('''
+        run_node(r'''
 import assert from 'node:assert/strict';
 import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
@@ -99,7 +99,7 @@ console.log('{}');
 ''')
 
     def test_treatment_follows_content_not_the_first_option(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
 const stages=styleTable({columns:['Stage','When','Decision at that point'],rows:[['Move alone','Year 1','Rent small'],['Partner joins','Year 2','Re-size']]});
@@ -133,7 +133,7 @@ console.log(JSON.stringify({accepted:true}));
         self.assertTrue(result['accepted'])
 
     def test_two_tables_share_a_page_only_when_they_read_as_one_design(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {splitTables} from './skills/professional-slides/runtime/compose.mjs';
 const light=(cols,rows)=>({type:'table',columns:cols,rows});
@@ -160,7 +160,7 @@ console.log(JSON.stringify({accepted:true}));
         self.assertTrue(result['accepted'])
 
     def test_stretched_rows_centre_every_cell(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
 const props={variant:'standard',treatment:'categories',fillHeight:true,columns:[{label:'Stage',type:'category'},{label:'Decision',type:'text'}],rows:[[{type:'category',text:'Move alone',sectionNumber:1},'Rent small'],[{type:'category',text:'Partner joins',sectionNumber:2},'Re-size']]};
@@ -183,7 +183,7 @@ if __name__ == '__main__':
 
 class StatusTableTests(unittest.TestCase):
     def test_observed_use_and_signed_changes_remain_neutral_without_a_verdict(self):
-        run_node('''
+        run_node(r'''
 import assert from 'node:assert/strict';
 import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
@@ -199,7 +199,7 @@ console.log('{}');
 ''')
 
     def test_verdict_cells_recommended_column_and_total_rows_are_inferred(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {styleTable, paginateTable} from './skills/professional-slides/runtime/compose.mjs';
 const t=styleTable({columns:['#','Workstream','Overall status','% complete','Signed'],rows:[['1','Alpha','At risk','40%','✓'],['2','Beta','On track','100%',{type:'check',value:'no'}],['Total','','','62%','']]});
@@ -231,7 +231,7 @@ console.log(JSON.stringify({accepted:true}));
         self.assertTrue(result['accepted'])
 
     def test_status_cells_render_pills_lamps_bars_and_bands(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
 const frame={x:60,y:140,width:1160,height:400};
@@ -272,7 +272,7 @@ class BarColumnTests(unittest.TestCase):
     """
 
     def test_a_bar_column_derives_its_shared_scale_and_keeps_the_figures(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
 const table = styleTable({type:'table',
@@ -318,7 +318,7 @@ class InferredTreatmentTests(unittest.TestCase):
     """
 
     def test_rating_words_remain_text_without_an_authored_rubric(self):
-        run_node("""
+        run_node(r"""
 import assert from 'node:assert/strict';
 import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
 const columns=['Function','Recognition','Owner'];
@@ -333,7 +333,7 @@ console.log('{}');
 """)
 
     def test_cards_wrap_into_a_grid(self):
-        run_node('''
+        run_node(r'''
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
 const items=[...Array(6)].map((_,i)=>({icon:'target',title:`Card ${i}`,text:'A line about it.'}));

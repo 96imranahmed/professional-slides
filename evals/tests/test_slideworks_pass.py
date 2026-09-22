@@ -8,7 +8,7 @@ from node_probe import run_node
 
 class SlideworksPassTests(unittest.TestCase):
     def test_side_panel_tones_and_photo_strips(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
 const find=(items,pred)=>{for(const it of items||[]){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
@@ -32,7 +32,7 @@ console.log(JSON.stringify({ok:true}));
         self.assertTrue(result["ok"])
 
     def test_periods_events_and_change_rules(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {normalizePeriods,normalizeEvents,periodBandHeight} from './skills/professional-slides/runtime/charts.mjs';
 import {changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
@@ -58,7 +58,7 @@ console.log(JSON.stringify({ok:true}));
         self.assertTrue(result["ok"])
 
     def test_highlight_row_and_line_budget_pagination(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {styleTable,paginateTable} from './skills/professional-slides/runtime/compose.mjs';
 const rows=Array.from({length:12},(_,i)=>[`City ${i+1}`,String(100-i),String(i+1)]);
@@ -78,7 +78,7 @@ console.log(JSON.stringify({ok:true}));
         self.assertTrue(result["ok"])
 
     def test_unit_chart_metric_tones_takeaways_and_column_agenda(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
 import {composeSlide,agendaPages} from './skills/professional-slides/runtime/compose.mjs';
@@ -127,7 +127,7 @@ console.log(JSON.stringify({ok:true}));
         self.assertTrue(result["ok"])
 
     def test_paired_bars_bubble_grid_and_segment_growth(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
 import {composeSlide,changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
@@ -165,7 +165,7 @@ console.log(JSON.stringify({ok:true}));
         self.assertTrue(result["ok"])
 
     def test_pass_three_furniture(self):
-        result = run_node('''
+        result = run_node(r'''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
 import {composeSlide,sectionTabs,styleTable} from './skills/professional-slides/runtime/compose.mjs';
