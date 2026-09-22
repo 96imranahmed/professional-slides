@@ -6,7 +6,7 @@ A deck is ready when the deterministic page gates pass, the review accepts it, a
 
 Measured on the rendered page before review. The report records severity. `runtime/gates/page_gates.py` owns the exact advisory-code set. Ink, whitespace, density, exhibit area, label counts and decoration/mix statistics prompt visual review; they do not prescribe furniture. A compact process or centered commentary can be complete, and a line chart can establish its claim through an axis and selected anchors. Keep these diagnostics visible for independent review; their count is not proof of a defect. Schema, title/evidence contradictions, text fit, clipping, collisions, scales and provenance still block. An independent reviewer may reject an actual visual defect even where its numeric diagnostic is advisory.
 
-| Gate | Code | Threshold |
+| Diagnostic or blocking gate | Code | Screen (severity is reported by the runtime) |
 | --- | --- | --- |
 | Ink coverage | `INK_COVERAGE` | at least 11.5% of the content area (14% on a `full` deck, 5% on an `airy` one) — calibrated on pages with an exhibit, where the reference sample's first quartile is 12.1%. A page with **no** exhibit is held instead to the ink its own word floor produces (0.00052 per word, measured by rendering: 4.4% at the balanced 95-word floor), because a page of type cannot reach 11.5% at any honest length |
 | Trailing dead band | `DEAD_BAND` | at most 8% (6% full, 14% airy) |
@@ -55,7 +55,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Limits against findings | `CAVEAT_HEAVY` | at most 2 caveat lines a page; a finding in contrastive form ("not X; it Y") is not a caveat |
 | The same table, repeated | `TABLE_SCHEMA_FLAT` | at most 3 tables in a deck open with the same column headers |
 | A share the page's own counts do not give | `CONTRADICTED_SHARE` | where a page prints "N of M", every percentage on it is a subset of those counts over M, within one count |
-| What the deck does, page after page | `DECK_CRAFT` | a phrase emphasised on at least 35% of pages (client decks run 51%), a source on at least 50% (they run 67%), at least 11 drawn elements a page (the corpus median is 32), and no single table device on more than 60% of the tables |
+| What the deck does, page after page | `DECK_CRAFT` | advisory legacy screen: a phrase emphasised on at least 35% of pages (client decks run 51%), a source on at least 50% (they run 67%), at least 11 drawn elements a page (the corpus median is 32), and no single table device on more than 60% of the tables. These counts never require decoration |
 
 Two more findings share the shape but fire before the page is rendered, from the composer rather than the gates: `THIN_PLAN` (what the page will carry against its floor, with the remedy that page's own data offers) and `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
 
@@ -81,25 +81,19 @@ Every finding names the exact defect and a repair that a person can act on. `run
 
 **Platform.** The requested editable format opens, native objects stay editable, fonts, charts, tables, notes and sources survive export, and the output directory contains only the requested deliverables.
 
-## Per-deck self-review
+## Reader review
 
-1. Render every slide.
-2. Review the montage for story, rhythm and repetition.
-3. Inspect every slide at full size.
-4. Check titles, evidence, sources and uncertainty.
-5. Check clipping, overlap, broken assets and unreadable text.
-6. Apply the deletion test to every page.
+[Taste review](../taste-review.md) is the authoritative procedure for title/original/spread review, adversarial consolidation, independent scoring and literal reference coverage. Schema/mix statistics cannot certify semantic quality. Preserve the exact artifact binding and complete inspected-slide IDs; a rebuild requires a new review.
 
-## Comparing against a reference deck
+`PLAN_STYLE_ENTROPY` and `PAGE_SHAPE_FLAT` remain blocking repetition screens. [Design](../design.md#page-architecture-and-repetition) owns normalized relationships and deliberate comparison series. Advisory counts must not provoke template rotation or invented content.
 
-Inspect every source page and every candidate render at full size, record the page mappings including deliberate consolidations and splits, and normalize type size against the source's visible crop. For each exhibit, identify the source's strongest analytical device and show how the candidate preserves or improves its function. Keeping every word and number does not pass when the reader must reconstruct a grouping the source made visible.
+## Forward-testing the skill
 
-A final review must use `runtime/reviewer.mjs`'s schema, including a rating,
-complete inspected-slide IDs and the hash binding of scene, PPTX and renders.
-Delivery rejects stale or incomplete review evidence. Precise new upper-case
-finding codes are allowed; major and blocker findings always prevent acceptance.
+For a substantial reusable-skill change, give an independent author the revised installed skill, a realistic new request and the minimum raw artifacts, without the expected answer, prior scores or repair list. Keep generated output in a separate task-owned evaluation directory. Default to at least 50 total rendered pages unless the user explicitly overrides the evaluation length. Select a sufficiently broad brief first; do not grow a small diagnostic through repeated calculations.
 
-`PLAN_STYLE_ENTROPY` and `PAGE_SHAPE_FLAT` block repeated page architectures. Normalize chart/table with two/three columns beneath, cards/prose, and optional closing insight into one family; mirror variants also count once. Measure actual evidence relationships after rendering, with a 40% dominant-family screen and local variety check. Decoration and whitespace distribution findings remain advisory; they cannot exempt architecture repetition.
+Use new domains, source structures and realistic input ambiguity to test transfer. A wholly synthetic case can test mechanisms, but cannot validate research quality or empirical depth. Record that limit. Include relevant positive/counterexample opportunities without telling the author the expected styling: taxonomy versus repeated membership, actual mechanism versus generic process, supported focus versus none, explicit good/bad text versus ordinary chart series. Do not add quotas.
+
+An independent whole-deck reader follows Taste review. Inspect whether the revised decision rule helped an unseen case, not only whether the last defect vanished. Short export/component probes remain diagnostics and never establish the full-deck taste result. Retain failures and repair the earliest shared owner; do not rewrite the score to meet a requested target.
 
 ## Corpus calibration
 

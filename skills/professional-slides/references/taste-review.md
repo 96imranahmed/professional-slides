@@ -1,120 +1,59 @@
 # The taste review
 
-The pass no threshold makes. Every defect this skill has caught that mattered
-was caught by a person opening the rendered pages and looking at them — the
-gates found the geometry, and a reader found that the deck said nothing. This is
-that reader, as a step in the build.
+One independent first reader inspects each candidate after generation. Passing gates establishes only the checks they measure. This review owns editorial judgment, reference comparison and the score; [Design](design.md) owns the visual rules and [Storylining](storylining.md) the evidence rules.
 
-Run one independent reviewer over the whole deck per iteration. Preserve each rendered candidate and its report. When the user requests iteration, repair the highest-impact findings at their earliest shared owner, rebuild, and run a fresh review. Do not tell the reviewer what score to produce. Continue until the requested standard is met or the user ends iteration. If stopped early, report the last verified score and unresolved findings; do not relabel an unfinished candidate as delivered. Disclose unavailable evidence.
+## Independent first reading
 
-## Running it
+Spawn one reviewer per whole-deck candidate. Give the realistic brief, exact artifact paths, source records and available references. Withhold prior scores, the requested target, the repair list and preferred verdict until the reviewer has written its first assessment. Then permit targeted regression verification without revising history to match an expected result.
 
-After a build, `out/rendered/` holds `spread-N.png` — the deck at reading size,
-four pages to a sheet, each page's number burned into its corner. Spawn **one**
-subagent with the brief below and the spread paths. It reads the images itself;
-do not paste them into the prompt.
-
-```
-Read every original slide image and every spread in <out>/rendered/.
-Follow <skill>/references/taste-review.md and <skill>/references/design.md.
-Inspect strong comparable original pages from each requested reference deck.
-Return the bound JSON report and a companion record of reference coverage,
-concrete comparisons, best/worst pages and remaining limitations.
+```text
+Review <candidate> as its intended reader, using <brief> and <source records>.
+Read the current skill's Storylining, Design and Taste review guidance.
+Read the titles first, then every original and spread in <out>/rendered/.
+Compare strong relevant originals from every requested reference deck.
+Write an independent assessment before consulting prior scores or repairs.
+Return the bound review and literal reference/page coverage with concrete comparisons.
 ```
 
-The report lands at `out/taste-review.json`. Treat `blocker` findings as build
-failures and `major` as fix-before-delivery, exactly like a gate finding.
+Do not supply a desired score. Keep each candidate and report. Iterate requested work at its earliest shared owner; if the user ends iteration, report the last verified result and remaining limitations.
 
-## The brief
+## Three reading scales
 
-You are the first reader. Nobody has explained the deck to you and nobody will.
+1. **Title spine:** write what the deck argues before opening slides. Does it answer the actual choice/horizon or promised explanation? Trace every decisive branch to proof. Check summary and close against the same scope, approval unit and evidence state. Identify the strongest countercase and the consequence of missing research.
+2. **Every original page:** inspect the actual evidence, labels, emphasis, hierarchy and reading effort at full size. Use the design decisions at their owner, including useful omitted cues, semantic table roles, heading ownership and text-only status colors. Does the finding appear before the furniture? Does commentary add something? Are comparisons local and equivalent? Do recorded treatments survive nested composition and export?
+3. **Every spread and the whole sequence:** compare normalized evidence relationships, density and narrative progression. Different chart types or two/three commentary columns do not establish variety. Preserve purposeful comparison series while challenging repeated informational jobs.
 
-**Read the titles alone first, in order, before you look at a single page.**
-Write down what you think the deck argues. If the titles do not add up to an
-argument, that is the first finding and it outranks everything else on this
-list.
+At each scale judge the saved artifact, not its labels or metadata. A declaration of category treatment is not a filled cell; a diagram with arrows is not a developed mechanism. A complete compact summary does not need extra metrics or icons.
 
-Check the factual premise and evidence state against dated sources and disclosed assumptions: distinguish an announced transaction from a completed one, platform usage from paid customers, and a modeled hurdle from a forecast. Apply the evidence reconciliation contract in [Storylining](storylining.md#reconcile-evidence-before-design).
+## Adversarial editorial challenge
 
-Treat exhibit-count diagnostics as prompts to inspect the argument: identify the exact missing premise, not a missing second component. A complete bridge, comparison or developed synthesis needs no extra exhibit to prove its substance.
+Name the worst page, best page and most repetitive sequence. For the most deletable page, draft the strongest merger/replacement concept and identify what evidence would be lost. If retaining it is better for this brief, explain why. The 50+ evaluation minimum does not protect filler, an unnecessary preview or a methods lesson that can be joined to its result. Audit lookup can earn its appendix role without being counted as another argument.
 
-Then look at the pages. Reconcile every promised criterion with a page that actually develops it; listing a dimension in a scorecard is not coverage. Read appendix conclusions as claims too: an exhibit about one population cannot substantiate a claim about an unshown comparator. Reconcile reused totals, sample membership, denominators and durations before rating. Read the full argument again after a global correction: stale versions often survive in a chart comment, a summary or the close. A judgement label cannot excuse an unbounded claim. For each spread ask:
+Challenge the least-supported conclusion or permission. Inspect interacting constraints together: a released hour may not be schedulable or cancellable; a prototype success may not establish an integrated replay. A generic instruction to test a mechanism is not the tested mechanism. Keep synthetic illustrations separate from empirical premises and readiness evidence.
 
-1. **Where does the eye land first, and is that the finding?** If the first
-   thing you see is a grey box, a heading, or the largest table cell rather than
-   the thing the title claims, say so.
-2. **Does the commentary tell you anything the exhibit does not?** A column that
-   restates the table beside it in different words is dead weight. Quote the
-   sentence.
-3. **Could this page be deleted without loss?** Name every page that could. A
-   fifty-page deck that should be thirty is a worse deck, not a longer one.
-4. **Is anything misaligned, overlapping, clipped, or floating in space** that a
-   person would notice in one second? Two panels read across must share a
-   baseline. A rule under nothing is a defect. A box two lines tall around one
-   line of text is a defect.
-5. **Does the page use one visual grammar or three?** A horizon band, a photo
-   strip and an icon list on one page is three.
-6. **Is the same page here twice?** Two tables with the same columns, two charts
-   with the same shape, two lists with the same lead structure — across the deck,
-   not just the spread.
-7. **Does the deck ever measure anything?** Count the pages carrying a plot. If
-   a comparison is argued for fifty pages and charted on one, say so plainly.
+Reconcile decisive quantities to named records: populations, units, horizons, scenario parameters and accounting bases. After a revision, trace a changed claim through notes, source map, summary and close. Inspect baseline-to-repair transitions at their actual failure boundary and retain unchanged failures. Reproduce material summaries when the evidence is supplied; do not infer cohort membership from a familiar label.
 
-Before scoring, compare every page with its [planned visual treatment](design.md#choose-visual-treatments-during-planning). Check omission as well as misuse: did a taxonomy remain an undifferentiated table, did a meaningful concept list lose its icons, or did a developed page bury its decision consequence? Also test the counterexample: repeated membership is not a category taxonomy, an icon is not proof, and an insight must add something beyond the title. Check chart heading ownership and semantic subtitle redundancy. These are semantic checks even when lexical-overlap gates pass. Where the verdict explicitly means good/bad, confine status colour to short text labels or check/cross icons; reject that status mapping on chart marks, swatches or backgrounds.
+Do not list twenty copies of one defect. Name the cause, affected IDs and earliest owner. A semantic or visible defect can be substantive even when all numeric gates pass. Do not report preferences, manufacture a fault quota or turn distribution statistics into a taste formula.
 
-Trace a revised claim from its raw record through the content plan, exhibit and close. A repair must show the expected and observed result at the failed boundary: preserving model identity does not establish provider identity. Keep a local prototype, integrated replay and original baseline visibly distinct; check which version actually governs the recommendation. Treat an unexplained change of state as an evidence defect even when each page's arithmetic is correct.
+## Benchmark and score
 
-Test the comparison against the reader's decision, not just its labels: initial commitment and full optional commitment must be comparable on both sides. Check whether a small aggregate needs named contributors on the page. A column labelled implication or decision must change the reader's choice or delimit an inference; a metric definition under that heading is still redundant.
+Before scoring, inspect strong comparable originals from each requested reference. Compare the evidence relationship and reader effort: what does the reference make visible that the candidate leaves to prose or mental joins? Use the [atlas](reference-atlas.md) to find suitable devices, not to substitute schematics for original reference inspection. Do not copy reference quirks that conflict with the user brief.
 
-Check series identity on the saved chart: every series needs a legend or direct name, including after label settings change. Check the kinds of items compared: editorial conclusions are not peer events, and examples are not stages. A page title must describe the displayed distribution, including exceptions, rather than exaggerating a house-wide pattern.
+Record argument, evidence, visual explanation, hierarchy/copy and sequence quality separately in the narrative. Use calibrated anchors, not a mechanical average:
 
-Audit the sequence using normalized architectures: chart/table above two or three commentary columns, prose or cards, with or without an insight strip, is one design. Swapping chart types, mirroring panels or adding furniture does not count. A repetitive deck cannot receive an excellent score because each individual page is tidy. Compare actual representative pages to strong reference pages at full size and identify what their evidence relationships do better.
+- **5:** understandable in parts, but weak proof, repetitive structure or costly reading materially limits usefulness.
+- **7:** useful and mostly supported, with substantial editorial/design work still needed.
+- **9:** strong argument and evidence, effective visual explanation, coherent rhythm; remaining weaknesses are limited and explicit.
+- **9.5+:** exceptional against strong comparable references across the deck, including its least effective page. No avoidable generic framework, unearned duplicate or missing decisive relationship is excused by a clean build.
 
-If user inspection exposes a recurring defect missed by an accepted review, withdraw that acceptance as a quality signal, update the relevant design/review rule, and reassess the full next candidate. A prior score is not a floor and successive iterations need not improve. Document user calibration separately from the independent score; do not average them or manufacture agreement.
+No major/blocker findings is necessary for acceptance, but not sufficient for an exceptional score. A valid appendix lookup need not be spectacular; it must earn its place and be efficient for its task. A prior score is not a floor. User calibration remains separate, never averaged into the independent rating. If user inspection exposes a recurring missed defect, withdraw the earlier acceptance as a quality signal and reassess the next full candidate.
 
-For alternative decks, compare the versions with colour and typography ignored. Identify the different narrative order, evidence relationships and reader task. A palette-only set cannot pass as content or visualization alternatives. Read the ending for repeated recommendations: consolidate selection criteria, named options, commitment and next steps when several pages merely restate the same choice.
+## Coverage and report
 
-Calibrate against the strongest comparable reference pages, not the previous candidate’s score. An exceptional score requires a developed argument and evidence relationship on the weakest page as well as the best page; clean geometry and absence of defects alone are insufficient. Record concrete reference comparisons and remaining limitations before assigning the rating.
+Skill evaluation defaults to at least 50 rendered pages; below-minimum diagnostics need an explicit user override to qualify. Page count establishes eligibility, not quality. [Evaluation](evaluation/index.md#forward-testing-the-skill) owns unseen transfer cases.
 
-A median supports a statement about the typical observation; a consistency claim also needs a spread measure. Search summaries, scorecards and the close for the same wording after correcting a statistical interpretation. Decomposition bridges must disclose the baseline and allocation order and must not turn an arithmetic contribution into a causal claim.
+Return `out/taste-review.json` using `runtime/reviewer.mjs`: `accepted`, `summary`, `rating`, `binding`, `inspectedSlides`, `findings` with `slide`, `code`, `severity`, `reason`, `repair`. Precise uppercase finding codes are allowed. Major/blocker findings prevent acceptance. The companion narrative holds first-reading argument, merger challenge, best/worst pages, dimension assessment, comparisons and limits.
 
-Before accepting a distribution, reproduce its summaries from the named observations and stated quantile method. Check observation date and cohort counts against the exhibit. A familiar population label or a source-family name is insufficient. At the ending, return to the original reader decision; do not introduce a new comparison there. Attach event-specific interpretation to its event when detached commentary weakens the mechanism.
+Compute `binding` with `reviewBinding(out)` after inspecting current files. It hashes PPTX, scene and every render. `inspectedSlides` contains all current IDs actually inspected. Delivery rejects stale/incomplete review; every rebuild requires a fresh review.
 
-After replacing an exhibit or its data, reconcile the displayed source map as well as speaker notes and sidecar records: remove obsolete measures and identify the new edition, population or primary record. Inspect selective line labels against every series, not only the labelled point; omit a nonessential label if its placement creates false attribution.
-
-
-Then, across the whole deck:
-
-- **Name the worst page and say why.** Not the weakest — the worst.
-- **Name the best page**, so the deck has something to imitate.
-- **Rate it out of ten**, as a reader receiving it, with one sentence of
-  justification. Be honest; a 4 that says why is worth more than a 7 that does
-  not.
-
-### What not to report
-
-- Anything a gate already measures numerically — ink, type size, characters per
-  line, word counts. Those have thresholds; you have judgement. Use it.
-- Preferences. "I would have used blue" is not a finding. "The accent is on the
-  row that is not the answer" is.
-- The same defect on twenty pages, twenty times. Report it once, list the pages.
-
-### What to return
-
-Use `runtime/reviewer.mjs` as the single transport schema: `accepted`, `summary`, `rating` (0–10), `binding`, `inspectedSlides`, and `findings` with `slide` (stable ID or null), `code`, `severity`, `reason`, and `repair`. A precise new upper-case code is allowed. Major and blocker findings prevent acceptance. Each repair names the earliest owner (evidence/storyline, design selection or shared renderer), so the next iteration changes the reusable skill as well as the candidate. Record the titles-only argument, best/worst pages and deletion candidates in a companion narrative if useful.
-
-Compute `binding` with `reviewBinding(out)` only after inspecting the current files. It hashes the editable deck, scene and every render. `inspectedSlides` lists every current slide ID actually inspected. Delivery rejects a stale binding or incomplete coverage. Any subsequent build needs a fresh review.
-
-For reference benchmarking, preserve an inventory of every requested reference, its availability, hash and pages inspected. Report deck coverage and page coverage separately. Representative pages from every deck establish all-deck sample coverage, not full-page coverage. Inspect strong comparable examples at full size and name the devices they use more effectively. Damaged or unavailable reference pages remain explicit gaps; they do not count as a visual pass. Scores assess argument, evidence, copy, hierarchy, exhibit choice and rhythm. They are independent judgements, not mechanical transforms of gate statistics.
-
-## Why this exists rather than more thresholds
-
-Three decks in this repository passed every gate and were wrong in the eye. The
-last one cleared 40-odd numeric thresholds and was rated 2 out of 10, because
-its commentary restated its tables, its tables were the same table, and fifty
-pages of comparison carried one chart. Each of those is now a gate — but they
-became gates *because somebody looked*, and the next class of defect will not be
-in the list until somebody looks again.
-
-A threshold catches what it was told to catch. This catches what nobody thought
-of, which is the only thing worth spending a model on.
+Keep a reference inventory with path/hash, availability, total pages and exact originals inspected. Distinguish deck coverage from page coverage; sampling every reference deck is not inspecting every page. Historical reports and unavailable/damaged pages do not count as fresh visual inspection. Disclose missing model/source verification. Technical validation, editorial acceptance and user acceptance remain distinct.

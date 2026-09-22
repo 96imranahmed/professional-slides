@@ -122,7 +122,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   const { deck, decisions } = planDeck(deckPlan);
   const contentAudit = auditContent(spec, deck);
   await fs.writeFile(path.join(directory, "content-audit.json"), JSON.stringify(contentAudit, null, 2) + "\n");
-  if (!contentAudit.accepted) throw new Error(`Composition lost authored prose: ${JSON.stringify(contentAudit.findings)}`);
+  if (!contentAudit.accepted) throw new Error(`Composition lost authored content or visual intent: ${JSON.stringify(contentAudit.findings)}`);
   const scenePath = path.join(directory, "scene.json");
   await fs.writeFile(scenePath, JSON.stringify(deck));
   await fs.writeFile(path.join(directory, "planning.json"), JSON.stringify(decisions, null, 2) + "\n");

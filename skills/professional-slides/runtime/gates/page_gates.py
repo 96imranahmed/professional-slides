@@ -1134,7 +1134,7 @@ def gate_plot_span(slide_no, slide, findings):
             "chart-period-label", "chart-event-label", "chart-annotation",
             "chart-annotation-label", "chart-bracket-label", "chart-callout",
             "chart-change-label", "chart-delta-label", "annotation-text",
-            "annotation-surface", "chart-badge"))
+            "annotation-surface", "chart-badge", "chart-reference-label"))
         if annotated:
             continue
         # Peers in a row share one plot frame: when the annotated panel reserves
@@ -1154,7 +1154,7 @@ def gate_plot_span(slide_no, slide, findings):
                     "chart-period-label", "chart-event-label", "chart-annotation",
                     "chart-annotation-label", "chart-bracket-label", "chart-callout",
                     "chart-change-label", "chart-delta-label", "annotation-text",
-                    "annotation-surface", "chart-badge")):
+                    "annotation-surface", "chart-badge", "chart-reference-label")):
                 peer_annotated = True
                 break
         if peer_annotated:
@@ -2304,6 +2304,11 @@ def page_architecture(slide):
             return "evidence-with-side-commentary"
         if any(box(c)[1] >= y + h - 4 for c in comments):
             return "evidence-over-commentary"
+        # A standalone bridge makes a base-to-result reconciliation visible.
+        # This is a different reading task, not another category-chart style.
+        # Commentary composites above remain normalized together.
+        if evidence[0].get("component") == "chart.waterfall":
+            return "reconciliation"
         return "evidence-only"
     if len(evidence) > 1:
         if len(evidence) > 2:

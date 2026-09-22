@@ -833,6 +833,19 @@ export function compileDeck(deckSpec, registry, {slideCache}={}) {
   configureChrome(deckSpec.chrome || null);
   try { return compileDeckInner(deckSpec, registry, {slideCache}); } finally { configureChrome(null); }
 }
+// Actual ink geometry belongs to the component instance, separately from its
+// allocation frame. Parents/reviewers can compare visible reading anchors.
+export function componentGeometry(nodes) {
+  const visible = nodes.filter(node => node.frame && [node.frame.x, node.frame.y, node.frame.width, node.frame.height].every(Number.isFinite));
+  if (!visible.length) return { occupiedFrame: null, anchors: {} };
+  const x = Math.min(...visible.map(node => node.frame.x)), y = Math.min(...visible.map(node => node.frame.y));
+  const right = Math.max(...visible.map(node => node.frame.x + node.frame.width));
+  const bottom = Math.max(...visible.map(node => node.frame.y + node.frame.height));
+  const headings = visible.filter(node => node.type === "text" && /header|heading|period|chart-title/.test(node.role));
+  return { occupiedFrame: { x, y, width: right - x, height: bottom - y },
+    anchors: { contentTop: y, contentBottom: bottom, ...(headings.length ? { headerTop: Math.min(...headings.map(node => node.frame.y)) } : {}) } };
+}
+
 function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   assertNoLegacyPageTaxonomy(deckSpec);
   const { tokens: designTokens, ...palette } = resolvePalette(deckSpec.palette, TOKENS, THEME_SLOT_TOKENS);
@@ -968,6 +981,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
         ...(props.semantic ? {relationships: props.semantic} : {}),
         variant: definition.resolveVariant?.(props),
         frame,
+        ...componentGeometry(rendered.nodes),
         tokens: definition.tokens,
         // Chart data travels with the instance so an emitter can write a native,
         // workbook-backed chart object in this frame instead of loose shapes.

@@ -4,6 +4,8 @@ Every sentence on a page adds a claim, evidence, interpretation, decision, actio
 
 ## Action titles
 
+Prefer readable numerals and precise nouns to long spelled-out quantities. The title should foreground the decision-relevant result; a calculation method belongs there only when explaining the method is the page's job.
+
 State the answer, not the topic: `[subject] [verb of change or state] [magnitude or comparator] [period or condition]`, within 14 words and two lines. Use the most decision-relevant supported comparison, magnitude, period, segment or threshold. Match the verb to the evidence: measured exposure supports *is exposed*, a sensitivity supports *could reach*, an approved minute supports *will proceed*. Narrow the title when the evidence is thinner than the wording.
 
 | Instead of | Write |
@@ -62,6 +64,8 @@ A page may need no separate insight, one, or two complementary insights. Let the
 
 ## Labels and hierarchy
 
+Separate a bold lead from its body with a colon, full stop or a deliberate new line. A color/weight change alone must not join two clauses into a broken sentence.
+
 Keep a label when it helps the audience decode data, navigation, timing, ownership, units or scenario state. Rhetorical role labels - *Answer*, *Key takeaway*, *What it means* - are replaced by the substantive heading or the sentence itself, and a parent heading adds information beyond its children. Every label visibly belongs to its content through proximity, alignment, a table field or a shared container. Use inline named examples when the name and explanation are one thought: **Pilot programme:** a controlled rollout tests demand before full deployment. Place interpretation beside the evidence it explains, emphasize the decision-changing phrase rather than whole paragraphs, and keep the decisive insight visible without a complete read of the body.
 
 ## Notes and methodology
@@ -88,7 +92,7 @@ Separate what the audience decides now from later approvals, combine duplicate c
 
 1. Check every sentence against the relevance rule above.
 2. Check that each title is supported by its exhibit, verb for verb.
-3. Remove redundant labels and repeated framing. Compare the slide subtitle with the chart heading by meaning, not just shared words: “Share of releases reaching 2.5 times budget” duplicates “Releases clearing the break-even multiple”. Keep the chart heading and its unit; move any unique basis into the note. A subtitle is optional, and tables or non-chart exhibits do not need an additional exhibit title.
+3. Apply [heading ownership](design.md#one-heading-owner-per-exhibit): every title, subtitle and exhibit heading adds unique information.
 4. Re-read each page with its title and any detached conclusion hidden: the exhibit still carries the argument.
 5. Read insight and recommendation copy aloud; complete sentences sound natural rather than clipped or padded.
 6. Scan the final artifact for em dashes and repeat until there are none.

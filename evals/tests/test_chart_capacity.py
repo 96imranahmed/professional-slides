@@ -4,6 +4,22 @@ from node_probe import run_node
 
 class ChartCapacityTests(unittest.TestCase):
 
+    def test_reference_values_expand_the_domain_and_cannot_enter_adjacent_content(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const frame={x:60,y:140,width:700,height:420};
+for (const type of ['chart.bar','chart.column','chart.line']) {
+ const props={categories:['First','Second'],series:[{name:'Planned',values:[24,28]}],referenceLines:[{value:32,label:'Capacity: 32'}],dataLabels:true};
+ const nodes=REGISTRY.get(type).render({id:'capacity',frame,props}).nodes;
+ const references=nodes.filter(n=>n.role==='chart-reference-line');
+ assert.ok(references.length,'the capacity remains visible');
+ for (const n of references) assert.ok(n.frame.x>=frame.x&&n.frame.x+n.frame.width<=frame.x+frame.width&&n.frame.y>=frame.y&&n.frame.y+n.frame.height<=frame.y+frame.height,'reference remains inside the chart allocation');
+ assert.throws(()=>REGISTRY.get(type).render({id:'fixed',frame,props:{...props,...(type==='chart.bar'?{xMin:0,xMax:30}:{yMin:0,yMax:30})}}),/bounds must contain every plotted value/);
+}
+console.log('{}');
+""")
+
     def test_horizontal_reference_guide_clears_nearby_value_labels(self):
         run_node(r"""
 import assert from 'node:assert/strict';
@@ -273,3 +289,19 @@ assert.throws(()=>REGISTRY.get('chart.area').render({id:'area',frame:{x:0,y:0,wi
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
+
+
+class PeerReferenceDomainTests(unittest.TestCase):
+    def test_peer_domain_includes_a_target_present_in_only_one_chart(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const charts=[24,28].map((value,i)=>({type:'chart.bar',heading:i?'West room seats':'East room seats',unit:'seats',categories:['A'],series:[{name:'Seats',values:[value]}],...(i===0?{referenceLines:[{value:60,label:'Capacity'}]}:{})}));
+const scene=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'peer-target',slides:[{id:'s',title:'Both rooms remain below the shared capacity',arrange:'row',exhibits:charts}]})).deck;
+const marks=scene.slides[0].nodes.filter(n=>n.role==='chart-mark');
+assert.equal(marks.length,2);
+assert.ok(Math.abs(marks[0].frame.width/marks[1].frame.width-24/28)<.001,'the reference changes both peers together');
+assert.ok(scene.slides[0].nodes.some(n=>n.role==='chart-reference-label'&&n.text==='Capacity'));
+console.log('{}');
+""")

@@ -61,15 +61,20 @@ export function ganttLayout(frame, props) {
   // Rows stretch to fill the frame up to twice their natural height.
   const scale = available > total ? Math.min(2, available / total) : 1;
   const heights = natural.map((h) => h * scale);
-  return { groups, rows, hasGroups, groupWidth, labelWidth, left, gridWidth, cell, tierHeight, headerHeight, labels, heights, height: tierHeight + headerHeight + heights.reduce((a, b) => a + b, 0), naturalHeight };
+  return { groups, rows, hasGroups, groupWidth, labelWidth, left, gridWidth, cell, tierHeight, headerHeight, labels, heights, height: tierHeight + headerHeight + heights.reduce((a, b) => a + b, 0), todayRow, naturalHeight };
 }
 
 export function ganttNodes({ id, frame, props }) {
   const L = ganttLayout(frame, props);
+  const valign = props.valign ?? "middle";
+  if (!["top", "middle", "bottom"].includes(valign)) throw new Error("Gantt valign must be top, middle or bottom");
   if (L.naturalHeight > frame.height + 0.01) throw new Error(`Gantt needs ${Math.ceil(L.naturalHeight)}px but has ${frame.height}px; split the plan`);
   const nodes = [];
   const x0 = L.left, gridRight = frame.x + frame.width;
-  let y = frame.y;
+  // Keep the measured schedule together when capped row growth leaves spare
+  // height. Reserve the optional Today caption in the same centred group.
+  const spare = Math.max(0, frame.height - L.height - L.todayRow);
+  let y = frame.y + (valign === "middle" ? spare / 2 : valign === "bottom" ? spare : 0);
   // Year tier
   if (L.tierHeight) {
     for (const [i, tier] of props.tiers.entries()) {

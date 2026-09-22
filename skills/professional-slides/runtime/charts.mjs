@@ -195,6 +195,10 @@ export function numericBounds(values, { min, max, axis = "y", includeZero = fals
   return { ...bounds, span: bounds.max - bounds.min };
 }
 
+// A target or capacity is part of the quantitative comparison. Include it in
+// automatic domains; numericBounds also rejects it outside an explicit domain.
+const withReferenceValues = (values, props) => [...values, ...(props.referenceLines || []).map(reference => reference.value)];
+
 const HIGHLIGHT_STYLES = Object.freeze(["bar", "region-box", "region-tint"]);
 const REGION_HIGHLIGHT_INLINE_PAD = 12;
 const REGION_HIGHLIGHT_BLOCK_PAD = 12;
@@ -718,7 +722,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       categoryValues.filter(value => value > 0).reduce((sum, value) => sum + value, 0)
     ];
   });
-  const bounds = numericBounds(stacked ? stackExtents : values, { min: horizontal ? (props.xMin ?? props.yMin) : props.yMin, max: horizontal ? (props.xMax ?? props.yMax) : props.yMax, axis: horizontal ? "x" : "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  const bounds = numericBounds(withReferenceValues(stacked ? stackExtents : values, props), { min: horizontal ? (props.xMin ?? props.yMin) : props.yMin, max: horizontal ? (props.xMax ?? props.yMax) : props.yMax, axis: horizontal ? "x" : "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
   // Reserve measured clearance below negative columns with direct labels.
   // Only automatic unlabelled domains expand; explicit bounds stay authoritative.
   if (!horizontal && !stacked && showDataLabels && !showValueAxis && props.gridlines !== true && props.yMin === undefined && values.some(value => value < 0)) {
@@ -1075,7 +1079,7 @@ function sparseLineChart({ id, frame, props }) {
   if (props.annotationRail || props.changeAnnotations?.length || props.highlights?.length || props.pointHighlights?.length) fail("sparse lines require exact keyed point labels or evidence annotations; categorical decorations are unsupported");
   assertGridlineOption(props);
   const values = series.flatMap(item => item.points.map(point => point.y));
-  const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y" });
+  const bounds = numericBounds(withReferenceValues(values, props), { min: props.yMin, max: props.yMax, axis: "y" });
   const showLegend = props.legend !== false && series.length > 1;
   const showValueAxis = props.showValueAxis !== false;
   const labelWidth = axisLabelWidth(bounds);
@@ -1153,7 +1157,7 @@ function lineChart({ id, frame, props, area = false }) {
   const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length <= 8);
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
-  const bounds = numericBounds(values, { min: props.yMin, max: props.yMax, axis: "y", tight: !showValueAxis && props.gridlines !== true });
+  const bounds = numericBounds(withReferenceValues(values, props), { min: props.yMin, max: props.yMax, axis: "y", tight: !showValueAxis && props.gridlines !== true });
   const labelWidth = axisLabelWidth(bounds);
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
@@ -1315,7 +1319,7 @@ function waterfall({ id, frame, props }) {
     else total += value;
     running.push(total);
   });
-  const bounds = numericBounds([0, ...running], { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  const bounds = numericBounds(withReferenceValues([0, ...running], props), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
   const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
   const nodes = axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis });
   if (bounds.min < 0 && bounds.max > 0) nodes.push(linePrimitive({ id: stableId(id, "zero-baseline"), role: "chart-axis", x1: plot.x, y1: yScale(0), x2: plot.x + plot.width, y2: yScale(0), style: lineStyle(INK) }));
@@ -1535,7 +1539,7 @@ function rangeChart({ id, frame, props }) {
   const labelWidth = Math.max(56, ...[...props.low, ...props.high].map((value) => Math.ceil(measureText(formatValue(value, props), 300, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 }).width) + 12));
   const categoryWidth = Math.max(90, ...categories.map((c) => Math.ceil(measureText(c, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width) + 12));
   const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: categoryWidth + labelWidth, valueLabelInset: labelWidth, centerPlot: false });
-  const bounds = numericBounds([...props.low, ...props.high], { min: props.xMin, max: props.xMax, axis: "x", includeZero: props.includeZero === true });
+  const bounds = numericBounds(withReferenceValues([...props.low, ...props.high], props), { min: props.xMin, max: props.xMax, axis: "x", includeZero: props.includeZero === true });
   const xScale = (value) => plot.x + (value - bounds.min) / bounds.span * plot.width;
   const nodes = [];
   const rowSpan = plot.height / categories.length;
@@ -1581,7 +1585,7 @@ function comboChart({ id, frame, props }) {
   // value axis is visible; padding its domain alone allowed the line to cross labels.
   const barPlot = secondary ? { ...plot, y: plot.y + plot.height * 0.35 + 40, height: plot.height * 0.65 - 40 } : plot;
   if (barPlot.height < 40) throw new Error("Combo chart needs more height for separate scales and labels");
-  const bounds = numericBounds(secondary ? barSeries.values : series.flatMap(item => item.values), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  const bounds = numericBounds(withReferenceValues(secondary ? barSeries.values : series.flatMap(item => item.values), props), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
   const lineBounds = secondary ? numericBounds(lineSeries.values, { min: props.y2Min, max: props.y2Max, axis: "y", tight: true }) : bounds;
   const yScale = (value) => barPlot.y + barPlot.height - (value - bounds.min) / bounds.span * barPlot.height;
   const lineBand = { top: plot.y + 30, height: Math.max(0, plot.height * 0.35 - 30) };
@@ -1745,7 +1749,7 @@ function scatter({ id, frame, props, bubble = false }) {
     annotationRail: props.annotationRail
   });
   const xBounds = numericBounds(props.points.map(point => point.x), { min: props.xMin, max: props.xMax, axis: "x" });
-  const yBounds = numericBounds(props.points.map(point => point.y), { min: props.yMin, max: props.yMax, axis: "y" });
+  const yBounds = numericBounds(withReferenceValues(props.points.map(point => point.y), props), { min: props.yMin, max: props.yMax, axis: "y" });
   const xScale = (value) => plot.x + (value - xBounds.min) / xBounds.span * plot.width;
   const yScale = (value) => plot.y + plot.height - (value - yBounds.min) / yBounds.span * plot.height;
   const quadrants = normalizedQuadrants(props.quadrants, xBounds, yBounds);

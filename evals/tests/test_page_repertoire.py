@@ -304,3 +304,35 @@ for (const [at, exhibit] of keepsWhole.entries()) {
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])
+
+
+class ReferenceAndRelationshipTests(unittest.TestCase):
+    def test_reference_annotation_earns_the_same_space_as_other_annotations(self):
+        frame = {'x': 60, 'y': 140, 'width': 1000, 'height': 400}
+        slide = {'componentInstances': [{'component': 'chart.column', 'frame': frame}], 'nodes': [
+            {'role': 'chart-mark', 'frame': {'x': 100+i*200, 'y': 440, 'width': 100, 'height': 100}}
+            for i in range(2)]}
+        before = page_gates.WEIGHT
+        page_gates.WEIGHT = {'plotSpan': .6}
+        try:
+            findings = []
+            page_gates.gate_plot_span(1, slide, findings)
+            self.assertTrue(any(f['code'] == 'PLOT_SPAN' for f in findings))
+            slide['nodes'].append({'role': 'chart-reference-label', 'frame': {'x': 800, 'y': 220, 'width': 100, 'height': 20}})
+            findings = []
+            page_gates.gate_plot_span(1, slide, findings)
+            self.assertFalse(findings)
+        finally:
+            page_gates.WEIGHT = before
+
+    def test_only_a_standalone_bridge_has_the_reconciliation_relationship(self):
+        def page(component, comments=False):
+            instances = [{'component': component, 'frame': {'x': 60, 'y': 140, 'width': 1160, 'height': 300}}]
+            if comments:
+                instances.append({'component': 'bullet-list', 'frame': {'x': 60, 'y': 460, 'width': 1160, 'height': 150}})
+            return {'componentInstances': instances}
+        self.assertEqual(page_gates.page_architecture(page('chart.waterfall')), 'reconciliation')
+        self.assertEqual(page_gates.page_architecture(page('chart.bar')), 'evidence-only')
+        self.assertEqual(page_gates.page_architecture(page('chart.line')), 'evidence-only')
+        self.assertEqual(page_gates.page_architecture(page('chart.waterfall', True)),
+                         page_gates.page_architecture(page('chart.bar', True)))

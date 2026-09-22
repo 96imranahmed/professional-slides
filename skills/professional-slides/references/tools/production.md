@@ -43,3 +43,12 @@ Blocking findings are factual errors, unsupported claims, misleading comparisons
 ## Repairs
 
 Consolidate findings by cause with their affected slide IDs and one coordinated repair. A wrong value returns to the evidence and the specification; a missing comparison returns to the argument plan; clipping returns to the composition. A shared change invalidates every page that uses it, so recheck those renders. When the repair allowance ends with a defect unresolved, report that defect precisely rather than recording it as accepted.
+
+
+## Portable evidence and release
+
+Keep the model/fixture generator and declared inputs with the evidence package. Before acceptance, run its documented command in an isolated directory containing only those inputs, and compare regenerated records with the plotted values. Historical authoring scripts remain provenance, not portable generators, when they require earlier iteration folders. Include designed thresholds, resources and numerical rehearsals in the cited record; [Storylining](../storylining.md#reconcile-evidence-before-design) owns their meaning.
+
+For shared changes, run the smallest relevant semantic export probes before a full build: signed values, unequal time intervals, equal physical peer scales, references, labels and nested treatments. These checks concern visual truth, not screenshot resemblance. Inspect the exact saved PPTX/PDF/PNGs after export; no scene-only assertion certifies the adapter.
+
+When releasing a changed skill, package and install the source version, verify source/package/cache hashes, and regenerate the evaluation through that installed standard runtime. Record the skill version/hash and candidate identity in the evaluation report. Acceptance belongs to the exact reviewed artifact; older or unrendered authored repairs remain unverified. Keep technical checks, independent taste judgment and user acceptance separate.

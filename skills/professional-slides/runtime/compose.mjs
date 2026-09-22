@@ -2356,7 +2356,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
           ex.series.reduce((sum, se) => sum + Math.max(0, se.values[i] || 0), 0),
         ])
         : ex.series.flatMap(se => se.values);
-      const values = charts.flatMap(extent);
+      const values = charts.flatMap(ex => [...extent(ex), ...(ex.referenceLines || []).map(reference => reference.value)]);
       const min = Math.min(0, ...values), max = Math.max(0, ...values);
       const sharedMin = min < 0 ? -niceCeiling(-min) : 0;
       const sharedMax = max > 0 ? niceCeiling(max) : min < 0 ? 0 : 1;
@@ -2389,19 +2389,23 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       for (const ex of charts) { ex.plotTopInset = inset; if (charts.some(decorated)) ex.native = false; }
     }
     // Chart beside a narrow table (three columns or fewer): the chart takes 3:2.
-    const panelSize = (ex) => {
-      if (slide.pairedWeights) return { width: { fr: slide.pairedWeights[exhibits.indexOf(ex)] }, height: "fill" };
+    const panelSize = (ex, index) => {
+      if (slide.pairedWeights) return { width: { fr: slide.pairedWeights[index] }, height: "fill" };
       if (exhibits.length !== 2) return SIZE;
-      const other = exhibits.find((o) => o !== ex);
+      const other = exhibits.find((_, i) => i !== index);
       const narrow = (t) => t?.type === "table" && (t.columns || []).length <= 3;
       if (String(ex.type).startsWith("chart.") && narrow(other)) return { width: { fr: 3 }, height: "fill" };
       if (narrow(ex) && String(other?.type).startsWith("chart.")) return { width: { fr: 2 }, height: "fill" };
       return SIZE;
     };
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 4).map((ex, i) => {
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 4).map((sourceEx, i) => {
+      // A schedule paired with a table shares its evidence top. Preserve an
+      // explicitly authored alternative; a standalone schedule stays centred.
+      const ex = sourceEx.type === "gantt" && sourceEx.valign === undefined && exhibits.some(peer => peer.type === "table")
+        ? { ...sourceEx, valign: "top" } : sourceEx;
       const panel = centredFigure(ex)
-        ? { id: `${id}-figure-${i}`, layout: "flow.column", leftover: "center", size: panelSize(ex), items: [exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, HUG)] }
-        : { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex) };
+        ? { id: `${id}-figure-${i}`, layout: "flow.column", leftover: "center", size: panelSize(ex, i), items: [exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, HUG)] }
+        : { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex, i) };
       return headedPanel(ex, panel, `${id}-exhibit-${i}`);
     }) });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
@@ -2838,29 +2842,16 @@ function planWords(slide) {
   return words;
 }
 
-/** What this page could carry, given the data it already holds. */
-function planRemedies(slide, elements) {
-  const out = [];
+/** Prompts for checking completeness; never instructions to pad a short page. */
+function planRemedies(slide) {
   const exhibits = [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean);
-  const hero = exhibits[0];
-  const points = slide.points || [];
-  if (!slide.subtitle) out.push("name the measure, the population and the period in a `subtitle`");
-  if (hero && String(hero.type || "").startsWith("chart.")) {
-    const categories = (hero.categories || []).length;
-    const series = (hero.series || []).length;
-    if (categories && categories < 8) out.push(`the page holds a dozen categories and the chart shows ${categories}: show the rest, or the second cut of the same measure`);
-    if (series === 1 && hero.dataTable === undefined) out.push("tabulate the series under the chart (`dataTable: true`)");
-    if (!hero.categoryNotes) out.push("name the base under each category (`categoryNotes: [\"n=412\", …]`)");
-    if (!hero.annotations && !hero.periods && !hero.events && hero.change === undefined && !hero.cagr) out.push("annotate the chart: bracket the periods, flag the event, or carry the change");
-  }
-  const tableLike = exhibits.find((exhibit) => exhibit.type === "table" || exhibit.type === "rows");
-  if (tableLike) {
-    const rows = (tableLike.rows || []).length;
-    if (rows && rows < 8) out.push(`the page holds around fourteen rows and the table shows ${rows}: show the rows behind the summary`);
-    if (tableLike.type === "table" && !tableLike.derive) out.push("add a derived column (`derive: [\"share\", \"rank\", \"change\"]`) - the numbers are already in the table");
-  }
-  if (points.length && points.length < 5) out.push(`carry five or six points in the column, not ${points.length}`);
-  if (exhibits.length < elements) out.push(`the deck's weight asks for ${elements} evidence elements and the page carries ${exhibits.length}`);
+  const out = ["check whether the claim has all necessary proof and compare its strongest merger alternative"];
+  if (exhibits.some(ex => String(ex.type || "").startsWith("chart.")))
+    out.push("retain the needed population, period and local comparator once; do not duplicate the plot as a table");
+  if (exhibits.some(ex => ex.type === "table" || ex.type === "rows"))
+    out.push("keep a complete lookup compact; add a row or derived field only when it answers a missing question");
+  if ((slide.points || []).length)
+    out.push("remove restatement and develop only the consequence or mechanism the evidence does not already show");
   return out;
 }
 
@@ -2878,10 +2869,10 @@ export function budgetFindings(spec) {
     // follows it here exactly as it does on the rendered page.
     const pageFloor = Math.round(floor * (1 - planPictureShare(slide)));
     if (pageFloor <= 0 || estimate >= pageFloor) return;
-    const remedies = planRemedies(slide, weight.elements || 1);
+    const remedies = planRemedies(slide);
     out.push({
-      slide: index + 1, code: "THIN_PLAN", measured: estimate, threshold: pageFloor,
-      repair: `This page plans to carry about ${estimate} words of body text against a floor of ${pageFloor}. From this page's own data: ${remedies.slice(0, 3).join("; ") || "deepen the evidence"}.`,
+      slide: index + 1, code: "THIN_PLAN", severity: "advisory", measured: estimate, threshold: pageFloor,
+      repair: `This page plans ${estimate} body words against a diagnostic reference of ${pageFloor}. Review completeness: ${remedies.slice(0, 3).join("; ")}. A complete short page is valid.`,
     });
   });
   return out;

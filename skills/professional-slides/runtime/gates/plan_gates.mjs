@@ -192,9 +192,9 @@ function gateMix(pages, findings) {
       null, "PLAN_TABLE_SHARE",
       { share: round(share("table")), pages: count("table"), of: total },
       PLAN.mix.table.max,
-      "A table is the right answer when the content is genuinely a matrix - three or more dimensions compared across " +
-      "the same rows. It is the wrong answer, and the commonest default, for two columns of sentences: that is a " +
-      "comparison panel, a rows list with an icon per category, or a chart. Published client decks run 11% tables.",
+      "Review whether each table serves a shared lookup or comparison task. Column count alone does not decide: " +
+      "a two-column exact-value lookup can be useful, while generic advice may read better as an icon-led list. " +
+      "This share is advisory; do not replace useful matrices to meet a corpus percentage.",
     ));
   }
   const measured = share("chart") + share("table");
@@ -289,11 +289,11 @@ function gateEntropy(pages, findings) {
     { entropy: round(entropy.value), architectures: entropy.distinct, observations: entropy.pages,
       commonest: commonest?.[0], commonestPages: commonest?.[1] },
     PLAN.entropyMin,
-    "The deck is built from too few page architectures, so it reads as one page repeated. The example decks run " +
-    `${PLAN.entropyObserved.join(", ")} on this measure. Give pages a reason to take a different shape: commentary ` +
-    "beside the exhibit on some, beneath it on others, a hero number where the story has one, two exhibits " +
-    "contrasted, a picture pair where the subject is two named things. A deliberate template run can be marked " +
-    "`series` and is then counted once.",
+    "Too many pages share one normalized evidence relationship. Reconsider the argument before rotating layouts: " +
+    "use paired measures, a reconciliation, a genuine dependency or decision structure, a calendar, or an integrated " +
+    "comparison where that relationship is present in the evidence. Two versus three commentary columns, " +
+    "mirroring, colour and an insight strip do not create distinct architectures. A series exception requires " +
+    "a real repeated comparison task and reviewer justification.",
   ));
 }
 
@@ -405,31 +405,28 @@ function gateCraft(pages, findings) {
     if (!measured.length) {
       findings.push(finding(null, "PLAN_TABLE_DEPTH",
         { median: null, reason: "no table page records its size", tables: tables.length }, CRAFT.tableRows.min,
-        "How many rows each table carries is not recorded in this plan, so a three-row table and a twelve-row one " +
-        "are the same entry. Write the data shape - `rows x columns` - beside the exhibit. A table of three rows is " +
-        "usually a comparison panel or a list with an icon per category; the reference tables run " +
-        `${CRAFT.tableRows.observedRange.join(" to ")} rows and split across pages when they run past the budget.`));
+        "Record the actual row and column counts so capacity can be assessed. A short matrix may be complete; " +
+        "a conceptual list may read better as rows or icons. Judge the evidence relationship and measured fit, " +
+        "not a required number of rows."));
     } else {
       const sorted = [...measured].sort((a, b) => a - b);
       const median = sorted[Math.floor(sorted.length / 2)];
       if (median < CRAFT.tableRows.min) {
         findings.push(finding(null, "PLAN_TABLE_DEPTH",
           { median, tables: tables.length, measured: sorted }, CRAFT.tableRows.min,
-          `The tables are planned at a median of ${median} rows against ${CRAFT.craftMedian ?? CRAFT.tableRows.observedMedian} in published client decks. A table of ` +
-          "three rows spends a whole page saying what a comparison panel or an icon list says in a corner of one. " +
-          "Either deepen it - more rows, a derived column, a second cut of the same measure - or choose the " +
-          "exhibit the content actually is. A long table is not a problem: it paginates."));
+          `The planned median is ${median} rows. Inspect whether these are complete matrices or underdeveloped lists. ` +
+          "Choose a smaller measured group or a more suitable encoding when appropriate; do not add rows or " +
+          "derived columns merely to reach a depth statistic."));
       }
     }
     const share = tables.filter(treated).length / tables.length;
     if (share < CRAFT.tableTreated.min) {
       findings.push(finding(null, "PLAN_TABLE_MONOTONY",
         { share: round(share), treated: tables.filter(treated).length, of: tables.length }, CRAFT.tableTreated.min,
-        "Not one of these tables says how it is treated, so every one of them will draw as the same plain grid. " +
-        "The treatments exist and are content-led: a verdict or decision column takes the implication gutter, a " +
-        "scored table takes heat, a share column takes bubbles or an in-cell bar, a qualitative rating takes " +
-        `harvey balls, a table whose title names a winner highlights that column. Published client tables carry one on ${Math.round(CRAFT.tableTreated.observed * 100)}% ` +
-        "of them. Name the treatment in the plan and the page stops being a grid of sentences."));
+        "Inspect omitted and misused treatments: distinct category classes can use filled category cells; " +
+        "repeated membership and individual records stay plain. Keep a verdict joined unless an authored inference " +
+        "arrow requires a gutter. Counts, ratings and highlights need explicit semantics. Record the chosen " +
+        "treatment or intentional plain construction; this advisory is not a decoration quota."));
     }
   }
 
@@ -438,10 +435,9 @@ function gateCraft(pages, findings) {
     if (share < CRAFT.chartAnnotated.min) {
       findings.push(finding(null, "PLAN_UNANNOTATED_CHARTS",
         { share: round(share), annotated: charts.filter(annotated).length, of: charts.length }, CRAFT.chartAnnotated.min,
-        "These charts plan no marks on the plot: no change bubble, no bracket between the two series the title " +
-        "compares, no reference line at the target, no period band, no flagged event, no highlighted category. A " +
-        "plot with nothing marked on it asks the reader to find the finding the title already states. Name the " +
-        `device beside the exhibit; published client decks carry one on ${Math.round(CRAFT.chartAnnotated.observed * 100)}% of their charts.`));
+        "Check whether the title needs a visible target, capacity, event or comparison annotation. Show that premise " +
+        "on the plot or beside it when it is required to support the claim. A readable neutral comparison may need " +
+        "no extra mark. Record useful reference lines or explicit focus in the plan; do not add decoration to hit a share."));
     }
   }
 

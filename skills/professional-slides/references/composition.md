@@ -79,29 +79,21 @@ Split a synthesis at a logical branch or exhibit boundary when the measured cont
 - copy fits the declared density, measured at the allocated width;
 - required provenance has a source component.
 
-If the items cannot fit while keeping hierarchy and legibility, split the slide.
+If items do not fit, remove duplication, rebalance tracks or choose a coherent density first. Split at a meaningful evidence boundary only when the proof genuinely needs another page; return to Storylining if several pages repeat one job.
 
 ## Adapter invariant
 
 HTML and PowerPoint consume the same resolved scene. HTML serializes canonical tokens as CSS variables; PowerPoint maps the same tokens to theme slots or resolved native values, converts pixels to inches once, and names every object from its scene ID. Compilation rejects undeclared component token use. A reader-back of the exported file recovers every named object, its frame within one pixel, and the canonical theme.
 
-## Match the structure to the kind of evidence
+## Shared geometry and visual intent
 
-Before choosing a variant, name what each row, panel and arrow represents. Peers must be the same kind of thing: observed events beside observed events, options beside options, ordered stages along a sequence. An editorial conclusion belongs outside an event table. A list of examples and a sequence should use different constructions even when they share a page. Do not force unlike relationships into matching tables to make the page symmetrical.
+[Design](design.md) owns semantic relationships and treatment decisions. Composition preserves them while assigning width, height and reading order. A parent may align peers without rewriting their category, focus, icon or verdict props.
 
-Attach a process step's actor, input, output and failure route to that step. A detached list of controls does not show where they operate. Use a phase/workstream matrix when several workstreams genuinely span stages; a single activity and record per column rarely need that hierarchy. Compare alternative decision states as alternatives, and show unresolved obligations under their owners. Decision branches represent alternative conditions; sequential actions within one route must not become sibling branches. Walk a named case through the diagram to check both relationships before rendering.
+Use content-hugging groups where a sparse object is complete. Choose top alignment for headed peers and group centering for unheaded support. When a natural-height schedule shares a row with a table, explicitly align their visible evidence tops; do not allow independent vertical-centering defaults to imply different reading levels. Quantitative alignment uses common physical scales and entity order, not equal outside boxes alone.
 
-A page that promises a preference or format comparison must show those distinguishing attributes. A score ranking alone answers which item scores higher. Either develop the promised comparison with sourced attributes or narrow the title and place the ranking as supporting evidence. Keep source and appendix pointers resolvable inside the delivered deck.
+Components expose occupied bounds and comparison/header anchors where supported. Use those anchors to inspect group relationships after composition; allocation frames alone cannot establish alignment. Optional surface, focus or divider treatments must preserve unrelated geometry. References participate in chart domains. [Production](tools/production.md) owns saved-artifact checks.
 
-When a natural-height sequence or diagram shares a row with compact prose, align the visible groups within their allocated panels. Do not leave one group at the top and the other at mid-page merely because their renderers have different defaults.
-
-For decision alternatives, develop the switching condition: what stated preference would make the reader choose another option? For optional commitments, distinguish the initial trial from incremental continuation and reconcile both to the full total. These relationships should replace a redundant ranking or repeated total when they answer the reader’s question more directly.
-
-If a categorical attribute changes how a number should be interpreted, give it a shared, aligned field for every compared entity instead of placing one side in a footnote. For preference decisions, branches must state the actual selectable conditions and lead to named actions; a connector is not evidence of a decision relationship by itself.
-
-Actionable recommendations must identify the actual starting object: distinguish a collection from a series, and name an edition or collected range when the same title has multiple meanings. Keep the first commitment separate from the complete run. Use primary records for factual identifiers; retain preference judgements as judgements.
-
-Compare options on matching attributes at the same level of abstraction. Separate series position from story structure, or availability from participation, rather than filling a broad catch-all row with unlike facts. When the reader is choosing an experience, replace a weakly sourced ranking with verified constraints that affect that choice.
+At the handoff compare authored intent with scene and rendered output: each nested category axis, icon set, exact focus, heading owner, status and evidence qualification must appear as intended. Record any deliberate revision in the existing plan before rebuilding. A visible icon can still be semantically wrong; deterministic checks preserve declared choices but cannot choose them.
 
 ## Named composition presets
 
@@ -114,6 +106,8 @@ Choose a preset because its evidence relationship fits the page, not to meet a w
 | `measure-table` | grouped measures under grouped headers with their units, footnote markers on the cells that need a basis | a `table` exhibit, `derive`, `total` |
 | `model-page` | the assumptions grid behind a forecast | a chart plus its `dataTable` |
 | `half-and-half` | a chart with its own callout on one side, six icon-led points on the other | an exhibit and `points` |
+
+The basic evidence presets are `exhibit-full` (full-width evidence), `exhibit-left` (evidence beside support) and `exhibit-top` (evidence above support). Other supported presets are `exhibit-right` (dominant evidence on the right), `hero-number` (one meaningful number with its supporting proof), `split-tone` (a treated support rail), `two-up` (peer exhibits), `metrics-over-exhibit` (a concise metric strip over underlying evidence), `table-halves` (a comparison split across matched tables), and `picture-pair`, `picture-strip`, `picture-hero` (two, several or one dominant sourced image). These are composition conveniences; their names do not establish distinct evidence relationships.
 
 ## Deck-spec controls
 

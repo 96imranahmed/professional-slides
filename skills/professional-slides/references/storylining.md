@@ -1,423 +1,134 @@
 # Storylining
 
-Storylining turns a brief into an approved slide sequence before any page is drawn. It produces three things: a governing answer, a hypothesis tree that proves it, and a dot-dash the owner approves.
-
-## Planning contract
-
-For new work set `workflow: "new_deck"` in the deck spec. Before rendering, write `<id>.content.json` and `<id>.plan.json` beside `<id>.deck.json`. Revisions use `workflow: "existing_deck_revision"` and may retain unaffected plans; record the revised scope. Existing user authorization carries forward.
-
-Give each slide a stable `id` shared by the content record, design record and deck spec. Never join these records by their position. For new decks, content records cover main analytical slides and design records cover every authored main and appendix slide; exact claims/titles must match before composition. The content record holds the exact claim, evidence, basis, relationship and consequence; `adds: null` means commentary is unnecessary. The design record reads all those fields before choosing its exhibit, architecture and focus. A keyword or evidence-kind label alone cannot select the design. Focus is an explicit exact set or none; a count, largest value or neighbouring page does not choose it.
-
-An opening summary states the answer, decisive proof, consequence and action before the first chapter. Declare `role: "executive-summary"`; `shape: "executive-summary"` is an optional composition preset. Metrics are optional. Rows of bullets with strong leads can carry the whole summary; do not repeat the same figures in a metric strip above those bullets. A metric strip on an ordinary page is not a summary. Keep chapter tracking off this page.
-
-Use `{{page:stable-id}}` for cross-references in copy and source tables. Resolve them after pagination; a split slide resolves to its complete page range. Reconcile title counts and repeated recommendations before design and again after any consolidation.
-
-## Reconcile evidence before design
-
-Verify the brief's factual premise before decomposing it. For a transaction, policy change or launch, distinguish rumor, announcement, signed agreement, approval and completion using dated primary records. A user's example identifies the topic; it does not establish the event's status. Preserve differences between headline values, consideration, contingent payments, retention costs and enterprise value. Check whether a policy or rate source has been superseded before using it in a model.
-
-For a requested page count, budget the entire delivered deck, including cover, summary, section pages and appendix, unless the brief specifies a different scope. Allocate distinct evidence questions before layouts; a fixed length does not justify splitting one insight into repetitive pages. Give alternative versions different reader questions, title sequences or evidence relationships before authoring; preserve any shared audience and decision required by the brief.
-
-Before accepting the dot-dash, compare adjacent pages' evidence and decision consequences. Combine elementary transformations of one model into a sensitivity matrix or joined comparison unless each changes a distinct decision. Use the released space for unresolved commercial or operating questions, worked cases and source-backed mechanisms. Develop a proposed mechanism against a named current alternative: show what changes, how outcomes would be measured and which result would reject it. A reused case needs a new analytical job, such as changed inputs, event order or repair replay; an appendix develops a missing record or calculation rather than restating its body-page conclusion. A structurally valid plan with unique titles can still be repetitive; do not approve it on counts and source keys alone.
-
-For an operating proposal, define the approval unit: workflow, population, exposure, configuration and permission requested. Preparation, an offline test, live exposure and expansion are different decisions. Carry the same unit through the summary, protocol, readiness record and close. A repair replay preserves case identity and records expected versus observed results at the actual failure boundary; changing a pass flag alone is not evidence of repair. Label baseline and revised states wherever their results reappear, and name which state governs the decision. Replace a page that merely asks for a protocol with a worked proposed record and its explicit missing inputs; do not portray assumed test results as completed readiness evidence. Synthetic source records must include numerical examples and decision rehearsals as well as narrative fixtures, and their local paths must resolve from the delivered sidecar.
-
-For an investment decision, separate economic value, incremental cash and internal resource use before calculating returns or funding. Released capacity and reduced backlog can have opportunity value without reducing a budget payment; staff training consumes time without necessarily adding payroll. Recognize cash savings only against an explicit avoided expenditure, timing and owner. Reconcile the value-to-cash bridge through the summary, annual flows, NPV and funding close. A pilot recommendation names its proposed cohort, duration, cash cap, internal hours and staged release conditions; missing quotes or statistical inputs stay explicit within that proposal.
-
-For each reused measure or model parameter, keep one source record: definition, exact members, exclusions, period,
-units, observed inputs, calculation and rounding. Sum the members before drafting
-an aggregate. Derive means, shares, rates and durations from that record; retain
-unrounded inputs and round only for display. Name the input changed by each sensitivity, hold the others at their recorded base values, and derive legend labels from those same inputs. Generate the explanatory formula and
-its speaker-note operands from the same records; matching totals do not excuse
-mismatched line items. A grouped cell containing two items
-still counts as two. Reconcile every reuse in titles, summaries, charts, notes and
-the close whenever membership or an input changes. Cost and benefit drivers may have different denominators: a share of transactions is not a share of effort when cases take different amounts of time. Derive each from the same underlying records. When demand grows, state whether the intervention covers the added volume or a fixed original pool.
-
-For a counted sequence or collection, enumerate its included ranges and extras before stating the length. Distinguish a complete named work, a selected arc, an author run and the larger continuing series. A familiar label is not a defined population; the displayed scope and the counted set must agree.
-
-Keep sample boundaries explicit: a historical sample is not a live census, a
-selected ranking is not a publisher or market total, and one film series is not
-necessarily a shared universe. Distinguish a measure from a proxy and an estimate
-from an observed input. If an aggregate cannot be itemized or traced, research it,
-remove that aggregate or label its limited basis; do not make it precise by repetition.
-
-Match uncertainty to the sampling unit and selection method: repeated ratings are not independent cases, and a challenge set does not establish a population failure rate. If missing outcomes could reverse a decision, show a bounded sensitivity and distinguish point-estimate scenarios from the protocol's uncertainty-based acceptance test.
-
-An inherited distribution is not validated by plausible summary statistics. Retain
-the named observations, capture date, membership rule and quantile method; show
-sample counts. Do not borrow a cohort definition from another measure. A targeted
-refresh must identify its new observation date separately from the release or
-reporting cutoff, and update every reused statistic and source label.
-
-When a revision moves or replaces a page, reconcile its claim, sequence, evidence,
-architecture and design reason in the content and plan records before rebuilding.
-Keep stable IDs; regenerate numbering from the revised order. Do not let the
-rendered deck and its authoring contract tell different stories.
-
-Keep the executive summary, but challenge later preview scorecards: if subsequent
-pages prove every row, move any unique measure to its evidence page and cut the
-preview. Attach scope and denominator to the actual comparison. In a decision-led
-deck, detailed context belongs in the appendix when it does not change the choice;
-retain the bounded conclusion and a resolvable supporting reference in the body.
-
-A conditional recommendation names the reader preference or option attribute that
-changes the choice. Test whether each proposed reversal actually affects the named
-option. Check the strongest counterexample and keep artistic judgement separate
-from a numerical league table. Do not manufacture a winner or a causal mechanism.
+Storylining owns the decision, proof, evidence definitions and page selection. Design begins only when those are coherent.
 
 ## Define the communication job
 
-Write one sentence:
+Above the dot-dash, record the audience, actual choice or learning objective, baseline and alternatives, horizon, ranked criteria, fixed constraints, evidence gaps and the condition that changes the answer. Distinguish user preferences from assumptions. Resolve the decision stage: diagnosis, option selection, recommendation, authorization or explanation. A sourced annual comparison cannot answer a three-year commitment merely by being labelled correctly.
 
-> After this deck, the audience should understand or decide ______ because ______.
-
-Then write the main question and the governing answer. When the answer is not yet supported, write it as a hypothesis and mark what would confirm or reject it.
-
-Resolve the decision stage as well as the topic:
-
-- **Diagnosis** - establish what is happening and why.
-- **Option selection** - establish which options merit detailed design.
-- **Recommendation** - name the supported choice and its conditions.
-- **Authorization** - request a defined action, with scope, resources, owner and the condition that reverses it.
-- **Explanation** - build understanding; the close delivers the promised understanding rather than a decision.
-
-Carry the stage into the summary and the close. An options diagnostic concludes which levers merit design; it leaves implementation, savings and staffing unapproved.
-
-## Sharpen the brief before drafting
-
-Ask the questions whose answers would change the argument, grouped into one interaction, and carry forward answers already given:
-
-- Who decides, and whose preferences matter? For a client engagement, establish the client's context rather than assuming your own.
-- What decision or change in belief should the deck enable?
-- Which criteria matter most, in what order, and which constraints are fixed?
-- What alternatives, baseline or current position are in play?
-- What time horizon or circumstance could change the answer?
-- What is the strongest counterargument, and what evidence would move the audience?
-
-**Specificity check.** Could this title spine and recommendation be reused unchanged for a different audience or decision? If so, name what is missing and ask one useful follow-up. The remedy is a sharper supported thesis, not extra personalization labels.
-
-Summarize the resulting brief above the dot-dash: audience, intended outcome, decisive criteria in the client's own ranked order, constraints, unresolved questions. Separate what the user said from what you assumed. Say how the answers changed the provisional thesis and what now falls outside the story.
-
-## Organize the evidence
-
-For every material fact retain: source location, population or business boundary, measure, unit, period, reported precision, and evidence state - observed, source-modeled, supplied assumption, or analyst-derived. For a calculation retain its inputs and formula. If calculation code accompanies delivery, bundle its required inputs and verify it runs in an isolated folder with the bundled inputs and without earlier iteration paths; distinguish runnable generators from historical authoring provenance and compare the regenerated results with the plotted values. For a qualitative fact retain the mechanism, condition or named example.
-
-Record research requirements explicitly: criterion, status (`resolved`, `uncertain`, `unavailable`, `needs-user`, `unperformed`), the evidence that closes it, and the remaining limit. Distinguish information that was unavailable after a genuine lookup from research not yet undertaken; an honest "not yet investigated" answers a different question from the one the brief asked.
-
-Build an alternatives-by-criteria coverage matrix before drafting. Every shortlisted option needs evidence on every decisive criterion, or an explicit open status. Choose the geography, period, unit and population first, then collect.
-
-Keep comparable observations apart from adjacent ones: an annual benefit and an implementation duration describe different dimensions; cash expenditure and after-tax earnings use different bases; national net employment and regional gross job flows answer different questions. Preserve source totals and independently rounded inputs as published, with a concise rounding note.
-
-## Build the problem logic
-
-For a decision under uncertainty, decompose the root question into a hypothesis tree. An issue tree asks what must be investigated; a hypothesis tree records what is currently believed and what evidence would confirm, refine or reject it. Give nodes stable IDs (`H1`, `H1.1`) so the tree survives changes to the story.
-
-For every terminal hypothesis record:
-
-- the provisional answer and its relationship to the parent;
-- the decision consequence if true and if false;
-- the confirming or disconfirming analysis;
-- the evidence state: supported, contradicted, mixed, untested or blocked;
-- the source or data dependency and its material limitation;
-- priority and disposition: core story, appendix, parked, unresolved.
-
-Siblings use one decomposition logic and divide the parent without overlap. Every leaf is falsifiable. Prioritize the small number of branches most likely to change the decision, and keep the others in the tree with an explicit disposition so focus stays visible as focus. Stop expanding a branch when more work will not change the governing answer at the required confidence.
-
-For explanatory work, map concepts and dependencies instead: what the audience must already understand, what each page supplies, and how the parts answer the communication question.
+For authorization, retain one approval unit: workflow, population, exposure/configuration, resources and permission requested. Preparation, offline testing, live exposure and expansion are different commitments. Carry the same unit into the summary, protocol and close. Ask only for missing information that would change the argument; existing authorization persists.
 
 ## Prove the governing answer
 
-Trace each decisive conclusion back through its assumptions to evidence. A sourced input and a correct calculation do not validate the model between them. Explain why the chosen drivers, scope, horizon and comparison answer the audience's question, and carry a constraint found in one branch into the branches it affects.
+Build a hypothesis tree for a decision, or a concept/dependency map for explanation. Use stable node IDs. For each terminal branch retain the provisional answer, confirming/disconfirming evidence, consequence, evidence status, dependency and disposition (body, appendix, unresolved or parked). Siblings divide the same parent question. Stop expanding when additional detail cannot change the answer or understanding.
 
-For modeled outcomes, distinguish an evidence-anchored estimate from a sensitivity or an illustrative case. State the decision rule that turns a range into an action, say whether its thresholds are supplied policy or your own assumption, and show when sensitivity changes the action. A conditional model supports a conditional recommendation.
+Name the actual competing route and the constraint it can or cannot change. “Test whether ownership helps” is an open research question, not evidence of an ownership mechanism. State a common outcome and the observation that would reject the proposed advantage. If the difference is unknown, retain that gap and its consequence; do not replace it with hypothetical precision.
 
-Compare alternatives on the same decision axis and horizon. Solve recommendation thresholds on that horizon too, including one-time costs and recurring flows; annual parity does not establish multi-year parity. Distinguish the audience's requested decision, the authorized approver and the execution owner when they differ. Uncosted work and missing authority remain a further decision.
+Write the exact title of every page. Under each title state the evidence that settles it, what it builds on, what is new and the audience consequence. A comparative title needs comparable proof on both sides. A selected example establishes an instance; a median establishes location, not consistency; a correlation or arithmetic bridge does not establish causality. A causal account requires evidence of the mechanism, and a decomposition states its baseline/allocation order.
 
-**Claim-to-proof check.** Before choosing a layout, write the exact premises that make the proposed title reasonable. A comparative verdict needs comparable evidence for both sides on the stated criterion. One example, one favourable period or one attractive photograph establishes an instance, not a general result. Where quantitative evidence can test the claim, show the values, comparison basis, period, units and sample sizes; check whether a total reflects volume and whether an average hides a distribution. Where the claim is inherently qualitative, use specific comparable examples and explain the mechanism. Match explanatory depth across the alternatives: develop a case, decision and consequence for each mechanism being contrasted.
+Before layout, compare every page with its closest sibling. Draft the merged alternative. Retain separate pages only when joining them materially harms a necessary comparison, explanation or lookup. Different titles, extra caveats and another arithmetic step are insufficient. Use existing `settles`, `adds` and plan `why` fields to record the decision; no extra checklist is needed. Consolidate preview scorecards and repeated endings. Audit detail earns its appendix role but is not credited as another persuasive premise.
 
-A claim about visual craft requires visible evidence of that craft: use attributed artwork, product views or comparable specimens and identify observable features on the page. Tie the explanation to a visible region with a precise spatial description or a restrained local annotation; naming the artwork alone is not analysis. Text about style cannot substitute for showing it. Bound the inference to the displayed specimen; a cover does not establish interior storytelling or a publisher-wide house style. A mechanism diagram must carry an actual dependency, event or transformation through its stages; generic verbs alone do not explain the mechanism. At the closing-page review, retain only a decision, condition or next step that earlier pages have not already resolved.
+For fixed length, budget cover, summary, sections and appendix first; select evidence breadth that supports the total. Reject a narrow evaluation topic before authoring if it requires padding. Do not invent another case whenever a thin page is found. Alternative decks first differ in question, sequence or evidence relationship, not palette.
 
+## Reconcile evidence before design
 
-Then hide the title and remove decorative imagery. The remaining exhibit must let a reader reconstruct the argument. If it cannot, repair the reasoning before changing the spacing.
+Verify factual premises and dated source status: rumour, announcement, agreement, approval and completion are distinct. Separate transaction consideration, contingent payments and retention costs; check superseded policies/rates. Track whether research is resolved, uncertain, unavailable after lookup, not yet performed or requires user input. Do not describe unperformed research as unavailable.
 
-## Choose the narrative arc
+Keep one record for each reused measure or parameter: exact definition, member observations/ranges, exclusions, population, unit, period/snapshot, evidence state, inputs, formula and rounding. Sum members before drafting totals. Derive means, shares, distributions and durations from those records, retaining unrounded values and a stated quantile method. An arc, complete work, author run and series are different counted sets; a grouped cell may contain several members.
 
-- answer, proof, decision - for a short, already-framed decision;
-- situation, complication, resolution - when a changed condition creates the need to act;
-- problem, solution, evidence, ask - for a proposal or funding request;
-- baseline, variance, cause, action - for performance diagnosis;
-- question, tests, synthesis, recommendation - for hypothesis-led analysis;
-- concept, mechanism, worked example, limits, application - for teaching.
+Parameter identity travels with values into labels, notes and summaries. Distinguish adoption from realization, transaction share from effort share, requests from people, capacity from schedulable release, and economic value from cash. Cost and benefit denominators can differ. Changing a parameter or cohort reopens every consumer: title, chart, note, source map, summary and close. Use existing source IDs and model records to locate consumers; do not retype derived numbers from memory.
+
+Match alternatives on the same horizon and feasible commitment. Initial trial and optional continuation are distinct on both sides. An ordered route, independent choices and a sum of optional choices are not equivalent packages. Separate economic opportunity from avoided expenditure, with timing and accountable owner. Training can consume internal hours without adding payroll. Solve switching thresholds on the decision horizon, including one-time costs.
+
+After individual sensitivities, join constraints that govern the same outcome into one feasible case or envelope. For example, released hours must also be schedulable, contractually cancellable and financially sufficient before they become cash savings. Keep the base, sensitivity, counterexample and revised governing case distinct. A correct series of isolated calculations can leave the central decision unproved.
+
+Match uncertainty to the sampling unit and selection method. Repeated observations are not independent cases; challenge sets do not establish population failure rates. When missing outcomes could reverse a decision, show bounds or a relevant sensitivity. An illustrative point estimate does not replace a protocol's uncertainty-based acceptance test.
+
+Synthetic records have a defined role: mechanism demonstration, inference counterexample, proposed record or decision rehearsal. They cannot establish empirical demand, causal uplift or completed readiness. Store designed capacities, prices, thresholds and worked results in the cited fixture too; authoring-only numbers do not acquire provenance by citing a different file. Name which real evidence would replace them. [Production](tools/production.md#portable-evidence-and-release) owns isolated reproduction.
+
+For stateful cases, retain the same case IDs through baseline, local prototype and integrated replay. Record the configuration, changed inputs, expected and observed boundary result, unchanged failures and state governing the recommendation. A changed pass flag is not a repair demonstration; preserved model identity does not prove provider identity. Proposed replay instructions are legitimate procedure, but cannot be counted as validation evidence.
+
+Qualitative comparison needs named, comparable choices and consequences. A visual-craft claim needs visible attributed specimens and precise observations; a cover does not prove interior craft or publisher-wide style. An operating mechanism follows an actual input/output, dependency or failure path through the steps. Generic verbs, arrows and case IDs do not supply proof.
+
+## Planning contract
+
+Set `workflow: "new_deck"` for new work. Retain `<id>.content.json`, `<id>.plan.json` and `<id>.deck.json` together. Use unique stable slide IDs; never join records by position. Content records cover main analytical slides; design records cover authored main and appendix slides. Titles/claims, order and scope must agree before composition. Revisions can retain unaffected records, but reconcile all changed dependencies.
+
+Use `{{page:stable-id}}` for cross-references; resolve after pagination, including split-page ranges. A section map owns tracker labels/order/membership. An opening summary declares `role: "executive-summary"` (the shape preset is optional) before the first section. [Copy](copy.md#executive-summary) owns its editorial content.
 
 ## Stage one: content design
 
-**Nothing in this stage may name a component, an architecture or a variant.**
-There is nowhere to put one, and that is the point.
-
-A 50-page deck once recorded thirteen page architectures, 0.93 style entropy and
-a stated reason on all fifty pages — the best layout numbers ever measured
-here — and carried one chart, twenty-eight pages opening with the literal word
-"Interpretation:", and eighteen tables on two invented schemas. A reader rated it
-2 out of 10. Layout planning passed with distinction; content design never
-happened. They were one artefact, so choosing a shape *felt* like choosing the
-evidence, and nothing noticed that the evidence had not been chosen.
-
-Write `deck.content.json`. One entry per page, four fields:
+Settle evidence before naming components or layouts. For each page record `claim`, `settles`, `adds` and `highlight`:
 
 ```json
-{ "schema": "professional-slides.content/v1", "id": "rollout",
-  "question": "Which markets go first, and what opens the second wave?",
-  "answer": "Three markets whose data is ready, a gate at month seven, one owner per wave.",
-  "pages": [
-    { "id": "readiness", "n": 4,
-      "claim": "Start with the three markets whose data is ready; file Germany now",
-      "settles": { "kind": "count", "what": "markets clearing the four-point readiness assessment" },
-      "adds": "Filing Germany in month one is what makes a month-12 launch reachable at all",
-      "highlight": "three of twelve" }
-  ] }
+{
+  "schema": "professional-slides.content/v1", "id": "capacity",
+  "question": "Which queues need the first capacity review?",
+  "answer": "Review the three queues containing 56 of 64 unresolved requests first.",
+  "pages": [{
+    "id": "queue-load", "n": 2,
+    "claim": "Three queues contain 56 of 64 unresolved requests",
+    "settles": {"kind": "count", "what": "Six named queues: 24, 2, 16, 16, 4, 2 unresolved requests in the same snapshot"},
+    "adds": "Volume prioritizes investigation; the required resource still depends on each queue's constraint.",
+    "highlight": null
+  }]
+}
 ```
 
-- **`claim`** — the sentence this page proves. A topic label is not a claim:
-  "Origins" is a section name, "DC's foundational icons predate Marvel's defining
-  1960s ensemble" is a page. If it has no verb, the page has no argument yet.
-- **`settles`** — what settles the claim, and of what **kind**: `count`, `share`,
-  `rank`, `rate`, `sequence`, `comparison`, `structure`, `qualitative`. This is
-  read together with the claim, evidence members, denominator, `adds` and focus
-  when choosing the exhibit. A qualitative-heavy deck prompts a review of whether
-  available quantities have been hidden in prose; it does not require invented measurements.
-- **`adds`** — what the commentary says that the exhibit *cannot*. This field did
-  not exist, and its absence is those twenty-eight "Interpretation:" pages: with
-  nowhere to record what the commentary was for, the commentary became a second
-  reading of the exhibit. If the honest answer is "nothing", the page does not
-  need a commentary column and the exhibit should have the width. A commentary
-  column is not the house default: measured over 264 published client pages, 73%
-  of chart pages carry one, 56% of diagram pages, 31% of table pages and **4% of
-  pages that are type alone**. Leaving it off is the commonest choice on the
-  commonest page.
-- **`highlight`** — the phrase the reader should see first, set in the accent
-  inside a sentence, or `null` when no special emphasis is justified.
+`settles.kind` is `count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure` or `qualitative`; its actual evidence, basis and audience question govern the later encoding. `adds: null` means commentary is unnecessary. `highlight` is an exact phrase for emphasis or null; it is not an instruction to infer a chart maximum.
 
-Present it to the person as one block per page, not as a table. A table gives
-every field a cell the width of a phrase, and `adds` answered in a phrase is how
-"Interpretation:" gets written.
-
-```bash
-node runtime/gates/content_gates.mjs deck.content.json
-```
-
-Get this accepted before writing a single exhibit name. **Name the file
-`<stem>.content.json` beside the deck spec** and `build-deck.mjs` runs the gate
-itself, before it composes anything — a rejected content plan stops the build
-with no scene written. New decks require the sidecars described in the planning
-contract. A revision without a content plan reports that stage as absent; this
-does not establish that its content has passed review.
+Present the dot-dash as developed page blocks so the proof and consequence remain readable. Run `node runtime/gates/content_gates.mjs <id>.content.json`. Passing checks do not replace the title-only argument, countercase and merger review.
 
 ## Stage two: layout planning
 
-Now decide what each page looks like. Read the full content record: claim,
-evidence, basis, relationship, consequence and focus. `settles.kind` narrows the
-candidate encodings; the actual evidence and reader question determine the choice.
+Read the complete content record. Use [Design](design.md) and the [reference atlas](reference-atlas.md) to choose an evidence relationship before a component. For a difficult page sketch materially different candidate structures and select the one that makes the comparison easiest. This is an internal design choice, not another user approval step.
 
-One row per page — here a table is right, because these are all short fields:
-
-| # | Exhibit | Variant | Why | Architecture | Anchors | Insight |
-| --- | --- | --- | --- | --- | --- | --- |
-
-- **Exhibit.** The encoding that makes the evidence relationship visible — use the table below as a starting point.
-- **Variant.** How that exhibit is treated: `heat`, `bubble`, `bar`, `harvey`, `verdict column`, `stacked`, `sorted`, `grid`, `paginated`, and a table's size as `12×5`. Two pages both reading `table` may be a twelve-row heat matrix and a three-row grid; counted as one kind they make a deck look more varied than it is, and the variety gate counts `exhibit/variant` where the variant is recorded. This is also where a table stops being a plain grid: across ten tables in a generated deck, not one named a treatment and not one got one.
-- **Why.** One phrase saying what made this the exhibit — "magnitude over time", "ranking, sorted", "genuinely a matrix: three dimensions over the same rows". Required on the exhibits a plan reaches for when it has not decided anything (a table, a column or bar chart, a staircase, a list), because that is where a default hides. A page that cannot produce the phrase has not chosen its exhibit yet.
-- **Architecture.** `exhibit-left`, `exhibit-top`, `hero-number`, `two-up`, `split-tone`, `grid`, `exhibit-full`, `metrics-over-exhibit`, `picture-hero`, `picture-pair`, `picture-strip`, `table-halves`, `text`. The evidence goes on the left and what it means on the right — `exhibit-right` exists but is never chosen for you, because a reading order a reader can rely on is worth more than the variety of not having one. A deck built from two architectures reads as one page repeated; the plan gates measure the spread as entropy and cannot measure it at all when this column is blank. Where a run of pages is one template on purpose — six use-cases, eight market profiles — name the run as `series: <name>` and the gates count it once instead of punishing a deliberate decision. **Variety belongs in the evidence relationship, not in which side of the page the table sits on.** Count chart/table over two or three commentary columns, with or without an insight strip, as one architecture. Record an explicit architecture for every analytical page; `auto` is not a planned design. Test the normalized mix and dominant share before composing.
-- **Anchors.** Select photographs or supported icons when recognition helps the reading task; apply one coherent treatment across peers and use `false` when deliberately unanchored. A named subject does not require a picture. A conceptual list may benefit from icons; a matrix still needs its comparison fields. Follow the [visual treatment decision](design.md#choose-visual-treatments-during-planning), and keep uncleared image candidates in the plan rather than adding empty rendered frames.
-- **Insight.** `filled`, `outline` or `none` — reserve a closing band for a distinct, supported decision consequence. Write its actual sentence in the content record before allocating the space; an empty band is not a reason to invent a conclusion.
-
-Keep planning language out of the rendered deck. `adds` is a field in a file,
-never a label on a page: a sentence that reaches a reader starting
-"Interpretation:" is the plan showing through, and `PLANNING_VOICE` reports it.
-
-**Choose the exhibit from the shape of the evidence.**
-
-| The evidence is | The encoding is |
-| --- | --- |
-| A magnitude over time | `chart.column`, or `chart.line` past about eight periods |
-| A ranking | `chart.bar`, sorted |
-| A composition | `chart.stacked-column`, `chart.marimekko`, `chart.waffle` |
-| A relationship between two measures | `chart.scatter`, `chart.bubble` |
-| A sequence whose stages have dates | `timeline` — the dates are the axis |
-| A sequence whose stages have durations | `gantt` — length is the finding |
-| A sequence a subject moves through | `journey` — the stages happen to someone |
-| A strictly ordered process with no dates | `chevron-process` |
-| A sequence that accumulates, each stage keeping the last | `steps` — the staircase, and only here |
-| A sequence that returns to its start | `cycle` |
-| A structure or set of relations | `framework`, `relationship-network`, `tree` |
-| Two named, depictable things | `picture-pair` — images side by side, the comparison as cards beneath |
-| One named, depictable subject | `picture-hero` — the picture on one side, the argument beside it |
-| Three to five depictable things | `picture-strip` — the pictures across the page, a card under each |
-| Named places, regions or territories | `map` with a choropleth and a `note` per region — the annotated map |
-| A set of named categories | `cards` or `rows`, one icon per category |
-| A comparison across three or more dimensions | `table` |
-| One number that carries the page | `metrics` with a `kpi` |
-
-**Put the two numbers the title compares next to each other.** A title that
-compares Marvel with DC, drawn as two bar groups of median and gross, makes the
-reader jump between groups to find the comparison it already stated. Exchange
-the category and the series — publisher as the category, measure as the series —
-and the two numbers sit adjacent. The encoding follows the sentence: whatever
-the title puts side by side, the chart puts side by side.
-
-**The staircase is for accumulation, not for sequence.** It says each stage
-keeps what the last one built. A sequence with dates is a timeline, with
-durations a gantt, with a subject moving through it a journey, and a strictly
-ordered process with neither is a chevron process. A deck that draws five
-staircases has used one shape for five different relationships.
-
-**Choose a table for shared lookup or comparison fields.** Develop a simple conceptual list as rows or an icon-led list when that makes the relationships easier to scan. Column count alone cannot decide: a two-column exact-value lookup can be a valid table, while several columns of generic advice can remain underdeveloped. Reference table counts are advisory, not a reason to replace a useful matrix.
-
-**Titles set on one line.** Target eight to twelve words. The page gate's fourteen-word limit is a ceiling, not a target, and a plan written to it makes two-line titles the norm — which is what makes the title band, its rule and the content beneath sit differently on every page.
+Use existing plan fields to record the exact target or deliberate absence of focus, category axis, useful anchors, heading ownership and distinct insight. Classify every component in a composite, not only the dominant exhibit. An overall `categories` treatment is insufficient when one sibling is a plain record table. [Composition](composition.md) owns allocation and peer anchors.
 
 ### The plan file the gates read
-
-The table above is how a plan is *read*; `<stem>.plan.json` beside the spec is
-how it is *checked*, and the build runs the gates over it automatically. One
-object per page, in deck order. New decks require stable `id` and exact `title`
-coverage under the planning contract above. `n` is a reporting position; the
-remaining design fields are checked when supplied.
 
 ```json
 {
   "schema": "professional-slides.plan/v1",
-  "noPictures": "The argument compares queue counts; photographs add no identifying evidence",
-  "pages": [
-    { "id": "opening", "n": 1, "kind": "cover", "title": "Market entry" },
-    { "id": "queue-load", "n": 4, "title": "Three queues account for most unresolved cases",
-      "exhibit": "chart.bar", "variant": "sorted", "why": "compare unresolved case counts across queues",
-      "architecture": "exhibit-full", "anchors": false, "insight": "none",
-      "highlight": null, "items": 6 }
-  ]
+  "noPictures": "The evidence is a queue roster; photographs would not identify its bottleneck",
+  "pages": [{
+    "id": "queue-load", "n": 2,
+    "title": "Three queues contain 56 of 64 unresolved requests",
+    "exhibit": "chart.bar", "variant": "neutral",
+    "why": "Compare all six counts; annotate the named three-queue set and its total, preserving the other counts. A second plot adds no proof.",
+    "architecture": "exhibit-full", "anchors": false,
+    "highlight": null, "annotation": "named set and total", "insight": "none", "items": 6
+  }]
 }
 ```
 
-| Field | What it is | Which gate reads it |
-| --- | --- | --- |
-| `id` | stable authored slide ID, independent of pagination | new-deck coverage, title parity and content transfer |
-| `n` | optional planning position | human-readable reporting only |
-| `kind` | `cover`, `section`, `agenda`, `takeaways`; absent or `content` for an analytical page | all of them - only content pages are measured |
-| `title` | the action title you intend to write | `PLAN_TITLE_LENGTH` |
-| `exhibit` | the encoding, from the table above | `PLAN_EXHIBIT_MIX`, `PLAN_EXHIBIT_RUN`, `PLAN_EXHIBIT_VARIETY` |
-| `variant` (or `exhibitVariant`) | how it is treated: `heat`, `bubble`, `bar`, `harvey`, `verdict column`, `sorted`, `12x5` | the variety count, and `PLAN_TABLE_MONOTONY` |
-| `why` (or `reason`, `exhibitReason`) | the phrase that chose the exhibit, twelve characters or more | `PLAN_EXHIBIT_REASON`, on defaulted exhibits |
-| `architecture` (or `layout`) | `exhibit-left`, `exhibit-top`, `two-up`, `grid`, `hero-number`, … | `PLAN_STYLE_ENTROPY` |
-| `anchors` | one entry per named thing: `{ "photo": "the Bucharest centre" }` or `{ "icon": "growth" }`; `false` where the page is unanchored on purpose | `PLAN_VISUAL_ANCHOR`, `PLAN_NO_PICTURES`, `PLAN_NO_ICONS` |
-| `insight` | `filled`, `outline` or `none` | `PLAN_NO_INSIGHT` |
-| `highlight` | the phrase the reader should see first | `PLAN_NO_HIGHLIGHT` |
-| `rows` (or `shape: "8x4"`) | how deep the table is | `PLAN_TABLE_DEPTH` |
-| `items` (or `points`) | how many named things the page enumerates | `PLAN_VISUAL_ANCHOR` |
-| `treatment`, `annotation` | named table treatments and chart annotations, when they are not in `variant` | `PLAN_TABLE_MONOTONY`, `PLAN_UNANNOTATED_CHARTS` |
-| `series` | a run of pages that is one template on purpose | `PLAN_EXHIBIT_RUN`, `PLAN_STYLE_ENTROPY` - counted once |
-| `noPictures` (deck level) | why this deck carries no photograph, in a sentence | excuses `PLAN_NO_PICTURES` |
+| Field | Meaning |
+| --- | --- |
+| `id`, `title` | Stable slide ID and exact approved title |
+| `n`, `kind` | Reporting position; structural type where applicable |
+| `exhibit`, `variant` | Selected encoding and treatment; implementation controls belong in deck props |
+| `why` | Evidence relationship, shared key/scale, hierarchy, treatment rationale and merger decision |
+| `architecture` | Explicit normalized structure; `auto` is not a considered design |
+| `anchors` | Authored supported icons/images, or false when unnecessary |
+| `highlight` | Exact phrase or null; chart/table focus is selected by exact keys in deck props |
+| `treatment`, `annotation` | Intended visual choices, identifying affected children in `why` |
+| `insight` | `filled`, `outline` or `none`; actual distinct sentence belongs in content/deck |
+| `rows`, `items` | Actual evidence size for capacity planning |
+| `series` | Deliberately comparable repeated task, with rationale; not a repetition exemption by label alone |
 
-Mix, treatment, highlight, picture, icon and density counts are advisory reference diagnostics. Schema and a meaningful exhibit rationale remain blocking. Review whether each chosen device helps the argument; never add a photograph, tint, arrow or annotation to satisfy a corpus percentage. `noPictures` records an intentional choice when images would not help. Do not add empty placeholders for missing pictures.
-
-Run `node runtime/gates/plan_gates.mjs deck.plan.json` over the machine-readable plan before writing any page. It answers in under a second, and named `<stem>.plan.json` beside the spec the build runs it for you.
-
-**Title spine test.** Read the dots alone. A decision deck should read as a clear executive memo; an explanatory deck as a coherent account. Titles state supported conclusions; explanatory headings may name a mechanism or distinction when a takeaway would overstate the page. Remove repeated claims, topic labels and unsupported certainty.
-
-**Standalone evidence test.** Read any synthesis together with the dot-dash, without slides or narration. Every decisive branch has proof, the proof supports the inference, the strongest countercase is addressed, and the verdict follows. For each analytical case record the actual values, source, population, period, comparator, inference limit and the slide that presents the proof.
-
-**Measurement before encoding.** Name the measurement basis for every exhibit: `native`, `percentage-change`, `per-capita`, `rebased-index` or `published-index`. Prefer native units with direct values, and labelled percentage change when relative change is the question. A rebased index earns its place only when a common-base trajectory answers a question native units cannot; record the base period and keep the absolute values in view.
-
-**Continuity.** For each analytical dot record what it builds on, what is new here, and what changes for the audience. Introduce an entity through its role in the parent comparison before its detailed statistics. Merge adjacent pages that share a decision consequence unless each supplies distinct necessary evidence.
-
-**Navigation.** When a visible tracker helps, map one parent tracker ID to each section and one chapter ID to each analytical subgroup, and record the applicable IDs on every dot. The section map is the only source of labels, order and membership.
+Run `node runtime/gates/plan_gates.mjs <id>.plan.json`. The build runs available sidecars automatically. Mix, icon, treatment and density statistics are advisory, never decoration quotas. Review [normalized relationships](design.md#page-architecture-and-repetition) across the actual sequence as well as the planned labels.
 
 ## Approve it
 
-For a new deck or a structural change, present the dot-dash and get the owner's confirmation before creating a slide file. Record the confirmation and the version it applies to. A standing instruction to proceed satisfies this within its stated scope.
+For new work or changes outside authorized structure, present the dot-dash and obtain confirmation before slide authoring. Record which version is authorized. A standing instruction to proceed satisfies this within its scope. A requested change directly authorizes that change and its necessary dependencies; do not ask again merely because the artifact version changed.
 
-Revise the affected rows in the same artifact so changes are easy to compare. An explicit user request to change an item authorizes that change directly. Seek approval again only for a material change outside the authorized scope.
+For an existing deck, inventory exact current titles and evidence first. Preserve unaffected structure. Perform internal handoff reviews without inventing new approval gates.
 
-For an existing deck, first write an as-is dot-dash with one dot per current slide, recording each slide's exact current title. A faithful authorized revision proceeds from that inventory when titles, order and structure stay the same; changing any of those returns to the approval step.
+## Worked example: a capacity decision
 
-## Worked example: Australia Post
+This synthetic example demonstrates the reasoning; it is not a claim about a real operation. The question is whether a four-week workload reduction permits a vendor commitment to be cut. The hypothetical source record defines 120 released hours, 80 that fit the vendor's shifts, 60 that the contract permits cancelling, a 50-hour minimum cancellation and £30 per cancelled hour. All five are explicit scenario inputs.
 
-Public figures adapted from [SlideScience's dot-dash guide](https://slidescience.co/storytelling-in-powerpoint/). They demonstrate grammar, not a current view of Australia Post.
+**Proof outline.**
 
-**Decision setup.** Communication job: decide whether further cost reduction can restore profitability. Governing answer: productivity is near its stated limits, so management must quantify revenue options before approving the recovery plan. Tracker: a compact number strip on analytical slides 3 to 5, because the plan has three named sections and consecutive evidence pages; none on the cover, summary or close.
-
-**Section map.**
-
-| Section | Slides | Purpose |
+| Stable ID | Exact title | Proof and distinct contribution |
 | --- | --- | --- |
-| Answer | 1-2 | Frame the decision and answer it. |
-| Evidence | 3-5 | Establish the gap and test cost headroom. |
-| Action | 6 | Set the next decision gate. |
+| answer | Cancel 60 vendor hours only if the shift and contract conditions hold | Opening summary: conditional answer, feasible quantity, cash effect and authorization required. Developed bullet rows suffice. |
+| feasible | Shift and contract limits reduce 120 released hours to 60 cancellable hours | One joined exhibit keeps released, schedulable and cancellable quantities distinct. The 60-hour feasible reduction exceeds the 50-hour contract minimum and yields £1,800 in this illustration. |
+| reversal | A 45-hour scheduling limit would eliminate the cancellation | A countercase changes one named input: min(45, 60) falls below the 50-hour minimum. Cash saving is then zero under the stated contract, not £1,350. |
+| decision | Verify shifts and cancellation terms before changing the commitment | Close: owner, missing real evidence and conditional action. The synthetic calculation does not authorize a real contract change. |
 
-**Stage one — content.** `deck.content.json`, presented one block per page.
-Nothing here names a shape.
+**Merger challenge.** Separate pages for released hours, schedulable hours and cancellable hours would force a mental join. Consolidate them into `feasible`. Keep `reversal` only if the reader needs the countercase developed; otherwise put it beside the base case on a common schema. A four-page worked example is a diagnostic, not a qualifying 50-page skill evaluation.
 
-```json
-{ "schema": "professional-slides.content/v1", "id": "australia-post",
-  "question": "Can further cost reduction restore profitability?",
-  "answer": "Productivity is near its stated limits, so quantify revenue options before approving the plan.",
-  "pages": [
-    { "n": 3,
-      "claim": "Costs grew 9% against 5% revenue growth, moving FY22 into a $13bn loss",
-      "settles": { "kind": "rate", "what": "annual revenue and cost growth, FY15-FY22, and the profit endpoints" },
-      "adds": "No revenue scenario in the plan closes a gap of this shape without a network decision",
-      "highlight": "$13bn loss" },
-    { "id": "readiness", "n": 4,
-      "claim": "Workforce reduction lifted output per employee close to the stated ceiling",
-      "settles": { "kind": "comparison", "what": "workforce and mail per employee at FY19, FY22 and the stated ceiling" },
-      "adds": "Only 5,000 pieces of headroom remain, so the next cost programme cannot come from labour",
-      "highlight": "330,000 ceiling" },
-    { "n": 5,
-      "claim": "Processing and delivery unit costs already sit below the cited benchmarks",
-      "settles": { "kind": "comparison", "what": "cost per piece at baseline, current and benchmark, for two activities" },
-      "adds": "Beating the benchmark twice means the credible unit-cost case is exhausted, not that it is working",
-      "highlight": "below benchmark" },
-    { "n": 6,
-      "claim": "Quantify revenue options before approving the recovery plan",
-      "settles": { "kind": "structure", "what": "what each option must supply: contribution, feasibility, service impact, timing, owner, downside" },
-      "adds": "Pause the approval if the options do not reconcile to the residual gap",
-      "highlight": "reconcile to the residual gap" }
-  ] }
-```
+**Design selection.** A shared-row reconciliation can attach the scheduling and contract constraints to their quantities. An unrelated process diagram and three commentary columns would not make the feasible result clearer. These rows are successive states of one quantity, not unordered category classes. Use ordinary chart series colors, place the 50-hour threshold at the point of decision, and highlight only the decisive authored result. A short favorable/adverse verdict may use status text color; the marks do not.
 
-Page 3's `adds` is the test to apply to every one of them. "Revenue grew 5% and
-costs 9%" would have been the chart read back; "no revenue scenario closes a gap
-of this shape" is what the chart cannot draw.
-
-**Stage two — layout.** Choose the encoding from each page's evidence relationship:
-
-| # | Exhibit | Variant | Why | Architecture | Anchors | Insight |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | — | — | cover | `cover` | photo: a delivery round | none |
-| 2 | `cards` | numbered, 3 | the answer, its proof and its condition | `exhibit-full` | icons: gap, ceiling, decision | filled |
-| 3 | `chart.combo` | growth bars, profit line, bracket on the crossing | `rate` over eight years with two measures on one category set | `exhibit-left` | none | filled |
-| 4 | `table` | harvey on headroom, 3×4 | `comparison` across three named states | `exhibit-left` | icons: workforce, output | outline |
-| 5 | `table` | bar column on cost per piece, 2×4 | `comparison` of two activities against one benchmark | `exhibit-left` | none | outline |
-| 6 | `framework` | six required inputs around the decision | `structure`: what an option owes before it is approved | `exhibit-top` | icons per input | filled |
-
-Two things the pairing shows. Page 3's `rate` sends it to a combo rather than to
-the two peer column charts an earlier version of this example specified — the
-kind chose the exhibit, not the other way round. And pages 4 and 5 are both
-`comparison` and both tables, so the variant column has to do the work of
-telling them apart: harvey balls against a ceiling, an in-cell bar against a
-benchmark. Two tables with the same columns and no variant is
-`TABLE_SCHEMA_FLAT`.
-
-**Parallelism check.** Each slide has one dot and substantive support. The spine moves answer, evidence, action. The section map matches the sequence. The tracker decision matches the length of the story.
-
-## Narrative QA
-
-Compare the commitment the reader is actually deciding on. When an initial trial and an optional full programme differ, show both on each side; a correctly labelled full-run comparison can still mislead an entry decision. In a small aggregate, identify the contributors on the page when the reader needs them to choose an item. An implication must state what the reader should do differently or what does not follow; repeating the measure's definition is not an implication.
-
-- one governing answer;
-- branches distinct and collectively sufficient;
-- one job per slide, and every slide earns its place;
-- evidence supports the title, verb for verb;
-- uncertainty explicit and attached to the claim it limits;
-- synthesis and close agree in scope, authority and qualification;
-- navigation, when used, follows the story;
-- every authored title traceable to its approved dot.
-
-For a qualitative comparison, a named example is not yet evidence. Each cell should identify an observable choice, event or feature and its consequence on the shared criterion. Match editions explicitly; separate those facts from interpretation, and use the work or a specific primary guide as the source rather than a generic publisher label. Do not infer frequency or exclusivity from a selected set of examples. A process, taxonomy or continuity page must walk at least one named item through to the reader’s decision; dates, genre labels and metadata alone do not demonstrate that consequence.
+**Handoff.** Carry the same stable IDs, quantities, conditions and evidence status into content, plan and deck records. Recalculate summary, exhibit and close when the scheduling input changes. Inspect the saved slide to confirm that the threshold and distinct quantity labels remain legible and attached to the calculation they qualify.
