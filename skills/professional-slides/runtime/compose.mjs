@@ -35,7 +35,7 @@ const V3 = "professional-slides.deck/v3";
 const SIZE = { width: { fr: 1 }, height: "fill" };
 const HUG = { width: { fr: 1 }, height: "hug" };
 
-export function isV3(spec) { return spec?.schema === V3; }
+function isV3(spec) { return spec?.schema === V3; }
 
 function imageDimensions(buffer) {
   if (buffer[0] === 0x89 && buffer[1] === 0x50) return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20), mime: "image/png" };

@@ -43,7 +43,7 @@ export const SECONDARY = token("color.textSecondary");
 export const GRID = token("color.chartGrid");
 export const PRIMARY = token("color.chartSeries1");
 export const CHART_LABEL = token("type.chartLabel");
-export const CHART_ANNOTATION = token("type.chartAnnotation");
+const CHART_ANNOTATION = token("type.chartAnnotation");
 export const AXIS_LABEL = token("type.chartLabel");
 const SPARSE_DIRECT_LABEL_LIMIT = 8;
 export const SERIES = [
@@ -1853,8 +1853,8 @@ function scatter({ id, frame, props, bubble = false }) {
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, allowAnnotationRail: false });
 }
 
-export const PART_TO_WHOLE_VARIANTS = Object.freeze({ "legend-top-right": {}, "outside-labels": { props: { labels: ["Category 1", "Category 2", "Category 3", "Category 4"], values: [25, 25, 25, 25] } }, "shared-legend": {} });
-export function resolvePartToWholeVariant(props = {}) {
+const PART_TO_WHOLE_VARIANTS = Object.freeze({ "legend-top-right": {}, "outside-labels": { props: { labels: ["Category 1", "Category 2", "Category 3", "Category 4"], values: [25, 25, 25, 25] } }, "shared-legend": {} });
+function resolvePartToWholeVariant(props = {}) {
   const variant = props.variant ?? (props.outsideLabels ? "outside-labels" : props.legend === false ? "shared-legend" : "legend-top-right");
   if (!Object.hasOwn(PART_TO_WHOLE_VARIANTS, variant)) throw new Error(`Unknown pie/donut variant: ${variant}`);
   if (props.legend === true && variant !== "legend-top-right" || props.legend === false && variant === "legend-top-right" || props.outsideLabels === true && variant !== "outside-labels") throw new Error("Pie/donut variant conflicts with legend or outsideLabels");

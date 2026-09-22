@@ -12,14 +12,14 @@ import {
 import { measureText } from "./text-layout.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
 
-export const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label", "end-bubble"]);
-export const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot", "speech"]);
+const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label", "end-bubble"]);
+const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot", "speech"]);
 // Keep a full label-height gap between the observation box and the plot. The
 // chart reserves this band before calculating marks, so value labels remain
 // readable instead of tucking under the annotation surface.
 export const EVIDENCE_CALLOUT_BAND = 88;
-export const CHANGE_ANNOTATION_BAND = 84;
-export const ANNOTATION_RAIL_BAND = 52;
+const CHANGE_ANNOTATION_BAND = 84;
+const ANNOTATION_RAIL_BAND = 52;
 const annotationRailLineHeight = () => measureText("0",1000,{fontSize:tokenValue(token("type.chartAnnotation"))}).height;
 const annotationRailBand = () => Math.max(ANNOTATION_RAIL_BAND,annotationRailLineHeight()+tokenValue(token("space.4"))*2);
 
@@ -70,7 +70,7 @@ function normalizeAnchor(anchor, field) {
   return { category: value.category, ...(value.series ? { series: value.series } : {}) };
 }
 
-export function normalizeEvidenceAnnotations(props = {}) {
+function normalizeEvidenceAnnotations(props = {}) {
   const annotations = props.annotations || [];
   if (!Array.isArray(annotations)) throw new Error("Chart annotations must be an array");
   if (annotations.length > 6) throw new Error("Use no more than six evidence annotations on one chart");
@@ -289,7 +289,7 @@ function speechNodes(id, placement, data) {
   return [
     tailed
       ? shapePrimitive({
-          id: stableId(id, "annotation-tail", index), role: "annotation-surface", geometry: "polygon",
+          id: stableId(id, "annotation-tail", index), role: "annotation-surface", geometry: "iconPath",
           frame: { x: minX, y: minY, width, height },
           style: { fill, stroke: fill, lineWidth: HAIRLINE },
           data: { ...data, paths: [{ points: points.map(([x, y]) => [(x - minX) / width, (y - minY) / height]), closed: true }] },
@@ -419,7 +419,7 @@ export function renderChartCallout({ id, frame, props }) {
     const width = Math.max(1, maxX - minX), height = Math.max(1, maxY - minY);
     return { nodes: [
       rectPrimitive({ id: stableId(id, "bubble"), role: "annotation-surface", frame, style: { fill, stroke: fill, lineWidth: HAIRLINE, radius: token("radius.small") } }),
-      shapePrimitive({ id: stableId(id, "bubble-tail"), role: "annotation-surface", geometry: "polygon",
+      shapePrimitive({ id: stableId(id, "bubble-tail"), role: "annotation-surface", geometry: "iconPath",
         frame: { x: minX, y: minY, width, height },
         style: { fill, stroke: fill, lineWidth: HAIRLINE },
         data: { paths: [{ points: points.map(([x, y]) => [(x - minX) / width, (y - minY) / height]), closed: true }] } }),

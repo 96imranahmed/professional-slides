@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 import os
@@ -62,6 +63,32 @@ class PluginDistributionTests(unittest.TestCase):
             (source/'.git').rmdir()
             with self.assertRaises(ValueError):
                 packager.package(source, dest)
+
+    def test_a_staged_package_is_not_edited_by_hand(self):
+        """`dist/` is a build output, and its manifest records a hash per file.
+
+        The version sits in `.codex-plugin/plugin.json` and the packager copies
+        that file, so the two cannot disagree unless someone edits the staged
+        copy - which is exactly what happened once, when a version bump was
+        applied to both by hand instead of to the source followed by a rebuild.
+        Skipped when nothing is staged.
+        """
+        staged = ROOT / 'dist' / 'professional-slides'
+        manifest = staged / 'package-manifest.json'
+        if not manifest.is_file():
+            self.skipTest('nothing staged in dist/; run npm run package:plugin')
+        recorded = json.loads(manifest.read_text(encoding='utf-8'))['files']
+        drifted = []
+        for rel, entry in recorded.items():
+            path = staged / rel
+            if not path.is_file():
+                drifted.append(f'{rel} (missing)')
+            elif hashlib.sha256(path.read_bytes()).hexdigest() != entry['sha256']:
+                drifted.append(rel)
+        self.assertEqual(
+            drifted, [],
+            'staged files differ from the manifest the packager wrote. '
+            'Edit the source and rerun `npm run package:plugin`; never edit dist/ directly')
 
     def test_package_rejects_unowned_destination_and_symlinks(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -11,7 +11,8 @@
     "import:maps": "node evals/scripts/import_natural_earth_maps.mjs",
     "package:plugin": "python3 evals/scripts/package_plugin.py",
     "build:deck": "node skills/professional-slides/runtime/build-deck.mjs",
-    "deliver:deck": "node skills/professional-slides/runtime/deliver-deck.mjs"
+    "deliver:deck": "node skills/professional-slides/runtime/deliver-deck.mjs",
+    "prune:output": "python3 evals/scripts/prune_output.py"
   },
   "engines": {
     "node": ">=20.9"

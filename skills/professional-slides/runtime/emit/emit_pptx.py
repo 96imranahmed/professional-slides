@@ -279,8 +279,11 @@ class Emitter:
         "triangle": MSO_SHAPE.ISOSCELES_TRIANGLE, "rtTriangle": MSO_SHAPE.RIGHT_TRIANGLE, "diamond": MSO_SHAPE.DIAMOND,
         "pentagon": MSO_SHAPE.REGULAR_PENTAGON, "hexagon": MSO_SHAPE.HEXAGON, "parallelogram": MSO_SHAPE.PARALLELOGRAM,
         "trapezoid": MSO_SHAPE.TRAPEZOID, "downArrow": MSO_SHAPE.DOWN_ARROW, "upArrow": MSO_SHAPE.UP_ARROW,
-        "homePlate": MSO_SHAPE.PENTAGON, "roundRect": MSO_SHAPE.ROUNDED_RECTANGLE,
     }
+    # `homePlate` and `roundRect` were listed here and nowhere else: no component
+    # emits either, and the HTML adapter cannot draw them, so a component that
+    # started would have thrown in every HTML-based test in the suite.
+    # test_geometry_parity keeps the two vocabularies in step.
 
     def _paint(self, shape, style: dict):
         fill = style_value(style, "fill", None)

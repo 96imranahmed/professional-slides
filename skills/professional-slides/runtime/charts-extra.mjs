@@ -32,7 +32,7 @@ const highlighted = (props, name) => props.focusSeries === name || (props.highli
 /* ------------------------------------------------------------- slope */
 // Two to four periods as columns, each series a line between them with its
 // name and value at both ends; the focus series in the accent, the rest grey.
-export function slopeLayout(frameIn, props) {
+function slopeLayout(frameIn, props) {
   const frame = probe(frameIn);
   const { series, categories } = seriesOf(props, 1, 12);
   if (categories.length < 2 || categories.length > 4) throw new Error("Slope chart takes two to four periods");
@@ -41,7 +41,7 @@ export function slopeLayout(frameIn, props) {
   const bounds = numericBounds(series.flatMap((sr) => sr.values), { min: props.yMin, max: props.yMax, axis: "y", tight: true });
   return { series, categories, plot, bounds, labelWidth, height: aspectHeight(frame, plot) };
 }
-export function slopeChart({ id, frame, props }) {
+function slopeChart({ id, frame, props }) {
   const { series, categories, plot, bounds } = slopeLayout(frame, props);
   const xAt = (i) => plot.x + plot.width * i / (categories.length - 1);
   const yAt = (v) => plot.y + plot.height - (v - bounds.min) / bounds.span * plot.height;
@@ -76,7 +76,7 @@ export function slopeChart({ id, frame, props }) {
 /* ---------------------------------------------------------- lollipop */
 // A ranked single series as thin stems with a dot at the value: the bar
 // chart's quieter cousin for many categories.
-export function lollipopLayout(frameIn, props) {
+function lollipopLayout(frameIn, props) {
   const frame = probe(frameIn);
   const { series, categories } = seriesOf(props, 1, 1);
   const labelWidth = Math.min(200, Math.max(72, ...categories.map((c) => Math.ceil(measure(c, 200).width) + 12)));
@@ -86,7 +86,7 @@ export function lollipopLayout(frameIn, props) {
   const rowHeight = Math.min(72, (plot.height + 24) / categories.length);
   return { series, categories, plot, bounds, labelWidth, rowHeight, height: rowsHeight(frame, plot, categories.length) };
 }
-export function lollipopChart({ id, frame, props }) {
+function lollipopChart({ id, frame, props }) {
   const { series, categories, plot, bounds, labelWidth, rowHeight } = lollipopLayout(frame, props);
   const xAt = (v) => plot.x + (v - bounds.min) / bounds.span * plot.width;
   const zero = xAt(Math.max(bounds.min, Math.min(0, bounds.max)));
@@ -151,7 +151,7 @@ export function bulletLayout(frameIn, props) {
   const rowHeight = Math.min(96, (plot.height + 24) / categories.length);
   return { series, categories, targets, ranges, plot, bounds, labelWidth, rowHeight, height: rowsHeight(frame, plot, categories.length) };
 }
-export function bulletChart({ id, frame, props }) {
+function bulletChart({ id, frame, props }) {
   const { series, categories, targets, ranges, plot, bounds, labelWidth, rowHeight } = bulletLayout(frame, props);
   const xAt = (v) => plot.x + (v - bounds.min) / bounds.span * plot.width;
   const nodes = [];
@@ -207,7 +207,7 @@ function squarify(items, frame) {
   }
   return rects;
 }
-export function treemapLayout(frameIn, props) {
+function treemapLayout(frameIn, props) {
   const frame = probe(frameIn);
   const items = (props.items || []).map((it) => ({ label: it?.label, value: Number(it?.value) }));
   if (items.length < 2 || items.length > 20 || items.some((it) => typeof it.label !== "string" || !it.label.trim() || !(it.value > 0))) throw new Error("Treemap takes two to twenty items with a label and a positive value");
@@ -216,7 +216,7 @@ export function treemapLayout(frameIn, props) {
   const body = { x: plot.x, y: plot.y, width: plot.width, height: plot.height + 40 };
   return { items: sorted, plot, body, rects: squarify(sorted, body), height: aspectHeight(frame, plot) };
 }
-export function treemapChart({ id, frame, props, tokens = TOKENS }) {
+function treemapChart({ id, frame, props, tokens = TOKENS }) {
   const { items, rects } = treemapLayout(frame, props);
   const total = items.reduce((s, it) => s + it.value, 0);
   const hasFocus = items.some(item => highlighted(props, item.label));
@@ -242,7 +242,7 @@ export function treemapChart({ id, frame, props, tokens = TOKENS }) {
 /* ------------------------------------------------------------- radar */
 // Three to eight axes from a centre, one polygon per series; the focus
 // series filled, comparators outlined.
-export function radarLayout(frameIn, props) {
+function radarLayout(frameIn, props) {
   const frame = probe(frameIn);
   const { series, categories } = seriesOf(props, 1, 4);
   if (categories.length < 3 || categories.length > 8) throw new Error("Radar chart takes three to eight axes");
@@ -251,7 +251,7 @@ export function radarLayout(frameIn, props) {
   const max = props.max ?? Math.max(...series.flatMap((s) => s.values));
   return { series, categories, plot, radius, max, centre: { x: plot.x + plot.width / 2, y: plot.y + plot.height / 2 }, height: aspectHeight(frame, plot) };
 }
-export function radarChart({ id, frame, props }) {
+function radarChart({ id, frame, props }) {
   const { series, categories, plot, radius, max, centre } = radarLayout(frame, props);
   const angle = (i) => -Math.PI / 2 + 2 * Math.PI * i / categories.length;
   const at = (i, r) => ({ x: centre.x + r * Math.cos(angle(i)), y: centre.y + r * Math.sin(angle(i)) });
@@ -278,7 +278,7 @@ export function radarChart({ id, frame, props }) {
 
 /* ---------------------------------------------------------- box plot */
 // Distributions per category: `boxes: [{ min, q1, median, q3, max }]`.
-export function boxPlotLayout(frameIn, props) {
+function boxPlotLayout(frameIn, props) {
   const frame = probe(frameIn);
   const categories = props.categories || [], boxes = props.boxes || [];
   if (!categories.length || boxes.length !== categories.length || boxes.some((b) => !b || ["min", "q1", "median", "q3", "max"].some((k) => !Number.isFinite(b[k])) || !(b.min <= b.q1 && b.q1 <= b.median && b.median <= b.q3 && b.q3 <= b.max))) throw new Error("Box plot requires one ordered { min, q1, median, q3, max } per category");
@@ -287,7 +287,7 @@ export function boxPlotLayout(frameIn, props) {
   const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: Math.max(labelWidth + 8, 54), valueLabelInset: 0, centerPlot: false });
   return { categories, boxes, bounds, labelWidth, plot, height: aspectHeight(frame, plot) };
 }
-export function boxPlotChart({ id, frame, props }) {
+function boxPlotChart({ id, frame, props }) {
   const { categories, boxes, bounds, labelWidth, plot } = boxPlotLayout(frame, props);
   const yAt = (v) => plot.y + plot.height - (v - bounds.min) / bounds.span * plot.height;
   const slot = plot.width / categories.length, boxW = Math.min(60, slot * 0.5);
@@ -308,7 +308,7 @@ export function boxPlotChart({ id, frame, props }) {
 /* ------------------------------------------------------ stacked area */
 // Cumulative areas from the baseline, full fills in series order, the last
 // category's segment values at the right.
-export function stackedAreaLayout(frameIn, props) {
+function stackedAreaLayout(frameIn, props) {
   const frame = probe(frameIn);
   const { series, categories } = seriesOf(props, 2, 6);
   if (series.some((s) => s.values.some((v) => v < 0))) throw new Error("Stacked area takes non-negative values");
@@ -318,7 +318,7 @@ export function stackedAreaLayout(frameIn, props) {
   const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: props.legend !== false ? legendRowsFor(series.map((s) => s.name), frame) : false, leftInset: Math.max(labelWidth + 8, 54), valueLabelInset: 70, centerPlot: false });
   return { series, categories, totals, bounds, labelWidth, plot, height: aspectHeight(frame, plot) };
 }
-export function stackedAreaChart({ id, frame, props }) {
+function stackedAreaChart({ id, frame, props }) {
   const { series, categories, bounds, labelWidth, plot } = stackedAreaLayout(frame, props);
   const xAt = (i) => plot.x + plot.width * i / Math.max(1, categories.length - 1);
   const yAt = (v) => plot.y + plot.height - (v - bounds.min) / bounds.span * plot.height;
@@ -346,7 +346,7 @@ export function stackedAreaChart({ id, frame, props }) {
 /* --------------------------------------------------------- sparklines */
 // A grid of small lines, one per item, each with its label and last value:
 // the scenario matrix and the KPI dashboard row.
-export function sparklinesLayout(frameIn, props) {
+function sparklinesLayout(frameIn, props) {
   const frame = probe(frameIn);
   const items = props.items || [];
   if (items.length < 2 || items.length > 12 || items.some((it) => typeof it?.label !== "string" || !it.label.trim() || !Array.isArray(it.values) || it.values.length < 2 || it.values.some((v) => !Number.isFinite(v)))) throw new Error("Sparklines take two to twelve items with a label and at least two values");
@@ -356,7 +356,7 @@ export function sparklinesLayout(frameIn, props) {
   const cellW = plot.width / columns, cellH = Math.min(220, (plot.height + 40) / rows);
   return { items, columns, rows, plot, cellW, cellH, height: (plot.y - frame.y) + rows * Math.max(80, Math.min(220, Math.round(frame.width / columns * 0.55))) };
 }
-export function sparklinesChart({ id, frame, props }) {
+function sparklinesChart({ id, frame, props }) {
   const { items, columns, plot, cellW, cellH } = sparklinesLayout(frame, props);
   const nodes = [];
   const shared = props.sharedScale === true ? numericBounds(items.flatMap((it) => it.values), { axis: "y", tight: true }) : null;

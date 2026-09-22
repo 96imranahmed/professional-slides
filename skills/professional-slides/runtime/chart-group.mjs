@@ -2,7 +2,7 @@ import { linePrimitive, stableId, token } from "./core.mjs";
 import { legendNodes, LEGEND_TOKENS } from "./legends.mjs";
 import { CHART_GUIDANCE } from "./guidance.mjs";
 
-export function assertEquivalentComparisons(props) {
+function assertEquivalentComparisons(props) {
   if (!props.comparison) return;
   if (props.comparison.kind !== "matched" || typeof props.comparison.unit !== "string" || !props.comparison.unit.trim()) throw new Error("Matched comparison requires a shared unit");
   const charts = props.charts || [];
