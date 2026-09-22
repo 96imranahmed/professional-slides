@@ -211,7 +211,7 @@ class GateVocabularyTests(unittest.TestCase):
         mixed = {"componentInstances": [chart, process]}
         self.assertEqual(page_gates.page_architecture(mixed), "evidence-stack")
         prose = {"component": "bullet-list", "frame": process["frame"]}
-        self.assertEqual(page_gates.page_architecture({"componentInstances": [chart, prose]}), "evidence-over-commentary")
+        self.assertEqual(page_gates.page_architecture({"componentInstances": [chart, prose]}), "evidence-with-commentary")
         self.assertEqual(page_gates.page_architecture({"componentInstances": [process]}), "chevron-process")
 
     def test_multiple_exhibits_cannot_hide_detached_commentary(self):
@@ -220,7 +220,7 @@ class GateVocabularyTests(unittest.TestCase):
         prose = {"component": "paragraph", "frame": {"x": 60, "y": 490, "width": 1120, "height": 100}}
         diagram = {"component": "relationship-network", "frame": chart["frame"]}
         for evidence in ([chart], [chart, table], [diagram]):
-            self.assertEqual(page_gates.page_architecture({"componentInstances": [*evidence, prose]}), "evidence-over-commentary")
+            self.assertEqual(page_gates.page_architecture({"componentInstances": [*evidence, prose]}), "evidence-with-commentary")
         self.assertEqual(page_gates.page_architecture({"componentInstances": [chart, table]}), "paired-evidence")
         local = {"component": "paragraph", "frame": {"x": 150, "y": 220, "width": 200, "height": 70}}
         self.assertEqual(page_gates.page_architecture({"componentInstances": [diagram, local]}), "relationship-network")
@@ -241,6 +241,28 @@ class GateVocabularyTests(unittest.TestCase):
                          page_gates.page_architecture(slide("chart.line")))
         self.assertEqual(page_gates.page_architecture(slide("chart.bar")),
                             page_gates.page_architecture(slide("table")))
+
+    def test_moving_detached_prose_cannot_invent_variety(self):
+        chart = {"component": "chart.bar", "frame": {"x": 60, "y": 140, "width": 700, "height": 320}}
+        def page(x, y, w, h):
+            return {"componentInstances": [chart, {"component": "paragraph", "frame": {"x": x, "y": y, "width": w, "height": h}}]}
+        side, below, local = page(800, 140, 350, 320), page(60, 490, 1100, 100), page(200, 220, 200, 80)
+        self.assertEqual(page_gates.page_architecture(side), page_gates.page_architecture(below))
+        self.assertNotEqual(page_gates.page_architecture(side), page_gates.page_architecture(local))
+        slides = [side, below, local] * 6
+        findings = []
+        page_gates.gate_page_shape_flat(slides, list(range(18)), findings, "balanced")
+        self.assertTrue(any(f["code"] == "PAGE_SHAPE_FLAT" for f in findings))
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {architecture} from './skills/professional-slides/runtime/gates/plan_gates.mjs';
+for (const shape of ['exhibit-left','exhibit-right','exhibit-top','evidence-with-side-commentary','evidence-over-commentary','chart-two-col']) {
+ assert.equal(architecture({architecture:shape}), 'evidence-with-commentary');
+}
+assert.notEqual(architecture({architecture:'paired-evidence'}),'evidence-with-commentary');
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result['ok'])
 
     def test_commentary_count_and_insight_do_not_invent_architectures(self):
         def slide(count, cards=False, insight=False):

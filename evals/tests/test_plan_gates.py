@@ -228,7 +228,7 @@ class PlanGateTests(unittest.TestCase):
         kinds = ["chart.column", "table", "chart.bar", "cards", "chart.line", "table",
                  "steps", "chart.waterfall", "chart.lollipop", "timeline",
                  "chart.dumbbell", "table", "chart.marimekko", "chart.slope"]
-        bare = [page(i + 1, exhibit=k, architecture=["exhibit-left", "exhibit-top", "two-up",
+        bare = [page(i + 1, exhibit=k, architecture="reconciliation" if k == "chart.waterfall" else ["exhibit-left", "exhibit-top", "two-up",
                      "hero-number", "exhibit-full", "text"][i % 6], insight="filled",
                      anchors=["photo:a"] if i == 3 else ["target"])
                 for i, k in enumerate(kinds)]

@@ -2303,9 +2303,9 @@ def page_architecture(slide):
             return "hero-number-with-evidence"
         if any((box(c)[0] >= x + w - 4 or box(c)[0] + box(c)[2] <= x + 4)
                and box(c)[1] < y + h and box(c)[1] + box(c)[3] > y for c in comments):
-            return "evidence-with-side-commentary"
+            return "evidence-with-commentary"
         if any(box(c)[1] >= y + h - 4 for c in comments):
-            return "evidence-over-commentary"
+            return "evidence-with-commentary"
     if len(evidence) == 1:
         if evidence[0].get("component") in diagram_components:
             return evidence[0]["component"]
@@ -2427,7 +2427,7 @@ def gate_page_shape_flat(slides, content_indexes, findings, fill):
     constrained = [i + 1 for i in content_indexes if shape_constrained(slides[i])]
     remedy = (
         "The same evidence relationship dominates the deck. Two or three commentary columns, "
-        "cards versus prose, and an optional insight strip count as one architecture. "
+        "cards versus prose, lateral versus lower prose, and an optional insight strip count as one architecture. "
         "Return to slide design: consider paired evidence on a shared basis, aligned small multiples, "
         "a reconciled bridge, a metric with its proof, a sequence or an integrated comparison. "
         "Select from the actual argument and reference examples; adding boxes, mirroring panels "

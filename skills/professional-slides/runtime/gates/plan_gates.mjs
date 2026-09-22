@@ -110,8 +110,8 @@ const isIcon = (anchor) => {
 export function architecture(page) {
   if (page.kind && page.kind !== "content") return null;
   const shape = String(page.architecture || page.layout || `auto:${family(page)}`);
-  if (["exhibit-left", "exhibit-right"].includes(shape)) return "evidence-with-side-commentary";
-  if (shape === "exhibit-top" || /^(?:chart|table)[- /].*(?:two|three|2|3)[- ]col/i.test(shape)) return "evidence-over-commentary";
+  if (["exhibit-left", "exhibit-right", "exhibit-top", "evidence-with-side-commentary", "evidence-over-commentary"].includes(shape)
+      || /^(?:chart|table)[- /].*(?:two|three|2|3)[- ]col/i.test(shape)) return "evidence-with-commentary";
   if (["two-up", "two-up-contrast", "split-tone"].includes(shape)) return "paired-evidence";
   return shape;
 }

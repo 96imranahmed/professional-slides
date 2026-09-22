@@ -50,7 +50,7 @@ console.log(JSON.stringify({accepted:true}));
             if k=='chart.bar':blocks.append({'component':'bullet-list','frame':{'x':820,'y':160,'width':400,'height':420}})
             return {'componentInstances':blocks}
         repertoire=[page(k) for k in ['chart.bar','table','image-frame','steps']]
-        self.assertEqual('evidence-with-side-commentary',page_gates.page_architecture(repertoire[0]))
+        self.assertEqual('evidence-with-commentary',page_gates.page_architecture(repertoire[0]))
         for count in [12,48]:
             slides=(repertoire*12)[:count];findings=[]
             page_gates.gate_page_shape_flat(slides,list(range(count)),findings,'balanced')
