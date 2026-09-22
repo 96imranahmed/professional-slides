@@ -8,7 +8,7 @@ Name what each mark, row, panel and arrow represents. Count the actual observati
 
 - Magnitudes, distributions and change use supported chart encodings; exact lookup across mixed fields can use a table, even with only two columns.
 - Shared entities across several measures can use common rows, scales or linked annotations rather than detached exhibits.
-- A mechanism needs an actual input/output, dependency, constraint or failure path. Chevrons alone do not explain it.
+- A mechanism needs an actual input/output, dependency, constraint or failure path. Attach conditions to the stream, step or state they govern. A separate train of generic approval verbs adds no proof when the same boundaries are already visible. Combine overview and local bottleneck on a keyed route before explaining that bottleneck again elsewhere.
 - Independent alternatives are peers; an ordered route is a sequence; unequal durations require a quantitative time axis. An accumulation keeps earlier stages' contributions and is different from ordinary sequence.
 - A joined scenario exposes interacting constraints. Do not distribute its premises across separate generic charts when their interaction is the finding.
 - Qualitative evidence can be a visible specimen, annotated example or named choice/consequence comparison. Never invent numerical axes to make preference look measured.

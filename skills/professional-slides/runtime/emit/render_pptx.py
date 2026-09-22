@@ -52,6 +52,10 @@ def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False) -> d
             files.append(str(target))
         files.sort(key=lambda s: int(Path(s).stem.split("-")[1]))
     result = {"pptx": str(pptx), "pdf": str(saved_pdf), "renders": files, "dpi": dpi, "renderer": "libreoffice"}
+    from pypdf import PdfReader
+    text_path = out_dir / "page-text.json"
+    text_path.write_text(json.dumps([page.extract_text() or "" for page in PdfReader(saved_pdf).pages], ensure_ascii=False))
+    result["pageText"] = str(text_path)
     if montage and files:
         from PIL import Image
         thumbs = [Image.open(f) for f in files]

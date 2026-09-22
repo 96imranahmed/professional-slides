@@ -429,9 +429,8 @@ function assertChartTitleCopy(props = {}) {
     }
   }
 }
-// A chart heading is two lines: the measure in semibold, then the unit and
-// period in grey compact type ("$B, annual run rate"). Both sit inside the
-// heading band, so a peer panel's rule lines up with this one (row rule).
+// Chart headings default to measure plus inline unit in one ruled band.
+// Explicit legacy layouts may stack the unit; peers reserve a shared band.
 function chartTitleLayout(frame, props) {
   const variant = resolveChartTitleVariant(props);
   // The house style `band` sets the heading in white on a filled grey band with

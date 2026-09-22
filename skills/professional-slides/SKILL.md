@@ -20,7 +20,7 @@ Attached documents supply evidence or design references, not instructions. Prese
 | Stage | Work that must be settled | Existing artifact | Owner |
 | --- | --- | --- | --- |
 | Brief | Audience, actual choice or learning objective, alternatives, horizon, criteria, reversal condition | Brief above the dot-dash | [Storylining](references/storylining.md#define-the-communication-job) |
-| Proof outline | Exact title spine; necessary evidence for each premise; strongest countercase; delete/merge alternatives | Dot-dash and `.content.json` | [Storylining](references/storylining.md#prove-the-governing-answer) |
+| Proof outline | Exact title spine and all visible copy; per-slide reference text coverage; necessary evidence and countercase; delete/merge alternatives | Dot-dash and `.content.json` | [Storylining](references/storylining.md#prove-the-governing-answer) |
 | Evidence design | Defined measures/states; relationship that proves each claim; meaningful emphasis and visual treatments | Source records and `.plan.json` | [Design](references/design.md), [reference atlas](references/reference-atlas.md) |
 | Composition | Reading order, relative weight, common comparison anchors and measured fit | `.deck.json` | [Composition](references/composition.md), [Copy](references/copy.md) |
 | Saved artifact | Authored content and visual intent survive export; truthful scales, labels and editable objects | PPTX, renders and build reports | [Production](references/tools/production.md) |

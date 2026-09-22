@@ -268,7 +268,7 @@ export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showV
       nodes.push(textPrimitive({
         id: stableId(id, "axis-label", index),
         role: "axis-label",
-        data: { axis: "y" },
+        data: { axis: "y", value: yMin + (yMax - yMin) * index / steps },
         frame: { x: plot.x - labelWidth - 8, y: y - 12, width: labelWidth, height: 24 },
         // Labels describe the actual tick, not a rounded neighbouring value.
         text: axisTickText(yMin, yMax, index, steps),
@@ -301,6 +301,7 @@ function horizontalAxes(id, plot, xMin, xMax, steps = 4, { gridlines = false, sh
       }));
       nodes.push(textPrimitive({
         id: stableId(id, "axis-label", index), role: "axis-label",
+        data: { axis: "x", value: xMin + (xMax - xMin) * index / steps },
         frame: { x: x - 28, y: plot.y + plot.height + 8, width: 56, height: 24 },
         text: String(Number((xMin + (xMax - xMin) * index / steps).toPrecision(6))),
         style: textStyle(AXIS_LABEL, SECONDARY, false, "center")

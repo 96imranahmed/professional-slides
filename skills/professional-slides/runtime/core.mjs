@@ -802,6 +802,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   const showValueAxis = renderedNodes
     ? renderedNodes.some(node => node.role === "axis-label")
     : props.showValueAxis ?? (props.gridlines === true || !dataLabels);
+  const ticks = (renderedNodes || []).filter(node => node.role === "axis-label" && Number.isFinite(node.data?.value)).map(node => node.data.value).sort((a,b)=>a-b);
   return {
     labelBold,
     type,
@@ -817,8 +818,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     ...(type === "range" ? { low: [...(props.low || [])], high: [...(props.high || [])] } : {}),
     ...(Array.isArray(props.points) ? { points: props.points.map(p => ({ ...p })) } : {}),
     unit: props.unit ?? null,
-    yMin: props.yMin ?? (["bar", "column", "stacked-bar", "stacked-column"].includes(type) && series.every(item => item.values.every(value => value >= 0)) ? 0 : null),
-    yMax: props.yMax ?? null,
+    yMin: ticks.length ? ticks[0] : props.yMin ?? (["bar", "column", "stacked-bar", "stacked-column"].includes(type) && series.every(item => item.values.every(value => value >= 0)) ? 0 : null),
+    yMax: ticks.length ? ticks.at(-1) : props.yMax ?? null,
+    ...(ticks.length>1 ? {yMajorUnit:ticks[1]-ticks[0]} : {}),
     dataLabels,
     showValueAxis,
     legend: props.legend === true || (series.length > 1 && props.legend !== false && !(type === "line" && props.endLabels !== false) && type !== "range"),
@@ -997,6 +999,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
     assertStyleProvenance(nodes);
     assertSceneBounds(nodes);
     const compiled = { id: slideId, notes: slideSpec.notes || "", nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+    if (slideSpec.sourceSlideId) compiled.sourceSlideId = slideSpec.sourceSlideId;
     slideCache?.set(cacheKey,structuredClone(compiled));
     return compiled;
     });

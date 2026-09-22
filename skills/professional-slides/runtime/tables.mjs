@@ -1016,7 +1016,8 @@ function renderTableAt({ id, frame, props }) {
   // Row-level fills (accented, total, group) are one continuous band so the
   // row reads as a band rather than a run of tinted cells with slits between.
   m.cells.forEach((row, r) => {
-    const band = rowBand(m.rows[r].style ?? props.rowStyle);
+    const band = props.treatment === "categories" && (m.rows[r].style ?? props.rowStyle) === "total"
+      ? t("color.surfaceMuted") : rowBand(m.rows[r].style ?? props.rowStyle);
     if (!band) return;
     nodes.push(rectPrimitive({ id: stableId(id, "row-band", r), role: "table-row-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(band), data: { row: r, rowStyle: m.rows[r].style ?? props.rowStyle } }));
   });
@@ -1097,7 +1098,8 @@ function renderTableAt({ id, frame, props }) {
           labelDisplay: cell.labelDisplay,
           numberDisplay: cell.numberDisplay,
         };
-      const band = rowBand(m.rows[r].style ?? props.rowStyle);
+      const categoryTotal = props.treatment === "categories" && (m.rows[r].style ?? props.rowStyle) === "total";
+      const band = categoryTotal ? t("color.surfaceMuted") : rowBand(m.rows[r].style ?? props.rowStyle);
       let fill = null;
       if (cell.type === "category" && categorySurface(cell, props) === "primary")
         fill = primary;
@@ -1115,6 +1117,7 @@ function renderTableAt({ id, frame, props }) {
           );
         fill = t("color.componentPrimaryTint");
       }
+      if (categoryTotal) fill = c === 0 ? t("color.accent") : null;
       if (fill)
         nodes.push(
           rectPrimitive({

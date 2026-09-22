@@ -113,14 +113,14 @@ class StageWiringTests(unittest.TestCase):
 class ExampleContentPlanTests(unittest.TestCase):
     """The worked example is a real deck, not a fixture."""
 
-    def test_the_example_content_plan_passes_its_own_gate(self):
+    def test_historical_example_content_plans_pass_explicit_legacy_audit(self):
         plans = sorted(EXAMPLES.glob("*.content.json"))
         self.assertTrue(plans, "at least one example deck carries its content stage")
         for plan in plans:
             with self.subTest(plan=plan.name):
                 out = subprocess.run(
                     [NODE, str(ROOT / "skills" / "professional-slides" / "runtime" / "gates" / "content_gates.mjs"),
-                     str(plan), "--json"], cwd=ROOT, capture_output=True, text=True)
+                     str(plan), "--json", "--legacy"], cwd=ROOT, capture_output=True, text=True)
                 self.assertEqual(out.returncode, 0, out.stdout[-600:])
                 report = json.loads(out.stdout)
                 self.assertTrue(report["accepted"])

@@ -17,7 +17,8 @@
  * like choosing the content, and nothing noticed that it had not been chosen.
  *
  * So the content file may not name a component, an architecture or a variant.
- * There is nowhere to put one. A page here is four things:
+ * There is nowhere to put one. A page makes four analytical decisions,
+ * then records complete visible copy and a matched-reference text comparison:
  *
  *   claim      the sentence this page proves
  *   settles    what settles it, and what KIND of thing that is
@@ -35,9 +36,14 @@
  * Exit 0 when the content passes, 2 when it has findings, 1 on a crash.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { checkTextPlan } from "../text-contract.mjs";
 
 export const CONTENT_CODES = Object.freeze({
   CONTENT_SCHEMA: "the content file is not a readable record of what the deck says",
+  TEXT_PLAN_INCOMPLETE: "the dot-dash does not list all visible copy",
+  TEXT_REFERENCE_MISSING: "per-page reference text comparison is missing",
+  TEXT_COVERAGE_LOW: "planned text is below comparable reference coverage",
+  TEXT_COVERAGE_EXCEPTION: "shorter copy needs specific editorial validation",
   CONTENT_NO_CLAIM: "a page names a topic instead of proving something",
   CONTENT_UNMEASURED: "many pages declare qualitative evidence; check its specificity",
   CONTENT_ADDS_NOTHING: "the commentary is planned as a second reading of the exhibit",
@@ -142,7 +148,7 @@ const finding = (page, code, measured, threshold, repair) => {
 
 const round = (n) => Math.round(n * 1000) / 1000;
 
-export function runContentGates(content) {
+export function runContentGates(content, options = {}) {
   const findings = [];
   if (!content || typeof content !== "object" || !Array.isArray(content.pages)) {
     findings.push(finding(null, "CONTENT_SCHEMA", "absent", "professional-slides.content/v1",
@@ -151,9 +157,12 @@ export function runContentGates(content) {
     return report(content, findings, []);
   }
   const pages = content.pages;
+  const textCheck = checkTextPlan(content, options);
+  findings.push(...textCheck.findings);
 
   for (const page of pages) {
     const at = page.n ?? null;
+    if (page.role === "structural") continue; // still subject to complete-copy/reference checks
     const leaked = LAYOUT_FIELDS.filter((f) => page[f] !== undefined);
     if (leaked.length) {
       findings.push(finding(at, "CONTENT_LAYOUT_LEAK", leaked, "none of " + LAYOUT_FIELDS.join(", "),
@@ -278,7 +287,7 @@ export function runContentGates(content) {
     }
   }
 
-  return report(content, findings, pages);
+  return {...report(content, findings, pages), textCoverage: textCheck};
 }
 
 function report(content, findings, pages) {
@@ -293,10 +302,10 @@ function report(content, findings, pages) {
     const n = findings.filter((f) => f.code === code).length;
     if (n) counts[code] = n;
   }
-  const reported = findings.map(f => ({...f, severity:
+  const reported = findings.map(f => ({...f, severity: f.severity ?? (
     ["CONTENT_NO_HIGHLIGHT", "CONTENT_UNMEASURED"].includes(f.code)
       || (f.code === "CONTENT_ANSWER_UNCARRIED" && f.measured?.coverage !== undefined)
-      ? "advisory" : "blocking"}));
+      ? "advisory" : "blocking")}));
   return {
     schema: "professional-slides.content-gates/v1",
     id: content?.id ?? null,
@@ -324,7 +333,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^.*\//,
     console.error("usage: content_gates.mjs deck.content.json [--report out.json] [--json]");
     process.exit(1);
   }
-  const result = runContentGates(JSON.parse(readFileSync(path, "utf8")));
+  const result = runContentGates(JSON.parse(readFileSync(path, "utf8")), {required: !args.includes("--legacy")});
   const reportAt = args[args.indexOf("--report") + 1];
   if (args.includes("--report") && reportAt) writeFileSync(reportAt, JSON.stringify(result, null, 2));
   if (args.includes("--json")) console.log(JSON.stringify(result, null, 2));

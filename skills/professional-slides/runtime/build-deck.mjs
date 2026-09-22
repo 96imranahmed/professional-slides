@@ -20,6 +20,7 @@ import { assertOutputDirectory } from "./output-path.mjs";
 import { auditContent } from "./content-audit.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
 import { runPlanGates } from "./gates/plan_gates.mjs";
+import { auditTextPlan, auditExportText } from "./text-contract.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,11 +28,11 @@ const runtime = path.dirname(fileURLToPath(import.meta.url));
 // carry partial plans; they still transfer semantic fields by stable ID only.
 export function validateStageContract(spec, stages) {
   if (spec.workflow !== "new_deck") return;
-  const pages = [...spec.slides, ...(spec.appendix || [])];
+  const pages = [...(spec.cover ? [{...spec.cover,id:"cover",kind:"cover"}] : []), ...spec.slides, ...(spec.appendix || [])];
   if (pages.some(s => !s.id) || new Set(pages.map(s => s.id)).size !== pages.length)
     throw new Error("New decks require unique stable slide ids before composition");
   for (const stage of ["content", "plan"]) {
-    const expected = stage === "content" ? spec.slides.filter(s => !s.kind || s.kind === "content") : pages;
+    const expected = stage === "content" && stages.content?.textContract !== "complete" ? spec.slides.filter(s => !s.kind || s.kind === "content") : pages;
     const records = stages[stage]?.pages || [];
     const byId = new Map(records.map(r => [r.id, r]));
     if (records.some(r => !r.id) || byId.size !== records.length
@@ -86,7 +87,9 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     const raw = await fs.readFile(at, "utf8").catch(() => null);
     if (raw === null && spec.workflow === "new_deck") throw new Error(`New decks require ${at} before composition`);
     if (raw === null) { result.stages[stage] = { state: "absent", expectedAt: at }; continue; }
-    const report = run(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+    if (stage === "content" && spec.workflow === "new_deck") parsed.textContract = "complete";
+    const report = run(parsed, {required:stage === "content" && spec.workflow === "new_deck"});
     const reportAt = path.join(directory, `${stage}-gates.json`);
     await fs.writeFile(reportAt, JSON.stringify(report, null, 2) + "\n");
     result.stages[stage] = { state: report.accepted ? "accepted" : "rejected", report: reportAt,
@@ -95,7 +98,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       throw new Error(`${stage} gates rejected ${path.basename(at)}: `
         + `${JSON.stringify(report.countsByCode)}. See ${reportAt}.`);
     }
-    stages[stage] = JSON.parse(raw);
+    stages[stage] = parsed;
   }
   validateStageContract(spec, stages);
 
@@ -106,7 +109,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // reached nothing. A page that does not name its own highlight takes the one
   // its content plan named, matched by stable ID so insertions cannot move emphasis to another slide.
   if (stages.content?.pages?.length) {
-    const byId = new Map([...spec.slides, ...(spec.appendix || [])].filter(s => s.id).map(s => [s.id, s]));
+    const byId = new Map([...(spec.cover ? [{...spec.cover,id:"cover",kind:"cover"}] : []), ...spec.slides, ...(spec.appendix || [])].filter(s => s.id).map(s => [s.id, s]));
     const seen = new Set();
     for (const page of stages.content.pages) {
       if (!page.id) continue; // Legacy plans are audited but never transferred by position.
@@ -121,6 +124,9 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   const deckPlan = toDeckPlan(spec, baseDir);
   const { deck, decisions } = planDeck(deckPlan);
   const contentAudit = auditContent(spec, deck);
+  const textAudit = auditTextPlan(stages.content || {}, deck);
+  await fs.writeFile(path.join(directory, "text-coverage.json"), JSON.stringify(textAudit, null, 2) + "\n");
+  if (!textAudit.accepted) throw new Error(`Composition changed the dot-dash text: ${JSON.stringify(textAudit.findings)}`);
   await fs.writeFile(path.join(directory, "content-audit.json"), JSON.stringify(contentAudit, null, 2) + "\n");
   if (!contentAudit.accepted) throw new Error(`Composition lost authored content or visual intent: ${JSON.stringify(contentAudit.findings)}`);
   const scenePath = path.join(directory, "scene.json");
@@ -162,6 +168,8 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     const renderDirectory = path.join(directory, "rendered");
     const rendered = await runProcess(python, [path.join(runtime, "emit", "render_pptx.py"), pptxPath, renderDirectory, "--montage"], { timeoutMs });
     result.render = lastJson(rendered.stdout);
+    result.textCoverage = auditExportText(stages.content || {}, deck, await readJson(result.render.pageText));
+    await fs.writeFile(path.join(directory, "rendered-text-coverage.json"), JSON.stringify(result.textCoverage, null, 2) + "\n");
     result.renderDirectory = renderDirectory;
     result.montagePath = result.render?.montage;
     result.timings.renderMs = Date.now() - t3;
@@ -187,7 +195,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       plannedShortfalls: (result.preflight?.countsByCode || {}).THIN_PLAN || 0,
     };
   }
-  const readbackOk = result.readback?.accepted === true;
+  const readbackOk = result.readback?.accepted === true && result.textCoverage?.accepted !== false;
   result.status = result.preflight.passed && readbackOk
     ? (result.gates?.passed === true ? "built" : render ? "built-with-findings" : "built-unrendered")
     : "built-with-findings";
@@ -201,7 +209,7 @@ async function readJson(file) { try { return JSON.parse(await fs.readFile(file, 
 // beside its build is the author's.
 export const BUILD_REPORTS = Object.freeze([
   "scene.json", "planning.json", "preflight-gates.json", "content-audit.json",
-  "readback.json", "gates.json", "build-result.json",
+  "readback.json", "gates.json", "build-result.json", "text-coverage.json", "rendered-text-coverage.json",
 ]);
 
 async function clearReports(directory) {

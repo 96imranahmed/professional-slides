@@ -32,7 +32,9 @@ Summary theme headings state substantive conclusions - "Career and industry", no
 
 ## Body copy
 
-Keep body copy within 100 words on an exhibit page and 140 on a text page. The title and exhibit may complete the page's argument without a separate closing sentence. Add a consequence only when it advances that argument, and keep qualifications beside the claims they limit.
+Develop enough text for the reader to understand the evidence, reasoning, material qualifications and decision consequence without narration. Do not impose a universal word ceiling: a decision pre-read often needs developed paragraphs or lead-and-body rows alongside its exhibit. Short labels and an action title cannot substitute for an explanation of why the result matters or when it holds. Compare substantive text coverage with strong reference pages serving the same reading task. Fit the composition to necessary copy at readable type, then remove redundancy; do not abbreviate away the reasoning to preserve an oversized visual or whitespace.
+
+The title and exhibit may complete a simple page's argument without a separate closing sentence. Add a consequence only when it advances that argument, and keep qualifications beside the claims they limit. Text volume is not a quota: definitions, repeated headlines and generic advice do not make a thin argument more complete.
 
 Use plain words, short sentences and explicit uncertainty, in complete sentences with the connective words the reasoning needs.
 

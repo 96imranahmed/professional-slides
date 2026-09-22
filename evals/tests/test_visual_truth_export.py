@@ -9,6 +9,7 @@ from node_probe import ROOT, run_node
 
 sys.path.insert(0, str(ROOT / 'skills/professional-slides/runtime/emit'))
 from emit_pptx import Emitter
+from readback_pptx import readback
 
 
 class VisualTruthExportTests(unittest.TestCase):
@@ -22,7 +23,8 @@ const slides=[
  {id:'dates',title:'A 20-day interval occupies twice the width of a 10-day interval',exhibit:{type:'timeline',variant:'dated-lanes',axis:{kind:'date',precision:'day',scale:'elapsed-days',domain:['2026-01-01','2026-02-01']},lanes:[{id:'board',label:'Board'}],events:[{id:'a',laneId:'board',date:'2026-01-01',label:'First'},{id:'b',laneId:'board',date:'2026-01-11',label:'Second'},{id:'c',laneId:'board',date:'2026-01-31',label:'Third'}]}},
  {id:'nested',title:'Capacity and event classes retain their distinct visual roles',arrange:'row',exhibits:[
   {type:'chart.bar',heading:'Available capacity',unit:'seats',categories:['A','B'],series:[{name:'Seats',values:[24,28]}],referenceLines:[{value:32,label:'Room limit'}]},
-  {type:'table',columns:[{label:'Class',type:'category'},'Meaning'],rows:[['Assignment','Given access'],['Outcome','Completed service']]}]}
+  {type:'table',columns:[{label:'Class',type:'category'},'Meaning'],rows:[['Assignment','Given access'],['Outcome','Completed service']]}]},
+ {id:'native-axis',title:'Stored supply declines across equal daily intervals',exhibit:{type:'chart.line',heading:'Remaining storage',unit:'ML',categories:['Day 0','Day 1','Day 2'],series:[{name:'Storage',values:[42,36,30]}],showValueAxis:true,dataLabels:false,endLabels:false,yMin:0,yMax:50}}
 ];
 console.log(JSON.stringify(planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'truth',slides})).deck));
 """)
@@ -71,3 +73,18 @@ console.log(JSON.stringify(planDeck(toDeckPlan({schema:'professional-slides.deck
         for node in category_text:
             run = self.shape(2, node).text_frame.paragraphs[0].runs[0]
             self.assertEqual(str(run.font.color.rgb), 'FFFFFF')
+
+    def test_native_ticks_keep_the_composed_domain_and_step(self):
+        slide = self.scene['slides'][3]
+        instance = next(c for c in slide['componentInstances'] if c.get('nativeChart'))
+        saved_chart = next(s.chart for s in self.saved.slides[3].shapes if getattr(s, 'has_chart', False))
+        self.assertEqual(saved_chart.value_axis.minimum_scale, 0)
+        self.assertEqual(saved_chart.value_axis.maximum_scale, 50)
+        self.assertEqual(saved_chart.value_axis.major_unit, 10)
+        self.assertEqual(instance['nativeChart']['yMajorUnit'], 10)
+        altered = Presentation(self.path)
+        chart = next(s.chart for s in altered.slides[3].shapes if getattr(s, 'has_chart', False))
+        chart.value_axis.major_unit = 5
+        bad = Path(self.tmp.name) / 'bad-axis.pptx'
+        altered.save(bad)
+        self.assertTrue(any(f['code'] == 'NATIVE_AXIS_DRIFT' for f in readback(self.scene, bad)['findings']))

@@ -117,6 +117,13 @@ def readback(scene: dict, pptx: Path, tol: float = 2.0) -> dict:
             actual = sum(len(list(p.series)) for p in sh.chart.plots)
             if actual != expected:
                 findings.append({"slide": si, "code": "SERIES_COUNT", "shape": name, "expected": expected, "actual": actual})
+            native_spec = ci["nativeChart"]
+            if native_spec.get("showValueAxis") and native_spec.get("type") not in ("pie", "donut", "scatter"):
+                for key, attr in (("yMin", "minimum_scale"), ("yMax", "maximum_scale"), ("yMajorUnit", "major_unit")):
+                    target = native_spec.get(key)
+                    actual_value = getattr(sh.chart.value_axis, attr)
+                    if target is not None and (actual_value is None or abs(actual_value - target) > 1e-8):
+                        findings.append({"slide": si, "code": "NATIVE_AXIS_DRIFT", "shape": name, "field": key, "expected": target, "actual": actual_value})
     return {"pptx": str(pptx), "accepted": not findings, "stats": stats, "findings": findings}
 
 

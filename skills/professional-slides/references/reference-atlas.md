@@ -11,7 +11,7 @@ Use this atlas during exhibit selection. The original schematics below explain r
 | Threshold / frontier | A real decision threshold or two meaningful variables; show switching point and feasible region. | Invented scores/axes, target hidden in commentary, one-variable sensitivity presented as a joint feasible case. |
 | Matched small multiples | Same entity order, denominator and physical scale; use parallel plots for a meaningful contrast. | Separate auto-scales that make equal values look unequal. |
 | Linked overview / detail | A keyed parent set and necessary decomposition, with explicit visual connection. | A second panel rereading the first. |
-| Constraint workflow | Actual stage inputs/outputs, actors, enabling conditions and failure boundaries. | Generic verbs in chevrons or independent alternatives disguised as stages. |
+| Constraint workflow | Actual stage inputs/outputs, actors, enabling conditions and failure boundaries. Attach conditions to the affected stream or transition, as in the illustrative 40 = 30 + 10 split below. | Generic verbs in chevrons or independent alternatives disguised as stages. |
 | Resource calendar | Shared time scale and competing lanes; distinguish trial and optional continuation. | Equal-width date labels for unequal elapsed time or a schedule with no resource collision to inspect. |
 | Decision branches | Selectable conditions leading to named actions; preserve sequential steps within each route. | Boxes saying to research an unknown condition, or actions made into sibling choices. |
 | Annotated specimen | Authorized/attributed visible evidence and precise feature-to-inference link. | Decorative image or a cover used to prove an entire publisher's style. |

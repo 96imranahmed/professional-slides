@@ -542,6 +542,8 @@ class Emitter:
                 vals = [v for s in spec.get("series", []) for v in (s.get("values") or []) if isinstance(v, (int, float))]
                 if vals and min(vals) >= 0 and max(vals) > 0:
                     va.maximum_scale = _nice_ceiling(max(vals) * LABEL_HEADROOM)
+            if spec.get("yMajorUnit") is not None:
+                va.major_unit = spec["yMajorUnit"]
             ca = chart.category_axis
             ca.tick_labels.font.size = Pt(10)
             if kind not in ("bar", "stacked-bar", "range"):

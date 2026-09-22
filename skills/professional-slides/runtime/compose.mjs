@@ -2696,7 +2696,9 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   };
   for (const raw of expanded) {
     const { sourceSlideId, ...page } = resolveReferences(raw);
-    slides.push(composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles));
+    const composed = composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles);
+    if (sourceSlideId) composed.sourceSlideId = sourceSlideId;
+    slides.push(composed);
     recent.splice(4);
     recentStyles.splice(9);
   }
