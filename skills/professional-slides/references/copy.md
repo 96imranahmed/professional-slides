@@ -90,7 +90,7 @@ Match the close to the stage established at intake:
 - **Authorization** - recommend the supported choice, its scope, resources and owner, with the strongest countercase and the condition that changes the decision.
 - **Explanation** - synthesize what the audience can now understand or apply, and the material limits.
 
-Separate what the audience decides now from later approvals, combine duplicate commitments, and keep the authority boundary and the decisive caveat visible. Instructions to the reader belong here, on the action page, rather than as captions on evidence pages.
+Separate what the audience decides now from later approvals, combine duplicate commitments, and keep the authority boundary and the decisive caveat visible. If the authorization already makes the vote concrete, join its final return instruction and recording requirements there instead of adding a second prose resolution. Keep exact trigger identities in the keyed register when they serve lookup. Instructions to the reader belong here, on the action page, rather than as captions on evidence pages.
 
 ## Copy QA
 

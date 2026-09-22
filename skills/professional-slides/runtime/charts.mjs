@@ -1684,9 +1684,10 @@ function normalizedQuadrants(quadrants, xBounds, yBounds) {
   if (!Number.isFinite(quadrants.y) || quadrants.y <= yBounds.min || quadrants.y >= yBounds.max) throw new Error("Scatter quadrant y threshold must sit inside the y bounds");
   const titles = quadrants.titles ?? {};
   if (!titles || typeof titles !== "object" || Array.isArray(titles) || Object.keys(titles).some(key => !SCATTER_QUADRANT_KEYS.includes(key)) || Object.values(titles).some(value => typeof value !== "string" || !value.trim())) throw new Error("Scatter quadrant titles must use non-empty named quadrant labels");
+  if (quadrants.xLabel !== undefined && (typeof quadrants.xLabel !== "string" || !quadrants.xLabel.trim())) throw new Error("Scatter x threshold label must be non-empty text");
   const focus = quadrants.focus ?? "topRight";
   if (style === "focus-tint" && !SCATTER_QUADRANT_KEYS.includes(focus)) throw new Error("Scatter focus quadrant must name a valid quadrant");
-  return { x: quadrants.x, y: quadrants.y, style, titles, focus };
+  return { x: quadrants.x, y: quadrants.y, style, titles, focus, xLabel: quadrants.xLabel };
 }
 
 function scatterQuadrantNodes({ id, plot, quadrants, xScale, yScale }) {
@@ -1744,13 +1745,22 @@ function scatter({ id, frame, props, bubble = false }) {
   if (declaredSeries && declaredSeries !== props.points.length) throw new Error("Scatter points must either all declare a series or all use the default series");
   const seriesNames = [...new Set(props.points.map(point => point.series).filter(value => typeof value === "string" && value.trim()))];
   const showLegend = props.legend !== false && (seriesNames.length > 1 || props.sizeLegend !== undefined);
-  const plot = chartFrame(frame, {
+  let plot = chartFrame(frame, {
     topInset: props.plotTopInset,
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail
   });
+  let thresholdLabelLayout = null;
+  if (props.quadrants?.xLabel !== undefined) {
+    if (typeof props.quadrants.xLabel !== "string" || !props.quadrants.xLabel.trim()) throw new Error("Scatter x threshold label must be non-empty text");
+    thresholdLabelLayout = measureText(props.quadrants.xLabel, Math.min(220, plot.width), { fontSize: tokenValue(CHART_ANNOTATION), bold: true });
+    const occupiedTop = showLegend || evidenceAnnotationTopBandCount({ annotations: props.annotations || [] }) || chartAnnotationBands({ changeAnnotations: props.changeAnnotations || [], annotationRail: props.annotationRail }).top;
+    const extra = occupiedTop ? thresholdLabelLayout.height + 6 : Math.max(0, thresholdLabelLayout.height + 6 - (plot.y - frame.y));
+    if (plot.height - extra < MIN_PLOT_HEIGHT) throw new Error("Scatter threshold label leaves insufficient plot height; enlarge the exhibit");
+    plot = { ...plot, y: plot.y + extra, height: plot.height - extra };
+  }
   const xBounds = numericBounds(props.points.map(point => point.x), { min: props.xMin, max: props.xMax, axis: "x" });
   const yBounds = numericBounds(withReferenceValues(props.points.map(point => point.y), props), { min: props.yMin, max: props.yMax, axis: "y" });
   const xScale = (value) => plot.x + (value - xBounds.min) / xBounds.span * plot.width;
@@ -1761,6 +1771,13 @@ function scatter({ id, frame, props, bubble = false }) {
     ...axes(id, plot, yBounds.min, yBounds.max, 4, { gridlines: props.gridlines === true }),
     ...scatterLegend({ id, frame, props, bubble, seriesNames })
   ];
+  if (thresholdLabelLayout) {
+    const width = Math.min(plot.width, Math.ceil(thresholdLabelLayout.width) + 2);
+    nodes.push(textPrimitive({ id: stableId(id, "x-threshold-label"), role: "chart-threshold-label",
+      frame: { x: Math.max(plot.x, Math.min(plot.x + plot.width - width, xScale(quadrants.x) - width / 2)), y: plot.y - thresholdLabelLayout.height - 6, width, height: thresholdLabelLayout.height },
+      text: quadrants.xLabel, style: { ...textStyle(CHART_ANNOTATION, INK, true, "center"), valign: "top" },
+      data: { thresholdAxis: "x", threshold: quadrants.x, textLayout: thresholdLabelLayout } }));
+  }
   // Both quantitative dimensions need a visible scale, even without point labels.
   for (let index = 0; index <= 4; index++) {
     const value = xBounds.min + xBounds.span * index / 4;

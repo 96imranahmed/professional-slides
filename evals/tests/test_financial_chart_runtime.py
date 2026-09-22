@@ -274,6 +274,33 @@ for(const width of [680,1000]) {
 console.log('{}');
 """)
 
+    def test_vertical_scatter_threshold_labels_preserve_coordinates_and_clear_legends(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const chart=REGISTRY.get('chart.scatter');
+const props={points:[{name:'First',x:1,y:2},{name:'Second',x:8,y:7}],xMin:0,xMax:10,yMin:0,yMax:10,quadrants:{x:5,y:5}};
+for(const width of [520,1000]) {
+ const frame={x:60,y:150,width,height:400};
+ const plain=chart.render({id:'s',frame,props}).nodes;
+ const named=chart.render({id:'s',frame,props:{...props,quadrants:{...props.quadrants,xLabel:'Required reserve 5'}}}).nodes;
+ assert.deepEqual(named.filter(n=>n.role==='chart-marker').map(n=>n.frame),plain.filter(n=>n.role==='chart-marker').map(n=>n.frame));
+ const label=named.find(n=>n.role==='chart-threshold-label'),line=named.find(n=>n.role==='chart-threshold-line'&&n.data.thresholdAxis==='x');
+ assert.equal(label.text,'Required reserve 5');assert.equal(label.data.threshold,5);
+ assert.ok(label.frame.y>=frame.y&&label.frame.y+label.frame.height<line.frame.y);
+ assert.ok(Math.abs(label.frame.x+label.frame.width/2-line.frame.x)<2);
+ const grouped=chart.render({id:'grouped',frame,props:{...props,points:props.points.map((p,i)=>({...p,series:'Series '+i})),quadrants:{...props.quadrants,xLabel:'Required reserve 5'}}}).nodes;
+ const q=grouped.find(n=>n.role==='chart-threshold-label');
+ for(const l of grouped.filter(n=>n.role==='legend-label')) assert.ok(q.frame.y>=l.frame.y+l.frame.height+2,'threshold label clears the legend');
+ for(const x of [.01,9.99]) {
+  const edge=chart.render({id:'edge',frame,props:{...props,quadrants:{x,y:5,xLabel:'Required reserve 5'}}}).nodes;
+  const e=edge.find(n=>n.role==='chart-threshold-label');assert.ok(e.frame.x>=frame.x&&e.frame.x+e.frame.width<=frame.x+width);
+ }
+}
+for(const xLabel of ['',42]) assert.throws(()=>chart.render({id:'bad',frame:{x:0,y:0,width:520,height:400},props:{...props,quadrants:{...props.quadrants,xLabel}}}),/threshold label/);
+console.log('{}');
+""")
+
     def test_scatter_quadrants_and_bubble_size_legend_are_theme_bound(self):
         result = run_node("""
 import assert from 'node:assert/strict';
