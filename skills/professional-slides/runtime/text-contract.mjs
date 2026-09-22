@@ -16,6 +16,8 @@ const roles = new Set(['title', 'body', 'exhibit', 'qualification', 'source', 'f
 const CONTRACT = JSON.parse(readFileSync(new URL('./weight.json', import.meta.url), 'utf8'));
 export const TEXT_FORM = CONTRACT.plan.textForm;
 export const normalizeText = value => String(value ?? '').normalize('NFKC').replace(/[\u00ad\u200b]/g, '').replace(/-\s*\r?\n\s*/g, '-').replace(/\s+/g, ' ').trim();
+// The reference counting rule's excluded lines (evals/corpus/build_reading_tasks.py).
+const NOTE_LINE = /^\s*(source|sources|note|notes|footnote)\b[:\s]/i;
 export const textWords = value => normalizeText(value).split(/\s+/).filter(Boolean).length;
 const resolvePages = (value, scene) => String(value).replace(/\{\{page:([^}]+)\}\}/g, (_, id) => {
   const numbers = scene.slides.flatMap((s,i)=>s.id===id || s.sourceSlideId===id ? [i+1] : []);
@@ -32,7 +34,11 @@ export function checkTextPlan(content, {required = false} = {}) {
     if (!Array.isArray(blocks) || !blocks.length || blocks.some(b=>!b.id || !roles.has(b.role) || typeof b.text !== 'string' || !b.text.trim()) || new Set(blocks.map(b=>b.id)).size !== blocks.length) {
       fail('TEXT_PLAN_INCOMPLETE','List every visible text block with a unique id, role and final wording.'); continue;
     }
-    const bodyWords = blocks.filter(b=>['body','exhibit','qualification'].includes(b.role)).reduce((n,b)=>n+textWords(b.text),0);
+    // Body words as the reference pages were counted: the reading-task bank
+    // drops any line opening with Source or Note, so a "Note: ..." block is not
+    // body here either. Counting it let every page clear its floor by the length
+    // of its note, which the rendered density profile then found short.
+    const bodyWords = blocks.filter(b=>['body','exhibit','qualification'].includes(b.role) && !NOTE_LINE.test(b.text)).reduce((n,b)=>n+textWords(b.text),0);
     const totalWords = blocks.filter(b=>b.role!=='furniture' && b.role!=='source').reduce((n,b)=>n+textWords(b.text),0);
     const ref = page.textReference;
     if (!ref?.task || !Array.isArray(ref.samples) || !ref.samples.length || ref.samples.some(s=>!s.reference || !Number.isInteger(s.page) || s.page<1 || !Number.isFinite(s.bodyWords) || s.bodyWords<0 || !Number.isFinite(s.totalWords) || s.totalWords<s.bodyWords || !s.sha256)) {
