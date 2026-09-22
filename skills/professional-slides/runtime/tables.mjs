@@ -711,9 +711,15 @@ export function measureTable({ frame, props }) {
     layout: measure(run.group, sum(widths.slice(run.start, run.end + 1)) - 2 * padding, true, textSize),
   }));
   const groupHeight = groups.length ? Math.max(...groups.map((g) => g.layout.height)) + paddingY + v("space.1") : 0;
-  const headerHeight = headers.some(Boolean)
+  const naturalHeaderHeight = headers.some(Boolean)
     ? Math.max(...headers.map((h) => h?.height ?? 0)) + unitHeight + 2 * paddingY + (chevronInset ? paddingY : 0) + groupHeight
     : 0;
+  // The shared band excludes the rule gap, as it does for chart and section
+  // headings. Reserve it during measurement so peer rules align before rows
+  // receive their height; headerless and chevron tables keep their own grammar.
+  const headerHeight = naturalHeaderHeight && !chevronInset
+    ? Math.max(naturalHeaderHeight, props.headerBandHeight === undefined ? 0 : props.headerBandHeight + v("space.1"))
+    : naturalHeaderHeight;
   const layouts = model.cells.map((row) =>
     row.map((cell) =>
       cell ? contentLayout(cell, widths[cell.column], tableProps, used) : null,

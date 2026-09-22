@@ -1518,6 +1518,11 @@ function registerCore(registry) {
       };
       definition.render = input => renderTable({...input,props:normalize(input.props)});
       definition.measureContent = input => measureTable({...input,props:normalize(input.props)});
+      definition.measureHeader = ({ frame, props = {} }) => {
+        if (props.headerShape === "chevron") return null;
+        const measured = measureTable({ frame: { ...frame, height: Infinity }, props: { ...normalize(props), fillHeight: false, headerBandHeight: undefined } });
+        return measured.headerHeight ? { top: frame.y, ruled: true, height: measured.headerHeight - tokenValue(token("space.1")) } : null;
+      };
       if (definition.id === "table") {
         definition.variants = TABLE_VARIANTS;
         definition.defaultVariant = "open";

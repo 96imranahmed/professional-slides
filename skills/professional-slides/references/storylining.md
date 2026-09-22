@@ -18,6 +18,8 @@ Write the exact title of every page. Under each title state the evidence that se
 
 Before layout, compare every page with its closest sibling. Draft the merged alternative. Retain separate pages only when joining them materially harms a necessary comparison, explanation or lookup. Different titles, extra caveats and another arithmetic step are insufficient. Use existing `settles`, `adds` and plan `why` fields to record the decision; no extra checklist is needed. Consolidate preview scorecards and repeated endings. Audit detail earns its appendix role but is not credited as another persuasive premise.
 
+Give secondary obstacles proportionate space. If an option already fails an essential prerequisite, attach a further cost or execution obstacle to that option unless it could reopen the choice or the brief requires its detailed examination. For example, a plant with no additional water entitlement need not receive another full page about its unavailable shutdown window. Preserve the timing gap and unproven remedies beside the plant constraint. By contrast, peak delivery and prolonged supply volume can earn separate proofs when each independently changes the governing case.
+
 For fixed length, budget cover, summary, sections and appendix first; select evidence breadth that supports the total. Reject a narrow evaluation topic before authoring if it requires padding. Do not invent another case whenever a thin page is found. Alternative decks first differ in question, sequence or evidence relationship, not palette.
 
 ## Reconcile evidence before design

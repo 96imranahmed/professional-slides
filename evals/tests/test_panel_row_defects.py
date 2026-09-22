@@ -126,6 +126,22 @@ console.log('{}');
 class BlankHeadingTests(unittest.TestCase):
     """A rule under nothing is a rule under nothing."""
 
+    def test_shared_header_band_does_not_create_headerless_or_chevron_rules(self):
+        run_node('''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const table=REGISTRY.get('table'),frame={x:0,y:0,width:600,height:400};
+const blank={columns:['',''],rows:[['One','Two']]};
+assert.equal(table.measureHeader({frame,props:blank}),null);
+assert.equal(table.measureContent({frame,props:{...blank,headerBandHeight:120}}).headerHeight,0);
+const chevron={columns:['First','Then'],rows:[['Read','Decide']],headerShape:'chevron',treatment:'standard'};
+assert.equal(table.measureHeader({frame,props:chevron}),null);
+const natural=table.measureContent({frame,props:chevron});
+assert.equal(table.measureContent({frame,props:{...chevron,headerBandHeight:120}}).headerHeight,natural.headerHeight);
+assert.ok(!table.render({id:'c',frame,props:chevron}).nodes.some(n=>n.id.includes(':header-rule:')));
+console.log('{}');
+''')
+
     def test_unheaded_table_beside_chart_has_no_invisible_heading_band(self):
         run_node('''
 import assert from 'node:assert/strict';

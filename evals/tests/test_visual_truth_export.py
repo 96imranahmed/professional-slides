@@ -25,7 +25,11 @@ const slides=[
   {type:'chart.bar',heading:'Available capacity',unit:'seats',categories:['A','B'],series:[{name:'Seats',values:[24,28]}],referenceLines:[{value:32,label:'Room limit'}]},
   {type:'table',columns:[{label:'Class',type:'category'},'Meaning'],rows:[['Assignment','Given access'],['Outcome','Completed service']]}]},
  {id:'native-axis',title:'Stored supply declines across equal daily intervals',exhibit:{type:'chart.line',heading:'Remaining storage',unit:'ML',categories:['Day 0','Day 1','Day 2'],series:[{name:'Storage',values:[42,36,30]}],showValueAxis:true,dataLabels:false,endLabels:false,yMin:0,yMax:50}},
- {id:'numeric-line',title:'The selected intermediate observation retains its true elapsed position',exhibit:{type:'chart.line',heading:'Observed output',unit:'units',xAxis:{unit:'days',min:0,max:3,ticks:[{value:0,label:'Day 0'},{value:1,label:'Day 1'},{value:3,label:'Day 3'}]},gapPolicy:'connect-observations',series:[{name:'Output',points:[{key:'a',x:0,y:2},{key:'b',x:1,y:4,label:true},{key:'c',x:3,y:6}]}],dataLabels:false,yMin:0,yMax:10}}
+ {id:'numeric-line',title:'The selected intermediate observation retains its true elapsed position',exhibit:{type:'chart.line',heading:'Observed output',unit:'units',xAxis:{unit:'days',min:0,max:3,ticks:[{value:0,label:'Day 0'},{value:1,label:'Day 1'},{value:3,label:'Day 3'}]},gapPolicy:'connect-observations',series:[{name:'Output',points:[{key:'a',x:0,y:2},{key:'b',x:1,y:4,label:true},{key:'c',x:3,y:6}]}],dataLabels:false,yMin:0,yMax:10}},
+ ...[false,true].map(longChart=>({id:longChart?'chart-wrap':'table-wrap',title:'Peer heading rules align while every label remains visible',layout:'two-up',exhibits:[
+  {type:'chart.column',heading:longChart?'Output across the full observation period for the two defined operating alternatives':'Output',unit:'units',categories:['A','B'],series:[{name:'Output',values:[2,4]}]},
+  {type:'table',columns:longChart?['Choice','Cash','Condition']:['First\nchoice','Initial cash\nand water','Timing condition'],rows:[['Full','$31m','Starts now'],['Wait','$0m','Starts later']]}
+ ]}))
 ];
 console.log(JSON.stringify(planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'truth',slides})).deck));
 """)
@@ -100,3 +104,18 @@ console.log(JSON.stringify(planDeck(toDeckPlan({schema:'professional-slides.deck
         labels = [n for n in slide['nodes'] if n['role'] == 'data-label']
         self.assertEqual([n['data']['pointKey'] for n in labels], ['b'])
         self.assertEqual(self.shape(4, labels[0]).text, '4')
+
+    def test_mixed_peer_heading_rules_align_in_saved_file_for_either_longer_header(self):
+        for page in [5, 6]:
+            nodes = self.scene['slides'][page]['nodes']
+            chart_rule = next(n for n in nodes if n['role'] == 'section-heading-rule')
+            table_rule = next(n for n in nodes if ':header-rule:' in n['id'])
+            rule_y = self.shape(page, chart_rule).top
+            self.assertEqual(rule_y, self.shape(page, table_rule).top)
+            headings = [n for n in nodes if n['role'] in ['section-heading', 'chart-unit', 'table-header-text']]
+            for node in headings:
+                shape = self.shape(page, node)
+                self.assertLessEqual(shape.top + shape.height, rule_y)
+            body = [n for n in nodes if n['role'] == 'table-cell-text']
+            self.assertTrue(body)
+            self.assertGreater(min(self.shape(page, n).top for n in body), rule_y)
