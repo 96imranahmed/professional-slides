@@ -4,6 +4,49 @@ from node_probe import run_node
 
 
 class IntrinsicLayoutTests(unittest.TestCase):
+    def test_declared_peer_table_rows_preserve_copy_scales_and_case_centres(self):
+        run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck,component,flow} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+const alignment={group:'cases',keys:['a','b','c']};
+assert.deepEqual(styleTable({columns:['Case'],rows:[['Alpha'],['Beta'],['All mixtures']],rowAlignment:alignment}).rowAlignment,alignment);
+const scale={type:'bars',label:'Units',unit:'units',min:0,max:5,series:['Amount']};
+const labels=['Alpha','Beta','All mixtures'];
+const explanation=['A retained local condition that needs several measured lines at the intended body size.','The separate route bound and direction remain explicit for this case.','Every permitted mixture conserves the total; this construction does not establish an approved operating policy.'];
+const make=(width,aligned=true)=>({slides:[{id:'s',frame:{x:60,y:100,width,height:450},composition:flow({id:'pair',direction:'row',gap:24,children:[
+ component({id:'amounts',component:'table',size:{width:'fill',height:'fill'},props:{columns:['Case','Amount'],rows:labels.map((x,i)=>[x,{type:'bars',values:[i+2],scale:'units'}]),scales:{units:scale},fillHeight:true,...(aligned?{rowAlignment:alignment}:{})}}),
+ component({id:'proof',component:'table',size:{width:'fill',height:'fill'},props:{columns:['Case','Conservation and governing condition'],rows:labels.map((x,i)=>[x,explanation[i]]),fillHeight:true,...(aligned?{rowAlignment:alignment}:{})}})
+]})}]});
+for(const width of [1000,1160]) {
+ const spec=make(width),before=JSON.stringify(spec),nodes=compileDeck(spec,REGISTRY).slides[0].nodes;
+ assert.equal(JSON.stringify(spec),before);
+ const plain=compileDeck(make(width,false),REGISTRY).slides[0].nodes;
+ for(let row=0;row<3;row++) {
+  const cells=nodes.filter(n=>n.role==='table-cell-text'&&n.data.row===row&&n.data.column===0);
+  assert.equal(cells.length,2);
+  assert.ok(Math.abs(cells[0].frame.y+cells[0].frame.height/2-cells[1].frame.y-cells[1].frame.height/2)<.01);
+ }
+ for(const n of nodes.filter(n=>n.role==='table-bar')) {
+  const original=plain.find(p=>p.id===n.id);assert.equal(n.frame.x,original.frame.x);assert.equal(n.frame.width,original.frame.width);assert.deepEqual(n.data.domain,original.data.domain);
+ }
+ for(const n of nodes.filter(n=>n.role==='table-cell-text')) {
+  const original=plain.find(p=>p.id===n.id);assert.equal(n.data.textLayout.source,original.data.textLayout.source);assert.deepEqual(n.style.fontSize,original.style.fontSize);assert.equal(n.data.fitStep,undefined);
+  assert.ok(n.frame.y+n.frame.height<=550.01);
+ }
+ const bad=make(width);bad.slides[0].composition.children[1].props.rowAlignment={group:'cases',keys:['b','a','c']};
+ assert.throws(()=>compileDeck(bad,REGISTRY),/identical ordered row keys/);
+ const duplicate=make(width);duplicate.slides[0].composition.children[1].props.rowAlignment={group:'cases',keys:['a','a','c']};
+ assert.throws(()=>compileDeck(duplicate,REGISTRY),/unique key per row/);
+ const single=make(width);delete single.slides[0].composition.children[1].props.rowAlignment;
+ assert.throws(()=>compileDeck(single,REGISTRY),/at least two peers/);
+ const short=make(width);short.slides[0].frame.height=120;
+ assert.throws(()=>compileDeck(short,REGISTRY),/allocated|available/);
+}
+console.log(JSON.stringify({accepted:true}));
+""")
+
     def test_hugged_peer_sections_reserve_the_shared_wrapped_heading_band(self):
         result = run_node("""
 import assert from 'node:assert/strict';

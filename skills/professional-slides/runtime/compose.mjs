@@ -856,6 +856,7 @@ export function styleTable(ex) {
   const recommended = ex.recommended !== undefined ? columns.findIndex((c) => String(c.label).trim().toLowerCase() === String(ex.recommended).trim().toLowerCase()) : -1;
   if (ex.recommended !== undefined && recommended < 0) throw new Error(`Table recommended column "${ex.recommended}" is not a column label`);
   const extra = { ...(recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {}), ...(ex.scales ? { scales: ex.scales } : {}), ...(ex.columnWidths ? { columnWidths: ex.columnWidths } : {}) };
+  if (ex.rowAlignment !== undefined) extra.rowAlignment = ex.rowAlignment;
   // A table that ends the chain with no treatment at all is a plain grid, and a
   // plain grid past five rows is where a reader loses their place. 89% of
   // tables in published client decks carry a treatment of some kind

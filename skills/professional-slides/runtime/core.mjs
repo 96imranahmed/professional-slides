@@ -916,6 +916,31 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
       const peers = placements.map(measure).filter((peer) => peer && Math.abs(peer.top - own.top) < 0.01);
       return Math.max(own.height, ...peers.map((peer) => peer.height));
     };
+    const sharedTableRows = (placement) => {
+      const alignment = placement.node.props?.rowAlignment;
+      if (placement.node.component !== "table" || !alignment) return undefined;
+      const peers = placements.filter(({ node }) => node.component === "table" && node.props?.rowAlignment?.group === alignment.group);
+      if (peers.length < 2) throw new Error(`Table rowAlignment group ${alignment.group} needs at least two peers`);
+      if (peers.some(({ node }) => JSON.stringify(node.props.rowAlignment.keys) !== JSON.stringify(alignment.keys)))
+        throw new Error(`Table rowAlignment group ${alignment.group} must use identical ordered row keys`);
+      const measured = peers.map(peer => ({ ...peer, measurement: registry.get("table").measureContent({
+        frame: { ...peer.frame, height: Infinity },
+        props: { ...peer.node.props, fillHeight: false, headerBandHeight: headerBandHeight(peer) }
+      }) }));
+      const bodyTop = measured[0].frame.y + measured[0].measurement.headerHeight;
+      if (measured.some(peer => Math.abs(peer.frame.y + peer.measurement.headerHeight - bodyTop) > 0.01))
+        throw new Error(`Table rowAlignment group ${alignment.group} requires a shared body-start anchor`);
+      const heights = alignment.keys.map((_, r) => Math.max(...measured.map(peer => peer.measurement.heights[r])));
+      const total = heights.reduce((sum, height) => sum + height, 0);
+      const capacity = Math.min(...measured.map(({ frame, measurement: m }) => frame.height - (m.height - m.heights.reduce((sum, height) => sum + height, 0))));
+      if (total > capacity + 0.01)
+        throw new Error(`Table rowAlignment group ${alignment.group} needs ${total.toFixed(1)}px of body space; only ${capacity.toFixed(1)}px is available`);
+      if (peers.every(({ node }) => node.props.fillHeight === true) && Number.isFinite(capacity) && heights.length) {
+        const extra = Math.min(capacity - total, total * 1.5) / heights.length;
+        heights.forEach((height, r) => { heights[r] = height + Math.max(0, extra); });
+      }
+      return heights;
+    };
     for (const { node, frame, ancestors = [] } of placements) {
       if (node.nodeType === "section") {
         const sectionDefinition = registry.get("section");
@@ -961,6 +986,8 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
       const chromePlacement = ["page-template", "slide-chrome"].includes(node.component) || ancestors.some(owner => chromeOwners.has(owner));
       if (chromePlacement) chromeOwners.add(instanceId);
       const props = { ...node.props, headerBandHeight: headerBandHeight({ node, frame }) };
+      const sharedRows = sharedTableRows({ node, frame });
+      if (sharedRows) props._sharedRowHeights = sharedRows;
       if (["page-template", "slide-chrome", "section-divider"].includes(node.component)) props.pageTemplate = { ...pageTemplate, ...node.props?.pageTemplate };
       let rendered;
       try {

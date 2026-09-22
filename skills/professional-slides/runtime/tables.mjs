@@ -668,6 +668,12 @@ function layoutLegend(id, scale, width, size, gap) {
 export function measureTable({ frame, props }) {
   const model = normalize(props),
     density = props.density ?? "body";
+  if (props.rowAlignment !== undefined) {
+    const { group, keys } = props.rowAlignment ?? {};
+    if (typeof group !== "string" || !group.trim() || !Array.isArray(keys) ||
+        keys.length !== model.cells.length || keys.some(key => typeof key !== "string" || !key.trim()) || new Set(keys).size !== keys.length)
+      throw new Error("Table rowAlignment requires a group and one unique key per row");
+  }
   if (!["body", "compact", "dense"].includes(density))
     throw new Error("Unknown table density");
   const tableProps = { ...props, density },
@@ -785,6 +791,12 @@ export function measureTable({ frame, props }) {
       }
     }),
   );
+  if (props._sharedRowHeights !== undefined) {
+    if (!props.rowAlignment || !Array.isArray(props._sharedRowHeights) || props._sharedRowHeights.length !== heights.length ||
+        props._sharedRowHeights.some((height, r) => !Number.isFinite(height) || height < heights[r] - 0.01))
+      throw new Error("Shared table rows must preserve every measured cell height");
+    heights.splice(0, heights.length, ...props._sharedRowHeights);
+  }
   for (const [id, scale] of used) {
     if (scale.legend !== false) continue;
     const columns = model.columns.filter((column, c) => model.cells.some(row => row[c]?.scale === id));
@@ -814,8 +826,8 @@ export function measureTable({ frame, props }) {
   // consulting scorecard does instead of leaving a void beneath it.
   // Stretched rows read as bands, so every cell's content is then centred on
   // the row rather than hanging from its top edge beside a centred category.
-  let stretched = false;
-  if (props.fillHeight === true && Number.isFinite(frame.height) && frame.height > height + 0.01 && heights.length) {
+  let stretched = props._sharedRowHeights !== undefined;
+  if (props._sharedRowHeights === undefined && props.fillHeight === true && Number.isFinite(frame.height) && frame.height > height + 0.01 && heights.length) {
     const surplus = Math.min(frame.height - height, heights.reduce((a, b) => a + b, 0) * 1.5);
     const per = surplus / heights.length;
     for (let r = 0; r < heights.length; r += 1) heights[r] += per;
@@ -849,6 +861,9 @@ export function measureTable({ frame, props }) {
 // that loses its band height to a shared heading steps its type down one notch
 // rather than failing the page.
 export function renderTable(input) {
+  // Peer rows were measured at the authored density; a local fallback would
+  // invalidate their shared geometry and silently change only one table.
+  if (input.props.rowAlignment) return renderTableAt(input);
   const ladder = ["body", "compact", "dense"];
   const start = Math.max(0, ladder.indexOf(input.props.density ?? "body"));
   let lastError = null;
