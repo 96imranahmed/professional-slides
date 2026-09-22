@@ -45,6 +45,9 @@ export const CONTENT_CODES = Object.freeze({
   TEXT_COVERAGE_LOW: "planned text is below comparable reference coverage",
   TEXT_BLOCK_TOO_LONG: "one run of prose is longer than client decks ever set",
   TEXT_COVERAGE_EXCEPTION: "shorter copy needs specific editorial validation",
+  // Raised at composition by text-contract.mjs, where the page's structure is
+  // known; listed here because it belongs to the same text contract.
+  TEXT_TASK_MISMATCH: "the reading task the page is measured against is not the one it composes to",
   CONTENT_NO_CLAIM: "a page names a topic instead of proving something",
   CONTENT_UNMEASURED: "many pages declare qualitative evidence; check its specificity",
   CONTENT_ADDS_NOTHING: "the commentary is planned as a second reading of the exhibit",

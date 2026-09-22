@@ -77,8 +77,36 @@ export function auditTextPlan(content, scene) {
       else if (at>=0) text = text.slice(0,at)+' '+text.slice(at+needle.length);
     }
     if (!findings.some(f=>f.id===page.id && f.severity==='blocking') && /[\p{L}\p{N}]/u.test(text)) findings.push({id:page.id,code:'TEXT_UNPLANNED',text:normalizeText(text),severity:'blocking'});
+    const mismatch = readingTaskMismatch(page.textReference?.task, actual[0]);
+    if (mismatch) findings.push({id:page.id,code:'TEXT_TASK_MISMATCH',...mismatch,severity:'blocking'});
   }
   return {...check,accepted:!findings.some(f=>f.severity==='blocking'),findings};
+}
+
+// Whether the page the reference is compared against reads the way this one does.
+//
+// The word floor is only as honest as the references it is drawn from. Client
+// chart pages carry a commentary column 38% of the time; the rest are a
+// full-width exhibit with a line of takeaway, and they run to about 90 body
+// words rather than 150. A deck measured every one of its full-width pages
+// against pages that had a commentary column, reached the floor the only way it
+// could - a takeaway band four lines deep - and passed. The reverse is the
+// loophole storylining already names: a page with a commentary column claiming
+// the lighter exhibit-led floor is choosing sparse references to lower the bar.
+// Both are the same mistake, and the composed page settles which one it is.
+export const READING_TASKS = Object.freeze({
+  'exhibit-with-commentary': {commentary: true},
+  'exhibit-led': {commentary: false},
+});
+const COMMENTARY_ROLES = new Set(['list-item', 'list-lead', 'paragraph']);
+export function readingTaskMismatch(task, slide) {
+  const rule = READING_TASKS[task];
+  if (!rule || !slide) return null;
+  const commentary = (slide.nodes || []).some(n => n.type === 'text' && COMMENTARY_ROLES.has(String(n.role || '')));
+  if (commentary === rule.commentary) return null;
+  return rule.commentary
+    ? {task, commentary, reason: 'This page has no commentary column, so its reading task is exhibit-led: a full-width exhibit with a line of takeaway. Measured against pages with a commentary column, it can only reach the floor by padding its takeaway band. Measure exhibit-led references and use those.'}
+    : {task, commentary, reason: 'This page has a commentary column, so exhibit-led references understate what it should carry. Measure pages that pair an exhibit with commentary.'};
 }
 
 export function auditExportText(content, scene, pageTexts) {

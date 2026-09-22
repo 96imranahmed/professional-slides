@@ -407,6 +407,7 @@ GATE_CODES = {
     "TITLE_WORDS": "an action title past the word budget",
     "TYPE_RANGE": "type set outside the approved range for its role",
     "CPL": "a measure too narrow or too wide to read",
+    "TAKEAWAY_LONG": "a takeaway band set past three lines, which makes it a paragraph",
     "WORDS": "prose doing the work an exhibit should do",
     "HERO_EXHIBIT": "an analytical page with no dominant exhibit carrying ink",
     "LAYOUT_MONOTONY": "one layout signature across most of the deck",
@@ -687,6 +688,33 @@ def gate_cpl(slide_no, slide, findings):
                 slide_no, "CPL", longest, THRESHOLDS["cpl_min"],
                 "The column is too narrow for prose. Widen it to at least 35 "
                 "characters per line or make the text a label.",
+            ))
+
+
+# A takeaway band says the reading once. The skill's own example decks set
+# theirs at a median of 18 words and never past 32, which is one line and a
+# half at the band's measure. A band of four lines is a paragraph set in bold
+# on a tint, and it competes with the exhibit it was meant to summarise. It
+# was reaching four when a page with no commentary column was measured against
+# references that had one, and the band was the only place left to put words.
+TAKEAWAY_ROLES = {"insight-body"}
+TAKEAWAY_LINES_MAX = 3
+
+
+def gate_takeaway_long(slide_no, slide, findings):
+    """TAKEAWAY_LONG. A takeaway band that sets past three lines."""
+    for node in text_nodes(slide):
+        if node.get("role") not in TAKEAWAY_ROLES:
+            continue
+        lines = lines_of(node)
+        if len(lines) > TAKEAWAY_LINES_MAX:
+            findings.append(finding(
+                slide_no, "TAKEAWAY_LONG", len(lines), TAKEAWAY_LINES_MAX,
+                "Say the reading once, in a line or two. Method, provenance and "
+                "qualification belong in the note under the exhibit; a second "
+                "argument belongs in a commentary column. If the page cannot reach "
+                "its word floor without a long band, check that its text reference "
+                "is an exhibit-led page rather than one with a commentary column.",
             ))
 
 
@@ -2604,6 +2632,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
             findings.extend(f for f in page if wanted(f["code"]))
             if wanted("CPL"):
                 gate_cpl(slide_no, slide, findings)
+            if wanted("TAKEAWAY_LONG"):
+                gate_takeaway_long(slide_no, slide, findings)
             if wanted("MISSING_ARGUMENT"):
                 gate_missing_argument(slide_no, slide, findings)
             if wanted("THIN_PAGE"):

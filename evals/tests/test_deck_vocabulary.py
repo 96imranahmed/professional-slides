@@ -271,3 +271,61 @@ console.log(JSON.stringify(JSON.parse(rows)[2]));
 ''')
         self.assertEqual(marked[1]["highlight"], ["Lowest critic score"])
         self.assertEqual(marked[2]["value"], "lost")
+
+
+class TakeawayLengthTests(unittest.TestCase):
+    """A takeaway band says the reading once."""
+
+    def band(self, lines):
+        return {"id": "s01", "nodes": [
+            text("action-title", "A title that states the finding"),
+            {"type": "text", "role": "insight-body", "text": "\n".join(f"line {i}" for i in range(lines)),
+             "data": {"textLayout": {"lines": [f"line {i}" for i in range(lines)]}}}]}
+
+    def codes(self, lines):
+        findings = []
+        page_gates.gate_takeaway_long(1, self.band(lines), findings)
+        return [f["code"] for f in findings]
+
+    def test_two_lines_pass(self):
+        self.assertEqual(self.codes(2), [])
+
+    def test_three_lines_are_tolerated(self):
+        self.assertEqual(self.codes(3), [])
+
+    def test_four_lines_are_a_paragraph(self):
+        self.assertEqual(self.codes(4), ["TAKEAWAY_LONG"])
+
+    def test_it_blocks(self):
+        self.assertNotIn("TAKEAWAY_LONG", page_gates.ADVISORY_CODES)
+
+
+class ReadingTaskTests(unittest.TestCase):
+    """The declared reading task has to describe the page that was composed."""
+
+    def mismatch(self, task, roles):
+        nodes = [{"type": "text", "role": r, "text": "x"} for r in roles]
+        return run_node(f'''
+import {{readingTaskMismatch}} from './skills/professional-slides/runtime/text-contract.mjs';
+console.log(JSON.stringify(readingTaskMismatch({json.dumps(task)}, {{nodes: {json.dumps(nodes)}}})));
+''')
+
+    FULL_WIDTH = ["action-title", "axis-label", "insight-body", "footnote-text"]
+    WITH_COLUMN = ["action-title", "axis-label", "list-lead", "list-item"]
+
+    def test_a_full_width_page_measured_as_commentary_is_refused(self):
+        result = self.mismatch("exhibit-with-commentary", self.FULL_WIDTH)
+        self.assertIsNotNone(result)
+        self.assertIn("padding its takeaway band", result["reason"])
+
+    def test_a_commentary_page_claiming_the_lighter_floor_is_refused(self):
+        result = self.mismatch("exhibit-led", self.WITH_COLUMN)
+        self.assertIsNotNone(result)
+        self.assertIn("understate", result["reason"])
+
+    def test_matching_tasks_pass(self):
+        self.assertIsNone(self.mismatch("exhibit-led", self.FULL_WIDTH))
+        self.assertIsNone(self.mismatch("exhibit-with-commentary", self.WITH_COLUMN))
+
+    def test_a_task_outside_the_vocabulary_is_not_second_guessed(self):
+        self.assertIsNone(self.mismatch("comparison-table", self.FULL_WIDTH))
