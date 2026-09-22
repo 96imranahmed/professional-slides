@@ -305,3 +305,33 @@ assert.ok(Math.abs(marks[0].frame.width/marks[1].frame.width-24/28)<.001,'the re
 assert.ok(scene.slides[0].nodes.some(n=>n.role==='chart-reference-label'&&n.text==='Capacity'));
 console.log('{}');
 """)
+
+    def test_row_charts_render_at_their_own_intrinsic_height(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {dumbbellLayout} from './skills/professional-slides/runtime/charts-extra.mjs';
+for(const type of ['chart.lollipop','chart.dumbbell','chart.bullet']){
+ for(const width of [400,572,1160])for(const count of [1,2,8])for(const headed of [false,true]){
+  const categories=Array.from({length:count},(_,i)=>`Unit ${i+1}`);
+  const props={categories,series:[{name:'Required staffing before shift redesign',values:categories.map((_,i)=>18+i)}],
+    ...(type==='chart.dumbbell'?{legend:true}:{}),
+    ...(type==='chart.bullet'?{targets:categories.map((_,i)=>20+i)}:{}),
+    ...(headed?{heading:'Staffing needed to cover the defined service period',unit:'people',headerBandHeight:72}:{})};
+  if(type==='chart.dumbbell')props.series.push({name:'Required staffing after shift redesign',values:categories.map((_,i)=>19+i)});
+  const def=REGISTRY.get(type),frame={x:0,y:0,width};
+  const height=def.measureContent({frame,props}).height;
+  const nodes=def.render({id:'intrinsic',frame:{...frame,height},props}).nodes;
+  assert.ok(nodes.some(n=>n.role==='chart-mark'),`${type} renders its data at measured height`);
+  assert.ok(nodes.every(n=>n.frame.y>=-1&&n.frame.y+n.frame.height<=height+1),`${type} keeps heading, legend and rows inside its measurement`);
+ }
+}
+// A genuinely undersized explicit frame must still fail; the minimum is not relaxed.
+const props={categories:['A'],series:[{name:'Before',values:[18.75]},{name:'After',values:[19.444]}]};
+assert.throws(()=>REGISTRY.get('chart.dumbbell').render({id:'small',frame:{x:0,y:0,width:572,height:141},props}),/insufficient plot height/);
+// Dense row sizing remains driven by the existing row spacing.
+const dense={...props,categories:Array.from({length:8},(_,i)=>String(i)),series:props.series.map(s=>({...s,values:Array(8).fill(s.values[0])}))};
+const layout=dumbbellLayout({x:0,y:0,width:1160},dense);
+assert.equal(layout.height,layout.plot.y+8*58+60);
+console.log('{}');
+""")

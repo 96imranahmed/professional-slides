@@ -7,7 +7,7 @@ import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableI
 import { measureText } from "./text-layout.mjs";
 import { contrastRatio } from "./palettes.mjs";
 import { formatValue } from "./value-format.mjs";
-import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle, labelBold, legendRowsFor, lineStyle, numericBounds, textStyle, topLegend } from "./charts.mjs";
+import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle, labelBold, legendRowsFor, lineStyle, numericBounds, textStyle, topLegend } from "./charts.mjs";
 import { TOKENS } from "./core.mjs";
 import { measureAt } from "./draw.mjs";
 
@@ -18,7 +18,8 @@ const probe = (frame) => (Number.isFinite(frame.height) ? frame : { ...frame, he
 // Intrinsic heights answer a hug measurement from the width (a plot wants
 // roughly a 16:9 share of its width; a row chart wants a row per category).
 const aspectHeight = (frame, plot) => (plot.y - frame.y) + Math.round(frame.width * 0.55) + 40;
-const rowsHeight = (frame, plot, n) => (plot.y - frame.y) + n * Math.max(24, Math.min(72, Math.round(frame.width * 0.05))) + 60;
+// Intrinsic row charts must be renderable without captions or a taller parent.
+const rowsHeight = (frame, plot, n) => (plot.y - frame.y) + Math.max(MIN_PLOT_HEIGHT, n * Math.max(24, Math.min(72, Math.round(frame.width * 0.05)))) + 60;
 const seriesOf = (props, min = 1, max = 6) => {
   const series = Array.isArray(props.series) ? props.series : [];
   const categories = props.categories || [];

@@ -55,6 +55,8 @@ export const SERIES = [
   token("color.chartSeries6")
 ];
 
+export const MIN_PLOT_HEIGHT = 100;
+
 export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, bottomInset = 56, periodBand = 0 } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
   leftInset = Math.max(leftInset, bands.left);
@@ -66,13 +68,13 @@ export function chartFrame(frame, { topLegend = false, annotations = [], changeA
   // Reserve the actual last metric row plus a trailing theme gap, not another full row band.
   const bottom = bands.bottom ? Math.max(bottomInset, 40 + bands.bottom + tokenValue(token("space.3"))) : bottomInset;
   const rightInset = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16);
-  if (frame.height - bottom - top < 100) throw new Error("Chart annotation bands leave insufficient plot height; enlarge or split the exhibit");
+  if (frame.height - bottom - top < MIN_PLOT_HEIGHT) throw new Error("Chart annotation bands leave insufficient plot height; enlarge or split the exhibit");
   if (frame.width - leftInset - rightInset < 120) throw new Error("Chart has insufficient plot width; enlarge or split the exhibit");
   return {
     x: frame.x + leftInset,
     y: frame.y + top,
     width: frame.width - leftInset - rightInset,
-    height: Math.max(100, frame.height - bottom - top)
+    height: Math.max(MIN_PLOT_HEIGHT, frame.height - bottom - top)
   };
 }
 
@@ -2069,6 +2071,10 @@ function chartExamples(id) {
 }
 
 export function registerCharts(registry) {
+  const headingProps = props => ({ heading: props.heading, unit: props.unit, variant: props.titleVariant,
+    ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}),
+    ...(props.badge ? { badge: props.badge } : {}),
+    ...(props.headerBandHeight ? { headerBandHeight: props.headerBandHeight } : {}) });
   for (const chart of chartDefinitions) {
     const examples = chartExamples(chart.id);
     const tokens = [
@@ -2098,7 +2104,11 @@ export function registerCharts(registry) {
       // like a section's, so peers beside it take the same band height and the
       // rules line up. The compiler passes the shared height back as headerBandHeight.
       ...(chart.id === "chart.waffle" ? { measureContent: ({ frame, props = {} }) => ({ height: waffleLayout(frame, props).height }) } : {}),
-      ...(EXTRA_CHARTS.some((c) => c.id === chart.id) ? { measureContent: ({ frame, props = {} }) => ({ height: EXTRA_CHARTS.find((c) => c.id === chart.id).layout(frame, props).height }) } : {}),
+      ...(EXTRA_CHARTS.some((c) => c.id === chart.id) ? { measureContent: ({ frame, props = {} }) => {
+        const headingHeight = String(props.heading ?? "").trim()
+          ? registry.get("chart-title").measureContent({ frame, props: headingProps(props) }).height : 0;
+        return { height: headingHeight + EXTRA_CHARTS.find((c) => c.id === chart.id).layout({ ...frame, height: undefined }, props).height };
+      } } : {}),
       ...(chart.id === "chart.marimekko" ? { measureContent: ({ frame, props = {} }) => ({ height: marimekkoLayout(frame, props).height }) } : {}),
       ...(chart.id === "chart.bubble-grid" ? { measureContent: ({ frame, props = {} }) => ({ height: bubbleGridLayout(frame, props).height }) } : {}),
       measureHeader: ({ frame, props = {} }) => {
@@ -2112,7 +2122,7 @@ export function registerCharts(registry) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
           return { nodes: chart.render({ id, frame, tokens, props }) };
         }
-        const title = registry.get("chart-title"), titleProps = { heading: props.heading, unit: props.unit, variant: props.titleVariant, ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}), ...(props.badge ? { badge: props.badge } : {}), ...(props.headerBandHeight ? { headerBandHeight: props.headerBandHeight } : {}) };
+        const title = registry.get("chart-title"), titleProps = headingProps(props);
         const height = title.measureContent({ frame, props: titleProps }).height;
         return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...chart.render({ id, frame: { ...frame, y: frame.y + height, height: frame.height - height }, tokens, props })] };
       }
