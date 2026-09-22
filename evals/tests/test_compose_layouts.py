@@ -5,7 +5,7 @@ from node_probe import run_node
 
 
 class ComposeLayoutTests(unittest.TestCase):
-    def test_single_bottom_implication_uses_its_region_without_widening_peers(self):
+    def test_single_bottom_implication_centres_readable_group_without_widening_peers(self):
         run_node('''
 import assert from 'node:assert/strict';
 import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
@@ -14,7 +14,7 @@ const text='The model retains the same service boundary. Additional capacity cha
 const build=count=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'bottom',tracker:false,slides:[{id:'s',title:'One implication uses the region below its evidence',layout:'exhibit-top',pointsHeading:false,exhibit:{type:'table',columns:['Case','Value'],rows:[['A',10],['B',20]]},points:Array.from({length:count},(_,i)=>({lead:`Finding ${i+1}`,text}))}]})).deck;
 const one=build(1),two=build(2),three=build(3);
 const paragraphs=deck=>deck.slides[0].nodes.filter(n=>n.role==='paragraph');
-const a=paragraphs(one);assert.equal(a.length,1);assert.ok(a[0].frame.width>1100);assert.equal(a[0].text.split(/\s+/).join(' '),text);
+const a=paragraphs(one);assert.equal(a.length,1);assert.ok(a[0].frame.width<=620);assert.ok(Math.abs(a[0].frame.x+a[0].frame.width/2-640)<1);assert.ok(a[0].text.split('\\n').every(line=>line.length<=90));assert.equal(a[0].text.split(/\s+/).join(' '),text);
 for(const [d,count,max] of [[two,2,580],[three,3,390]]){
  const p=paragraphs(d);assert.equal(p.length,count);assert.ok(p.every(n=>n.frame.width<max));assert.equal(new Set(p.map(n=>n.frame.width)).size,1);
  assert.ok(p.every(n=>n.text.split(/\s+/).join(' ')===text));assert.ok(p.every(n=>n.style.fontSize.tokenId===a[0].style.fontSize.tokenId));

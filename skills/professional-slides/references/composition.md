@@ -109,7 +109,7 @@ Choose a preset because its evidence relationship fits the page, not to meet a w
 
 The basic evidence presets are `exhibit-full` (full-width evidence), `exhibit-left` (evidence beside support) and `exhibit-top` (evidence above support). Other supported presets are `exhibit-right` (dominant evidence on the right), `hero-number` (one meaningful number with its supporting proof), `split-tone` (a treated support rail), `two-up` (peer exhibits), `metrics-over-exhibit` (a concise metric strip over underlying evidence), `table-halves` (a comparison split across matched tables), and `picture-pair`, `picture-strip`, `picture-hero` (two, several or one dominant sourced image). These are composition conveniences; their names do not establish distinct evidence relationships.
 
-A lone implication beneath a full-width exhibit owns that support region; `exhibit-top` lets its paragraph use the region's width rather than leaving an empty sibling column. Two or more implications keep their shared column widths. This exception does not widen ordinary paragraphs or side commentary: inspect the resulting line length and choose a deliberate narrower composition when sustained prose needs it.
+A lone implication beneath a full-width exhibit owns that support region; `exhibit-top` centres its heading and paragraph together at a readable measure rather than leaving an empty sibling column. Two or more implications keep their shared column widths. Do not expand sustained prose across the whole canvas to fill space; retain the line-length check and inspect the relationship to the exhibit above.
 
 ## Deck-spec controls
 

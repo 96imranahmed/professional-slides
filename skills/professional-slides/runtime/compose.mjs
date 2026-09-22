@@ -2255,10 +2255,9 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       // means". A hairline under each of three sub-headings as well turns one
       // divided idea into four ruled boxes, and the reader reads the rules
       // before the words.
-      return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
+      return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: slide.points.length === 1 ? "hug" : { fr: 1 }, height: "fill" },
         ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
-        items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text,
-          ...(slide.points.length === 1 ? { maxMeasure: false } : {}), ...(runs ? { runs } : {}) }, size: HUG }] };
+        items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text, ...(runs ? { runs } : {}) }, size: HUG }] };
     });
     // The columns share one heading, the way the side column does: without it
     // the page drops straight from the plot into three paragraphs with nothing
@@ -2271,7 +2270,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
     items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
       headedPanel(exhibits[0], item, `${id}-exhibit`, false),
       { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}),
-        layout: "flow.row", size: HUG, items: columns },
+        layout: "flow.row", ...(columns.length === 1 ? { leftover: "center" } : {}), size: HUG, items: columns },
     ] });
   } else if (layout === "hero-number") {
     // One figure carries the page: the number set large with its explanation,
