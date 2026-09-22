@@ -1103,7 +1103,9 @@ function registerCore(registry) {
         const treatment = props.treatment || "open";
         const edge = props.edge || "contained";
         if(!["contained","full-bleed"].includes(edge))throw new Error("Unknown section edge treatment");
-        if (!["open", "muted", "primary", "dark", "tint"].includes(treatment)) throw new Error(`Unknown section treatment: ${treatment}`);
+        // `card`: a plain surface with padding and no rule - the white card an
+        // exhibit sits on over a photograph, where `open` draws nothing at all.
+        if (!["open", "muted", "primary", "dark", "tint", "card"].includes(treatment)) throw new Error(`Unknown section treatment: ${treatment}`);
         const padding = sectionPadding(props);
         // Side panels from the 2020–24 decks: a navy "Key insights" column (dark),
         // a grey commentary column (muted) and an accent-tinted message column (tint).
@@ -1556,7 +1558,7 @@ function registerCore(registry) {
         definition.render=input=>{if(!Object.hasOwn(TABLE_VARIANTS,definition.resolveVariant(input.props)))throw new Error('Unknown table variant');return render(input);};
       }
     }
-    const axes = { section: ["treatment", ["open", "muted", "primary", "dark", "tint"]], panel: ["tone", ["open", "muted", "primary", "dark"]], "content-rail": ["treatment", ["muted", "open"]], roadmap: ["variant", ["process", "wave-columns"]], "section-heading": ["variant", ["standard", "accent", "inverse"]] };
+    const axes = { section: ["treatment", ["open", "muted", "primary", "dark", "tint", "card"]], panel: ["tone", ["open", "muted", "primary", "dark"]], "content-rail": ["treatment", ["muted", "open"]], roadmap: ["variant", ["process", "wave-columns"]], "section-heading": ["variant", ["standard", "accent", "inverse"]] };
     axes["section-boundary"] = ["variant", ["related", "inference", "inference-chevron", "subsection"]];
     axes.metric = ["variant", ["default", "prominent"]];
     axes.connector = ["variant", ["disc-chevron", "divider-chevron", "divider", "arrow", "chevron", "line", "labelled-line"]];

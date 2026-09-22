@@ -1,4 +1,4 @@
-"""Furniture from the 2020–25 firm decks (output/slideworks-library): toned side
+"""Furniture from the 2020–25 firm decks (the corpus slideworks/ library): toned side
 panels, photo strips, period bands and event flags, highlighted rows and
 line-budget pagination, unit charts, stat-row tones, the takeaways page and
 the column agenda."""

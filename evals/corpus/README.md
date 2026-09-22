@@ -171,3 +171,17 @@ python3 evals/corpus/measure_corpus.py sample <corpus> pixels.jsonl out/
 Then hand `out/sample.pdf` and `rubric.md` to a vision pass and keep its JSON as
 `page-judgements.json`. The corpus itself is not in this repository: it is 2.1GB
 of third-party PDFs.
+
+## The Slideworks library
+
+The McKinsey, BCG and Bain decks listed by slideworks.io are part of the corpus,
+under `slideworks/` beside `index.csv`: a coverage record of all 351 listings, the
+141 with no usable download and why, the 207 unique documents on disk (9,835
+pages) with their hashes, a browsable `index.html`, and `decks/<firm>/` links to
+the canonical PDFs rather than copies. `build_slideworks_library.py` rebuilds it
+from `index.csv`. Nothing about the collection lives in the repository's
+`output/` folder, which is working space.
+
+The design-style inventory in `styles/` samples 300 of its pages alongside 100
+from the rest of the corpus; `style-classification.csv` at the corpus root holds
+the page-by-page result.

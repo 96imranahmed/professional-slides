@@ -1,4 +1,4 @@
-// Ten figure families the reference corpus uses and the skill could not draw.
+// Fifteen figure families the reference corpus uses and the skill could not draw.
 //
 // A 400-page sample of the corpus (evals/corpus/styles) was classified into 85
 // design styles and each probed against the runtime. These are the diagram and
@@ -12,6 +12,7 @@
 import { token, tokenValue, stableId, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive } from "./core.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
+import { mediaNode } from "./media.mjs";
 
 const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink");
 const WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), RULE = token("color.rule");
@@ -627,6 +628,299 @@ export function capsulesNodes({ id, frame, props }) {
   return out;
 }
 
+
+/* ---------------------------------------------------------------- fact-grid */
+
+// The infographic panel: a grid of facts, each a large figure with its label,
+// an optional icon and an optional gauge - the dense "by the numbers" page the
+// published reports run. Every tile is one fact; a tile with two numbers in it
+// is two tiles.
+function normalizeFacts(props) {
+  return between(props.items, 3, 9, "A fact grid").map((item, i) => {
+    if (!clean(item?.value) || !clean(item?.label)) throw new Error(`Fact ${i + 1} needs a value and a label`);
+    if (String(item.value).length > 10) throw new Error(`Fact ${i + 1}: "${item.value}" is too long for a figure; keep it to ten characters`);
+    const gauge = item.gauge === undefined ? null : Number(item.gauge);
+    if (gauge !== null && !(gauge >= 0 && gauge <= 1)) throw new Error(`Fact ${i + 1}: a gauge is a fraction from 0 to 1`);
+    return { value: clean(item.value), label: clean(item.label), text: clean(item.text), icon: item.icon ?? null, gauge };
+  });
+}
+
+export function factGridLayout(frame, props) {
+  const items = normalizeFacts(props);
+  const columns = props.columns ?? (items.length <= 4 ? items.length : items.length <= 6 ? 3 : Math.min(4, Math.ceil(items.length / 2)));
+  const rows = Math.ceil(items.length / columns), gap = v("space.4"), pad = v("space.4");
+  const width = (frame.width - gap * (columns - 1)) / columns, inner = width - 2 * pad;
+  if (inner < 110) throw new Error("A fact grid this wide is too narrow per tile; use fewer columns");
+  const tiles = items.map((item) => {
+    const value = measure(item.value, inner, "type.metric", true, DISPLAY);
+    const label = measure(item.label, inner, "type.body", true);
+    const text = item.text ? measure(item.text, inner, "type.compact") : null;
+    const top = item.icon ? 28 + v("space.2") : 0;
+    return { item, value, label, text, height: 2 * pad + top + value.height + v("space.1") + label.height + (text ? v("space.1") + text.height : 0) + (item.gauge !== null ? v("space.2") + 6 : 0) };
+  });
+  const rowHeights = Array.from({ length: rows }, (_, r) => Math.max(...tiles.slice(r * columns, (r + 1) * columns).map((t) => t.height)));
+  return { tiles, columns, rows, width, inner, gap, pad, rowHeights, height: rowHeights.reduce((a, b) => a + b, 0) + gap * (rows - 1) };
+}
+
+export function factGridNodes({ id, frame, props }) {
+  const L = factGridLayout(frame, props);
+  if (L.height > frame.height + 0.01) throw new Error(`The fact grid needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a fact or its line`);
+  const dark = props.tone === "dark", out = [];
+  const stretch = Math.min(1.35, (frame.height - L.gap * (L.rows - 1)) / (L.height - L.gap * (L.rows - 1)));
+  let y = frame.y + (frame.height - (L.height - L.gap * (L.rows - 1)) * stretch - L.gap * (L.rows - 1)) / 2;
+  for (let r = 0; r < L.rows; r++) {
+    const h = L.rowHeights[r] * stretch;
+    L.tiles.slice(r * L.columns, (r + 1) * L.columns).forEach((t, c) => {
+      const x = frame.x + c * (L.width + L.gap), tid = stableId(id, "fact", r * L.columns + c);
+      out.push(fillRect(stableId(tid, "tile"), "fact-tile", { x, y, width: L.width, height: h }, dark ? PRIMARY : MUTED, { radius: "radius.small" }));
+      let ty = y + L.pad;
+      if (t.item.icon) { out.push(...iconMarker({ id: stableId(tid, "icon"), role: "fact-icon", x: x + L.pad, y: ty, size: 28, icon: t.item.icon, tone: dark ? "inverse" : "accent" })); ty += 28 + v("space.2"); }
+      out.push(label(stableId(tid, "value"), "fact-value", { x: x + L.pad, y: ty, width: L.inner }, t.value, style("type.metric", dark ? WHITE : ACCENT, true, "left", DISPLAY)));
+      ty += t.value.height + v("space.1");
+      out.push(label(stableId(tid, "label"), "fact-label", { x: x + L.pad, y: ty, width: L.inner }, t.label, style("type.body", dark ? WHITE : INK, true)));
+      ty += t.label.height;
+      if (t.text) { out.push(label(stableId(tid, "text"), "fact-text", { x: x + L.pad, y: ty + v("space.1"), width: L.inner }, t.text, style("type.compact", dark ? WHITE : SECONDARY))); ty += v("space.1") + t.text.height; }
+      if (t.item.gauge !== null) {
+        const gy = y + h - L.pad - 6;
+        out.push(fillRect(stableId(tid, "gauge-track"), "fact-gauge-track", { x: x + L.pad, y: gy, width: L.inner, height: 6 }, dark ? SECONDARY : RULE, { radius: "radius.round" }));
+        out.push(fillRect(stableId(tid, "gauge"), "fact-gauge", { x: x + L.pad, y: gy, width: Math.max(2, L.inner * t.item.gauge), height: 6 }, ACCENT, { radius: "radius.round" }));
+      }
+    });
+    y += h + L.gap;
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------- zone-matrix */
+
+// A matrix of graded zones with items plotted on it: likelihood against impact,
+// effort against value. The zones are graded in the accent's own tint, never
+// red, amber and green - the deck reserves status colour for verdicts, and a
+// background that says "danger" makes a claim the items have not earned.
+function normalizeZones(props) {
+  const axis = (a, name) => {
+    if (!clean(a?.label)) throw new Error(`A zone matrix needs a ${name} axis label`);
+    return { label: clean(a.label), low: clean(a.low) ?? "Low", high: clean(a.high) ?? "High" };
+  };
+  const size = props.size ?? 3;
+  if (![2, 3, 4].includes(size)) throw new Error("A zone matrix is 2, 3 or 4 zones a side");
+  const points = between(props.points, 1, 15, "A zone matrix's items").map((pt, i) => {
+    const x = Number(pt?.x), y = Number(pt?.y);
+    if (!clean(pt?.label)) throw new Error(`Plotted item ${i + 1} needs a label`);
+    if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1)) throw new Error(`"${pt.label}" is placed at a fraction from 0 to 1 on each axis`);
+    return { label: clean(pt.label), x, y, highlight: Boolean(pt.highlight) };
+  });
+  return { x: axis(props.xAxis, "horizontal"), y: axis(props.yAxis, "vertical"), size, points, zoneLabels: props.zoneLabels ?? null };
+}
+
+export function zoneMatrixLayout(frame, props) {
+  const Z = normalizeZones(props);
+  const axisWidth = 56, axisHeight = 44;
+  const side = Math.min(frame.width * 0.62 - axisWidth, (Number.isFinite(frame.height) ? frame.height : 460) - axisHeight);
+  return { ...Z, axisWidth, axisHeight, side, height: Math.max(260, side + axisHeight) };
+}
+
+export function zoneMatrixNodes({ id, frame, props }) {
+  const L = zoneMatrixLayout(frame, props);
+  const side = Math.min(L.side, frame.height - L.axisHeight);
+  if (side < 200) throw new Error("A zone matrix needs at least 200px a side");
+  const out = [], x0 = frame.x + L.axisWidth, y0 = frame.y, cell = side / L.size;
+  const tones = [MUTED, TINT, ACCENT];
+  for (let i = 0; i < L.size; i++) for (let j = 0; j < L.size; j++) {
+    const level = (i + (L.size - 1 - j)) / (2 * (L.size - 1));
+    const tone = tones[Math.min(2, Math.floor(level * 2.999))];
+    out.push(fillRect(stableId(id, "zone", i, j), "zone-cell", { x: x0 + i * cell, y: y0 + j * cell, width: cell - 2, height: cell - 2 }, tone, { data: { level } }));
+  }
+  if (L.zoneLabels) for (const [key, at] of [["low", [0, L.size - 1]], ["high", [L.size - 1, 0]]]) {
+    const text = clean(L.zoneLabels[key]); if (!text) continue;
+    const m = measure(text, cell - 12, "type.label", true);
+    const [i, j] = at, dark = key === "high";
+    out.push(label(stableId(id, "zone-label", key), "zone-label", { x: x0 + i * cell + 6, y: y0 + j * cell + 6, width: cell - 12 }, m, style("type.label", dark ? WHITE : SECONDARY, true)));
+  }
+  // Ids by position, not by text: both axes default their ends to "Low" and
+  // "High", and two labels named for their words collide.
+  const ax = (key, text, frameBox, align) => { const m = measure(text, frameBox.width, "type.compact", true); out.push(label(stableId(id, "axis", key), "zone-axis", frameBox, m, style("type.compact", INK, true, align))); };
+  ax("x-label", L.x.label, { x: x0, y: y0 + side + 20, width: side }, "center");
+  ax("x-low", L.x.low, { x: x0, y: y0 + side + 4, width: side / 2 }, "left");
+  ax("x-high", L.x.high, { x: x0 + side / 2, y: y0 + side + 4, width: side / 2 }, "right");
+  ax("y-high", L.y.high, { x: frame.x, y: y0, width: L.axisWidth - 6 }, "right");
+  ax("y-low", L.y.low, { x: frame.x, y: y0 + side - 18, width: L.axisWidth - 6 }, "right");
+  const yl = measure(L.y.label, L.axisWidth - 6, "type.compact", true);
+  out.push(label(stableId(id, "axis-y"), "zone-axis", { x: frame.x, y: y0 + side / 2 - yl.height / 2, width: L.axisWidth - 6 }, yl, style("type.compact", INK, true, "right")));
+  const listX = x0 + side + v("space.5"), listW = frame.x + frame.width - listX;
+  L.points.forEach((pt, k) => {
+    const cx = x0 + pt.x * side, cy = y0 + (1 - pt.y) * side, r = 13;
+    // A highlighted item is drawn white on its zone, ringed in ink: an accent
+    // disc on the accent zone vanished into it.
+    out.push(ellipsePrimitive({ id: stableId(id, "item", k), role: "zone-item", frame: { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r }, style: { fill: pt.highlight ? WHITE : PRIMARY, stroke: pt.highlight ? INK : WHITE, lineWidth: token("line.standard") } }));
+    const n = measure(String(k + 1), 2 * r, "type.label", true);
+    out.push(label(stableId(id, "item-number", k), "zone-item-number", { x: cx - r, y: cy - n.height / 2, width: 2 * r }, n, style("type.label", pt.highlight ? INK : WHITE, true, "center")));
+    if (listW > 120) {
+      const m = measure(`${k + 1}  ${pt.label}`, listW, "type.compact", pt.highlight);
+      out.push(label(stableId(id, "legend", k), "zone-legend", { x: listX, y: y0 + k * Math.max(22, m.height + 6), width: listW }, m, style("type.compact", INK, pt.highlight)));
+    }
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------ device-frame */
+
+// A screenshot shown in the device it runs on: a laptop or a phone. The frame
+// says "this is the product as a customer sees it", which a bare screenshot on
+// a slide does not.
+export function deviceFrameLayout(frame, props) {
+  const device = props.device ?? "laptop";
+  if (!["laptop", "phone"].includes(device)) throw new Error("A device frame is a laptop or a phone");
+  if (!props.image || (!props.image.dataUri && !clean(props.image.alt))) throw new Error("A device frame needs an image, or `{ alt }` naming the screenshot to come");
+  const w = frame.width, h = Number.isFinite(frame.height) ? frame.height : w * 0.62;
+  return { device, height: Math.min(h, device === "laptop" ? w * 0.62 : 520) };
+}
+
+export function deviceFrameNodes({ id, frame, props }) {
+  const L = deviceFrameLayout(frame, props);
+  const out = [];
+  let screen;
+  if (L.device === "laptop") {
+    const bodyH = frame.height * 0.9, bodyW = Math.min(frame.width, bodyH * 1.55), x = frame.x + (frame.width - bodyW) / 2, y = frame.y;
+    out.push(fillRect(stableId(id, "lid"), "device-body", { x, y, width: bodyW, height: bodyH }, INK, { radius: "radius.small" }));
+    screen = { x: x + 12, y: y + 12, width: bodyW - 24, height: bodyH - 24 };
+    out.push(shapePrimitive({ id: stableId(id, "base"), role: "device-base", geometry: "trapezoid", frame: { x: x - bodyW * 0.06, y: y + bodyH, width: bodyW * 1.12, height: frame.height * 0.06 }, style: { fill: SECONDARY, stroke: "none" } }));
+  } else {
+    const h = frame.height, w = Math.min(frame.width, h * 0.5), x = frame.x + (frame.width - w) / 2;
+    out.push(fillRect(stableId(id, "body"), "device-body", { x, y: frame.y, width: w, height: h }, INK, { radius: "radius.round" }));
+    screen = { x: x + 10, y: frame.y + 28, width: w - 20, height: h - 56 };
+  }
+  if (props.image.dataUri) out.push(mediaNode({ id: stableId(id, "screen"), role: "image", frame: screen, props: props.image, fit: "cover" }));
+  else {
+    out.push(fillRect(stableId(id, "screen"), "image-frame", screen, MUTED, { data: { alt: props.image.alt } }));
+    const m = measure(props.image.alt, screen.width - 24, "type.compact");
+    out.push(label(stableId(id, "alt"), "device-alt", { x: screen.x + 12, y: screen.y + (screen.height - m.height) / 2, width: screen.width - 24 }, m, style("type.compact", SECONDARY, false, "center")));
+  }
+  return out;
+}
+
+/* --------------------------------------------------------------- worksheet */
+
+// A worksheet: labelled boxes with the prompt for what goes in each, left for
+// the reader to fill. Workshop and training decks use it to hand the method
+// over; the prompts are the content.
+function normalizeWorksheet(props) {
+  return between(props.fields, 2, 9, "A worksheet").map((f, i) => {
+    if (!clean(f?.label) || !clean(f?.prompt)) throw new Error(`Worksheet field ${i + 1} needs a label and a prompt`);
+    const span = f.span ?? 1;
+    if (![1, 2, 3].includes(span)) throw new Error(`Worksheet field ${i + 1}: span is 1, 2 or 3`);
+    return { label: clean(f.label), prompt: clean(f.prompt), span };
+  });
+}
+
+export function worksheetLayout(frame, props) {
+  const fields = normalizeWorksheet(props), columns = props.columns ?? 3, gap = v("space.4");
+  const unit = (frame.width - gap * (columns - 1)) / columns;
+  const rows = []; let row = [], used = 0;
+  for (const f of fields) { const span = Math.min(f.span, columns); if (used + span > columns) { rows.push(row); row = []; used = 0; } row.push({ ...f, span }); used += span; }
+  if (row.length) rows.push(row);
+  const measured = rows.map((r) => r.map((f) => {
+    const w = unit * f.span + gap * (f.span - 1) - 2 * v("space.3");
+    return { ...f, width: w, title: measure(f.label, w, "type.body", true), text: measure(f.prompt, w, "type.compact") };
+  }));
+  const min = measured.map((r) => Math.max(...r.map((f) => f.title.height + v("space.1") + f.text.height)) + 2 * v("space.3") + 40);
+  return { rows: measured, columns, gap, unit, min, height: min.reduce((a, b) => a + b, 0) + gap * (rows.length - 1) };
+}
+
+export function worksheetNodes({ id, frame, props }) {
+  const L = worksheetLayout(frame, props);
+  if (L.height > frame.height + 0.01) throw new Error(`The worksheet needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a field`);
+  const out = [], spare = (frame.height - L.height) / L.rows.length;
+  let y = frame.y;
+  L.rows.forEach((row, r) => {
+    const h = L.min[r] + spare; let x = frame.x;
+    row.forEach((f, c) => {
+      const w = L.unit * f.span + L.gap * (f.span - 1), fid = stableId(id, "field", r, c);
+      out.push(fillRect(stableId(fid, "box"), "worksheet-box", { x, y, width: w, height: h }, "none", { stroke: RULE, radius: "radius.small" }));
+      out.push(label(stableId(fid, "label"), "worksheet-label", { x: x + v("space.3"), y: y + v("space.3"), width: f.width }, f.title, style("type.body", INK, true)));
+      out.push(label(stableId(fid, "prompt"), "worksheet-prompt", { x: x + v("space.3"), y: y + v("space.3") + f.title.height + v("space.1"), width: f.width }, f.text, style("type.compact", SECONDARY)));
+      x += w + L.gap;
+    });
+    y += h + L.gap;
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------------ speech */
+
+// People and what they said, in speech bubbles above them: the interview page
+// where the speaker matters as much as the line. Two to four speakers.
+function normalizeSpeech(props) {
+  return between(props.items, 2, 4, "A speech page").map((item, i) => {
+    if (!clean(item?.speaker) || !clean(item?.quote)) throw new Error(`Speaker ${i + 1} needs a name and a quote`);
+    return { speaker: clean(item.speaker), role: clean(item.role), quote: clean(item.quote), icon: item.icon ?? null };
+  });
+}
+
+export function speechLayout(frame, props) {
+  const items = normalizeSpeech(props), gap = v("space.5");
+  const width = (frame.width - gap * (items.length - 1)) / items.length, inner = width - 2 * v("space.4");
+  const measured = items.map((item) => ({ item, quote: measure(`“${item.quote}”`, inner, "type.body"),
+    name: measure(item.speaker, width, "type.compact", true), role: item.role ? measure(item.role, width, "type.label") : null }));
+  if (measured.some((m) => m.quote.lines.length > 8)) throw new Error("A quote in a speech bubble runs to eight lines at most; cut it to the line that matters");
+  const bubble = Math.max(...measured.map((m) => m.quote.height)) + 2 * v("space.4");
+  const avatar = 52, foot = avatar + v("space.2") + Math.max(...measured.map((m) => m.name.height + (m.role ? m.role.height : 0)));
+  return { measured, gap, width, inner, bubble, avatar, foot, height: bubble / 0.84 + v("space.3") + foot };
+}
+
+export function speechNodes({ id, frame, props }) {
+  const L = speechLayout(frame, props);
+  if (L.height > frame.height + 0.01) throw new Error(`The speech page needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; shorten the quotes`);
+  const out = [], top = frame.y + (frame.height - L.height) / 2, bubbleH = L.bubble / 0.84;
+  L.measured.forEach((m, i) => {
+    const x = frame.x + i * (L.width + L.gap), sid = stableId(id, "speaker", i);
+    out.push(shapePrimitive({ id: stableId(sid, "bubble"), role: "speech-bubble", geometry: "quoteCallout", frame: { x, y: top, width: L.width, height: bubbleH },
+      style: { fill: i % 2 ? MUTED : TINT, stroke: "none" }, data: { bodyRatio: 0.84, caretCenterRatio: 0.5, caretWidthRatio: 0.12 } }));
+    out.push(label(stableId(sid, "quote"), "speech-quote", { x: x + v("space.4"), y: top + v("space.4"), width: L.inner }, m.quote, style("type.body", INK)));
+    const ay = top + bubbleH + v("space.3"), ax = x + (L.width - L.avatar) / 2;
+    if (m.item.icon) out.push(...iconMarker({ id: stableId(sid, "avatar"), role: "speech-avatar", x: ax, y: ay, size: L.avatar, icon: m.item.icon, tone: "filled" }));
+    else {
+      out.push(ellipsePrimitive({ id: stableId(sid, "avatar"), role: "speech-avatar", frame: { x: ax, y: ay, width: L.avatar, height: L.avatar }, style: { fill: PRIMARY, stroke: "none" } }));
+      const initials = m.item.speaker.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+      const im = measure(initials, L.avatar, "type.body", true);
+      out.push(label(stableId(sid, "initials"), "speech-initials", { x: ax, y: ay + (L.avatar - im.height) / 2, width: L.avatar }, im, style("type.body", WHITE, true, "center")));
+    }
+    let ny = ay + L.avatar + v("space.2");
+    out.push(label(stableId(sid, "name"), "speech-name", { x, y: ny, width: L.width }, m.name, style("type.compact", INK, true, "center")));
+    if (m.role) out.push(label(stableId(sid, "role"), "speech-role", { x, y: ny + m.name.height, width: L.width }, m.role, style("type.label", SECONDARY, false, "center")));
+  });
+  return out;
+}
+
+
+/* ---------------------------------------------------------- side-statement */
+
+// The panel of a sidebar page: the statement set large in a filled column, a
+// short accent bar above it. A question, a claim or the page's single figure;
+// the evidence sits beside it.
+export function sideStatementLayout(frame, props) {
+  if (!clean(props.text)) throw new Error("A side statement needs its text");
+  const inner = frame.width - 2 * v("space.5");
+  const text = measure(props.text, inner, "type.heading", true, DISPLAY);
+  if (text.lines.length > 8) throw new Error("A side statement runs to eight lines at most; it is the page's reading, not its argument");
+  const kicker = clean(props.kicker) ? measure(props.kicker, inner, "type.label", true) : null;
+  return { inner, text, kicker, height: text.height + (kicker ? kicker.height + v("space.3") : 0) + v("space.4") + 2 * v("space.5") };
+}
+
+export function sideStatementNodes({ id, frame, props }) {
+  const L = sideStatementLayout(frame, props);
+  const tone = props.tone ?? "dark", light = tone === "muted" || tone === "tint";
+  const fill = tone === "primary" ? PRIMARY : tone === "muted" ? MUTED : tone === "tint" ? TINT : INK;
+  const ink = light ? INK : WHITE, out = [fillRect(stableId(id, "panel"), "side-panel", frame, fill)];
+  let y = frame.y + Math.max(v("space.5"), (frame.height - L.height) / 2 + v("space.5"));
+  const x = frame.x + v("space.5");
+  out.push(fillRect(stableId(id, "bar"), "side-panel-bar", { x, y, width: 32, height: 3 }, ACCENT));
+  y += v("space.4");
+  if (L.kicker) { out.push(label(stableId(id, "kicker"), "side-panel-kicker", { x, y, width: L.inner }, L.kicker, style("type.label", light ? SECONDARY : WHITE, true))); y += L.kicker.height + v("space.3"); }
+  out.push(label(stableId(id, "text"), "side-panel-text", { x, y, width: L.inner }, L.text, style("type.heading", ink, true, "left", DISPLAY)));
+  return out;
+}
+
 /* ----------------------------------------------------------- registration */
 
 const SAMPLES = {
@@ -643,6 +937,12 @@ const SAMPLES = {
   pictogram: { rows: [{ label: "(Insert population)", value: 6 }, { label: "(Insert comparison)", value: 3 }] },
   "arrow-rows": { items: [{ label: "(Insert scenario 1)", text: "(Insert what follows)" }, { label: "(Insert scenario 2)", text: "(Insert what follows)" }] },
   capsules: { items: [{ title: "(Insert priority 1)", text: "(Insert what it means)" }, { title: "(Insert priority 2)", text: "(Insert what it means)" }, { title: "(Insert priority 3)", text: "(Insert what it means)" }] },
+  "fact-grid": { items: [{ value: "63m", label: "(Insert what it counts)" }, { value: "1,200+", label: "(Insert what it counts)" }, { value: "47", label: "(Insert what it counts)" }] },
+  "zone-matrix": { xAxis: { label: "(Insert axis)" }, yAxis: { label: "(Insert axis)" }, points: [{ label: "(Insert item)", x: 0.3, y: 0.7 }, { label: "(Insert item)", x: 0.8, y: 0.8 }] },
+  "device-frame": { device: "laptop", image: { alt: "(Insert what the screenshot shows)" } },
+  worksheet: { fields: [{ label: "(Insert field)", prompt: "(Insert the question it answers)", span: 3 }, { label: "(Insert field)", prompt: "(Insert the question)" }, { label: "(Insert field)", prompt: "(Insert the question)" }] },
+  speech: { items: [{ speaker: "(Insert name)", quote: "(Insert what they said)" }, { speaker: "(Insert name)", quote: "(Insert what they said)" }] },
+  "side-statement": { text: "(Insert the statement the page makes)", kicker: "(Insert a label)" },
 };
 
 const GUIDANCE = {
@@ -656,6 +956,12 @@ const GUIDANCE = {
   pictogram: { useWhen: "one to five population shares best read as 'six in ten'", why: "filled figures make a share countable, which a bar at 60% does not", actionTitle: "state the share and who it describes" },
   "arrow-rows": { useWhen: "two to six scenarios or levers, each leading to a consequence", why: "the arrow says the row leads somewhere; the consequence sits where the arrow points", actionTitle: "state the scenario that matters and what follows from it" },
   capsules: { useWhen: "two to five priorities or principles set as equal columns", why: "tall pillars side by side read as parallel commitments, each taken on its own", actionTitle: "state the priority the rest depend on" },
+  "fact-grid": { useWhen: "three to nine separate facts, each a figure with its label, on a 'by the numbers' page", why: "a grid of equal tiles lets each figure read on its own and the set read as a profile", actionTitle: "state what the facts together say" },
+  "zone-matrix": { useWhen: "items plotted on two judged axes whose combination grades them, such as likelihood against impact", why: "graded zones show where attention belongs without asserting a verdict colour", actionTitle: "state which items sit in the highest zone" },
+  "device-frame": { useWhen: "a product or document screenshot, shown as a customer sees it", why: "the device frame says the image is the working product, not an illustration", actionTitle: "state what the screen shows the customer can do" },
+  worksheet: { useWhen: "handing a method over: the fields to complete and the question each answers", why: "labelled empty boxes make the method usable in the room", actionTitle: "state what completing the worksheet produces" },
+  speech: { useWhen: "two to four people and what they said, when who said it matters", why: "bubbles above named speakers keep each line attached to its source", actionTitle: "state what the voices agree on or disagree about" },
+  "side-statement": { useWhen: "the panel of a sidebar page: a question, claim or figure the content beside it supports", why: "a filled column in heading type reads first and holds the page's one idea", actionTitle: "let the panel carry the question and the title the answer" },
 };
 
 const RENDER = {
@@ -669,6 +975,12 @@ const RENDER = {
   pictogram: [pictogramNodes, pictogramLayout, { width: 1160, height: 320 }],
   "arrow-rows": [arrowRowsNodes, arrowRowsLayout, { width: 1160, height: 400 }],
   capsules: [capsulesNodes, capsulesLayout, { width: 1160, height: 460 }],
+  "fact-grid": [factGridNodes, factGridLayout, { width: 1160, height: 440 }],
+  "zone-matrix": [zoneMatrixNodes, zoneMatrixLayout, { width: 1160, height: 460 }],
+  "device-frame": [deviceFrameNodes, deviceFrameLayout, { width: 720, height: 440 }],
+  worksheet: [worksheetNodes, worksheetLayout, { width: 1160, height: 440 }],
+  speech: [speechNodes, speechLayout, { width: 1160, height: 400 }],
+  "side-statement": [sideStatementNodes, sideStatementLayout, { width: 380, height: 508 }],
 };
 
 export const FIGURE_IDS = Object.freeze(Object.keys(RENDER));

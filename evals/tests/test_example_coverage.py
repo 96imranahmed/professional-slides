@@ -56,6 +56,9 @@ FURNITURE = {
     "insight", "panel", "image-frame", "cover", "divider", "statement", "takeaways",
     "agenda", "callout", "table", "rows", "evidence-note", "insight-tree-table",
     "comparison-table", "logo-collage", "icon-trends", "quote-cluster",
+    # The panel of a `layout: "sidebar"` page, placed from `panel`; the gallery's
+    # sidebar page exercises it.
+    "side-statement",
 }
 
 

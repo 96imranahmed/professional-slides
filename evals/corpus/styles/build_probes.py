@@ -251,6 +251,52 @@ PROBES.update({
             {"title": "Cultivate fiscal prudence", "text": "Debt stabilised by 2027", "icon": "shield"}]}),
 })
 
+PROBES.update({
+    "X-sidebar": page("Where is quantum computing headed?", layout="sidebar",
+        panel={"text": "Most of the value arrives after 2030, and the race to get there is already being decided."},
+        points=[{"lead": "Leadership is still open.", "text": "Photonic, trapped-ion and superconducting approaches each lead on a different measure, and none has a lead that holds across all of them."},
+                {"lead": "Investment is concentrating.", "text": "The largest rounds of the last three years went to fewer than ten companies, most of them building hardware."},
+                {"lead": "Governments are buying in.", "text": "National programmes now fund a third of the work, which ties the race to industrial policy as much as to the science."}]),
+    "K-infographic": page("The report in numbers", layout="exhibit-full", exhibit={
+        "type": "fact-grid", "tone": "dark", "items": [
+            {"value": "63m", "label": "article reads", "text": "Across the site and partners in 2024", "icon": "search"},
+            {"value": "1,200+", "label": "reports published", "text": "Research and survey work", "icon": "checklist"},
+            {"value": "47", "label": "industry awards", "icon": "target"},
+            {"value": "5,000+", "label": "cited articles", "text": "Referenced in outside work", "icon": "chart-line"},
+            {"value": "78%", "label": "reader satisfaction", "gauge": 0.78, "icon": "people"},
+            {"value": "1,500", "label": "authors", "text": "Across 65 countries", "icon": "globe"}]}),
+    "C-over-photo": page("Connected devices will outnumber people ten to one by 2025", layout="photo-backdrop",
+        photo={"path": "assets/harbour.jpg", "alt": "City at dusk", "credit": "examples/assets"},
+        exhibit={"type": "chart.column", "heading": "Connected devices and population", "unit": "bn",
+                 "categories": ["2003", "2010", "2015", "2025"],
+                 "series": [{"name": "Connected devices", "values": [0.5, 12.5, 25, 50]}]}),
+    "D-zone-matrix": page("Two risks sit in the highest zone and one of them has no owner", layout="exhibit-full", exhibit={
+        "type": "zone-matrix", "xAxis": {"label": "Likelihood", "low": "Rare", "high": "Likely"},
+        "yAxis": {"label": "Impact", "low": "Minor", "high": "Severe"}, "zoneLabels": {"low": "Monitor", "high": "Act now"},
+        "points": [{"label": "Supplier insolvency", "x": 0.82, "y": 0.86, "highlight": True}, {"label": "Data breach", "x": 0.55, "y": 0.9},
+                   {"label": "Key-person loss", "x": 0.7, "y": 0.5}, {"label": "Regulatory change", "x": 0.3, "y": 0.65},
+                   {"label": "Currency swing", "x": 0.6, "y": 0.25}]}),
+    "P-device-mockup": page("The new portal puts the claim status on the first screen", layout="exhibit-left",
+        exhibit={"type": "device-frame", "device": "laptop", "image": {"path": "assets/harbour.jpg", "alt": "Portal home screen", "credit": "examples/assets"}},
+        points=[{"lead": "Status first.", "text": "The claim's stage and the next action sit above the fold."},
+                {"lead": "One login.", "text": "Policy, claims and payments share a single account."}]),
+    "X-checklist": page("Six questions before a programme is funded", layout="text", pointsStyle="checklist", points=[
+        {"text": "Is the scope fixed and signed by the sponsor?"}, {"text": "Is there one named owner for delivery?"},
+        {"text": "Is the benefit measured before work starts?", "state": "yes"}, {"text": "Is funding released in waves against evidence?"},
+        {"text": "Is there a date to switch off the old system?"}, {"text": "Is the stopping condition written down?", "state": "no"}]),
+    "X-worksheet": page("Problem statement worksheet", layout="exhibit-full", exhibit={
+        "type": "worksheet", "columns": 3, "fields": [
+            {"label": "Problem question", "prompt": "The basic question to be resolved, in one sentence", "span": 3},
+            {"label": "Context", "prompt": "What makes this a problem now?"}, {"label": "Criteria for success", "prompt": "How will we know it is solved?"},
+            {"label": "Constraints", "prompt": "What cannot change?"}, {"label": "Stakeholders", "prompt": "Who decides, who is affected?"},
+            {"label": "Scope", "prompt": "What is in and out?"}, {"label": "Sources of insight", "prompt": "Where will the evidence come from?"}]}),
+    "X-speech-bubbles": page("The barriers to experimentation are cultural before they are technical", layout="exhibit-full", exhibit={
+        "type": "speech", "items": [
+            {"speaker": "Fred Mills", "role": "Head of marketing", "quote": "I'm not interested in holdout groups. I'm interested in personalisation, and I can't approve experiments that alienate my loyal customers."},
+            {"speaker": "Donna Reyes", "role": "Data science lead", "quote": "Not being able to test something directly is common in science. Let me show you how we use the same techniques here."},
+            {"speaker": "Mark Chen", "role": "Product manager", "quote": "Causal inference and off-policy evaluation would let us learn from what we already do."}]}),
+})
+
 
 def main():
     slides, missing = [], []

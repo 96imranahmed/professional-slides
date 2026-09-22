@@ -2,7 +2,7 @@
 // process step, a table tracker, a map pin, an agenda item — is drawn here, so
 // they match to the pixel; every icon-in-a-circle likewise. Components pass a
 // frame and get primitives back; they never draw a numeral themselves.
-import { token, tokenValue, stableId, textPrimitive, ellipsePrimitive, shapePrimitive } from "./core.mjs";
+import { rectPrimitive, token, tokenValue, stableId, textPrimitive, ellipsePrimitive, shapePrimitive } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { iconDefinition } from "./icons.mjs";
 
@@ -59,6 +59,14 @@ export function iconMarker({ id, role = "icon", x, y, size, icon, tone = "outlin
 
 /** ✓ / ✗ disc for checklists: green tick or red cross on a filled disc. */
 export function stateMarker({ id, role = "marker", x, y, size = markerSize(), state, data = {} }) {
+  // `open`: an empty box - a question still to answer, a criterion not yet
+  // judged. A checklist of open questions drew each one as a red cross,
+  // because anything that was not "yes" was "no".
+  if (state === "open") {
+    const box = size * 0.78, inset = (size - box) / 2;
+    return [rectPrimitive({ id: stableId(id, "box"), role, frame: { x: x + inset, y: y + inset, width: box, height: box },
+      style: { fill: "none", stroke: PRIMARY, lineWidth: token("line.standard"), radius: token("radius.none") }, data: { ...data, marker: "state", state: "open" } })];
+  }
   const yes = state === "yes" || state === true || state === "done";
   const fill = token(yes ? "color.positive" : "color.negative");
   const definition = iconDefinition(yes ? "check" : "cross");

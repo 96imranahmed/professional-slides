@@ -3,7 +3,7 @@
     python3 evals/corpus/styles/sample_pages.py > evals/corpus/styles/sample.json
 
 Three hundred pages from the Slideworks decks (McKinsey, BCG and Bain client
-and published work, the collection the skill was asked to cover) and one
+and published work; the corpus slideworks/ library) and one
 hundred from the rest of the corpus, at most four pages from any one document
 so a two-hundred-page report cannot set the style mix on its own. First and
 last pages are skipped: covers and back matter are a style each, and the

@@ -1356,6 +1356,9 @@ const POINT_STYLES = {
   numbered: { marker: "number" },
   // The plain house bullet.
   bulleted: { marker: "auto" },
+  // A box per item: questions to answer, criteria to meet. An item may set
+  // `state: "yes"` or `"no"` once it is judged; unset, the box stays open.
+  checklist: { marker: "check" },
 };
 
 export const POINT_STYLE_NAMES = Object.freeze(Object.keys(POINT_STYLES));
@@ -1397,6 +1400,10 @@ function pointsItem(points, id, tone, fill, inColumn = false, style = null, cent
   // two lists rather than one. Both were visible on the first cold run.
   const distribute = inColumn && points.length > 1;
   const shape = style && POINT_STYLES[style] ? POINT_STYLES[style] : {};
+  if (style === "checklist") points = points.map((p) => {
+    const item = typeof p === "string" ? { text: p } : { ...p };
+    return item.state === undefined ? { ...item, state: "open" } : item;
+  });
   return { id, component: "bullet-list", props: { variant: "body", items: points, ...shape, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}), ...(distribute ? { distribute: true, ...(centre ? {} : { centre: false }) } : {}) }, size: distribute ? { width: { fr: 1 }, height: "fill" } : HUG };
 }
 
@@ -1822,11 +1829,13 @@ export const SLIDE_KEYS = Object.freeze({
   // the commentary
   points: "the commentary column: a lead and a sentence per point",
   pointsHeading: "the heading over that column, or false for none",
-  pointsStyle: "how the column is marked: icon-lead, icon-framed, prose, ruled, lettered, numbered or bulleted",
+  pointsStyle: "how the column is marked: icon-lead, icon-framed, prose, ruled, lettered, numbered, bulleted or checklist",
   pointsTone: "open, dark, muted, tint or primary",
   pointsAlign: "middle to centre the points on the exhibit",
   paragraphs: "body prose, on a text page",
   textColumns: "1, 2 or 3: how many columns a text page sets its paragraphs in (default by length)",
+  panel: "on a sidebar page, { text, kicker, tone }: the statement the side panel carries",
+  photoSide: "on a photo-backdrop page, which side of the photograph the card leaves clear: left (default) or right",
   text: "the sentence a statement page carries",
   subtext: "the line under that sentence",
   insight: "the so-what as a box in the side column",
@@ -2729,6 +2738,39 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       ? { id: `${id}-picture-column`, layout: "flow.column", gap: "space.3", size: { width: { fr: 1 }, height: "fill" }, items: [{ ...frame, size: { width: { fr: 1 }, height: "fill" } }, caption] }
       : frame;
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [column, side] });
+  } else if (layout === "sidebar") {
+    // A side panel carrying the page's statement, the content beside it: the
+    // corpus sets a question, a claim or a headline figure in a dark panel down
+    // the left and lets the evidence or the points take the rest. The panel is
+    // the reading; what sits beside it is the support.
+    const panel = slide.panel;
+    if (!panel || typeof panel.text !== "string" || !panel.text.trim()) throw new Error(`${id}: a sidebar page needs \`panel: { text }\`, the statement the panel carries`);
+    const tone = panel.tone ?? "dark";
+    if (!["dark", "primary", "muted", "tint"].includes(tone)) throw new Error(`${id}: panel.tone is dark, primary, muted or tint`);
+    const panelBox = { id: `${id}-panel`, component: "side-statement", props: { text: panel.text.trim(), tone, ...(panel.kicker ? { kicker: panel.kicker } : {}) },
+      size: { width: { fr: 1 }, height: "fill" } };
+    const body = [];
+    exhibits.forEach((ex, i) => body.push(exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, SIZE)));
+    if (slide.points?.length) body.push(pointsItem(slide.points, `${id}-points`, "open", fill, !exhibits.length, pointsStyle));
+    for (const [at, text] of (slide.paragraphs || []).entries()) body.push({ id: `${id}-p${at}`, component: "paragraph", props: { text }, size: HUG });
+    if (!body.length) throw new Error(`${id}: a sidebar page needs an exhibit, points or paragraphs beside its panel`);
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [panelBox,
+      { id: `${id}-body`, layout: "flow.column", ...(exhibits.length ? {} : { leftover: "center" }), size: { width: { fr: 2 }, height: "fill" }, items: body }] });
+  } else if (layout === "photo-backdrop") {
+    // The exhibit on a card over a full-bleed photograph of what it measures:
+    // the published reports' "numbers over the thing itself". The photo sets
+    // the subject; the card keeps the chart legible over it.
+    if (!slide.photo) throw new Error(`${id}: a photo-backdrop page needs \`photo\`, the picture the card sits on`);
+    if (exhibits.length !== 1) throw new Error(`${id}: a photo-backdrop page carries one exhibit on its card`);
+    const backdrop = slide.photo.path
+      ? { id: `${id}-backdrop`, component: "image-frame", props: { ...imageProps(slide.photo, baseDir), fit: "cover" }, size: SIZE }
+      : { id: `${id}-backdrop`, component: "image-frame", props: { alt: slide.photo.alt }, size: SIZE };
+    const card = { id: `${id}-card`, treatment: "card", layout: "flow.column", gap: "space.3",
+      size: { width: Math.round(BODY_WIDTH * 0.58), height: "fill" },
+      items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, SIZE),
+              ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, "open", fill, false, pointsStyle)] : [])] };
+    items.push({ id: `${id}-stage`, layout: "overlay", size: SIZE, items: [backdrop,
+      { id: `${id}-card-row`, layout: "flow.row", padding: "space.5", leftover: slide.photoSide === "right" ? "start" : "end", size: SIZE, items: [card] }] });
   } else {
     const points = slide.points || [];
     const tone = sideTreatment(slide);
