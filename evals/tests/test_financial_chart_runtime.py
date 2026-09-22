@@ -249,6 +249,31 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
+    def test_scatter_labels_clear_fixed_thresholds_without_moving_evidence(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const component=REGISTRY.get('chart.scatter');
+const props={points:[{name:'Highland well',x:0,y:0},{name:'Store / access',x:6,y:0},{name:'Twin main',x:6,y:2},{name:'Reuse',x:-10,y:12}],xMin:-10,xMax:10,yMin:-5,yMax:15,legend:false};
+for(const width of [680,1000]) {
+ const frame={x:60,y:150,width,height:420};
+ const baseline=component.render({id:'scatter',frame,props}).nodes;
+ const nodes=component.render({id:'scatter',frame,props:{...props,quadrants:{x:5,y:0}}}).nodes;
+ const marks=n=>n.filter(x=>x.role==='chart-marker').map(x=>x.frame);
+ assert.deepEqual(marks(nodes),marks(baseline),'threshold-aware placement preserves every point and scale');
+ const lines=nodes.filter(n=>n.role==='chart-threshold-line');
+ assert.deepEqual(lines.map(n=>n.data.threshold),[5,0]);
+ const labels=nodes.filter(n=>n.role==='data-label');
+ assert.deepEqual(labels.map(n=>n.text),props.points.map(p=>p.name));
+ for(const label of labels) for(const line of lines) {
+  const a=label.frame,b=line.frame;
+  assert.ok(!(a.x<b.x+b.width+3&&a.x+a.width+3>b.x&&a.y<b.y+b.height+3&&a.y+a.height+3>b.y),`${label.text} clears ${line.data.thresholdAxis} threshold`);
+ }
+ assert.ok(labels.find(n=>n.text==='Highland well').frame.y !== baseline.find(n=>n.text==='Highland well').frame.y);
+}
+console.log('{}');
+""")
+
     def test_scatter_quadrants_and_bubble_size_legend_are_theme_bound(self):
         result = run_node("""
 import assert from 'node:assert/strict';

@@ -1799,6 +1799,8 @@ function scatter({ id, frame, props, bubble = false }) {
   });
   const placed = [];
   const marks = nodes.filter((node) => node.role === "chart-marker");
+  // Thresholds are fixed evidence; move outside labels, never their points or bounds.
+  const labelObstacles = nodes.filter((node) => ["chart-marker", "chart-threshold-line", "chart-quadrant-title"].includes(node.role)).map((node) => node.frame);
   const intersects = (a, b) => a.x < b.x + b.width + 3 && a.x + a.width + 3 > b.x && a.y < b.y + b.height + 3 && a.y + a.height + 3 > b.y;
   for (const label of nodes.filter((node) => node.role === "data-label")) {
     const point = pointMap.get(`value:${label.text}`);
@@ -1826,7 +1828,7 @@ function scatter({ id, frame, props, bubble = false }) {
       { x: mark.frame.x + mark.frame.width + gap * 3, y: point.y - height / 2, width, height },
       { x: mark.frame.x - width - gap * 3, y: point.y - height / 2, width, height }
     ];
-    const candidate = candidates.find((candidate) => candidate.x >= plot.x && candidate.x + width <= plot.x + plot.width && candidate.y >= plot.y && candidate.y + height <= plot.y + plot.height && [...placed, ...marks.map((node) => node.frame)].every((other) => !intersects(candidate, other)));
+    const candidate = candidates.find((candidate) => candidate.x >= plot.x && candidate.x + width <= plot.x + plot.width && candidate.y >= plot.y && candidate.y + height <= plot.y + plot.height && [...placed, ...labelObstacles].every((other) => !intersects(candidate, other)));
     if (!candidate) throw new Error(`No collision-free position for scatter label ${label.text}; enlarge the exhibit or reduce labelled points`);
     label.frame = candidate;
     placed.push(candidate);
