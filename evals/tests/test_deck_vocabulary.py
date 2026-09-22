@@ -394,3 +394,16 @@ console.log(JSON.stringify(Object.keys(READING_TASKS)));
 """)
         for task in self.BANK["commentary"]:
             self.assertIn(task, known)
+
+
+class FigureRoleVocabularyTests(unittest.TestCase):
+    """The device families count the roles the figure components emit."""
+
+    def test_a_figure_icon_counts_as_an_icon(self):
+        for role in ("capsule-icon-glyph", "placement-icon-glyph", "arrow-row-icon-ring", "pictogram-figure-glyph"):
+            with self.subTest(role=role):
+                self.assertTrue(page_gates.DEVICE_FAMILIES["icon"].match(role))
+
+    def test_a_supplied_table_photo_counts_and_its_empty_slot_does_not(self):
+        self.assertTrue(page_gates.DEVICE_FAMILIES["picture"].match("table-photo"))
+        self.assertFalse(page_gates.DEVICE_FAMILIES["picture"].match("table-photo-placeholder"))

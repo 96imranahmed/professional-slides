@@ -47,7 +47,7 @@ Decide what the page has to make the reader see, then take the slide type that s
 | The people involved | `people`, with portraits when supplied | Names in a table |
 | Who is in a set | `logos`, `logo-collage` | A list of names |
 | A thing worth seeing: a product, a place, a film, a person | a picture layout (`picture-hero`, `picture-strip`, `photo` beside text, or a table `photo` column) | A description of it |
-| Report-style argument with no single exhibit | a text page of `paragraphs`, which sets in columns past about 170 words | A single wide block |
+| Report-style argument with no single exhibit | a text page of `paragraphs`, which sets in columns past about 110 words | A single wide block |
 | One sentence the deck turns on | `statement`, over a photograph when there is one | A title on an empty page |
 
 When two rows fit, the message decides: "China rose from sixth to first" is movement, so `rank-flow`; "China is first" is a level, so a sorted bar. Record the choice and the rejected alternative in the plan `why`. A deck that finds itself using one chart type for most of its charts should go back through this table page by page; `PLAN_CHART_MONOTONY` reports it.

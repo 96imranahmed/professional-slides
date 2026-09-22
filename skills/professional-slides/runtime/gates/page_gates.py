@@ -2085,8 +2085,14 @@ def gate_deck_craft(slides, analytical, findings):
 # rather than a whole role: the first version of this table looked for an exact
 # `card-icon` and would have scored every deck in the repository at zero icons.
 DEVICE_FAMILIES = {
-    "icon": re.compile(r"^(icon|list-icon|card-icon|table-cell-icon)(-|$)"),
-    "picture": re.compile(r"^(image|image-frame|cover-image|divider-image|statement-image|takeaways-image)(-|$)"),
+    # iconMarker suffixes the role it is given, so a component's own icon role
+    # ("capsule-icon", "placement-icon") arrives as "capsule-icon-glyph". The
+    # first version listed four prefixes and scored a deck of icon-led figures
+    # as drawing no icons at all.
+    "icon": re.compile(r"^(?:(?:icon|list-icon|card-icon|table-cell-icon)(?:-|$)|.*-icon-(?:glyph|ring)$|pictogram-figure)"),
+    # A table's photo cell counts once it holds a photograph; its empty slot is
+    # UNSOURCED_PICTURE's business, not a picture drawn.
+    "picture": re.compile(r"^(?:(?:image|image-frame|cover-image|divider-image|statement-image|takeaways-image)(?:-|$)|table-photo$)"),
     "score": re.compile(r"^table-(harvey|rating)"),
     "valuePill": re.compile(r"^table-bubble"),
     "cellBar": re.compile(r"^(table-bar|gantt-bar)"),

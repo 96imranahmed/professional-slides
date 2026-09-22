@@ -1133,11 +1133,11 @@ function metricsStrip(metrics, id, tone) {
 }
 
 // Words of prose one column carries before a document page opens a second.
-// A client report page sets prose at 45 to 75 characters a line, and a full
-// width column of 180 words runs to eight lines of about 150 characters each,
-// which the CPL gate already refuses; a second column is the fix a report
-// designer reaches for.
-const DOCUMENT_COLUMN_WORDS = 170;
+// A single column is capped at a readable measure of about 600px, so past a
+// hundred words or so it leaves the right half of the page standing empty; a
+// report designer opens the second column there rather than letting one
+// narrow column run down the left.
+const DOCUMENT_COLUMN_WORDS = 110;
 const wordsIn = (text) => String(text ?? "").split(/\s+/).filter(Boolean).length;
 
 /**
