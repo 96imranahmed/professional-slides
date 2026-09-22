@@ -49,17 +49,35 @@ def words(line: str) -> int:
     return len([w for w in re.split(r"\s+", line.strip()) if re.search(r"[A-Za-z0-9]", w)])
 
 
-def page_blocks(text: str) -> list[int]:
+def squash(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text)).strip()
+
+
+def strip_header(lines: list[str], header: set[str] | None) -> list[str]:
+    """Remove the title. The corpus drops a page's first line, which is its
+    title on a client page. A generated page often carries a section kicker
+    above the title, and the first-line rule then dropped the kicker and
+    counted the title as body. Given the page's own title and kicker lines,
+    those are removed instead; without them the first-line rule stands."""
+    if header:
+        return [l for l in lines if not (l.strip() and squash(l) in header)]
+    out, seen = [], False
+    for line in lines:
+        if line.strip() and not seen and not PAGE_NUMBER.match(line) and not SOURCE_LINE.match(line):
+            seen = True
+            continue
+        out.append(line)
+    return out
+
+
+def page_blocks(text: str, header: set[str] | None = None) -> list[int]:
     """Words per text block, the title, page numbers and source lines removed."""
-    kept, seen_title = [], False
-    for line in text.split("\n"):
+    kept = []
+    for line in strip_header(text.split("\n"), header):
         if not line.strip():
             kept.append("")
             continue
         if PAGE_NUMBER.match(line) or SOURCE_LINE.match(line):
-            continue
-        if not seen_title:
-            seen_title = True
             continue
         kept.append(line)
     out, run = [], 0
@@ -74,12 +92,22 @@ def page_blocks(text: str) -> list[int]:
     return [n for n in out if n >= 3]
 
 
-def body_words(text: str) -> int:
+def body_words(text: str, header: set[str] | None = None) -> int:
     """Body words as the reading-task bank counts them: every word but the title and source lines."""
-    lines = [l for l in text.split("\n") if l.strip() and not PAGE_NUMBER.match(l)]
-    if not lines:
-        return 0
-    return max(0, sum(words(l) for l in lines) - words(lines[0]) - sum(words(l) for l in lines if SOURCE_LINE.match(l)))
+    lines = [l for l in strip_header(text.split("\n"), header) if l.strip() and not PAGE_NUMBER.match(l)]
+    return max(0, sum(words(l) for l in lines) - sum(words(l) for l in lines if SOURCE_LINE.match(l)))
+
+
+HEADER_ROLES = ("action-title", "tracker-compact-label", "tracker-label", "kicker")
+
+
+def header_lines(slide: dict) -> set[str]:
+    """The page's title and kicker, line by line as they were set."""
+    out = set()
+    for node in slide.get("nodes", []):
+        if node.get("type") == "text" and str(node.get("role", "")) in HEADER_ROLES:
+            out |= {squash(line) for line in str(node.get("text", "")).split("\n") if line.strip()}
+    return out
 
 
 def extract(pdf: Path, page: int) -> str:
@@ -110,8 +138,9 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
         if task in STRUCTURAL_TASKS or is_cover(slide, index - 1):
             continue
         text = extract(pdf, index)
-        blocks = page_blocks(text)
-        body = body_words(text)
+        header = header_lines(slide) or None
+        blocks = page_blocks(text, header)
+        body = body_words(text, header)
         entry = {"page": index, "id": slide.get("id"), "task": task, "bodyWords": body,
                  "blocks": len(blocks), "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0,
                  "longestBlock": max(blocks) if blocks else 0, "blockSizes": blocks, "flags": []}

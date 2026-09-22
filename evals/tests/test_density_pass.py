@@ -39,6 +39,16 @@ class BlockExtractionTests(unittest.TestCase):
         self.assertEqual(density_profile.page_blocks(page), [12, 7])
         self.assertEqual(density_profile.body_words(page), 21)
 
+    def test_a_kicker_above_the_title_does_not_turn_the_title_into_body(self):
+        # A generated page sets its section kicker above the title. The corpus
+        # rule drops only the first line, so given the page's header lines the
+        # profile drops the kicker and the title both.
+        page = "\n".join(["What a page carries", "", "Client chart pages print 26 numbers", "", "Four words of body text here", "Source: dropped"])
+        header = {"What a page carries", "Client chart pages print 26 numbers"}
+        self.assertEqual(density_profile.page_blocks(page, header), [6])
+        self.assertEqual(density_profile.body_words(page, header), 6)
+        self.assertEqual(density_profile.body_words(page), 12)
+
 
 class DensityReviewTests(unittest.TestCase):
     def test_every_flagged_page_needs_a_verdict_and_only_right_passes(self):
