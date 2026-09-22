@@ -509,11 +509,16 @@ class Emitter:
             decimals = int(fmt["decimals"])
         else:
             # No declared format: labels read the way the drawn charts write them
-            # — whole numbers from ten up, one decimal below ten. A native chart
-            # that rounded 4.2 to 4 would disagree with its own scene.
+            # (value-format.mjs decimalsFor). A series rounds as one: whole
+            # numbers once any value reaches 100, otherwise one decimal when any
+            # value has one. This used to give the decimal only to values under
+            # ten, so a 100% stack printed 35.8 in its scene and 36 in PowerPoint.
             values = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
             fractional = [v for v in values if abs(v - round(v)) > 1e-9]
-            decimals = 1 if fractional and max(abs(v) for v in fractional) < 10 else 0
+            if len(values) > 1:
+                decimals = 0 if max(abs(v) for v in values) >= 100 else 1 if fractional else 0
+            else:
+                decimals = 1 if fractional and abs(fractional[0]) < 10 else 0
         # Four figures and up read with a thousands separator, the way the drawn
         # charts write them and every published page prints them.
         values_all = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]

@@ -772,6 +772,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // measured; PowerPoint draws its own category axis wherever it likes, so a
   // chart that carries category notes is assembled as shapes.
   if (props.native === false || type === "scatter" || type === "range") return null;
+  // Labels set outside the wedges with leaders are placed against the drawn
+  // circle; PowerPoint cannot reproduce them, so that variant stays drawn.
+  if (["pie", "donut"].includes(type) && (props.outsideLabels || props.variant === "outside-labels")) return null;
   // Explicit numeric x positions and keyed point labels are not a categorical
   // native line. Preserve their spacing and selected labels as editable shapes.
   if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;
@@ -829,7 +832,11 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     ...(ticks.length>1 ? {yMajorUnit:ticks[1]-ticks[0]} : {}),
     dataLabels,
     showValueAxis,
-    legend: props.legend === true || (series.length > 1 && props.legend !== false && !(type === "line" && props.endLabels !== false) && type !== "range"),
+    // A pie or donut names its categories in its legend (the drawn chart's
+    // "legend-top-right"); without one the native chart shows unlabelled wedges.
+    legend: props.legend === true || (["pie", "donut"].includes(type)
+      ? props.legend !== false && (props.variant ?? "legend-top-right") === "legend-top-right"
+      : series.length > 1 && props.legend !== false && !(type === "line" && props.endLabels !== false) && type !== "range"),
     gridlines: props.gridlines === true,
     valueFormat: props.valueFormat ?? null,
     colorIndices: Array.isArray(props.colorIndices) ? [...props.colorIndices] : null,

@@ -238,9 +238,18 @@ function insightNodes({ id, frame, props }) {
       // there is simply not emphasised - it is not an error.
       ? accentRuns(measured.text, props.highlight, { bold: false, accent: true, strict: false })
       : null;
+    // The runs above are cut from the wrapped text, so they carry its line
+    // breaks, and the PowerPoint emitter reads a break inside runs as a new
+    // paragraph: a highlight that fell just after a wrap split the band into two
+    // paragraphs on export. The emitter prefers runs over the unwrapped source,
+    // so those travel with the layout.
+    const emphasised = accented && accented.some((run) => run.accent);
+    const sourceRuns = emphasised && measured.source !== undefined
+      ? accentRuns(measured.source, props.highlight, { bold: false, accent: true, strict: false }).map((run) => ({ ...run, bold: true }))
+      : null;
     nodes.push(textPrimitive({ id: stableId(id, part), role: `insight-${part}`, frame: { x: textX, y, width: layout.width, height: measured.height }, text: measured.text,
-      ...(accented && accented.some((run) => run.accent) ? { runs: accented.map((run) => ({ ...run, bold: true })) } : {}),
-      style: { ...textStyle(part === "heading" ? token("type.heading") : BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, true, props.align ?? "left", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } }));
+      ...(emphasised ? { runs: accented.map((run) => ({ ...run, bold: true })) } : {}),
+      style: { ...textStyle(part === "heading" ? token("type.heading") : BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, true, props.align ?? "left", "top"), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: sourceRuns ? { ...measured, sourceRuns } : measured } }));
     y += measured.height + layout.gap;
   }
   return nodes;

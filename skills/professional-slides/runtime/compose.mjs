@@ -271,7 +271,13 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
     // Lines carry their series name at the end of the line instead of a legend,
     // and no per-point labels when there is more than one series.
     const line = type === "chart.line" || type === "chart.area";
-    const props = { dataLabels: !(line && multi), legend: multi && !line, ...(line && multi ? { endLabels: true } : {}), highlights: [], annotations: [], referenceLines: [], ...rest };
+    // A pie or donut has no series list, so `multi` is false and the legend
+    // default came out false - which a part-to-whole chart reads as "the legend
+    // is shared with a neighbour" and draws none. A standalone donut named no
+    // category anywhere. Its categories are its labels, so it keeps its legend
+    // unless the author places them otherwise.
+    const partToWhole = type === "chart.pie" || type === "chart.donut";
+    const props = { dataLabels: !(line && multi), ...(partToWhole ? {} : { legend: multi && !line }), ...(line && multi ? { endLabels: true } : {}), highlights: [], annotations: [], referenceLines: [], ...rest };
     // Switching off the default endpoint labels must retain series identity.
     if (line && multi && !props.endLabels && props.directLabels !== "end" && rest.legend === undefined) props.legend = true;
     // Lines that finish close together need their end labels pushed apart, which
@@ -1701,7 +1707,19 @@ const SIDEWAYS_CATEGORIES = new Set(["chart.bar", "chart.stacked-bar", "chart.lo
 export function percentStack(ex) {
   if (!ex || !ex.percent || !["chart.stacked-column", "chart.stacked-bar"].includes(ex.type) || !Array.isArray(ex.series) || !Array.isArray(ex.categories)) return ex;
   const totals = ex.categories.map((_, i) => ex.series.reduce((sum, sr) => sum + (sr.values[i] || 0), 0));
-  const series = ex.series.map((sr) => ({ ...sr, values: sr.values.map((v, i) => (totals[i] ? Math.round((v / totals[i]) * 1000) / 10 : 0)) }));
+  // Shares to one decimal by largest remainder, so each column sums to exactly
+  // 100. Rounding each share on its own let 24, 13 and 14 come to 100.1, past
+  // the 0-100 axis the chart then refused to draw.
+  const shares = ex.categories.map((_, i) => {
+    if (!totals[i]) return ex.series.map(() => 0);
+    const exact = ex.series.map((sr) => ((sr.values[i] || 0) / totals[i]) * 1000);
+    const floors = exact.map(Math.floor);
+    let short = 1000 - floors.reduce((a, b) => a + b, 0);
+    const order = exact.map((v, k) => [v - floors[k], k]).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+    for (const [, k] of order) { if (short <= 0) break; floors[k] += 1; short -= 1; }
+    return floors.map((v) => v / 10);
+  });
+  const series = ex.series.map((sr, k) => ({ ...sr, values: sr.values.map((_, i) => shares[i][k]) }));
   const { percent, ...rest } = ex;
   return { ...rest, series, unit: ex.unit || "% of total", yMin: 0, yMax: 100, change: ex.change ?? false };
 }
