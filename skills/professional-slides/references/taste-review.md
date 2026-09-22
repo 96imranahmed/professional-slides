@@ -4,7 +4,7 @@ One independent first reader inspects each candidate after generation. Passing g
 
 ## Independent first reading
 
-Spawn one reviewer per whole-deck candidate. Give the realistic brief, exact artifact paths, source records and available references. Withhold prior scores, the requested target, the repair list and preferred verdict until the reviewer has written its first assessment. Then permit targeted regression verification without revising history to match an expected result.
+Spawn one reviewer per whole-deck candidate. Give the realistic brief, exact artifact paths, source records and available references. Withhold prior scores, the requested target, the repair list and preferred verdict until the reviewer has written its first assessment. Keep prior-review artifacts and peer status summaries outside the first reader's context; if exposure occurs, disclose it and use a fresh reader for the independent score. Then permit targeted regression verification without revising history to match an expected result.
 
 ```text
 Review <candidate> as its intended reader, using <brief> and <source records>.

@@ -145,19 +145,9 @@ export async function buildReviewPacket({ outputDirectory, brief = "", answer = 
   return { packetDir, packet };
 }
 
-/**
- * What the deck is made of, counted off the scene.
- *
- * The beautification pass is a judgement, and a judgement is easier to make
- * against a number than against a feeling. A reviewer told that the deck draws
- * on 2.9 exhibits per ten pages where the reference runs 7 is being handed the
- * finding; a reviewer asked whether it "feels varied" is being asked to guess.
- */
+/** Descriptive diagnostics for corpus analysis; not editorial targets or reference proof. */
 export function designStatistics(scene) {
-  // A treatment is anything a reader can see that a plain grid does not do.
-  // Client tables carry one 100% of the time - 32 of 32 - so a zebra band
-  // counts as much as a harvey ball, and so do an icon on every row and a
-  // numbered category marker. `page_gates.py` holds the same list, because the
+  // Counts describe rendered devices, not whether their semantic use is appropriate. `page_gates.py` holds the same list, because the
   // build has to be able to refuse a deck and the build reads that file.
   const TREATMENT = /^table-(bubble|bar|rating-|implication|column-band|row-band|zebra-band|harvey|status-pill|number-circle|lamp|dot|check|progress-|cell-icon|section-marker|section-number)/;
   const ANNOTATION = /^(annotation-|chart-(bracket|delta|event-|highlight|reference|band|callout|change))/;
@@ -202,7 +192,11 @@ export function designStatistics(scene) {
 }
 
 export function reviewPrompt(packet) {
+  // Historical corpus aggregates remain available to analysis callers, not as review targets.
+  const { reference: historicalReference, ...candidateStatistics } = packet.statistics || {};
   return `You are reviewing a consulting deck against the client's brief. Look at every rendered slide image and the montage; read the text. Judge it the way an engagement manager would the night before a steering committee.
+
+Read references/storylining.md, references/design.md and references/taste-review.md before assessing. The taste-review guidance owns benchmark calibration and literal coverage. Do not consult prior candidate scores, repair lists or peer status summaries.
 
 BRIEF: ${packet.brief || "(not supplied)"}
 GOVERNING ANSWER: ${packet.answer || "(not supplied)"}
@@ -221,12 +215,14 @@ ${packet.slides.flatMap((s) => s.gateFindings.map((f) => `- slide ${s.index} ${f
 Slide images: ${packet.slides.map((s) => s.image).join(", ")}
 Montage: ${packet.montage}
 
-VISUAL REVIEW. Read all spreads and inspect uncertain details at full size. Follow the semantic checks in references/design.md: coherent argument and counts; reconciled totals, periods, sample membership and durations; scoped comparisons, non-causal wording unless supported, and reversal conditions that affect the named option; focus that supports the claim; appropriate table category/dimension grammar; one chart heading owner; consistent qualifiers; vertically balanced sparse groups; meaningful arrows and rules; and cross-slide consistency. Neutral charts, joined verdicts, optional commentary and repeated comparison layouts are valid. Do not require pictures, icons, highlights or layout variety to meet quotas. Record concrete defects, not preferences.
+VISUAL REVIEW. Inspect every original page at full size, every spread and the montage. Follow the semantic checks in references/design.md: coherent argument and counts; reconciled totals, periods, sample membership and durations; scoped comparisons, non-causal wording unless supported, and reversal conditions that affect the named option; focus that supports the claim; appropriate table category/dimension grammar; one chart heading owner; consistent qualifiers; vertically balanced sparse groups; meaningful arrows and rules; and cross-slide consistency. Neutral charts, joined verdicts, optional commentary and repeated comparison layouts are valid. Do not require pictures, icons, highlights or layout variety to meet quotas. Record concrete defects, not preferences.
 
-What this deck is made of, beside what a reference deck carries:
-${JSON.stringify(packet.statistics, null, 1)}
+Candidate diagnostics, not quality targets:
+${JSON.stringify(candidateStatistics, null, 1)}
 
-A number below the reference is not automatically a defect - a short deck of one argument may honestly use three exhibits - but it is where to look first, and where it is a defect say so with the code above.
+Compare strong relevant original pages from every requested reference deck before scoring. Record exact pages inspected and missing coverage in a companion assessment. Historical aggregate device counts do not establish a benchmark. Explain concrete differences in evidence relationships and reader effort; do not infer quality from more devices or annotations. Compare substantive text against matched reading tasks, preserving necessary explanation without padding.
+
+Name the best page, worst page and most repetitive sequence. Challenge the most deletable page with a concrete merger and identify any lost evidence. Reproduce material calculations from supplied source records; disclose unverified assumptions. Record argument, evidence, visual explanation, hierarchy/copy and sequence quality in the companion assessment.
 
 After inspecting them, record inspectedSlides from these IDs: ${JSON.stringify(packet.inspectedSlides)}. Bind this review to ${packet.binding}. Rate the actual deck out of ten independently of any requested target. A passing gate is not a taste score.
 
