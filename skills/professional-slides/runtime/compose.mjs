@@ -2020,8 +2020,12 @@ const SHAPES = {
   // page 2 was this page assembled by hand, and nothing said to write it.
   "executive-summary": (slide) => {
     const findings = slide.points || slide.rows;
-    if (!Array.isArray(findings) || findings.length < 2 || findings.length > 5) {
-      throw new Error("An executive summary carries two to five findings in `points`");
+    // Up to seven: a client executive summary is the densest text page in the
+    // deck, four to six developed statements of about sixty words with their
+    // parts as sub-points (L.E.K.'s runs to 245 words a page), not three
+    // bullets and an insight box.
+    if (!Array.isArray(findings) || findings.length < 2 || findings.length > 7) {
+      throw new Error("An executive summary carries two to seven findings in `points`");
     }
     return {
       density: slide.density ?? "pre-read",

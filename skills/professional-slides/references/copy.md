@@ -28,6 +28,8 @@ A synthesis explains its scoped answer to the depth the communication job needs.
 3. Integrate the recommendation or condition where it belongs in the argument, preserving the alternatives and the criterion that changes their preference.
 4. Read the summary alone: can the reader explain the governing answer, the supporting case and the material countercase?
 
+Write it dense. The client executive summary is the fullest text page in the deck: L.E.K.'s freight study runs two summary pages of 243 and 252 words, each four developed statements of about sixty words with their parts set as sub-points, and no closing insight box. Three one-line bullets and a takeaway band is a table of contents for the argument, not the argument. Give each statement its evidence, its qualification and what follows, and use a point's `points` for the parts it lists (the options compared, the criteria, the conditions). A closing band is optional; the page's last statement can carry the consequence. The density profile will mark a summary this full as dense for a text page, and the review judges it against this job rather than the text-page median.
+
 Summary theme headings state substantive conclusions - "Career and industry", not "Chapter 1".
 
 ## Body copy

@@ -531,7 +531,14 @@ export function normalizeListItems(items) {
     // house colour, which is how the reference pages emphasise the finding
     // inside a sentence rather than bolding the whole line.
     const highlight = o.highlight === undefined || o.highlight === null ? null : o.highlight;
-    return { lead, text, icon: o.icon ?? null, state: o.state ?? null, highlight, number: o.number ?? index + 1 };
+    // `points`: sub-points under the item, each a short line set at an indent
+    // with a dash - the way a client executive summary develops a statement
+    // into its parts ("the vision includes: - better data - planning ...").
+    if (o.points !== undefined && (!Array.isArray(o.points) || o.points.some((sub) => typeof sub !== "string" || !sub.trim()))) {
+      throw new Error("A point's sub-points are a list of nonempty strings");
+    }
+    const points = (o.points || []).map((sub) => sub.trim());
+    return { lead, text, icon: o.icon ?? null, state: o.state ?? null, highlight, number: o.number ?? index + 1, points };
   });
 }
 
@@ -570,6 +577,7 @@ function bodyListLayout(frame, itemsIn, props = {}) {
   if (frame.width <= offset) throw new Error("Body bullet list has no text width");
   const width = frame.width - offset;
   const font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 };
+  const subIndent = tokenValue(token("space.5"));
   // `inlineLead`: the lead runs *into* the sentence in the house accent rather
   // than sitting above it in bold - the way the reference icon lists set the
   // phrase that carries the finding. The item then measures as one block.
@@ -580,7 +588,9 @@ function bodyListLayout(frame, itemsIn, props = {}) {
       const runs = accentRuns(joined, item.highlight ?? [item.lead], { bold: true, accent: true, strict: false })
         || [{ text: joined }];
       const block = measureTextRuns(runs, width, font);
-      return { item, lead: null, text: block, textHeight: block.height, height: Math.max(block.height, markerWidth) };
+      const subs = item.points.map((sub) => measureText(sub, Math.max(1, width - subIndent), font));
+      const subHeight = subs.reduce((sum, sub) => sum + sub.height, 0) + (subs.length ? leadGap * subs.length : 0);
+      return { item, lead: null, text: block, subs, textHeight: block.height + subHeight, height: Math.max(block.height + subHeight, markerWidth) };
     }
     // A highlight inside the lead is set in the accent on the lead's own line;
     // inside the text it flows with the sentence.
@@ -592,10 +602,12 @@ function bodyListLayout(frame, itemsIn, props = {}) {
     const textRuns = item.text && !(leadRuns && leadRuns.some((run) => run.accent)) ? accentRuns(item.text, item.highlight, { bold: houseStyle("style.labelWeight") !== "regular", strict: false }) : null;
     const lead = item.lead ? (leadRuns && leadRuns.some((run) => run.accent) ? measureTextRuns(leadRuns.map((run) => ({ ...run, bold: true })), width, font) : measureText(item.lead, width, { ...font, bold: true })) : null;
     const text = item.text ? (textRuns ? measureTextRuns(textRuns, width, font) : measureText(item.text, width, font)) : null;
-    const textHeight = (lead?.height ?? 0) + (lead && text ? leadGap : 0) + (text?.height ?? 0);
-    return { item, lead, text, textHeight, height: Math.max(textHeight, markerWidth) };
+    const subs = item.points.map((sub) => measureText(sub, Math.max(1, width - subIndent), font));
+    const subHeight = subs.reduce((sum, sub) => sum + sub.height, 0) + (subs.length ? leadGap * subs.length : 0);
+    const textHeight = (lead?.height ?? 0) + (lead && text ? leadGap : 0) + (text?.height ?? 0) + subHeight;
+    return { item, lead, text, subs, textHeight, height: Math.max(textHeight, markerWidth) };
   });
-  return { marker, offset, gap, leadGap, ringed, markerSize: plain ? markerSquare : markerWidth, measured, height: measured.reduce((sum, m) => sum + m.height, 0) + gap * (items.length - 1) };
+  return { marker, offset, gap, leadGap, subIndent, ringed, markerSize: plain ? markerSquare : markerWidth, measured, height: measured.reduce((sum, m) => sum + m.height, 0) + gap * (items.length - 1) };
 }
 
 function bodyListNodes({ id, frame, props }) {
@@ -677,6 +689,14 @@ function bodyListNodes({ id, frame, props }) {
       ty += m.lead.height + (m.text ? layout.leadGap : 0);
     }
     if (m.text) nodes.push(textPrimitive({ id: stableId(id, "item", index), role: "list-item", frame: { x: frame.x + layout.offset, y: ty, width: frame.width - layout.offset, height: m.text.height }, text: m.text.text, ...(m.text.runs && m.text.runs.some((run) => run.accent) && !inverse ? { runs: m.text.runs } : {}), style: { ...textStyle(BODY, INK_, false, "left", "top"), lineHeight: m.text.lineHeight }, data: { textLayout: m.text } }));
+    if (m.text) ty += m.text.height;
+    m.subs.forEach((sub, k) => {
+      ty += layout.leadGap;
+      const x = frame.x + layout.offset;
+      nodes.push(rectPrimitive({ id: stableId(id, "sub-marker", index, k), role: "list-submarker", frame: { x: x + 4, y: ty + sub.lineHeight / 2 - 0.5, width: tokenValue(token("space.2")), height: 1 }, style: boxStyle(INK_, INK_, HAIRLINE, token("radius.none")) }));
+      nodes.push(textPrimitive({ id: stableId(id, "sub", index, k), role: "list-subitem", frame: { x: x + layout.subIndent, y: ty, width: frame.width - layout.offset - layout.subIndent, height: sub.height }, text: sub.text, style: { ...textStyle(BODY, INK_, false, "left", "top"), lineHeight: sub.lineHeight }, data: { textLayout: sub } }));
+      ty += sub.height;
+    });
     y += m.height + layout.gap + extraGap;
   });
   return nodes;
@@ -1332,7 +1352,7 @@ function registerCore(registry) {
       const caption = props.variant === "caption";
       return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: caption ? "panel-caption" : "paragraph", frame: { ...frame, width }, text: props.text, ...(props.runs?{runs:props.runs}:{}), style: textStyle(caption ? COMPACT : BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") })] };
     } }),
-    component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.accent", "color.componentPrimary", "color.onPrimary", "color.rule", "space.1", "space.3", "space.4", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "circle" }) }) }),
+    component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.accent", "color.componentPrimary", "color.onPrimary", "color.rule", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "circle" }) }) }),
     component({ id: "insight", category: "section", role: "insight", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.3", "space.4", "space.5", "space.6", "line.hairline", "line.standard", "radius.small", "radius.round", "icon.medium"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
     component({ id: "callout", category: "section", role: "callout", tokens: ["color.calloutTint", "color.caution", "color.accent", "color.surface", "color.ink", "font.body", "type.compact", "type.body", "space.2", "space.3", "space.4", "line.hairline", "radius.none"], preferredSize: { width: 360, height: 72 }, sample: { text: "(Insert reading note)" }, render: input => ({ nodes: calloutNodes(input) }) }),
     component({ id: "evidence-note", category: "section", role: "evidence-note", tokens: ["color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.3", "space.4", "space.5", "space.6", "line.hairline", "line.standard", "radius.small", "radius.round", "icon.medium"], preferredSize: { width: 1160, height: 150 }, sample: { heading: "Measurement basis", text: "(Insert scope, period or scenario assumptions)" }, render: input => { if (!input.props.heading || !input.props.text) throw new Error("Evidence note requires heading and body"); return { nodes: insightNodes({...input, props:{...input.props, variant:"neutral", align:"left"}}).map(node => ({...node, role:node.role.replace("insight-", "evidence-note-")})) }; } }),

@@ -1,4 +1,4 @@
-// Fifteen figure families the reference corpus uses and the skill could not draw.
+// Seventeen figure families the reference corpus uses and the skill could not draw.
 //
 // A 400-page sample of the corpus (evals/corpus/styles) was classified into 85
 // design styles and each probed against the runtime. These are the diagram and

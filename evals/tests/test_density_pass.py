@@ -60,6 +60,24 @@ class PopulationTests(unittest.TestCase):
             self.assertFalse(density_profile.prose_task(task), task)
 
 
+class ExecutiveSummaryTests(unittest.TestCase):
+    def test_a_summary_carries_up_to_seven_developed_points_with_sub_points(self):
+        # The client summary is four to six developed statements with their
+        # parts as sub-points, not three bullets and an insight box.
+        result = run_node("""
+import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
+const points=Array.from({length:6},(_,i)=>({lead:'Statement '+(i+1)+'.',text:'A developed statement with its evidence and what follows from it.',...(i===0?{points:['The first part','The second part']}:{})}));
+const spec={schema:'professional-slides.deck/v3',id:'e',cover:{title:'x'},slides:[{title:'The answer the deck argues, stated in one line',role:'executive-summary',shape:'executive-summary',pointsStyle:'prose',points}]};
+const page=planDeck(toDeckPlan(spec,'.')).deck.slides.at(-1);
+let error=null; try{toDeckPlan({...spec,slides:[{...spec.slides[0],points:[...points,...points]}]},'.');}catch(e){error=e.message;}
+console.log(JSON.stringify({items:page.nodes.filter(n=>n.role==='list-item').length,subs:page.nodes.filter(n=>n.role==='list-subitem').map(n=>n.text),error}));
+""")
+        self.assertEqual(result["items"], 6)
+        self.assertEqual(result["subs"], ["The first part", "The second part"])
+        self.assertIn("two to seven", result["error"])
+
+
 class DensityReviewTests(unittest.TestCase):
     def test_every_flagged_page_needs_a_verdict_and_only_right_passes(self):
         result = run_node("""

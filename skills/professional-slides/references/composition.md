@@ -101,7 +101,7 @@ Choose a preset because its evidence relationship fits the page, not to meet a w
 
 | `shape` | What it is | What it needs |
 | --- | --- | --- |
-| `executive-summary` | the opening answer, proof, consequence and action | two to five `points`; optional `metrics` |
+| `executive-summary` | the opening answer, proof, consequence and action | two to seven developed `points`, each with optional sub-`points`; optional `metrics` |
 | `findings-matrix` | findings down the left, two or three columns of short bulleted evidence across | `rows` with `cells` |
 | `measure-table` | grouped measures under grouped headers with their units, footnote markers on the cells that need a basis | a `table` exhibit, `derive`, `total` |
 | `model-page` | the assumptions grid behind a forecast | a chart plus its `dataTable` |
