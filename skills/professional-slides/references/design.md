@@ -15,6 +15,8 @@ Name what each mark, row, panel and arrow represents. Count the actual observati
 
 For hard pages, sketch two plausible evidence structures at low fidelity; select on reading effort and preserved proof. Change the structure when it improves the relationship, not to rotate templates. Record the reason and rejected alternative in existing plan `why`. Two regions must add different necessary evidence; a second component is not a variety token.
 
+Prefer one primary chart or table with developed implications when it can carry the argument. A separate chart-plus-table pair is an uncommon, deliberate exception: specify what necessary relationship each contributes and why neither one exhibit nor local labels suffice. A chart of a total beside a table decomposing the same authority usually belongs in one table with interpretation. A compact data strip directly aligned to chart categories can instead be part of that chart. For an evidence-to-implication layout, use the established dashed separator and one arrow centred on the evidence body; focus rows never move it. Keep this an appropriate inference treatment, not a new layout quota, and retain varied mechanisms, sequences and comparisons elsewhere.
+
 ## Choose visual treatments during planning
 
 Use the existing `why`, `treatment`, `anchors`, `highlight`, `annotation` and `insight` fields. A composite identifies the intended treatment of each child. The table below is the semantic owner for these decisions; chart/component references own executable props.
@@ -48,6 +50,8 @@ Remove subtitles that duplicate chart headings by meaning, not merely shared wor
 Use [Charts: category and verdict semantics](charts.md#category-and-verdict-semantics) for exact props. A plain verdict joins the table with continuous row fills; a gutter belongs only to an authored inference-arrow variant. A table-wide arrow centers in the evidence body independently of highlighted rows. Per-row arrows are a distinct choice. Chevron headers have no redundant underline. Unordered classes get no sequence numbering. Heat scales and Harvey balls need a defined rubric; conclusion/total rows keep their own role.
 
 Paired tables can share column widths and row anchors while retaining different semantic treatment. Parent alignment must not erase a child's category or verdict choice. When splitting a comparison, repeat the needed schema, units and common physical scale; do not split simply to change the silhouette.
+
+For a justified chart/table pair, declare the shared heading-rule or evidence-start anchor and allow for the chart's heading and legend before placing the table. Do not independently centre a headed table in the chart's full frame: its header then floats below the neighbouring heading and its rows start arbitrarily. Align shared categories row by row when that is the actual relationship. Reference examples: BCG NYC p19 aligns chart/implication heading rules and attaches a numeric strip to chart categories; Denali p11 aligns peer heading rules; Denali p8 joins amounts, drivers and methodology in one table. These are alignment/reading-order examples, not permission to copy their colors or add headings to every table.
 
 ## Space, type and boundaries
 
