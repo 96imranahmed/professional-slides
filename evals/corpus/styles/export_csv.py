@@ -6,8 +6,9 @@ One row per classified page, beside the corpus's own index.csv, so a page can
 be found from its style and a style traced to its pages. `skill_status` is
 `claimed` until the style's probe page composes, then `verified`; a style the
 skill cannot draw is `missing`. `sample` says which draw the page came from:
-`client` (pages 1-400, client and proposal decks) or `published` (401-600, the
-firms' published and infographic reports).
+`corpus` (pages 1-400: 300 from the Slideworks decks and 100 from the rest of
+the corpus, most of it published work either way) or `published` (401-600,
+thought-piece reports only, none of the pages the first draw took).
 """
 from __future__ import annotations
 
@@ -43,7 +44,7 @@ with open(out, "w", newline="", encoding="utf-8") as handle:
             status = "missing"
         else:
             status = "verified" if verified.get(style) is True else "claimed"
-        writer.writerow(["published" if n in published else "client", n, page["listing"], page["firm"], page["deckType"], page["title"], page["path"],
+        writer.writerow(["published" if n in published else "corpus", n, page["listing"], page["firm"], page["deckType"], page["title"], page["path"],
                          page["page"], page["sha256"], vocab["families"].get(style[0], ""), style,
                          vocab["styles"].get(style, "Blank or placeholder page"),
                          "; ".join(entry["devices"]), status, via or ""])
