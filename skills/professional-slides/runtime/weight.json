@@ -228,6 +228,14 @@
         "familiesMin": 4,
         "from": 12,
         "$comment": "Device families a deck actually draws, measured on the composed scene. A vocabulary floor rather than a rate measured off client PDFs: what share of client pages carry a harvey ball cannot be read off a render. It asserts only that a deck of twelve analytical pages or more reached for more than a couple of the families it has."
+      },
+      "chartTypeShare": {
+        "$comment": "The largest share one chart type may take of a deck's charts, once it has eight or more. The gallery deck, the only example with that many, spreads 31 charts across 15 types and its commonest takes 19%. A fifty-page deck that set seven of its seventeen charts as columns (41%) passed every other check and read as one chart reprinted. Advisory: the example set is one deck deep.",
+        "max": 0.35,
+        "fromCharts": 8,
+        "observed": {
+          "gallery-acceptance": 0.19
+        }
       }
     },
     "textForm": {

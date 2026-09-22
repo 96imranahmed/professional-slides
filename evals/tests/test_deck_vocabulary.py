@@ -329,3 +329,41 @@ console.log(JSON.stringify(readingTaskMismatch({json.dumps(task)}, {{nodes: {jso
 
     def test_a_task_outside_the_vocabulary_is_not_second_guessed(self):
         self.assertIsNone(self.mismatch("comparison-table", self.FULL_WIDTH))
+
+
+class ChartMonotonyTests(unittest.TestCase):
+    """One chart type doing most of a deck's charting is reported."""
+
+    def gate(self, charts, extra=()):
+        pages = [{"id": f"p{i}", "n": i + 1, "exhibit": t, "architecture": "evidence-only", "why": "because"}
+                 for i, t in enumerate(list(charts) + list(extra))]
+        return run_node(f'''
+import {{runPlanGates}} from './skills/professional-slides/runtime/gates/plan_gates.mjs';
+const r = runPlanGates({{schema:'professional-slides.plan/v1', pages:{json.dumps(pages)}}});
+console.log(JSON.stringify(r.findings.filter(f => f.code === 'PLAN_CHART_MONOTONY')));
+''')
+
+    def test_seven_columns_in_seventeen_charts_is_reported(self):
+        charts = ["chart.column"] * 7 + ["chart.bar"] * 3 + ["chart.line"] * 3 + ["chart.scatter", "chart.pie", "chart.waterfall", "chart.combo"]
+        found = self.gate(charts)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["measured"]["chart"], "chart.column")
+        self.assertIn("selector table", found[0]["repair"])
+
+    def test_a_spread_of_charts_passes(self):
+        charts = ["chart.column", "chart.bar", "chart.line", "chart.scatter", "chart.waterfall", "chart.combo",
+                  "chart.dumbbell", "chart.waffle", "chart.column", "chart.bar"]
+        self.assertEqual(self.gate(charts), [])
+
+    def test_a_deck_with_few_charts_is_not_judged_on_their_mix(self):
+        self.assertEqual(self.gate(["chart.column"] * 5), [])
+
+    def test_it_is_advisory(self):
+        charts = ["chart.column"] * 8
+        report = run_node(f'''
+import {{runPlanGates}} from './skills/professional-slides/runtime/gates/plan_gates.mjs';
+const pages = {json.dumps([{"id": f"p{i}", "n": i + 1, "exhibit": t, "architecture": "evidence-only", "why": "b"} for i, t in enumerate(charts)])};
+const r = runPlanGates({{schema:'professional-slides.plan/v1', pages}});
+console.log(JSON.stringify(r.findings.filter(f => f.code === 'PLAN_CHART_MONOTONY').map(f => f.severity)));
+''')
+        self.assertEqual(report, ["advisory"])

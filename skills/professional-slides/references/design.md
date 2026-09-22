@@ -2,6 +2,56 @@
 
 Design owns the evidence relationship, attention, treatment and visual hierarchy. [Storylining](storylining.md) owns whether the claim is supported and deserves a page; [Composition](composition.md) owns its geometry.
 
+## Pick the slide type from what the page says
+
+Decide what the page has to make the reader see, then take the slide type that shows exactly that. A deck built this way is varied because its messages are, not because it rotates templates; one that reaches for a column chart and a table on every page has skipped this step. The catalogue below is the whole range, measured against 400 pages of client and published work (`evals/corpus/styles`): 77 of the 85 styles found there compose, covering 96% of those pages.
+
+| The page has to show | Take | Not |
+| --- | --- | --- |
+| A level compared across a few categories | `chart.column`, or `chart.bar` when labels are long or it is a ranking | A table of the same numbers |
+| A ranking where the order is the finding | `chart.lollipop`, `chart.bar` sorted | A pie |
+| Change over time | `chart.line`; `chart.column` for a handful of periods | Unconnected bars for a trend |
+| Parts of a whole, one period | `chart.donut` for two to four parts, `chart.waffle` for a share read as counts, `chart.treemap` for many | A pie with eight slices |
+| Composition changing over time | `chart.stacked-column`, `chart.stacked-area` | Side-by-side pies |
+| Size and share together, two dimensions | `chart.marimekko` | Two separate charts |
+| Two measures on one category set | `chart.combo` | Twin axes without a reason |
+| A bridge from one total to another | `chart.waterfall` | A stacked bar |
+| Before against after, per category | `chart.dumbbell`, `chart.slope` | Grouped bars with ten pairs |
+| A relationship between two measures | `chart.scatter`; `chart.bubble` when a third measure matters | A table of pairs |
+| Spread within groups | `chart.boxplot`, `chart.range` | An average alone |
+| A population share read as "six in ten" | `pictogram` | A single bar at 60% |
+| Rank movement across periods | `rank-flow` | A table of ranks |
+| Quantities moving from one set to another | `sankey` | Two tables |
+| Where on a map | `map` (highlight, markers, choropleth) | A list of countries |
+| One number that is the whole point | `hero-number` layout with the evidence that produced it | A bullet |
+| Three to six headline numbers | `metrics` strip; `stat-list` when each needs its sentence, dark for a side panel | Numbers buried in prose |
+| Exact values looked up across fields | `table`, with the treatment the cells call for: `bar`, `heat`, `bubble`, harvey, state | A chart that hides the digits |
+| Options judged on criteria | `table` with harvey or check cells and a verdict column | Prose pros and cons |
+| A sequence of steps | `process`, `chevron-process`; `steps` when each builds on the last | A numbered list |
+| Steps with branches or merges | `flow` | Chevrons that pretend it is linear |
+| Something that repeats | `cycle` | A process with an arrow drawn back |
+| Dated milestones | `timeline`; `gantt` for durations and parallel work; `roadmap` for waves | A table of dates |
+| Stages across lanes or owners | `roadmap` phase-workstreams, a swimlane `table` | Separate lists per owner |
+| A decision with branches | `tree` | Nested bullets |
+| A hierarchy or dependency stack | `framework` pyramid, `layers` | A list with indents |
+| An ambition resting on levers | `framework` house | Three unrelated boxes |
+| Items sorted into categories | `placement` | A table with one column of ticks |
+| Two things judged on two axes | `matrix` with plotted items; `quadrants` when each box holds a list | A ranked list |
+| Position between two poles | `spectrum` | A 1-to-5 score nobody measured |
+| A hub and what depends on it | `relationship-network` hub-ring | A list of dependencies |
+| Two to five priorities as equals | `capsules`, `cards` | A paragraph |
+| Scenarios that each lead somewhere | `arrow-rows` | A table of scenarios |
+| From one state to another | `compare`, `two-up-contrast` | Before and after in prose |
+| Named categories, each with a meaning | `cards` with an icon each; `icon-trends` columns | Plain bullets |
+| What people said | `quote-cluster` | Quotes inside bullets |
+| The people involved | `people`, with portraits when supplied | Names in a table |
+| Who is in a set | `logos`, `logo-collage` | A list of names |
+| A thing worth seeing: a product, a place, a film, a person | a picture layout (`picture-hero`, `picture-strip`, `photo` beside text, or a table `photo` column) | A description of it |
+| Report-style argument with no single exhibit | a text page of `paragraphs`, which sets in columns past about 170 words | A single wide block |
+| One sentence the deck turns on | `statement`, over a photograph when there is one | A title on an empty page |
+
+When two rows fit, the message decides: "China rose from sixth to first" is movement, so `rank-flow`; "China is first" is a level, so a sorted bar. Record the choice and the rejected alternative in the plan `why`. A deck that finds itself using one chart type for most of its charts should go back through this table page by page; `PLAN_CHART_MONOTONY` reports it.
+
 ## Allocate evidence before geometry
 
 Name what each mark, row, panel and arrow represents. Count the actual observations, stages, comparison fields and longest labels. Choose the relationship that makes the title inspectable before choosing a component. Use the [illustrated reference atlas](reference-atlas.md) for candidate structures and counterexamples.
@@ -70,7 +120,7 @@ Use the existing `why`, `treatment`, `anchors`, `highlight`, `annotation` and `i
 | Count pills | A selected count field benefits from distinct scanning and a common pill size. | The value is a date, score, arbitrary label or unsupported metric. |
 | Status | A short verdict explicitly means good/bad: color Cleared/Met or Missed, or use a labelled check/cross. | Identity, preference and ordinary category membership are not status. Positive/negative colors never map chart marks, swatches or backgrounds. |
 | Closing insight | A supported consequence is otherwise buried and deserves a closing band. Write it before reserving space. | It paraphrases the title, rereads the rows or fills whitespace. |
-| Image | Recognition or visible features are necessary evidence: product, place, physical allocation or attributed specimen. Resolve usable assets before layout. | A named subject alone does not need a picture. Imagery cannot establish performance, safety or causality. |
+| Image | The subject has a visual identity a reader recognises: a film, a product, a brand, a place, a person, a physical site or specimen. Plan a picture for each such subject while drafting, and say where each comes from. A picture the author must supply - a poster, a product shot, a logo - is planned as `{ alt }` and asked for; the author supplies the file and the use they are entitled to make of it, which becomes its `credit`. | The subject is a number, a process or an abstraction with nothing to look at. Imagery cannot establish performance, safety or causality, and a stock photograph of a generic scene is decoration. |
 
 Resolve focus from the claim before selecting a palette. Record the exact subject keys and affected measures in `why`, then carry that focus coherently through corresponding marks or labels in a composite. For example, a district driving demand growth should be easy to find in both the level comparison and its aligned change strip. A title naming two failure cases needs readable names on those selected marks; single-letter project codes that require a separate lookup weaken the join even when the table decodes them correctly. Use the smallest sufficient cue: an accent mark, bold direct label or local annotation. Do not color an unrelated measure, override established series identity, or highlight the largest item merely because it is largest. A balanced comparison of peers can remain neutral.
 

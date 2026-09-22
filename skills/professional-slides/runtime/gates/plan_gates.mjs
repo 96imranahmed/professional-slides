@@ -45,6 +45,7 @@ export const PLAN_CODES = Object.freeze({
   PLAN_UNANNOTATED_CHARTS: "charts planned with nothing marked on the plot",
   PLAN_NO_HIGHLIGHT: "no page names the phrase its reader should see first",
   PLAN_EXHIBIT_VARIETY: "the deck draws on too few of the exhibits it could use",
+  PLAN_CHART_MONOTONY: "one chart type carries most of the deck's charts",
   PLAN_EXHIBIT_REASON: "a page took a default exhibit without saying why",
 });
 
@@ -487,6 +488,27 @@ function gateCraft(pages, findings) {
       "reaching for the shape the last page used."));
   }
 
+  // One chart type doing most of the charting. Distinct exhibits per ten pages
+  // can look healthy while every chart in the deck is a column chart: the
+  // windowed count sees tables, diagrams and text pages between them. What a
+  // reader notices is the same chart coming back, so count the charts alone.
+  const chartTypes = content.map((p) => String(p.exhibit ?? "").trim()).filter((t) => t.startsWith("chart."));
+  if (chartTypes.length >= CRAFT.chartTypeShare.fromCharts) {
+    const tally = {};
+    for (const t of chartTypes) tally[t] = (tally[t] || 0) + 1;
+    const [top, n] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
+    const share = n / chartTypes.length;
+    if (share > CRAFT.chartTypeShare.max) {
+      findings.push(finding(null, "PLAN_CHART_MONOTONY",
+        { chart: top, count: n, of: chartTypes.length, share: round(share) }, CRAFT.chartTypeShare.max,
+        `${n} of this deck's ${chartTypes.length} charts are ${top}. Go back through the pages that use it and ask ` +
+        "what each one has to show: a ranking reads as a lollipop, a composition as a waffle or a stacked column, " +
+        "change between two points as a dumbbell or slope, movement in rank as a rank-flow, a share of a population " +
+        "as a pictogram. Design's selector table maps each message to its slide type. Keep the pages where the " +
+        "column genuinely is the right chart; change the ones that took it by default."));
+    }
+  }
+
   // Why this exhibit, on the pages where a default hides.
   const defaulted = content.filter((p) => DEFAULT_EXHIBITS.has(String(p.exhibit ?? "").trim()));
   const unexplained = defaulted.filter((p) => !reasoned(p));
@@ -525,11 +547,13 @@ function gateDeckWideDevices(pages, findings, plan = {}) {
       null, "PLAN_NO_PICTURES",
       { pages: content.length, photographs: 0 }, 1,
       "Not one page carries a photograph. A reference page averages 29 drawn elements; a deck of type and rules " +
-      "averages very few. Cover, section dividers and any page whose subject is a real place, product or person " +
-      "are the cheapest places to start. If this deck genuinely has nothing it can photograph - trademarked " +
-      "subjects, a confidential site, a subject that is a number - write `noPictures` on the plan in a sentence saying why, and put " +
-      "the drawn elements into icons, marks and treated tables instead. Do not draw an empty frame and explain " +
-      "it on the page.",
+      "averages very few. Any subject a reader would recognise - a film, a product, a brand, a place, a person - " +
+      "wants its picture, and the cover and section dividers are the cheapest places to start. A picture the " +
+      "author has to supply, such as a poster or a product shot, is not a reason to go without: plan it as " +
+      "`{ alt }`, ask for the file, and record the use the author is entitled to make of it as its `credit`. " +
+      "`noPictures` is for a deck whose subject genuinely has nothing to look at - a number, a process, a " +
+      "confidential site - and says so in a sentence. An empty frame is a draft, never a delivery; " +
+      "UNSOURCED_PICTURE stops it at the render.",
     ));
   }
   if (!anchors.some(isIcon)) {
