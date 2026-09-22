@@ -94,9 +94,15 @@ export function auditTextPlan(content, scene) {
 // loophole storylining already names: a page with a commentary column claiming
 // the lighter exhibit-led floor is choosing sparse references to lower the bar.
 // Both are the same mistake, and the composed page settles which one it is.
+// The bank of judged client pages (runtime/reading-tasks.json) names the tasks
+// by exhibit family and commentary; the two older names are kept for plans
+// written before it.
+const BANK = JSON.parse(readFileSync(new URL('./reading-tasks.json', import.meta.url), 'utf8'));
+export const READING_TASK_BANK = BANK.tasks;
 export const READING_TASKS = Object.freeze({
   'exhibit-with-commentary': {commentary: true},
   'exhibit-led': {commentary: false},
+  ...Object.fromEntries(Object.entries(BANK.commentary).map(([task, commentary]) => [task, {commentary}])),
 });
 const COMMENTARY_ROLES = new Set(['list-item', 'list-lead', 'paragraph']);
 export function readingTaskMismatch(task, slide) {

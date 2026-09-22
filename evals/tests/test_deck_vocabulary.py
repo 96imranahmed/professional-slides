@@ -367,3 +367,30 @@ const r = runPlanGates({{schema:'professional-slides.plan/v1', pages}});
 console.log(JSON.stringify(r.findings.filter(f => f.code === 'PLAN_CHART_MONOTONY').map(f => f.severity)));
 ''')
         self.assertEqual(report, ["advisory"])
+
+
+class ReadingTaskBankTests(unittest.TestCase):
+    """The shipped bank is every judged client page, measured and hashed."""
+
+    BANK = json.loads((RUNTIME / "reading-tasks.json").read_text(encoding="utf-8"))
+
+    def test_every_sample_is_a_measured_hashed_page(self):
+        for task, samples in self.BANK["tasks"].items():
+            for s in samples:
+                with self.subTest(task=task, reference=s["reference"], page=s["page"]):
+                    self.assertRegex(s["sha256"], r"^[0-9a-f]{64}$")
+                    self.assertGreater(s["bodyWords"], 0, "a raster page is never a zero-word baseline")
+                    self.assertGreaterEqual(s["totalWords"], s["bodyWords"])
+
+    def test_a_chart_page_without_commentary_is_measured_against_its_own_kind(self):
+        led = sorted(s["bodyWords"] for s in self.BANK["tasks"]["chart-led"])
+        told = sorted(s["bodyWords"] for s in self.BANK["tasks"]["chart-with-commentary"])
+        self.assertLess(led[len(led) // 2], told[len(told) // 2])
+
+    def test_the_cross_check_knows_every_task_that_has_a_column_or_not(self):
+        known = run_node("""
+import {READING_TASKS} from './skills/professional-slides/runtime/text-contract.mjs';
+console.log(JSON.stringify(Object.keys(READING_TASKS)));
+""")
+        for task in self.BANK["commentary"]:
+            self.assertIn(task, known)

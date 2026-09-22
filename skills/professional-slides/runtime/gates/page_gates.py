@@ -1009,9 +1009,13 @@ def gate_unsourced_picture(slide_no, slide, findings):
     counts as a picture everywhere a picture is counted. The placeholder is for
     work in progress; this is what stops it reaching a reader.
     """
+    # A table's photo slot is a thumbnail, well under the size floor that keeps
+    # an icon-sized frame out of this count - but it is still a photograph
+    # nobody supplied, so it is counted whatever its size.
     empty = [n for n in slide.get("nodes", [])
-             if str(n.get("role") or "") == "image-frame"
-             and (n.get("frame") or {}).get("width", 0) * (n.get("frame") or {}).get("height", 0) >= PHOTO_MIN_AREA]
+             if (str(n.get("role") or "") == "image-frame"
+                 and (n.get("frame") or {}).get("width", 0) * (n.get("frame") or {}).get("height", 0) >= PHOTO_MIN_AREA)
+             or str(n.get("role") or "") == "table-photo-placeholder"]
     if not empty:
         return
     findings.append(finding(

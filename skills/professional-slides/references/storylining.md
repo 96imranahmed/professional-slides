@@ -50,7 +50,13 @@ Match interim resources to their actual availability period. Join repeated year-
 
 For stateful cases, retain the same case IDs through baseline, local prototype and integrated replay. Record the configuration, changed inputs, expected and observed boundary result, unchanged failures and state governing the recommendation. A changed pass flag is not a repair demonstration; preserved model identity does not prove provider identity. A repair attributed to resequencing preserves activity duration, resource demand and completion criteria unless a separate, supported intervention changes them; record and explain that intervention rather than silently shortening the work. Proposed replay instructions are legitimate procedure, but cannot be counted as validation evidence.
 
-Take a picture inventory with the evidence, not after the layout. List every subject a reader would recognise on sight - a film and its poster, a product, a brand, a place, a person, a site - and for each say where its picture comes from: an asset already cleared, one the author supplies, or none because the subject has nothing to look at. Ask the author for the ones only they can supply, such as posters, product shots and logos, and record the use they are entitled to make of each as its `credit`. Plan the slots as `{ alt }` until the files arrive; the build lays them out and `UNSOURCED_PICTURE` holds delivery until they are filled. "The images are copyrighted" is a reason to ask, not a reason to leave the subject unseen.
+Take a picture inventory with the evidence, not after the layout. List every subject a reader would recognise on sight - a film and its poster, a product, a brand, a place, a person, a site - and give each a source:
+
+- an asset already cleared, used with its recorded credit;
+- one only the author can supply, such as a poster, a product shot or a logo: ask for it, and record the use they are entitled to make of it as its `credit`;
+- none, because the subject has nothing to look at.
+
+Plan the pictures still to come as `{ alt }`; the build lays them out and `UNSOURCED_PICTURE` holds delivery until they are filled. "The images are copyrighted" is a reason to ask, not a reason to leave the subject unseen.
 
 Qualitative comparison needs named, comparable choices and consequences. A visual-craft claim needs visible attributed specimens and precise observations; a cover does not prove interior craft or publisher-wide style. An operating mechanism follows an actual input/output, dependency or failure path through the steps. Generic verbs, arrows and case IDs do not supply proof.
 
@@ -87,7 +93,18 @@ The dot-dash is the full writing draft, not a promise to write later. Set `textC
 
 Each page also carries `textReference: {task, samples: [{reference, page, sha256, bodyWords, totalWords}], rationale?}`. Inspect and measure strong originals with the same reading task across the core references. Record extraction method and original PDF hash in the reference inventory; raster-only pages need OCR or verified transcription, never a zero-word baseline. Body counts include exhibit labels and qualifications; title/source/footer are separate. Match analytic pages to analytic pages, not covers, and avoid selecting unusually sparse references to lower the comparison.
 
-Name the reading task by the page's structure, because structure sets the floor. `exhibit-with-commentary` is an exhibit with a column or block of developed points beside or below it; `exhibit-led` is a full-width exhibit with at most a line or two of takeaway and a note, and no commentary column. Only 38% of client chart pages carry a commentary column, and the rest run to about 90 body words against 150, so the two are not interchangeable in either direction. A full-width page measured against commentary pages can only reach its floor by padding the takeaway band into a paragraph; a commentary page claiming exhibit-led references is choosing sparse ones. The build checks the declared task against the composed page (`TEXT_TASK_MISMATCH`) and refuses a takeaway band that sets past three lines (`TAKEAWAY_LONG`). Tables, synthesis pages, covers and dividers keep their own tasks.
+Name the reading task by the page's structure, because structure sets the floor. Take a page's samples from `runtime/reading-tasks.json`, which holds every client-project page the corpus vision pass judged, keyed by exhibit family and commentary, with each page's hash and measured words. Use all of a task's samples: a hand-picked handful of dense references is how a clean chart page gets refused as thin, and a sparse handful is how a thin one passes.
+
+| Task | The page | Client body words, median |
+| --- | --- | --- |
+| `chart-led` | A chart with at most a line of takeaway | 55 |
+| `chart-with-commentary` | A chart with developed points beside or below | 160 |
+| `table-led` / `table-with-commentary` | A table, without or with a commentary column | 167 / 220 |
+| `diagram-led` / `diagram-with-commentary` | A diagram, without or with a commentary column | 126 / 113 |
+| `text-page` | Prose or points with no exhibit | 136 |
+| `mixed` | Two or more exhibit families on one page | 127 |
+
+The build checks the declared task against the composed page (`TEXT_TASK_MISMATCH`): a page with a commentary column cannot claim a task without one, or the reverse. It refuses a takeaway band that sets past three lines (`TAKEAWAY_LONG`).
 
 The dot-dash gate reports each page's body and total words, matched-reference median and lower quartile, and `textCoverageScore = 100 × planned body words / reference median body words`. This is a relative text-coverage index, **not a taste rating**. Below the matched lower quartile, develop missing reasoning or record a specific rationale for editorial review; the rationale does not establish acceptance. Do not pad to a quota or let repeated labels substitute for explanation. Dense reference tables still need a separate check of substantive prose under [Copy](copy.md#body-copy).
 

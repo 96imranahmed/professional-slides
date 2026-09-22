@@ -436,7 +436,14 @@ function contentLayout(cell, width, props, used) {
     // set a thumbnail of the thing the row describes, cropped to the column.
     // A logo cell is held to one body line so marks share a height; a photo at
     // that height is a sliver nobody can read, so it takes its own.
-    if (!cell.media) throw new Error("A photo cell needs an image");
+    if (!cell.media) throw new Error("A photo cell needs an image, or `{ alt }` naming the one still to come");
+    // A photo the author has yet to supply is planned as `{ alt }`: the cell
+    // draws its frame with the line naming what goes there, as a page picture
+    // does, and UNSOURCED_PICTURE holds the deck until the file arrives.
+    if (!cell.media.dataUri) {
+      if (!String(cell.media.alt ?? "").trim()) throw new Error("A photo cell with no file needs `alt` saying what the photo will show");
+      return { height: PHOTO_CELL_HEIGHT, padding, blocks: [measure(cell.media.alt, inner - 8, false, "type.label")] };
+    }
     return { height: PHOTO_CELL_HEIGHT, padding };
   }
   if (cell.type === "implication") {
@@ -1222,9 +1229,17 @@ function renderTableAt({ id, frame, props }) {
         const { size, on } = l.mark, x0 = area.x + (area.width - m.gap - size) / 2, y0 = area.y + (height - size) / 2;
         nodes.push(...stateMarker({ id: stableId(cellId, "check"), role: "table-check", x: x0, y: y0, size, state: on ? "yes" : "no", data }));
       } else if (cell.type === "photo") {
-        const photo = mediaNode({ id: stableId(cellId, "photo"), frame: { x: inner.x, y: area.y + (height - l.height) / 2, width: inner.width, height: l.height }, props: cell.media, role: "table-photo", fit: "cover" });
-        photo.data = { ...photo.data, ...data };
-        nodes.push(photo);
+        const box = { x: inner.x, y: area.y + (height - l.height) / 2, width: inner.width, height: l.height };
+        if (cell.media.dataUri) {
+          const photo = mediaNode({ id: stableId(cellId, "photo"), frame: box, props: cell.media, role: "table-photo", fit: "cover" });
+          photo.data = { ...photo.data, ...data };
+          nodes.push(photo);
+        } else {
+          nodes.push(rectPrimitive({ id: stableId(cellId, "photo-slot"), role: "table-photo-placeholder", frame: box,
+            style: { fill: t("color.surfaceMuted"), stroke: t("color.rule"), lineWidth: t("line.hairline") }, data: { ...data, alt: cell.media.alt } }));
+          putText(stableId(cellId, "photo-alt"), "table-photo-alt", { x: box.x + 4, y: box.y + (box.height - l.blocks[0].height) / 2, width: box.width - 8 },
+            l.blocks[0], textStyle(false, t("color.textSecondary"), "center", "type.label"), data);
+        }
       } else if (cell.type === "logo") {
         const logo = mediaNode({id:stableId(cellId,"logo"),frame:{x:inner.x,y:area.y+(height-l.height)/2,width:inner.width,height:l.height},props:cell.media,role:"table-logo"});
         logo.data = {...logo.data,...data,sharedHeight:l.height};
