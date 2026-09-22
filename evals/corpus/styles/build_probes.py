@@ -194,6 +194,63 @@ PROBES = {
             {"id": "h4", "label": "Pioneer", "title": "Automated", "description": "Decisions made in the flow"}]}),
 }
 
+PROBES.update({
+    "K-stat-list": page("Managers see wellbeing as their job; few are recognised for it", layout="exhibit-left",
+        exhibit={"type": "stat-list", "tone": "dark", "items": [
+            {"value": "87%", "text": "of managers say supporting employee wellbeing is part of their job"},
+            {"value": "70%", "text": "say their organisation expects it of them"},
+            {"value": "1 in 4", "text": "companies formally recognise the work in reviews or promotion"}]},
+        points=[{"lead": "The expectation is set and the reward is not.", "text": "Most managers accept the job; three companies in four do not count it when they decide who is promoted."}]),
+    "D-flow": page("An order passes three checks before it ships, and two can send it back", layout="exhibit-full", exhibit={
+        "type": "flow", "nodes": [
+            {"id": "order", "label": "Order received"}, {"id": "credit", "label": "Credit check", "text": "Automated, 2 minutes"},
+            {"id": "stock", "label": "Stock check", "text": "Warehouse system"}, {"id": "manual", "label": "Manual review", "tone": "accent", "text": "Averages 2 days"},
+            {"id": "pick", "label": "Pick and pack"}, {"id": "ship", "label": "Dispatched"}],
+        "edges": [{"from": "order", "to": "credit"}, {"from": "order", "to": "stock"}, {"from": "credit", "to": "manual", "label": "flagged"},
+                  {"from": "credit", "to": "pick"}, {"from": "stock", "to": "pick"}, {"from": "manual", "to": "ship"}, {"from": "pick", "to": "ship"}]},
+        soWhat="One order in eight reaches manual review, and it accounts for most of the delay."),
+    "D-spectrum": page("Leaders sit nearer growth than fixed on every dimension but one", layout="exhibit-full", exhibit={
+        "type": "spectrum", "items": [
+            {"left": "Fixed", "right": "Growth", "value": 0.72, "text": "How can this challenge be an opportunity to learn?"},
+            {"left": "Expert", "right": "Curious", "value": 0.58, "text": "What would I ask if I knew nothing about this?"},
+            {"left": "Reactive", "right": "Creative", "value": 0.31, "text": "What is the bigger 'why' I am solving for?"}]}),
+    "D-layers": page("Every capability rests on one data platform", layout="exhibit-full", exhibit={
+        "type": "layers", "layers": [
+            {"label": "Customer experience", "text": "Apps, portals and the contact centre"},
+            {"label": "Business services", "text": "Pricing, fulfilment and billing"},
+            {"label": "Integration", "text": "APIs and event streams between systems"},
+            {"label": "Data platform", "text": "One customer and product record for every layer above"}]}),
+    "D-kanban": page("Most sectors face a setback; five accelerate", layout="exhibit-full", exhibit={
+        "type": "placement", "columns": [{"label": "Temporary setback", "icon": "chart-line"}, {"label": "Continued growth", "icon": "growth"}, {"label": "Accelerated", "icon": "target"}],
+        "items": [{"label": "Transport", "column": 0}, {"label": "Online travel", "column": 0}, {"label": "Food delivery", "column": 1},
+                  {"label": "Online media", "column": 1}, {"label": "E-commerce", "column": 2, "highlight": True}, {"label": "Payments", "column": 2}, {"label": "Remittance", "column": 2}]}),
+    "C-bump": page("China rose from sixth to first in fifteen years", layout="exhibit-full", exhibit={
+        "type": "rank-flow", "periods": ["1990", "2000", "2010", "2012"], "highlight": ["China", "India"],
+        "entities": [{"name": "United States", "ranks": [1, 1, 2, 2]}, {"name": "Japan", "ranks": [2, 2, 3, 3]},
+                     {"name": "Germany", "ranks": [3, 3, 4, 4]}, {"name": "Italy", "ranks": [4, 5, 6, 6]},
+                     {"name": "United Kingdom", "ranks": [5, 4, 7, 7]}, {"name": "China", "ranks": [6, 6, 1, 1]},
+                     {"name": "India", "ranks": [7, 7, 5, 5]}]}),
+    "C-sankey": page("Most loan-officer roles move into underwriting", layout="exhibit-full", exhibit={
+        "type": "sankey", "left": [{"id": "lo", "label": "Loan officers"}, {"id": "proc", "label": "Processors"}, {"id": "cs", "label": "Customer service"}],
+        "right": [{"id": "uw", "label": "Underwriting"}, {"id": "adv", "label": "Advisers"}, {"id": "ops", "label": "Operations"}],
+        "flows": [{"from": "lo", "to": "uw", "value": 40}, {"from": "lo", "to": "adv", "value": 25}, {"from": "proc", "to": "ops", "value": 30},
+                  {"from": "proc", "to": "uw", "value": 10}, {"from": "cs", "to": "adv", "value": 20}, {"from": "cs", "to": "ops", "value": 15}],
+        "highlight": ["lo"]}),
+    "C-pictogram": page("Six in ten employees self-identify as allies; one in ten acts on it", layout="exhibit-full", exhibit={
+        "type": "pictogram", "of": 10, "rows": [
+            {"label": "Self-identify as allies", "value": 6, "text": "63% of employees surveyed"},
+            {"label": "Take consistent action", "value": 1, "text": "10% of employees surveyed"}]}),
+    "D-arrows": page("Two paths for customers, and only one keeps them", layout="exhibit-full", exhibit={
+        "type": "arrow-rows", "items": [
+            {"label": "Green customers stay", "icon": "people", "text": "They continue to bank with the bank they trust and switch to its sustainable products."},
+            {"label": "Green customers leave", "icon": "chart-line", "text": "They switch to a more sustainable bank, taking deposits and the relationship with them."}]}),
+    "X-capsules": page("Three priorities for the budget", layout="exhibit-full", exhibit={
+        "type": "capsules", "items": [
+            {"title": "Stimulate domestic demand", "text": "Targeted relief for households", "icon": "people"},
+            {"title": "Accelerate public investment", "text": "Infrastructure brought forward", "icon": "building"},
+            {"title": "Cultivate fiscal prudence", "text": "Debt stabilised by 2027", "icon": "shield"}]}),
+})
+
 
 def main():
     slides, missing = [], []

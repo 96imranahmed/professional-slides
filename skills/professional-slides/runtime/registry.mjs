@@ -45,6 +45,7 @@ import { registerInsightTreeTable } from "./insight-tree-table.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker, stateMarker } from "./marks.mjs";
 import { registerPanels } from "./panels.mjs";
 import { registerExtras } from "./extras.mjs";
+import { registerFigures } from "./figures.mjs";
 import { registerGantt } from "./gantt.mjs";
 import { registerFramework } from "./framework.mjs";
 
@@ -1743,7 +1744,7 @@ function registerCore(registry) {
 }
 
 export function createRegistry() {
-  return registerFramework(registerGantt(registerExtras(registerPanels(registerRelationshipNetwork(registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map())))))))))))));
+  return registerFigures(registerFramework(registerGantt(registerExtras(registerPanels(registerRelationshipNetwork(registerSegmentedEvidence(registerMedia(registerChartGroup(registerCharts(registerQuoteCluster(registerInsightTreeTable(registerTrackers(registerCore(new Map()))))))))))))));
 }
 
 export const REGISTRY = createRegistry();

@@ -71,8 +71,11 @@ console.log(JSON.stringify({
 }));
 """
         )
-        self.assertEqual(result["registry"], 89)
-        self.assertEqual(result["components"], 63)
+        # Ten figure families added from the corpus style inventory
+        # (evals/corpus/styles): stat-list, flow, spectrum, layers, placement,
+        # rank-flow, sankey, pictogram, arrow-rows and capsules.
+        self.assertEqual(result["registry"], 99)
+        self.assertEqual(result["components"], 73)
         self.assertEqual(result["charts"], 26)
         self.assertEqual(result["layoutFixtures"], 76)
         self.assertGreater(result["componentBoards"], 0)

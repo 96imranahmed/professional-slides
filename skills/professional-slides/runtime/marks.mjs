@@ -40,12 +40,15 @@ export function iconMarker({ id, role = "icon", x, y, size, icon, tone = "outlin
   // primary glyph alone; inverse: white glyph alone (on a filled field);
   // muted: a hairline ring and a secondary glyph, for a marker that is only
   // telling the reader where the item starts.
-  const ring = tone !== "plain" && tone !== "inverse" && tone !== "accent";
+  // `faint`: the glyph alone in the rule grey - the unfilled figures of an icon
+  // array, which have to read as present but not counted.
+  const ring = !["plain", "inverse", "accent", "faint"].includes(tone);
   // `accent`: the glyph alone in the house accent, so an icon list reads in the
   // same colour as the phrases it highlights.
   const strokeColor = tone === "filled" || tone === "inverse" ? WHITE
     : tone === "accent" ? token("color.accent")
-    : tone === "muted" ? token("color.textSecondary") : PRIMARY;
+    : tone === "muted" ? token("color.textSecondary")
+    : tone === "faint" ? token("color.rule") : PRIMARY;
   const ringStroke = tone === "muted" ? token("color.rule") : PRIMARY;
   if (ring) nodes.push(ellipsePrimitive({ id: stableId(id, "ring"), role: `${role}-ring`, frame: { x, y, width: size, height: size }, style: { fill: tone === "filled" ? PRIMARY : SURFACE, stroke: ringStroke, lineWidth: token("line.standard"), radius: token("radius.round") }, data: { ...data, icon, tone } }));
   const inset = ring ? size * 0.24 : size * 0.06;

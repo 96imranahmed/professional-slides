@@ -198,7 +198,7 @@ export function stepsNodes({ id, frame, props }) {
     // A staircase already carries its order in its shape, so an icon loses
     // nothing and says what the step is about.
     nodes.push(...(m.item.icon
-      ? iconMarker({ id: stableId(sid, "icon"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, icon: m.item.icon, tone: "plain", color: WHITE })
+      ? iconMarker({ id: stableId(sid, "icon"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, icon: m.item.icon, tone: "inverse" })
       : numberMarker({ id: stableId(sid, "number"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, number: i + 1, reverse: true })));
     nodes.push(label(stableId(sid, "label"), "step-label", { x: x + L.pad + L.disc + v("space.2"), y: top + (L.tread - m.title.height) / 2, width: L.inner }, m.title, text("type.body", WHITE, true)));
     if (m.body) nodes.push(label(stableId(sid, "text"), "step-text", { x: x + L.pad, y: top - v("space.2") - m.body.height, width: L.width - L.pad }, m.body, text("type.compact", INK)));
