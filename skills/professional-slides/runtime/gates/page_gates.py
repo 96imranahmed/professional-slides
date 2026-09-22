@@ -621,8 +621,10 @@ def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=Fa
     if band > THRESHOLDS["dead_band_max"]:
         findings.append(finding(
             slide_no, "DEAD_BAND", round(band, 4), THRESHOLDS["dead_band_max"],
-            "A trailing empty band sits above the footer. Set the page body to "
-            "distribute or let the exhibit fill the remaining track.",
+            "Review the trailing empty band against the intended reading group. "
+            "Restore any missing explanation, then align or centre the complete "
+            "group when appropriate. Do not stretch rows or add content merely "
+            "to occupy the band.",
         ))
     # INTERNAL_VOID: the largest empty band *between* content rows below the title.
     # A takeaway pinned to the bottom with nothing above it is as empty as a trailing band.
@@ -957,21 +959,15 @@ def nodes_inside(slide, frame, predicate=None):
 
 
 def thin_remedy(where="The page"):
-    """The one repair for a page carrying less than the deck said it would.
-
-    THIN_PAGE reports it on the rendered page, THIN_PLAN reports it from the
-    spec before the page exists and DECK_FLAT reports it across the deck. They
-    are three moments of one shortfall, so they give one answer; an author who
-    acts on the plan-time message has acted on the render-time one too.
-    """
+    """Corpus density is diagnostic; the complete-copy contract owns matched coverage."""
     return (
-        f"{where} is under-carrying where it matters. The floor counts the "
-        "body alone - the title, the source and the notes do not stand in "
-        "for evidence. Deepen the exhibit: more categories or rows, a "
-        "derived column (rank, share, change), a value on every mark, a "
-        "second line in the measure cell, the second cut of the same "
-        "measure, and points that run to a sentence each. Reference client "
-        f"pages carry {REFERENCE_PAGE_BANDS['body']} words in the body."
+        f"{where} falls below the deck-wide body-word diagnostic. Compare its "
+        "complete text plan with the matched reference reading task and retain "
+        "the same coverage findings through composition and export. Name any "
+        "missing evidence, mechanism, qualification or decision consequence "
+        "before revising the dot-dash. Do not add rows, columns, labels or "
+        "repeated commentary solely to raise the count; a specific coverage "
+        "exception remains subject to reader review."
     )
 
 
@@ -1047,9 +1043,7 @@ def gate_unsourced_picture(slide_no, slide, findings):
 
 
 def gate_thin_page(slide_no, slide, findings):
-    """THIN_PAGE. A content page carrying less than the deck's weight floor of
-    page text. Not a style rule: a reader who gets three bullets and a chart has
-    been handed the analysis to do themselves."""
+    """THIN_PAGE. Advisory body-word diagnostic, alongside matched text coverage."""
     floor = WEIGHT.get("pageWords") or 0
     if floor <= 0:
         return
@@ -1282,9 +1276,8 @@ def gate_unannotated(slide_no, slide, findings):
     if not charts:
         return
     marks = [n for n in slide.get("nodes", []) if str(n.get("role") or "") == "chart-mark"]
-    # Two marks are a comparison and still want the change said on them; the
-    # reference decks annotate almost every plot, and one chart in forty was
-    # what this deck actually carried.
+    # Two or more marks provide an opportunity for a useful local comparison.
+    # An advisory count cannot establish that a further annotation is needed.
     if len(marks) < 2:
         return
     annotated = [n for n in slide.get("nodes", []) if str(n.get("role") or "") in ANNOTATION_ROLES]
@@ -1292,10 +1285,10 @@ def gate_unannotated(slide_no, slide, findings):
         return
     findings.append(finding(
         slide_no, "UNANNOTATED", 0, "one annotation on the chart",
-        "Say it on the chart: `periods` brackets the runs, `events` flags the "
-        "date, `change` or `cagr` carries the movement in a bubble, "
-        "`categoryNotes` names the base under each category, and `annotations` "
-        "puts the observation beside the mark it is about.",
+        "Check whether a decisive comparator, event or scope condition is "
+        "missing at its relevant mark. If so, add a supported local annotation. "
+        "A chart whose values, labels and title already establish the claim "
+        "does not need a redundant callout to satisfy this count.",
     ))
 
 
@@ -1492,10 +1485,10 @@ def gate_missing_argument(slide_no, slide, findings):
         slide_no, "MISSING_ARGUMENT",
         {"photos": len(photos), "panels": len(exhibits)},
         "one insight, so-what or points column",
-        "Say what the page proves: add `soWhat` (or `insight`, or three `points`) "
-        "that names which side wins on this criterion and what follows. On a "
-        "comparison page the reader must leave knowing the verdict, not the "
-        "exhibits.",
+        "State the missing interpretation or decision consequence in the "
+        "existing argument region, using `soWhat`, `insight` or developed "
+        "`points` as appropriate. Explain the comparison's result without "
+        "inventing a winner or adding a fixed number of commentary blocks.",
     ))
 
 

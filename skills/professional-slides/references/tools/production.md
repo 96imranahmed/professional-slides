@@ -30,6 +30,12 @@ blocking findings from advisory distribution, whitespace and decoration counts.
 Do not add content or visual devices to satisfy advisory percentages. Review the
 rendered argument and retain purposeful neutral exhibits and open space.
 
+For complete-copy decks, the dot-dash's matched-reference coverage and wording
+checks persist through composition and export. Global body-word, whitespace and
+annotation diagnostics are additional review prompts; they do not replace that
+contract or justify padding a page. Name the missing reasoning before adding
+text, and preserve complete compact comparisons when no premise is missing.
+
 For new work, `workflow: "new_deck"` requires content and design sidecars, stable
 IDs, title parity and an executive summary before the first section. Revisions
 may use partial plans. Content transfers by ID rather than by page position.
