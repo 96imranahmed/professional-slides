@@ -114,6 +114,7 @@ Use existing plan fields to record the exact target or deliberate absence of foc
 | `n`, `kind` | Reporting position; structural type where applicable |
 | `exhibit`, `variant` | Selected encoding and treatment; implementation controls belong in deck props |
 | `why` | Evidence relationship, shared key/scale, hierarchy, treatment rationale and merger decision |
+| `kind` | Mark a cover as `cover`; analytical pages, including appendix evidence, use `content` or omit this field |
 | `architecture` | Explicit normalized structure; `auto` is not a considered design |
 | `anchors` | Authored supported icons/images, or false when unnecessary |
 | `highlight` | Exact phrase or null; chart/table focus is selected by exact keys in deck props |

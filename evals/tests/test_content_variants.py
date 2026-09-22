@@ -3,6 +3,35 @@ from node_probe import run_node
 
 
 class ContentVariantTests(unittest.TestCase):
+    def test_decision_tiers_measure_developed_conclusions_without_shrinking_type(self):
+        run_node(r'''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {tokenValue,stableId} from './skills/professional-slides/runtime/core.mjs';
+const tree=REGISTRY.get('tree');
+const props={root:'Permanent capacity equals planned supply less the two named losses',
+ branches:[{id:'a',label:'Normal operating case',conclusions:[
+ {id:'a1',text:'The observed recovery follows its own maturity and validation records. Do not count the same reduction twice.'},
+ {id:'a2',text:'The full demand remains a requirement to serve, rather than proof that each local route has sufficient capacity.'}]},
+ {id:'b',label:'Conditional temporary operating case',conclusions:[
+ {id:'b1',text:'The additional reduction applies only while its separate permission remains valid and the customer response has been verified.'},
+ {id:'b2',text:'The operating duration has a fixed ceiling. The permanent scenario receives no credit for this temporary reduction.'}]}],
+ conclusion:'Keep permanent capacity and conditional response separate until the required evidence has been established.'};
+for(const width of [900,1160]) {
+ const frame={x:40,y:80,width,height:500};const nodes=tree.render({id:'branches',frame,props}).nodes;
+ const boxes=nodes.filter(n=>n.role==='decision-box');
+ const tierY=[...new Set(boxes.map(n=>n.frame.y))].sort((a,b)=>a-b);assert.equal(tierY.length,3);
+ for(let i=0;i<2;i++)assert.ok(Math.max(...boxes.filter(n=>n.frame.y===tierY[i]).map(n=>n.frame.y+n.frame.height))+16<=tierY[i+1]+0.01);
+ for(const n of nodes){assert.ok(n.frame.x>=frame.x-0.01);assert.ok(n.frame.y>=frame.y-0.01);assert.ok(n.frame.x+n.frame.width<=frame.x+width+0.01);assert.ok(n.frame.y+n.frame.height<=frame.y+frame.height+0.01);}
+ for(const n of nodes.filter(n=>n.role==='decision-label'))assert.ok(n.data.textLayout.height<=n.frame.height);
+ const leaf=nodes.find(n=>n.id===stableId('branches','a1')+'-text');assert.equal(tokenValue(leaf.style.fontSize),tokenValue('type.body'));assert.equal(leaf.style.bold,false);
+ assert.deepEqual(boxes.find(n=>n.id===stableId('branches','a')+'-box').style.fill,boxes.find(n=>n.id===stableId('branches','b')+'-box').style.fill);
+}
+const impossible=structuredClone(props);impossible.branches[0].conclusions[0].text='A necessary qualification that cannot be discarded. '.repeat(80);
+assert.throws(()=>tree.render({id:'overflow',frame:{x:0,y:0,width:1160,height:500},props:impossible}),/more room/);
+console.log('{}');
+''')
+
     def test_auto_layout_preserves_evidence_and_only_authored_supplements(self):
         run_node(r'''
 import assert from 'node:assert/strict';
