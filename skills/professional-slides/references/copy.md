@@ -38,6 +38,8 @@ The title and exhibit may complete a simple page's argument without a separate c
 
 Use plain words, short sentences and explicit uncertainty, in complete sentences with the connective words the reasoning needs.
 
+Translate technical terms that can suggest a different ordinary meaning. Network subset capacity checks are not customer demand cuts; model states are not observed outcomes. Name the relevant entity in the visible wording. Column headings name their field concisely; avoid sentence-length headings that repeat the exhibit's purpose, while preserving qualifiers needed to interpret the values.
+
 | Instead of | Write |
 | --- | --- |
 | Further work may be required | Public evidence does not show retention |

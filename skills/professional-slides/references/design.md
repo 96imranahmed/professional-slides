@@ -6,7 +6,7 @@ Design owns the evidence relationship, attention, treatment and visual hierarchy
 
 Name what each mark, row, panel and arrow represents. Count the actual observations, stages, comparison fields and longest labels. Choose the relationship that makes the title inspectable before choosing a component. Use the [illustrated reference atlas](reference-atlas.md) for candidate structures and counterexamples.
 
-- Magnitudes, distributions and change use supported chart encodings; exact lookup across mixed fields can use a table, even with only two columns.
+- Magnitudes, distributions and change use supported chart encodings; exact lookup across mixed fields can use a table, even with only two columns. If the finding is an allocation, reconcile the full total and make relative sizes visible. Equal prose boxes can classify components but do not show their quantitative contribution.
 - Shared entities across several measures can use common rows, scales or linked annotations rather than detached exhibits.
 - A mechanism needs an actual input/output, dependency, constraint or failure path. Attach conditions to the stream, step or state they govern. A separate train of generic approval verbs adds no proof when the same boundaries are already visible. Combine overview and local bottleneck on a keyed route before explaining that bottleneck again elsewhere.
 - Independent alternatives are peers; an ordered route is a sequence; unequal durations require a quantitative time axis. An accumulation keeps earlier stages' contributions and is different from ordinary sequence.
@@ -14,6 +14,8 @@ Name what each mark, row, panel and arrow represents. Count the actual observati
 - Qualitative evidence can be a visible specimen, annotated example or named choice/consequence comparison. Never invent numerical axes to make preference look measured.
 
 For hard pages, sketch two plausible evidence structures at low fidelity; select on reading effort and preserved proof. Change the structure when it improves the relationship, not to rotate templates. Record the reason and rejected alternative in existing plan `why`. Two regions must add different necessary evidence; a second component is not a variety token.
+
+When a small changed input governs the result, compare that input with its required level and capacity ceiling. Keep an unchanged large baseline as compact context if it otherwise dominates the page. For example, a warehouse's existing throughput may dwarf the small route increase that resolves its bottleneck; compare required route throughput with old and new route capacity, then reconcile the total locally.
 
 Prefer one primary chart or table with developed implications when it can carry the argument. A separate chart-plus-table pair is an uncommon, deliberate exception: specify what necessary relationship each contributes and why neither one exhibit nor local labels suffice. A chart of a total beside a table decomposing the same authority usually belongs in one table with interpretation. A compact data strip directly aligned to chart categories can instead be part of that chart. For an evidence-to-implication layout, use the established dashed separator and one arrow centred on the evidence body; focus rows never move it. Keep this an appropriate inference treatment, not a new layout quota, and retain varied mechanisms, sequences and comparisons elsewhere.
 
@@ -68,6 +70,8 @@ Resolve palette and typography through the theme. Color roles distinguish struct
 Record the dominant encoding, shared entity/axis, nesting and attachment of support in each plan's `why`. Review this beside the title sequence. Test repeated informational jobs as well as shapes: several different charts can repeat one calculation; a composite can still be two redundant panels.
 
 Normalize chart/table with detached commentary beside or below it, two/three commentary columns, cards/prose and optional insight as **evidence with commentary**. Moving the same explanation between lateral and lower regions does not add variety. A process, diagram or second plot counts as evidence only when it develops another necessary part of the claim. Category fills, icons, color, markers and titles never create a new relationship.
+
+Inspect repeated diagram geometry too. A central oval with surrounding boxes remains the same visual arrangement when its labels change from topology to allocation to inequalities. Keep it where the actual topology earns it; use quantitative allocation or a direct constraint comparison when those are the reading tasks. Replacing repeated tables with repeated prose diagrams does not establish richer visual explanation.
 
 The existing blocking repetition screens remain: no architecture over 40% of analytical pages; ten-page windows contain at least three meaningful relationships. These are alarms, not a template-rotation recipe. A repeated comparison series needs an actual comparability reason; naming `series` alone is not editorial acceptance. Preserve common scales and geometry when repetition helps comparison. A 50-page minimum does not exempt a repetitive or deletable sequence.
 
