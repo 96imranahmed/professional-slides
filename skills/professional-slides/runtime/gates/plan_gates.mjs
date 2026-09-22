@@ -107,17 +107,34 @@ const isIcon = (anchor) => {
  * The plan declares it; where it does not, the family is a coarse stand-in so a
  * plan written before this record existed still measures rather than crashing.
  */
+const ARCHITECTURES = new Set([
+  "evidence-with-commentary", "evidence-only", "paired-evidence", "evidence-stack", "evidence-grid",
+  "reconciliation", "metrics-over-evidence", "hero-number-with-evidence", "metrics-with-text",
+  "picture-led", "card-grid", "text", "steps", "cycle", "journey", "timeline", "process",
+  "chevron-process", "flow", "roadmap", "tree", "organization", "matrix", "quadrants",
+  "horizons", "gantt", "relationship-network",
+]);
+const ARCHITECTURE_ALIASES = {
+  "exhibit-full": "evidence-only", "shared-rows": "evidence-only",
+  "two-up": "paired-evidence", "two-up-contrast": "paired-evidence", "table-halves": "paired-evidence",
+  "split-tone": "evidence-with-commentary", "stack": "evidence-stack",
+  "hero-number": "hero-number-with-evidence", "metrics-over-exhibit": "metrics-over-evidence",
+  "picture-pair": "picture-led", "picture-strip": "picture-led", "picture-hero": "picture-led",
+};
+
 export function architecture(page) {
   if (page.kind && page.kind !== "content") return null;
   const shape = String(page.architecture || page.layout || `auto:${family(page)}`);
   if (["exhibit-left", "exhibit-right", "exhibit-top", "evidence-with-side-commentary", "evidence-over-commentary"].includes(shape)
       || /^(?:chart|table)[- /].*(?:two|three|2|3)[- ]col/i.test(shape)) return "evidence-with-commentary";
-  if (["two-up", "two-up-contrast", "split-tone"].includes(shape)) return "paired-evidence";
-  return shape;
+  const normalized = ARCHITECTURE_ALIASES[shape] ?? shape;
+  // A new name for an old reading task must not manufacture entropy. The
+  // specific mechanism belongs in `why`; unclassified plans cannot pass.
+  return ARCHITECTURES.has(normalized) ? normalized : null;
 }
 
 /** Did the author actually choose a shape for this page, or is it inferred? */
-const declaresArchitecture = (page) => Boolean((page.architecture || page.layout) && (page.architecture || page.layout) !== "auto");
+const declaresArchitecture = (page) => architecture(page) !== null;
 
 // --- the entropy metric -----------------------------------------------------
 
@@ -264,6 +281,17 @@ function gateRuns(pages, findings) {
 
 function gateEntropy(pages, findings) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");
+  const unknown = content.filter(p => (p.architecture || p.layout) && !declaresArchitecture(p));
+  if (unknown.length) {
+    findings.push(finding(null, "PLAN_STYLE_ENTROPY",
+      { entropy: null, reason: "unrecognized architecture", pages: unknown.map(p => p.id ?? p.n),
+        names: [...new Set(unknown.map(p => p.architecture || p.layout))] },
+      [...ARCHITECTURES],
+      "Classify the actual reading relationship using the normalized Design vocabulary. Keep task-specific " +
+      "names and mechanisms in `why`. A table of explanations beside a chart is evidence-with-commentary; " +
+      "table borders and new labels do not create an independent evidence relationship."));
+    return;
+  }
   if (content.length < PLAN.from) return;
   const entropy = styleEntropy(content);
   // Without a declared architecture per page the only thing left to count is
@@ -274,7 +302,7 @@ function gateEntropy(pages, findings) {
   if (!entropy.declared) {
     findings.push(finding(
       null, "PLAN_STYLE_ENTROPY",
-      { entropy: null, reason: "no page declares an architecture", observations: entropy.pages },
+      { entropy: null, reason: "one or more pages have no normalized architecture", observations: entropy.pages },
       PLAN.entropyMin,
       "Page architecture is not recorded in this plan, so the deck's variety cannot be measured before it is built - " +
       "and measuring it afterwards is what makes the remedy a rewrite. Name the shape each page takes " +

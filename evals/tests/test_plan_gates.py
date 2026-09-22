@@ -114,6 +114,23 @@ class PlanGateTests(unittest.TestCase):
         self.assertIsNone(finding["measured"]["entropy"])
         self.assertIn("not recorded", finding["repair"])
 
+    def test_task_specific_names_cannot_manufacture_architecture_variety(self):
+        for count in (2, 50):
+            pages = [page(i + 1, architecture=f"case-{i}-explanation", why="Named case explanation")
+                     for i in range(count)]
+            report = run_plan(deck(pages), self.tmp)
+            self.assertFalse(report["accepted"])
+            self.assertIsNone(report["statistics"]["styleEntropy"])
+            issue = next(f for f in report["findings"] if f["code"] == "PLAN_STYLE_ENTROPY")
+            self.assertEqual(issue["measured"]["reason"], "unrecognized architecture")
+
+    def test_preset_aliases_do_not_invent_reading_relationships(self):
+        names = ["exhibit-full", "shared-rows", "evidence-only"]
+        pages = [page(i + 1, architecture=names[i % len(names)], why="Exact shared fields") for i in range(20)]
+        report = run_plan(deck(pages), self.tmp)
+        self.assertEqual(report["statistics"]["architectures"], 1)
+        self.assertIn("PLAN_STYLE_ENTROPY", report["countsByCode"])
+
     def test_entropy_falls_when_one_architecture_dominates(self):
         flat = [page(i + 1, architecture="exhibit-left" if i else "two-up", insight="filled")
                 for i in range(20)]
