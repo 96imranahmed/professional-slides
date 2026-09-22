@@ -109,6 +109,8 @@ Choose a preset because its evidence relationship fits the page, not to meet a w
 
 The basic evidence presets are `exhibit-full` (full-width evidence), `exhibit-left` (evidence beside support) and `exhibit-top` (evidence above support). Other supported presets are `exhibit-right` (dominant evidence on the right), `hero-number` (one meaningful number with its supporting proof), `split-tone` (a treated support rail), `two-up` (peer exhibits), `metrics-over-exhibit` (a concise metric strip over underlying evidence), `table-halves` (a comparison split across matched tables), and `picture-pair`, `picture-strip`, `picture-hero` (two, several or one dominant sourced image). These are composition conveniences; their names do not establish distinct evidence relationships.
 
+A lone implication beneath a full-width exhibit owns that support region; `exhibit-top` lets its paragraph use the region's width rather than leaving an empty sibling column. Two or more implications keep their shared column widths. This exception does not widen ordinary paragraphs or side commentary: inspect the resulting line length and choose a deliberate narrower composition when sustained prose needs it.
+
 ## Deck-spec controls
 
 Use `density` for a coherent page type scale, not local font shrinking. `exhibits` carries multiple exhibits; `arrange: "row" | "stack" | "grid"` selects their relationship. `stackWeights` sets height shares and `pairedWeights` width shares. `layout: "two-up-contrast"` holds two peer exhibits without shared commentary; `layout: "stack"` reads them vertically. Keep matched measures on matched scales.

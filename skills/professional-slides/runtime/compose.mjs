@@ -2257,7 +2257,8 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       // before the words.
       return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
         ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
-        items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text, ...(runs ? { runs } : {}) }, size: HUG }] };
+        items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text,
+          ...(slide.points.length === 1 ? { maxMeasure: false } : {}), ...(runs ? { runs } : {}) }, size: HUG }] };
     });
     // The columns share one heading, the way the side column does: without it
     // the page drops straight from the plot into three paragraphs with nothing
