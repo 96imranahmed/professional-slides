@@ -772,6 +772,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // measured; PowerPoint draws its own category axis wherever it likes, so a
   // chart that carries category notes is assembled as shapes.
   if (props.native === false || type === "scatter" || type === "range") return null;
+  // Explicit numeric x positions and keyed point labels are not a categorical
+  // native line. Preserve their spacing and selected labels as editable shapes.
+  if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;
   // External stack labels and their leaders use measured scene coordinates;
   // Office repositioning the labels would detach those leaders from the text.
   if (renderedNodes?.some(node => node.role === "data-label" && node.data?.external)) return null;

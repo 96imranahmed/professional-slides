@@ -126,6 +126,25 @@ console.log('{}');
 class BlankHeadingTests(unittest.TestCase):
     """A rule under nothing is a rule under nothing."""
 
+    def test_unheaded_table_beside_chart_has_no_invisible_heading_band(self):
+        run_node('''
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const make=(heading)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'mixed',slides:[{id:'s',title:'Read quantities and permissions together',layout:'two-up',exhibits:[
+ {type:'chart.column',heading:'Programme authority',unit:'$m',categories:['Scope'],series:[{name:'Amount',values:[31]}]},
+ {type:'table',...(heading?{heading}:{}),columns:['Scope','Amount'],rows:[['First work','$31m'],['Later work','$215m']]}
+]}]})).deck.slides[0];
+const plain=make();
+const chart=plain.componentInstances.find(c=>c.component==='chart.column');
+const table=plain.componentInstances.find(c=>c.component==='table');
+assert.equal(table.frame.y,chart.frame.y,'table starts with the chart, not below a fabricated band');
+assert.ok(!plain.nodes.some(n=>n.role==='section-heading'&&n.frame.x>=table.frame.x),'no unrequested table heading');
+const named=make('Approved scope');
+assert.ok(named.nodes.some(n=>n.role==='section-heading'&&n.text==='Approved scope'),'explicit author heading survives');
+console.log('{}');
+''')
+
     def test_a_panel_with_no_heading_draws_no_rule_and_keeps_its_band(self):
         run_node('''
 import assert from 'node:assert/strict';

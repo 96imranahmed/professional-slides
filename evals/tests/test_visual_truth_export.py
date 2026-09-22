@@ -24,7 +24,8 @@ const slides=[
  {id:'nested',title:'Capacity and event classes retain their distinct visual roles',arrange:'row',exhibits:[
   {type:'chart.bar',heading:'Available capacity',unit:'seats',categories:['A','B'],series:[{name:'Seats',values:[24,28]}],referenceLines:[{value:32,label:'Room limit'}]},
   {type:'table',columns:[{label:'Class',type:'category'},'Meaning'],rows:[['Assignment','Given access'],['Outcome','Completed service']]}]},
- {id:'native-axis',title:'Stored supply declines across equal daily intervals',exhibit:{type:'chart.line',heading:'Remaining storage',unit:'ML',categories:['Day 0','Day 1','Day 2'],series:[{name:'Storage',values:[42,36,30]}],showValueAxis:true,dataLabels:false,endLabels:false,yMin:0,yMax:50}}
+ {id:'native-axis',title:'Stored supply declines across equal daily intervals',exhibit:{type:'chart.line',heading:'Remaining storage',unit:'ML',categories:['Day 0','Day 1','Day 2'],series:[{name:'Storage',values:[42,36,30]}],showValueAxis:true,dataLabels:false,endLabels:false,yMin:0,yMax:50}},
+ {id:'numeric-line',title:'The selected intermediate observation retains its true elapsed position',exhibit:{type:'chart.line',heading:'Observed output',unit:'units',xAxis:{unit:'days',min:0,max:3,ticks:[{value:0,label:'Day 0'},{value:1,label:'Day 1'},{value:3,label:'Day 3'}]},gapPolicy:'connect-observations',series:[{name:'Output',points:[{key:'a',x:0,y:2},{key:'b',x:1,y:4,label:true},{key:'c',x:3,y:6}]}],dataLabels:false,yMin:0,yMax:10}}
 ];
 console.log(JSON.stringify(planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'truth',slides})).deck));
 """)
@@ -88,3 +89,14 @@ console.log(JSON.stringify(planDeck(toDeckPlan({schema:'professional-slides.deck
         bad = Path(self.tmp.name) / 'bad-axis.pptx'
         altered.save(bad)
         self.assertTrue(any(f['code'] == 'NATIVE_AXIS_DRIFT' for f in readback(self.scene, bad)['findings']))
+
+    def test_numeric_x_line_automatically_preserves_spacing_and_selected_label(self):
+        slide = self.scene['slides'][4]
+        self.assertFalse(any(c.get('nativeChart') for c in slide['componentInstances']))
+        self.assertFalse(any(getattr(s, 'has_chart', False) for s in self.saved.slides[4].shapes))
+        markers = sorted((n for n in slide['nodes'] if n['role'] == 'chart-marker'), key=lambda n:n['data']['xValue'])
+        a, b, c = [self.shape(4, n).left for n in markers]
+        self.assertAlmostEqual((c-b)/(b-a), 2, places=4)
+        labels = [n for n in slide['nodes'] if n['role'] == 'data-label']
+        self.assertEqual([n['data']['pointKey'] for n in labels], ['b'])
+        self.assertEqual(self.shape(4, labels[0]).text, '4')

@@ -2406,7 +2406,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
       const panel = centredFigure(ex)
         ? { id: `${id}-figure-${i}`, layout: "flow.column", leftover: "center", size: panelSize(ex, i), items: [exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, HUG)] }
         : { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex, i) };
-      return headedPanel(ex, panel, `${id}-exhibit-${i}`);
+      // Charts own their heading inside the component. An empty section above
+      // an unheaded peer table would add a second, invisible heading band and
+      // push that table's actual header below the chart's reading start.
+      return headedPanel(ex, panel, `${id}-exhibit-${i}`,
+        !exhibits.some(peer => String(peer.type).startsWith("chart.")));
     }) });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
   } else if (layout === "picture-pair" || layout === "picture-strip") {
