@@ -51,10 +51,13 @@ export function checkTextPlan(content, {required = false} = {}) {
     const median = quantile(ref.samples.map(s=>s.bodyWords),.5), floor = quantile(ref.samples.map(s=>s.bodyWords),.25);
     const score = {id:page.id,page:page.n,task:ref.task,bodyWords,totalWords,proseBlocks:prose.length,longestBlock:longest,referenceBodyMedian:median,referenceBodyLowerQuartile:floor,referenceTotalMedian:quantile(ref.samples.map(s=>s.totalWords),.5),textCoverageScore:median ? Math.round(bodyWords/median*100) : null,explanation:ref.rationale || null};
     scores.push(score);
-    if (bodyWords<floor) {
-      if (!ref.rationale?.trim()) fail('TEXT_COVERAGE_LOW',`Planned body has ${bodyWords} words; comparable reference lower quartile is ${floor}. Develop the missing explanation or document why this page's complete argument needs less text for editorial review.`);
-      else findings.push({page:page.n,id:page.id,code:'TEXT_COVERAGE_EXCEPTION',reason:ref.rationale,severity:'advisory'});
-    }
+    // The floor is hard. It used to give way to a written rationale, and the
+    // rationale became the way a thin page shipped: a fresh deck put two of its
+    // pages under the floor with a sentence each and passed. A page below the
+    // lower quartile of the client pages doing its job has not done that job;
+    // whether a page above the floor is dense enough is the review's density
+    // pass (runtime/gates/density_profile.py), not an exception granted here.
+    if (bodyWords<floor) fail('TEXT_COVERAGE_LOW',`Planned body has ${bodyWords} words; the client pages doing this job carry at least ${floor} (lower quartile) and ${median} at the median. The floor is hard: develop the missing explanation, the mechanism, the limitation or the consequence, or move the page to the reading task it actually performs. A rationale does not release it.`);
   }
   return {accepted:!findings.some(f=>f.severity==='blocking'),state:'checked',findings,scores};
 }

@@ -123,6 +123,13 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
 
   const deckPlan = toDeckPlan(spec, baseDir);
   const { deck, decisions } = planDeck(deckPlan);
+  // An evaluation of the skill is judged on a deck long enough to show its
+  // rhythm, repetition and weakest page; a short one is a diagnostic. The rule
+  // lived in the skill's prose and nothing held a deck to it, so three
+  // evaluation decks in a row came out at twenty pages.
+  if (spec.purpose === "evaluation" && deck.slides.length < EVALUATION_MIN_PAGES) {
+    throw new Error(`EVALUATION_TOO_SHORT: an evaluation deck renders at least ${EVALUATION_MIN_PAGES} pages, cover and appendix included; this one composes ${deck.slides.length}. Widen the evidence, not the repetition, or drop purpose: "evaluation" for a diagnostic.`);
+  }
   const contentAudit = auditContent(spec, deck);
   const textAudit = auditTextPlan(stages.content || {}, deck);
   await fs.writeFile(path.join(directory, "text-coverage.json"), JSON.stringify(textAudit, null, 2) + "\n");
@@ -178,6 +185,14 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     const gated = await runProcess(python, [gates, scenePath, renderDirectory, "--report", gateReport], { timeoutMs, expect: [0, 2] });
     result.gates = { ...(await readJson(gateReport)), report: gateReport, passed: gated.code === 0 };
     result.timings.gatesMs = Date.now() - t4;
+    // The density profile: the rendered pages measured the way the corpus was,
+    // against the client targets. It fails nothing; the review's density pass
+    // reads it and judges every page it flags (references/taste-review.md).
+    const profileReport = path.join(directory, "density-profile.json");
+    const contentAt = path.join(baseDir, `${stem}.content.json`);
+    const withContent = result.stages.content?.state === "accepted" ? [contentAt] : [];
+    const profiled = await runProcess(python, [path.join(runtime, "gates", "density_profile.py"), result.render.pdf, scenePath, ...withContent, "--report", profileReport], { timeoutMs });
+    result.densityProfile = { report: profileReport, ...lastJson(profiled.stdout) };
   }
   // The deck's budget, in one block: what its pages carry against what the
   // reference corpus carries, so a regression is a number in the build output
@@ -210,7 +225,12 @@ async function readJson(file) { try { return JSON.parse(await fs.readFile(file, 
 export const BUILD_REPORTS = Object.freeze([
   "scene.json", "planning.json", "preflight-gates.json", "content-audit.json",
   "readback.json", "gates.json", "build-result.json", "text-coverage.json", "rendered-text-coverage.json",
+  "density-profile.json",
 ]);
+
+// Skill evaluations are judged on at least this many rendered pages
+// (SKILL.md "Evaluation and delivery"); `purpose: "evaluation"` enforces it.
+export const EVALUATION_MIN_PAGES = 50;
 
 async function clearReports(directory) {
   await Promise.all(BUILD_REPORTS.map((name) => fs.rm(path.join(directory, name), { force: true })));

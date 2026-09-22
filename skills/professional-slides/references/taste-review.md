@@ -27,6 +27,19 @@ At each scale judge the saved artifact, not its labels or metadata. A declaratio
 
 For a pre-read, explicitly test substantive text coverage against comparable reference originals. Can the reader explain why the evidence supports the claim, the relevant mechanism, the material limitation and the decision consequence from the page alone? Flag recurring terse labels, unsupported takeaways and large empty regions where necessary explanation is absent. Repair the missing reasoning before resizing visuals; extra repeated sentences or a mandatory insight box do not satisfy this check.
 
+## Density pass
+
+The word floor in the dot-dash is hard, so no page ships under the client pages doing its job. Clearing it is not the same as reading like them. Each build writes `density-profile.json`: the rendered pages measured the way the corpus was (body words against the page's reading task, text blocks per page, words per block, longest block) beside the client targets, with every page outside the target band flagged.
+
+Read the deck comparison first. The client median page carries four blocks of about 56 words, its longest block under 152, and body words at the task median. Then open every flagged page and give it a verdict:
+
+- **right:** the density suits the job. A chart-led page with one line of takeaway may rightly sit light, and a record table may rightly run dense.
+- **too thin:** the reader cannot explain the claim, mechanism, limitation or consequence from the page.
+- **too dense:** padding, restatement or detail the page does not need to prove its title. A page padded to clear the floor goes here.
+- **wrong shape:** the words are right in number and wrong in form, for example one long block where the client page makes three points.
+
+Record `density.deck` (the deck's medians against the targets and what that means for a reader) and one `density.pages` entry per flagged page. Delivery refuses a review that skips a flagged page, and any verdict other than right blocks it as `DENSITY_MISMATCH`. Judge the page, not the number: the profile asks the question and the reader answers it.
+
 ## Adversarial editorial challenge
 
 Name the worst page, best page and most repetitive sequence. For the most deletable page, draft the strongest merger/replacement concept and identify what evidence would be lost. If retaining it is better for this brief, explain why. The 50+ evaluation minimum does not protect filler, an unnecessary preview or a methods lesson that can be joined to its result. Audit lookup can earn its appendix role without being counted as another argument.
@@ -52,9 +65,9 @@ No major/blocker findings is necessary for acceptance, but not sufficient for an
 
 ## Coverage and report
 
-Skill evaluation defaults to at least 50 rendered pages; below-minimum diagnostics need an explicit user override to qualify. Page count establishes eligibility, not quality. [Evaluation](evaluation/index.md#forward-testing-the-skill) owns unseen transfer cases.
+Skill evaluation defaults to at least 50 rendered pages; below-minimum diagnostics need an explicit user override to qualify. Mark an evaluation deck `purpose: "evaluation"` and the build refuses it under 50 pages (`EVALUATION_TOO_SHORT`). Page count establishes eligibility, not quality. [Evaluation](evaluation/index.md#forward-testing-the-skill) owns unseen transfer cases.
 
-Return `out/taste-review.json` using `runtime/reviewer.mjs`: `accepted`, `summary`, `rating`, `binding`, `inspectedSlides`, `findings` with `slide`, `code`, `severity`, `reason`, `repair`. Precise uppercase finding codes are allowed. Major/blocker findings prevent acceptance. The companion narrative holds first-reading argument, merger challenge, best/worst pages, dimension assessment, comparisons and limits.
+Return `out/taste-review.json` using `runtime/reviewer.mjs`: `accepted`, `summary`, `rating`, `binding`, `inspectedSlides`, `density` (the density pass above), `findings` with `slide`, `code`, `severity`, `reason`, `repair`. Precise uppercase finding codes are allowed. Major/blocker findings prevent acceptance. The companion narrative holds first-reading argument, merger challenge, best/worst pages, dimension assessment, comparisons and limits.
 
 Compute `binding` with `reviewBinding(out)` after inspecting current files. It hashes PPTX, scene and every render. `inspectedSlides` contains all current IDs actually inspected. Delivery rejects stale/incomplete review; every rebuild requires a fresh review.
 

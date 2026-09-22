@@ -39,7 +39,9 @@ assert.equal(checkTextPlan(content).scores[0].textCoverageScore,100);
 const thin=structuredClone(content);thin.pages[0].textPlan[1].text='Prepare now.';
 assert.ok(runContentGates(thin).findings.some(f=>f.code==='TEXT_COVERAGE_LOW'&&f.severity==='blocking'));
 thin.pages[0].textReference.rationale='The retained comparison identifies the full commitment and the sole gating permission; the reference also explains an unrelated mechanism.';
-assert.ok(runContentGates(thin).findings.some(f=>f.code==='TEXT_COVERAGE_EXCEPTION'&&f.severity==='advisory'));
+// The floor is hard: a rationale explains a short page, it does not release it.
+assert.ok(runContentGates(thin).findings.some(f=>f.code==='TEXT_COVERAGE_LOW'&&f.severity==='blocking'));
+assert.ok(!runContentGates(thin).findings.some(f=>f.code==='TEXT_COVERAGE_EXCEPTION'));
 const missing=structuredClone(content);delete missing.pages[0].textPlan;
 assert.ok(!checkTextPlan(missing).accepted);
 const legacy={pages:[{...page,textPlan:undefined,textReference:undefined}]};

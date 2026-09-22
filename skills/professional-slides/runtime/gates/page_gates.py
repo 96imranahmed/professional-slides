@@ -468,6 +468,7 @@ ADVISORY_CODES = {
 COMPOSE_CODES = {
     "THIN_PLAN": "what the page will carry falls under the floor, before it is built",
     "MISSING_EVIDENCE": "a ranked criterion with no comparative exhibit",
+    "EVALUATION_TOO_SHORT": "a deck marked as a skill evaluation composes fewer than fifty pages",
 }
 
 

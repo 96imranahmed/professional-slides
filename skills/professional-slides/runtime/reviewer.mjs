@@ -42,13 +42,40 @@ export const CODES = Object.freeze({
   MIXED_GRAMMAR: "different evidence grammars share a page without a clear relationship or reading order",
   DECORATION: "a rule, band or device that separates nothing and says nothing",
   NARROW_REPERTOIRE: "the deck draws on a handful of exhibits where its evidence has many shapes",
+  // density - the review's pass over the rendered density profile
+  DENSITY_MISMATCH: "a page's words are thinner, denser or differently shaped than the client pages doing its job, and it shows",
   EDITORIAL: "a wording preference"
 });
 
+// A flagged page is right, or it is wrong in one of three ways. Only "right"
+// lets the deck through: the profile's flag is a question, the verdict is the
+// answer, and a padded page that cleared the hard floor is answered here.
+export const DENSITY_VERDICTS = Object.freeze(["right", "too thin", "too dense", "wrong shape"]);
+
 export const REVIEW_SCHEMA = {
   type: "object", additionalProperties: false,
-  required: ["accepted", "summary", "findings", "binding", "inspectedSlides", "rating"],
+  required: ["accepted", "summary", "findings", "binding", "inspectedSlides", "rating", "density"],
   properties: {
+    // The density pass: the rendered pages measured the way the corpus was
+    // (density-profile.json), judged. `deck` compares the deck's medians with
+    // the client targets; `pages` holds a verdict for every flagged page.
+    density: {
+      type: "object", additionalProperties: false, required: ["deck", "pages"],
+      properties: {
+        deck: { type: "string", minLength: 40 },
+        pages: {
+          type: "array",
+          items: {
+            type: "object", additionalProperties: false, required: ["slide", "verdict", "reason"],
+            properties: {
+              slide: { type: "string" },
+              verdict: { type: "string", enum: DENSITY_VERDICTS },
+              reason: { type: "string", minLength: 20 }
+            }
+          }
+        }
+      }
+    },
     binding: { type: "string", pattern: "^[a-f0-9]{64}$" },
     inspectedSlides: { type: "array", items: { type: "string" } },
     rating: { type: "number", minimum: 0, maximum: 10 },
@@ -115,8 +142,36 @@ export async function validateReviewBinding(review, directory, slideIds) {
   return errors;
 }
 
+/**
+ * The density pass is complete: the deck comparison is written and every page
+ * the profile flagged has a verdict. A review without it cannot accept a deck
+ * whose rendered words were never compared with the client pages.
+ */
+export function validateDensityReview(review, profile) {
+  if (!profile) return [];
+  const errors = [];
+  const density = review?.density;
+  if (!density || typeof density !== "object") return ["Review must carry the density pass (density.deck and density.pages)"];
+  if (typeof density.deck !== "string" || density.deck.trim().length < 40) errors.push("density.deck must compare the deck's measured medians with the client targets");
+  const pages = Array.isArray(density.pages) ? density.pages : [];
+  for (const [i, entry] of pages.entries()) {
+    if (!DENSITY_VERDICTS.includes(entry?.verdict)) errors.push(`density.pages[${i}]: verdict must be one of ${DENSITY_VERDICTS.join(", ")}`);
+    if (typeof entry?.reason !== "string" || entry.reason.trim().length < 20) errors.push(`density.pages[${i}]: give the reason for the verdict`);
+  }
+  const judged = new Set(pages.map((entry) => entry?.slide));
+  const missing = (profile.flaggedPages || []).filter((id) => !judged.has(id));
+  if (missing.length) errors.push(`density pass must judge every flagged page; missing ${missing.join(", ")}`);
+  return errors;
+}
+
 export function reviewOutcome(review) {
   const blocking = (review.findings || []).filter((f) => ["major", "blocker"].includes(f.severity));
+  // A density verdict other than "right" blocks as a finding would.
+  for (const entry of review.density?.pages || []) {
+    if (entry.verdict === "right") continue;
+    blocking.push({ slide: entry.slide, code: "DENSITY_MISMATCH", severity: "major", reason: `${entry.verdict}: ${entry.reason}`,
+      repair: "Rewrite the page to the density of the client pages doing its job: add the missing reasoning, cut the padding, or split the long block into points" });
+  }
   return { accepted: review.accepted === true && blocking.length === 0, blocking };
 }
 
@@ -139,7 +194,8 @@ export async function buildReviewPacket({ outputDirectory, brief = "", answer = 
     image: path.join(dir, "rendered", `slide-${i + 1}.png`)
   }));
   const statistics = designStatistics(scene);
-  const packet = { binding: await reviewBinding(dir), inspectedSlides: slides.map(s => s.id), statistics, brief, answer, montage: path.join(dir, "rendered", "montage.png"), titles: slides.map((s) => `${s.index}. ${s.title}`), slides, codes: CODES, schema: REVIEW_SCHEMA };
+  const density = await fs.readFile(path.join(dir, "density-profile.json"), "utf8").then(JSON.parse).catch(() => null);
+  const packet = { binding: await reviewBinding(dir), inspectedSlides: slides.map(s => s.id), statistics, density, brief, answer, montage: path.join(dir, "rendered", "montage.png"), titles: slides.map((s) => `${s.index}. ${s.title}`), slides, codes: CODES, schema: REVIEW_SCHEMA };
   await fs.writeFile(path.join(packetDir, "packet.json"), JSON.stringify(packet, null, 2));
   await fs.writeFile(path.join(packetDir, "schema.json"), JSON.stringify(REVIEW_SCHEMA, null, 2));
   await fs.writeFile(path.join(packetDir, "prompt.md"), reviewPrompt(packet));
@@ -226,10 +282,25 @@ Compare strong relevant original pages from every requested reference deck befor
 
 Name the best page, worst page and most repetitive sequence. Challenge the most deletable page with a concrete merger and identify any lost evidence. Reproduce material calculations from supplied source records; disclose unverified assumptions. Record argument, evidence, visual explanation, hierarchy/copy and sequence quality in the companion assessment.
 
+${densityPrompt(packet.density)}
+
 After inspecting them, record inspectedSlides from these IDs: ${JSON.stringify(packet.inspectedSlides)}. Bind this review to ${packet.binding}. Rate the actual deck out of ten independently of any requested target. A passing gate is not a taste score.
 
 Return ONLY JSON matching this schema: ${JSON.stringify(packet.schema)}
 Set accepted=false if any finding is major or blocker. The summary is two sentences: what the deck does well and what must change.`;
+}
+
+/** The density pass: the profile's comparison and flags, put to the reviewer as questions. */
+export function densityPrompt(profile) {
+  if (!profile) return "DENSITY PASS. No density profile was built (the deck was not rendered); set density to {\"deck\": \"No rendered density profile was available for this build.\", \"pages\": []}.";
+  const deck = profile.deck || {};
+  const line = (name, label) => deck[name] ? `- ${label}: ${deck[name].measured} against the client ${deck[name].target} (band ${JSON.stringify(deck[name].band ?? null)}), ${deck[name].position}` : null;
+  const flagged = (profile.pages || []).filter((p) => p.flags?.length);
+  return `DENSITY PASS. The rendered pages were measured the way the client corpus was (pdftotext -layout; title and source lines excluded; a block is a run of lines between blank ones; blocks under three words are labels). Compare the deck with the client targets, then open every flagged page and judge whether its density is right for the job it does. A flag is a question, not a verdict: a chart-led page may rightly sit light, and a page that clears its word floor with padding or restatement is too dense or the wrong shape even though it passed. Deck against client pages:
+${[line("bodyWordsVsTaskMedian", "body words against each page's task median (1.0 = client median)"), line("blocksPerPage", "text blocks per page"), line("wordsPerBlock", "words per block"), line("longestBlock", "longest block per page"), deck.singleBlockShare ? `- single-block pages: ${deck.singleBlockShare.measured} of pages against at most ${deck.singleBlockShare.target}` : null].filter(Boolean).join("\n")}
+Flagged pages:
+${flagged.map((p) => `- ${p.id} (page ${p.page}, ${p.task ?? "no task"}): ${p.flags.join("; ")}`).join("\n") || "- none"}
+Record density.deck as two or three sentences comparing the deck's medians with the client targets and saying what that means for a reader, and density.pages as one verdict per flagged page (right, too thin, too dense or wrong shape) with the reason you saw on the page. Any verdict other than right blocks delivery.`;
 }
 
 function hasCli(name) { return spawnSync("sh", ["-c", `command -v ${name}`], { stdio: "ignore" }).status === 0; }

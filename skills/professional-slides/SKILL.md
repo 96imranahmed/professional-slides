@@ -40,7 +40,7 @@ Keep each rule at one owner and link to it. Use instructions and contrasting exa
 
 ## Evaluation and delivery
 
-Skill evaluations default to **at least 50 total rendered pages**, including cover and appendix, unless the user explicitly overrides that evaluation's length. Select sufficient evidence breadth before drafting. Fifty pages of repeated calculation is a weaker evaluation, not a compliant way to extend a small case. Short probes remain diagnostics. Ordinary decks follow the user's brief. [Evaluation](references/evaluation/index.md#forward-testing-the-skill) owns transfer testing.
+Skill evaluations default to **at least 50 total rendered pages**, including cover and appendix, unless the user explicitly overrides that evaluation's length. Set `purpose: "evaluation"` on an evaluation deck; the build then refuses it under 50 pages. Select sufficient evidence breadth before drafting. Fifty pages of repeated calculation is a weaker evaluation, not a compliant way to extend a small case. Short probes remain diagnostics. Ordinary decks follow the user's brief. [Evaluation](references/evaluation/index.md#forward-testing-the-skill) owns transfer testing.
 
 Use the standard pipeline, resolving paths from this skill:
 
@@ -49,4 +49,4 @@ node runtime/build-deck.mjs <id>.deck.json out/
 node runtime/deliver-deck.mjs <id>.deck.json out/ --skip-build --review out/taste-review.json
 ```
 
-[Production](references/tools/production.md) owns dependency setup, portable evidence, saved-file verification and package provenance. Delivery requires passing blocking checks and an accepted review bound to the exact editable file, scene and all current renders. Distinguish technical validation, editorial rating and user acceptance. State missing evidence and unfinished work. Verify Google Slides separately after import.
+[Production](references/tools/production.md) owns dependency setup, portable evidence, saved-file verification and package provenance. Delivery requires passing blocking checks and an accepted review bound to the exact editable file, scene and all current renders. The review includes a density pass over `density-profile.json`, which compares the rendered pages' words with the client pages doing the same job ([Taste review](references/taste-review.md#density-pass)); the dot-dash word floor is hard and the pass judges everything above it. Distinguish technical validation, editorial rating and user acceptance. State missing evidence and unfinished work. Verify Google Slides separately after import.
