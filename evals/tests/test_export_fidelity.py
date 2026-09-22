@@ -52,6 +52,17 @@ console.log(JSON.stringify({wrapped:body.text.includes('\\n'),runsHaveBreak:(bod
         self.assertTrue(result["joined"])
 
 
+class DeclaredDecimalsTests(unittest.TestCase):
+    def test_a_declared_format_rounds_half_away_from_zero_like_powerpoint(self):
+        # 3.55 is stored as 3.5499...; toFixed printed 3.5 on the drawn chart
+        # while PowerPoint printed 3.6 on the native one.
+        result = run_node("""
+import { formatValue } from './skills/professional-slides/runtime/value-format.mjs';
+console.log(JSON.stringify([3.55, -1.25, 2.345].map(v => formatValue(v, {valueFormat: {decimals: 1}}))));
+""")
+        self.assertEqual(result, ["3.6", "-1.3", "2.3"])
+
+
 class SeriesRoundingTests(unittest.TestCase):
     def test_the_native_label_format_matches_the_drawn_one(self):
         sys.path.insert(0, str(RUNTIME / "emit"))

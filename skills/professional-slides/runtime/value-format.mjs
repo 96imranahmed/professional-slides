@@ -49,7 +49,11 @@ export function formatValue(value, props) {
   const decimals = format.decimals ?? (format.compactUnit ? 1 : 0);
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > 6) throw new Error("valueFormat.decimals must be an integer from zero to six");
   if (format.grouping !== undefined && typeof format.grouping !== "boolean") throw new Error("valueFormat.grouping must be boolean");
-  const raw = Number(value / divisor).toFixed(decimals);
+  // Round half away from zero on the decimal value, as PowerPoint and Excel
+  // do. toFixed rounds the binary value, so 3.55 (stored as 3.5499...) became
+  // "3.5" on the drawn chart and "3.6" on the native one beside it.
+  const scaled = Math.abs(value / divisor) * 10 ** decimals;
+  const raw = (Math.sign(value / divisor) * Math.round(scaled + 1e-9) / 10 ** decimals).toFixed(decimals);
   const number = format.grouping ? raw.split(".").map((part, index) => index === 0 ? group(part) : part).join(".") : raw;
   const sign = format.sign === "always" && Number(raw) > 0 ? "+" : "";
   return `${format.prefix || ""}${sign}${number}${format.compactUnit || ""}${format.suffix || ""}`;
