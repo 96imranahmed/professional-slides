@@ -162,3 +162,49 @@ console.log(JSON.stringify({{construction: page ? page.tracker.construction : nu
 
     def test_long_section_names_take_the_label(self):
         self.assertEqual(self.construction(["Where the value is", "How we would capture it"]), "compact-label")
+
+
+class TableDensityTests(unittest.TestCase):
+    """The type floor has to admit the smallest table the composer can set.
+
+    The density ladder ends at `dense`, which sets cells at type.label. With the
+    floor at 9.0 pt and type.label at 8.5, any table that reached the last rung
+    was refused with no rung left to fall to, and the only repair was to delete
+    rows the page needed.
+    """
+
+    def test_the_floor_admits_the_densest_table_on_every_palette(self):
+        """Compose one per palette, rather than restate the size here.
+
+        type.label is 9 pt on the default theme and 8.5 on others, so a floor at
+        9.0 passed every test written against the default and refused real decks
+        built on the rest. A table that reaches the last rung has nowhere else to
+        fall, so the only repair left was deleting rows the page needed.
+        """
+        rows = [[f"Row {i}", str(i), f"{i * 3}%"] for i in range(1, 12)]
+        floor = page_gates.TYPE_RANGES["table-dense"][0]
+        for palette in ("mckinsey", "bcg", "bain", "deloitte", "consulting-toolkit"):
+            with self.subTest(palette=palette):
+                self.assertLessEqual(floor, self.densest(rows, palette),
+                                     "a table at the last rung of the ladder is refused")
+
+    def densest(self, rows, palette):
+        sizes = run_node(f'''
+import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+import {{planDeck}} from './skills/professional-slides/runtime/planner.mjs';
+const deck = planDeck(toDeckPlan({{schema:'professional-slides.deck/v3', id:'t',
+  palette:{json.dumps(palette)}, density:'pre-read', slides:[{{
+  id:'p', title:'A table set at the densest rung the ladder has', layout:'exhibit-top',
+  exhibit:{{type:'table', density:'dense', columns:['Name','Count','Share'],
+            rows:{json.dumps(rows)}}},
+  points:[{{text:'A developed point that carries this page on its own.'}}]}}]}})).deck;
+const pts = deck.slides[0].nodes
+  .filter(n => n.role === 'table-cell-text')
+  .map(n => n.style?.fontSize?.value ?? n.style?.fontSize);
+console.log(JSON.stringify({{min: Math.min(...pts), count: pts.length}}));
+''')
+        self.assertGreater(sizes["count"], 0)
+        return sizes["min"]
+
+    def test_the_floor_still_refuses_type_smaller_than_any_rung(self):
+        self.assertGreater(page_gates.TYPE_RANGES["table-dense"][0], 7.0)

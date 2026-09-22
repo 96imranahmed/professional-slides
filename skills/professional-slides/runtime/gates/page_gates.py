@@ -108,10 +108,14 @@ PHOTO_MIN_AREA = 0.03 * CANVAS_W * CANVAS_H
 
 TYPE_RANGES = {
     "body": (10.0, 14.0),
-    # A table set dense carries its cells at 9 pt. The reference decks run
-    # twenty- and thirty-row tables at that size rather than splitting them, and
-    # a cell is a lookup value, not prose.
-    "table-dense": (9.0, 14.0),
+    # The reference decks run twenty- and thirty-row tables small rather than
+    # splitting them, and a cell is a lookup value, not prose. The floor is the
+    # densest rung the composer actually has: `compact` sets cells at
+    # type.compact, 9 pt, and `dense` at type.label, 8.5. The floor sat at 9.0
+    # on the belief that dense was 9 pt, which made every table the density
+    # ladder pushed to its last rung unbuildable - an eleven-row table with a
+    # bar column and three commentary blocks has nowhere else to go.
+    "table-dense": (8.5, 14.0),
     "chart-furniture": (8.0, 11.0),
     "action-title": (20.0, 26.0),
     "source": (7.0, 9.0),
