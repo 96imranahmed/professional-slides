@@ -357,6 +357,10 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
         [centerX - width / 2, centerY - half - gap - height, "center"], [centerX - width / 2, centerY + half + gap, "center"],
         [centerX + half, centerY - half - height, "left"], [centerX + half, centerY + half, "left"],
         [centerX - half - width, centerY - half - height, "right"], [centerX - half - width, centerY + half, "right"],
+        // A farther ring for a crowded cluster, before any overlap is accepted.
+        [centerX + half + gap, centerY - half - height - 10, "left"], [centerX + half + gap, centerY + half + 10, "left"],
+        [centerX - half - gap - width, centerY - half - height - 10, "right"], [centerX - half - gap - width, centerY + half + 10, "right"],
+        [centerX - width / 2, centerY - half - height - 16, "center"], [centerX - width / 2, centerY + half + 16, "center"],
       ].map(([x, y, align]) => ({ frame: { x, y, width, height }, align }));
       const inside = (f) => f.x >= frame.x && f.y >= frame.y && f.x + f.width <= frame.x + frame.width && f.y + f.height <= frame.y + frame.height;
       const clear = (f) => !occupied.some((o) => f.x < o.x + o.width && o.x < f.x + f.width && f.y < o.y + o.height && o.y < f.y + f.height);

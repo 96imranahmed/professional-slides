@@ -23,6 +23,27 @@ const resolvePages = (value, scene) => String(value).replace(/\{\{page:([^}]+)\}
   const numbers = scene.slides.flatMap((s,i)=>s.id===id || s.sourceSlideId===id ? [i+1] : []);
   return numbers.length ? numbers.length>1 ? `${numbers[0]}–${numbers.at(-1)}` : String(numbers[0]) : `{{page:${id}}}`;
 });
+// Text the runtime writes rather than the author: axis ticks, page numbers,
+// tracker and contents labels, numbering, the deck footer, legend values. It
+// is checked by the runtime's own gates; the text plan need not list it, and
+// the audits subtract it after matching what the plan does list.
+export const GENERATED_ROLES = /^(page-number|axis-label|tracker-|agenda-marker-label|table-section-number|table-row-number|footer-(left|right)|divider-number|divider-contents|map-size-legend-label)/;
+// Pages the runtime inserts: the contents pages and the appendix divider.
+export const GENERATED_PAGE = /^(agenda-\d+|appendix-divider)$/;
+// A structural page (cover, divider, contents, statement, takeaways) keeps its
+// text checks but is not an analytical page, so no reading-task floor applies.
+const STRUCTURAL_KINDS = new Set(['cover', 'section', 'divider', 'agenda', 'statement', 'takeaways']);
+const structural = page => page.role === 'structural' || STRUCTURAL_KINDS.has(page.kind);
+function subtractGenerated(residual, slide) {
+  let rest = residual;
+  for (const node of slide?.nodes || []) {
+    if (node.type !== 'text' || !GENERATED_ROLES.test(String(node.role || ''))) continue;
+    const t = normalizeText(node.data?.textLayout?.source ?? node.text);
+    const at = t ? rest.indexOf(t) : -1;
+    if (at >= 0) rest = rest.slice(0, at) + ' ' + rest.slice(at + t.length);
+  }
+  return rest;
+}
 export function checkTextPlan(content, {required = false} = {}) {
   const enabled = required || content?.textContract === 'complete';
   const findings = [], scores = [];
@@ -41,6 +62,7 @@ export function checkTextPlan(content, {required = false} = {}) {
     const totalWords = blocks.filter(b=>b.role!=='furniture' && b.role!=='source').reduce((n,b)=>n+textWords(b.text),0);
     // The page names its reading task and is held to that task's target
     // quartiles, which ship with the runtime as numbers.
+    if (structural(page)) continue;
     const ref = page.textReference;
     const target = READING_TASK_BANK[ref?.task];
     if (!target) {
@@ -75,7 +97,7 @@ export function auditTextPlan(content, scene) {
   if (check.state !== 'checked') return check;
   const findings = [...check.findings];
   const plannedIds = new Set((content.pages || []).map(p=>p.id));
-  for (const slide of scene.slides) if (!plannedIds.has(slide.id)) findings.push({id:slide.id,code:'TEXT_PAGE_UNPLANNED',severity:'blocking'});
+  for (const slide of scene.slides) if (!plannedIds.has(slide.id) && !GENERATED_PAGE.test(String(slide.id))) findings.push({id:slide.id,code:'TEXT_PAGE_UNPLANNED',severity:'blocking'});
   for (const page of content.pages || []) {
     const actual = scene.slides.filter(s=>s.id===page.id || s.sourceSlideId===page.id);
     if (!actual.length) { findings.push({id:page.id,code:'TEXT_PAGE_MISSING',severity:'blocking'}); continue; }
@@ -87,6 +109,7 @@ export function auditTextPlan(content, scene) {
       if (at<0) findings.push({id:page.id,block:block.id,code:'TEXT_PLAN_LOST',text:block.text,severity:'blocking'});
       else if (at>=0) text = text.slice(0,at)+' '+text.slice(at+needle.length);
     }
+    text = subtractGenerated(text, actual[0]);
     if (!findings.some(f=>f.id===page.id && f.severity==='blocking') && /[\p{L}\p{N}]/u.test(text)) findings.push({id:page.id,code:'TEXT_UNPLANNED',text:normalizeText(text),severity:'blocking'});
     const mismatch = readingTaskMismatch(page.textReference?.task, actual[0]);
     if (mismatch) findings.push({id:page.id,code:'TEXT_TASK_MISMATCH',...mismatch,severity:'blocking'});
@@ -133,12 +156,23 @@ export function auditExportText(content, scene, pageTexts) {
     if (texts.length!==1) { findings.push({id:page.id,code:'TEXT_PLAN_PAGINATION',severity:'blocking'}); continue; }
     // PDF text can have different reading order. Check each planned fragment,
     // and count repeated fragments, without requiring node order to persist.
+    // PDF extraction can split a kerned pair inside a word ("T ony"): a block
+    // with letters that is not found as written is tried again with optional
+    // whitespace between its characters. Numbers are matched as written, so a
+    // short cell cannot be found across the gap between two others.
     let actual = normalizeText(texts.join(' '));
     for (const block of [...(page.textPlan || [])].sort((a,b)=>b.text.length-a.text.length)) {
-      const needle = normalizeText(resolvePages(block.text,scene)), at = actual.indexOf(needle);
+      const needle = normalizeText(resolvePages(block.text,scene));
+      let at = actual.indexOf(needle), length = needle.length;
+      if (at < 0 && /\p{L}/u.test(needle)) {
+        const loose = new RegExp([...needle.replace(/\s+/g, '')].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s?'), 'u');
+        const match = loose.exec(actual);
+        if (match) { at = match.index; length = match[0].length; }
+      }
       if (at<0) findings.push({id:page.id,block:block.id,code:'TEXT_EXPORT_LOST',text:block.text,severity:'blocking'});
-      else actual = actual.slice(0,at)+' '+actual.slice(at+needle.length);
+      else actual = actual.slice(0,at)+' '+actual.slice(at+length);
     }
+    actual = subtractGenerated(actual, scene.slides.find(s=>s.id===page.id || s.sourceSlideId===page.id));
     if (!findings.some(f=>f.id===page.id && f.severity==='blocking') && /[\p{L}\p{N}]/u.test(actual)) findings.push({id:page.id,code:'TEXT_EXPORT_UNPLANNED',text:normalizeText(actual),severity:'blocking'});
   }
   return {...check,stage:'saved-pdf',accepted:!findings.some(f=>f.severity==='blocking'),findings};

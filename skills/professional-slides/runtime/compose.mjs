@@ -3093,7 +3093,7 @@ function composeDeckWith(spec, baseDir) {
   // Appendix divider. A strong deck keeps its densest pages here, and a page that
   // belongs in the appendix stops crowding the page that carries the argument.
   const appendix = Array.isArray(spec.appendix) && spec.appendix.length
-    ? [{ kind: "section", title: "Appendix", summary: "The workings behind the story" },
+    ? [{ id: "appendix-divider", kind: "section", title: "Appendix", summary: "The workings behind the story" },
        ...spec.appendix.map((page) => ({ density: "appendix", ...page }))]
     : [];
   const storySlides = appendix.length ? [...spec.slides, ...appendix] : spec.slides;

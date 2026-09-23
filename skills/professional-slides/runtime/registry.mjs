@@ -474,6 +474,11 @@ function assertChartTitleCopy(props = {}) {
     copy = copy.replace(/\bper\s+(?:100[,. ]?000|100k|1[,. ]?000|1k|100|10|1)\b(?:\s+(?:residents|people|employees|units|capita))?/gi, "per population");
     copy = copy.replace(/\b\d+(?:\.\d+)?\s*(?:-|–)\s*(?:minute|min|hour|day|week|month|year)\b/gi, "duration"); // "45-minute limit" names a threshold
     copy = copy.replace(/\b(?:above|below|under|over|at least|at most)\s+[$€£]?\d+(?:[.,]\d+)?\s*(?:bn|billion|million|m|k|%|hours?|minutes?)\b/gi, "population threshold");
+    // Model and product designations name a thing, not a result: A350-1000,
+    // A321neo, 787-9, 737 MAX 8, iPhone 15. A token that mixes letters and
+    // digits, or a three-digit model with a short variant, is masked.
+    copy = copy.replace(/\b(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{2,}(?:-[A-Za-z0-9]+)*\b/g, "designation");
+    copy = copy.replace(/\b\d{3}(?:-\d{1,2}[A-Za-z]*|\s+MAX(?:\s+\d{1,2})?)\b/g, "designation");
     const numberWords = "(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)";
     // A number word is a result only when it quantifies a change or share ("twenty percent", "one point"),
     // not when it counts things the chart shows ("three monthly budgets").

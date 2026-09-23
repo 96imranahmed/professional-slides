@@ -60,7 +60,7 @@ assert.ok(auditExportText(content,scene,['$31m']).findings.some(f=>f.code==='TEX
 assert.deepEqual(auditExportText(content,scene,[page.textPlan.map(b=>b.text).join('\n')]).scores,checkTextPlan(content).scores);
 const duplicate=structuredClone(content);duplicate.pages[0].textPlan.push({id:'again',role:'exhibit',text:'$31m'});
 assert.ok(auditTextPlan(duplicate,scene).findings.some(f=>f.code==='TEXT_PLAN_LOST'));
-// Furniture is excluded only from the density score, never from all-text retention.
+// Planned furniture is retained like any block; unplanned runtime furniture is subtracted.
 const shell=structuredClone(content);
 shell.pages[0].textPlan.push({id:'footer',role:'furniture',text:'Board pre-read'},{id:'page',role:'furniture',text:'01'});
 const withShell=structuredClone(scene);
@@ -68,7 +68,8 @@ withShell.slides[0].nodes.push({type:'text',role:'footer-right',text:'Board pre-
 assert.ok(auditTextPlan(shell,withShell).accepted);
 assert.deepEqual(checkTextPlan(shell).scores,checkTextPlan(content).scores);
 assert.ok(auditTextPlan(shell,scene).findings.some(f=>f.code==='TEXT_PLAN_LOST'));
-assert.ok(auditTextPlan(content,withShell).findings.some(f=>f.code==='TEXT_UNPLANNED'));
+// Runtime-generated furniture (footer, page number) need not be planned; authored text still must.
+assert.ok(auditTextPlan(content,withShell).accepted);
 const exported=shell.pages[0].textPlan.map(b=>b.text).join('\n');
 assert.ok(auditExportText(shell,withShell,[exported]).accepted);
 assert.ok(auditExportText(shell,withShell,[page.textPlan.map(b=>b.text).join('\n')]).findings.some(f=>f.code==='TEXT_EXPORT_LOST'));
@@ -98,3 +99,37 @@ assert.equal(ordinary.find(n=>n.role==='table-row-band'&&n.data.row===1).style.f
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result['ok'])
+
+
+class ContractDefectTests(unittest.TestCase):
+    """Defects a full deck build hit, fixed at their source."""
+
+    def test_structural_pages_generated_pages_and_split_words(self):
+        result = run_node('''
+import { checkTextPlan, auditTextPlan, auditExportText } from './skills/professional-slides/runtime/text-contract.mjs';
+const cover = { id: 'cover', kind: 'cover', textPlan: [{ id: 't', role: 'title', text: 'Riyadh Air' }] };
+const content = { textContract: 'complete', pages: [cover] };
+const scene = { slides: [
+  { id: 'cover', nodes: [{ type: 'text', role: 'cover-title', text: 'Riyadh Air' }, { type: 'text', role: 'page-number', text: '01' }] },
+  { id: 'agenda-1', nodes: [{ type: 'text', role: 'action-title', text: 'Contents' }] } ] };
+console.log(JSON.stringify({
+  coverFloor: checkTextPlan(content).findings.map(f => f.code),
+  plan: auditTextPlan(content, scene).findings.map(f => f.code),
+  split: auditExportText(content, scene, ['Riy adh Air 01', 'Contents']).findings.map(f => f.code) }));
+''')
+        self.assertEqual(result['coverFloor'], [])
+        self.assertEqual(result['plan'], [])
+        self.assertEqual(result['split'], [])
+
+    def test_page_references_in_points_match_their_number(self):
+        result = run_node('''
+import { auditContent } from './skills/professional-slides/runtime/content-audit.mjs';
+const spec = { slides: [{ title: 'A page', points: ['See the scorecard on page {{page:score}}'] }] };
+const scene = { slides: [{ nodes: [{ type: 'text', role: 'action-title', text: 'A page' }, { type: 'text', role: 'list-item', text: 'See the scorecard on page 46' }] }] };
+console.log(JSON.stringify(auditContent(spec, scene).findings.map(f => f.code)));
+''')
+        self.assertEqual(result, [])
+
+
+if __name__ == '__main__':
+    unittest.main()

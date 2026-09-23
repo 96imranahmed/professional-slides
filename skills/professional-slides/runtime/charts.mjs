@@ -1252,6 +1252,12 @@ function lineChart({ id, frame, props, area = false }) {
   }
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props);
+  // `focusSeries`: one line in the primary, the others a muted grey, so the
+  // subject reads first among its peers.
+  if (props.focusSeries !== undefined && !series.some((item) => item.name === props.focusSeries)) throw new Error("focusSeries must name an exact chart series");
+  const lineColor = (seriesIndex) => props.focusSeries !== undefined
+    ? (series[seriesIndex].name === props.focusSeries ? token("color.componentPrimary") : token("color.rule"))
+    : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
   if (area && categories.length < 2) throw new Error("Area charts require at least two categories");
   const endLabels = props.directLabels === "end" || props.endLabels === true;
   const showLegend = !endLabels && props.legend !== false && series.length > 1;
@@ -1316,7 +1322,7 @@ function lineChart({ id, frame, props, area = false }) {
         role: "chart-area",
         geometry: "customPolygon",
         frame: plot,
-        style: { fill: SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length], stroke: "none", lineWidth: token("line.hairline"), opacity: 0.18 },
+        style: { fill: lineColor(seriesIndex), stroke: "none", lineWidth: token("line.hairline"), opacity: 0.18 },
         data: { paths: [polygonPoints], series: item.name, baselineValue }
       }));
     }
@@ -1327,7 +1333,7 @@ function lineChart({ id, frame, props, area = false }) {
       y1: points[index].y,
       x2: point.x,
       y2: point.y,
-      style: lineStyle(SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length], token("line.standard"))
+      style: lineStyle(lineColor(seriesIndex), token("line.standard"))
     })));
     const labelSides = lineLabelSides(points.map(point => point.value));
     points.forEach((point) => {
@@ -1335,7 +1341,7 @@ function lineChart({ id, frame, props, area = false }) {
         id: stableId(id, "point", item.name, point.category),
         role: "chart-marker",
         frame: { x: point.x - 5, y: point.y - 5, width: 10, height: 10 },
-        style: fillStyle(SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length])
+        style: fillStyle(lineColor(seriesIndex))
       }));
       const mappedPoint = { ...point, changeX: point.x, changeY: point.y - (showDataLabels ? 30 : 16) };
       pointMap.set(`${item.name}:${point.category}`, mappedPoint);
@@ -1361,7 +1367,7 @@ function lineChart({ id, frame, props, area = false }) {
     if (endLabels) {
       const point = points.at(-1);
       // The label starts clear of the 10px marker, not on it.
-      pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 9, y: point.y - 12, text: `${item.name} ${formatValue(point.value, props)}`, data: { series: item.name, category: point.category, value: point.value, labelKind: "series-end" }, color: SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length] });
+      pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 9, y: point.y - 12, text: `${item.name} ${formatValue(point.value, props)}`, data: { series: item.name, category: point.category, value: point.value, labelKind: "series-end" }, color: lineColor(seriesIndex) });
     }
   });
   // End labels of lines that finish close together push apart (22px minimum)
