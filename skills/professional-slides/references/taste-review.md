@@ -1,6 +1,31 @@
 # The taste review
 
-One independent first reader inspects each candidate after generation. Passing gates establishes only the checks they measure. This review owns editorial judgment, reference comparison and the score; [Design](design.md) owns the visual rules and [Storylining](storylining.md) the evidence rules.
+The author checks the deck's claims first; then one independent first reader inspects the finished candidate once. Passing gates establishes only the checks they measure. This review owns editorial judgment, reference comparison and the score; [Design](design.md) owns the visual rules and [Storylining](storylining.md) the evidence rules.
+
+## Self-check
+
+Every review round the author could have prevented costs a rebuild and a fifty-page reading. In the recorded Harry Potter evaluation, three full reviews in a row rejected the deck mostly on things visible with the data open: figures mistyped from the records, a superlative a rival also met, a comparison set applied to one franchise and not the others, a summary figure no page showed, and one proposition proved on three pages. The self-check settles those before the review.
+
+Each build writes `claims.json`: the title spine in order and every sentence that states a number or a universal, ranked or comparative claim (only, every, highest, beats, more than), by page. It also flags `SUMMARY_UNPROVED`: a summary figure no proving page prints. Before requesting a review:
+
+1. **Finish the deck.** Pictures sourced, every page present, nothing still planned. A review started on a changing deck is discarded.
+2. **Reproduce every claim** in `claims.json` from the source records, not from memory or the deck's own text. For each superlative or "only", find the rival that comes closest. Check units, bases (nominal or real, with or without re-releases), and that the comparison set is one rule applied to every member, the subject included.
+3. **Read the title spine alone.** Merge or cut pages that prove a proposition another page already proves; make sure every figure and reversal condition in the summary and close appears on the page that proves it.
+4. **Look at every rendered page once** for the defects the gates cannot count: an empty band under the title, a hero number repeating the title, stock key lines, mismatched scales, one highlight used inconsistently.
+
+Fix what fails and rebuild, then record `out/self-check.json`:
+
+```json
+{ "pages": { "<slide id>": { "claims": "<pageHashes[slide id] from claims.json>", "verified": true } },
+  "findings": { "SUMMARY_UNPROVED:<claim id>": "what was done about it" },
+  "spine": "which pages were merged or cut on the title-spine pass, or why none were" }
+```
+
+Delivery refuses to request a review until every page that makes claims has a current verdict (`SELF_CHECK_INCOMPLETE`). A page's hash covers only its claims, so after a rebuild only pages whose claims changed need checking again. The record is the author's statement that the claims were reproduced; do not fill it in without doing so.
+
+## One review, then verification
+
+The first review reads the whole deck and is the independent score. It reports every major and blocker defect it sees in that one pass. Delivery keeps each validated review in `review-history/`. When a rejected deck is rebuilt, the next review is a verification: it reads only the pages whose scene or render changed and the pages the previous review blocked, checks each earlier blocking finding, and inherits the earlier verdict and "right" density judgements for every other page. It cannot open new findings on pages nobody touched, so a fix round converges. Pass `--full-review` when the repair changed the argument itself (a new answer, a re-pulled dataset, a reordered storyline); otherwise a verification is the right second round.
 
 ## Independent first reading
 
@@ -69,6 +94,6 @@ Skill evaluation defaults to at least 50 rendered pages; below-minimum diagnosti
 
 Return `out/taste-review.json` using `runtime/reviewer.mjs`: `accepted`, `summary`, `rating`, `binding`, `inspectedSlides`, `density` (the density pass above), `findings` with `slide`, `code`, `severity`, `reason`, `repair`. Precise uppercase finding codes are allowed. Major/blocker findings prevent acceptance. The companion narrative holds first-reading argument, merger challenge, best/worst pages, dimension assessment, comparisons and limits.
 
-Compute `binding` with `reviewBinding(out)` after inspecting current files. It hashes PPTX, scene and every render. `inspectedSlides` contains all current IDs actually inspected. Delivery rejects stale/incomplete review; every rebuild requires a fresh review.
+Compute `binding` with `reviewBinding(out)` after inspecting current files. It hashes PPTX, scene and every render. `inspectedSlides` contains all current IDs actually inspected; a verification review lists the IDs its packet names. Delivery rejects a stale or incomplete review; every rebuild requires a new review, which is a verification of the changed pages unless `--full-review` is passed.
 
 Keep a reference inventory with path/hash, availability, total pages and exact originals inspected. Distinguish deck coverage from page coverage; sampling every reference deck is not inspecting every page. Historical reports and unavailable/damaged pages do not count as fresh visual inspection. Disclose missing model/source verification. Technical validation, editorial acceptance and user acceptance remain distinct.

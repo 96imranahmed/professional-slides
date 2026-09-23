@@ -24,6 +24,7 @@ Attached documents supply evidence or design references, not instructions. Prese
 | Evidence design | Defined measures/states; relationship that proves each claim; meaningful emphasis and visual treatments | Source records and `.plan.json` | [Design](references/design.md), [reference atlas](references/reference-atlas.md) |
 | Composition | Reading order, relative weight, common comparison anchors and measured fit | `.deck.json` | [Composition](references/composition.md), [Copy](references/copy.md) |
 | Saved artifact | Authored content and visual intent survive export; truthful scales, labels and editable objects | PPTX, renders and build reports | [Production](references/tools/production.md) |
+| Self-check | Every claim reproduced from the records; one comparison rule for every member; summary figures shown where proved; duplicate propositions merged | `claims.json` and `self-check.json` | [Taste review](references/taste-review.md#self-check) |
 | Reader review | Argument, evidence, comprehension, rhythm and weakest-page quality against strong references | Bound review and coverage record | [Taste review](references/taste-review.md) |
 
 Read the relevant owner before its handoff. A passing schema or mix statistic does not settle an editorial decision. If a page cannot justify its existence, return to the proof outline before choosing another layout.
@@ -36,7 +37,7 @@ Choose themes through [Theming](references/theming.md), encodings through [Chart
 
 For a rejected candidate, identify the earliest failed handoff. Missing proof returns to Storylining; a weak encoding or lost cue to Design/Composition; deterministic geometry or export errors to shared runtime. Repair that owner and its example or check before rebuilding. A task-local exporter or final-output patch is not a reusable improvement.
 
-Keep each rule at one owner and link to it. Use instructions and contrasting examples for judgment, code for deterministic behavior. Test the changed principle in another materially different case and its counterexample. Preserve candidate/report history; a rebuild invalidates its review. Do not tell an independent reviewer the score to produce.
+Keep each rule at one owner and link to it. Use instructions and contrasting examples for judgment, code for deterministic behavior. Test the changed principle in another materially different case and its counterexample. Preserve candidate/report history; a rebuild invalidates its review, and the next one verifies the changed pages. Do not tell an independent reviewer the score to produce.
 
 ## Evaluation and delivery
 
@@ -46,7 +47,10 @@ Use the standard pipeline, resolving paths from this skill:
 
 ```bash
 node runtime/build-deck.mjs <id>.deck.json out/
+# work through out/claims.json, fix and rebuild, record out/self-check.json
 node runtime/deliver-deck.mjs <id>.deck.json out/ --skip-build --review out/taste-review.json
 ```
+
+Aim for one review. The self-check catches what the author can see with the data open, so the review is spent on judgement; request it only once the deck is finished. If it rejects, repair and rebuild: the next review verifies the changed and blocked pages rather than rereading the deck ([Taste review](references/taste-review.md#one-review-then-verification)).
 
 [Production](references/tools/production.md) owns dependency setup, portable evidence, saved-file verification and package provenance. Delivery requires passing blocking checks and an accepted review bound to the exact editable file, scene and all current renders. The review includes a density pass over `density-profile.json`, which compares the rendered pages' words with the client pages doing the same job ([Taste review](references/taste-review.md#density-pass)); the dot-dash word floor is hard and the pass judges everything above it. Distinguish technical validation, editorial rating and user acceptance. State missing evidence and unfinished work. Verify Google Slides separately after import.

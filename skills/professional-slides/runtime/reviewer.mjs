@@ -5,6 +5,11 @@
 //   packet  — no model call: writes review-packet/ for the calling agent to review and
 //             answer with `deliver-deck.mjs … --review review.json`. This is the default
 //             inside an agent session, where the agent *is* the reviewer.
+//
+// One full review per deck. Every validated review is kept in review-history/;
+// the next review of a rebuilt deck is a verification: it reads the pages whose
+// render or scene changed and the pages its predecessor blocked, and inherits
+// the rest. A fix round therefore cannot reopen pages nobody touched.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -132,12 +137,71 @@ export async function reviewBinding(directory) {
   return hash.digest("hex");
 }
 
-export async function validateReviewBinding(review, directory, slideIds) {
+/** One hash per slide over its scene record and its render: what a verification review compares. */
+export async function slideHashes(directory) {
+  const scene = JSON.parse(await fs.readFile(path.join(directory, "scene.json"), "utf8"));
+  const hashes = {};
+  for (const [i, slide] of scene.slides.entries()) {
+    const hash = createHash("sha256").update(JSON.stringify(slide));
+    hash.update(await fs.readFile(path.join(directory, "rendered", `slide-${i + 1}.png`)).catch(() => Buffer.alloc(0)));
+    hashes[slide.id] = hash.digest("hex");
+  }
+  return hashes;
+}
+
+const HISTORY = "review-history";
+
+/** Keep a validated review with the slide hashes it was bound to, so the next one can be scoped. */
+export async function recordReview(directory, review) {
+  const dir = path.join(directory, HISTORY);
+  await fs.mkdir(dir, { recursive: true });
+  const n = (await fs.readdir(dir)).filter((f) => /^review-\d+\.json$/.test(f)).length + 1;
+  const file = path.join(dir, `review-${n}.json`);
+  await fs.writeFile(file, JSON.stringify({ review, binding: review.binding, slideHashes: await slideHashes(directory), recordedAt: new Date().toISOString() }, null, 2) + "\n");
+  return file;
+}
+
+export async function latestReview(directory) {
+  const dir = path.join(directory, HISTORY);
+  const files = (await fs.readdir(dir).catch(() => [])).filter((f) => /^review-\d+\.json$/.test(f))
+    .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
+  return files.length ? JSON.parse(await fs.readFile(path.join(dir, files.at(-1)), "utf8")) : null;
+}
+
+/**
+ * What a verification review must read: every slide whose scene record or
+ * render changed since the recorded review, and every slide that review
+ * blocked. Unchanged slides keep their inspection and their "right" density
+ * verdicts; deck-level blockers are put to the reviewer again.
+ */
+export function verificationScope(prior, current) {
+  if (!prior?.slideHashes || !prior.review) return null;
+  const blocking = reviewOutcome(prior.review).blocking;
+  const ids = Object.keys(current);
+  const changed = ids.filter((id) => prior.slideHashes[id] !== current[id]);
+  const blocked = [...new Set(blocking.map((f) => f.slide).filter((id) => id && current[id]))];
+  const mustInspect = ids.filter((id) => changed.includes(id) || blocked.includes(id));
+  const inheritedDensity = (prior.review.density?.pages || []).filter((p) => p.verdict === "right" && !mustInspect.includes(p.slide) && current[p.slide]);
+  return { basedOn: prior.binding, changed, mustInspect, priorBlocking: blocking, inheritedDensity, priorRating: prior.review.rating };
+}
+
+/** A verification review carries forward the density verdicts of pages it did not need to reread. */
+export function withInheritedDensity(review, scope) {
+  if (!scope) return review;
+  const judged = new Set((review.density?.pages || []).map((p) => p.slide));
+  const pages = [...(review.density?.pages || []), ...scope.inheritedDensity.filter((p) => !judged.has(p.slide))];
+  return { ...review, density: { ...(review.density || {}), pages } };
+}
+
+export async function validateReviewBinding(review, directory, slideIds, scope = null) {
   const errors = [];
   if (review.binding !== await reviewBinding(directory)) errors.push("Review does not match the current PPTX, scene and renders");
   const inspected = Array.isArray(review.inspectedSlides) ? review.inspectedSlides : [];
   const seen = new Set(inspected);
-  if (inspected.length !== slideIds.length || seen.size !== slideIds.length || slideIds.some(id => !seen.has(id))) errors.push("Review must record inspection of every current slide");
+  if (scope) {
+    const missing = scope.mustInspect.filter((id) => !seen.has(id));
+    if (missing.length) errors.push(`Verification review must inspect every changed or previously blocked slide; missing ${missing.join(", ")}`);
+  } else if (inspected.length !== slideIds.length || seen.size !== slideIds.length || slideIds.some(id => !seen.has(id))) errors.push("Review must record inspection of every current slide");
   if (!Number.isFinite(review.rating) || review.rating < 0 || review.rating > 10) errors.push("Review must provide a rating from zero to ten");
   return errors;
 }
@@ -179,7 +243,7 @@ function textOf(slide) {
   return slide.nodes.filter((n) => n.type === "text" && !["page-number", "source-text"].includes(n.role)).map((n) => ({ role: n.role, text: (n.data?.textLayout?.source ?? n.text) }));
 }
 
-export async function buildReviewPacket({ outputDirectory, brief = "", answer = "" }) {
+export async function buildReviewPacket({ outputDirectory, brief = "", answer = "", scope = null }) {
   const dir = path.resolve(outputDirectory);
   const scene = JSON.parse(await fs.readFile(path.join(dir, "scene.json"), "utf8"));
   const gates = await fs.readFile(path.join(dir, "gates.json"), "utf8").then(JSON.parse).catch(() => ({ findings: [] }));
@@ -195,10 +259,10 @@ export async function buildReviewPacket({ outputDirectory, brief = "", answer = 
   }));
   const statistics = designStatistics(scene);
   const density = await fs.readFile(path.join(dir, "density-profile.json"), "utf8").then(JSON.parse).catch(() => null);
-  const packet = { binding: await reviewBinding(dir), inspectedSlides: slides.map(s => s.id), statistics, density, brief, answer, montage: path.join(dir, "rendered", "montage.png"), titles: slides.map((s) => `${s.index}. ${s.title}`), slides, codes: CODES, schema: REVIEW_SCHEMA };
+  const packet = { binding: await reviewBinding(dir), inspectedSlides: scope ? scope.mustInspect : slides.map(s => s.id), scope, statistics, density, brief, answer, montage: path.join(dir, "rendered", "montage.png"), titles: slides.map((s) => `${s.index}. ${s.title}`), slides, codes: CODES, schema: REVIEW_SCHEMA };
   await fs.writeFile(path.join(packetDir, "packet.json"), JSON.stringify(packet, null, 2));
   await fs.writeFile(path.join(packetDir, "schema.json"), JSON.stringify(REVIEW_SCHEMA, null, 2));
-  await fs.writeFile(path.join(packetDir, "prompt.md"), reviewPrompt(packet));
+  await fs.writeFile(path.join(packetDir, "prompt.md"), packet.scope ? verificationPrompt(packet) : reviewPrompt(packet));
   return { packetDir, packet };
 }
 
@@ -256,6 +320,8 @@ export function reviewPrompt(packet) {
 
 Read these skill files before assessing: ${guidance.join(", ")}. The taste-review guidance owns benchmark calibration and literal coverage. Do not consult prior candidate scores, repair lists or peer status summaries.
 
+This is the deck's only full review. A later round, if there is one, reads only the pages that changed and the findings you raise here, so a defect you see and leave out will not be raised again. Report every major and blocker defect in this one pass, across all pages, with its repair: work through every page before deciding, rather than stopping at the first few serious findings.
+
 BRIEF: ${packet.brief || "(not supplied)"}
 GOVERNING ANSWER: ${packet.answer || "(not supplied)"}
 
@@ -290,12 +356,44 @@ Return ONLY JSON matching this schema: ${JSON.stringify(packet.schema)}
 Set accepted=false if any finding is major or blocker. The summary is two sentences: what the deck does well and what must change.`;
 }
 
+/** A verification round: the prior blockers and the changed pages, not a fresh reading of the whole deck. */
+export function verificationPrompt(packet) {
+  const { scope } = packet;
+  const byId = new Map(packet.slides.map((s) => [s.id, s]));
+  const pages = scope.mustInspect.map((id) => byId.get(id)).filter(Boolean);
+  const guidance = ["design", "taste-review"].map(name => fileURLToPath(new URL(`../references/${name}.md`, import.meta.url)));
+  return `You are verifying repairs to a consulting deck that an earlier full review rejected. This is not a fresh review of the whole deck: the earlier review read every page, and its verdict stands for every page that has not changed since.
+
+Read ${guidance.join(" and ")} for the standards. BRIEF: ${packet.brief || "(not supplied)"}
+GOVERNING ANSWER: ${packet.answer || "(not supplied)"}
+
+The earlier review's blocking findings (each must now be resolved, or raised again with its repair):
+${scope.priorBlocking.map((f) => `- ${f.slide ?? "deck"} · ${f.code}: ${f.reason}${f.repair ? ` → ${f.repair}` : ""}`).join("\n") || "- none"}
+
+Pages to read at full size (changed since that review, or blocked by it):
+${pages.map((s) => `- ${s.id} (page ${s.index}): ${s.title} — ${s.image}`).join("\n") || "- none"}
+Montage, for the sequence: ${packet.montage}
+
+TITLES ALONE, to check the repaired pages still fit the argument:
+${packet.titles.join("\n")}
+
+Do three things. (1) For every earlier finding, check the repair on the page: if it is fixed, drop it; if not, raise it again at its severity. A deck-level finding is checked against the titles, montage and the changed pages. (2) Read every listed page as a first reader would, and raise any major or blocker defect on it, including one the repair introduced. (3) Check the changed pages against their neighbours in the sequence for a new contradiction or repetition. Do not raise new findings on pages that are not listed: they were accepted as they stand. Use the same codes and severities as the full review:
+${Object.entries(packet.codes).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
+
+${densityPrompt(packet.density, scope.mustInspect)}
+
+Record inspectedSlides as exactly these IDs once you have read them: ${JSON.stringify(scope.mustInspect)}. Bind this review to ${packet.binding}. The earlier rating was ${scope.priorRating ?? "not recorded"}; rate the repaired deck out of ten on what you now see.
+
+Return ONLY JSON matching this schema: ${JSON.stringify(packet.schema)}
+Set accepted=false if any finding is major or blocker. The summary is two sentences: which repairs held and what, if anything, must still change.`;
+}
+
 /** The density pass: the profile's comparison and flags, put to the reviewer as questions. */
-export function densityPrompt(profile) {
+export function densityPrompt(profile, only = null) {
   if (!profile) return "DENSITY PASS. No density profile was built (the deck was not rendered); set density to {\"deck\": \"No rendered density profile was available for this build.\", \"pages\": []}.";
   const deck = profile.deck || {};
   const line = (name, label) => deck[name] ? `- ${label}: ${deck[name].measured} against the client ${deck[name].target} (band ${JSON.stringify(deck[name].band ?? null)}), ${deck[name].position}` : null;
-  const flagged = (profile.pages || []).filter((p) => p.flags?.length);
+  const flagged = (profile.pages || []).filter((p) => p.flags?.length && (!only || only.includes(p.id)));
   return `DENSITY PASS. The rendered pages were measured the way the client corpus was (pdftotext -layout; title and source lines excluded; a block is a run of lines between blank ones; blocks under three words are labels). Compare the deck with the client targets, then open every flagged page and judge whether its density is right for the job it does. A flag is a question, not a verdict: a chart-led page may rightly sit light, and a page that clears its word floor with padding or restatement is too dense or the wrong shape even though it passed. Deck against client pages (block measures over the ${deck.comparedPages ?? "?"} pages that carry commentary or prose, the population the benchmark measured; ${deck.exhibitLed?.pages ?? 0} exhibit-led pages sit beside them at ${deck.exhibitLed?.wordsPerBlock ?? "-"} words a block, which are labels):
 ${[line("bodyWordsVsTaskMedian", "body words against each page's task median (1.0 = client median)"), line("blocksPerPage", "text blocks per page"), line("wordsPerBlock", "words per block"), line("longestBlock", "longest block per page"), deck.singleBlockShare ? `- single-block pages: ${deck.singleBlockShare.measured} of pages against at most ${deck.singleBlockShare.target}` : null].filter(Boolean).join("\n")}
 Flagged pages:
@@ -313,8 +411,8 @@ export function detectBackend(preferred = "auto") {
   return "packet";
 }
 
-export async function runReview({ outputDirectory, brief, answer, backend = "auto", model, timeoutMs = 600000 }) {
-  const { packetDir, packet } = await buildReviewPacket({ outputDirectory, brief, answer });
+export async function runReview({ outputDirectory, brief, answer, backend = "auto", model, timeoutMs = 600000, scope = null }) {
+  const { packetDir, packet } = await buildReviewPacket({ outputDirectory, brief, answer, scope });
   const which = detectBackend(backend);
   const prompt = await fs.readFile(path.join(packetDir, "prompt.md"), "utf8");
   const reviewPath = path.join(path.resolve(outputDirectory), "review.json");
@@ -324,7 +422,7 @@ export async function runReview({ outputDirectory, brief, answer, backend = "aut
   }
   if (which === "codex") {
     const out = path.join(packetDir, "codex-last-message.json");
-    const args = ["exec", ...(model ? ["--model", model] : []), "--sandbox", "read-only", "--ephemeral", "--output-schema", path.join(packetDir, "schema.json"), "--output-last-message", out, ...packet.slides.flatMap((s) => ["--image", s.image]), "--image", packet.montage, "-"];
+    const args = ["exec", ...(model ? ["--model", model] : []), "--sandbox", "read-only", "--ephemeral", "--output-schema", path.join(packetDir, "schema.json"), "--output-last-message", out, ...packet.slides.filter((s) => !scope || scope.mustInspect.includes(s.id)).flatMap((s) => ["--image", s.image]), "--image", packet.montage, "-"];
     await runProcess("codex", args, { input: prompt, timeoutMs });
     raw = await fs.readFile(out, "utf8");
   } else if (which === "claude") {

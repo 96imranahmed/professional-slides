@@ -18,9 +18,10 @@ emit/emit_pptx.py  scene → editable PPTX (title placeholders, wrap=square, aut
 emit/render_pptx.py  PPTX → PDF (LibreOffice) → PNG per slide + montage
 emit/readback_pptx.py  saved PPTX re-opened with python-pptx and compared to the scene
 gates/page_gates.py  deterministic page gates (ink, dead band, internal void, hero, type range, cpl, words, titles, monotony, ticks)
-reviewer.mjs       one review prompt + schema + artifact binding and full-slide coverage; backends codex | claude | packet
-build-deck.mjs     plan → scene → pptx → render → readback → gates
-deliver-deck.mjs   build → gates must pass → review → <id>-DELIVERED.pptx or REJECTED.md
+reviewer.mjs       one full review prompt + schema + artifact binding; verification rounds scoped to changed/blocked slides; backends codex | claude | packet
+claims.mjs         claim ledger (claims.json) for the author's self-check, and its validation
+build-deck.mjs     plan → scene → claims → pptx → render → readback → gates
+deliver-deck.mjs   build → gates must pass → self-check must cover claims → review → <id>-DELIVERED.pptx or REJECTED.md
 ```
 
 Component contract: `render({ id, frame, props }) → { nodes }` with frames in canvas px (1280×720); `measureContent({ frame, props })` returns the natural height at a width — components without it fall back to `preferredSize`, and `evals/tests/test_measure_vs_preferred.py` reports the list. Chart components expose `nativeChart` on their instance so the emitter can write a workbook-backed chart; charts with reference lines, annotations or highlights stay as grouped shapes.
@@ -41,4 +42,5 @@ Schema, argument completeness, text fit, collisions, clipping and scale checks b
 Corpus mix, decoration frequency, empty bands and density statistics are advisory; neutral
 exhibits and concise pages can be correct. Independent rendered review decides
 whether those pages communicate well. A review is valid only for its hashed
-scene, editable deck and renders, with every current slide explicitly inspected.
+scene, editable deck and renders, with every current slide explicitly inspected, or, for a
+verification after a recorded review, every changed and previously blocked slide.

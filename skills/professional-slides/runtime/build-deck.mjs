@@ -21,6 +21,7 @@ import { auditContent } from "./content-audit.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
 import { runPlanGates } from "./gates/plan_gates.mjs";
 import { auditTextPlan, auditExportText } from "./text-contract.mjs";
+import { writeLedger } from "./claims.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -140,6 +141,8 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   await fs.writeFile(scenePath, JSON.stringify(deck));
   await fs.writeFile(path.join(directory, "planning.json"), JSON.stringify(decisions, null, 2) + "\n");
   Object.assign(result, { scenePath, slides: deck.slides.length, metrics: metricsBackend() });
+  // The claim ledger the author works through before the review (references/taste-review.md#self-check).
+  result.claims = (await writeLedger(directory)).counts;
   result.timings.planMs = Date.now() - started;
 
   // Story gates need only the scene (titles, words, hedges, monotony).
@@ -225,7 +228,7 @@ async function readJson(file) { try { return JSON.parse(await fs.readFile(file, 
 export const BUILD_REPORTS = Object.freeze([
   "scene.json", "planning.json", "preflight-gates.json", "content-audit.json",
   "readback.json", "gates.json", "build-result.json", "text-coverage.json", "rendered-text-coverage.json",
-  "density-profile.json",
+  "density-profile.json", "claims.json",
 ]);
 
 // Skill evaluations are judged on at least this many rendered pages
