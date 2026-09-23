@@ -660,6 +660,7 @@ function barNumber(cell) {
   const value = Number(raw);
   return Number.isFinite(value) ? value : null;
 }
+const sharedBarScale = (column) => (column && typeof column === "object" && typeof column.barScale === "string" && column.barScale.trim() ? column.barScale.trim() : null);
 const barScaleId = (label) => `${String(label).replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-bar`;
 /** Zero (or below zero) to a round number above the largest value, so the bars
  *  are proportional to the measure rather than to each other, and a column of
@@ -689,10 +690,14 @@ export function barScales(ex) {
     if (!column || typeof column !== "object" || column.bar !== true) continue;
     const label = String(column.label ?? "").trim(), unit = String(column.unit ?? "").trim();
     if (!label || !unit) continue; // styleTable says what is missing, and better.
-    const values = (ex.rows || [])
-      .map((row) => (Array.isArray(row) ? row : row.cells || [])[index])
-      .map(barNumber).filter((n) => Number.isFinite(n));
-    if (values.length) scales[barScaleId(label)] = { ...barScaleRecord(label, unit, values),
+    // `barScale`: columns that measure the same thing share one scale, so a
+    // row reads across them. Pooled over every column in the group.
+    const group = sharedBarScale(column);
+    const members = group ? (ex.columns || []).map((c, i) => [c, i]).filter(([c]) => c && sharedBarScale(c) === group).map(([, i]) => i) : [index];
+    const values = members.flatMap((i) => (ex.rows || [])
+      .map((row) => (Array.isArray(row) ? row : row.cells || [])[i])
+      .map(barNumber).filter((n) => Number.isFinite(n)));
+    if (values.length) scales[barScaleId(group ?? label)] = { ...barScaleRecord(group ?? label, unit, values), legend: false,
       labelTexts: (ex.rows || []).map(row => {
         const cell = (Array.isArray(row) ? row : row.cells || [])[index];
         return String(cell?.text ?? cell ?? "");
@@ -723,7 +728,11 @@ function columnTreatments(ex) {
     if (!label) throw new Error("A bar column needs a label; it names the scale its bars share");
     const unit = String(rest.unit ?? "").trim();
     if (!unit) throw new Error(`The "${label}" bar column needs a unit: a bar without one is a length, not a measure`);
-    barScales[i] = { id: barScaleId(label), label, unit };
+    const group = sharedBarScale(rest);
+    if (group && columns.some((other) => sharedBarScale(other) === group && String(other.unit ?? "").trim() !== unit)) {
+      throw new Error(`Bar columns sharing the "${group}" scale must share a unit`);
+    }
+    barScales[i] = { id: barScaleId(group ?? label), label: group ?? label, unit };
     return { ...rest, type: "bars" };
   });
   // The column writes its own cells, so a cell that already has a type is the
@@ -761,9 +770,12 @@ function columnTreatments(ex) {
   // split the table, and a half-table must not rescale itself.
   const scales = { ...(ex.scales || {}) };
   for (const [index, record] of Object.entries(barScales)) {
-    const values = nextRows.map((row) => (Array.isArray(row) ? row : row.cells)[index]).map((cell) => cell?.values?.[0]).filter((n) => Number.isFinite(n));
+    const members = Object.entries(barScales).filter(([, other]) => other.id === record.id).map(([i]) => Number(i));
+    const values = members.flatMap((i) => nextRows.map((row) => (Array.isArray(row) ? row : row.cells)[i]).map((cell) => cell?.values?.[0]).filter((n) => Number.isFinite(n)));
     if (!values.length) throw new Error(`The "${record.label}" bar column has no numbers to scale`);
-    if (!scales[record.id]) scales[record.id] = barScaleRecord(record.label, record.unit, values);
+    // The column header already prints the unit, so a legend line repeating it
+    // with "common scale 0 to N" is template text under the table.
+    if (!scales[record.id]) scales[record.id] = { ...barScaleRecord(record.label, record.unit, values), legend: false };
   }
   return { ...ex, columns: nextColumns, rows: nextRows, bubbleColumn: undefined, ...(Object.keys(barScales).length ? { scales } : {}) };
 }

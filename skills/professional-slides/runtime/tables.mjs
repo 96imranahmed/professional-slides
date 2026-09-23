@@ -833,8 +833,8 @@ export function measureTable({ frame, props }) {
     // Yes; No; Not assessed." - defines its own term with itself under a table
     // that says neither "requirement" nor "option".
     if (scale.type === "binary" && columns.length && columns.every(column => /\?\s*$/.test(String(column.label ?? "").trim()))) continue;
-    if (scale.type !== "bars" || scale.series.length !== 1 || columns.some(column => !column.label.includes(scale.unit)))
-      throw new Error("Only single-series bar legends may be omitted, with their unit visible in every using column header, or a binary scale whose every column header asks a question");
+    if (scale.type !== "bars" || scale.series.length !== 1 || columns.some(column => !column.label.includes(scale.unit) && String(column.unit ?? "").trim() !== scale.unit))
+      throw new Error("Only single-series bar legends may be omitted, with their unit visible in every using column header or its unit line, or a binary scale whose every column header asks a question");
   }
   const legends = [...used.entries()].filter(([, scale]) => scale.legend !== false).map(([id, scale]) =>
     layoutLegend(id, scale, frame.width, textSize, gap),

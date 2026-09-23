@@ -66,6 +66,26 @@ console.log(JSON.stringify({photoLeft:photo.frame.x, footRight:foot ? foot.frame
         self.assertLessEqual(result["footRight"], result["photoLeft"])
 
 
+class BarScaleTests(unittest.TestCase):
+    def test_bar_columns_can_share_a_scale_and_print_no_template_key(self):
+        # Four "% of films" columns each scaled to their own maximum could not
+        # be read across a row, and each printed "(unit, common scale 0 to N)".
+        result = run_node("""
+import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
+const col = (label) => ({label, unit: '% of films', bar: true, barScale: 'share'});
+const spec={schema:'professional-slides.deck/v3',id:'b',cover:{title:'x'},slides:[{title:'The lead holds until the bars reward peaks over consistency',layout:'exhibit-full',
+  exhibit:{type:'table',columns:[{label:'Franchise'},col('Loose bars'),col('Strict bars')],rows:[['A','100','12'],['B','67','50'],['C','47','32']]}}]};
+const page=planDeck(toDeckPlan(spec,'.')).deck.slides.at(-1);
+const bars=page.nodes.filter(n=>n.role==='table-bar');
+const width=(row,col)=>bars.find(n=>n.data?.row===row&&n.data?.column===col)?.frame.width;
+console.log(JSON.stringify({key:page.nodes.some(n=>/common scale/.test(String(n.text||''))), ratio: width(1,2)/width(1,1)}));
+""")
+        self.assertFalse(result["key"])
+        # 50 against 67 on one scale, not each bar at its own column's maximum.
+        self.assertAlmostEqual(result["ratio"], 50 / 67, places=2)
+
+
 class DeclaredDecimalsTests(unittest.TestCase):
     def test_a_declared_format_rounds_half_away_from_zero_like_powerpoint(self):
         # 3.55 is stored as 3.5499...; toFixed printed 3.5 on the drawn chart

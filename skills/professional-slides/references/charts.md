@@ -146,7 +146,7 @@ Cell types: `text`; `bullets`; `category` (primary fill with contrasting text, o
 | `implication: true` | Names the column that concludes from the columns before it, and inserts a gutter of `implication` chevrons in front of it | Cannot be the first column: the gutter carries the argument's direction |
 | `heat: true` | Every cell `type: "heatmap"` | The shared sequential scale |
 | `bubble: true` | Every value in a filled pill (`surface: "bubble"`) | - the table's counterpart to the chart's change bubble |
-| `bar: true` | Every cell `type: "bars"`, over a scale derived from the column's own numbers - zero (or the lowest negative, rounded down) to a round number above the largest | `label` and `unit` on the column, both set |
+| `bar: true` | Every cell `type: "bars"`, over a scale derived from the column's own numbers - zero (or the lowest negative, rounded down) to a round number above the largest; columns that measure the same thing set one `barScale` name and share one scale, so a row reads across them. The header prints the unit, so no key line is added under the table | `label` and `unit` on the column, both set; one unit per `barScale` |
 
 `implicationStyle` is `per-row` or `single`; the default follows the row count, `per-row` at four rows or fewer. `single` is not one chevron on the middle row - that reads as a verdict on that row - but a dashed rule down the gutter carrying one disc centred on the rows it spans, which stops above a total: a total is the same evidence added up, not another line of it.
 
