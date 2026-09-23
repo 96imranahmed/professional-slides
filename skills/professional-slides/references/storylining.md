@@ -45,6 +45,26 @@ For repeated permission or readiness summaries, compare the exact record keys wi
 
 For fixed length, budget cover, summary, sections and appendix first; select evidence breadth that supports the total. Reject a narrow evaluation topic before authoring if it requires padding. Do not invent another case whenever a thin page is found. Alternative decks first differ in question, sequence or evidence relationship, not palette.
 
+## Stress-test the storyline
+
+Before anything is drawn, the storyline goes through a mock problem-solving session with a reader who did not write it. `node runtime/storyline.mjs <id>.deck.json out/` writes a packet - the question, the answer, the players, the data found, and every page's title, what its exhibit shows (with two-number charts marked) and what its commentary says - and a prompt that asks a senior, adversarial reader to:
+
+1. rewrite the answer if it restates the question or is too safe to be wrong;
+2. test whether the pillars are a MECE set of reasons that together prove it, and name each pillar's strongest counter-argument;
+3. flag every page that reports a count or a two-number comparison without an implication, and say what it should show instead;
+4. name the analyses a strong team would have run, with the public data behind them;
+5. list pages to cut or merge;
+6. return `ready` or `revise`, a rating and the fixes that matter most.
+
+Run it as a subagent loop:
+
+1. **Spawn a fresh subagent** as the critic - the harness's agent or task tool, or `--run codex` / `--run claude` when that CLI is installed. Give it only the path to `prompt.md` and ask it to return the JSON. It gets none of the author's reasoning, notes or earlier reviews: a critic that knows what the author meant forgives what the page fails to show.
+2. **Save** its JSON as `out/storyline-review.json`.
+3. **Revise at the root.** A missing analysis means more research, not a new sentence: go back to [the data](#find-the-data-before-the-dot-dash), download the series, and rebuild the pages. A two-number chart becomes the whole peer set or the trend; a plain or word-filled table becomes a scorecard with numbers and a treatment in the cells; an obvious page is cut or merged.
+4. **Spawn a new critic** on the revised storyline - never the same one - and repeat until the verdict is `ready`. Three rounds is typical; if the rating stops rising, the missing piece is usually data, not wording.
+
+The bar the critic holds is a deck that feels important: every page carries evidence a reader could not assemble in five minutes, charts compare the whole set or a trend with its rate rather than two categories, and tables are dense with real numbers and judge in their cells. The review is bound to the story's structure (page ids, titles, exhibits and what they plot): rewording a sentence keeps it, changing what a page argues or shows does not, and delivery refuses a deck without a current `ready` critique (`STORYLINE_UNREVIEWED`). Do not tell the reviewer the verdict you want.
+
 ## Reconcile evidence before design
 
 Verify factual premises and dated source status: rumour, announcement, agreement, approval and completion are distinct. Separate transaction consideration, contingent payments and retention costs; check superseded policies/rates. Track whether research is resolved, uncertain, unavailable after lookup, not yet performed or requires user input. Do not describe unperformed research as unavailable.

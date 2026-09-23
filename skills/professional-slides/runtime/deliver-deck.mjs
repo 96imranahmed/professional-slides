@@ -20,6 +20,7 @@ import { assertOutputDirectory } from "./output-path.mjs";
 import { buildDeck } from "./build-deck.mjs";
 import { runReview, validateReview, validateReviewBinding, validateDensityReview, reviewOutcome, slideHashes, latestReview, verificationScope, withInheritedDensity, recordReview } from "./reviewer.mjs";
 import { writeLedger, validateSelfCheck } from "./claims.mjs";
+import { validateStorylineReview } from "./storyline.mjs";
 
 export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto", model, reviewFile, skipBuild = false, brief, answer, fullReview = false } = {}) {
   const directory = await assertOutputDirectory(outputDirectory);
@@ -41,6 +42,14 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   if (build.preflight?.passed === false) blockers.push(...(build.preflight.findings || []).map(f => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: f.reason || `preflight ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
   if (build.status !== "built" && !blockers.length) blockers.push({slide:null, code:"BROKEN_GEOMETRY", severity:"blocker", reason:`Build is not complete: ${build.status}`, repair:"Complete the build and all gates before delivery"});
   if (blockers.length) return reject(report, directory, rejectedNote, "page gates", blockers);
+
+  // The storyline was stress-tested before it was drawn: an independent
+  // critique of the dot-dash, bound to its structure, said it was ready.
+  report.stage = "storyline";
+  const storyline = await fs.readFile(path.join(directory, "storyline-review.json"), "utf8").then(JSON.parse).catch(() => null);
+  const storyErrors = spec.purpose === "catalogue" ? [] : validateStorylineReview(storyline, spec);
+  if (storyErrors.length) return reject(report, directory, rejectedNote, "storyline", storyErrors.map((reason) => ({ slide: null, code: "STORYLINE_UNREVIEWED", severity: "blocker", reason,
+    repair: "Run node runtime/storyline.mjs on the deck, give prompt.md to an independent reviewer, revise until it returns verdict ready, and save its JSON as out/storyline-review.json" })));
 
   // The author reproduces every claim before anyone reviews the deck: a review
   // spent finding a mistyped figure is a round the deck did not need.

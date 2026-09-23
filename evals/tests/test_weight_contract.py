@@ -116,7 +116,7 @@ class GateVocabularyTests(unittest.TestCase):
         # The plan and content stages keep their vocabularies in their own
         # modules, and the docs that teach those stages name them.
         stages = set()
-        for module in ("gates/plan_gates.mjs", "gates/content_gates.mjs", "gates/craft_gates.mjs", "claims.mjs"):
+        for module in ("gates/plan_gates.mjs", "gates/content_gates.mjs", "gates/craft_gates.mjs", "claims.mjs", "storyline.mjs"):
             source = (SKILL / "runtime" / module).read_text(encoding="utf-8")
             stages |= set(re.findall(r"^  ([A-Z][A-Z_]{3,}):", source, re.M))
         # Runtime constants that are named in the docs and are not codes.
