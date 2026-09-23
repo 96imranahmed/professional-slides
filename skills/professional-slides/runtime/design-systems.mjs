@@ -110,13 +110,57 @@ export function identityColors(identity, canvas = "#FFFFFF") {
   };
 }
 
+// Run-to-run variation. The runtime is deterministic, so the same brief
+// planned twice came out with the same shapes in the same order and the same
+// secondary styles. `variation` (any string or number; a new deck takes a fresh
+// one) draws, once per deck and reproducibly, from choices the system allows:
+// list markers, table rows, the tracker, the contents page, how lead-in points
+// are marked, and which of the shapes that fit a page the deck leans toward.
+// It never changes what a page says or which shapes fit it.
+export const VARIATION = Object.freeze({
+  "style.listMarker": ["dot", "dash"],
+  "style.tableRows": ["rules", "zebra"],
+  tracker: ["label", "breadcrumb", "number-strip"],
+  agendaStyle: [null, "columns"],
+  leadPoints: ["prose", "ruled"],
+  // Shapes that only score when the page's content suits them, so a lean
+  // toward one changes the layout of pages that could take either.
+  leanShapes: ["exhibit-top", "metrics-over-exhibit", "hero-number", "split-tone", "two-up-contrast", "stack"]
+});
+
+export function seededRandom(seed) {
+  let h = 2166136261;
+  for (const ch of String(seed)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** The deck's draws for a seed; the same seed always gives the same deck. */
+export function variationChoices(seed) {
+  const random = seededRandom(seed);
+  const pick = (options) => options[Math.floor(random() * options.length)];
+  const lean = [...VARIATION.leanShapes].sort(() => random() - 0.5).slice(0, 2);
+  const order = [...Array(64).keys()].sort(() => random() - 0.5);
+  return {
+    "style.listMarker": pick(VARIATION["style.listMarker"]), "style.tableRows": pick(VARIATION["style.tableRows"]),
+    tracker: pick(VARIATION.tracker), agendaStyle: pick(VARIATION.agendaStyle), leadPoints: pick(VARIATION.leadPoints),
+    lean, order
+  };
+}
+
 /**
  * Resolve `design` and `identity` into the settings the pipeline reads. An
  * author's own `palette` colours, `chrome` and `tracker` still win: the system
  * is the default frame, not a lock.
  */
 export function applyDesign(spec) {
-  if (!spec || (spec.design === undefined && spec.identity === undefined)) return spec;
+  if (!spec || (spec.design === undefined && spec.identity === undefined && spec.variation === undefined)) return spec;
   const name = spec.design ?? "consulting";
   if (!Object.hasOwn(DESIGN_SYSTEMS, name)) throw new Error(`Unknown design: ${name}; use ${DESIGN_NAMES.map((n) => `"${n}"`).join(", ")}`);
   const system = DESIGN_SYSTEMS[name];
@@ -124,11 +168,19 @@ export function applyDesign(spec) {
   const base = own?.base ?? (typeof spec.palette === "string" ? spec.palette : system.base);
   const styleTokens = Object.fromEntries(Object.entries(system.style).map(([key, value]) => [`style.${key}`, value]));
   const canvas = own?.colors?.["color.canvas"] ?? system.colors["color.canvas"] ?? "#FFFFFF";
-  const colors = { ...system.colors, ...styleTokens, ...identityColors(spec.identity, canvas), ...(own?.colors || {}) };
+  const drawn = spec.variation === undefined ? null : variationChoices(spec.variation);
+  // A system that fixes a style (the journal's zebra rows, the editorial dash)
+  // keeps it; the draw fills only what the system leaves open.
+  const varied = drawn ? Object.fromEntries(["style.listMarker", "style.tableRows"].filter((key) => !(key in system.colors)).map((key) => [key, drawn[key]])) : {};
+  const colors = { ...system.colors, ...varied, ...styleTokens, ...identityColors(spec.identity, canvas), ...(own?.colors || {}) };
   const out = { ...spec, palette: { base, id: own?.id ?? `${name}-${spec.id ?? "deck"}`, label: own?.label ?? `${system.label}${spec.identity ? " (subject identity)" : ""}`, colors } };
   if (system.chrome && !spec.chrome) out.chrome = system.chrome;
-  if (system.tracker !== undefined && spec.tracker === undefined) out.tracker = system.tracker;
+  if (spec.tracker === undefined && drawn) out.tracker = drawn.tracker;
+  else if (system.tracker !== undefined && spec.tracker === undefined) out.tracker = system.tracker;
+  if (drawn && spec.agendaStyle === undefined && drawn.agendaStyle) out.agendaStyle = drawn.agendaStyle;
   if (spec.cover?.image && !spec.cover.layout && system.coverImage === "full") out.cover = { ...spec.cover, layout: "full", tone: spec.cover.tone ?? "dark" };
-  out.designLayout = { name, takeaway: system.takeaway, commentary: system.commentary, shapeBias: system.shapeBias, panelTones: system.panelTones || {} };
+  const shapeBias = { ...system.shapeBias };
+  out.designLayout = { name, takeaway: system.takeaway, commentary: system.commentary, shapeBias, panelTones: system.panelTones || {},
+    ...(drawn ? { variation: { seed: String(spec.variation), leadPoints: drawn.leadPoints, order: drawn.order, lean: drawn.lean } } : {}) };
   return out;
 }

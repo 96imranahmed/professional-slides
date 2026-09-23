@@ -1417,8 +1417,9 @@ function resolvePointsStyle(slide, points) {
   if (entries.some((e) => e.state)) return "numbered";
   if (entries.every((e) => e.number !== undefined)) return "numbered";
   if (!entries.some((e) => e.lead)) return "bulleted";
-  // Parallel findings have no implied order or invented icon.
-  return "prose";
+  // Parallel findings have no implied order or invented icon. A varied deck
+  // marks them one of two unordered ways, the same way on every page.
+  return LAYOUT.variation?.leadPoints ?? "prose";
 }
 
 function pointsItem(points, id, tone, fill, inColumn = false, style = null, centre = true) {
@@ -1714,7 +1715,9 @@ function chooseLayout(slide, recent = []) {
   // a shape that already fits the page.
   const bias = LAYOUT.shapeBias || {};
   const scored = Object.entries(PAGE_SHAPES)
-    .map(([name, shape]) => { const fit = shape.fit(slide, exhibits); return [name, fit > 0 ? fit + (bias[name] || 0) : 0]; })
+    // The variation's drawn lean is lighter: it favours a shape, but not on
+    // the page straight after one, so the deck still alternates.
+    .map(([name, shape]) => { const fit = shape.fit(slide, exhibits); const lean = LAYOUT.variation?.lean?.includes(name) && recent[0] !== name ? 1 : 0; return [name, fit > 0 ? fit + (bias[name] || 0) + lean : 0]; })
     .filter(([, score]) => score > 0);
   if (!scored.length) return exhibits.length ? "exhibit-full" : "text";
   const best = Math.max(...scored.map(([, score]) => score));
@@ -1730,7 +1733,9 @@ function chooseLayout(slide, recent = []) {
   const unused = recent.length + 1;
   const staleness = (name) => { const at = recent.indexOf(name); return at === -1 ? unused : at; };
   const score = (name) => scored.find(([n]) => n === name)[1];
-  const declared = (name) => PAGE_SHAPE_NAMES.indexOf(name);
+  // A varied deck breaks the last tie in its own drawn order, not the order the
+  // shapes happen to be declared in.
+  const declared = (name) => LAYOUT.variation ? LAYOUT.variation.order[PAGE_SHAPE_NAMES.indexOf(name)] : PAGE_SHAPE_NAMES.indexOf(name);
   return viable.slice().sort((a, b) =>
     score(b) - score(a) || staleness(b) - staleness(a) || declared(a) - declared(b))[0];
 }
@@ -3141,6 +3146,7 @@ function composeDeckWith(spec, baseDir) {
     id: spec.id,
     palette: spec.palette || "mckinsey",
     ...(spec.designLayout ? { design: spec.designLayout.name } : {}),
+    ...(spec.designLayout?.variation ? { variation: { seed: spec.designLayout.variation.seed, lean: spec.designLayout.variation.lean, leadPoints: spec.designLayout.variation.leadPoints, tracker: spec.tracker ?? null } } : {}),
     ...(spec.pageTemplate ? { pageTemplate: spec.pageTemplate } : {}),
     ...(spec.typography ? { typography: spec.typography } : {}),
     ...(spec.chrome ? { chrome: spec.chrome } : {}),
@@ -3297,6 +3303,25 @@ function planRemedies(slide) {
 
 export function budgetFindings(spec) {
   if (!isV3(spec) || !Array.isArray(spec.slides)) return [];
+  return [...layoutPinnedFindings(spec), ...pageBudgetFindings(spec)];
+}
+
+/**
+ * A plan that names a layout on most of its pages decides every page's shape
+ * by habit: two runs of one brief came out with 31 of 43 pages in the same
+ * two shapes. Named layouts are for the page that needs one construction;
+ * the rest are left to the chooser, which picks among the shapes that fit and
+ * spreads them by the deck's `variation`.
+ */
+function layoutPinnedFindings(spec) {
+  const content = spec.slides.filter((slide) => (!slide.kind || slide.kind === "content") && slide.title);
+  const pinned = content.filter((slide) => slide.layout && slide.layout !== "auto");
+  if (content.length < 8 || pinned.length / content.length <= 0.5) return [];
+  return [{ slide: null, code: "LAYOUT_PINNED", severity: "advisory", measured: Math.round(pinned.length / content.length * 100) / 100, threshold: 0.5,
+    repair: `${pinned.length} of ${content.length} content pages name a layout. Leave layout unset where the page does not need one construction; the chooser picks among the shapes that fit and the deck's variation spreads them.` }];
+}
+
+function pageBudgetFindings(spec) {
   const weight = resolveWeight(spec, resolveFill(spec));
   const floor = weight.pageWords || 0;
   if (floor <= 0) return [];

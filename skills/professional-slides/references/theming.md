@@ -17,6 +17,8 @@ The system biases the layout chooser toward its repertoire and translates the au
 
 `identity: { primary, accent }` takes the colours from the subject - a franchise's house colours, a brand's, a flag's - onto any system: primary and accent are darkened until they read as text, tints and a chart-series ramp are derived, and the raw accent stays bright as a chart series. A deck about a recognisable subject carries its identity; two decks in one system on different subjects then differ at a glance.
 
+**Variation between runs.** Two runs of one brief should not produce the same deck. `variation` on the deck (any string; a new deck takes a fresh one from `runtime/variation.mjs`) draws reproducibly from what the system leaves open: list markers, table rows, the tracker, the contents page, how lead-in points are marked, two shapes the chooser leans toward and its tie-break order. The same script names two featured page types from the system's repertoire for the plan. A layout named on a page is always honoured, so a plan that pins most pages (`LAYOUT_PINNED`) has chosen every shape by habit and leaves the variation nothing to do.
+
 **Choosing.** Ask the user before planning a new deck: either supply a deck in the house or style they want (import it with `import-template.py`; the profile names the nearest system and why, and its colours, faces and margins override the system's), or pick a system. Show `assets/design-systems.png`, the same pages in all four, when asking. Record the choice and reason in the brief. An explicit palette, chrome or tracker on the deck still overrides the system's default.
 
 ## Palettes
