@@ -132,7 +132,7 @@ def prose_task(task) -> bool:
 
 
 def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
-    planned = {p["id"]: p for p in (content or {}).get("pages", [])}
+    planned = {p["id"]: p for p in (content or {}).get("pages", []) if "id" in p}
     pages = []
     for index, slide in enumerate(scene["slides"], 1):
         pid = slide.get("sourceSlideId") or slide.get("id")
