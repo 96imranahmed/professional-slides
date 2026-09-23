@@ -94,20 +94,43 @@ export async function buildStorylinePacket(specPath, outputDirectory) {
   const content = await fs.readFile(path.join(base, `${stem}.content.json`), "utf8").then(JSON.parse).catch(() => null);
   const byId = new Map((content?.pages || []).map((p) => [p.id, p]));
   const sources = await fs.readdir(path.join(base, "sources")).catch(() => []);
+  const insightLog = await fs.readFile(path.join(base, `${stem}.insights.json`), "utf8").then(JSON.parse).catch(() => null);
+  const insights = checkInsights(insightLog, sources);
   const pages = [...(spec.slides || []), ...(spec.appendix || [])].map((s, i) => {
     const planned = byId.get(s.id) || {};
     const body = (planned.textPlan || []).filter((b) => ["body", "qualification"].includes(b.role)).map((b) => b.text);
     return { n: i + 1, id: s.id ?? null, kind: s.kind ?? "content", title: s.title ?? s.text ?? "", claim: planned.claim ?? null,
       settles: planned.settles ?? null, exhibits: exhibitsOf(s).map(describeExhibit), commentary: body.slice(0, 6), source: s.source ?? null };
   });
+  const contentPages = pages.filter((p) => p.kind === "content").length;
+  const targetPages = Number.isFinite(spec.targetPages) ? spec.targetPages : spec.purpose === "evaluation" ? 50 : null;
   const packet = { binding: storylineBinding(spec), brief: spec.brief ?? content?.question ?? "", answer: spec.answer ?? content?.answer ?? "",
-    players: spec.players ?? [], sources, pages };
+    players: spec.players ?? [], sources, insights, targetPages, totalPages: pages.length, contentPages, pages };
   const dir = path.join(outputDirectory, "storyline-review");
   await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(path.join(dir, "packet.json"), JSON.stringify(packet, null, 2));
   await fs.writeFile(path.join(dir, "schema.json"), JSON.stringify(STORYLINE_SCHEMA, null, 2));
   await fs.writeFile(path.join(dir, "prompt.md"), storylinePrompt(packet));
   return { dir, packet };
+}
+
+/**
+ * The insight log, checked for what makes a finding a finding: a statement,
+ * the calculation that produced it, and a source file that exists. Problems
+ * are reported to the critic, who weighs them; they are not a gate here.
+ */
+export function checkInsights(log, sources = []) {
+  if (!log) return { present: false, items: [], problems: ["no insight log: the titles were written without recorded findings"] };
+  const items = Array.isArray(log.insights) ? log.insights : [];
+  const have = new Set(sources.map((f) => `sources/${f}`));
+  const problems = [];
+  for (const item of items) {
+    if (!item?.finding || !item?.calculation) problems.push(`${item?.id ?? "?"}: a finding needs its statement and the calculation behind it`);
+    const missing = (item?.sources || []).filter((f) => !have.has(f));
+    if (!(item?.sources || []).length) problems.push(`${item?.id ?? "?"}: no source file`);
+    else if (missing.length) problems.push(`${item?.id ?? "?"}: source not in sources/: ${missing.join(", ")}`);
+  }
+  return { present: true, items: items.map((i) => ({ id: i.id, finding: i.finding, strength: i.strength ?? null, calculation: i.calculation ?? null, sources: i.sources ?? [] })), problems };
 }
 
 export function storylinePrompt(packet) {
@@ -121,6 +144,10 @@ THE TEAM'S ANSWER: ${packet.answer || "(not stated)"}
 PLAYERS DECLARED: ${JSON.stringify(packet.players)}
 DATA THEY FOUND (files under sources/): ${packet.sources.length ? packet.sources.join(", ") : "none"}
 
+REQUESTED LENGTH: ${packet.targetPages ? `${packet.targetPages}+ pages (the storyline has ${packet.totalPages}, ${packet.contentPages} of them content pages)` : `not fixed (the storyline has ${packet.totalPages} pages)`}
+INSIGHT LOG (what the team extracted from the data before writing titles):
+${packet.insights?.present ? packet.insights.items.map((i) => `- [${i.id}] (${i.strength ?? "ungraded"}) ${i.finding} — calc: ${i.calculation ?? "none"}; sources: ${i.sources.join(", ") || "none"}`).join("\n") || "- empty" : "- none recorded"}${packet.insights?.problems?.length ? `\nINSIGHT LOG PROBLEMS: ${packet.insights.problems.slice(0, 12).join("; ")}` : ""}
+
 THE STORYLINE (title, what each page shows, what it says):
 ${spine}
 
@@ -130,7 +157,8 @@ Work through it in this order.
 2. The pillars. Read the section titles and page titles alone. Do they form a MECE set of reasons that together prove the answer, in an order a reader follows? Name overlaps and gaps. For each pillar give your verdict and the strongest counter-argument a sceptic would raise, and whether the storyline answers it.
 3. Insight depth, page by page. The bar is a deck that feels important: every page carries evidence a reader could not have assembled in five minutes, and the charts and tables are dense with real data. Flag every page that reports a count, a fact or a comparison of two numbers without an implication; every chart marked TWO-NUMBER or comparing two or three categories where the whole set exists; every table marked PLAIN GRID, or whose cells are mostly words where the comparison is quantitative, or that has too few rows and columns to be worth a page; every page whose title a reader would shrug at; every claim the listed evidence does not prove. For each, say what the page should show instead - the trend over five or more years with its growth rate, the whole peer set ranked on the same basis, the share and how it moved, the ratio that removes size, the benchmark gap, the network on a map, the scorecard that judges every player on every criterion with the numbers in the cells.
 4. Missing analyses. What would a strong team have run that is not here? Name each analysis, why it matters to the answer, and the public data that would support it (annual reports, regulators, industry bodies, schedules, order books).
-5. Cut or merge. Which pages repeat each other, preview what follows, or exist to reach a page count?
+5. Cut or merge. Which pages repeat each other, preview what follows, or exist to reach a page count? A long deck is legitimate when the brief asks for one: never recommend a total below the requested length. Where you merge duplicates, say which missing analysis should take the freed pages.
+   Check the insight log against the pages: an insight with no page, a page whose title no insight supports, and a title that restates a fact rather than a finding.
 6. Verdict. "ready" only if the answer is sharp, the pillars hold, the evidence on the decisive pages is genuinely analytical (trends, ranked peer sets, shares, ratios, maps, judging tables - not two-number comparisons), and no missing analysis would change the answer. Otherwise "revise". Rate the storyline out of ten against what a top team would bring to this question. Rank the fixes that matter most.
 
 Bind the review to ${packet.binding}. Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_SCHEMA)}`;

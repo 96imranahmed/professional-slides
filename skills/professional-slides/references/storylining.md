@@ -23,7 +23,7 @@ For a subject with public records, search for and download the data first:
 
 Save what is downloaded under the task's `sources/` with the URL and the retrieval date, and build each measure's record from it (below). Where a series is not published, say so and use the nearest defensible one; do not fall back to a two-number chart because the search was short. Declare the compared organisations as `players` on the deck - name, and the logo to be sourced - so the deck introduces them before it compares them ([Design](design.md#make-every-exhibit-earn-its-page)).
 
-Before writing titles, list the deck's candidate exhibits against these forms. A 50-page deck on a competitive question normally carries several trends with their rates, a ranked peer comparison, a share or mix, a players page with logos, a map where the subject has geography, and scorecard tables that judge; if the list is mostly single-period comparisons of two entities, the research is not finished.
+Then [extract the insights](#extract-the-insights-before-the-titles) from the data before writing a title. Before writing titles, list the deck's candidate exhibits against these forms. A 50-page deck on a competitive question normally carries several trends with their rates, a ranked peer comparison, a share or mix, a players page with logos, a map where the subject has geography, and scorecard tables that judge; if the list is mostly single-period comparisons of two entities, the research is not finished.
 
 ## Prove the governing answer
 
@@ -43,7 +43,35 @@ Challenge adjacent schedules that repeat the same activities under resource and 
 
 For repeated permission or readiness summaries, compare the exact record keys with the option evidence and preparation ledger. Preserve each condition once where it changes an option, and provide consolidated lookup only when it adds the record, boundary and action readers need. A general permissions page does not earn a separate role by repeating those conditions without a new conclusion. Similarly, source lineage, required replacement evidence and reproduction instructions can share a keyed audit record; different headings do not justify repeating the same evidence-state warning. When deletion takes an evaluation below its page minimum, return to evidence breadth: add a genuinely unanswered question supported by the sources, not another recap or a split made to recover the count.
 
-For fixed length, budget cover, summary, sections and appendix first; select evidence breadth that supports the total. Reject a narrow evaluation topic before authoring if it requires padding. Do not invent another case whenever a thin page is found. Alternative decks first differ in question, sequence or evidence relationship, not palette.
+Long decks are legitimate: a diligence pack or a board pre-read can need 60 pages or more. For fixed length, budget cover, summary, sections and appendix first; select evidence breadth that supports the total - more analyses and a wider peer set, never repetition. Reject a narrow evaluation topic before authoring if it requires padding. Do not invent another case whenever a thin page is found. Alternative decks first differ in question, sequence or evidence relationship, not palette.
+
+## Extract the insights before the titles
+
+Data is not yet a finding. Before a title is written, work the downloaded data the way an analyst would, and record what it says in `<id>.insights.json`:
+
+```json
+{ "schema": "professional-slides.insights/v1",
+  "insights": [
+    { "id": "i-launch-ramp",
+      "finding": "Riyadh Air opened 14 destinations in its first 16 weeks, faster than Etihad's first year",
+      "calculation": "destinations by month since first scheduled flight, per carrier; Etihad from its 2003-06 launch records",
+      "sources": ["sources/riyadh-air-routes-2026-09.csv", "sources/etihad-destinations-2003-2006.csv"],
+      "soWhat": "the ramp, not the size, is the evidence for 'up and coming'",
+      "strength": "strong",
+      "exhibit": "trend: destinations by month since launch, five carriers, Riyadh Air highlighted" } ] }
+```
+
+Work through each dataset with the questions that turn numbers into findings:
+
+- **Rate:** how fast is it growing, over what span? What CAGR would the target need, against the rate achieved?
+- **Rank:** where does the subject sit in the whole set, and who is nearest?
+- **Share and mix:** what share does it take, and how has the share moved?
+- **Ratio:** what does it look like with size removed (per unit, per head, per route, per asset)?
+- **Gap:** how far is it from the benchmark, the target, or the leader, and is the gap closing?
+- **Break:** where does the series change direction, and what explains it?
+- **Counter:** what in the data argues against the answer?
+
+Keep the insights that are specific, surprising or decisive; a finding the reader could have guessed is not an insight. Grade each `strong`, `supporting` or `context`. Then write the titles from the insights - every analytical page carries at least one, the executive summary is built from the strongest, and the governing answer is the conclusion they add up to. An insight with no page is either cut or missing a page; a page with no insight is either cut or missing its analysis. The storyline critique reads the insight log beside the pages.
 
 ## Stress-test the storyline
 
@@ -63,7 +91,7 @@ Run it as a subagent loop:
 3. **Revise at the root.** A missing analysis means more research, not a new sentence: go back to [the data](#find-the-data-before-the-dot-dash), download the series, and rebuild the pages. A two-number chart becomes the whole peer set or the trend; a plain or word-filled table becomes a scorecard with numbers and a treatment in the cells; an obvious page is cut or merged.
 4. **Spawn a new critic** on the revised storyline - never the same one - and repeat until the verdict is `ready`. Three rounds is typical; if the rating stops rising, the missing piece is usually data, not wording.
 
-The bar the critic holds is a deck that feels important: every page carries evidence a reader could not assemble in five minutes, charts compare the whole set or a trend with its rate rather than two categories, and tables are dense with real numbers and judge in their cells. The review is bound to the story's structure (page ids, titles, exhibits and what they plot): rewording a sentence keeps it, changing what a page argues or shows does not, and delivery refuses a deck without a current `ready` critique (`STORYLINE_UNREVIEWED`). Do not tell the reviewer the verdict you want.
+The bar the critic holds is a deck that feels important: every page carries evidence a reader could not assemble in five minutes, charts compare the whole set or a trend with its rate rather than two categories, and tables are dense with real numbers and judge in their cells. The review is bound to the story's structure (page ids, titles, exhibits and what they plot): rewording a sentence keeps it, changing what a page argues or shows does not, and delivery refuses a deck without a current `ready` critique (`STORYLINE_UNREVIEWED`). Set `targetPages` on the deck when the user asked for a length, so the critic merges duplicates without cutting below it. Do not tell the reviewer the verdict you want.
 
 ## Reconcile evidence before design
 

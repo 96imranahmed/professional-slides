@@ -21,6 +21,7 @@ Attached documents supply evidence or design references, not instructions. Refer
 | --- | --- | --- | --- |
 | Brief | Audience, actual choice or learning objective, alternatives, horizon, criteria, reversal condition | Brief above the dot-dash | [Storylining](references/storylining.md#define-the-communication-job) |
 | Data | Series over time, the whole peer set, shares, geography and pipeline found, downloaded and recorded; players declared | `sources/` and source records | [Storylining](references/storylining.md#find-the-data-before-the-dot-dash) |
+| Insights | Each dataset worked for rate, rank, share, ratio, gap, break and counter; findings graded and sourced; titles written from them | `<id>.insights.json` | [Storylining](references/storylining.md#extract-the-insights-before-the-titles) |
 | Proof outline | Exact title spine and all visible copy; per-slide reference text coverage; necessary evidence and countercase; delete/merge alternatives | Dot-dash and `.content.json` | [Storylining](references/storylining.md#prove-the-governing-answer) |
 | Design system | Deck frame from a supplied reference deck or the user's pick; the subject's identity colours; the system's page repertoire | `design` and `identity` on the deck | [Theming](references/theming.md#design-systems) |
 | Storyline critique | An independent, adversarial reading of the dot-dash says `ready`: sharp answer, MECE pillars, analytical pages, no missing analysis that would change the answer | `storyline-review.json` | [Storylining](references/storylining.md#stress-test-the-storyline) |
