@@ -13,7 +13,7 @@ import { contrastRatio } from './skills/professional-slides/runtime/palettes.mjs
 const definition=REGISTRY.get('section-divider'),frame={x:0,y:0,width:1280,height:720};
 assert.equal(Object.keys(definition.variants).length,12);
 assert.equal(definition.defaultVariant,'plain-dark-none');
-for(const palette of ['mckinsey']) {
+for(const palette of ['midnight']) {
  const {deck,fixtures}=buildGoldenSetDeck({palette});
  const variants=fixtures.filter(f=>f.target==='section-divider').map(f=>({fixture:f,slide:deck.slides[f.slide-1]}));
  assert.equal(variants.length,12);
@@ -40,7 +40,7 @@ for(const palette of ['mckinsey']) {
  assert.ok(!standard.nodes.some(n=>['divider-number','divider-orientation'].includes(n.role)));
 }
 for(const props of [{title:''},{title:42},{title:'A',mode:'sepia'},{title:'A',style:'numbered'},{title:'A',style:'poster'},{title:'A',subtitle:42},{title:'A',number:'1'},{title:'A',orientation:'B'},{title:'A',dividerRule:true},{title:'A',pageTemplate:{rules:'sometimes'}},{title:'A\\nB\\nC'}]) assert.throws(()=>definition.render({id:'bad',frame,props}));
-const company=compileDeck({palette:'bain',typography:{display:'Georgia'},pageTemplate:{rules:'bottom'},slides:[{id:'divider',frame,composition:component({id:'divider',component:'section-divider',frame,props:{title:'Section A',mode:'light',companyName:'Company',pageNumber:2}})}]},REGISTRY);
+const company=compileDeck({palette:'crimson',typography:{display:'Georgia'},pageTemplate:{rules:'bottom'},slides:[{id:'divider',frame,composition:component({id:'divider',component:'section-divider',frame,props:{title:'Section A',mode:'light',companyName:'Company',pageNumber:2}})}]},REGISTRY);
 assert.equal(company.slides[0].nodes.find(n=>n.role==='divider-title').style.fontFamily.value,'Georgia');
 assert.equal(company.slides[0].nodes.filter(n=>n.role==='footer-rule').length,1);
 const furniture=company.slides[0].nodes.filter(n=>['footer-right','page-number'].includes(n.role));
@@ -140,7 +140,7 @@ import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 import { renderSlideHtml } from './skills/professional-slides/runtime/adapters/html.mjs';
 const original=JSON.stringify(TOKENS), definition=REGISTRY.get('table');
 const spec={id:'palette-probe',frame:{x:0,y:0,width:1280,height:720},composition:component({id:'table',component:'table',frame:{x:60,y:150,width:1160,height:420},props:definition.sample})};
-const decks=['mckinsey','bcg','bain'].map(palette=>compileDeck({id:`probe-${palette}`,palette,slides:[spec]},REGISTRY));
+const decks=['midnight','evergreen','crimson'].map(palette=>compileDeck({id:`probe-${palette}`,palette,slides:[spec]},REGISTRY));
 assert.equal(JSON.stringify(TOKENS),original);
 assert.equal(new Set(decks.map(d=>d.manifest.tokens['color.componentPrimary'].value)).size,3);
 assert.equal(new Set(decks.map(d=>d.manifest.designHash)).size,3);
@@ -151,13 +151,13 @@ for(const deck of decks) for(const slide of deck.slides) {
   for(const token of Object.values(slide.tokens)) if(token.themeSlot) assert.equal(token.value,slide.tokens[THEME_SLOT_TOKENS[token.themeSlot]].value);
 }
 assert.throws(()=>compileDeck({palette:'unknown',slides:[]},REGISTRY),/Unknown palette/);
-assert.throws(()=>compileDeck({slides:[{palette:'bain'}]},REGISTRY),/palette/i);
-assert.deepEqual(GOLDEN_PALETTES,['mckinsey']);
+assert.throws(()=>compileDeck({slides:[{palette:'crimson'}]},REGISTRY),/palette/i);
+assert.deepEqual(GOLDEN_PALETTES,['midnight']);
 const golden=buildGoldenSetDeck();
 console.log(JSON.stringify({palettes:decks.map(d=>d.palette.id),goldenPalettes:GOLDEN_PALETTES,slides:golden.deck.slides.length}));
 """)
-        self.assertEqual(result["palettes"], ["mckinsey", "bcg", "bain"])
-        self.assertEqual(result["goldenPalettes"], ["mckinsey"])
+        self.assertEqual(result["palettes"], ["midnight", "evergreen", "crimson"])
+        self.assertEqual(result["goldenPalettes"], ["midnight"])
 
     def test_pie_variants_are_centered_and_category_labels_do_not_duplicate_legend(self):
         result = run_node("""

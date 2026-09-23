@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {renderSlideHtml} from './skills/professional-slides/runtime/adapters/html.mjs';
-for(const palette of ['mckinsey','bcg','bain']) {
+for(const palette of ['midnight','evergreen','crimson']) {
  const deck=compileDeck({id:'company',palette,typography:{body:'Georgia',display:'Georgia',semibold:{family:'Georgia',nativeBold:true,effectiveWeight:700}},slides:[{id:'insight-test',composition:component({id:'insight',component:'insight',props:{variant:'primary',text:'The stronger operating result supports expansion only if cash generation can fund the required investment.'},frame:{x:60,y:200,width:1160,height:120}})}]},REGISTRY);
  const surface=deck.slides[0].nodes[0], body=deck.slides[0].nodes.find(n=>n.role==='insight-body');
  assert.equal(body.style.fontFamily.value,'Georgia');assert.equal(body.style.bold,true);

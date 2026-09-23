@@ -276,12 +276,12 @@ function ringMetricNodes({ id, frame, props }) {
 export function metricNodes({ id, frame, props }) {
   if (props.value === undefined || props.value === null || String(props.value).trim() === "") throw new Error("Metric requires a value");
   const METRIC_TONES = ["default", "dark", "tint", "hero", "ink", "rule", "ring"];
-  // "ring": a share drawn as an accent arc around the value (the Deloitte KPI ring).
+  // "ring": a share drawn as an accent arc around the value (a KPI ring).
   if (props.tone === "ring") return ringMetricNodes({ id, frame, props });
   if (props.tone !== undefined && !METRIC_TONES.includes(props.tone)) throw new Error(`Unknown metric tone: ${props.tone}; use one of ${METRIC_TONES.join(", ")}`);
-  // "ink": a black tile with the value in the accent (the Bain keynote stat row);
+  // "ink": a black tile with the value in the accent (a keynote stat row);
   // "rule": no tile, the value in the accent behind a hairline at the left (the
-  // McKinsey "51 | 443 | 39" stat row).
+  // "51 | 443 | 39" stat row).
   const ink_ = props.tone === "ink", ruled = props.tone === "rule";
   const dark = props.tone === "dark" || ink_;
   const pad = props.tone === "hero" ? 0 : v("space.3");
@@ -374,7 +374,7 @@ export function agendaNodes({ id, frame, props }) {
 }
 
 /**
- * The 2020 McKinsey contents page: sections as equal columns headed by big
+ * A columned contents page: sections as equal columns headed by big
  * two-digit numerals ("01", "02"), the active section in the accent and bold,
  * the others in grey. Works on the light page and, with `tone: "dark"`, on navy.
  */

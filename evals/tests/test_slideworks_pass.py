@@ -208,8 +208,8 @@ assert.equal(tl.filter(n=>n.role==='tracker-pill').length,2);
 // BCG sets "Topic | statement"; McKinsey keeps the accent lead.
 const frame={x:0,y:0,width:1280,height:720};
 const titleFor=(palette)=>compileDeck({id:'t',palette,slides:[{id:'p',frame,composition:component({id:'chrome',component:'slide-chrome',frame,props:{title:'Sector outlook: IT stays soft',titleLead:'Sector outlook'}})}]},registry).slides[0].nodes.find(n=>n.role==='action-title');
-assert.equal(titleFor('bcg').text,'Sector outlook | IT stays soft');
-assert.equal(titleFor('mckinsey').text,'Sector outlook: IT stays soft');
+assert.equal(titleFor('evergreen').text,'Sector outlook | IT stays soft');
+assert.equal(titleFor('midnight').text,'Sector outlook: IT stays soft');
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])

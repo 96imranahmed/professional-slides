@@ -22,8 +22,8 @@ for (const design of DESIGN_NAMES) {
     cover: spec.palette.colors['style.coverLayout'], divider: spec.palette.colors['style.dividerLayout'],
     canvas: spec.palette.colors['color.canvas'] ?? '#FFFFFF', chrome: spec.chrome ?? null };
 }
-out.untouched = applyDesign({ id: 'd', palette: 'bcg', slides: [] }).palette;
-out.override = applyDesign({ id: 'd', design: 'editorial', chrome: { left: 60 }, palette: { base: 'bcg', colors: { 'color.accent': '#123456' } }, slides: [] });
+out.untouched = applyDesign({ id: 'd', palette: 'evergreen', slides: [] }).palette;
+out.override = applyDesign({ id: 'd', design: 'editorial', chrome: { left: 60 }, palette: { base: 'evergreen', colors: { 'color.accent': '#123456' } }, slides: [] });
 console.log(JSON.stringify(out));
 ''')
         frames = {name: (v['takeaway'], v['cover'], v['divider']) for name, v in result.items() if name in ('consulting', 'editorial', 'journal', 'keynote')}
@@ -31,10 +31,10 @@ console.log(JSON.stringify(out));
         self.assertEqual(result['editorial']['commentary'], 'left')
         self.assertNotEqual(result['editorial']['canvas'], '#FFFFFF')
         # A deck that names no design keeps exactly what it had.
-        self.assertEqual(result['untouched'], 'bcg')
+        self.assertEqual(result['untouched'], 'evergreen')
         # The author's own palette colours and chrome win over the system.
         self.assertEqual(result['override']['palette']['colors']['color.accent'], '#123456')
-        self.assertEqual(result['override']['palette']['base'], 'bcg')
+        self.assertEqual(result['override']['palette']['base'], 'evergreen')
         self.assertEqual(result['override']['chrome'], {'left': 60})
 
     def test_identity_colours_read_as_text_and_keep_the_bright_accent_for_marks(self):

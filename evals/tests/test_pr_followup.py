@@ -164,7 +164,7 @@ console.log(JSON.stringify({{ok:true}}));
                     shape.top = round(top * sy); shape.height = round(shape_height * sy)
                 prs.slide_width, prs.slide_height = Inches(width), Inches(height)
                 file = Path(tmp) / f'{width}-{height}.pptx'; prs.save(file)
-                profiles.append(importer.analyse(file, 'mckinsey'))
+                profiles.append(importer.analyse(file, 'midnight'))
             for profile in profiles[1:]:
                 self.assertEqual(profile['chrome'], profiles[0]['chrome'])
                 self.assertEqual(profile['stats']['medianBodyCoverage'], profiles[0]['stats']['medianBodyCoverage'])

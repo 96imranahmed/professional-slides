@@ -87,6 +87,14 @@ A cell whose text is a delivery status (`on track`, `behind`, `at risk`, `comple
 
 **`map`** renders editable native country polygons from Natural Earth 1:110m. Set `geography` to a preset (`world`, `usa`, `usa-contiguous`, `europe`, `emea`, `apac`, `mena`, `gcc`, `latin-america`, single countries, or `country:ISO`) or to a sourced object `{id, title, source: {url, license, sha256}, geojson, bounds?}`. `highlightCountries` marks the geographies carrying the claim in component primary; `markers` accept a country anchor or crop-relative `{x, y}` from the displayed crop's top-left, or `longitude`/`latitude` for sourced GeoJSON; a marker with a `number` draws the numbered disc pin that a list or table beside the map can key to. `choropleth: {values, scale, labels}` fills features from one explicit domain on the shared eleven-bin heat scale. Regional acronym membership varies by institution, so state the declared country set beside any analytical claim.
 
+For a network or a set of places:
+
+- Markers take `longitude` and `latitude` for a city. A country marker labelled with anything but the country's name is refused unless `countryLevel: true`.
+- `hub: true` draws the network's centre as a ring; `value` sizes a dot by area.
+- `routes: [{ from, to, status, value }]` draws curved lines between markers named by id, label or index, dashed when `status: "planned"` and weighted by `value`.
+- `crop: "fit"` frames the map on its markers.
+- Highlighted countries recede to the tint when markers or routes are drawn over them.
+
 **`connector`** draws a real directional relationship between two named objects: `disc-chevron` (preferred for a row-level implication), `chevron` (light, between two open reasoning lists), `line`, and `labelled-line`. Bind the disc to `icon-md`, align it to the centres of the fields it joins, and reserve whitespace for it. Use standalone implication chevrons for deliberate authored inferences; process chevrons that encode real stages are a separate use.
 
 **`insight-tree-table`** aligns a root finding, one to four named branches, two to seven leaves, and one insight plus one to four implications per leaf, under three substantive headers, with `rowTreatment` of `tonal` or `open`. **`relationship-network`** (`hub-ring`, `directed-spokes`) arranges one `centerId` (a filled navy ellipse) and three to six perimeter `nodes` (filled boxes; `tone: "accent"` or `"outline"` per node separates two classes, as hard and soft elements in a 7S) in a named `ringOrder`, with `edges` naming exact `from`, `to`, a semantic `relation` and `direction` of `forward`, `bidirectional` or `none`; supported edges are centre spokes and adjacent perimeter pairs.

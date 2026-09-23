@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Infer a house profile from a template deck.
 
-    python3 runtime/import-template.py template.pptx [--out house.json] [--base mckinsey]
+    python3 runtime/import-template.py template.pptx [--out house.json] [--base midnight]
 
 Reads the theme (colour scheme, major and minor fonts), the slide size, the
 master and layout placeholders (title, body, footer, slide number, logo), and
@@ -526,7 +526,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("template", help="the .pptx to read")
     parser.add_argument("--out", help="where to write the house profile (default: <template>.house.json)")
-    parser.add_argument("--base", default="mckinsey", help="the built-in palette the overlay starts from")
+    parser.add_argument("--base", default="midnight", help="the built-in palette the overlay starts from")
     args = parser.parse_args()
     path = Path(args.template)
     if not path.exists():

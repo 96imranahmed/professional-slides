@@ -309,7 +309,7 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const frame={x:60,y:150,width:1000,height:500};
 const bubble=REGISTRY.get('chart.bubble');
 const sizeProps={...bubble.sample,...bubble.examples['size-legend-top-right'].props};
-const sizeSlide=compileDeck({palette:'mckinsey',slides:[{id:'bubble',frame,composition:component({id:'bubble',component:'chart.bubble',frame,props:sizeProps})}]},REGISTRY).slides[0];
+const sizeSlide=compileDeck({palette:'midnight',slides:[{id:'bubble',frame,composition:component({id:'bubble',component:'chart.bubble',frame,props:sizeProps})}]},REGISTRY).slides[0];
 const legendSwatches=sizeSlide.nodes.filter(n=>n.role==='legend-swatch');
 const legendLabels=sizeSlide.nodes.filter(n=>n.role==='legend-label');
 assert.equal(legendSwatches.length,1);
@@ -474,7 +474,7 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
 const frame={x:60,y:160,width:760,height:420};
 const slide=props=>({id:'chart',composition:component({id:'chart',component:'chart.column',frame,props})});
-for(const palette of ['mckinsey','bcg','bain']) {
+for(const palette of ['midnight','evergreen','crimson']) {
   const deck=compileDeck({palette,slides:[slide({categories:['Current','Future'],series:[{name:'Measure',values:[80,150]}]})]},REGISTRY);
   const marks=deck.slides[0].nodes.filter(n=>n.role==='chart-mark');
   assert.equal(marks.length,2);
@@ -484,7 +484,7 @@ for(const palette of ['mckinsey','bcg','bain']) {
 }
 const explicit=compileDeck({slides:[slide({categories:['Current','Future'],series:[{name:'Measure',values:[80,150]}],colorIndices:[1]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
 assert.deepEqual(explicit.map(n=>n.style.fill.tokenId),['color.chartSeries2','color.chartSeries2']);
-const focused=compileDeck({palette:'bain',slides:[slide({categories:['A','B','C'],series:[{name:'Measure',values:[40,70,55]}],highlights:[{category:'B',style:'bar'}]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
+const focused=compileDeck({palette:'crimson',slides:[slide({categories:['A','B','C'],series:[{name:'Measure',values:[40,70,55]}],highlights:[{category:'B',style:'bar'}]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
 // Highlight the answer: the named bar takes the accent; the others keep the series colour, never grey.
 assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartSeries1','color.accent','color.chartSeries1']);
 assert.deepEqual(focused.map(n=>n.data.highlighted),[false,true,false]);
@@ -500,8 +500,8 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
 const frame={x:60,y:160,width:900,height:460};
 const base={categories:['A','B'],series:[{name:'Baseline',values:[40,50]},{name:'Actual',values:[55,70]}],focusSeries:'Actual',dataLabels:true};
-const render=(kind,props,palette='mckinsey')=>compileDeck({palette,slides:[{id:'focus',composition:component({id:'focus',component:kind,frame,props})}]},REGISTRY).slides[0].nodes;
-for(const palette of ['mckinsey','bcg','bain']) for(const kind of ['chart.column','chart.bar']) for(const reversed of [false,true]) {
+const render=(kind,props,palette='midnight')=>compileDeck({palette,slides:[{id:'focus',composition:component({id:'focus',component:kind,frame,props})}]},REGISTRY).slides[0].nodes;
+for(const palette of ['midnight','evergreen','crimson']) for(const kind of ['chart.column','chart.bar']) for(const reversed of [false,true]) {
   const props=reversed?{...base,categories:[...base.categories].reverse(),series:[...base.series].reverse().map(s=>({...s,values:[...s.values].reverse()}))}:base;
   const nodes=render(kind,props,palette),marks=nodes.filter(n=>n.role==='chart-mark'),swatches=nodes.filter(n=>n.role==='legend-swatch');
   for(const mark of marks) {

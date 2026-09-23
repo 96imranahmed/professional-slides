@@ -47,6 +47,12 @@ export const CODES = Object.freeze({
   MIXED_GRAMMAR: "different evidence grammars share a page without a clear relationship or reading order",
   DECORATION: "a rule, band or device that separates nothing and says nothing",
   NARROW_REPERTOIRE: "the deck draws on a handful of exhibits where its evidence has many shapes",
+  TRIVIAL_CHART: "a chart that shows two or three numbers a metric would state, or a comparison too obvious to need drawing",
+  NO_INSIGHT_CHART: "a chart that displays data without making the implication visible: no trend and growth rate, no ranking across the full set, no share, no gap to a benchmark",
+  DEVICE_OVERUSE: "one construction (steps, cards, a bar chart) carries pages whose evidence has different shapes",
+  FLAT_TABLE: "a table that compares, rates or judges but is set as a plain grid: no Harvey balls, ratings, bars, status or implication column",
+  MISSING_CONTEXT: "named players, places or products appear without being introduced: no page with their logos, what they are and the numbers that matter",
+  MAP_DESIGN: "a map that misplaces cities, fills countries that mean nothing, draws markers that cover the geography, or omits the routes or flows it is about",
   // density - the review's pass over the rendered density profile
   DENSITY_MISMATCH: "a page's words are thinner, denser or differently shaped than the skill's targets for pages doing its job, and it shows",
   EDITORIAL: "a wording preference"
@@ -259,7 +265,8 @@ export async function buildReviewPacket({ outputDirectory, brief = "", answer = 
   }));
   const statistics = designStatistics(scene);
   const density = await fs.readFile(path.join(dir, "density-profile.json"), "utf8").then(JSON.parse).catch(() => null);
-  const packet = { binding: await reviewBinding(dir), inspectedSlides: scope ? scope.mustInspect : slides.map(s => s.id), scope, statistics, density, brief, answer, montage: path.join(dir, "rendered", "montage.png"), titles: slides.map((s) => `${s.index}. ${s.title}`), slides, codes: CODES, schema: REVIEW_SCHEMA };
+  const craft = await fs.readFile(path.join(dir, "preflight-gates.json"), "utf8").then(JSON.parse).then((r) => (r.findings || []).filter((f) => String(f.code).startsWith("CRAFT_"))).catch(() => []);
+  const packet = { binding: await reviewBinding(dir), inspectedSlides: scope ? scope.mustInspect : slides.map(s => s.id), scope, craft, statistics, density, brief, answer, montage: path.join(dir, "rendered", "montage.png"), titles: slides.map((s) => `${s.index}. ${s.title}`), slides, codes: CODES, schema: REVIEW_SCHEMA };
   await fs.writeFile(path.join(packetDir, "packet.json"), JSON.stringify(packet, null, 2));
   await fs.writeFile(path.join(packetDir, "schema.json"), JSON.stringify(REVIEW_SCHEMA, null, 2));
   await fs.writeFile(path.join(packetDir, "prompt.md"), packet.scope ? verificationPrompt(packet) : reviewPrompt(packet));
@@ -336,10 +343,15 @@ Severity: blocker (must fix before any reader sees it), major (fix before delive
 Deterministic gate findings already computed (confirm, refine or explain why they do not matter):
 ${packet.slides.flatMap((s) => s.gateFindings.map((f) => `- slide ${s.index} ${f.code}: ${f.measured ?? ""} (threshold ${f.threshold ?? ""})`)).join("\n") || "- none"}
 
+Deck craft findings from the build (a blocker has already stopped delivery; confirm each advisory or explain why it does not apply):
+${(packet.craft || []).map((f) => `- ${f.severity} ${f.code}: ${JSON.stringify(f.measured)}`).join("\n") || "- none"}
+
 Slide images: ${packet.slides.map((s) => s.image).join(", ")}
 Montage: ${packet.montage}
 
-VISUAL REVIEW. Inspect every original page at full size, every spread and the montage. Follow the semantic checks in references/design.md: coherent argument and counts; reconciled totals, periods, sample membership and durations; scoped comparisons, non-causal wording unless supported, and reversal conditions that affect the named option; focus that supports the claim; appropriate table category/dimension grammar; one chart heading owner; consistent qualifiers; vertically balanced sparse groups; meaningful arrows and rules; and cross-slide consistency. Neutral charts, joined verdicts, optional commentary and repeated comparison layouts are valid. Do not require pictures, icons, highlights or layout variety to meet quotas. Record concrete defects, not preferences.
+VISUAL REVIEW. Inspect every original page at full size, every spread and the montage. Follow the semantic checks in references/design.md: coherent argument and counts; reconciled totals, periods, sample membership and durations; scoped comparisons, non-causal wording unless supported, and reversal conditions that affect the named option; focus that supports the claim; appropriate table category/dimension grammar; one chart heading owner; consistent qualifiers; vertically balanced sparse groups; meaningful arrows and rules; and cross-slide consistency. Neutral charts, joined verdicts and optional commentary are valid where they serve the page.
+
+CRAFT REVIEW. Judge the deck the way a partner would who has seen strong decks on this subject. For every chart ask what it shows that two numbers in the title do not: a chart of two bars is a metric pair (TRIVIAL_CHART); a chart that could show the trend with its growth rate, the full ranked peer set, the share or the gap to a benchmark and does not is NO_INSIGHT_CHART. For every table ask whether it compares, rates or judges and, if so, whether the treatment shows it (FLAT_TABLE). Count the constructions: steps, cards, bar charts or two-column comparisons standing in for evidence of other shapes is DEVICE_OVERUSE. Named players (companies, brands, products, places) compared without a page that introduces them with their logos is MISSING_CONTEXT. Maps are checked for placed cities, meaningful fills, marker size and the routes or flows they are about (MAP_DESIGN). Parallel categories with no icon, and a deck with no photograph of a recognisable subject, are defects too. These are major when they recur across the deck; record each with the pages and a concrete repair. Record concrete defects, not preferences.
 
 Candidate diagnostics, not quality targets:
 ${JSON.stringify(candidateStatistics, null, 1)}

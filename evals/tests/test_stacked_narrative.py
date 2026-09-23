@@ -32,7 +32,7 @@ import {compileDeck} from './skills/professional-slides/runtime/core.mjs';
 import {goldenFixtureSpecs} from './skills/professional-slides/runtime/golden-fixtures.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const spec=goldenFixtureSpecs().find(item=>item.id==='golden-stacked-and-narrative');
-const slide=compileDeck({id:'narrative',palette:'mckinsey',slides:[spec]},REGISTRY).slides[0];
+const slide=compileDeck({id:'narrative',palette:'midnight',slides:[spec]},REGISTRY).slides[0];
 const panels=slide.nodes.filter(node=>node.role==='panel-surface'&&node.data.seriesKey);
 const marks=slide.nodes.filter(node=>node.role==='chart-mark');
 assert.equal(panels.length,3);

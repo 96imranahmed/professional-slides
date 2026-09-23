@@ -182,7 +182,7 @@ class TableDensityTests(unittest.TestCase):
         """
         rows = [[f"Row {i}", str(i), f"{i * 3}%"] for i in range(1, 12)]
         floor = page_gates.TYPE_RANGES["table-dense"][0]
-        for palette in ("mckinsey", "bcg", "bain", "deloitte", "consulting-toolkit"):
+        for palette in ("midnight", "evergreen", "crimson", "graphite", "toolkit"):
             with self.subTest(palette=palette):
                 self.assertLessEqual(floor, self.densest(rows, palette),
                                      "a table at the last rung of the ladder is refused")

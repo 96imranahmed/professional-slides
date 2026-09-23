@@ -363,7 +363,7 @@ export function buildGoldenDeck({ referenceOnly = false } = {}) {
   // The standard cover was deliberately replaced; it is validated in the
   // component/golden suite, not against the retired external cover artwork.
   const specs = goldenFixtureSpecs().filter(spec => !referenceOnly || spec.sourceSlide !== null);
-  const deck = compileDeck({ id: "consulting-toolkit-golden", palette: "consulting-toolkit", slides: specs }, REGISTRY);
+  const deck = compileDeck({ id: "consulting-toolkit-golden", palette: "toolkit", slides: specs }, REGISTRY);
   return {
     deck,
     fixtures: specs.map((spec, index) => ({

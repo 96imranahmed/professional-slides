@@ -273,7 +273,7 @@ const spec={schema:'professional-slides.deck/v3',id:'d',fill:'full',slides:[{tit
 assert.equal(composeDeck(spec).weight.pageWords, WEIGHT_BY_FILL.full.pageWords);
 assert.equal(composeDeck({...spec,weight:{pageWords:111}}).weight.pageWords, 111);
 // A template's house profile carries fill and weight into a deck that sets neither.
-const house={schema:'professional-slides.house/v1',palette:{base:'bcg',id:'h',label:'H',colors:{}},fill:'full',weight:{pageWords:140,columnFill:0.7}};
+const house={schema:'professional-slides.house/v1',palette:{base:'evergreen',id:'h',label:'H',colors:{}},fill:'full',weight:{pageWords:140,columnFill:0.7}};
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'house-'));
 fs.writeFileSync(path.join(dir,'house.json'), JSON.stringify(house));

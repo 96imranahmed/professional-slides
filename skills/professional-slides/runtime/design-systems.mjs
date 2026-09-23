@@ -20,7 +20,7 @@ export const DESIGN_SYSTEMS = Object.freeze({
     label: "Consulting",
     use: "Steering committees, board papers and diligence, where the reader expects the familiar analytical grammar.",
     character: "Open white canvas, sans titles top-left, commentary rail on the right, tinted takeaway band, dark cover and numbered chapter panels.",
-    base: "mckinsey", colors: {},
+    base: "midnight", colors: {},
     style: { takeaway: "band", coverLayout: "block", dividerLayout: "panel" },
     commentary: "right", takeaway: "band", tracker: undefined, chrome: undefined, coverImage: "half", shapeBias: {}
   },
@@ -28,7 +28,7 @@ export const DESIGN_SYSTEMS = Object.freeze({
     label: "Editorial",
     use: "Pre-reads, strategy narratives and essays read alone, where the argument is carried by sentences as much as by charts.",
     character: "Warm paper canvas, large regular-weight serif titles, wide margins, commentary on the left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages with no dark panels.",
-    base: "mckinsey",
+    base: "midnight",
     colors: {
       "color.canvas": "#FAF7F2", "color.surfaceMuted": "#F0EBE3", "color.ink": "#221E1A", "color.textSecondary": "#5E564C",
       "color.componentPrimary": "#7A2E1E", "color.componentPrimaryTint": "#F2E4DF", "color.accent": "#9C4221", "color.accentTint": "#F6E6DC",
@@ -46,7 +46,7 @@ export const DESIGN_SYSTEMS = Object.freeze({
     label: "Data journal",
     use: "Evidence-led briefings where the charts carry the argument and the reader wants the finding and the proof, fast.",
     character: "Economist-style: a red tab over short bold sans titles with the finding as a standfirst beneath, tight margins, full-width exhibits, zebra tables, no tinted boxes; clean white chapter pages keyed by the red tab.",
-    base: "bcg",
+    base: "evergreen",
     colors: {
       "color.canvas": "#FFFFFF", "color.surfaceMuted": "#EEF1F3", "color.ink": "#121212", "color.textSecondary": "#555A5E",
       "color.componentPrimary": "#1E4D6B", "color.componentPrimaryTint": "#E1EBF1", "color.accent": "#C8102E", "color.accentTint": "#F8DDE1",
@@ -63,7 +63,7 @@ export const DESIGN_SYSTEMS = Object.freeze({
     label: "Keynote",
     use: "Decks presented to a room, launches and pitches, where each page has to land at a glance from the back of the room.",
     character: "Bold statement titles reversed out of a full-width colour block, large type, the takeaway as a statement with an accent bar, full-bleed picture covers and full-colour chapter pages.",
-    base: "bain",
+    base: "crimson",
     colors: {
       "color.canvas": "#FFFFFF", "color.ink": "#141414", "color.textSecondary": "#4F4F4F",
       "color.componentPrimary": "#2B2D6E", "color.componentPrimaryTint": "#E4E5F2", "color.accent": "#D1452B", "color.accentTint": "#FBE3DD",

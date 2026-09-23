@@ -1,7 +1,8 @@
 {
   "schema": "professional-slides.deck/v3",
   "id": "gallery-acceptance",
-  "palette": "mckinsey",
+  "palette": "midnight",
+  "purpose": "catalogue",
   "footer": "Component gallery",
   "agenda": true,
   "cover": {

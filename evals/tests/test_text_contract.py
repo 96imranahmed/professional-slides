@@ -82,7 +82,7 @@ console.log(JSON.stringify({ok:true}));
 import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-const draw = props => compileDeck({palette:'mckinsey',slides:[{id:'table',composition:component({id:'table',component:'table',props})}]},REGISTRY).slides[0].nodes;
+const draw = props => compileDeck({palette:'midnight',slides:[{id:'table',composition:component({id:'table',component:'table',props})}]},REGISTRY).slides[0].nodes;
 const props={treatment:'categories',columns:[{label:'Customer group',type:'category'},'Accounts','Added revenue'],rows:[['Protected','20,000','$0m'],{style:'total',cells:['Total','120,000','$10.8m']}]};
 const nodes=draw(props);
 const band=nodes.find(n=>n.role==='table-row-band'&&n.data.row===1);

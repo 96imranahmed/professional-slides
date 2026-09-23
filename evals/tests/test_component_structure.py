@@ -162,7 +162,7 @@ const light = compile({title:'Growth strategy',subtitle:'Commercial priorities',
 assert.deepEqual(light.slides[0].nodes.map(n=>n.role),['cover-accent','cover-title','cover-subtitle']);
 assert.equal(light.slides[0].nodes[1].style.color.tokenId,'color.ink');
 for (const subtitleValue of [undefined,'','   ']) assert.equal(compile({title:'Growth strategy',subtitle:subtitleValue}).slides[0].nodes.length,3);
-const company = compile({title:'Growth strategy',subtitle:'Commercial priorities'},{palette:'bain',typography:{body:'Arial',display:'Georgia'}});
+const company = compile({title:'Growth strategy',subtitle:'Commercial priorities'},{palette:'crimson',typography:{body:'Arial',display:'Georgia'}});
 assert.equal(company.slides[0].nodes.find(n=>n.role==='cover-title').style.fontFamily.value,'Georgia');
 assert.equal(company.slides[0].nodes.find(n=>n.role==='cover-subtitle').style.fontFamily.value,'Arial');
 const wrapped = compile({title:'Growth strategy\\nfor the next cycle',subtitle:'Commercial priorities\\nand delivery milestones'});

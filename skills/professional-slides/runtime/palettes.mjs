@@ -1,8 +1,8 @@
-// Named, versioned presentation presets. They are not official firm templates.
+// Named, versioned presentation presets.
 export const PALETTES = Object.freeze({
-  mckinsey: {
-    label: "McKinsey",
-    basis: "Brand-inspired preset, not an official template: serif display titles on an open canvas, deep navy with an electric-blue accent, dash bullets, zebra tables",
+  midnight: {
+    label: "Midnight",
+    basis: "Serif display titles on an open canvas, deep navy with an electric-blue accent, dash bullets, zebra tables",
     colors: {
       "color.ink": "#051C2C", "color.textSecondary": "#4D4D4D", "color.componentPrimary": "#051C2C", "color.accent": "#2251FF", "color.accentTint": "#DCE4FF",
       "color.componentPrimaryTint": "#E6E8EA", "color.surfaceMuted": "#F0F0F0",
@@ -12,9 +12,9 @@ export const PALETTES = Object.freeze({
       "style.titleWeight": "bold", "style.titleRule": "none", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "zebra", "style.labelWeight": "bold"
     }
   },
-  bcg: {
-    label: "BCG",
-    basis: "Brand-inspired preset, not an official template: regular-weight titles on an open canvas, green pill date tags, plain chart headings with inline units, green bar families",
+  evergreen: {
+    label: "Evergreen",
+    basis: "Regular-weight titles on an open canvas, green pill date tags, plain chart headings with inline units, green bar families",
     colors: {
       "color.ink": "#212427", "color.textSecondary": "#696969", "color.componentPrimary": "#0E7A5E", "color.accent": "#16814B", "color.accentTint": "#DFF6E8",
       "color.componentPrimaryTint": "#E3F3EC", "color.surfaceMuted": "#F2F2F2",
@@ -23,9 +23,9 @@ export const PALETTES = Object.freeze({
       "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "below-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold", "style.titleLead": "pipe"
     }
   },
-  bain: {
-    label: "Bain",
-    basis: "Brand-inspired preset, not an official template: light regular titles, grey bar families with the answer in red, red KPI call-outs, annotation rails",
+  crimson: {
+    label: "Crimson",
+    basis: "Light regular titles, grey bar families with the answer in red, red KPI call-outs, annotation rails",
     colors: {
       "color.ink": "#252525", "color.textSecondary": "#595959", "color.componentPrimary": "#CC0000", "color.accent": "#CC0000", "color.accentTint": "#FAE3E3",
       "color.componentPrimaryTint": "#FAE8E9", "color.surfaceMuted": "#F2F2F2", "color.chartComparator": "#BFBFBF",
@@ -34,9 +34,9 @@ export const PALETTES = Object.freeze({
       "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "top-right", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold"
     }
   },
-  deloitte: {
-    label: "Deloitte",
-    basis: "Brand-inspired preset, not an official template: black ink with a bright green accent, regular titles, green chart families, ring KPIs",
+  graphite: {
+    label: "Graphite",
+    basis: "Black ink with a bright green accent, regular titles, green chart families, ring KPIs",
     colors: {
       "color.ink": "#000000", "color.textSecondary": "#53565A", "color.componentPrimary": "#000000", "color.accent": "#86BC25", "color.accentTint": "#EAF4D5",
       "color.componentPrimaryTint": "#E8E8E8", "color.surfaceMuted": "#F2F2F2",
@@ -45,12 +45,12 @@ export const PALETTES = Object.freeze({
       "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold"
     }
   },
-  "consulting-toolkit": { label: "Consulting toolkit reference", basis: "Retained reference palette", colors: {} }
+  "toolkit": { label: "Toolkit", basis: "Neutral palette retained for component fixtures", colors: {} }
 });
 // Release validation uses one canonical visual system. The other named palettes
 // remain supported inputs, but they are covered by fast token/contract tests
 // rather than repeating the full render-and-readback gallery.
-export const GOLDEN_PALETTES = Object.freeze(["mckinsey"]);
+export const GOLDEN_PALETTES = Object.freeze(["midnight"]);
 
 export function heatScaleTokens(colors) {
   const mix=(a,b,f)=>'#'+[0,1,2].map(i=>Math.round(parseInt(a.slice(1+i*2,3+i*2),16)*(1-f)+parseInt(b.slice(1+i*2,3+i*2),16)*f).toString(16).padStart(2,'0')).join('').toUpperCase();
@@ -62,12 +62,12 @@ export function heatScaleTokens(colors) {
   })));
 }
 
-export function resolvePalette(id = "mckinsey", baseTokens, slots) {
+export function resolvePalette(id = "midnight", baseTokens, slots) {
   // A palette object `{ base, colors, label? }` (a house profile imported from a
   // template deck) overlays its colours and style tokens on a named base.
   let preset;
   if (id && typeof id === "object" && !Array.isArray(id)) {
-    const base = id.base ?? "mckinsey";
+    const base = id.base ?? "midnight";
     if (!Object.hasOwn(PALETTES, base)) throw new Error(`Unknown palette base: ${base}`);
     const colors = id.colors || {};
     for (const [key, value] of Object.entries(colors)) {

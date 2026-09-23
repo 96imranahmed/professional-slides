@@ -66,6 +66,10 @@ export const MAP_TOKENS = Object.freeze([
   "color.ink",
   "color.textSecondary",
   "color.componentPrimary",
+  "color.componentPrimaryTint",
+  "color.accent",
+  "color.canvas",
+  "line.standard",
   "font.body",
   "type.label",
   "line.hairline",
@@ -237,13 +241,15 @@ function projection(frame, bounds) {
   return { plot, project, contains: ([longitude, latitude]) => longitude >= minLon && longitude <= maxLon && latitude >= minLat && latitude <= maxLat };
 }
 
-function polygonNode({ id, country, paths, highlighted, quantitative }) {
+function polygonNode({ id, country, paths, highlighted, quantitative, recede = false }) {
   const points = paths.flat();
   const [x,y,maxX,maxY] = points.reduce((b,p)=>[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);
   const width=maxX-x, height=maxY-y;
   if (width < 0.35 || height < 0.35) return null;
   const normalized = paths.map((path) => path.map(([px, py]) => [Number(((px - x) / width).toFixed(6)), Number(((py - y) / height).toFixed(6))]));
-  const fill = quantitative ? quantitativeScaleColor(quantitative.scale,quantitative.value) : highlighted ? PRIMARY : MUTED_SURFACE;
+  // Under markers or routes a highlighted country recedes to the tint: the
+  // points are the subject, and a navy country under a navy dot hides both.
+  const fill = quantitative ? quantitativeScaleColor(quantitative.scale,quantitative.value) : highlighted ? (recede ? token("color.componentPrimaryTint") : PRIMARY) : MUTED_SURFACE;
   return shapePrimitive({
     id: stableId(id, "land", country.id),
     role: "map-land",
@@ -272,6 +278,14 @@ function markerCoordinate(marker, geography, projected) {
   }
   if (marker.country) {
     const id = geography.custom ? String(marker.country) : resolveCountryId(marker.country);
+    // A country marker sits on the country's label point. A marker labelled
+    // with a city ("Mumbai" on India) then lands in the middle of the country,
+    // hundreds of kilometres from the place it names; a city needs its own
+    // longitude and latitude.
+    const named = COUNTRY_BY_ID.get(id)?.name;
+    if (!geography.custom && marker.label && named && ![named, id].some((value) => normalizedKey(value) === normalizedKey(marker.label)) && !marker.countryLevel) {
+      throw new Error(`Map marker "${marker.label}" is placed on ${named}'s label point; give a city its longitude and latitude, or set countryLevel: true if the marker stands for the whole country`);
+    }
     const country = geography.countries.find((candidate) => candidate.id === id);
     if (!country) throw new Error(`Map marker country ${id} is outside ${geography.id}`);
     if (!country.label || !projected.contains(country.label)) throw new Error(`Map marker country ${id} has no visible label point`);
@@ -282,6 +296,14 @@ function markerCoordinate(marker, geography, projected) {
 }
 
 function markerNodes({ id, frame, geography, projected, markers, highlighted = new Set() }) {
+  const maxValue = Math.max(0, ...markers.map((marker) => Number.isFinite(marker?.value) ? marker.value : 0));
+  // Every marker's footprint, before any label is placed, so a label never
+  // lands on a marker that comes later in the list.
+  const occupied = markers.map((marker) => {
+    const [x, y] = markerCoordinate(marker, geography, projected);
+    const r = (marker.size ?? (marker.hub ? 16 : 10)) / 2 + 1;
+    return { x: x - r, y: y - r, width: 2 * r, height: 2 * r };
+  });
   const nodes = [];
   for (const [index, marker] of markers.entries()) {
     if (!marker || typeof marker !== "object" || Array.isArray(marker)) throw new Error("Map marker must be an object");
@@ -305,19 +327,94 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
       }
       continue;
     }
-    const size = marker.size ?? 34;
+    // A location is a dot, not a disc: 10px marks a place on a map of the
+    // world without covering the country around it. A hub is a ring with a dot
+    // in it. A marker carrying a value is sized by area against the largest
+    // value on the map, from 8 to 26px.
+    const valued = Number.isFinite(marker.value) && maxValue > 0;
+    const size = marker.size ?? (valued ? 8 + 18 * Math.sqrt(marker.value / maxValue) : marker.hub ? 16 : 10);
     const markerFrame = { x: centerX - size / 2, y: centerY - size / 2, width: size, height: size };
-    nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: INK, lineWidth: HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id } }));
-    const fraction = marker.fraction ?? 1;
-    if (fraction >= 0.999) nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: markerFrame, style: { fill: INK, stroke: INK, lineWidth: HAIRLINE, radius: token("radius.round") } }));
+    nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: marker.hub ? PRIMARY : INK, lineWidth: marker.hub ? token("line.standard") : HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, hub: Boolean(marker.hub) } }));
+    if (marker.hub) {
+      const dot = size * 0.45, dotFrame = { x: centerX - dot / 2, y: centerY - dot / 2, width: dot, height: dot };
+      nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: dotFrame, style: { fill: PRIMARY, stroke: PRIMARY, lineWidth: HAIRLINE, radius: token("radius.round") } }));
+    }
+    const fraction = marker.hub ? 0 : (marker.fraction ?? 1);
+    if (fraction >= 0.999) nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: markerFrame, style: { fill: PRIMARY, stroke: SURFACE, lineWidth: HAIRLINE, radius: token("radius.round") } }));
     else if (fraction > 0) nodes.push(wedgePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: markerFrame, startAngle: -90, endAngle: -90 + fraction * 360, style: { fill: INK, stroke: INK, lineWidth: HAIRLINE, radius: token("radius.none") } }));
     if (marker.label) {
-      const width = Math.min(150, Math.max(90, frame.width * 0.18));
-      const placeRight = markerFrame.x + size + 4 + width <= frame.x + frame.width;
-      const labelFrame = { x: placeRight ? markerFrame.x + size + 4 : markerFrame.x - width - 4, y: markerFrame.y - 2, width, height: size + 4 };
-      nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: labelFrame, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: SECONDARY, bold: true, align: placeRight ? "left" : "right", valign: "mid" } }));
+      // The label takes the first side that is clear of every marker and of
+      // the labels already placed - right, left, above, below, then the
+      // diagonals - and sits on a patch of canvas, so a route passing under it
+      // does not strike through the name.
+      const measured = measureText(marker.label, 220, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 });
+      const width = Math.ceil(measured.width) + 4, height = Math.max(14, Math.ceil(measured.height));
+      const gap = 3, half = size / 2;
+      const candidates = [
+        [centerX + half + gap, centerY - height / 2, "left"], [centerX - half - gap - width, centerY - height / 2, "right"],
+        [centerX - width / 2, centerY - half - gap - height, "center"], [centerX - width / 2, centerY + half + gap, "center"],
+        [centerX + half, centerY - half - height, "left"], [centerX + half, centerY + half, "left"],
+        [centerX - half - width, centerY - half - height, "right"], [centerX - half - width, centerY + half, "right"],
+      ].map(([x, y, align]) => ({ frame: { x, y, width, height }, align }));
+      const inside = (f) => f.x >= frame.x && f.y >= frame.y && f.x + f.width <= frame.x + frame.width && f.y + f.height <= frame.y + frame.height;
+      const clear = (f) => !occupied.some((o) => f.x < o.x + o.width && o.x < f.x + f.width && f.y < o.y + o.height && o.y < f.y + f.height);
+      const chosen = candidates.find((c) => inside(c.frame) && clear(c.frame)) ?? candidates.find((c) => inside(c.frame)) ?? candidates[0];
+      occupied.push(chosen.frame);
+      nodes.push(rectPrimitive({ id: stableId(id, "marker-label-backing", index), role: "map-label-backing", frame: { x: chosen.frame.x - 1, y: chosen.frame.y + 1, width: chosen.frame.width + 2, height: chosen.frame.height - 2 }, style: { fill: token("color.canvas"), stroke: "none", lineWidth: HAIRLINE, radius: token("radius.small") } }));
+      nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: chosen.frame, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: marker.hub ? INK : SECONDARY, bold: true, align: chosen.align, valign: "mid" }, data: { textLayout: measured } }));
     }
   }
+  return nodes;
+}
+
+// `crop: "fit"` frames the map on its markers: a network from one hub read on
+// a map of the whole world is a cluster of dots in a tenth of the frame. The
+// crop keeps a margin of a sixth of the span, and never narrows below 36
+// degrees of longitude or 24 of latitude, so the places keep their context.
+function fitBounds(markers, geography) {
+  const points = markers.filter((m) => Number.isFinite(m?.longitude) && Number.isFinite(m?.latitude)).map((m) => [m.longitude, m.latitude]);
+  if (points.length < 2) throw new Error('crop: "fit" needs at least two markers with longitude and latitude');
+  let [minLon, minLat, maxLon, maxLat] = points.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [Infinity, Infinity, -Infinity, -Infinity]);
+  const grow = (lo, hi, min) => { const span = Math.max(hi - lo, min), mid = (lo + hi) / 2; return [mid - span / 2, mid + span / 2]; };
+  [minLon, maxLon] = grow(minLon, maxLon, 36); [minLat, maxLat] = grow(minLat, maxLat, 24);
+  const padLon = (maxLon - minLon) / 6, padLat = (maxLat - minLat) / 6;
+  const [gw, gs, ge, gn] = geography.bounds;
+  return [Math.max(gw, minLon - padLon), Math.max(gs, minLat - padLat), Math.min(ge, maxLon + padLon), Math.min(gn, maxLat + padLat)];
+}
+
+// Routes: a curved line from one marker to another, the hub-and-spoke picture
+// a network page is recognised by. Each route is a quadratic curve bowed a
+// fifth of its length to one side, drawn under the markers. `status:
+// "planned"` draws it dashed; the dashes are separate strokes, so every
+// renderer shows them the same way.
+function routeNodes({ id, geography, projected, markers, routes }) {
+  if (!routes.length) return [];
+  const byKey = new Map();
+  markers.forEach((marker, index) => { for (const key of [marker?.id, marker?.label, String(index)]) if (key !== undefined && key !== null) byKey.set(String(key), marker); });
+  const nodes = [];
+  // A route carrying a volume is drawn at a width proportional to it, from
+  // 1.5 to 6px against the largest route on the map; without one, 2px.
+  const maxVolume = Math.max(0, ...routes.map((route) => Number.isFinite(route?.value) ? route.value : 0));
+  routes.forEach((route, index) => {
+    const from = byKey.get(String(route?.from)), to = byKey.get(String(route?.to));
+    if (!from || !to) throw new Error(`Map route ${index + 1} must name two markers by id, label or index`);
+    if (route.status !== undefined && !["operating", "planned"].includes(route.status)) throw new Error('Map route status is "operating" or "planned"');
+    const [x1, y1] = markerCoordinate(from, geography, projected), [x2, y2] = markerCoordinate(to, geography, projected);
+    const dx = x2 - x1, dy = y2 - y1, length = Math.hypot(dx, dy);
+    if (length < 4) return;
+    const bow = length * 0.2, cx = (x1 + x2) / 2 - (dy / length) * bow, cy = (y1 + y2) / 2 + (dx / length) * bow * (dx >= 0 ? -1 : 1);
+    const points = Array.from({ length: 25 }, (_, i) => { const t = i / 24, u = 1 - t; return [u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]; });
+    const [minX, minY, maxX, maxY] = points.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [Infinity, Infinity, -Infinity, -Infinity]);
+    const width = Math.max(maxX - minX, 1), height = Math.max(maxY - minY, 1);
+    const unit = (p) => [Number(((p[0] - minX) / width).toFixed(5)), Number(((p[1] - minY) / height).toFixed(5))];
+    const planned = route.status === "planned";
+    const paths = planned
+      ? Array.from({ length: 12 }, (_, i) => ({ points: points.slice(i * 2, i * 2 + 2).map(unit), closed: false })).filter((path) => path.points.length === 2)
+      : [{ points: points.map(unit), closed: false }];
+    nodes.push(shapePrimitive({ id: stableId(id, "route", index), role: "map-route", geometry: "iconPath", frame: { x: minX, y: minY, width, height },
+      style: { fill: "none", stroke: planned ? token("color.accent") : PRIMARY, lineWidth: Number.isFinite(route.value) && maxVolume > 0 ? Math.round((1.5 + 4.5 * route.value / maxVolume) * 10) / 10 : token("line.standard"), lineCap: "round" },
+      data: { paths, from: String(route.from), to: String(route.to), status: route.status ?? "operating", ...(Number.isFinite(route.value) ? { value: route.value } : {}) } }));
+  });
   return nodes;
 }
 
@@ -329,11 +426,16 @@ export function mapNodes({ id, frame, props = {} }) {
   const highlighted = new Set((props.highlightCountries || []).map(value => geography.custom ? String(value) : resolveCountryId(value)));
   const absentHighlights = [...highlighted].filter((countryId) => !geography.countries.some((country) => country.id === countryId));
   if (absentHighlights.length) throw new Error(`Highlighted countries are outside ${geography.id}: ${absentHighlights.join(", ")}`);
-  const projected = projection(frame, geography.bounds);
+  if (props.routes !== undefined && !Array.isArray(props.routes)) throw new Error("Map routes must be an array of { from, to }");
+  if (props.crop !== undefined && props.crop !== "fit") throw new Error('Map crop must be "fit" (crop to the markers and routes)');
+  const bounds = props.crop === "fit" ? fitBounds(props.markers || [], geography) : geography.bounds;
+  const projected = projection(frame, bounds);
+  const recede = Boolean((props.markers || []).length || (props.routes || []).length);
   const nodes = geography.countries.map((country) => {
-    const paths = country.polygons.map((ring) => clipRing(ring, geography.bounds)).filter((ring) => ring.length >= 3).map((ring) => ring.map(projected.project));
-    return paths.length ? polygonNode({ id, country, paths, highlighted: highlighted.has(country.id) }) : null;
+    const paths = country.polygons.map((ring) => clipRing(ring, bounds)).filter((ring) => ring.length >= 3).map((ring) => ring.map(projected.project));
+    return paths.length ? polygonNode({ id, country, paths, highlighted: highlighted.has(country.id), recede }) : null;
   }).filter(Boolean);
+  nodes.push(...routeNodes({ id, geography, projected, markers: props.markers || [], routes: props.routes || [] }));
   nodes.push(...markerNodes({ id, frame, geography, projected, markers: props.markers || [], highlighted }));
   if (!nodes.some((node) => node.role === "map-land")) throw new Error(`Map geography ${geography.id} produced no visible land shapes`);
   return nodes;

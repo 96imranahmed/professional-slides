@@ -27,7 +27,7 @@ assert.ok(inference[1].frame.y>disc.frame.y+disc.frame.height);
 const specs=[...componentFixtureSpecs(),...componentVariantFixtureSpecs()].filter(s=>s.target==='section-boundary');
 assert.equal(specs.length,4);
 assert.equal(specs.filter(s=>s.defaultVariant).length,1);
-for(const palette of ['mckinsey','bcg','bain']) {
+for(const palette of ['midnight','evergreen','crimson']) {
  const d=compileDeck({id:'boundary',palette,slides:specs},REGISTRY);
  const n=d.slides.flatMap(s=>s.nodes).find(n=>n.role==='relationship-disc');
  assert.equal(n.style.fill.value,d.manifest.tokens['color.componentPrimary'].value);

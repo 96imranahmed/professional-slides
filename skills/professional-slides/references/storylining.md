@@ -8,6 +8,23 @@ Above the dot-dash, record the audience, actual choice or learning objective, ba
 
 For authorization, retain one approval unit: workflow, population, exposure/configuration, resources and permission requested. Preparation, offline testing, live exposure and expansion are different commitments. Carry the same unit into the summary, protocol and close. Include cancellation, option and contingent liabilities in the authorized exposure, even when cash is released later. A request for preparatory spending needs its own supported purpose, downside and stop condition; a conditional main programme does not automatically justify its first tranche. Ask only for missing information that would change the argument; existing authorization persists.
 
+## Find the data before the dot-dash
+
+A dot-dash written from what the author already knows produces pages of two numbers each: one company against another on a count. The rich page - a trend with its growth rate, the whole peer set ranked, a share shifting, a network on a map - needs a dataset, and the datasets have to be found before the titles are written, because they decide which titles can be proved.
+
+For a subject with public records, search for and download the data first:
+
+- **Series over time** for the measures the question turns on - revenue, profit, volume, capacity, users, fleet, share - five or more periods, from annual reports, investor presentations, regulators, statistics offices and industry bodies.
+- **The whole peer set** on the same measures and the same basis, not the subject against one rival.
+- **Composition and share**: segments, regions, product lines, and how they have shifted.
+- **Geography**: locations, networks and routes, with coordinates.
+- **Pipeline and commitments**: orders, plans, announcements, each with its status (announced, firm, delivered).
+- **Ratios that remove size**: per unit, per head, per route, per asset.
+
+Save what is downloaded under the task's `sources/` with the URL and the retrieval date, and build each measure's record from it (below). Where a series is not published, say so and use the nearest defensible one; do not fall back to a two-number chart because the search was short. Declare the compared organisations as `players` on the deck - name, and the logo to be sourced - so the deck introduces them before it compares them ([Design](design.md#make-every-exhibit-earn-its-page)).
+
+Before writing titles, list the deck's candidate exhibits against these forms. A 50-page deck on a competitive question normally carries several trends with their rates, a ranked peer comparison, a share or mix, a players page with logos, a map where the subject has geography, and scorecard tables that judge; if the list is mostly single-period comparisons of two entities, the research is not finished.
+
 ## Prove the governing answer
 
 Build a hypothesis tree for a decision, or a concept/dependency map for explanation. Use stable node IDs. For each terminal branch retain the provisional answer, confirming/disconfirming evidence, consequence, evidence status, dependency and disposition (body, appendix, unresolved or parked). Siblings divide the same parent question. Stop expanding when additional detail cannot change the answer or understanding.

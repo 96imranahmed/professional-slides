@@ -24,6 +24,8 @@ Decide what the page has to make the reader see, then take the slide type that s
 | Rank movement across periods | `rank-flow` | A table of ranks |
 | Quantities moving from one set to another | `sankey` | Two tables |
 | Where on a map | `map` (highlight, markers, choropleth) | A list of countries |
+| A network from a hub, or flows between places | `map` with markers at their longitude and latitude, `hub: true`, `routes`, `crop: "fit"` | Countries filled to stand for cities |
+| The players the deck compares | a table with a `logo` column and the numbers the deck will use, or `logos` with a line each | Names in a bullet list |
 | One number that is the whole point | `hero-number` layout with the evidence that produced it | A bullet |
 | Three to six headline numbers | `metrics` strip; `stat-list` when each needs its sentence, dark for a side panel | Numbers buried in prose |
 | Exact values looked up across fields | `table`, with the treatment the cells call for: `bar`, `heat`, `bubble`, harvey, state | A chart that hides the digits |
@@ -53,6 +55,30 @@ Decide what the page has to make the reader see, then take the slide type that s
 | One sentence the deck turns on | `statement`, over a photograph when there is one | A title on an empty page |
 
 When two rows fit, the message decides: "China rose from sixth to first" is movement, so `rank-flow`; "China is first" is a level, so a sorted bar. Record the choice and the rejected alternative in the plan `why`. A deck that finds itself using one chart type for most of its charts should go back through this table page by page; `PLAN_CHART_MONOTONY` reports it.
+
+## Make every exhibit earn its page
+
+A chart earns its page by showing a relationship the reader could not get from the numbers in the title. Two bars of one series are a metric pair with a chart drawn round it: set them as metrics with the delta, or widen the evidence until the chart shows something. `CRAFT_TRIVIAL_CHARTS` stops a deck where more than a quarter of the charts are two-number charts. The forms that carry an implication:
+
+- **A trend with its rate.** Five or more periods, the CAGR on an arrow over the span (`change`, `cagr`), eras bracketed (`periods`), the latest periods in the accent. Most strategic questions have a history - revenue, volume, fleet, share, users - and the series is usually public.
+- **The whole set, ranked.** Every peer, sorted, the subject highlighted and the rest neutral, rather than the subject against one rival. The tail or the gap is the finding: bracket it.
+- **Share and mix.** A composition over time with the share of the part that matters marked on each column.
+- **Gap to a benchmark.** A reference line for the target or the average, or a bracket with the gap value between two bars.
+- **A normalised ratio.** Per seat, per head, per route, per aircraft: size removed so the comparison is fair.
+- **A network or flow.** Routes from a hub on a map, widths by volume, planned routes dashed.
+- **Rank movement.** Who moved over four dates, as a rank-flow.
+
+Mark the finding on the plot where the eye already is; the annotation carries the page's claim. Keep one accent series and the rest muted.
+
+**Tables judge as well as list.** Every table that compares, rates or judges shows it in the cells: Harvey balls or ratings in a single accent with a legend, check and cross states, bars growing from a shared baseline with the value at the end, up/flat/down impact arrows, an implication column of a quarter of the width, rows grouped in bands. A plain grid is right for a record lookup and little else. `CRAFT_TABLES_PLAIN` stops a deck where most tables are plain.
+
+**Introduce the players.** A deck that compares named companies, brands or products opens that comparison with one page that introduces them: each player's logo as the row header, what it is, and the two or three numbers the rest of the deck compares (fleet, revenue, network, founding year), with ratings or a status column where the deck will judge them. Logos are always logo plus evidence, never a bare wall; keep them in colour, evened by optical weight. Declare the set as `players` on the deck; `CRAFT_PLAYERS_UNINTRODUCED` stops a deck that compares them without the page. Source logos as pictures are sourced: name them, ask, and plan the unsourced ones as `{ alt }`.
+
+**Steps are for procedures.** A staircase or chevron process is a sequence the reader follows step by step. A set of options is a table with ratings; a plan over time is a timeline or gantt; parallel priorities are icon cards; a path with gates is a roadmap; conditions are a checklist. `CRAFT_STEP_OVERUSE` allows two per deck, or one per 25 pages in a longer one.
+
+**Icons mark parallel categories.** Three or four parallel items - the pillars of a case, the risks, the levers - read faster with an icon each in one line style and the accent, beside a bold lead and a line or two of text (`pointsStyle: "icon-lead"`), or as icon cards. Never icons alone.
+
+**Maps show places, not countries standing in for them.** Put a city at its longitude and latitude (a country marker labelled with a city is refused), crop to the network (`crop: "fit"`, or a regional preset), keep land a flat grey and fill a country only when the fill means something, with a legend. Dots are small - the default is 10px; a hub is a ring. Routes are curved lines from the hub, their width by volume when the volume is known, planned routes dashed. Label places in small plain type beside the dot; the commentary beside the map says what the network adds up to.
 
 ## Allocate evidence before geometry
 

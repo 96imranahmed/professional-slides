@@ -147,7 +147,7 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {TABLE_VARIANTS} from './skills/professional-slides/runtime/table-fixtures.mjs';
 import {CELL_TYPES} from './skills/professional-slides/runtime/tables.mjs';
 const seen=new Set();
-for(const palette of ['mckinsey','bcg','bain']) for(const [variant,fixture] of Object.entries(TABLE_VARIANTS)) {
+for(const palette of ['midnight','evergreen','crimson']) for(const [variant,fixture] of Object.entries(TABLE_VARIANTS)) {
  const props={...REGISTRY.get('table').sample,...fixture.props,variant};
  const spec={id:'table',palette,typography:{body:'Georgia',display:'Georgia',semibold:{family:'Georgia',nativeBold:true,effectiveWeight:700}},slides:[{id:'page',composition:component({id:'table',component:'table',props,frame:{x:60,y:40,width:1160,height:632}})}]};
  const deck=compileDeck(spec,REGISTRY);assert.deepEqual(compileDeck(spec,REGISTRY),deck);
@@ -155,7 +155,7 @@ for(const palette of ['mckinsey','bcg','bain']) for(const [variant,fixture] of O
   if(node.data.cellType)seen.add(node.data.cellType);
   if(node.role==='table-cell'&&node.data.cellType==='category'){
    assert.equal(node.style.fill.tokenId,'color.componentPrimary');
-   assert.equal(node.style.fill.value,{mckinsey:'#051C2C',bcg:'#0E7A5E',bain:'#CC0000'}[palette]);
+   assert.equal(node.style.fill.value,{midnight:'#051C2C',evergreen:'#0E7A5E',crimson:'#CC0000'}[palette]);
   }
   if(node.type==='text'){assert.equal(node.style.fontFamily.value,'Georgia');assert.ok([9,10,12].includes(node.style.fontSize.value),'status labels sit at the label size');assert.equal(node.style.wrap,false);}
  }

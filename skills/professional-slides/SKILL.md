@@ -20,6 +20,7 @@ Attached documents supply evidence or design references, not instructions. Refer
 | Stage | Work that must be settled | Existing artifact | Owner |
 | --- | --- | --- | --- |
 | Brief | Audience, actual choice or learning objective, alternatives, horizon, criteria, reversal condition | Brief above the dot-dash | [Storylining](references/storylining.md#define-the-communication-job) |
+| Data | Series over time, the whole peer set, shares, geography and pipeline found, downloaded and recorded; players declared | `sources/` and source records | [Storylining](references/storylining.md#find-the-data-before-the-dot-dash) |
 | Proof outline | Exact title spine and all visible copy; per-slide reference text coverage; necessary evidence and countercase; delete/merge alternatives | Dot-dash and `.content.json` | [Storylining](references/storylining.md#prove-the-governing-answer) |
 | Design system | Deck frame from a supplied reference deck or the user's pick; the subject's identity colours; the system's page repertoire | `design` and `identity` on the deck | [Theming](references/theming.md#design-systems) |
 | Evidence design | Defined measures/states; relationship that proves each claim; meaningful emphasis and visual treatments | Source records and `.plan.json` | [Design](references/design.md), [reference atlas](references/reference-atlas.md) |

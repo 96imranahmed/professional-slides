@@ -222,7 +222,7 @@ function visualVariantSignature(target, variant) {
   });
 }
 
-export function buildGoldenSetDeck({ palette = "mckinsey" } = {}) {
+export function buildGoldenSetDeck({ palette = "midnight" } = {}) {
   const specs = goldenSetSpecs();
   const deck = compileDeck({ id: `golden-${palette}`, palette, slides: specs }, REGISTRY);
   assertParentheticalTemplateCopy(deck.slides);

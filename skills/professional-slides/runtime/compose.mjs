@@ -4,7 +4,7 @@
 //
 // {
 //   "schema": "professional-slides.deck/v3",
-//   "id": "nyc-or-sf", "palette": "mckinsey", "density": "executive",
+//   "id": "nyc-or-sf", "palette": "midnight", "density": "executive",
 //   "cover": { "title", "subtitle", "date", "logo", "tone": "dark|light", "image": "assets/cover.jpg" },
 //   "footer": "Document title",          // right footer, beside the page number
 //   "slides": [
@@ -3141,7 +3141,7 @@ function composeDeckWith(spec, baseDir) {
   }
   return {
     id: spec.id,
-    palette: spec.palette || "mckinsey",
+    palette: spec.palette || "midnight",
     ...(spec.designLayout ? { design: spec.designLayout.name } : {}),
     ...(spec.designLayout?.variation ? { variation: { seed: spec.designLayout.variation.seed, lean: spec.designLayout.variation.lean, leadPoints: spec.designLayout.variation.leadPoints, tracker: spec.tracker ?? null } } : {}),
     ...(spec.pageTemplate ? { pageTemplate: spec.pageTemplate } : {}),
