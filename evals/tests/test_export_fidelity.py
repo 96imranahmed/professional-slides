@@ -52,6 +52,20 @@ console.log(JSON.stringify({wrapped:body.text.includes('\\n'),runsHaveBreak:(bod
         self.assertTrue(result["joined"])
 
 
+class ImageDividerFooterTests(unittest.TestCase):
+    def test_the_footer_stays_in_the_panel_not_on_the_photograph(self):
+        # White footer type over a crowd in the photo was unreadable.
+        result = run_node("""
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const img = {dataUri:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',width:1,height:1,alt:'A photograph',authorization:'test'};
+const nodes = REGISTRY.get('section-divider').render({id:'d',frame:{x:0,y:0,width:1280,height:720},props:{title:'The test',companyName:'A deck footer',image:img}}).nodes;
+const photo = nodes.find(n=>n.role==='divider-image'), foot = nodes.find(n=>n.role==='footer-right');
+console.log(JSON.stringify({photoLeft:photo.frame.x, footRight:foot ? foot.frame.x+foot.frame.width : null}));
+""")
+        self.assertIsNotNone(result["footRight"])
+        self.assertLessEqual(result["footRight"], result["photoLeft"])
+
+
 class DeclaredDecimalsTests(unittest.TestCase):
     def test_a_declared_format_rounds_half_away_from_zero_like_powerpoint(self):
         # 3.55 is stored as 3.5499...; toFixed printed 3.5 on the drawn chart

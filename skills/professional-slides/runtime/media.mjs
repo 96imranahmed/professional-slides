@@ -155,9 +155,19 @@ export function registerMedia(registry) {
     const { frame } = input;
     const panelWidth = Math.round(frame.width * 0.42);
     const base = dividerRender({ ...input, props: { ...props, panelWidth } });
+    // The footer row is laid out for a page with nothing behind it, so on an
+    // image divider it landed on the photograph: white type over a crowd in
+    // one deck, unreadable where the photo was bright. The row moves, as one
+    // group, to end at the panel's right margin.
+    const FURNITURE = new Set(["footer-right", "footer-left", "page-number", "source-text"]);
+    const furniture = base.nodes.filter((node) => FURNITURE.has(node.role) && node.frame);
+    const panelRight = frame.x + panelWidth - Math.round(frame.width * 0.025);
+    const reach = furniture.length ? Math.max(...furniture.map((node) => node.frame.x + node.frame.width)) : 0;
+    const shift = reach > frame.x + panelWidth ? panelRight - reach : 0;
+    const nodes = shift ? base.nodes.map((node) => FURNITURE.has(node.role) && node.frame ? { ...node, frame: { ...node.frame, x: node.frame.x + shift } } : node) : base.nodes;
     return { ...base, nodes: [
       mediaNode({ id: stableId(input.id, "image"), frame: { x: frame.x + panelWidth, y: frame.y, width: frame.width - panelWidth, height: frame.height }, props: image, role: "divider-image", fit: "cover" }),
-      ...base.nodes,
+      ...nodes,
     ] };
   };
   const takeaways = registry.get("takeaways"), takeawaysRender = takeaways.render;
