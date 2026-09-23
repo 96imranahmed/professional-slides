@@ -50,8 +50,10 @@ class FollowupReviewTests(unittest.TestCase):
             self.assertEqual(image.read_bytes(), (ROOT / 'skills/professional-slides/examples/assets/hills.jpg').read_bytes())
             manifest = json.loads((package / 'package-manifest.json').read_text())
             self.assertIn('skills/professional-slides/examples/assets/hills.jpg', manifest['files'])
-            for example in ['slideworks', 'nyc-or-sf']:
-                result = self.cli(package / 'evals/scripts/compile_scene.mjs',
+            # The package is the skill alone; the development scripts stay here.
+            self.assertFalse([f for f in manifest['files'] if f.startswith('evals/')])
+            for example in ['house-style', 'nyc-or-sf']:
+                result = self.cli(ROOT / 'evals/scripts/compile_scene.mjs',
                                   skill / f'examples/{example}.deck.json', root / f'{example}.scene.json')
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertGreater(len(json.loads((root / f'{example}.scene.json').read_text())['slides']), 1)

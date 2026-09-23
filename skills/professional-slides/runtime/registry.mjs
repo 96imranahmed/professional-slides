@@ -118,7 +118,7 @@ export { fitText };
 
 function insightLayout(frame, props) {
   // `items`: the closing block as two or three square-bulleted findings on the
-  // band rather than one sentence running across it. The reference decks close
+  // band rather than one sentence running across it. A strong deck closes
   // a dense table this way - each line carries its own finding, and the reader
   // can take them one at a time.
   const list = Array.isArray(props.items) ? props.items.map((item) => String(item ?? "").trim()).filter(Boolean) : null;
@@ -330,8 +330,8 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
   // is retried at 22pt. Beyond that the page gate (TITLE_LINES) reports it.
   // An optional lead-in ("Why", "Drive") is set in the accent colour as a run.
   const lead = typeof props.lead === "string" && props.lead.trim() && props.text.startsWith(props.lead) ? props.lead : null;
-  // The house decides how a lead reads: in the accent before the rest (McKinsey
-  // "South Korea: …"), or as "Topic | statement" with the topic in bold, a pipe,
+  // The house decides how a lead reads: in the accent before the rest
+  // ("South Korea: …"), or as "Topic | statement" with the topic in bold, a pipe,
   // and the statement in the title weight. The pipe replaces a colon or dash
   // after the lead while retaining a single title hierarchy.
   const pipe = lead && chrome && houseStyle("style.titleLead") === "pipe";
@@ -427,7 +427,7 @@ function contentRailInsets(props = {}) {
 function sectionPadding(props = {}) {
   if (props.padding !== undefined) return normalizeInsets(props.padding);
   const treatment = props.treatment || "open";
-  // A filled panel breathes: the firm panels set their copy a full gutter off
+  // A filled panel breathes: a well-made panel sets its copy a full gutter off
   // every edge, not the four pixels a tint can get away with.
   const value = tokenValue(token("space.5"));
   return treatment === "open" ? { top: 0, right: 0, bottom: 0, left: 0 } : { top: value, right: value, bottom: value, left: value };
@@ -588,11 +588,11 @@ export function normalizeListItems(items) {
     const text = typeof o.text === "string" && o.text.trim() ? o.text.trim() : null;
     if (!lead && !text) throw new Error("Body bullet list needs nonempty text items");
     // `highlight`: the phrase (or phrases) inside the point that reads in the
-    // house colour, which is how the reference pages emphasise the finding
+    // house colour, which is how a well-made page emphasises the finding
     // inside a sentence rather than bolding the whole line.
     const highlight = o.highlight === undefined || o.highlight === null ? null : o.highlight;
     // `points`: sub-points under the item, each a short line set at an indent
-    // with a dash - the way a client executive summary develops a statement
+    // with a dash - the way a strong executive summary develops a statement
     // into its parts ("the vision includes: - better data - planning ...").
     if (o.points !== undefined && (!Array.isArray(o.points) || o.points.some((sub) => typeof sub !== "string" || !sub.trim()))) {
       throw new Error("A point's sub-points are a list of nonempty strings");
@@ -609,8 +609,8 @@ export function resolveListMarker(props) {
   if (marker === "auto") return items.some((i) => i.icon) ? "icon" : items.some((i) => i.state !== null) ? "check" : items.some((i) => i.lead) ? "number" : houseStyle("style.listMarker") === "dash" ? "dash" : "dot";
   // `none` is the prose column (a bold lead and its paragraph, nothing in the
   // gutter), `rule` separates items with a hairline instead of marking them,
-  // and `letter` is A / B / C for options rather than steps - the devices the
-  // reference decks use where we only ever reached for the numbered disc.
+  // and `letter` is A / B / C for options rather than steps - the devices a
+  // strong deck uses where we only ever reached for the numbered disc.
   if (!["dot", "dash", "number", "letter", "icon", "icon-ring", "check", "none", "rule"].includes(marker)) throw new Error(`Unknown list marker: ${marker}`);
   return marker;
 }
@@ -619,7 +619,7 @@ function bodyListLayout(frame, itemsIn, props = {}) {
   const items = normalizeListItems(itemsIn);
   const marker = resolveListMarker({ ...props, items: itemsIn });
   const disc = markerSize();
-  // The reference icon list sets the glyph alone in the house colour, about
+  // A well-made icon list sets the glyph alone in the house colour, about
   // twice the text line, with the text beside it and room between the rows -
   // not a small icon in a ring. `marker: "icon-ring"` keeps the ringed marker.
   const ringed = marker === "icon-ring";
@@ -639,7 +639,7 @@ function bodyListLayout(frame, itemsIn, props = {}) {
   const font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 };
   const subIndent = tokenValue(token("space.5"));
   // `inlineLead`: the lead runs *into* the sentence in the house accent rather
-  // than sitting above it in bold - the way the reference icon lists set the
+  // than sitting above it in bold - the way a well-made icon list sets the
   // phrase that carries the finding. The item then measures as one block.
   const inlineLead = props.inlineLead === true;
   const measured = items.map((item) => {
@@ -711,7 +711,7 @@ function bodyListNodes({ id, frame, props }) {
     } else if (layout.marker === "dash") {
       nodes.push(rectPrimitive({ id: stableId(id, "marker", index), role: "list-marker", frame: { x: frame.x, y: lineCentre - 0.5, width: tokenValue(token("space.2")), height: 1 }, style: boxStyle(INK_, INK_, HAIRLINE, token("radius.none")) }));
     } else if (layout.marker === "number" || layout.marker === "letter") {
-      // `state: "open"` hollows the disc: the reference ledger runs solid discs
+      // `state: "open"` hollows the disc: a well-made ledger runs solid discs
       // for what is done and outlined ones for what is not, on one list.
       const hollow = m.item.state === "open";
       const label = layout.marker === "letter" ? String.fromCharCode(64 + Number(m.item.number || index + 1)) : m.item.number;
@@ -728,7 +728,7 @@ function bodyListNodes({ id, frame, props }) {
       nodes.push(...stateMarker({ id: stableId(id, "marker", index), role: "list-marker", x: frame.x, y: Math.max(y, lineCentre - layout.markerSize / 2), size: layout.markerSize, state: m.item.state ?? "yes" }));
     } else {
       // A ringed icon centres on the item block, as on a feature row. A plain
-      // glyph sits on the first line, the way a reference icon list reads down
+      // glyph sits on the first line, the way a well-made icon list reads down
       // a column whose items run to three and four lines.
       const iconY = layout.ringed ? mid - layout.markerSize / 2 : Math.max(y, lineCentre - layout.markerSize / 2);
       // A RINGED marker is a marker, not the finding. Drawn in the house
@@ -1083,8 +1083,8 @@ function registerCore(registry) {
         const page = renderPageTemplate({ id, frame, props });
         const tracker = props.tracker ? trackerLabelNodes({ id: stableId(id, "tracker"), frame: { x: frame.x + CHROME.left, y: frame.y + 30, width: page.titleWidth, height: 20 }, props: props.tracker }) : [];
         // `kicker`: the small label above the title that says what part of the
-        // argument this page belongs to ("People", "Commercial evidence"). The
-        // reference pages carry a dozen words of this band furniture against our
+        // argument this page belongs to ("People", "Commercial evidence"). A
+        // well-made page carries a dozen words of this band furniture against our
         // four, and it shares the tracker's row: kicker left, pills right.
         const kickerText = typeof props.kicker === "string" && props.kicker.trim() ? props.kicker.trim() : null;
         const kicker = [];
@@ -1106,7 +1106,7 @@ function registerCore(registry) {
         }
         // `subtitle`: the standfirst under the action title - what the page
         // measures, over what population, for what period ("Employment, growth
-        // and specialization by subsector"). The reference title band carries
+        // and specialization by subsector"). A well-made title band carries
         // twenty words against our fourteen, and this line is the difference.
         const subtitleText = typeof props.subtitle === "string" && props.subtitle.trim() ? props.subtitle.trim() : null;
         const tagPlacement = props.tag ? houseStyle("style.tagPlacement") : "top-right";
@@ -1254,8 +1254,8 @@ function registerCore(registry) {
       // Dark tone is the gallery default: navy full bleed, title block in the
       // lower third, a logo slot top-left, a date line under the subtitle.
       const dark = (props.tone ?? "dark") === "dark";
-      // On navy the subtitle takes the accent tint when it reads (BCG's fourth
-      // series is dark green), white otherwise.
+      // On navy the subtitle takes the accent tint when it reads (a dark green
+      // fourth series does not), white otherwise.
       const tint = token("color.accentTint");
       const ink = dark ? WHITE : INK, secondary = dark ? (contrastRatio(tokenValue(INK), tokenValue(tint)) >= 4.5 ? tint : WHITE) : SECONDARY;
       const width = Math.min(frame.width - CHROME.left - CHROME.right, frame.width * 0.72);
@@ -1370,7 +1370,7 @@ function registerCore(registry) {
         ...page.nodes
       ] };
     } }),
-    // The closing page of the 2022 McKinsey decks: navy, "Key takeaways", the
+    // A closing page: navy, "Key takeaways", the
     // three or four messages as big serif numerals with bold copy, an optional
     // photograph on the right (media.mjs). Structural, like a divider.
     component({ id: "takeaways", category: "navigation", role: "takeaways", tokens: ["color.canvas", "color.ink", "color.onPrimary", "color.accent", "color.rule", "font.display", "font.body", "type.deckTitle", "type.heading", "type.sectionTitle", "type.body", "line.hairline", "radius.none", "space.3", "space.4", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { title: "Key takeaways", items: ["(Insert takeaway 1)", "(Insert takeaway 2)", "(Insert takeaway 3)"] }, render: ({ id, frame, props }) => {
@@ -1417,7 +1417,7 @@ function registerCore(registry) {
       const items = (Array.isArray(props.items) ? props.items : []).map((item) => measureText(String(item), width - 64, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: 1 }));
       return { height: CHROME.titleTop + 8 + title.height + tokenValue(token("space.4")) + 12 + items.reduce((sum, item) => sum + item.height + 16, 0) };
     } }),
-    // The statement page (e-Conomy, Bain keynotes): one sentence set large and
+    // The statement page: one sentence set large and
     // centred, its key phrase in the accent (bold white on navy), a short accent
     // rule above; with a photograph (media.mjs) the sentence sits on a navy card.
     component({ id: "statement", category: "navigation", role: "statement", tokens: ["color.canvas", "color.ink", "color.onPrimary", "color.accent", "font.display", "font.body", "type.deckTitle", "type.heading", "line.hairline", "line.standard", "radius.none", "space.4", "space.5", ...PAGE_TEMPLATE_TOKENS], preferredSize: { ...SLIDE }, sample: { text: "The pandemic has been a catalyst for existing digital users to adopt new online services.", accent: ["adopt new online services"] }, render: ({ id, frame, props }) => {
@@ -1469,7 +1469,7 @@ function registerCore(registry) {
       if (typeof props.text !== "string" || !props.text.trim()) throw new Error(`paragraph ${id} requires a non-empty text string; keep geometry in the component frame`);
       const width = paragraphMeasure(frame.width, props);
       // `variant: "caption"` is the line under a panel: compact, secondary, the
-      // finding this panel carries. The reference captions every panel in a row
+      // finding this panel carries. A well-made page captions every panel in a row
       // instead of closing the page with one shared so-what.
       const caption = props.variant === "caption";
       return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: caption ? "panel-caption" : "paragraph", frame: { ...frame, width }, text: props.text, ...(props.runs?{runs:props.runs}:{}), style: textStyle(caption ? COMPACT : BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") })] };
@@ -1566,15 +1566,15 @@ function registerCore(registry) {
       if (variant === "chevron") return { nodes: [lightChevronNode(id, frame)] };
       // `divider`: the quiet end of the range - one solid hairline down the
       // gutter and nothing on it. It separates the evidence from what is read
-      // off it without asserting an inference, which is what most of the
-      // reference pages do when the right-hand heading already says "as a
+      // off it without asserting an inference, which is what most well-made
+      // pages do when the right-hand heading already says "as a
       // result". Reach for it whenever the relation is carried in the words.
       // `arrow`: a filled block arrow pointing from the evidence at what
       // follows from it. Where the disc is a small punctuation mark in the
-      // gutter, this is a shape the page can see from across a room, and the
-      // reference decks spend it on the page's own conclusion - Bain's Berkeley
-      // diagnostic drops one into the line that closes the page, BCG's NYCHA
-      // pages fan them from a model into what each function becomes. It points
+      // gutter, this is a shape the page can see from across a room, and a
+      // strong deck spends it on the page's own conclusion - dropped into the
+      // line that closes the page, or fanned from a model into what each
+      // function becomes. It points
       // the way the argument runs: across a gutter between two columns, down a
       // band drawn across the page.
       if (variant === "arrow") {

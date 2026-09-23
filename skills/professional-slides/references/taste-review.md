@@ -54,14 +54,14 @@ For a pre-read, explicitly test substantive text coverage against the task targe
 
 ## Density pass
 
-The word floor in the dot-dash is hard, so no page ships under the client pages doing its job. Clearing it is not the same as reading like them. Each build writes `density-profile.json`: the rendered pages measured the way the corpus was (body words against the page's reading task, text blocks per page, words per block, longest block) beside the client targets, with every page outside the target band flagged.
+The word floor in the dot-dash is hard, so no page ships under the target for its reading task. Clearing it is not the same as reading well. Each build writes `density-profile.json`: the rendered pages measured the way the targets are set (body words against the page's reading task, text blocks per page, words per block, longest block) beside the targets, with every page outside the target band flagged.
 
-Read the deck comparison first. The client median page carries four blocks of about 56 words, its longest block under 152, and body words at the task median. Then open every flagged page and give it a verdict:
+Read the deck comparison first. A typical well-made page carries four blocks of about 56 words, its longest block under 152, and body words at the task median. Then open every flagged page and give it a verdict:
 
 - **right:** the density suits the job. A chart-led page with one line of takeaway may rightly sit light, and a record table may rightly run dense.
 - **too thin:** the reader cannot explain the claim, mechanism, limitation or consequence from the page.
 - **too dense:** padding, restatement or detail the page does not need to prove its title. A page padded to clear the floor goes here.
-- **wrong shape:** the words are right in number and wrong in form, for example one long block where the client page makes three points.
+- **wrong shape:** the words are right in number and wrong in form, for example one long block where a well-made page makes three points.
 
 Record `density.deck` (the deck's medians against the targets and what that means for a reader) and one `density.pages` entry per flagged page. Delivery refuses a review that skips a flagged page, and any verdict other than right blocks it as `DENSITY_MISMATCH`. Judge the page, not the number: the profile asks the question and the reader answers it.
 
@@ -77,7 +77,7 @@ Do not list twenty copies of one defect. Name the cause, affected IDs and earlie
 
 ## Benchmark and score
 
-Before scoring, compare the candidate with the [atlas](reference-atlas.md) devices and, when the user supplied reference decks, with their strong comparable pages. Compare the evidence relationship and reader effort: what would a strong page make visible that the candidate leaves to prose or mental joins? Do not copy reference quirks that conflict with the user brief. Reference material is only what the user supplies in the task: never search the machine for decks, a corpus or client documents to benchmark against.
+Before scoring, compare the candidate with the [atlas](reference-atlas.md) devices and, when the user supplied reference decks, with their strong comparable pages. Compare the evidence relationship and reader effort: what would a strong page make visible that the candidate leaves to prose or mental joins? Do not copy reference quirks that conflict with the user brief. Reference material is only what the user supplies in the task: do not search the filesystem for other decks or documents to benchmark against.
 
 Record argument, evidence, visual explanation, hierarchy/copy and sequence quality separately in the narrative. Use calibrated anchors, not a mechanical average:
 

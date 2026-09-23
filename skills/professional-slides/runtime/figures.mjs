@@ -1,8 +1,7 @@
-// Seventeen figure families the reference corpus uses and the skill could not draw.
+// Seventeen figure families that well-made decks use and the skill could not
+// otherwise draw.
 //
-// A 400-page sample of the corpus (evals/corpus/styles) was classified into 85
-// design styles and each probed against the runtime. These are the diagram and
-// statistic styles that had no component: a column of large statistics, a
+// These are diagram and statistic styles that had no component: a column of large statistics, a
 // flowchart, spectrum sliders, a layer stack, items placed into category
 // columns, a rank table across periods, a two-sided flow, an icon array, rows
 // carried by arrows and a row of capsule pillars. Each is drawn from the
@@ -41,7 +40,7 @@ const line = (id, role, x1, y1, x2, y2, stroke = RULE, width = "line.hairline", 
 /* --------------------------------------------------------------- stat-list */
 
 // A column of large statistics, each with the line that says what it counts.
-// The corpus sets these down a dark side panel or in a two-column grid; the
+// A strong deck sets these down a dark side panel or in a two-column grid; the
 // number is the figure, so it is set in the metric type and the sentence beside
 // it at body size. Rows share the height they are given, capped so a short list
 // does not turn into four islands.
@@ -205,11 +204,11 @@ export function flowNodes({ id, frame, props }) {
 /* ---------------------------------------------------------------- spectrum */
 
 // Sliders between two poles, one per dimension, with a marker where the subject
-// sits. The corpus uses them for mindsets and positioning: "fixed" to "growth",
+// sits. They suit mindsets and positioning: "fixed" to "growth",
 // "reactive" to "creative". The pole names carry the scale, so there are no ticks.
 //
 // `segments: 3–7` turns each track into a row of discrete steps with the one the
-// subject sits on filled: the published reports' assessment scale ("impact on
+// subject sits on filled: the familiar assessment scale ("impact on
 // industry: very low … very high", "time to mainstream: 0–2 … 10+ years"). A
 // judged grade is not a point on a continuum, and a slider drawn at 0.62 claims
 // a precision the judgement does not have. `scale` names the steps once, above
@@ -286,8 +285,8 @@ export function spectrumNodes({ id, frame, props }) {
 
 /* ------------------------------------------------------------------ layers */
 
-// A layer stack: bands one above another, each resting on the one below. The
-// corpus draws architectures, capability stacks and hierarchies of need this
+// A layer stack: bands one above another, each resting on the one below. A
+// well-made deck draws architectures, capability stacks and hierarchies of need this
 // way. The top band takes the accent; the rest step down in tone.
 function normalizeLayers(props) {
   return between(props.layers, 2, 7, "A layer stack").map((layer, i) => {
@@ -527,7 +526,7 @@ export function sankeyNodes({ id, frame, props }) {
 
 // An icon array: ten or twenty figures per row with the share filled in the
 // accent. "Six in ten" reads faster as six filled people than as a bar at 60%,
-// and the corpus uses it for exactly that kind of population share.
+// and it suits exactly that kind of population share.
 function normalizePictogram(props) {
   const of = props.of ?? 10;
   if (![10, 20].includes(of)) throw new Error("A pictogram row counts out of 10 or 20");
@@ -663,8 +662,8 @@ export function capsulesNodes({ id, frame, props }) {
 /* ---------------------------------------------------------------- fact-grid */
 
 // The infographic panel: a grid of facts, each a large figure with its label,
-// an optional icon and an optional gauge - the dense "by the numbers" page the
-// published reports run. Every tile is one fact; a tile with two numbers in it
+// an optional icon and an optional gauge - the dense "by the numbers" page a
+// strong report runs. Every tile is one fact; a tile with two numbers in it
 // is two tiles.
 function normalizeFacts(props) {
   return between(props.items, 3, 9, "A fact grid").map((item, i) => {
@@ -955,7 +954,7 @@ export function sideStatementNodes({ id, frame, props }) {
 /* ------------------------------------------------------------- radial-bars */
 
 // Concentric arcs, one per item, each swept in proportion to its value: the
-// published reports' radial bar (three survey shares as rings, a nested set of
+// familiar radial bar (three survey shares as rings, a nested set of
 // half-circles). Each arc runs clockwise from twelve o'clock over at most three
 // quarters of a turn, so the empty quarter holds every ring's figure and label
 // on the ring's own line. The rings are shares of different wholes read side by

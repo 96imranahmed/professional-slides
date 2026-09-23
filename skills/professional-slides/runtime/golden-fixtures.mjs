@@ -5,7 +5,7 @@ const fullFrame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
 const at = (id, componentId, frame, props) => component({ id, component: componentId, frame, props });
 const chrome = (title, pageNumber, overrides = {}) => ({
   title,
-  // These source-reference pages explicitly use ruled titles; production defaults remain line-free.
+  // These gallery pages explicitly use ruled titles; production defaults remain line-free.
   titleVariant: "with-line",
   pageTemplate: { rules: "bottom", sourcePlacement: "separate" },
   source: "Source: (Insert source)",

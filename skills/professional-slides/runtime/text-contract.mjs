@@ -3,20 +3,20 @@ import { readFileSync } from 'node:fs';
 
 const roles = new Set(['title', 'body', 'exhibit', 'qualification', 'source', 'furniture']);
 
-// How long a single run of prose may be, measured rather than chosen.
+// How long a single run of prose may be.
 //
 // The word-count contract asks whether a page says enough. It does not ask what
 // shape the words are in, and a deck answered every page with one 150-to-200
-// word paragraph, passed, and read as an essay with pictures. Over 37 analytic
-// pages of client-project decks the median page carries four text blocks of
-// about 56 words, and three pages in four keep every block under 152. That
+// word paragraph, passed, and read as an essay with pictures. A typical
+// well-made analytic page carries four text blocks of about 56 words, and three
+// pages in four keep every block under 152. That
 // number is the cap here: past it, the page is asking the reader to take a
 // wall of prose in one go, and the fix is two or three developed points rather
 // than a shorter sentence.
 const CONTRACT = JSON.parse(readFileSync(new URL('./weight.json', import.meta.url), 'utf8'));
 export const TEXT_FORM = CONTRACT.plan.textForm;
 export const normalizeText = value => String(value ?? '').normalize('NFKC').replace(/[\u00ad\u200b]/g, '').replace(/-\s*\r?\n\s*/g, '-').replace(/\s+/g, ' ').trim();
-// The client counting rule's excluded lines, as the shipped task targets were measured.
+// Lines the counting rule excludes, matching how the shipped task targets count.
 const NOTE_LINE = /^\s*(source|sources|note|notes|footnote)\b[:\s]/i;
 export const textWords = value => normalizeText(value).split(/\s+/).filter(Boolean).length;
 const resolvePages = (value, scene) => String(value).replace(/\{\{page:([^}]+)\}\}/g, (_, id) => {
@@ -33,16 +33,14 @@ export function checkTextPlan(content, {required = false} = {}) {
     if (!Array.isArray(blocks) || !blocks.length || blocks.some(b=>!b.id || !roles.has(b.role) || typeof b.text !== 'string' || !b.text.trim()) || new Set(blocks.map(b=>b.id)).size !== blocks.length) {
       fail('TEXT_PLAN_INCOMPLETE','List every visible text block with a unique id, role and final wording.'); continue;
     }
-    // Body words as the reference pages were counted: the reading-task bank
+    // Body words as the task targets count them: the reading-task bank
     // drops any line opening with Source or Note, so a "Note: ..." block is not
     // body here either. Counting it let every page clear its floor by the length
     // of its note, which the rendered density profile then found short.
     const bodyWords = blocks.filter(b=>['body','exhibit','qualification'].includes(b.role) && !NOTE_LINE.test(b.text)).reduce((n,b)=>n+textWords(b.text),0);
     const totalWords = blocks.filter(b=>b.role!=='furniture' && b.role!=='source').reduce((n,b)=>n+textWords(b.text),0);
-    // The page names its reading task and is held to that task's client
-    // quartiles, which ship with the runtime as numbers. It never cites, opens
-    // or measures a reference document: the pages behind the numbers are
-    // development evidence and are not part of the skill.
+    // The page names its reading task and is held to that task's target
+    // quartiles, which ship with the runtime as numbers.
     const ref = page.textReference;
     const target = READING_TASK_BANK[ref?.task];
     if (!target) {
@@ -54,7 +52,7 @@ export function checkTextPlan(content, {required = false} = {}) {
     const longest = prose.length ? Math.max(...prose) : 0;
     if (longest > TEXT_FORM.longestBlockMax) {
       fail('TEXT_BLOCK_TOO_LONG',
-        `One run of ${longest} words; client decks keep every block under ${TEXT_FORM.longestBlockMax} `
+        `One run of ${longest} words; strong decks keep every block under ${TEXT_FORM.longestBlockMax} `
         + `(median block ${TEXT_FORM.wordsPerBlock.median} words, median page ${TEXT_FORM.blocksPerPage.median} blocks). `
         + 'Split it into two or three points that each make their own claim, rather than shortening the sentence.');
     }
@@ -64,10 +62,10 @@ export function checkTextPlan(content, {required = false} = {}) {
     // The floor is hard. It used to give way to a written rationale, and the
     // rationale became the way a thin page shipped: a fresh deck put two of its
     // pages under the floor with a sentence each and passed. A page below the
-    // lower quartile of the client pages doing its job has not done that job;
+    // lower quartile of the skill's targets for pages doing its job has not done that job;
     // whether a page above the floor is dense enough is the review's density
     // pass (runtime/gates/density_profile.py), not an exception granted here.
-    if (bodyWords<floor) fail('TEXT_COVERAGE_LOW',`Planned body has ${bodyWords} words; the client pages doing this job carry at least ${floor} (lower quartile) and ${median} at the median. The floor is hard: develop the missing explanation, the mechanism, the limitation or the consequence, or move the page to the reading task it actually performs. A rationale does not release it.`);
+    if (bodyWords<floor) fail('TEXT_COVERAGE_LOW',`Planned body has ${bodyWords} words; pages doing this job carry at least ${floor} (lower quartile) and ${median} at the median. The floor is hard: develop the missing explanation, the mechanism, the limitation or the consequence, or move the page to the reading task it actually performs. A rationale does not release it.`);
   }
   return {accepted:!findings.some(f=>f.severity==='blocking'),state:'checked',findings,scores};
 }
@@ -96,18 +94,18 @@ export function auditTextPlan(content, scene) {
   return {...check,accepted:!findings.some(f=>f.severity==='blocking'),findings};
 }
 
-// Whether the page the reference is compared against reads the way this one does.
+// Whether the reading task a page is compared against reads the way the page does.
 //
-// The word floor is only as honest as the references it is drawn from. Client
+// The word floor is only as honest as the pages it is compared with. Well-made
 // chart pages carry a commentary column 38% of the time; the rest are a
 // full-width exhibit with a line of takeaway, and they run to about 90 body
 // words rather than 150. A deck measured every one of its full-width pages
 // against pages that had a commentary column, reached the floor the only way it
 // could - a takeaway band four lines deep - and passed. The reverse is the
 // loophole storylining already names: a page with a commentary column claiming
-// the lighter exhibit-led floor is choosing sparse references to lower the bar.
+// the lighter exhibit-led floor is choosing sparse targets to lower the bar.
 // Both are the same mistake, and the composed page settles which one it is.
-// The bank of judged client pages (runtime/reading-tasks.json) names the tasks
+// The reading-task bank (runtime/reading-tasks.json) names the tasks
 // by exhibit family and commentary; the two older names are kept for plans
 // written before it.
 const BANK = JSON.parse(readFileSync(new URL('./reading-tasks.json', import.meta.url), 'utf8'));
@@ -122,7 +120,7 @@ export function readingTaskMismatch(task, slide) {
   if (commentary === rule.commentary) return null;
   return rule.commentary
     ? {task, commentary, reason: 'This page has no commentary column, so its reading task is exhibit-led: a full-width exhibit with a line of takeaway. Measured against pages with a commentary column, it can only reach the floor by padding its takeaway band. Name an exhibit-led task (chart-led, table-led, diagram-led).'}
-    : {task, commentary, reason: 'This page has a commentary column, so exhibit-led references understate what it should carry. Name a with-commentary task.'};
+    : {task, commentary, reason: 'This page has a commentary column, so exhibit-led targets understate what it should carry. Name a with-commentary task.'};
 }
 
 export function auditExportText(content, scene, pageTexts) {

@@ -21,7 +21,7 @@ Use this atlas during exhibit selection. The original schematics below explain r
 
 ## Devices worth transferring
 
-Each device below was observed on strong client pages during development. They are described, not cited: the documents are not part of the skill, and nothing here is a pointer to retrieve.
+Each device below is a pattern a strong page uses. They are described, not cited, and nothing here is a pointer to retrieve.
 
 | Device | What it makes easier |
 | --- | --- |

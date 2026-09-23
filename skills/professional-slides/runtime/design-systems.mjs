@@ -18,7 +18,7 @@ import { contrastRatio } from "./palettes.mjs";
 export const DESIGN_SYSTEMS = Object.freeze({
   consulting: {
     label: "Consulting",
-    use: "Steering committees, board papers and diligence read against firm decks; the reader expects the house grammar.",
+    use: "Steering committees, board papers and diligence, where the reader expects the familiar analytical grammar.",
     character: "Open white canvas, sans titles top-left, commentary rail on the right, tinted takeaway band, dark cover and numbered chapter panels.",
     base: "mckinsey", colors: {},
     style: { takeaway: "band", coverLayout: "block", dividerLayout: "panel" },

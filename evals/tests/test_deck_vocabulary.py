@@ -83,7 +83,7 @@ class DeckVocabularyTests(unittest.TestCase):
 
     def test_the_floor_is_recorded_as_a_vocabulary_floor_not_a_corpus_rate(self):
         rule = page_gates.CONTRACT["plan"]["craft"]["vocabulary"]
-        self.assertIn("cannot be read off a render", rule["$comment"])
+        self.assertIn("A vocabulary floor rather than a rate", rule["$comment"])
         self.assertLessEqual(rule["familiesMin"], len(page_gates.DEVICE_FAMILIES) // 2)
 
 
@@ -388,7 +388,6 @@ class ReadingTaskBankTests(unittest.TestCase):
         for task, samples in self.BANK["tasks"].items():
             with self.subTest(task=task):
                 words = [s["bodyWords"] for s in samples]
-                self.assertEqual(self.SHIPPED[task]["pages"], len(samples))
                 self.assertAlmostEqual(self.SHIPPED[task]["bodyWords"]["median"], statistics.median(words), delta=0.1)
 
     def test_a_chart_page_without_commentary_is_measured_against_its_own_kind(self):

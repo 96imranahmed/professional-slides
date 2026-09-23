@@ -188,8 +188,8 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     const gated = await runProcess(python, [gates, scenePath, renderDirectory, "--report", gateReport], { timeoutMs, expect: [0, 2] });
     result.gates = { ...(await readJson(gateReport)), report: gateReport, passed: gated.code === 0 };
     result.timings.gatesMs = Date.now() - t4;
-    // The density profile: the rendered pages measured the way the corpus was,
-    // against the client targets. It fails nothing; the review's density pass
+    // The density profile: the rendered pages measured against the skill's
+    // density targets. It fails nothing; the review's density pass
     // reads it and judges every page it flags (references/taste-review.md).
     const profileReport = path.join(directory, "density-profile.json");
     const contentAt = path.join(baseDir, `${stem}.content.json`);
@@ -197,8 +197,8 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     const profiled = await runProcess(python, [path.join(runtime, "gates", "density_profile.py"), result.render.pdf, scenePath, ...withContent, "--report", profileReport], { timeoutMs });
     result.densityProfile = { report: profileReport, ...lastJson(profiled.stdout) };
   }
-  // The deck's budget, in one block: what its pages carry against what the
-  // reference corpus carries, so a regression is a number in the build output
+  // The deck's budget, in one block: what its pages carry against the
+  // reference targets, so a regression is a number in the build output
   // rather than a screenshot somebody notices later.
   const density = result.gates?.density;
   if (density) {

@@ -33,7 +33,7 @@ export function formatValue(value, props) {
   // Without a declared format, labels round the way a reader reads them: whole
   // numbers from ten up, one decimal below ten. Marks keep the raw value.
   // Four figures and up read with a thousands separator, the way every
-  // published page prints them: 10,156 rather than 10156.
+  // well-made page prints them: 10,156 rather than 10156.
   const group = groupThousands;
   if (!format) {
     const rounded = round(value, decimalsFor(props, value));
@@ -62,7 +62,7 @@ export function formatValue(value, props) {
 /**
  * A formatted number with its unit, written the way the unit is written.
  *
- * "$m" after the figure gives "888$m", which no published page prints: a
+ * "$m" after the figure gives "888$m", which no well-made page prints: a
  * currency symbol leads and its magnitude trails, so the same unit gives
  * "$888m". A percent closes up against the number, and everything else takes
  * the space it needs.

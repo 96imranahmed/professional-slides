@@ -52,7 +52,7 @@ const PORTRAIT_PHOTO_HEIGHT = 84;
 const isPortrait = (media) => media?.width > 0 && media?.height > media.width * 1.15;
 // Cells that may lead with an icon before their label.
 const ICON_LED_CELLS = new Set(["category", "text"]);
-// Outlook cells (the Bain sector tables): an arrow in a ring, green up, grey flat, red down.
+// Outlook cells (as in a sector outlook table): an arrow in a ring, green up, grey flat, red down.
 export const TREND_STATES = Object.freeze({ up: { glyph: "↑", color: "color.positive" }, flat: { glyph: "→", color: "color.textSecondary" }, down: { glyph: "↓", color: "color.negative" } });
 // Status vocabularies. Pill labels are the canonical words; the composer maps
 // free text onto them.
@@ -135,7 +135,7 @@ const textStyle = (
 ) => baseTextStyle({ fontFamily: t("font.body"), fontSize: t(size), color, bold, align, valign: "top", wrap: false });
 const measure = (text, width, bold = false, size = "type.body") => measureAt(text, width, { size, bold });
 // A cell may carry `highlight`: the phrase inside it that reads in the house
-// accent, the way a reference table marks the figure that decides the row.
+// accent, the way a well-made table marks the figure that decides the row.
 const measureRuns = (text, highlight, width, bold = false, size = "type.body") => {
   const runs = accentRuns(String(text), highlight, { bold: true, strict: false });
   if (!runs) return measure(text, width, bold, size);
@@ -438,7 +438,7 @@ function contentLayout(cell, width, props, used) {
     return {height, padding, mediaWidth:node.frame.width};
   }
   if (cell.type === "photo") {
-    // A photograph leading a row: the corpus's component and category tables
+    // A photograph leading a row: component and category tables often
     // set a thumbnail of the thing the row describes, cropped to the column.
     // A logo cell is held to one body line so marks share a height; a photo at
     // that height is a sliver nobody can read, so it takes its own.
@@ -576,12 +576,12 @@ function contentLayout(cell, width, props, used) {
   }
   // A numbered section marker sits at the left of its category cell, on the
   // label's centre line, whatever the surface; the label starts after it.
-  // A row label carries a numbered disc, an icon, or both: the reference matrix
+  // A row label carries a numbered disc, an icon, or both: a well-made matrix
   // numbers its rows and gives each one its own mark, and the label starts after
   // whatever is there.
   // A text cell may lead with an icon too. It was read only on category cells,
   // so `{ text, icon }` in an ordinary row label set the label and dropped the
-  // mark without a word - the icon-led row a reference table uses for drivers,
+  // mark without a word - the icon-led row a well-made table uses for drivers,
   // channels or trends could be authored and never appeared.
   const leadsWithIcon = ICON_LED_CELLS.has(cell.type) && Boolean(cell.icon);
   const inlineSectionMarker = cell.sectionNumber !== undefined || leadsWithIcon;
@@ -593,7 +593,7 @@ function contentLayout(cell, width, props, used) {
   }
   const blocks = texts.map((s) => measureRuns(s, cell.accent, inner - offset, bold, size));
   // A bullets cell may open with a bold lead line: the finding, then the
-  // evidence under it. The reference matrix page sets every cell this way.
+  // evidence under it. A well-made matrix page sets every cell this way.
   const leadText = cell.type === "bullets" && typeof cell.lead === "string" && cell.lead.trim() ? cell.lead.trim() : null;
   const lead = leadText ? measureRuns(leadText, cell.accent, inner, true, size) : null;
   // `sub`: the qualifier under a measure, in the small type - "10,156" over

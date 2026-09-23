@@ -28,7 +28,7 @@ A synthesis explains its scoped answer to the depth the communication job needs.
 3. Integrate the recommendation or condition where it belongs in the argument, preserving the alternatives and the criterion that changes their preference.
 4. Read the summary alone: can the reader explain the governing answer, the supporting case and the material countercase?
 
-Write it dense. The client executive summary is the fullest text page in the deck: L.E.K.'s freight study runs two summary pages of 243 and 252 words, each four developed statements of about sixty words with their parts set as sub-points, and no closing insight box. Three one-line bullets and a takeaway band is a table of contents for the argument, not the argument. Give each statement its evidence, its qualification and what follows, and use a point's `points` for the parts it lists (the options compared, the criteria, the conditions). A closing band is optional; the page's last statement can carry the consequence. The density profile will mark a summary this full as dense for a text page, and the review judges it against this job rather than the text-page median.
+Write it dense. The executive summary is the fullest text page in a well-made deck: a strong summary can run to two pages of 243 and 252 words, each four developed statements of about sixty words with their parts set as sub-points, and no closing insight box. Three one-line bullets and a takeaway band is a table of contents for the argument, not the argument. Give each statement its evidence, its qualification and what follows, and use a point's `points` for the parts it lists (the options compared, the criteria, the conditions). A closing band is optional; the page's last statement can carry the consequence. The density profile will mark a summary this full as dense for a text page, and the review judges it against this job rather than the text-page median.
 
 Summary theme headings state substantive conclusions - "Career and industry", not "Chapter 1".
 
@@ -59,20 +59,20 @@ Numbers belong on marks. Replace a sentence that transcribes the chart with labe
 
 Word count is not shape. A deck can clear its text-coverage score with one long paragraph per page and still read as an essay with pictures, and one did: forty pages whose commentary was a single block of 150 to 200 words.
 
-Measured during development over 37 analytic pages of client-project decks (the numbers ship in `runtime/weight.json`; the documents do not):
+The skill's targets for an analytic page (the numbers live in `runtime/weight.json`):
 
-| | Client decks | Write to |
+| | Typical well-made page | Write to |
 | --- | --- | --- |
 | Text blocks per page | median 4 (quartiles 2 and 5) | two or three, more when the evidence has that many findings |
 | Words per block | median 56 (quartiles 41 and 87) | 40-90 |
 | Longest block on a page | median 128, third quartile 152 | never past 152 |
-| Pages with a single block | 5 of 37 | rare, and only when one finding is the whole page |
+| Pages with a single block | about one in seven | rare, and only when one finding is the whole page |
 
 `TEXT_BLOCK_TOO_LONG` fails a dot-dash whose longest planned run passes 152 words, and the same plan is checked again on the composed scene, so the shape cannot be lost between stages.
 
 The repair is not a shorter sentence. It is two or three points that each make their own claim: split the run at the place where it stops proving one thing and starts proving the next, and give the second half its own lead. A page whose commentary is one block is asserting that its evidence supports exactly one finding, which is sometimes true and usually not.
 
-The opposite failure is the fragment: a bold lead and one sentence of twenty words, three to a column, each restating a value the exhibit already prints. It clears the word floor by adding points rather than developing them. A fifty-page evaluation deck written this way carried the client pages' word volume at 17 words a block against their 56, and its review called fourteen pages the wrong shape. Develop each point to 40-90 words: the finding, the mechanism or basis behind it (the sample it rests on, what drives it), and what the reader should do about it. Two developed points beat three fragments. The build's density profile measures the rendered blocks and the review's density pass judges the pages it flags ([Taste review](taste-review.md#density-pass)); the one-to-two-line limit on takeaway bands is a separate rule and still holds.
+The opposite failure is the fragment: a bold lead and one sentence of twenty words, three to a column, each restating a value the exhibit already prints. It clears the word floor by adding points rather than developing them. A fifty-page evaluation deck written this way carried the target word volume at 17 words a block against a target of 56, and its review called fourteen pages the wrong shape. Develop each point to 40-90 words: the finding, the mechanism or basis behind it (the sample it rests on, what drives it), and what the reader should do about it. Two developed points beat three fragments. The build's density profile measures the rendered blocks and the review's density pass judges the pages it flags ([Taste review](taste-review.md#density-pass)); the one-to-two-line limit on takeaway bands is a separate rule and still holds.
 
 ## Where each kind of sentence goes
 
@@ -99,7 +99,7 @@ Keep the analytical argument on the slide and put routine arithmetic, familiar m
 
 ## Punctuation and voice
 
-Watch dot separators. A bullet or middle dot joining two labels - `1939 • Marvel Comics #1`, `Investor pulse · Q4` - spreads through every eyebrow, footer and caption until the deck reads as a menu. Published decks do use it, so this is a matter of restraint rather than a rule: write the qualifier in brackets, after a comma, on its own eyebrow line or as a column, and separate sources with a semicolon.
+Watch dot separators. A bullet or middle dot joining two labels - `1939 • Marvel Comics #1`, `Investor pulse · Q4` - spreads through every eyebrow, footer and caption until the deck reads as a menu. Well-made decks do use it, so this is a matter of restraint rather than a rule: write the qualifier in brackets, after a comma, on its own eyebrow line or as a column, and separate sources with a semicolon.
 
 Audience-facing copy uses commas, full stops, parentheses and clear connectors in place of em dashes; a sourced quotation containing one is replaced by another exact excerpt or an attributed paraphrase. Use the punctuation a clear list, qualification or notation needs, and rewrite a sentence that collects colons, semicolons and parenthetical asides. Watch for repeated *not just X, but Y* constructions, false contrasts, rhetorical questions and unsupported superlatives such as *transformative*.
 

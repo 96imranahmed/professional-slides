@@ -1,9 +1,8 @@
 {
- "$comment": "Word targets by reading task, distilled from the judged client-page bank kept under evals/corpus. Body words exclude the title and source lines (pdftotext -layout). The documents behind these numbers are not part of the skill: never search for, open or cite them.",
+ "$comment": "Body-word targets by reading task: lower quartile, median and upper quartile of a well-made page doing that job. Body words exclude the title and source lines.",
  "tasks": {
   "chart-led": {
    "commentary": false,
-   "pages": 23,
    "bodyWords": {
     "q1": 41.5,
     "median": 55.0,
@@ -15,7 +14,6 @@
   },
   "chart-with-commentary": {
    "commentary": true,
-   "pages": 14,
    "bodyWords": {
     "q1": 96.0,
     "median": 150.0,
@@ -27,7 +25,6 @@
   },
   "diagram-led": {
    "commentary": false,
-   "pages": 7,
    "bodyWords": {
     "q1": 110.5,
     "median": 126.0,
@@ -39,7 +36,6 @@
   },
   "diagram-with-commentary": {
    "commentary": true,
-   "pages": 5,
    "bodyWords": {
     "q1": 108.0,
     "median": 113.0,
@@ -51,7 +47,6 @@
   },
   "exhibit-led": {
    "commentary": false,
-   "pages": 49,
    "bodyWords": {
     "q1": 55.0,
     "median": 110.0,
@@ -63,7 +58,6 @@
   },
   "exhibit-with-commentary": {
    "commentary": true,
-   "pages": 24,
    "bodyWords": {
     "q1": 111.8,
     "median": 154.5,
@@ -75,7 +69,6 @@
   },
   "mixed": {
    "commentary": null,
-   "pages": 16,
    "bodyWords": {
     "q1": 81.8,
     "median": 126.5,
@@ -87,7 +80,6 @@
   },
   "table-led": {
    "commentary": false,
-   "pages": 19,
    "bodyWords": {
     "q1": 100.0,
     "median": 167.0,
@@ -99,7 +91,6 @@
   },
   "table-with-commentary": {
    "commentary": true,
-   "pages": 5,
    "bodyWords": {
     "q1": 149.0,
     "median": 220.0,
@@ -111,7 +102,6 @@
   },
   "text-page": {
    "commentary": null,
-   "pages": 31,
    "bodyWords": {
     "q1": 120.5,
     "median": 136.0,

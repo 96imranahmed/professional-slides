@@ -84,7 +84,7 @@ export function measureTextRuns(runs, width, { fontFamily = activeDesignTokens()
 
 /**
  * Split a sentence into runs at the phrases the page wants to carry in the
- * accent. This is the reference decks' commonest emphasis: the figure or the
+ * accent. This is the commonest emphasis in a well-made deck: the figure or the
  * finding is set in the house colour inside a sentence that otherwise reads as
  * ink ("Improved quality of care for patients"), rather than bolded whole or
  * split onto its own line. `phrases` is one string or several; each is matched

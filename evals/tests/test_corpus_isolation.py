@@ -18,33 +18,40 @@ SKILL = ROOT / 'skills' / 'professional-slides'
 spec = importlib.util.spec_from_file_location('package_plugin', ROOT / 'evals/scripts/package_plugin.py')
 package_plugin = importlib.util.module_from_spec(spec); spec.loader.exec_module(package_plugin)
 
-# A path into the corpus, a machine path, or a named source document such as
-# "bain-syracuse-university-diagnostic-report-2014.pdf".
-LEAKS = re.compile(r'professional-slides-corpus|real-client-decks|/Users/|search the available corpus|[a-z]+-[a-z0-9-]+-(?:19|20)\d\d\.pdf', re.I)
+# Anything that tells a reader of the shipped plugin that a corpus exists, where
+# its numbers came from, or which documents were in it.
+LEAKS = re.compile(r"corpus|professional-slides-corpus|real-client-decks|/Users/|client[- ]?(?:deck|page|work|project|engagement)s?\b"
+                   r"|published (?:deck|work|page|report|slideshow)s?\b|thought leadership|slideworks|vision pass|calibration sample"
+                   r"|[a-z]+-[a-z0-9-]+-(?:19|20)\d\d\.pdf|\b(?:mckinsey|bcg|bain|deloitte|l\.e\.k|oliver wyman)\b.{0,40}\b(?:19|20)\d\d\b", re.I)
+TEXT = {'.md', '.mjs', '.js', '.py', '.json', '.yaml', '.yml', '.toml', '.txt', '.svg'}
 
 
 class CorpusIsolationTests(unittest.TestCase):
     def test_shipped_task_targets_are_numbers_only(self):
         tasks = json.loads((SKILL / 'runtime' / 'reading-tasks.json').read_text())['tasks']
         for name, task in tasks.items():
-            self.assertEqual(set(task), {'commentary', 'pages', 'bodyWords', 'totalWords'}, name)
+            self.assertEqual(set(task), {'commentary', 'bodyWords', 'totalWords'}, name)
             self.assertLessEqual(task['bodyWords']['q1'], task['bodyWords']['median'])
 
-    def test_no_shipped_skill_file_points_at_a_document(self):
-        offenders = []
-        for path in SKILL.rglob('*'):
-            if path.suffix in {'.md', '.mjs', '.py', '.json', '.yaml'} and '__pycache__' not in path.parts:
-                for i, line in enumerate(path.read_text(encoding='utf-8', errors='ignore').splitlines(), 1):
-                    if LEAKS.search(line):
-                        offenders.append(f'{path.relative_to(ROOT)}:{i}')
-        self.assertEqual(offenders, [])
+    def test_nothing_in_the_package_mentions_the_corpus(self):
+        # Scan the real package, not the source tree: it is what gets shared.
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / 'pkg'
+            package_plugin.package(ROOT, dest)
+            offenders = []
+            for path in dest.rglob('*'):
+                if path.is_file() and path.suffix in TEXT:
+                    for i, line in enumerate(path.read_text(encoding='utf-8', errors='ignore').splitlines(), 1):
+                        if LEAKS.search(line):
+                            offenders.append(f'{path.relative_to(dest)}:{i}: {LEAKS.search(line).group(0)}')
+        self.assertEqual(offenders, [], '\n'.join(offenders[:40]))
 
-    def test_the_package_leaves_the_corpus_evidence_out(self):
+    def test_the_package_is_the_skill_alone(self):
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / 'pkg'
             package_plugin.package(ROOT, dest)
             files = json.loads((dest / 'package-manifest.json').read_text())['files']
-            self.assertFalse([f for f in files if f.startswith('evals/corpus/')])
+            self.assertFalse([f for f in files if f.startswith('evals/')])
             self.assertIn('skills/professional-slides/runtime/reading-tasks.json', files)
 
     def test_a_page_names_its_task_and_is_held_to_its_numbers(self):

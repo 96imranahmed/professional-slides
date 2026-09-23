@@ -133,17 +133,17 @@ export const TOKENS = Object.freeze({
   "radius.small": length("--radius-small", 4),
   "radius.round": length("--radius-round", 999),
   // Design profile: the house style a palette carries beyond its colours. Each
-  // palette sets these to what the firm's 2020+ decks do; components read them.
+  // palette sets these to what its house style does; components read them.
   "style.titleWeight": keyword("--style-title-weight", "bold"),        // bold | regular
   "style.titleRule": keyword("--style-title-rule", "none"),            // none | rule (hairline under the title) | band (tinted title band) | block (primary title block, reversed type)
   "style.tagPlacement": keyword("--style-tag-placement", "top-right"), // top-right | below-title (accent pill) | above-title (accent label)
   "style.chartHeading": keyword("--style-chart-heading", "text"),      // text | band (filled grey band)
   // A bullet unless the house explicitly sets a dash: the marker is a dot in
-  // the published decks, and a hyphen reads as a sentence fragment.
+  // a well-made deck, and a hyphen reads as a sentence fragment.
   "style.listMarker": keyword("--style-list-marker", "dot"),           // dot | dash
   "style.tableRows": keyword("--style-table-rows", "rules"),           // rules | zebra
   "style.labelWeight": keyword("--style-label-weight", "bold"),        // bold | regular (chart value labels)
-  "style.titleLead": keyword("--style-title-lead", "accent"),          // accent (lead in the accent) | pipe (BCG: "Topic | statement", the statement in the accent)
+  "style.titleLead": keyword("--style-title-lead", "accent"),          // accent (lead in the accent) | pipe ("Topic | statement", the statement in the accent)
   // The design system's page frame (design-systems.mjs): how the takeaway, the
   // cover and the chapter pages are built. Each value is a whole construction.
   "style.takeaway": keyword("--style-takeaway", "band"),               // band (tinted box) | rule (serif close over a hairline) | statement (accent bar, large type)

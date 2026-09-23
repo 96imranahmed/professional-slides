@@ -212,7 +212,7 @@ function gateMix(pages, findings) {
       PLAN.mix.table.max,
       "Review whether each table serves a shared lookup or comparison task. Column count alone does not decide: " +
       "a two-column exact-value lookup can be useful, while generic advice may read better as an icon-led list. " +
-      "This share is advisory; do not replace useful matrices to meet a corpus percentage.",
+      "This share is advisory; do not replace useful matrices to meet a target percentage.",
     ));
   }
   const measured = share("chart") + share("table");
@@ -231,9 +231,9 @@ function gateMix(pages, findings) {
       findings.push(finding(
         null, "PLAN_EXHIBIT_MIX",
         { family: name, share: round(value), pages: count(name), of: total, direction: "below",
-          published: band.observedDominant },
+          target: band.observedDominant },
         band.min,
-        `The deck carries too few ${name} pages. Published client decks run ${pc(band.observedDominant)} ` +
+        `The deck carries too few ${name} pages. Strong decks run ${pc(band.observedDominant)} ` +
         `${name} pages; the floor sits under that so a real deck would pass it. A family at zero is a family ` +
         "nobody considered.",
       ));
@@ -242,13 +242,13 @@ function gateMix(pages, findings) {
       findings.push(finding(
         null, "PLAN_EXHIBIT_MIX",
         { family: name, share: round(value), pages: count(name), of: total, direction: "above",
-          published: band.observedDominant },
+          target: band.observedDominant },
         band.max,
         name === "text"
-          ? `${count(name)} of ${total} pages carry no exhibit at all. Published decks run ` +
+          ? `${count(name)} of ${total} pages carry no exhibit at all. Strong decks run ` +
             `${pc(band.observedDominant)} pages of type alone - that is a real page, not a failure - but past ` +
             "this the deck is an essay with a template around it. Give the argument something to stand on."
-          : `The deck leans on ${name} pages. Published client decks run ${pc(band.observedDominant)}.`,
+          : `The deck leans on ${name} pages. Strong decks run ${pc(band.observedDominant)}.`,
       ));
     }
   }
@@ -546,7 +546,7 @@ function gateDeckWideDevices(pages, findings, plan = {}) {
     findings.push(finding(
       null, "PLAN_NO_PICTURES",
       { pages: content.length, photographs: 0 }, 1,
-      "Not one page carries a photograph. A reference page averages 29 drawn elements; a deck of type and rules " +
+      "Not one page carries a photograph. A well-made page averages 29 drawn elements; a deck of type and rules " +
       "averages very few. Any subject a reader would recognise - a film, a product, a brand, a place, a person - " +
       "wants its picture, and the cover and section dividers are the cheapest places to start. A picture the " +
       "author has to supply, such as a poster or a product shot, is not a reason to go without: plan it as " +
@@ -570,7 +570,7 @@ function gateDeckWideDevices(pages, findings, plan = {}) {
       null, "PLAN_NO_HIGHLIGHT",
       { pages: content.length, highlighted: 0 }, 1,
       "No page names the phrase its reader should see first. `highlight` sets one phrase inside a point in the " +
-      "house accent - \"**Improved quality of care** for patients\" - which is how a reference page emphasises the " +
+      "house accent - \"**Improved quality of care** for patients\" - which is how a well-made page emphasises the " +
       "finding inside a sentence instead of bolding the whole line or breaking it onto its own. It is not wanted " +
       "on every point, and a deck that uses it nowhere has left the emphasis to the reader.",
     ));

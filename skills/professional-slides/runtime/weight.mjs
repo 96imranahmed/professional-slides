@@ -1,7 +1,7 @@
 /**
  * How much a page is expected to carry.
  *
- * Density is not the defect; empty is. Real client pages run a median of about
+ * Density is not the defect; empty is. A well-made page runs a median of about
  * 185 words of page text (title, labels, table cells, footnotes included), two
  * or three evidence elements, a commentary column that reaches the bottom of
  * its track. Our pages were running half of that, so the runtime now carries an
@@ -73,22 +73,19 @@ export function resolveWeight(spec = {}, fill = DEFAULT_FILL) {
 }
 
 /**
- * The reference corpus, measured rather than asserted - see evals/corpus. `slides`
- * is the pixel sample: 2,125 pages from 426 published decks rendered onto the same
- * 1280x720 canvas the gates read. `corpus` is the wide sample: 16,334 analytical
- * pages of twelve firms' published work, measured off the text layer. `judged` is
- * a vision pass over 264 pages, one per deck, which is where the family shares and
- * the craft rates come from. The floors above sit deliberately below these
- * medians; a floor is not a target, and a page that clears it is not yet a firm
- * page.
+ * The skill's reference targets for a well-made page. `slides` holds the pixel
+ * targets, on the same 1280x720 canvas the gates read. `benchmark` holds the page
+ * text distribution for analytical pages. `judged` holds the family shares and
+ * the craft rates. The floors above sit deliberately below these medians; a
+ * floor is not a target, and a page that clears it is not yet a strong page.
  */
 export const REFERENCE = Object.freeze({
   slides: Object.freeze({ ...CONTRACT.reference.slides, bands: Object.freeze({ ...CONTRACT.reference.slides.bands }), numericByFamily: Object.freeze({ ...CONTRACT.reference.slides.numericByFamily }) }),
-  corpus: Object.freeze({ ...CONTRACT.reference.corpus }),
+  benchmark: Object.freeze({ ...CONTRACT.reference.benchmark }),
   judged: Object.freeze({ ...CONTRACT.reference.judged, byFamily: Object.freeze({ ...CONTRACT.reference.judged.byFamily }) }),
 });
 
 /** The page's three bands, as a reference analytical slide carries them. */
-export const REFERENCE_PAGE_BANDS = Object.freeze({ ...REFERENCE.slides.bands, pages: REFERENCE.slides.pages });
-/** Page text over the wide corpus, for the distribution the DECK_FLAT gate reads. */
-export const REFERENCE_PAGE_WORDS = Object.freeze({ ...REFERENCE.corpus });
+export const REFERENCE_PAGE_BANDS = Object.freeze({ ...REFERENCE.slides.bands });
+/** Page text across analytical pages, for the distribution the DECK_FLAT gate reads. */
+export const REFERENCE_PAGE_WORDS = Object.freeze({ ...REFERENCE.benchmark });

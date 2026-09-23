@@ -1,22 +1,20 @@
-"""The density profile: a built deck's words measured the way the corpus was.
+"""The density profile: a built deck's words measured as a reader meets them.
 
     python3 density_profile.py deck.pdf scene.json [content.json] --report density-profile.json
 
 The text contract checks what the dot-dash plans to say, and its word floor is
 hard. What it cannot see is whether the rendered page reads at the density of
-the client pages it is set against: a deck can clear every floor with one long
+the targets it is set against: a deck can clear every floor with one long
 paragraph a page, or with commentary padded to reach the floor, and a deck
 measured on its plan alone once reported a median of 75 body words a page and
 a longest block of 52 while its rendered pages read nothing like either.
 
-So this reads the rendered PDF with the extraction the corpus used
-(evals/corpus/measure_text_form.py and build_reading_tasks.py): pdftotext
--layout one page at a time, the first non-empty line dropped as the title,
-page numbers and Source/Note lines dropped, a block being a run of non-empty
-lines between blank ones, blocks under three words dropped as labels. It
-writes, for the deck and for each analytic page, the numbers the client pages
-were measured on beside the client targets, and flags every page outside the
-target band.
+So this reads the rendered PDF itself: pdftotext -layout one page at a
+time, the first non-empty line dropped as the title, page numbers and
+Source/Note lines dropped, a block being a run of non-empty lines between
+blank ones, blocks under three words dropped as labels. It writes, for the
+deck and for each analytic page, these numbers beside the skill's targets,
+and flags every page outside the target band.
 
 The profile does not pass or fail anything. It is the input to the review's
 density pass (references/taste-review.md), where a reader looks at each
@@ -40,8 +38,8 @@ from page_gates import is_cover  # noqa: E402
 TEXT_FORM = json.loads((HERE.parent / "weight.json").read_text())["plan"]["textForm"]
 SOURCE_LINE = re.compile(r"^\s*(source|sources|note|notes|footnote)\b[:\s]", re.I)
 PAGE_NUMBER = re.compile(r"^\s*\d{1,3}\s*$")
-# Pages the corpus measures exclude covers, dividers and contents; so does this,
-# by the planned task and by the page gates' own test for a structural page.
+# The targets exclude covers, dividers and contents; so does this, by the
+# planned task and by the page gates' own test for a structural page.
 STRUCTURAL_TASKS = {"cover", "structural"}
 
 
@@ -54,8 +52,8 @@ def squash(text: str) -> str:
 
 
 def strip_header(lines: list[str], header: set[str] | None) -> list[str]:
-    """Remove the title. The corpus drops a page's first line, which is its
-    title on a client page. A generated page often carries a section kicker
+    """Remove the title. The plain rule drops a page's first line, which is
+    its title on a well-made page. A generated page often carries a section kicker
     above the title, and the first-line rule then dropped the kicker and
     counted the title as body. Given the page's own title and kicker lines,
     those are removed instead; without them the first-line rule stands."""
@@ -123,7 +121,7 @@ def quartiles(values: list[float]) -> tuple[float, float, float]:
     return q[0], st.median(values), q[2]
 
 
-# The per-task client targets, shipped as numbers (runtime/reading-tasks.json).
+# The per-task targets, shipped as numbers (runtime/reading-tasks.json).
 TASK_TARGETS = json.loads((Path(__file__).resolve().parents[1] / "reading-tasks.json").read_text())["tasks"]
 
 
@@ -159,18 +157,18 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
             entry["bodyWordsVsTaskMedian"] = round(body / median, 2) if median else None
             position = band(body, q1, q3)
             if position == "below":
-                entry["flags"].append(f"thin for its task: {body} body words against the client pages' {round(q1)} to {round(q3)}")
+                entry["flags"].append(f"thin for its task: {body} body words against a target of {round(q1)} to {round(q3)}")
             elif position == "above":
-                entry["flags"].append(f"dense for its task: {body} body words against the client pages' {round(q1)} to {round(q3)}")
+                entry["flags"].append(f"dense for its task: {body} body words against a target of {round(q1)} to {round(q3)}")
         if entry["longestBlock"] > TEXT_FORM["longestBlockMax"]:
-            entry["flags"].append(f"a block of {entry['longestBlock']} words; three client pages in four keep every block under {round(TEXT_FORM['longestBlockMax'])}")
+            entry["flags"].append(f"a block of {entry['longestBlock']} words; three strong pages in four keep every block under {round(TEXT_FORM['longestBlockMax'])}")
         if entry["blocks"] > TEXT_FORM["blocksPerPage"]["max"] - 2:
-            entry["flags"].append(f"{entry['blocks']} text blocks; client pages carry {TEXT_FORM['blocksPerPage']['q1']:.0f} to {TEXT_FORM['blocksPerPage']['q3']:.0f}")
+            entry["flags"].append(f"{entry['blocks']} text blocks; strong pages carry {TEXT_FORM['blocksPerPage']['q1']:.0f} to {TEXT_FORM['blocksPerPage']['q3']:.0f}")
         if blocks and entry["blocks"] >= 2 and entry["wordsPerBlock"] > TEXT_FORM["wordsPerBlock"]["q3"]:
-            entry["flags"].append(f"blocks average {entry['wordsPerBlock']} words; client blocks run {TEXT_FORM['wordsPerBlock']['q1']} to {TEXT_FORM['wordsPerBlock']['q3']}")
+            entry["flags"].append(f"blocks average {entry['wordsPerBlock']} words; strong pages' blocks run {TEXT_FORM['wordsPerBlock']['q1']} to {TEXT_FORM['wordsPerBlock']['q3']}")
         pages.append(entry)
 
-    # The text-form benchmark was measured on client pages that carry prose:
+    # The text-form benchmark describes pages that carry prose:
     # charts with commentary, comparison tables and developed synthesis. A
     # chart-led page's only blocks are its bar and axis labels, so setting all
     # analytic pages against it read a deck of developed 52-word points as 19
@@ -201,7 +199,7 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
                                  TEXT_FORM["wordsPerBlock"]["q1"], TEXT_FORM["wordsPerBlock"]["q3"]),
         "longestBlock": compare("longestBlock", [p["longestBlock"] for p in measured], TEXT_FORM["longestBlock"]["median"],
                                 0, TEXT_FORM["longestBlock"]["q3"]),
-        # Each page against the client pages doing its job: 1.0 is the task median.
+        # Each page against the target for its job: 1.0 is the task median.
         "bodyWordsVsTaskMedian": compare("ratio", ratios, 1.0, 0.75, 1.25),
         "singleBlockShare": {"measured": round(single, 3), "target": TEXT_FORM["singleBlockPagesMax"],
                              "position": "above" if single > TEXT_FORM["singleBlockPagesMax"] else "within"},
@@ -209,7 +207,7 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
     deck["outsideBand"] = sorted(k for k, v in deck.items() if isinstance(v, dict) and v.get("position") in ("above", "below"))
     return {
         "schema": "professional-slides.density-profile/v1",
-        "$comment": ("Rendered pages measured with the corpus's own extraction; targets from weight.json plan.textForm "
+        "$comment": ("Rendered pages measured with pdftotext -layout; targets from weight.json plan.textForm "
                      "and each page's textReference. Flags are questions for the review's density pass, not failures."),
         "deck": deck,
         "flaggedPages": [p["id"] for p in pages if p["flags"]],

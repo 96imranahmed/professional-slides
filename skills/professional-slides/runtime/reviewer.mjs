@@ -48,7 +48,7 @@ export const CODES = Object.freeze({
   DECORATION: "a rule, band or device that separates nothing and says nothing",
   NARROW_REPERTOIRE: "the deck draws on a handful of exhibits where its evidence has many shapes",
   // density - the review's pass over the rendered density profile
-  DENSITY_MISMATCH: "a page's words are thinner, denser or differently shaped than the client pages doing its job, and it shows",
+  DENSITY_MISMATCH: "a page's words are thinner, denser or differently shaped than the skill's targets for pages doing its job, and it shows",
   EDITORIAL: "a wording preference"
 });
 
@@ -61,9 +61,9 @@ export const REVIEW_SCHEMA = {
   type: "object", additionalProperties: false,
   required: ["accepted", "summary", "findings", "binding", "inspectedSlides", "rating", "density"],
   properties: {
-    // The density pass: the rendered pages measured the way the corpus was
-    // (density-profile.json), judged. `deck` compares the deck's medians with
-    // the client targets; `pages` holds a verdict for every flagged page.
+    // The density pass: the rendered pages measured against the skill's density
+    // targets (density-profile.json), judged. `deck` compares the deck's medians
+    // with those targets; `pages` holds a verdict for every flagged page.
     density: {
       type: "object", additionalProperties: false, required: ["deck", "pages"],
       properties: {
@@ -209,14 +209,14 @@ export async function validateReviewBinding(review, directory, slideIds, scope =
 /**
  * The density pass is complete: the deck comparison is written and every page
  * the profile flagged has a verdict. A review without it cannot accept a deck
- * whose rendered words were never compared with the client pages.
+ * whose rendered words were never compared with the skill's density targets.
  */
 export function validateDensityReview(review, profile) {
   if (!profile) return [];
   const errors = [];
   const density = review?.density;
   if (!density || typeof density !== "object") return ["Review must carry the density pass (density.deck and density.pages)"];
-  if (typeof density.deck !== "string" || density.deck.trim().length < 40) errors.push("density.deck must compare the deck's measured medians with the client targets");
+  if (typeof density.deck !== "string" || density.deck.trim().length < 40) errors.push("density.deck must compare the deck's measured medians with the skill's targets");
   const pages = Array.isArray(density.pages) ? density.pages : [];
   for (const [i, entry] of pages.entries()) {
     if (!DENSITY_VERDICTS.includes(entry?.verdict)) errors.push(`density.pages[${i}]: verdict must be one of ${DENSITY_VERDICTS.join(", ")}`);
@@ -234,7 +234,7 @@ export function reviewOutcome(review) {
   for (const entry of review.density?.pages || []) {
     if (entry.verdict === "right") continue;
     blocking.push({ slide: entry.slide, code: "DENSITY_MISMATCH", severity: "major", reason: `${entry.verdict}: ${entry.reason}`,
-      repair: "Rewrite the page to the density of the client pages doing its job: add the missing reasoning, cut the padding, or split the long block into points" });
+      repair: "Rewrite the page to the skill's density targets for pages doing its job: add the missing reasoning, cut the padding, or split the long block into points" });
   }
   return { accepted: review.accepted === true && blocking.length === 0, blocking };
 }
@@ -266,7 +266,7 @@ export async function buildReviewPacket({ outputDirectory, brief = "", answer = 
   return { packetDir, packet };
 }
 
-/** Descriptive diagnostics for corpus analysis; not editorial targets or reference proof. */
+/** Descriptive diagnostics for analysis; not editorial targets or reference proof. */
 export function designStatistics(scene) {
   // Counts describe rendered devices, not whether their semantic use is appropriate. `page_gates.py` holds the same list, because the
   // build has to be able to refuse a deck and the build reads that file.
@@ -279,8 +279,8 @@ export function designStatistics(scene) {
     const components = (slide.componentInstances || []).map((c) => String(c.component));
     for (const c of components) if (!["chrome", "section", "page-template"].includes(c)) kinds.add(c);
     const roles = slide.nodes.map((n) => String(n.role ?? ""));
-    // "Drawings", the way the corpus counts them: every primitive that is not
-    // type. A published analytical page carries 32 (p25 11, p75 88); a page of rules and text
+    // "Drawings": every primitive that is not type. A well-made
+    // analytical page carries 32 (p25 11, p75 88); a page of rules and text
     // carries very few, which is the difference a reader feels first.
     marks += slide.nodes.filter((n) => n.type !== "text").length;
     // An empty picture frame: a photograph written as `alt` with no `path`. It
@@ -313,12 +313,12 @@ export function designStatistics(scene) {
 }
 
 export function reviewPrompt(packet) {
-  // Historical corpus aggregates remain available to analysis callers, not as review targets.
+  // Historical aggregates remain available to analysis callers, not as review targets.
   const { reference: historicalReference, ...candidateStatistics } = packet.statistics || {};
   const guidance = ["storylining", "design", "taste-review"].map(name => fileURLToPath(new URL(`../references/${name}.md`, import.meta.url)));
   return `You are reviewing a consulting deck against the client's brief. Look at every rendered slide image and the montage; read the text. Judge it the way an engagement manager would the night before a steering committee.
 
-Read these skill files before assessing: ${guidance.join(", ")}. The taste-review guidance owns benchmark calibration and literal coverage. Do not consult prior candidate scores, repair lists or peer status summaries.
+Read these skill files before assessing: ${guidance.join(", ")}. The taste-review guidance owns benchmark comparison and literal coverage. Do not consult prior candidate scores, repair lists or peer status summaries.
 
 This is the deck's only full review. A later round, if there is one, reads only the pages that changed and the findings you raise here, so a defect you see and leave out will not be raised again. Report every major and blocker defect in this one pass, across all pages, with its repair: work through every page before deciding, rather than stopping at the first few serious findings.
 
@@ -344,7 +344,7 @@ VISUAL REVIEW. Inspect every original page at full size, every spread and the mo
 Candidate diagnostics, not quality targets:
 ${JSON.stringify(candidateStatistics, null, 1)}
 
-If the user supplied reference decks, compare strong relevant pages from each before scoring and record the pages inspected. Reference material is only what the user supplied: never search the machine for other decks, a corpus or client documents. Historical aggregate device counts do not establish a benchmark. Explain concrete differences in evidence relationships and reader effort; do not infer quality from more devices or annotations. Compare substantive text against matched reading tasks, preserving necessary explanation without padding.
+If the user supplied reference decks, compare strong relevant pages from each before scoring and record the pages inspected. Reference material is only what the user supplied: never search the machine for other decks or documents. Historical aggregate device counts do not establish a benchmark. Explain concrete differences in evidence relationships and reader effort; do not infer quality from more devices or annotations. Compare substantive text against matched reading tasks, preserving necessary explanation without padding.
 
 Name the best page, worst page and most repetitive sequence. Challenge the most deletable page with a concrete merger and identify any lost evidence. Reproduce material calculations from supplied source records; disclose unverified assumptions. Record argument, evidence, visual explanation, hierarchy/copy and sequence quality in the companion assessment.
 
@@ -392,13 +392,13 @@ Set accepted=false if any finding is major or blocker. The summary is two senten
 export function densityPrompt(profile, only = null) {
   if (!profile) return "DENSITY PASS. No density profile was built (the deck was not rendered); set density to {\"deck\": \"No rendered density profile was available for this build.\", \"pages\": []}.";
   const deck = profile.deck || {};
-  const line = (name, label) => deck[name] ? `- ${label}: ${deck[name].measured} against the client ${deck[name].target} (band ${JSON.stringify(deck[name].band ?? null)}), ${deck[name].position}` : null;
+  const line = (name, label) => deck[name] ? `- ${label}: ${deck[name].measured} against the target ${deck[name].target} (band ${JSON.stringify(deck[name].band ?? null)}), ${deck[name].position}` : null;
   const flagged = (profile.pages || []).filter((p) => p.flags?.length && (!only || only.includes(p.id)));
-  return `DENSITY PASS. The rendered pages were measured the way the client corpus was (pdftotext -layout; title and source lines excluded; a block is a run of lines between blank ones; blocks under three words are labels). Compare the deck with the client targets, then open every flagged page and judge whether its density is right for the job it does. A flag is a question, not a verdict: a chart-led page may rightly sit light, and a page that clears its word floor with padding or restatement is too dense or the wrong shape even though it passed. Deck against client pages (block measures over the ${deck.comparedPages ?? "?"} pages that carry commentary or prose, the population the benchmark measured; ${deck.exhibitLed?.pages ?? 0} exhibit-led pages sit beside them at ${deck.exhibitLed?.wordsPerBlock ?? "-"} words a block, which are labels):
-${[line("bodyWordsVsTaskMedian", "body words against each page's task median (1.0 = client median)"), line("blocksPerPage", "text blocks per page"), line("wordsPerBlock", "words per block"), line("longestBlock", "longest block per page"), deck.singleBlockShare ? `- single-block pages: ${deck.singleBlockShare.measured} of pages against at most ${deck.singleBlockShare.target}` : null].filter(Boolean).join("\n")}
+  return `DENSITY PASS. The rendered pages were measured by the skill's density rules (pdftotext -layout; title and source lines excluded; a block is a run of lines between blank ones; blocks under three words are labels). Compare the deck with the skill's targets, then open every flagged page and judge whether its density is right for the job it does. A flag is a question, not a verdict: a chart-led page may rightly sit light, and a page that clears its word floor with padding or restatement is too dense or the wrong shape even though it passed. Deck against the targets for pages doing this job (block measures over the ${deck.comparedPages ?? "?"} pages that carry commentary or prose, the population the targets describe; ${deck.exhibitLed?.pages ?? 0} exhibit-led pages sit beside them at ${deck.exhibitLed?.wordsPerBlock ?? "-"} words a block, which are labels):
+${[line("bodyWordsVsTaskMedian", "body words against each page's task median (1.0 = target median)"), line("blocksPerPage", "text blocks per page"), line("wordsPerBlock", "words per block"), line("longestBlock", "longest block per page"), deck.singleBlockShare ? `- single-block pages: ${deck.singleBlockShare.measured} of pages against at most ${deck.singleBlockShare.target}` : null].filter(Boolean).join("\n")}
 Flagged pages:
 ${flagged.map((p) => `- ${p.id} (page ${p.page}, ${p.task ?? "no task"}): ${p.flags.join("; ")}`).join("\n") || "- none"}
-Record density.deck as two or three sentences comparing the deck's medians with the client targets and saying what that means for a reader, and density.pages as one verdict per flagged page (right, too thin, too dense or wrong shape) with the reason you saw on the page. Any verdict other than right blocks delivery.`;
+Record density.deck as two or three sentences comparing the deck's medians with the skill's targets and saying what that means for a reader, and density.pages as one verdict per flagged page (right, too thin, too dense or wrong shape) with the reason you saw on the page. Any verdict other than right blocks delivery.`;
 }
 
 function hasCli(name) { return spawnSync("sh", ["-c", `command -v ${name}`], { stdio: "ignore" }).status === 0; }

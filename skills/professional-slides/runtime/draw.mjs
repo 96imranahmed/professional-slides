@@ -64,7 +64,7 @@ export function measuredLabel(id, role, frame, layout, style) {
 }
 
 /**
- * Four figures and up read with a thousands separator, the way every published
+ * Four figures and up read with a thousands separator, the way every well-made
  * page prints them: 10,156 rather than 10156.
  */
 export function groupThousands(digits) {

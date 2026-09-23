@@ -546,7 +546,7 @@ class Emitter:
             else:
                 decimals = 1 if fractional and abs(fractional[0]) < 10 else 0
         # Four figures and up read with a thousands separator, the way the drawn
-        # charts write them and every published page prints them.
+        # charts write them and every well-made page prints them.
         values_all = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
         grouped = any(abs(v) >= 1000 for v in values_all)
         base = "#,##0" if grouped else "0"

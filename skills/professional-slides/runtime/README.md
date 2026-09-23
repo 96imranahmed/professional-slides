@@ -39,7 +39,7 @@ final titles. A declared executive summary precedes the first section. Revision
 work may carry partial plans. Semantic fields transfer by ID, never position.
 
 Schema, argument completeness, text fit, collisions, clipping and scale checks block delivery.
-Corpus mix, decoration frequency, empty bands and density statistics are advisory; neutral
+Page-family mix, decoration frequency, empty bands and density statistics are advisory; neutral
 exhibits and concise pages can be correct. Independent rendered review decides
 whether those pages communicate well. A review is valid only for its hashed
 scene, editable deck and renders, with every current slide explicitly inspected, or, for a

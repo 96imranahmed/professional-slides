@@ -31,7 +31,7 @@ class WeightContractTests(unittest.TestCase):
         self.assertEqual(page_gates.WEIGHT_BY_FILL, CONTRACT["byFill"])
         self.assertEqual(page_gates.FILL_LEVELS, CONTRACT["geometryByFill"])
         self.assertEqual(page_gates.DEFAULT_FILL, CONTRACT["defaultFill"])
-        self.assertEqual(page_gates.REFERENCE_PAGE_WORDS, CONTRACT["reference"]["corpus"])
+        self.assertEqual(page_gates.REFERENCE_PAGE_WORDS, CONTRACT["reference"]["benchmark"])
         self.assertEqual(page_gates.REFERENCE_PAGE_BANDS["body"], CONTRACT["reference"]["slides"]["bands"]["body"])
 
     def test_the_composer_resolves_what_the_gates_enforce(self):
@@ -68,23 +68,22 @@ console.log(JSON.stringify({byFill: WEIGHT_BY_FILL, keys: WEIGHT_KEYS, bands: RE
         self.assertLess(CONTRACT["byFill"]["airy"]["pageWords"], CONTRACT["byFill"]["balanced"]["pageWords"])
         self.assertLess(CONTRACT["byFill"]["balanced"]["pageWords"], CONTRACT["byFill"]["full"]["pageWords"])
 
-    def test_the_skill_quotes_the_corpus_it_was_measured_from(self):
+    def test_the_skill_quotes_the_targets_it_is_held_to(self):
         # The comparison table in the evaluation reference is the argument for the floors. If
-        # the corpus is re-measured, the table moves with it rather than
-        # standing as a second, older record of the same thing.
+        # the targets move, the table moves with them rather than standing as a
+        # second, older record of the same thing.
         skill = (SKILL / "references/evaluation/index.md").read_text(encoding="utf-8")
         slides = CONTRACT["reference"]["slides"]
-        wide = CONTRACT["reference"]["corpus"]
-        self.assertIn(f"{wide['pages']:,} analytical pages", skill)
+        wide = CONTRACT["reference"]["benchmark"]
         for value in (slides["words"], slides["bands"]["titleBand"], slides["bands"]["body"],
                       slides["bands"]["footer"], slides["drawings"],
                       slides["numericByFamily"]["chart"]):  # noqa: E501
-            self.assertRegex(skill, rf"\|[^|\n]*\b{value}\b", f"the evaluation reference's corpus table has lost {value}")
+            self.assertRegex(skill, rf"\|[^|\n]*\b{value}\b", f"the evaluation reference's target table has lost {value}")
         self.assertIn(f"{round(slides['heavyShare'] * 100)}%", skill)
         # And the craft rates the plan gates now floor against.
         craft = CONTRACT["plan"]["craft"]
         for key in ("chartAnnotated", "tableTreated"):
-            self.assertIn(f"{round(craft[key]['observedClient'] * 100)}%", skill,
+            self.assertIn(f"{round(craft[key]['observed'] * 100)}%", skill,
                           f"the evaluation reference does not say what client decks do for {key}")
 
     def test_no_floor_is_stricter_than_the_corpus_it_claims_to_come_from(self):

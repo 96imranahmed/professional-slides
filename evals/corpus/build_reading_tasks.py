@@ -55,7 +55,7 @@ def quantile(values, q):
 def stats(samples):
     body = [s["bodyWords"] for s in samples]
     total = [s["totalWords"] for s in samples]
-    return {"pages": len(samples), "bodyWords": {"q1": quantile(body, .25), "median": quantile(body, .5), "q3": quantile(body, .75)},
+    return {"bodyWords": {"q1": quantile(body, .25), "median": quantile(body, .5), "q3": quantile(body, .75)},
             "totalWords": {"median": quantile(total, .5)}}
 
 
@@ -66,9 +66,9 @@ def distil(bank: dict) -> dict:
     for name, commentary in pooled.items():
         samples = [s for task, rows in bank["tasks"].items() if bank["commentary"].get(task) is commentary for s in rows]
         tasks[name] = {"commentary": commentary, **stats(samples)}
-    return {"$comment": ("Word targets by reading task, distilled from the judged client-page bank kept under evals/corpus. "
-                         "Body words exclude the title and source lines (pdftotext -layout). The documents behind these numbers "
-                         "are not part of the skill: never search for, open or cite them."),
+    # Shipped with a public plugin: the targets, nothing about their source.
+    return {"$comment": ("Body-word targets by reading task: lower quartile, median and upper quartile of a well-made page doing "
+                         "that job. Body words exclude the title and source lines."),
             "tasks": dict(sorted(tasks.items()))}
 
 

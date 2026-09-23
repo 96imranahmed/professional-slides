@@ -5,7 +5,7 @@
   "footer": "Component gallery",
   "agenda": true,
   "cover": {
-    "title": "Five reference pages, rebuilt from the spec",
+    "title": "Every exhibit, built from the spec",
     "subtitle": "Every registered exhibit, from the bar chart to the rollout grid",
     "date": "September 2026",
     "logo": "Professional slides"
@@ -2243,6 +2243,175 @@
         ]
       },
       "source": "Strategy review, March 2026"
+    },
+    {
+      "title": "Grocery and household hold two thirds of the delivery market, mostly in large cities",
+      "exhibit": {
+        "type": "chart.marimekko",
+        "heading": "Delivery market by category and city size, 2026",
+        "unit": "$B; column width = category revenue",
+        "categories": [
+          "Grocery",
+          "Household",
+          "Meals",
+          "Pharmacy",
+          "Pet"
+        ],
+        "series": [
+          {
+            "name": "Large cities",
+            "values": [
+              38,
+              24,
+              16,
+              7,
+              4
+            ]
+          },
+          {
+            "name": "Mid-size",
+            "values": [
+              12,
+              9,
+              8,
+              4,
+              2
+            ]
+          },
+          {
+            "name": "Towns",
+            "values": [
+              6,
+              5,
+              2,
+              3,
+              1
+            ]
+          }
+        ],
+        "annotations": [
+          {
+            "category": "Pharmacy",
+            "text": "The most even split by city size",
+            "treatment": "callout"
+          }
+        ]
+      },
+      "points": [
+        "Grocery and household are two thirds of the market, and two thirds of each sits in large cities",
+        "Pharmacy is the only category where towns carry a fifth of revenue",
+        "Pet is small everywhere, so it is an add-on rather than a market to enter"
+      ],
+      "source": "Illustrative data",
+      "soWhat": "Grocery in large cities is the market; every other cell is an extension of it."
+    },
+    {
+      "title": "Most teams adopt a new tool for speed; cost savings rank last",
+      "exhibit": {
+        "type": "chart.waffle",
+        "heading": "Teams ranking each reason first",
+        "unit": "Number of teams",
+        "categories": [
+          "Faster delivery",
+          "Fewer handoffs",
+          "Compliance",
+          "Cost savings"
+        ],
+        "series": [
+          {
+            "name": "Teams",
+            "values": [
+              18,
+              12,
+              7,
+              3
+            ]
+          }
+        ],
+        "dataTable": true
+      },
+      "kpi": {
+        "value": "45%",
+        "label": "of teams rank faster delivery first"
+      },
+      "points": [
+        {
+          "lead": "Fewer handoffs rank second",
+          "text": "for 30% of teams, most often where work crosses three or more groups"
+        },
+        {
+          "lead": "Cost savings rank last",
+          "text": "for 8%, which is what an adoption decision looks like before anyone has measured the saving"
+        }
+      ],
+      "source": "Illustrative survey of 40 teams",
+      "soWhat": "Speed is the stated case, so the first rollouts will be judged on cycle time, not on cost."
+    },
+    {
+      "title": "Most initiatives are still in planning, with the platform group furthest into rollout",
+      "exhibit": {
+        "type": "chart.bubble-grid",
+        "heading": "Initiatives by group and stage",
+        "unit": "initiatives",
+        "rows": [
+          "Platform (6)",
+          "Product (9)",
+          "Operations (11)",
+          "Support (4)"
+        ],
+        "columns": [
+          "Planning",
+          "Prototype",
+          "Pilot",
+          "Rollout",
+          "Stopped"
+        ],
+        "values": [
+          [
+            8,
+            6,
+            5,
+            5,
+            0
+          ],
+          [
+            20,
+            8,
+            6,
+            2,
+            1
+          ],
+          [
+            26,
+            9,
+            7,
+            3,
+            0
+          ],
+          [
+            5,
+            4,
+            3,
+            1,
+            0
+          ]
+        ]
+      },
+      "points": [
+        {
+          "lead": "Operations carries the most activity",
+          "text": "with 26 initiatives in planning and 7 at pilot across 11 teams"
+        },
+        {
+          "lead": "Platform leads rollout",
+          "text": "with 5 of its 24 initiatives live, the highest share of any group"
+        },
+        {
+          "lead": "Almost nothing has been stopped",
+          "text": "one initiative in 125, so the portfolio has not yet been pruned"
+        }
+      ],
+      "source": "Illustrative data"
     },
     {
       "kind": "section",

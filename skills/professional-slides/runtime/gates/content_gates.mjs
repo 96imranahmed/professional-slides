@@ -43,7 +43,7 @@ export const CONTENT_CODES = Object.freeze({
   TEXT_PLAN_INCOMPLETE: "the dot-dash does not list all visible copy",
   TEXT_REFERENCE_MISSING: "per-page reference text comparison is missing",
   TEXT_COVERAGE_LOW: "planned text is below comparable reference coverage",
-  TEXT_BLOCK_TOO_LONG: "one run of prose is longer than client decks ever set",
+  TEXT_BLOCK_TOO_LONG: "one run of prose is longer than a strong deck ever sets",
   // Raised at composition by text-contract.mjs, where the page's structure is
   // known; listed here because it belongs to the same text contract.
   TEXT_TASK_MISMATCH: "the reading task the page is measured against is not the one it composes to",
@@ -124,8 +124,8 @@ const CONDITIONAL = /\b(unless|except|if you|for the|for a|for those|whereas|whi
  */
 function contradictions(answer, pages) {
   if (!RECOMMENDS.test(answer) || CONDITIONAL.test(answer)) return [];
-  const corpus = [answer, ...pages.map((p) => String(p.claim ?? ""))].join(" ");
-  const lowercased = new Set(corpus.match(/\b[a-z][a-z']+\b/g) ?? []);
+  const argument = [answer, ...pages.map((p) => String(p.claim ?? ""))].join(" ");
+  const lowercased = new Set(argument.match(/\b[a-z][a-z']+\b/g) ?? []);
   const names = (text) => new Set((String(text ?? "").match(/\b[A-Z][A-Za-z']{2,}\b/g) ?? [])
     .filter((word) => !STOPWORDS.has(word.toLowerCase()) && !lowercased.has(word.toLowerCase())));
   const answerNames = names(answer);

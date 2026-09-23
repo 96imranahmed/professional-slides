@@ -82,7 +82,7 @@ export function chartFrame(frame, { topLegend = false, annotations = [], changeA
 }
 
 
-/** Value labels follow the house style: bold by default, regular where the firm sets them light. */
+/** Value labels follow the house style: bold by default, regular where the house sets them light. */
 export const labelBold = () => houseStyle("style.labelWeight") !== "regular";
 export function textStyle(size = CHART_LABEL, color = SECONDARY, bold = false, align = "center") {
   return { ...(bold ? chartAnnotationStyle() : { fontFamily: FONT }), fontSize: size, color, bold, align, valign: "mid" };
@@ -616,8 +616,8 @@ function growthColumn(g, categories, series, name) {
 
 /**
  * `categoryIcons`: a mark beside each category's label - an icon name from
- * runtime/icons.mjs, or `{ image }` for a brand logo or a flag. The published
- * reports set logos under columns and flags beside bars where the reader knows
+ * runtime/icons.mjs, or `{ image }` for a brand logo or a flag. A well-made
+ * page sets logos under columns and flags beside bars where the reader knows
  * the mark before the name. An image not yet supplied is planned as
  * `{ image: { alt } }` and draws an empty frame the picture gate holds.
  * Takes a map from category to entry, or an array in category order.
@@ -674,8 +674,8 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const chartProps = { ...props, highlights };
   const showLegend = props.legend !== false && series.length > 1;
   const values = series.flatMap((item) => item.values);
-  // Every mark carries its value while the marks are countable: the reference
-  // pages print twelve labels as readily as four, and a labelled mark is a
+  // Every mark carries its value while the marks are countable: a well-made
+  // page prints twelve labels as readily as four, and a labelled mark is a
   // block of evidence where an axis is a lookup table. `dataLabels: false`
   // still declines, and a dense chart falls back to the axis.
   const markCount = series.length * categories.length;
@@ -706,7 +706,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const deltas = normalizeDeltas(props, categories);
   // `segmentGrowth: { from, to, label? }` on a stacked column: the rate per
   // segment between two categories in a column at the right, aligned to the
-  // last stack's segments (the Bain "CAGR 2019–23" column).
+  // last stack's segments (a "CAGR 2019–23" column).
   const segmentGrowth = stacked && !horizontal && props.segmentGrowth ? growthColumn(props.segmentGrowth, categories, series, "segmentGrowth") : null;
   const deltaWidth = (deltas && horizontal ? 64 : 0) + (segmentGrowth ? 76 : 0);
   // On columns the deltas are pills in a band above the plot, one over each
@@ -826,8 +826,8 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   }));
   const categorySpan = (horizontal ? plot.height : plot.width) / categories.length;
   // Bar weight follows the category count. Four categories drawn at the
-  // many-category gap read as ribbons with the page showing through; the firm
-  // pages set few, fat bars and many, thinner ones.
+  // many-category gap read as ribbons with the page showing through; a well-made
+  // page sets few, fat bars and many, thinner ones.
   const barWeight = categories.length <= 3 ? 0.86 : categories.length <= 6 ? 0.78 : 0.7;
   let groupSpan = categorySpan * barWeight;
   let stackExternalWidth = 0;
@@ -1021,8 +1021,8 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       }));
     }
     // `categoryNotes`: a second line under the category label - the base of the
-    // measure ("n=412"), the year, the unit of that column. The reference charts
-    // carry it and it is most of what separates their label band from ours.
+    // measure ("n=412"), the year, the unit of that column. A well-made chart
+    // carries it and it is most of what separates its label band from a bare one.
     const noteText = hideCategoryLabels ? null : categoryNotes[categoryIndex];
     const noteLayout = noteText ? measureText(noteText, Math.max(40, horizontal ? horizontalCategoryLabelWidth : categorySpan - 8), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }) : null;
     // With a note under it, a bar's label stops being a box centred on the bar
@@ -1239,7 +1239,7 @@ function lineChart({ id, frame, props, area = false }) {
   const showLegend = !endLabels && props.legend !== false && series.length > 1;
   const values = series.flatMap((item) => item.values);
   // `seriesGrowth: { from, to, label? }`: each line's growth in a column beside
-  // its end label (the published reports' "CAGR 2020–30" column at the right
+  // its end label (a "CAGR 2020–30" column at the right
   // of a forecast). It rides on the end labels, which name the rows.
   if (props.seriesGrowth && !endLabels) throw new Error("seriesGrowth sits beside the end labels; set directLabels: \"end\"");
   const seriesGrowth = props.seriesGrowth ? growthColumn(props.seriesGrowth, categories, series, "seriesGrowth") : null;
@@ -1269,7 +1269,7 @@ function lineChart({ id, frame, props, area = false }) {
   const categoryMap = new Map();
   const categorySlot = Math.min(120, Math.max(76, plot.width / Math.max(1, categories.length) * 0.82));
   // Dense periods (more categories than the plot has label slots) label every
-  // nth point, always keeping the first and last, as the firm decks do.
+  // nth point, always keeping the first and last, as a strong deck does.
   const pitch = categories.length > 1 ? (xScale(1) - xScale(0)) : plot.width;
   const widest = Math.max(...categories.map((c) => measureText(String(c), 400, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width));
   const every = Math.max(1, Math.ceil((widest + 10) / Math.max(1, pitch)));
@@ -1469,7 +1469,7 @@ function waterfall({ id, frame, props }) {
  * `highlights` was honoured by the column, bar and range charts and silently
  * ignored everywhere else, alongside `annotations`, which three plot types
  * accepted and drew nothing from. A recoloured category is the commonest mark
- * in published client work and the only one that costs a plot no layout, so it
+ * in a strong deck and the only one that costs a plot no layout, so it
  * is the one these types get.
  */
 function highlightedCategory(props) {

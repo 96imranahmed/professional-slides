@@ -324,7 +324,7 @@ function evidenceNodes(id, placement) {
   const { annotation, index, frame, leader } = placement;
   const callout = annotation.treatment === "callout";
   const dotEnded = annotation.treatment === "orthogonal-dot";
-  // `speech` is the filled bubble the reference decks put on a busy plot, where
+  // `speech` is the filled bubble a strong deck puts on a busy plot, where
   // an outlined surface on a canvas ground disappears into the gridlines. It is
   // the loudest of the three, so it carries one short phrase and no border of
   // its own: the fill is the emphasis.
@@ -399,8 +399,8 @@ export function renderChartCallout({ id, frame, props }) {
   if (!Object.hasOwn(leaders, direction)) throw new Error(`Unknown callout direction: ${direction}`);
   const measured = measureText(props.text, frame.width - 16, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
   if (measured.height > frame.height - 14) throw new Error("Chart callout text does not fit its frame");
-  // `variant: "speech"` is the filled bubble with a pointed tail the reference
-  // decks put over a chart - an aside in the deck's voice, rather than a
+  // `variant: "speech"` is the filled bubble with a pointed tail a strong
+  // deck puts over a chart - an aside in the deck's voice, rather than a
   // bordered note with a leader line to a mark.
   if (props.variant === "speech") {
     const leader = leaders[direction];

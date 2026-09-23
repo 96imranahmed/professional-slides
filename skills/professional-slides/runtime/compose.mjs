@@ -98,7 +98,7 @@ function tableAlias(ex) {
     return { type: "table", treatment: "dimensions", variant: "standard", headerShape: ex.headerShape ?? "chevron", columns: [{ label: "", type: "category", width: labelWidth }, ...phases.map((ph) => ({ label: typeof ph === "string" ? ph : ph.label, type: "text", width: 200 }))], rows, density: ex.density };
   }
   if (ex.type === "rows") {
-    // A row may carry several content columns (`cells`), which is the reference
+    // A row may carry several content columns (`cells`), which is a strong
     // deck's densest page: findings down the left with a numbered disc and an
     // icon, two or three columns across, each cell a short bulleted list under
     // a bold lead. Four hundred words of structured evidence, no chart.
@@ -138,8 +138,8 @@ function tableAlias(ex) {
         rows };
     }
     const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label, ...(row.number ? { sectionNumber: row.number } : {}), ...(row.icon ? { icon: row.icon } : {}) }, Array.isArray(row.points) ? { type: "bullets", items: row.points } : row.text]);
-    // `columns: ["What we found", "What it means"]` heads the two tracks. The
-    // reference pages label them; an unlabelled ledger keeps the blank band.
+    // `columns: ["What we found", "What it means"]` heads the two tracks. A
+    // well-made ledger labels them; an unlabelled ledger keeps the blank band.
     const labels = Array.isArray(ex.columns) ? ex.columns.map((column) => String(typeof column === "string" ? column : column?.label || "")) : [];
     return { type: "table", treatment: "categories", variant: "standard", columns: [{ label: labels[0] || "", type: "category", width: 200 }, { label: labels[1] || "", type: "text", width: 800 }], rows, density: ex.density };
   }
@@ -179,7 +179,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
   // A `compare` whose sides name an `image` sets the two pictures above the two
   // columns, aligned to them. A comparison of two named things - two
   // characters, two cities, two products - is a page the reader should be able
-  // to tell apart before reading a word, and the reference decks lead with the
+  // to tell apart before reading a word, and a strong deck leads with the
   // picture. The images share one height so the columns beneath them start
   // level, and the exhibit is unchanged underneath: this is furniture above a
   // comparison, not a different exhibit.
@@ -195,8 +195,8 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
       exhibitItem(bare, id, baseDir, { width: { fr: 1 }, height: "fill" }),
     ] };
   }
-  // `caption`: the finding under this panel. In a two-up or a grid the
-  // reference captions every panel rather than closing with one shared
+  // `caption`: the finding under this panel. In a two-up or a grid a
+  // well-made page captions every panel rather than closing with one shared
   // so-what, because each panel answers its own question.
   if (exIn && typeof exIn.caption === "string" && exIn.caption.trim()) {
     const { caption, captionHeight, ...rest } = exIn;
@@ -257,7 +257,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
     return { id, component: type, props: { ...rest, fillHeight: size.height === "fill" }, size };
   }
   // A metrics exhibit: one row up to four tiles, a grid of equal rows beyond
-  // (the McKinsey "Impact to date" 3x3 of navy tiles). `tone` sets every tile.
+  // (an "Impact to date" 3x3 of navy tiles, say). `tone` sets every tile.
   if (type === "metrics") {
     const tiles = rest.items.map((m) => (typeof m === "string" ? { value: m } : m));
     const perRow = rest.columns || (tiles.length <= 4 ? tiles.length : tiles.length <= 6 ? 3 : tiles.length <= 8 ? 4 : 3);
@@ -419,7 +419,7 @@ function withDefaultScales(ex, rowsIn) {
  * `deriveFrom` names the measure column (default: the first numeric one), and a
  * total row is left out of the arithmetic and carries the totals instead.
  * Ten rows and one derived column is ten more blocks of evidence and a second
- * reading of the same data, which is how a reference measure table gets to six
+ * reading of the same data, which is how a well-made measure table gets to six
  * columns without a second source.
  */
 const DERIVATIONS = ["rank", "share", "change", "index"];
@@ -489,7 +489,7 @@ function deriveColumns(ex) {
 }
 
 // A column of bare four-figure counts reads with a thousands separator, the way
-// every published table prints it. Only whole numbers, only where the whole
+// every well-made table prints it. Only whole numbers, only where the whole
 // column is numeric, so a code or a year is left alone.
 function groupNumericColumns(ex) {
   const rowsIn = ex.rows.map((row) => (Array.isArray(row) ? { cells: row, plain: true } : { ...row }));
@@ -526,7 +526,7 @@ function groupNumericColumns(ex) {
 
 /**
  * `total: true` closes a table of counts with the column sums, which is how a
- * reference measure table ends. Numeric columns sum; a share column sums to 100;
+ * well-made measure table ends. Numeric columns sum; a share column sums to 100;
  * anything the arithmetic cannot reach stays blank rather than guessing.
  */
 /**
@@ -640,10 +640,10 @@ function implicationColumn(ex) {
  * mind does.
  *
  * `heat: true` fills every cell in the column on a sequential scale, which is
- * how the reference benchmark tables let a reader find the leader without
+ * how a well-made benchmarking table lets a reader find the leader without
  * reading a single number. `bubble: true` sets the value in a filled pill, the
  * same device the change annotation uses on a chart, so one column of a flat
- * reference table carries emphasis. `bar: true` draws the in-cell bar chart:
+ * table carries emphasis. `bar: true` draws the in-cell bar chart:
  * the magnitude down the column read at a glance, the figure still beside it.
  *
  * The bar cell has always existed, and nothing used it, because reaching it by
@@ -794,8 +794,8 @@ function inlineChartUnits(items) {
 /**
  * `icons: [...]` on a table, or `icon` on a row: an icon beside each row label.
  *
- * The renderer has always drawn an icon on a `category` cell - it is how the
- * reference findings matrix marks its rows - and the only surface that could
+ * The renderer has always drawn an icon on a `category` cell - it is how a
+ * findings matrix marks its rows - and the only surface that could
  * reach it was the `rows` alias. A plain `columns`/`rows` table had no route to
  * it at all, which is most of why two cold-run decks of 39 tables carried not
  * one icon between them. An authored icon draws wherever it is authored.
@@ -925,9 +925,9 @@ export function styleTable(ex) {
   const extra = { ...(recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {}), ...(ex.scales ? { scales: ex.scales } : {}), ...(ex.columnWidths ? { columnWidths: ex.columnWidths } : {}) };
   if (ex.rowAlignment !== undefined) extra.rowAlignment = ex.rowAlignment;
   // A table that ends the chain with no treatment at all is a plain grid, and a
-  // plain grid past five rows is where a reader loses their place. 89% of
-  // tables in published client decks carry a treatment of some kind
-  // (evals/corpus), and the commonest by far is a banded row - it costs the
+  // plain grid past five rows is where a reader loses their place. About 89% of
+  // tables in strong decks carry a treatment of some kind, and the commonest
+  // by far is a banded row - it costs the
   // page nothing and it is the only device that works on a table of words. So
   // banding is what an untreated table falls back to, rather than nothing.
   if (untreatedGrid(ex, columns, rowsIn, extra)) extra.zebra = true;
@@ -936,7 +936,7 @@ export function styleTable(ex) {
     if (Array.isArray(r) && i === rowsIn.length - 1 && /^total\b/i.test(String(r[0]?.text ?? r[0] ?? ""))) rowsIn[i] = { style: "total", cells: r };
   });
   // `highlightRow`: the subject's row (by first-cell label or index) as a tinted
-  // band, the way the benchmark tables single out the client city or company.
+  // band, the way a benchmarking table singles out the client's own city or company.
   if (ex.highlightRow !== undefined) {
     const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
     const at = Number.isInteger(ex.highlightRow) ? ex.highlightRow : rowsIn.findIndex((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
@@ -1073,7 +1073,7 @@ export function paginateTable(slide, bodyScale = 1) {
   if (slide.layout && !["auto", "exhibit-full"].includes(slide.layout)) return [slide];
   const ex = slide.exhibit;
   if (!ex || ex.type !== "table" || !Array.isArray(ex.rows) || slide.exhibits) return [slide];
-  // The page holds about 16 body lines of table (compact rows in the firm decks
+  // The page holds about 16 body lines of table (compact rows in a dense deck
   // run to 14–20 one-line rows): a row of short cells counts one line, longer
   // cells wrap, so a ranking table keeps a dozen rows on a page while a text
   // table breaks at eight.
@@ -1113,7 +1113,7 @@ export function paginateTable(slide, bodyScale = 1) {
     - (slide.subtitle && String(slide.title ?? "").length > 60 ? 26 : 0);
   // The density ladder comes before the split. A twenty-row table set compact is
   // one page of evidence; the same table halved across two pages is two pages of
-  // half an argument, and the reference decks run tables to twenty and thirty
+  // half an argument, and strong decks run tables to twenty and thirty
   // rows rather than splitting them. `density` on the exhibit still wins.
   const ladder = ex.density === undefined ? ["body", "compact", "dense"] : [ex.density];
   const fits = ladder.find((density) => heightAt(density) <= available);
@@ -1187,7 +1187,7 @@ const wordsIn = (text) => String(text ?? "").split(/\s+/).filter(Boolean).length
  * Paragraphs were pushed one by one into the page's body column, which spreads
  * leftover height between its items. Two paragraphs came out pinned to the top
  * and the foot of the page with the body empty between them - the single most
- * common page in the corpus, report-style prose, drawn as two stranded lines.
+ * common kind of page, report-style prose, drawn as two stranded lines.
  */
 function documentItem(slide, id, pointCount) {
   const paragraphs = slide.paragraphs || [];
@@ -1317,14 +1317,13 @@ const SIDE_COLUMN_SLACK = 0.66;
 /**
  * The bridge between the evidence and what is read off it, in the gutter.
  *
- * The reference decks carry this relation four or five different ways and draw
- * it in the gutter on very few pages. BCG's NYC media pages set the right-hand
- * heading to say the relation in words ("As a result of piracy and
- * internationalization") and put nothing between the columns. Bain's Syracuse
- * diagnostic runs "KEY FACTS AND DATA" against a bordered "PERSPECTIVES" panel,
- * ten pages running, with no mark in the gutter at all. L.E.K.'s freight
- * comparison leaves plain white space. McKinsey's Purdue pages close the
- * exhibit with a filled band underneath it. The dashed rule with a disc on it
+ * A well-made deck carries this relation four or five different ways and draws
+ * it in the gutter on very few pages. One page sets the right-hand heading to
+ * say the relation in words ("As a result of piracy and internationalization")
+ * and puts nothing between the columns. A diagnostic runs "KEY FACTS AND DATA"
+ * against a bordered "PERSPECTIVES" panel, ten pages running, with no mark in
+ * the gutter at all. A plain comparison leaves white space. Another page closes
+ * the exhibit with a filled band underneath it. The dashed rule with a disc on it
  * is one member of that set, not the house style: a deck that draws it on every
  * page has made the reader stop seeing it, and the pages where the inference is
  * genuinely authored no longer stand out.
@@ -1374,11 +1373,10 @@ function pointsHeight(points, width) {
 /**
  * The shapes a commentary column can take.
  *
- * Measured over the reference client decks, the numbered disc is one device
- * among six, and it is used for a full-width ledger of one-line items rather
+ * In a well-made deck the numbered disc is one device among six, and it is used for a full-width ledger of one-line items rather
  * than for a three-item side column. A composer with one shape produced five
- * consecutive pages of identical numbered lists; these are the alternatives the
- * corpus actually uses. Markers follow the authored relationship.
+ * consecutive pages of identical numbered lists; these are the alternatives a
+ * strong deck actually uses. Markers follow the authored relationship.
  */
 const POINT_STYLES = {
   // Icon, then the lead running into the sentence in the house accent.
@@ -1392,7 +1390,7 @@ const POINT_STYLES = {
   ruled: { marker: "rule" },
   // A / B / C: options, not steps.
   lettered: { marker: "letter" },
-  // The numbered disc, which the corpus reserves for an ordered ledger.
+  // The numbered disc, which a strong deck reserves for an ordered ledger.
   numbered: { marker: "number" },
   // The plain house bullet.
   bulleted: { marker: "auto" },
@@ -1482,7 +1480,7 @@ function sideTreatment(slide) {
 /**
  * The page's close, under everything else.
  *
- * One sentence is the tonal band. A list is the reference decks' other closing
+ * One sentence is the tonal band. A list is the other common closing
  * device: two or three square-bulleted lines on a muted surface under a dense
  * table, each carrying its own finding, rather than one long band that says
  * three things in a row.
@@ -1516,7 +1514,7 @@ function soWhatItem(text, id, highlight, tinted = true) {
 /**
  * The page shapes the composer can build, and what each one wants.
  *
- * Measured against the corpus, a reference client deck runs about five distinct
+ * A well-made deck runs about five distinct
  * page shapes per ten analytical pages and never lets one shape past a quarter
  * of the deck. A deck built on the old chooser ran 1.3 shapes per ten pages with
  * 69% on one of them, because a single branch - one exhibit plus any commentary
@@ -1553,7 +1551,7 @@ const PAGE_SHAPES = {
   // reads the other way.
   "exhibit-right": { fit: () => 0 },
   // The exhibit across the full width with the commentary in columns beneath
-  // it: the commonest reference shape, and the right one when the exhibit is
+  // it: the commonest well-made shape, and the right one when the exhibit is
   // wide (many categories) or the commentary divides into parallel points.
   "exhibit-top": {
     fit: (s, ex) => {
@@ -1612,7 +1610,7 @@ const PAGE_SHAPES = {
       && s.metricsPosition !== "bottom" && !hasCommentary(s) ? 4 : 0),
   },
   // A long, narrow table cut down the middle and set as two panels side by
-  // side, each with its own header: the reference deck's ranking page. Twelve
+  // side, each with its own header: the classic ranking page. Twelve
   // rows down the centre of a 1160px body leaves half the page empty and makes
   // the reader scan a column three times its natural length.
   "table-halves": { fit: (s, ex) => (ex.length === 1 && !hasCommentary(s) && halvable(ex[0]) ? 3 : 0) },
@@ -1756,7 +1754,7 @@ const signed = (n, suffix = "") => `${n >= 0 ? "+" : "−"}${fmtNumber(Math.abs(
 /** `percent: true` on a stacked chart re-expresses each category as shares of its total (100% stack). */
 // A chart whose categories run down the side, not along the bottom. A data
 // table stacked under one of these has columns that align with nothing: a
-// reference deck shipped "Consultants 110 221 112" in a row beneath three
+// deck once shipped "Consultants 110 221 112" in a row beneath three
 // horizontal bars, so each number sat under empty plot. The table is only ever
 // readable under a chart whose category axis is the x axis.
 const SIDEWAYS_CATEGORIES = new Set(["chart.bar", "chart.stacked-bar", "chart.lollipop",
@@ -1809,7 +1807,7 @@ export function changeFromContent(ex, title) {
   // A stack's change is the change in its totals.
   const totals = stacked ? categories.map((_, i) => series.reduce((sum, sr) => sum + sr.values[i], 0)) : series[0].values;
   // `change: "steps"`: the period-to-period change between every adjacent pair,
-  // as a small bracket above each pair (the e-Conomy small-multiple pattern).
+  // as a small bracket above each pair (a familiar small-multiple pattern).
   if (ex.change === "steps" && (series.length === 1 || stacked) && categories.length >= 2 && categories.length <= 8) {
     const annotations = [];
     for (let i = 1; i < categories.length; i += 1) {
@@ -1848,8 +1846,8 @@ export function changeFromContent(ex, title) {
 /**
  * `paired: true` on a horizontal bar chart with two or three series: one panel
  * per series side by side, each on its own scale and headed by the series
- * name, sharing the left panel's category column (the McKinsey "share of
- * commuters | share of residents" pair). The row is a two-up of peers, so the
+ * name, sharing the left panel's category column (a "share of
+ * commuters | share of residents" pair, say). The row is a two-up of peers, so the
  * plots share one top band and the rows line up.
  */
 function pairedBars(slide) {
@@ -1864,7 +1862,7 @@ function pairedBars(slide) {
 }
 
 /**
- * `footnotes: [{ on, text }]`: the firm page's numbered notes. Each one prints a
+ * `footnotes: [{ on, text }]`: the page's numbered notes. Each one prints a
  * superscript against the first occurrence of `on` — a category, a series name,
  * a column label, a table cell, a point — and its text joins the numbered note
  * line under the page. A footnote with no `on` (or whose `on` is not found) is
@@ -2047,7 +2045,7 @@ const KINDS = {
 /**
  * The four heavy-page shapes, named.
  *
- * SKILL.md describes the shapes a reference deck's dense pages take; a `shape`
+ * SKILL.md describes the shapes a strong deck's dense pages take; a `shape`
  * on the slide is the author saying "this is that page", and the preset sets
  * the weight and the defaults that shape needs. Everything a preset sets, the
  * slide can override, because the shape is a starting point and not a mould.
@@ -2078,9 +2076,9 @@ const SHAPES = {
   // page 2 was this page assembled by hand, and nothing said to write it.
   "executive-summary": (slide) => {
     const findings = slide.points || slide.rows;
-    // Up to seven: a client executive summary is the densest text page in the
+    // Up to seven: an executive summary is the densest text page in the
     // deck, four to six developed statements of about sixty words with their
-    // parts as sub-points (L.E.K.'s runs to 245 words a page), not three
+    // parts as sub-points (a strong one runs to 245 words a page), not three
     // bullets and an insight box.
     if (!Array.isArray(findings) || findings.length < 2 || findings.length > 7) {
       throw new Error("An executive summary carries two to seven findings in `points`");
@@ -2121,7 +2119,7 @@ export const SHAPE_NAMES = Object.freeze(Object.keys(SHAPES));
  * highlight per page - "the phrase the reader should see first" - and threw it
  * away: the stage was a checkpoint with no consequence.
  *
- * Client decks emphasise a phrase on half their pages, and on seven pages of
+ * Strong decks emphasise a phrase on half their pages, and on seven pages of
  * type in ten. Ours managed 0.05 to 0.22 (DECK_CRAFT). So a page-level
  * `highlight` is given to every point and every table cell whose text actually
  * contains it, and to none that do not - the phrase is emphasised where it is
@@ -2204,7 +2202,7 @@ const SLIDE_PASSES = [
   // `split: true` on a multi-series chart sets it as small multiples: one
   // panel per series, each headed by the series name, sharing one value scale
   // and one category axis. A legend and twelve marks becomes three headings
-  // and twelve labelled marks - the reference's way of showing three cuts of
+  // and twelve labelled marks - the well-made way of showing three cuts of
   // one measure.
   ["split-into-small-multiples", (slide) => {
     if (!(slide.exhibit && slide.exhibit.split === true && !slide.exhibits)) return slide;
@@ -2396,10 +2394,9 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
   // A lone implication takes the exhibit's track: heading at the body's left
   // margin, text reaching the same right edge as the last column above it.
   // The 80-character measure cap is for sustained prose in a column; a close
-  // set under a full-width exhibit is a band, and the reference pages set the
-  // band to the width of the thing it is read off - McKinsey's Purdue pages
-  // end each chart with one, BCG's NYCHA pages run theirs the width of the
-  // page. Hugging its own measure and centring, this sat in the middle of an
+  // set under a full-width exhibit is a band, and a well-made page sets the
+  // band to the width of the thing it is read off - under a chart, the width
+  // of the chart; under a full-width table, the width of the page. Hugging its own measure and centring, this sat in the middle of an
   // empty support region related to the table above it by nothing.
   const loneBand = slide.points.length === 1;
   const columns = slide.points.map((point, at) => {
@@ -2407,7 +2404,7 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
     const hoist = entry.lead && standsAlone(entry.text);
     const text = hoist ? entry.text : [entry.lead, entry.text].filter(Boolean).join(" ");
     // A lead that stays in the sentence still leads it: it runs in bold, the
-    // way the reference pages set the phrase that carries the finding.
+    // way a well-made page sets the phrase that carries the finding.
     const runs = !hoist && entry.lead
       ? accentRuns(text, [entry.lead], { bold: true, strict: false })
       : null;
@@ -2421,9 +2418,9 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
     // the table above it by nothing - the table ran the full body and the
     // sentence drawn from it started a third of the way in. Set to the same
     // track, its first word sits under the first column and its last under
-    // the last, which is how the reference pages close an exhibit: McKinsey's
-    // Purdue pages run the finding as a band the width of the chart it is
-    // read off, and BCG's NYCHA pages run it the width of the page.
+    // the last, which is how a well-made page closes an exhibit: the finding
+    // runs as a band the width of the chart it is read off, or the width of
+    // the page.
     return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
       ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
       items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text, ...(runs ? { runs } : {}), ...(loneBand ? { maxMeasure: false } : {}) }, size: HUG }] };
@@ -2498,7 +2495,7 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   // `insight`: the so-what as a tonal box in the side column, centred on the
   // exhibit when it stands alone, above the points when there are some. The
   // column then carries no heading unless `pointsHeading` names one.
-  // `insights: [a, b]` is the reference pattern of flanking an exhibit with two
+  // `insights: [a, b]` is the familiar pattern of flanking an exhibit with two
   // statements that carry the numbers in words; `insight` is the single box.
   const insightSpecs = (Array.isArray(slide.insights) ? slide.insights : slide.insight !== undefined ? [slide.insight] : []).filter((entry) => entry !== undefined && entry !== null);
   if (insightSpecs.length > 2) throw new Error(`${id}: a side column carries at most two insights`);
@@ -2604,7 +2601,7 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   const chevron = bridge
     ? { id: `${id}-implication`, component: "connector", props: { variant: bridge }, size: { width: 44, height: "fill" } } : null;
   // `photo`: a photograph strip at the right edge, full body height, cropped
-  // to fit (the 2022 McKinsey pattern: chart, commentary, photo).
+  // to fit (a familiar pattern: chart, commentary, photo).
   const photo = photoStrip(slide, `${id}-photo`, baseDir);
   const ordered = layout === "exhibit-left" ? [hero, chevron, side] : [side, chevron, hero];
   items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [...ordered.filter(Boolean), ...(photo ? [photo] : [])] });
@@ -2834,8 +2831,8 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       : frame;
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [column, side] });
   } else if (layout === "sidebar") {
-    // A side panel carrying the page's statement, the content beside it: the
-    // corpus sets a question, a claim or a headline figure in a dark panel down
+    // A side panel carrying the page's statement, the content beside it: a
+    // strong deck sets a question, a claim or a headline figure in a dark panel down
     // the left and lets the evidence or the points take the rest. The panel is
     // the reading; what sits beside it is the support.
     const panel = slide.panel;
@@ -2853,7 +2850,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       { id: `${id}-body`, layout: "flow.column", ...(exhibits.length ? {} : { leftover: "center" }), size: { width: { fr: 2 }, height: "fill" }, items: body }] });
   } else if (layout === "photo-backdrop") {
     // The exhibit on a card over a full-bleed photograph of what it measures:
-    // the published reports' "numbers over the thing itself". The photo sets
+    // "numbers over the thing itself". The photo sets
     // the subject; the card keeps the chart legible over it.
     if (!slide.photo) throw new Error(`${id}: a photo-backdrop page needs \`photo\`, the picture the card sits on`);
     if (exhibits.length !== 1) throw new Error(`${id}: a photo-backdrop page carries one exhibit on its card`);
@@ -2929,7 +2926,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   inlineChartUnits(items);
   // Footer: "Source:" and "Note:" lead their lines, as on a consulting page.
   const prefixed = (label, text) => (text && !/^(source|sources|note|notes)\s*:/i.test(text) ? `${label}: ${text}` : text);
-  // `note` takes a list as well as a line: the reference pages carry two to four
+  // `note` takes a list as well as a line: a well-made page carries two to four
   // numbered notes under the page, and a numbered note is what a superscript in
   // a label or a heading ("Revenue¹") points at.
   const noteLine = Array.isArray(slide.note)
@@ -2956,7 +2953,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
  *
  * `pills` hug the right of the title row - the right 20% of the band is
  * reserved for exactly this - and the other three are drawn from the left
- * margin, which is the left-anchored tracker the reference decks run down the
+ * margin, which is the left-anchored tracker a strong deck runs down the
  * side of a section. They are the same component: only the construction
  * changes, and each says where you are in a different amount of space.
  */
@@ -3044,7 +3041,7 @@ function composeDeckWith(spec, baseDir) {
     if (spec.cover.logo || spec.logo) cover.logo = spec.cover.logo || spec.logo;
     // `image` with `layout: "full"` puts the title on a card over a full-bleed
     // photograph; otherwise the photo takes the right half and `tone: "dark"`
-    // paints the title half navy (the McKinsey/BCG 2020 cover).
+    // paints the title half navy (a classic split cover).
     if (spec.cover.image) { cover.variant = spec.cover.layout === "full" ? "full-image" : "half-image"; cover.image = imageProps(spec.cover.image, baseDir); if (spec.cover.tone) cover.tone = spec.cover.tone; }
     else cover.variant = spec.cover.tone === "light" ? "plain" : "dark";
     if (spec.cover.notes) cover.notes = spec.cover.notes;
@@ -3093,7 +3090,7 @@ function composeDeckWith(spec, baseDir) {
   const tabs = spec.sectionTabs ?? (TRACKER_NAMES.includes(trackerMode) && sections >= 2);
   // `appendix: [...]`: the source pages behind the story - the model grid, the
   // full table, the survey instrument - set at `density: "appendix"` behind an
-  // Appendix divider. The corpus keeps its densest pages here, and a page that
+  // Appendix divider. A strong deck keeps its densest pages here, and a page that
   // belongs in the appendix stops crowding the page that carries the argument.
   const appendix = Array.isArray(spec.appendix) && spec.appendix.length
     ? [{ kind: "section", title: "Appendix", summary: "The workings behind the story" },

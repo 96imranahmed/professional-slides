@@ -8,7 +8,7 @@ Measured on the rendered page before review. The report records severity. `runti
 
 | Diagnostic or blocking gate | Code | Screen (severity is reported by the runtime) |
 | --- | --- | --- |
-| Ink coverage | `INK_COVERAGE` | at least 11.5% of the content area (14% on a `full` deck, 5% on an `airy` one) — calibrated on pages with an exhibit, where the reference sample's first quartile is 12.1%. A page with **no** exhibit is held instead to the ink its own word floor produces (0.00052 per word, measured by rendering: 4.4% at the balanced 95-word floor), because a page of type cannot reach 11.5% at any honest length |
+| Ink coverage | `INK_COVERAGE` | at least 11.5% of the content area (14% on a `full` deck, 5% on an `airy` one) — set for pages with an exhibit, where a typical page's first quartile is 12.1%. A page with **no** exhibit is held instead to the ink its own word floor produces (0.00052 per word, measured by rendering: 4.4% at the balanced 95-word floor), because a page of type cannot reach 11.5% at any honest length |
 | Trailing dead band | `DEAD_BAND` | at most 8% (6% full, 14% airy) |
 | Internal void | `INTERNAL_VOID` | at most 22% between two content blocks (16% full, 32% airy) |
 | Right column stops short | `COLUMN_VOID` | at most 20% of the page, `full` decks only |
@@ -16,7 +16,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Body type | `TYPE_RANGE` | 10 to 14 pt body, 8 to 11 pt chart furniture, 20 to 26 pt titles |
 | Characters per line | `CPL` | 35 to 90 |
 | Takeaway band length | `TAKEAWAY_LONG` | at most three lines; one or two is the norm |
-| Body words, exhibit page | `WORDS` | the measured body band, 128 prose words (`live-pitch` 77, `pre-read` 179, `appendix` 224). A text page is held to the 1,832-page corpus instead: 196 words, `live-pitch` 127, `pre-read` 282, `appendix` 352. Table cells and chart furniture are evidence, not prose |
+| Body words, exhibit page | `WORDS` | the target body band, 128 prose words (`live-pitch` 77, `pre-read` 179, `appendix` 224). A text page is held to the text-page target instead: 196 words, `live-pitch` 127, `pre-read` 282, `appendix` 352. Table cells and chart furniture are evidence, not prose |
 | Hero exhibit, analytical page | `HERO_EXHIBIT` | at least 40% of the content area, carrying ink |
 | Layout repetition | `LAYOUT_MONOTONY` | no layout signature on more than 35% of content pages |
 | Page families | `PAGE_VARIETY` | at least three families across ten pages or more |
@@ -27,7 +27,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Sections and tracker | `NO_SECTIONS` | required past twelve analytical pages |
 | Contents page | `NO_CONTENTS` | a sectioned deck past twelve analytical pages says what its sections are |
 | Opening summary | `NO_SUMMARY` | the first analytical page declares `role: "executive-summary"` before the first section; the shape preset is optional and metrics do not establish the role |
-| Body text floor | `THIN_PAGE` | the deck's `weight.pageWords`, counted in the body alone (95 balanced, 120 full); reference client slides carry 128 body words |
+| Body text floor | `THIN_PAGE` | the deck's `weight.pageWords`, counted in the body alone (95 balanced, 120 full); a typical well-made page carries 128 body words |
 | Notes carrying the page | `NOTE_HEAVY` | the footer stays under a third of the page's text |
 | Plan-time shortfall | `THIN_PLAN` | preflight: what the page will carry against the floor, with the remedy its own data offers |
 | Chart annotation | `UNANNOTATED` | a bracket, a flag, a change bubble, a base or an observation on any plot of three marks or more |
@@ -51,13 +51,13 @@ Measured on the rendered page before review. The report records severity. `runti
 | What is measured | Code | The bar |
 | --- | --- | --- |
 | Compared columns that agree | `TWIN_CELLS` | two or more rows, over 40% of the table, where two compared cells are the same words |
-| Commentary against its exhibit | `RESTATEMENT` | at most 47% of the column's content words already in the exhibit (reference decks run 25–36%), and at most 66% of any one block's - a column does not average out the block a reader stops at |
+| Commentary against its exhibit | `RESTATEMENT` | at most 47% of the column's content words already in the exhibit (well-made decks run 25–36%), and at most 66% of any one block's - a column does not average out the block a reader stops at |
 | Planning language on the page | `PLANNING_VOICE` | no sentence opens `Interpretation:`, `Takeaway:`, `So what:` or `Key insight —` |
 | Limits against findings | `CAVEAT_HEAVY` | at most 2 caveat lines a page; a finding in contrastive form ("not X; it Y") is not a caveat |
 | The same table, repeated | `TABLE_SCHEMA_FLAT` | at most 3 tables in a deck open with the same column headers |
 | A share the page's own counts do not give | `CONTRADICTED_SHARE` | where a page prints "N of M", every percentage on it is a subset of those counts over M, within one count |
-| What the deck draws, by device family | `DECK_VOCABULARY` | advisory: at least four of ten device families (icon, picture, score, value pill, in-cell bar, heat, state, growth, reference, annotation) drawn somewhere in a deck of twelve analytical pages or more. A vocabulary floor, not a corpus rate: what share of client pages carry a harvey ball cannot be read off a render. Measured on the composed scene, because a plan can record a treatment the page never draws |
-| What the deck does, page after page | `DECK_CRAFT` | advisory legacy screen: a phrase emphasised on at least 35% of pages (client decks run 51%), a source on at least 50% (they run 67%), at least 11 drawn elements a page (the corpus median is 32), no single table device on more than 60% of the tables, and a drawn mark in the gutter between an exhibit and its commentary on no more than 40% of the pages that pair the two - the reference decks state that relation in words far more often than they draw it. These counts never require decoration |
+| What the deck draws, by device family | `DECK_VOCABULARY` | advisory: at least four of ten device families (icon, picture, score, value pill, in-cell bar, heat, state, growth, reference, annotation) drawn somewhere in a deck of twelve analytical pages or more. A vocabulary floor, not a target rate: what share of pages carry a harvey ball cannot be read off a render. Measured on the composed scene, because a plan can record a treatment the page never draws |
+| What the deck does, page after page | `DECK_CRAFT` | advisory legacy screen: a phrase emphasised on at least 35% of pages (well-made decks run 51%), a source on at least 50% (they run 67%), at least 11 drawn elements a page (the typical median is 32), no single table device on more than 60% of the tables, and a drawn mark in the gutter between an exhibit and its commentary on no more than 40% of the pages that pair the two - well-made decks state that relation in words far more often than they draw it. These counts never require decoration |
 
 Two more findings share the shape but fire before the page is rendered, from the composer rather than the gates: `THIN_PLAN` (what the page will carry against its floor, with the remedy that page's own data offers) and `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
 
@@ -97,11 +97,11 @@ Use new domains, source structures and realistic input ambiguity to test transfe
 
 An independent whole-deck reader follows Taste review. Inspect whether the revised decision rule helped an unseen case, not only whether the last defect vanished. Short export/component probes remain diagnostics and never establish the full-deck taste result. Retain failures and repair the earliest shared owner; do not rewrite the score to meet a requested target.
 
-## Corpus calibration
+## Target calibration
 
-The calibration sample contains 3,606 analytical pages from 28 client engagement decks, with covers, dividers, back matter and portrait documents excluded. Published thought leadership is a separate contrast. These are descriptive distributions, not content or decoration quotas. The values come from `runtime/weight.json`; repository-only acquisition and measurement evidence lives in `evals/corpus/`.
+The targets describe a typical analytical page, with covers, dividers, back matter and portrait documents excluded. A working deck is one read in a meeting or as a pre-read; a narrative deck is a longer-form report set as slides, shown for contrast. These are descriptive distributions, not content or decoration quotas. The values come from `runtime/weight.json`.
 
-| Per analytical page | Client decks | Published work | What the gate does with it |
+| Per analytical page | Working deck | Narrative deck | What the gate does with it |
 | --- | --- | --- | --- |
 | Ink on the page | median 18%, quartiles 12% and 27% | 19% | `INK_COVERAGE` reports the active fill profile’s diagnostic threshold |
 | Words of page text | 189 (p20 110, p80 290) | 198 | `WORDS` caps, by profile |
@@ -117,4 +117,4 @@ The calibration sample contains 3,606 analytical pages from 28 client engagement
 | Titles that state a claim | 65% (89% on chart pages, 38% on table pages) | 55% | the house rule is every page; this is the gap to close |
 | Pages with a commentary column | 33% (13% on pages of type) | 43% | it is not the default - see `storylining.md` |
 | Charts carrying an annotation | **80%** | 63% | descriptive reference; no annotation quota |
-| Tables carrying a treatment | **100%** (32 of 32) | 89% | descriptive reference; treatment follows meaning |
+| Tables carrying a treatment | **100%** | 89% | descriptive reference; treatment follows meaning |

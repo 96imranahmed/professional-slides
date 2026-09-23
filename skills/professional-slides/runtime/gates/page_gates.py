@@ -40,7 +40,7 @@ from typing import NamedTuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nice_ticks import is_nice_tick, nice_axis, parse_number  # noqa: E402
 
-# The weight contract and the corpus it is calibrated against. One file, read
+# The weight contract and the benchmark figures it is set against. One file, read
 # here and by runtime/weight.mjs, so a floor cannot move in the composer
 # without moving in the finding that reports it.
 CONTRACT = json.loads((Path(__file__).resolve().parent.parent / "weight.json").read_text(encoding="utf-8"))
@@ -97,8 +97,8 @@ ARGUMENT_COMPONENTS = {"insight", "callout", "bullet-list", "evidence-note", "st
 # Pages carried by pictures rather than measurement.
 QUALITATIVE_COMPONENTS = {"image-frame", "logos", "logo-collage", "people", "quote-cluster", "icon-trends"}
 STRUCTURE_COMPONENTS = {"section-divider", "agenda", "tracker-page", "statement", "takeaways"}
-# A photograph, not an icon, a logo mark or a spot image: the reference pages
-# carry a small image on about half their pages (median 0.5% of the page), and
+# A photograph, not an icon, a logo mark or a spot image: a well-made deck
+# carries a small image on about half their pages (median 0.5% of the page), and
 # those are marks, not decoration. A photograph covers 3% of the canvas and up.
 PHOTO_MIN_AREA = 0.03 * CANVAS_W * CANVAS_H
 # "1939 • Marvel Comics #1": a bullet doing the work of a comma, a bracket or a
@@ -108,7 +108,7 @@ PHOTO_MIN_AREA = 0.03 * CANVAS_W * CANVAS_H
 
 TYPE_RANGES = {
     "body": (10.0, 14.0),
-    # The reference decks run twenty- and thirty-row tables small rather than
+    # A strong deck runs twenty- and thirty-row tables small rather than
     # splitting them, and a cell is a lookup value, not prose. The floor is the
     # densest rung the composer actually has: `compact` sets cells at
     # type.compact, 9 pt, and `dense` at type.label, 8.5. The floor sat at 9.0
@@ -124,16 +124,16 @@ TYPE_RANGES = {
 # How full the deck means to read (`fill` on the spec, carried on the scene).
 # Emptiness is right for a live-pitch deck and wrong for a pre-read, so the
 # three geometric thresholds move with it; nothing else does.
-# Ink is calibrated against the corpus, not against taste: 2,125 rendered pages
-# of published client decks run a median ink share of 0.191, a first quartile of
-# 0.112 and a tenth percentile of 0.077. A document-weight page floors at the
-# quartile, a balanced page at the tenth percentile, an airy page below both.
-# The ladder that ran 0.14 / 0.115 failed 36% and 26% of published pages.
+# Ink is set against a benchmark, not against taste: well-made pages run a
+# median ink share of 0.191, a first quartile of 0.112 and a tenth percentile
+# of 0.077. A document-weight page floors at the quartile, a balanced page at
+# the tenth percentile, an airy page below both.
+# The ladder that ran 0.14 / 0.115 failed 36% and 26% of well-made pages.
 FILL_LEVELS = CONTRACT["geometryByFill"]
-# The reference corpus, measured three ways by evals/corpus/measure_corpus.py.
-# `slides` is the pixel sample: 2,125 pages from 426 published decks rendered
-# onto this same 1280x720 canvas. `corpus` is the wide text sample, 16,334
-# analytical pages. `judged` is a vision pass over 264 pages, one per deck.
+# The benchmark figures, three views of a well-made page. `slides` holds the
+# pixel and band figures on this same 1280x720 canvas, `benchmark` the page-text
+# word counts, and `judged` the rates at which a deck emphasises, sources and
+# annotates.
 REFERENCE_PAGE = CONTRACT["reference"]["slides"]
 REFERENCE_JUDGED = CONTRACT["reference"]["judged"]
 # Ink a page of body type puts on the canvas per word, measured by rendering
@@ -151,34 +151,34 @@ DEFAULT_FILL = CONTRACT["defaultFill"]
 # ceiling — the ceiling on prose is WORDS, and density is only a defect when
 # the content is not.
 WEIGHT_BY_FILL = CONTRACT["byFill"]
-# The wide corpus: 1,832 pages of page text, median 196 words, quartiles 127 and
+# Page text on a well-made analytical page: median 196 words, quartiles 127 and
 # 282. The floors sit below that on purpose.
-REFERENCE_PAGE_WORDS = CONTRACT["reference"]["corpus"]
-# The careful sample, split into the page's three bands: what a reference
-# analytical slide carries where.
-REFERENCE_PAGE_BANDS = dict(REFERENCE_PAGE["bands"], pages=REFERENCE_PAGE["pages"])
+REFERENCE_PAGE_WORDS = CONTRACT["reference"]["benchmark"]
+# The same page split into its three bands: what a well-made analytical slide
+# carries where.
+REFERENCE_PAGE_BANDS = dict(REFERENCE_PAGE["bands"])
 
 # Density profiles change how much prose a page may carry; they never relax a
 # geometric or typographic threshold.
 #
-# Derived from the corpus rather than chosen. These were eight bare numbers -
+# Derived from the benchmark rather than chosen. These were eight bare numbers -
 # 70/100, 100/140, 160/220, 200/280 - in a file where every neighbouring
-# threshold cites what it was measured against, and they sat *below* what the
-# reference decks carry: `executive` capped a text page at 140 words while the
-# 1,832-page corpus runs a median of 196 and the 137-slide sample a median of
-# 185. A ceiling under the median of the work you are imitating is not a
-# ceiling, it is a tax.
+# threshold says what it rests on, and they sat *below* what a strong deck
+# carries: `executive` capped a text page at 140 words while a well-made page
+# runs a median of 196 words of page text (185 on an analytical slide). A
+# ceiling under the median of the work you are imitating is not a ceiling, it
+# is a tax.
 #
 # A page whose evidence is an exhibit spends its area on the exhibit, so its
 # prose ceiling is the measured body band; a page whose evidence *is* its prose
-# may run to the corpus figure for its density.
+# may run to the benchmark figure for its density.
 _BODY_BAND = REFERENCE_PAGE["bands"]["body"]          # 128 words, measured band by band
 PROFILES = {
-    # Read from a stage: the body band cut back, and the corpus's own lower quartile.
+    # Read from a stage: the body band cut back, and the benchmark's lower quartile.
     "live-pitch": {"words_exhibit": round(_BODY_BAND * 0.6), "words_text": REFERENCE_PAGE_WORDS["p25"]},
-    # The default, and the corpus at its middle.
+    # The default, and the benchmark at its middle.
     "executive": {"words_exhibit": _BODY_BAND, "words_text": REFERENCE_PAGE_WORDS["median"]},
-    # Read at a desk: the corpus's upper quartile.
+    # Read at a desk: the benchmark's upper quartile.
     "pre-read": {"words_exhibit": round(_BODY_BAND * 1.4), "words_text": REFERENCE_PAGE_WORDS["p75"]},
     # Source-rich support behind the story, set in the smallest approved type:
     # it carries more words in the same frame, by design.
@@ -188,17 +188,17 @@ DEFAULT_PROFILE = "executive"
 
 # Which stacked row of the page a component sits in, for `page_architecture`.
 # This was a bare `// 120` deciding what counts as the same row - and the
-# thresholds it feeds (`shapes_per_ten_min`, `shape_share_max`) cite the corpus,
-# so a measured bar was sitting on an invented measurement. A page stacks at
+# thresholds it feeds (`shapes_per_ten_min`, `shape_share_max`) rest on a
+# benchmark, so a measured bar was sitting on an invented measurement. A page stacks at
 # most six bands of content between its title and its footer, so the band is the
 # canvas divided by six; the value is unchanged and now says where it comes from.
 ARCH_BAND = CANVAS_H // 6
 WEIGHT = dict(WEIGHT_BY_FILL[DEFAULT_FILL])
 
 THRESHOLDS = {
-    "ink_min": 0.077,  # the corpus's tenth percentile over 2,125 rendered pages; waived when a qualifying hero exhibit carries the page (a line chart is ink-light by nature)
-    "dead_band_max": 0.08,       # fires on 6% of published pages; the corpus p90 is 0.049
-    "internal_void_max": 0.13,   # 94px of nothing between two content blocks; the corpus p90 is 0.069
+    "ink_min": 0.077,  # the benchmark's tenth percentile; waived when a qualifying hero exhibit carries the page (a line chart is ink-light by nature)
+    "dead_band_max": 0.08,       # fires on 6% of well-made pages; their p90 is 0.049
+    "internal_void_max": 0.13,   # 94px of nothing between two content blocks; a well-made page's p90 is 0.069
     "exhibit_ink_min": 0.02,     # a hero frame must carry ink, not just area (a line chart sits near 2-3%, a 12pt table near 5-6%)
     "title_lines_max": 2,
     "title_words_max": 14,
@@ -215,16 +215,16 @@ THRESHOLDS = {
     "sections_from": 12,       # analytical pages beyond which a deck needs sections and a tracker
     "deck_shape_from": 8,      # analytical pages beyond which a deck needs a heavy page among the light ones
     "shape_variety_from": 10,   # analytical pages beyond which the deck needs more than one page architecture
-    "shapes_per_ten_min": 3.0,  # distinct architectures per ten pages (the reference decks run about five)
-    "shape_share_max": 0.40,    # share of pages on the commonest architecture (the reference median is 0.23)
+    "shapes_per_ten_min": 3.0,  # distinct architectures per ten pages (a strong deck runs about five)
+    "shape_share_max": 0.40,    # share of pages on the commonest architecture (a strong deck's median is 0.23)
     "front_matter_from": 12,    # analytical pages beyond which a deck needs a contents page and an opening summary
-    "column_run_max": 4,        # consecutive pages whose commentary column may share one device    # share of pages on the commonest architecture (the reference median is 0.23)
-    # What the page says. Calibrated on the four example decks, which are the
-    # only corpus in the repository - `--report` prints the measured value
-    # beside the floor so the number can be argued with.
+    "column_run_max": 4,        # consecutive pages whose commentary column may share one device
+    # What the page says. Set on the four example decks in the repository -
+    # `--report` prints the measured value beside the floor so the number can
+    # be argued with.
     # Share of the commentary's own content words already printed in the exhibit
-    # beside it. The corpus runs a median of 0.25-0.36 and a p90 of 0.47; this
-    # sat at 0.55, ABOVE the ninetieth percentile of the work it imitates, so it
+    # beside it. Strong commentary runs a median of 0.25-0.36 and a p90 of 0.47;
+    # this sat at 0.55, ABOVE the ninetieth percentile of the work it imitates, so it
     # could not fire - and until COMMENTARY_ROLES was corrected it could not see
     # a paragraph either. At 0.47 it flags the worst tenth, which is what a gate
     # about a tail is for.
@@ -235,27 +235,26 @@ THRESHOLDS = {
     # in it. The bar is higher than the column's, because a short sentence that
     # names two categories shares their words by naming them - "asset
     # valuations and public debt sit mid-table and moved little" is a reading,
-    # not a restatement, and runs 0.57 on a reference page. Past two thirds
+    # not a restatement, and runs 0.57 on a well-made page. Past two thirds
     # there is nothing left in the sentence that the exhibit did not supply.
     "restatement_block_words_min": 6,
     "restatement_block_max": 0.66,
     # DECK_CRAFT's own floors are not here: they live beside the observations
-    # they were calibrated from, in `weight.json` under `plan.craft`, and are
+    # they rest on, in `weight.json` under `plan.craft`, and are
     # read through CONTRACT. Two of the five already did, and `highlight` was
     # carried in both places at 0.35 - one number, two homes, and nothing
     # checking they agreed. `test_weight_contract` now asserts they cannot
     # diverge again.
-    "caveats_max": 2,           # caveat lines per page; the reference decks run at most two, the deck that failed ran three plus a table row plus a note
+    "caveats_max": 2,           # caveat lines per page; a strong deck runs at most two, the deck that failed ran three plus a table row plus a note
     "schema_repeat_max": 3,     # pages that may open their table with the same column headers (the deck that failed ran fourteen)
-    # What a deck DOES, measured over its own pages against 122 pages of real
-    # client-project work (evals/corpus). These were not measured anywhere:
-    # client decks highlight a phrase on half their pages and ours managed a
-    # fifth.
+    # What a deck DOES, measured over its own pages against the rates a strong
+    # deck keeps. These were not checked anywhere: a strong deck highlights a
+    # phrase on half its pages and ours managed a fifth.
     #
     # A fourth rate was tried and removed: commentary columns per page, capped
-    # at the corpus's 0.33. Our decks run 0.78 to 1.00 and would all have failed
-    # it - but their commentary's own overlap with the exhibit beside it runs a
-    # median of 0.17 to 0.30 against a corpus median of 0.25 to 0.36. They talk
+    # at 0.33. Our decks run 0.78 to 1.00 and would all have failed it - but
+    # their commentary's own overlap with the exhibit beside it runs a median of
+    # 0.17 to 0.30 against a benchmark median of 0.25 to 0.36. They talk
     # on most pages and they are not restating. The cap was measuring the wrong
     # thing: the defect is commentary that says the exhibit again, and
     # RESTATEMENT measures exactly that - so RESTATEMENT is where the threshold
@@ -448,7 +447,7 @@ GATE_CODES = {
     "CAVEAT_HEAVY": "a page spending more of itself on limits than on findings",
     "TABLE_SCHEMA_FLAT": "the same table invented over and over across the deck",
     "CONTRADICTED_SHARE": "a percentage in the prose the page's own counts do not give",
-    "DECK_CRAFT": "the deck emphasises, sources or comments at a rate real client decks do not",
+    "DECK_CRAFT": "the deck emphasises, sources or comments at a rate strong decks do not",
     "DECK_VOCABULARY": "the deck draws a couple of devices and leaves the rest of the vocabulary unused",
     "UNSCALED_FIGURE": "a figure drawn to a scale its own printed numbers contradict",
     "TITLE_COUNT": "the title states a count the page's own exhibit does not show",
@@ -531,12 +530,12 @@ def gate_column_void(slide_no, matrix, findings):
 def text_page_ink_floor():
     """The ink a page of type alone must show: what its required words produce.
 
-    `ink_min` is calibrated on pages with an exhibit - the careful sample's ink
-    first quartile is 0.121 over 137 analytical slides, and the balanced floor
+    `ink_min` is set on pages with an exhibit - a well-made analytical slide's
+    ink first quartile is 0.121, and the balanced floor
     of 0.115 sits just under it. A page of body type cannot reach that at any
     honest length: rendering text pages from 93 to 185 words gives a straight
     line at 0.00052 ink per word, so 0.115 would need about 220 words of body
-    against a reference body of 128. The floor was not a high bar for those
+    against a benchmark body of 128. The floor was not a high bar for those
     pages, it was an impossible one.
 
     So a text page is held to the ink its own word floor produces, which makes
@@ -633,8 +632,8 @@ def gate_title(slide_no, slide, findings):
 
 def gate_type_range(slide_no, slide, findings, profile=DEFAULT_PROFILE):
     """TYPE_RANGE across body, chart furniture, title and source roles. An
-    appendix page is set smaller on purpose - the corpus runs its model grids and
-    source tables at 8 pt - so its table cells and chart furniture floor a point
+    appendix page is set smaller on purpose - a strong deck runs its model grids
+    and source tables at 8 pt - so its table cells and chart furniture floor a point
     lower than a page that sits in the story."""
     relax = 1.0 if profile == "appendix" else 0.0
     for node in text_nodes(slide):
@@ -847,14 +846,13 @@ def gate_nice_ticks(slide_no, slide, findings):
 def page_text_words(slide):
     """Every word printed on the page: title, labels, table cells, footnotes.
     The same thing `pdftotext` counts, so our pages can be compared with the
-    reference decks rather than with our own idea of a page."""
+    benchmark rather than with our own idea of a page."""
     bands = page_bands(slide)
     return bands.body + bands.footer + bands.title_band
 
 
-# The bands of the page. Measured over 137 analytical reference slides, their
-# title band carries 20 words, their body 128 and their footer 19; ours carried
-# 14 / 87 / 33. The gap is the body, and the footer is the one band where we
+# The bands of the page. A well-made analytical slide's title band carries 20
+# words, its body 128 and its footer 19; ours carried 14 / 87 / 33. The gap is the body, and the footer is the one band where we
 # were ahead - which is exactly what a floor counting all page text rewards.
 BODY_TOP = 0.18
 BODY_BOTTOM = 0.88
@@ -943,7 +941,7 @@ def nodes_inside(slide, frame, predicate=None):
 
 
 def thin_remedy(where="The page"):
-    """Corpus density is diagnostic; the complete-copy contract owns matched coverage."""
+    """Benchmark density is diagnostic; the complete-copy contract owns matched coverage."""
     return (
         f"{where} falls below the deck-wide body-word diagnostic. Compare its "
         "complete text plan with the matched reference reading task and retain "
@@ -1518,7 +1516,7 @@ CAVEAT_RE = re.compile(
 # "Education does not decide the city; it decides the neighborhood" is a finding
 # in contrastive form, not a caveat. The negation sets up the positive clause
 # that follows it, and counting it as a hedge punishes the sharpest sentence on
-# the page - which it did, on a reference deck, the first time this gate ran.
+# the page - which it did, on a well-made deck, the first time this gate ran.
 CONTRAST_RE = re.compile(r"(;\s*it\b|,\s*it\b|\bbut\b|\brather,|\binstead\b|\bwhat it does\b|\bit is\b)", re.I)
 # Planning language: the vocabulary of the dot-dash, which belongs in the plan.
 PLANNING_PREFIX_RE = re.compile(
@@ -1892,7 +1890,7 @@ TABLE_COMPONENTS = {"table", "comparison-table", "heatmap", "trend-rows"}
 
 
 def gate_deck_craft(slides, analytical, findings):
-    """DECK_CRAFT. What the deck does, over its own pages, against what client
+    """DECK_CRAFT. What the deck does, over its own pages, against what strong
     decks do over theirs.
 
     Every other deck-level gate here counts shapes - how many families, how many
@@ -1900,17 +1898,17 @@ def gate_deck_craft(slides, analytical, findings):
     four things a reader notices first, and all four are a share of pages rather
     than a property of one:
 
-      highlight   a phrase set in the accent inside a sentence. Client decks do
+      highlight   a phrase set in the accent inside a sentence. Strong decks do
                   this on half their pages and on seven pages of type in ten.
                   Our example decks managed 0.05 to 0.22.
-      source      the line that says where the numbers came from. 0.67 in client
-                  work; a page without one is a page a reader cannot check.
-      marks       drawn primitives that are not type, per page. The corpus runs
-                  a median of 32 and a first quartile of 11.
-      treated     tables carrying a device beyond a plain grid. 32 of 32 in
-                  client work - not one plain grid in 28 decks.
-      annotated   charts carrying a mark that states the finding. 0.80 in client
-                  work. These two had floors in `plan.craft` and the floors ran
+      source      the line that says where the numbers came from. 0.67 in a
+                  strong deck; a page without one is a page a reader cannot check.
+      marks       drawn primitives that are not type, per page. A strong deck
+                  runs a median of 32 and a first quartile of 11.
+      treated     tables carrying a device beyond a plain grid. Every one in a
+                  strong deck - a plain grid is the exception.
+      annotated   charts carrying a mark that states the finding. 0.80 in a
+                  strong deck. These two had floors in `plan.craft` and the floors ran
                   only when a plan file existed, so a deck could ship 33%
                   annotated charts and pass its own build.
 
@@ -1939,8 +1937,8 @@ def gate_deck_craft(slides, analytical, findings):
         return float(frame.get("width") or 0) * float(frame.get("height") or 0)
 
     def carrying(test):
-        """Pages *carried by* this kind of exhibit, which is what the corpus
-        counted. A chart's own values printed as a one-row strip beneath it is
+        """Pages *carried by* this kind of exhibit, which is what the rate
+        counts. A chart's own values printed as a one-row strip beneath it is
         furniture, not a table the page has to treat - so an exhibit counts
         only when it is the biggest one on its page."""
         out = []
@@ -1974,7 +1972,7 @@ def gate_deck_craft(slides, analytical, findings):
 
     # The mark in the gutter between an exhibit and the commentary read off it.
     # Every page that sets those two side by side has to join them, and the
-    # reference decks do it in words far more often than they draw it: a named
+    # strong decks do it in words far more often than they draw it: a named
     # heading ("As a result of..."), a headed panel ("Key facts" against
     # "Perspectives"), a closing band, or nothing at all. Drawing it is the
     # emphatic option and it is spent on the pages where the inference is the
@@ -2010,7 +2008,7 @@ def gate_deck_craft(slides, analytical, findings):
     # pills, harvey balls, in-cell bars - and a deck that uses one of them
     # everywhere has chosen once.
     # Banding is not a choice: a grid past five rows bands itself so the reader
-    # keeps their place, and client work bands nearly everything. What counts
+    # keeps their place, and strong decks band nearly everything. What counts
     # here is the device the author chose - the gutter, the pills, the balls,
     # the bars, the filled category cells.
     chosen = []
@@ -2031,24 +2029,24 @@ def gate_deck_craft(slides, analytical, findings):
             "tablesTreated": craft["tableTreated"]["min"], "chartsAnnotated": craft["chartAnnotated"]["min"],
             "commonestTableDevice": craft["tableDevice"]["shareMax"],
             "drawnBridges": craft["drawnBridge"]["shareMax"]}
-    client = REFERENCE_JUDGED
+    target = REFERENCE_JUDGED
     short = []
     if highlighted < want["highlight"]:
         short.append(
-            f"a phrase is emphasised on {highlighted:.0%} of pages against {client['highlightedPhrase']:.0%} in "
-            "client decks. Review whether the decisive comparison needs emphasis; neutral is valid")
+            f"a phrase is emphasised on {highlighted:.0%} of pages against {target['highlightedPhrase']:.0%} in "
+            "strong decks. Review whether the decisive comparison needs emphasis; neutral is valid")
     if sourced < want["source"]:
         short.append(
-            f"only {sourced:.0%} of pages carry a source against {client['sourceLine']:.0%}. A measured page "
+            f"only {sourced:.0%} of pages carry a source against {target['sourceLine']:.0%}. A measured page "
             "says where the measure came from")
     if treated is not None and treated < want["tablesTreated"]:
         short.append(
-            f"{treated:.0%} of the tables carry a treatment against {craft['tableTreated']['observedClient']:.0%} in "
-            f"client work. Review the {len(tables)} tables by their reading task; do not add treatment for its frequency")
+            f"{treated:.0%} of the tables carry a treatment against {craft['tableTreated']['observed']:.0%} in "
+            f"strong decks. Review the {len(tables)} tables by their reading task; do not add treatment for its frequency")
     if annotated is not None and annotated < want["chartsAnnotated"]:
         short.append(
             f"{annotated:.0%} of the charts carry a mark that states the finding against "
-            f"{craft['chartAnnotated']['observedClient']:.0%} in client work. A bracket between the two series the "
+            f"{craft['chartAnnotated']['observed']:.0%} in strong decks. A bracket between the two series the "
             "title compares may help, as may a reference line at a real target; use neither without a content reason")
     if (commonest is not None and len(tables) >= craft["tableDevice"]["from"]
             and commonest > want["commonestTableDevice"]):
@@ -2060,19 +2058,19 @@ def gate_deck_craft(slides, analytical, findings):
         commonest_bridge = Counter(inferences).most_common(1)[0]
         short.append(
             f"{drawnShare:.0%} of the {len(joined)} pages that set an exhibit against its commentary draw a mark "
-            f"in the gutter, {commonest_bridge[1]} of them the same one ({commonest_bridge[0]}). The reference "
+            f"in the gutter, {commonest_bridge[1]} of them the same one ({commonest_bridge[0]}). Strong "
             "decks carry that relation in the commentary's heading, in a headed panel, in a closing band or in "
             "nothing at all, and draw it on the few pages where the inference is the page's work. Review which "
             "of these pages is actually asserting an inference and let the words join the rest")
     if marks < want["marksPerPage"]:
         short.append(
-            f"{marks:.0f} drawn elements a page against a corpus median of {REFERENCE_PAGE['drawings']}. A page "
+            f"{marks:.0f} drawn elements a page against a benchmark median of {REFERENCE_PAGE['drawings']}. A page "
             "of rules and paragraphs is what a reader feels before reading a word")
     if not short:
         return
     findings.append(finding(
         None, "DECK_CRAFT", measured, want,
-        "Reference-distribution differences for visual review, not decoration targets: " + "; ".join(short) + ".",
+        "Differences from the benchmark rates, for visual review, not decoration targets: " + "; ".join(short) + ".",
     ))
 
 
@@ -2253,8 +2251,8 @@ def gate_deck_front_matter(slides, analytical, findings, fill):
 
 
 def gate_deck_shape(slides, analytical, findings, fill):
-    """DECK_FLAT, deck level. The reference client decks do not carry the same
-    page twice: their page text runs from 104 words at the lower quintile to 278
+    """DECK_FLAT, deck level. A strong deck does not carry the same page
+    twice: its page text runs from 104 words at the lower quintile to 278
     at the upper, and two pages in five carry 200 words or more. A deck whose
     pages all weigh the same has not decided which pages matter - and the way to
     fix it is a page that carries the detail (a findings matrix, a deep measure
@@ -2444,8 +2442,8 @@ def gate_column_monotony(slides, content_indexes, findings):
     """COLUMN_MONOTONY, deck level.
 
     Four or more consecutive analytical pages whose commentary column uses the
-    same device. The reference decks mark a column with icons, an accent lead
-    phrase, a hairline or nothing at all, and reserve the numbered disc for an
+    same device. A strong deck marks a column with icons, an accent lead
+    phrase, a hairline or nothing at all, and reserves the numbered disc for an
     ordered ledger; a deck that reaches for one device every time reads as one
     page repeated even when its exhibits differ.
     """
@@ -2485,10 +2483,10 @@ def gate_column_monotony(slides, content_indexes, findings):
 def gate_page_shape_flat(slides, content_indexes, findings, fill):
     """PAGE_SHAPE_FLAT, deck level.
 
-    Measured over the reference client decks, a deck runs about five distinct
-    page architectures per ten analytical pages and never lets one architecture
-    past a quarter of them. A deck built before the composer scored its shapes
-    ran 1.3 per ten with 69% on one, which no page-level gate could see.
+    A strong deck runs about five distinct page architectures per ten
+    analytical pages and never lets one architecture past a quarter of them. A
+    deck built before the composer scored its shapes ran 1.3 per ten with 69% on
+    one, which no page-level gate could see.
     """
     # A catalogue declares itself airy: every page there exists to show one
     # encoding, so one architecture repeated is the point, not the defect.
