@@ -35,7 +35,7 @@ Spawn one reviewer per whole-deck candidate. Give the realistic brief, exact art
 Review <candidate> as its intended reader, using <brief> and <source records>.
 Read the current skill's Storylining, Design and Taste review guidance.
 Read the titles first, then every original and spread in <out>/rendered/.
-Compare strong relevant originals from every requested reference deck.
+Compare strong relevant pages of any reference deck the user supplied.
 Write an independent assessment before consulting prior scores or repairs.
 Return the bound review and literal reference/page coverage with concrete comparisons.
 ```
@@ -50,7 +50,7 @@ Do not supply a desired score. Keep each candidate and report. Iterate requested
 
 At each scale judge the saved artifact, not its labels or metadata. A declaration of category treatment is not a filled cell; a diagram with arrows is not a developed mechanism. A complete compact summary does not need extra metrics or icons.
 
-For a pre-read, explicitly test substantive text coverage against comparable reference originals. Can the reader explain why the evidence supports the claim, the relevant mechanism, the material limitation and the decision consequence from the page alone? Flag recurring terse labels, unsupported takeaways and large empty regions where necessary explanation is absent. Repair the missing reasoning before resizing visuals; extra repeated sentences or a mandatory insight box do not satisfy this check.
+For a pre-read, explicitly test substantive text coverage against the task targets in `density-profile.json` and any reference the user supplied. Can the reader explain why the evidence supports the claim, the relevant mechanism, the material limitation and the decision consequence from the page alone? Flag recurring terse labels, unsupported takeaways and large empty regions where necessary explanation is absent. Repair the missing reasoning before resizing visuals; extra repeated sentences or a mandatory insight box do not satisfy this check.
 
 ## Density pass
 
@@ -77,7 +77,7 @@ Do not list twenty copies of one defect. Name the cause, affected IDs and earlie
 
 ## Benchmark and score
 
-Before scoring, inspect strong comparable originals from each requested reference. Compare the evidence relationship and reader effort: what does the reference make visible that the candidate leaves to prose or mental joins? Use the [atlas](reference-atlas.md) to find suitable devices, not to substitute schematics for original reference inspection. Do not copy reference quirks that conflict with the user brief.
+Before scoring, compare the candidate with the [atlas](reference-atlas.md) devices and, when the user supplied reference decks, with their strong comparable pages. Compare the evidence relationship and reader effort: what would a strong page make visible that the candidate leaves to prose or mental joins? Do not copy reference quirks that conflict with the user brief. Reference material is only what the user supplies in the task: never search the machine for decks, a corpus or client documents to benchmark against.
 
 Record argument, evidence, visual explanation, hierarchy/copy and sequence quality separately in the narrative. Use calibrated anchors, not a mechanical average:
 
@@ -96,4 +96,4 @@ Return `out/taste-review.json` using `runtime/reviewer.mjs`: `accepted`, `summar
 
 Compute `binding` with `reviewBinding(out)` after inspecting current files. It hashes PPTX, scene and every render. `inspectedSlides` contains all current IDs actually inspected; a verification review lists the IDs its packet names. Delivery rejects a stale or incomplete review; every rebuild requires a new review, which is a verification of the changed pages unless `--full-review` is passed.
 
-Keep a reference inventory with path/hash, availability, total pages and exact originals inspected. Distinguish deck coverage from page coverage; sampling every reference deck is not inspecting every page. Historical reports and unavailable/damaged pages do not count as fresh visual inspection. Disclose missing model/source verification. Technical validation, editorial acceptance and user acceptance remain distinct.
+When the user supplied reference decks, keep an inventory of them with the pages inspected; sampling every reference deck is not inspecting every page. Historical reports and unavailable/damaged pages do not count as fresh visual inspection. Disclose missing model/source verification. Technical validation, editorial acceptance and user acceptance remain distinct.

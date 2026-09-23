@@ -16,14 +16,13 @@ const roles = new Set(['title', 'body', 'exhibit', 'qualification', 'source', 'f
 const CONTRACT = JSON.parse(readFileSync(new URL('./weight.json', import.meta.url), 'utf8'));
 export const TEXT_FORM = CONTRACT.plan.textForm;
 export const normalizeText = value => String(value ?? '').normalize('NFKC').replace(/[\u00ad\u200b]/g, '').replace(/-\s*\r?\n\s*/g, '-').replace(/\s+/g, ' ').trim();
-// The reference counting rule's excluded lines (evals/corpus/build_reading_tasks.py).
+// The client counting rule's excluded lines, as the shipped task targets were measured.
 const NOTE_LINE = /^\s*(source|sources|note|notes|footnote)\b[:\s]/i;
 export const textWords = value => normalizeText(value).split(/\s+/).filter(Boolean).length;
 const resolvePages = (value, scene) => String(value).replace(/\{\{page:([^}]+)\}\}/g, (_, id) => {
   const numbers = scene.slides.flatMap((s,i)=>s.id===id || s.sourceSlideId===id ? [i+1] : []);
   return numbers.length ? numbers.length>1 ? `${numbers[0]}–${numbers.at(-1)}` : String(numbers[0]) : `{{page:${id}}}`;
 });
-const quantile = (values, q) => { const a = [...values].sort((x,y)=>x-y), i = (a.length-1)*q; return a.length ? a[Math.floor(i)] + (a[Math.ceil(i)]-a[Math.floor(i)])*(i%1) : null; };
 export function checkTextPlan(content, {required = false} = {}) {
   const enabled = required || content?.textContract === 'complete';
   const findings = [], scores = [];
@@ -40,9 +39,14 @@ export function checkTextPlan(content, {required = false} = {}) {
     // of its note, which the rendered density profile then found short.
     const bodyWords = blocks.filter(b=>['body','exhibit','qualification'].includes(b.role) && !NOTE_LINE.test(b.text)).reduce((n,b)=>n+textWords(b.text),0);
     const totalWords = blocks.filter(b=>b.role!=='furniture' && b.role!=='source').reduce((n,b)=>n+textWords(b.text),0);
+    // The page names its reading task and is held to that task's client
+    // quartiles, which ship with the runtime as numbers. It never cites, opens
+    // or measures a reference document: the pages behind the numbers are
+    // development evidence and are not part of the skill.
     const ref = page.textReference;
-    if (!ref?.task || !Array.isArray(ref.samples) || !ref.samples.length || ref.samples.some(s=>!s.reference || !Number.isInteger(s.page) || s.page<1 || !Number.isFinite(s.bodyWords) || s.bodyWords<0 || !Number.isFinite(s.totalWords) || s.totalWords<s.bodyWords || !s.sha256)) {
-      fail('TEXT_REFERENCE_MISSING','Supply measured, inspected reference pages serving this reading task, including source hash and body/total word counts.'); continue;
+    const target = READING_TASK_BANK[ref?.task];
+    if (!target) {
+      fail('TEXT_REFERENCE_MISSING',`Name this page's reading task in textReference.task: one of ${Object.keys(READING_TASK_BANK).join(', ')}.`); continue;
     }
     // Form, not just volume: the longest single run of prose on the page, and
     // how many runs there are. Exhibit cells and furniture are not prose.
@@ -54,8 +58,8 @@ export function checkTextPlan(content, {required = false} = {}) {
         + `(median block ${TEXT_FORM.wordsPerBlock.median} words, median page ${TEXT_FORM.blocksPerPage.median} blocks). `
         + 'Split it into two or three points that each make their own claim, rather than shortening the sentence.');
     }
-    const median = quantile(ref.samples.map(s=>s.bodyWords),.5), floor = quantile(ref.samples.map(s=>s.bodyWords),.25);
-    const score = {id:page.id,page:page.n,task:ref.task,bodyWords,totalWords,proseBlocks:prose.length,longestBlock:longest,referenceBodyMedian:median,referenceBodyLowerQuartile:floor,referenceTotalMedian:quantile(ref.samples.map(s=>s.totalWords),.5),textCoverageScore:median ? Math.round(bodyWords/median*100) : null,explanation:ref.rationale || null};
+    const median = target.bodyWords.median, floor = target.bodyWords.q1;
+    const score = {id:page.id,page:page.n,task:ref.task,bodyWords,totalWords,proseBlocks:prose.length,longestBlock:longest,referenceBodyMedian:median,referenceBodyLowerQuartile:floor,referenceTotalMedian:target.totalWords.median,textCoverageScore:median ? Math.round(bodyWords/median*100) : null,explanation:ref.rationale || null};
     scores.push(score);
     // The floor is hard. It used to give way to a written rationale, and the
     // rationale became the way a thin page shipped: a fresh deck put two of its
@@ -108,11 +112,8 @@ export function auditTextPlan(content, scene) {
 // written before it.
 const BANK = JSON.parse(readFileSync(new URL('./reading-tasks.json', import.meta.url), 'utf8'));
 export const READING_TASK_BANK = BANK.tasks;
-export const READING_TASKS = Object.freeze({
-  'exhibit-with-commentary': {commentary: true},
-  'exhibit-led': {commentary: false},
-  ...Object.fromEntries(Object.entries(BANK.commentary).map(([task, commentary]) => [task, {commentary}])),
-});
+export const READING_TASKS = Object.freeze(Object.fromEntries(Object.entries(BANK.tasks)
+  .filter(([, t]) => typeof t.commentary === 'boolean').map(([task, t]) => [task, {commentary: t.commentary}])));
 const COMMENTARY_ROLES = new Set(['list-item', 'list-lead', 'paragraph']);
 export function readingTaskMismatch(task, slide) {
   const rule = READING_TASKS[task];
@@ -120,8 +121,8 @@ export function readingTaskMismatch(task, slide) {
   const commentary = (slide.nodes || []).some(n => n.type === 'text' && COMMENTARY_ROLES.has(String(n.role || '')));
   if (commentary === rule.commentary) return null;
   return rule.commentary
-    ? {task, commentary, reason: 'This page has no commentary column, so its reading task is exhibit-led: a full-width exhibit with a line of takeaway. Measured against pages with a commentary column, it can only reach the floor by padding its takeaway band. Measure exhibit-led references and use those.'}
-    : {task, commentary, reason: 'This page has a commentary column, so exhibit-led references understate what it should carry. Measure pages that pair an exhibit with commentary.'};
+    ? {task, commentary, reason: 'This page has no commentary column, so its reading task is exhibit-led: a full-width exhibit with a line of takeaway. Measured against pages with a commentary column, it can only reach the floor by padding its takeaway band. Name an exhibit-led task (chart-led, table-led, diagram-led).'}
+    : {task, commentary, reason: 'This page has a commentary column, so exhibit-led references understate what it should carry. Name a with-commentary task.'};
 }
 
 export function auditExportText(content, scene, pageTexts) {

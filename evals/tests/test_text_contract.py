@@ -32,10 +32,10 @@ const missingCover=structuredClone(stages);missingCover.content.pages.shift();
 assert.throws(()=>validateStageContract(spec,missingCover),/missing or has a changed title for cover/);
 assert.equal(normalizeText('net-\ndemand'), 'net-demand');
 assert.notEqual(normalizeText('net demand'), 'net-demand');
-const page={id:'case',n:1,claim:'The first approval releases preparation subject to explicit constraints',settles:{kind:'comparison',what:'Two defined alternatives'},adds:null,highlight:null,textPlan:[{id:'title',role:'title',text:'The first approval releases preparation subject to explicit constraints'},{id:'reason',role:'body',text:'Preparation preserves an option but does not authorize construction.'},{id:'data',role:'exhibit',text:'$31m'},{id:'source',role:'source',text:'Source: Designed fixture'}],textReference:{task:'Decision explanation',samples:[{reference:'ref',page:10,sha256:'a'.repeat(64),bodyWords:10,totalWords:20}]}};
+const page={id:'case',n:1,claim:'The first approval releases preparation subject to explicit constraints',settles:{kind:'comparison',what:'Two defined alternatives'},adds:null,highlight:null,textPlan:[{id:'title',role:'title',text:'The first approval releases preparation subject to explicit constraints'},{id:'reason',role:'body',text:'Preparation preserves an option but does not authorize construction. '+'The retained option keeps the approval path open while the gating permission is sought, '.repeat(3)+'and nothing is committed until then.'},{id:'data',role:'exhibit',text:'$31m'},{id:'source',role:'source',text:'Source: Designed fixture'}],textReference:{task:'chart-led'}};
 const content={textContract:'complete',pages:[page]};
 assert.ok(checkTextPlan(content).accepted);
-assert.equal(checkTextPlan(content).scores[0].textCoverageScore,100);
+assert.equal(checkTextPlan(content).scores[0].textCoverageScore,Math.round(58/55*100)); // 58 body words against the chart-led median of 55
 const thin=structuredClone(content);thin.pages[0].textPlan[1].text='Prepare now.';
 assert.ok(runContentGates(thin).findings.some(f=>f.code==='TEXT_COVERAGE_LOW'&&f.severity==='blocking'));
 thin.pages[0].textReference.rationale='The retained comparison identifies the full commitment and the sole gating permission; the reference also explains an unrelated mechanism.';

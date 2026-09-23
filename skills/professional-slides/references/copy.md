@@ -59,7 +59,7 @@ Numbers belong on marks. Replace a sentence that transcribes the chart with labe
 
 Word count is not shape. A deck can clear its text-coverage score with one long paragraph per page and still read as an essay with pictures, and one did: forty pages whose commentary was a single block of 150 to 200 words.
 
-Measured over 37 analytic pages of client-project decks (`evals/corpus/measure_text_form.py`):
+Measured during development over 37 analytic pages of client-project decks (the numbers ship in `runtime/weight.json`; the documents do not):
 
 | | Client decks | Write to |
 | --- | --- | --- |

@@ -170,11 +170,11 @@ Inspect repeated diagram geometry too. A central oval with surrounding boxes rem
 
 The existing blocking repetition screens remain: no architecture over 40% of analytical pages; ten-page windows contain at least three meaningful relationships. These are alarms, not a template-rotation recipe. A repeated comparison series needs an actual comparability reason; naming `series` alone is not editorial acceptance. Preserve common scales and geometry when repetition helps comparison. A 50-page minimum does not exempt a repetitive or deletable sequence.
 
-Alternatives must differ with colors and fonts ignored. Use different questions, orders or evidence relationships; retain comparable tasks where appropriate. After composition inspect the actual montage and originals because plan labels cannot certify the pixels.
+Alternatives must differ with colors and fonts ignored. Use different questions, orders or evidence relationships; retain comparable tasks where appropriate. After composition inspect the actual montage and the rendered pages at full size because plan labels cannot certify the pixels.
 
 ## Working from a reference deck
 
-For faithful reference transformation, inspect the whole supplied reference and map consolidations/splits. For benchmarking, select strong comparable originals from every requested deck and state literal page coverage. Extract analytical device, evidence payload, hierarchy, emphasis and readable type size before adopting a structure. Compare at equal viewing size. The [atlas](reference-atlas.md) points to devices, not an exemption from viewing the actual references. Do not copy reference quirks that contradict user preferences.
+For faithful reference transformation, inspect the whole supplied reference and map consolidations/splits. For benchmarking against decks the user supplied, select strong comparable pages from each and state literal page coverage. Only the user's own references count; never search for others. Extract analytical device, evidence payload, hierarchy, emphasis and readable type size before adopting a structure. Compare at equal viewing size. The [atlas](reference-atlas.md) describes devices; it is not a list of documents to find. Do not copy reference quirks that contradict user preferences.
 
 ## Visual review
 

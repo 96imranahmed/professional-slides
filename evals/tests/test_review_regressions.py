@@ -111,7 +111,7 @@ assert.match(prompt,/NARROW_REPERTOIRE/);
 assert.ok(prompt.includes('"exhibitVarietyPerTen": 7.5'),'candidate diagnostics reach the reviewer');
 assert.ok(!prompt.includes('"reference"') && !prompt.includes('7.1 to 8.3'),'historical aggregates are not presented as reference targets');
 assert.match(prompt,/Inspect every original page at full size, every spread/);
-assert.match(prompt,/every requested reference deck before scoring/);
+assert.match(prompt,/If the user supplied reference decks/);assert.match(prompt,/never search the machine/);
 assert.match(prompt,/peer status summaries/);
 assert.ok(prompt.includes('references/taste-review.md'));
 // Reviewer subprocesses inherit arbitrary authoring directories; guidance is package-relative.

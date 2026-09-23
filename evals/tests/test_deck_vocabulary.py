@@ -100,8 +100,7 @@ class TextFormTests(unittest.TestCase):
                 "adds": None, "highlight": None,
                 "textPlan": [{"id": "t", "role": "title", "text": "A page that proves something"},
                              {"id": "b", "role": "body", "text": body}],
-                "textReference": {"task": "t", "samples": [
-                    {"reference": "r.pdf", "page": 1, "sha256": "x" * 64, "bodyWords": 150, "totalWords": 160}]},
+                "textReference": {"task": "chart-with-commentary"},
             }],
         }
 
@@ -370,9 +369,11 @@ console.log(JSON.stringify(r.findings.filter(f => f.code === 'PLAN_CHART_MONOTON
 
 
 class ReadingTaskBankTests(unittest.TestCase):
-    """The shipped bank is every judged client page, measured and hashed."""
+    """The development bank is every judged client page, measured and hashed;
+    the runtime ships only each task's quartiles, distilled from it."""
 
-    BANK = json.loads((RUNTIME / "reading-tasks.json").read_text(encoding="utf-8"))
+    BANK = json.loads((ROOT / "evals" / "corpus" / "reading-task-bank.json").read_text(encoding="utf-8"))
+    SHIPPED = json.loads((RUNTIME / "reading-tasks.json").read_text(encoding="utf-8"))["tasks"]
 
     def test_every_sample_is_a_measured_hashed_page(self):
         for task, samples in self.BANK["tasks"].items():
@@ -382,10 +383,16 @@ class ReadingTaskBankTests(unittest.TestCase):
                     self.assertGreater(s["bodyWords"], 0, "a raster page is never a zero-word baseline")
                     self.assertGreaterEqual(s["totalWords"], s["bodyWords"])
 
+    def test_the_shipped_targets_are_the_banks_quartiles(self):
+        import statistics
+        for task, samples in self.BANK["tasks"].items():
+            with self.subTest(task=task):
+                words = [s["bodyWords"] for s in samples]
+                self.assertEqual(self.SHIPPED[task]["pages"], len(samples))
+                self.assertAlmostEqual(self.SHIPPED[task]["bodyWords"]["median"], statistics.median(words), delta=0.1)
+
     def test_a_chart_page_without_commentary_is_measured_against_its_own_kind(self):
-        led = sorted(s["bodyWords"] for s in self.BANK["tasks"]["chart-led"])
-        told = sorted(s["bodyWords"] for s in self.BANK["tasks"]["chart-with-commentary"])
-        self.assertLess(led[len(led) // 2], told[len(told) // 2])
+        self.assertLess(self.SHIPPED["chart-led"]["bodyWords"]["median"], self.SHIPPED["chart-with-commentary"]["bodyWords"]["median"])
 
     def test_the_cross_check_knows_every_task_that_has_a_column_or_not(self):
         known = run_node("""

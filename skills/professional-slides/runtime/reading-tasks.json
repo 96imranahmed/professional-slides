@@ -1,1109 +1,125 @@
 {
- "$comment": "    python3 evals/corpus/build_reading_tasks.py Method: pdftotext -layout; body words exclude the title and source lines.",
- "commentary": {
-  "chart-led": false,
-  "table-led": false,
-  "diagram-led": false,
-  "chart-with-commentary": true,
-  "table-with-commentary": true,
-  "diagram-with-commentary": true
- },
+ "$comment": "Word targets by reading task, distilled from the judged client-page bank kept under evals/corpus. Body words exclude the title and source lines (pdftotext -layout). The documents behind these numbers are not part of the skill: never search for, open or cite them.",
  "tasks": {
-  "chart-led": [
-   {
-    "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
-    "path": "real-client-decks/bain-and-company/bain-syracuse-university-diagnostic-report-2014.pdf",
-    "page": 16,
-    "sha256": "82416a0d09db1731b29391ee5a2f5c2d4417d085b2f7f74cb0fc0665b896e20f",
-    "bodyWords": 6,
-    "totalWords": 37,
-    "judged": "Survey question banner bolded and underlined"
+  "chart-led": {
+   "commentary": false,
+   "pages": 23,
+   "bodyWords": {
+    "q1": 41.5,
+    "median": 55.0,
+    "q3": 112.5
    },
-   {
-    "reference": "mckinsey-future-of-work-tripartite-forum-evidence-base-on-the-future-of-work-2019.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-future-of-work-tripartite-forum-evidence-base-on-the-future-of-work-2019.pdf",
-    "page": 10,
-    "sha256": "ebd2a5ae2aa4624403fc7e94a57781f1989347509295d2354565ea46ad3792ad",
-    "bodyWords": 33,
-    "totalWords": 138,
-    "judged": ""
-   },
-   {
-    "reference": "bcg-corporate-ventures-in-sweden-how-to-improve-the-connection-between-swedish-start-ups-and-corporations.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-corporate-ventures-in-sweden-how-to-improve-the-connection-between-swedish-start-ups-and-corporations.pdf",
-    "page": 19,
-    "sha256": "337f0a9a047e7cb2b19f6997f74126e465feec75916d0c73a43bef63db580184",
-    "bodyWords": 37,
-    "totalWords": 94,
-    "judged": "Two callout boxes over line chart"
-   },
-   {
-    "reference": "bcg-study-on-enhancing-the-competitiveness-of-the-iron-and-steel-industry-in-malaysia-final-report-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-study-on-enhancing-the-competitiveness-of-the-iron-and-steel-industry-in-malaysia-final-report-2012.pdf",
-    "page": 192,
-    "sha256": "a968063f9d5cb0500a6de6de3f0314a2f94b906fcfc86d6da4cc4741fe5497d4",
-    "bodyWords": 39,
-    "totalWords": 72,
-    "judged": "Axis to 20 dwarfs values under 9; huge white space"
-   },
-   {
-    "reference": "bcg-the-open-education-resources-ecosystem-an-evaluation-of-the-oer-movements-current-state-and-its-progr.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-the-open-education-resources-ecosystem-an-evaluation-of-the-oer-movements-current-state-and-its-progr.pdf",
-    "page": 7,
-    "sha256": "b9e4aa74e06ec2fb335bc17fbebc35f3a4bd39053f703d5e2af29e740b959a60",
-    "bodyWords": 39,
-    "totalWords": 66,
-    "judged": "Shaded take-off band on borrowed Rogers diffusion curve"
-   },
-   {
-    "reference": "bcg-corporate-ventures-in-sweden-how-to-improve-the-connection-between-swedish-start-ups-and-corporations.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-corporate-ventures-in-sweden-how-to-improve-the-connection-between-swedish-start-ups-and-corporations.pdf",
-    "page": 6,
-    "sha256": "337f0a9a047e7cb2b19f6997f74126e465feec75916d0c73a43bef63db580184",
-    "bodyWords": 41,
-    "totalWords": 82,
-    "judged": "Callout with leader line and bracket"
-   },
-   {
-    "reference": "bcg-unlocking-the-growth-opportunity-of-the-responsible-consumer-unilever-work-session-2015.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-unlocking-the-growth-opportunity-of-the-responsible-consumer-unilever-work-session-2015.pdf",
-    "page": 71,
-    "sha256": "9d69bca4674945ff943ecc5d7a1cd066ea8b03fa318dcd215cdbd5bcb7559ac7",
-    "bodyWords": 42,
-    "totalWords": 89,
-    "judged": "Product pack shots serve as bar labels"
-   },
-   {
-    "reference": "mckinsey-modelling-the-potential-of-digitally-enabled-processes-transparency-and-participation-in-the-nhs.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-modelling-the-potential-of-digitally-enabled-processes-transparency-and-participation-in-the-nhs.pdf",
-    "page": 11,
-    "sha256": "b93253cc6c7b77579c5d032c1f83f3abc57f44a26eb5c3f4e393b98dfd940583",
-    "bodyWords": 42,
-    "totalWords": 74,
-    "judged": "Gap arrows with value pills; no data labels on lines"
-   },
-   {
-    "reference": "mckinsey-usps-future-business-model-2010.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-usps-future-business-model-2010.pdf",
-    "page": 12,
-    "sha256": "3405334ada69213cf953f607f3245726ee2c7670046b64a9bf0927e06df85f7a",
-    "bodyWords": 48,
-    "totalWords": 83,
-    "judged": "Area chart with CAGR pill and trend arrow; red/green deltas"
-   },
-   {
-    "reference": "bcg-san-pedro-bay-clean-truck-program-ctp-options-analysis-2008.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-san-pedro-bay-clean-truck-program-ctp-options-analysis-2008.pdf",
-    "page": 19,
-    "sha256": "e982d1720107f878e1ca08cea1cf7fd1c4dc3dd3674c9c2c897d0fbe7efe6fa8",
-    "bodyWords": 50,
-    "totalWords": 92,
-    "judged": "Callout box with leader lines plus mean overlay line"
-   },
-   {
-    "reference": "mckinsey-future-of-work-tripartite-forum-evidence-base-on-the-future-of-work-2019.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-future-of-work-tripartite-forum-evidence-base-on-the-future-of-work-2019.pdf",
-    "page": 8,
-    "sha256": "ebd2a5ae2aa4624403fc7e94a57781f1989347509295d2354565ea46ad3792ad",
-    "bodyWords": 53,
-    "totalWords": 100,
-    "judged": "Dashed band connectors and circled adoption pills"
-   },
-   {
-    "reference": "bcg-melbourne-as-a-global-cultural-destination-final-report-summary-2017.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-melbourne-as-a-global-cultural-destination-final-report-summary-2017.pdf",
-    "page": 46,
-    "sha256": "081387ea195165d0b7fc9928dec1e8264b3951474a34a59306123491669758e7",
-    "bodyWords": 55,
-    "totalWords": 71,
-    "judged": "Dashed box and +24% pill on the anchor pair"
-   },
-   {
-    "reference": "bcg-victoria-s-creative-and-cultural-economy-fact-pack-2015.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-victoria-s-creative-and-cultural-economy-fact-pack-2015.pdf",
-    "page": 24,
-    "sha256": "735010653b75c61eeb1e4bbbc3f35cd63b5eec65f18bf407feecc36dddba3a21",
-    "bodyWords": 82,
-    "totalWords": 118,
-    "judged": "Dashed reference line with labelled arrow"
-   },
-   {
-    "reference": "bcg-corporate-ventures-in-sweden-how-to-improve-the-connection-between-swedish-start-ups-and-corporations.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-corporate-ventures-in-sweden-how-to-improve-the-connection-between-swedish-start-ups-and-corporations.pdf",
-    "page": 11,
-    "sha256": "337f0a9a047e7cb2b19f6997f74126e465feec75916d0c73a43bef63db580184",
-    "bodyWords": 89,
-    "totalWords": 168,
-    "judged": "Bubble chart with leader lines, two reference lines"
-   },
-   {
-    "reference": "bcg-the-economic-impact-of-ford-and-the-f-series-2020.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-the-economic-impact-of-ford-and-the-f-series-2020.pdf",
-    "page": 21,
-    "sha256": "98475addf934efd56e17622afc26f034ff3c0709575cf41dbd7369fc66399288",
-    "bodyWords": 104,
-    "totalWords": 169,
-    "judged": "Photo background behind bars; bracket for sports leagues"
-   },
-   {
-    "reference": "bcg-unlocking-the-growth-opportunity-of-the-responsible-consumer-unilever-work-session-2015.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-unlocking-the-growth-opportunity-of-the-responsible-consumer-unilever-work-session-2015.pdf",
-    "page": 75,
-    "sha256": "9d69bca4674945ff943ecc5d7a1cd066ea8b03fa318dcd215cdbd5bcb7559ac7",
-    "bodyWords": 104,
-    "totalWords": 148,
-    "judged": ""
-   },
-   {
-    "reference": "bcg-unlocking-the-growth-opportunity-of-the-responsible-consumer-unilever-work-session-2015.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-unlocking-the-growth-opportunity-of-the-responsible-consumer-unilever-work-session-2015.pdf",
-    "page": 11,
-    "sha256": "9d69bca4674945ff943ecc5d7a1cd066ea8b03fa318dcd215cdbd5bcb7559ac7",
-    "bodyWords": 110,
-    "totalWords": 172,
-    "judged": "Category brackets group 20 paired bars"
-   },
-   {
-    "reference": "bcg-unlocking-the-growth-opportunity-of-the-responsible-consumer-unilever-work-session-2015.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-unlocking-the-growth-opportunity-of-the-responsible-consumer-unilever-work-session-2015.pdf",
-    "page": 86,
-    "sha256": "9d69bca4674945ff943ecc5d7a1cd066ea8b03fa318dcd215cdbd5bcb7559ac7",
-    "bodyWords": 115,
-    "totalWords": 227,
-    "judged": "Hand-drawn circle and delta pills on charts"
-   },
-   {
-    "reference": "bcg-interoperables-verfahren-fur-internet-und-mobile-zahlungen-angebot-zur-erstellung-eines-feinkonzepts.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-interoperables-verfahren-fur-internet-und-mobile-zahlungen-angebot-zur-erstellung-eines-feinkonzepts.pdf",
-    "page": 35,
-    "sha256": "5d6525b39e88cd6b71d4f5da1403cb71b6ae717e5db50328fc018eb294495ff2",
-    "bodyWords": 126,
-    "totalWords": 151,
-    "judged": "Three callouts with arrows, one bar recoloured"
-   },
-   {
-    "reference": "mckinsey-king-county-and-seattle-homelessness-some-facts-final-report-2017.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-king-county-and-seattle-homelessness-some-facts-final-report-2017.pdf",
-    "page": 19,
-    "sha256": "86c676a17b7ea5f1b0150c9b27f27d44b08695130405890b75b3657c002c5be8",
-    "bodyWords": 159,
-    "totalWords": 277,
-    "judged": "Gap arrow with value pill and leader lines"
-   },
-   {
-    "reference": "bcg-healthcare-system-reform-and-short-term-opportunities-iceland-health-care-system-project-2011.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-healthcare-system-reform-and-short-term-opportunities-iceland-health-care-system-project-2011.pdf",
-    "page": 26,
-    "sha256": "dd5382252b9d0f05d8b90e803516a7ba74c5efcb07aedf65cfe9ef72e2656291",
-    "bodyWords": 166,
-    "totalWords": 207,
-    "judged": "Four linked bar panels, red ellipse, dashed callout"
-   },
-   {
-    "reference": "bcg-healthcare-system-reform-and-short-term-opportunities-iceland-health-care-system-project-2011.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-healthcare-system-reform-and-short-term-opportunities-iceland-health-care-system-project-2011.pdf",
-    "page": 83,
-    "sha256": "dd5382252b9d0f05d8b90e803516a7ba74c5efcb07aedf65cfe9ef72e2656291",
-    "bodyWords": 199,
-    "totalWords": 239,
-    "judged": "Small multiples plus weights box and -37% pill"
-   },
-   {
-    "reference": "bcg-interim-project-update-to-dallas-animal-shelter-commission-2016.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-interim-project-update-to-dallas-animal-shelter-commission-2016.pdf",
-    "page": 10,
-    "sha256": "46753bd70f90f798f5c00548956eec87d0c2065b43bc06d039a23bf833e69c07",
-    "bodyWords": 216,
-    "totalWords": 328,
-    "judged": "Three panels; heavy footnote block"
+   "totalWords": {
+    "median": 118.0
    }
-  ],
-  "chart-with-commentary": [
-   {
-    "reference": "mckinsey-transportation-and-warehousing-sector-analysis-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-transportation-and-warehousing-sector-analysis-2020.pdf",
-    "page": 34,
-    "sha256": "26b116c1f5676925624e8f36be123f0945af56aa1947683213a8b229748fbc73",
-    "bodyWords": 43,
-    "totalWords": 130,
-    "judged": "Dark right rail carries two large stat figures"
+  },
+  "chart-with-commentary": {
+   "commentary": true,
+   "pages": 14,
+   "bodyWords": {
+    "q1": 96.0,
+    "median": 150.0,
+    "q3": 174.8
    },
-   {
-    "reference": "mckinsey-future-of-work-tripartite-forum-evidence-base-on-the-future-of-work-2019.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-future-of-work-tripartite-forum-evidence-base-on-the-future-of-work-2019.pdf",
-    "page": 12,
-    "sha256": "ebd2a5ae2aa4624403fc7e94a57781f1989347509295d2354565ea46ad3792ad",
-    "bodyWords": 52,
-    "totalWords": 93,
-    "judged": "Red delta pills plus retrained-worker band under bars"
-   },
-   {
-    "reference": "mckinsey-capturing-the-full-electricity-efficiency-potential-of-the-u-k-2012.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-capturing-the-full-electricity-efficiency-potential-of-the-u-k-2012.pdf",
-    "page": 22,
-    "sha256": "360aded3ea6eaa6740c20498939652a57ec7eff40b9907b18209597f4e58b85d",
-    "bodyWords": 64,
-    "totalWords": 118,
-    "judged": "Sensitivity grid; base scenario cell shaded"
-   },
-   {
-    "reference": "bcg-loose-dogs-in-dallas-strategic-recommendations-to-improve-public-safety-and-animal-welfare-presentati.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-loose-dogs-in-dallas-strategic-recommendations-to-improve-public-safety-and-animal-welfare-presentati.pdf",
-    "page": 401,
-    "sha256": "8890588fa59591738e94ddd463f5adfe1baf3ae4576bf172017d9c91cada09c2",
-    "bodyWords": 88,
-    "totalWords": 169,
-    "judged": "Yellow caveat banner above three small multiples"
-   },
-   {
-    "reference": "mckinsey-usps-future-business-model-2010.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-usps-future-business-model-2010.pdf",
-    "page": 7,
-    "sha256": "3405334ada69213cf953f607f3245726ee2c7670046b64a9bf0927e06df85f7a",
-    "bodyWords": 120,
-    "totalWords": 151,
-    "judged": "Stacked bars left, tinted driver-bullet panel right"
-   },
-   {
-    "reference": "bcg-the-economic-impact-of-ford-and-the-f-series-2020.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-the-economic-impact-of-ford-and-the-f-series-2020.pdf",
-    "page": 12,
-    "sha256": "98475addf934efd56e17622afc26f034ff3c0709575cf41dbd7369fc66399288",
-    "bodyWords": 128,
-    "totalWords": 166,
-    "judged": "Waterfall with two labelled brackets and a description row"
-   },
-   {
-    "reference": "mckinsey-chilean-hydrogen-pathway-final-report-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-chilean-hydrogen-pathway-final-report-2020.pdf",
-    "page": 42,
-    "sha256": "5746bf71e89f050e68bf4949c586725745b100af3eab3886f1e37db9bf9fd0a7",
-    "bodyWords": 140,
-    "totalWords": 204,
-    "judged": "Boxed comment above each country chart"
-   },
-   {
-    "reference": "bcg-melbourne-as-a-global-cultural-destination-final-report-summary-2017.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-melbourne-as-a-global-cultural-destination-final-report-summary-2017.pdf",
-    "page": 23,
-    "sha256": "081387ea195165d0b7fc9928dec1e8264b3951474a34a59306123491669758e7",
-    "bodyWords": 160,
-    "totalWords": 225,
-    "judged": "Melbourne bar coloured orange against green peers"
-   },
-   {
-    "reference": "bcg-melbourne-as-a-global-cultural-destination-final-report-summary-2017.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-melbourne-as-a-global-cultural-destination-final-report-summary-2017.pdf",
-    "page": 9,
-    "sha256": "081387ea195165d0b7fc9928dec1e8264b3951474a34a59306123491669758e7",
-    "bodyWords": 166,
-    "totalWords": 284,
-    "judged": "Grey definition boxes top and bottom define GVA and CAGR"
-   },
-   {
-    "reference": "mckinsey-mta-financial-impact-assessment-on-2020-revenue-of-covid-19-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-mta-financial-impact-assessment-on-2020-revenue-of-covid-19-2020.pdf",
-    "page": 13,
-    "sha256": "3e5aae2b11a5faf6b1ea1c6f8183d59808540072d9bf7383fbc289adf2e5cd10",
-    "bodyWords": 174,
-    "totalWords": 207,
-    "judged": "End-of-line pills carry scenario values; assumptions rail"
-   },
-   {
-    "reference": "bcg-healthcare-system-reform-and-short-term-opportunities-iceland-health-care-system-project-2011.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-healthcare-system-reform-and-short-term-opportunities-iceland-health-care-system-project-2011.pdf",
-    "page": 50,
-    "sha256": "dd5382252b9d0f05d8b90e803516a7ba74c5efcb07aedf65cfe9ef72e2656291",
-    "bodyWords": 175,
-    "totalWords": 206,
-    "judged": "Red ellipse on tail of sorted bars"
-   },
-   {
-    "reference": "bcg-study-on-enhancing-the-competitiveness-of-the-iron-and-steel-industry-in-malaysia-final-report-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-study-on-enhancing-the-competitiveness-of-the-iron-and-steel-industry-in-malaysia-final-report-2012.pdf",
-    "page": 139,
-    "sha256": "a968063f9d5cb0500a6de6de3f0314a2f94b906fcfc86d6da4cc4741fe5497d4",
-    "bodyWords": 178,
-    "totalWords": 224,
-    "judged": "Four radar charts under a continuum arrow, takeaways below"
-   },
-   {
-    "reference": "mckinsey-mta-financial-impact-assessment-on-2020-revenue-of-covid-19-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-mta-financial-impact-assessment-on-2020-revenue-of-covid-19-2020.pdf",
-    "page": 10,
-    "sha256": "3e5aae2b11a5faf6b1ea1c6f8183d59808540072d9bf7383fbc289adf2e5cd10",
-    "bodyWords": 185,
-    "totalWords": 237,
-    "judged": "Split title; event marker lines; grey commentary rail"
-   },
-   {
-    "reference": "bcg-budgetanalyse-af-forsvaret-2017-materialesamling-del-2-2017-in-danish.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-budgetanalyse-af-forsvaret-2017-materialesamling-del-2-2017-in-danish.pdf",
-    "page": 204,
-    "sha256": "6a7825eb3878c28646e7635985bb37c200432a258988daf48bd95b2af35806a5",
-    "bodyWords": 200,
-    "totalWords": 284,
-    "judged": "Two stacked bars plus conclusion column"
+   "totalWords": {
+    "median": 205.0
    }
-  ],
-  "diagram-led": [
-   {
-    "reference": "mckinsey-king-county-and-seattle-homelessness-some-facts-final-report-2017.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-king-county-and-seattle-homelessness-some-facts-final-report-2017.pdf",
-    "page": 21,
-    "sha256": "86c676a17b7ea5f1b0150c9b27f27d44b08695130405890b75b3657c002c5be8",
-    "bodyWords": 16,
-    "totalWords": 62,
-    "judged": "Concentric ring framework with colour legend"
+  },
+  "diagram-led": {
+   "commentary": false,
+   "pages": 7,
+   "bodyWords": {
+    "q1": 110.5,
+    "median": 126.0,
+    "q3": 167.5
    },
-   {
-    "reference": "bcg-study-on-enhancing-the-competitiveness-of-the-iron-and-steel-industry-in-malaysia-final-report-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-study-on-enhancing-the-competitiveness-of-the-iron-and-steel-industry-in-malaysia-final-report-2012.pdf",
-    "page": 18,
-    "sha256": "a968063f9d5cb0500a6de6de3f0314a2f94b906fcfc86d6da4cc4741fe5497d4",
-    "bodyWords": 110,
-    "totalWords": 124,
-    "judged": "Decision tree with H/M/L probability badges and legend"
-   },
-   {
-    "reference": "mckinsey-transportation-and-warehousing-sector-analysis-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-transportation-and-warehousing-sector-analysis-2020.pdf",
-    "page": 37,
-    "sha256": "26b116c1f5676925624e8f36be123f0945af56aa1947683213a8b229748fbc73",
-    "bodyWords": 111,
-    "totalWords": 185,
-    "judged": "2x2 with labelled axes; bold lead-in per quadrant"
-   },
-   {
-    "reference": "bcg-interoperables-verfahren-fur-internet-und-mobile-zahlungen-angebot-zur-erstellung-eines-feinkonzepts.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-interoperables-verfahren-fur-internet-und-mobile-zahlungen-angebot-zur-erstellung-eines-feinkonzepts.pdf",
-    "page": 114,
-    "sha256": "5d6525b39e88cd6b71d4f5da1403cb71b6ae717e5db50328fc018eb294495ff2",
-    "bodyWords": 126,
-    "totalWords": 144,
-    "judged": "Six-column taxonomy of tinted blocks"
-   },
-   {
-    "reference": "mckinsey-modelling-the-potential-of-digitally-enabled-processes-transparency-and-participation-in-the-nhs.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-modelling-the-potential-of-digitally-enabled-processes-transparency-and-participation-in-the-nhs.pdf",
-    "page": 6,
-    "sha256": "b93253cc6c7b77579c5d032c1f83f3abc57f44a26eb5c3f4e393b98dfd940583",
-    "bodyWords": 127,
-    "totalWords": 155,
-    "judged": "Chevron methodology flow with roman-numeral badges"
-   },
-   {
-    "reference": "mckinsey-modelling-the-potential-of-digitally-enabled-processes-transparency-and-participation-in-the-nhs.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-modelling-the-potential-of-digitally-enabled-processes-transparency-and-participation-in-the-nhs.pdf",
-    "page": 12,
-    "sha256": "b93253cc6c7b77579c5d032c1f83f3abc57f44a26eb5c3f4e393b98dfd940583",
-    "bodyWords": 208,
-    "totalWords": 272,
-    "judged": "3x3 shaded matrix; each cell a bullet list"
-   },
-   {
-    "reference": "bcg-evaluating-nyc-media-sector-development-and-setting-the-stage-for-future-growth-final-report-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-evaluating-nyc-media-sector-development-and-setting-the-stage-for-future-growth-final-report-2012.pdf",
-    "page": 38,
-    "sha256": "41c49c3447565978ef32ea1f3532cad2160d10491b895b61785bf481c1459321",
-    "bodyWords": 220,
-    "totalWords": 253,
-    "judged": "Four numbered rows, arrow from trend to action"
+   "totalWords": {
+    "median": 155.0
    }
-  ],
-  "diagram-with-commentary": [
-   {
-    "reference": "mckinsey-covid-19-business-recovery-council-report-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-covid-19-business-recovery-council-report-2020.pdf",
-    "page": 17,
-    "sha256": "5e11340caa3c15005109ed45b09798eb21dbc345158dcd91bd8c6a40234f2279",
-    "bodyWords": 92,
-    "totalWords": 126,
-    "judged": "Triangle diagram with leader-lined labels and takeaway bar"
+  },
+  "diagram-with-commentary": {
+   "commentary": true,
+   "pages": 5,
+   "bodyWords": {
+    "q1": 108.0,
+    "median": 113.0,
+    "q3": 163.0
    },
-   {
-    "reference": "bcg-corporate-ventures-in-sweden-how-to-improve-the-connection-between-swedish-start-ups-and-corporations.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-corporate-ventures-in-sweden-how-to-improve-the-connection-between-swedish-start-ups-and-corporations.pdf",
-    "page": 21,
-    "sha256": "337f0a9a047e7cb2b19f6997f74126e465feec75916d0c73a43bef63db580184",
-    "bodyWords": 108,
-    "totalWords": 143,
-    "judged": "Colour-keyed labels tie bullets to positioning matrix"
-   },
-   {
-    "reference": "bcg-the-open-education-resources-ecosystem-an-evaluation-of-the-oer-movements-current-state-and-its-progr.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-the-open-education-resources-ecosystem-an-evaluation-of-the-oer-movements-current-state-and-its-progr.pdf",
-    "page": 5,
-    "sha256": "b9e4aa74e06ec2fb335bc17fbebc35f3a4bd39053f703d5e2af29e740b959a60",
-    "bodyWords": 113,
-    "totalWords": 145,
-    "judged": "Swimlane chevron chain, red outlines mark leverage points"
-   },
-   {
-    "reference": "bcg-interoperables-verfahren-fur-internet-und-mobile-zahlungen-angebot-zur-erstellung-eines-feinkonzepts.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-interoperables-verfahren-fur-internet-und-mobile-zahlungen-angebot-zur-erstellung-eines-feinkonzepts.pdf",
-    "page": 36,
-    "sha256": "5d6525b39e88cd6b71d4f5da1403cb71b6ae717e5db50328fc018eb294495ff2",
-    "bodyWords": 163,
-    "totalWords": 185,
-    "judged": "Two picture-based process chains, green speech callouts"
-   },
-   {
-    "reference": "bcg-study-on-enhancing-the-competitiveness-of-the-iron-and-steel-industry-in-malaysia-final-report-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-study-on-enhancing-the-competitiveness-of-the-iron-and-steel-industry-in-malaysia-final-report-2012.pdf",
-    "page": 145,
-    "sha256": "a968063f9d5cb0500a6de6de3f0314a2f94b906fcfc86d6da4cc4741fe5497d4",
-    "bodyWords": 372,
-    "totalWords": 404,
-    "judged": "Formula diagram plus small illustrative line chart; very dense"
+   "totalWords": {
+    "median": 145.0
    }
-  ],
-  "mixed": [
-   {
-    "reference": "bcg-the-economic-impact-of-ford-and-the-f-series-2020.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-the-economic-impact-of-ford-and-the-f-series-2020.pdf",
-    "page": 14,
-    "sha256": "98475addf934efd56e17622afc26f034ff3c0709575cf41dbd7369fc66399288",
-    "bodyWords": 36,
-    "totalWords": 66,
-    "judged": "Ford line in green with 2.1x gap arrow; full-bleed plant photo"
+  },
+  "exhibit-led": {
+   "commentary": false,
+   "pages": 49,
+   "bodyWords": {
+    "q1": 55.0,
+    "median": 110.0,
+    "q3": 167.0
    },
-   {
-    "reference": "mckinsey-king-county-and-seattle-homelessness-some-facts-final-report-2017.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-king-county-and-seattle-homelessness-some-facts-final-report-2017.pdf",
-    "page": 8,
-    "sha256": "86c676a17b7ea5f1b0150c9b27f27d44b08695130405890b75b3657c002c5be8",
-    "bodyWords": 55,
-    "totalWords": 106,
-    "judged": "Colour-chip ratio table beside stacked bars; pointer callout"
-   },
-   {
-    "reference": "mckinsey-future-of-work-tripartite-forum-evidence-base-on-the-future-of-work-2019.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-future-of-work-tripartite-forum-evidence-base-on-the-future-of-work-2019.pdf",
-    "page": 7,
-    "sha256": "ebd2a5ae2aa4624403fc7e94a57781f1989347509295d2354565ea46ad3792ad",
-    "bodyWords": 74,
-    "totalWords": 153,
-    "judged": "Region rows with red/green in-cell bars and total pills"
-   },
-   {
-    "reference": "bcg-the-economic-impact-of-ford-and-the-f-series-2020.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-the-economic-impact-of-ford-and-the-f-series-2020.pdf",
-    "page": 25,
-    "sha256": "98475addf934efd56e17622afc26f034ff3c0709575cf41dbd7369fc66399288",
-    "bodyWords": 81,
-    "totalWords": 116,
-    "judged": "Product photo takes a third of the page"
-   },
-   {
-    "reference": "mckinsey-usps-future-business-model-2010.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-usps-future-business-model-2010.pdf",
-    "page": 31,
-    "sha256": "3405334ada69213cf953f607f3245726ee2c7670046b64a9bf0927e06df85f7a",
-    "bodyWords": 82,
-    "totalWords": 105,
-    "judged": "Five option columns headed by stock photos; colour legend"
-   },
-   {
-    "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
-    "page": 58,
-    "sha256": "6a820bcf7a2c481007ed7b3f88bc4e4e07bdacb5520c7a9e19e673f7ecb1ca3f",
-    "bodyWords": 83,
-    "totalWords": 109,
-    "judged": "Tool screenshot marked illustrative; bold takeaways beneath"
-   },
-   {
-    "reference": "bcg-victoria-s-creative-and-cultural-economy-fact-pack-2015.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-victoria-s-creative-and-cultural-economy-fact-pack-2015.pdf",
-    "page": 11,
-    "sha256": "735010653b75c61eeb1e4bbbc3f35cd63b5eec65f18bf407feecc36dddba3a21",
-    "bodyWords": 91,
-    "totalWords": 155,
-    "judged": "No headline; waterfall feeding labelled boxes"
-   },
-   {
-    "reference": "bcg-loose-dogs-in-dallas-strategic-recommendations-to-improve-public-safety-and-animal-welfare-presentati.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-loose-dogs-in-dallas-strategic-recommendations-to-improve-public-safety-and-animal-welfare-presentati.pdf",
-    "page": 274,
-    "sha256": "8890588fa59591738e94ddd463f5adfe1baf3ae4576bf172017d9c91cada09c2",
-    "bodyWords": 126,
-    "totalWords": 158,
-    "judged": "Faucet metaphor schematic paired with action/consequence table"
-   },
-   {
-    "reference": "bcg-interim-project-update-to-dallas-animal-shelter-commission-2016.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-interim-project-update-to-dallas-animal-shelter-commission-2016.pdf",
-    "page": 8,
-    "sha256": "46753bd70f90f798f5c00548956eec87d0c2065b43bc06d039a23bf833e69c07",
-    "bodyWords": 127,
-    "totalWords": 166,
-    "judged": "Bucket schematic keyed by number to consequence grid"
-   },
-   {
-    "reference": "mckinsey-covid-19-business-recovery-council-report-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-covid-19-business-recovery-council-report-2020.pdf",
-    "page": 6,
-    "sha256": "5e11340caa3c15005109ed45b09798eb21dbc345158dcd91bd8c6a40234f2279",
-    "bodyWords": 130,
-    "totalWords": 161,
-    "judged": "Scenario line chart with matching colour-keyed parameter blocks"
-   },
-   {
-    "reference": "bcg-unlocking-the-growth-opportunity-of-the-responsible-consumer-unilever-work-session-2015.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-unlocking-the-growth-opportunity-of-the-responsible-consumer-unilever-work-session-2015.pdf",
-    "page": 69,
-    "sha256": "9d69bca4674945ff943ecc5d7a1cd066ea8b03fa318dcd215cdbd5bcb7559ac7",
-    "bodyWords": 142,
-    "totalWords": 202,
-    "judged": "Description panel plus arrow-and-pill annotated bar chart"
-   },
-   {
-    "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
-    "path": "real-client-decks/bain-and-company/bain-syracuse-university-diagnostic-report-2014.pdf",
-    "page": 29,
-    "sha256": "82416a0d09db1731b29391ee5a2f5c2d4417d085b2f7f74cb0fc0665b896e20f",
-    "bodyWords": 144,
-    "totalWords": 155,
-    "judged": "Red hand-drawn ring around CAGR figure"
-   },
-   {
-    "reference": "mckinsey-lebanon-economic-vision-full-report-2018.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-lebanon-economic-vision-full-report-2018.pdf",
-    "page": 1035,
-    "sha256": "17ab46aee3a0f072df64a484c0e6c272c8865110bf3177cace2add29633cbd63",
-    "bodyWords": 173,
-    "totalWords": 274,
-    "judged": "Overview bullets above single stacked bar with count pills"
-   },
-   {
-    "reference": "mckinsey-lebanon-economic-vision-full-report-2018.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-lebanon-economic-vision-full-report-2018.pdf",
-    "page": 28,
-    "sha256": "17ab46aee3a0f072df64a484c0e6c272c8865110bf3177cace2add29633cbd63",
-    "bodyWords": 226,
-    "totalWords": 283,
-    "judged": "Dense dashboard page; challenges panel on tinted right rail"
-   },
-   {
-    "reference": "bcg-victoria-s-creative-and-cultural-economy-fact-pack-2015.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-victoria-s-creative-and-cultural-economy-fact-pack-2015.pdf",
-    "page": 41,
-    "sha256": "735010653b75c61eeb1e4bbbc3f35cd63b5eec65f18bf407feecc36dddba3a21",
-    "bodyWords": 231,
-    "totalWords": 277,
-    "judged": "Harvey-ball ratings in table and evaluation block"
-   },
-   {
-    "reference": "mckinsey-capturing-the-full-electricity-efficiency-potential-of-the-u-k-2012.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-capturing-the-full-electricity-efficiency-potential-of-the-u-k-2012.pdf",
-    "page": 74,
-    "sha256": "360aded3ea6eaa6740c20498939652a57ec7eff40b9907b18209597f4e58b85d",
-    "bodyWords": 242,
-    "totalWords": 264,
-    "judged": "Assumptions panel plus three scenario bar rows with pills"
+   "totalWords": {
+    "median": 169.0
    }
-  ],
-  "table-led": [
-   {
-    "reference": "bcg-san-pedro-bay-clean-truck-program-ctp-options-analysis-2008.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-san-pedro-bay-clean-truck-program-ctp-options-analysis-2008.pdf",
-    "page": 67,
-    "sha256": "e982d1720107f878e1ca08cea1cf7fd1c4dc3dd3674c9c2c897d0fbe7efe6fa8",
-    "bodyWords": 63,
-    "totalWords": 101,
-    "judged": "Alternating grey bands, key columns bolded"
+  },
+  "exhibit-with-commentary": {
+   "commentary": true,
+   "pages": 24,
+   "bodyWords": {
+    "q1": 111.8,
+    "median": 154.5,
+    "q3": 179.8
    },
-   {
-    "reference": "bcg-study-on-enhancing-the-competitiveness-of-the-iron-and-steel-industry-in-malaysia-final-report-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-study-on-enhancing-the-competitiveness-of-the-iron-and-steel-industry-in-malaysia-final-report-2012.pdf",
-    "page": 102,
-    "sha256": "a968063f9d5cb0500a6de6de3f0314a2f94b906fcfc86d6da4cc4741fe5497d4",
-    "bodyWords": 68,
-    "totalWords": 104,
-    "judged": "Green header band, tinted alternating rows"
-   },
-   {
-    "reference": "mckinsey-capturing-the-full-electricity-efficiency-potential-of-the-u-k-2012.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-capturing-the-full-electricity-efficiency-potential-of-the-u-k-2012.pdf",
-    "page": 40,
-    "sha256": "360aded3ea6eaa6740c20498939652a57ec7eff40b9907b18209597f4e58b85d",
-    "bodyWords": 87,
-    "totalWords": 138,
-    "judged": "Traffic-light barrier matrix with total row"
-   },
-   {
-    "reference": "mckinsey-mta-financial-impact-assessment-on-2020-revenue-of-covid-19-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-mta-financial-impact-assessment-on-2020-revenue-of-covid-19-2020.pdf",
-    "page": 34,
-    "sha256": "3e5aae2b11a5faf6b1ea1c6f8183d59808540072d9bf7383fbc289adf2e5cd10",
-    "bodyWords": 91,
-    "totalWords": 172,
-    "judged": "Shaded total row plus brackets computing range size"
-   },
-   {
-    "reference": "mckinsey-king-county-and-seattle-homelessness-some-facts-final-report-2017.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-king-county-and-seattle-homelessness-some-facts-final-report-2017.pdf",
-    "page": 15,
-    "sha256": "86c676a17b7ea5f1b0150c9b27f27d44b08695130405890b75b3657c002c5be8",
-    "bodyWords": 93,
-    "totalWords": 206,
-    "judged": "Grouped bands, harvey-style ticks and filled squares"
-   },
-   {
-    "reference": "mckinsey-usps-future-business-model-2010.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-usps-future-business-model-2010.pdf",
-    "page": 30,
-    "sha256": "3405334ada69213cf953f607f3245726ee2c7670046b64a9bf0927e06df85f7a",
-    "bodyWords": 107,
-    "totalWords": 122,
-    "judged": "Two-row definition table with colour-coded row labels"
-   },
-   {
-    "reference": "mckinsey-mta-financial-impact-assessment-on-2020-revenue-of-covid-19-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-mta-financial-impact-assessment-on-2020-revenue-of-covid-19-2020.pdf",
-    "page": 27,
-    "sha256": "3e5aae2b11a5faf6b1ea1c6f8183d59808540072d9bf7383fbc289adf2e5cd10",
-    "bodyWords": 112,
-    "totalWords": 217,
-    "judged": "Shaded bold total row; disclaimer box top right"
-   },
-   {
-    "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
-    "page": 29,
-    "sha256": "6a820bcf7a2c481007ed7b3f88bc4e4e07bdacb5520c7a9e19e673f7ecb1ca3f",
-    "bodyWords": 141,
-    "totalWords": 180,
-    "judged": "Green row-label blocks, bullets as cells"
-   },
-   {
-    "reference": "bcg-budgetanalyse-af-forsvaret-2017-2017-in-danish.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-budgetanalyse-af-forsvaret-2017-2017-in-danish.pdf",
-    "page": 12,
-    "sha256": "f8ae740778b6acd96f05a1da841a2a6cd2b243abf827d4a152a519116581fe05",
-    "bodyWords": 161,
-    "totalWords": 180,
-    "judged": "Checkmark coverage matrix, banded rows"
-   },
-   {
-    "reference": "bcg-evaluating-nyc-media-sector-development-and-setting-the-stage-for-future-growth-final-report-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-evaluating-nyc-media-sector-development-and-setting-the-stage-for-future-growth-final-report-2012.pdf",
-    "page": 32,
-    "sha256": "41c49c3447565978ef32ea1f3532cad2160d10491b895b61785bf481c1459321",
-    "bodyWords": 167,
-    "totalWords": 180,
-    "judged": "Row bands, green label cells, quote column"
-   },
-   {
-    "reference": "mckinsey-transportation-and-warehousing-sector-analysis-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-transportation-and-warehousing-sector-analysis-2020.pdf",
-    "page": 5,
-    "sha256": "26b116c1f5676925624e8f36be123f0945af56aa1947683213a8b229748fbc73",
-    "bodyWords": 167,
-    "totalWords": 224,
-    "judged": "Every value cell heat-shaded across four metric columns"
-   },
-   {
-    "reference": "bcg-san-pedro-bay-clean-truck-program-ctp-options-analysis-2008.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-san-pedro-bay-clean-truck-program-ctp-options-analysis-2008.pdf",
-    "page": 78,
-    "sha256": "e982d1720107f878e1ca08cea1cf7fd1c4dc3dd3674c9c2c897d0fbe7efe6fa8",
-    "bodyWords": 185,
-    "totalWords": 206,
-    "judged": "Green/red text coding with legend box for benefits and risks"
-   },
-   {
-    "reference": "bcg-budgetanalyse-af-forsvaret-2017-2017-in-danish.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-budgetanalyse-af-forsvaret-2017-2017-in-danish.pdf",
-    "page": 93,
-    "sha256": "f8ae740778b6acd96f05a1da841a2a6cd2b243abf827d4a152a519116581fe05",
-    "bodyWords": 197,
-    "totalWords": 207,
-    "judged": "Harvey balls in feasibility column"
-   },
-   {
-    "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
-    "page": 34,
-    "sha256": "6a820bcf7a2c481007ed7b3f88bc4e4e07bdacb5520c7a9e19e673f7ecb1ca3f",
-    "bodyWords": 252,
-    "totalWords": 276,
-    "judged": "Grey arrows carry current state to future state"
-   },
-   {
-    "reference": "mckinsey-lebanon-economic-vision-full-report-2018.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-lebanon-economic-vision-full-report-2018.pdf",
-    "page": 841,
-    "sha256": "17ab46aee3a0f072df64a484c0e6c272c8865110bf3177cace2add29633cbd63",
-    "bodyWords": 254,
-    "totalWords": 308,
-    "judged": "Initiative register with icons, codes and greyed play letters"
-   },
-   {
-    "reference": "mckinsey-chilean-hydrogen-pathway-final-report-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-chilean-hydrogen-pathway-final-report-2020.pdf",
-    "page": 23,
-    "sha256": "5746bf71e89f050e68bf4949c586725745b100af3eab3886f1e37db9bf9fd0a7",
-    "bodyWords": 308,
-    "totalWords": 340,
-    "judged": "Icons in domain column; bold phrases in cells"
-   },
-   {
-    "reference": "mckinsey-modelling-the-potential-of-digitally-enabled-processes-transparency-and-participation-in-the-nhs.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-modelling-the-potential-of-digitally-enabled-processes-transparency-and-participation-in-the-nhs.pdf",
-    "page": 10,
-    "sha256": "b93253cc6c7b77579c5d032c1f83f3abc57f44a26eb5c3f4e393b98dfd940583",
-    "bodyWords": 309,
-    "totalWords": 409,
-    "judged": "Very dense value grid; tinted subtotal and total chips"
-   },
-   {
-    "reference": "bcg-healthcare-system-reform-and-short-term-opportunities-iceland-health-care-system-project-2011.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-healthcare-system-reform-and-short-term-opportunities-iceland-health-care-system-project-2011.pdf",
-    "page": 46,
-    "sha256": "dd5382252b9d0f05d8b90e803516a7ba74c5efcb07aedf65cfe9ef72e2656291",
-    "bodyWords": 370,
-    "totalWords": 390,
-    "judged": "Traffic-light scorecard in two columns"
-   },
-   {
-    "reference": "bcg-budgetanalyse-af-forsvaret-2017-2017-in-danish.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-budgetanalyse-af-forsvaret-2017-2017-in-danish.pdf",
-    "page": 147,
-    "sha256": "f8ae740778b6acd96f05a1da841a2a6cd2b243abf827d4a152a519116581fe05",
-    "bodyWords": 460,
-    "totalWords": 480,
-    "judged": "Dense one-pager template, green label column"
+   "totalWords": {
+    "median": 205.0
    }
-  ],
-  "table-with-commentary": [
-   {
-    "reference": "mckinsey-capturing-the-full-electricity-efficiency-potential-of-the-u-k-2012.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-capturing-the-full-electricity-efficiency-potential-of-the-u-k-2012.pdf",
-    "page": 118,
-    "sha256": "360aded3ea6eaa6740c20498939652a57ec7eff40b9907b18209597f4e58b85d",
-    "bodyWords": 132,
-    "totalWords": 209,
-    "judged": "Dot-marked coverage matrix beside utility key"
+  },
+  "mixed": {
+   "commentary": null,
+   "pages": 16,
+   "bodyWords": {
+    "q1": 81.8,
+    "median": 126.5,
+    "q3": 151.2
    },
-   {
-    "reference": "bcg-evaluating-nyc-media-sector-development-and-setting-the-stage-for-future-growth-final-report-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-evaluating-nyc-media-sector-development-and-setting-the-stage-for-future-growth-final-report-2012.pdf",
-    "page": 7,
-    "sha256": "41c49c3447565978ef32ea1f3532cad2160d10491b895b61785bf481c1459321",
-    "bodyWords": 149,
-    "totalWords": 162,
-    "judged": "Shaded total row, red negatives"
-   },
-   {
-    "reference": "bcg-budgetanalyse-af-forsvaret-2017-2017-in-danish.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-budgetanalyse-af-forsvaret-2017-2017-in-danish.pdf",
-    "page": 121,
-    "sha256": "f8ae740778b6acd96f05a1da841a2a6cd2b243abf827d4a152a519116581fe05",
-    "bodyWords": 220,
-    "totalWords": 276,
-    "judged": "Shaded final column, total rows set apart"
-   },
-   {
-    "reference": "bcg-budgetanalyse-af-forsvaret-2017-materialesamling-del-2-2017-in-danish.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-budgetanalyse-af-forsvaret-2017-materialesamling-del-2-2017-in-danish.pdf",
-    "page": 312,
-    "sha256": "6a7825eb3878c28646e7635985bb37c200432a258988daf48bd95b2af35806a5",
-    "bodyWords": 268,
-    "totalWords": 351,
-    "judged": "Checkmarks plus red dashed row highlight"
-   },
-   {
-    "reference": "bcg-budgetanalyse-af-forsvaret-2017-materialesamling-del-2-2017-in-danish.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-budgetanalyse-af-forsvaret-2017-materialesamling-del-2-2017-in-danish.pdf",
-    "page": 285,
-    "sha256": "6a7825eb3878c28646e7635985bb37c200432a258988daf48bd95b2af35806a5",
-    "bodyWords": 434,
-    "totalWords": 482,
-    "judged": "Two matrices with red dashed highlight boxes"
+   "totalWords": {
+    "median": 156.5
    }
-  ],
-  "text-page": [
-   {
-    "reference": "mckinsey-mta-financial-impact-assessment-on-2020-revenue-of-covid-19-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-mta-financial-impact-assessment-on-2020-revenue-of-covid-19-2020.pdf",
-    "page": 3,
-    "sha256": "3e5aae2b11a5faf6b1ea1c6f8183d59808540072d9bf7383fbc289adf2e5cd10",
-    "bodyWords": 35,
-    "totalWords": 36,
-    "judged": "Untitled single-paragraph scope statement between rules"
+  },
+  "table-led": {
+   "commentary": false,
+   "pages": 19,
+   "bodyWords": {
+    "q1": 100.0,
+    "median": 167.0,
+    "q3": 253.0
    },
-   {
-    "reference": "mckinsey-chilean-hydrogen-pathway-final-report-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-chilean-hydrogen-pathway-final-report-2020.pdf",
-    "page": 30,
-    "sha256": "5746bf71e89f050e68bf4949c586725745b100af3eab3886f1e37db9bf9fd0a7",
-    "bodyWords": 49,
-    "totalWords": 53,
-    "judged": "Statement panel beside three icon-and-label columns"
-   },
-   {
-    "reference": "mckinsey-covid-19-business-recovery-council-report-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-covid-19-business-recovery-council-report-2020.pdf",
-    "page": 16,
-    "sha256": "5e11340caa3c15005109ed45b09798eb21dbc345158dcd91bd8c6a40234f2279",
-    "bodyWords": 88,
-    "totalWords": 111,
-    "judged": "Three icon cards plus tinted takeaway column"
-   },
-   {
-    "reference": "mckinsey-transportation-and-warehousing-sector-analysis-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-transportation-and-warehousing-sector-analysis-2020.pdf",
-    "page": 36,
-    "sha256": "26b116c1f5676925624e8f36be123f0945af56aa1947683213a8b229748fbc73",
-    "bodyWords": 99,
-    "totalWords": 119,
-    "judged": "Definition page, very sparse; large empty margins"
-   },
-   {
-    "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
-    "path": "real-client-decks/bain-and-company/bain-syracuse-university-diagnostic-report-2014.pdf",
-    "page": 7,
-    "sha256": "82416a0d09db1731b29391ee5a2f5c2d4417d085b2f7f74cb0fc0665b896e20f",
-    "bodyWords": 100,
-    "totalWords": 113,
-    "judged": "Four headed bullet columns, no exhibit"
-   },
-   {
-    "reference": "mckinsey-university-of-arizona-2018-strategic-plan-2018.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-university-of-arizona-2018-strategic-plan-2018.pdf",
-    "page": 23,
-    "sha256": "a441a49df6c9c983ecb56718aa5d6f8594aa4cddbbc8d1337e2d1aa3bd3c8b54",
-    "bodyWords": 110,
-    "totalWords": 115,
-    "judged": "Goals list with bolded targets, red sub-headings"
-   },
-   {
-    "reference": "bcg-san-pedro-bay-clean-truck-program-ctp-options-analysis-2008.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-san-pedro-bay-clean-truck-program-ctp-options-analysis-2008.pdf",
-    "page": 2,
-    "sha256": "e982d1720107f878e1ca08cea1cf7fd1c4dc3dd3674c9c2c897d0fbe7efe6fa8",
-    "bodyWords": 118,
-    "totalWords": 127,
-    "judged": ""
-   },
-   {
-    "reference": "mckinsey-university-of-arizona-2018-strategic-plan-2018.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-university-of-arizona-2018-strategic-plan-2018.pdf",
-    "page": 6,
-    "sha256": "a441a49df6c9c983ecb56718aa5d6f8594aa4cddbbc8d1337e2d1aa3bd3c8b54",
-    "bodyWords": 120,
-    "totalWords": 144,
-    "judged": "Client-built goals page; red bolded target figures"
-   },
-   {
-    "reference": "bcg-melbourne-as-a-global-cultural-destination-final-report-summary-2017.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-melbourne-as-a-global-cultural-destination-final-report-summary-2017.pdf",
-    "page": 6,
-    "sha256": "081387ea195165d0b7fc9928dec1e8264b3951474a34a59306123491669758e7",
-    "bodyWords": 121,
-    "totalWords": 126,
-    "judged": "Numbered objectives, lower half of page empty"
-   },
-   {
-    "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
-    "path": "real-client-decks/bain-and-company/bain-syracuse-university-diagnostic-report-2014.pdf",
-    "page": 10,
-    "sha256": "82416a0d09db1731b29391ee5a2f5c2d4417d085b2f7f74cb0fc0665b896e20f",
-    "bodyWords": 121,
-    "totalWords": 133,
-    "judged": ""
-   },
-   {
-    "reference": "bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-reshaping-nycha-support-functions-bcg-engagement-key-findings-and-recommendations-2012.pdf",
-    "page": 87,
-    "sha256": "6a820bcf7a2c481007ed7b3f88bc4e4e07bdacb5520c7a9e19e673f7ecb1ca3f",
-    "bodyWords": 123,
-    "totalWords": 137,
-    "judged": "Bottom half of page left blank"
-   },
-   {
-    "reference": "mckinsey-covid-19-business-recovery-council-report-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-covid-19-business-recovery-council-report-2020.pdf",
-    "page": 20,
-    "sha256": "5e11340caa3c15005109ed45b09798eb21dbc345158dcd91bd8c6a40234f2279",
-    "bodyWords": 124,
-    "totalWords": 146,
-    "judged": "Numbered goal list; filled badges flag council priorities"
-   },
-   {
-    "reference": "mckinsey-chilean-hydrogen-pathway-final-report-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-chilean-hydrogen-pathway-final-report-2020.pdf",
-    "page": 39,
-    "sha256": "5746bf71e89f050e68bf4949c586725745b100af3eab3886f1e37db9bf9fd0a7",
-    "bodyWords": 132,
-    "totalWords": 166,
-    "judged": "Six numbered icon-and-text blocks"
-   },
-   {
-    "reference": "mckinsey-modelling-the-potential-of-digitally-enabled-processes-transparency-and-participation-in-the-nhs.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-modelling-the-potential-of-digitally-enabled-processes-transparency-and-participation-in-the-nhs.pdf",
-    "page": 4,
-    "sha256": "b93253cc6c7b77579c5d032c1f83f3abc57f44a26eb5c3f4e393b98dfd940583",
-    "bodyWords": 134,
-    "totalWords": 163,
-    "judged": "Is/is-not cards over faded tick and cross watermarks"
-   },
-   {
-    "reference": "bcg-the-open-education-resources-ecosystem-an-evaluation-of-the-oer-movements-current-state-and-its-progr.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-the-open-education-resources-ecosystem-an-evaluation-of-the-oer-movements-current-state-and-its-progr.pdf",
-    "page": 16,
-    "sha256": "b9e4aa74e06ec2fb335bc17fbebc35f3a4bd39053f703d5e2af29e740b959a60",
-    "bodyWords": 136,
-    "totalWords": 147,
-    "judged": "Closes with a tinted contact block"
-   },
-   {
-    "reference": "mckinsey-capturing-the-full-electricity-efficiency-potential-of-the-u-k-2012.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-capturing-the-full-electricity-efficiency-potential-of-the-u-k-2012.pdf",
-    "page": 56,
-    "sha256": "360aded3ea6eaa6740c20498939652a57ec7eff40b9907b18209597f4e58b85d",
-    "bodyWords": 136,
-    "totalWords": 169,
-    "judged": "Lettered case list beside rationale panel"
-   },
-   {
-    "reference": "bain-syracuse-university-diagnostic-report-2014.pdf",
-    "path": "real-client-decks/bain-and-company/bain-syracuse-university-diagnostic-report-2014.pdf",
-    "page": 26,
-    "sha256": "82416a0d09db1731b29391ee5a2f5c2d4417d085b2f7f74cb0fc0665b896e20f",
-    "bodyWords": 140,
-    "totalWords": 149,
-    "judged": "Facts column, boxed perspectives panel, logo montage"
-   },
-   {
-    "reference": "bcg-interim-project-update-to-dallas-animal-shelter-commission-2016.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-interim-project-update-to-dallas-animal-shelter-commission-2016.pdf",
-    "page": 5,
-    "sha256": "46753bd70f90f798f5c00548956eec87d0c2065b43bc06d039a23bf833e69c07",
-    "bodyWords": 151,
-    "totalWords": 167,
-    "judged": "Bullet page closed by green takeaway bar"
-   },
-   {
-    "reference": "bcg-interim-project-update-to-dallas-animal-shelter-commission-2016.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-interim-project-update-to-dallas-animal-shelter-commission-2016.pdf",
-    "page": 24,
-    "sha256": "46753bd70f90f798f5c00548956eec87d0c2065b43bc06d039a23bf833e69c07",
-    "bodyWords": 153,
-    "totalWords": 180,
-    "judged": "Backup page: formula and worked calculation"
-   },
-   {
-    "reference": "bcg-budgetanalyse-af-forsvaret-2017-materialesamling-del-2-2017-in-danish.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-budgetanalyse-af-forsvaret-2017-materialesamling-del-2-2017-in-danish.pdf",
-    "page": 151,
-    "sha256": "6a7825eb3878c28646e7635985bb37c200432a258988daf48bd95b2af35806a5",
-    "bodyWords": 171,
-    "totalWords": 185,
-    "judged": "Three text columns, chevron labels, takeaway bar"
-   },
-   {
-    "reference": "bcg-the-open-education-resources-ecosystem-an-evaluation-of-the-oer-movements-current-state-and-its-progr.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-the-open-education-resources-ecosystem-an-evaluation-of-the-oer-movements-current-state-and-its-progr.pdf",
-    "page": 10,
-    "sha256": "b9e4aa74e06ec2fb335bc17fbebc35f3a4bd39053f703d5e2af29e740b959a60",
-    "bodyWords": 188,
-    "totalWords": 208,
-    "judged": "Tinted challenge cards beside torn-paper quote blocks"
-   },
-   {
-    "reference": "bcg-loose-dogs-in-dallas-strategic-recommendations-to-improve-public-safety-and-animal-welfare-presentati.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-loose-dogs-in-dallas-strategic-recommendations-to-improve-public-safety-and-animal-welfare-presentati.pdf",
-    "page": 247,
-    "sha256": "8890588fa59591738e94ddd463f5adfe1baf3ae4576bf172017d9c91cada09c2",
-    "bodyWords": 195,
-    "totalWords": 257,
-    "judged": "Summary box over recommendation/rationale columns"
-   },
-   {
-    "reference": "bcg-healthcare-system-reform-and-short-term-opportunities-iceland-health-care-system-project-2011.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-healthcare-system-reform-and-short-term-opportunities-iceland-health-care-system-project-2011.pdf",
-    "page": 80,
-    "sha256": "dd5382252b9d0f05d8b90e803516a7ba74c5efcb07aedf65cfe9ef72e2656291",
-    "bodyWords": 197,
-    "totalWords": 226,
-    "judged": "Three green label blocks with bullet lists"
-   },
-   {
-    "reference": "mckinsey-lebanon-economic-vision-full-report-2018.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-lebanon-economic-vision-full-report-2018.pdf",
-    "page": 595,
-    "sha256": "17ab46aee3a0f072df64a484c0e6c272c8865110bf3177cace2add29633cbd63",
-    "bodyWords": 211,
-    "totalWords": 235,
-    "judged": "Tailwinds/headwinds two-column bullets, green bolding"
-   },
-   {
-    "reference": "mckinsey-covid-19-business-recovery-council-report-2020.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-covid-19-business-recovery-council-report-2020.pdf",
-    "page": 22,
-    "sha256": "5e11340caa3c15005109ed45b09798eb21dbc345158dcd91bd8c6a40234f2279",
-    "bodyWords": 217,
-    "totalWords": 231,
-    "judged": "Blue bold phrases carry the takeaways"
-   },
-   {
-    "reference": "mckinsey-university-of-arizona-2018-strategic-plan-2018.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-university-of-arizona-2018-strategic-plan-2018.pdf",
-    "page": 24,
-    "sha256": "a441a49df6c9c983ecb56718aa5d6f8594aa4cddbbc8d1337e2d1aa3bd3c8b54",
-    "bodyWords": 251,
-    "totalWords": 256,
-    "judged": "Three text columns under numbered initiative badges"
-   },
-   {
-    "reference": "bcg-victoria-s-creative-and-cultural-economy-fact-pack-2015.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-victoria-s-creative-and-cultural-economy-fact-pack-2015.pdf",
-    "page": 4,
-    "sha256": "735010653b75c61eeb1e4bbbc3f35cd63b5eec65f18bf407feecc36dddba3a21",
-    "bodyWords": 252,
-    "totalWords": 267,
-    "judged": "Executive summary, bold lead-ins over bullets"
-   },
-   {
-    "reference": "mckinsey-university-of-arizona-2018-strategic-plan-2018.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-university-of-arizona-2018-strategic-plan-2018.pdf",
-    "page": 18,
-    "sha256": "a441a49df6c9c983ecb56718aa5d6f8594aa4cddbbc8d1337e2d1aa3bd3c8b54",
-    "bodyWords": 291,
-    "totalWords": 309,
-    "judged": "Two columns of run-in bold initiative headings"
-   },
-   {
-    "reference": "bcg-loose-dogs-in-dallas-strategic-recommendations-to-improve-public-safety-and-animal-welfare-presentati.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-loose-dogs-in-dallas-strategic-recommendations-to-improve-public-safety-and-animal-welfare-presentati.pdf",
-    "page": 397,
-    "sha256": "8890588fa59591738e94ddd463f5adfe1baf3ae4576bf172017d9c91cada09c2",
-    "bodyWords": 295,
-    "totalWords": 348,
-    "judged": "Green label cards beside verbatim quote bullets"
-   },
-   {
-    "reference": "mckinsey-university-of-arizona-2018-strategic-plan-2018.pdf",
-    "path": "real-client-decks/mckinsey-and-company/mckinsey-university-of-arizona-2018-strategic-plan-2018.pdf",
-    "page": 15,
-    "sha256": "a441a49df6c9c983ecb56718aa5d6f8594aa4cddbbc8d1337e2d1aa3bd3c8b54",
-    "bodyWords": 313,
-    "totalWords": 334,
-    "judged": "Four paragraphs of unbroken prose, no emphasis"
-   },
-   {
-    "reference": "bcg-san-pedro-bay-clean-truck-program-ctp-options-analysis-2008.pdf",
-    "path": "real-client-decks/boston-consulting-group/bcg-san-pedro-bay-clean-truck-program-ctp-options-analysis-2008.pdf",
-    "page": 7,
-    "sha256": "e982d1720107f878e1ca08cea1cf7fd1c4dc3dd3674c9c2c897d0fbe7efe6fa8",
-    "bodyWords": 342,
-    "totalWords": 354,
-    "judged": "Dense prose executive summary, no exhibit"
+   "totalWords": {
+    "median": 206.0
    }
-  ]
+  },
+  "table-with-commentary": {
+   "commentary": true,
+   "pages": 5,
+   "bodyWords": {
+    "q1": 149.0,
+    "median": 220.0,
+    "q3": 268.0
+   },
+   "totalWords": {
+    "median": 276.0
+   }
+  },
+  "text-page": {
+   "commentary": null,
+   "pages": 31,
+   "bodyWords": {
+    "q1": 120.5,
+    "median": 136.0,
+    "q3": 204.0
+   },
+   "totalWords": {
+    "median": 166.0
+   }
+  }
  }
 }

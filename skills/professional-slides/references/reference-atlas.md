@@ -1,6 +1,6 @@
 # Reference atlas: relationships before layouts
 
-Use this atlas during exhibit selection. The original schematics below explain relationships; they are not cropped reference slides, component screenshots or fixed templates. Inspect a strong comparable original before claiming reference calibration. [Design](design.md) owns selection and treatment, [Composition](composition.md) the native building blocks.
+Use this atlas during exhibit selection. The original schematics below explain relationships; they are not cropped reference slides, component screenshots or fixed templates. [Design](design.md) owns selection and treatment, [Composition](composition.md) the native building blocks.
 
 ![Twelve evidence relationships](../assets/reference-relationships.svg)
 
@@ -19,24 +19,24 @@ Use this atlas during exhibit selection. The original schematics below explain r
 | Distribution / exceptions | Named observations, sample basis, quantile method; locate focal case against cohort spread. | Median alone called consistency; plausible inherited quartiles with no members. |
 | Spatial allocation | Real geometry or an explicitly designed conceptual allocation whose adjacency/capacity matters. | Map-shaped decoration or invented geographical coordinates. |
 
-## Original reference anchors
+## Devices worth transferring
 
-These page numbers identify the inspected PDF pages in the project's reference selections; printed slide numbers sometimes differ. They guide retrieval, not a claim that a new review has inspected them. Keep references external to the portable skill and record the locally available original path/hash in each evaluation's coverage record.
+Each device below was observed on strong client pages during development. They are described, not cited: the documents are not part of the skill, and nothing here is a pointer to retrieve.
 
-| Original | Page | Device worth transferring |
-| --- | --- | --- |
-| BCG, Media and Entertainment in NYC (2015) | 19 | Budget bins, matched periods and aligned change values in one reading field |
-| McKinsey, Vancouver business recovery (2020) | 22 | Developed text synthesis with selective emphasis and no compulsory metric strip |
-| Bain, Syracuse diagnostic (2014) | 14 | Named focal institution against the directly drawn peer benchmark |
-| LEK, Australia freight comparison | 29,37 | Comparator selection and shared stage/metric evidence |
-| Oliver Wyman, Big Tech venture investment | 22 | Concern, test and finding aligned as one argument |
-| IAB, Podcast ad revenue study (2017) | 10 | Stable categories compared across two periods |
-| BCG, Project Denali (2013) | 8 | Amount, competing estimate, driver and method joined; recurring versus one-time effects separated |
-| Bain, Con Edison cost optimization (2019) | 27 | Enablers and detractors attached to actual workflow stages |
-| BCG, Melbourne cultural destination (2017) | 30 | Category definitions aligned beneath marks, aggregate separated from component categories |
-| McKinsey, digitally enabled NHS (2014) | 15 | Mechanism, magnitude and evidence confidence on common rows |
+| Device | What it makes easier |
+| --- | --- |
+| Budget bins, matched periods and aligned change values in one reading field | Reading level and change together without a second chart |
+| Developed text synthesis with selective emphasis and no compulsory metric strip | Carrying an argument that has no single headline number |
+| A named focal entity against a directly drawn peer benchmark | Locating the subject in its cohort at a glance |
+| Comparator selection and shared stage/metric evidence | Showing why these comparators, on one basis |
+| Concern, test and finding aligned as one argument | Following a claim from worry to verdict on one row |
+| Stable categories compared across two periods | Change in mix without re-reading the legend |
+| Amount, competing estimate, driver and method joined; recurring and one-time effects separated | Trusting a number by seeing how it was built |
+| Enablers and detractors attached to actual workflow stages | Seeing where in a process a condition bites |
+| Category definitions aligned beneath marks; the aggregate separated from its components | Reading what each bar contains |
+| Mechanism, magnitude and evidence confidence on common rows | Weighing claims by how well they are supported |
 
-Do not import reference styling that conflicts with the brief. In particular positive/negative chart colors, extra title bands or dense legacy typography are not prescribed by these examples. Record the original's strongest device, what it makes easier and why the candidate preserves or improves that function. For a new domain, search the available corpus for a better matched original rather than repeatedly sampling the same page irrespective of task.
+Do not import reference styling that conflicts with the brief. In particular positive/negative chart colours, extra title bands or dense legacy typography are not prescribed by these devices. When the user supplies reference decks, record their strongest device, what it makes easier and whether the candidate preserves or improves that function.
 
 ## Worked selection
 

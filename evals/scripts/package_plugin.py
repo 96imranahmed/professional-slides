@@ -11,6 +11,11 @@ ASSET_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.svg'}
 ALLOWED_FILES = {'.codex-plugin/plugin.json', 'README.md', 'package.json'}
 EXTENSIONS = {'.md', '.mjs', '.py', '.json', '.toml', '.yaml', '.yml', '.svg'}
 EXCLUDED = {'dist', 'output', 'outputs', 'tmp', 'deliverables', 'renders', 'node_modules', '__pycache__', '.git'}
+# The calibration corpus's page records, paths and measuring scripts are
+# development evidence. The skill ships the numbers distilled from them
+# (runtime/reading-tasks.json, runtime/weight.json) and nothing that names a
+# document an installed skill could go looking for.
+EXCLUDED_TREES = {('evals', 'corpus')}
 
 
 def package(source: Path, destination: Path):
@@ -26,7 +31,7 @@ def package(source: Path, destination: Path):
     files = []
     for p in source.rglob('*'):
         rel = p.relative_to(source)
-        if p.is_relative_to(destination) or any(x in EXCLUDED for x in rel.parts):
+        if p.is_relative_to(destination) or any(x in EXCLUDED for x in rel.parts) or rel.parts[:2] in EXCLUDED_TREES:
             continue
         if not (rel.as_posix() in ALLOWED_FILES
                 or (rel.parts[0] in ALLOWED_ROOTS and p.suffix in EXTENSIONS)

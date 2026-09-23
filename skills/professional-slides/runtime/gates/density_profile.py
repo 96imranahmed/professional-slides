@@ -123,6 +123,10 @@ def quartiles(values: list[float]) -> tuple[float, float, float]:
     return q[0], st.median(values), q[2]
 
 
+# The per-task client targets, shipped as numbers (runtime/reading-tasks.json).
+TASK_TARGETS = json.loads((Path(__file__).resolve().parents[1] / "reading-tasks.json").read_text())["tasks"]
+
+
 def band(value, low, high) -> str:
     return "below" if value < low else "above" if value > high else "within"
 
@@ -148,9 +152,9 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
         entry = {"page": index, "id": slide.get("id"), "task": task, "bodyWords": body,
                  "blocks": len(blocks), "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0,
                  "longestBlock": max(blocks) if blocks else 0, "blockSizes": blocks, "flags": []}
-        samples = [s["bodyWords"] for s in reference.get("samples", []) if isinstance(s.get("bodyWords"), (int, float))]
-        if samples:
-            q1, median, q3 = quartiles(samples)
+        target = TASK_TARGETS.get(task, {}).get("bodyWords")
+        if target:
+            q1, median, q3 = target["q1"], target["median"], target["q3"]
             entry["target"] = {"bodyWordsQ1": round(q1), "bodyWordsMedian": round(median), "bodyWordsQ3": round(q3)}
             entry["bodyWordsVsTaskMedian"] = round(body / median, 2) if median else None
             position = band(body, q1, q3)

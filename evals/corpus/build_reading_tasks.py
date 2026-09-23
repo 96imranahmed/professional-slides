@@ -1,6 +1,14 @@
-"""Build the reading-task reference bank the text contract compares pages with.
+"""Build the reading-task bank, and the per-task targets the runtime ships.
 
-    python3 evals/corpus/build_reading_tasks.py
+    python3 evals/corpus/build_reading_tasks.py            from the corpus
+    python3 evals/corpus/build_reading_tasks.py --distil   from reading-task-bank.json
+
+Two outputs, and only the second leaves this repository. The bank
+(evals/corpus/reading-task-bank.json) lists every judged client page with its
+file, page and hash: development evidence, never shipped. The runtime file
+(skills/professional-slides/runtime/reading-tasks.json) holds each task's
+quartiles and nothing that names a document, so a deck is held to the client
+pages' numbers without the skill ever reading, searching for or citing them.
 
 Each page's word floor is the lower quartile of the reference pages that share
 its reading task. Those references were chosen by hand, five per task, and a
@@ -22,6 +30,7 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 CORPUS = Path("/Users/imran/Desktop/Side Projects/professional-slides-corpus")
+BANK = HERE / "reading-task-bank.json"
 OUT = HERE.parents[1] / "skills" / "professional-slides" / "runtime" / "reading-tasks.json"
 
 TASKS = {
@@ -35,7 +44,39 @@ COMMENTARY = {"chart-led": False, "table-led": False, "diagram-led": False,
               "chart-with-commentary": True, "table-with-commentary": True, "diagram-with-commentary": True}
 
 
+def quantile(values, q):
+    a = sorted(values)
+    i = (len(a) - 1) * q
+    lo = int(i)
+    hi = min(lo + 1, len(a) - 1)
+    return round(a[lo] + (a[hi] - a[lo]) * (i - lo), 1)
+
+
+def stats(samples):
+    body = [s["bodyWords"] for s in samples]
+    total = [s["totalWords"] for s in samples]
+    return {"pages": len(samples), "bodyWords": {"q1": quantile(body, .25), "median": quantile(body, .5), "q3": quantile(body, .75)},
+            "totalWords": {"median": quantile(total, .5)}}
+
+
+def distil(bank: dict) -> dict:
+    """Per-task targets, plus the two pooled tasks older plans name."""
+    tasks = {task: {"commentary": bank["commentary"].get(task), **stats(samples)} for task, samples in bank["tasks"].items()}
+    pooled = {"exhibit-with-commentary": True, "exhibit-led": False}
+    for name, commentary in pooled.items():
+        samples = [s for task, rows in bank["tasks"].items() if bank["commentary"].get(task) is commentary for s in rows]
+        tasks[name] = {"commentary": commentary, **stats(samples)}
+    return {"$comment": ("Word targets by reading task, distilled from the judged client-page bank kept under evals/corpus. "
+                         "Body words exclude the title and source lines (pdftotext -layout). The documents behind these numbers "
+                         "are not part of the skill: never search for, open or cite them."),
+            "tasks": dict(sorted(tasks.items()))}
+
+
 def main() -> int:
+    import sys
+    if "--distil" in sys.argv:
+        OUT.write_text(json.dumps(distil(json.loads(BANK.read_text())), indent=1) + "\n")
+        return 0
     judged = json.loads((HERE / "client-page-judgements.json").read_text())
     measures = {m[0]: m for m in json.loads((HERE / "client-page-measures.json").read_text())}
     files = {os.path.basename(p): p for p in glob.glob(str(CORPUS / "**" / "*.pdf"), recursive=True)}
@@ -60,7 +101,8 @@ def main() -> int:
         "commentary": COMMENTARY,
         "tasks": {k: sorted(v, key=lambda s: s["bodyWords"]) for k, v in sorted(bank.items())},
     }
-    OUT.write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n")
+    BANK.write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n")
+    OUT.write_text(json.dumps(distil(out), indent=1) + "\n")
     for k, v in sorted(bank.items()):
         words = sorted(s["bodyWords"] for s in v)
         print(f"{k:24s} n={len(v):3d}  q1={words[len(words)//4]:4d}  median={words[len(words)//2]:4d}")

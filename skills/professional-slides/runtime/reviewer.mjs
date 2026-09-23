@@ -344,7 +344,7 @@ VISUAL REVIEW. Inspect every original page at full size, every spread and the mo
 Candidate diagnostics, not quality targets:
 ${JSON.stringify(candidateStatistics, null, 1)}
 
-Compare strong relevant original pages from every requested reference deck before scoring. Record exact pages inspected and missing coverage in a companion assessment. Historical aggregate device counts do not establish a benchmark. Explain concrete differences in evidence relationships and reader effort; do not infer quality from more devices or annotations. Compare substantive text against matched reading tasks, preserving necessary explanation without padding.
+If the user supplied reference decks, compare strong relevant pages from each before scoring and record the pages inspected. Reference material is only what the user supplied: never search the machine for other decks, a corpus or client documents. Historical aggregate device counts do not establish a benchmark. Explain concrete differences in evidence relationships and reader effort; do not infer quality from more devices or annotations. Compare substantive text against matched reading tasks, preserving necessary explanation without padding.
 
 Name the best page, worst page and most repetitive sequence. Challenge the most deletable page with a concrete merger and identify any lost evidence. Reproduce material calculations from supplied source records; disclose unverified assumptions. Record argument, evidence, visual explanation, hierarchy/copy and sequence quality in the companion assessment.
 
