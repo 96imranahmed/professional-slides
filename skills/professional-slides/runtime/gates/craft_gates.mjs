@@ -121,7 +121,7 @@ export function craftFindings(spec, scene) {
     block("CRAFT_PLAYERS_UNINTRODUCED", { players: players.length, logoPages: 0 }, 1,
       `The deck compares ${players.length} named players and never shows their marks. Introduce them early on one page: each player's ` +
       "logo, what it is and the two or three numbers the deck will compare (a `logos` exhibit, or a table with a `logo` column). Later " +
-      "pages can then name a player without the reader having to remember who it is. A logo not yet sourced is planned as `{ alt }` and asked for.");
+      "pages can then name a player without the reader having to remember who it is. Plan each logo as `{ alt: \"<Name> logo\" }`: the build fetches it from the player's Wikipedia infobox.");
   }
 
   const perTen = content.length ? (stats.distinctExhibits / content.length) * 10 : 0;

@@ -688,7 +688,11 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const hideCategoryLabels = horizontal && props.categoryLabels === false;
   const categoryIcons = hideCategoryLabels ? null : normalizeCategoryIcons(props, categories);
   const iconSize = categoryIcons ? (horizontal ? 22 : 28) : 0;
-  const iconSlot = categoryIcons ? iconSize + 6 : 0;
+  // A logo is a wordmark, not a glyph: it takes a wide box (letterboxed, so a
+  // square mark keeps its shape) where an icon takes a square one.
+  const logoMarks = categoryIcons ? [...categoryIcons.values()].some((record) => record.image) : false;
+  const iconW = logoMarks ? (horizontal ? 64 : 72) : iconSize, iconH = logoMarks ? (horizontal ? 24 : 28) : iconSize;
+  const iconSlot = categoryIcons ? (horizontal ? iconW : iconH) + 6 : 0;
   // Category notes on a bar chart sit under their label as a two-line block
   // centred on the bar. When the lanes are too thin for that block, the notes
   // move to a column of their own at the right of the bars - one line each,
@@ -1076,8 +1080,8 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     // between a bar's label and the bar.
     const iconRecord = categoryIcons?.get(category);
     if (iconRecord) nodes.push(...categoryIconNodes(id, category, iconRecord, horizontal
-      ? { x: plot.x - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) - iconSize, y: categoryStart + (groupSpan - iconSize) / 2, width: iconSize, height: iconSize }
-      : { x: categoryMap.get(category).labelCenter - iconSize / 2, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: iconSize, height: iconSize }));
+      ? { x: plot.x - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) - iconW, y: categoryStart + (groupSpan - Math.min(iconH, groupSpan)) / 2, width: iconW, height: Math.min(iconH, groupSpan) }
+      : { x: categoryMap.get(category).labelCenter - Math.min(iconW, categorySpan - 8) / 2, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: Math.min(iconW, categorySpan - 8), height: iconH }));
   });
   for(const [i,group] of categoryGroups.entries()) {
     const start=categories.indexOf(group.categories[0]),end=start+group.categories.length;

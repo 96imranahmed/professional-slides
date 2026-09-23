@@ -99,5 +99,21 @@ console.log(JSON.stringify({ column: notes.every(n => n.data.column), clash: not
         self.assertTrue(result['column'])
         self.assertFalse(result['clash'])
 
+
+class LogoFetchTests(unittest.TestCase):
+    def test_infobox_logo_and_placeholder_filling_offline(self):
+        result = run_node('''
+import { logoFileFrom, fillLogos } from './skills/professional-slides/runtime/fetch-logos.mjs';
+const infobox = "{{Infobox airline\\n| airline = Emirates\\n| logo = Emirates logo.svg\\n| image = Emirates A380.jpg\\n}}";
+const spec = { players: [{ name: 'Emirates', logo: { alt: 'Emirates logo' } }], slides: [{ exhibit: { categoryIcons: { Emirates: { image: { alt: 'Emirates logo' } } } } }] };
+const filled = fillLogos(spec, [{ name: 'Emirates', path: '/deck/assets/logos/emirates.png', credit: 'Emirates logo, via Wikipedia' }], '/deck');
+console.log(JSON.stringify({ file: logoFileFrom(infobox), photoOnly: logoFileFrom("| image = A380.jpg"), filled, path: spec.slides[0].exhibit.categoryIcons.Emirates.image.path }));
+''')
+        self.assertEqual(result['file'], 'Emirates logo.svg')
+        self.assertIsNone(result['photoOnly'])
+        self.assertEqual(result['filled'], 2)
+        self.assertEqual(result['path'], 'assets/logos/emirates.png')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -51,7 +51,7 @@ Use the standard pipeline, resolving paths from this skill:
 
 ```bash
 node runtime/storyline.mjs <id>.deck.json out/   # critique until ready, before drawing
-node runtime/build-deck.mjs <id>.deck.json out/
+node runtime/build-deck.mjs <id>.deck.json out/     # fetches player logos planned as { alt }; --no-fetch offline
 # work through out/claims.json, fix and rebuild, record out/self-check.json
 node runtime/deliver-deck.mjs <id>.deck.json out/ --skip-build --review out/taste-review.json
 ```

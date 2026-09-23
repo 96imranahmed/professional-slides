@@ -21,6 +21,7 @@ import { auditContent } from "./content-audit.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
 import { runPlanGates } from "./gates/plan_gates.mjs";
 import { craftFindings } from "./gates/craft_gates.mjs";
+import { autoFillLogos } from "./fetch-logos.mjs";
 import { auditTextPlan, auditExportText } from "./text-contract.mjs";
 import { writeLedger } from "./claims.mjs";
 
@@ -53,11 +54,14 @@ export function validateStageContract(spec, stages) {
     throw new Error("New decks require an opening executive summary before the first section");
 }
 
-export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = process.env.RUNTIME_PYTHON || "python3" } = {}) {
+export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = process.env.RUNTIME_PYTHON || "python3", fetchLogos = true } = {}) {
   const started = Date.now();
   const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
   const stem = deckStem(spec);
   const baseDir = path.dirname(path.resolve(specPath));
+  // The declared players' logos load themselves: reused from assets/logos/,
+  // fetched when missing, left as placeholders only when that fails.
+  const logos = await autoFillLogos(spec, baseDir, { hint: spec.playersHint, fetchMissing: fetchLogos });
   const directory = await assertOutputDirectory(outputDirectory);
   await fs.mkdir(directory, { recursive: true });
   // Every report this build is about to write, removed before anything that can
@@ -81,7 +85,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // plan is allowed - not every page of a rebuild needs one - but the build
   // output says so, which is the difference between a stage that was skipped
   // and a stage that does not exist.
-  const result = { status: "planned", outputDirectory: directory, timings: {}, stages: {} };
+  const result = { status: "planned", outputDirectory: directory, timings: {}, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}) };
   const stages = {};
   for (const [stage, suffix, run] of [["content", ".content.json", runContentGates],
                                       ["plan", ".plan.json", runPlanGates]]) {
@@ -256,11 +260,11 @@ async function finish(result, directory) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  if (args.length < 2) { console.error("Usage: build-deck.mjs spec.json output-directory [--preflight] [--no-render]"); process.exit(1); }
+  if (args.length < 2) { console.error("Usage: build-deck.mjs spec.json output-directory [--preflight] [--no-render] [--no-fetch]"); process.exit(1); }
   try {
     const pythonIndex = args.indexOf("--python");
     if (pythonIndex >= 0 && (!args[pythonIndex + 1] || args[pythonIndex + 1].startsWith("--"))) throw new Error("--python requires an executable");
-    const result = await buildDeck(path.resolve(args[0]), path.resolve(args[1]), { preflight: args.includes("--preflight"), render: !args.includes("--no-render"), python: pythonIndex < 0 ? undefined : args[pythonIndex + 1] });
+    const result = await buildDeck(path.resolve(args[0]), path.resolve(args[1]), { preflight: args.includes("--preflight"), render: !args.includes("--no-render"), fetchLogos: !args.includes("--no-fetch"), python: pythonIndex < 0 ? undefined : args[pythonIndex + 1] });
     console.log(JSON.stringify({ status: result.status, stages: Object.fromEntries(Object.entries(result.stages || {}).map(([k, v]) => [k, v.state])), pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, timings: result.timings }));
     process.exit(["built", "built-unrendered", "preflight-passed"].includes(result.status) ? 0 : 2);
   } catch (error) {
