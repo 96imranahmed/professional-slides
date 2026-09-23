@@ -140,5 +140,47 @@ console.log(JSON.stringify({titles:n.filter(x=>x.role==='axis-title').map(x=>x.t
         self.assertEqual(len(result["y"]), 5)
 
 
+class LineLabelSideTests(unittest.TestCase):
+    def test_a_trough_label_sits_below_and_the_scene_and_native_chart_agree(self):
+        # Bond's mean gross by decade: every label above its marker set 540,
+        # 869 and 901 on the line itself.
+        values = [1000, 930, 540, 711, 869, 1375, 901]
+        sys.path.insert(0, str(ROOT / "skills/professional-slides/runtime/emit"))
+        try:
+            import importlib
+            emit = importlib.import_module("emit_pptx")
+        except ModuleNotFoundError:
+            self.skipTest("python-pptx is not installed")
+        python_sides = emit.line_label_sides(values)
+        js = run_node(f"""
+import {{ lineLabelSides }} from './skills/professional-slides/runtime/charts.mjs';
+console.log(JSON.stringify(lineLabelSides({values})));
+""")
+        self.assertEqual(python_sides, js)
+        self.assertEqual(python_sides, ["above", "above", "below", "above", "below", "above", "right"])
+
+
+class PictureRowTests(unittest.TestCase):
+    def test_a_poster_row_sets_its_text_on_the_picture_centre_and_keeps_the_poster_upright(self):
+        # A row of posters cropped to landscape slivers, the film's name set at
+        # the poster's top edge and its gross half a poster lower.
+        import base64, struct, zlib
+        def png(w, h):
+            chunk = lambda kind, body: struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xffffffff)
+            raw = b"".join(b"\x00" + b"\x80\x80\x80" * w for _ in range(h))
+            return base64.b64encode(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                                    + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")).decode()
+        result = run_node(f"""
+import {{ REGISTRY }} from './skills/professional-slides/runtime/registry.mjs';
+const media={{dataUri:'data:image/png;base64,{png(20, 30)}',width:20,height:30,alt:'A poster',authorization:'test fixture'}};
+const n=REGISTRY.get('table').render({{id:'t',frame:{{x:0,y:0,width:900,height:400}},props:{{columns:[{{label:'',type:'photo',width:{{px:96}}}},{{label:'Film'}},{{label:'Critics',unit:'%'}}],rows:[[{{media}},'A film with a name','81']]}}}}).nodes;
+const photo=n.find(x=>x.role==='table-photo'), texts=n.filter(x=>x.type==='text'&&x.data?.row===0);
+const centre=f=>f.y+f.height/2;
+console.log(JSON.stringify({{ratio:photo.frame.height/photo.frame.width, offsets:texts.map(x=>Math.abs(centre(x.frame)-centre(photo.frame)))}}));
+""")
+        self.assertAlmostEqual(result["ratio"], 1.5, places=2)
+        self.assertTrue(all(o < 3 for o in result["offsets"]), result["offsets"])
+
+
 if __name__ == "__main__":
     unittest.main()

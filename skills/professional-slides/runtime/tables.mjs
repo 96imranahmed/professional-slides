@@ -44,6 +44,12 @@ export const CELL_TYPES = Object.freeze([
 // A photo cell's height: three body lines, which is where a thumbnail stops
 // being a sliver and starts showing what it is of.
 const PHOTO_CELL_HEIGHT = 64;
+// A portrait picture - a poster, a book cover - cropped to a landscape cell
+// kept a band across its middle, and a row of posters became a row of
+// unreadable strips. It keeps its own shape, a little taller than a landscape
+// thumbnail so its width is still enough to recognise.
+const PORTRAIT_PHOTO_HEIGHT = 92;
+const isPortrait = (media) => media?.width > 0 && media?.height > media.width * 1.15;
 // Cells that may lead with an icon before their label.
 const ICON_LED_CELLS = new Set(["category", "text"]);
 // Outlook cells (the Bain sector tables): an arrow in a ring, green up, grey flat, red down.
@@ -444,7 +450,7 @@ function contentLayout(cell, width, props, used) {
       if (!String(cell.media.alt ?? "").trim()) throw new Error("A photo cell with no file needs `alt` saying what the photo will show");
       return { height: PHOTO_CELL_HEIGHT, padding, blocks: [measure(cell.media.alt, inner - 8, false, "type.label")] };
     }
-    return { height: PHOTO_CELL_HEIGHT, padding };
+    return { height: isPortrait(cell.media) ? PORTRAIT_PHOTO_HEIGHT : PHOTO_CELL_HEIGHT, padding };
   }
   if (cell.type === "implication") {
     if (cell.relation !== "implies")
@@ -1134,6 +1140,11 @@ function renderTableAt({ id, frame, props }) {
     const pillHeight = Math.min(text.height + 2 * BUBBLE_PAD_Y, height - m.gap);
     return { x: area.x + (area.width - m.gap - width) / 2, y: area.y + (height - pillHeight) / 2, width, height: pillHeight };
   };
+  // A row led by a picture takes its height from the picture, and its text set
+  // at the top of that height while the figures centred put one row on two
+  // baselines: the film's name level with the poster's top edge, its gross
+  // half a poster lower. Every cell in such a row centres on the picture.
+  const pictureRows = new Set(m.cells.flatMap((row, r) => row.some(cell => cell && (cell.type === "photo" || cell.type === "logo")) ? [r] : []));
   m.cells.forEach((row, r) =>
     row.forEach((cell, c) => {
       if (!cell) return;
@@ -1229,7 +1240,8 @@ function renderTableAt({ id, frame, props }) {
         const { size, on } = l.mark, x0 = area.x + (area.width - m.gap - size) / 2, y0 = area.y + (height - size) / 2;
         nodes.push(...stateMarker({ id: stableId(cellId, "check"), role: "table-check", x: x0, y: y0, size, state: on ? "yes" : "no", data }));
       } else if (cell.type === "photo") {
-        const box = { x: inner.x, y: area.y + (height - l.height) / 2, width: inner.width, height: l.height };
+        const portraitWidth = isPortrait(cell.media) ? Math.min(inner.width, l.height * cell.media.width / cell.media.height) : inner.width;
+        const box = { x: inner.x, y: area.y + (height - l.height) / 2, width: portraitWidth, height: l.height };
         if (cell.media.dataUri) {
           const photo = mediaNode({ id: stableId(cellId, "photo"), frame: box, props: cell.media, role: "table-photo", fit: "cover" });
           photo.data = { ...photo.data, ...data };
@@ -1349,7 +1361,7 @@ function renderTableAt({ id, frame, props }) {
       } else {
         let y = inner.y;
         if (
-          m.stretched ||
+          m.stretched || pictureRows.has(r) ||
           ["category", "number", "binary", "harvey", "heatmap"].includes(
             cell.type,
           )

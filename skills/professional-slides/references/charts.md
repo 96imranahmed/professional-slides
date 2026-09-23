@@ -105,6 +105,8 @@ Trends, inflections, trajectory comparison, actual against forecast over ordered
 
 Irregular observations use the numeric contract: `xAxis: {unit, min, max, ticks}`, a visible heading and shared unit, and series of `points: [{key, x, y, label?, breakBefore?}]` with strictly increasing in-domain x. `gapPolicy: "connect-observations"` joins only supplied observations; `"explicit-breaks"` with `breakBefore: true` leaves a gap open. `statusBoundary: {x, beforeLabel, afterLabel}` draws a measured boundary and each series declares its side.
 
+Point labels take the side the line leaves open: a peak's above, a trough's below, a point on a rise or fall beside its gentler segment, an end point under a climbing segment beside it, outward. The drawn scene and the native chart use one rule (`lineLabelSides`, `line_label_sides`).
+
 *Example:* ten years of reported homicides, heading `NYPD reported homicides, 2015-2025`, endpoints labelled, one annotation on the 2020 inflection.
 
 ## Stacked

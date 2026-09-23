@@ -48,7 +48,7 @@ Decide what the page has to make the reader see, then take the slide type that s
 | What people said | `quote-cluster` | Quotes inside bullets |
 | The people involved | `people`, with portraits when supplied | Names in a table |
 | Who is in a set | `logos`, `logo-collage` | A list of names |
-| A thing worth seeing: a product, a place, a film, a person | a picture layout (`picture-hero`, `picture-strip`, `photo` beside text, or a table `photo` column) | A description of it |
+| A thing worth seeing: a product, a place, a film, a person | a picture layout (`picture-hero`, `picture-strip`, `photo` beside text, or a table `photo` column, where a portrait picture such as a poster keeps its shape and the row's text centres on it) | A description of it |
 | Report-style argument with no single exhibit | a text page of `paragraphs`, which sets in columns past about 110 words | A single wide block |
 | One sentence the deck turns on | `statement`, over a photograph when there is one | A title on an empty page |
 

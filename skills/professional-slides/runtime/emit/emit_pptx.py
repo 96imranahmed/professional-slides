@@ -84,6 +84,32 @@ def _nice_ceiling(value):
     return 10 * magnitude
 
 
+def line_label_sides(values):
+    """Where each point's label goes on a line: a peak's above, a trough's
+    below, a point on a rise or fall on the side of its gentler segment, which
+    is the side the line leaves open, and an end point whose one segment climbs
+    over it beside the point, outward. Mirrors lineLabelSides in charts.mjs."""
+    sides = []
+    for j, v in enumerate(values):
+        prev = values[j - 1] if j > 0 else None
+        nxt = values[j + 1] if j + 1 < len(values) else None
+        if prev is None and nxt is None:
+            sides.append("above")
+        elif prev is None:
+            sides.append("above" if nxt <= v else "left")
+        elif nxt is None:
+            sides.append("above" if prev <= v else "right")
+        elif v >= prev and v >= nxt:
+            sides.append("above")
+        elif v <= prev and v <= nxt:
+            sides.append("below")
+        elif prev < v:
+            sides.append("above" if nxt - v < v - prev else "below")
+        else:
+            sides.append("above" if prev - v < v - nxt else "below")
+    return sides
+
+
 def _luminance(hex_color):
     """Relative luminance (0..1) of a #RRGGBB colour, for label contrast."""
     try:
@@ -636,6 +662,23 @@ class Emitter:
                     sdl.number_format = number_format; sdl.number_format_is_linked = False
                     sdl.font.size = Pt(11); sdl.font.bold = bool(spec.get("labelBold", True))
                     sdl.position = XL_LABEL_POSITION.ABOVE
+                    # Above every marker put a trough's label on the two
+                    # segments meeting under it; each point takes the side its
+                    # segments leave free (line_label_sides, as the scene does).
+                    if sdl.show_value:
+                        values = spec["series"][i]["values"]
+                        for j, side in enumerate(line_label_sides(values)):
+                            if side == "above" or (spec.get("endLabels") and j == len(values) - 1):
+                                continue
+                            lab = ser.points[j].data_label
+                            lab.position = {"below": XL_LABEL_POSITION.BELOW, "left": XL_LABEL_POSITION.LEFT, "right": XL_LABEL_POSITION.RIGHT}[side]
+                            lab.font.size = Pt(11); lab.font.bold = bool(spec.get("labelBold", True))
+                            dlbl = lab._dLbl
+                            if dlbl is not None and dlbl.find(qn("c:numFmt")) is None:
+                                fmt = etree.Element(qn("c:numFmt")); fmt.set("formatCode", number_format); fmt.set("sourceLinked", "0")
+                                dlbl.find(qn("c:idx")).addnext(fmt)
+                            if dlbl is not None and dlbl.find(qn("c:showVal")) is not None:
+                                dlbl.find(qn("c:showVal")).set("val", "1")
                 if kind in ("column", "bar", "stacked-column", "stacked-bar") and single and spec.get("dataLabels", True):
                     # Series-level labels first (a per-point override otherwise
                     # creates a series block that hides the other labels), then

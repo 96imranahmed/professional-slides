@@ -1209,6 +1209,24 @@ function sparseLineChart({ id, frame, props }) {
   return rendered;
 }
 
+// Where each point's label goes: a peak's above, a trough's below, a point on a
+// rise or fall on the side of its gentler segment, and an end point whose one
+// segment climbs over it beside the point, outward. Every label above its
+// marker set a trough's value on the two segments meeting under it.
+// emit_pptx.py line_label_sides applies the same rule to the native chart.
+export function lineLabelSides(values) {
+  return values.map((v, j) => {
+    const prev = j > 0 ? values[j - 1] : null, next = j + 1 < values.length ? values[j + 1] : null;
+    if (prev === null && next === null) return "above";
+    if (prev === null) return next <= v ? "above" : "left";
+    if (next === null) return prev <= v ? "above" : "right";
+    if (v >= prev && v >= next) return "above";
+    if (v <= prev && v <= next) return "below";
+    if (prev < v) return next - v < v - prev ? "above" : "below";
+    return prev - v < v - next ? "above" : "below";
+  });
+}
+
 function lineChart({ id, frame, props, area = false }) {
   if (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined)) {
     if (area) throw new Error("Sparse observations are supported by chart.line only; areas require complete categorical observations");
@@ -1293,6 +1311,7 @@ function lineChart({ id, frame, props, area = false }) {
       y2: point.y,
       style: lineStyle(SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length], token("line.standard"))
     })));
+    const labelSides = lineLabelSides(points.map(point => point.value));
     points.forEach((point) => {
       nodes.push(ellipsePrimitive({
         id: stableId(id, "point", item.name, point.category),
@@ -1314,7 +1333,7 @@ function lineChart({ id, frame, props, area = false }) {
           frame: first
             ? { x: point.x - 68, y: point.y - 12, width: 60, height: 24 }
             : last ? { x: point.x + 8, y: point.y - 12, width: 60, height: 24 }
-            : { x: point.x - 30, y: point.y - 27, width: 60, height: 24 },
+            : { x: point.x - 30, y: labelSides[points.indexOf(point)] === "below" ? point.y + 5 : point.y - 27, width: 60, height: 24 },
           text: formatValue(point.value, props),
           data: { series: item.name, category: point.category, value: point.value, labelKind: "point" },
           style: textStyle(CHART_LABEL, INK, labelBold(), first ? "right" : last ? "left" : "center")

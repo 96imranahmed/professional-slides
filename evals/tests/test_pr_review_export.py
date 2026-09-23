@@ -114,7 +114,9 @@ class ZeroStackLabelTests(unittest.TestCase):
                 chart = next(s.chart for s in Presentation(path).slides[0].shapes if s.has_chart)
                 labels = chart.series[0]._element.find(qn('c:dLbls'))
                 self.assertEqual(labels.find(qn('c:showVal')).get('val'), '1' if point_labels else '0')
-                endpoint = labels.find(qn('c:dLbl'))
+                # The first point, under a rising line, carries its own
+                # placement override too; the endpoint is the one at idx 3.
+                endpoint = next(l for l in labels.findall(qn('c:dLbl')) if l.find(qn('c:idx')).get('val') == '3')
                 self.assertEqual(endpoint.find(qn('c:idx')).get('val'), '3')
                 self.assertEqual(''.join(t.text for t in endpoint.findall('.//' + qn('a:t'))), 'Monthly support 18.0')
 
