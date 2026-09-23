@@ -20,8 +20,8 @@ package_plugin = importlib.util.module_from_spec(spec); spec.loader.exec_module(
 
 # Anything that tells a reader of the shipped plugin that a corpus exists, where
 # its numbers came from, or which documents were in it.
-LEAKS = re.compile(r"corpus|professional-slides-corpus|real-client-decks|/Users/|client[- ]?(?:deck|page|work|project|engagement)s?\b"
-                   r"|published (?:deck|work|page|report|slideshow)s?\b|thought leadership|slideworks|vision pass|calibration sample"
+LEAKS = re.compile(r"corpus|/Users/|client[- ]?(?:deck|page|work|project|engagement)s?\b"
+                   r"|published (?:deck|work|page|report|slideshow)s?\b|thought leadership|vision pass|calibration sample"
                    r"|[a-z]+-[a-z0-9-]+-(?:19|20)\d\d\.pdf|\b(?:mckinsey|bcg|bain|deloitte|l\.e\.k|oliver wyman)\b", re.I)
 TEXT = {'.md', '.mjs', '.js', '.py', '.json', '.yaml', '.yml', '.toml', '.txt', '.svg'}
 

@@ -1,4 +1,4 @@
-"""Furniture from the 2020–25 firm decks (the corpus slideworks/ library): toned side
+"""Page furniture: toned side
 panels, photo strips, period bands and event flags, highlighted rows and
 line-budget pagination, unit charts, stat-row tones, the takeaways page and
 the column agenda."""
@@ -6,7 +6,7 @@ import unittest
 from node_probe import run_node
 
 
-class SlideworksPassTests(unittest.TestCase):
+class PageFurnitureTests(unittest.TestCase):
     def test_side_panel_tones_and_photo_strips(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';

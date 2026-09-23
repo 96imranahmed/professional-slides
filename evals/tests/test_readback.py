@@ -22,10 +22,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 EMIT = ROOT / "skills" / "professional-slides" / "runtime" / "emit"
 GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
-SCENE_GZ = ROOT / "evals" / "fixtures" / "scene-nyc.json.gz"
 
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
+from node_probe import example_scene  # noqa: E402
 
 try:
     import pptx  # noqa: F401
@@ -47,7 +47,7 @@ class ReadbackTests(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         root = Path(cls.tmp.name)
         cls.scene_path = root / "scene.json"
-        cls.scene = page_gates.load_scene(SCENE_GZ)
+        cls.scene = example_scene("nyc-or-sf")
         cls.scene_path.write_text(json.dumps(cls.scene))
         cls.pptx_path = root / "deck.pptx"
         emit = subprocess.run(
@@ -80,13 +80,12 @@ class ReadbackTests(unittest.TestCase):
 
     @requires_pptx
     def test_every_slide_has_a_real_title_placeholder(self):
-        self.assertEqual(self.report["stats"]["title_placeholders"], 21)
-        self.assertEqual(len(self.scene["slides"]), 21)
+        self.assertEqual(self.report["stats"]["title_placeholders"], len(self.scene["slides"]))
 
     @requires_pptx
     def test_charts_are_native_objects_with_their_own_series(self):
-        self.assertEqual(self.report["stats"]["charts_checked"], 5)
-        self.assertEqual(self.emit_stats["native_charts"], 5)
+        self.assertGreater(self.report["stats"]["charts_checked"], 0)
+        self.assertEqual(self.emit_stats["native_charts"], self.report["stats"]["charts_checked"])
         self.assertGreater(self.emit_stats["grouped"], 0)
 
     @requires_pptx

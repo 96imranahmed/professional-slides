@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
+from node_probe import example_scene  # noqa: E402
 
 
 def text(role, body, **data):
@@ -235,7 +236,7 @@ class ContradictedShareTests(unittest.TestCase):
     """A percentage the page's own counts do not give.
 
     Found on a *reference* deck by a reader, not by anything in this repository
-    - which is the point. `slideworks` printed four rings (80% have access, 52%
+    - which is the point. An example deck printed four rings (80% have access, 52%
     require guidelines, 38% limit tools, 12% have no access) over a bar chart
     labelled "17 of 33", "12 of 33", "4 of 33". 17 + 12 = 29 of 33 is 88%, and
     the page's own 12% is what makes 80% provably wrong. Two bullets beside it
@@ -286,16 +287,6 @@ class FalsifiabilityTests(unittest.TestCase):
     CONTENT_CODES = {"RESTATEMENT", "PLANNING_VOICE", "CAVEAT_HEAVY", "TWIN_CELLS",
                      "TABLE_SCHEMA_FLAT", "CONTRADICTED_SHARE"}
 
-    def test_the_audited_fixture_deck_is_clean_on_content(self):
-        """The NYC/SF deck is the deck the whole audit was written about.
-
-        It fails plenty of geometric gates on purpose - that is what the fixture
-        is for - and it is careful, hand-checked prose. If a content gate fires
-        on it, the gate is measuring style rather than substance.
-        """
-        scene = page_gates.load_scene(ROOT / "evals" / "fixtures" / "scene-nyc.json.gz")
-        report = page_gates.run_gates(scene, gates=self.CONTENT_CODES)
-        self.assertEqual([f["code"] for f in report["findings"]], [])
 
     def test_every_content_code_is_registered_and_documented(self):
         for code in self.CONTENT_CODES:

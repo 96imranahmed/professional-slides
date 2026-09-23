@@ -59,11 +59,10 @@ not stored — the Marvel plan is 118KB and would rot — only what scoring prod
 A specimen is useful because it is a run nobody can re-argue: these are the
 numbers from a deck that passed every gate the skill had at the time.
 
-`example-deck-baseline.json` is the same harness pointed at the four example
-decks, which is how you know the harness is not simply strict. Two of them miss a
-bar today, and that is a finding about those decks rather than a reason to move
-the bar: `slideworks` treats one table in six against a reference of about half,
-and `house-style` treats none of its one table.
+`example-deck-baseline.json` is the same harness pointed at the example decks,
+which is how you know the harness is not simply strict. Where one misses a bar,
+that is a finding about the deck rather than a reason to move the bar:
+`house-style` treats none of its one table.
 
 A specimen also carries `foundByLooking`: what step 3 found that the score did
 not. `2026-09-18-network-rollout.json` records eight entries against a run that

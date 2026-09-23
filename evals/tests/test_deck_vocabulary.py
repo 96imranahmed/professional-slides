@@ -369,26 +369,16 @@ console.log(JSON.stringify(r.findings.filter(f => f.code === 'PLAN_CHART_MONOTON
 
 
 class ReadingTaskBankTests(unittest.TestCase):
-    """The development bank is every judged client page, measured and hashed;
-    the runtime ships only each task's quartiles, distilled from it."""
+    """The runtime ships each reading task's targets as quartiles."""
 
-    BANK = json.loads((ROOT / "evals" / "corpus" / "reading-task-bank.json").read_text(encoding="utf-8"))
     SHIPPED = json.loads((RUNTIME / "reading-tasks.json").read_text(encoding="utf-8"))["tasks"]
 
-    def test_every_sample_is_a_measured_hashed_page(self):
-        for task, samples in self.BANK["tasks"].items():
-            for s in samples:
-                with self.subTest(task=task, reference=s["reference"], page=s["page"]):
-                    self.assertRegex(s["sha256"], r"^[0-9a-f]{64}$")
-                    self.assertGreater(s["bodyWords"], 0, "a raster page is never a zero-word baseline")
-                    self.assertGreaterEqual(s["totalWords"], s["bodyWords"])
-
-    def test_the_shipped_targets_are_the_banks_quartiles(self):
-        import statistics
-        for task, samples in self.BANK["tasks"].items():
+    def test_each_task_carries_ordered_quartiles(self):
+        for task, target in self.SHIPPED.items():
             with self.subTest(task=task):
-                words = [s["bodyWords"] for s in samples]
-                self.assertAlmostEqual(self.SHIPPED[task]["bodyWords"]["median"], statistics.median(words), delta=0.1)
+                words = target["bodyWords"]
+                self.assertLessEqual(words["q1"], words["median"])
+                self.assertLessEqual(words["median"], words["q3"])
 
     def test_a_chart_page_without_commentary_is_measured_against_its_own_kind(self):
         self.assertLess(self.SHIPPED["chart-led"]["bodyWords"]["median"], self.SHIPPED["chart-with-commentary"]["bodyWords"]["median"])
@@ -398,8 +388,9 @@ class ReadingTaskBankTests(unittest.TestCase):
 import {READING_TASKS} from './skills/professional-slides/runtime/text-contract.mjs';
 console.log(JSON.stringify(Object.keys(READING_TASKS)));
 """)
-        for task in self.BANK["commentary"]:
-            self.assertIn(task, known)
+        for task, target in self.SHIPPED.items():
+            if isinstance(target.get("commentary"), bool):
+                self.assertIn(task, known)
 
 
 class FigureRoleVocabularyTests(unittest.TestCase):

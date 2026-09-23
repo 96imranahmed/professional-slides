@@ -121,7 +121,7 @@ console.log(JSON.stringify({ok:true}));
     def test_removed_dependency_route_has_explicit_usage_error(self):
         result = self.cli(ROOT / 'evals/scripts/run_tests.mjs', '--dependencies')
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Usage: run_tests.mjs [--release]', result.stderr)
+        self.assertIn('Usage: run_tests.mjs', result.stderr)
         self.assertNotIn('MODULE_NOT_FOUND', result.stderr)
 
     def test_empty_footer_overrides_house_and_raw_planner_compilation_still_works(self):

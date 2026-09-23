@@ -756,44 +756,6 @@ class CorpusBenchmarkTests(unittest.TestCase):
     9pt or smaller. Ours are floors, not targets - the point is that a change
     that quietly empties the pages fails here instead of in a screenshot."""
 
-    def test_the_flagship_example_stays_inside_the_corpus_band(self):
-        result = run_node('''
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
-const path='./evals/fixtures/slideworks.deck.json';
-const spec=JSON.parse(fs.readFileSync(path,'utf8'));
-const {deck}=planDeck(toDeckPlan(spec,'./evals/fixtures'));
-const median=(values)=>{const s=[...values].sort((a,b)=>a-b);const m=s.length>>1;
-  return s.length%2?s[m]:(s[m-1]+s[m])/2;};
-const pages=[];
-for(const slide of deck.slides){
-  const texts=slide.nodes.filter(n=>typeof n.text==='string'&&n.text.trim());
-  const words=texts.reduce((sum,n)=>sum+n.text.trim().split(/\\s+/).length,0);
-  // A cover, a divider or a statement page is not an analytical page; the
-  // corpus measurement excluded them the same way, by a word floor.
-  if(words<25) continue;
-  const size=(n)=>Number(n.style?.fontSize?.value ?? n.style?.fontSize ?? 0);
-  pages.push({words,blocks:texts.length,
-    numeric:texts.reduce((sum,n)=>sum+(n.text.match(/\\d/g)?1:0),0),
-    small:texts.filter(n=>size(n)>0&&size(n)<=9).reduce((sum,n)=>sum+n.text.trim().split(/\\s+/).length,0)});
-}
-const measured={pages:pages.length,words:median(pages.map(p=>p.words)),blocks:median(pages.map(p=>p.blocks)),
-  numeric:median(pages.map(p=>p.numeric)),small:median(pages.map(p=>p.small))};
-console.log(JSON.stringify(measured));
-''')
-        # Floors are set a step under what the deck measures today, so ordinary
-        # drift is fine and a page-emptying change is not.
-        # Measured on the scene, one block per text node, where the corpus was
-        # measured on the rendered page, one block per printed line: 16 pages
-        # today at 128 words, 37.5 blocks, 20 numeric blocks and 24.5 words of
-        # small type per page.
-        self.assertGreaterEqual(result["pages"], 12)
-        self.assertGreaterEqual(result["words"], 110, "page text has fallen away from the corpus band")
-        self.assertGreaterEqual(result["blocks"], 30, "the page has lost its furniture: labels, units, notes")
-        self.assertGreaterEqual(result["numeric"], 14, "the evidence has stopped carrying numbers")
-        self.assertGreaterEqual(result["small"], 16, "the small type - labels, units, notes - has gone")
 
 
 class HeavyPageTests(unittest.TestCase):

@@ -47,10 +47,6 @@ export const PALETTES = Object.freeze({
   },
   "toolkit": { label: "Toolkit", basis: "Neutral palette retained for component fixtures", colors: {} }
 });
-// Release validation uses one canonical visual system. The other named palettes
-// remain supported inputs, but they are covered by fast token/contract tests
-// rather than repeating the full render-and-readback gallery.
-export const GOLDEN_PALETTES = Object.freeze(["midnight"]);
 
 export function heatScaleTokens(colors) {
   const mix=(a,b,f)=>'#'+[0,1,2].map(i=>Math.round(parseInt(a.slice(1+i*2,3+i*2),16)*(1-f)+parseInt(b.slice(1+i*2,3+i*2),16)*f).toString(16).padStart(2,'0')).join('').toUpperCase();

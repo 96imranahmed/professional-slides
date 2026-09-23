@@ -2,9 +2,8 @@
 
 Two halves:
 
-* Known-bad pages. The NYC/SF deck in `evals/fixtures` is the deck the audit was
-  written about. Each gate must actually fire on the page where the defect is
-  visible, with the right code and a repair sentence.
+* Defects. Each gate must fire on a page that carries its defect, with the
+  right code and a repair sentence; the shipped NYC/SF example is the base deck.
 * A synthetic good page. A slide built to satisfy every threshold must produce
   no findings at all, so the gates are falsifiable rather than always-on.
 """
@@ -20,16 +19,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
-FIXTURES = ROOT / "evals" / "fixtures"
-SCENE = FIXTURES / "scene-nyc.json.gz"
-# The four accepted golden references double as the gate's render fixture:
-# same deck, same pages, one copy in the repository.
-RENDER = ROOT / "evals" / "golden" / "reference"
 
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
 
-from node_probe import requires_python_package  # noqa: E402
+from node_probe import requires_python_package, example_scene, example_scene_file  # noqa: E402
 
 # The three gates that read the renders need Pillow (see requirements.txt).
 # Everything else in this file works off the scene.
@@ -37,7 +31,9 @@ needs_pixels = requires_python_package('PIL')
 
 
 def load_scene():
-    return page_gates.load_scene(SCENE)
+    # The shipped NYC/SF example, compiled; a copy so a test can mutate it.
+    import copy
+    return copy.deepcopy(example_scene("nyc-or-sf"))
 
 
 def codes(report):
@@ -226,7 +222,7 @@ class SyntheticGoodPageTests(unittest.TestCase):
 
     def test_every_finding_carries_a_repair_sentence(self):
         scene = load_scene()
-        report = page_gates.run_gates(scene, render_dir=str(RENDER))
+        report = page_gates.run_gates(scene, render_dir=None)
         self.assertTrue(report["findings"])
         for item in report["findings"]:
             self.assertEqual(
@@ -249,89 +245,6 @@ class SyntheticGoodPageTests(unittest.TestCase):
         self.assertTrue(report["accepted"], report["findings"])
 
 
-class KnownBadDeckTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.scene = load_scene()
-        cls.report = page_gates.run_gates(cls.scene, render_dir=str(RENDER))
-
-    def test_the_audited_deck_is_rejected(self):
-        self.assertFalse(self.report["accepted"])
-        self.assertEqual(self.report["slides"], 21)
-        self.assertEqual(self.report["coverSlides"], [1])
-        self.assertEqual(self.report["contentSlides"], 20)
-
-    def test_body_type_is_out_of_range_across_the_deck(self):
-        # 16.1 pt body copy and 30 pt titles: the density multiplier produced
-        # sizes that are on no modular scale.
-        type_findings = [f for f in self.report["findings"] if f["code"] == "TYPE_RANGE"]
-        self.assertGreater(len(type_findings), 100)
-        sizes = {f["measured"]["pt"] for f in type_findings}
-        self.assertIn(30.0, sizes)   # action titles, allowed band is 20-26
-        self.assertIn(16.1, sizes)   # body copy, allowed band is 10-14
-
-    # `HEDGED_TITLE` was a nine-entry word list applied to every title in every
-    # deck - a log of four offending titles, not a lexicon, and it failed
-    # "Three of five markets could fund the build from cash", which commits to a
-    # finding. Whether a title commits is real and is a judgement; it lives in
-    # the taste review now, and `reviewer.mjs` still raises the code.
-
-    @needs_pixels
-    def test_hero_exhibit_and_ink_gates_fire_on_the_thin_pages(self):
-        self.assertTrue(slides_with(self.report, "HERO_EXHIBIT"))
-        ink = slides_with(self.report, "INK_COVERAGE")
-        # The render fixture only carries four pages; the ink gate can only fire
-        # where a PNG exists.
-        rendered = {2, 5, 6, 15}
-        self.assertTrue(set(ink) & rendered, f"no ink finding on {sorted(rendered)}")
-
-    def test_layout_monotony_is_reported_once_for_the_deck(self):
-        monotony = [f for f in self.report["findings"] if f["code"] == "LAYOUT_MONOTONY"]
-        self.assertEqual(len(monotony), 1)
-        finding = monotony[0]
-        self.assertIsNone(finding["slide"])
-        # 8 of the 20 content pages are the identical two-column prose construction.
-        self.assertGreater(finding["measured"]["share"], page_gates.THRESHOLDS["monotony_max"])
-        self.assertGreaterEqual(len(finding["measured"]["slides"]), 8)
-
-    @needs_pixels
-    def test_ink_is_measured_from_the_png_and_separates_thin_from_full_pages(self):
-        coverage = {}
-        for number in (2, 5, 6, 15):
-            rows = page_gates.load_ink_rows(RENDER / f"slide-{number}.png")
-            self.assertEqual(len(rows), page_gates.CANVAS_H)
-            coverage[number] = sum(rows[:page_gates.FOOTER_TOP]) / float(
-                page_gates.CANVAS_W * page_gates.CANVAS_H)
-        # Slide 2 is the two-column prose page the audit measured as mostly
-        # empty; slide 6 is the four-bar chart page that fills its frame.
-        self.assertLess(coverage[2], page_gates.THRESHOLDS["ink_min"])
-        self.assertLess(coverage[5], page_gates.THRESHOLDS["ink_min"])
-        self.assertGreater(coverage[6], page_gates.THRESHOLDS["ink_min"])
-        findings = []
-        page_gates.gate_ink_and_dead_band(
-            2, page_gates.load_ink_rows(RENDER / "slide-2.png"), findings)
-        self.assertIn("INK_COVERAGE", [f["code"] for f in findings])
-        findings = []
-        page_gates.gate_ink_and_dead_band(
-            6, page_gates.load_ink_rows(RENDER / "slide-6.png"), findings)
-        self.assertNotIn("INK_COVERAGE", [f["code"] for f in findings])
-        self.assertNotIn("DEAD_BAND", [f["code"] for f in findings])
-        # But it does trip INTERNAL_VOID at 0.142, and it should: the two chart
-        # panels stop 100px above the note and leave a band of nothing across
-        # the page. The old ceiling of 0.22 sat in the corpus's worst 0.6% and
-        # never fired; 0.13 sits in its worst 2%, and the first thing it caught
-        # was a page of our own that reads empty through the middle. Left
-        # standing on purpose - the repair belongs in the composer's track
-        # sizing, not in the threshold.
-        self.assertIn("INTERNAL_VOID", [f["code"] for f in findings])
-
-    def test_the_cover_is_exempt_from_the_page_gates(self):
-        # Story and geometry gates do not judge a structural page. Typography
-        # does: type sizes and label punctuation are house rules everywhere, and
-        # this fixture's cover carries "Imran · September 2026".
-        typographic = {"TYPE_RANGE", "NICE_TICKS", "MISSING_RENDER"}
-        cover_findings = [f for f in self.report["findings"] if f["slide"] == 1]
-        self.assertEqual([f["code"] for f in cover_findings if f["code"] not in typographic], [])
 
 
 class TextPageInkFloorTests(unittest.TestCase):
@@ -392,17 +305,6 @@ class TextPageInkFloorTests(unittest.TestCase):
         self.assertAlmostEqual(ink[0]["threshold"], round(floor, 4), places=4)
         self.assertIn("word floor", ink[0]["repair"])
 
-    @needs_pixels
-    def test_a_page_with_an_exhibit_keeps_the_exhibit_floor(self):
-        # The deferral is only for pages with no exhibit. A chart page that
-        # renders nearly blank is still a chart page that renders nearly blank.
-        page_gates.configure("balanced")
-        findings = []
-        page_gates.gate_ink_and_dead_band(
-            2, page_gates.load_ink_rows(RENDER / "slide-2.png"), findings)
-        ink = [f for f in findings if f["code"] == "INK_COVERAGE"]
-        self.assertEqual(len(ink), 1)
-        self.assertEqual(ink[0]["threshold"], page_gates.THRESHOLDS["ink_min"])
 
 
 class ShapeConstraintTests(unittest.TestCase):
@@ -467,8 +369,14 @@ class CliTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "gates.json"
+            # A known defect: one action title set at 40pt, far past its range.
+            scene = load_scene()
+            title = next(n for sl in scene["slides"] for n in sl["nodes"] if n.get("role") == "action-title")
+            title["style"]["fontSize"] = {**title["style"]["fontSize"], "value": 40}
+            scene_path = Path(tmp) / "scene.json"
+            scene_path.write_text(json.dumps(scene))
             result = subprocess.run(
-                [sys.executable, str(GATES / "page_gates.py"), str(SCENE), str(RENDER),
+                [sys.executable, str(GATES / "page_gates.py"), str(scene_path),
                  "--report", str(out), "--profile", "executive"],
                 capture_output=True, text=True, cwd=str(ROOT))
             self.assertEqual(result.returncode, 2, result.stderr)

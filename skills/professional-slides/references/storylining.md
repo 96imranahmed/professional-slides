@@ -56,6 +56,8 @@ Research and analysis are the slow part of a deck and they split cleanly, so whe
 | Draft the copy | Section, once the title spine is fixed | The section's pages in the content record's format, drawn only from the merged insight log |
 | Critique | A fresh subagent every round, never reused | `storyline-review.json` ([stress-test](#stress-test-the-storyline)) |
 
+Keep research proportionate. Start with four or five workstreams, not one per player; give each a budget of about twenty searches and a clear list of the decisive series to find; tell it to stop when those are found and to record what it could not find rather than keep searching. A second, targeted pass follows only when the storyline critique names a missing analysis that would change the answer.
+
 Brief each subagent completely - it has none of your context: the question and the deck's answer so far, exactly what to find or work, the file formats and folders to write to, the date the evidence is current to, and what to do when something cannot be found (record it; never invent it). Run the workstreams at the same time. When they return, the lead merges the insight fragments into `<id>.insights.json`, removes duplicates, grades them across the deck, and writes the titles; only the lead edits the title spine. A harness with no subagents does the same stages in sequence.
 
 ## Extract the insights before the titles

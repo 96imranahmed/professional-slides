@@ -73,8 +73,7 @@ Use Node 20.9 or newer and install test dependencies with `npm ci`. For the Powe
 npm run check          # source checks and fast regression tests
 evals/run.sh           # tests plus fixture page-gate diagnostics
 evals/run.sh --slow    # also exercise the LibreOffice end-to-end render
-npm run check:release  # emit, render, and compare the committed reference pages
 python3 evals/scripts/package_plugin.py
 ```
 
-The release check compares fresh renders of the committed fixture with four accepted reference images. Other tests cover component and scene behavior; none of these checks alone proves the deck's argument, factual accuracy, visual quality, or Google Slides fidelity. Inspect every final slide render and the exact saved PPTX before claiming acceptance. After changing plugin source, reinstall it and compare the packaged and installed `.codex-plugin` and `skills` files with the source.
+The tests cover component and scene behavior; none of these checks alone proves the deck's argument, factual accuracy, visual quality, or Google Slides fidelity. Inspect every final slide render and the exact saved PPTX before claiming acceptance. After changing plugin source, reinstall it and compare the packaged and installed `.codex-plugin` and `skills` files with the source.

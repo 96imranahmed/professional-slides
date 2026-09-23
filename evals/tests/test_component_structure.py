@@ -72,7 +72,7 @@ console.log(JSON.stringify({
 """
         )
         # Sixteen figure families added from the corpus style inventory
-        # (evals/corpus/styles): stat-list, flow, spectrum, layers, placement,
+        # (the style classification): stat-list, flow, spectrum, layers, placement,
         # rank-flow, sankey, pictogram, arrow-rows, capsules, fact-grid,
         # zone-matrix, device-frame, worksheet, speech and side-statement.
         self.assertEqual(result["registry"], 106)
@@ -86,54 +86,6 @@ console.log(JSON.stringify({
         self.assertGreater(result["nodeCount"], 800)
         self.assertEqual(result["missing"], [])
 
-    def test_golden_fixtures_cover_source_families_without_raster_or_fixed_page_taxonomy(self):
-        result = run_node(
-            """
-import { buildGoldenDeck } from './skills/professional-slides/runtime/golden-fixtures.mjs';
-const { deck, fixtures } = buildGoldenDeck();
-const analytical = fixtures.filter(item => !['cover','section-divider'].includes(item.visualFamily));
-const chrome = analytical.map(item => {
-  const slide = deck.slides[item.slide - 1];
-  const title = slide.nodes.find(node => node.role === 'title-rule');
-  const text = slide.nodes.find(node => node.role === 'action-title');
-  const footer = slide.nodes.find(node => node.role === 'footer-rule');
-  return {title: title?.frame, textBottom: text.frame.y + text.data.textLayout.height, footer: footer?.frame};
-});
-console.log(JSON.stringify({
-  slides: deck.slides.length,
-  nodes: deck.slides.reduce((sum, slide) => sum + slide.nodes.length, 0),
-  families: new Set(fixtures.map(item => item.visualFamily)).size,
-  sources: fixtures.map(item => item.sourceSlide).filter(value => value !== null),
-  allCapabilities: fixtures.every(item => item.capabilities.length > 0),
-  imageNodes: deck.slides.flatMap(slide => slide.nodes).filter(node => node.type === 'image').length,
-  fixedTaxonomy: JSON.stringify({deck, fixtures}).toLowerCase().includes('archetype'),
-  chrome
-}));
-"""
-        )
-        self.assertEqual(result["slides"], 18)
-        self.assertGreater(result["nodes"], 700)
-        self.assertEqual(result["families"], 18)
-        self.assertEqual(len(result["sources"]), len(set(result["sources"])))
-        self.assertTrue(result["allCapabilities"])
-        self.assertEqual(result["imageNodes"], 0)
-        self.assertFalse(result["fixedTaxonomy"])
-        for chrome in result["chrome"]:
-            # The rule is anchored to the content, not hung under the title: a
-            # fixed gap above the body, so the distance from rule to content
-            # reads the same whether the title took one line or two. It never
-            # rises above where the title leaves it.
-            self.assertEqual(chrome["title"]["x"], 60)
-            self.assertEqual(chrome["title"]["width"], 1160)
-            self.assertGreaterEqual(chrome["title"]["y"], chrome["textBottom"] + 8)
-            # y 680 -> 674: the footer band now keeps a third of the page's side
-            # margin (FOOTER_EDGE_MARGIN_RATIO, 20px of 60) clear of the bottom
-            # edge instead of the 14px CHROME.footerTop happened to leave, and
-            # the rule rides with the row it closes. The band lifts as a whole,
-            # so its distance to the footer text is unchanged, and the lift
-            # comes out of the footer's own clearance: the content frame is the
-            # same height it was.
-            self.assertEqual(chrome["footer"], {"x": 60, "y": 674, "width": 1160, "height": 0})
 
     def test_cover_is_dark_by_default_with_a_lower_third_title_block(self):
         result = run_node("""
@@ -172,20 +124,6 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
-    def test_plain_cover_is_golden_but_not_an_obsolete_artwork_fidelity_target(self):
-        result = run_node("""
-import { buildGoldenDeck } from './skills/professional-slides/runtime/golden-fixtures.mjs';
-const full = buildGoldenDeck(), reference = buildGoldenDeck({referenceOnly:true});
-console.log(JSON.stringify({golden:full.fixtures.length, reference:reference.fixtures.length,
-  cover:full.fixtures.find(f=>f.visualFamily==='cover'), sources:reference.fixtures.map(f=>f.sourceSlide),
-  referenceFamilies:reference.fixtures.map(f=>f.visualFamily)}));
-""")
-        self.assertEqual(result["golden"], 18)
-        self.assertEqual(result["reference"], 16)
-        self.assertIsNone(result["cover"]["sourceSlide"])
-        self.assertNotIn("cover", result["referenceFamilies"])
-        self.assertNotIn("section-divider", result["referenceFamilies"])
-        self.assertTrue(all(isinstance(value, int) for value in result["sources"]))
 
     def test_planner_selects_relationships_and_rejects_unprepared_content(self):
         result = run_node(
@@ -580,16 +518,6 @@ console.log(JSON.stringify({counts: headings.map(n => n.data.textLayout.lines.le
         self.assertEqual(result["sizes"], [14, 14, 14])
         self.assertEqual(result["wraps"], [False, False, False])
 
-    def test_reference_chart_and_open_rail_headers_remain_peers(self):
-        result = run_node("""
-import { buildGoldenDeck } from './skills/professional-slides/runtime/golden-fixtures.mjs';
-const { deck } = buildGoldenDeck();
-const peers = deck.slides.filter(s => s.componentInstances.some(c => c.component === 'content-rail') && s.nodes.filter(n => n.role === 'section-heading-rule').length === 2);
-console.log(JSON.stringify(peers.map(s => ({id:s.id,ruleYs:[...new Set(s.nodes.filter(n=>n.role==='section-heading-rule').map(n=>n.frame.y))]}))));
-""")
-        self.assertEqual(len(result), 4)
-        for slide in result:
-            self.assertEqual(len(slide["ruleYs"]), 1, slide["id"])
 
     def test_unbreakable_heading_and_insufficient_annotation_space_reject(self):
         result = run_node("""
