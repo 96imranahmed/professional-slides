@@ -8,6 +8,7 @@ import {
   tokenValue
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
+import { textStyle as baseTextStyle, measuredTextNode as baseMeasuredTextNode } from "./text-style.mjs";
 
 const BODY_FONT = token("font.body");
 const INK = token("color.ink");
@@ -16,6 +17,7 @@ const PRIMARY = token("color.componentPrimary");
 const STANDARD = token("line.standard");
 const BODY = token("type.body");
 const HEADING = token("type.heading");
+const AXIS_TITLE = token("type.chartLabel");
 const SERIES = [
   token("color.chartSeries1"),
   token("color.chartSeries2"),
@@ -30,6 +32,7 @@ const VARIANT_CAPACITY = Object.freeze({ curves: 5, stepped: 5, "stepped-minimal
 export const HORIZONS_TOKENS = Object.freeze([
   "color.surfaceMuted", "color.onPrimary", "radius.none",
   "font.body",
+  "type.chartLabel",
   "type.heading",
   "type.body",
   "type.label",
@@ -77,26 +80,16 @@ export const HORIZONS_SAMPLE = Object.freeze({
   horizons: CURVE_SAMPLE_HORIZONS
 });
 
+// This file's argument order and defaults, over the shared builders.
 function textStyle(fontSize = BODY, color = INK, bold = false, align = "left", valign = "top") {
-  return { fontFamily: BODY_FONT, fontSize, color, bold, align, valign };
+  return baseTextStyle({ fontFamily: BODY_FONT, fontSize, color, bold, align, valign });
 }
 
-function measuredTextNode({ id, role, frame, text, style, data = {} }) {
-  const textLayout = measureText(text, frame.width, {
-    fontFamily: tokenValue(style.fontFamily),
-    fontSize: tokenValue(style.fontSize),
-    bold: style.bold,
-    wrapWidthRatio: 1
-  });
-  if (textLayout.height > frame.height) throw new Error(`${id} exceeds its allocated text height`);
-  return textPrimitive({
-    id,
-    role,
-    frame,
-    text: textLayout.text,
-    style: { ...style, lineHeight: textLayout.lineHeight, wrap: false },
-    data: { ...data, textLayout }
-  });
+// A horizon band's geometry is computed from the text it holds, so a smaller
+// size would not rescue a frame that is already the wrong height: measure once
+// and refuse.
+function measuredTextNode(input) {
+  return baseMeasuredTextNode({ ...input, fit: false });
 }
 
 function finiteUnitInterval(value, path) {
@@ -180,8 +173,8 @@ function renderCurves({ id, frame, props, horizons }) {
       style: { stroke: INK, lineWidth: STANDARD },
       data: { axis: "y", endArrow: true, endArrowType: "triangle", label: props.yLabel || "Value" }
     }),
-    measuredTextNode({ id: stableId(id, "axis-label", "x"), role: "axis-label", frame: { x: plot.x + plot.width - 90, y: bottom + 12, width: 90, height: 28 }, text: props.xLabel || "Time", style: textStyle(HEADING, INK, true, "right", "top"), data: { axis: "x" } }),
-    measuredTextNode({ id: stableId(id, "axis-label", "y"), role: "axis-label", frame: { x: frame.x, y: plot.y + 2, width: 74, height: 28 }, text: props.yLabel || "Value", style: textStyle(HEADING, INK, true, "right", "top"), data: { axis: "y" } })
+    measuredTextNode({ id: stableId(id, "axis-label", "x"), role: "axis-title", frame: { x: plot.x + plot.width - 90, y: bottom + 12, width: 90, height: 28 }, text: props.xLabel || "Time", style: textStyle(AXIS_TITLE, INK, true, "right", "top"), data: { axis: "x" } }),
+    measuredTextNode({ id: stableId(id, "axis-label", "y"), role: "axis-title", frame: { x: frame.x, y: plot.y + 2, width: 74, height: 28 }, text: props.yLabel || "Value", style: textStyle(AXIS_TITLE, INK, true, "right", "top"), data: { axis: "y" } })
   );
 
   const bandHeight = plot.height * 0.94 / horizons.length;

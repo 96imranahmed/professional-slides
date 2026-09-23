@@ -1,0 +1,16 @@
+{
+ "61":["C-stack",["sidebar-text"]], "62":["D-network",["before-after","icon"]], "63":["C-stack",["percent"]],
+ "64":["C-stack",["percent","paired"]], "65":["C-col",["period-brackets","cagr-circle"]], "66":["P-people",["map","logos"]],
+ "67":["D-hub",["arrows","dense"]], "68":["T-text",["dark","icon"]], "69":["X-quote",["photo"]],
+ "70":["C-col",["growth-callout","sidebar-text"]], "71":["C-bar-h",["paired","text-panel"]], "72":["C-stack",["cagr-table","dark-sidebar"]],
+ "73":["S-other",[]], "74":["X-capsules",["numbered","icon","quote"]], "75":["C-stack",["percent","paired","sidebar-text"]],
+ "76":["X-sidebar",["statement"]], "77":["C-col",["color-by-category"]], "78":["C-pictogram",["stat-list","dark-panel"]],
+ "79":["D-funnel",["horizontal","icon","stages"]], "80":["C-stack",["callout-bubble","logos"]],
+ "81":["T-logo-rows",[]], "82":["P-illustration",["dot-cloud"]], "83":["T-photo-rows",["numbered"]],
+ "84":["X-exec",["numbered"]], "85":["P-case-study",["photo"]], "86":["C-bar-h",["icon-rows","dark-kpi-sidebar","range"]],
+ "87":["X-numbered-rows",["letters"]], "88":["C-paired",["photo-side"]], "89":["P-photo-text",["numbered-heading"]],
+ "90":["S-other",[]], "91":["C-small-multiples",["callout"]], "92":["K-ring",["grid","sidebar-text"]],
+ "93":["S-agenda",["active"]], "94":["X-columns",["icon","circles"]], "95":["D-flow",["arrows","ring"]],
+ "96":["T-bars",["icon-rows","panels"]], "97":["T-rag",["scores"]], "98":["P-photo-full",["headline-overlay","bullets"]],
+ "99":["S-backmatter",[]], "100":["C-col",[]]
+}

@@ -1,0 +1,2007 @@
+{
+ "$comment": "A second sample: published and infographic decks, for styles client work lacks.",
+ "seed": 20260923,
+ "perDocument": 3,
+ "pages": [
+  {
+   "listing": "analyst-academy-457",
+   "firm": "KPMG",
+   "deckType": "thought-pieces",
+   "title": "KPMG global tech report 2022",
+   "path": "thought-pieces/kpmg/kpmg-global-tech-report-2022.pdf",
+   "sha256": "94a0dfb7dea2ab7723f068e345cfc28f6d07f408a0c47de488066c572fa330b0",
+   "page": 23,
+   "n": 401
+  },
+  {
+   "listing": "analyst-academy-317",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Value untangled Accelerating radical growth through interoperability",
+   "path": "thought-pieces/accenture/value-untangled-accelerating-radical-growth-through-interoperability.pdf",
+   "sha256": "d2de29ee39c1feb9c34ed13434285a6b5f075392c840af2f057d4c74bd630458",
+   "page": 44,
+   "n": 402
+  },
+  {
+   "listing": "analyst-academy-561",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Solving fashion\u2019s product returns",
+   "path": "thought-pieces/roland-berger/solving-fashions-product-returns.pdf",
+   "sha256": "4b12c63cb8d2806cdb4a383f6d1ede7a421e769acabcbf2b243838ad48dfed93",
+   "page": 26,
+   "n": 403
+  },
+  {
+   "listing": "analyst-academy-184",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "Deloitte Global Treasury Survey",
+   "path": "thought-pieces/deloitte/deloitte-global-treasury-survey.pdf",
+   "sha256": "d4f9ea650f802fbc3cf573c47005dca7ece4c665ed7e76c365c48ef32ca31a1f",
+   "page": 5,
+   "n": 404
+  },
+  {
+   "listing": "analyst-academy-414",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Four fault lines show a fracturing among global consumers",
+   "path": "thought-pieces/pwc/four-fault-lines-show-a-fracturing-among-global-consumers.pdf",
+   "sha256": "0c62266ab999bfef75d3e3abe30f6c0d608eba01af007172600ffb9ced861883",
+   "page": 15,
+   "n": 405
+  },
+  {
+   "listing": "analyst-academy-498",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "Mergers and Acquisitions in LatAm: Evolution and prospects",
+   "path": "thought-pieces/l-e-k-consulting/mergers-and-acquisitions-in-latam-evolution-and-prospects.pdf",
+   "sha256": "2d31482b2168e6cc5a13acfe73ff9044ad7bd3a457f3d19dffe560fc5b3f4a4a",
+   "page": 15,
+   "n": 406
+  },
+  {
+   "listing": "analyst-academy-480",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "Infrastructure beyond COVID-19",
+   "path": "thought-pieces/l-e-k-consulting/infrastructure-beyond-covid-19.pdf",
+   "sha256": "dc54b92fca2a99c0ad638b93717712cdab622a2e378ed4436dc0f785056775a0",
+   "page": 8,
+   "n": 407
+  },
+  {
+   "listing": "analyst-academy-500",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "2023 SEA Hospital Insights Survey Findings Summary materials",
+   "path": "thought-pieces/l-e-k-consulting/2023-sea-hospital-insights-survey-findings-summary-materials.pdf",
+   "sha256": "b33decff5a116b24a8ffaf1351f6056773f401f32b0a8c96f6a47588e0630c02",
+   "page": 33,
+   "n": 408
+  },
+  {
+   "listing": "slideworks-bain-017",
+   "firm": "Bain",
+   "deckType": "thought-pieces",
+   "title": "Bain - Covid-19 Retail Webinar: Scenarios and Implications for Brazil (2020)",
+   "path": "thought-pieces/bain-and-company/bain-covid-19-retail-webinar-scenarios-and-implications-for-brazil-2020.pdf",
+   "sha256": "0c49a1b6150c46e5d5b0d0fec5e8f5841608cc8c9f9f5cf7ea8510570b2ba37d",
+   "page": 28,
+   "n": 409
+  },
+  {
+   "listing": "analyst-academy-315",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "How will COVID-19 change the consumer?",
+   "path": "thought-pieces/accenture/how-will-covid-19-change-the-consumer.pdf",
+   "sha256": "3ab0ee93f7ac642f3c225981e3a784253cd4bbe66c4855f4f6c633496d51535d",
+   "page": 4,
+   "n": 410
+  },
+  {
+   "listing": "analyst-academy-168",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "TrendRadar: The Future Consumer",
+   "path": "thought-pieces/deloitte/trendradar-the-future-consumer.pdf",
+   "sha256": "8ce9e896d376dcdfdccc359beb423a96805d2d3c1198de77ff9157e43d65356c",
+   "page": 11,
+   "n": 411
+  },
+  {
+   "listing": "slideworks-bcg-052",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "BCG - Gen Z Attitudes Toward Higher Education: Community colleges versus four-year degrees (2023)",
+   "path": "thought-pieces/boston-consulting-group/bcg-gen-z-attitudes-toward-higher-education-community-colleges-versus-four-year-degrees-2023.pdf",
+   "sha256": "88c1126b8db75f854f065ebbf9627c405a3a3ded5570c34ea7210f361a11c821",
+   "page": 11,
+   "n": 412
+  },
+  {
+   "listing": "analyst-academy-351",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Apache Hadoop Summit 2016: The Future of Apache Hadoop an Enterprise Architecture View",
+   "path": "thought-pieces/pwc/apache-hadoop-summit-2016-the-future-of-apache-hadoop-an-enterprise-architecture-view.pdf",
+   "sha256": "4cb6482ccc9ad0934467a43388778a7e7173aa6388d32a1cc2a7ddffc87e858e",
+   "page": 7,
+   "n": 413
+  },
+  {
+   "listing": "slideworks-bcg-104",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "BCG - The True-Luxury Global Consumer Insight (2017)",
+   "path": "thought-pieces/boston-consulting-group/bcg-the-true-luxury-global-consumer-insight-2017.pdf",
+   "sha256": "5942a2f21f1a557eecef172badbe7ef4009a1734c65b3e8a7acd9fa34985db34",
+   "page": 61,
+   "n": 414
+  },
+  {
+   "listing": "analyst-academy-320",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "FULL VALUE. FULL STOP How to scale innovation and achieve full value with Future Systems",
+   "path": "thought-pieces/accenture/full-value-full-stop-how-to-scale-innovation-and-achieve-full-value-with-future-systems.pdf",
+   "sha256": "0bca2f29f69f824603ae2dbb72f3c8ff62a0ce823c1e6805a0d415ced62c3e7b",
+   "page": 21,
+   "n": 415
+  },
+  {
+   "listing": "analyst-academy-335",
+   "firm": "EY",
+   "deckType": "thought-pieces",
+   "title": "EY Work Reimagined 2022 Survey",
+   "path": "thought-pieces/ey/ey-work-reimagined-2022-survey.pdf",
+   "sha256": "fa0e281c430c9e7f8edfdd146207514ffe10c55e5fa9147a59ba9450de71be56",
+   "page": 10,
+   "n": 416
+  },
+  {
+   "listing": "analyst-academy-300",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Thought you knew the Scope 3 issues in your supply chain? Think again.",
+   "path": "thought-pieces/accenture/thought-you-knew-the-scope-3-issues-in-your-supply-chain-think-again.pdf",
+   "sha256": "90d690e8f31fe40a93ebc3e93c17669ab2d39b453066dce743d8938fc6874b17",
+   "page": 19,
+   "n": 417
+  },
+  {
+   "listing": "analyst-academy-297",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Global Banking Consumer Study Reignite human connections to discover hidden value",
+   "path": "thought-pieces/accenture/global-banking-consumer-study-reignite-human-connections-to-discover-hidden-value.pdf",
+   "sha256": "2fe0e16b76dc9ac6e38b06772a1e0a17121d20ee2694997fe37054ab08161f0e",
+   "page": 31,
+   "n": 418
+  },
+  {
+   "listing": "slideworks-mckinsey-081",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - A global view of how consumer behavior is changing amid COVID-19: Discussion document (2020)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-a-global-view-of-how-consumer-behavior-is-changing-amid-covid-19-discussion-document-2020.pdf",
+   "sha256": "084d2f8cd45c906fd1a7aab003153c7333dfd5b51732315df2b50abb7676057c",
+   "page": 12,
+   "n": 419
+  },
+  {
+   "listing": "slideworks-mckinsey-161",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Top Ten Customer Airport Complaints (2016)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-top-ten-customer-airport-complaints-2016.pdf",
+   "sha256": "dec9cc138bf128be5dcbd41c864cdc6a3df7dacbc7ec165b599b308d8788c00a",
+   "page": 9,
+   "n": 420
+  },
+  {
+   "listing": "analyst-academy-316",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "LIVING BUSINESS Achieving Sustainable Growth Through Hyper-Relevance",
+   "path": "thought-pieces/accenture/living-business-achieving-sustainable-growth-through-hyper-relevance.pdf",
+   "sha256": "e7dd33e660dd4dd08eef45e05bb94617902d121c27e29add57918ee1b300a5eb",
+   "page": 2,
+   "n": 421
+  },
+  {
+   "listing": "slideworks-mckinsey-138",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Outperformers: High-growth emerging economies and the companies that propel them (2018)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-outperformers-high-growth-emerging-economies-and-the-companies-that-propel-them-2018.pdf",
+   "sha256": "9befc945e476cbb29d6d6dede7c71dfee7da4daafef61469e4c2a8c43180e5c2",
+   "page": 13,
+   "n": 422
+  },
+  {
+   "listing": "analyst-academy-294",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Green by Default",
+   "path": "thought-pieces/accenture/green-by-default.pdf",
+   "sha256": "4fcc744c9e9c3f46a8f79857555985f0897df341f0351d67fc4c932ca3ec643b",
+   "page": 10,
+   "n": 423
+  },
+  {
+   "listing": "analyst-academy-141",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "Consumer privacy in retail",
+   "path": "thought-pieces/deloitte/consumer-privacy-in-retail.pdf",
+   "sha256": "b679b56a1f19d79ce23d517ff49986b2751326a3a531ae7027b5c6d1e2270a0b",
+   "page": 11,
+   "n": 424
+  },
+  {
+   "listing": "analyst-academy-044",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "A Pulse Check of the Luxury Consumer",
+   "path": "thought-pieces/boston-consulting-group/a-pulse-check-of-the-luxury-consumer.pdf",
+   "sha256": "73022806be5a3bc643da04500dad90c3bbd1d58e52b2e6ccac18cceb8d68e752",
+   "page": 35,
+   "n": 425
+  },
+  {
+   "listing": "analyst-academy-437",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "From promise to reality: Does business really care about the SDGs?",
+   "path": "thought-pieces/pwc/from-promise-to-reality-does-business-really-care-about-the-sdgs.pdf",
+   "sha256": "a6c4f2b313548178a9010e0ee8e752aac804e9a4a08b15aebd873e887df2ed89",
+   "page": 8,
+   "n": 426
+  },
+  {
+   "listing": "analyst-academy-508",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "Steering Clear of the IT Danger Zones",
+   "path": "thought-pieces/l-e-k-consulting/steering-clear-of-the-it-danger-zones.pdf",
+   "sha256": "9d9b227e1947a4fa95e325073b5cb1d8be5e22d64a7c75b171e0978874f91e09",
+   "page": 6,
+   "n": 427
+  },
+  {
+   "listing": "slideworks-mckinsey-054",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Global Energy Perspective 2022: Executive Summary (2022)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-global-energy-perspective-2022-executive-summary-2022.pdf",
+   "sha256": "49721d26908eee0659a56547b2166f4dbafa82dbd161be595b05f8597bd2891d",
+   "page": 3,
+   "n": 428
+  },
+  {
+   "listing": "analyst-academy-481",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "China Exit or Co-Investment Opportunities for German PE Investors",
+   "path": "thought-pieces/l-e-k-consulting/china-exit-or-co-investment-opportunities-for-german-pe-investors.pdf",
+   "sha256": "b4814e4dead029e08955ab61b87cfd4b0c473d1606693730a4a16cb9e0d70be2",
+   "page": 12,
+   "n": 429
+  },
+  {
+   "listing": "analyst-academy-287",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Strategy at the Pace of Technology",
+   "path": "thought-pieces/accenture/strategy-at-the-pace-of-technology.pdf",
+   "sha256": "2b2fc6e737bb0ed7337a0f4d0cbce244f771a5166d35d1288081a176662efb10",
+   "page": 25,
+   "n": 430
+  },
+  {
+   "listing": "slideworks-bain-009",
+   "firm": "Bain",
+   "deckType": "thought-pieces",
+   "title": "Bain - Winning the right to deploy AI: Dedication to craft, designing the right experiments, and creating leverage at scale (2024)",
+   "path": "thought-pieces/bain-and-company/bain-winning-the-right-to-deploy-ai-dedication-to-craft-designing-the-right-experiments-and-creating-leverage.pdf",
+   "sha256": "ebf8e029ace9069c7f1e15d74e3419ccdc2e6e3c187a1cbeeb9d3bcc05a3fd57",
+   "page": 10,
+   "n": 431
+  },
+  {
+   "listing": "analyst-academy-528",
+   "firm": "AT Kearney",
+   "deckType": "thought-pieces",
+   "title": "ASEAN Growth and Scale Talent Playbook",
+   "path": "thought-pieces/kearney/asean-growth-and-scale-talent-playbook.pdf",
+   "sha256": "0ac536403a3174422fd19f77a0b2c9ba4ea6bb65a20e31f4cea4e1f3d15a346f",
+   "page": 6,
+   "n": 432
+  },
+  {
+   "listing": "analyst-academy-370",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Risk Management as a catalyst for growth",
+   "path": "thought-pieces/pwc/risk-management-as-a-catalyst-for-growth.pdf",
+   "sha256": "9ce5eb83cec4a34f67c7b4dee20d1e03ee9fc9b7db46617e9e28061deaf90478",
+   "page": 16,
+   "n": 433
+  },
+  {
+   "listing": "analyst-academy-153",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "Fueling the AI transformation: Four key actions powering widespread value from AI, right now.",
+   "path": "thought-pieces/deloitte/fueling-the-ai-transformation-four-key-actions-powering-widespread-value-from-ai-right-now.pdf",
+   "sha256": "16b023d2f242d690fa585342d529bb4cf703870321186919aedfe8377499bc69",
+   "page": 14,
+   "n": 434
+  },
+  {
+   "listing": "analyst-academy-260",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Future-proof ad sales: The new transformation imperative",
+   "path": "thought-pieces/accenture/future-proof-ad-sales-the-new-transformation-imperative.pdf",
+   "sha256": "8b1343769f454d33f3e560135b87150ee76109e531e554833f67b7f48678a031",
+   "page": 3,
+   "n": 435
+  },
+  {
+   "listing": "analyst-academy-217",
+   "firm": "Bain & Co.",
+   "deckType": "thought-pieces",
+   "title": "e-Conomy SEA 2023 report: Vietnam",
+   "path": "thought-pieces/bain-and-company/e-conomy-sea-2023-report-vietnam.pdf",
+   "sha256": "6ee5af52f50779c2dd5f41e148ab8006eaf3cb3d1a00622aadbc07066e167aab",
+   "page": 5,
+   "n": 436
+  },
+  {
+   "listing": "analyst-academy-521",
+   "firm": "AT Kearney",
+   "deckType": "thought-pieces",
+   "title": "The Future of Commercial Vehicle Powertrains (2012)",
+   "path": "thought-pieces/kearney/the-future-of-commercial-vehicle-powertrains-2012.pdf",
+   "sha256": "9a5000647690ea11b23ac1d37c698e86dcca87cf6ea79caf89edf5f7b3193dc6",
+   "page": 14,
+   "n": 437
+  },
+  {
+   "listing": "analyst-academy-533",
+   "firm": "AT Kearney",
+   "deckType": "thought-pieces",
+   "title": "Hydrogen applications and business models",
+   "path": "thought-pieces/kearney/hydrogen-applications-and-business-models.pdf",
+   "sha256": "50969125d64ab2a9a3b25dd2787ed8344e7595a3d2729524b9b7184b603773e1",
+   "page": 77,
+   "n": 438
+  },
+  {
+   "listing": "analyst-academy-403",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "South Africa Economic Outlook 2024 Turning short-term crises into opportunities for business value creation and societal impact.",
+   "path": "thought-pieces/strategy-and/south-africa-economic-outlook-2024-turning-short-term-crises-into-opportunities-for-business-value-creati.pdf",
+   "sha256": "396442b718cbe73ca30ab2d2810da68a5da2abae37478e817457bbe3d8ea97e9",
+   "page": 2,
+   "n": 439
+  },
+  {
+   "listing": "analyst-academy-261",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "2021 P&C Underwriting Survey",
+   "path": "thought-pieces/accenture/2021-p-c-underwriting-survey.pdf",
+   "sha256": "94e74cd9448589bb0c0632fa2b77d6747d9ea1714405c23372f1050a5ef914bc",
+   "page": 24,
+   "n": 440
+  },
+  {
+   "listing": "analyst-academy-571",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Digital CFO Results of the Oliver Wyman Study",
+   "path": "thought-pieces/oliver-wyman/digital-cfo-results-of-the-oliver-wyman-study.pdf",
+   "sha256": "cc38572a40720ef479abfb84490d35984ae1283efc928446a393b38f681dc5fe",
+   "page": 16,
+   "n": 441
+  },
+  {
+   "listing": "analyst-academy-252",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Accenture Consumer Value Report 2021",
+   "path": "thought-pieces/accenture/accenture-consumer-value-report-2021.pdf",
+   "sha256": "e01775f2e1e39c5083857ee52d354427cffc5c84a56ad1f5d74ed10452b2d2be",
+   "page": 13,
+   "n": 442
+  },
+  {
+   "listing": "slideworks-bain-016",
+   "firm": "Bain",
+   "deckType": "thought-pieces",
+   "title": "Bain - Covid-19: Columbia's Consumer Pulse Update (2020)",
+   "path": "thought-pieces/bain-and-company/bain-covid-19-columbia-s-consumer-pulse-update-2020.pdf",
+   "sha256": "3ea3cc0ff6a6a04af86a36985096dd3d9353b5e5f0596584dde0c8ba315739c0",
+   "page": 34,
+   "n": 443
+  },
+  {
+   "listing": "analyst-academy-052",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "Seeing the BIG Picture",
+   "path": "thought-pieces/boston-consulting-group/seeing-the-big-picture.pdf",
+   "sha256": "1df2e5b05d54f5eb4b5ddf78792736148404c035e5762e3f248b665699873fee",
+   "page": 38,
+   "n": 444
+  },
+  {
+   "listing": "analyst-academy-262",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Digital adoption in healthcare: Reaction or revolution?",
+   "path": "thought-pieces/accenture/digital-adoption-in-healthcare-reaction-or-revolution.pdf",
+   "sha256": "781a802a89302c2025b5c82ded774e29496fd53bb1f625ff09c1cdf0d828ea21",
+   "page": 6,
+   "n": 445
+  },
+  {
+   "listing": "analyst-academy-264",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "The Next Gen Index Millennials and Gen Z in the US",
+   "path": "thought-pieces/accenture/the-next-gen-index-millennials-and-gen-z-in-the-us.pdf",
+   "sha256": "af0148e6ac444bb3b3020da23757a058ad86597874e7e0675dc3c469ea167144",
+   "page": 4,
+   "n": 446
+  },
+  {
+   "listing": "analyst-academy-407",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Insurance reimagined: Spotlight on trust, convergence and transformation",
+   "path": "thought-pieces/pwc/insurance-reimagined-spotlight-on-trust-convergence-and-transformation.pdf",
+   "sha256": "6994ba2477647506353d51426fc9d70273703092b8824910b2b0832ff18ac8ad",
+   "page": 12,
+   "n": 447
+  },
+  {
+   "listing": "analyst-academy-546",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Joining Forces: Interagency Collaboration and \u201cSmart Power\u201d",
+   "path": "thought-pieces/booz-allen-hamilton/joining-forces-interagency-collaboration-and-smart-power.pdf",
+   "sha256": "cbf8d2bd1cc12bc97c071a5cd1352a87e554d9c69ab4fc81dbe8ba0fb74d0251",
+   "page": 5,
+   "n": 448
+  },
+  {
+   "listing": "analyst-academy-450",
+   "firm": "KPMG",
+   "deckType": "thought-pieces",
+   "title": "KPMG 2021 CEO Outlook",
+   "path": "thought-pieces/kpmg/kpmg-2021-ceo-outlook.pdf",
+   "sha256": "66ef713f99858b72453e0a14020cfd12547f8664166bb2c51820b43516b6e097",
+   "page": 15,
+   "n": 449
+  },
+  {
+   "listing": "analyst-academy-323",
+   "firm": "EY",
+   "deckType": "thought-pieces",
+   "title": "How fit is your allocation strategy?",
+   "path": "thought-pieces/ey/how-fit-is-your-allocation-strategy.pdf",
+   "sha256": "ad800be7cde2cc6fe08e23e8e9efd72f34bea3cf586f85873a85fffcaf3e0353",
+   "page": 19,
+   "n": 450
+  },
+  {
+   "listing": "analyst-academy-342",
+   "firm": "EY",
+   "deckType": "thought-pieces",
+   "title": "Seeking stability within volatility: How interdependent risks put CROs at the heart of the banking business",
+   "path": "thought-pieces/ey/seeking-stability-within-volatility-how-interdependent-risks-put-cros-at-the-heart-of-the-banking-busines.pdf",
+   "sha256": "c6c41987d973280686d43573272f3aa5c02674bacf82ae3e39fca774f0973cb8",
+   "page": 6,
+   "n": 451
+  },
+  {
+   "listing": "analyst-academy-414",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Four fault lines show a fracturing among global consumers",
+   "path": "thought-pieces/pwc/four-fault-lines-show-a-fracturing-among-global-consumers.pdf",
+   "sha256": "0c62266ab999bfef75d3e3abe30f6c0d608eba01af007172600ffb9ced861883",
+   "page": 8,
+   "n": 452
+  },
+  {
+   "listing": "analyst-academy-514",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "2022 Manufacturing Survey Executive Summary",
+   "path": "thought-pieces/l-e-k-consulting/2022-manufacturing-survey-executive-summary.pdf",
+   "sha256": "5df9c86d0f432fa3ae39c133f7ccb061b3913ae76dedb38818369aaf6246f2d8",
+   "page": 7,
+   "n": 453
+  },
+  {
+   "listing": "slideworks-bain-057",
+   "firm": "Bain",
+   "deckType": "thought-pieces",
+   "title": "Bain - Beauty@Digital - A study by Bain & Google (2016)",
+   "path": "thought-pieces/bain-and-company/bain-beauty-digital-a-study-by-bain-google-2016.pdf",
+   "sha256": "b199e71f178e552f77e27aa55b419963d9e42e8904dae19e54d5cbc669d3df45",
+   "page": 17,
+   "n": 454
+  },
+  {
+   "listing": "analyst-academy-276",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Hyper-disruption demands constant reinvention",
+   "path": "thought-pieces/accenture/hyper-disruption-demands-constant-reinvention.pdf",
+   "sha256": "13cbab9325128facf5357639cadcd3bfb3dc0e9cee03dda696633bc898e0bf19",
+   "page": 11,
+   "n": 455
+  },
+  {
+   "listing": "analyst-academy-560",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Lazards Lcoeplus",
+   "path": "thought-pieces/lazard/lazards-lcoeplus.pdf",
+   "sha256": "0cc09bfbd3e6a25fa89f9289c9bf7ad49d599570c9864fba70e84693de63ceb4",
+   "page": 20,
+   "n": 456
+  },
+  {
+   "listing": "analyst-academy-599",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Prefabricated housing market in Central and Northern Europe \u2013 Overview of market trends and development",
+   "path": "thought-pieces/roland-berger/prefabricated-housing-market-in-central-and-northern-europe-overview-of-market-trends-and-development.pdf",
+   "sha256": "1bc072f343c22ec5a0f800bd823e47b9822363d015c9e19586e71ddf4af4e26c",
+   "page": 42,
+   "n": 457
+  },
+  {
+   "listing": "analyst-academy-300",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Thought you knew the Scope 3 issues in your supply chain? Think again.",
+   "path": "thought-pieces/accenture/thought-you-knew-the-scope-3-issues-in-your-supply-chain-think-again.pdf",
+   "sha256": "90d690e8f31fe40a93ebc3e93c17669ab2d39b453066dce743d8938fc6874b17",
+   "page": 5,
+   "n": 458
+  },
+  {
+   "listing": "analyst-academy-463",
+   "firm": "KPMG",
+   "deckType": "thought-pieces",
+   "title": "KPMG: OurImpact Plan 2022 update",
+   "path": "thought-pieces/kpmg/kpmg-ourimpact-plan-2022-update.pdf",
+   "sha256": "cfa72c6a187e472b334cbf3e39a4c1aec652a1e902b852cfa6245da1efa198c2",
+   "page": 13,
+   "n": 459
+  },
+  {
+   "listing": "analyst-academy-388",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Dissecting the 2023/24 Annual Budget Speech",
+   "path": "thought-pieces/pwc/dissecting-the-2023-24-annual-budget-speech.pdf",
+   "sha256": "3d322e9c6c9d40586aaf81d60dd19e1dfb78c1e8a5133563deab7dbcdde64b06",
+   "page": 10,
+   "n": 460
+  },
+  {
+   "listing": "analyst-academy-194",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "2022 Japan Consumer Survey on Next-Generation Automobiles",
+   "path": "thought-pieces/deloitte/2022-japan-consumer-survey-on-next-generation-automobiles.pdf",
+   "sha256": "ce8b7571d1dd19b665dde6c99e842cdb08ac79ad79dbb4f2402ac165e77aea6d",
+   "page": 27,
+   "n": 461
+  },
+  {
+   "listing": "slideworks-bain-022",
+   "firm": "Bain",
+   "deckType": "thought-pieces",
+   "title": "Bain - Covid-19: Brazil's Consumer Pulse Update (2020)",
+   "path": "thought-pieces/bain-and-company/bain-covid-19-brazil-s-consumer-pulse-update-2020.pdf",
+   "sha256": "41507499612293d35f0c50bdb895e778da7478f55c32b245df8944f1a4dc5244",
+   "page": 36,
+   "n": 462
+  },
+  {
+   "listing": "analyst-academy-303",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "The productivity push Powering the UK\u2019s performance with five digital capabilities",
+   "path": "thought-pieces/accenture/the-productivity-push-powering-the-uks-performance-with-five-digital-capabilities.pdf",
+   "sha256": "1cb824739186bc9cbff1b431cf779c1d1a20813a285f5f31b49fe3ef0a0511b9",
+   "page": 11,
+   "n": 463
+  },
+  {
+   "listing": "analyst-academy-042",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "The Combustion Engine Business Model in the Age of Electromobility",
+   "path": "thought-pieces/boston-consulting-group/the-combustion-engine-business-model-in-the-age-of-electromobility.pdf",
+   "sha256": "ba98f2c3b16b58a971228800d5131706b1b83a412d327537b3d60139cd822e89",
+   "page": 9,
+   "n": 464
+  },
+  {
+   "listing": "analyst-academy-449",
+   "firm": "KPMG",
+   "deckType": "thought-pieces",
+   "title": "2024 U.S. CEO Outlook Pulse Survey",
+   "path": "thought-pieces/kpmg/2024-u-s-ceo-outlook-pulse-survey.pdf",
+   "sha256": "25ffb9cd8ec417e6f21e5be16e6dc42bf2c6a11a8f22628118a908ecea195e24",
+   "page": 8,
+   "n": 465
+  },
+  {
+   "listing": "slideworks-mckinsey-141",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Jobs lost, jobs gained: Workforce transitions in a time of automation (2017)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-jobs-lost-jobs-gained-workforce-transitions-in-a-time-of-automation-2017.pdf",
+   "sha256": "9561c6727dadada8ec9e2ad3d0b446a0d0f4a43634193c7dcb2557516b745a02",
+   "page": 4,
+   "n": 466
+  },
+  {
+   "listing": "slideworks-bcg-116",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "BCG - True-Luxury Global Consumer Insight (2015)",
+   "path": "thought-pieces/boston-consulting-group/bcg-true-luxury-global-consumer-insight-2015.pdf",
+   "sha256": "3ba64510eb39ab9156185fa9f5197a899ac4b135b97e42098b00e132226a06bc",
+   "page": 34,
+   "n": 467
+  },
+  {
+   "listing": "analyst-academy-540",
+   "firm": "AT Kearney",
+   "deckType": "thought-pieces",
+   "title": "Retail Banking Evolution in the Age of AI",
+   "path": "thought-pieces/kearney/retail-banking-evolution-in-the-age-of-ai.pdf",
+   "sha256": "432edcac17d0e7cabf70b5de26feff7a57452556285cb53fd4cb7b956d47e46a",
+   "page": 4,
+   "n": 468
+  },
+  {
+   "listing": "analyst-academy-158",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "2023 Global Shared Services and Outsourcing Survey",
+   "path": "thought-pieces/deloitte/2023-global-shared-services-and-outsourcing-survey.pdf",
+   "sha256": "89d1d80f08a809f92274adbf888cb63d57817b151c5d7cf4c98561140be5961f",
+   "page": 22,
+   "n": 469
+  },
+  {
+   "listing": "analyst-academy-248",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Intelligent Operations for Future-Ready Businesses",
+   "path": "thought-pieces/accenture/intelligent-operations-for-future-ready-businesses.pdf",
+   "sha256": "b01f97eb053a94c5bdb9ce652dd7afb8d9ad61b38c8d94c9ed09547c21e561e0",
+   "page": 6,
+   "n": 470
+  },
+  {
+   "listing": "analyst-academy-028",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "Climate Change: BCG\u2019s Perspectives and Offerings",
+   "path": "thought-pieces/boston-consulting-group/climate-change-bcgs-perspectives-and-offerings.pdf",
+   "sha256": "c0739f92447e133f34814cde931f0a686f09f21e8e47174de8a03e93cf6d49cd",
+   "page": 16,
+   "n": 471
+  },
+  {
+   "listing": "analyst-academy-402",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "South Africa Economic Outlook Productivity Potential Index (PPI): A new way of measuring countries\u2019 productive competitiveness.",
+   "path": "thought-pieces/strategy-and/south-africa-economic-outlook-productivity-potential-index-ppi-a-new-way-of-measuring-countries-productiv.pdf",
+   "sha256": "779ba5b5e1f3d9e2dbc6523290118f95aa418f5ad9f37f8a7d4b4d0ec9b04fd0",
+   "page": 7,
+   "n": 472
+  },
+  {
+   "listing": "analyst-academy-467",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "Creating a Winning Recipe for a Meal Kits Program",
+   "path": "thought-pieces/l-e-k-consulting/creating-a-winning-recipe-for-a-meal-kits-program.pdf",
+   "sha256": "4c0747715337c58f600ad829efc05d5f020515e5414e4f161b38c7e5c475f1ea",
+   "page": 10,
+   "n": 473
+  },
+  {
+   "listing": "slideworks-mckinsey-051",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Global Economics Intelligence: Global Summary Report (2023)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-global-economics-intelligence-global-summary-report-2023.pdf",
+   "sha256": "c6f334d4c34ba964540b7db1a76b2e54b111c95afd39392a8455a2efd006fec2",
+   "page": 21,
+   "n": 474
+  },
+  {
+   "listing": "analyst-academy-193",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "Deloitte\u2019s 2022 Global Tax Survey: Beyond BEPS",
+   "path": "thought-pieces/deloitte/deloittes-2022-global-tax-survey-beyond-beps.pdf",
+   "sha256": "1f76f3b802fd8def8f386d098a8c8044d352a587a787d54e62c932a48daa229a",
+   "page": 37,
+   "n": 475
+  },
+  {
+   "listing": "analyst-academy-141",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "Consumer privacy in retail",
+   "path": "thought-pieces/deloitte/consumer-privacy-in-retail.pdf",
+   "sha256": "b679b56a1f19d79ce23d517ff49986b2751326a3a531ae7027b5c6d1e2270a0b",
+   "page": 13,
+   "n": 476
+  },
+  {
+   "listing": "analyst-academy-341",
+   "firm": "EY",
+   "deckType": "thought-pieces",
+   "title": "2022: a record year for MENA IPOs",
+   "path": "thought-pieces/ey/2022-a-record-year-for-mena-ipos.pdf",
+   "sha256": "664fdc8ac7991a6de087fbb98eff4a345e29c88d5f21d35d8ad58ab2542498fb",
+   "page": 7,
+   "n": 477
+  },
+  {
+   "listing": "analyst-academy-354",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "PwC\u2019s new Golden Age Index \u2013 how well are countries harnessing the power of older workers?",
+   "path": "thought-pieces/pwc/pwcs-new-golden-age-index-how-well-are-countries-harnessing-the-power-of-older-workers.pdf",
+   "sha256": "52e5a221e4a102647a4b6ba4d75fa209d47b6d491784e0b7b231b7c4286eaaba",
+   "page": 26,
+   "n": 478
+  },
+  {
+   "listing": "analyst-academy-607",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Rail supply digitization",
+   "path": "thought-pieces/roland-berger/rail-supply-digitization.pdf",
+   "sha256": "63a534d3bda66b9f0fac06052d7bfbfddaf0a1811b542005394652a6340b99c0",
+   "page": 3,
+   "n": 479
+  },
+  {
+   "listing": "analyst-academy-277",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "From survive to thrive Achieving tech transformation for communication service providers\u2019 future",
+   "path": "thought-pieces/accenture/from-survive-to-thrive-achieving-tech-transformation-for-communication-service-providers-future.pdf",
+   "sha256": "bb2c76afc4f3344223215fa7cb750ddeacbb4a07cbc11db0a6839eaa242ff279",
+   "page": 19,
+   "n": 480
+  },
+  {
+   "listing": "analyst-academy-247",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Tech Adoption and Strategy for Innovation & Growth",
+   "path": "thought-pieces/accenture/tech-adoption-and-strategy-for-innovation-growth.pdf",
+   "sha256": "7954f83f1591db1aa5dfe7405ff65829d499523f6e984a4998f6830b0994810a",
+   "page": 11,
+   "n": 481
+  },
+  {
+   "listing": "analyst-academy-024",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "Understanding the path to digital marketing maturity",
+   "path": "thought-pieces/boston-consulting-group/understanding-the-path-to-digital-marketing-maturity.pdf",
+   "sha256": "e5ad85abfce4af4ca84d579a1cbca0f16c02d4bb5420c6404901025e16ce0a41",
+   "page": 15,
+   "n": 482
+  },
+  {
+   "listing": "analyst-academy-050",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "BCG Investor Perspectives Series",
+   "path": "thought-pieces/boston-consulting-group/bcg-investor-perspectives-series.pdf",
+   "sha256": "47810cbaf77715e0e88f00c4358ea6eed8d2e0dbb2f1c3f5c25e7595b439c97c",
+   "page": 18,
+   "n": 483
+  },
+  {
+   "listing": "analyst-academy-037",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "What if all vehicles were electric?",
+   "path": "thought-pieces/boston-consulting-group/what-if-all-vehicles-were-electric.pdf",
+   "sha256": "8b484db5e44940219686488de88fc82e6e9ad395d12d365b11ed6b29ad2ddd1b",
+   "page": 2,
+   "n": 484
+  },
+  {
+   "listing": "analyst-academy-237",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Fintech New York: Partnerships, Platforms and Open Innovation",
+   "path": "thought-pieces/accenture/fintech-new-york-partnerships-platforms-and-open-innovation.pdf",
+   "sha256": "a60822c17f4d9f6697218905c48625d24f6260dc4cc7fa1a2f2863a0c6daee91",
+   "page": 6,
+   "n": 485
+  },
+  {
+   "listing": "analyst-academy-530",
+   "firm": "AT Kearney",
+   "deckType": "thought-pieces",
+   "title": "The Future of Procurement: Why is Technology Lagging Behind?",
+   "path": "thought-pieces/kearney/the-future-of-procurement-why-is-technology-lagging-behind.pdf",
+   "sha256": "8769bcdf8ee54f8da28f5b71f5b967a63197535ed9d7244ae854214d99af7705",
+   "page": 15,
+   "n": 486
+  },
+  {
+   "listing": "slideworks-mckinsey-108",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Winning competition through organizational agility (2016)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-winning-competition-through-organizational-agility-2016.pdf",
+   "sha256": "a751953036904691092b9537a855789aa5c4820ac9c9639b23b4cda59d42411c",
+   "page": 27,
+   "n": 487
+  },
+  {
+   "listing": "analyst-academy-214",
+   "firm": "Bain & Co.",
+   "deckType": "thought-pieces",
+   "title": "e-Conomy SEA 2021 Roaring 20s: The SEA Digital Decade",
+   "path": "thought-pieces/bain-and-company/e-conomy-sea-2021-roaring-20s-the-sea-digital-decade.pdf",
+   "sha256": "9e5e3d081cc769d3faa05cd0e5f351982f495394b1dbd36b5107ff357b776d71",
+   "page": 36,
+   "n": 488
+  },
+  {
+   "listing": "analyst-academy-522",
+   "firm": "AT Kearney",
+   "deckType": "thought-pieces",
+   "title": "A.T. Kearney 2017 State of Logistics Report: Accelerating into Uncertainty",
+   "path": "thought-pieces/kearney/a-t-kearney-2017-state-of-logistics-report-accelerating-into-uncertainty.pdf",
+   "sha256": "8c64c50a3d0f735a35cdc1ff9a0d1be1c2f1f675164ecf551090525eca53c475",
+   "page": 15,
+   "n": 489
+  },
+  {
+   "listing": "analyst-academy-202",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "Consumer views on autonomous and electric powertrain technologies Asia Pacific insights from Deloitte\u2019s Global Automotive Consumer Study",
+   "path": "thought-pieces/deloitte/consumer-views-on-autonomous-and-electric-powertrain-technologies-asia-pacific-insights-from-deloittes-gl.pdf",
+   "sha256": "f33d9453c25620d8c29be10f89b1e6f02a018962fb20d20c0beec24dc0ffdb48",
+   "page": 9,
+   "n": 490
+  },
+  {
+   "listing": "slideworks-mckinsey-076",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - The Quantum Technology Monitor: FACTS & FIGURES (2020)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-the-quantum-technology-monitor-facts-figures-2020.pdf",
+   "sha256": "b0c7808160ed43dde820d01e1e4db5febe2f4acdc84c33be6112f4e544c16236",
+   "page": 8,
+   "n": 491
+  },
+  {
+   "listing": "analyst-academy-289",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Conquering the next value frontier in private equity",
+   "path": "thought-pieces/accenture/conquering-the-next-value-frontier-in-private-equity.pdf",
+   "sha256": "7a6b4fc12210251e1594731427e6a94abf6fdc789659bb9cd1ae024a21ab4023",
+   "page": 13,
+   "n": 492
+  },
+  {
+   "listing": "analyst-academy-564",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Going full circle",
+   "path": "thought-pieces/oliver-wyman/going-full-circle.pdf",
+   "sha256": "18a99d79d272c6855743809619435b545b4ace095d505a0bf590e2df5ed8ce12",
+   "page": 9,
+   "n": 493
+  },
+  {
+   "listing": "analyst-academy-071",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "2018 True-Luxury Global Consumer Insight",
+   "path": "thought-pieces/boston-consulting-group/2018-true-luxury-global-consumer-insight.pdf",
+   "sha256": "0d7e1371beccca8b3e98ff06208548b006f1a39f75915876d8d2b0e2b596bef5",
+   "page": 12,
+   "n": 494
+  },
+  {
+   "listing": "analyst-academy-255",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Digital Transformation Initiative In collaboration with Accenture",
+   "path": "thought-pieces/accenture/digital-transformation-initiative-in-collaboration-with-accenture.pdf",
+   "sha256": "416b4216176a1f627046bc13633019e7980e30a49f052beff471a81cb3c6aa02",
+   "page": 23,
+   "n": 495
+  },
+  {
+   "listing": "analyst-academy-280",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Work, workforce, workers Reinvented in the age of generative AI",
+   "path": "thought-pieces/accenture/work-workforce-workers-reinvented-in-the-age-of-generative-ai.pdf",
+   "sha256": "35b9951f1a85650c48d802d17305f830c24ff288271cf4ef8486bf97efade316",
+   "page": 16,
+   "n": 496
+  },
+  {
+   "listing": "analyst-academy-478",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "2016 Strategic Hospital Priorities Study",
+   "path": "thought-pieces/l-e-k-consulting/2016-strategic-hospital-priorities-study.pdf",
+   "sha256": "63e2f6179525098b3b5538b7b166976064ea45020023adec9fe14c51c03cc62f",
+   "page": 7,
+   "n": 497
+  },
+  {
+   "listing": "analyst-academy-189",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "Multi-regional transmission model",
+   "path": "thought-pieces/deloitte/multi-regional-transmission-model.pdf",
+   "sha256": "c8f63b03dec6f0cb938e84356302571b9c093e55f6c7b4e60ea91b4d914b952c",
+   "page": 41,
+   "n": 498
+  },
+  {
+   "listing": "slideworks-mckinsey-068",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - The Press Forward Discussion: Pipeline to Leadership for Women in News (2021)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-the-press-forward-discussion-pipeline-to-leadership-for-women-in-news-2021.pdf",
+   "sha256": "1837f0442977f2f13812a7d54057174e5d25b64a49cca75a0de7b16d3b22b7e9",
+   "page": 21,
+   "n": 499
+  },
+  {
+   "listing": "analyst-academy-223",
+   "firm": "Bain & Co.",
+   "deckType": "thought-pieces",
+   "title": "Altagamma 2017 Worldwide Luxury Market Monitor",
+   "path": "thought-pieces/bain-and-company/altagamma-2017-worldwide-luxury-market-monitor.pdf",
+   "sha256": "f16f724be6bc4b7a5dd867f77fc22073c9fec31c1f3cb1060ddef0afb3770f79",
+   "page": 36,
+   "n": 500
+  },
+  {
+   "listing": "analyst-academy-459",
+   "firm": "KPMG",
+   "deckType": "thought-pieces",
+   "title": "KPMG: Our Impact Plan 2024 update",
+   "path": "thought-pieces/kpmg/kpmg-our-impact-plan-2024-update.pdf",
+   "sha256": "57965e2b1f02123e15dec69db0ebccc535f2f610a0fcc8ea758c468579be148e",
+   "page": 40,
+   "n": 501
+  },
+  {
+   "listing": "analyst-academy-289",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Conquering the next value frontier in private equity",
+   "path": "thought-pieces/accenture/conquering-the-next-value-frontier-in-private-equity.pdf",
+   "sha256": "7a6b4fc12210251e1594731427e6a94abf6fdc789659bb9cd1ae024a21ab4023",
+   "page": 12,
+   "n": 502
+  },
+  {
+   "listing": "slideworks-mckinsey-038",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Global Economics Intelligence: Global Summary Report (2024)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-global-economics-intelligence-global-summary-report-2024.pdf",
+   "sha256": "5ae3432e9edd1744e81aaf33c680db7de08e192e27e47847b6c2e763cb991e4a",
+   "page": 3,
+   "n": 503
+  },
+  {
+   "listing": "analyst-academy-344",
+   "firm": "EY",
+   "deckType": "thought-pieces",
+   "title": "Can resilience shape a shifting landscape?",
+   "path": "thought-pieces/ey/can-resilience-shape-a-shifting-landscape.pdf",
+   "sha256": "f99cc2af1964ab7f1a0795ead7c3c92a3e38fb4ad728362d5cb1a328d1763684",
+   "page": 37,
+   "n": 504
+  },
+  {
+   "listing": "analyst-academy-534",
+   "firm": "AT Kearney",
+   "deckType": "thought-pieces",
+   "title": "Carbon Capture Utilization and Storage",
+   "path": "thought-pieces/kearney/carbon-capture-utilization-and-storage.pdf",
+   "sha256": "c501e9ee3aa39cd70f8aafbf0634eeec36c7a6ee088b7aef6c4f761b5dabdf4d",
+   "page": 56,
+   "n": 505
+  },
+  {
+   "listing": "slideworks-mckinsey-103",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Digital Luxury Experience (2017)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-digital-luxury-experience-2017.pdf",
+   "sha256": "6357dc5eebfdf03f45331032e11e3c89dd41af1c3015b141bead024626f2b560",
+   "page": 13,
+   "n": 506
+  },
+  {
+   "listing": "analyst-academy-047",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "The CEO Outlook Caution, Optimism, and Navigating the Road Ahead",
+   "path": "thought-pieces/boston-consulting-group/the-ceo-outlook-caution-optimism-and-navigating-the-road-ahead.pdf",
+   "sha256": "04ad1b78dd137b1fcfb8eb2c825584d80da55f9adb4898ddc169bfd492a76ab4",
+   "page": 24,
+   "n": 507
+  },
+  {
+   "listing": "analyst-academy-278",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "The age of AI: Banking\u2019s new reality",
+   "path": "thought-pieces/accenture/the-age-of-ai-bankings-new-reality.pdf",
+   "sha256": "7665704941b0ea2503a8cba84fa3af17bab7764262bc6e7fc969a4be7c5200cb",
+   "page": 14,
+   "n": 508
+  },
+  {
+   "listing": "slideworks-mckinsey-076",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - The Quantum Technology Monitor: FACTS & FIGURES (2020)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-the-quantum-technology-monitor-facts-figures-2020.pdf",
+   "sha256": "b0c7808160ed43dde820d01e1e4db5febe2f4acdc84c33be6112f4e544c16236",
+   "page": 16,
+   "n": 509
+  },
+  {
+   "listing": "analyst-academy-154",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "The CMO Survey Marketing in a Post Covid Era",
+   "path": "thought-pieces/deloitte/the-cmo-survey-marketing-in-a-post-covid-era.pdf",
+   "sha256": "f82755fbd1bf71f02b087a26d9b525204791f9dfeeceaa169515d80e0e8c6aab",
+   "page": 36,
+   "n": 510
+  },
+  {
+   "listing": "analyst-academy-185",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "The future of M&A 2022 M&A Trends Survey",
+   "path": "thought-pieces/deloitte/the-future-of-m-a-2022-m-a-trends-survey.pdf",
+   "sha256": "8b93379812b012c97ec3dd19a4821d7f674873773512740260328e3a5d993e51",
+   "page": 4,
+   "n": 511
+  },
+  {
+   "listing": "analyst-academy-325",
+   "firm": "EY",
+   "deckType": "thought-pieces",
+   "title": "EY Price Point: global oil and gas market outlook, Q2 | April 2022",
+   "path": "thought-pieces/ey/ey-price-point-global-oil-and-gas-market-outlook-q2-april-2022.pdf",
+   "sha256": "6ed30d4870b1f7f4a581165cf056490b58b7adf4abd8b02ddc63a0cdb09e2cbd",
+   "page": 2,
+   "n": 512
+  },
+  {
+   "listing": "analyst-academy-331",
+   "firm": "EY",
+   "deckType": "thought-pieces",
+   "title": "EY Academic Resource Center \u2013 mission",
+   "path": "thought-pieces/ey/ey-academic-resource-center-mission.pdf",
+   "sha256": "8f2d69da19b704e51a99041a92e304c1e8e829dc49365d42634a576c8ab738e4",
+   "page": 39,
+   "n": 513
+  },
+  {
+   "listing": "analyst-academy-503",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "Japan Hospital Insights Survey Findings Summary materials",
+   "path": "thought-pieces/l-e-k-consulting/japan-hospital-insights-survey-findings-summary-materials.pdf",
+   "sha256": "12dd8816dbfd061fd67fe5927a3ca763f6c3db1badf7b16cb05af304dc80b79c",
+   "page": 7,
+   "n": 514
+  },
+  {
+   "listing": "slideworks-mckinsey-160",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - The Secret of Transformations (2019)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-the-secret-of-transformations-2019.pdf",
+   "sha256": "bcfdef831fabbd43fbcdb516fd25c3436414ad16c7da86d7d39723c4277ddcca",
+   "page": 30,
+   "n": 515
+  },
+  {
+   "listing": "slideworks-mckinsey-036",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Global Materials Perspective 2025 (2025)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-global-materials-perspective-2025-2025.pdf",
+   "sha256": "946a40191d640872f3e0303d23c8dfe9631f4639e09602441f64bbb6d6b73c5f",
+   "page": 44,
+   "n": 516
+  },
+  {
+   "listing": "analyst-academy-571",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Digital CFO Results of the Oliver Wyman Study",
+   "path": "thought-pieces/oliver-wyman/digital-cfo-results-of-the-oliver-wyman-study.pdf",
+   "sha256": "cc38572a40720ef479abfb84490d35984ae1283efc928446a393b38f681dc5fe",
+   "page": 8,
+   "n": 517
+  },
+  {
+   "listing": "analyst-academy-347",
+   "firm": "EY",
+   "deckType": "thought-pieces",
+   "title": "Generative AI in wealth and asset management",
+   "path": "thought-pieces/ey/generative-ai-in-wealth-and-asset-management.pdf",
+   "sha256": "de9253357ae50ff231c861d41efb577aba0b0c09b88b5a2a8bbdcd0299ac0d40",
+   "page": 6,
+   "n": 518
+  },
+  {
+   "listing": "slideworks-mckinsey-087",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Responding to COVID-19: Addressing the economic impact of the crisis - Information for US state leaders (2020)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-responding-to-covid-19-addressing-the-economic-impact-of-the-crisis-information-for-us-state-lea.pdf",
+   "sha256": "9d5af2d703df0ea4d1fd82d5c91e9a8edfbc53503b62cdf6539c1885240f4e65",
+   "page": 17,
+   "n": 519
+  },
+  {
+   "listing": "analyst-academy-097",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "The net-zero transition",
+   "path": "thought-pieces/mckinsey-and-company/the-net-zero-transition.pdf",
+   "sha256": "6cfaee983fef3ac4957e457447d288d1607ed86f20bc81e1bda07008dfc83720",
+   "page": 5,
+   "n": 520
+  },
+  {
+   "listing": "analyst-academy-064",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "Fast-moving consumer goods: Driving value creation in an era of disruption",
+   "path": "thought-pieces/boston-consulting-group/fast-moving-consumer-goods-driving-value-creation-in-an-era-of-disruption.pdf",
+   "sha256": "d96691699b907bc39bf3a3c9ab37434b966ae6b5e920c1eb0cfa7dd7196565ad",
+   "page": 9,
+   "n": 521
+  },
+  {
+   "listing": "slideworks-bcg-083",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "BCG - The Bionic Future (2019)",
+   "path": "thought-pieces/boston-consulting-group/bcg-the-bionic-future-2019.pdf",
+   "sha256": "2573ada21e814ffa7406de08c057e5b82b0a1dda71e5a659d8cded25416da63d",
+   "page": 8,
+   "n": 522
+  },
+  {
+   "listing": "analyst-academy-077",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "The Canadian Venture Opportunity",
+   "path": "thought-pieces/boston-consulting-group/the-canadian-venture-opportunity.pdf",
+   "sha256": "fadbff684555c6e760a626e6115bed29f9b5d45c3f7c150791013267881130c2",
+   "page": 15,
+   "n": 523
+  },
+  {
+   "listing": "analyst-academy-395",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "4th edition eReadiness 2023",
+   "path": "thought-pieces/strategy-and/4th-edition-ereadiness-2023.pdf",
+   "sha256": "23afe5d6a23befeadaea0e0cd6c8ab30e308388bd4d96cbab586db51f4678881",
+   "page": 51,
+   "n": 524
+  },
+  {
+   "listing": "analyst-academy-437",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "From promise to reality: Does business really care about the SDGs?",
+   "path": "thought-pieces/pwc/from-promise-to-reality-does-business-really-care-about-the-sdgs.pdf",
+   "sha256": "a6c4f2b313548178a9010e0ee8e752aac804e9a4a08b15aebd873e887df2ed89",
+   "page": 38,
+   "n": 525
+  },
+  {
+   "listing": "slideworks-bcg-039",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "BCG - BCG's approach to portfolio strategy \u2013 Evolution from the 1960's growth/share matrix to today's frameworks (2016)",
+   "path": "thought-pieces/boston-consulting-group/bcg-portfolio-strategy-evolution-pdf-strategic-management-business.pdf",
+   "sha256": "bd8081acee54f50a44602bdf4ef6db33bcac2c09668a8f524af232f0d90a3d1a",
+   "page": 15,
+   "n": 526
+  },
+  {
+   "listing": "analyst-academy-342",
+   "firm": "EY",
+   "deckType": "thought-pieces",
+   "title": "Seeking stability within volatility: How interdependent risks put CROs at the heart of the banking business",
+   "path": "thought-pieces/ey/seeking-stability-within-volatility-how-interdependent-risks-put-cros-at-the-heart-of-the-banking-busines.pdf",
+   "sha256": "c6c41987d973280686d43573272f3aa5c02674bacf82ae3e39fca774f0973cb8",
+   "page": 23,
+   "n": 527
+  },
+  {
+   "listing": "analyst-academy-319",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "The art of AI maturity Advancing from practice to performance North America",
+   "path": "thought-pieces/accenture/the-art-of-ai-maturity-advancing-from-practice-to-performance-north-america.pdf",
+   "sha256": "d313b9f6804611873f15ec97aa97983a843048199fcd6f8e334cfde56cb36e98",
+   "page": 7,
+   "n": 528
+  },
+  {
+   "listing": "analyst-academy-239",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "The Decade to Deliver: A Call to Business Action",
+   "path": "thought-pieces/accenture/the-decade-to-deliver-a-call-to-business-action-2.pdf",
+   "sha256": "0428cc7b44b8ac910598cc36aac6ea069a54e4a79430a66911f165f2984d721c",
+   "page": 13,
+   "n": 529
+  },
+  {
+   "listing": "analyst-academy-365",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Re-Imagine the Possible 2018/2019",
+   "path": "thought-pieces/pwc/re-imagine-the-possible-2018-2019.pdf",
+   "sha256": "7144e31bf348fcd5088efa95ff83682cc4c0a64506e8a24c5aa5c82abe0da76c",
+   "page": 28,
+   "n": 530
+  },
+  {
+   "listing": "analyst-academy-428",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Digital Treasury-It takes two to tango 2019 Global Treasury Benchmarking Survey",
+   "path": "thought-pieces/pwc/digital-treasury-it-takes-two-to-tango-2019-global-treasury-benchmarking-survey.pdf",
+   "sha256": "f51aa243b427714443b3d98262e8577fdd944e2869ae1156c176d5aa1c5955a5",
+   "page": 4,
+   "n": 531
+  },
+  {
+   "listing": "analyst-academy-253",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Bridging the Skills Gap in the Future Workforce",
+   "path": "thought-pieces/accenture/bridging-the-skills-gap-in-the-future-workforce.pdf",
+   "sha256": "0b5054cacac77342821320ee4a8b09bab770423d608895c3ee0d2398709a807e",
+   "page": 32,
+   "n": 532
+  },
+  {
+   "listing": "analyst-academy-391",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "National Budget 2024/25 For Our Humanity: Now\u2019s the time to work together.",
+   "path": "thought-pieces/pwc/national-budget-2024-25-for-our-humanity-nows-the-time-to-work-together.pdf",
+   "sha256": "92553531ef7898305ec540634b47cec872d5a058013800ff6e7a34d31a8b5de7",
+   "page": 24,
+   "n": 533
+  },
+  {
+   "listing": "analyst-academy-179",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "VC Human Capital Survey",
+   "path": "thought-pieces/deloitte/vc-human-capital-survey.pdf",
+   "sha256": "7485cb67d21280152543dd6f0725554e5740738d2b36e939ea00010cc3763e45",
+   "page": 12,
+   "n": 534
+  },
+  {
+   "listing": "analyst-academy-222",
+   "firm": "Bain & Co.",
+   "deckType": "thought-pieces",
+   "title": "e-Conomy SEA 2023 report: Philippines",
+   "path": "thought-pieces/bain-and-company/e-conomy-sea-2023-report-philippines.pdf",
+   "sha256": "2b5632b3891ae98e8efbd7c7eda08c46447c313d7a3546222f2e90eed361d66b",
+   "page": 11,
+   "n": 535
+  },
+  {
+   "listing": "slideworks-mckinsey-035",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Development in the Future of Work: 2025 Perspective on Evolving Trends in L&D (2025)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-development-in-the-future-of-work-2025-perspective-on-evolving-trends-in-l-d-2025.pdf",
+   "sha256": "d70bedec640b9be8d019260dd1f452e132a921df360b091bc429151e3defd4ff",
+   "page": 21,
+   "n": 536
+  },
+  {
+   "listing": "analyst-academy-290",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "2023 Post & Parcel industry trends",
+   "path": "thought-pieces/accenture/2023-post-parcel-industry-trends.pdf",
+   "sha256": "df04ac5e2c64cba81f9e7ad4b0af0e8b57ad9032812004e96657ef6d36673922",
+   "page": 4,
+   "n": 537
+  },
+  {
+   "listing": "analyst-academy-425",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Crisis Preparedness as the next competitive advantage: Learning from 4,500 crises PwC\u2019s Global Crisis Survey 2019",
+   "path": "thought-pieces/pwc/crisis-preparedness-as-the-next-competitive-advantage-learning-from-4-500-crises-pwcs-global-crisis-surve.pdf",
+   "sha256": "c48e4c1add4a55d0fd6895035421f8ee515c9566ec0bc2be0856d962071a0539",
+   "page": 16,
+   "n": 538
+  },
+  {
+   "listing": "analyst-academy-481",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "China Exit or Co-Investment Opportunities for German PE Investors",
+   "path": "thought-pieces/l-e-k-consulting/china-exit-or-co-investment-opportunities-for-german-pe-investors.pdf",
+   "sha256": "b4814e4dead029e08955ab61b87cfd4b0c473d1606693730a4a16cb9e0d70be2",
+   "page": 11,
+   "n": 539
+  },
+  {
+   "listing": "analyst-academy-316",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "LIVING BUSINESS Achieving Sustainable Growth Through Hyper-Relevance",
+   "path": "thought-pieces/accenture/living-business-achieving-sustainable-growth-through-hyper-relevance.pdf",
+   "sha256": "e7dd33e660dd4dd08eef45e05bb94617902d121c27e29add57918ee1b300a5eb",
+   "page": 23,
+   "n": 540
+  },
+  {
+   "listing": "slideworks-mckinsey-098",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Investment and Industrial Policy: A Perspective on the Future (2018)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-investment-and-industrial-policy-a-perspective-on-the-future-2018.pdf",
+   "sha256": "f24205e51392fe96826481c54f539292551c3c820ebfefb715efcd1c7b35322b",
+   "page": 4,
+   "n": 541
+  },
+  {
+   "listing": "analyst-academy-436",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Time to talk: What has to change for women at work",
+   "path": "thought-pieces/pwc/time-to-talk-what-has-to-change-for-women-at-work.pdf",
+   "sha256": "855f8a32b4a751cff7f28668cfb1e939e2faaa9e8d863e9334ab348d5bc4d61c",
+   "page": 2,
+   "n": 542
+  },
+  {
+   "listing": "analyst-academy-465",
+   "firm": "KPMG",
+   "deckType": "thought-pieces",
+   "title": "The 14th Five- Year Plan: Sector Impact Outlook",
+   "path": "thought-pieces/kpmg/the-14th-five-year-plan-sector-impact-outlook.pdf",
+   "sha256": "a3ec9a2d40be086040c50eb078f355a75f6ed011ffb56b78041cb0829a5ab33a",
+   "page": 9,
+   "n": 543
+  },
+  {
+   "listing": "analyst-academy-421",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Vitamins & Dietary Supplements Market trends \u2013 Overview",
+   "path": "thought-pieces/pwc/vitamins-dietary-supplements-market-trends-overview.pdf",
+   "sha256": "6cea2313f574a4cdccc7379e61076b564409df51924114290bb41e3a0a3c4326",
+   "page": 13,
+   "n": 544
+  },
+  {
+   "listing": "analyst-academy-599",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Prefabricated housing market in Central and Northern Europe \u2013 Overview of market trends and development",
+   "path": "thought-pieces/roland-berger/prefabricated-housing-market-in-central-and-northern-europe-overview-of-market-trends-and-development.pdf",
+   "sha256": "1bc072f343c22ec5a0f800bd823e47b9822363d015c9e19586e71ddf4af4e26c",
+   "page": 18,
+   "n": 545
+  },
+  {
+   "listing": "analyst-academy-255",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Digital Transformation Initiative In collaboration with Accenture",
+   "path": "thought-pieces/accenture/digital-transformation-initiative-in-collaboration-with-accenture.pdf",
+   "sha256": "416b4216176a1f627046bc13633019e7980e30a49f052beff471a81cb3c6aa02",
+   "page": 65,
+   "n": 546
+  },
+  {
+   "listing": "analyst-academy-589",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Sportech 2021 Paris, February 2022",
+   "path": "thought-pieces/roland-berger/sportech-2021-paris-february-2022.pdf",
+   "sha256": "fae3b3d1718a36b5492505eee009786451601f7590d38ae291c43d8314b47dc0",
+   "page": 12,
+   "n": 547
+  },
+  {
+   "listing": "analyst-academy-570",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Sustainability Risk Under Solvency II",
+   "path": "thought-pieces/oliver-wyman/sustainability-risk-under-solvency-ii.pdf",
+   "sha256": "284d2ee7c60314d56913f398cbbf11ae73ea099157d2c3fc328522b92add2ec3",
+   "page": 14,
+   "n": 548
+  },
+  {
+   "listing": "analyst-academy-592",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Challenges abound Ongoing crises call for a proactive approach",
+   "path": "thought-pieces/roland-berger/challenges-abound-ongoing-crises-call-for-a-proactive-approach.pdf",
+   "sha256": "e25cf5b4c6b7084b5d3c81d4ace43d255f65861026bd648a6a99ad699b9a3fb3",
+   "page": 4,
+   "n": 549
+  },
+  {
+   "listing": "analyst-academy-183",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "Now decides next: Getting real about Generative AI",
+   "path": "thought-pieces/deloitte/now-decides-next-getting-real-about-generative-ai.pdf",
+   "sha256": "6d12b36cc9037b4c5356f2d517d9056cd2705702d16677a84248046ace6793c8",
+   "page": 10,
+   "n": 550
+  },
+  {
+   "listing": "analyst-academy-581",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "What if Germany becomes the sick man of Europe again?",
+   "path": "thought-pieces/roland-berger/what-if-germany-becomes-the-sick-man-of-europe-again.pdf",
+   "sha256": "186cf43a4d419e868bd148b4a738212d7c7f03aa4568f7823cfe5819ec9701a8",
+   "page": 18,
+   "n": 551
+  },
+  {
+   "listing": "analyst-academy-527",
+   "firm": "AT Kearney",
+   "deckType": "thought-pieces",
+   "title": "Consumers at 250",
+   "path": "thought-pieces/kearney/consumers-at-250.pdf",
+   "sha256": "d452bed51627a2446488b0cfe4bb7f234038818dd44815c7c3d04ad1ee9eed7d",
+   "page": 29,
+   "n": 552
+  },
+  {
+   "listing": "analyst-academy-330",
+   "firm": "EY",
+   "deckType": "thought-pieces",
+   "title": "EY Germany FinTech Landscape",
+   "path": "thought-pieces/ey/ey-germany-fintech-landscape.pdf",
+   "sha256": "1cae3dd55126b2e464e81e0d3f1d3ef7a71296e6773357cf9e2508caabfed466",
+   "page": 13,
+   "n": 553
+  },
+  {
+   "listing": "analyst-academy-307",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Building Sustainable Organizations",
+   "path": "thought-pieces/accenture/building-sustainable-organizations.pdf",
+   "sha256": "c6c73b6b12cca09db0b85f4128fe98cedffe238aff6678f0d64254c878b7dc5e",
+   "page": 40,
+   "n": 554
+  },
+  {
+   "listing": "analyst-academy-412",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "The global consumer: Changed for good Consumer trends accelerated by the COVID-19 pandemic are sticking",
+   "path": "thought-pieces/pwc/the-global-consumer-changed-for-good-consumer-trends-accelerated-by-the-covid-19-pandemic-are-sticking.pdf",
+   "sha256": "15104ed3c0237103720109c1be83b6c83dc8bb5e30f88ef6432f521e07a63755",
+   "page": 23,
+   "n": 555
+  },
+  {
+   "listing": "analyst-academy-259",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Inclusion and Diversity Survey Make It More Than A Mantra",
+   "path": "thought-pieces/accenture/inclusion-and-diversity-survey-make-it-more-than-a-mantra.pdf",
+   "sha256": "b0f07f6a411609a1e243398857355c49e8c9aac421842d8b35e2246edd66a6bc",
+   "page": 2,
+   "n": 556
+  },
+  {
+   "listing": "slideworks-bain-048",
+   "firm": "Bain",
+   "deckType": "thought-pieces",
+   "title": "Bain - Electronics Co Case Interview (date unknown)",
+   "path": "thought-pieces/bain-and-company/electronics-co-case-interview-analysis-pdf-revenue-electronics.pdf",
+   "sha256": "68b1abb73757a3f3b2085c716cec9f0de4b8ea0507954435b4d11e377482d525",
+   "page": 6,
+   "n": 557
+  },
+  {
+   "listing": "analyst-academy-544",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "IP Theft",
+   "path": "thought-pieces/booz-allen-hamilton/ip-theft.pdf",
+   "sha256": "d1838b2f835e30bbd751265109527422135c8da37777a8c18b44ba2f8ce75788",
+   "page": 3,
+   "n": 558
+  },
+  {
+   "listing": "analyst-academy-235",
+   "firm": "Bain & Co.",
+   "deckType": "thought-pieces",
+   "title": "2017 China Luxury Market Study",
+   "path": "thought-pieces/bain-and-company/2017-china-luxury-market-study.pdf",
+   "sha256": "cbb6688dc599f927560f0942e72c7b96b19a75c812e3284621448ebbc577ea99",
+   "page": 4,
+   "n": 559
+  },
+  {
+   "listing": "slideworks-bain-023",
+   "firm": "Bain",
+   "deckType": "thought-pieces",
+   "title": "Bain - Covid-19: A Multimillion Results Journey through Operations Efficiency (2020)",
+   "path": "thought-pieces/bain-and-company/bain-covid-19-a-multimillion-results-journey-through-operations-efficiency-2020.pdf",
+   "sha256": "dc64d070cc060d36119ada6813635bb1a71b166a8f0c89ca3890ce354aa2be13",
+   "page": 14,
+   "n": 560
+  },
+  {
+   "listing": "slideworks-bain-014",
+   "firm": "Bain",
+   "deckType": "thought-pieces",
+   "title": "Bain - Covid-19: Chile's Consumer Pulse Update (2020)",
+   "path": "thought-pieces/bain-and-company/bain-covid-19-chile-s-consumer-pulse-update-2020.pdf",
+   "sha256": "f596541f3e342281a91273c2783c83c5b2d4d2ed77c74e83f79db69d0aff64a6",
+   "page": 7,
+   "n": 561
+  },
+  {
+   "listing": "slideworks-mckinsey-096",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Digital and Innovation Strategies for the Infrastructure Industry (2018)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-digital-and-innovation-strategies-for-the-infrastructure-industry-2018.pdf",
+   "sha256": "47b8cd80198cdd72d8375eb92904c99b5cf9d96e98db5ecb8595eb82ce997392",
+   "page": 7,
+   "n": 562
+  },
+  {
+   "listing": "slideworks-mckinsey-146",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Attracting Responsible Mining Investment in Fragile and Conflict Affected Settings (2014)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-attracting-responsible-mining-investment-in-fragile-and-conflict-affected-settings-2014.pdf",
+   "sha256": "df4a9e04f0e5f6e04ce8b712ae6e9971d8a6cff31513258feaf40490e0563a5c",
+   "page": 3,
+   "n": 563
+  },
+  {
+   "listing": "analyst-academy-071",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "2018 True-Luxury Global Consumer Insight",
+   "path": "thought-pieces/boston-consulting-group/2018-true-luxury-global-consumer-insight.pdf",
+   "sha256": "0d7e1371beccca8b3e98ff06208548b006f1a39f75915876d8d2b0e2b596bef5",
+   "page": 50,
+   "n": 564
+  },
+  {
+   "listing": "analyst-academy-031",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "What the Evolution of Travel Means for Business",
+   "path": "thought-pieces/boston-consulting-group/what-the-evolution-of-travel-means-for-business.pdf",
+   "sha256": "d4fbf61486aa99106c7ba8dffda9414c52f354e9a30d707557d7045cea072a88",
+   "page": 18,
+   "n": 565
+  },
+  {
+   "listing": "analyst-academy-048",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "BCG Investor Perspectives Series Q2 2023",
+   "path": "thought-pieces/boston-consulting-group/bcg-investor-perspectives-series-q2-2023.pdf",
+   "sha256": "083e57cc55d3a4ddd6af35dd8d8cd74157677dad5f369afaa4038f3b4ff0b8fc",
+   "page": 5,
+   "n": 566
+  },
+  {
+   "listing": "slideworks-mckinsey-054",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Global Energy Perspective 2022: Executive Summary (2022)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-global-energy-perspective-2022-executive-summary-2022.pdf",
+   "sha256": "49721d26908eee0659a56547b2166f4dbafa82dbd161be595b05f8597bd2891d",
+   "page": 14,
+   "n": 567
+  },
+  {
+   "listing": "analyst-academy-079",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "The CEO\u2019s Dilemma Leveraging Tech and Digital to Build Resilience",
+   "path": "thought-pieces/boston-consulting-group/the-ceos-dilemma-leveraging-tech-and-digital-to-build-resilience.pdf",
+   "sha256": "0a5703ff9642127dfbbba1b948bfc43bb6380bbe01645bc7a7241c752e8064cd",
+   "page": 21,
+   "n": 568
+  },
+  {
+   "listing": "analyst-academy-407",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Insurance reimagined: Spotlight on trust, convergence and transformation",
+   "path": "thought-pieces/pwc/insurance-reimagined-spotlight-on-trust-convergence-and-transformation.pdf",
+   "sha256": "6994ba2477647506353d51426fc9d70273703092b8824910b2b0832ff18ac8ad",
+   "page": 5,
+   "n": 569
+  },
+  {
+   "listing": "analyst-academy-231",
+   "firm": "Bain & Co.",
+   "deckType": "thought-pieces",
+   "title": "Southeast Asia\u2019s Green Economy 2022 Report",
+   "path": "thought-pieces/bain-and-company/southeast-asias-green-economy-2022-report.pdf",
+   "sha256": "8c0860d0de8671a22c46e63c4cc94d36b07b9e050d5a5b8b3fe1a363d66b8693",
+   "page": 106,
+   "n": 570
+  },
+  {
+   "listing": "analyst-academy-318",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "The Decade to Deliver a Call to Business Action",
+   "path": "thought-pieces/accenture/the-decade-to-deliver-a-call-to-business-action.pdf",
+   "sha256": "2146cfb040583b3b8b23831bbe9f0b326b9348bd74f6aa7c50976e549e02ac28",
+   "page": 30,
+   "n": 571
+  },
+  {
+   "listing": "analyst-academy-459",
+   "firm": "KPMG",
+   "deckType": "thought-pieces",
+   "title": "KPMG: Our Impact Plan 2024 update",
+   "path": "thought-pieces/kpmg/kpmg-our-impact-plan-2024-update.pdf",
+   "sha256": "57965e2b1f02123e15dec69db0ebccc535f2f610a0fcc8ea758c468579be148e",
+   "page": 6,
+   "n": 572
+  },
+  {
+   "listing": "analyst-academy-271",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Re-focus your talent lens: Abundance awaits",
+   "path": "thought-pieces/accenture/re-focus-your-talent-lens-abundance-awaits.pdf",
+   "sha256": "c1705c3a35d80bdb12463f1233dae0d4ec5f4e8ceb5b3e0233645c83675c2392",
+   "page": 39,
+   "n": 573
+  },
+  {
+   "listing": "analyst-academy-177",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "The Hotel Property Handbook 4.0 Investment & Financing Keys",
+   "path": "thought-pieces/deloitte/the-hotel-property-handbook-4-0-investment-financing-keys.pdf",
+   "sha256": "556fdf17049a0ebe0b231bb23d50ae0b7ea5b32203cb8c5638cc41631f9ce17c",
+   "page": 39,
+   "n": 574
+  },
+  {
+   "listing": "analyst-academy-278",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "The age of AI: Banking\u2019s new reality",
+   "path": "thought-pieces/accenture/the-age-of-ai-bankings-new-reality.pdf",
+   "sha256": "7665704941b0ea2503a8cba84fa3af17bab7764262bc6e7fc969a4be7c5200cb",
+   "page": 11,
+   "n": 575
+  },
+  {
+   "listing": "analyst-academy-557",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "Megatrend 5 \u2013 Technology & Innovation",
+   "path": "thought-pieces/roland-berger/megatrend-5-technology-innovation.pdf",
+   "sha256": "83d2bb1a153506e5a6c2e4ce21826dda9b273837644a017893f4af26aa93ed17",
+   "page": 72,
+   "n": 576
+  },
+  {
+   "listing": "analyst-academy-168",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "TrendRadar: The Future Consumer",
+   "path": "thought-pieces/deloitte/trendradar-the-future-consumer.pdf",
+   "sha256": "8ce9e896d376dcdfdccc359beb423a96805d2d3c1198de77ff9157e43d65356c",
+   "page": 24,
+   "n": 577
+  },
+  {
+   "listing": "analyst-academy-459",
+   "firm": "KPMG",
+   "deckType": "thought-pieces",
+   "title": "KPMG: Our Impact Plan 2024 update",
+   "path": "thought-pieces/kpmg/kpmg-our-impact-plan-2024-update.pdf",
+   "sha256": "57965e2b1f02123e15dec69db0ebccc535f2f610a0fcc8ea758c468579be148e",
+   "page": 94,
+   "n": 578
+  },
+  {
+   "listing": "slideworks-mckinsey-149",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Context for Global Growth and Development (2014)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-context-for-global-growth-and-development-2014.pdf",
+   "sha256": "11bb688d833fb2f668b8bec7ed3cdfccc03872dd850ad5d4d1ab331ac912fc13",
+   "page": 3,
+   "n": 579
+  },
+  {
+   "listing": "analyst-academy-169",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "The importance of being human in a digital world",
+   "path": "thought-pieces/deloitte/the-importance-of-being-human-in-a-digital-world.pdf",
+   "sha256": "5911c0daa5efd3fd80f45e99f3204b38b524adebdcb778120575c77389569739",
+   "page": 15,
+   "n": 580
+  },
+  {
+   "listing": "slideworks-bcg-122",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "BCG - Health Systems Leapfrogging in Emerging Economies (2014)",
+   "path": "thought-pieces/boston-consulting-group/bcg-health-systems-leapfrogging-in-emerging-economies-2014.pdf",
+   "sha256": "e1aa52eeaf2d666ce00eec7006e08862d2cd597d0226b773b70dfe3bc816a0d9",
+   "page": 5,
+   "n": 581
+  },
+  {
+   "listing": "analyst-academy-568",
+   "firm": "Booz Allen Hamilton, Alvarez & Marsal and others",
+   "deckType": "thought-pieces",
+   "title": "the true value of green: willingness to pay for sustainability in consumer & home electronics",
+   "path": "thought-pieces/oliver-wyman/the-true-value-of-green-willingness-to-pay-for-sustainability-in-consumer-home-electronics.pdf",
+   "sha256": "c1dd03808382d1d79bcd09235e4e74aed38a979087ec02a622e07d3e3b3ba9a7",
+   "page": 11,
+   "n": 582
+  },
+  {
+   "listing": "analyst-academy-524",
+   "firm": "AT Kearney",
+   "deckType": "thought-pieces",
+   "title": "The Accelerating Growth of Frictionless Commerce",
+   "path": "thought-pieces/kearney/the-accelerating-growth-of-frictionless-commerce.pdf",
+   "sha256": "524485571de64c7b405a0a8f9110a7d1ffc3eb622ee599e0ea85e9ce35b2e228",
+   "page": 2,
+   "n": 583
+  },
+  {
+   "listing": "slideworks-mckinsey-145",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Global flows in a digital age: How trade, finance, people, and data connect the world economy (2014)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-global-flows-in-a-digital-age-how-trade-finance-people-and-data-connect-the-world-economy-2014.pdf",
+   "sha256": "b4a12cd02c8ed95a1034452349dcfc7ad48754d3633ac41d40f8dad48e40fa6f",
+   "page": 20,
+   "n": 584
+  },
+  {
+   "listing": "analyst-academy-151",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "Doing business in the Philippines 2021",
+   "path": "thought-pieces/deloitte/doing-business-in-the-philippines-2021.pdf",
+   "sha256": "b5ba74485ec6c7c0c95a9d76a49c04ac9594a58ca113935a168f47665e0238f3",
+   "page": 18,
+   "n": 585
+  },
+  {
+   "listing": "slideworks-mckinsey-159",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Take a Step. Forward. - My Learning Workbook (date unknown)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-take-a-step-forward-my-learning-workbook-date-unknown.pdf",
+   "sha256": "49c126cadf327352366365782b5bd14fec9037c818fb67eafec5144855d553ac",
+   "page": 24,
+   "n": 586
+  },
+  {
+   "listing": "analyst-academy-514",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "2022 Manufacturing Survey Executive Summary",
+   "path": "thought-pieces/l-e-k-consulting/2022-manufacturing-survey-executive-summary.pdf",
+   "sha256": "5df9c86d0f432fa3ae39c133f7ccb061b3913ae76dedb38818369aaf6246f2d8",
+   "page": 2,
+   "n": 587
+  },
+  {
+   "listing": "analyst-academy-477",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "2018 Brand Owner Packaging Survey",
+   "path": "thought-pieces/l-e-k-consulting/2018-brand-owner-packaging-survey.pdf",
+   "sha256": "72d18ade7947204d3116b927d8b0c53e8a8d4052a49dc66dd6bdce11082c481f",
+   "page": 10,
+   "n": 588
+  },
+  {
+   "listing": "analyst-academy-023",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "COVID-19 BCG Perspectives Publication #5 with a focus on Revamping Organizations for the New Reality",
+   "path": "thought-pieces/boston-consulting-group/covid-19-bcg-perspectives-publication-5-with-a-focus-on-revamping-organizations-for-the-new-reality.pdf",
+   "sha256": "6296fb4d15541244e1292d07226fb7b5dc8b4d18154a2367feb908ea11dba68a",
+   "page": 42,
+   "n": 589
+  },
+  {
+   "listing": "analyst-academy-162",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "Building a Future-Ready Investment Firm",
+   "path": "thought-pieces/deloitte/building-a-future-ready-investment-firm.pdf",
+   "sha256": "f6c40939abd469b3194aebcf9db8aa5cf12dfb3c0c781f3f86ac4151af8878c2",
+   "page": 7,
+   "n": 590
+  },
+  {
+   "listing": "analyst-academy-389",
+   "firm": "PwC / Strategy&",
+   "deckType": "thought-pieces",
+   "title": "Global Top 100 companies \u2013 by market capitalisation 2023",
+   "path": "thought-pieces/pwc/global-top-100-companies-by-market-capitalisation-2023.pdf",
+   "sha256": "a7d73c5dc9010fb17c4941f873a3885cd33ca54f484973c4265aabe929a4bf13",
+   "page": 13,
+   "n": 591
+  },
+  {
+   "listing": "slideworks-mckinsey-058",
+   "firm": "McKinsey",
+   "deckType": "thought-pieces",
+   "title": "McKinsey - Battery materials demand and supply perspective (2022)",
+   "path": "thought-pieces/mckinsey-and-company/mckinsey-battery-materials-demand-and-supply-perspective-2022.pdf",
+   "sha256": "01f062929eac5663646162b7a115a3fb5f2cbc19e6b6ee3d080f8ca873035d3f",
+   "page": 4,
+   "n": 592
+  },
+  {
+   "listing": "analyst-academy-317",
+   "firm": "Accenture",
+   "deckType": "thought-pieces",
+   "title": "Value untangled Accelerating radical growth through interoperability",
+   "path": "thought-pieces/accenture/value-untangled-accelerating-radical-growth-through-interoperability.pdf",
+   "sha256": "d2de29ee39c1feb9c34ed13434285a6b5f075392c840af2f057d4c74bd630458",
+   "page": 14,
+   "n": 593
+  },
+  {
+   "listing": "slideworks-bain-026",
+   "firm": "Bain",
+   "deckType": "thought-pieces",
+   "title": "Bain - Employee Inspiration: How to Create Energy That Drives Better Customer Outcomes (2016)",
+   "path": "thought-pieces/bain-and-company/bain-employee-inspiration-how-to-create-energy-that-drives-better-customer-outcomes-2016.pdf",
+   "sha256": "a2b81c0660f50b99898cc2c1b83a199a2fc54258bca900dc679a6fbe0a99c291",
+   "page": 12,
+   "n": 594
+  },
+  {
+   "listing": "analyst-academy-454",
+   "firm": "KPMG",
+   "deckType": "thought-pieces",
+   "title": "KPMG: Our Impact Plan",
+   "path": "thought-pieces/kpmg/kpmg-our-impact-plan.pdf",
+   "sha256": "b19e47d811e35d4db378cdc9ab37b5083ed8127a048ace680e407fd5e56b95a9",
+   "page": 12,
+   "n": 595
+  },
+  {
+   "listing": "analyst-academy-074",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "True-Luxury Global Consumer Insights 7th Edition",
+   "path": "thought-pieces/boston-consulting-group/true-luxury-global-consumer-insights-7th-edition.pdf",
+   "sha256": "4cbf8ae7a025a040af62de44e737219ca50caec7d3206bb5e2fbc81d04300749",
+   "page": 2,
+   "n": 596
+  },
+  {
+   "listing": "analyst-academy-519",
+   "firm": "AT Kearney",
+   "deckType": "thought-pieces",
+   "title": "Australia: Taking Bigger Steps",
+   "path": "thought-pieces/kearney/australia-taking-bigger-steps.pdf",
+   "sha256": "0464988f90badf1fc90c1af28ff11d7d8e5e86826759d1b0a0f9471d06818d02",
+   "page": 4,
+   "n": 597
+  },
+  {
+   "listing": "analyst-academy-475",
+   "firm": "LEK",
+   "deckType": "thought-pieces",
+   "title": "The Rapidly Evolving Landscape of Meal Kits and E-commerce in Food & Beverage",
+   "path": "thought-pieces/l-e-k-consulting/the-rapidly-evolving-landscape-of-meal-kits-and-e-commerce-in-food-beverage.pdf",
+   "sha256": "871017b709b72bd74a0105c981de01f138342c7ce12e4aba58810ff09a1dc739",
+   "page": 23,
+   "n": 598
+  },
+  {
+   "listing": "slideworks-bcg-122",
+   "firm": "BCG",
+   "deckType": "thought-pieces",
+   "title": "BCG - Health Systems Leapfrogging in Emerging Economies (2014)",
+   "path": "thought-pieces/boston-consulting-group/bcg-health-systems-leapfrogging-in-emerging-economies-2014.pdf",
+   "sha256": "e1aa52eeaf2d666ce00eec7006e08862d2cd597d0226b773b70dfe3bc816a0d9",
+   "page": 3,
+   "n": 599
+  },
+  {
+   "listing": "analyst-academy-179",
+   "firm": "Deloitte",
+   "deckType": "thought-pieces",
+   "title": "VC Human Capital Survey",
+   "path": "thought-pieces/deloitte/vc-human-capital-survey.pdf",
+   "sha256": "7485cb67d21280152543dd6f0725554e5740738d2b36e939ea00010cc3763e45",
+   "page": 15,
+   "n": 600
+  }
+ ]
+}

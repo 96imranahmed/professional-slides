@@ -1,8 +1,58 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class FinancialChartRuntimeTests(unittest.TestCase):
+
+    def test_signed_peer_bars_share_physical_scale_when_only_one_has_losses(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const slide={id:'s',title:'One offer cannot fund both savings goals',layout:'two-up',exhibits:[[8,-12],[39,8]].map((values,i)=>({type:'chart.bar',heading:i?'New York residual':'London residual',unit:'£k',categories:['First goal','Second goal'],series:[{name:'Residual',values}],dataTable:false,valueFormat:{decimals:1}}))};
+const {deck}=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'peer-bars',slides:[slide]}));
+const marks=deck.slides[0].nodes.filter(n=>n.role==='chart-mark'&&((n.data.componentInstance==='s:s-exhibit-0'&&n.data.category==='First goal')||(n.data.componentInstance==='s:s-exhibit-1'&&n.data.category==='Second goal')));
+assert.equal(marks.length,2);
+assert.ok(Math.abs(marks[0].frame.width-marks[1].frame.width)<.01,'equal monetary amounts occupy equal physical lengths despite a negative value in one peer');
+console.log('{}');
+""")
+
+    def test_paired_signed_charts_share_the_complete_numeric_domain(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {composeSlide,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const walk=item=>[item,...(item.items||[]).flatMap(walk)];
+for(const [type,series,min,max] of [
+ ['chart.bar',[[{name:'Residual',values:[8,-12]}],[{name:'Residual',values:[39,19]}]],-12,39],
+ ['chart.bar',[[{name:'Change',values:[-8,-12]}],[{name:'Change',values:[-39,-19]}]],-39,0],
+ ['chart.stacked-column',[[{name:'A',values:[30,-5]},{name:'B',values:[-20,-8]}],[{name:'A',values:[10,15]},{name:'B',values:[-3,-9]}]],-20,30]
+]) {
+ const slide={id:'s',title:'Cash remaining depends on both the goal and the offer',layout:'two-up',exhibits:series.map((ss,i)=>({type,heading:'Scenario '+String.fromCharCode(65+i),unit:'£k',categories:['One','Two'],series:ss,native:false,dataTable:false}))};
+ const plan=composeSlide(slide,0),charts=walk(plan).filter(i=>i.component===type);
+ assert.equal(charts.length,2);
+ assert.equal(charts[0].props.yMin,charts[1].props.yMin);
+ assert.equal(charts[0].props.yMax,charts[1].props.yMax);
+ assert.ok(charts[0].props.yMin<=min&&charts[0].props.yMax>=max);
+ assert.doesNotThrow(()=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'signed',slides:[slide]})));
+}
+console.log('{}');
+""")
+
+    def test_declared_chart_units_cannot_disappear_when_heading_is_empty(self):
+        result = run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const chart=REGISTRY.get('chart.bar'),frame={x:60,y:60,width:1100,height:600};
+const props={categories:['Group A','Group B'],series:[{name:'Net change',values:[163,-63]}],unit:'Thousand workers'};
+for(const heading of [undefined,'','  ']) assert.throws(()=>chart.render({id:'units',frame,props:{...props,heading}}),/unit requires a nonempty chart heading/);
+const rendered=chart.render({id:'visible',frame,props:{...props,heading:'Net demand minus supply, 2030'}}).nodes;
+assert.equal(rendered.filter(n=>n.role==='chart-unit'&&n.text.trim()==='Thousand workers').length,1);
+assert.doesNotThrow(()=>chart.render({id:'parent-title',frame,props:{categories:props.categories,series:props.series}}));
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result['accepted'])
+
     def test_chart_titles_reject_statistics_across_all_shared_entry_points(self):
         result = run_node("""
 import assert from 'node:assert/strict';
@@ -10,7 +60,8 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const frame={x:60,y:60,width:1000,height:500};
 const title=REGISTRY.get('chart-title');
 const data={categories:['2024','2025'],series:[{name:'Homicides',values:[382,305]}]};
-const invalid=['NYPD: 382 to 305','SF: 35 to 28','Decline of −20.2%','Revenue $1.2bn','Share 1/3','Rate 35 per 100,000','NYPD: 2025','Revenue in 2025: 305','Revenue, 2025.5','Twenty percent decline','Revenue doubled','SF: ３５ to ２８'];
+const invalid=['NYPD: 382 to 305','SF: 35 to 28','Decline of −20.2%','Revenue $1.2bn','Share 1/3','Rate 35 per 100,000','NYPD: 2025','Revenue in 2025: 305','Revenue, 2025.5','Twenty percent decline','Revenue doubled','SF: ３５ to ２８','Revenue FY14.5','Revenue FY14: 17%'];
+invalid.push('Net employment change to 2030: +16%', 'Reported Gini change versus 2016: one percent', 'Revenue to 2030.5', 'Revenue versus 2016%', 'Disrupted workers within one year: 25%');
 for(const heading of invalid) {
  assert.throws(()=>title.measureContent({frame,props:{heading}}),/must not contain statistics/);
  assert.throws(()=>title.render({id:'title',frame,props:{heading}}),/must not contain statistics/);
@@ -19,14 +70,25 @@ for(const heading of invalid) {
  const charts=[heading,'SF reported homicides'].map(heading=>({heading,component:'chart.column',props:data}));
  assert.throws(()=>REGISTRY.get('chart-group').render({id:'group',frame,props:{charts}}),/must not contain statistics/);
 }
-for(const heading of ['NYPD reported homicides','Reported homicides in 2025','Revenue, 2025','Revenue (2025)','Revenue FY2025','Revenue Q1 2025','Revenue 2024–2025']) {
+for(const heading of ['NYPD reported homicides','Reported homicides in 2025','Revenue, 2025','Revenue (2025)','Revenue FY2025','Revenue Q1 2025','Revenue 2024–2025','Revenue FY14','FY14–FY17 average earnings impact','Revenue FY14–17','Revenue FY2014–2017']) {
  assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading,unit:'index'}}));
 }
-for(const unit of ['%','$B','USD millions, 2026','homicides per 100,000']) {
+for(const unit of ['%','$B','USD millions, 2026','homicides per 100,000','baseline = 100','index, base = 1']) {
  assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'Reported homicides',unit}}));
 }
-for(const unit of ['index, 382 to 305','−20.2%','35 per 100,000']) {
+for(const unit of ['index, 382 to 305','−20.2%','35 per 100,000','baseline = 100, result = 120','baseline = 100.5','baseline = 100%']) {
  assert.throws(()=>title.render({id:'title',frame,props:{heading:'Reported homicides',unit}}),/must not contain statistics/);
+}
+for(const heading of ['Net employment change to 2030, midpoint adoption','Reported Gini change versus 2016','Reported Gini change vs. 2016']) {
+ assert.doesNotThrow(()=>title.measureContent({frame,props:{heading}}));
+ assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading}}));
+ assert.doesNotThrow(()=>REGISTRY.get('chart.column').render({id:'chart',frame,props:{...data,heading}}));
+}
+for(const unit of ['Disrupted workers within one year, %','Disrupted workers within 1 year, %']) {
+ assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'Worker disruption',unit}}));
+}
+for(const unit of ['Disrupted workers within one year, 25%','Disrupted workers within one year, one percent']) {
+ assert.throws(()=>title.render({id:'title',frame,props:{heading:'Worker disruption',unit}}),/must not contain statistics/);
 }
 // The action title remains free to state a quantified conclusion.
 assert.doesNotThrow(()=>REGISTRY.get('section-heading').render({id:'section',frame,props:{heading:'Homicides fell 20%'}}));
@@ -123,13 +185,10 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result['accepted'])
 
-    def test_chart_labels_annotations_legends_and_title_subtitles_use_body_size(self):
+    def test_chart_labels_annotations_legends_and_title_subtitles_use_the_chart_label_scale(self):
         result = run_node("""
 import assert from 'node:assert/strict';
-import {TOKENS} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-assert.equal(TOKENS['type.chartLabel'].value,TOKENS['type.body'].value);
-assert.equal(TOKENS['type.chartAnnotation'].value,TOKENS['type.body'].value);
 const frame={x:60,y:150,width:1000,height:500};
 const column=REGISTRY.get('chart.column');
 const props={categories:['Current','Future'],series:[{name:'Actual',values:[80,150]},{name:'Plan',values:[72,140]}],dataLabels:true,annotations:[{series:'Actual',category:'Future',text:'Above plan'}],changeAnnotations:[]};
@@ -137,23 +196,27 @@ const nodes=column.render({id:'column',frame,props}).nodes;
 assert.ok(nodes.filter(n=>n.role==='data-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 assert.ok(nodes.filter(n=>n.role==='legend-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 assert.ok(nodes.filter(n=>n.role==='annotation-text').every(n=>n.style.fontSize.tokenId==='type.chartAnnotation'));
-assert.ok(nodes.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.body'));
+assert.ok(nodes.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 const waterfall=REGISTRY.get('chart.waterfall');
 const change=waterfall.render({id:'waterfall',frame,props:{...waterfall.sample,...waterfall.examples['end-to-end-construction'].props}}).nodes;
 assert.ok(change.filter(n=>n.role==='data-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 assert.ok(change.filter(n=>n.role==='annotation-text').every(n=>n.style.fontSize.tokenId==='type.chartAnnotation'));
-const title=REGISTRY.get('chart-title').render({id:'title',frame:{x:60,y:60,width:800,height:90},props:{heading:'Performance',unit:'USD millions, 2026'}}).nodes;
-assert.equal(title.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.heading');
+// The stacked unit line is the unruled `unit` variant; a ruled heading takes
+// the unit inline so its rule stays on the row's line.
+const title=REGISTRY.get('chart-title').render({id:'title',frame:{x:60,y:60,width:800,height:90},props:{heading:'Performance',unit:'USD millions, 2026',variant:'unit'}}).nodes;
+assert.equal(title.find(n=>n.role==='chart-unit').style.fontSize.tokenId,'type.compact');
 assert.equal(title.find(n=>n.role==='chart-unit').style.color.tokenId,'color.chartUnit');
-assert.equal(title.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
-assert.equal(title.filter(n=>n.role==='section-heading-rule').length,1);
+assert.equal(title.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'stacked');
+const ruledTitle=REGISTRY.get('chart-title').render({id:'title',frame:{x:60,y:60,width:800,height:90},props:{heading:'Performance',unit:'USD millions, 2026'}}).nodes;
+assert.equal(ruledTitle.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inline');
+assert.equal(ruledTitle.filter(n=>n.role==='section-heading-rule').length,1);
 const cover=REGISTRY.get('cover').render({id:'cover',frame:{x:0,y:0,width:1280,height:720},props:{title:'Strategy',subtitle:'Priorities for the planning cycle'}}).nodes;
-assert.equal(cover.find(n=>n.role==='cover-subtitle').style.fontSize.tokenId,'type.body');
+assert.equal(cover.find(n=>n.role==='cover-subtitle').style.fontSize.tokenId,'type.heading');
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
-    def test_sparse_directly_labelled_charts_omit_value_axes_and_keep_body_sized_category_ticks(self):
+    def test_sparse_directly_labelled_charts_omit_value_axes_and_keep_chart_label_sized_ticks(self):
         result = run_node("""
 import assert from 'node:assert/strict';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
@@ -163,10 +226,14 @@ const sparse=column.render({id:'sparse',frame,props:{categories:['Revenue','Oper
 assert.equal(sparse.filter(n=>n.role==='axis-label').length,0);
 assert.equal(sparse.filter(n=>n.id.endsWith('y-axis')).length,0);
 assert.equal(sparse.filter(n=>n.id.endsWith('x-axis')).length,1);
-assert.ok(sparse.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.body'));
-const threshold=column.render({id:'threshold',frame,props:{categories:['A','B','C','D'],series:[{name:'Actual',values:[1,2,3,4]},{name:'Plan',values:[2,3,4,5]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
-assert.equal(threshold.filter(n=>n.role==='axis-label').length,5);
-assert.ok(threshold.filter(n=>n.role==='axis-label').every(n=>n.style.fontSize.tokenId==='type.body'));
+assert.ok(sparse.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
+// Direct labels replace the value axis however many marks there are; an axis
+// returns only when the marks are unlabelled or it is asked for.
+const labelled=column.render({id:'labelled',frame,props:{categories:['A','B','C','D'],series:[{name:'Actual',values:[1,2,3,4]},{name:'Plan',values:[2,3,4,5]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
+assert.equal(labelled.filter(n=>n.role==='axis-label').length,0);
+const unlabelled=column.render({id:'unlabelled',frame,props:{categories:['A','B','C','D'],series:[{name:'Actual',values:[1,2,3,4]},{name:'Plan',values:[2,3,4,5]}],dataLabels:false,annotations:[],highlights:[],referenceLines:[]}}).nodes;
+assert.equal(unlabelled.filter(n=>n.role==='axis-label').length,5);
+assert.ok(unlabelled.filter(n=>n.role==='axis-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 const forced=column.render({id:'forced',frame,props:{categories:['A','B'],series:[{name:'Value',values:[1,2]}],dataLabels:true,showValueAxis:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
 assert.equal(forced.filter(n=>n.role==='axis-label').length,5);
 const horizontal=REGISTRY.get('chart.bar').render({id:'horizontal',frame,props:{categories:['A','B'],series:[{name:'Value',values:[1,2]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
@@ -181,6 +248,58 @@ assert.throws(()=>column.render({id:'bad',frame,props:{categories:['A'],series:[
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
+
+    def test_scatter_labels_clear_fixed_thresholds_without_moving_evidence(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const component=REGISTRY.get('chart.scatter');
+const props={points:[{name:'Highland well',x:0,y:0},{name:'Store / access',x:6,y:0},{name:'Twin main',x:6,y:2},{name:'Reuse',x:-10,y:12}],xMin:-10,xMax:10,yMin:-5,yMax:15,legend:false};
+for(const width of [680,1000]) {
+ const frame={x:60,y:150,width,height:420};
+ const baseline=component.render({id:'scatter',frame,props}).nodes;
+ const nodes=component.render({id:'scatter',frame,props:{...props,quadrants:{x:5,y:0}}}).nodes;
+ const marks=n=>n.filter(x=>x.role==='chart-marker').map(x=>x.frame);
+ assert.deepEqual(marks(nodes),marks(baseline),'threshold-aware placement preserves every point and scale');
+ const lines=nodes.filter(n=>n.role==='chart-threshold-line');
+ assert.deepEqual(lines.map(n=>n.data.threshold),[5,0]);
+ const labels=nodes.filter(n=>n.role==='data-label');
+ assert.deepEqual(labels.map(n=>n.text),props.points.map(p=>p.name));
+ for(const label of labels) for(const line of lines) {
+  const a=label.frame,b=line.frame;
+  assert.ok(!(a.x<b.x+b.width+3&&a.x+a.width+3>b.x&&a.y<b.y+b.height+3&&a.y+a.height+3>b.y),`${label.text} clears ${line.data.thresholdAxis} threshold`);
+ }
+ assert.ok(labels.find(n=>n.text==='Highland well').frame.y !== baseline.find(n=>n.text==='Highland well').frame.y);
+}
+console.log('{}');
+""")
+
+    def test_vertical_scatter_threshold_labels_preserve_coordinates_and_clear_legends(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const chart=REGISTRY.get('chart.scatter');
+const props={points:[{name:'First',x:1,y:2},{name:'Second',x:8,y:7}],xMin:0,xMax:10,yMin:0,yMax:10,quadrants:{x:5,y:5}};
+for(const width of [520,1000]) {
+ const frame={x:60,y:150,width,height:400};
+ const plain=chart.render({id:'s',frame,props}).nodes;
+ const named=chart.render({id:'s',frame,props:{...props,quadrants:{...props.quadrants,xLabel:'Required reserve 5'}}}).nodes;
+ assert.deepEqual(named.filter(n=>n.role==='chart-marker').map(n=>n.frame),plain.filter(n=>n.role==='chart-marker').map(n=>n.frame));
+ const label=named.find(n=>n.role==='chart-threshold-label'),line=named.find(n=>n.role==='chart-threshold-line'&&n.data.thresholdAxis==='x');
+ assert.equal(label.text,'Required reserve 5');assert.equal(label.data.threshold,5);
+ assert.ok(label.frame.y>=frame.y&&label.frame.y+label.frame.height<line.frame.y);
+ assert.ok(Math.abs(label.frame.x+label.frame.width/2-line.frame.x)<2);
+ const grouped=chart.render({id:'grouped',frame,props:{...props,points:props.points.map((p,i)=>({...p,series:'Series '+i})),quadrants:{...props.quadrants,xLabel:'Required reserve 5'}}}).nodes;
+ const q=grouped.find(n=>n.role==='chart-threshold-label');
+ for(const l of grouped.filter(n=>n.role==='legend-label')) assert.ok(q.frame.y>=l.frame.y+l.frame.height+2,'threshold label clears the legend');
+ for(const x of [.01,9.99]) {
+  const edge=chart.render({id:'edge',frame,props:{...props,quadrants:{x,y:5,xLabel:'Required reserve 5'}}}).nodes;
+  const e=edge.find(n=>n.role==='chart-threshold-label');assert.ok(e.frame.x>=frame.x&&e.frame.x+e.frame.width<=frame.x+width);
+ }
+}
+for(const xLabel of ['',42]) assert.throws(()=>chart.render({id:'bad',frame:{x:0,y:0,width:520,height:400},props:{...props,quadrants:{...props.quadrants,xLabel}}}),/threshold label/);
+console.log('{}');
+""")
 
     def test_scatter_quadrants_and_bubble_size_legend_are_theme_bound(self):
         result = run_node("""
@@ -306,8 +425,12 @@ const borderless=line.render({id:'borderless',frame,props:{...base,annotations:[
 assert.equal(borderless.find(n=>n.role==='annotation-surface').style.stroke,'none');
 const straight=borderless.find(n=>n.role==='annotation-leader');
 assert.equal(straight.data.x1,straight.data.x2);
-assert.equal(straight.data.endArrow,true);
-assert.equal(straight.data.endArrowType,'triangle');
+// Every leader ends in a dot on the coordinate it keys. An arrowhead landing on
+// a data point covers the point it is identifying and reads as a second mark on
+// the plot, so the callout takes the terminator the orthogonal treatment used.
+assert.equal(straight.data.endArrow,false);
+assert.equal(straight.data.endpoint,'dot');
+assert.ok(borderless.some(n=>n.role==='annotation-endpoint'),'the callout leader ends in a dot');
 assert.equal(straight.style.lineWidth.tokenId,'line.standard');
 const component=REGISTRY.get('chart-callout');
 const compact=component.render({id:'compact',frame,props:{...component.sample,...component.variants.borderless.props}}).nodes;
@@ -326,7 +449,16 @@ const horizontalLeader=horizontal.find(n=>n.role==='annotation-leader'&&n.data.a
 assert.equal(horizontalLeader.data.y1,horizontalLeader.data.y2);
 assert.equal(horizontalLeader.data.endArrow,false);
 assert.equal(horizontal.filter(n=>n.role==='annotation-endpoint').length,1);
-assert.throws(()=>line.render({id:'bad-treatment',frame,props:{...base,annotations:[{category:'Q3',text:'Bad',treatment:'speech'}]}}),/Unknown chart evidence annotation treatment/);
+// `speech` is the third treatment: a filled bubble, white text, no outline.
+const speech=line.render({id:'speech',frame,props:{...base,annotations:[{category:'Q3',text:'+18% on the quarter',treatment:'speech'}]}}).nodes;
+const bubble=speech.find(n=>n.role==='annotation-surface'&&n.id.includes('annotation-box'));
+assert.equal(bubble.style.fill.tokenId,'color.ink');
+assert.equal(bubble.style.radius.tokenId,'radius.small');
+assert.equal(speech.find(n=>n.role==='annotation-text').style.color.tokenId,'color.onPrimary');
+// Close to its mark it closes the gap with a tapered tail; far from it, the
+// same dotted leader, because a stretched wedge stops reading as a taper.
+assert.ok(speech.some(n=>n.geometry==='polygon')||speech.some(n=>n.role==='annotation-endpoint'));
+assert.throws(()=>line.render({id:'bad-treatment',frame,props:{...base,annotations:[{category:'Q3',text:'Bad',treatment:'shout'}]}}),/Unknown chart evidence annotation treatment/);
 assert.throws(()=>line.render({id:'bad-orientation',frame,props:{...base,annotations:[{category:'Q3',text:'Bad',treatment:'orthogonal-dot',orientation:'diagonal'}]}}),/Unknown orthogonal chart annotation orientation/);
 const cramped={categories:['Q1','Q2'],series:[{name:'Measure',values:[30,40]}],yMax:50,dataLabels:true,legend:false,highlights:[],referenceLines:[],annotations:[{category:'Q1',text:'No corridor',treatment:'orthogonal-dot',orientation:'horizontal',side:'left'}]};
 assert.throws(()=>line.render({id:'cramped',frame:{x:60,y:150,width:390,height:360},props:cramped}),/insufficient clearance for a horizontal orthogonal-dot annotation/);
@@ -353,7 +485,8 @@ for(const palette of ['mckinsey','bcg','bain']) {
 const explicit=compileDeck({slides:[slide({categories:['Current','Future'],series:[{name:'Measure',values:[80,150]}],colorIndices:[1]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
 assert.deepEqual(explicit.map(n=>n.style.fill.tokenId),['color.chartSeries2','color.chartSeries2']);
 const focused=compileDeck({palette:'bain',slides:[slide({categories:['A','B','C'],series:[{name:'Measure',values:[40,70,55]}],highlights:[{category:'B',style:'bar'}]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
-assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartComparator','color.componentPrimary','color.chartComparator']);
+// Highlight the answer: the named bar takes the accent; the others keep the series colour, never grey.
+assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartSeries1','color.accent','color.chartSeries1']);
 assert.deepEqual(focused.map(n=>n.data.highlighted),[false,true,false]);
 console.log(JSON.stringify({accepted:true}));
 """)
@@ -380,8 +513,8 @@ for(const palette of ['mckinsey','bcg','bain']) for(const kind of ['chart.column
 }
 for(const categories of [['A','B'],['B','A']]) {
   const marks=render('chart.column',{categories,series:[{name:'Value',values:[40,70]}],highlights:[{category:'B',style:'bar'}]}).filter(n=>n.role==='chart-mark');
-  assert.equal(marks.find(n=>n.data.category==='B').style.fill.tokenId,'color.componentPrimary');
-  assert.equal(marks.find(n=>n.data.category==='A').style.fill.tokenId,'color.chartComparator');
+  assert.equal(marks.find(n=>n.data.category==='B').style.fill.tokenId,'color.accent');
+  assert.equal(marks.find(n=>n.data.category==='A').style.fill.tokenId,'color.chartSeries1');
 }
 assert.throws(()=>render('chart.column',{...base,focusSeries:'Unknown'}),/exact chart series/);
 assert.throws(()=>render('chart.column',{...base,colorIndices:[0,1]}),/conflicts/);
@@ -409,7 +542,10 @@ const boxNodes=render({category:'B',style:'region-box'});
 const boxMarks=boxNodes.filter(n=>n.role==='chart-mark'&&n.data.category==='B');
 const boxLabel=boxNodes.find(n=>n.role==='category-label'&&n.text==='B');
 assert.ok(box.frame.y<Math.min(...boxMarks.map(n=>n.frame.y)));
-assert.ok(box.frame.y+box.frame.height>Math.max(...boxMarks.map(n=>n.frame.y+n.frame.height)));
+// The band stops at the baseline. Padded past it, twelve pixels of tint hang
+// below the axis and read as a bar that starts under the chart.
+const boxPlotBottom=Math.max(...boxMarks.map(n=>n.frame.y+n.frame.height));
+assert.ok(Math.abs(box.frame.y+box.frame.height-boxPlotBottom)<=0.01);
 assert.ok(boxLabel.frame.y>box.frame.y+box.frame.height);
 const tint=render({category:'B',style:'region-tint'}).find(n=>n.role==='chart-highlight');
 assert.equal(tint.style.fill.tokenId,'color.surfaceMuted');
@@ -421,7 +557,9 @@ for (const style of ['region-box','region-tint']) {
   const highlight=nodes.find(n=>n.role==='chart-highlight');
   const marks=nodes.filter(n=>n.role==='chart-mark'&&n.data.category==='C');
   for (const mark of marks) {
-    assert.ok(mark.frame.x-highlight.frame.x>=12);
+    // A horizontal bar starts at the value axis, so the band starts there too
+    // rather than twelve pixels to its left, across the axis line.
+    assert.ok(Math.abs(mark.frame.x-highlight.frame.x)<=0.01);
     assert.ok(highlight.frame.x+highlight.frame.width-mark.frame.x-mark.frame.width>=12-1e-8);
     assert.ok(mark.frame.y-highlight.frame.y>=12);
     assert.ok(highlight.frame.y+highlight.frame.height-mark.frame.y-mark.frame.height>=12);
@@ -432,7 +570,8 @@ for (const style of ['region-box','region-tint']) {
 const legacy=render({category:'B'}).find(n=>n.role==='chart-highlight');
 assert.equal(legacy.data.highlightStyle,'region-tint');
 assert.throws(()=>render({category:'B',style:'bar'}),/exactly one series/);
-assert.throws(()=>REGISTRY.get('chart.column').render({id:'bad',frame,props:{...base,highlights:[{category:'A'},{category:'B'}]}}),/one primary/);
+assert.ok(REGISTRY.get('chart.column').render({id:'set',frame,props:{...base,highlights:[{category:'A'},{category:'B'}]}}).nodes.length);
+assert.throws(()=>REGISTRY.get('chart.column').render({id:'bad',frame,props:{...base,highlights:[{category:'A',style:'region-box'},{category:'B',style:'region-tint'}]}}),/one coherent/);
 assert.throws(()=>render({category:'B',style:'glow'}),/Unknown chart highlight style/);
 assert.throws(()=>REGISTRY.get('chart.line').render({id:'line',frame,props:{categories:['A','B'],series:[{name:'Measure',values:[1,2]}],highlights:[{category:'B',style:'bar'}]}}),/single-bar highlight/);
 console.log(JSON.stringify({accepted:true}));
@@ -444,8 +583,14 @@ console.log(JSON.stringify({accepted:true}));
 import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-const deck=compileDeck({slides:[{id:'fractional',composition:component({id:'chart',component:'chart.column',frame:{x:60,y:160,width:1160,height:480},props:{categories:['2025','2026'],series:[{name:'Revenue',values:[13.624,24.768]}],yMax:30,showValueAxis:true}})}]},REGISTRY);
-assert.deepEqual(deck.slides[0].nodes.filter(n=>n.role==='axis-label').map(n=>n.text),['0','7.5','15','22.5','30']);
+for(const [values,yMax,expected] of [
+ [[13.624,24.768],30,['0','10','20','30']],
+ [[.13624,.24768],.3,['0','0.1','0.2','0.3']],
+ [[.4,.8],1,['0','0.25','0.5','0.75','1']]
+]) {
+ const deck=compileDeck({slides:[{id:'fractional',composition:component({id:'chart',component:'chart.column',frame:{x:60,y:160,width:1160,height:480},props:{categories:['2025','2026'],series:[{name:'Revenue',values}],yMax,showValueAxis:true}})}]},REGISTRY);
+ assert.deepEqual(deck.slides[0].nodes.filter(n=>n.role==='axis-label').map(n=>n.text),expected);
+}
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

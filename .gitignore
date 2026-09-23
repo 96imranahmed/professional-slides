@@ -10,7 +10,10 @@ node_modules/
 build/
 dist/
 output/
+outputs/
 renders/
+# The desktop app writes deliverables here, beside the repo rather than in it.
+Claude outputs/
 /tmp/
 *.tmp
 ~$*.pptx

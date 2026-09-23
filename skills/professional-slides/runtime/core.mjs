@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { tagSemanticNodes } from "./semantic-integrity.mjs";
 import { resolvePalette, heatScaleTokens } from "./palettes.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
@@ -22,21 +21,50 @@ export function resolveTitleVariant({ variant, rule } = {}) {
 }
 export const SLIDE = Object.freeze({ width: 1280, height: 720 });
 export const CONTENT_FRAME = Object.freeze({ x: 60, y: 46, width: 1160, height: 632 });
-export const CHROME = Object.freeze({
+const DEFAULT_CHROME = Object.freeze({
   left: 60,
   right: 60,
-  titleTop: 48,
-  titleHeight: 58,
-  bodyTop: 150,
+  titleTop: 44,
+  titleHeight: 36,      // one 24pt line box; a second line adds 36
+  titleRail: 0.2,       // right share of the title band reserved for a tracker or sticker
+  bodyTop: 140,         // 44 + 2 × 36 + 24: identical for one- and two-line titles
   sourceTop: 648,
   footerRuleY: 680,
   footerTop: 684
 });
+// The page chrome is read at call time everywhere, so a deck built from a
+// template can move the margins: `configureChrome({ left, right, titleTop,
+// bodyTop, footerTop })` for the build, `configureChrome(null)` to restore.
+export const CHROME = { ...DEFAULT_CHROME };
+export function configureChrome(overrides) {
+  const next = { ...DEFAULT_CHROME };
+  if (overrides) {
+    for (const [key, value] of Object.entries(overrides)) {
+      if (!Object.hasOwn(DEFAULT_CHROME, key)) throw new Error(`Unknown chrome setting: ${key}`);
+      if (!Number.isFinite(value)) throw new Error(`Chrome ${key} must be a number`);
+      next[key] = value;
+    }
+    if (next.left < 24 || next.right < 24 || next.left + next.right > 400) throw new Error("Chrome margins must be between 24px and a combined 400px");
+    if (next.titleTop < 16 || next.bodyTop < next.titleTop + 48) throw new Error("Chrome bodyTop must sit at least 48px under titleTop");
+    if (next.footerTop <= next.bodyTop + 200 || next.footerTop > 700) throw new Error("Chrome footerTop leaves no body height");
+    if (overrides.footerTop !== undefined && overrides.sourceTop === undefined) next.sourceTop = next.footerTop - 36;
+    if (overrides.footerTop !== undefined && overrides.footerRuleY === undefined) next.footerRuleY = next.footerTop - 4;
+  }
+  Object.assign(CHROME, next);
+  return { ...CHROME };
+}
+// 12-column grid inside the 1160px content width: 12 × 82 + 11 × 16.
+export const GRID = Object.freeze({ columns: 12, column: 82, gutter: 16 });
+export function gridSpan(columns, start = 0) {
+  if (!Number.isInteger(columns) || columns < 1 || columns > GRID.columns || start < 0 || start + columns > GRID.columns) throw new Error(`Invalid grid span ${start}+${columns}`);
+  return { x: CHROME.left + start * (GRID.column + GRID.gutter), width: columns * GRID.column + (columns - 1) * GRID.gutter };
+}
 
 const colour = (cssVar, value, themeSlot = null) => ({ kind: "color", cssVar, value, themeSlot });
 const length = (cssVar, value) => ({ kind: "lengthPx", cssVar, value });
 const point = (cssVar, value) => ({ kind: "fontSizePt", cssVar, value });
 const font = (cssVar, value) => ({ kind: "fontFamily", cssVar, value });
+const keyword = (cssVar, value) => ({ kind: "keyword", cssVar, value });
 
 export const TOKENS = Object.freeze({
   ...heatScaleTokens({'color.canvas':'#FFFFFF','color.componentPrimary':'#00A6E6','color.negative':'#C53030','color.positive':'#198754'}),
@@ -48,6 +76,9 @@ export const TOKENS = Object.freeze({
   "color.chartUnit": colour("--chart-unit-color", "#757575"),
   "color.componentPrimary": colour("--component-primary", "#00A6E6", "accent1"),
   "color.componentPrimaryTint": colour("--component-primary-tint", "#DCEEF8"),
+  "color.calloutTint": colour("--callout-tint", "#FFF6DC"),
+  "color.accent": colour("--accent", "#00A6E6"),
+  "color.accentTint": colour("--accent-tint", "#DCF3FD"),
   "color.rule": colour("--rule", "#929BA3"),
   "color.chartGrid": colour("--chart-gridline", "#D4D8DC"),
   "color.chartComparator": colour("--chart-comparator", "#D9DDE0"),
@@ -60,6 +91,7 @@ export const TOKENS = Object.freeze({
   "color.positive": colour("--status-positive", "#198754"),
   "color.caution": colour("--status-caution", "#C47B00"),
   "color.negative": colour("--status-negative", "#C53030"),
+  "color.negativeTint": colour("--status-negative-tint", "#F6DADA"),
   "color.info": colour("--status-info", "#0877BE"),
   "color.onPrimary": colour("--on-primary", "#FFFFFF"),
   "font.body": font("--font-body", "Arial"),
@@ -67,23 +99,23 @@ export const TOKENS = Object.freeze({
   "weight.semibold": { kind: "fontWeight", cssVar: "--weight-semibold", value: 600 },
   "font.display": font("--font-display", "Arial"),
   "font.serif": font("--font-serif", "Georgia"),
-  "type.deckTitle": point("--type-deck-title", 38),
-  "type.actionTitle": point("--type-action-title", 30),
-  "type.actionTitleLong": point("--type-action-title-long", 27),
+  "type.deckTitle": point("--type-deck-title", 32),
+  "type.actionTitle": point("--type-action-title", 24),
+  "type.actionTitleLong": point("--type-action-title-long", 22),
   "type.sectionTitle": point("--type-section-title", 24),
   "type.sectionNumber": point("--type-section-number", 170),
   "type.quoteMark": point("--type-quote-mark", 48),
   "type.quoteMarkHero": point("--type-quote-mark-hero", 76),
-  "type.heading": point("--type-heading", 16),
-  "type.body": point("--type-body", 14),
-  // Chart text keeps semantic roles so adapters can preserve purpose and
-  // weight, while its default size stays aligned to ordinary body copy.
-  "type.chartLabel": point("--type-chart-label", 14),
-  "type.chartAnnotation": point("--type-chart-annotation", 14),
-  "type.compact": point("--type-compact", 12),
-  "type.label": point("--type-label", 10),
+  "type.heading": point("--type-heading", 14),
+  "type.body": point("--type-body", 12),
+  // Modular scale 8 / 9 / 10 / 12 / 14 / 18 / 24 / 32 (about 1.2). Chart furniture
+  // sits two steps below body, as on a consulting page.
+  "type.chartLabel": point("--type-chart-label", 10),
+  "type.chartAnnotation": point("--type-chart-annotation", 10),
+  "type.compact": point("--type-compact", 10),
+  "type.label": point("--type-label", 9),
   "type.source": point("--type-source", 8),
-  "type.metric": point("--type-metric", 26),
+  "type.metric": point("--type-metric", 28),
   "space.1": length("--space-1", 4),
   "space.2": length("--space-2", 8),
   "space.3": length("--space-3", 12),
@@ -94,28 +126,49 @@ export const TOKENS = Object.freeze({
   "layout.titleContentGap": length("--title-content-gap", 56),
   "icon.small": length("--icon-sm", 16),
   "icon.medium": length("--icon-md", 24),
+  "icon.large": length("--icon-lg", 36),
   "line.hairline": length("--line-hairline", 1),
   "line.standard": length("--line-standard", 2),
   "radius.none": length("--radius-none", 0),
   "radius.small": length("--radius-small", 4),
-  "radius.round": length("--radius-round", 999)
+  "radius.round": length("--radius-round", 999),
+  // Design profile: the house style a palette carries beyond its colours. Each
+  // palette sets these to what the firm's 2020+ decks do; components read them.
+  "style.titleWeight": keyword("--style-title-weight", "bold"),        // bold | regular
+  "style.titleRule": keyword("--style-title-rule", "none"),            // none | rule (hairline under the title) | band (tinted title band)
+  "style.tagPlacement": keyword("--style-tag-placement", "top-right"), // top-right | below-title (accent pill) | above-title (accent label)
+  "style.chartHeading": keyword("--style-chart-heading", "text"),      // text | band (filled grey band)
+  // A bullet unless the house explicitly sets a dash: the marker is a dot in
+  // the published decks, and a hyphen reads as a sentence fragment.
+  "style.listMarker": keyword("--style-list-marker", "dot"),           // dot | dash
+  "style.tableRows": keyword("--style-table-rows", "rules"),           // rules | zebra
+  "style.labelWeight": keyword("--style-label-weight", "bold"),        // bold | regular (chart value labels)
+  "style.titleLead": keyword("--style-title-lead", "accent")           // accent (lead in the accent) | pipe (BCG: "Topic | statement", the statement in the accent)
 });
+export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead"]);
+/** The active design profile value for a style token ("style.titleWeight" → "bold"). */
+export function houseStyle(id) { return tokenValue(token(id)); }
 
 export const DENSITY_PROFILES = Object.freeze({
   "live-pitch": Object.freeze({ typeScale: 1.15 }),
   executive: Object.freeze({ typeScale: 1 }),
-  "pre-read": Object.freeze({ typeScale: 0.9 }),
-  appendix: Object.freeze({ typeScale: 0.8 })
+  "pre-read": Object.freeze({ typeScale: 0.92 }),
+  appendix: Object.freeze({ typeScale: 0.84 })
 });
+// Page chrome keeps its size at every density so hierarchy ratios survive the knob.
+const DENSITY_FIXED = new Set(["type.deckTitle", "type.actionTitle", "type.actionTitleLong", "type.sectionTitle", "type.sectionNumber", "type.source", "type.quoteMark", "type.quoteMarkHero"]);
+const snapHalfPoint = (value) => Math.round(value * 2) / 2;
 
 export function resolveDensityTokens(baseTokens, density = "executive") {
   if (typeof density !== "string" || !Object.hasOwn(DENSITY_PROFILES, density)) throw new Error(`Unknown density profile: ${density}`);
   const scale = DENSITY_PROFILES[density].typeScale;
   return Object.fromEntries(Object.entries(baseTokens).map(([tokenId, definition]) => [
     tokenId,
-    tokenId.startsWith("type.")
-      ? { ...definition, value: Number((definition.value * scale).toFixed(2)) }
-      : { ...definition }
+    tokenId.startsWith("type.") && !DENSITY_FIXED.has(tokenId)
+      ? { ...definition, value: snapHalfPoint(definition.value * scale) }
+      : tokenId.startsWith("space.")
+        ? { ...definition, value: Math.max(2, Math.round(definition.value * scale)) }
+        : { ...definition }
   ]));
 }
 
@@ -229,8 +282,11 @@ export function primitive({ type, id, role, frame, style = {}, text = null, data
   };
 }
 
-export function textPrimitive({ id, role = "text", frame, text, style = {}, data = {}, tokens = [] }) {
-  return primitive({ type: "text", id, role, frame, text: String(text ?? ""), style, data, tokens });
+export function textPrimitive({ id, role = "text", frame, text, runs, style = {}, data = {}, tokens = [] }) {
+  const value = String(text ?? "");
+  if (runs !== undefined && (!Array.isArray(runs) || !runs.length || runs.some(run => !run || typeof run.text !== 'string' || typeof run.bold !== 'boolean' || (run.accent !== undefined && typeof run.accent !== 'boolean') || Object.keys(run).some(key => !['text', 'bold', 'accent'].includes(key))) || runs.map(run => run.text).join('') !== value)) throw new Error('Measured text runs must reconstruct the exact text and may vary only bold and accent');
+  const node = primitive({ type: "text", id, role, frame, text: value, style, data, tokens });
+  return runs === undefined ? node : { ...node, runs: runs.map(run => ({ ...run })) };
 }
 
 export function rectPrimitive({ id, role = "surface", frame, style = {}, data = {}, tokens = [] }) {
@@ -269,8 +325,17 @@ export function shapePrimitive({ id, role = "shape", geometry = "rect", frame, s
   return primitive({ type: "shape", id, role, frame, style, data: { ...data, geometry }, tokens });
 }
 
-export function flow({ id, direction = "row", gap = token("space.4"), padding = 0, size = {}, cell = null, frame = null, children = [] }) {
-  return { nodeType: "flow", id, direction, gap, padding, size, cell, frame, children };
+export const FLOW_LEFTOVER_POLICIES = Object.freeze(["start", "distribute", "center", "end"]);
+
+/**
+ * `leftover` names what happens to main-axis space no child claimed. Every child
+ * hugging its content leaves `fractionTotal === 0`, so without a policy the
+ * remainder is silently abandoned at the far end of the frame. "start" preserves
+ * that legacy packing; slide bodies opt into an explicit policy.
+ */
+export function flow({ id, direction = "row", gap = token("space.4"), padding = 0, size = {}, cell = null, frame = null, children = [], leftover = "start" }) {
+  if (!FLOW_LEFTOVER_POLICIES.includes(leftover)) throw new Error(`${id}.leftover must be one of ${FLOW_LEFTOVER_POLICIES.join(", ")}`);
+  return { nodeType: "flow", id, direction, gap, padding, size, cell, frame, children, leftover };
 }
 
 export function grid({ id, columns, rows, columnGap = token("space.4"), rowGap = token("space.4"), padding = 0, size = {}, cell = null, frame = null, children = [] }) {
@@ -295,8 +360,9 @@ export function assertSectionHeadingProps(props = {}) {
 
 export function section(options) {
   assertSectionHeadingProps(options);
-  const { id, treatment = "open", edge = "contained", heading = null, padding = token("space.4"), children = [], composition = null, size = {}, cell = null, frame = null } = options;
-  return { nodeType: "section", id, treatment, edge, heading, padding, children, composition, size, cell, frame };
+  // Open sections keep the grid's left and right edges; boxed sections pad inward.
+  const { id, treatment = "open", edge = "contained", heading = null, headingRule, padding = treatment === "open" ? 0 : token("space.4"), children = [], composition = null, size = {}, cell = null, frame = null } = options;
+  return { nodeType: "section", id, treatment, edge, heading, headingRule, padding, children, composition, size, cell, frame };
 }
 
 function resolveLength(value, available, preferred = 0) {
@@ -314,22 +380,114 @@ function fraction(value) {
   return 0;
 }
 
-function gridTrackPreferences(node, axis, registry) {
+function gridTrackPreferences(node, axis, registry, widths = null) {
   const tracks = axis === "width" ? node.columns : node.rows;
-  return tracks.map((_, index) => Math.max(0, ...node.children
+  const columnGap = isTokenReference(node.columnGap) ? tokenValue(node.columnGap) : Number(node.columnGap || 0);
+  const childWidths = widths ? node.children.map(child => {
+    const column = child.cell?.column ?? 0, span = child.cell?.columnSpan ?? 1;
+    return widths.slice(column, column + span).reduce((sum, value) => sum + value, 0) + (span - 1) * columnGap;
+  }) : null;
+  const children = childWidths ? alignPeerHeaders(node.children, childWidths, registry, child => child.cell?.row ?? 0) : node.children;
+  return tracks.map((_, index) => Math.max(0, ...children
     .filter((child) => ((axis === "width" ? child.cell?.column : child.cell?.row) ?? 0) === index && ((axis === "width" ? child.cell?.columnSpan : child.cell?.rowSpan) ?? 1) === 1)
-    .map((child) => preferredSize(child, axis, registry))));
+    .map((child) => {
+      const column = child.cell?.column ?? 0, span = child.cell?.columnSpan ?? 1;
+      const width = widths ? widths.slice(column, column + span).reduce((sum, value) => sum + value, 0) + (span - 1) * columnGap : null;
+      return preferredSize(child, axis, registry, width);
+    })));
 }
 
-function preferredSize(node, axis, registry) {
+function placementProps(node) {
+  if (node.nodeType !== "section") return node.props || {};
+  assertSectionHeadingProps(node);
+  return { treatment: node.treatment, edge: node.edge, heading: node.heading,
+           ...(node.headingRule === false ? { headingRule: false } : {}),
+           padding: node.padding, headerBandHeight: node.headerBandHeight };
+}
+
+// Shared heading baselines consume real height. Measure that shared band before
+// allocating hugged peers, rather than growing it only after their frames lock.
+function alignPeerHeaders(children, widths, registry, group = () => 0) {
+  const headers = children.map((node, index) => registry.get(node.nodeType === "section" ? "section" : node.component)?.measureHeader?.({
+    frame: { x: 0, y: 0, width: widths[index], height: 0 }, props: placementProps(node)
+  }));
+  return children.map((node, index) => {
+    const own = headers[index];
+    // A heading band is shared by every peer that starts where this one does,
+    // whether or not it inks a rule. A panel on a ground does its separating
+    // with the ground and draws no rule; that is a decision about what is
+    // drawn, and it used to drop the panel out of the row's shared band, so a
+    // heading that wrapped beside it left the two panels' contents on
+    // different lines.
+    if (!own) return node;
+    const peers = headers.filter((header, i) => header && group(children[i]) === group(node) && Math.abs(header.top - own.top) < 0.01);
+    const headerBandHeight = Math.max(own.height, ...peers.map(header => header.height));
+    return node.nodeType === "section" ? { ...node, headerBandHeight } : { ...node, props: { ...node.props, headerBandHeight } };
+  });
+}
+
+const FILLS_FRAME = (id) => /^chart\./.test(id) || ["chart-group", "image-frame", "section-divider", "cover", "tracker-page", "map", "matrix", "heatmap", "funnel", "tree", "organization", "relationship-network", "quote-cluster", "logo-collage", "panel", "content-rail", "section-boundary"].includes(id);
+const PROBE_HEIGHT = 1400;
+const renderMeasurements = new Map();
+function measureByRender(node, definition, width) {
+  if (!definition?.render || FILLS_FRAME(definition.id)) {
+    // scale the sample size with the width so a half-width chart is not as tall as a full one
+    const size = definition?.preferredSize;
+    if (size?.width && size?.height && FILLS_FRAME(definition.id) && width) return Math.round(Math.min(size.height, size.height * (width / size.width) * 1.1));
+    return null;
+  }
+  const key = hashJson({ id: definition.id, width, props: node.props, tokens: activeDesignTokens() ? Object.keys(activeDesignTokens()).length : 0 });
+  if (renderMeasurements.has(key)) return renderMeasurements.get(key);
+  let height = null;
+  try {
+    const rendered = definition.render({ id: `probe:${node.id}`, frame: { x: 0, y: 0, width, height: PROBE_HEIGHT }, props: node.props });
+    const nodes = rendered?.nodes || [];
+    if (nodes.length) {
+      const bottom = Math.max(...nodes.map((n) => (n.frame?.y ?? 0) + (n.frame?.height ?? 0)));
+      // a component that stretched a surface to the whole probe is a frame-filler
+      height = bottom >= PROBE_HEIGHT * 0.9 ? null : Math.ceil(bottom);
+    }
+  } catch { height = null; }
+  renderMeasurements.set(key, height);
+  return height;
+}
+
+// Width is resolved before measuring wrapped content. Sample preferred sizes
+// remain a fallback only for components without intrinsic measurement.
+function preferredSize(node, axis, registry, width = null) {
   if (node.nodeType === "component") {
-    return registry.get(node.component)?.preferredSize?.[axis] || 0;
+    const definition = registry.get(node.component);
+    if (axis === "height" && width !== null) {
+      const measure = definition?.measureIntrinsic ?? definition?.measureContent;
+      let measured;
+      try {
+        measured = measure?.({ frame: { x: 0, y: 0, width }, props: node.props });
+      } catch (error) {
+        throw new Error(`Cannot measure ${node.id} (${node.component}) at ${width}px wide: ${error.message}`, { cause: error });
+      }
+      if (measured?.height !== undefined) {
+        if (!Number.isFinite(measured.height) || measured.height < 0) throw new Error(`Invalid intrinsic height for ${node.id}`);
+        return measured.height;
+      }
+      // Universal fallback: components that draw to a frame are measured by
+      // rendering them once at this width into a tall probe and taking the ink
+      // extent. Components that scale to whatever frame they get (charts, images,
+      // dividers) keep their declared size, proportionally to the width.
+      const byRender = measureByRender(node, definition, width);
+      if (byRender !== null) return byRender;
+    }
+    return definition?.preferredSize?.[axis] || 0;
   }
   if (node.nodeType === "section") {
     const padding = normalizeInsets(node.padding);
     const nested = node.composition || (node.children?.length ? flow({ id: `${node.id}-intrinsic`, direction: "column", gap: token("space.3"), children: node.children }) : null);
-    const content = nested ? preferredSize(nested, axis, registry) : 0;
+    const innerWidth = width === null ? null : width - padding.left - padding.right;
+    const content = nested ? preferredSize(nested, axis, registry, innerWidth) : 0;
     if (axis === "width") return content + padding.left + padding.right;
+    if (width !== null && registry.get("section")?.measureInsets) {
+      const insets = registry.get("section").measureInsets({ frame: { x: 0, y: 0, width }, props: node });
+      return content + insets.top + insets.bottom;
+    }
     return content + padding.top + padding.bottom + (node.heading ? 46 : 0);
   }
   const padding = normalizeInsets(node.padding);
@@ -338,9 +496,15 @@ function preferredSize(node, axis, registry) {
   if (node.nodeType === "flow") {
     const row = node.direction === "row";
     const gap = isTokenReference(node.gap) ? tokenValue(node.gap) : Number(node.gap || 0);
-    const childValues = node.children.map((child) => {
+    const innerWidth = width === null ? null : width - horizontalPadding;
+    const widths = axis === "height" && innerWidth !== null
+      ? row ? allocateTracks(node.children.map(child => child.size?.width), innerWidth, Math.max(0, node.children.length - 1) * gap, node.children.map(child => preferredSize(child, "width", registry)))
+        : node.children.map(child => resolveLength(child.size?.width, innerWidth, preferredSize(child, "width", registry)) ?? innerWidth)
+      : [];
+    const children = row && widths.length ? alignPeerHeaders(node.children, widths, registry) : node.children;
+    const childValues = children.map((child, index) => {
       const explicit = child.size?.[axis];
-      const preferred = preferredSize(child, axis, registry);
+      const preferred = preferredSize(child, axis, registry, widths[index] ?? null);
       if (typeof explicit === "number" || isTokenReference(explicit) || explicit === "hug") return resolveLength(explicit, 0, preferred) ?? preferred;
       return preferred;
     });
@@ -353,7 +517,9 @@ function preferredSize(node, axis, registry) {
     const tracks = axis === "width" ? node.columns : node.rows;
     const gapValue = axis === "width" ? node.columnGap : node.rowGap;
     const gap = isTokenReference(gapValue) ? tokenValue(gapValue) : Number(gapValue || 0);
-    const contentPreferences = gridTrackPreferences(node, axis, registry);
+    const columnGap = isTokenReference(node.columnGap) ? tokenValue(node.columnGap) : Number(node.columnGap || 0);
+    const widths = axis === "height" && width !== null ? allocateTracks(node.columns, width - horizontalPadding, Math.max(0, node.columns.length - 1) * columnGap, gridTrackPreferences(node, "width", registry)) : null;
+    const contentPreferences = gridTrackPreferences(node, axis, registry, widths);
     const trackPreferred = tracks.map((track, index) => {
       const content = contentPreferences[index];
       if (typeof track === "number" || isTokenReference(track) || track === "hug") return resolveLength(track, 0, content) ?? content;
@@ -366,7 +532,7 @@ function preferredSize(node, axis, registry) {
   if (node.nodeType === "overlay" || node.nodeType === "absolute") {
     const extent = Math.max(0, ...(node.children || []).map((child) => {
       if (child.frame) return (axis === "width" ? child.frame.x + child.frame.width : child.frame.y + child.frame.height);
-      return preferredSize(child, axis, registry);
+      return preferredSize(child, axis, registry, width === null ? null : width - horizontalPadding);
     }));
     return extent + (axis === "width" ? horizontalPadding : verticalPadding);
   }
@@ -435,19 +601,27 @@ export function resolveLayout(root, frame, registry) {
       const gap = isTokenReference(node.gap) ? tokenValue(node.gap) : Number(node.gap || 0);
       const mainAvailable = row ? inner.width : inner.height;
       const specs = node.children.map((child) => row ? child.size?.width : child.size?.height);
-      const preferred = node.children.map((child) => preferredSize(child, row ? "width" : "height", registry));
+      const preferred = node.children.map((child) => preferredSize(child, row ? "width" : "height", registry, row ? null : resolveLength(child.size?.width, inner.width, preferredSize(child, "width", registry)) ?? inner.width));
       const lengths = allocateTracks(specs, mainAvailable, Math.max(0, node.children.length - 1) * gap, preferred);
-      let cursor = row ? inner.x : inner.y;
-      node.children.forEach((child, index) => {
+      // Space no child claimed. Abandoning it is what leaves a dead band below
+      // an all-hug body; the policy says where it goes instead.
+      const claimed = lengths.reduce((sum, value) => sum + value, 0) + Math.max(0, node.children.length - 1) * gap;
+      const leftover = Math.max(0, mainAvailable - claimed);
+      const policy = node.leftover || "start";
+      const extraGap = policy === "distribute" && node.children.length > 1 ? leftover / (node.children.length - 1) : 0;
+      const leadOffset = policy === "center" ? leftover / 2 : policy === "end" ? leftover : 0;
+      let cursor = (row ? inner.x : inner.y) + leadOffset;
+      const children = row ? alignPeerHeaders(node.children, lengths, registry) : node.children;
+      children.forEach((child, index) => {
         const crossSpec = row ? child.size?.height : child.size?.width;
         const crossAvailable = row ? inner.height : inner.width;
-        const cross = resolveLength(crossSpec, crossAvailable, preferredSize(child, row ? "height" : "width", registry)) ?? crossAvailable;
+        const cross = resolveLength(crossSpec, crossAvailable, preferredSize(child, row ? "height" : "width", registry, row ? lengths[index] : null)) ?? crossAvailable;
         if (cross < 0 || cross > crossAvailable + 0.01) throw new Error(`Flow child ${child.id} exceeds its cross axis`);
         const childFrame = row
           ? { x: cursor, y: inner.y, width: lengths[index], height: cross }
           : { x: inner.x, y: cursor, width: cross, height: lengths[index] };
         walk(child, childFrame);
-        cursor += lengths[index] + gap;
+        cursor += lengths[index] + gap + extraGap;
       });
       return;
     }
@@ -455,7 +629,7 @@ export function resolveLayout(root, frame, registry) {
       const columnGap = isTokenReference(node.columnGap) ? tokenValue(node.columnGap) : Number(node.columnGap || 0);
       const rowGap = isTokenReference(node.rowGap) ? tokenValue(node.rowGap) : Number(node.rowGap || 0);
       const widths = allocateTracks(node.columns, inner.width, Math.max(0, node.columns.length - 1) * columnGap, gridTrackPreferences(node, "width", registry));
-      const heights = allocateTracks(node.rows, inner.height, Math.max(0, node.rows.length - 1) * rowGap, gridTrackPreferences(node, "height", registry));
+      const heights = allocateTracks(node.rows, inner.height, Math.max(0, node.rows.length - 1) * rowGap, gridTrackPreferences(node, "height", registry, widths));
       const starts = (values, start, gap) => values.map((_, index) => start + values.slice(0, index).reduce((sum, value) => sum + value, 0) + index * gap);
       const xs = starts(widths, inner.x, columnGap);
       const ys = starts(heights, inner.y, rowGap);
@@ -516,12 +690,21 @@ export function assertDeclaredComponentTokens(definition, nodes, instanceId) {
   }
 }
 
+/** The frame a rotated node occupies on the page (a quarter turn swaps its sides about its centre). */
+export function visibleFrame(node) {
+  const rotate = Number(node.style?.rotate || 0) % 180;
+  if (Math.abs(rotate) !== 90) return node.frame;
+  const { x, y, width, height } = node.frame;
+  return { x: x + width / 2 - height / 2, y: y + height / 2 - width / 2, width: height, height: width };
+}
+
 export function assertSceneBounds(nodes, bounds = SLIDE) {
   for (const node of nodes) {
     const values = [node.frame.x, node.frame.y, node.frame.width, node.frame.height];
     if (values.some((value) => !Number.isFinite(value))) throw new Error(`${node.id} has a non-finite frame`);
     if (node.frame.width < 0 || node.frame.height < 0) throw new Error(`${node.id} has a negative frame dimension`);
-    if (node.frame.x < -0.01 || node.frame.y < -0.01 || node.frame.x + node.frame.width > bounds.width + 0.01 || node.frame.y + node.frame.height > bounds.height + 0.01) {
+    const frame = visibleFrame(node);
+    if (frame.x < -0.01 || frame.y < -0.01 || frame.x + frame.width > bounds.width + 0.01 || frame.y + frame.height > bounds.height + 0.01) {
       throw new Error(`${node.id} exceeds the ${bounds.width} by ${bounds.height} slide`);
     }
   }
@@ -562,13 +745,131 @@ export function buildManifest(deck) {
   return manifest;
 }
 
-export function compileDeck(deckSpec, registry) {
+const NATIVE_CHART_TYPES = Object.freeze({
+  "chart.column": "column", "chart.bar": "bar", "chart.stacked-column": "stacked-column",
+  "chart.stacked-bar": "stacked-bar", "chart.line": "line", "chart.pie": "pie", "chart.donut": "donut",
+  "chart.scatter": "scatter", "chart.area": "area", "chart.range": "range"
+});
+/** Every plotted value a chart's props carry, however the series are written. */
+function seriesValues(props = {}) {
+  if (Array.isArray(props.series)) return props.series.flatMap((item) => item?.values || []);
+  if (Array.isArray(props.values)) return props.values;
+  return [];
+}
+
+/** Data an emitter needs for a native chart. Types outside NATIVE_CHART_TYPES keep shapes. */
+export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
+  const type = NATIVE_CHART_TYPES[componentId];
+  if (!type) return null;
+  // Reference lines and annotations need the plot scale; PowerPoint does not
+  // expose it, so those charts stay as assembled, grouped shapes. A single-bar
+  // highlight is a per-point fill and stays native.
+  const highlights = props.highlights || [];
+  // A floating range band prints its low value left of the band and its high
+  // value right of it, in ink. PowerPoint's stacked-bar stand-in can only put a
+  // label inside the band, so the range chart is assembled as shapes.
+  // A sub-label under a category ("n=412") is placed against the plot we
+  // measured; PowerPoint draws its own category axis wherever it likes, so a
+  // chart that carries category notes is assembled as shapes.
+  if (props.native === false || type === "scatter" || type === "range") return null;
+  // Labels set outside the wedges with leaders are placed against the drawn
+  // circle; PowerPoint cannot reproduce them, so that variant stays drawn.
+  if (["pie", "donut"].includes(type) && (props.outsideLabels || props.variant === "outside-labels")) return null;
+  // Explicit numeric x positions and keyed point labels are not a categorical
+  // native line. Preserve their spacing and selected labels as editable shapes.
+  if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;
+  // External stack labels and their leaders use measured scene coordinates;
+  // Office repositioning the labels would detach those leaders from the text.
+  if (renderedNodes?.some(node => node.role === "data-label" && node.data?.external)) return null;
+  if (Array.isArray(props.categoryNotes) && props.categoryNotes.some((note) => typeof note === "string" && note.trim())) return null;
+  // Signed bars need the measured zero baseline and label gutters. Native
+  // horizontal axes can move category labels into the bars; native columns
+  // also lose negative signs/direction in the LibreOffice render. Preserve
+  // the signed comparison as editable shapes in either orientation.
+  if (["bar", "stacked-bar", "column", "stacked-column"].includes(type) && seriesValues(props).some((value) => value < 0)) return null;
+  // Keep named scatter points and rich value labels editable as scene shapes
+  // until the native exporter can preserve their complete semantics.
+  if (props.valueFormat && (typeof props.valueFormat !== "object" ||
+      Object.keys(props.valueFormat).some(key => key !== "decimals"))) return null;
+  // Stack totals and category groups are drawn by the runtime; PowerPoint has no native total label.
+  if ((props.stackTotals || []).length || (props.categoryGroups || []).length || (props.secondaryLabels || []).length || (props.stackBracket || []).length || (props.deltas || []).length || (props.periods || []).length || (props.events || []).length || props.categoryLabels === false || props.segmentGrowth) return null;
+  // Category icons and a growth column are placed against the plot we
+  // measured; PowerPoint lays out its own axes, so they would float free.
+  if (props.categoryIcons || props.seriesGrowth) return null;
+  if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
+  const categories = [...(props.categories || props.labels || [])];
+  const series = type === "range"
+    ? [{ name: "low", values: [...(props.low || [])], hidden: true }, { name: "range", values: (props.high || []).map((h, i) => h - (props.low || [])[i]) }]
+    : Array.isArray(props.series) ? props.series.map(s => ({ name: s.name, values: [...(s.values || [])] }))
+    : Array.isArray(props.values) ? [{ name: props.name || "", values: [...props.values] }] : [];
+  const forecastIndex = props.forecastFrom !== undefined ? categories.indexOf(props.forecastFrom) : -1;
+  const labelBold = houseStyle("style.labelWeight") !== "regular";
+  // Use the actual scene's resolved visibility (dense charts can omit direct
+  // labels by default), so the native axes follow the same decision.
+  const dataLabels = renderedNodes
+    ? renderedNodes.some(node => node.role === "data-label") : props.dataLabels !== false;
+  const showValueAxis = renderedNodes
+    ? renderedNodes.some(node => node.role === "axis-label")
+    : props.showValueAxis ?? (props.gridlines === true || !dataLabels);
+  const ticks = (renderedNodes || []).filter(node => node.role === "axis-label" && Number.isFinite(node.data?.value)).map(node => node.data.value).sort((a,b)=>a-b);
+  return {
+    labelBold,
+    type,
+    categories,
+    series,
+    highlightIndices: highlights.map((h) => categories.indexOf(h.category)).filter((i) => i >= 0),
+    forecastIndex,
+    endLabels: props.directLabels === "end" || props.endLabels === true || (type === "line" && series.length > 1 && props.legend !== true && props.endLabels !== false),
+    ...(type === "line" ? { pointDataLabels: renderedNodes
+      ? renderedNodes.some(node => node.role === "data-label" && node.data?.labelKind === "point")
+      : props.dataLabels !== false } : {}),
+    center: props.center ?? null,
+    ...(type === "range" ? { low: [...(props.low || [])], high: [...(props.high || [])] } : {}),
+    ...(Array.isArray(props.points) ? { points: props.points.map(p => ({ ...p })) } : {}),
+    unit: props.unit ?? null,
+    yMin: ticks.length ? ticks[0] : props.yMin ?? (["bar", "column", "stacked-bar", "stacked-column"].includes(type) && series.every(item => item.values.every(value => value >= 0)) ? 0 : null),
+    yMax: ticks.length ? ticks.at(-1) : props.yMax ?? null,
+    ...(ticks.length>1 ? {yMajorUnit:ticks[1]-ticks[0]} : {}),
+    dataLabels,
+    showValueAxis,
+    // A pie or donut names its categories in its legend (the drawn chart's
+    // "legend-top-right"); without one the native chart shows unlabelled wedges.
+    legend: props.legend === true || (["pie", "donut"].includes(type)
+      ? props.legend !== false && (props.variant ?? "legend-top-right") === "legend-top-right"
+      : series.length > 1 && props.legend !== false && !(type === "line" && props.endLabels !== false) && type !== "range"),
+    gridlines: props.gridlines === true,
+    valueFormat: props.valueFormat ?? null,
+    colorIndices: Array.isArray(props.colorIndices) ? [...props.colorIndices] : null,
+    frame: { ...frame }
+  };
+}
+
+export function compileDeck(deckSpec, registry, {slideCache}={}) {
+  configureChrome(deckSpec.chrome || null);
+  try { return compileDeckInner(deckSpec, registry, {slideCache}); } finally { configureChrome(null); }
+}
+// Actual ink geometry belongs to the component instance, separately from its
+// allocation frame. Parents/reviewers can compare visible reading anchors.
+export function componentGeometry(nodes) {
+  const visible = nodes.filter(node => node.frame && [node.frame.x, node.frame.y, node.frame.width, node.frame.height].every(Number.isFinite));
+  if (!visible.length) return { occupiedFrame: null, anchors: {} };
+  const x = Math.min(...visible.map(node => node.frame.x)), y = Math.min(...visible.map(node => node.frame.y));
+  const right = Math.max(...visible.map(node => node.frame.x + node.frame.width));
+  const bottom = Math.max(...visible.map(node => node.frame.y + node.frame.height));
+  const headings = visible.filter(node => node.type === "text" && /header|heading|period|chart-title/.test(node.role));
+  return { occupiedFrame: { x, y, width: right - x, height: bottom - y },
+    anchors: { contentTop: y, contentBottom: bottom, ...(headings.length ? { headerTop: Math.min(...headings.map(node => node.frame.y)) } : {}) } };
+}
+
+function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   assertNoLegacyPageTaxonomy(deckSpec);
   const { tokens: designTokens, ...palette } = resolvePalette(deckSpec.palette, TOKENS, THEME_SLOT_TOKENS);
   const typography = resolveTypography(deckSpec.typography, designTokens);
   const pageTemplate = registry.get("page-template")?.resolveTemplate(deckSpec.pageTemplate);
   return withDesignTokens(designTokens, () => {
   const slides = deckSpec.slides.map((slideSpec, slideIndex) => {
+    const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate,chrome:CHROME}) : null;
+    if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
     const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
     const density = slideSpec.density ?? "executive";
     const slideTokens = resolveDensityTokens(designTokens, density);
@@ -578,19 +879,23 @@ export function compileDeck(deckSpec, registry) {
     const nodes = [];
     const componentInstances = [];
     const templatePlacements = [];
+    // Page furniture belongs to the deck's visual system. Evidence density
+    // may change by slide without resizing titles, trackers or footers.
+    const chromeOwners = new Set();
     let contentFrame = CONTENT_FRAME;
     let resolvedPageTemplate;
     if (slideSpec.chrome) {
       const chromeDefinition = registry.get("slide-chrome");
       if (!chromeDefinition) throw new Error("The component registry must define slide-chrome");
       const chromeId = stableId(slideId, "chrome");
+      chromeOwners.add(chromeId);
       const chromeProps = { ...slideSpec.chrome, pageTemplate: { ...pageTemplate, ...slideSpec.chrome.pageTemplate }, pageNumber: slideSpec.chrome.pageNumber ?? slideIndex + 1 };
-      const rendered = chromeDefinition.render({
+      const rendered = withDesignTokens(designTokens, () => chromeDefinition.render({
         id: chromeId,
-        tokens: slideTokens,
+        tokens: designTokens,
         frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
         props: chromeProps
-      });
+      }));
       contentFrame = rendered.contentFrame;
       resolvedPageTemplate = rendered.pageTemplate;
       templatePlacements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [chromeId] })));
@@ -610,19 +915,41 @@ export function compileDeck(deckSpec, registry) {
       });
     }
     const placements = [...templatePlacements, ...resolveLayout(slideSpec.composition, slideSpec.frame || contentFrame, registry)];
-    const placementProps = (node) => {
-      if (node.nodeType !== "section") return node.props || {};
-      assertSectionHeadingProps(node);
-      return { treatment: node.treatment, edge: node.edge, heading: node.heading, padding: node.padding };
-    };
     const headerBandHeight = (placement) => {
       const measure = ({ node, frame }) => registry.get(node.nodeType === "section" ? "section" : node.component)?.measureHeader?.({ frame, props: placementProps(node) });
       const own = measure(placement);
       if (!own) return undefined;
-      // Ruled peers sharing a top guide share a bottom-aligned text band. Longer
-      // headings increase the band; neither adapter may shrink or invent wraps.
-      const peers = own.ruled ? placements.map(measure).filter((peer) => peer?.ruled && Math.abs(peer.top - own.top) < 0.01) : [own];
+      // Peers sharing a top guide share a bottom-aligned text band, whether or
+      // not they ink a rule: a panel on a ground separates with the ground, and
+      // it is still a panel in the row. Longer headings increase the band;
+      // neither adapter may shrink or invent wraps.
+      const peers = placements.map(measure).filter((peer) => peer && Math.abs(peer.top - own.top) < 0.01);
       return Math.max(own.height, ...peers.map((peer) => peer.height));
+    };
+    const sharedTableRows = (placement) => {
+      const alignment = placement.node.props?.rowAlignment;
+      if (placement.node.component !== "table" || !alignment) return undefined;
+      const peers = placements.filter(({ node }) => node.component === "table" && node.props?.rowAlignment?.group === alignment.group);
+      if (peers.length < 2) throw new Error(`Table rowAlignment group ${alignment.group} needs at least two peers`);
+      if (peers.some(({ node }) => JSON.stringify(node.props.rowAlignment.keys) !== JSON.stringify(alignment.keys)))
+        throw new Error(`Table rowAlignment group ${alignment.group} must use identical ordered row keys`);
+      const measured = peers.map(peer => ({ ...peer, measurement: registry.get("table").measureContent({
+        frame: { ...peer.frame, height: Infinity },
+        props: { ...peer.node.props, fillHeight: false, headerBandHeight: headerBandHeight(peer) }
+      }) }));
+      const bodyTop = measured[0].frame.y + measured[0].measurement.headerHeight;
+      if (measured.some(peer => Math.abs(peer.frame.y + peer.measurement.headerHeight - bodyTop) > 0.01))
+        throw new Error(`Table rowAlignment group ${alignment.group} requires a shared body-start anchor`);
+      const heights = alignment.keys.map((_, r) => Math.max(...measured.map(peer => peer.measurement.heights[r])));
+      const total = heights.reduce((sum, height) => sum + height, 0);
+      const capacity = Math.min(...measured.map(({ frame, measurement: m }) => frame.height - (m.height - m.heights.reduce((sum, height) => sum + height, 0))));
+      if (total > capacity + 0.01)
+        throw new Error(`Table rowAlignment group ${alignment.group} needs ${total.toFixed(1)}px of body space; only ${capacity.toFixed(1)}px is available`);
+      if (peers.every(({ node }) => node.props.fillHeight === true) && Number.isFinite(capacity) && heights.length) {
+        const extra = Math.min(capacity - total, total * 1.5) / heights.length;
+        heights.forEach((height, r) => { heights[r] = height + Math.max(0, extra); });
+      }
+      return heights;
     };
     for (const { node, frame, ancestors = [] } of placements) {
       if (node.nodeType === "section") {
@@ -666,9 +993,19 @@ export function compileDeck(deckSpec, registry) {
       const definition = registry.get(node.component);
       if (!definition) throw new Error(`Unknown component: ${node.component}`);
       const instanceId = stableId(slideId, node.id || node.component);
+      const chromePlacement = ["page-template", "slide-chrome"].includes(node.component) || ancestors.some(owner => chromeOwners.has(owner));
+      if (chromePlacement) chromeOwners.add(instanceId);
       const props = { ...node.props, headerBandHeight: headerBandHeight({ node, frame }) };
+      const sharedRows = sharedTableRows({ node, frame });
+      if (sharedRows) props._sharedRowHeights = sharedRows;
       if (["page-template", "slide-chrome", "section-divider"].includes(node.component)) props.pageTemplate = { ...pageTemplate, ...node.props?.pageTemplate };
-      const rendered = definition.render({ id: instanceId, frame, tokens: slideTokens, props });
+      let rendered;
+      try {
+        const placementTokens = chromePlacement ? designTokens : slideTokens;
+        rendered = withDesignTokens(placementTokens, () => definition.render({ id: instanceId, frame, tokens: placementTokens, props }));
+      } catch (error) {
+        throw new Error(`Cannot render ${instanceId} (${definition.id}): ${error.message}`, { cause: error });
+      }
       placements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
       assertDeclaredComponentTokens(definition, rendered.nodes, instanceId);
       rendered.nodes.forEach((item) => {
@@ -686,18 +1023,25 @@ export function compileDeck(deckSpec, registry) {
         ...(props.semantic ? {relationships: props.semantic} : {}),
         variant: definition.resolveVariant?.(props),
         frame,
-        tokens: definition.tokens
+        ...componentGeometry(rendered.nodes),
+        tokens: definition.tokens,
+        // Chart data travels with the instance so an emitter can write a native,
+        // workbook-backed chart object in this frame instead of loose shapes.
+        ...(String(definition.id).startsWith("chart.") ? { nativeChart: nativeChartSpec(definition.id, props, frame, rendered.nodes) } : {})
       });
     }
-    tagSemanticNodes(nodes, componentInstances);
     assertUniqueIds(nodes);
     for (const node of nodes) {
+      const nodeTokens = chromeOwners.has(node.data.componentInstance) || node.data.componentAncestors?.some(owner => chromeOwners.has(owner)) ? designTokens : slideTokens;
       node.style = Object.fromEntries(Object.entries(node.style).map(([key, value]) => [key,
-        isTokenReference(value) ? { tokenId: value.tokenId, ...slideTokens[value.tokenId] } : value]));
+        isTokenReference(value) ? { tokenId: value.tokenId, ...nodeTokens[value.tokenId] } : value]));
     }
     assertStyleProvenance(nodes);
     assertSceneBounds(nodes);
-    return { id: slideId, notes: slideSpec.notes || "", nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+    const compiled = { id: slideId, notes: slideSpec.notes || "", nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+    if (slideSpec.sourceSlideId) compiled.sourceSlideId = slideSpec.sourceSlideId;
+    slideCache?.set(cacheKey,structuredClone(compiled));
+    return compiled;
     });
   });
   const templateSequences = [];
@@ -736,7 +1080,7 @@ export function compileDeck(deckSpec, registry) {
   for (const sequence of templateSequences) {
     if (sequence.slides.length !== sequence.total) throw new Error(`Template sequence ${sequence.id} declares ${sequence.total} slides but contains ${sequence.slides.length}`);
   }
-  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, tokens: designTokens, templateSequences };
+  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), ...(deckSpec.weight ? { weight: deckSpec.weight } : {}), tokens: designTokens, templateSequences };
   deck.manifest = buildManifest(deck);
   return deck;
   });

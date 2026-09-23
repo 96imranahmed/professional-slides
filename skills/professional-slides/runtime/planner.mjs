@@ -1,12 +1,14 @@
-import { assertPlanRelationships } from "./semantic-integrity.mjs";
 import {
   SLIDE,
+  TOKENS,
   absolute,
   assertSectionHeadingProps,
   compileDeck,
   component as componentNode,
   flow,
   grid,
+  isTokenReference,
+  normalizeInsets,
   overlay,
   resolveTitleVariant,
   section,
@@ -14,15 +16,6 @@ import {
 } from "./core.mjs";
 import { REGISTRY } from "./registry.mjs";
 
-const GENERIC_LABELS = new Set([
-  "action", "analysis", "answer", "calculation boundary", "company definition",
-  "current snapshot", "decision", "decision gate", "evidence", "implication",
-  "insight", "interpretation", "key insight", "key takeaway", "operating proof",
-  "priority area", "read-through", "recommendation", "section heading", "synthesis",
-  "takeaway", "what holds back a buy", "what it means", "what the quarter supports"
-]);
-
-const words = (value) => String(value || "").trim().split(/\s+/).filter(Boolean);
 const DENSITY_ORDER = Object.freeze(["live-pitch", "executive", "pre-read", "appendix"]);
 
 function maximumDensity(left, right) {
@@ -43,106 +36,55 @@ function extentOf(props = {}) {
   );
 }
 
-function capacityRequirement(item, path, reasons) {
-  let required = "live-pitch";
+function capacityRecommendation(item, path, reasons) {
+  let recommended = "executive";
   const props = item.props || {};
   if (item.component === "insight-tree-table") {
     const branches = Array.isArray(props.branches) ? props.branches.length : 0;
     const leaves = Array.isArray(props.branches) ? props.branches.reduce((count, branch) => count + (Array.isArray(branch?.leaves) ? branch.leaves.length : 0), 0) : 0;
     if (branches >= 4 || leaves >= 6) {
-      required = "pre-read";
-      reasons.push({ path, component: item.component, measure: "hierarchy", count: Math.max(branches, leaves), required });
+      recommended = "pre-read";
+      reasons.push({ path, component: item.component, measure: "hierarchy", count: Math.max(branches, leaves), recommended });
     }
   } else if (item.component === "table") {
-    const rows = Array.isArray(props.rows) ? props.rows.length : 0;
-    const columns = Array.isArray(props.columns) ? props.columns.length : 0;
-    required = rows > 8 || columns > 6 ? "appendix" : rows > 5 || columns > 4 ? "pre-read" : required;
-    if (required !== "live-pitch") reasons.push({ path, component: item.component, measure: rows >= columns ? "rows" : "columns", count: Math.max(rows, columns), required });
+    // A dense table steps its own type down (body → compact → dense) and long
+    // tables paginate; it never drags the page's other type with it.
   } else if (typeof item.component === "string" && item.component.startsWith("chart.")) {
     const extent = extentOf(props);
-    required = extent > 12 ? "appendix" : extent > 8 ? "pre-read" : required;
-    if (required !== "live-pitch") reasons.push({ path, component: item.component, measure: "marks", count: extent, required });
+    recommended = extent > 12 ? "appendix" : extent > 8 ? "pre-read" : recommended;
+    if (recommended !== "live-pitch") reasons.push({ path, component: item.component, measure: "marks", count: extent, recommended });
   }
-  for (const [index, child] of (item.items || []).entries()) required = maximumDensity(required, capacityRequirement(child, `${path}.items[${index}]`, reasons));
-  return required;
+  for (const [index, child] of (item.items || []).entries()) recommended = maximumDensity(recommended, capacityRecommendation(child, `${path}.items[${index}]`, reasons));
+  return recommended;
 }
 
 export function resolveSlideDensity(plan) {
   const requested = plan.density ?? "executive";
   if (!DENSITY_ORDER.includes(requested)) throw new Error(`Unknown density profile: ${requested}`);
   const reasons = [];
-  const required = (plan.items || []).reduce((result, item, index) => maximumDensity(result, capacityRequirement(item, `${plan.id}.items[${index}]`, reasons)), "live-pitch");
-  return { requested, required, resolved: maximumDensity(requested, required), reasons };
-}
-
-function validateContentValue(value, path = "props") {
-  if (typeof value === "string" && value.includes("—")) throw new Error(`${path} contains a Unicode em dash`);
-  if (Array.isArray(value)) return value.forEach((item, index) => validateContentValue(item, `${path}[${index}]`));
-  if (!value || typeof value !== "object") return;
-  for (const [key, child] of Object.entries(value)) {
-    if (["heading", "label", "title"].includes(key) && typeof child === "string" && GENERIC_LABELS.has(child.trim().toLowerCase())) {
-      throw new Error(`${path}.${key} is a redundant generic label`);
-    }
-    validateContentValue(child, `${path}.${key}`);
-  }
-}
-
-function countWords(value) {
-  if (typeof value === "string") return words(value).length;
-  if (Array.isArray(value)) return value.reduce((sum, item) => sum + countWords(item), 0);
-  if (!value || typeof value !== "object") return 0;
-  return Object.values(value).reduce((sum, item) => sum + countWords(item), 0);
-}
-
-function itemAudienceCopy(item) {
-  return {
-    heading: item.heading,
-    props: item.props || {},
-    items: (item.items || []).map(itemAudienceCopy)
-  };
-}
-
-function trackerAudienceCopy(tracker) {
-  if (!tracker || typeof tracker !== "object") return null;
-  return {
-    title: tracker.title,
-    parentTitle: tracker.parentTitle,
-    items: (tracker.items || []).map(item => ({ id: item.id, label: item.label }))
-  };
-}
-
-export function assertChartSelection(component, props, path = 'chart') {
-  const selection = props.chartSelection;
-  if (selection && (!selection.question?.trim() || !selection.reason?.trim() || !selection.rejectedAlternative?.trim() || !selection.dataBasis?.trim())) throw new Error(`${path}: chart selection requires question, dataBasis, reason and rejectedAlternative`);
-  const indexed = selection?.measurementBasis === 'rebased-index' || /\bindex(?:ed)?\b/i.test(String(props.unit || '') + ' ' + String(props.heading || ''));
-  if (indexed && selection?.measurementBasis !== 'published-index') {
-    if (selection?.measurementBasis !== 'rebased-index' || !selection.indexJustification?.trim() || !selection.absoluteValueContext?.trim() || !selection.indexBase?.period?.trim() || !Number.isFinite(selection.indexBase?.value) || selection.indexBase.value <= 0) throw new Error(`${path}: INDEX_JUSTIFICATION requires an explicit rebased-index purpose, base period/value, absolute-value context and reason native units or percentage changes are inadequate`);
-  }
-  if (component === 'chart.line') {
-    const years = (props.categories || []).map(v => /^\d{4}(?:\s.*)?$/.test(String(v)) ? Number(String(v).slice(0,4)) : Number(v));
-    const values = (props.series || []).map(s => s.values);
-    const linear = years.length >= 3 && years.every(Number.isFinite) && years.every((v,i)=>i===0 || v>years[i-1]) && values.length && values.every(v => v.length === years.length && v.every(Number.isFinite) && v.slice(2).every((y,i) => Math.abs((y-v[i+1])/(years[i+2]-years[i+1])-(v[1]-v[0])/(years[1]-years[0])) < 1e-8));
-    if (selection?.dataBasis === 'constant-rate-scenario' || selection?.dataBasis === 'endpoint-only') throw new Error(`${path}: constant-rate or endpoint-only evidence requires bar/column comparison, not a line trajectory`);
-    if (linear && !['observed','published-forecast'].includes(selection?.dataBasis)) throw new Error(`${path}: linear year series requires source-backed chart selection; constant-rate extrapolation belongs in endpoint bars`);
-  }
-  for (const child of props.charts || []) assertChartSelection(child.component, {...(child.props || child), heading:child.heading ?? child.props?.heading, unit:child.unit ?? child.props?.unit}, path + '.charts');
+  const recommended = (plan.items || []).reduce((result, item, index) => maximumDensity(result, capacityRecommendation(item, `${plan.id}.items[${index}]`, reasons)), "executive");
+  // An explicit density is the author's; otherwise the denser of default and recommendation.
+  const explicit = plan.density !== undefined;
+  return { requested, recommended, resolved: explicit ? requested : maximumDensity(requested, recommended), selection: explicit ? "explicit" : "capacity-default", reasons };
 }
 
 function validateItem(item, path, registry) {
   if (!item?.id) throw new Error(`${path}.id is required`);
-  if (!item.job || !String(item.job).trim()) throw new Error(`${path}.job must state why the item is on the slide`);
   if (item.component && !registry.has(item.component)) throw new Error(`${path}.component is not registered: ${item.component}`);
   if ((!item.component && (!Array.isArray(item.items) || !item.items.length)) || (item.items !== undefined && (!Array.isArray(item.items) || !item.items.length))) throw new Error(`${path} needs a component or nested items`);
   if (item.items) assertSectionHeadingProps(item);
+  if (item.heading && item.items?.length === 1) {
+    const child = item.items[0];
+    if (child.component?.startsWith("chart.") && String(child.props?.heading ?? "").trim()) {
+      throw new Error(`${path}: a section wrapping one headed chart creates redundant heading levels; remove the section heading and let the chart own its measure, unit and rule`);
+    }
+  }
   if (["section", "section-heading", "content-rail"].includes(item.component)) assertSectionHeadingProps(item.props);
-  validateContentValue({ heading: item.heading }, path);
-  validateContentValue(item.props || {}, `${path}.props`);
   const checkChange = (props) => {
-    if (props.changeIntent && !(props.changeAnnotations?.length)) throw new Error(`${path}: declared change requires a highlighted change annotation`);
+    if (props.changeIntent && !(props.changeAnnotations?.length) && props.changePresentation !== 'direct-labels') throw new Error(`${path}: declared change requires a highlighted change annotation`);
     for (const chart of props.charts || []) checkChange(chart.props || chart);
   };
   checkChange(item.props || {});
-  assertChartSelection(item.component, item.props || {}, path);
   (item.items || []).forEach((child, index) => validateItem(child, `${path}.items[${index}]`, registry));
 }
 
@@ -150,8 +92,6 @@ export function validateSlidePlan(plan, registry = REGISTRY) {
   if (!plan?.id) throw new Error("Slide plan id is required");
   resolveTitleVariant({ variant: plan.titleVariant });
   if (!plan.title || !String(plan.title).trim()) throw new Error(`${plan.id}.title is required`);
-  if (words(plan.title).length > 14) throw new Error(`${plan.id}.title exceeds 14 words`);
-  if (String(plan.title).includes("—")) throw new Error(`${plan.id}.title contains a Unicode em dash`);
   if (!Array.isArray(plan.items) || plan.items.length === 0) throw new Error(`${plan.id}.items must contain at least one content item`);
   if (plan.template !== undefined) {
     const reference = plan.template;
@@ -162,30 +102,121 @@ export function validateSlidePlan(plan, registry = REGISTRY) {
     }
   }
   plan.items.forEach((item, index) => validateItem(item, `${plan.id}.items[${index}]`, registry));
-  assertPlanRelationships(plan);
   const density = resolveSlideDensity(plan);
-  const defaultBudget = density.resolved === "appendix" ? 130 : density.resolved === "pre-read" ? 85 : density.resolved === "live-pitch" ? 30 : 55;
-  const override = plan.copyBudget;
-  if (override !== undefined && (!override || typeof override !== "object" || Array.isArray(override)
-    || Object.keys(override).some(key => !["maxWordsPerSlide", "rationale"].includes(key))
-    || !Number.isInteger(override.maxWordsPerSlide) || override.maxWordsPerSlide <= 0
-    || typeof override.rationale !== "string" || !override.rationale.trim())) {
-    throw new Error(`${plan.id}.copyBudget requires a positive integer maxWordsPerSlide and a nonempty rationale`);
-  }
-  const budget = override?.maxWordsPerSlide ?? defaultBudget;
-  const countedWords = countWords({
-    title: plan.title,
-    subtitle: plan.subtitle,
-    source: plan.source,
-    note: plan.note,
-    notes: plan.notes,
-    companyName: plan.companyName,
-    tracker: trackerAudienceCopy(plan.tracker),
-    items: plan.items.map(itemAudienceCopy)
-  });
-  if (countedWords > budget) throw new Error(`${plan.id} has ${countedWords} counted words; ${density.resolved} permits ${budget}`);
   if (plan.provenanceRequired && !plan.source) throw new Error(`${plan.id} requires a source`);
-  return { countedWords, budget, density, ...(override ? { defaultBudget, overrideRationale: override.rationale } : {}) };
+  return { density };
+}
+
+/* --------------------------------------------------------------- row rules */
+
+/**
+ * What a section holds, leaf by leaf. A section's family is decided by its
+ * contents rather than by its name: the composer's ids are its own business.
+ */
+function leafComponents(item, out = []) {
+  if (Array.isArray(item.items)) for (const child of item.items) leafComponents(child, out);
+  else if (item.component) out.push(item.component);
+  return out;
+}
+
+// The components a commentary column is built from. Anything else in a section
+// is evidence, and a section holding evidence is a panel.
+const COMMENTARY_COMPONENTS = new Set([
+  "paragraph", "bullet-list", "insight", "evidence-note", "callout", "metric",
+  "connector", "source", "section-boundary", "legend", "section-heading"
+]);
+const isPanel = (item) => Array.isArray(item.items) && leafComponents(item).some((id) => !COMMENTARY_COMPONENTS.has(id));
+
+/** A section's padding before the section() default fills it in. */
+const rawPadding = (item) => item.padding ?? ((item.treatment || "open") === "open" ? 0 : token("space.4"));
+function insetSpecs(item) {
+  const raw = rawPadding(item);
+  if (typeof raw === "number" || isTokenReference(raw)) return { top: raw, right: raw, bottom: raw, left: raw };
+  return { top: raw.top ?? raw.y ?? 0, right: raw.right ?? raw.x ?? 0, bottom: raw.bottom ?? raw.y ?? 0, left: raw.left ?? raw.x ?? 0 };
+}
+// Only ever used to order two paddings against each other. The spacing tokens
+// scale with the page's density, so the winner is carried as its own spec and
+// never as the pixel count read here.
+const paddingTop = (item) => normalizeInsets(rawPadding(item)).top;
+
+/**
+ * Panels in a row are drawn the same way and start on the same line.
+ *
+ * Two panels side by side are read across, so a tinted panel beside a plain one
+ * says one of the two matters more - and says it by accident, because the
+ * surface is what a composer reached for to tell the halves apart. Worse, the
+ * surface pads its contents inward and the plain panel does not, so the tables
+ * inside them start at different heights and the row stops reading across at
+ * all. Both halves of that are fixed here, where the row is built.
+ *
+ * Peers are the sections in the row that carry evidence. A commentary rail
+ * beside an exhibit is not a peer of it and keeps whatever ground the page gave
+ * it (`pointsTone`), because it is read down, not across.
+ *
+ * Differing treatments hold only when every peer names its own: that is the
+ * page deciding which side is highlighted. Where one peer names a ground and
+ * another takes the default, the difference is an alternation rather than a
+ * decision, and the row falls back to the open ground. Whatever the grounds,
+ * the peers take one top inset, so their headings and their tables begin on one
+ * line.
+ */
+function alignRowPanels(items) {
+  const panels = items.filter(isPanel);
+  if (panels.length < 2) return items;
+  const named = panels.every((panel) => panel.treatment !== undefined);
+  const mixed = new Set(panels.map((panel) => panel.treatment || "open")).size > 1;
+  let resolved = mixed && !named ? panels.map((panel) => ({ ...panel, treatment: "open" })) : panels;
+  const tallest = resolved.reduce((deepest, panel) => (paddingTop(panel) > paddingTop(deepest) ? panel : deepest));
+  const top = insetSpecs(tallest).top;
+  resolved = resolved.map((panel) => (paddingTop(panel) === paddingTop(tallest) ? panel : { ...panel, padding: { ...insetSpecs(panel), top } }));
+  const aligned = new Map(panels.map((panel, index) => [panel, resolved[index]]));
+  return items.map((item) => aligned.get(item) ?? item);
+}
+
+/**
+ * A row whose every column is a section holding nothing but prose: the shape
+ * the composer builds when a page's commentary goes under its exhibit rather
+ * than beside it. A bare pair of paragraphs in a row is a label and its body
+ * (the `rows` exhibit), which is one point read across, not three read down.
+ */
+const isProseRow = (items) => items.length >= 2 && items.every((item) => {
+  const leaves = leafComponents(item);
+  return Array.isArray(item.items) && leaves.length > 0 && leaves.every((id) => id === "paragraph");
+});
+
+// About one line of a column in a three-up under a full-width exhibit (360px of
+// 14px Arial), and the widest a column may be before it reads as a sentence
+// rather than as one of three parallel answers.
+const PARALLEL_LINE = 64;
+// A one-word column beside a full line is not a set, however short both are.
+const PARALLEL_RATIO = 3;
+
+/**
+ * Three columns across the foot of a page say: here are three parallel answers
+ * to one question. Three sentences that happen to number three say no such
+ * thing, and setting them in columns claims a structure the writing has not
+ * got - "the series ran from 1992 to 1995" beside "interpretation: the format
+ * offers repeated encounters" is a list, drawn as a comparison.
+ *
+ * So the columns must be built the same way. Either every one carries its own
+ * lead - the lead becomes the column's heading, and three headings are three
+ * parallel answers - or none does and every column is a short phrase of
+ * comparable length: at most a line, and none more than three times another.
+ * Anything else stacks as ordinary points, which is what it is.
+ */
+function parallelProse(items) {
+  const headed = items.filter((item) => item.heading).length;
+  if (headed === items.length) return true;
+  if (headed) return false;
+  const lengths = items.map((item) => leafText(item).length);
+  if (Math.max(...lengths) > PARALLEL_LINE) return false;
+  return Math.max(...lengths) <= Math.min(...lengths) * PARALLEL_RATIO;
+}
+
+function leafText(item, out = []) {
+  if (Array.isArray(item.items)) for (const child of item.items) leafText(child, out);
+  else if (typeof item.props?.text === "string") out.push(item.props.text);
+  return out.join(" ");
 }
 
 function layoutKind(plan, items) {
@@ -199,15 +230,16 @@ function layoutKind(plan, items) {
 }
 
 function makeItem(item, index, cell = null) {
-  const size = item.size || { width: { fr: item.weight || 1 }, height: "fill" };
+  const size = item.size || { width: { fr: item.weight || 1 }, height: (["paragraph", "insight", "evidence-note", "callout", "table"].includes(item.component) || item.component === "bullet-list" && item.props?.variant === "body") ? "hug" : "fill" };
   if (item.items) {
-    const nestedPlan = { id: item.id, layout: item.layout || "auto" };
+    const nestedPlan = { id: item.id, layout: item.layout || "auto", gap: item.gap, leftover: item.leftover, textFlow: item.textFlow };
     const nested = makeComposition(nestedPlan, item.items);
     return section({
       id: item.id,
       treatment: item.treatment || "open",
       edge: item.edge || "contained",
       heading: item.heading || null,
+      headingRule: item.headingRule,
       padding: item.padding,
       composition: nested,
       size,
@@ -226,16 +258,36 @@ function makeItem(item, index, cell = null) {
   });
 }
 
-function makeComposition(plan, items) {
+function makeComposition(plan, items, { root = false } = {}) {
   const kind = layoutKind(plan, items);
+  if (plan.gap !== undefined && (typeof plan.gap !== "string" || !plan.gap.startsWith("space.") || !Object.hasOwn(TOKENS, plan.gap))) throw new Error(`${plan.id}.gap must name a canonical spacing token`);
+  if (plan.gap !== undefined && !["flow.row", "flow.column"].includes(kind)) throw new Error(`${plan.id}.gap is supported only for row and column flows`);
   if (kind === "absolute") return absolute({ id: `${plan.id}-absolute`, children: items.map((item, index) => makeItem(item, index)) });
   if (kind === "overlay") return overlay({ id: `${plan.id}-overlay`, children: items.map((item, index) => makeItem(item, index)) });
   if (kind === "flow.row" || kind === "flow.column") {
+    let direction = kind.endsWith("row") ? "row" : "column";
+    let children = items;
+    if (direction === "row") {
+      children = alignRowPanels(children);
+      // A row of prose that is not parallel is a list, and a list reads down -
+      // unless it is one text set in columns, which reads down the first column
+      // and on into the next. A document page says so; reflowing its columns
+      // into one stack is what left report prose in a single narrow band.
+      if (plan.textFlow !== "columns" && isProseRow(children) && !parallelProse(children)) {
+        direction = "column";
+        children = children.map((item) => ({ ...item, size: { width: { fr: 1 }, height: "hug" } }));
+      }
+    }
+    // A slide body whose blocks all hug their content claims less than the frame.
+    // Without a policy the remainder is abandoned below the last block, which is
+    // what produces a dead band across the lower third of the page.
+    const bodyColumn = root && direction === "column";
     return flow({
-      id: `${plan.id}-${kind.replace(".", "-")}`,
-      direction: kind.endsWith("row") ? "row" : "column",
-      gap: token("space.4"),
-      children: items.map((item, index) => makeItem(item, index))
+      id: `${plan.id}-flow-${direction}`,
+      direction,
+      gap: token(plan.gap ?? "space.4"),
+      leftover: plan.leftover ?? (bodyColumn ? "distribute" : "start"),
+      children: children.map((item, index) => makeItem(item, index))
     });
   }
   if (kind === "section-split-50-50") {
@@ -270,25 +322,78 @@ function planCover(plan) {
   if (!plan.title || !String(plan.title).trim()) throw new Error(`${plan.id}.title is required`);
   if (String(plan.title).includes("—") || String(plan.subtitle || "").includes("—")) throw new Error(`${plan.id} contains a Unicode em dash`);
   if (plan.items !== undefined || plan.chrome !== undefined || plan.source !== undefined || plan.note !== undefined || plan.tracker !== undefined) {
-    throw new Error(`${plan.id} cover content belongs in title and subtitle only`);
+    throw new Error(`${plan.id} cover content belongs in title, subtitle, date and logo only`);
   }
+  // Dark is the default cover; a sourced image makes it half-image.
+  const variant = plan.variant ?? (plan.image ? "half-image" : "dark");
   const spec = {
     id: plan.id,
     density: plan.density ?? "executive",
     frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
-    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.variant ? {variant:plan.variant} : {}), ...(plan.image ? {image:plan.image} : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
+    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.date ? { date: plan.date } : {}), ...(plan.logo ? { logo: plan.logo } : {}), variant, ...(plan.image ? {image:plan.image} : {}), ...(plan.image && plan.tone ? { tone: plan.tone } : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
   };
-  return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, required: "live-pitch", resolved: spec.density, reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
+  return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, recommended: "live-pitch", resolved: spec.density, selection: plan.density === undefined ? "capacity-default" : "explicit", reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
+}
+
+// A section divider is its own page: navy full bleed, section title, giant
+// numeral; no chrome title, its own page furniture.
+function planDivider(plan) {
+  if (!plan?.id || !plan.title?.trim()) throw new Error("Divider plan requires id and title");
+  const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
+  const props = { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.number !== undefined ? { style: "numbered", sectionId: String(plan.number) } : {}), ...(Array.isArray(plan.contents) && plan.contents.length ? { contents: plan.contents, ...(Number.isInteger(plan.contentsActive) ? { contentsActive: plan.contentsActive } : {}) } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}), ...(plan.image ? { image: plan.image } : {}) };
+  return {
+    spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", frame, composition: absolute({ id: `${plan.id}-divider`, children: [componentNode({ id: "divider", component: "section-divider", props, frame, role: "divider" })] }) },
+    decision: { layout: "structural", kind: "divider", density: { requested: "executive", recommended: "live-pitch", resolved: plan.density ?? "executive", selection: "explicit", reasons: [] }, itemJobs: [{ id: "divider", job: "open the section", component: "section-divider" }] }
+  };
+}
+
+function planTakeaways(plan) {
+  if (!plan?.id || !Array.isArray(plan.items) || !plan.items.length) throw new Error("Takeaways plan requires id and items");
+  const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
+  const props = { ...(plan.title ? { title: plan.title } : {}), items: plan.items, ...(plan.mode ? { mode: plan.mode } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}), ...(plan.image ? { image: plan.image } : {}) };
+  return {
+    spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", frame, composition: absolute({ id: `${plan.id}-takeaways`, children: [componentNode({ id: "takeaways", component: "takeaways", props, frame, role: "takeaways" })] }) },
+    decision: { layout: "structural", kind: "takeaways", density: { requested: "executive", recommended: "live-pitch", resolved: plan.density ?? "executive", selection: "explicit", reasons: [] }, itemJobs: [{ id: "takeaways", job: "close the deck", component: "takeaways" }] }
+  };
+}
+
+function planStatement(plan) {
+  if (!plan?.id || !plan.text?.trim()) throw new Error("Statement plan requires id and text");
+  const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
+  const props = { text: plan.text, ...(plan.accent ? { accent: plan.accent } : {}), ...(plan.subtext ? { subtext: plan.subtext } : {}), ...(plan.mode ? { mode: plan.mode } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}), ...(plan.image ? { image: plan.image } : {}) };
+  return {
+    spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", frame, composition: absolute({ id: `${plan.id}-statement`, children: [componentNode({ id: "statement", component: "statement", props, frame, role: "statement" })] }) },
+    decision: { layout: "structural", kind: "statement", density: { requested: "executive", recommended: "live-pitch", resolved: plan.density ?? "executive", selection: "explicit", reasons: [] }, itemJobs: [{ id: "statement", job: "state the message", component: "statement" }] }
+  };
+}
+
+function planTracker(plan, registry) {
+  if (!plan?.id || !plan.title?.trim()) throw new Error("Tracker plan requires id and title");
+  const props = plan.trackerPage;
+  if (!props || !props.items?.some(item => item.id === props.selectedId && item.label === plan.title)) throw new Error("Tracker title must match its selected chapter label");
+  if (plan.items !== undefined || plan.tracker !== undefined) throw new Error("Full tracker content belongs in trackerPage");
+  validateItem({ id: "tracker", job: "orient the reader in the approved sequence", component: "tracker-page", props }, plan.id, registry);
+  const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
+  const density = plan.density ?? "pre-read";
+  return {
+    spec: { id: plan.id, notes: plan.notes || "", density, frame, composition: absolute({ id: `${plan.id}-tracker`, children: [
+      componentNode({ id: "tracker", component: "tracker-page", props, frame, role: "tracker-page" }),
+      componentNode({ id: "page", component: "page-template", props: { pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, frame, role: "page-furniture" })
+    ] }) },
+    decision: { layout: "structural", kind: "tracker", tracker: props, density: { requested: density, recommended: "live-pitch", resolved: density, selection: "explicit", reasons: [] }, itemJobs: [{ id: "tracker", job: "orient the reader in the approved sequence", component: "tracker-page" }] }
+  };
 }
 
 export function planSlide(plan, registry = REGISTRY) {
   const content = validateSlidePlan(plan, registry);
-  const titleVariant = resolveTitleVariant({ variant: plan.titleVariant });
-  const body = makeComposition(plan, plan.items);
+  // Undefined lets the house style (a palette's style.titleRule) decide the rule.
+  const titleVariant = plan.titleVariant === undefined ? undefined : resolveTitleVariant({ variant: plan.titleVariant });
+  const titleDecision = titleVariant ?? "house-style";
+  const body = makeComposition({...plan, gap: plan.gap ?? (["pre-read","appendix"].includes(content.density.resolved) && ["flow.row","flow.column"].includes(layoutKind(plan,plan.items)) ? "space.3" : undefined)}, plan.items, { root: true });
   return {
-    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, tracker: plan.tracker, source: plan.source, note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
+    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.tag ? { tag: plan.tag } : {}), ...(plan.kicker ? { kicker: plan.kicker } : {}), ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), tracker: plan.tracker, source: plan.source, note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
     decision: {
-      titleVariant,
+      titleVariant: titleDecision,
       density: content.density,
       tracker: plan.tracker ?? null,
       layout: layoutKind(plan, plan.items),
@@ -299,7 +404,7 @@ export function planSlide(plan, registry = REGISTRY) {
   };
 }
 
-const TEMPLATE_INSTANCE_KEYS = new Set(["id", "title", "notes", "source", "note", "companyName", "pageNumber", "tracker", "copyBudget", "itemContent"]);
+const TEMPLATE_INSTANCE_KEYS = new Set(["id", "title", "titleLead", "tag", "kicker", "subtitle", "notes", "source", "note", "companyName", "pageNumber", "tracker", "itemContent"]);
 
 function templateItemIndex(items, index = new Map()) {
   for (const item of items || []) {
@@ -344,14 +449,23 @@ export function instantiateSlideTemplate({ id, template, instances }) {
   });
 }
 
-export function planDeck(deckPlan, registry = REGISTRY) {
+export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
   if (!deckPlan?.id || !Array.isArray(deckPlan.slides)) throw new Error("Deck plan requires id and slides");
   const defaultTitleVariant = resolveTitleVariant({ variant: deckPlan.titleVariant });
-  const planned = deckPlan.slides.map((slide) => slide.kind === "cover"
+  // A page that carries an argument carries a page number. `slide-chrome`
+  // defaults one from the slide's position; the structural pages planned below
+  // it did not, so a deck's closing takeaways and its statements sat unnumbered
+  // in a numbered deck and the printed footer ran 45, 46, then nothing, then
+  // 49. A divider is the exception a reader expects: a full-bleed navy page
+  // with a numeral on it already says where it is.
+  const planned = deckPlan.slides.map((slide, index) => slide.kind === "cover"
     ? planCover(slide)
-    : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? defaultTitleVariant : slide.titleVariant }, registry));
-  return {
-    deck: compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, slides: planned.map((item) => item.spec) }, registry),
-    decisions: planned.map((item) => item.decision)
-  };
+    : slide.kind === "tracker" ? planTracker(slide, registry)
+    : slide.kind === "divider" ? planDivider(slide)
+    : slide.kind === "takeaways" ? planTakeaways({ pageNumber: index + 1, ...slide })
+    : slide.kind === "statement" ? planStatement({ pageNumber: index + 1, ...slide })
+    : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
+  const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, ...(deckPlan.chrome ? { chrome: deckPlan.chrome } : {}), ...(deckPlan.fill ? { fill: deckPlan.fill } : {}), ...(deckPlan.weight ? { weight: deckPlan.weight } : {}), slides: planned.map((item) => item.spec) }, registry, {slideCache});
+  deck.slides.forEach((slide, index) => { if (deckPlan.slides[index].role) slide.role = deckPlan.slides[index].role; });
+  return {deck, decisions:planned.map(item=>item.decision)};
 }

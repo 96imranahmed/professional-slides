@@ -23,25 +23,26 @@ const TOKENS = [
   "line.hairline",
   "radius.none",
 ];
+const copyLayout = (value, width, bold, heading = bold) => measureText(value, width, {
+  fontFamily: tokenValue(token("font.body")),
+  fontSize: tokenValue(token(heading ? "type.heading" : "type.body")),
+  bold,
+  wrapWidthRatio: 1,
+});
 function text(
   id,
   frame,
   value,
-  { white = false, bold = false, role = "segment-copy" } = {},
+  { white = false, bold = false, heading = bold, role = "segment-copy" } = {},
 ) {
   const style = {
     fontFamily: token("font.body"),
-    fontSize: token(bold ? "type.heading" : "type.body"),
+    fontSize: token(heading ? "type.heading" : "type.body"),
     color: token(white ? "color.onPrimary" : "color.ink"),
     bold,
     valign: "middle",
   };
-  const layout = measureText(value, frame.width, {
-    fontFamily: tokenValue(style.fontFamily),
-    fontSize: tokenValue(style.fontSize),
-    bold,
-    wrapWidthRatio: 1,
-  });
+  const layout = copyLayout(value, frame.width, bold, heading);
   if (layout.height > frame.height)
     throw new Error(`${id} needs more text space`);
   return textPrimitive({
@@ -166,14 +167,29 @@ export function registerSegmentedEvidence(registry) {
       throw new Error("Decision IDs must be unique and nonempty");
     if (frame.width < 900 || frame.height < 440)
       throw new Error("Decision tree requires 900 by 440");
+    const width = (frame.width - 40) / 2;
+    const rootWidth = Math.min(600, frame.width / 2);
+    const branchWidth = Math.min(440, width - 20);
+    const nodeHeight = (value, width, bold) => copyLayout(value, width - 24, bold).height + 16;
+    const rootHeight = Math.max(70, nodeHeight(props.root, rootWidth, true));
+    const branchHeight = Math.max(70, ...branches.map(b => nodeHeight(b.label, branchWidth, true)));
+    const leafHeight = Math.max(80, ...branches.flatMap(b => {
+      const leafWidth = (width - 20 * (b.conclusions.length - 1)) / b.conclusions.length;
+      return b.conclusions.map(c => nodeHeight(c.text, leafWidth, false));
+    }));
+    const conclusionHeight = Math.max(64, copyLayout(props.conclusion, frame.width - 32, true).height + 16);
+    const gap = (frame.height - rootHeight - branchHeight - leafHeight - conclusionHeight) / 3;
+    if (gap < 16) throw new Error(`${id} decision tree needs more room for its complete node text and tier gaps`);
+    const branchY = frame.y + rootHeight + gap;
+    const leafY = branchY + branchHeight + gap;
     const nodes = [],
       root = {
-        x: frame.x + frame.width / 2 - 150,
+        x: frame.x + (frame.width - rootWidth) / 2,
         y: frame.y,
-        width: 300,
-        height: 70,
+        width: rootWidth,
+        height: rootHeight,
       };
-    const nodeBox = (key, f, value, fill) =>
+    const nodeBox = (key, f, value, fill, bold = true) =>
       nodes.push(
         box(`${key}-box`, f, fill, "decision-box"),
         text(
@@ -185,7 +201,7 @@ export function registerSegmentedEvidence(registry) {
             height: f.height - 16,
           },
           value,
-          { white: whiteOn(fill), bold: true, role: "decision-label" },
+          { white: whiteOn(fill), bold, role: "decision-label" },
         ),
       );
     const connect = (key, x1, y1, x2, y2, from, to) =>
@@ -205,22 +221,21 @@ export function registerSegmentedEvidence(registry) {
         }),
       );
     nodeBox(`${id}-root`, root, props.root, "color.ink");
-    const width = (frame.width - 40) / 2;
     branches.forEach((b, i) => {
       const x = frame.x + i * (width + 40),
-        fill = i ? "color.componentPrimary" : "color.surfaceMuted",
+        fill = "color.surfaceMuted",
         center = x + width / 2;
       connect(
         stableId(id, b.id, "link"),
         frame.x + frame.width / 2,
-        frame.y + 70,
+        frame.y + rootHeight,
         center,
-        frame.y + 140,
+        branchY,
         `${id}-root-box`, `${stableId(id,b.id)}-box`,
       );
       nodeBox(
         stableId(id, b.id),
-        { x: center - 140, y: frame.y + 140, width: 280, height: 70 },
+        { x: center - branchWidth / 2, y: branchY, width: branchWidth, height: branchHeight },
         b.label,
         fill,
       );
@@ -231,24 +246,25 @@ export function registerSegmentedEvidence(registry) {
         connect(
           stableId(id, c.id, "link"),
           center,
-          frame.y + 210,
+          branchY + branchHeight,
           lx + leafWidth / 2,
-          frame.y + 280,
+          leafY,
           `${stableId(id,b.id)}-box`, `${stableId(id,c.id)}-box`,
         );
         nodeBox(
           stableId(id, c.id),
-          { x: lx, y: frame.y + 280, width: leafWidth, height: 80 },
+          { x: lx, y: leafY, width: leafWidth, height: leafHeight },
           c.text,
           fill,
+          false,
         );
       });
     });
     const f = {
       x: frame.x,
-      y: frame.y + frame.height - 64,
+      y: frame.y + frame.height - conclusionHeight,
       width: frame.width,
-      height: 64,
+      height: conclusionHeight,
     };
     nodes.push(
       box(

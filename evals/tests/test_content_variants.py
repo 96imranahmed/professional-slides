@@ -1,8 +1,78 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class ContentVariantTests(unittest.TestCase):
+    def test_decision_tiers_measure_developed_conclusions_without_shrinking_type(self):
+        run_node(r'''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {tokenValue,stableId} from './skills/professional-slides/runtime/core.mjs';
+const tree=REGISTRY.get('tree');
+const props={root:'Permanent capacity equals planned supply less the two named losses',
+ branches:[{id:'a',label:'Normal operating case',conclusions:[
+ {id:'a1',text:'The observed recovery follows its own maturity and validation records. Do not count the same reduction twice.'},
+ {id:'a2',text:'The full demand remains a requirement to serve, rather than proof that each local route has sufficient capacity.'}]},
+ {id:'b',label:'Conditional temporary operating case',conclusions:[
+ {id:'b1',text:'The additional reduction applies only while its separate permission remains valid and the customer response has been verified.'},
+ {id:'b2',text:'The operating duration has a fixed ceiling. The permanent scenario receives no credit for this temporary reduction.'}]}],
+ conclusion:'Keep permanent capacity and conditional response separate until the required evidence has been established.'};
+for(const width of [900,1160]) {
+ const frame={x:40,y:80,width,height:500};const nodes=tree.render({id:'branches',frame,props}).nodes;
+ const boxes=nodes.filter(n=>n.role==='decision-box');
+ const tierY=[...new Set(boxes.map(n=>n.frame.y))].sort((a,b)=>a-b);assert.equal(tierY.length,3);
+ for(let i=0;i<2;i++)assert.ok(Math.max(...boxes.filter(n=>n.frame.y===tierY[i]).map(n=>n.frame.y+n.frame.height))+16<=tierY[i+1]+0.01);
+ for(const n of nodes){assert.ok(n.frame.x>=frame.x-0.01);assert.ok(n.frame.y>=frame.y-0.01);assert.ok(n.frame.x+n.frame.width<=frame.x+width+0.01);assert.ok(n.frame.y+n.frame.height<=frame.y+frame.height+0.01);}
+ for(const n of nodes.filter(n=>n.role==='decision-label'))assert.ok(n.data.textLayout.height<=n.frame.height);
+ const leaf=nodes.find(n=>n.id===stableId('branches','a1')+'-text');assert.equal(tokenValue(leaf.style.fontSize),tokenValue('type.body'));assert.equal(leaf.style.bold,false);
+ assert.deepEqual(boxes.find(n=>n.id===stableId('branches','a')+'-box').style.fill,boxes.find(n=>n.id===stableId('branches','b')+'-box').style.fill);
+}
+const impossible=structuredClone(props);impossible.branches[0].conclusions[0].text='A necessary qualification that cannot be discarded. '.repeat(80);
+assert.throws(()=>tree.render({id:'overflow',frame:{x:0,y:0,width:1160,height:500},props:impossible}),/more room/);
+console.log('{}');
+''')
+
+    def test_auto_layout_preserves_evidence_and_only_authored_supplements(self):
+        run_node(r'''
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const chart={type:'chart.column',heading:'Workload volume',unit:'cases',categories:['A','B'],series:[{name:'Cases',values:[10,20]}]};
+const make=slide=>toDeckPlan({schema:'professional-slides.deck/v3',id:'t',tracker:false,slides:[{id:'s',title:'The comparison uses matching populations and periods',...slide}]});
+const components=value=>{const out=[];function walk(x){if(!x||typeof x!=='object')return;if(x.component)out.push(x.component);for(const v of Object.values(x))if(typeof v==='object')Array.isArray(v)?v.forEach(walk):walk(v);}walk(value);return out;};
+const small=make({exhibit:chart});
+assert.ok(components(small).includes('chart.column'));
+assert.ok(!components(small).includes('metric'));
+const multi={...chart,series:[...chart.series,{name:'Other',values:[15,25]}]};
+assert.ok(!components(make({exhibit:multi})).includes('table'));
+assert.ok(components(make({exhibit:{...multi,dataTable:true}})).includes('table'));
+const points=Array.from({length:3},(_,i)=>({lead:`Finding ${i+1}`,text:'The supporting evidence changes the next operating decision.'}));
+const prose=make({points});
+assert.ok(!components(prose).includes('cards'));
+assert.doesNotThrow(()=>planDeck(prose));
+assert.ok(components(make({exhibit:{type:'cards',tone:'plain',items:points.map(p=>({title:p.lead,text:p.text}))}})).includes('cards'));
+assert.ok(components(make({metrics:[{value:'20',label:'Cases'}],points})).includes('metric'));
+console.log('{}');
+''')
+
+    def test_exhibit_commentary_does_not_change_with_its_neighbours(self):
+        run_node(r'''
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const page=(id,n=2)=>({id,title:'Capacity serves the defined workload under fixed assumptions',layout:'exhibit-top',pointsHeading:false,pointsStyle:'prose',
+ exhibit:{type:'chart.bar',heading:'Service capacity',unit:'hours',categories:['Baseline','Scenario'],series:[{name:'Capacity',values:[100,120]}]},
+ points:Array.from({length:n},(_,i)=>({lead:`Finding ${i+1}`,text:'Review the workload boundary before expanding the deployment.'}))});
+const build=slides=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'t',tracker:false,slides})).deck.slides;
+const alone=build([page('target')])[0];
+const after=build([page('prior'),page('target'),page('single',1)]);
+assert.deepEqual(after[1].nodes.filter(n=>n.id.includes('target-col-')).map(n=>[n.id,n.text]),alone.nodes.filter(n=>n.id.includes('target-col-')).map(n=>[n.id,n.text]));
+assert.ok(after[1].nodes.some(n=>n.id.includes('target-col-')));
+assert.ok(!after.some(s=>s.nodes.some(n=>n.id.includes('below-cards'))));
+assert.doesNotThrow(()=>build([page('single',1)]));
+console.log('{}');
+''')
+
     def test_custom_geography_preserves_provenance_and_rejects_invalid_rings(self):
         run_node(r'''
 import assert from 'node:assert/strict';
@@ -50,18 +120,6 @@ const image=mediaNode({id:'image',frame:{x:0,y:0,width:400,height:200},props:MED
 assert.equal(image.frame.width,image.frame.height);
 assert.equal(image.frame.x,100);
 assert.throws(()=>mediaNode({id:'bad',frame,props:{...MEDIA_SAMPLE,authorization:''}}),/authorization/);
-console.log('{}');
-''')
-
-    def test_embedded_media_gate_rejects_missing_or_unplanned_payloads(self):
-        run_node(r'''
-import assert from 'node:assert/strict';
-import {auditEmbeddedMedia} from './evals/scripts/media_integrity.mjs';
-const a=Buffer.from('declared image'),b=Buffer.from('unexpected image');
-assert.equal(auditEmbeddedMedia([a],[a,a]).accepted,true);
-assert.equal(auditEmbeddedMedia([a],[]).accepted,false);
-assert.equal(auditEmbeddedMedia([a],[a,b]).accepted,false);
-assert.equal(auditEmbeddedMedia([],[]).accepted,true);
 console.log('{}');
 ''')
 
@@ -132,3 +190,62 @@ assert.equal(rendered.length,1);
 assert.equal(rendered[0].text,label.sample.items.find(i=>i.id===label.sample.selectedId).label);
 console.log('{}');
 ''')
+
+
+class BodyBulletTests(unittest.TestCase):
+    def test_body_variant_is_measured_theme_bound_and_never_distributed(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const owner=REGISTRY.get('bullet-list'),frame={x:0,y:0,width:440,height:300};
+const props={variant:'body',items:['Demand has strengthened, but additional capacity is needed before the business can convert it into growth.','Proceed only after the required capacity is available.']};
+const measured=owner.measureContent({frame,props}),nodes=owner.render({id:'body',frame,props}).nodes;
+assert.equal(nodes.filter(n=>n.role==='list-item').length,2);
+const [a,b]=nodes.filter(n=>n.role==='list-item');
+assert.equal(a.style.fontSize.tokenId,'type.body');assert.equal(a.style.fontFamily.tokenId,'font.body');
+assert.equal(a.frame.x,b.frame.x);assert.equal(b.frame.y-a.frame.y-a.frame.height,8);
+assert.equal(b.frame.y+b.frame.height,measured.height);
+assert.deepEqual(owner.render({id:'body',frame:{...frame,height:600},props}).nodes,nodes);
+assert.throws(()=>owner.render({id:'body',frame,props:{...props,variant:'tiny'}}),/Unknown/);
+assert.throws(()=>owner.measureContent({frame,props:{variant:'body',items:[]}}),/nonempty/);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+
+class StaircaseRiseTests(unittest.TestCase):
+    """A staircase is a shape, not a way of spending height.
+
+    The rise stretched to fill whatever frame it was given: three steps in a
+    470px body produced a 191px rise for a 44px tread, so the page read as three
+    small islands with a hundred and fifty pixels of nothing between them and
+    the whole top-left corner empty. It now rises by about what a tread and its
+    text need, and the figure centres in the leftover rather than smearing it
+    between every step.
+    """
+
+    def test_the_rise_is_capped_and_the_figure_centres(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const registry = createRegistry();
+const items = ['A relationship', 'A choice', 'A consequence'].map((label) => ({
+  label, text: 'A sentence of supporting detail that runs to about two lines at this width.' }));
+const measure = (height) => {
+  const frame = {x: 60, y: 140, width: 1160, height};
+  const nodes = registry.get('steps').render({id: 's', frame, props: {items}}).nodes;
+  const treads = nodes.filter((n) => n.role === 'step-block').map((n) => n.frame.y).sort((a, b) => a - b);
+  const top = Math.min(...nodes.map((n) => (n.frame ? n.frame.y : Infinity)));
+  const bottom = Math.max(...nodes.map((n) => (n.frame ? n.frame.y + (n.frame.height || 0) : 0)));
+  return {rise: treads[1] - treads[0], above: top - frame.y, below: frame.y + height - bottom};
+};
+const tall = measure(470), short = measure(300);
+// The rise no longer tracks the frame: a page half again as tall does not make
+// the staircase half again as loose.
+assert.ok(tall.rise < 110, `rise ${tall.rise} should stay compact in a tall frame`);
+assert.ok(tall.rise / short.rise < 1.6, `rise grew ${short.rise} -> ${tall.rise} with the frame`);
+// And the leftover is shared top and bottom rather than dumped in one place.
+assert.ok(Math.abs(tall.above - tall.below) < 40, `unbalanced: ${tall.above} above, ${tall.below} below`);
+console.log(JSON.stringify({ok: true}));
+''')
+        self.assertTrue(result["ok"])

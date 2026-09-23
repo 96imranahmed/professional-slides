@@ -60,7 +60,7 @@ export async function auditSlideOverlaps(page, slide) {
       if (a.type === "text" && b.type === "text") return null;
       // A legitimate text backing must precede its text in the native paint
       // order. Otherwise it hides that text, even if an HTML preview looks fine.
-      for (const [text, shape] of [[a, b], [b, a]]) if (text.type === "text" && shape.type !== "text" && shape.type !== "line" && value(shape.style.fill) !== "none" && shape.data.paintOrder > text.data.paintOrder) return null;
+      for (const [text, shape] of [[a, b], [b, a]]) if (text.type === "text" && shape.type !== "text" && shape.type !== "line" && value(shape.style.fill) !== "none" && (shape.data.paintOrder ?? entries.indexOf(shape)) > (text.data.paintOrder ?? entries.indexOf(text))) return null;
       for (const [surface, child] of [[a, b], [b, a]]) {
         const related = own(surface, child) || descendant(surface, child);
         if (policy.surfaces.includes(surface.role) && related && inside(surface.frame, child.frame)) return `contained by ${surface.role}`;
@@ -79,6 +79,10 @@ export async function auditSlideOverlaps(page, slide) {
         if (surface.role === "annotation-leader" && policy.chartGeometry.includes(child.role)) return "annotation leader anchored to plot geometry";
       }
       if (!own(a, b)) return null;
+      for (const rule of policy.keyedLineJoints || []) if (a.type==='line' && b.type==='line' && a.role===rule.role && b.role===rule.role && a.data[rule.key]!==undefined && a.data[rule.key]===b.data[rule.key]) {
+        const ends=node=>[[node.data.x1,node.data.y1],[node.data.x2,node.data.y2]];
+        if (ends(a).some(p=>ends(b).some(q=>Math.hypot(p[0]-q[0],p[1]-q[1])<.01))) return rule.reason;
+      }
       if (a.role === "annotation-leader" && b.role === "annotation-leader" && a.data.annotationKey && a.data.annotationKey === b.data.annotationKey) return "line junction within one change annotation";
       if(a.role==='table-implication'&&b.role==='table-implication'&&a.data.row===b.data.row&&a.data.column===b.data.column){
         const disc=a.type==='ellipse'?a:b.type==='ellipse'?b:null,mark=disc===a?b:a;
@@ -141,5 +145,5 @@ export async function auditObservedOverlaps(page, deck, observed) {
     audits.push(await auditSlideOverlaps(page, { ...slide, nodes }));
   }
   const result = summarizeOverlapAudits(audits);
-  return { ...result, accepted: result.accepted && !textMismatches.length, source: "artifact-tool-imported-pptx-geometry", textMismatches };
+  return { ...result, accepted: result.accepted && !textMismatches.length, source: "imported-pptx-geometry", textMismatches };
 }

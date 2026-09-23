@@ -1,6 +1,6 @@
 import unittest
 
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class StackedNarrativeTests(unittest.TestCase):
@@ -53,3 +53,33 @@ console.log(JSON.stringify({accepted:true}));
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class StackLabelTests(unittest.TestCase):
+    def test_totals_secondary_units_and_small_segments(self):
+        result = run_node(r'''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const chart=REGISTRY.get('chart.stacked-column');
+const frame={x:60,y:120,width:1160,height:510};
+const props={categories:['A','B','C','D','E'],series:[{name:'Midpoint',values:[19,12,10,8,9]},{name:'Additional',values:[27,22,23,24,20]}],yMin:0,yMax:50,dataLabels:true,valueFormat:{suffix:'%',decimals:0},stackTotals:[46,34,33,32,29].map((value,i)=>({category:['A','B','C','D','E'][i],value})),secondaryLabels:[{category:'E',series:'Midpoint',value:296000,unit:'workers',valueFormat:{compactUnit:'k',decimals:0}},{category:'E',series:'Additional',value:635000,unit:'workers',valueFormat:{compactUnit:'k',decimals:0}},{category:'E',anchor:'stack-total',value:931000,unit:'workers',valueFormat:{compactUnit:'k',decimals:0}}]};
+const nodes=chart.render({id:'counts',frame,props}).nodes;
+assert.equal(nodes.filter(n=>n.data?.anchor==='stack-total').length,5);
+for(const text of ['9%\n296k workers','20%\n635k workers','29%\n931k workers'])assert.ok(nodes.some(n=>n.text===text),text);
+const text=nodes.filter(n=>n.role==='data-label');
+for(const n of text)assert.ok(n.frame.y>=frame.y&&n.frame.y+n.frame.height<=frame.y+frame.height);
+const small={categories:['Late','Midpoint','Early'],series:[{name:'Adopted',values:[2,21,41]},{name:'Remaining',values:[39,39,38]}],stackTotals:[41,60,79].map((value,i)=>({category:['Late','Midpoint','Early'][i],value})),dataLabels:true,yMin:0,yMax:80,valueFormat:{suffix:'%',decimals:0}};
+const result=chart.render({id:'small',frame,props:small}).nodes;
+assert.ok(result.some(n=>n.text==='2%'&&n.data.external));
+const marks=result.filter(n=>n.role==='chart-mark');
+const two=marks.find(n=>n.data.category==='Late'&&n.data.series==='Adopted');
+const thirtyNine=marks.find(n=>n.data.category==='Late'&&n.data.series==='Remaining');
+assert.ok(Math.abs(two.frame.height/thirtyNine.frame.height-2/39)<.0001);
+assert.throws(()=>chart.render({id:'bad',frame,props:{...props,stackTotals:[{category:'A',value:47}]}}),/reconcile/);
+assert.doesNotThrow(()=>chart.render({id:'rounded',frame,props:{...props,secondaryLabels:[],stackTotals:[{category:'A',value:47,roundingTolerance:1,roundingReason:'Independently rounded source total'}]}}));
+for(const secondary of [{category:'Z',series:'Midpoint',value:1,unit:'workers'},{category:'A',series:'Unknown',value:1,unit:'workers'},{category:'A',series:'Midpoint',anchor:'stack-total',value:1,unit:'workers'}])assert.throws(()=>chart.render({id:'bad',frame,props:{...props,secondaryLabels:[secondary]}}));
+assert.throws(()=>REGISTRY.get('chart.column').render({id:'bad',frame,props}),/nonnegative stacked/);
+assert.throws(()=>chart.render({id:'bad',frame,props:{...props,dataLabels:false}}),/visible data labels/);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])

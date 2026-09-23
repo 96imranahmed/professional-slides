@@ -1,19 +1,21 @@
-import { createRequire } from "node:module";
 import { activeDesignTokens } from "./design-context.mjs";
+import { fontContext } from "./font-metrics.mjs";
 
-const require = createRequire(import.meta.url);
-let context;
-function fontContext() {
-  if (!context) {
-    const paths = process.env.RUNTIME_NODE_MODULES ? [process.env.RUNTIME_NODE_MODULES] : undefined;
-    const { createCanvas, GlobalFonts } = require(require.resolve("@napi-rs/canvas", { paths }));
-    context = createCanvas(1, 1).getContext("2d");
-    context.hasFont = (family) => GlobalFonts.has(family);
-  }
-  return context;
+const measurements=new Map();
+const MAX_MEASUREMENTS=4096;
+export function clearTextMeasurementCache(){measurements.clear();}
+export function textMeasurementCacheSize(){return measurements.size;}
+function cachedMeasurement(key,fn){if(measurements.has(key)){const value=measurements.get(key);measurements.delete(key);measurements.set(key,value);return structuredClone(value);}const value=fn();measurements.set(key,structuredClone(value));if(measurements.size>MAX_MEASUREMENTS)measurements.delete(measurements.keys().next().value);return value;}
+function measureWidth(ctx,text){return cachedMeasurement(JSON.stringify([ctx.font,text]),()=>({width:ctx.measureText(text).width}));}
+
+// Line boxes sit on a 4px baseline grid: Arial's natural box is 1.117em, so every
+// size rounds up to the next multiple of 4px (12pt → 20px, 14pt → 24px, 24pt → 36px).
+export const BASELINE = 4;
+export function lineBox(fontSizePt) {
+  return Math.ceil((fontSizePt * 96 / 72 * 1.12) / BASELINE) * BASELINE;
 }
 
-// Wrap once, using the resolved font. Both adapters receive the same explicit lines.
+// Wrap once, using the resolved font. The box is sized here; PowerPoint owns the final wrap.
 export function measureText(text, width, { fontFamily = activeDesignTokens()?.["font.body"].value ?? "Arial", fontSize = 16, bold = false, wrapWidthRatio = 0.97 } = {}) {
   if (!(width > 0)) throw new Error("Text width must be positive");
   if (!(wrapWidthRatio > 0 && wrapWidthRatio <= 1)) throw new Error("Text wrap width ratio must be greater than zero and at most one");
@@ -27,14 +29,89 @@ export function measureText(text, width, { fontFamily = activeDesignTokens()?.["
       const candidate = line ? `${line} ${word}` : word;
       // Ordinary headings reserve font-engine tolerance; titles may use their full
       // measured width rather than create a spurious final-word wrap.
-      if (line && ctx.measureText(candidate).width > width * wrapWidthRatio) {
+      if (line && measureWidth(ctx,candidate).width > width * wrapWidthRatio) {
         lines.push(line);
         line = word;
       } else line = candidate;
-      if (ctx.measureText(line).width > width) throw new Error(`Unbreakable text exceeds its width: ${line}`);
+      if (measureWidth(ctx,line).width > width + 0.01) throw new Error(`Unbreakable text exceeds its width: ${line}`);
     }
     lines.push(line);
   }
-  const lineHeight = Math.ceil(fontSize * 96 / 72 * 1.12);
-  return { text: lines.join("\n"), lines, width: Math.max(...lines.map((line) => ctx.measureText(line).width)), lineHeight, height: lines.length * lineHeight };
+  const lineHeight = lineBox(fontSize);
+  return { source: String(text ?? ""), text: lines.join("\n"), lines, width: Math.max(...lines.map((line) => measureWidth(ctx,line).width)), lineHeight, height: lines.length * lineHeight };
+}
+
+// Styled runs share a single font family, point size and line box. Only emphasis
+// varies; neither the author nor an adapter may independently reflow a run.
+export function measureTextRuns(runs, width, { fontFamily = activeDesignTokens()?.["font.body"].value ?? "Arial", fontSize = 16, wrapWidthRatio = 0.97 } = {}) {
+  if (!Array.isArray(runs) || !runs.length || runs.some(run => !run || typeof run.text !== 'string' || typeof run.bold !== 'boolean' || (run.accent !== undefined && typeof run.accent !== 'boolean') || Object.keys(run).some(key => !['text', 'bold', 'accent'].includes(key)))) throw new Error('Text runs require text and boolean bold (and optional boolean accent) only');
+  if (!(width > 0) || !(wrapWidthRatio > 0 && wrapWidthRatio <= 1)) throw new Error('Text runs require a positive width and valid wrap ratio');
+  const ctx = fontContext();
+  if (!ctx.hasFont(fontFamily)) throw new Error(`Required font is not installed: ${fontFamily}`);
+  const source = runs.map(run => run.text).join('');
+  let offset = 0;
+  const ranges = runs.map(run => { const start = offset; offset += run.text.length; return { ...run, start, end: offset }; });
+  const merge = parts => parts.reduce((result, part) => {
+    if (!part.text) return result;
+    if (result.at(-1)?.bold === part.bold && Boolean(result.at(-1)?.accent) === Boolean(part.accent)) result.at(-1).text += part.text;
+    else result.push({ text: part.text, bold: part.bold, ...(part.accent ? { accent: true } : {}) });
+    return result;
+  }, []);
+  const runWidth = parts => merge(parts).reduce((total, part) => {
+    ctx.font = `${part.bold ? 'bold' : 'normal'} ${fontSize * 96 / 72}px "${fontFamily}"`;
+    return total + measureWidth(ctx,part.text).width;
+  }, 0);
+  const wordRuns = (start, end) => ranges.filter(run => run.end > start && run.start < end).map(run => ({ text: source.slice(Math.max(start, run.start), Math.min(end, run.end)), bold: run.bold, ...(run.accent ? { accent: true } : {}) }));
+  const lineRuns = [];
+  offset = 0;
+  for (const paragraph of source.split('\n')) {
+    let line = [];
+    for (const match of paragraph.matchAll(/\S+/g)) {
+      const word = wordRuns(offset + match.index, offset + match.index + match[0].length);
+      const candidate = merge([...line, ...(line.length ? [{ text: ' ', bold: line.at(-1).bold, ...(line.at(-1).accent ? { accent: true } : {}) }] : []), ...word]);
+      if (line.length && runWidth(candidate) > width * wrapWidthRatio) { lineRuns.push(line); line = merge(word); }
+      else line = candidate;
+      if (runWidth(line) > width + 0.01) throw new Error(`Unbreakable text exceeds its width: ${match[0]}`);
+    }
+    lineRuns.push(line);
+    offset += paragraph.length + 1;
+  }
+  const lines = lineRuns.map(parts => parts.map(part => part.text).join(''));
+  const measuredRuns = merge(lineRuns.flatMap((parts, index) => [...(index ? [{ text: '\n', bold: false }] : []), ...parts]));
+  const lineHeight = lineBox(fontSize);
+  return { source, sourceRuns: merge(runs), text: lines.join('\n'), lines, runs: measuredRuns.length ? measuredRuns : [{text:'',bold:false}], width: Math.max(...lineRuns.map(runWidth)), lineHeight, height: lines.length * lineHeight };
+}
+
+/**
+ * Split a sentence into runs at the phrases the page wants to carry in the
+ * accent. This is the reference decks' commonest emphasis: the figure or the
+ * finding is set in the house colour inside a sentence that otherwise reads as
+ * ink ("Improved quality of care for patients"), rather than bolded whole or
+ * split onto its own line. `phrases` is one string or several; each is matched
+ * in order of appearance, once. Unmatched phrases throw: a highlight that does
+ * not occur in the text is a typo, and silently dropping it hides the typo.
+ */
+export function accentRuns(text, phrases, { bold = true, accent = true, strict = true } = {}) {
+  const list = (Array.isArray(phrases) ? phrases : phrases === undefined || phrases === null ? [] : [phrases])
+    .map((phrase) => String(phrase ?? "").trim()).filter(Boolean);
+  const source = String(text ?? "");
+  if (!list.length) return null;
+  // `strict: false` is for a block that is one of several (the items of a table
+  // cell): the phrase belongs to one of them, and the caller checks that it
+  // matched somewhere rather than in every block.
+  if (!strict && !list.some((phrase) => source.includes(phrase))) return null;
+  for (const phrase of list) {
+    if (strict && !source.includes(phrase)) throw new Error(`highlight "${phrase}" does not occur in "${source}"`);
+  }
+  const runs = [];
+  let rest = source;
+  while (rest.length) {
+    const hits = list.map((phrase) => ({ phrase, at: rest.indexOf(phrase) })).filter((hit) => hit.at >= 0).sort((a, b) => a.at - b.at);
+    if (!hits.length) { runs.push({ text: rest, bold: false }); break; }
+    const { phrase, at } = hits[0];
+    if (at > 0) runs.push({ text: rest.slice(0, at), bold: false });
+    runs.push({ text: phrase, bold, ...(accent ? { accent: true } : {}) });
+    rest = rest.slice(at + phrase.length);
+  }
+  return runs.filter((run) => run.text.length);
 }

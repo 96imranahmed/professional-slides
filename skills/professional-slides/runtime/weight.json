@@ -1,0 +1,401 @@
+{
+  "$comment": "The weight contract and the reference corpus it is calibrated against. This file is the single source: runtime/weight.mjs reads it for the composer and runtime/gates/page_gates.py reads it for the gates, so a change to a floor moves the page and the finding together. Every number under byFill is a floor, never a ceiling - the ceiling on prose is the WORDS gate. Everything under `reference` is measured by evals/corpus/measure_corpus.py against 670 published client PDFs from twelve firms; evals/corpus/README.md says what was measured and what it cost.",
+  "schema": "professional-slides.weight/v1",
+  "keys": {
+    "pageWords": "words in the page BODY - the title band, source and notes do not count",
+    "columnFill": "share of its own height the side column must reach",
+    "plotSpan": "share of the exhibit frame the marks must span",
+    "pointWords": "mean words per point in a side column",
+    "tableFill": "share of the page's row budget a table should use",
+    "elements": "evidence elements expected on an analytical page"
+  },
+  "ranges": {
+    "pageWords": [
+      0,
+      400
+    ],
+    "columnFill": [
+      0,
+      1
+    ],
+    "plotSpan": [
+      0,
+      1
+    ],
+    "pointWords": [
+      0,
+      60
+    ],
+    "tableFill": [
+      0,
+      1
+    ],
+    "elements": [
+      1,
+      4
+    ]
+  },
+  "defaultFill": "balanced",
+  "byFill": {
+    "full": {
+      "pageWords": 120,
+      "columnFill": 0.68,
+      "plotSpan": 0.6,
+      "pointWords": 10,
+      "tableFill": 0.55,
+      "elements": 2
+    },
+    "balanced": {
+      "pageWords": 95,
+      "columnFill": 0.55,
+      "plotSpan": 0.52,
+      "pointWords": 8,
+      "tableFill": 0.45,
+      "elements": 1
+    },
+    "airy": {
+      "pageWords": 0,
+      "columnFill": 0,
+      "plotSpan": 0,
+      "pointWords": 0,
+      "tableFill": 0,
+      "elements": 1
+    }
+  },
+  "geometryByFill": {
+    "$comment": "The geometric thresholds that move with fill, each set to a percentile of the corpus's own distribution over 2,125 rendered pages, so a floor can be read as a promise: an `airy` deck beats the emptiest 3% of published pages, a `balanced` deck the emptiest 10%, a `full` deck the emptiest quarter. The old ink ladder of 0.14 / 0.115 sat at the 36th and 26th percentiles - it rejected a third of the corpus, which is not a floor on emptiness but a floor on being denser than most published work. The dead band and column-void ceilings were already close to right (0.06 fires on 8% of published pages, 0.2 on 4%) and are unchanged; internal void at 0.16-0.32 fired on 1.3% and 0.6% and never caught anything, so it moves to the same 2-3% tail the others sit in. A page of type alone cannot reach ink_min at any honest length: see inkPerWord, which sets that page's floor instead.",
+    "full": {
+      "ink_min": 0.118,
+      "dead_band_max": 0.06,
+      "internal_void_max": 0.12,
+      "column_void_max": 0.2
+    },
+    "balanced": {
+      "ink_min": 0.077,
+      "dead_band_max": 0.08,
+      "internal_void_max": 0.13,
+      "column_void_max": 1.0
+    },
+    "airy": {
+      "ink_min": 0.05,
+      "dead_band_max": 0.14,
+      "internal_void_max": 0.18,
+      "column_void_max": 1.0
+    }
+  },
+  "inkPerWord": {
+    "$comment": "Ink a page of body type puts on the canvas, per word, measured by rendering text pages of 93 to 185 words at three and five points and reading the coverage back off the PNG. The relationship is linear: 95 words measured 0.0556, 128 words 0.0687, 185 words 0.0962. A text page's ink floor is this times the deck's own pageWords, so the ink a page must show is the ink its required words produce, and the two gates cannot disagree.",
+    "value": 0.00052,
+    "tolerance": 0.9,
+    "measured": {
+      "pages": 10,
+      "words": [
+        93,
+        185
+      ],
+      "ink": [
+        0.0528,
+        0.0962
+      ]
+    }
+  },
+  "picture": {
+    "$comment": "A page whose evidence is a photograph carries fewer words, because the reader is looking at the subject rather than reading about it - and the body left for type is what sits beside or beneath the frame. So the word floor follows the geometry, exactly as inkPerWord makes a text page's ink floor follow its own word floor, rather than adding a second constant nobody measured: the floor is pageWords times the share of the body that is not photograph. shareMax caps the relief, so a page cannot buy its way out of carrying an argument by growing its picture; MISSING_ARGUMENT holds the other end and IMAGE_BUDGET caps how many pages may do this at all.",
+    "shareMax": 0.6
+  },
+  "plan": {
+    "$comment": "Thresholds for the plan gates, which judge the dot-dash before a page is drawn. The mix bands and the entropy floor are calibrated on the example decks and are GUIDELINES - move them with judgement as real plans are measured against them. The shapes of the tests are not guidelines: charts and tables get separate bands because merging them into one 45% floor is what let a deck of 43% tables pass more comfortably than a balanced one.",
+    "from": 8,
+    "measuredMin": 0.45,
+    "runMax": 2,
+    "entropyMin": 0.7,
+    "entropyObserved": [
+      0.67,
+      0.78,
+      0.88,
+      0.92
+    ],
+    "titleWords": {
+      "target": 12,
+      "overShareMax": 0.35
+    },
+    "anchor": {
+      "itemsFrom": 2,
+      "itemsTo": 6
+    },
+    "mix": {
+      "$comment": "Measured over 122 pages of real CLIENT PROJECT decks (BCG, McKinsey, Bain), with the published-work numbers recorded beside them because the two are different animals. Client work runs more tables (0.197 dominant against 0.110) and fewer charts (0.303 against 0.371) than published thought leadership, and a quarter of its pages still carry no exhibit at all. The floors sit under what client work does; the caps sit above it. `picture` used to carry a 0.05 FLOOR, which asked for three times the photographs a client deck carries. `text` had no band at all, which is why the composer never planned a page of type and then produced fifty pages of commentary restating the exhibit beside it.",
+      "chart": {
+        "min": 0.25,
+        "observedClient": 0.303,
+        "observedPublished": 0.371,
+        "presentClient": 0.402
+      },
+      "table": {
+        "max": 0.3,
+        "observedClient": 0.197,
+        "observedPublished": 0.11,
+        "presentClient": 0.262
+      },
+      "diagram": {
+        "min": 0.07,
+        "observedClient": 0.098,
+        "observedPublished": 0.076,
+        "presentClient": 0.148
+      },
+      "picture": {
+        "max": 0.15,
+        "observedClient": 0.016,
+        "observedPublished": 0.008,
+        "presentClient": 0.066
+      },
+      "text": {
+        "max": 0.35,
+        "observedClient": 0.254,
+        "observedPublished": 0.3
+      }
+    },
+    "craft": {
+      "$comment": "What the dot-dash has to record about the *craft* of a page. A generated 50-page deck passed every mix, entropy and anchor gate and still read as dry: 10 tables with a median of 3 rows and not one treatment, 18 charts with not one annotation, 35 point lists with not one highlighted phrase. The floors were 0.20 and 0.25, guessed off four self-authored decks. In real client decks **every table carried a treatment - 32 of 32** - and four charts in five carried an annotation. Published thought leadership is looser (0.89 and 0.63), which is why the floors are set from client work.",
+      "tableRows": {
+        "min": 4,
+        "observedClientMedian": 5,
+        "observedPublishedMedian": 7,
+        "observedRange": [
+          2,
+          30
+        ]
+      },
+      "tableTreated": {
+        "min": 0.75,
+        "observedClient": 1.0,
+        "observedPublished": 0.89,
+        "observedOf": 32
+      },
+      "chartAnnotated": {
+        "min": 0.65,
+        "observedClient": 0.796,
+        "observedPublished": 0.63,
+        "observedOf": 49
+      },
+      "exhibitVarietyPerTen": {
+        "min": 4.0,
+        "observed": [
+          7.1,
+          7.5,
+          7.5,
+          8.3
+        ]
+      },
+      "reasonShareMax": 0.25,
+      "chartValuesPrinted": {
+        "min": 0.6,
+        "observedClient": 0.755,
+        "observedPublished": 0.79,
+        "observedOf": 49
+      },
+      "highlightedPhrase": {
+        "min": 0.35,
+        "observedClient": 0.508,
+        "observedPublished": 0.414
+      },
+      "sourceLine": {
+        "min": 0.5,
+        "observedClient": 0.672,
+        "$comment": "A page without a source line is a page a reader cannot check. Client work runs 0.672."
+      },
+      "marksPerPage": {
+        "min": 11,
+        "corpusFirstQuartile": 11,
+        "corpusMedian": 32,
+        "$comment": "Drawn primitives that are not type, per page. A page of rules and paragraphs is what a reader feels before reading a word."
+      },
+      "from": {
+        "min": 5,
+        "$comment": "Analytical pages before a deck-wide rate means anything."
+      },
+      "tableDevice": {
+        "shareMax": 0.6,
+        "from": 4,
+        "$comment": "One table device on more than three fifths of a deck's tables is one decision made once. Treated is not the same as varied: nine of fourteen tables in the cold run drew the implication gutter and the reader stopped seeing it."
+      },
+      "drawnBridge": {
+        "shareMax": 0.4,
+        "from": 5,
+        "$comment": "A drawn mark in the gutter between an exhibit and its commentary asserts an inference. The reference decks state that relation in the commentary's heading, in a headed panel or in a closing band far more often than they draw it; a deck that draws it on most such pages has stopped choosing."
+      },
+      "vocabulary": {
+        "familiesMin": 4,
+        "from": 12,
+        "$comment": "Device families a deck actually draws, measured on the composed scene. A vocabulary floor rather than a rate measured off client PDFs: what share of client pages carry a harvey ball cannot be read off a render. It asserts only that a deck of twelve analytical pages or more reached for more than a couple of the families it has."
+      },
+      "chartTypeShare": {
+        "$comment": "The largest share one chart type may take of a deck's charts, once it has eight or more. The gallery deck, the only example with that many, spreads 31 charts across 15 types and its commonest takes 19%. A fifty-page deck that set seven of its seventeen charts as columns (41%) passed every other check and read as one chart reprinted. Advisory: the example set is one deck deep.",
+        "max": 0.35,
+        "fromCharts": 8,
+        "observed": {
+          "gallery-acceptance": 0.19
+        }
+      }
+    },
+    "textForm": {
+      "$comment": "How client decks shape a page's words. Measured over analytic pages of 5 client-project decks with pdftotext -layout; a block is a run of consecutive non-empty lines, title and source lines excluded, blocks under three words dropped as labels. A deck that answers every page with one long paragraph passes the word-count contract and still reads as an essay with pictures; these are the numbers that say so.",
+      "pagesMeasured": 37,
+      "blocksPerPage": {
+        "median": 4,
+        "q1": 2.0,
+        "q3": 5.0,
+        "min": 1,
+        "max": 9
+      },
+      "wordsPerBlock": {
+        "median": 55.8,
+        "q1": 41.3,
+        "q3": 86.5
+      },
+      "longestBlock": {
+        "median": 128,
+        "q3": 152.0,
+        "max": 374
+      },
+      "longestBlockMax": 152.0,
+      "blocksPerPageMin": 2,
+      "singleBlockPagesMax": 0.135
+    }
+  },
+  "reference": {
+    "$comment": "Measured, not asserted, and split by what the deck is FOR. `corpus` is the wide text sample of real client-project decks - 3,606 analytical pages - which is what the floors are set against. `published` records the same measures over thought leadership, for contrast: the page geometry barely differs, the craft does. `slides` is the pixel sample rendered onto the same 1280x720 canvas page_gates.py reads. `judged` is a vision pass, 122 client pages against evals/corpus/rubric.md. The previous version of this block claimed 137 hand-decomposed slides that nothing in the tree could reproduce.",
+    "slides": {
+      "pages": 140,
+      "decks": 28,
+      "inkMedian": 0.184,
+      "inkQ1": 0.118,
+      "inkP10": 0.077,
+      "deadBandP90": 0.033,
+      "internalVoidP90": 0.06,
+      "columnVoidP90": 0.109,
+      "bands": {
+        "titleBand": 18,
+        "body": 148,
+        "footer": 13
+      },
+      "words": 189,
+      "wordsP20": 110,
+      "wordsP80": 290,
+      "wordsMax": 1845,
+      "heavyShare": 0.512,
+      "numericTokens": 13,
+      "numericByFamily": {
+        "chart": 26,
+        "chartP25": 20,
+        "table": 20,
+        "diagram": 4,
+        "text": 3
+      },
+      "exceedance": {
+        "$comment": "Share of the 140 rendered client-project pages each candidate threshold would flag. The full 2,125-page corpus gives the same answers within two points, so the geometry is not what separates client work from published work.",
+        "inkBelow": {
+          "0.05": 0.064,
+          "0.077": 0.114,
+          "0.118": 0.243,
+          "0.14": 0.307
+        },
+        "deadBandAbove": {
+          "0.06": 0.093,
+          "0.08": 0.071,
+          "0.14": 0.05
+        },
+        "internalVoidAbove": {
+          "0.12": 0.043,
+          "0.13": 0.043,
+          "0.18": 0.029,
+          "0.22": 0.014
+        },
+        "columnVoidAbove": {
+          "0.13": 0.093,
+          "0.2": 0.043
+        }
+      },
+      "drawings": 32,
+      "drawingsP25": 11,
+      "drawingsP75": 88,
+      "$comment": "Client-project pages rendered onto the gate's own canvas."
+    },
+    "corpus": {
+      "$comment": "Client-project decks only: BCG, McKinsey, Bain.",
+      "pages": 3606,
+      "decks": 28,
+      "p25": 126,
+      "median": 189,
+      "p75": 267,
+      "heavyShare": 0.512
+    },
+    "judged": {
+      "$comment": "122 content pages of client-project work; the published figure follows each one.",
+      "pages": 132,
+      "contentPages": 122,
+      "decks": 28,
+      "noExhibitShare": 0.246,
+      "exhibitsPerPage": 1.11,
+      "titleIsClaim": 0.648,
+      "titleIsClaimPublished": 0.553,
+      "hasCommentary": 0.328,
+      "hasCommentaryPublished": 0.43,
+      "highlightedPhrase": 0.508,
+      "sourceLine": 0.672,
+      "byFamily": {
+        "chart": {
+          "share": 0.303,
+          "titleIsClaim": 0.89,
+          "hasCommentary": 0.38,
+          "highlightedPhrase": 0.38,
+          "bodyWords": 104,
+          "numeric": 27
+        },
+        "table": {
+          "share": 0.197,
+          "titleIsClaim": 0.38,
+          "hasCommentary": 0.21,
+          "highlightedPhrase": 0.46,
+          "bodyWords": 167,
+          "numeric": 20
+        },
+        "diagram": {
+          "share": 0.098,
+          "titleIsClaim": 0.75,
+          "hasCommentary": 0.42,
+          "highlightedPhrase": 0.5,
+          "bodyWords": 120,
+          "numeric": 4
+        },
+        "text": {
+          "share": 0.254,
+          "titleIsClaim": 0.42,
+          "hasCommentary": 0.13,
+          "highlightedPhrase": 0.71,
+          "bodyWords": 136,
+          "numeric": 3
+        },
+        "mixed": {
+          "share": 0.131,
+          "titleIsClaim": 0.81,
+          "hasCommentary": 0.69,
+          "highlightedPhrase": 0.5,
+          "bodyWords": 126,
+          "numeric": 19
+        }
+      }
+    },
+    "published": {
+      "$comment": "Published thought leadership in deck format, for contrast. Not what the floors are set from.",
+      "pages": 12678,
+      "decks": 396,
+      "p25": 119,
+      "median": 198,
+      "p75": 297,
+      "heavyShare": 0.54,
+      "reportPages": 1924,
+      "reportMedian": 174
+    }
+  }
+}

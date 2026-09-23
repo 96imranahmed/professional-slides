@@ -1,0 +1,16 @@
+{
+ "101":["T-plain",["form"]], "102":["S-divider",["numbered"]], "103":["X-columns",["chevron-header","dark","intro-panel"]],
+ "104":["X-document",["pull-quote"]], "105":["P-device-mockup",["chart"]], "106":["X-quote",["cluster","label-panels"]],
+ "107":["C-scatter",["quadrant-labels","ring"]], "108":["S-other",[]], "109":["C-stack",["photo-band","callout"]],
+ "110":["C-bar-h",["ranked","sidebar-text"]], "111":["C-lollipop",["ring","before-after","dark"]], "112":["X-cards",["photo","numbered"]],
+ "113":["X-statement",["gradient","big-number"]], "114":["C-paired",[]], "115":["X-document",["photo","sidebar"]],
+ "116":["C-shared-rows",[]], "117":["P-photo-text",["color-panel"]], "118":["X-numbered-rows",["photo-side"]],
+ "119":["X-document",[]], "120":["X-personas",["photo","quote"]],
+ "121":["S-other",[]], "122":["C-waffle",["document"]], "123":["C-map",["country-list"]],
+ "124":["C-waterfall",["side-labels"]], "125":["C-line",["shaded","highlight-box","dot-row"]], "126":["C-stack",["horizontal","percent","document"]],
+ "127":["C-bar-h",["dark","icon"]], "128":["S-agenda",["active"]], "129":["T-icon-rows",["quote","arrow"]],
+ "130":["X-numbered-rows",["image"]], "131":["C-col",["diverging","sidebar-box"]], "132":["C-stack",["sidebar-text"]],
+ "133":["X-document",[]], "134":["P-case-study",["logos","dark"]], "135":["X-columns",["icon-arrows"]],
+ "136":["C-bar-h",["range","icon-rows","dark","statement"]], "137":["X-columns",[]], "138":["C-area",["phases","sidebar-rows"]],
+ "139":["X-icon-list",[]], "140":["X-personas",["photo","kpi"]]
+}

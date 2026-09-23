@@ -1,0 +1,99 @@
+{
+  "schema": "professional-slides.content/v1",
+  "id": "nyc-or-sf",
+  "question": "Which city, and which neighborhood, should the move be to?",
+  "answer": "Park Slope, unless the interview puts the role inside model decisions, which only San Francisco offers.",
+  "$comment": "The content stage for this deck, written after the fact so the stage has a worked example that is a real deck rather than a fixture. Nothing here names a component, an architecture or a variant - `settles.kind` is the only field the layout stage reads. Compare `adds` against `claim` on every page: where the two say the same thing the page has no commentary column to earn.",
+  "pages": [
+    {
+      "n": 1,
+      "claim": "Lead with Park Slope; move to SF only for a role inside model decisions",
+      "settles": {
+        "kind": "comparison",
+        "what": "the five gates scored across both cities and their shortlisted neighborhoods"
+      },
+      "adds": "Four gates resolve on evidence already gathered, so the interview is the only thing left that can reverse the answer",
+      "highlight": "clears every gate with evidence in hand"
+    },
+    {
+      "n": 2,
+      "claim": "Both cities offer the role; only Anthropic lets you take it in New York",
+      "settles": {
+        "kind": "rank",
+        "what": "published base-salary bands for the four product roles at both labs"
+      },
+      "adds": "The bands overlap enough that pay decides nothing; what separates the offers is which decisions the seat owns",
+      "highlight": "inside model decisions"
+    },
+    {
+      "n": 3,
+      "claim": "NYC schools beat their peers by 7\u201312 points; the SF pair is a preference",
+      "settles": {
+        "kind": "comparison",
+        "what": "state proficiency against district and state peers for the four shortlisted schools"
+      },
+      "adds": "Education does not decide the city; it decides the neighborhood, and it has to be fixed before entry year rather than after the move",
+      "highlight": "by 7 to 12 points"
+    },
+    {
+      "n": 4,
+      "claim": "Hoboken is safest on the matched measure; neighborhoods differ more than cities",
+      "settles": {
+        "kind": "rank",
+        "what": "violent crime per 1,000 residents across the six shortlisted neighborhoods"
+      },
+      "adds": "The within-city spread is wider than the between-city gap, so a city-level safety argument settles nothing either way",
+      "highlight": "get the rates before signing a lease"
+    },
+    {
+      "n": 5,
+      "claim": "Every shortlisted commute fits in 45 minutes except Berkeley, which fails by 10",
+      "settles": {
+        "kind": "comparison",
+        "what": "door-to-door transit time by leg for each neighborhood against a 45-minute budget"
+      },
+      "adds": "Berkeley is the only option that fails on a measure with no remedy short of moving again, which is why it leaves the list rather than scoring low",
+      "highlight": "Ride time is not the constraint"
+    },
+    {
+      "n": 6,
+      "claim": "Rent moves five points of gross pay: a comfort decision, not a viability one",
+      "settles": {
+        "kind": "share",
+        "what": "rent as a share of gross pay at each neighborhood's median two-bedroom"
+      },
+      "adds": "Five points is inside the range a stage-one rental can absorb, so rent should not be allowed to outrank the role",
+      "highlight": "not twenty"
+    },
+    {
+      "n": 7,
+      "claim": "Hoboken is the midtown fallback: cheapest and safest, but its school trails its district",
+      "settles": {
+        "kind": "comparison",
+        "what": "the same five gates for Hoboken against Park Slope"
+      },
+      "adds": "It wins on the two gates that are cheapest to change later and loses on the one that is hardest, which is the wrong way round for a family move",
+      "highlight": "trails its district by 2 points"
+    },
+    {
+      "n": 8,
+      "claim": "Every gate resolves on evidence except the role, which only the interview can settle",
+      "settles": {
+        "kind": "structure",
+        "what": "each gate, its evidence state, and what would still change it"
+      },
+      "adds": "Name the two questions to ask in the interview now, because after an offer the answer is no longer free to act on",
+      "highlight": "only the interview settles"
+    },
+    {
+      "n": 9,
+      "claim": "Rent for stage one, book two visits, and fix the school before entry year",
+      "settles": {
+        "kind": "sequence",
+        "what": "the three actions, their timing and what each one depends on"
+      },
+      "adds": "Renting keeps the reversal cheap while the role question is still open, which is the only reason to delay buying",
+      "highlight": "the role with the closest researcher contact"
+    }
+  ]
+}

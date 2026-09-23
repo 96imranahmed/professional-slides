@@ -1,0 +1,1141 @@
+{
+ "$comment": "Pages 401-600 of sample-published.json (the firms' published and infographic reports), one primary style per page from styles.json and the devices it carries. Built from codes-published-*.json.",
+ "401": {
+  "style": "X-document",
+  "devices": []
+ },
+ "402": {
+  "style": "P-people",
+  "devices": []
+ },
+ "403": {
+  "style": "X-document",
+  "devices": []
+ },
+ "404": {
+  "style": "S-divider",
+  "devices": []
+ },
+ "405": {
+  "style": "P-photo-text",
+  "devices": []
+ },
+ "406": {
+  "style": "T-logo-rows",
+  "devices": []
+ },
+ "407": {
+  "style": "X-columns",
+  "devices": []
+ },
+ "408": {
+  "style": "C-stack",
+  "devices": []
+ },
+ "409": {
+  "style": "P-photo-tiles",
+  "devices": []
+ },
+ "410": {
+  "style": "C-col",
+  "devices": []
+ },
+ "411": {
+  "style": "X-cards",
+  "devices": [
+   "segmented-scale"
+  ]
+ },
+ "412": {
+  "style": "C-col",
+  "devices": [
+   "delta-pills"
+  ]
+ },
+ "413": {
+  "style": "X-numbered-rows",
+  "devices": []
+ },
+ "414": {
+  "style": "X-numbered-rows",
+  "devices": []
+ },
+ "415": {
+  "style": "C-col",
+  "devices": []
+ },
+ "416": {
+  "style": "K-ring",
+  "devices": [
+   "hex-photo-mosaic"
+  ]
+ },
+ "417": {
+  "style": "X-document",
+  "devices": []
+ },
+ "418": {
+  "style": "X-document",
+  "devices": []
+ },
+ "419": {
+  "style": "C-col",
+  "devices": []
+ },
+ "420": {
+  "style": "P-illustration",
+  "devices": []
+ },
+ "421": {
+  "style": "S-agenda",
+  "devices": []
+ },
+ "422": {
+  "style": "C-shared-rows",
+  "devices": []
+ },
+ "423": {
+  "style": "X-document",
+  "devices": []
+ },
+ "424": {
+  "style": "X-before-after",
+  "devices": []
+ },
+ "425": {
+  "style": "S-other",
+  "devices": []
+ },
+ "426": {
+  "style": "C-radial",
+  "devices": [
+   "nested-arcs"
+  ]
+ },
+ "427": {
+  "style": "C-col",
+  "devices": []
+ },
+ "428": {
+  "style": "P-photo-full",
+  "devices": []
+ },
+ "429": {
+  "style": "C-col",
+  "devices": []
+ },
+ "430": {
+  "style": "T-check",
+  "devices": []
+ },
+ "431": {
+  "style": "T-photo-rows",
+  "devices": []
+ },
+ "432": {
+  "style": "X-document",
+  "devices": []
+ },
+ "433": {
+  "style": "S-divider",
+  "devices": []
+ },
+ "434": {
+  "style": "S-divider",
+  "devices": []
+ },
+ "435": {
+  "style": "X-statement",
+  "devices": []
+ },
+ "436": {
+  "style": "C-small-multiples",
+  "devices": []
+ },
+ "437": {
+  "style": "C-small-multiples",
+  "devices": []
+ },
+ "438": {
+  "style": "C-waterfall",
+  "devices": []
+ },
+ "439": {
+  "style": "X-cards",
+  "devices": []
+ },
+ "440": {
+  "style": "X-bullets",
+  "devices": []
+ },
+ "441": {
+  "style": "C-bar-h",
+  "devices": [
+   "dark",
+   "range",
+   "text-panel"
+  ]
+ },
+ "442": {
+  "style": "C-paired",
+  "devices": [
+   "bubble"
+  ]
+ },
+ "443": {
+  "style": "C-col",
+  "devices": [
+   "logo-axis"
+  ]
+ },
+ "444": {
+  "style": "P-case-study",
+  "devices": [
+   "illustration",
+   "timeline"
+  ]
+ },
+ "445": {
+  "style": "X-document",
+  "devices": []
+ },
+ "446": {
+  "style": "X-personas",
+  "devices": [
+   "generations"
+  ]
+ },
+ "447": {
+  "style": "C-pie",
+  "devices": [
+   "paired",
+   "document"
+  ]
+ },
+ "448": {
+  "style": "C-bar-h",
+  "devices": [
+   "profile"
+  ]
+ },
+ "449": {
+  "style": "X-document",
+  "devices": [
+   "quote"
+  ]
+ },
+ "450": {
+  "style": "P-photo-full",
+  "devices": []
+ },
+ "451": {
+  "style": "T-heat",
+  "devices": [
+   "dot-matrix",
+   "document"
+  ]
+ },
+ "452": {
+  "style": "C-paired",
+  "devices": [
+   "icon-axis"
+  ]
+ },
+ "453": {
+  "style": "T-rag",
+  "devices": [
+   "icon",
+   "rank-change"
+  ]
+ },
+ "454": {
+  "style": "T-text",
+  "devices": [
+   "maturity",
+   "icon"
+  ]
+ },
+ "455": {
+  "style": "P-photo-text",
+  "devices": [
+   "numbered",
+   "dark"
+  ]
+ },
+ "456": {
+  "style": "T-text",
+  "devices": []
+ },
+ "457": {
+  "style": "C-line",
+  "devices": [
+   "end-cagr-column"
+  ]
+ },
+ "458": {
+  "style": "X-document",
+  "devices": []
+ },
+ "459": {
+  "style": "X-document",
+  "devices": [
+   "pull-stat"
+  ]
+ },
+ "460": {
+  "style": "C-col",
+  "devices": [
+   "big-number-callouts"
+  ]
+ },
+ "461": {
+  "style": "C-bar-h",
+  "devices": [
+   "paired",
+   "highlight-box"
+  ]
+ },
+ "462": {
+  "style": "C-col",
+  "devices": [
+   "logo-axis"
+  ]
+ },
+ "463": {
+  "style": "X-document",
+  "devices": [
+   "big-number",
+   "bar"
+  ]
+ },
+ "464": {
+  "style": "T-text",
+  "devices": [
+   "icon-header",
+   "timeline-footer"
+  ]
+ },
+ "465": {
+  "style": "K-ring",
+  "devices": [
+   "photo-backdrop"
+  ]
+ },
+ "466": {
+  "style": "C-pie",
+  "devices": [
+   "ranked-lists",
+   "plus-minus"
+  ]
+ },
+ "467": {
+  "style": "P-photo-tiles",
+  "devices": [
+   "stats"
+  ]
+ },
+ "468": {
+  "style": "C-lollipop",
+  "devices": [
+   "vertical",
+   "flags"
+  ]
+ },
+ "469": {
+  "style": "C-bar-h",
+  "devices": [
+   "ranked",
+   "check-callout"
+  ]
+ },
+ "470": {
+  "style": "C-lollipop",
+  "devices": [
+   "dot-plot",
+   "sidebar-text"
+  ]
+ },
+ "471": {
+  "style": "S-divider",
+  "devices": [
+   "photo"
+  ]
+ },
+ "472": {
+  "style": "X-document",
+  "devices": []
+ },
+ "473": {
+  "style": "X-document",
+  "devices": [
+   "photo"
+  ]
+ },
+ "474": {
+  "style": "T-heat",
+  "devices": [
+   "dense",
+   "text"
+  ]
+ },
+ "475": {
+  "style": "C-paired",
+  "devices": [
+   "dark",
+   "flags"
+  ]
+ },
+ "476": {
+  "style": "X-numbered-rows",
+  "devices": [
+   "two-column"
+  ]
+ },
+ "477": {
+  "style": "C-line",
+  "devices": [
+   "dense",
+   "text-panel"
+  ]
+ },
+ "478": {
+  "style": "S-divider",
+  "devices": [
+   "numbered"
+  ]
+ },
+ "479": {
+  "style": "S-agenda",
+  "devices": []
+ },
+ "480": {
+  "style": "X-document",
+  "devices": [
+   "photo"
+  ]
+ },
+ "481": {
+  "style": "X-document",
+  "devices": []
+ },
+ "482": {
+  "style": "C-col",
+  "devices": [
+   "multiplier-bracket",
+   "quote-panel"
+  ]
+ },
+ "483": {
+  "style": "X-document",
+  "devices": []
+ },
+ "484": {
+  "style": "P-photo-text",
+  "devices": [
+   "hex-icons"
+  ]
+ },
+ "485": {
+  "style": "P-photo-full",
+  "devices": [
+   "bullets-overlay"
+  ]
+ },
+ "486": {
+  "style": "D-process",
+  "devices": [
+   "chevron",
+   "value-chain"
+  ]
+ },
+ "487": {
+  "style": "T-logo-rows",
+  "devices": [
+   "logo-grid"
+  ]
+ },
+ "488": {
+  "style": "X-statement",
+  "devices": []
+ },
+ "489": {
+  "style": "C-line",
+  "devices": [
+   "icon-markers"
+  ]
+ },
+ "490": {
+  "style": "C-pie",
+  "devices": [
+   "small-multiples",
+   "flags"
+  ]
+ },
+ "491": {
+  "style": "C-col",
+  "devices": [
+   "dark",
+   "range-labels"
+  ]
+ },
+ "492": {
+  "style": "C-bar-h",
+  "devices": [
+   "ranked"
+  ]
+ },
+ "493": {
+  "style": "T-bars",
+  "devices": [
+   "flags"
+  ]
+ },
+ "494": {
+  "style": "X-cards",
+  "devices": [
+   "framework",
+   "photo-circles"
+  ]
+ },
+ "495": {
+  "style": "X-document",
+  "devices": [
+   "sidebar-diagram"
+  ]
+ },
+ "496": {
+  "style": "C-bar-h",
+  "devices": [
+   "paired",
+   "document"
+  ]
+ },
+ "497": {
+  "style": "D-matrix",
+  "devices": []
+ },
+ "498": {
+  "style": "P-photo-full",
+  "devices": [
+   "headline-overlay"
+  ]
+ },
+ "499": {
+  "style": "K-ring",
+  "devices": [
+   "icon-list"
+  ]
+ },
+ "500": {
+  "style": "C-small-multiples",
+  "devices": [
+   "sorted-distribution",
+   "circle-stats"
+  ]
+ },
+ "501": {
+  "style": "C-small-multiples",
+  "devices": [
+   "percent-stack",
+   "big-number-sidebar"
+  ]
+ },
+ "502": {
+  "style": "P-photo-text",
+  "devices": []
+ },
+ "503": {
+  "style": "C-line",
+  "devices": [
+   "document"
+  ]
+ },
+ "504": {
+  "style": "C-pie",
+  "devices": [
+   "photo-side"
+  ]
+ },
+ "505": {
+  "style": "T-profile",
+  "devices": [
+   "fact-card",
+   "pros-cons",
+   "ratings"
+  ]
+ },
+ "506": {
+  "style": "T-text",
+  "devices": [
+   "icon",
+   "photo-side"
+  ]
+ },
+ "507": {
+  "style": "K-ring",
+  "devices": [
+   "numbered",
+   "photo"
+  ]
+ },
+ "508": {
+  "style": "T-heat",
+  "devices": [
+   "capability-map"
+  ]
+ },
+ "509": {
+  "style": "S-divider",
+  "devices": []
+ },
+ "510": {
+  "style": "X-document",
+  "devices": [
+   "dark"
+  ]
+ },
+ "511": {
+  "style": "K-stat-list",
+  "devices": [
+   "dark",
+   "columns"
+  ]
+ },
+ "512": {
+  "style": "X-document",
+  "devices": [
+   "photo",
+   "people"
+  ]
+ },
+ "513": {
+  "style": "P-case-study",
+  "devices": [
+   "photo"
+  ]
+ },
+ "514": {
+  "style": "X-columns",
+  "devices": [
+   "icon-header"
+  ]
+ },
+ "515": {
+  "style": "K-tiles",
+  "devices": [
+   "dark",
+   "big-numbers"
+  ]
+ },
+ "516": {
+  "style": "C-waterfall",
+  "devices": [
+   "floating"
+  ]
+ },
+ "517": {
+  "style": "C-radial",
+  "devices": [
+   "nested-arcs",
+   "bars"
+  ]
+ },
+ "518": {
+  "style": "S-agenda",
+  "devices": [
+   "photo"
+  ]
+ },
+ "519": {
+  "style": "X-columns",
+  "devices": [
+   "icon-header"
+  ]
+ },
+ "520": {
+  "style": "P-photo-text",
+  "devices": [
+   "bullets"
+  ]
+ },
+ "521": {
+  "style": "D-arrows",
+  "devices": [
+   "photo-circles"
+  ]
+ },
+ "522": {
+  "style": "X-statement",
+  "devices": [
+   "photo",
+   "definition"
+  ]
+ },
+ "523": {
+  "style": "C-col",
+  "devices": [
+   "photo-side",
+   "bubble-highlight"
+  ]
+ },
+ "524": {
+  "style": "C-paired",
+  "devices": []
+ },
+ "525": {
+  "style": "S-contact",
+  "devices": [
+   "photos"
+  ]
+ },
+ "526": {
+  "style": "P-screenshot",
+  "devices": [
+   "thumbnail-grid"
+  ]
+ },
+ "527": {
+  "style": "P-photo-text",
+  "devices": [
+   "document"
+  ]
+ },
+ "528": {
+  "style": "C-area",
+  "devices": [
+   "document"
+  ]
+ },
+ "529": {
+  "style": "T-plain",
+  "devices": [
+   "paired",
+   "values"
+  ]
+ },
+ "530": {
+  "style": "D-cycle",
+  "devices": [
+   "segmented"
+  ]
+ },
+ "531": {
+  "style": "X-columns",
+  "devices": [
+   "numbered"
+  ]
+ },
+ "532": {
+  "style": "X-document",
+  "devices": []
+ },
+ "533": {
+  "style": "C-combo",
+  "devices": [
+   "dual-axis"
+  ]
+ },
+ "534": {
+  "style": "X-document",
+  "devices": [
+   "dark",
+   "photo"
+  ]
+ },
+ "535": {
+  "style": "C-map",
+  "devices": [
+   "paired"
+  ]
+ },
+ "536": {
+  "style": "P-photo-text",
+  "devices": []
+ },
+ "537": {
+  "style": "P-screenshot",
+  "devices": [
+   "timeline"
+  ]
+ },
+ "538": {
+  "style": "X-document",
+  "devices": [
+   "photo",
+   "pull-quote"
+  ]
+ },
+ "539": {
+  "style": "C-col",
+  "devices": [
+   "table-below"
+  ]
+ },
+ "540": {
+  "style": "P-photo-full",
+  "devices": [
+   "statement"
+  ]
+ },
+ "541": {
+  "style": "C-line",
+  "devices": [
+   "end-annotations"
+  ]
+ },
+ "542": {
+  "style": "S-agenda",
+  "devices": [
+   "photo-thumbnails"
+  ]
+ },
+ "543": {
+  "style": "X-document",
+  "devices": [
+   "charts"
+  ]
+ },
+ "544": {
+  "style": "C-pie",
+  "devices": [
+   "paired",
+   "bars"
+  ]
+ },
+ "545": {
+  "style": "T-text",
+  "devices": [
+   "quotes",
+   "flags"
+  ]
+ },
+ "546": {
+  "style": "X-icon-list",
+  "devices": []
+ },
+ "547": {
+  "style": "T-logo-rows",
+  "devices": [
+   "matrix"
+  ]
+ },
+ "548": {
+  "style": "D-hub",
+  "devices": [
+   "takeaway-band"
+  ]
+ },
+ "549": {
+  "style": "C-radial",
+  "devices": [
+   "polar-rose"
+  ]
+ },
+ "550": {
+  "style": "C-col",
+  "devices": [
+   "dark"
+  ]
+ },
+ "551": {
+  "style": "X-numbered-rows",
+  "devices": [
+   "bracket-summary"
+  ]
+ },
+ "552": {
+  "style": "K-stat-list",
+  "devices": [
+   "dark",
+   "quotes"
+  ]
+ },
+ "553": {
+  "style": "S-divider",
+  "devices": []
+ },
+ "554": {
+  "style": "S-backmatter",
+  "devices": []
+ },
+ "555": {
+  "style": "S-contact",
+  "devices": [
+   "methodology"
+  ]
+ },
+ "556": {
+  "style": "X-statement",
+  "devices": [
+   "circle-callout"
+  ]
+ },
+ "557": {
+  "style": "S-other",
+  "devices": []
+ },
+ "558": {
+  "style": "X-statement",
+  "devices": [
+   "highlighted-numbers",
+   "bars"
+  ]
+ },
+ "559": {
+  "style": "C-stack",
+  "devices": [
+   "icon-legend",
+   "end-cagr-column",
+   "highlights"
+  ]
+ },
+ "560": {
+  "style": "P-screenshot",
+  "devices": [
+   "paired"
+  ]
+ },
+ "561": {
+  "style": "C-stack",
+  "devices": [
+   "paired"
+  ]
+ },
+ "562": {
+  "style": "T-heat",
+  "devices": [
+   "dense"
+  ]
+ },
+ "563": {
+  "style": "C-stack",
+  "devices": [
+   "percent",
+   "pie",
+   "growth-pill"
+  ]
+ },
+ "564": {
+  "style": "C-col",
+  "devices": [
+   "ranked",
+   "rank-dots",
+   "flags"
+  ]
+ },
+ "565": {
+  "style": "C-small-multiples",
+  "devices": [
+   "lines"
+  ]
+ },
+ "566": {
+  "style": "X-document",
+  "devices": []
+ },
+ "567": {
+  "style": "C-paired",
+  "devices": [
+   "line",
+   "col"
+  ]
+ },
+ "568": {
+  "style": "S-contact",
+  "devices": [
+   "photos"
+  ]
+ },
+ "569": {
+  "style": "P-photo-text",
+  "devices": [
+   "document"
+  ]
+ },
+ "570": {
+  "style": "T-text",
+  "devices": [
+   "dense",
+   "mini-stack"
+  ]
+ },
+ "571": {
+  "style": "X-document",
+  "devices": [
+   "dark"
+  ]
+ },
+ "572": {
+  "style": "P-photo-text",
+  "devices": []
+ },
+ "573": {
+  "style": "S-backmatter",
+  "devices": []
+ },
+ "574": {
+  "style": "S-backmatter",
+  "devices": [
+   "dark",
+   "illustration"
+  ]
+ },
+ "575": {
+  "style": "K-stat-list",
+  "devices": [
+   "photo-backdrop"
+  ]
+ },
+ "576": {
+  "style": "D-cycle",
+  "devices": [
+   "icon"
+  ]
+ },
+ "577": {
+  "style": "X-cards",
+  "devices": [
+   "photo",
+   "segmented-scale"
+  ]
+ },
+ "578": {
+  "style": "T-text",
+  "devices": [
+   "dense"
+  ]
+ },
+ "579": {
+  "style": "C-stack",
+  "devices": [
+   "dark",
+   "share-labels"
+  ]
+ },
+ "580": {
+  "style": "K-infographic",
+  "devices": [
+   "word-cloud"
+  ]
+ },
+ "581": {
+  "style": "C-scatter",
+  "devices": [
+   "annotated-path"
+  ]
+ },
+ "582": {
+  "style": "K-ring",
+  "devices": [
+   "icon",
+   "dark-sidebar"
+  ]
+ },
+ "583": {
+  "style": "C-col",
+  "devices": [
+   "dark"
+  ]
+ },
+ "584": {
+  "style": "C-map",
+  "devices": [
+   "callouts"
+  ]
+ },
+ "585": {
+  "style": "P-illustration",
+  "devices": [
+   "stats"
+  ]
+ },
+ "586": {
+  "style": "X-worksheet",
+  "devices": []
+ },
+ "587": {
+  "style": "P-photo-tiles",
+  "devices": [
+   "icon-header"
+  ]
+ },
+ "588": {
+  "style": "C-bar-h",
+  "devices": [
+   "document"
+  ]
+ },
+ "589": {
+  "style": "T-text",
+  "devices": [
+   "dark-sidebar",
+   "numbered"
+  ]
+ },
+ "590": {
+  "style": "K-stat-list",
+  "devices": [
+   "paired-columns"
+  ]
+ },
+ "591": {
+  "style": "T-plain",
+  "devices": [
+   "highlight-bands"
+  ]
+ },
+ "592": {
+  "style": "C-small-multiples",
+  "devices": [
+   "lines"
+  ]
+ },
+ "593": {
+  "style": "P-photo-text",
+  "devices": []
+ },
+ "594": {
+  "style": "C-waffle",
+  "devices": [
+   "paired",
+   "dot-grid"
+  ]
+ },
+ "595": {
+  "style": "P-photo-text",
+  "devices": [
+   "color-panel"
+  ]
+ },
+ "596": {
+  "style": "T-icon-rows",
+  "devices": [
+   "photo-circles",
+   "timeline"
+  ]
+ },
+ "597": {
+  "style": "T-heat",
+  "devices": [
+   "scenario-matrix"
+  ]
+ },
+ "598": {
+  "style": "P-photo-tiles",
+  "devices": []
+ },
+ "599": {
+  "style": "C-col",
+  "devices": [
+   "side-notes",
+   "takeaway-band"
+  ]
+ },
+ "600": {
+  "style": "C-small-multiples",
+  "devices": [
+   "dark",
+   "stacked"
+  ]
+ }
+}

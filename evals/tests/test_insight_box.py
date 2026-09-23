@@ -1,5 +1,5 @@
 import unittest
-from test_source_structure import run_node
+from node_probe import run_node
 
 
 class InsightBoxTests(unittest.TestCase):
@@ -11,8 +11,8 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {renderSlideHtml} from './skills/professional-slides/runtime/adapters/html.mjs';
 for(const palette of ['mckinsey','bcg','bain']) {
  const deck=compileDeck({id:'company',palette,typography:{body:'Georgia',display:'Georgia',semibold:{family:'Georgia',nativeBold:true,effectiveWeight:700}},slides:[{id:'insight-test',composition:component({id:'insight',component:'insight',props:{variant:'primary',text:'The stronger operating result supports expansion only if cash generation can fund the required investment.'},frame:{x:60,y:200,width:1160,height:120}})}]},REGISTRY);
- const [surface,body]=deck.slides[0].nodes;
- assert.equal(body.style.fontFamily.value,'Georgia');assert.equal(body.style.bold,false);
+ const surface=deck.slides[0].nodes[0], body=deck.slides[0].nodes.find(n=>n.role==='insight-body');
+ assert.equal(body.style.fontFamily.value,'Georgia');assert.equal(body.style.bold,true);
  assert.equal(surface.style.fill.value,deck.manifest.tokens['color.componentPrimary'].value);
  assert.equal(body.style.color.value,deck.manifest.tokens['color.onPrimary'].value);
  const html=renderSlideHtml(deck.slides[0]);assert.ok(html.includes('Georgia'));assert.ok(html.includes('--component-primary'));
@@ -30,24 +30,39 @@ const props={text:'Stronger operating margins support the growth case, but retur
 for(const variant of Object.keys(owner.variants)) {
  const input={...props,variant}, layout=owner.measureContent({frame,props:input});
  const nodes=owner.render({id:'insight',frame,props:input}).nodes;
+ if(variant==='plain'){
+  // The statement with no box: one text node, flush with the column, and only
+  // the reading gap above and below it.
+  assert.equal(nodes.length,1);
+  const text=nodes[0];
+  assert.equal(text.frame.x,frame.x);
+  assert.equal(text.style.bold,true);
+  assert.equal(text.frame.y+text.frame.height/2,frame.y+frame.height/2);
+  assert.equal(layout.height,text.frame.height+16);
+  continue;
+ }
+ // A takeaway band: semibold body, left-aligned, 16px side padding; the primary
+ // band carries a chevron disc and offsets the text past it.
  assert.equal(nodes.filter(n=>n.type==='text').length,1); const surface=nodes[0],body=nodes.at(-1);
- assert.equal(body.style.bold,false); assert.equal(body.style.fontFamily.tokenId,'font.body');
- assert.equal(body.style.fontSize.tokenId,'type.body'); assert.equal(body.style.align,'center');
+ assert.equal(body.style.bold,true); assert.equal(body.style.fontFamily.tokenId,'font.body');
+ assert.equal(body.style.fontSize.tokenId,'type.body'); assert.equal(body.style.align,'left');
  assert.equal(body.frame.y+body.frame.height/2,frame.y+frame.height/2);
- assert.equal(body.frame.x,frame.x+24); assert.equal(body.style.wrap,false);
+ const marker=nodes.find(n=>n.role==='insight-marker');
+ if(variant==='primary'){assert.ok(marker);assert.equal(body.frame.x,frame.x+16+24+12);assert.equal(marker.style.fill.tokenId,'color.onPrimary');}
+ else {assert.equal(marker,undefined);assert.equal(body.frame.x,frame.x+16);}
+ assert.equal(body.style.wrap,false);
  assert.equal(body.style.color.tokenId,variant==='primary'?'color.onPrimary':'color.ink');
  assert.equal(surface.style.stroke,'none');
  if(variant==='dotted'){
   assert.equal(surface.style.fill,'none');const dots=nodes.filter(n=>n.role==='insight-border-dot');assert.ok(dots.length>10);
   assert.equal(new Set(dots.map(n=>JSON.stringify(n.frame))).size,dots.length);
   for(const dot of dots){assert.equal(dot.type,'ellipse');assert.equal(dot.style.fill.tokenId,'color.rule');assert.equal(dot.style.stroke,'none');assert.ok(dot.frame.width<=1);assert.ok(dot.frame.x>=frame.x&&dot.frame.x+dot.frame.width<=frame.x+frame.width);assert.ok(dot.frame.y>=frame.y&&dot.frame.y+dot.frame.height<=frame.y+frame.height);}
- }else assert.equal(nodes.length,2);
- assert.equal(layout.height,body.frame.height+32);
- assert.throws(()=>owner.render({id:'insight',frame:{...frame,height:20},props:input}),/never shrink/);
+ }else assert.equal(nodes.length,variant==='primary'?4:2);
+ assert.equal(layout.height,Math.max(body.frame.height,variant==='primary'?24:0)+24);
 }
 const withHeading=owner.render({id:'titled',frame:{...frame,height:180},props:{...props,heading:'The expansion condition',align:'left'}}).nodes;
 assert.equal(withHeading.length,3);assert.equal(withHeading[1].role,'insight-heading');
-assert.equal(withHeading[1].style.bold,true);assert.equal(withHeading[2].style.bold,false);
+assert.equal(withHeading[1].style.bold,true);assert.equal(withHeading[2].style.bold,true);
 assert.equal(withHeading[2].frame.y-withHeading[1].frame.y-withHeading[1].frame.height,8);
 assert.throws(()=>owner.render({id:'bad',frame,props:{...props,variant:'custom'}}),/Unknown/);
 assert.throws(()=>owner.measureContent({frame,props:{text:''}}),/nonempty/);

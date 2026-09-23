@@ -1,5 +1,7 @@
 import {
   ellipsePrimitive,
+  linePrimitive,
+  rectPrimitive,
   shapePrimitive,
   stableId,
   textPrimitive,
@@ -8,6 +10,9 @@ import {
   wedgePrimitive
 } from "./core.mjs";
 import { NATURAL_EARTH_COUNTRIES, NATURAL_EARTH_SOURCE } from "./natural-earth-map-data.mjs";
+import { measureText } from './text-layout.mjs';
+import { MARK_TOKENS, markerSize, numberMarker } from './marks.mjs';
+import { normalizeQuantitativeScale, quantitativeScaleColor, quantitativeLegendNodes, QUANTITATIVE_SCALE_TOKENS } from './legends.mjs';
 
 const SURFACE = token("color.surface");
 const MUTED_SURFACE = token("color.surfaceMuted");
@@ -53,7 +58,10 @@ export const MAP_PRESETS = Object.freeze({
 
 export const MAP_PRESET_IDS = Object.freeze(Object.keys(MAP_PRESETS));
 export const MAP_TOKENS = Object.freeze([
+  ...MARK_TOKENS,
+  ...QUANTITATIVE_SCALE_TOKENS, 'type.chartLabel', 'space.2',
   "color.surface",
+  "color.rule",
   "color.surfaceMuted",
   "color.ink",
   "color.textSecondary",
@@ -62,7 +70,8 @@ export const MAP_TOKENS = Object.freeze([
   "type.label",
   "line.hairline",
   "radius.round",
-  "radius.none"
+  "radius.none",
+  "radius.small"
 ]);
 export const MAP_GUIDANCE = Object.freeze({
   useWhen: "showing geographic distribution, market coverage, regional differences or a location-bound priority",
@@ -134,7 +143,9 @@ function customGeography(value) {
       if (!area) throw new Error("Custom polygon ring has zero area");
       return (area > 0) === (index === 0) ? xy : xy.reverse();
     }));
-    return { id: featureId, name: feature.properties?.name || featureId, polygons: oriented, source };
+    const name=feature.properties?.name || featureId, labelText=feature.properties?.labelText ?? name;
+    if (typeof labelText!=='string' || labelText.replace(/\s/g,'')!==name.replace(/\s/g,'')) throw new Error('Custom feature labelText may only add line breaks to its full name');
+    return { id: featureId, name, labelText, polygons: oriented, source, label:feature.properties?.labelPoint };
   });
   const points = countries.flatMap(c => c.polygons.flat());
   const [minX,minY,maxX,maxY] = points.reduce((b,p) => [Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);
@@ -226,24 +237,25 @@ function projection(frame, bounds) {
   return { plot, project, contains: ([longitude, latitude]) => longitude >= minLon && longitude <= maxLon && latitude >= minLat && latitude <= maxLat };
 }
 
-function polygonNode({ id, country, paths, highlighted }) {
+function polygonNode({ id, country, paths, highlighted, quantitative }) {
   const points = paths.flat();
   const [x,y,maxX,maxY] = points.reduce((b,p)=>[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);
   const width=maxX-x, height=maxY-y;
   if (width < 0.35 || height < 0.35) return null;
   const normalized = paths.map((path) => path.map(([px, py]) => [Number(((px - x) / width).toFixed(6)), Number(((py - y) / height).toFixed(6))]));
-  const fill = highlighted ? PRIMARY : MUTED_SURFACE;
+  const fill = quantitative ? quantitativeScaleColor(quantitative.scale,quantitative.value) : highlighted ? PRIMARY : MUTED_SURFACE;
   return shapePrimitive({
     id: stableId(id, "land", country.id),
     role: "map-land",
     geometry: "customPolygon",
     frame: { x, y, width, height },
-    style: { fill, stroke: SURFACE, lineWidth: HAIRLINE, radius: token("radius.none") },
+    style: { fill, stroke: quantitative ? token("color.rule") : SURFACE, lineWidth: HAIRLINE, radius: token("radius.none") },
     data: {
       paths: normalized,
       countryId: country.id,
       countryName: country.name,
       highlighted,
+      ...(quantitative ? {featureId:country.id,value:quantitative.value,unit:quantitative.scale.unit,domain:quantitative.scale.domain,palette:quantitative.scale.palette,scaleSemantics:quantitative.scale.semantics??null,bin:Math.round((quantitative.value-quantitative.scale.domain[0])/(quantitative.scale.domain[1]-quantitative.scale.domain[0])*10)} : {}),
       source: country.source?.name || country.source?.url || NATURAL_EARTH_SOURCE.name,
       sourceUrl: country.source?.url || NATURAL_EARTH_SOURCE.url,
       sourceSha256: country.source?.sha256,
@@ -259,7 +271,7 @@ function markerCoordinate(marker, geography, projected) {
     return projected.project([marker.longitude, marker.latitude]);
   }
   if (marker.country) {
-    const id = resolveCountryId(marker.country);
+    const id = geography.custom ? String(marker.country) : resolveCountryId(marker.country);
     const country = geography.countries.find((candidate) => candidate.id === id);
     if (!country) throw new Error(`Map marker country ${id} is outside ${geography.id}`);
     if (!country.label || !projected.contains(country.label)) throw new Error(`Map marker country ${id} has no visible label point`);
@@ -269,13 +281,30 @@ function markerCoordinate(marker, geography, projected) {
   return [projected.plot.x + marker.x * projected.plot.width, projected.plot.y + marker.y * projected.plot.height];
 }
 
-function markerNodes({ id, frame, geography, projected, markers }) {
+function markerNodes({ id, frame, geography, projected, markers, highlighted = new Set() }) {
   const nodes = [];
   for (const [index, marker] of markers.entries()) {
     if (!marker || typeof marker !== "object" || Array.isArray(marker)) throw new Error("Map marker must be an object");
     if (marker.size !== undefined && (!Number.isFinite(marker.size) || marker.size <= 0)) throw new Error("Map marker size must be positive and finite");
     if (marker.fraction !== undefined && (!Number.isFinite(marker.fraction) || marker.fraction < 0 || marker.fraction > 1)) throw new Error("Map marker fraction must be a number from zero to one");
     const [centerX, centerY] = markerCoordinate(marker, geography, projected);
+    // A numbered pin is the deck's numbered disc, so the side list matches it.
+    if (marker.number !== undefined) {
+      const disc = markerSize(), pinFrame = { x: centerX - disc / 2, y: centerY - disc / 2, width: disc, height: disc };
+      // On a highlighted country the disc reverses (white on navy) so it stays visible.
+      const onHighlight = marker.country !== undefined && highlighted.has(geography.custom ? String(marker.country) : resolveCountryId(marker.country));
+      nodes.push(...numberMarker({ id: stableId(id, "marker-base", index), role: "map-marker", labelRole: "map-marker-number", x: pinFrame.x, y: pinFrame.y, size: disc, number: marker.number, reverse: onHighlight, data: { geography: geography.id, number: marker.number } }));
+      if (marker.label) {
+        // The label sits on a white pill so it reads over land, sea or a filled country.
+        const measured = measureText(marker.label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 });
+        const width = Math.ceil(measured.width) + 12, height = 22;
+        const placeRight = pinFrame.x + disc + 4 + width <= frame.x + frame.width;
+        const lx = placeRight ? pinFrame.x + disc + 4 : pinFrame.x - 4 - width;
+        nodes.push(rectPrimitive({ id: stableId(id, "marker-label-pill", index), role: "map-label-pill", frame: { x: lx, y: centerY - height / 2, width, height }, style: { fill: SURFACE, stroke: token("color.rule"), lineWidth: token("line.hairline"), radius: token("radius.small") } }));
+        nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: { x: lx + 6, y: centerY - 12, width: width - 12, height: 24 }, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: INK, bold: true, align: "left", valign: "mid" } }));
+      }
+      continue;
+    }
     const size = marker.size ?? 34;
     const markerFrame = { x: centerX - size / 2, y: centerY - size / 2, width: size, height: size };
     nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: INK, lineWidth: HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id } }));
@@ -295,6 +324,7 @@ function markerNodes({ id, frame, geography, projected, markers }) {
 export function mapNodes({ id, frame, props = {} }) {
   if (props.markers !== undefined && !Array.isArray(props.markers)) throw new Error("Map markers must be an array");
   const geography = resolveGeography(props.geography ?? "world");
+  if (props.choropleth) return choroplethNodes({id,frame,props,geography});
   if (props.highlightCountries !== undefined && !Array.isArray(props.highlightCountries)) throw new Error("Map highlights must be an array");
   const highlighted = new Set((props.highlightCountries || []).map(value => geography.custom ? String(value) : resolveCountryId(value)));
   const absentHighlights = [...highlighted].filter((countryId) => !geography.countries.some((country) => country.id === countryId));
@@ -304,10 +334,93 @@ export function mapNodes({ id, frame, props = {} }) {
     const paths = country.polygons.map((ring) => clipRing(ring, geography.bounds)).filter((ring) => ring.length >= 3).map((ring) => ring.map(projected.project));
     return paths.length ? polygonNode({ id, country, paths, highlighted: highlighted.has(country.id) }) : null;
   }).filter(Boolean);
-  nodes.push(...markerNodes({ id, frame, geography, projected, markers: props.markers || [] }));
+  nodes.push(...markerNodes({ id, frame, geography, projected, markers: props.markers || [], highlighted }));
   if (!nodes.some((node) => node.role === "map-land")) throw new Error(`Map geography ${geography.id} produced no visible land shapes`);
   return nodes;
 }
+
+function choroplethNodes({id,frame,props,geography}) {
+  const spec=props.choropleth,scale=normalizeQuantitativeScale(spec.scale);
+  if ((props.highlightCountries||[]).length || (props.markers||[]).length) throw new Error('Choropleth cannot combine quantitative fill with highlights or markers');
+  if (!Array.isArray(spec.values)) throw new Error('Choropleth requires one value for every feature');
+  const values=new Map(),notes=new Map();
+  for (const item of spec.values) {
+    if (!item || typeof item.featureId!=='string'||values.has(item.featureId)||!geography.countries.some(c=>c.id===item.featureId)) throw new Error('Choropleth value needs a unique known featureId');
+    quantitativeScaleColor(scale,item.value);
+    values.set(item.featureId,item.value);
+    // `note`: what this region's sentence says. The lane has always carried the
+    // feature's name and nothing else, so a page whose subject was five named
+    // places had to put the sentences in a column beside a photograph and leave
+    // the reader to match them up. With the note the map *is* the page: the
+    // boundary, the value and what it means, keyed by a leader to the region.
+    if (item.note!==undefined) {
+      if (typeof item.note!=='string'||!item.note.trim()) throw new Error('A choropleth note is a sentence about that region');
+      notes.set(item.featureId,item.note.trim());
+    }
+  }
+  if (values.size!==geography.countries.length) throw new Error('Choropleth requires one value for every feature; missing regions cannot be silently neutral');
+  if (spec.labels?.placement!==undefined && spec.labels.placement!=='external') throw new Error('Choropleth labels support external placement');
+  const fontSize=tokenValue(LABEL),gap=tokenValue(token('space.2'));
+  const legendHeight=measureText('0',1000,{fontSize:tokenValue(token('type.chartLabel'))}).height+20;
+  const mapFrame={...frame,y:frame.y+legendHeight+gap,height:frame.height-legendHeight-gap};
+  // A name fits in 112px; a sentence does not. The lane widens when any region
+  // carries a note, and the map gives up the width - which is the right trade,
+  // because an annotated map is read at the annotations.
+  const labelWidth=notes.size?Math.min(240,frame.width*.30):Math.min(112,frame.width*.27);
+  const centerFrame={x:frame.x+labelWidth+gap,y:mapFrame.y,width:frame.width-2*(labelWidth+gap),height:mapFrame.height};
+  if (centerFrame.width<80 || centerFrame.height<100) throw new Error('Choropleth frame cannot fit geography and external labels');
+  const projected=projection(centerFrame,geography.bounds);
+  const nodes=[],labels=[];
+  for (const country of geography.countries) {
+    if (!Array.isArray(country.label)||country.label.length!==2||!country.label.every(Number.isFinite)||!projected.contains(country.label)) throw new Error(`Choropleth feature ${country.id} needs a visible WGS84 labelPoint`);
+    const [lon,lat]=country.label;
+    const interior=country.polygons.reduce((inside,ring)=>{
+      let hit=false;
+      for(let i=0,j=ring.length-1;i<ring.length;j=i++) if ((ring[i][1]>lat)!==(ring[j][1]>lat) && lon<(ring[j][0]-ring[i][0])*(lat-ring[i][1])/(ring[j][1]-ring[i][1])+ring[i][0]) hit=!hit;
+      return inside!==hit;
+    },false);
+    if (!interior) throw new Error(`Choropleth feature ${country.id} labelPoint must be inside its own polygon`);
+    const paths=country.polygons.map(ring=>clipRing(ring,geography.bounds)).filter(ring=>ring.length>=3).map(ring=>ring.map(projected.project));
+    const node=paths.length ? polygonNode({id,country,paths,highlighted:false,quantitative:{scale,value:values.get(country.id)}}) : null;
+    if (!node) throw new Error(`Choropleth feature ${country.id} is not visible at this scale`);
+    nodes.push(node);
+    const [x,y]=projected.project(country.label),side=x<centerFrame.x+centerFrame.width/2?'left':'right';
+    const measured=measureText(country.labelText ?? country.name,labelWidth,{fontSize,bold:Boolean(notes.size),wrapWidthRatio:1});
+    const note=notes.get(country.id);
+    const noteLayout=note?measureText(note,labelWidth,{fontSize}):null;
+    const height=measured.height+(noteLayout?gap/2+noteLayout.height:0);
+    labels.push({country,x,y,side,measured,noteLayout,height});
+  }
+  for (const side of ['left','right']) {
+    const lane=labels.filter(l=>l.side===side).sort((a,b)=>a.y-b.y);
+    const required=lane.reduce((sum,l)=>sum+l.height,0)+Math.max(0,lane.length-1)*gap;
+    if (required>mapFrame.height) throw new Error('Choropleth external labels do not fit; enlarge map or recompose');
+    let cursor=mapFrame.y;
+    for (const label of lane) {label.top=Math.max(cursor,label.y-label.height/2);cursor=label.top+label.height+gap;}
+    let bottom=mapFrame.y+mapFrame.height;
+    for (const label of [...lane].reverse()) {label.top=Math.min(label.top,bottom-label.height);bottom=label.top-gap;}
+    for (const label of lane) {
+      const x=side==='left'?frame.x:frame.x+frame.width-labelWidth;
+      const edge=side==='left'?x+labelWidth:x;
+      const data={featureId:label.country.id,value:values.get(label.country.id),unit:scale.unit,geography:geography.id,labelPoint:label.country.label,dependencies:[stableId(id,'land',label.country.id)]};
+      const elbow=side==='left'?centerFrame.x:centerFrame.x+centerFrame.width;
+      nodes.push(linePrimitive({id:stableId(id,'feature-label-leader',label.country.id,'anchor'),role:'map-label-leader',x1:label.x,y1:label.y,x2:elbow,y2:label.y,style:{stroke:SECONDARY,lineWidth:HAIRLINE},data}));
+      nodes.push(linePrimitive({id:stableId(id,'feature-label-leader',label.country.id,'lane'),role:'map-label-leader',x1:elbow,y1:label.y,x2:edge,y2:label.top+label.measured.height/2,style:{stroke:SECONDARY,lineWidth:HAIRLINE},data}));
+      const align=side==='left'?'right':'left';
+      nodes.push(textPrimitive({id:stableId(id,'feature-label',label.country.id),role:'map-label',frame:{x,y:label.top,width:labelWidth,height:label.measured.height},text:label.measured.text,style:{fontFamily:FONT,fontSize:LABEL,color:INK,bold:Boolean(notes.size),align,valign:'top',lineHeight:label.measured.lineHeight,wrap:false},data:{...data,textLayout:label.measured}}));
+      if (label.noteLayout) nodes.push(textPrimitive({id:stableId(id,'feature-note',label.country.id),role:'map-note',frame:{x,y:label.top+label.measured.height+gap/2,width:labelWidth,height:label.noteLayout.height},text:label.noteLayout.text,style:{fontFamily:FONT,fontSize:LABEL,color:SECONDARY,align,valign:'top',lineHeight:label.noteLayout.lineHeight,wrap:true},data:{...data,note:true,textLayout:label.noteLayout}}));
+    }
+  }
+  nodes.push(...quantitativeLegendNodes({id:stableId(id,'legend'),frame:{x:frame.x,y:frame.y,width:frame.width,height:legendHeight},props:{scale}}));
+  return nodes;
+}
+
+export const CHOROPLETH_MAP_SAMPLE={
+  geography:{id:'neutral-regions',title:'Illustrative regional areas',source:{url:'https://example.org/illustrative-regions',license:'Original synthetic fixture',sha256:'0'.repeat(64)},geojson:{type:'FeatureCollection',features:[
+    {type:'Feature',id:'west',properties:{name:'Western area',labelPoint:[-2,1]},geometry:{type:'Polygon',coordinates:[[[-4,0],[0,0],[0,3],[-4,3],[-4,0]]]}},
+    {type:'Feature',id:'east',properties:{name:'Eastern area',labelPoint:[2,1]},geometry:{type:'Polygon',coordinates:[[[0,0],[4,0],[4,3],[0,3],[0,0]]]}}
+  ]}},choropleth:{values:[{featureId:'west',value:-2},{featureId:'east',value:8}],scale:{domain:[-2,8],unit:'%',palette:'red-white-green'},labels:{placement:'external'}}
+};
 
 export const CUSTOM_MAP_SAMPLE = {
   id: "germany-import", title: "Germany imported geometry",
