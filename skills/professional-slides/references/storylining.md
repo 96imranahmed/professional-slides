@@ -45,6 +45,19 @@ For repeated permission or readiness summaries, compare the exact record keys wi
 
 Long decks are legitimate: a diligence pack or a board pre-read can need 60 pages or more. For fixed length, budget cover, summary, sections and appendix first; select evidence breadth that supports the total - more analyses and a wider peer set, never repetition. Reject a narrow evaluation topic before authoring if it requires padding. Do not invent another case whenever a thin page is found. Alternative decks first differ in question, sequence or evidence relationship, not palette.
 
+## Work in parallel with subagents
+
+Research and analysis are the slow part of a deck and they split cleanly, so when the harness can spawn subagents (an agent or task tool), fan them out rather than working through the list alone. The lead agent keeps the question, the answer, the players and the title spine; subagents do bounded work and return files.
+
+| Stage | Fan out by | Each subagent returns |
+| --- | --- | --- |
+| Find the data | Workstream: the subject's own series; each player or group of players; the market and demand; geography and networks; pipeline and commitments; the counter-case | Downloaded files under `sources/<workstream>/`, each with its URL and retrieval date, and a note of what it could not find |
+| Extract the insights | The same workstreams, each working its own datasets | `insights-<workstream>.json` in the insight-log format, every finding with its calculation and sources |
+| Draft the copy | Section, once the title spine is fixed | The section's pages in the content record's format, drawn only from the merged insight log |
+| Critique | A fresh subagent every round, never reused | `storyline-review.json` ([stress-test](#stress-test-the-storyline)) |
+
+Brief each subagent completely - it has none of your context: the question and the deck's answer so far, exactly what to find or work, the file formats and folders to write to, the date the evidence is current to, and what to do when something cannot be found (record it; never invent it). Run the workstreams at the same time. When they return, the lead merges the insight fragments into `<id>.insights.json`, removes duplicates, grades them across the deck, and writes the titles; only the lead edits the title spine. A harness with no subagents does the same stages in sequence.
+
 ## Extract the insights before the titles
 
 Data is not yet a finding. Before a title is written, work the downloaded data the way an analyst would, and record what it says in `<id>.insights.json`:
