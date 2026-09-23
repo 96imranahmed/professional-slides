@@ -48,7 +48,7 @@ const PHOTO_CELL_HEIGHT = 64;
 // kept a band across its middle, and a row of posters became a row of
 // unreadable strips. It keeps its own shape, a little taller than a landscape
 // thumbnail so its width is still enough to recognise.
-const PORTRAIT_PHOTO_HEIGHT = 92;
+const PORTRAIT_PHOTO_HEIGHT = 84;
 const isPortrait = (media) => media?.width > 0 && media?.height > media.width * 1.15;
 // Cells that may lead with an icon before their label.
 const ICON_LED_CELLS = new Set(["category", "text"]);
