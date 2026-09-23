@@ -1815,6 +1815,11 @@ function scatterLegend({ id, frame, props, bubble, seriesNames }) {
   return topLegend({ id: stableId(id, "legend"), frame, items, variant: "marker" });
 }
 
+function scaleTicks(scale, bounds) {
+  const count = Number.isFinite(scale?.step) && scale.step > 0 ? bounds.span / scale.step : NaN;
+  return Number.isInteger(Math.round(count * 1e6) / 1e6) && count >= 2 && count <= 10 ? Math.round(count) : 4;
+}
+
 function scatter({ id, frame, props, bubble = false }) {
   assertGridlineOption(props);
   if (!Array.isArray(props.points) || !props.points.length || props.points.some(point => !point || typeof point.name !== "string" || !point.name.trim() || !Number.isFinite(point.x) || !Number.isFinite(point.y))) throw new Error("Scatter charts require named points with finite x and y values");
@@ -1853,14 +1858,23 @@ function scatter({ id, frame, props, bubble = false }) {
     if (plot.height - extra < MIN_PLOT_HEIGHT) throw new Error("Scatter threshold label leaves insufficient plot height; enlarge the exhibit");
     plot = { ...plot, y: plot.y + extra, height: plot.height - extra };
   }
-  const xBounds = numericBounds(props.points.map(point => point.x), { min: props.xMin, max: props.xMax, axis: "x" });
-  const yBounds = numericBounds(withReferenceValues(props.points.map(point => point.y), props), { min: props.yMin, max: props.yMax, axis: "y" });
+  // Axis titles: a scatter's two measures are its whole argument, and it drew
+  // neither name - `xLabel` and `yLabel` were accepted and ignored. The x title
+  // sits under the tick labels, the y title above the value axis.
+  const xTitle = typeof props.xLabel === "string" && props.xLabel.trim() ? props.xLabel.trim() : null;
+  const yTitle = typeof props.yLabel === "string" && props.yLabel.trim() ? props.yLabel.trim() : null;
+  if (xTitle) plot = { ...plot, height: plot.height - 24 };
+  if (yTitle && plot.y - frame.y < 26) plot = { ...plot, y: plot.y + 26 - (plot.y - frame.y), height: plot.height - (26 - (plot.y - frame.y)) };
+  if (plot.height < MIN_PLOT_HEIGHT) throw new Error("Scatter axis titles leave insufficient plot height; enlarge the exhibit");
+  // `xScale` / `yScale: { min, max }` name the same domain as xMin/xMax.
+  const xBounds = numericBounds(props.points.map(point => point.x), { min: props.xMin ?? props.xScale?.min, max: props.xMax ?? props.xScale?.max, axis: "x" });
+  const yBounds = numericBounds(withReferenceValues(props.points.map(point => point.y), props), { min: props.yMin ?? props.yScale?.min, max: props.yMax ?? props.yScale?.max, axis: "y" });
   const xScale = (value) => plot.x + (value - xBounds.min) / xBounds.span * plot.width;
   const yScale = (value) => plot.y + plot.height - (value - yBounds.min) / yBounds.span * plot.height;
   const quadrants = normalizedQuadrants(props.quadrants, xBounds, yBounds);
   const nodes = [
     ...scatterQuadrantNodes({ id, plot, quadrants, xScale, yScale }),
-    ...axes(id, plot, yBounds.min, yBounds.max, 4, { gridlines: props.gridlines === true }),
+    ...axes(id, plot, yBounds.min, yBounds.max, scaleTicks(props.yScale, yBounds), { gridlines: props.gridlines === true }),
     ...scatterLegend({ id, frame, props, bubble, seriesNames })
   ];
   if (thresholdLabelLayout) {
@@ -1870,10 +1884,15 @@ function scatter({ id, frame, props, bubble = false }) {
       text: quadrants.xLabel, style: { ...textStyle(CHART_ANNOTATION, INK, true, "center"), valign: "top" },
       data: { thresholdAxis: "x", threshold: quadrants.x, textLayout: thresholdLabelLayout } }));
   }
+  if (xTitle) nodes.push(textPrimitive({ id: stableId(id, "x-axis-title"), role: "axis-title", frame: { x: plot.x, y: plot.y + plot.height + 46, width: plot.width, height: 20 }, text: xTitle, style: textStyle(AXIS_LABEL, INK, true, "center"), data: { axis: "x" } }));
+  if (yTitle) nodes.push(textPrimitive({ id: stableId(id, "y-axis-title"), role: "axis-title", frame: { x: Math.max(frame.x, plot.x - 54), y: plot.y - 26, width: plot.width, height: 20 }, text: yTitle, style: textStyle(AXIS_LABEL, INK, true, "left"), data: { axis: "y" } }));
   // Both quantitative dimensions need a visible scale, even without point labels.
-  for (let index = 0; index <= 4; index++) {
-    const value = xBounds.min + xBounds.span * index / 4;
-    nodes.push(textPrimitive({ id: stableId(id, "x-axis-label", index), role: "axis-label", frame: { x: xScale(value) - (index === 0 ? 0 : index === 4 ? 64 : 32), y: plot.y + plot.height + 20, width: 64, height: 28 }, text: String(Number(value.toFixed(2))), style: textStyle(AXIS_LABEL, SECONDARY, false, index === 0 ? "left" : index === 4 ? "right" : "center"), data: { axis: "x" } }));
+  // A declared step sets the ticks when it divides the domain; four quarters
+  // otherwise, which on a 40-90 axis read 52.5 and 77.5.
+  const xTicks = scaleTicks(props.xScale, xBounds);
+  for (let index = 0; index <= xTicks; index++) {
+    const value = xBounds.min + xBounds.span * index / xTicks;
+    nodes.push(textPrimitive({ id: stableId(id, "x-axis-label", index), role: "axis-label", frame: { x: xScale(value) - (index === 0 ? 0 : index === xTicks ? 64 : 32), y: plot.y + plot.height + 20, width: 64, height: 28 }, text: String(Number(value.toFixed(2))), style: textStyle(AXIS_LABEL, SECONDARY, false, index === 0 ? "left" : index === xTicks ? "right" : "center"), data: { axis: "x" } }));
   }
   if (props.yTickLabels) {
     for (let index = nodes.length - 1; index >= 0; index--) if (nodes[index].role === "axis-label" && !nodes[index].id.includes("x-axis-label")) nodes.splice(index, 1);

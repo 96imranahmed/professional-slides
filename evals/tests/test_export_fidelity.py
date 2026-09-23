@@ -122,5 +122,23 @@ console.log(JSON.stringify(planDeck(toDeckPlan(spec,'.')).deck));
             self.assertEqual(chart.plots[0].data_labels.number_format, "General")
 
 
+class ScatterAxisTests(unittest.TestCase):
+    def test_a_scatter_names_both_axes_and_ticks_at_its_declared_step(self):
+        # A scatter accepted xLabel, yLabel and xScale and drew none of them:
+        # an unnamed pair of axes running to 120 on a percentage measure.
+        result = run_node("""
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const n=REGISTRY.get('chart.scatter').render({id:'s',frame:{x:0,y:0,width:700,height:420},props:{xLabel:'Mean score, %',yLabel:'Share of films, %',
+  xScale:{min:40,max:90,step:10},yScale:{min:0,max:100,step:25},points:[{name:'A',x:84,y:100},{name:'B',x:50,y:20}]}}).nodes;
+const text=(role,axis)=>n.filter(x=>x.role===role&&x.data?.axis===axis).map(x=>x.text);
+console.log(JSON.stringify({titles:n.filter(x=>x.role==='axis-title').map(x=>x.text),x:text('axis-label','x'),y:text('axis-label','y')}));
+""")
+        self.assertEqual(result["titles"], ["Mean score, %", "Share of films, %"])
+        self.assertEqual(result["x"], ["40", "50", "60", "70", "80", "90"])
+        self.assertEqual(result["y"][0], "0")
+        self.assertEqual(result["y"][-1], "100")
+        self.assertEqual(len(result["y"]), 5)
+
+
 if __name__ == "__main__":
     unittest.main()
