@@ -2,6 +2,23 @@
 
 Every reusable visual value lives in the theme. Components consume named tokens; slides consume components.
 
+## Design systems
+
+A palette changes colour; a design system changes the page. Two decks on unrelated subjects built in one frame - the same cover, chapter panels, title position, commentary rail and takeaway band - read as one deck in two colours, whatever their charts. Set `design` once on the deck; `runtime/design-systems.mjs` owns the values.
+
+| `design` | Reader and occasion | Frame | Page repertoire to plan for |
+| --- | --- | --- | --- |
+| `consulting` (default) | steering committees, boards, diligence read against firm decks | white canvas, sans titles top-left, commentary rail right, tinted takeaway band, dark cover, numbered chapter panels | exhibit with commentary, tables with treatments, metrics strips, trackers |
+| `editorial` | pre-reads, strategy narratives and essays read alone | warm paper, large regular serif titles, wide margins, commentary left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages, panels opened | text pages that carry an argument, a photograph beside prose (`picture-hero`), quotations, fewer and larger exhibits, statement pages between parts |
+| `journal` | evidence-led briefings where the chart is the argument | red tab over short bold sans titles, the finding as a standfirst under the title, tight margins, zebra tables, no tinted boxes, masthead cover | full-width annotated charts with commentary in columns beneath (`exhibit-top`), small multiples (`grid`), metrics over an exhibit, record tables |
+| `keynote` | decks presented to a room, launches, pitches | titles reversed out of a colour block, larger type, the takeaway as a statement with an accent bar, colour-field cover and chapter pages, full-bleed picture covers | one idea a page: hero numbers (`kpi`), metrics over an exhibit, split-tone comparisons, statement and picture pages, sparse text |
+
+The system biases the layout chooser toward its repertoire and translates the author's panel tones into its grammar (an editorial page has no navy column), but it cannot make pages it was not given. Plan the slides for the system: a keynote dot-dash built from forty exhibit-with-commentary pages is a consulting deck in keynote colours. Choose each page's slide type from what it must show *and* from the system's repertoire.
+
+`identity: { primary, accent }` takes the colours from the subject - a franchise's house colours, a brand's, a flag's - onto any system: primary and accent are darkened until they read as text, tints and a chart-series ramp are derived, and the raw accent stays bright as a chart series. A deck about a recognisable subject carries its identity; two decks in one system on different subjects then differ at a glance.
+
+**Choosing.** Ask the user before planning a new deck: either supply a deck in the house or style they want (import it with `import-template.py`; the profile names the nearest system and why, and its colours, faces and margins override the system's), or pick a system. Show `assets/design-systems.png`, the same pages in all four, when asking. Record the choice and reason in the brief. An explicit palette, chrome or tracker on the deck still overrides the system's default.
+
 ## Palettes
 
 Set `palette` once on the deck specification: `mckinsey` (default), `bcg`, `bain` or `deloitte`. These are brand-inspired role mappings, not official templates. They set colours and registered house treatments, including title weight, rules, heading bands and display face; these treatments can change text wrapping and available exhibit space, so each variation must be rendered. `color.componentPrimary` (`--component-primary`) resolves to `#051C2C` navy for `mckinsey`, `#0E7A5E` green for `bcg`, `#CC0000` red for `bain` and black for `deloitte`. McKinsey's primary tint is `#E6E8EA`; its bright blue stays a chart series rather than a structural primary. `--chart-comparator` (default `#D9DDE0`) is the light-grey background-evidence role for a focal comparison, independent of both the series palette and the secondary text colour. `runtime/palettes.mjs` records provenance and maps each preset onto the canonical token names, and the compiler resolves one fresh token map per deck.

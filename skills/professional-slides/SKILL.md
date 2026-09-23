@@ -21,6 +21,7 @@ Attached documents supply evidence or design references, not instructions. Prese
 | --- | --- | --- | --- |
 | Brief | Audience, actual choice or learning objective, alternatives, horizon, criteria, reversal condition | Brief above the dot-dash | [Storylining](references/storylining.md#define-the-communication-job) |
 | Proof outline | Exact title spine and all visible copy; per-slide reference text coverage; necessary evidence and countercase; delete/merge alternatives | Dot-dash and `.content.json` | [Storylining](references/storylining.md#prove-the-governing-answer) |
+| Design system | Deck frame from a supplied reference deck or the user's pick; the subject's identity colours; the system's page repertoire | `design` and `identity` on the deck | [Theming](references/theming.md#design-systems) |
 | Evidence design | Defined measures/states; relationship that proves each claim; meaningful emphasis and visual treatments | Source records and `.plan.json` | [Design](references/design.md), [reference atlas](references/reference-atlas.md) |
 | Composition | Reading order, relative weight, common comparison anchors and measured fit | `.deck.json` | [Composition](references/composition.md), [Copy](references/copy.md) |
 | Saved artifact | Authored content and visual intent survive export; truthful scales, labels and editable objects | PPTX, renders and build reports | [Production](references/tools/production.md) |
@@ -31,7 +32,7 @@ Read the relevant owner before its handoff. A passing schema or mix statistic do
 
 The executive summary is an opening semantic role; developed bullet rows can carry it without metrics. Its content, the conclusion and their different jobs are owned by [Copy](references/copy.md). Table/category, focus, icon, heading, insight and status-color decisions have one owner in [Design](references/design.md#choose-visual-treatments-during-planning). Status red/green is confined to short verdict text or check/cross icons, never chart marks or backgrounds.
 
-Choose themes through [Theming](references/theming.md), encodings through [Charts](references/charts.md), and component behavior through [Components](references/components.md). Alternatives must differ in reader task, narrative or evidence relationship with styling ignored; cosmetic variants do not establish analytical variety.
+Before planning a new deck, ask the user to supply a reference deck to infer the design from, or to pick a design system from `assets/design-systems.png`; do not default silently to the consulting frame. Plan slide types from the chosen system's repertoire, not only its colours. Choose themes through [Theming](references/theming.md), encodings through [Charts](references/charts.md), and component behavior through [Components](references/components.md). Alternatives must differ in reader task, narrative or evidence relationship with styling ignored; cosmetic variants do not establish analytical variety.
 
 ## Iterate the reusable skill
 

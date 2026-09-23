@@ -22,6 +22,7 @@
 // }
 // exhibit.type: any registered component id, or the aliases "table", "image", "metrics", "cards",
 // "quadrants", "swot", "compare", "phase-table", "rows".
+import { applyDesign } from "./design-systems.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { measureText, accentRuns } from "./text-layout.mjs";
@@ -1053,6 +1054,21 @@ export function splitTables(slide) {
  * pages marked (1/2), (2/2). Applies to a lone table under an auto layout.
  */
 const MAX_ROWS = 8;
+// Commentary set in columns under a full-width table (`exhibit-top`, or the
+// journal's lean toward it) takes its height from the table's budget: each
+// column as many body lines as its longest point needs, plus its lead and the
+// gap above the row. An estimate, like the rest of the budget - the renderer
+// measures - but a page that leaves it out plans rows it cannot hold.
+function pointsBelowHeight(slide) {
+  const points = Array.isArray(slide.points) ? slide.points : [];
+  const below = slide.layout === "exhibit-top" || (!slide.layout && (LAYOUT.shapeBias?.["exhibit-top"] ?? 0) > 0 && points.length >= 2 && points.length <= 4);
+  if (!below || !points.length) return 0;
+  const perLine = Math.max(20, Math.floor((BODY_WIDTH - COLUMN_GAP * (points.length - 1)) / points.length / 6.4));
+  const text = (point) => typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`;
+  const lines = Math.max(...points.map((point) => Math.ceil(text(point).length / perLine)));
+  return (lines + 1) * 18 + 22;
+}
+
 export function paginateTable(slide, bodyScale = 1) {
   if (slide.layout && !["auto", "exhibit-full"].includes(slide.layout)) return [slide];
   const ex = slide.exhibit;
@@ -1088,7 +1104,13 @@ export function paginateTable(slide, bodyScale = 1) {
       return modelled(density);
     }
   };
-  const available = 508 * bodyScale - (slide.callout ? 70 : 0) - (Array.isArray(slide.metrics) && slide.metrics.length ? 112 : 0) - (slide.soWhat ? 44 : 0) - 4;
+  const available = 508 * bodyScale - (slide.callout ? 70 : 0) - (Array.isArray(slide.metrics) && slide.metrics.length ? 112 : 0) - (slide.soWhat ? (LAYOUT.takeaway === "statement" ? 64 : 44) : 0) - 4
+    // The column's gap above each block stacked under the table.
+    - 22 * [slide.callout, slide.soWhat].filter(Boolean).length
+    - pointsBelowHeight(slide)
+    // bodyTop holds a two-line title, not a two-line title and a standfirst:
+    // with both, the body starts a line lower.
+    - (slide.subtitle && String(slide.title ?? "").length > 60 ? 26 : 0);
   // The density ladder comes before the split. A twenty-row table set compact is
   // one page of evidence; the same table halved across two pages is two pages of
   // half an argument, and the reference decks run tables to twenty and thirty
@@ -1448,9 +1470,12 @@ export function resolveFill(spec = {}) {
  */
 const POINTS_TONES = ["open", "dark", "muted", "tint", "primary"];
 function sideTreatment(slide) {
-  const tone = slide.pointsTone ?? "open";
-  if (!POINTS_TONES.includes(tone)) throw new Error(`Unknown pointsTone: ${tone}; use one of ${POINTS_TONES.join(", ")}`);
-  return tone;
+  const asked = slide.pointsTone ?? "open";
+  if (!POINTS_TONES.includes(asked)) throw new Error(`Unknown pointsTone: ${asked}; use one of ${POINTS_TONES.join(", ")}`);
+  // The design system translates a panel into its own grammar: the editorial
+  // page has no navy column, the journal no coloured one, and the keynote
+  // turns the navy column into its colour field.
+  return LAYOUT.panelTones?.[asked] ?? asked;
 }
 
 /**
@@ -1461,12 +1486,20 @@ function sideTreatment(slide) {
  * table, each carrying its own finding, rather than one long band that says
  * three things in a row.
  */
+// The design system's composition choices for the deck being composed
+// (design-systems.mjs); set by composeDeck, read by the page builders.
+const CONSULTING_LAYOUT = Object.freeze({ name: "consulting", takeaway: "band", commentary: "right", shapeBias: {} });
+let LAYOUT = CONSULTING_LAYOUT;
+const TAKEAWAY_VARIANT = { band: "tonal", rule: "rule", statement: "statement", standfirst: "rule" };
+
 function soWhatItem(text, id, highlight, tinted = true) {
   const accent = highlight === undefined || highlight === null ? {} : { highlight };
   // One tinted box per page. A callout is already a tinted box saying "read
   // this"; a second one underneath in a different tint reads as two competing
   // boxes rather than as a page with a close, which is what a reviewer sees
   // first and cannot explain.
+  // A design whose takeaway is not a box closes the page its own way.
+  if (LAYOUT.takeaway !== "band" && !Array.isArray(text)) return { id, component: "insight", props: { text, variant: TAKEAWAY_VARIANT[LAYOUT.takeaway], ...accent }, size: HUG };
   if (!tinted) {
     const plain = Array.isArray(text) ? { items: text } : { text };
     return { id, component: "insight", props: { ...plain, variant: "plain", ...accent }, size: HUG };
@@ -1538,6 +1571,10 @@ const PAGE_SHAPES = {
       // searching for a clear position - a scatter, a bubble plot - runs out of
       // positions when the plot shortens, so it keeps the taller frame.
       if (["chart.scatter", "chart.bubble", "chart.bubble-grid"].includes(ex[0].type)) return 0;
+      // Each annotation row - period bands, a change marker, events - is taken
+      // out of the plot's height before a bar is drawn; with two of them the
+      // shortened frame leaves no plot to annotate.
+      if ([ex[0].periods?.length, ex[0].change || ex[0].changeAnnotations?.length, ex[0].events?.length].filter(Boolean).length >= 2) return 0;
       // It fits as well as the side column does, never better: a page composed
       // on its own keeps the established shape, and the variety comes from
       // alternating across the deck rather than from a new monoculture.
@@ -1672,8 +1709,12 @@ function chooseLayout(slide, recent = []) {
   // column rather than shrinking into a three-way row.
   if (exhibits.length === 2 && slide.points?.length && exhibits.every((ex) => String(ex.type).startsWith("chart.")) && JSON.stringify(exhibits[0].categories) === JSON.stringify(exhibits[1].categories)) return "stack";
 
+  // A design system leans toward the shapes its pages are built from: the
+  // journal's full-width exhibit, the keynote's hero number. A bias only moves
+  // a shape that already fits the page.
+  const bias = LAYOUT.shapeBias || {};
   const scored = Object.entries(PAGE_SHAPES)
-    .map(([name, shape]) => [name, shape.fit(slide, exhibits)])
+    .map(([name, shape]) => { const fit = shape.fit(slide, exhibits); return [name, fit > 0 ? fit + (bias[name] || 0) : 0]; })
     .filter(([, score]) => score > 0);
   if (!scored.length) return exhibits.length ? "exhibit-full" : "text";
   const best = Math.max(...scored.map(([, score]) => score));
@@ -2606,6 +2647,12 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       ...(slide.notes ? { notes: slide.notes } : {}) };
   }
   if (slide.evidenceStatus) slide = { ...slide, subtitle: [slide.evidenceStatus, slide.subtitle].filter(Boolean).join(" · ") };
+  // The journal sets the finding as the standfirst under the title, where a
+  // reader of a data briefing looks for it, instead of closing the page on it.
+  if (LAYOUT.takeaway === "standfirst" && typeof slide.soWhat === "string" && !slide.subtitle && slide.soWhat.length <= 200) {
+    const { soWhat, ...rest } = slide;
+    slide = { ...rest, subtitle: soWhat };
+  }
   const slideIn = slide;
   for (const [name, run] of SLIDE_PASSES.slice(3)) {
     try {
@@ -2615,8 +2662,11 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     }
   }
   const pictures = normalizePictures(slide, id);
-  const layout = chooseLayout(slide, recent);
-  if (Array.isArray(recent)) recent.unshift(layout);
+  const chosen = chooseLayout(slide, recent);
+  // Editorial pages read commentary first: the mirror, on every page of the
+  // deck, so the reading order is still one the reader can rely on.
+  const layout = chosen === "exhibit-left" && !slide.layout && LAYOUT.commentary === "left" ? "exhibit-right" : chosen;
+  if (Array.isArray(recent)) recent.unshift(chosen);
   const columnPoints = slide.points;
   const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints) : null;
   if (pointsStyle && Array.isArray(recentStyles)) recentStyles.unshift(pointsStyle);
@@ -2975,6 +3025,11 @@ export function agendaPages(slidesIn, agenda, agendaStyle) {
 
 /** Expand a v3 deck into the deckPlan the planner consumes. */
 export function composeDeck(spec, baseDir = process.cwd()) {
+  LAYOUT = spec.designLayout ?? CONSULTING_LAYOUT;
+  try { return composeDeckWith(spec, baseDir); } finally { LAYOUT = CONSULTING_LAYOUT; }
+}
+
+function composeDeckWith(spec, baseDir) {
   if (!isV3(spec)) throw new Error(`Expected schema ${V3}`);
   if (!spec.id || !Array.isArray(spec.slides)) throw new Error("deck/v3 requires id and slides");
   const slides = [];
@@ -3045,7 +3100,10 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   const agendaMode = trackerMode === "repeat-contents" ? true : contentsMode === "once" || contentsMode === true ? "once" : false;
   const trackerStyle = TRACKER_NAMES.includes(trackerMode) ? trackerMode : "pills";
   const pages = agendaPages(tabs ? sectionTabs(storySlides, trackerStyle) : storySlides, contentsMode === false ? false : agendaMode, spec.agendaStyle);
-  const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140)) / 508)) : 1;
+  // A tracker above the title drops the body a step (slide-chrome's trackerGap),
+  // which the table budget has to know or it plans rows the page cannot hold.
+  const trackerGap = spec.chrome && tabs ? 11 : 0;
+  const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140) - trackerGap) / 508)) : 1;
   const fill = resolveFill(spec);
   // The weight contract: what a page of this deck is expected to carry. The
   // deck's own `weight` wins, then the house profile a template produced, then
@@ -3082,6 +3140,7 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   return {
     id: spec.id,
     palette: spec.palette || "mckinsey",
+    ...(spec.designLayout ? { design: spec.designLayout.name } : {}),
     ...(spec.pageTemplate ? { pageTemplate: spec.pageTemplate } : {}),
     ...(spec.typography ? { typography: spec.typography } : {}),
     ...(spec.chrome ? { chrome: spec.chrome } : {}),
@@ -3128,6 +3187,8 @@ export function applyTemplate(spec, baseDir = process.cwd()) {
   delete out.template;
   if (!spec.palette && house.palette) out.palette = house.palette;
   if (!spec.typography && house.typography) out.typography = house.typography;
+  // The importer names the design system nearest the template's own frame.
+  if (!spec.design && house.design) out.design = house.design;
   if (!spec.chrome && house.chrome) out.chrome = house.chrome;
   if (!spec.pageTemplate && house.pageTemplate) out.pageTemplate = house.pageTemplate;
   if (!spec.density && house.density) out.density = house.density;
@@ -3141,7 +3202,7 @@ export function applyTemplate(spec, baseDir = process.cwd()) {
 }
 
 export function toDeckPlan(specIn, baseDir) {
-  const spec = applyTemplate(specIn, baseDir);
+  const spec = applyDesign(applyTemplate(specIn, baseDir));
   if (isV3(spec)) return composeDeck(spec, baseDir);
   if (spec?.deckPlan) return spec.deckPlan;
   throw new Error("Spec must be professional-slides.deck/v3 or carry a deckPlan");

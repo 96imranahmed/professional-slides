@@ -466,6 +466,25 @@ def analyse(path: Path, base: str) -> dict:
         f"and a {weight['columnFill']:.0%} column, at fill '{fill}'"
     )
 
+    # --- nearest design system ------------------------------------------------
+    # The house's colours, faces and margins are copied exactly; the design
+    # system supplies what a master cannot show - how the takeaway, the
+    # commentary, the cover and the chapter pages are built. Pick the one whose
+    # frame the template already resembles, and say why.
+    serif = bool(re.search(r"georgia|times|garamond|serif|baskerville|caslon|minion|cambria|palatino", str(display), re.I)) and display != body
+    chart_share = (charts / len(slides)) if slides else 0
+    if style.get("style.titleRule") == "band" and density == "live-pitch":
+        design, why = "keynote", "a full-width title band on a template that carries few words a page"
+    elif density == "live-pitch":
+        design, why = "keynote", f"a presented template: median {median_words:.0f} words a slide"
+    elif serif and style.get("style.titleWeight") == "regular":
+        design, why = "editorial", f"regular-weight serif titles ({display})"
+    elif chart_share >= 0.5 and style.get("style.titleWeight", "bold") == "bold":
+        design, why = "journal", f"chart-led pages ({chart_share:.0%} of slides carry a chart) under bold titles"
+    else:
+        design, why = "consulting", "an analytical house template with sans titles over evidence and commentary"
+    observations.append(f"Nearest design system: {design} ({why}); the house colours, faces and margins override it")
+
     page_template = {}
     if not company and footer_texts:
         text, n = footer_texts.most_common(1)[0]
@@ -481,6 +500,7 @@ def analyse(path: Path, base: str) -> dict:
         "source": str(path.name),
         "palette": {"base": base, "id": re.sub(r"[^a-z0-9]+", "-", path.stem.lower()).strip("-") or "template", "label": path.stem, "colors": {**colors, **style}},
         "typography": typography,
+        "design": design,
         **({"chrome": chrome} if chrome else {}),
         **({"pageTemplate": page_template} if page_template else {}),
         **({"footer": company} if company else {}),

@@ -72,7 +72,8 @@ export function resolvePalette(id = "mckinsey", baseTokens, slots) {
     const colors = id.colors || {};
     for (const [key, value] of Object.entries(colors)) {
       if (key.startsWith("color.") && !/^#[0-9A-Fa-f]{6}$/.test(String(value))) throw new Error(`Palette colour ${key} must be a #RRGGBB hex`);
-      if (!key.startsWith("color.") && !key.startsWith("style.") && !key.startsWith("font.")) throw new Error(`Palette override ${key} must be a color., style. or font. token`);
+      if (!key.startsWith("color.") && !key.startsWith("style.") && !key.startsWith("font.") && !key.startsWith("type.")) throw new Error(`Palette override ${key} must be a color., style., font. or type. token`);
+      if (key.startsWith("type.") && !(Number.isFinite(value) && value >= 6 && value <= 200)) throw new Error(`Palette type size ${key} must be a point size`);
     }
     preset = { ...PALETTES[base], label: id.label ?? `${PALETTES[base].label} (custom)`, colors: { ...PALETTES[base].colors, ...colors } };
     id = id.id ?? `${base}-custom`;

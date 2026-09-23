@@ -30,6 +30,17 @@ const props={text:'Stronger operating margins support the growth case, but retur
 for(const variant of Object.keys(owner.variants)) {
  const input={...props,variant}, layout=owner.measureContent({frame,props:input});
  const nodes=owner.render({id:'insight',frame,props:input}).nodes;
+ if(variant==='rule'||variant==='statement'){
+  // The open closes of the editorial/journal and keynote systems: no surface,
+  // a hairline over the text or an accent bar beside it.
+  assert.equal(nodes.filter(n=>n.role==='insight-surface').length,0);
+  assert.ok(nodes.some(n=>n.role===(variant==='rule'?'insight-rule':'insight-bar')));
+  const body=nodes.find(n=>n.role==='insight-body');
+  assert.equal(body.style.fontFamily.tokenId,variant==='rule'?'font.display':'font.body');
+  assert.equal(body.style.fontSize.tokenId,variant==='rule'?'type.body':'type.heading');
+  assert.ok(layout.height<=frame.height);
+  continue;
+ }
  if(variant==='plain'){
   // The statement with no box: one text node, flush with the column, and only
   // the reading gap above and below it.

@@ -135,7 +135,7 @@ export const TOKENS = Object.freeze({
   // Design profile: the house style a palette carries beyond its colours. Each
   // palette sets these to what the firm's 2020+ decks do; components read them.
   "style.titleWeight": keyword("--style-title-weight", "bold"),        // bold | regular
-  "style.titleRule": keyword("--style-title-rule", "none"),            // none | rule (hairline under the title) | band (tinted title band)
+  "style.titleRule": keyword("--style-title-rule", "none"),            // none | rule (hairline under the title) | band (tinted title band) | block (primary title block, reversed type)
   "style.tagPlacement": keyword("--style-tag-placement", "top-right"), // top-right | below-title (accent pill) | above-title (accent label)
   "style.chartHeading": keyword("--style-chart-heading", "text"),      // text | band (filled grey band)
   // A bullet unless the house explicitly sets a dash: the marker is a dot in
@@ -143,9 +143,14 @@ export const TOKENS = Object.freeze({
   "style.listMarker": keyword("--style-list-marker", "dot"),           // dot | dash
   "style.tableRows": keyword("--style-table-rows", "rules"),           // rules | zebra
   "style.labelWeight": keyword("--style-label-weight", "bold"),        // bold | regular (chart value labels)
-  "style.titleLead": keyword("--style-title-lead", "accent")           // accent (lead in the accent) | pipe (BCG: "Topic | statement", the statement in the accent)
+  "style.titleLead": keyword("--style-title-lead", "accent"),          // accent (lead in the accent) | pipe (BCG: "Topic | statement", the statement in the accent)
+  // The design system's page frame (design-systems.mjs): how the takeaway, the
+  // cover and the chapter pages are built. Each value is a whole construction.
+  "style.takeaway": keyword("--style-takeaway", "band"),               // band (tinted box) | rule (serif close over a hairline) | statement (accent bar, large type)
+  "style.coverLayout": keyword("--style-cover-layout", "block"),       // block | editorial | journal | keynote
+  "style.dividerLayout": keyword("--style-divider-layout", "panel")     // panel | editorial | journal | keynote
 });
-export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead"]);
+export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead", "style.takeaway", "style.coverLayout", "style.dividerLayout"]);
 /** The active design profile value for a style token ("style.titleWeight" → "bold"). */
 export function houseStyle(id) { return tokenValue(token(id)); }
 
