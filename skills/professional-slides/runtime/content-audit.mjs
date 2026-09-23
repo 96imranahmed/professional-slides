@@ -26,6 +26,12 @@ export function auditContent(spec, scene) {
     }
     if (slide.evidenceStatus && !nodes.some(node => node.type === "text" && normalize(node.data?.textLayout?.source ?? node.text).includes(normalize(slide.evidenceStatus))))
       missingIntent("evidence-status", slide.evidenceStatus);
+    // A page given a photograph draws it, or the build says it did not: a
+    // hero-number page dropped its `photo` without a word, and a poster the
+    // author had cleared never reached the deck.
+    const pictures = [slide.photo, slide.image].filter((picture) => picture && typeof picture === "object");
+    if (pictures.length && !nodes.some((node) => node.type === "image" || /image-frame|image-placeholder/.test(String(node.role ?? ""))))
+      missingIntent("photo", pictures[0].alt ?? pictures[0].path ?? "photo");
     for (const exhibit of [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean)) {
       if (exhibit.type === "table") {
         for (const row of exhibit.rows || []) {
