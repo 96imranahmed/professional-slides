@@ -689,9 +689,21 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
   const categoryIcons = hideCategoryLabels ? null : normalizeCategoryIcons(props, categories);
   const iconSize = categoryIcons ? (horizontal ? 22 : 28) : 0;
   const iconSlot = categoryIcons ? iconSize + 6 : 0;
+  // Category notes on a bar chart sit under their label as a two-line block
+  // centred on the bar. When the lanes are too thin for that block, the notes
+  // move to a column of their own at the right of the bars - one line each,
+  // level with its bar - rather than wrapping into the next bar's lane.
+  const axisText = (text, width) => measureText(text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 });
+  const noteTexts = horizontal && !hideCategoryLabels ? (props.categoryNotes || []).filter((n) => typeof n === "string" && n.trim()) : [];
+  const baseLabelWidth = Math.min(180, Math.max(72, Math.ceil(Math.max(...(props.comparisonDomain?.categories ?? categories).map(category => axisText(category, 180).width))) + 12));
+  const noteWidth = noteTexts.length ? Math.min(220, Math.ceil(Math.max(...noteTexts.map((n) => axisText(n, 400).width))) + 12) : 0;
+  const estimatedLane = horizontal ? Math.max(1, (frame.height - 56) / Math.max(1, categories.length)) : Infinity;
+  const blockHeight = noteTexts.length ? Math.max(...noteTexts.map((n) => axisText(n, Math.max(baseLabelWidth, Math.min(240, noteWidth))).height)) + axisText("Ag", 180).height : 0;
+  const noteColumn = noteTexts.length > 0 && blockHeight > estimatedLane;
   const horizontalCategoryLabelWidth = horizontal && !hideCategoryLabels
-    ? iconSlot + Math.min(180, Math.max(72, Math.ceil(Math.max(...(props.comparisonDomain?.categories ?? categories).map(category => measureText(category, 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width))) + 12))
+    ? iconSlot + (noteTexts.length && !noteColumn ? Math.max(baseLabelWidth, Math.min(240, noteWidth)) : baseLabelWidth)
     : 0;
+  const noteColumnWidth = noteColumn ? noteWidth + 8 : 0;
   const negativeLabelGutter = horizontal && !stacked && showDataLabels && (props.comparisonDomain?.values ?? values).some(v=>v<0) ? barLabelWidth + barLabelGap : 0;
   const totalTexts = new Map([...stackLabels.totals].map(([category, record]) => [category,
     attachedLabelText(formatValue(record.value, props), stackLabels.secondary.get(`${category}:stack-total`),props)]));
@@ -735,7 +747,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     // also mirrors to the right when the plot is centred, so this is twice the
     // width back on every labelled column chart.
     leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : showValueAxis ? 54 : 16,
-    valueLabelInset: (horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter) + deltaWidth,
+    valueLabelInset: (horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter) + deltaWidth + noteColumnWidth,
     totalLabelInset: horizontal ? 0 : totalHeight,
     centerPlot: !horizontal && !showValueAxis
   });
@@ -1024,11 +1036,15 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     // measure ("n=412"), the year, the unit of that column. A well-made chart
     // carries it and it is most of what separates its label band from a bare one.
     const noteText = hideCategoryLabels ? null : categoryNotes[categoryIndex];
-    const noteLayout = noteText ? measureText(noteText, Math.max(40, horizontal ? horizontalCategoryLabelWidth : categorySpan - 8), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }) : null;
+    const noteLayout = noteText ? measureText(noteText, Math.max(40, horizontal ? (noteColumn ? noteWidth : horizontalCategoryLabelWidth) : categorySpan - 8), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }) : null;
     // With a note under it, a bar's label stops being a box centred on the bar
     // and becomes the first line of a two-line block, measured and placed.
-    const barLabelLayout = horizontal && noteLayout ? measureText(category, horizontalCategoryLabelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }) : null;
+    // In the note column the label keeps its own place and the note is level
+    // with the bar at the right.
+    const barLabelLayout = horizontal && noteLayout && !noteColumn ? measureText(category, horizontalCategoryLabelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }) : null;
     const barBlockTop = barLabelLayout ? categoryStart + (groupSpan - barLabelLayout.height - noteLayout.height) / 2 : 0;
+    if (horizontal && noteLayout && (noteColumn ? noteLayout.height : barLabelLayout.height + noteLayout.height) > categorySpan + 2)
+      throw new Error(`Category "${category}" and its note do not fit its ${Math.floor(categorySpan)}px lane even in a note column: shorten the note or give the chart more height`);
     if (noteLayout) {
       // The label and its note read as one block: on a bar chart the pair sits
       // centred on the bar, on a column chart the note takes the line under the
@@ -1036,12 +1052,14 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       nodes.push(textPrimitive({
         id: stableId(id, "category-note", category),
         role: "category-note",
-        frame: horizontal
+        frame: horizontal && noteColumn
+          ? { x: frame.x + frame.width - noteWidth, y: categoryStart + (groupSpan - noteLayout.height) / 2, width: noteWidth, height: noteLayout.height }
+          : horizontal
           ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: barBlockTop + barLabelLayout.height, width: horizontalCategoryLabelWidth - iconSlot, height: noteLayout.height }
           : { x: categoryMap.get(category).labelCenter - (categorySpan - 8) / 2, y: plot.y + plot.height + (regionHighlight ? 18 : 8) + iconSlot + categoryLayouts[categoryIndex].height, width: categorySpan - 8, height: noteLayout.height },
         text: noteLayout.text,
-        style: { ...textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), valign: "top", lineHeight: noteLayout.lineHeight, wrap: false },
-        data: { category, textLayout: noteLayout, note: true }
+        style: { ...textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? (noteColumn ? "left" : "right") : "center"), valign: "top", lineHeight: noteLayout.lineHeight, wrap: false },
+        data: { category, textLayout: noteLayout, note: true, ...(noteColumn ? { column: true } : {}) }
       }));
     }
     if (!hideCategoryLabels) nodes.push(textPrimitive({

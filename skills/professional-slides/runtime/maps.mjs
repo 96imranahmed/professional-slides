@@ -70,6 +70,8 @@ export const MAP_TOKENS = Object.freeze([
   "color.accent",
   "color.canvas",
   "line.standard",
+  "line.medium",
+  "line.heavy",
   "font.body",
   "type.label",
   "line.hairline",
@@ -330,9 +332,9 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
     // A location is a dot, not a disc: 10px marks a place on a map of the
     // world without covering the country around it. A hub is a ring with a dot
     // in it. A marker carrying a value is sized by area against the largest
-    // value on the map, from 8 to 26px.
+    // value on the map (valueDiameter), so the size legend reads true.
     const valued = Number.isFinite(marker.value) && maxValue > 0;
-    const size = marker.size ?? (valued ? 8 + 18 * Math.sqrt(marker.value / maxValue) : marker.hub ? 16 : 10);
+    const size = marker.size ?? (valued ? valueDiameter(marker.value, maxValue) : marker.hub ? 16 : 10);
     const markerFrame = { x: centerX - size / 2, y: centerY - size / 2, width: size, height: size };
     nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: marker.hub ? PRIMARY : INK, lineWidth: marker.hub ? token("line.standard") : HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, hub: Boolean(marker.hub) } }));
     if (marker.hub) {
@@ -392,8 +394,8 @@ function routeNodes({ id, geography, projected, markers, routes }) {
   const byKey = new Map();
   markers.forEach((marker, index) => { for (const key of [marker?.id, marker?.label, String(index)]) if (key !== undefined && key !== null) byKey.set(String(key), marker); });
   const nodes = [];
-  // A route carrying a volume is drawn at a width proportional to it, from
-  // 1.5 to 6px against the largest route on the map; without one, 2px.
+  // A route carrying a volume is drawn in one of three width classes against
+  // the largest route on the map (2, 3.5 and 5px, all tokens); without one, 2px.
   const maxVolume = Math.max(0, ...routes.map((route) => Number.isFinite(route?.value) ? route.value : 0));
   routes.forEach((route, index) => {
     const from = byKey.get(String(route?.from)), to = byKey.get(String(route?.to));
@@ -412,9 +414,82 @@ function routeNodes({ id, geography, projected, markers, routes }) {
       ? Array.from({ length: 12 }, (_, i) => ({ points: points.slice(i * 2, i * 2 + 2).map(unit), closed: false })).filter((path) => path.points.length === 2)
       : [{ points: points.map(unit), closed: false }];
     nodes.push(shapePrimitive({ id: stableId(id, "route", index), role: "map-route", geometry: "iconPath", frame: { x: minX, y: minY, width, height },
-      style: { fill: "none", stroke: planned ? token("color.accent") : PRIMARY, lineWidth: Number.isFinite(route.value) && maxVolume > 0 ? Math.round((1.5 + 4.5 * route.value / maxVolume) * 10) / 10 : token("line.standard"), lineCap: "round" },
+      style: { fill: "none", stroke: planned ? token("color.accent") : PRIMARY, lineWidth: Number.isFinite(route.value) && maxVolume > 0 ? token(route.value / maxVolume > 2 / 3 ? "line.heavy" : route.value / maxVolume > 1 / 3 ? "line.medium" : "line.standard") : token("line.standard"), lineCap: "round" },
       data: { paths, from: String(route.from), to: String(route.to), status: route.status ?? "operating", ...(Number.isFinite(route.value) ? { value: route.value } : {}) } }));
   });
+  return nodes;
+}
+
+// Area, not diameter, carries the value: a city twice as large draws a circle
+// of twice the area. The largest value on the map is 32px across; nothing
+// falls under 5px, so the smallest city stays visible.
+const VALUE_MAX_DIAMETER = 32, VALUE_MIN_DIAMETER = 5;
+export function valueDiameter(value, maxValue) {
+  return Math.max(VALUE_MIN_DIAMETER, VALUE_MAX_DIAMETER * Math.sqrt(Math.max(0, value) / maxValue));
+}
+
+function niceValue(v) {
+  if (!(v > 0)) return 0;
+  const power = 10 ** Math.floor(Math.log10(v));
+  const step = [1, 2, 2.5, 5, 10].find((n) => n * power >= v * 0.999) ?? 10;
+  return step * power;
+}
+const formatLegendValue = (v) => Number.isInteger(v) ? v.toLocaleString("en-US") : String(Math.round(v * 100) / 100);
+
+/**
+ * The size legend: what a circle's area means, for maps whose markers carry a
+ * `value` (city population, passengers, flights). `row` sets reference circles
+ * side by side with their values; `stacked` nests them on one baseline with a
+ * leader from each rim to its value. Reference values default to three nice
+ * numbers under the largest value on the map.
+ */
+function sizeLegendSpec(props, markers) {
+  const valued = markers.filter((m) => Number.isFinite(m?.value));
+  if (!valued.length || props.sizeLegend === false) return null;
+  const options = props.sizeLegend && typeof props.sizeLegend === "object" ? props.sizeLegend : {};
+  const style = options.style ?? "row";
+  if (!["row", "stacked"].includes(style)) throw new Error('Map sizeLegend style is "row" or "stacked"');
+  const maxValue = Math.max(...valued.map((m) => m.value));
+  const values = Array.isArray(options.values) && options.values.length
+    ? options.values.filter((v) => Number.isFinite(v) && v > 0).sort((a, b) => a - b)
+    : [...new Set([niceValue(maxValue * 0.1), niceValue(maxValue * 0.4), niceValue(maxValue)].filter((v) => v > 0))];
+  const label = String(options.label ?? props.valueLabel ?? "").trim();
+  if (!label) throw new Error("A map whose markers carry a value needs sizeLegend.label (or valueLabel) saying what circle size shows, e.g. \"City population, m\"");
+  return { style, values, maxValue, label, height: VALUE_MAX_DIAMETER + (style === "stacked" ? 36 : 22) };
+}
+
+function sizeLegendNodes(id, legend, box) {
+  const nodes = [];
+  const text = (key, x, y, width, value, align = "left", bold = false, color = SECONDARY) => nodes.push(textPrimitive({ id: stableId(id, "size-legend", key), role: "map-size-legend-label", frame: { x, y, width, height: 14 }, text: value, style: { fontFamily: FONT, fontSize: LABEL, color, bold, align, valign: "mid" } }));
+  const circle = (key, cx, cy, d) => nodes.push(ellipsePrimitive({ id: stableId(id, "size-legend", key), role: "map-size-legend-circle", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: { fill: "none", stroke: INK, lineWidth: HAIRLINE, radius: token("radius.round") } }));
+  const measure = (value) => Math.ceil(measureText(value, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 }).width) + 4;
+  const titleWidth = measure(legend.label);
+  text("title", box.x, box.y, titleWidth, legend.label, "left", true, INK);
+  const baseline = box.y + box.height;
+  if (legend.style === "row") {
+    let x = box.x;
+    legend.values.forEach((value, i) => {
+      const d = valueDiameter(value, legend.maxValue), cy = baseline - VALUE_MAX_DIAMETER / 2;
+      circle(`c${i}`, x + d / 2, cy, d);
+      const label = formatLegendValue(value), w = measure(label);
+      text(`v${i}`, x + d + 4, cy - 7, w, label);
+      x += d + 4 + w + 14;
+    });
+  } else {
+    // Nested on one baseline; each value sits on a leader from its circle's
+    // top, pushed up so the labels stay at least 12px apart.
+    const big = valueDiameter(legend.values.at(-1), legend.maxValue), cx = box.x + big / 2;
+    let lastY = Infinity;
+    legend.values.forEach((value, i) => {
+      const d = valueDiameter(value, legend.maxValue), top = baseline - d;
+      const labelY = Math.min(top, lastY - 12);
+      lastY = labelY;
+      circle(`c${i}`, cx, baseline - d / 2, d);
+      nodes.push(linePrimitive({ id: stableId(id, "size-legend", `l${i}`), role: "map-size-legend-leader", x1: cx, y1: top, x2: cx + big / 2 + 10, y2: labelY, style: { stroke: INK, lineWidth: HAIRLINE } }));
+      const label = formatLegendValue(value);
+      text(`v${i}`, cx + big / 2 + 13, labelY - 7, measure(label), label);
+    });
+  }
   return nodes;
 }
 
@@ -429,6 +504,10 @@ export function mapNodes({ id, frame, props = {} }) {
   if (props.routes !== undefined && !Array.isArray(props.routes)) throw new Error("Map routes must be an array of { from, to }");
   if (props.crop !== undefined && props.crop !== "fit") throw new Error('Map crop must be "fit" (crop to the markers and routes)');
   const bounds = props.crop === "fit" ? fitBounds(props.markers || [], geography) : geography.bounds;
+  // A size legend takes a strip under the map, so it never sits on land.
+  const legend = sizeLegendSpec(props, props.markers || []);
+  const outer = frame;
+  if (legend) frame = { ...frame, height: frame.height - legend.height - 8 };
   const projected = projection(frame, bounds);
   const recede = Boolean((props.markers || []).length || (props.routes || []).length);
   const nodes = geography.countries.map((country) => {
@@ -437,6 +516,7 @@ export function mapNodes({ id, frame, props = {} }) {
   }).filter(Boolean);
   nodes.push(...routeNodes({ id, geography, projected, markers: props.markers || [], routes: props.routes || [] }));
   nodes.push(...markerNodes({ id, frame, geography, projected, markers: props.markers || [], highlighted }));
+  if (legend) nodes.push(...sizeLegendNodes(id, legend, { x: projected.plot.x, y: outer.y + outer.height - legend.height, width: outer.width, height: legend.height }));
   if (!nodes.some((node) => node.role === "map-land")) throw new Error(`Map geography ${geography.id} produced no visible land shapes`);
   return nodes;
 }

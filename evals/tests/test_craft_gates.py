@@ -69,5 +69,35 @@ console.log(JSON.stringify({ dot: dot.frame.width, routes: routes.length, dashes
         self.assertEqual(result['labels'], 3)
 
 
+
+class SizeLegendAndNotesTests(unittest.TestCase):
+    def test_valued_markers_need_a_legend_and_it_scales_by_area(self):
+        result = run_node('''
+import { mapNodes, valueDiameter } from './skills/professional-slides/runtime/maps.mjs';
+const frame = { x: 0, y: 0, width: 800, height: 450 };
+const markers = [{ id: 'a', label: 'Riyadh', longitude: 46.7, latitude: 24.7, hub: true }, { id: 'b', label: 'Shanghai', longitude: 121.5, latitude: 31.2, value: 25 }, { id: 'c', label: 'Warsaw', longitude: 21, latitude: 52.2, value: 2 }];
+let refused = null; try { mapNodes({ id: 'm', frame, props: { geography: 'world', crop: 'fit', markers } }); } catch (e) { refused = e.message; }
+const out = {};
+for (const style of ['row', 'stacked']) out[style] = mapNodes({ id: 'm', frame, props: { geography: 'world', crop: 'fit', markers, sizeLegend: { label: 'City population, m', style } } }).filter(n => n.role === 'map-size-legend-circle').length;
+console.log(JSON.stringify({ refused, ratio: (valueDiameter(25, 25) / valueDiameter(6.25, 25)), ...out }));
+''')
+        self.assertIn('sizeLegend.label', result['refused'])
+        self.assertAlmostEqual(result['ratio'], 2.0, places=3)  # a quarter of the value, half the diameter
+        self.assertGreaterEqual(result['row'], 2)
+        self.assertEqual(result['row'], result['stacked'])
+
+    def test_long_bar_notes_move_to_a_column_instead_of_overlapping(self):
+        result = run_node('''
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const cats = ['Riyadh Air','IndiGo','Akasa Air','Breeze Airways','STARLUX','Norse Atlantic','Etihad Airways','Emirates','Qatar Airways'];
+const props = { categories: cats, series: [{ name: 'Orders', values: [124,100,72,60,17,0,0,0,0] }], categoryNotes: cats.map((_, i) => i % 2 ? '28 months, leased at first' : '39 months to service') };
+const nodes = REGISTRY.get('chart.bar').render({ id: 'c', frame: { x: 0, y: 0, width: 1160, height: 240 }, props }).nodes;
+const notes = nodes.filter(n => n.role === 'category-note'), labels = nodes.filter(n => n.role === 'category-label');
+const overlap = (a, b) => a.frame.x < b.frame.x + b.frame.width && b.frame.x < a.frame.x + a.frame.width && a.frame.y < b.frame.y + b.frame.height && b.frame.y < a.frame.y + a.frame.height;
+console.log(JSON.stringify({ column: notes.every(n => n.data.column), clash: notes.some(n => labels.some(l => overlap(n, l))) || notes.some((n, i) => notes.some((m, j) => i !== j && overlap(n, m))) }));
+''')
+        self.assertTrue(result['column'])
+        self.assertFalse(result['clash'])
+
 if __name__ == '__main__':
     unittest.main()

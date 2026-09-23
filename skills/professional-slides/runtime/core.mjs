@@ -129,6 +129,8 @@ export const TOKENS = Object.freeze({
   "icon.large": length("--icon-lg", 36),
   "line.hairline": length("--line-hairline", 1),
   "line.standard": length("--line-standard", 2),
+  "line.medium": length("--line-medium", 3.5),   // map routes: the middle volume class
+  "line.heavy": length("--line-heavy", 5),       // map routes: the largest volume class
   "radius.none": length("--radius-none", 0),
   "radius.small": length("--radius-small", 4),
   "radius.round": length("--radius-round", 999),

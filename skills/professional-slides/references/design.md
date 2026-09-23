@@ -76,6 +76,8 @@ Mark the finding on the plot where the eye already is; the annotation carries th
 
 **Steps are for procedures.** A staircase or chevron process is a sequence the reader follows step by step. A set of options is a table with ratings; a plan over time is a timeline or gantt; parallel priorities are icon cards; a path with gates is a roadmap; conditions are a checklist. `CRAFT_STEP_OVERUSE` allows two per deck, or one per 25 pages in a longer one.
 
+**Pictures show the subject.** A long deck about recognisable things - aircraft, cabins, hubs, cities, products, people - carries photographs: on the cover, the dividers and the pages about them. Logos identify; they do not count. `CRAFT_NO_PICTURES` stops a 20-page deck with none unless `noPictures` says in a sentence why its subject has nothing to look at.
+
 **Icons mark parallel categories.** Three or four parallel items - the pillars of a case, the risks, the levers - read faster with an icon each in one line style and the accent, beside a bold lead and a line or two of text (`pointsStyle: "icon-lead"`), or as icon cards. Never icons alone.
 
 **Maps show places, not countries standing in for them.** Put a city at its longitude and latitude (a country marker labelled with a city is refused), crop to the network (`crop: "fit"`, or a regional preset), keep land a flat grey and fill a country only when the fill means something, with a legend. Dots are small - the default is 10px; a hub is a ring. Routes are curved lines from the hub, their width by volume when the volume is known, planned routes dashed. Label places in small plain type beside the dot; the commentary beside the map says what the network adds up to.

@@ -90,7 +90,7 @@ A cell whose text is a delivery status (`on track`, `behind`, `at risk`, `comple
 For a network or a set of places:
 
 - Markers take `longitude` and `latitude` for a city. A country marker labelled with anything but the country's name is refused unless `countryLevel: true`.
-- `hub: true` draws the network's centre as a ring; `value` sizes a dot by area.
+- `hub: true` draws the network's centre as a ring; `value` sizes a dot by area (the largest 32px), and the map then carries a size legend: `sizeLegend: { label: "City population, m", style: "row" | "stacked", values }` - reference circles side by side, or nested on one baseline - with three reference values chosen from the data unless given. The legend text is part of the page's text plan.
 - `routes: [{ from, to, status, value }]` draws curved lines between markers named by id, label or index, dashed when `status: "planned"` and weighted by `value`.
 - `crop: "fit"` frames the map on its markers.
 - Highlighted countries recede to the tint when markers or routes are drawn over them.

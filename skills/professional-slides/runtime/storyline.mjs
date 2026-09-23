@@ -67,7 +67,9 @@ export function describeExhibit(ex) {
     const cells = (ex.rows || []).flatMap((r) => Array.isArray(r) ? r : r?.cells || []);
     const text = (c) => String(c && typeof c === "object" ? (c.text ?? c.value ?? c.label ?? "") : c ?? "");
     const numeric = cells.filter((c) => /\d/.test(text(c)) || (c && typeof c === "object" && Number.isFinite(c.value))).length;
-    const treated = (ex.columns || []).filter((c) => c && typeof c === "object" && c.type && !["text", "number", "category"].includes(c.type)).map((c) => c.type);
+    const cellTypes = new Set(cells.filter((c) => c && typeof c === "object" && c.type).map((c) => c.type));
+    const treated = [...new Set([...(ex.columns || []).filter((c) => c && typeof c === "object" && ((c.type && !["text", "number", "category"].includes(c.type)) || c.bar || c.bars || c.heat || c.pill)).map((c) => c.type || (c.bar || c.bars ? "bar" : c.heat ? "heat" : "pill")),
+      ...[...cellTypes].filter((t) => !["text", "number", "category"].includes(t)), ...(ex.treatment ? [ex.treatment] : []), ...(ex.bars || ex.heat ? ["bars"] : [])])];
     parts.push(`${(ex.columns || []).length} columns (${(ex.columns || []).map((c) => typeof c === "string" ? c : `${c.label ?? ""}${c.type ? ":" + c.type : ""}`).join(" | ")}), ${(ex.rows || []).length} rows, ${numeric} of ${cells.length} cells carry a number${treated.length ? `, treated: ${treated.join(", ")}` : ", PLAIN GRID"}`);
   }
   if (type === "map") parts.push(`${(ex.markers || []).length} markers, ${(ex.routes || []).length} routes`);
@@ -93,7 +95,8 @@ export async function buildStorylinePacket(specPath, outputDirectory) {
   const base = path.dirname(specPath), stem = path.basename(specPath).replace(/\.deck\.json$/, "");
   const content = await fs.readFile(path.join(base, `${stem}.content.json`), "utf8").then(JSON.parse).catch(() => null);
   const byId = new Map((content?.pages || []).map((p) => [p.id, p]));
-  const sources = await fs.readdir(path.join(base, "sources")).catch(() => []);
+  // Sources sit in workstream folders (sources/<workstream>/...), so list them all.
+  const sources = await fs.readdir(path.join(base, "sources"), { recursive: true }).then((all) => all.filter((f) => /\.[a-z0-9]+$/i.test(f))).catch(() => []);
   const insightLog = await fs.readFile(path.join(base, `${stem}.insights.json`), "utf8").then(JSON.parse).catch(() => null);
   const insights = checkInsights(insightLog, sources);
   const pages = [...(spec.slides || []), ...(spec.appendix || [])].map((s, i) => {
@@ -137,7 +140,7 @@ export function storylinePrompt(packet) {
   const spine = packet.pages.map((p) => p.kind === "content" || !p.kind
     ? `${p.n}. [${p.id}] ${p.title}\n     shows: ${p.exhibits.join(" + ") || "text only"}${p.commentary.length ? `\n     says: ${p.commentary.join(" / ").slice(0, 400)}` : ""}`
     : `${p.n}. -- ${p.kind}: ${p.title}`).join("\n");
-  return `You are a senior partner reviewing a team's storyline before a single slide is drawn - the problem-solving session where a weak story gets taken apart. You did not write it and you owe it nothing. Be adversarial and specific: your job is to find where the argument is thin, obvious, unproven or badly built, and to say exactly what would make it strong.
+  return `You are a senior partner reviewing a team's storyline before a single slide is drawn - the problem-solving session where a weak story gets taken apart. You did not write it and you owe it nothing. Be adversarial and specific: your job is to find where the argument is thin, obvious, unproven or badly built, and to say exactly what would make it strong. Judge from this packet alone: do not search the web or open other files. Keep it short: at most ten weak pages, five missing analyses and five top fixes.
 
 THE QUESTION: ${packet.brief || "(not stated)"}
 THE TEAM'S ANSWER: ${packet.answer || "(not stated)"}
@@ -169,7 +172,11 @@ export function validateStorylineReview(review, spec) {
   if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (references/storylining.md#stress-test-the-storyline)"];
   if (!STORYLINE_VERDICTS.includes(review.verdict)) errors.push("storyline review verdict must be ready or revise");
   if (review.binding !== storylineBinding(spec)) errors.push("storyline review is for a different storyline: the titles, pages or exhibits changed since it was written; run the critique again");
-  if (review.verdict !== "ready") errors.push(`the storyline critique says revise (${review.rating ?? "?"}/10): ${(review.topFixes || []).slice(0, 3).join("; ")}`);
+  // One critique and one revision is the default. A storyline the critic
+  // called "revise" passes once the author has revised and answered each fix
+  // in `authorResponse`; further rounds happen only when the user asks.
+  const answered = typeof review.authorResponse === "string" && review.authorResponse.trim().length >= 40;
+  if (review.verdict !== "ready" && !answered) errors.push(`the storyline critique says revise (${review.rating ?? "?"}/10): ${(review.topFixes || []).slice(0, 3).join("; ")}`);
   return errors;
 }
 

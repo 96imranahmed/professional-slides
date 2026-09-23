@@ -56,7 +56,7 @@ Research and analysis are the slow part of a deck and they split cleanly, so whe
 | Draft the copy | Section, once the title spine is fixed | The section's pages in the content record's format, drawn only from the merged insight log |
 | Critique | A fresh subagent every round, never reused | `storyline-review.json` ([stress-test](#stress-test-the-storyline)) |
 
-Keep research proportionate. Start with four or five workstreams, not one per player; give each a budget of about twenty searches and a clear list of the decisive series to find; tell it to stop when those are found and to record what it could not find rather than keep searching. A second, targeted pass follows only when the storyline critique names a missing analysis that would change the answer.
+Keep research proportionate. Use at most four workstreams, not one per player; give each a budget of about fifteen searches and a clear list of the decisive series to find; tell it to stop when those are found and to record what it could not find rather than keep searching. A second, targeted pass follows only when the storyline critique names a missing analysis that would change the answer.
 
 Brief each subagent completely - it has none of your context: the question and the deck's answer so far, exactly what to find or work, the file formats and folders to write to, the date the evidence is current to, and what to do when something cannot be found (record it; never invent it). Run the workstreams at the same time. When they return, the lead merges the insight fragments into `<id>.insights.json`, removes duplicates, grades them across the deck, and writes the titles; only the lead edits the title spine. A harness with no subagents does the same stages in sequence.
 
@@ -99,12 +99,12 @@ Before anything is drawn, the storyline goes through a mock problem-solving sess
 5. list pages to cut or merge;
 6. return `ready` or `revise`, a rating and the fixes that matter most.
 
-Run it as a subagent loop:
+Run it as one partner critique and one revision - the critic judges from the packet alone, with no web research:
 
 1. **Spawn a fresh subagent** as the critic - the harness's agent or task tool, or `--run codex` / `--run claude` when that CLI is installed. Give it only the path to `prompt.md` and ask it to return the JSON. It gets none of the author's reasoning, notes or earlier reviews: a critic that knows what the author meant forgives what the page fails to show.
 2. **Save** its JSON as `out/storyline-review.json`.
 3. **Revise at the root.** A missing analysis means more research, not a new sentence: go back to [the data](#find-the-data-before-the-dot-dash), download the series, and rebuild the pages. A two-number chart becomes the whole peer set or the trend; a plain or word-filled table becomes a scorecard with numbers and a treatment in the cells; an obvious page is cut or merged.
-4. **Spawn a new critic** on the revised storyline - never the same one - and repeat until the verdict is `ready`. Three rounds is typical; if the rating stops rising, the missing piece is usually data, not wording.
+4. **Stop after one round by default.** Revise once, then record an `authorResponse` in `storyline-review.json` saying how each top fix was handled; delivery accepts a `ready` verdict or an answered one. Another critique round runs only when the user asks for it - offer it in the final response.
 
 The bar the critic holds is a deck that feels important: every page carries evidence a reader could not assemble in five minutes, charts compare the whole set or a trend with its rate rather than two categories, and tables are dense with real numbers and judge in their cells. The review is bound to the story's structure (page ids, titles, exhibits and what they plot): rewording a sentence keeps it, changing what a page argues or shows does not, and delivery refuses a deck without a current `ready` critique (`STORYLINE_UNREVIEWED`). Set `targetPages` on the deck when the user asked for a length, so the critic merges duplicates without cutting below it. Do not tell the reviewer the verdict you want.
 

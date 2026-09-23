@@ -25,7 +25,7 @@ Delivery refuses to request a review until every page that makes claims has a cu
 
 ## One review, then verification
 
-The first review reads the whole deck and is the independent score. It reports every major and blocker defect it sees in that one pass. Delivery keeps each validated review in `review-history/`. When a rejected deck is rebuilt, the next review is a verification: it reads only the pages whose scene or render changed and the pages the previous review blocked, checks each earlier blocking finding, and inherits the earlier verdict and "right" density judgements for every other page. It cannot open new findings on pages nobody touched, so a fix round converges. Pass `--full-review` when the repair changed the argument itself (a new answer, a re-pulled dataset, a reordered storyline); otherwise a verification is the right second round.
+The first review reads the whole deck and is the independent score; by default it is the only one, and any further review round, of the storyline or of the deck design, runs when the user asks for it. It reports every major and blocker defect it sees in that one pass. Delivery keeps each validated review in `review-history/`. When a rejected deck is rebuilt, the next review is a verification: it reads only the pages whose scene or render changed and the pages the previous review blocked, checks each earlier blocking finding, and inherits the earlier verdict and "right" density judgements for every other page. It cannot open new findings on pages nobody touched, so a fix round converges. Pass `--full-review` when the repair changed the argument itself (a new answer, a re-pulled dataset, a reordered storyline); otherwise a verification is the right second round.
 
 ## Independent first reading
 
@@ -34,7 +34,7 @@ Spawn one reviewer per whole-deck candidate. Give the realistic brief, exact art
 ```text
 Review <candidate> as its intended reader, using <brief> and <source records>.
 Read the current skill's Storylining, Design and Taste review guidance.
-Read the titles first, then every original and spread in <out>/rendered/.
+Read the titles first, then every spread in <out>/rendered/; open a page at full size only where a spread shows a possible defect.
 Compare strong relevant pages of any reference deck the user supplied.
 Write an independent assessment before consulting prior scores or repairs.
 Return the bound review and literal reference/page coverage with concrete comparisons.
@@ -45,7 +45,7 @@ Do not supply a desired score. Keep each candidate and report. Iterate requested
 ## Three reading scales
 
 1. **Title spine:** write what the deck argues before opening slides. Does it answer the actual choice/horizon or promised explanation? Trace every decisive branch to proof. Check summary and close against the same scope, approval unit and evidence state. Identify the strongest countercase and the consequence of missing research.
-2. **Every original page:** inspect the actual evidence, labels, emphasis, hierarchy and reading effort at full size. Use the design decisions at their owner, including useful omitted cues, semantic table roles, heading ownership and text-only status colors. Does the finding appear before the furniture? Does commentary add something? Are comparisons local and equivalent? Do recorded treatments survive nested composition and export?
+2. **Every page, through its spread:** inspect the actual evidence, labels, emphasis, hierarchy and reading effort on the four-up spreads, opening a page at full size only to confirm a suspected defect. Use the design decisions at their owner, including useful omitted cues, semantic table roles, heading ownership and text-only status colors. Does the finding appear before the furniture? Does commentary add something? Are comparisons local and equivalent? Do recorded treatments survive nested composition and export?
 3. **Every spread and the whole sequence:** compare normalized evidence relationships, density and narrative progression. Different chart types or two/three commentary columns do not establish variety. Preserve purposeful comparison series while challenging repeated informational jobs.
 
 At each scale judge the saved artifact, not its labels or metadata. A declaration of category treatment is not a filled cell; a diagram with arrows is not a developed mechanism. A complete compact summary does not need extra metrics or icons.

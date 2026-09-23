@@ -19,6 +19,7 @@ export const CRAFT_CODES = Object.freeze({
   CRAFT_CHARTS_BARE: "most charts have nothing marked on them",
   CRAFT_STEP_OVERUSE: "step and process diagrams recur far more often than the argument needs",
   CRAFT_NO_ICONS: "a long deck with no icon anywhere",
+  CRAFT_NO_PICTURES: "a long deck about recognisable subjects with no photograph anywhere",
   CRAFT_PLAYERS_UNINTRODUCED: "the deck compares named players but never introduces them with their marks",
   CRAFT_EXHIBIT_VARIETY: "the deck draws on too few kinds of exhibit for its length",
 });
@@ -104,6 +105,17 @@ export function craftFindings(spec, scene) {
       "segments - read faster with an icon per point (`pointsStyle: \"icon-lead\"`) or as icon cards.");
   }
 
+  // Pictures: a deck about airlines, films, products or places with no
+  // photograph reads as a spreadsheet. Logos do not count - they identify, they
+  // do not show. `noPictures` states in a sentence why a deck has none.
+  const excused = String(spec.noPictures ?? "").trim().split(/\s+/).filter(Boolean).length >= 3;
+  if (content.length >= 20 && stats.pictures === 0 && !excused) {
+    block("CRAFT_NO_PICTURES", { pages: content.length, pictures: 0 }, 1,
+      "No page carries a photograph. The cover, the section dividers and the pages about a recognisable subject - an aircraft, a cabin, " +
+      "a hub, a city, a product - want one: `cover.image`, a divider `image`, `photo` on a page, or a photo column in a table. Name the " +
+      "pictures and ask for them; plan the unsourced ones as `{ alt }`. `noPictures` is for a deck whose subject has nothing to look at, stated in a sentence.");
+  }
+
   const players = Array.isArray(spec.players) ? spec.players.filter((p) => p && (typeof p === "string" || p.name)) : [];
   if (players.length >= 3 && stats.logos === 0) {
     block("CRAFT_PLAYERS_UNINTRODUCED", { players: players.length, logoPages: 0 }, 1,
@@ -123,7 +135,7 @@ export function craftFindings(spec, scene) {
 }
 
 function sceneStatistics(scene) {
-  let tables = 0, tablesTreated = 0, charts = 0, chartsAnnotated = 0, icons = 0, logos = 0;
+  let tables = 0, tablesTreated = 0, charts = 0, chartsAnnotated = 0, icons = 0, logos = 0, pictures = 0;
   const kinds = new Set();
   for (const slide of scene?.slides || []) {
     if (!slide.nodes?.some((n) => n.role === "action-title")) continue;
@@ -141,5 +153,10 @@ function sceneStatistics(scene) {
     icons += roles.filter((r) => /icon/.test(r)).length;
     logos += roles.filter((r) => /logo/.test(r) && r !== "cover-logo").length;
   }
-  return { tables, tablesTreated, charts, chartsAnnotated, icons, logos, distinctExhibits: kinds.size };
+  // Pictures anywhere, cover and dividers included, logos excluded.
+  for (const slide of scene?.slides || []) for (const n of slide.nodes || []) {
+    const role = String(n.role ?? "");
+    if ((n.type === "image" || /image-frame|image-placeholder|table-photo|photo/.test(role)) && !/logo/.test(role)) pictures += 1;
+  }
+  return { tables, tablesTreated, charts, chartsAnnotated, icons, logos, pictures, distinctExhibits: kinds.size };
 }
