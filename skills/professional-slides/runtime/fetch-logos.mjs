@@ -17,8 +17,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 
-const UA = "professional-slides/1.0 (deck logo fetch; https://www.mediawiki.org/wiki/API:Etiquette)";
+export const UA = "professional-slides/1.0 (deck logo fetch; https://www.mediawiki.org/wiki/API:Etiquette)";
 const API = "https://en.wikipedia.org/w/api.php";
 
 async function api(params) {
@@ -42,6 +43,42 @@ export function logoFileFrom(wikitext) {
   return field("logo") ?? field("logo_image") ?? (field("image") && /logo|wordmark/i.test(field("image")) ? field("image") : null);
 }
 
+// Crop a logo to its mark. Infobox logos often sit in a wide transparent or
+// white margin, so a square mark letterboxed into a wordmark slot came out a
+// third of the size of its neighbours. Pillow ships with python-pptx.
+const TRIM = `
+import sys
+from PIL import Image, ImageChops
+p = sys.argv[1]
+im = Image.open(p); im.load()
+rgba = im.convert("RGBA")
+w, h = rgba.size
+box = rgba.getchannel("A").point(lambda v: 255 if v > 16 else 0).getbbox()
+if box in (None, (0, 0, w, h)):
+    ink = ImageChops.difference(rgba.convert("RGB"), Image.new("RGB", (w, h), (255, 255, 255))).convert("L")
+    box = ink.point(lambda v: 255 if v > 24 else 0).getbbox() or box
+if box:
+    pad = max(2, round(0.02 * max(box[2] - box[0], box[3] - box[1])))
+    box = (max(0, box[0] - pad), max(0, box[1] - pad), min(w, box[2] + pad), min(h, box[3] + pad))
+    if box != (0, 0, w, h):
+        im.crop(box).save(p)
+        print("trimmed")
+`;
+
+/** Trim a logo file to its mark in place; true when it was cropped. Never throws. */
+export function trimLogo(file, python = process.env.RUNTIME_PYTHON || "python3") {
+  return new Promise((resolve) => {
+    const child = spawn(python, ["-c", TRIM, file], { stdio: ["ignore", "pipe", "ignore"] });
+    let out = "";
+    child.stdout.on("data", (chunk) => { out += chunk; });
+    child.on("error", () => resolve(false));
+    child.on("close", (code) => resolve(code === 0 && out.includes("trimmed")));
+  });
+}
+
+/** A file-name slug: lower case, hyphens, at most 60 characters. */
+export const slugOf = (text) => String(text).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60).replace(/-$/, "");
+
 export async function fetchLogo(player, directory, hint) {
   // The first candidate article whose infobox names a logo: a bare name
   // ("Emirates") can land on a region or a disambiguation page first.
@@ -61,9 +98,10 @@ export async function fetchLogo(player, directory, hint) {
   const type = res.headers.get("content-type") || "";
   const ext = /png/.test(type) ? "png" : /jpe?g/.test(type) ? "jpg" : null;
   if (!ext) return { name: player.name, article: title, file, error: `unsupported image type ${type}` };
-  const slug = player.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const slug = slugOf(player.name);
   const out = path.join(directory, `${slug}.${ext}`);
   await fs.writeFile(out, Buffer.from(await res.arrayBuffer()));
+  await trimLogo(out);
   return { name: player.name, article: title, file, path: out,
     credit: `${player.name} logo, via Wikipedia (${title}): https://en.wikipedia.org/wiki/File:${file.replace(/ /g, "_")}` };
 }
@@ -96,7 +134,7 @@ export async function autoFillLogos(spec, baseDir, { hint, fetchMissing = true }
   const records = new Map((await fs.readFile(path.join(directory, "sources.json"), "utf8").then(JSON.parse).catch(() => [])).map((r) => [r.name, r]));
   const results = [];
   for (const player of players) {
-    const slug = player.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const slug = slugOf(player.name);
     const existing = await Promise.any(["png", "jpg"].map(async (ext) => { const f = path.join(directory, `${slug}.${ext}`); await fs.access(f); return f; })).catch(() => null);
     const known = records.get(player.name);
     if (existing) { results.push({ name: player.name, path: existing, credit: known?.credit ?? `${player.name} logo` }); continue; }

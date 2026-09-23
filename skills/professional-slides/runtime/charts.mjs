@@ -640,10 +640,27 @@ function normalizeCategoryIcons(props, categories) {
   return map.size ? map : null;
 }
 
-function categoryIconNodes(id, category, record, box) {
+/**
+ * A logo's frame inside its slot, sized to a common visual area rather than
+ * fitted to the box. Fitted, a wide wordmark filled its 64px slot while a
+ * square mark shrank to the slot's height, a third of the ink; logo walls
+ * equalise area instead. `area` is the ink each logo gets; the result keeps
+ * the logo's aspect, stays inside the box, and sits against `align`.
+ */
+export function logoFrame(box, width, height, { area = box.width * box.height * 0.6, align = "center" } = {}) {
+  const aspect = width > 0 && height > 0 ? width / height : box.width / box.height;
+  let w = Math.sqrt(area * aspect), h = Math.sqrt(area / aspect);
+  const shrink = Math.min(1, box.width / w, box.height / h);
+  w *= shrink; h *= shrink;
+  const x = align === "right" ? box.x + box.width - w : box.x + (box.width - w) / 2;
+  return { x, y: box.y + (box.height - h) / 2, width: w, height: h };
+}
+
+function categoryIconNodes(id, category, record, box, { area, align } = {}) {
   if (record.icon !== undefined) return iconMarker({ id: stableId(id, "category-icon", category), role: "category-icon", x: box.x, y: box.y, size: box.width, icon: record.icon, tone: record.tone ?? "plain", data: { category } });
   if (!record.image.dataUri) return [rectPrimitive({ id: stableId(id, "category-logo-placeholder", category), role: "category-logo-placeholder", frame: box, style: { fill: token("color.surfaceMuted"), stroke: token("color.rule"), lineWidth: token("line.hairline"), radius: token("radius.none") }, data: { category, alt: record.image.alt } })];
-  return [mediaNode({ id: stableId(id, "category-logo", category), frame: box, props: record.image, role: "category-logo" })];
+  const frame = area ? logoFrame(box, record.image.width, record.image.height, { area, align }) : box;
+  return [mediaNode({ id: stableId(id, "category-logo", category), frame, props: record.image, role: "category-logo" })];
 }
 
 /** deltas: [n, …] aligned with the categories, or [{ category, value, significant? }]. */
@@ -1079,9 +1096,13 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     // The category's icon or logo: under the column above its label, or
     // between a bar's label and the bar.
     const iconRecord = categoryIcons?.get(category);
+    // A placeholder keeps the nominal slot; a logo may grow taller than it,
+    // up to the lane, so a square mark gets the same ink as a wordmark.
+    const slotH = horizontal ? (logoMarks && iconRecord?.image?.dataUri ? Math.min(iconH + 8, groupSpan - 2) : Math.min(iconH, groupSpan)) : iconH;
     if (iconRecord) nodes.push(...categoryIconNodes(id, category, iconRecord, horizontal
-      ? { x: plot.x - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) - iconW, y: categoryStart + (groupSpan - Math.min(iconH, groupSpan)) / 2, width: iconW, height: Math.min(iconH, groupSpan) }
-      : { x: categoryMap.get(category).labelCenter - Math.min(iconW, categorySpan - 8) / 2, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: Math.min(iconW, categorySpan - 8), height: iconH }));
+      ? { x: plot.x - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) - iconW, y: categoryStart + (groupSpan - slotH) / 2, width: iconW, height: slotH }
+      : { x: categoryMap.get(category).labelCenter - Math.min(iconW, categorySpan - 8) / 2, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: Math.min(iconW, categorySpan - 8), height: iconH },
+      logoMarks ? { area: iconW * iconH * 0.6, align: horizontal ? "right" : "center" } : {}));
   });
   for(const [i,group] of categoryGroups.entries()) {
     const start=categories.indexOf(group.categories[0]),end=start+group.categories.length;

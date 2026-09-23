@@ -20,7 +20,11 @@ emit/readback_pptx.py  saved PPTX re-opened with python-pptx and compared to the
 gates/page_gates.py  deterministic page gates (ink, dead band, internal void, hero, type range, cpl, words, titles, monotony, ticks)
 reviewer.mjs       one full review prompt + schema + artifact binding; verification rounds scoped to changed/blocked slides; backends codex | claude | packet
 claims.mjs         claim ledger (claims.json) for the author's self-check, and its validation
-build-deck.mjs     plan → scene → claims → pptx → render → readback → gates
+build-deck.mjs     assets → plan → scene → claims → pptx → render → readback → gates
+fetch-logos.mjs    player logos from Wikipedia infoboxes, trimmed to the mark (run by the build)
+fetch-pictures.mjs photographs for `{ alt }` placeholders from Wikimedia Commons, free licences only (run by the build)
+fetch-places.mjs   coordinates for map markers that name a place, cached in assets/places.json (run by the build)
+fetch-series.mjs   public time series (World Bank, Our World in Data) into sources/ as CSV + a chart block
 deliver-deck.mjs   build → gates must pass → self-check must cover claims → review → <id>-DELIVERED.pptx or REJECTED.md
 ```
 

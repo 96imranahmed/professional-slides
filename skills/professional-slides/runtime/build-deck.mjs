@@ -22,6 +22,8 @@ import { runContentGates } from "./gates/content_gates.mjs";
 import { runPlanGates } from "./gates/plan_gates.mjs";
 import { craftFindings } from "./gates/craft_gates.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
+import { autoFillPictures } from "./fetch-pictures.mjs";
+import { autoFillPlaces } from "./fetch-places.mjs";
 import { auditTextPlan, auditExportText } from "./text-contract.mjs";
 import { writeLedger } from "./claims.mjs";
 
@@ -62,6 +64,11 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // The declared players' logos load themselves: reused from assets/logos/,
   // fetched when missing, left as placeholders only when that fails.
   const logos = await autoFillLogos(spec, baseDir, { hint: spec.playersHint, fetchMissing: fetchLogos });
+  // Photographs planned as `{ alt }` come the same way, from Wikimedia Commons
+  // under a free licence, credited on a generated last page; map markers that
+  // name a place get its coordinates.
+  const pictures = await autoFillPictures(spec, baseDir, { fetchMissing: fetchLogos });
+  const places = await autoFillPlaces(spec, baseDir, { fetchMissing: fetchLogos });
   const directory = await assertOutputDirectory(outputDirectory);
   await fs.mkdir(directory, { recursive: true });
   // Every report this build is about to write, removed before anything that can
@@ -85,7 +92,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // plan is allowed - not every page of a rebuild needs one - but the build
   // output says so, which is the difference between a stage that was skipped
   // and a stage that does not exist.
-  const result = { status: "planned", outputDirectory: directory, timings: {}, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}) };
+  const result = { status: "planned", outputDirectory: directory, timings: {}, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}), ...(pictures.filled || pictures.failed.length ? { pictures } : {}), ...(places.placed || places.failed.length ? { places } : {}) };
   const stages = {};
   for (const [stage, suffix, run] of [["content", ".content.json", runContentGates],
                                       ["plan", ".plan.json", runPlanGates]]) {

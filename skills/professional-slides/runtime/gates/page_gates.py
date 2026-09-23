@@ -96,6 +96,7 @@ DATA_COMPONENTS = {
 ARGUMENT_COMPONENTS = {"insight", "callout", "bullet-list", "evidence-note", "status-list"}
 # Pages carried by pictures rather than measurement.
 QUALITATIVE_COMPONENTS = {"image-frame", "logos", "logo-collage", "people", "quote-cluster", "icon-trends"}
+GENERATED_PAGES = {"picture-credits"}
 STRUCTURE_COMPONENTS = {"section-divider", "agenda", "tracker-page", "statement", "takeaways"}
 # A photograph, not an icon, a logo mark or a spot image: a well-made deck
 # carries a small image on about half their pages (median 0.5% of the page), and
@@ -1023,8 +1024,10 @@ def gate_unsourced_picture(slide_no, slide, findings):
         slide_no, "UNSOURCED_PICTURE", len(empty), 0,
         "This page draws {} picture frame{} with no picture in {}. Writing a picture as `alt` with no "
         "`path` is how a page gets laid out before its photographs are cleared, and it is not how a deck "
-        "is delivered: source the file and give it a `path`, or drop the picture and give the page the "
-        "icons, the exhibit or the width instead.".format(
+        "is delivered. The build fetches logos from Wikipedia and photographs from Wikimedia Commons; "
+        "one still empty found nothing: give it a `search` (or a player's `wikipedia` title) that names it "
+        "better, supply the file as `path`, or drop the picture and give the page the icons, the exhibit "
+        "or the width instead.".format(
             len(empty), "" if len(empty) == 1 else "s", "it" if len(empty) == 1 else "them"),
     ))
 
@@ -2595,6 +2598,10 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         slide_profile = profile or slide.get("density") or DEFAULT_PROFILE
         if slide_profile not in PROFILES:
             raise ValueError(f"Unknown density profile: {slide_profile}")
+        # The picture-credits page is written by the runtime, not argued: it
+        # is a list of attributions and no page gate has anything to say to it.
+        if slide.get("id") in GENERATED_PAGES:
+            continue
         cover = is_cover(slide, index)
         if cover:
             covers.append(slide_no)

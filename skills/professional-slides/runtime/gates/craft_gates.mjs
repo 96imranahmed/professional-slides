@@ -112,8 +112,9 @@ export function craftFindings(spec, scene) {
   if (content.length >= 20 && stats.pictures === 0 && !excused) {
     block("CRAFT_NO_PICTURES", { pages: content.length, pictures: 0 }, 1,
       "No page carries a photograph. The cover, the section dividers and the pages about a recognisable subject - an aircraft, a cabin, " +
-      "a hub, a city, a product - want one: `cover.image`, a divider `image`, `photo` on a page, or a photo column in a table. Name the " +
-      "pictures and ask for them; plan the unsourced ones as `{ alt }`. `noPictures` is for a deck whose subject has nothing to look at, stated in a sentence.");
+      "a hub, a city, a product - want one: `cover.image`, a divider `image`, `photo` on a page, or a photo column in a table. Plan each " +
+      "as `{ alt, search }`: the build fetches a freely licensed photograph from Wikimedia Commons and credits it on a generated last " +
+      "page; mark `fetch: false` on one that must come from the client. `noPictures` is for a deck whose subject has nothing to look at, stated in a sentence.");
   }
 
   const players = Array.isArray(spec.players) ? spec.players.filter((p) => p && (typeof p === "string" || p.name)) : [];
@@ -138,7 +139,7 @@ function sceneStatistics(scene) {
   let tables = 0, tablesTreated = 0, charts = 0, chartsAnnotated = 0, icons = 0, logos = 0, pictures = 0;
   const kinds = new Set();
   for (const slide of scene?.slides || []) {
-    if (!slide.nodes?.some((n) => n.role === "action-title")) continue;
+    if (!slide.nodes?.some((n) => n.role === "action-title") || slide.id === "picture-credits") continue;
     const components = (slide.componentInstances || []).map((c) => String(c.component));
     for (const c of components) if (!["slide-chrome", "section", "page-template", "chrome"].includes(c)) kinds.add(c);
     const roles = slide.nodes.map((n) => String(n.role ?? ""));

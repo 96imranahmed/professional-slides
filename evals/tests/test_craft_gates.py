@@ -114,6 +114,75 @@ console.log(JSON.stringify({ file: logoFileFrom(infobox), photoOnly: logoFileFro
         self.assertEqual(result['filled'], 2)
         self.assertEqual(result['path'], 'assets/logos/emirates.png')
 
+    def test_logos_share_a_visual_area_instead_of_fitting_the_box(self):
+        result = run_node('''
+import { logoFrame } from './skills/professional-slides/runtime/charts.mjs';
+const box = { x: 0, y: 0, width: 64, height: 32 }, area = 64 * 24 * 0.6;
+const wide = logoFrame(box, 960, 200, { area, align: 'right' }), square = logoFrame(box, 400, 400, { area, align: 'right' }), tall = logoFrame(box, 300, 600, { area });
+console.log(JSON.stringify({ wide, square, tall, ratio: (square.width * square.height) / (wide.width * wide.height) }));
+''')
+        self.assertLessEqual(result['wide']['width'], 64)
+        self.assertAlmostEqual(result['wide']['x'] + result['wide']['width'], 64, places=3)  # hugs the bar
+        self.assertGreater(result['ratio'], 0.9)  # a square mark gets as much ink as a wordmark
+        self.assertLessEqual(result['tall']['height'], 32)
+
+
+class PictureAndPlaceTests(unittest.TestCase):
+    def test_commons_choice_keeps_free_landscape_photographs(self):
+        result = run_node('''
+import { chooseCommonsPhoto, picturePlaceholders } from './skills/professional-slides/runtime/fetch-pictures.mjs';
+const page = (index, title, license, { mime = 'image/jpeg', width = 2400, height = 1600 } = {}) => ({ index, title, imageinfo: [{ mime, width, height, thumburl: 'u' + index, descriptionurl: 'd' + index, extmetadata: { LicenseShortName: { value: license }, Artist: { value: '<a href="x">Jo Bloggs</a>' } } }] });
+const pages = [page(1, 'File:Route map.jpg', 'CC BY 4.0'), page(2, 'File:Cabin.jpg', 'CC BY-NC 2.0'), page(3, 'File:Tail.png', 'CC0', { mime: 'image/png' }),
+  page(4, 'File:Tall.jpg', 'CC BY-SA 4.0', { width: 1600, height: 2400 }), page(5, 'File:Small.jpg', 'CC0', { width: 800 }), page(6, 'File:Aircraft at LHR.jpg', 'CC BY 4.0')];
+const spec = { cover: { image: { alt: 'A 787 on approach', search: 'Riyadh Air 787' } }, players: [{ name: 'X', logo: { alt: 'X logo' } }], slides: [{ photo: { alt: 'Client site', fetch: false } }, { photo: { alt: 'Done', path: 'a.jpg' } }] };
+console.log(JSON.stringify({ choice: chooseCommonsPhoto(pages), none: chooseCommonsPhoto(pages.slice(0, 3)), wanted: picturePlaceholders(spec).map(p => p.alt) }));
+''')
+        self.assertEqual(result['choice']['title'], 'File:Aircraft at LHR.jpg')  # landscape wins over the earlier portrait
+        self.assertEqual(result['choice']['credit'], 'Photo: Jo Bloggs, CC BY 4.0, via Wikimedia Commons')
+        self.assertIsNone(result['none'])  # a map, a non-commercial licence and a PNG are all refused
+        self.assertEqual(result['wanted'], ['A 787 on approach'])
+
+    def test_attributed_pictures_get_a_generated_credits_page(self):
+        result = run_node('''
+import { pictureCredits } from './skills/professional-slides/runtime/compose.mjs';
+const spec = { cover: { image: { alt: 'Hub', path: 'a.jpg', credit: 'Photo: A, CC BY-SA 4.0, via Wikimedia Commons' } },
+  slides: [{ id: 'fleet', photo: { alt: 'Cabin', path: 'b.jpg', credit: 'Photo: B, CC BY 4.0, via Wikimedia Commons' } }, { id: 'own', photo: { alt: 'Office', path: 'c.jpg', credit: 'Client photograph' } }] };
+const pages = pictureCredits(spec);
+console.log(JSON.stringify({ n: pages.length, id: pages[0]?.id, rows: pages[0]?.exhibit.rows, none: pictureCredits({ slides: [] }).length }));
+''')
+        self.assertEqual(result['id'], 'picture-credits')
+        self.assertEqual(result['rows'], [['Cover', 'Hub', 'A, CC BY-SA 4.0, via Wikimedia Commons'], ['{{page:fleet}}', 'Cabin', 'B, CC BY 4.0, via Wikimedia Commons']])
+        self.assertEqual(result['none'], 0)
+
+    def test_named_markers_are_placed_from_the_cache_offline(self):
+        result = run_node('''
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { autoFillPlaces, markersToPlace } from './skills/professional-slides/runtime/fetch-places.mjs';
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'places-'));
+fs.mkdirSync(path.join(dir, 'assets')); fs.writeFileSync(path.join(dir, 'assets', 'places.json'), JSON.stringify({ Riyadh: { latitude: 24.63, longitude: 46.72 } }));
+const spec = { slides: [{ exhibit: { type: 'map', markers: [{ label: 'Riyadh' }, { label: 'India', country: 'IND', countryLevel: true }, { label: 'Warsaw', longitude: 21, latitude: 52.2 }, { label: 'Home', place: 'Riyadh' }, { label: 'Unknown town' }] } }] };
+const wanted = markersToPlace(spec).map(w => w.name);
+const out = await autoFillPlaces(spec, dir, { fetchMissing: false });
+console.log(JSON.stringify({ wanted, out, markers: spec.slides[0].exhibit.markers }));
+''')
+        self.assertEqual(result['wanted'], ['Riyadh', 'Riyadh', 'Unknown town'])
+        self.assertEqual(result['out']['placed'], 2)
+        self.assertEqual(result['markers'][3], {'label': 'Home', 'longitude': 46.72, 'latitude': 24.63})
+        self.assertNotIn('longitude', result['markers'][4])
+
+    def test_series_tables_carry_cagr_and_a_gapless_chart(self):
+        result = run_node('''
+import { worldBankTable, owidTable, summarise } from './skills/professional-slides/runtime/fetch-series.mjs';
+const row = (country, date, value) => ({ country: { value: country }, indicator: { value: 'Passengers' }, date: String(date), value });
+const wb = summarise(worldBankTable([{}, [row('A', 2020, 100), row('A', 2022, 121), row('A', 2021, null), row('B', 2020, 50), row('B', 2021, 60), row('B', 2022, 70)]]), { provider: 'WB' });
+const owid = owidTable('Entity,Code,Year,value\\n"Korea, South",KOR,2020,5\\nFrance,FRA,2020,9\\n', ['Korea, South']);
+console.log(JSON.stringify({ series: wb.summary.series, chart: wb.summary.chart, csv: wb.csv, korea: [...owid.values.get('Korea, South').entries()] }));
+''')
+        self.assertEqual(result['series'][0]['cagr'], 10.0)
+        self.assertEqual(result['chart']['categories'], ['2020', '2022'])  # 2021 is missing for A
+        self.assertIn('2021,,60', result['csv'])
+        self.assertEqual(result['korea'], [[2020, 5]])
+
 
 if __name__ == '__main__':
     unittest.main()

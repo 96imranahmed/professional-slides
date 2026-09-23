@@ -3025,6 +3025,30 @@ export function agendaPages(slidesIn, agenda, agendaStyle) {
   return out;
 }
 
+/**
+ * The generated last page crediting the photographs a licence requires the
+ * deck to credit (CC BY, CC BY-SA: `credit` naming a licence other than CC0 or
+ * the public domain). fetch-pictures.mjs writes those credits; a picture the
+ * author cleared some other way carries its own `credit` and is listed the
+ * same. None when no picture needs attribution.
+ */
+export function pictureCredits(spec) {
+  const rows = [];
+  const walk = (value, page) => {
+    if (Array.isArray(value)) { value.forEach((v) => walk(v, page)); return; }
+    if (!value || typeof value !== "object") return;
+    if (typeof value.alt === "string" && (value.path || value.dataUri) && /\bCC[- ]BY\b/i.test(String(value.credit ?? ""))) {
+      rows.push([page, value.alt, String(value.credit).replace(/^Photo:\s*/i, "")]);
+    }
+    for (const child of Object.values(value)) walk(child, page);
+  };
+  if (spec.cover) walk(spec.cover, "Cover");
+  for (const slide of [...(spec.slides || []), ...(spec.appendix || [])]) walk(slide, slide.id ? `{{page:${slide.id}}}` : "");
+  if (!rows.length) return [];
+  return [{ id: "picture-credits", kind: "content", density: "appendix", title: "Picture credits",
+    exhibit: { type: "table", columns: [{ label: "Page", type: "text", width: 60 }, { label: "Picture", type: "text" }, { label: "Author, licence and source", type: "text" }], rows } }];
+}
+
 /** Expand a v3 deck into the deckPlan the planner consumes. */
 export function composeDeck(spec, baseDir = process.cwd()) {
   LAYOUT = spec.designLayout ?? CONSULTING_LAYOUT;
@@ -3096,7 +3120,8 @@ function composeDeckWith(spec, baseDir) {
     ? [{ id: "appendix-divider", kind: "section", title: "Appendix", summary: "The workings behind the story" },
        ...spec.appendix.map((page) => ({ density: "appendix", ...page }))]
     : [];
-  const storySlides = appendix.length ? [...spec.slides, ...appendix] : spec.slides;
+  const credits = pictureCredits(spec);
+  const storySlides = [...spec.slides, ...appendix, ...credits];
   // The contents page leads the deck; `repeat-contents` also reprints it in
   // front of every later section, which is the other way a deck tracks.
   const agendaMode = trackerMode === "repeat-contents" ? true : contentsMode === "once" || contentsMode === true ? "once" : false;

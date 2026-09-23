@@ -141,7 +141,7 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
         plan = planned.get(pid) or planned.get(slide.get("id")) or {}
         reference = plan.get("textReference") or {}
         task = reference.get("task")
-        if task in STRUCTURAL_TASKS or is_cover(slide, index - 1):
+        if task in STRUCTURAL_TASKS or is_cover(slide, index - 1) or slide.get("id") == "picture-credits":
             continue
         text = extract(pdf, index)
         header = header_lines(slide) or None

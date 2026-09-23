@@ -28,8 +28,8 @@ const resolvePages = (value, scene) => String(value).replace(/\{\{page:([^}]+)\}
 // is checked by the runtime's own gates; the text plan need not list it, and
 // the audits subtract it after matching what the plan does list.
 export const GENERATED_ROLES = /^(page-number|axis-label|tracker-|agenda-marker-label|table-section-number|table-row-number|footer-(left|right)|divider-number|divider-contents|map-size-legend-label)/;
-// Pages the runtime inserts: the contents pages and the appendix divider.
-export const GENERATED_PAGE = /^(agenda-\d+|appendix-divider)$/;
+// Pages the runtime inserts: the contents pages, the appendix divider and the picture credits.
+export const GENERATED_PAGE = /^(agenda-\d+|appendix-divider|picture-credits)$/;
 // A structural page (cover, divider, contents, statement, takeaways) keeps its
 // text checks but is not an analytical page, so no reading-task floor applies.
 const STRUCTURAL_KINDS = new Set(['cover', 'section', 'divider', 'agenda', 'statement', 'takeaways']);

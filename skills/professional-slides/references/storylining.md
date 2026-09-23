@@ -14,7 +14,7 @@ A dot-dash written from what the author already knows produces pages of two numb
 
 For a subject with public records, search for and download the data first:
 
-- **Series over time** for the measures the question turns on - revenue, profit, volume, capacity, users, fleet, share - five or more periods, from annual reports, investor presentations, regulators, statistics offices and industry bodies.
+- **Series over time** for the measures the question turns on - revenue, profit, volume, capacity, users, fleet, share - five or more periods, from annual reports, investor presentations, regulators, statistics offices and industry bodies. Country-level series (passengers, GDP, population, tourism, energy) come in one call: `node runtime/fetch-series.mjs worldbank IS.AIR.PSGR SAU,ARE,QAT --from 2010` or `... owid <grapher-slug> "Saudi Arabia,Qatar"` writes the CSV, its source and retrieval date, each series' CAGR and a chart block ready for the exhibit.
 - **The whole peer set** on the same measures and the same basis, not the subject against one rival.
 - **Composition and share**: segments, regions, product lines, and how they have shifted.
 - **Geography**: locations, networks and routes, with coordinates.
