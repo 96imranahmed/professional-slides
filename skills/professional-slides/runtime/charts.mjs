@@ -86,6 +86,11 @@ export function chartFrame(frame, { topLegend = false, annotations = [], changeA
   const railWidth = evidenceRailWidth({ annotations });
   const rightInset = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16) + railWidth;
   let top = topFor(false), compact = false;
+  // A peer in a row is given the row's top band; when its full bands would
+  // overrun that budget and compact ones fit it, it closes them and keeps the
+  // shared top line.
+  const shared = Number(topInset) || 0;
+  if (shared && top > shared && evidenceAnnotationTopBandCount({ annotations }) && topFor(true) <= shared) { top = topFor(true); compact = true; }
   if (frame.height - bottom - top < MIN_PLOT_HEIGHT && evidenceAnnotationTopBandCount({ annotations })) { top = topFor(true); compact = true; }
   if (frame.height - bottom - top < MIN_PLOT_HEIGHT) throw new Error(`Chart annotation bands leave insufficient plot height (${Math.max(0, Math.floor(frame.height - bottom - top))}px of the ${MIN_PLOT_HEIGHT}px minimum, even with compact callout bands); give the chart ${Math.ceil(MIN_PLOT_HEIGHT - (frame.height - bottom - top))}px more height, drop an annotation, or split the exhibit`);
   if (frame.width - leftInset - rightInset < 120) throw new Error(`Chart has insufficient plot width (${Math.max(0, Math.floor(frame.width - leftInset - rightInset))}px of the 120px minimum after its labels and gutters); widen the chart, shorten category labels, or split the exhibit`);

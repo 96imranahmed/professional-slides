@@ -434,9 +434,17 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     slide.layout = layoutFor[page.commentary];
   }
 
+  // Advisories the compiler can see and the author should: they do not block.
+  const advisories = [];
+  if (page.type === "place" && typeof primary?.geography === "string") {
+    const points = (primary.markers || []).filter((m) => Number.isFinite(m?.longitude) && Number.isFinite(m?.latitude));
+    const span = points.length > 1 ? Math.max(...points.map((m) => m.longitude)) - Math.min(...points.map((m) => m.longitude)) : 0;
+    if (points.length > 1 && span < 20) advisories.push(`MAP_COARSE: the markers span ${span.toFixed(1)} degrees; the built-in 1:110m coastline is coarse at that scale - import a 1:10m or 1:50m geography (runtime/import-geography.mjs) and pass it as \`geography\``);
+  }
   if (typeof page.takeaway === "string") slide.soWhat = page.takeaway.trim();
   slide.pageType = { type: page.type, form: page.form, commentary: page.commentary, takeaway: typeof page.takeaway === "string",
     ...(page.series ? { series: String(page.series) } : {}), why: page.why.trim(), family: familyOf(page.type, page.form),
+    ...(advisories.length ? { advisories } : {}),
     // The claim is the title: the build holds the two together.
     content: { claim: String(page.title ?? page.text ?? "").trim(), ...(settles ? { settles } : {}), adds: page.adds ?? null, ...(evidence.length ? { evidence } : {}) } };
   slide.pageType.structure = structureOf(slide);

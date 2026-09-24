@@ -9,7 +9,7 @@ last test of each group checks the message names the fix.
 """
 import unittest
 
-from node_probe import run_node
+from node_probe import RUNTIME, run_node
 
 
 PRELUDE = """
@@ -304,3 +304,39 @@ console.log(JSON.stringify({spread:(Math.max(...xs)-Math.min(...xs))/frame.width
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OpenIssueFixes(unittest.TestCase):
+    def test_inside_bar_callout_compact_peer_bands_and_takeaway_is_body(self):
+        result = run_node('''
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { chartFrame } from './skills/professional-slides/runtime/charts.mjs';
+const props = { categories: ['Alpha', 'Beta', 'Gamma'], series: [{ name: 'x', values: [100, 99, 98] }], annotations: [{ category: 'Beta', text: 'Short note here' }] };
+const nodes = REGISTRY.get('chart.bar').render({ id: 'c', frame: { x: 0, y: 0, width: 520, height: 330 }, props }).nodes;
+const box = nodes.find((n) => n.role === 'annotation-surface');
+const bar = nodes.find((n) => n.role === 'chart-mark' && n.data.category === 'Beta');
+const within = box.frame.x >= bar.frame.x && box.frame.y >= bar.frame.y && box.frame.x + box.frame.width <= bar.frame.x + bar.frame.width && box.frame.y + box.frame.height <= bar.frame.y + bar.frame.height;
+// A peer given the row's compact band closes its callout bands to share the top line.
+const annotations = [{ category: 'A', text: 'One note' }, { category: 'B', text: 'Another note' }];
+const own = chartFrame({ x: 0, y: 0, width: 500, height: 600 }, { annotations });
+const peer = chartFrame({ x: 0, y: 0, width: 500, height: 600 }, { annotations, topInset: 150 });
+console.log(JSON.stringify({ placement: box.data.evidencePlacement, within, leader: nodes.some((n) => n.role === 'annotation-leader' && n.data.evidenceIndex === box.data.evidenceIndex),
+  ownTop: own.y, peerTop: peer.y, compact: peer.evidenceCompact === true }));
+''')
+        self.assertEqual(result['placement'], 'inside')
+        self.assertTrue(result['within'])
+        self.assertFalse(result['leader'])  # a callout on its own bar needs no leader
+        self.assertGreater(result['ownTop'], 150)  # full bands alone overrun the row's band
+        self.assertEqual(result['peerTop'], 150)
+        self.assertTrue(result['compact'])
+
+    def test_a_takeaway_line_is_body_not_footer(self):
+        import sys
+        sys.path.insert(0, str(RUNTIME / 'gates'))
+        import page_gates
+        slide = {'nodes': [
+            {'type': 'text', 'role': 'paragraph', 'text': ' '.join(['word'] * 30), 'frame': {'x': 80, 'y': 200, 'width': 800, 'height': 100}},
+            {'type': 'text', 'role': 'insight-body', 'text': ' '.join(['close'] * 20), 'frame': {'x': 80, 'y': 640, 'width': 800, 'height': 20}}]}
+        body, footer, _ = page_gates.body_bands(slide)
+        self.assertEqual((body, footer), (50, 0))
+

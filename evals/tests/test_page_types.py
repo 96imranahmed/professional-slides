@@ -191,5 +191,16 @@ console.log(JSON.stringify({{ twoNumbers: error(() => compilePage(ranking(['i1']
         self.assertEqual(chart_led, [])  # 60 words is a full chart page carrying its own callouts
         self.assertEqual(table_commentary[0]['code'], 'THIN_PAGE')
 
+    def test_a_regional_map_on_the_coarse_coastline_is_advised(self):
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+const markers = [{{ label: 'Leeds', longitude: -1.55, latitude: 53.8 }}, {{ label: 'York', longitude: -1.08, latitude: 53.96 }}, {{ label: 'Hull', longitude: -0.34, latitude: 53.74 }}];
+const page = compilePage({{ id: 'm', type: 'place', form: 'map', commentary: 'beside', points: ['A point.'], takeaway: false, why: 'Where the network runs is the claim',
+  settles: {{ kind: 'structure', what: 'The operator route map' }}, title: 'The network is three cities', exhibit: {{ geography: 'europe', crop: 'fit', markers }} }});
+console.log(JSON.stringify({{ advisories: page.pageType.advisories ?? [] }}));
+''')
+        self.assertTrue(any(a.startswith('MAP_COARSE') for a in result['advisories']))
+
+
 if __name__ == '__main__':
     unittest.main()

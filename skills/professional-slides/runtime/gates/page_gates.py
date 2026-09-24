@@ -877,6 +877,9 @@ class PageText(NamedTuple):
     title_band: int
 
 
+TAKEAWAY_ROLE = re.compile(r"^(insight|takeaway|so-?what|closing)")
+
+
 def page_bands(slide):
     """Split the page's words into its three bands, by role first and position
     second, so a note dropped in the body still counts as a note and a label
@@ -897,6 +900,12 @@ def page_bands(slide):
             continue
         if role in TITLE_ROLES or role in TITLE_BAND_ROLES:
             band += words
+            continue
+        # The page's closing takeaway sits low on the page but is its
+        # conclusion, not a note: counted by position it made a short page
+        # with a takeaway line "footer-heavy" and pushed the line off.
+        if TAKEAWAY_ROLE.match(role):
+            body += words
             continue
         frame = node.get("frame") or {}
         top = float(frame.get("y", 0)) / CANVAS_H if frame.get("height") else None

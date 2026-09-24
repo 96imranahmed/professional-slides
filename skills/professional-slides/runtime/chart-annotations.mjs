@@ -322,6 +322,30 @@ function besidePlacement({ annotation, index, target, bounds, obstacles, placeme
 }
 
 /**
+ * A callout set inside its own bar: the step between beside and the rail. A
+ * long, thick bar has plain area past its start, and a note set there needs no
+ * leader - it is on the thing it describes. Only its own mark (same category
+ * and series), fully inside with a margin, clear of its value label and every
+ * other obstacle; the overlap audit accepts exactly this construction and
+ * nothing looser (overlap-policy.mjs).
+ */
+function insidePlacement({ annotation, index, target, marks, obstacles, placements }) {
+  if (annotation.treatment === "speech") return null; // a speech bubble points with its tail
+  const mark = marks.find((node) => node.data?.category === annotation.category && (annotation.series === undefined || node.data?.series === annotation.series));
+  if (!mark?.frame) return null;
+  const { width, height } = evidenceBoxSize(annotation);
+  const pad = 6, f = mark.frame;
+  const room = { x: f.x + pad, y: f.y + pad, width: f.width - 2 * pad, height: f.height - 2 * pad };
+  const others = obstacles.filter((node) => node.id !== mark.id);
+  for (const at of [{ x: room.x, y: f.y + (f.height - height) / 2 }, { x: f.x + (f.width - width) / 2, y: room.y + room.height - height }]) {
+    const frame = { ...at, width, height };
+    if (frameInside(frame, room) && clearSurface(frame, others, placements))
+      return { annotation, index, target, frame, leader: null, placement: "inside", insideOf: { category: mark.data.category, series: mark.data.series ?? null } };
+  }
+  return null;
+}
+
+/**
  * Where a callout's leader lands: the mark's centre on the category axis, at
  * its value end - the top-centre of a column, the end-centre of a bar.
  *
@@ -479,11 +503,13 @@ function evidenceNodes(id, placement) {
     targetCategory: annotation.category,
     targetSeries: annotation.series ?? null,
     ...(placement.placement ? { evidencePlacement: annotation._placement === "rail" ? "rail" : placement.placement, evidenceIndex: index } : {}),
-    ...(placement.released ? { evidenceReleased: true } : {})
+    ...(placement.released ? { evidenceReleased: true } : {}),
+    ...(placement.insideOf ? { insideMark: true, category: placement.insideOf.category, ...(placement.insideOf.series !== null ? { series: placement.insideOf.series } : {}) } : {})
   };
   if (speech) return speechNodes(id, placement, data);
   const nodes = [
-    linePrimitive({
+    // A callout set inside its own bar has no leader: it sits on its mark.
+    ...(leader ? [linePrimitive({
       id: stableId(id, "annotation-leader", index),
       role: "annotation-leader",
       ...leader,
@@ -493,7 +519,7 @@ function evidenceNodes(id, placement) {
       // the orthogonal treatment already used.
       style: { stroke: callout ? PRIMARY : RULE, lineWidth: callout ? STANDARD : HAIRLINE, dash: "solid" },
       data: { ...data, endArrow: false, endpoint: "dot" }
-    }),
+    })] : []),
     rectPrimitive({
       id: stableId(id, "annotation-box", index),
       role: "annotation-surface",
@@ -506,7 +532,7 @@ function evidenceNodes(id, placement) {
     // trailing space pushed the last word of a line past the box edge.
     evidenceTextNode(id, index, frame, annotation.text, data)
   ];
-  nodes.push(ellipsePrimitive({
+  if (leader) nodes.push(ellipsePrimitive({
     id: stableId(id, "annotation-endpoint", index),
     role: "annotation-endpoint",
     frame: { x: leader.x2 - ENDPOINT_DIAMETER / 2, y: leader.y2 - ENDPOINT_DIAMETER / 2, width: ENDPOINT_DIAMETER, height: ENDPOINT_DIAMETER },
@@ -617,13 +643,14 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
     const banded = holdsBand(annotation);
     const context = { annotation, index, target, plot, props, bandIndex, obstacles: collisionObstacles, placements };
     const beside = () => besidePlacement({ ...context, bounds: besideBounds, obstacles: besideObstacles });
+    const inside = () => insidePlacement({ ...context, marks: obstacles.filter((node) => node.role === "chart-mark") });
     const chain = RELEASED_PLACEMENTS.has(annotation._placement)
-      ? [beside]
+      ? [beside, inside]
       : annotation.treatment === "orthogonal-dot" && annotation.orientation === "horizontal"
-        ? [() => horizontalPlacement(context), beside]
+        ? [() => horizontalPlacement(context), beside, inside]
         : annotation.treatment === "orthogonal-dot"
-          ? [() => verticalPlacement(context), () => standardPlacement(context), beside]
-          : [() => standardPlacement(context), beside];
+          ? [() => verticalPlacement(context), () => standardPlacement(context), beside, inside]
+          : [() => standardPlacement(context), beside, inside];
     let placement = null;
     for (const attempt of chain) if ((placement = attempt())) break;
     if (banded) bandIndex += 1;
