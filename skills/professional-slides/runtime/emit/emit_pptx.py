@@ -533,6 +533,9 @@ class Emitter:
         fmt = spec.get("valueFormat") or {}
         if isinstance(fmt, dict) and "decimals" in fmt:
             decimals = int(fmt["decimals"])
+        elif isinstance(spec.get("labelDecimals"), int):
+            # The precision the drawn chart printed (core.mjs nativeChartSpec).
+            decimals = spec["labelDecimals"]
         else:
             # No declared format: labels read the way the drawn charts write them
             # (value-format.mjs decimalsFor). A series rounds as one: whole
@@ -550,13 +553,10 @@ class Emitter:
         values_all = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
         grouped = any(abs(v) >= 1000 for v in values_all)
         base = "#,##0" if grouped else "0"
+        # A fixed format, never "General": every label in the series carries the
+        # one precision, so 12 prints as 12.0 beside 35.8, as the drawn chart
+        # prints it.
         number_format = base if decimals == 0 else base + "." + "0" * decimals
-        # The drawn chart prints a one-decimal series as JavaScript rounds it:
-        # 35.8 beside 12, not 12.0. When every value already has at most one
-        # decimal and no format was declared, "General" prints exactly that.
-        if decimals == 1 and not (isinstance(fmt, dict) and "decimals" in fmt) and values_all \
-                and all(abs(v * 10 - round(v * 10)) < 1e-9 for v in values_all) and not grouped:
-            number_format = "General"
         if kind not in ("pie", "donut", "scatter"):
             # Bar weight follows the category count, as in the drawn charts:
             # few categories take fat bars, many take thinner ones.
@@ -584,6 +584,13 @@ class Emitter:
                     va.maximum_scale = _nice_ceiling(max(vals) * LABEL_HEADROOM)
             if spec.get("yMajorUnit") is not None:
                 va.major_unit = spec["yMajorUnit"]
+                # One precision down the axis, as the drawn axis prints it:
+                # 0.0, 2.5, 5.0 rather than General's 0, 2.5, 5.
+                ticks = [spec.get("yMin") or 0, spec.get("yMax") or 0, spec["yMajorUnit"]]
+                places = max(len(f"{float(t):.12g}".partition(".")[2]) for t in ticks)
+                if places:
+                    va.tick_labels.number_format = ("#,##0" if grouped else "0") + "." + "0" * min(places, 6)
+                    va.tick_labels.number_format_is_linked = False
             ca = chart.category_axis
             ca.tick_labels.font.size = Pt(10)
             if kind not in ("bar", "stacked-bar", "range"):
@@ -728,7 +735,8 @@ class Emitter:
                         lab.position = XL_LABEL_POSITION.RIGHT
                         tf = lab.text_frame
                         value = spec["series"][i]["values"][last]
-                        decimals = (spec.get("valueFormat") or {}).get("decimals", 0)
+                        # The chart's one precision, not a whole-number default
+                        # that rounded 40.8 to "41" beside point labels of 40.8.
                         tf.text = f'{spec["series"][i].get("name") or ""} {value:,.{decimals}f}'
                         for p in tf.paragraphs:
                             for r in p.runs:

@@ -506,7 +506,7 @@ function contentLayout(cell, width, props, used) {
     // 15, which is right for a figure the runtime derived and wrong for one
     // the author typed - a page cannot say 14.8 in its takeaway and 15 in
     // the table it is drawn from.
-    const labels = cell.values.map((n, i) => cell.labels?.[i] ?? formatValue(n, cell.scaleRecord));
+    const labels = cell.values.map((n, i) => cell.labels?.[i] ?? formatValue(n, { ...cell.scaleRecord, values: cell.scaleValues ?? cell.values }));
     const size = bodySize(props);
     const labelWidth = Math.max(
       ...[...labels, ...(cell.scaleRecord.labelTexts || [])].map((s) => measure(s, inner, true, size).width),
@@ -818,6 +818,14 @@ export function measureTable({ frame, props }) {
     throw new Error("Unknown table density");
   const tableProps = { ...props, density },
     used = new Map();
+  // The figures beside a scale's bars are read down the column, so they share
+  // one precision; each cell choosing its own printed 15 above 14.9.
+  const scaleValues = new Map();
+  for (const cell of model.cells.flat())
+    if (cell?.type === "bars" && Array.isArray(cell.values))
+      scaleValues.set(cell.scale, [...(scaleValues.get(cell.scale) || []), ...cell.values]);
+  for (const cell of model.cells.flat())
+    if (cell?.type === "bars") cell.scaleValues = scaleValues.get(cell.scale);
   const compact = density !== "body",
     padding = v(
       density === "dense" ? "space.1" : compact ? "space.2" : "space.3",
@@ -1506,7 +1514,7 @@ function renderTableAt({ id, frame, props }) {
                 data: { ...markData, series: i, value, zeroX, domain: [scale.min, scale.max] },
               }),
             );
-          const label = measure(cell.labels?.[i] ?? formatValue(value, scale), l.labelWidth, true, l.size);
+          const label = measure(cell.labels?.[i] ?? formatValue(value, { ...scale, values: cell.scaleValues ?? cell.values }), l.labelWidth, true, l.size);
           putText(
             stableId(cellId, "value", i),
             "table-cell-text",

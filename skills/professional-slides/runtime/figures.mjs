@@ -970,11 +970,15 @@ function normalizeRadial(props) {
   const max = props.max ?? 100;
   if (!(Number.isFinite(max) && max > 0)) throw new Error("A radial bar's max must be a positive number");
   const unit = props.unit ?? (max === 100 ? "%" : "");
-  return between(props.items, 2, 6, "A radial bar").map((item, i) => {
+  const items = between(props.items, 2, 6, "A radial bar");
+  // The rings' figures are read together, so they share one precision: 40.0%
+  // beside 32.5%, not 40% - a decimal for all when any ring needs one.
+  const decimals = items.some((item) => Number(Number(item?.value).toFixed(1)) % 1 !== 0) ? 1 : 0;
+  return items.map((item, i) => {
     if (!clean(item?.label)) throw new Error(`Radial ring ${i + 1} needs a label`);
     const value = Number(item.value);
     if (!(value >= 0 && value <= max)) throw new Error(`Radial ring ${i + 1}: value must be between 0 and ${max}`);
-    return { label: clean(item.label), value, display: clean(item.display) ?? `${Number(value.toFixed(1))}${unit}`, highlight: item.highlight === true };
+    return { label: clean(item.label), value, display: clean(item.display) ?? `${value.toFixed(decimals)}${unit}`, highlight: item.highlight === true };
   });
 }
 

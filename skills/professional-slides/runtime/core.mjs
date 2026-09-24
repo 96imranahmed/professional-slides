@@ -945,6 +945,11 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   const showValueAxis = renderedNodes
     ? renderedNodes.some(node => node.role === "axis-label")
     : props.showValueAxis ?? (props.gridlines === true || !dataLabels);
+  // The drawn chart has already chosen one precision for its labels; the
+  // native chart prints the same, rather than re-deriving it and drifting.
+  const drawnLabels = (renderedNodes || []).filter(node => node.role === "data-label" && typeof node.text === "string");
+  const labelDecimals = drawnLabels.length
+    ? Math.max(...drawnLabels.map(node => node.text.match(/\d\.(\d+)/)?.[1].length ?? 0)) : null;
   const ticks = (renderedNodes || []).filter(node => node.role === "axis-label" && Number.isFinite(node.data?.value)).map(node => node.data.value).sort((a,b)=>a-b);
   // A two-mark contrast paints one peer in the primary and the other grey, and
   // which one is the scene's decision (charts.mjs defaultFocusIndex: the named
@@ -975,6 +980,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     yMax: ticks.length ? ticks.at(-1) : props.yMax ?? null,
     ...(ticks.length>1 ? {yMajorUnit:ticks[1]-ticks[0]} : {}),
     dataLabels,
+    ...(labelDecimals !== null ? { labelDecimals } : {}),
     showValueAxis,
     // A pie or donut names its categories in its legend (the drawn chart's
     // "legend-top-right"); without one the native chart shows unlabelled wedges.

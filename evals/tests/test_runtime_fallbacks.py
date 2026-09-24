@@ -224,7 +224,7 @@ const outside=nodes.filter(n=>n.role==='data-label'&&n.data.outside);
 for(const l of outside) for(const m of nodes.filter(n=>n.role==='chart-mark')) assert.ok(!meet(l.frame,m.frame));
 console.log(JSON.stringify({outside:outside.map(n=>n.text)}));
 """)
-        self.assertEqual(sorted(result['outside']), ['1.5', '2'])
+        self.assertEqual(sorted(result['outside']), ['1.5', '2.0'])
 
     def test_an_arrow_too_short_for_its_bubble_becomes_a_bracket(self):
         result = run_node(PRELUDE + """

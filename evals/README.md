@@ -42,6 +42,23 @@ node evals/scripts/compile_scene.mjs spec.json scene.json
 python3 evals/scripts/pptx_scene_probe.py deck.pptx scene.json
 ```
 
+## Reference census
+
+`scripts/reference_census.py` measures a rendered deck page by page — words and
+numeric tokens, body ink, occupied grid cells, empty bands, title rules, and,
+given the scene or pages file, exhibits per page, one-exhibit-plus-column pages,
+plotted values per chart page and one-to-three-word title last lines — and sets
+it beside a reference census. `reference_census.json` holds the numbers for a
+sample of strong consulting pages; the sample stays outside the repository, so
+pass another PDF or census JSON to `--reference` to compare against something
+else.
+
+```bash
+python3 evals/scripts/reference_census.py out/rendered/deck.pdf \
+    --scene out/scene.json --pages deck.pages.json \
+    --reference evals/reference_census.json [--out census.json]
+```
+
 ## Page gates
 
 `runtime/gates/page_gates.py` measures the resolved scene and, where the

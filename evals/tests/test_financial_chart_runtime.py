@@ -96,6 +96,19 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result['accepted'])
 
+    def test_chart_titles_accept_years_and_dates_but_not_results(self):
+        # "Destinations, today and 2030 goal" was refused as a statistic by the
+        # same message that asked for an explicit period.
+        result = run_node("""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const title=REGISTRY.get('chart-title'),frame={x:60,y:60,width:1000,height:500};
+const accepted=heading=>{try{title.render({id:'t',frame,props:{heading}});return true;}catch(error){if(!/must not contain statistics/.test(error.message))throw error;return false;}};
+const periods=['Destinations, today and 2030 goal','2030 target capacity','Seats, 2024 vs 2030 plan','Capacity 2019 and 2030','Fleet by 2030','Passengers FY26','Revenue 2025-26','Revenue Q3 2025','Balance at 31 March 2026','Balance as of 2026-03-31','Balance on 31/03/2026','Balance at March 31, 2026'];
+const results=['Revenue +12%','Revenue up 3.4x','Revenue up 12x','Revenue fell 20%','Revenue $1.2bn','Revenue 5bn','Share 45%','NYPD: 2025','Homicides fell 2015','Revenue of 2030','Revenue, 2025.5','Revenue versus 2016%','Margin up 40pp'];
+console.log(JSON.stringify({refusedPeriods:periods.filter(h=>!accepted(h)),acceptedResults:results.filter(accepted)}));
+""")
+        self.assertEqual(result, {"refusedPeriods": [], "acceptedResults": []})
+
     def test_growth_bracket_stays_near_small_marks_on_a_shared_scale(self):
         result = run_node("""
 import assert from 'node:assert/strict';
@@ -635,8 +648,8 @@ import {compileDeck,component} from './skills/professional-slides/runtime/core.m
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 for(const [values,yMax,expected] of [
  [[13.624,24.768],30,['0','10','20','30']],
- [[.13624,.24768],.3,['0','0.1','0.2','0.3']],
- [[.4,.8],1,['0','0.25','0.5','0.75','1']]
+ [[.13624,.24768],.3,['0.0','0.1','0.2','0.3']],
+ [[.4,.8],1,['0.00','0.25','0.50','0.75','1.00']]
 ]) {
  const deck=compileDeck({slides:[{id:'fractional',composition:component({id:'chart',component:'chart.column',frame:{x:60,y:160,width:1160,height:480},props:{categories:['2025','2026'],series:[{name:'Revenue',values}],yMax,showValueAxis:true}})}]},REGISTRY);
  assert.deepEqual(deck.slides[0].nodes.filter(n=>n.role==='axis-label').map(n=>n.text),expected);

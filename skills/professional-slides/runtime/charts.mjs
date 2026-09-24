@@ -274,7 +274,8 @@ function axisTickText(min, max, index, steps = 4) {
     const text = String(Number(entry.toPrecision(12)));
     return text.includes(".") ? text.split(".")[1].length : 0;
   }));
-  return String(Number(value.toFixed(Math.min(10, decimals))));
+  // Every tick prints that one precision: 0.0, 2.5, 5.0, not 0, 2.5, 5.
+  return (value + 0).toFixed(Math.min(10, decimals)).replace(/^-(0(\.0+)?)$/, "$1");
 }
 
 export function axisLabelWidth(bounds) {
@@ -342,7 +343,7 @@ function horizontalAxes(id, plot, xMin, xMax, steps = 4, { gridlines = false, sh
         id: stableId(id, "axis-label", index), role: "axis-label",
         data: { axis: "x", value: xMin + (xMax - xMin) * index / steps },
         frame: { x: x - 28, y: plot.y + plot.height + 8, width: 56, height: 24 },
-        text: String(Number((xMin + (xMax - xMin) * index / steps).toPrecision(6))),
+        text: axisTickText(xMin, xMax, index, steps),
         style: textStyle(AXIS_LABEL, SECONDARY, false, "center")
       }));
     }
@@ -657,11 +658,18 @@ function growthColumn(g, categories, series, name) {
   if (a < 0 || b <= a) throw new Error(`${name}.from and .to must name two categories in order`);
   const year = (c) => { const m = String(c).match(/(?:19|20)\d{2}/); return m ? Number(m[0]) : null; };
   const years = year(g.from) !== null && year(g.to) !== null && year(g.to) > year(g.from) ? year(g.to) - year(g.from) : null;
-  const rows = series.map((item) => {
+  const rates = series.map((item) => {
     const v0 = item.values[a], v1 = item.values[b];
-    if (!(v0 > 0 && v1 > 0)) return { name: item.name, text: "n/a" };
-    const rate = years ? (Math.pow(v1 / v0, 1 / years) - 1) * 100 : (v1 / v0 - 1) * 100;
-    return { name: item.name, text: `${rate >= 0 ? "+" : "−"}${Math.abs(rate).toFixed(Math.abs(rate) < 10 ? 1 : 0)}%` };
+    if (!(v0 > 0 && v1 > 0)) return null;
+    return years ? (Math.pow(v1 / v0, 1 / years) - 1) * 100 : (v1 / v0 - 1) * 100;
+  });
+  // The column is read down, so it takes one precision: a decimal when any
+  // rate is under ten, which gave "+4.2%" above "+12%" when chosen per rate.
+  const decimals = rates.some((rate) => rate !== null && Math.abs(rate) < 10) ? 1 : 0;
+  const rows = series.map((item, index) => {
+    const rate = rates[index];
+    if (rate === null) return { name: item.name, text: "n/a" };
+    return { name: item.name, text: `${rate >= 0 ? "+" : "−"}${Math.abs(rate).toFixed(decimals)}%` };
   });
   return { to: g.to, label: g.label || (years ? `CAGR ${g.from}–${String(g.to).slice(-2)}` : `Change ${g.from}–${g.to}`), rows };
 }
@@ -2152,7 +2160,7 @@ function scatter({ id, frame, props, bubble = false }) {
   const xTicks = scaleTicks(props.xScale, xBounds);
   for (let index = 0; index <= xTicks; index++) {
     const value = xBounds.min + xBounds.span * index / xTicks;
-    nodes.push(textPrimitive({ id: stableId(id, "x-axis-label", index), role: "axis-label", frame: { x: xScale(value) - (index === 0 ? 0 : index === xTicks ? 64 : 32), y: plot.y + plot.height + 20, width: 64, height: 28 }, text: String(Number(value.toFixed(2))), style: textStyle(AXIS_LABEL, SECONDARY, false, index === 0 ? "left" : index === xTicks ? "right" : "center"), data: { axis: "x" } }));
+    nodes.push(textPrimitive({ id: stableId(id, "x-axis-label", index), role: "axis-label", frame: { x: xScale(value) - (index === 0 ? 0 : index === xTicks ? 64 : 32), y: plot.y + plot.height + 20, width: 64, height: 28 }, text: axisTickText(xBounds.min, xBounds.max, index, xTicks), style: textStyle(AXIS_LABEL, SECONDARY, false, index === 0 ? "left" : index === xTicks ? "right" : "center"), data: { axis: "x" } }));
   }
   if (props.yTickLabels) {
     for (let index = nodes.length - 1; index >= 0; index--) if (nodes[index].role === "axis-label" && !nodes[index].id.includes("x-axis-label")) nodes.splice(index, 1);

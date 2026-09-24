@@ -486,6 +486,8 @@ function assertChartTitleCopy(props = {}) {
     // "31 March 2026", "calendar 2025": the date or year the measure is taken at.
     copy = copy.replace(new RegExp(`\\b(?:\\d{1,2}\\s+)?${month}\\.?\\s+${year}\\b`, "gi"), "period");
     copy = copy.replace(new RegExp(`\\b(?:calendar|fiscal|financial)\\s+(?:year\\s+)?${year}\\b`, "gi"), "period");
+    // Dates written as numbers: 2026-03-31, 31/03/2026, March 31, 2026.
+    copy = copy.replace(new RegExp(`\\b${year}-\\d{1,2}-\\d{1,2}\\b|\\b\\d{1,2}/\\d{1,2}/(?:${year}|\\d{2})\\b|\\b${month}\\.?\\s+\\d{1,2},?\\s+${year}\\b`, "gi"), "period");
     const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:\\s+${year})?|${month}\\.?\\s+${year}|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
     copy = copy.replace(new RegExp(`\\bindex(?:ed)?\\b[^\\d]*${year}\\s*=\\s*100\\b`, "gi"), "index base"); // "Index, 2021 = 100" names the base, not a result
     copy = copy.replace(/\b[nN]\s*=\s*[\d,.]+\b/g, "sample size"); // "n = 240" is the population, not a result
@@ -493,6 +495,11 @@ function assertChartTitleCopy(props = {}) {
     copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|to|versus|vs\\.?|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
     copy = copy.replace(new RegExp(`([,(]\\s*)${year}(?=\\s*(?:$|[,) ;]))`, "g"), "$1period");
     copy = copy.replace(new RegExp(`^\\s*${year}(?=\\s*(?:$|[,;) ]))`), "period"); // a unit line that opens with its period
+    // A year anywhere else is the period the heading asks for - "today and
+    // 2030 goal", "2030 target" - not a result. It reads as a value only when
+    // it is one: after a colon ("NYPD: 2025"), a currency or sign, a verb of
+    // change ("fell 2015"), or carrying a decimal, percent or multiplier.
+    copy = copy.replace(new RegExp(`(?<![:$€£¥₹+\\-−=.,\\d]\\s*)(?<!\\b(?:fell|rose|grew|declined|increased|decreased|dropped|reached|hit|totall?ed|of|at|was|were|is|are|up|down)\\s+)\\b${year}\\b(?![\\d.,]*\\s*(?:%|[xX]\\b|bn\\b|mn\\b|[mkb]\\b|pp\\b|pts?\\b|bps\\b|percent\\b|points?\\b|times\\b|fold\\b))(?![.,]\\d)`, "g"), "period");
     // A bounded observation window describes the measure. Mask only the
     // complete duration phrase so adjoining result values still reject.
     copy = copy.replace(/\bwithin\s+(?:one|1)\s+year\b/gi, "within observation period");
@@ -503,7 +510,9 @@ function assertChartTitleCopy(props = {}) {
     // Model and product designations name a thing, not a result: A350-1000,
     // A321neo, 787-9, 737 MAX 8, iPhone 15. A token that mixes letters and
     // digits, or a three-digit model with a short variant, is masked.
-    copy = copy.replace(/\b(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{2,}(?:-[A-Za-z0-9]+)*\b/g, "designation");
+    // A figure with its multiplier or magnitude ("12x", "5bn", "40pp") mixes
+    // letters and digits too, and is a result, so it is left to reject.
+    copy = copy.replace(/\b(?!\d+(?:[xX]|bn|mn|[mkb]|pp|pts?|bps)\b)(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{2,}(?:-[A-Za-z0-9]+)*\b/g, "designation");
     copy = copy.replace(/\b\d{3}(?:-\d{1,2}[A-Za-z]*|\s+MAX(?:\s+\d{1,2})?)\b/g, "designation");
     const numberWords = "(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)";
     // A number word is a result only when it quantifies a change or share ("twenty percent", "one point"),
