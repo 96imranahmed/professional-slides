@@ -274,8 +274,20 @@ function makeComposition(plan, items, { root = false } = {}) {
       // and on into the next. A document page says so; reflowing its columns
       // into one stack is what left report prose in a single narrow band.
       if (plan.textFlow !== "columns" && isProseRow(children) && !parallelProse(children)) {
-        direction = "column";
-        children = children.map((item) => ({ ...item, size: { width: { fr: 1 }, height: "hug" } }));
+        // It reads down - in two columns, not one. Stacked, each paragraph
+        // stopped at the 80-character measure and the list filled the left half
+        // of a full-width band under the exhibit with nothing to its right,
+        // which is most of what made an editorial deck look unfinished. Two
+        // columns reading down and across keep the measure and fill the width.
+        const hug = (item) => ({ ...item, size: { width: { fr: 1 }, height: "hug" } });
+        if (children.length >= 2) {
+          const half = Math.ceil(children.length / 2);
+          children = [children.slice(0, half), children.slice(half)].map((part, k) => ({
+            id: `${plan.id}-reading-${k}`, layout: "flow.column", gap: plan.gap, size: { width: { fr: 1 }, height: "hug" }, items: part.map(hug) }));
+        } else {
+          direction = "column";
+          children = children.map(hug);
+        }
       }
     }
     // A slide body whose blocks all hug their content claims less than the frame.

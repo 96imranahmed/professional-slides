@@ -47,7 +47,7 @@ console.log(JSON.stringify({ primary: contrastRatio(c['color.componentPrimary'],
 ''')
         self.assertGreaterEqual(result['primary'], 4.5)
         self.assertGreaterEqual(result['accent'], 4.5)
-        self.assertEqual(result['mark'], '#D3A625')
+        self.assertEqual(result['mark'], '#D3A625')  # the secondary colour is the second series; the accent is the brand
         self.assertIn('#RRGGBB', result['error'])
 
 

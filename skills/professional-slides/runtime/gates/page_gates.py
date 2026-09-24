@@ -452,6 +452,7 @@ GATE_CODES = {
     "DECK_VOCABULARY": "the deck draws a couple of devices and leaves the rest of the vocabulary unused",
     "UNSCALED_FIGURE": "a figure drawn to a scale its own printed numbers contradict",
     "TITLE_COUNT": "the title states a count the page's own exhibit does not show",
+    "DECK_THIN_PAGES": "nearly a third or more of the deck's pages are thin or half empty",
 }
 
 # Distribution and furniture statistics prompt human review; they do not
@@ -2579,6 +2580,32 @@ def configure(fill=None, declared=None):
     return fill
 
 
+EMPTY_PAGE_CODES = {"THIN_PAGE", "HERO_EXHIBIT", "INK_COVERAGE", "INTERNAL_VOID", "DEAD_BAND", "COLUMN_VOID"}
+
+
+def gate_deck_thin_pages(content_indexes, findings):
+    """DECK_THIN_PAGES. Each empty-page finding is advisory, because on one
+    page it can be the right call: a quiet statement, a chart that wants air.
+    Across the deck it is not. A 50-page deck delivered with sixteen THIN_PAGE
+    advisories, four HERO_EXHIBIT and three INK_COVERAGE - timelines of three
+    dots across an empty band, four-row tables stretched to fill a page, a
+    paragraph list in the left half - and the review, reading the argument,
+    accepted it. When nearly a third of the pages are flagged the deck has a habit,
+    and the habit blocks."""
+    pages = len(content_indexes)
+    flagged = sorted({f["slide"] for f in findings if f.get("code") in EMPTY_PAGE_CODES and f.get("slide")})
+    if pages < 12 or len(flagged) < 5 or len(flagged) / pages < 0.3:
+        return
+    findings.append(finding(
+        None, "DECK_THIN_PAGES", len(flagged), max(5, round(pages * 0.3)),
+        "{} of {} content pages are flagged thin or half empty (pages {}). Fix the pattern, not each page: give the "
+        "exhibit the page (a wider chart with its annotation, a table with a treated column and the numbers the "
+        "commentary quotes), move a figure that only needs a strip to a page that shares it, set commentary beside "
+        "the exhibit rather than in a band under it, or merge two thin pages into one full one.".format(
+            len(flagged), pages, ", ".join(str(n) for n in flagged[:20])),
+    ))
+
+
 def run_gates(scene, render_dir=None, profile=None, gates=None):
     if profile is not None and profile not in PROFILES:
         raise ValueError(f"Unknown density profile: {profile}")
@@ -2716,6 +2743,9 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         gate_column_monotony(slides, content_indexes, findings)
     if not gates or "TABLE_SCHEMA_FLAT" in gates:
         gate_table_schema_flat(slides, content_indexes, findings)
+
+    if not gates or "DECK_THIN_PAGES" in gates:
+        gate_deck_thin_pages(content_indexes, findings)
 
     # A density report beside the findings: the numbers this review is about, so
     # a regression shows up as a number rather than as a screenshot.

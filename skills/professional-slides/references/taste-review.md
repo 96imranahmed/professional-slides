@@ -48,6 +48,17 @@ Do not supply a desired score. Keep each candidate and report. Iterate requested
 2. **Every page, through its spread:** inspect the actual evidence, labels, emphasis, hierarchy and reading effort on the four-up spreads, opening a page at full size only to confirm a suspected defect. Use the design decisions at their owner, including useful omitted cues, semantic table roles, heading ownership and text-only status colors. Does the finding appear before the furniture? Does commentary add something? Are comparisons local and equivalent? Do recorded treatments survive nested composition and export?
 3. **Every spread and the whole sequence:** compare normalized evidence relationships, density and narrative progression. Different chart types or two/three commentary columns do not establish variety. Preserve purposeful comparison series while challenging repeated informational jobs.
 
+**Finish is judged, not assumed.** A reviewer reading for the argument accepted a deck at 8/10 whose pages a reader called ugly on sight. Before the argument, look at the montage the way the reader will, and raise a major finding for each of these that recurs on more than a couple of pages:
+- half a page empty, or a list set in the left half with nothing beside it;
+- a small figure (three dots on a line, two ranks) floating in a band sized for a chart;
+- a table stretched into tall rows of short phrases;
+- emphasis the wrong way round: the rival or the target in the loudest colour, the subject muted;
+- a share or two numbers drawn as a two-bar chart;
+- source lines a reader cannot look up (ledger codes, "see source ledger");
+- repeated page shapes (metric beside table) that make pages indistinguishable at thumbnail size.
+
+A deck with a recurring finish defect is not scored above 7, however sound the argument.
+
 At each scale judge the saved artifact, not its labels or metadata. A declaration of category treatment is not a filled cell; a diagram with arrows is not a developed mechanism. A complete compact summary does not need extra metrics or icons.
 
 For a pre-read, explicitly test substantive text coverage against the task targets in `density-profile.json` and any reference the user supplied. Can the reader explain why the evidence supports the claim, the relevant mechanism, the material limitation and the decision consequence from the page alone? Flag recurring terse labels, unsupported takeaways and large empty regions where necessary explanation is absent. Repair the missing reasoning before resizing visuals; extra repeated sentences or a mandatory insight box do not satisfy this check.

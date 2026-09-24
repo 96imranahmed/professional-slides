@@ -101,12 +101,18 @@ export function identityColors(identity, canvas = "#FFFFFF") {
   if (identity.accent !== undefined && !hex(identity.accent)) throw new Error("identity.accent must be a #RRGGBB colour");
   const primary = readable(identity.primary, canvas, 4.5);
   const rawAccent = identity.accent ?? mix(identity.primary, "#FFFFFF", 0.35);
-  const accent = readable(rawAccent, canvas, 4.5);
+  // Emphasis is the subject's own colour. A chart marks the bar the title is
+  // about in `color.accent` and draws the rest in series 1; with the brand red
+  // as series 1 and a soft secondary as the accent, an Emirates deck drew every
+  // rival bar in Emirates red and Emirates itself in tan - the emphasis upside
+  // down. Series 1 is now a dark neutral warmed by the brand, the accent is the
+  // brand colour, and the secondary colour is the second series.
+  const base = mix("#3A3A3A", identity.primary, 0.08);
   return {
     "color.componentPrimary": primary, "color.componentPrimaryTint": mix(primary, canvas, 0.88),
-    "color.accent": accent, "color.accentTint": mix(rawAccent, canvas, 0.85),
-    "color.chartSeries1": primary, "color.chartSeries2": rawAccent, "color.chartSeries3": mix(primary, "#FFFFFF", 0.45),
-    "color.chartSeries4": mix(primary, "#000000", 0.35), "color.chartSeries5": "#8A8A8A", "color.chartSeries6": "#C9C9C9"
+    "color.accent": primary, "color.accentTint": mix(identity.primary, canvas, 0.88),
+    "color.chartSeries1": base, "color.chartSeries2": rawAccent, "color.chartSeries3": mix(primary, "#FFFFFF", 0.45),
+    "color.chartSeries4": mix(base, "#FFFFFF", 0.45), "color.chartSeries5": "#8A8A8A", "color.chartSeries6": "#C9C9C9"
   };
 }
 

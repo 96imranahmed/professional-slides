@@ -855,14 +855,17 @@ export function measureTable({ frame, props }) {
     throw new Error(
       `Table content needs ${height.toFixed(1)}px, but only ${frame.height}px is allocated; widen, simplify or split the table`,
     );
-  // A table given more height than it needs spreads the surplus across its rows,
-  // up to 2.5× the natural row height, so a hero table fills its frame the way a
-  // consulting scorecard does instead of leaving a void beneath it.
+  // A table given more height than it needs spreads some of the surplus across
+  // its rows, so a hero table fills its frame the way a consulting scorecard
+  // does. Only some: at 2.5× a four-row table of one-line cells grew 100px rows
+  // with a short phrase floating in each, which reads as an unfinished page, not
+  // a scorecard. Rows grow by at most 60% and 24px each; the page composer, not
+  // the table, owns what is left.
   // Stretched rows read as bands, so every cell's content is then centred on
   // the row rather than hanging from its top edge beside a centred category.
   let stretched = props._sharedRowHeights !== undefined;
   if (props._sharedRowHeights === undefined && props.fillHeight === true && Number.isFinite(frame.height) && frame.height > height + 0.01 && heights.length) {
-    const surplus = Math.min(frame.height - height, heights.reduce((a, b) => a + b, 0) * 1.5);
+    const surplus = Math.min(frame.height - height, heights.reduce((a, b) => a + b, 0) * 0.6, heights.length * 24);
     const per = surplus / heights.length;
     for (let r = 0; r < heights.length; r += 1) heights[r] += per;
     height += surplus;
@@ -925,6 +928,10 @@ function renderTableAt({ id, frame, props }) {
   const m = measureTable({ frame, props }),
     nodes = [],
     xs = m.widths.map((_, c) => frame.x + sum(m.widths.slice(0, c)));
+  // Runs of columns between implication gutters: where a split rule starts and ends.
+  const isGutter = (c) => m.columns[c]?.type === "implication";
+  const runStart = (c) => !isGutter(c) && (c === 0 || isGutter(c - 1));
+  const runEndX = (c) => { let e = c; while (e + 1 < m.columns.length && !isGutter(e + 1)) e += 1; return xs[e] + m.widths[e] - m.gap; };
   const ys = m.heights.map(
     (_, r) =>
       frame.y +
@@ -1048,13 +1055,16 @@ function renderTableAt({ id, frame, props }) {
     // One continuous header rule unless a column is an implication arrow or
     // the header sits over a chevron/category run whose slits are by design.
     const continuousHeader = !m.columns.some((col) => col.type === "implication") && props.headerShape !== "chevron" && header !== "categories";
-    if (!(filledHeader && props.headerShape === "chevron") && (continuousHeader ? c === 0 : column.type !== "implication"))
+    // An implication gutter splits the rule in two - evidence, verdict - and
+    // no further: a rule broken at every column read as a damaged table.
+    const gutterSplit = !continuousHeader && props.headerShape !== "chevron" && header !== "categories";
+    if (!(filledHeader && props.headerShape === "chevron") && (continuousHeader ? c === 0 : column.type !== "implication" && (!gutterSplit || runStart(c))))
       nodes.push(
         line(
           stableId(id, "header-rule", c),
           xs[c],
           frame.y + m.headerHeight,
-          continuousHeader ? frame.x + frame.width - m.gap : xs[c] + m.widths[c] - m.gap,
+          continuousHeader ? frame.x + frame.width - m.gap : gutterSplit ? runEndX(c) : xs[c] + m.widths[c] - m.gap,
           frame.y + m.headerHeight,
         ),
       );
@@ -1563,12 +1573,14 @@ function renderTableAt({ id, frame, props }) {
         // One continuous rule per row unless the row is a run of filled
         // category boxes, whose slits are part of the design.
         const continuous = props.treatment !== "categories" && cell.rowSpan === 1 && !m.columns.some((col) => col.type === "implication");
-        if (zebra && continuous) { /* zebra bands replace the row rules */ } else if (!continuous || c === 0) nodes.push(
+        // Split only at the implication gutter, as the header rule is.
+        const gutterRun = !continuous && props.treatment !== "categories" && cell.rowSpan === 1 && m.cells[r].every((other) => !other || (other.rowSpan ?? 1) === 1);
+        if (zebra && continuous) { /* zebra bands replace the row rules */ } else if (gutterRun ? runStart(c) : (!continuous || c === 0)) nodes.push(
           line(
             stableId(cellId, "rule"),
             area.x,
             area.y + height,
-            continuous ? frame.x + frame.width - m.gap : area.x + area.width - m.gap,
+            continuous ? frame.x + frame.width - m.gap : gutterRun ? runEndX(c) : area.x + area.width - m.gap,
             area.y + height,
             "table-rule",
             { ...data, rule: "row" },

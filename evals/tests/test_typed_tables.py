@@ -234,7 +234,7 @@ for(const variant of ['bar-columns','heatmap-1-10','grouped-hypotheses','numbere
 	  assert.equal(arrows.filter(n=>n.type==='ellipse'&&n.data.arrowVariant==='disc-chevron').length,3);
 	  assert.ok(arrows.filter(n=>n.type==='line').every(n=>['color.ink','color.onPrimary'].includes(n.style.stroke.tokenId)));
 	  const rowRules=nodes.filter(n=>n.role==='table-rule'&&n.data.rule==='row');
-	  assert.equal(rowRules.length,6);assert.ok(rowRules.every(n=>n.data.column!==2));
+	  assert.equal(rowRules.length,4);assert.ok(rowRules.every(n=>n.data.column!==2)); // one rule per side of the gutter per row boundary, not one per column
 	  delete props.columns[2].relation;assert.throws(()=>renderTable({id:'bad',frame,props}),/relation: implies/);
  }
 }

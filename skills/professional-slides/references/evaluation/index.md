@@ -34,6 +34,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Page architecture | `PAGE_SHAPE_FLAT` | at least three distinct evidence relationships per ten analytical pages, none past 40%. Chart/table above two or three commentary columns, with or without an insight strip, counts once; mirrored arrangements also count once. The finding reports `constrainedPages` to locate evidence that needs redesign. Change the relationship when the argument warrants it; adding commentary or furniture does not create a new architecture |
 | Commentary column | `COLUMN_MONOTONY` | at most three consecutive pages marked with the same device (icon, numbered disc, hairline, prose) |
 | Deck shape | `DECK_FLAT` | past eight analytical pages, one page carries the detail: 282+ words, or a p80 a third above the median |
+| Thin pages | `DECK_THIN_PAGES` | blocks when 30% or more of 12+ content pages (and at least five) carry a thin or half-empty page finding |
 | Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |
 | Marks in the exhibit | `PLOT_SPAN` | marks span `weight.plotSpan` of the exhibit frame (annotated and peer-aligned charts exempt) |
 | Table against its budget | `THIN_TABLE` | uses `weight.tableFill` of the page's row budget |

@@ -22,7 +22,13 @@ export const CRAFT_CODES = Object.freeze({
   CRAFT_NO_PICTURES: "a long deck about recognisable subjects with no photograph anywhere",
   CRAFT_PLAYERS_UNINTRODUCED: "the deck compares named players but never introduces them with their marks",
   CRAFT_EXHIBIT_VARIETY: "the deck draws on too few kinds of exhibit for its length",
+  CRAFT_SOURCE_CODES: "source lines cite internal ledger codes instead of naming the publisher",
 });
+
+// "Source: E26+DXB+SKY+B777; exact URL in source ledger". A reader cannot look
+// up E26; the source line names the publisher, the document and the date.
+const SOURCE_CODE = /\b[A-Z][A-Z0-9]{1,6}(?:\+[A-Z][A-Z0-9]{1,6})+\b|\b(?:source|evidence|citation) (?:ledger|register)\b|\bsee ledger\b/i;
+export const codedSource = (text) => SOURCE_CODE.test(String(text ?? ""));
 
 // Decks shorter than this are diagnostics and probes; the floors are about a
 // deck's rhythm, which a handful of pages does not have.
@@ -44,6 +50,14 @@ export function trivialChart(ex) {
   return series <= 1 && categories <= 2;
 }
 
+/** Two bars of one series that add up to a whole: a share drawn as a comparison. */
+export function shareAsBars(ex) {
+  if (!trivialChart(ex) || (ex.categories || []).length !== 2) return false;
+  const values = (ex.series?.[0]?.values || []).map(Number);
+  const total = values.reduce((a, b) => a + b, 0);
+  return values.length === 2 && values.every((v) => v >= 0) && Math.abs(total - 100) <= 1.5;
+}
+
 /** A chart over time: four or more period categories. */
 export function trendChart(ex) {
   const categories = Array.isArray(ex.categories) ? ex.categories.map(String) : [];
@@ -62,12 +76,16 @@ export function craftFindings(spec, scene) {
 
   const charts = content.flatMap((slide) => exhibitsOf(slide).filter(isChart).map((ex) => ({ slide, ex })));
   const trivial = charts.filter(({ ex }) => trivialChart(ex));
-  if (charts.length >= 4 && trivial.length / charts.length > 0.25) {
-    block("CRAFT_TRIVIAL_CHARTS", { trivial: trivial.length, of: charts.length, pages: trivial.map(({ slide }) => slide.id ?? null) }, 0.25,
+  // A share drawn as two bars (cargo 12, everything else 88) is never the right
+  // chart, however few there are: it is a number, or one segment of a whole.
+  const shares = trivial.filter(({ ex }) => shareAsBars(ex));
+  if (charts.length >= 4 && (trivial.length / charts.length >= 0.2 || shares.length)) {
+    block("CRAFT_TRIVIAL_CHARTS", { trivial: trivial.length, of: charts.length, pages: trivial.map(({ slide }) => slide.id ?? null) }, 0.2,
       `${trivial.length} of ${charts.length} charts plot two numbers of one series. Two numbers are a metric pair: set them as metrics with ` +
       "the delta, or give the chart what makes it evidence - the whole peer set ranked, the series over time with its CAGR, the share " +
       "each part takes, the gap to a benchmark, a ratio that normalises size (per seat, per head, per route). A chart earns its page " +
-      "by showing a relationship the reader could not get from the numbers in the title.");
+      "by showing a relationship the reader could not get from the numbers in the title." +
+      (shares.length ? ` ${shares.length} of them draw a share as two bars (${shares.map(({ slide }) => slide.id).join(", ")}): state the share as a metric, or show it as one segment of a stacked bar beside the peers' mix.` : ""));
   }
   if (charts.length >= 8 && !charts.some(({ ex }) => trendChart(ex))) {
     advise("CRAFT_NO_TREND", { charts: charts.length, overTime: 0 }, 1,
@@ -123,6 +141,15 @@ export function craftFindings(spec, scene) {
       `The deck compares ${players.length} named players and never shows their marks. Introduce them early on one page: each player's ` +
       "logo, what it is and the two or three numbers the deck will compare (a `logos` exhibit, or a table with a `logo` column). Later " +
       "pages can then name a player without the reader having to remember who it is. Plan each logo as `{ alt: \"<Name> logo\" }`: the build fetches it from the player's Wikipedia infobox.");
+  }
+
+  // One coded source is one too many, so this is a count, not a share.
+  const coded = [...(spec.slides || []), ...(spec.appendix || [])].filter((slide) => codedSource(slide.source) || (slide.footnotes || []).some(codedSource));
+  if (coded.length) {
+    block("CRAFT_SOURCE_CODES", { pages: coded.length, example: String(coded[0].source ?? "").slice(0, 80) }, 0,
+      `${coded.length} source line${coded.length === 1 ? "" : "s"} cite ledger codes ("${String(coded[0].source ?? "").slice(0, 60)}"). ` +
+      "The reader has no ledger. Name each source as it would be cited: publisher, document, date - \"Emirates Group Annual Report 2025-26; " +
+      "Dubai Airports, traffic release, Feb 2026\". Keep the URLs in sources.md.", coded.map((slide) => slide.id ?? null));
   }
 
   const perTen = content.length ? (stats.distinctExhibits / content.length) * 10 : 0;

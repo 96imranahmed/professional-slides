@@ -221,10 +221,14 @@ const spec={schema:'professional-slides.deck/v3',id:'series',slides:[{
   ]}]};
 const paragraphs=planDeck(toDeckPlan(spec)).deck.slides[0].nodes.filter(n=>n.role==='paragraph');
 assert.equal(paragraphs.length,3);
-assert.equal(new Set(paragraphs.map(n=>n.frame.x)).size,1,'one column, not three');
-assert.equal(new Set(paragraphs.map(n=>n.frame.y)).size,3,'the three read down the page');
-const tops=paragraphs.map(n=>n.frame.y);
-assert.deepEqual(tops,[...tops].sort((a,b)=>a-b),'in the order they were written');
+// A list reads down - in two columns, so it keeps its measure and still fills
+// the band under the exhibit instead of leaving the right half empty.
+const [a,b,c]=paragraphs;
+assert.equal(a.frame.x,b.frame.x,'the first two read down the first column');
+assert.ok(b.frame.y>a.frame.y,'in the order they were written');
+assert.ok(c.frame.x>a.frame.x+a.frame.width-1,'the third opens the second column');
+assert.equal(c.frame.y,a.frame.y,'at the top of it');
+assert.ok(c.frame.x+c.frame.width>900,'the list spans the width of the band');
 console.log('{}');
 ''')
 
@@ -257,7 +261,8 @@ const mixed=row([
   {lead:'The peak is the first year',text:'Twenty-eight episodes ran before the format settled'},
   'Each year afterwards carries roughly half the episodes of the year before it',
   'Five episodes close the run, which is a season in name rather than in length']);
-assert.equal(new Set(mixed.map(n=>n.frame.x)).size,1,'mixed construction stacks');
+assert.equal(mixed[0].frame.x,mixed[1].frame.x,'mixed construction reads down, not across');
+assert.ok(mixed[1].frame.y>mixed[0].frame.y);
 console.log('{}');
 ''')
 
