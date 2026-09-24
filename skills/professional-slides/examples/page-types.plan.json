@@ -63,8 +63,21 @@
    "insight": "none"
   },
   {
-   "id": "p04",
+   "id": "p03b",
    "n": 6,
+   "title": "Northvale's journeys have recovered more slowly than all five regional peers since FY19",
+   "exhibit": "chart.line",
+   "architecture": "evidence-with-commentary",
+   "why": "Whether the stall is Northvale's or the market's is settled by setting its recovery against every peer's from the same base year",
+   "pageType": "trend/indexed",
+   "commentary": "rail",
+   "annotation": "none",
+   "anchors": [],
+   "insight": "none"
+  },
+  {
+   "id": "p04",
+   "n": 7,
    "title": "Peak trains run above 90% full on every line; off-peak trains run under half",
    "exhibit": "paired",
    "architecture": "paired-evidence",
@@ -77,14 +90,14 @@
   },
   {
    "id": "p05",
-   "n": 7,
+   "n": 8,
    "title": "Northvale sits mid-table on journeys per route-km, 27% below the leading peer",
    "exhibit": "chart.bar",
    "architecture": "evidence-with-commentary",
-   "why": "Where Northvale stands among all seven regional operators on one intensity measure is the claim, so the whole set is ranked and Northvale marked",
-   "pageType": "ranking/bar",
-   "commentary": "beside",
-   "annotation": "highlight",
+   "why": "Where Northvale stands among all seven regional operators is the claim, and the reason sits in two more measures for the same operators, so the three share one axis with Northvale marked",
+   "pageType": "ranking/aligned-bars",
+   "commentary": "below",
+   "annotation": "none",
    "anchors": [],
    "highlight": [
     "27% below Westmoor",
@@ -95,7 +108,7 @@
   },
   {
    "id": "p06",
-   "n": 8,
+   "n": 9,
    "title": "Leisure is two thirds of off-peak travel but only a seventh of the peak",
    "exhibit": "chart.stacked-column",
    "architecture": "evidence-with-commentary",
@@ -113,7 +126,7 @@
   },
   {
    "id": "p07",
-   "n": 9,
+   "n": 10,
    "title": "Half-hourly off-peak stations grew off-peak journeys 3.7 times as fast as hourly ones",
    "exhibit": "chart.scatter",
    "architecture": "evidence-with-commentary",
@@ -130,8 +143,26 @@
    "insight": "none"
   },
   {
+   "id": "p07b",
+   "n": 11,
+   "title": "Northvale's cost per train-km is ninth of twenty, £3.40 above the lowest-cost operator",
+   "exhibit": "chart.bar",
+   "architecture": "evidence-with-commentary",
+   "why": "The claim is where Northvale's unit cost sits in the whole field of regional operators, so all twenty are sorted and Northvale marked",
+   "pageType": "ranking/distribution",
+   "commentary": "beside",
+   "annotation": "highlight",
+   "anchors": [],
+   "highlight": [
+    "£17.60 per train-km",
+    "electric",
+    "£16.40"
+   ],
+   "insight": "none"
+  },
+  {
    "id": "p08",
-   "n": 10,
+   "n": 12,
    "title": "The Eastern line carries the most journeys at the highest cost per train-km",
    "exhibit": "table",
    "architecture": "evidence-only",
@@ -146,7 +177,7 @@
   },
   {
    "id": "s2",
-   "n": 11,
+   "n": 13,
    "title": "02 / What holds it back",
    "kind": "section",
    "exhibit": "text",
@@ -155,7 +186,7 @@
   },
   {
    "id": "p09",
-   "n": 12,
+   "n": 14,
    "title": "Hybrid working cost 7.1 million journeys; housing and timetable changes won back 5.0 million",
    "exhibit": "chart.waterfall",
    "architecture": "reconciliation",
@@ -168,7 +199,7 @@
   },
   {
    "id": "p10",
-   "n": 13,
+   "n": 15,
    "title": "Each peak train added to the Eastern line has cost a point of punctuality",
    "exhibit": "paired",
    "architecture": "paired-evidence",
@@ -186,7 +217,7 @@
   },
   {
    "id": "p11",
-   "n": 14,
+   "n": 16,
    "title": "Frequency drives a loop: shorter waits win leisure trips that fund the next train",
    "exhibit": "cycle",
    "architecture": "cycle",
@@ -204,7 +235,7 @@
   },
   {
    "id": "p12",
-   "n": 15,
+   "n": 17,
    "title": "The Dales and Valley lines can grow now; the Coast line cannot",
    "exhibit": "table",
    "architecture": "matrix",
@@ -219,7 +250,7 @@
   },
   {
    "id": "p13",
-   "n": 16,
+   "n": 18,
    "title": "Passengers name the wait, not the fare, as what keeps them off trains",
    "exhibit": "rows",
    "architecture": "matrix",
@@ -232,7 +263,7 @@
   },
   {
    "id": "p14",
-   "n": 17,
+   "n": 19,
    "title": "Lapsed riders blame the hourly service, not the fare, for driving instead",
    "exhibit": "quote-cluster",
    "architecture": "text",
@@ -245,7 +276,7 @@
   },
   {
    "id": "p15",
-   "n": 18,
+   "n": 20,
    "title": "Three corridors serve three different markets, each needing its own timetable",
    "exhibit": "picture-strip",
    "architecture": "picture-led",
@@ -268,7 +299,7 @@
   },
   {
    "id": "s3",
-   "n": 19,
+   "n": 21,
    "title": "03 / The plan",
    "kind": "section",
    "exhibit": "text",
@@ -277,7 +308,7 @@
   },
   {
    "id": "p16",
-   "n": 20,
+   "n": 22,
    "title": "Electrifying the Eastern line beats bi-mode trains on cost per journey from year six",
    "exhibit": "compare",
    "architecture": "paired-evidence",
@@ -290,7 +321,7 @@
   },
   {
    "id": "p17",
-   "n": 21,
+   "n": 23,
    "title": "Four levers add 11.7 million journeys, led by the off-peak timetable",
    "exhibit": "cards",
    "architecture": "card-grid",
@@ -303,7 +334,7 @@
   },
   {
    "id": "p18",
-   "n": 22,
+   "n": 24,
    "title": "London and Manchester send three in five of the visitors from beyond the network",
    "exhibit": "map",
    "architecture": "evidence-with-commentary",
@@ -322,7 +353,7 @@
   },
   {
    "id": "p19",
-   "n": 23,
+   "n": 25,
    "title": "The plan adds 11.7 million journeys a year by FY31, mostly after electrification",
    "exhibit": "chart.line",
    "architecture": "hero-number-with-evidence",
@@ -340,7 +371,7 @@
   },
   {
    "id": "p20",
-   "n": 24,
+   "n": 26,
    "title": "Fare revenue passes its FY20 level in FY29, carried by off-peak travel",
    "exhibit": "chart.stacked-column",
    "architecture": "evidence-only",
@@ -353,7 +384,7 @@
   },
   {
    "id": "p21",
-   "n": 25,
+   "n": 27,
    "title": "The plan costs £640 million, mostly in FY28-FY29, and pays back in eleven years",
    "exhibit": "paired",
    "architecture": "paired-evidence",
@@ -366,7 +397,7 @@
   },
   {
    "id": "p22",
-   "n": 26,
+   "n": 28,
    "title": "Grant covers just over half the cost; Northvale must borrow or earn the rest",
    "exhibit": "chart.donut",
    "architecture": "evidence-with-commentary",
@@ -379,7 +410,7 @@
   },
   {
    "id": "s4",
-   "n": 27,
+   "n": 29,
    "title": "04 / Delivering it",
    "kind": "section",
    "exhibit": "text",
@@ -388,7 +419,7 @@
   },
   {
    "id": "p23",
-   "n": 28,
+   "n": 30,
    "title": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
    "exhibit": "gantt",
    "architecture": "gantt",
@@ -405,7 +436,7 @@
   },
   {
    "id": "p24",
-   "n": 29,
+   "n": 31,
    "title": "Four named owners carry one lever each, reporting monthly to the managing director",
    "exhibit": "people",
    "architecture": "card-grid",
@@ -418,7 +449,7 @@
   },
   {
    "id": "p25",
-   "n": 30,
+   "n": 32,
    "title": "Two of seven 2027 milestones are at risk, both on the electrification path",
    "exhibit": "table",
    "architecture": "matrix",
@@ -437,7 +468,7 @@
   },
   {
    "id": "p26",
-   "n": 31,
+   "n": 33,
    "title": "Service grows by a fifth while punctuality holds at 90% and unit cost falls",
    "exhibit": "chart.column",
    "architecture": "metrics-over-evidence",
@@ -450,7 +481,7 @@
   },
   {
    "id": "p27",
-   "n": 32,
+   "n": 34,
    "title": "Fare reform should follow the new timetable, not lead it",
    "exhibit": "text",
    "architecture": "text",
@@ -464,7 +495,7 @@
   },
   {
    "id": "p28",
-   "n": 33,
+   "n": 35,
    "title": "Four decisions put Northvale on the path to 60 million journeys",
    "exhibit": "text",
    "architecture": "text",

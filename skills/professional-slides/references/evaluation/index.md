@@ -21,6 +21,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Layout repetition | `LAYOUT_MONOTONY` | no layout signature on more than 35% of content pages |
 | Page families | `PAGE_VARIETY` | at least three families across ten pages or more |
 | Measured pages | `EVIDENCE_MIX` | at least 45% of analytical pages carry a chart, a table or measured tiles |
+| Values a chart page plots | `EVIDENCE_DEPTH` | blocks at authoring and in the build's preflight (the variety contract): from eight chart pages, the median chart page plots 15 values or more - strong decks plot about 22 (the middle half 10 to 48). Each chart page is also floored at 8 when it compiles (a bridge 5); see [Page types](../page-types.md#evidence-depth) |
 | Photographs | `IMAGE_BUDGET`, `IMAGE_RUN` | at most 30% of analytical pages, never more than two running |
 | Argument on a picture or comparison page | `MISSING_ARGUMENT` | an insight, a so-what or a points column |
 | One number over a table | `METRIC_STACK` | a lone tile belongs beside its evidence |

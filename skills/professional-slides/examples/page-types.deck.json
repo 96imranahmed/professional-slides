@@ -64,6 +64,7 @@
     "takeaway": false,
     "why": "The opening states the answer and the four levers behind it, each with the condition it depends on",
     "family": "text",
+    "values": 5,
     "content": {
      "claim": "Northvale can reach 60 million journeys by FY31 by filling the off-peak",
      "settles": {
@@ -168,6 +169,8 @@
     "takeaway": false,
     "why": "The claim is the shape of the recovery - a steep rebound and then a plateau short of the FY20 peak - so the break and the stall are marked where they happen",
     "family": "chart",
+    "values": 10,
+    "chart": true,
     "content": {
      "claim": "Journeys recovered to 48 million but stalled 4 million below the FY20 peak",
      "settles": {
@@ -177,6 +180,130 @@
      "adds": "The callouts say why the series broke and why it has stalled, which the line alone cannot"
     },
     "structure": "|exhibit-full|||||chart.line||"
+   }
+  },
+  {
+   "id": "p03b",
+   "title": "Northvale's journeys have recovered more slowly than all five regional peers since FY19",
+   "exhibit": {
+    "heading": "Journeys by operator",
+    "unit": "Index, FY19 = 100",
+    "categories": [
+     "FY19",
+     "FY20",
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Westmoor Trains",
+      "values": [
+       100,
+       101.3,
+       31,
+       69,
+       91.1,
+       98.7,
+       102.3,
+       104.8
+      ]
+     },
+     {
+      "name": "Southdown Rail",
+      "values": [
+       100,
+       101.6,
+       30.8,
+       69.7,
+       91.6,
+       99.1,
+       102,
+       104.1
+      ]
+     },
+     {
+      "name": "Lakeside Lines",
+      "values": [
+       100,
+       101,
+       29.1,
+       67.3,
+       87.8,
+       93.5,
+       96.4,
+       97.7
+      ]
+     },
+     {
+      "name": "Fenland Rail",
+      "values": [
+       100,
+       100.9,
+       28.1,
+       66.1,
+       86.6,
+       92.9,
+       95.1,
+       96.9
+      ]
+     },
+     {
+      "name": "Highland Link",
+      "values": [
+       100,
+       100.5,
+       27.9,
+       63.4,
+       82.5,
+       88.5,
+       92.3,
+       95.1
+      ]
+     },
+     {
+      "name": "Northvale Rail",
+      "values": [
+       100,
+       101.2,
+       28.8,
+       61,
+       82.6,
+       89,
+       91.7,
+       93.2
+      ]
+     }
+    ],
+    "type": "chart.line",
+    "focusSeries": "Northvale Rail"
+   },
+   "source": "Source: illustrative data for fictional operators; financial years ending March",
+   "panel": {
+    "text": "The two peers back above FY19 added off-peak frequency in FY23; Northvale kept its hourly off-peak timetable, and its recovery flattened a year later."
+   },
+   "layout": "sidebar",
+   "pageType": {
+    "type": "trend",
+    "form": "indexed",
+    "commentary": "rail",
+    "takeaway": false,
+    "why": "Whether the stall is Northvale's or the market's is settled by setting its recovery against every peer's from the same base year",
+    "family": "chart",
+    "values": 48,
+    "chart": true,
+    "content": {
+     "claim": "Northvale's journeys have recovered more slowly than all five regional peers since FY19",
+     "settles": {
+      "kind": "rate",
+      "what": "journeys FY19-FY26 for Northvale and five regional peers, each indexed to FY19"
+     },
+     "adds": "The rail says what separates the two operators that recovered fully from the rest"
+    },
+    "structure": "|sidebar|||||chart.line||rail"
    }
   },
   {
@@ -249,6 +376,8 @@
     "takeaway": false,
     "why": "One question - how full are the trains - answered for the peak and the off-peak on the same five lines, side by side",
     "family": "exhibit",
+    "values": 10,
+    "chart": true,
     "content": {
      "claim": "Peak trains run above 90% full on every line; off-peak trains run under half",
      "settles": {
@@ -269,43 +398,118 @@
     "7 m"
    ],
    "exhibit": {
-    "heading": "Journeys per route-km, FY26",
-    "unit": "thousand",
-    "categories": [
-     "Westmoor Trains",
-     "Southdown Rail",
-     "Lakeside Lines",
-     "Northvale Rail",
-     "Fenland Rail",
-     "Highland Link",
-     "Marches Rail"
-    ],
-    "series": [
+    "type": "chart-group",
+    "aligned": true,
+    "charts": [
      {
-      "name": "Journeys per route-km",
-      "values": [
-       142,
-       131,
-       118,
-       104,
-       97,
-       88,
-       71
-      ]
-     }
-    ],
-    "highlights": [
+      "heading": "Journeys per route-km",
+      "unit": "thousand, FY26",
+      "component": "chart.bar",
+      "props": {
+       "categories": [
+        "Westmoor Trains",
+        "Southdown Rail",
+        "Lakeside Lines",
+        "Northvale Rail",
+        "Fenland Rail",
+        "Highland Link",
+        "Marches Rail"
+       ],
+       "series": [
+        {
+         "name": "Journeys per route-km",
+         "values": [
+          142,
+          131,
+          118,
+          104,
+          97,
+          88,
+          71
+         ]
+        }
+       ],
+       "highlights": [
+        {
+         "category": "Northvale Rail"
+        }
+       ]
+      }
+     },
      {
-      "category": "Northvale Rail"
-     }
-    ],
-    "referenceLines": [
+      "heading": "Off-peak frequency",
+      "unit": "trains an hour",
+      "component": "chart.bar",
+      "props": {
+       "categories": [
+        "Westmoor Trains",
+        "Southdown Rail",
+        "Lakeside Lines",
+        "Northvale Rail",
+        "Fenland Rail",
+        "Highland Link",
+        "Marches Rail"
+       ],
+       "series": [
+        {
+         "name": "Off-peak frequency",
+         "values": [
+          2.6,
+          2.4,
+          2.1,
+          1.4,
+          1.8,
+          1.2,
+          1
+         ]
+        }
+       ],
+       "highlights": [
+        {
+         "category": "Northvale Rail"
+        }
+       ],
+       "valueFormat": {
+        "decimals": 1
+       }
+      }
+     },
      {
-      "value": 107.5,
-      "label": "Peer median 108"
+      "heading": "Peak load factor",
+      "unit": "% of seats",
+      "component": "chart.bar",
+      "props": {
+       "categories": [
+        "Westmoor Trains",
+        "Southdown Rail",
+        "Lakeside Lines",
+        "Northvale Rail",
+        "Fenland Rail",
+        "Highland Link",
+        "Marches Rail"
+       ],
+       "series": [
+        {
+         "name": "Peak load factor",
+         "values": [
+          94,
+          92,
+          90,
+          95,
+          86,
+          81,
+          78
+         ]
+        }
+       ],
+       "highlights": [
+        {
+         "category": "Northvale Rail"
+        }
+       ]
+      }
      }
-    ],
-    "type": "chart.bar"
+    ]
    },
    "points": [
     {
@@ -323,23 +527,25 @@
    ],
    "pointsHeading": false,
    "source": "Source: illustrative data for fictional operators; route-km excludes freight-only track",
-   "layout": "exhibit-left",
+   "layout": "exhibit-top",
    "pageType": {
     "type": "ranking",
-    "form": "bar",
-    "commentary": "beside",
+    "form": "aligned-bars",
+    "commentary": "below",
     "takeaway": false,
-    "why": "Where Northvale stands among all seven regional operators on one intensity measure is the claim, so the whole set is ranked and Northvale marked",
+    "why": "Where Northvale stands among all seven regional operators is the claim, and the reason sits in two more measures for the same operators, so the three share one axis with Northvale marked",
     "family": "chart",
+    "values": 21,
+    "chart": true,
     "content": {
      "claim": "Northvale sits mid-table on journeys per route-km, 27% below the leading peer",
      "settles": {
       "kind": "rank",
-      "what": "journeys per route-km for all seven comparable regional operators"
+      "what": "journeys per route-km, off-peak trains per hour and peak load factor for all seven comparable regional operators, FY26"
      },
-     "adds": "The column explains why intensity trails - route length and hourly off-peak service - and what the gap is worth"
+     "adds": "The column explains why intensity trails - hourly off-peak service on full-peak lines - and what the gap is worth"
     },
-    "structure": "|exhibit-left|||||chart.bar|points|"
+    "structure": "|exhibit-top|||||chart-group|points|"
    }
   },
   {
@@ -423,6 +629,8 @@
     "takeaway": false,
     "why": "The claim is how the mix of trip purposes differs between the peak, the off-peak and the weekend, each resolving to 100%",
     "family": "chart",
+    "values": 16,
+    "chart": true,
     "content": {
      "claim": "Leisure is two thirds of off-peak travel but only a seventh of the peak",
      "settles": {
@@ -534,6 +742,8 @@
     "takeaway": false,
     "why": "The claim is that two measures move together across the stations - off-peak frequency and off-peak growth - so each station is one point",
     "family": "chart",
+    "values": 10,
+    "chart": true,
     "content": {
      "claim": "Half-hourly off-peak stations grew off-peak journeys 3.7 times as fast as hourly ones",
      "settles": {
@@ -543,6 +753,119 @@
      "adds": "The points quantify the gap between half-hourly and hourly stations and rule out the obvious alternative explanation, population growth"
     },
     "structure": "|exhibit-top|||||chart.scatter|points|"
+   }
+  },
+  {
+   "id": "p07b",
+   "title": "Northvale's cost per train-km is ninth of twenty, £3.40 above the lowest-cost operator",
+   "highlight": [
+    "£17.60 per train-km",
+    "electric",
+    "£16.40"
+   ],
+   "exhibit": {
+    "heading": "Operating cost per train-km, FY26",
+    "unit": "£",
+    "categories": [
+     "Westmoor Trains",
+     "Lakeside Lines",
+     "Southdown Rail",
+     "Kestrel Coast Rail",
+     "Mereside Trains",
+     "Oakfield Link",
+     "Fenland Rail",
+     "Stonebeck Rail",
+     "Northvale Rail",
+     "Linmouth Rail",
+     "Brackenmoor Lines",
+     "Calderbrook Trains",
+     "Harrowdale Rail",
+     "Highland Link",
+     "Pembrook Rail",
+     "Thornfield Trains",
+     "Ravensholt Lines",
+     "Marches Rail",
+     "Dunmore Link",
+     "Upland Rail"
+    ],
+    "series": [
+     {
+      "name": "Cost per train-km",
+      "values": [
+       14.2,
+       14.9,
+       15.3,
+       15.8,
+       16.1,
+       16.4,
+       16.9,
+       17.2,
+       17.6,
+       17.9,
+       18.3,
+       18.6,
+       19,
+       19.4,
+       19.9,
+       20.5,
+       21.2,
+       21.8,
+       22.7,
+       24.1
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Northvale Rail"
+     }
+    ],
+    "valueFormat": {
+     "decimals": 1
+    },
+    "referenceLines": [
+     {
+      "value": 18.1,
+      "label": "Median £18.10"
+     }
+    ],
+    "type": "chart.bar"
+   },
+   "points": [
+    {
+     "lead": "Ninth of twenty",
+     "text": "At £17.60 per train-km Northvale sits just below the field's median of £18.10, and £3.40 above Westmoor, the lowest-cost operator."
+    },
+    {
+     "lead": "The cheapest run electric",
+     "text": "Five of the six lowest-cost operators run electric trains on their busiest lines; every operator above £19.00 still runs diesel on most of its network."
+    },
+    {
+     "lead": "The plan closes a third",
+     "text": "Electric trains on the Eastern line take Northvale to £16.40 by FY31, which would place it sixth on today's figures."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for fictional operators; operating cost excludes track access charges",
+   "layout": "exhibit-left",
+   "pageType": {
+    "type": "ranking",
+    "form": "distribution",
+    "commentary": "beside",
+    "takeaway": false,
+    "why": "The claim is where Northvale's unit cost sits in the whole field of regional operators, so all twenty are sorted and Northvale marked",
+    "family": "chart",
+    "values": 20,
+    "chart": true,
+    "content": {
+     "claim": "Northvale's cost per train-km is ninth of twenty, £3.40 above the lowest-cost operator",
+     "settles": {
+      "kind": "rank",
+      "what": "operating cost per train-km, FY26, for all twenty regional operators"
+     },
+     "adds": "The points say what separates the low-cost operators from Northvale and how much of the gap the plan closes"
+    },
+    "structure": "|exhibit-left|||||chart.bar|points|"
    }
   },
   {
@@ -648,6 +971,7 @@
     "takeaway": false,
     "why": "Five measures per line are looked up and compared under their units, and no single chart would hold all five",
     "family": "table",
+    "values": 31,
     "content": {
      "claim": "The Eastern line carries the most journeys at the highest cost per train-km",
      "settles": {
@@ -714,6 +1038,8 @@
     "takeaway": false,
     "why": "The change from the FY20 peak to FY26 is made of five reconciled drivers, each of which the plan treats differently",
     "family": "chart",
+    "values": 7,
+    "chart": true,
     "content": {
      "claim": "Hybrid working cost 7.1 million journeys; housing and timetable changes won back 5.0 million",
      "settles": {
@@ -739,6 +1065,9 @@
      "heading": "Eastern line peak trains per hour",
      "unit": "trains",
      "categories": [
+      "FY19",
+      "FY20",
+      "FY21",
       "FY22",
       "FY23",
       "FY24",
@@ -749,6 +1078,9 @@
       {
        "name": "Peak trains per hour",
        "values": [
+        9,
+        9,
+        7,
         9,
         10,
         11,
@@ -769,6 +1101,9 @@
      "heading": "Eastern line punctuality",
      "unit": "% on time",
      "categories": [
+      "FY19",
+      "FY20",
+      "FY21",
       "FY22",
       "FY23",
       "FY24",
@@ -779,6 +1114,9 @@
       {
        "name": "Punctuality",
        "values": [
+        90.9,
+        90.6,
+        93.4,
         91.2,
         89.8,
         88.1,
@@ -809,11 +1147,13 @@
     "takeaway": false,
     "why": "Two measures of the same line over the same years - trains added and punctuality lost - only prove the claim read together",
     "family": "exhibit",
+    "values": 16,
+    "chart": true,
     "content": {
      "claim": "Each peak train added to the Eastern line has cost a point of punctuality",
      "settles": {
       "kind": "comparison",
-      "what": "Eastern line peak trains per hour and punctuality, FY22-FY26"
+      "what": "Eastern line peak trains per hour and punctuality, FY19-FY26"
      },
      "adds": "The points give the mechanism - dwell time at single-track sections - and why the off-peak does not share it"
     },
@@ -878,6 +1218,7 @@
     "takeaway": false,
     "why": "Off-peak growth is a loop in which each turn funds the next, so it is drawn as a cycle rather than a list",
     "family": "diagram",
+    "values": 0,
     "content": {
      "claim": "Frequency drives a loop: shorter waits win leisure trips that fund the next train",
      "settles": {
@@ -1032,6 +1373,7 @@
     "takeaway": true,
     "why": "Five lines are judged on the same four readiness criteria, and each line's verdict sits in its own row",
     "family": "table",
+    "values": 23,
     "content": {
      "claim": "The Dales and Valley lines can grow now; the Coast line cannot",
      "settles": {
@@ -1143,6 +1485,7 @@
     "takeaway": false,
     "why": "The survey finding is clearest in passengers' own words, so three voices from three corridors carry the page",
     "family": "text",
+    "values": 0,
     "content": {
      "claim": "Lapsed riders blame the hourly service, not the fare, for driving instead",
      "settles": {
@@ -1243,6 +1586,7 @@
     "takeaway": true,
     "why": "The Eastern line decision is between two options compared on the same four terms: cost, timing, running cost and what each frees up",
     "family": "table",
+    "values": 0,
     "content": {
      "claim": "Electrifying the Eastern line beats bi-mode trains on cost per journey from year six",
      "settles": {
@@ -1296,6 +1640,7 @@
     "takeaway": false,
     "why": "The four levers are parallel and independent, each with its own size, owner and dependency, so they read as four columns",
     "family": "exhibit",
+    "values": 0,
     "content": {
      "claim": "Four levers add 11.7 million journeys, led by the off-peak timetable",
      "settles": {
@@ -1439,6 +1784,7 @@
     "takeaway": false,
     "why": "Where the visitors come from is the claim, so the origin cities are drawn on the map, sized by the journeys they send, with their routes into Leeds",
     "family": "exhibit",
+    "values": 8,
     "advisories": [
      "MAP_COARSE: the markers span 4.1 degrees; the built-in 1:110m coastline is coarse at that scale - import a 1:10m or 1:50m geography (runtime/import-geography.mjs) and pass it as `geography`"
     ],
@@ -1514,6 +1860,7 @@
     "takeaway": false,
     "why": "One number carries the plan - the journeys it adds - with the path to it underneath and the conditions beside it",
     "family": "exhibit",
+    "values": 6,
     "content": {
      "claim": "The plan adds 11.7 million journeys a year by FY31, mostly after electrification",
      "settles": {
@@ -1599,6 +1946,8 @@
     "takeaway": false,
     "why": "Revenue's path over eight years, split into peak and off-peak, shows both when it passes the FY20 level and which part does the work",
     "family": "chart",
+    "values": 16,
+    "chart": true,
     "content": {
      "claim": "Fare revenue passes its FY20 level in FY29, carried by off-peak travel",
      "settles": {
@@ -1706,6 +2055,8 @@
     "takeaway": false,
     "why": "The cost of the plan has three parts the reader needs together - when it is spent, on what, and how quickly it pays back",
     "family": "exhibit",
+    "values": 15,
+    "chart": true,
     "content": {
      "claim": "The plan costs £640 million, mostly in FY28-FY29, and pays back in eleven years",
      "settles": {
@@ -1749,6 +2100,8 @@
     "takeaway": false,
     "why": "The claim is what the £640 million of funding is made of, four parts of one total",
     "family": "chart",
+    "values": 4,
+    "chart": true,
     "content": {
      "claim": "Grant covers just over half the cost; Northvale must borrow or earn the rest",
      "settles": {
@@ -1877,6 +2230,7 @@
     "takeaway": true,
     "why": "The question is what happens when, and which workstream the others wait on",
     "family": "diagram",
+    "values": 0,
     "content": {
      "claim": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
      "settles": {
@@ -1937,6 +2291,7 @@
     "takeaway": false,
     "why": "Each lever has one accountable owner, and the reader needs to know who they are and what each is on the hook for",
     "family": "exhibit",
+    "values": 0,
     "content": {
      "claim": "Four named owners carry one lever each, reporting monthly to the managing director",
      "settles": {
@@ -2036,6 +2391,7 @@
     "takeaway": false,
     "why": "Seven milestones are each judged on one criterion - on track or not - and the pattern of the red ones is the finding",
     "family": "table",
+    "values": 7,
     "content": {
      "claim": "Two of seven 2027 milestones are at risk, both on the electrification path",
      "settles": {
@@ -2113,6 +2469,7 @@
     "takeaway": false,
     "why": "Three numbers set the operating constraint the plan must hold, over the service growth that tests it",
     "family": "exhibit",
+    "values": 6,
     "content": {
      "claim": "Service grows by a fifth while punctuality holds at 90% and unit cost falls",
      "settles": {

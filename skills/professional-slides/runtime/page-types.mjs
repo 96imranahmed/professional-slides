@@ -54,12 +54,13 @@ export const PAGE_TYPES = Object.freeze({
   trend: {
     task: "how a measure moved over time, with the rate or the break marked on the plot",
     forms: { line: CHART("line"), column: CHART("column"), "stacked-column": CHART("stacked-column"), area: CHART("area"),
-      "stacked-area": CHART("stacked-area"), combo: CHART("combo"), slope: CHART("slope") },
+      "stacked-area": CHART("stacked-area"), combo: CHART("combo"), slope: CHART("slope"), indexed: CHART("line") },
     commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1, marked: true, periods: true,
   },
   ranking: {
     task: "where every member of the set stands on one measure, the subject marked",
-    forms: { bar: CHART("bar"), column: CHART("column"), lollipop: CHART("lollipop"), dumbbell: CHART("dumbbell"), bullet: CHART("bullet") },
+    forms: { bar: CHART("bar"), column: CHART("column"), lollipop: CHART("lollipop"), dumbbell: CHART("dumbbell"), bullet: CHART("bullet"),
+      distribution: CHART("bar"), "aligned-bars": "aligned-bars" },
     commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1, marked: true, minCategories: 4,
   },
   composition: {
@@ -165,12 +166,26 @@ export const PAGE_TYPES = Object.freeze({
 // a trend a series over time. A page whose evidence lacks the shape is a
 // research task, found here rather than by the storyline critic or the review.
 export const SETTLES_KINDS = ["count", "share", "rank", "rate", "sequence", "comparison", "structure", "qualitative"];
+//
+// A shape also has a breadth. A generated deck's chart pages plotted a median
+// of five values against about twenty-two on strong decks' pages, because the
+// research stopped at the subject and one comparator: a "series" of four years,
+// a "peer set" of three. So each chart-bearing shape records how wide its data
+// is - `breadth: { periods, series, members, parts, steps }`, or the `data`
+// itself (`categories`, `series`, `points`, ...) for the counts to be read
+// from - and the insight log refuses a shape narrower than a page needs while
+// finding the longer window or the rest of the peer set is still research.
 export const SHAPES = Object.freeze({
-  series: { kind: "rate", means: "one measure over four or more periods" },
-  "peer-set": { kind: "rank", means: "one measure for every member of the set" },
-  mix: { kind: "share", means: "the parts of a whole" },
-  "measure-pair": { kind: "comparison", means: "two measures for each member" },
-  bridge: { kind: "structure", means: "the steps between two totals" },
+  series: { kind: "rate", means: "one measure over six or more periods, or four or more for two or more series (the subject and its peers or a benchmark)",
+    needs: ({ periods = 0, series = 1 }) => periods >= 6 || (periods >= 4 && series >= 2),
+    deepen: "the longer window (six or more periods), or the same measure for the peers or a benchmark over the same periods" },
+  "peer-set": { kind: "rank", means: "one measure for every member of the set, six or more members",
+    needs: ({ members = 0 }) => members >= 6, deepen: "the whole peer set on the same basis, six members or more" },
+  mix: { kind: "share", means: "the parts of a whole, three or more", needs: ({ parts = 0 }) => parts >= 3, deepen: "the whole broken into three or more parts" },
+  "measure-pair": { kind: "comparison", means: "two measures for each of eight or more members",
+    needs: ({ members = 0 }) => members >= 8, deepen: "both measures for eight or more members of the set" },
+  bridge: { kind: "structure", means: "the three or more steps between two totals",
+    needs: ({ steps = 0 }) => steps >= 3, deepen: "the drivers of the change, three or more steps between the totals" },
   geography: { kind: "structure", means: "places with coordinates or regions" },
   schedule: { kind: "sequence", means: "dated phases, milestones or workstreams" },
   roster: { kind: "count", means: "the named members and their attributes" },
@@ -183,6 +198,41 @@ export const TYPE_SHAPES = Object.freeze({
   place: ["geography"], schedule: ["schedule"], profiles: ["roster", "peer-set"], numbers: [...QUANT],
   panels: [...QUANT], scorecard: ["peer-set", "roster", "qualitative", "measure-pair"], lookup: [...QUANT, "roster"],
 });
+const BREADTH_KEYS = { series: ["periods", "series"], "peer-set": ["members"], mix: ["parts"], "measure-pair": ["members"], bridge: ["steps"] };
+
+/** How wide an insight's data is: its `breadth` counts, over the counts read off its `data`. */
+export function breadthOf(insight) {
+  const data = insight?.data && typeof insight.data === "object" ? insight.data : null;
+  const n = (list) => (Array.isArray(list) ? list.length : undefined);
+  const read = {};
+  if (data) {
+    const rows = n(data.categories) ?? n(data.labels) ?? n(data.points) ?? n(data.rows) ?? n(data.items) ?? n(data.values);
+    const series = n(data.series);
+    if (insight.shape === "series") Object.assign(read, { periods: rows, series: series ?? 1 });
+    if (insight.shape === "peer-set" || insight.shape === "measure-pair") read.members = rows;
+    if (insight.shape === "mix") read.parts = data.categories && series ? series : rows;
+    if (insight.shape === "bridge" && rows !== undefined) read.steps = rows - 2;
+  }
+  const counts = { ...read, ...(insight?.breadth && typeof insight.breadth === "object" ? insight.breadth : {}) };
+  return Object.fromEntries(Object.entries(counts).filter(([, v]) => Number.isFinite(v)));
+}
+
+/**
+ * Why an insight's data is too narrow for its shape, or null. A chart-bearing
+ * shape with no breadth recorded is refused with what to record, so a log
+ * written before breadth was recorded names every insight to update at once.
+ */
+export function breadthProblem(insight) {
+  const shape = SHAPES[insight?.shape];
+  if (!shape?.needs) return null;
+  const id = insight.id ?? "?", counts = breadthOf(insight);
+  if (!Object.keys(counts).length)
+    return `${id} (${insight.shape}): record how wide its data is - \`breadth: { ${BREADTH_KEYS[insight.shape].map((k) => `${k}: n`).join(", ")} }\` or the \`data\` itself - so the pages resting on it can be held to what a ${insight.shape} is: ${shape.means}`;
+  if (shape.needs(counts)) return null;
+  return `${id} (${insight.shape}): the data has ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(", ")}; a ${insight.shape} is ${shape.means}. ` +
+    `That is a research task before any page is written: find ${shape.deepen}. If the data does not exist, record the shape it has (\`fact\`) and carry it on a numbers page`;
+}
+
 // The exhibit family each type reads as, for its reading task (reading-tasks.json).
 const FAMILY = { trend: "chart", ranking: "chart", composition: "chart", relationship: "chart", bridge: "chart",
   scorecard: "table", lookup: "table", matrix: "table", mechanism: "diagram", schedule: "diagram",
@@ -206,6 +256,67 @@ export function markedChart(ex) {
     || ["change", "cagr", "growth", "focusSeries"].some((key) => ex?.[key] !== undefined && ex[key] !== false);
 }
 
+// How many values an exhibit plots: every number a reader can read off it - a
+// bar, a point on a line, a slice, a dot on a scatter, a box's five figures, a
+// cell with a number in it (the row label is not one). A waffle counts its
+// parts, not its squares: the squares are one count drawn out. A chart group
+// is the sum of its charts, a page the sum of its exhibits.
+const finite = (v) => v !== null && v !== "" && typeof v !== "boolean" && !Array.isArray(v) && typeof v !== "object" && Number.isFinite(Number(v));
+const counted = (list) => (Array.isArray(list) ? list.filter(finite).length : 0);
+const TABLE_TYPES = new Set(["table", "comparison-table", "heatmap", "trend-rows", "insight-tree-table"]);
+function numericCells(ex) {
+  const cellText = (c) => (c && typeof c === "object" ? (finite(c.value) ? String(c.value) : String(c.text ?? c.label ?? "")) : String(c ?? ""));
+  return (ex.rows || []).reduce((n, row) => n + (Array.isArray(row) ? row : row?.cells || []).slice(Array.isArray(row) ? 1 : 0)
+    .filter((c) => /\d/.test(cellText(c))).length, 0);
+}
+export function plottedValues(ex) {
+  if (Array.isArray(ex)) return ex.reduce((n, e) => n + plottedValues(e), 0);
+  if (!ex || typeof ex !== "object") return 0;
+  const type = String(ex.type ?? "");
+  if (type === "chart-group") return (ex.charts || []).reduce((n, c) => n + plottedValues({ type: c?.component, ...(c?.props || {}) }), 0);
+  if (type === "chart.waffle") return (ex.categories || []).length;
+  if (TABLE_TYPES.has(type)) return numericCells(ex);
+  if (Array.isArray(ex.boxes)) return ex.boxes.length * 5;
+  if (Array.isArray(ex.low) && Array.isArray(ex.high)) return counted(ex.low) + counted(ex.high);
+  if (Array.isArray(ex.series) && ex.series.length)
+    return ex.series.reduce((n, s) => n + (Array.isArray(s?.points) ? s.points.length : counted(s?.values)), 0) + counted(ex.targets);
+  if (Array.isArray(ex.points)) return ex.points.length;
+  if (Array.isArray(ex.values)) return ex.values.flat().filter(finite).length;
+  if (Array.isArray(ex.items)) return ex.items.reduce((n, item) => n + (Array.isArray(item?.values) ? counted(item.values) : finite(item?.value) ? 1 : 0), 0);
+  if (Array.isArray(ex.markers)) return ex.markers.length;
+  return 0;
+}
+
+// The evidence floor for a chart page. Strong consulting decks' chart pages
+// plot a median of about 22 values (the middle half 10 to 48); a generated
+// fifty-page deck plotted a median of 5, because every type's minimum - four
+// periods, four members - was a single series at its least. The floor sits
+// under strong decks' lower quartile, so it refuses only what they rarely
+// draw, one series of four to seven values, and each way of deepening clears
+// it in one move: a second series doubles a four-period trend, a peer set of
+// eight fills a ranking.
+//   - A bridge's steps are the drivers the change has; splitting a driver to
+//     reach eight bars would invent precision. Start, three steps and end is
+//     the least that decomposes a change rather than restating two totals.
+//   - One whole's parts (pie, donut, treemap, waffle) number what the whole
+//     has - a pie holds five at most, and small counts are sent to the waffle
+//     - so the form is not floored; the deck's median still counts them.
+// The deck-level median (variety_gates.mjs EVIDENCE_DEPTH) holds the rest.
+export const EVIDENCE_FLOOR = Object.freeze({ chart: 8, bridge: 5 });
+const CHART_TYPES = ["trend", "ranking", "composition", "relationship", "bridge"];
+const WHOLE_PARTS = ["pie", "donut", "treemap", "waffle"];
+const isChartExhibit = (ex) => /^chart[.-]/.test(String(ex?.type ?? ""));
+/** Is this a chart page: a chart type, or panels that carry a chart? */
+export const chartPage = (type, exhibits) => CHART_TYPES.includes(type) || (type === "panels" && exhibits.some(isChartExhibit));
+const DEEPEN = {
+  trend: "a longer window (eight or more periods), or the peers or a benchmark over the same periods as further series - form `indexed` sets the subject against three or more peers",
+  ranking: "the whole peer set (form `distribution` sorts fifteen to forty members), the prior period as a second series (form `dumbbell`), or several measures for the same members (form `aligned-bars`)",
+  composition: "the mix for each member or each period side by side (form `stacked-bar` or `stacked-column`)",
+  relationship: "every member of the set as a point, eight or more",
+  bridge: "the drivers of the change, one step each - three or more between the totals",
+  panels: "each panel the whole set or the series over time, not a pair of numbers",
+};
+
 // What each component can hold, as its renderer enforces it: published in the
 // catalogue and checked at compile, so an author learns a donut's five-part
 // limit from `--types`, not from a failed composition.
@@ -218,7 +329,17 @@ export const LIMITS = Object.freeze({
   // A figure is a number, not a phrase: the renderers refuse a longer value.
   "stat-list": { key: "items", min: 2, max: 6, valueChars: 9 }, "fact-grid": { key: "items", min: 3, max: 9, valueChars: 10 },
   "chart.waffle": { key: "categories", min: 2 },
+  // Forms built for many values, held by the form rather than the component:
+  // a distribution is the whole field sorted - under fifteen members it is an
+  // ordinary ranking, past forty the bars are too thin to label; aligned bars
+  // are two to four measures, as many columns as the page's width holds (two
+  // beside a text column, measured); an indexed line sets the subject against
+  // three or more peers, and past eight lines the grey peers cannot be told apart.
+  "ranking/distribution": { key: "categories", min: 15, max: 40 }, "ranking/aligned-bars": { key: "series", min: 2, max: 4 },
+  "trend/indexed": { key: "series", min: 4, max: 8 },
 });
+/** The limit a page's primary exhibit is held to: its form's, else its component's. */
+const limitOf = (type, form, target) => LIMITS[`${type}/${form}`] ?? LIMITS[target];
 // Callouts a chart carries before the plot runs out of clear corridors: past
 // three, the fourth note is commentary and belongs beside the chart.
 export const CALLOUTS_MAX = 3;
@@ -253,11 +374,70 @@ const CONSTRUCTION_DATA = {
   text: ["paragraphs"], sidebar: ["panel", "paragraphs"], statement: ["text"], "executive-summary": ["points"], takeaways: ["items"],
   "picture-hero": ["pictures"], "picture-pair": ["pictures"], "picture-strip": ["pictures"], "photo-backdrop": ["photo", "exhibit"],
   "two-up-contrast": ["exhibits"], "table-halves": ["exhibits"], row: ["exhibits"], grid: ["exhibits"], stack: ["exhibits"],
+  "aligned-bars": ["categories", "series (one per measure: name, unit, values)", "highlights (the subject)"],
 };
-export function dataKeys(exhibitType) {
+// Forms that read more than their component's sample says.
+const FORM_DATA = {
+  "trend/indexed": ["categories", "series (raw values, the subject and three or more peers)", "indexBase (the period set to 100)", "subject (the series in colour)"],
+  "ranking/distribution": ["categories (15 to 40 members, sorted by the value)", "series (one measure)", "highlights (the subject)"],
+};
+export function dataKeys(exhibitType, { type, form } = {}) {
+  if (FORM_DATA[`${type}/${form}`]) return FORM_DATA[`${type}/${form}`];
   if (CONSTRUCTION_DATA[exhibitType]) return CONSTRUCTION_DATA[exhibitType];
   const sample = REGISTRY.get(exhibitType)?.sample;
   return sample ? Object.keys(sample).filter((key) => !STYLING.has(key)) : [];
+}
+
+/**
+ * The forms built for many values, checked and set up from what the author
+ * wrote. An indexed trend is rebased here, so the author supplies the raw
+ * series and no line is indexed by hand; a distribution is the whole field
+ * sorted with the subject marked; aligned bars are one category axis with a
+ * column per measure.
+ */
+function formExhibit(id, page, ex) {
+  const cats = (ex.categories || []).map(String);
+  const series = Array.isArray(ex.series) ? ex.series : [];
+  if (page.type === "trend" && page.form === "indexed") {
+    const at = cats.indexOf(String(ex.indexBase));
+    if (at < 0) throw new Error(`${id}: an indexed trend names its base period in \`indexBase\` - one of its categories - and sets every line to 100 there`);
+    if (!series.some((s) => s?.name === ex.subject)) throw new Error(`${id}: an indexed trend names its \`subject\` - the series drawn in colour while the peers stay grey`);
+    ex.series = series.map((s) => {
+      const base = Number(s?.values?.[at]);
+      if (!(base > 0)) throw new Error(`${id}: "${s?.name}" has no positive value at ${ex.indexBase} to index from; choose a base period every series reports`);
+      return { ...s, values: s.values.map((v) => (finite(v) ? Math.round((Number(v) / base) * 1000) / 10 : v)) };
+    });
+    // Every line passes through 100 at the base and the unit names it; a
+    // labelled base line was tried and its label sat on the peers' lines.
+    ex.focusSeries = ex.subject;
+    if (!String(ex.heading ?? "").trim()) ex.heading = `Index, ${ex.indexBase} = 100`;
+    else if (!ex.unit) ex.unit = `Index, ${ex.indexBase} = 100`;
+    delete ex.indexBase; delete ex.subject;
+  }
+  if (page.type === "ranking" && page.form === "distribution") {
+    if (series.length !== 1) throw new Error(`${id}: a distribution plots one measure across the field - one series; several measures for the same members are form "aligned-bars"`);
+    const v = (series[0].values || []).map(Number);
+    if (!(v.every((x, i) => !i || x <= v[i - 1]) || v.every((x, i) => !i || x >= v[i - 1])))
+      throw new Error(`${id}: a distribution is sorted - order the members by the value, so the subject's place in the field is where it stands`);
+    if (!(ex.highlights || []).some((h) => cats.includes(String(h?.category))))
+      throw new Error(`${id}: a distribution marks the subject - \`highlights: [{ category }]\` naming one of its members`);
+  }
+  if (page.type === "ranking" && page.form === "aligned-bars") {
+    if (page.commentary === "on-exhibit") throw new Error(`${id}: aligned bars carry no callouts - a callout on one column pushes its bars out of line with the others; choose "beside", "below" or "rail"`);
+    // Each column needs about two hundred pixels for its bars and their values:
+    // beside a text column the exhibit holds two, across the page four.
+    if (["beside", "beside-left", "rail"].includes(page.commentary) && series.length > 2)
+      throw new Error(`${id}: aligned bars beside a text column hold two measures; ${series.length} need the page's width - choose commentary "below"`);
+    const bad = series.find((s) => typeof s?.name !== "string" || !s.name.trim() || !Array.isArray(s.values) || s.values.length !== cats.length);
+    if (!cats.length || bad) throw new Error(`${id}: aligned bars list the members once in \`categories\` and give each measure as a series - \`{ name, unit, values }\`, one value per member${bad ? ` ("${bad?.name ?? "?"}" does not)` : ""}`);
+  }
+}
+
+/** Aligned bars as the composer draws them: a chart group of bar charts on one category axis. */
+function alignedBarsGroup(ex) {
+  const { categories, series, highlights = [], valueFormat, type, ...rest } = ex;
+  return { ...rest, type: "chart-group", aligned: true, charts: series.map((s) => ({ heading: s.name, ...(s.unit ? { unit: s.unit } : {}), component: "chart.bar",
+    props: { categories, series: [{ name: s.name, values: s.values }], highlights, ...(s.valueFormat ?? valueFormat ? { valueFormat: s.valueFormat ?? valueFormat } : {}) } })) };
 }
 const words = (text) => String(text ?? "").trim().split(/\s+/).filter(Boolean);
 const overlap = (a, b) => { const x = new Set(words(a).map((w) => w.toLowerCase())); const y = words(b).map((w) => w.toLowerCase()); return y.length ? y.filter((w) => x.has(w)).length / y.length : 0; };
@@ -337,7 +517,7 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     if (ex.type !== undefined && ex.type !== value) throw new Error(`${id}: form "${page.form}" draws ${value}, but the exhibit says type "${ex.type}"; drop the exhibit's type and let the form set it`);
     ex.type = value;
   };
-  if (target.startsWith("chart.") || ["mechanism", "schedule"].includes(page.type) || (page.type === "profiles" && page.form !== "logo-table")
+  if (target.startsWith("chart.") || target === "aligned-bars" || ["mechanism", "schedule"].includes(page.type) || (page.type === "profiles" && page.form !== "logo-table")
       || (page.type === "parallel" && exhibits.length) || (page.type === "numbers" && ["fact-grid", "stat-list"].includes(page.form))) {
     if (!exhibits.length) throw new Error(`${id}: form "${page.form}" needs its exhibit`);
     setType(slide.exhibit ?? slide.exhibits[0], target);
@@ -377,6 +557,12 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     if (ex.type?.startsWith("chart.") && (ex.annotations || []).length > CALLOUTS_MAX)
       throw new Error(`${id}: a chart carries ${CALLOUTS_MAX} callouts at most (this one has ${ex.annotations.length}); the rest is commentary - choose "beside" or "rail" for it`);
   }
+  const formLimit = primary && LIMITS[`${page.type}/${page.form}`];
+  if (formLimit) {
+    const n = Array.isArray(primary[formLimit.key]) ? primary[formLimit.key].length : 0;
+    if (n < formLimit.min || n > formLimit.max) throw new Error(`${id}: form "${page.form}" holds ${formLimit.min} to ${formLimit.max} ${formLimit.key}; this one has ${n}`);
+  }
+  if (primary) formExhibit(id, page, primary);
   const minimum = primary && MINIMUM[page.type]?.(primary, page.form);
   if (typeof minimum === "string") throw new Error(`${id}: ${minimum}`);
   // Small counts are counted, not shared out: fourteen cities as 50% / 29% / 14%
@@ -409,6 +595,17 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   }
   if (type.minCategories && (primary.categories || primary.rows || []).length < type.minCategories)
     throw new Error(`${id}: a ranking shows the whole set - ${type.minCategories} members or more. Two or three numbers are a metric pair: use a numbers page.`);
+  // The evidence floor (EVIDENCE_FLOOR), counted on what the page plots.
+  const values = plottedValues(exhibits);
+  const isChart = chartPage(page.type, exhibits);
+  if (isChart && !(page.type === "composition" && WHOLE_PARTS.includes(page.form))) {
+    const floor = page.type === "bridge" ? EVIDENCE_FLOOR.bridge : EVIDENCE_FLOOR.chart;
+    if (values < floor) throw new Error(`${id}: this ${page.type} page plots ${values} value${values === 1 ? "" : "s"}; a chart page plots ${floor} or more (strong decks' chart pages plot about 22, the middle half 10 to 48). ` +
+      `Deepen the evidence, not the styling: ${DEEPEN[page.type]}. If the data stops here, it is a numbers page - or a research task`);
+  }
+  if (page.type === "ranking" && page.form === "aligned-bars") {
+    if (slide.exhibit) slide.exhibit = alignedBarsGroup(primary); else slide.exhibits = [alignedBarsGroup(primary)];
+  }
   if (type.table) {
     if (primary.type !== undefined && primary.type !== "table") throw new Error(`${id}: a ${page.type} page carries a table exhibit`);
     primary.type = "table";
@@ -520,6 +717,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   if (typeof page.takeaway === "string") slide.soWhat = page.takeaway.trim();
   slide.pageType = { type: page.type, form: page.form, commentary: page.commentary, takeaway: typeof page.takeaway === "string",
     ...(page.series ? { series: String(page.series) } : {}), why: page.why.trim(), family: familyOf(page.type, page.form),
+    // What the page plots, for the deck's evidence depth (EVIDENCE_DEPTH) and the author's summary.
+    ...(exhibits.length ? { values } : {}), ...(isChart ? { chart: true } : {}),
     ...(advisories.length ? { advisories } : {}),
     // The claim is the title: the build holds the two together.
     content: { claim: String(page.title ?? page.text ?? "").trim(), ...(settles ? { settles } : {}), adds: page.adds ?? null, ...(evidence.length ? { evidence } : {}) } };
@@ -569,20 +768,33 @@ export function describeTypes() {
     "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log.", "",
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", "",
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point).", "",
-    `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, ""];
+    `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
+    `Evidence: a chart page (trend, ranking, composition, relationship, bridge, panels of charts) plots ${EVIDENCE_FLOOR.chart} or more values - a bridge ${EVIDENCE_FLOOR.bridge}, one whole's parts (pie, donut, treemap, waffle) are not floored - and strong decks' chart pages plot about 22. Deepen with the peer set, a prior period or a benchmark series, or a longer window: forms \`indexed\` (trend), \`distribution\` and \`aligned-bars\` (ranking) are built for many values.`, ""];
   for (const [name, t] of Object.entries(PAGE_TYPES)) {
     const n = Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits;
-    const data = Object.entries(t.forms).map(([form, target]) => [form, dataKeys(target)]).filter(([, keys]) => keys.length);
+    const data = Object.entries(t.forms).map(([form, target]) => [form, dataKeys(target, { type: name, form })]).filter(([, keys]) => keys.length);
     lines.push(`## ${name}`, t.task, "", `- form: ${Object.keys(t.forms).join(" | ")}`,
-      ...(() => { const limits = Object.entries(t.forms).map(([form, target]) => [form, LIMITS[target]]).filter(([, l]) => l);
+      ...(() => { const limits = Object.entries(t.forms).map(([form, target]) => [form, limitOf(name, form, target)]).filter(([, l]) => l);
         return limits.length ? [`- holds: ${limits.map(([form, l]) => `${form} ${l.min}${l.max ? `-${l.max}` : "+"} ${l.key}${l.valueChars ? ` (values ${l.valueChars} characters at most)` : ""}`).join("; ")}`] : []; })(),
       ...(data.length ? [`- data: ${[...data.reduce((m, [form, keys]) => m.set(keys.join(", "), [...(m.get(keys.join(", ")) || []), form]), new Map())]
         .map(([keys, forms]) => forms.length === data.length ? keys : `${keys} (${forms.join(", ")})`).join("; ")}`] : []), `- commentary: ${t.commentary.join(" | ")}`, `- exhibits: ${n}` +
       (t.marked ? "; the chart marks its finding (annotation, highlight, reference line or rate)" : "") +
-      (t.periods ? "; four or more periods" : "") + (t.minCategories ? `; ${t.minCategories}+ members` : "") + (t.rows ? "; `rows` with `cells`" : ""), "");
+      (t.periods ? "; four or more periods" : "") + (t.minCategories ? `; ${t.minCategories}+ members` : "") + (t.rows ? "; `rows` with `cells`" : "") +
+      (CHART_TYPES.includes(name) || name === "panels" ? `; plots ${name === "bridge" ? EVIDENCE_FLOOR.bridge : EVIDENCE_FLOOR.chart}+ values${name === "panels" ? " when a panel is a chart" : ""}` : ""), "");
   }
   return lines.join("\n");
 }
+
+// The exhibit each many-value form reads, for a harness that generates to the schema.
+const FORM_SCHEMA = {
+  "trend/indexed": { type: "object", required: ["categories", "series", "indexBase", "subject"],
+    properties: { series: { type: "array", minItems: LIMITS["trend/indexed"].min, maxItems: LIMITS["trend/indexed"].max }, indexBase: { type: "string" }, subject: { type: "string" } } },
+  "ranking/distribution": { type: "object", required: ["categories", "series", "highlights"],
+    properties: { categories: { type: "array", minItems: LIMITS["ranking/distribution"].min, maxItems: LIMITS["ranking/distribution"].max }, series: { type: "array", minItems: 1, maxItems: 1 } } },
+  "ranking/aligned-bars": { type: "object", required: ["categories", "series", "highlights"],
+    properties: { series: { type: "array", minItems: LIMITS["ranking/aligned-bars"].min, maxItems: LIMITS["ranking/aligned-bars"].max,
+      items: { type: "object", required: ["name", "values"], properties: { name: { type: "string" }, unit: { type: "string" }, values: { type: "array" } } } } } },
+};
 
 /** A JSON Schema for a typed page, for harnesses that validate or constrain generation. */
 export function pageSchema() {
@@ -599,6 +811,8 @@ export function pageSchema() {
       evidence: { type: "array", items: { type: "string" }, description: "insight ids from <id>.insights.json; with an insight log, required for data-bearing types and it derives settles" },
     },
     not: { anyOf: OWNED.map((key) => ({ required: [key] })) },
+    ...(Object.keys(t.forms).some((form) => FORM_SCHEMA[`${name}/${form}`]) ? { allOf: Object.keys(t.forms).filter((form) => FORM_SCHEMA[`${name}/${form}`])
+      .map((form) => ({ if: { properties: { form: { const: form } } }, then: { required: ["exhibit"], properties: { exhibit: FORM_SCHEMA[`${name}/${form}`] } } })) } : {}),
   }));
   const structural = { type: "object", required: ["kind"], properties: { kind: { enum: ["section", "agenda"] } } };
   return {

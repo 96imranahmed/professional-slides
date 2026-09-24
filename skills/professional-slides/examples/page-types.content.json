@@ -47,7 +47,9 @@
    "adds": "Each point carries the condition under which its lever delivers, which the table does not show",
    "highlight": "frequency, not fares, is the main lever",
    "textReference": {
-    "task": "text-page"
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
    },
    "textPlan": [
     {
@@ -179,7 +181,9 @@
    "adds": null,
    "highlight": null,
    "textReference": {
-    "task": "text-page"
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
    },
    "textPlan": [
     {
@@ -230,7 +234,9 @@
    "adds": "The callouts say why the series broke and why it has stalled, which the line alone cannot",
    "highlight": null,
    "textReference": {
-    "task": "chart-led"
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
    },
    "textPlan": [
     {
@@ -371,8 +377,121 @@
    ]
   },
   {
-   "id": "p04",
+   "id": "p03b",
    "n": 6,
+   "claim": "Northvale's journeys have recovered more slowly than all five regional peers since FY19",
+   "settles": {
+    "kind": "rate",
+    "what": "journeys FY19-FY26 for Northvale and five regional peers, each indexed to FY19"
+   },
+   "adds": "The rail says what separates the two operators that recovered fully from the rest",
+   "highlight": null,
+   "textReference": {
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
+   },
+   "textPlan": [
+    {
+     "id": "p03b-chrome:title",
+     "role": "title",
+     "text": "Northvale's journeys have recovered more slowly than all five regional peers since FY19"
+    },
+    {
+     "id": "p03b-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for fictional operators; financial years ending March"
+    },
+    {
+     "id": "p03b-p03b-panel:text",
+     "role": "exhibit",
+     "text": "The two peers back above FY19 added off-peak frequency in FY23; Northvale kept its hourly off-peak timetable, and its recovery flattened a year later."
+    },
+    {
+     "id": "p03b-p03b-exhibit-0-heading:heading",
+     "role": "body",
+     "text": "Journeys by operator,"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0-heading:unit",
+     "role": "exhibit",
+     "text": "Index, FY19 = 100"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:category:fy19",
+     "role": "exhibit",
+     "text": "FY19"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:category:fy20",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:category:fy21",
+     "role": "exhibit",
+     "text": "FY21"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:category:fy22",
+     "role": "exhibit",
+     "text": "FY22"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:category:fy23",
+     "role": "exhibit",
+     "text": "FY23"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:category:fy24",
+     "role": "exhibit",
+     "text": "FY24"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:category:fy25",
+     "role": "exhibit",
+     "text": "FY25"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:category:fy26",
+     "role": "exhibit",
+     "text": "FY26"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:end-label:westmoor-trains",
+     "role": "exhibit",
+     "text": "Westmoor Trains 105"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:end-label:southdown-rail",
+     "role": "exhibit",
+     "text": "Southdown Rail 104"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:end-label:lakeside-lines",
+     "role": "exhibit",
+     "text": "Lakeside Lines 98"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:end-label:fenland-rail",
+     "role": "exhibit",
+     "text": "Fenland Rail 97"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:end-label:highland-link",
+     "role": "exhibit",
+     "text": "Highland Link 95"
+    },
+    {
+     "id": "p03b-p03b-exhibit-0:end-label:northvale-rail",
+     "role": "exhibit",
+     "text": "Northvale Rail 93"
+    }
+   ]
+  },
+  {
+   "id": "p04",
+   "n": 7,
    "claim": "Peak trains run above 90% full on every line; off-peak trains run under half",
    "settles": {
     "kind": "comparison",
@@ -381,7 +500,9 @@
    "adds": "Each caption states what its panel shows that the other does not: no room in one, two-thirds empty in the other",
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -533,20 +654,22 @@
   },
   {
    "id": "p05",
-   "n": 7,
+   "n": 8,
    "claim": "Northvale sits mid-table on journeys per route-km, 27% below the leading peer",
    "settles": {
     "kind": "rank",
-    "what": "journeys per route-km for all seven comparable regional operators"
+    "what": "journeys per route-km, off-peak trains per hour and peak load factor for all seven comparable regional operators, FY26"
    },
-   "adds": "The column explains why intensity trails - route length and hourly off-peak service - and what the gap is worth",
+   "adds": "The column explains why intensity trails - hourly off-peak service on full-peak lines - and what the gap is worth",
    "highlight": [
     "27% below Westmoor",
     "The gap is off-peak",
     "7 m"
    ],
    "textReference": {
-    "task": "chart-with-commentary"
+    "task": "chart-with-commentary",
+    "floor": 96,
+    "ceiling": 293
    },
    "textPlan": [
     {
@@ -560,117 +683,202 @@
      "text": "Source: illustrative data for fictional operators; route-km excludes freight-only track"
     },
     {
-     "id": "p05-p05-exhibit-heading:heading",
+     "id": "p05-p05-exhibit-chart-0-heading:heading",
      "role": "body",
-     "text": "Journeys per route-km, FY26,"
+     "text": "Journeys per route-km,"
     },
     {
-     "id": "p05-p05-exhibit-heading:unit",
+     "id": "p05-p05-exhibit-chart-0-heading:unit",
      "role": "exhibit",
-     "text": "thousand"
+     "text": "thousand, FY26"
     },
     {
-     "id": "p05-p05-exhibit:value-label:journeys-per-route-km:westmoor-trains",
+     "id": "p05-p05-exhibit-chart-0:value-label:journeys-per-route-km:westmoor-trains",
      "role": "exhibit",
      "text": "142"
     },
     {
-     "id": "p05-p05-exhibit:category:westmoor-trains",
+     "id": "p05-p05-exhibit-chart-0:category:westmoor-trains",
      "role": "exhibit",
      "text": "Westmoor Trains"
     },
     {
-     "id": "p05-p05-exhibit:value-label:journeys-per-route-km:southdown-rail",
+     "id": "p05-p05-exhibit-chart-0:value-label:journeys-per-route-km:southdown-rail",
      "role": "exhibit",
      "text": "131"
     },
     {
-     "id": "p05-p05-exhibit:category:southdown-rail",
+     "id": "p05-p05-exhibit-chart-0:category:southdown-rail",
      "role": "exhibit",
      "text": "Southdown Rail"
     },
     {
-     "id": "p05-p05-exhibit:value-label:journeys-per-route-km:lakeside-lines",
+     "id": "p05-p05-exhibit-chart-0:value-label:journeys-per-route-km:lakeside-lines",
      "role": "exhibit",
      "text": "118"
     },
     {
-     "id": "p05-p05-exhibit:category:lakeside-lines",
+     "id": "p05-p05-exhibit-chart-0:category:lakeside-lines",
      "role": "exhibit",
      "text": "Lakeside Lines"
     },
     {
-     "id": "p05-p05-exhibit:value-label:journeys-per-route-km:northvale-rail",
+     "id": "p05-p05-exhibit-chart-0:value-label:journeys-per-route-km:northvale-rail",
      "role": "exhibit",
      "text": "104"
     },
     {
-     "id": "p05-p05-exhibit:category:northvale-rail",
+     "id": "p05-p05-exhibit-chart-0:category:northvale-rail",
      "role": "exhibit",
      "text": "Northvale Rail"
     },
     {
-     "id": "p05-p05-exhibit:value-label:journeys-per-route-km:fenland-rail",
+     "id": "p05-p05-exhibit-chart-0:value-label:journeys-per-route-km:fenland-rail",
      "role": "exhibit",
      "text": "97"
     },
     {
-     "id": "p05-p05-exhibit:category:fenland-rail",
+     "id": "p05-p05-exhibit-chart-0:category:fenland-rail",
      "role": "exhibit",
      "text": "Fenland Rail"
     },
     {
-     "id": "p05-p05-exhibit:value-label:journeys-per-route-km:highland-link",
+     "id": "p05-p05-exhibit-chart-0:value-label:journeys-per-route-km:highland-link",
      "role": "exhibit",
      "text": "88"
     },
     {
-     "id": "p05-p05-exhibit:category:highland-link",
+     "id": "p05-p05-exhibit-chart-0:category:highland-link",
      "role": "exhibit",
      "text": "Highland Link"
     },
     {
-     "id": "p05-p05-exhibit:value-label:journeys-per-route-km:marches-rail",
+     "id": "p05-p05-exhibit-chart-0:value-label:journeys-per-route-km:marches-rail",
      "role": "exhibit",
      "text": "71"
     },
     {
-     "id": "p05-p05-exhibit:category:marches-rail",
+     "id": "p05-p05-exhibit-chart-0:category:marches-rail",
      "role": "exhibit",
      "text": "Marches Rail"
     },
     {
-     "id": "p05-p05-exhibit:reference-label:0",
-     "role": "exhibit",
-     "text": "Peer median 108"
+     "id": "p05-p05-exhibit-chart-1-heading:heading",
+     "role": "body",
+     "text": "Off-peak frequency,"
     },
     {
-     "id": "p05-p05-points:lead:0",
+     "id": "p05-p05-exhibit-chart-1-heading:unit",
+     "role": "exhibit",
+     "text": "trains an hour"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-1:value-label:off-peak-frequency:westmoor-trains",
+     "role": "exhibit",
+     "text": "2.6"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-1:value-label:off-peak-frequency:southdown-rail",
+     "role": "exhibit",
+     "text": "2.4"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-1:value-label:off-peak-frequency:lakeside-lines",
+     "role": "exhibit",
+     "text": "2.1"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-1:value-label:off-peak-frequency:northvale-rail",
+     "role": "exhibit",
+     "text": "1.4"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-1:value-label:off-peak-frequency:fenland-rail",
+     "role": "exhibit",
+     "text": "1.8"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-1:value-label:off-peak-frequency:highland-link",
+     "role": "exhibit",
+     "text": "1.2"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-1:value-label:off-peak-frequency:marches-rail",
+     "role": "exhibit",
+     "text": "1.0"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-2-heading:heading",
+     "role": "body",
+     "text": "Peak load factor,"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-2-heading:unit",
+     "role": "exhibit",
+     "text": "% of seats"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-2:value-label:peak-load-factor:westmoor-trains",
+     "role": "exhibit",
+     "text": "94"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-2:value-label:peak-load-factor:southdown-rail",
+     "role": "exhibit",
+     "text": "92"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-2:value-label:peak-load-factor:lakeside-lines",
+     "role": "exhibit",
+     "text": "90"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-2:value-label:peak-load-factor:northvale-rail",
+     "role": "exhibit",
+     "text": "95"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-2:value-label:peak-load-factor:fenland-rail",
+     "role": "exhibit",
+     "text": "86"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-2:value-label:peak-load-factor:highland-link",
+     "role": "exhibit",
+     "text": "81"
+    },
+    {
+     "id": "p05-p05-exhibit-chart-2:value-label:peak-load-factor:marches-rail",
+     "role": "exhibit",
+     "text": "78"
+    },
+    {
+     "id": "p05-p05-col-0-header:heading",
      "role": "body",
      "text": "Mid-table, not behind"
     },
     {
-     "id": "p05-p05-points:item:0",
-     "role": "body",
-     "text": "Northvale carries 104 thousand journeys per route-km, just under the peer median of 108 and 27% below Westmoor, the most intensive operator in the set."
-    },
-    {
-     "id": "p05-p05-points:lead:1",
+     "id": "p05-p05-col-1-header:heading",
      "role": "body",
      "text": "The gap is off-peak"
     },
     {
-     "id": "p05-p05-points:item:1",
-     "role": "body",
-     "text": "Westmoor and Southdown run half-hourly off-peak services on most lines; Northvale runs hourly on three of its five, and its peak intensity is close to theirs."
-    },
-    {
-     "id": "p05-p05-points:lead:2",
+     "id": "p05-p05-col-2-header:heading",
      "role": "body",
      "text": "Worth 7 million journeys"
     },
     {
-     "id": "p05-p05-points:item:2",
+     "id": "p05-p05-col-0-text:text",
+     "role": "body",
+     "text": "Northvale carries 104 thousand journeys per route-km, just under the peer median of 108 and 27% below Westmoor, the most intensive operator in the set."
+    },
+    {
+     "id": "p05-p05-col-1-text:text",
+     "role": "body",
+     "text": "Westmoor and Southdown run half-hourly off-peak services on most lines; Northvale runs hourly on three of its five, and its peak intensity is close to theirs."
+    },
+    {
+     "id": "p05-p05-col-2-text:text",
      "role": "body",
      "text": "Reaching the peer median off-peak intensity on the Dales and Valley lines alone would add about 7 million journeys a year on today's network."
     }
@@ -678,7 +886,7 @@
   },
   {
    "id": "p06",
-   "n": 8,
+   "n": 9,
    "claim": "Leisure is two thirds of off-peak travel but only a seventh of the peak",
    "settles": {
     "kind": "share",
@@ -691,7 +899,9 @@
     "Leisure is discretionary"
    ],
    "textReference": {
-    "task": "chart-with-commentary"
+    "task": "chart-with-commentary",
+    "floor": 96,
+    "ceiling": 293
    },
    "textPlan": [
     {
@@ -868,7 +1078,7 @@
   },
   {
    "id": "p07",
-   "n": 9,
+   "n": 10,
    "claim": "Half-hourly off-peak stations grew off-peak journeys 3.7 times as fast as hourly ones",
    "settles": {
     "kind": "comparison",
@@ -881,7 +1091,9 @@
     "30 trains"
    ],
    "textReference": {
-    "task": "chart-with-commentary"
+    "task": "chart-with-commentary",
+    "floor": 96,
+    "ceiling": 293
    },
    "textPlan": [
     {
@@ -992,8 +1204,285 @@
    ]
   },
   {
+   "id": "p07b",
+   "n": 11,
+   "claim": "Northvale's cost per train-km is ninth of twenty, £3.40 above the lowest-cost operator",
+   "settles": {
+    "kind": "rank",
+    "what": "operating cost per train-km, FY26, for all twenty regional operators"
+   },
+   "adds": "The points say what separates the low-cost operators from Northvale and how much of the gap the plan closes",
+   "highlight": [
+    "£17.60 per train-km",
+    "electric",
+    "£16.40"
+   ],
+   "textReference": {
+    "task": "chart-with-commentary",
+    "floor": 96,
+    "ceiling": 293
+   },
+   "textPlan": [
+    {
+     "id": "p07b-chrome:title",
+     "role": "title",
+     "text": "Northvale's cost per train-km is ninth of twenty, £3.40 above the lowest-cost operator"
+    },
+    {
+     "id": "p07b-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for fictional operators; operating cost excludes track access charges"
+    },
+    {
+     "id": "p07b-p07b-exhibit-heading:heading",
+     "role": "body",
+     "text": "Operating cost per train-km, FY26,"
+    },
+    {
+     "id": "p07b-p07b-exhibit-heading:unit",
+     "role": "exhibit",
+     "text": "£"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:westmoor-trains",
+     "role": "exhibit",
+     "text": "14.2"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:westmoor-trains",
+     "role": "exhibit",
+     "text": "Westmoor Trains"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:lakeside-lines",
+     "role": "exhibit",
+     "text": "14.9"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:lakeside-lines",
+     "role": "exhibit",
+     "text": "Lakeside Lines"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:southdown-rail",
+     "role": "exhibit",
+     "text": "15.3"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:southdown-rail",
+     "role": "exhibit",
+     "text": "Southdown Rail"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:kestrel-coast-rail",
+     "role": "exhibit",
+     "text": "15.8"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:kestrel-coast-rail",
+     "role": "exhibit",
+     "text": "Kestrel Coast Rail"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:mereside-trains",
+     "role": "exhibit",
+     "text": "16.1"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:mereside-trains",
+     "role": "exhibit",
+     "text": "Mereside Trains"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:oakfield-link",
+     "role": "exhibit",
+     "text": "16.4"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:oakfield-link",
+     "role": "exhibit",
+     "text": "Oakfield Link"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:fenland-rail",
+     "role": "exhibit",
+     "text": "16.9"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:fenland-rail",
+     "role": "exhibit",
+     "text": "Fenland Rail"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:stonebeck-rail",
+     "role": "exhibit",
+     "text": "17.2"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:stonebeck-rail",
+     "role": "exhibit",
+     "text": "Stonebeck Rail"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:northvale-rail",
+     "role": "exhibit",
+     "text": "17.6"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:northvale-rail",
+     "role": "exhibit",
+     "text": "Northvale Rail"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:linmouth-rail",
+     "role": "exhibit",
+     "text": "17.9"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:linmouth-rail",
+     "role": "exhibit",
+     "text": "Linmouth Rail"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:brackenmoor-lines",
+     "role": "exhibit",
+     "text": "18.3"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:brackenmoor-lines",
+     "role": "exhibit",
+     "text": "Brackenmoor Lines"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:calderbrook-trains",
+     "role": "exhibit",
+     "text": "18.6"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:calderbrook-trains",
+     "role": "exhibit",
+     "text": "Calderbrook Trains"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:harrowdale-rail",
+     "role": "exhibit",
+     "text": "19.0"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:harrowdale-rail",
+     "role": "exhibit",
+     "text": "Harrowdale Rail"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:highland-link",
+     "role": "exhibit",
+     "text": "19.4"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:highland-link",
+     "role": "exhibit",
+     "text": "Highland Link"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:pembrook-rail",
+     "role": "exhibit",
+     "text": "19.9"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:pembrook-rail",
+     "role": "exhibit",
+     "text": "Pembrook Rail"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:thornfield-trains",
+     "role": "exhibit",
+     "text": "20.5"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:thornfield-trains",
+     "role": "exhibit",
+     "text": "Thornfield Trains"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:ravensholt-lines",
+     "role": "exhibit",
+     "text": "21.2"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:ravensholt-lines",
+     "role": "exhibit",
+     "text": "Ravensholt Lines"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:marches-rail",
+     "role": "exhibit",
+     "text": "21.8"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:marches-rail",
+     "role": "exhibit",
+     "text": "Marches Rail"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:dunmore-link",
+     "role": "exhibit",
+     "text": "22.7"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:dunmore-link",
+     "role": "exhibit",
+     "text": "Dunmore Link"
+    },
+    {
+     "id": "p07b-p07b-exhibit:value-label:cost-per-train-km:upland-rail",
+     "role": "exhibit",
+     "text": "24.1"
+    },
+    {
+     "id": "p07b-p07b-exhibit:category:upland-rail",
+     "role": "exhibit",
+     "text": "Upland Rail"
+    },
+    {
+     "id": "p07b-p07b-exhibit:reference-label:0",
+     "role": "exhibit",
+     "text": "Median £18.10"
+    },
+    {
+     "id": "p07b-p07b-points:lead:0",
+     "role": "body",
+     "text": "Ninth of twenty"
+    },
+    {
+     "id": "p07b-p07b-points:item:0",
+     "role": "body",
+     "text": "At £17.60 per train-km Northvale sits just below the field's median of £18.10, and £3.40 above Westmoor, the lowest-cost operator."
+    },
+    {
+     "id": "p07b-p07b-points:lead:1",
+     "role": "body",
+     "text": "The cheapest run electric"
+    },
+    {
+     "id": "p07b-p07b-points:item:1",
+     "role": "body",
+     "text": "Five of the six lowest-cost operators run electric trains on their busiest lines; every operator above £19.00 still runs diesel on most of its network."
+    },
+    {
+     "id": "p07b-p07b-points:lead:2",
+     "role": "body",
+     "text": "The plan closes a third"
+    },
+    {
+     "id": "p07b-p07b-points:item:2",
+     "role": "body",
+     "text": "Electric trains on the Eastern line take Northvale to £16.40 by FY31, which would place it sixth on today's figures."
+    }
+   ]
+  },
+  {
    "id": "p08",
-   "n": 10,
+   "n": 12,
    "claim": "The Eastern line carries the most journeys at the highest cost per train-km",
    "settles": {
     "kind": "structure",
@@ -1002,7 +1491,9 @@
    "adds": "The implication column says what each line's row means for the plan",
    "highlight": "electrifying first",
    "textReference": {
-    "task": "table-led"
+    "task": "table-led",
+    "floor": 100,
+    "ceiling": 483
    },
    "textPlan": [
     {
@@ -1289,7 +1780,7 @@
   },
   {
    "id": "s2",
-   "n": 11,
+   "n": 13,
    "kind": "section",
    "role": "structural",
    "claim": "02 / What holds it back",
@@ -1314,7 +1805,7 @@
   },
   {
    "id": "p09",
-   "n": 12,
+   "n": 14,
    "claim": "Hybrid working cost 7.1 million journeys; housing and timetable changes won back 5.0 million",
    "settles": {
     "kind": "structure",
@@ -1323,7 +1814,9 @@
    "adds": "The callouts give the mechanism behind the largest loss and the largest gain",
    "highlight": null,
    "textReference": {
-    "task": "chart-led"
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
    },
    "textPlan": [
     {
@@ -1430,11 +1923,11 @@
   },
   {
    "id": "p10",
-   "n": 13,
+   "n": 15,
    "claim": "Each peak train added to the Eastern line has cost a point of punctuality",
    "settles": {
     "kind": "comparison",
-    "what": "Eastern line peak trains per hour and punctuality, FY22-FY26"
+    "what": "Eastern line peak trains per hour and punctuality, FY19-FY26"
    },
    "adds": "The points give the mechanism - dwell time at single-track sections - and why the off-peak does not share it",
    "highlight": [
@@ -1443,7 +1936,9 @@
     "Off-peak trains share"
    ],
    "textReference": {
-    "task": "exhibit-with-commentary"
+    "task": "exhibit-with-commentary",
+    "floor": 112,
+    "ceiling": 282
    },
    "textPlan": [
     {
@@ -1480,6 +1975,36 @@
      "id": "p10-p10-exhibit-0-heading:unit",
      "role": "exhibit",
      "text": "trains"
+    },
+    {
+     "id": "p10-p10-exhibit-0:value-label:peak-trains-per-hour:fy19",
+     "role": "exhibit",
+     "text": "9"
+    },
+    {
+     "id": "p10-p10-exhibit-0:category:fy19",
+     "role": "exhibit",
+     "text": "FY19"
+    },
+    {
+     "id": "p10-p10-exhibit-0:value-label:peak-trains-per-hour:fy20",
+     "role": "exhibit",
+     "text": "9"
+    },
+    {
+     "id": "p10-p10-exhibit-0:category:fy20",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p10-p10-exhibit-0:value-label:peak-trains-per-hour:fy21",
+     "role": "exhibit",
+     "text": "7"
+    },
+    {
+     "id": "p10-p10-exhibit-0:category:fy21",
+     "role": "exhibit",
+     "text": "FY21"
     },
     {
      "id": "p10-p10-exhibit-0:value-label:peak-trains-per-hour:fy22",
@@ -1547,6 +2072,21 @@
      "text": "% on time"
     },
     {
+     "id": "p10-p10-exhibit-1:category:fy19",
+     "role": "exhibit",
+     "text": "FY19"
+    },
+    {
+     "id": "p10-p10-exhibit-1:category:fy20",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p10-p10-exhibit-1:category:fy21",
+     "role": "exhibit",
+     "text": "FY21"
+    },
+    {
      "id": "p10-p10-exhibit-1:category:fy22",
      "role": "exhibit",
      "text": "FY22"
@@ -1570,6 +2110,21 @@
      "id": "p10-p10-exhibit-1:category:fy26",
      "role": "exhibit",
      "text": "FY26"
+    },
+    {
+     "id": "p10-p10-exhibit-1:value-label:punctuality:fy19",
+     "role": "exhibit",
+     "text": "90.9"
+    },
+    {
+     "id": "p10-p10-exhibit-1:value-label:punctuality:fy20",
+     "role": "exhibit",
+     "text": "90.6"
+    },
+    {
+     "id": "p10-p10-exhibit-1:value-label:punctuality:fy21",
+     "role": "exhibit",
+     "text": "93.4"
     },
     {
      "id": "p10-p10-exhibit-1:value-label:punctuality:fy22",
@@ -1605,7 +2160,7 @@
   },
   {
    "id": "p11",
-   "n": 14,
+   "n": 16,
    "claim": "Frequency drives a loop: shorter waits win leisure trips that fund the next train",
    "settles": {
     "kind": "sequence",
@@ -1618,7 +2173,9 @@
     "Where the loop breaks"
    ],
    "textReference": {
-    "task": "diagram-with-commentary"
+    "task": "diagram-with-commentary",
+    "floor": 108,
+    "ceiling": 246
    },
    "textPlan": [
     {
@@ -1745,7 +2302,7 @@
   },
   {
    "id": "p12",
-   "n": 15,
+   "n": 17,
    "claim": "The Dales and Valley lines can grow now; the Coast line cannot",
    "settles": {
     "kind": "comparison",
@@ -1754,7 +2311,9 @@
    "adds": "The implication column turns each row of scores into a sequencing decision",
    "highlight": "December 2027 timetable",
    "textReference": {
-    "task": "table-led"
+    "task": "table-led",
+    "floor": 100,
+    "ceiling": 483
    },
    "textPlan": [
     {
@@ -1966,7 +2525,7 @@
   },
   {
    "id": "p13",
-   "n": 16,
+   "n": 18,
    "claim": "Passengers name the wait, not the fare, as what keeps them off trains",
    "settles": {
     "kind": "qualitative",
@@ -1975,7 +2534,9 @@
    "adds": "The third column turns each finding into a design choice for the timetable or the fares",
    "highlight": null,
    "textReference": {
-    "task": "table-led"
+    "task": "table-led",
+    "floor": 100,
+    "ceiling": 483
    },
    "textPlan": [
     {
@@ -2087,7 +2648,7 @@
   },
   {
    "id": "p14",
-   "n": 17,
+   "n": 19,
    "claim": "Lapsed riders blame the hourly service, not the fare, for driving instead",
    "settles": {
     "kind": "qualitative",
@@ -2096,7 +2657,9 @@
    "adds": null,
    "highlight": null,
    "textReference": {
-    "task": "text-page"
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
    },
    "textPlan": [
     {
@@ -2173,7 +2736,7 @@
   },
   {
    "id": "p15",
-   "n": 18,
+   "n": 20,
    "claim": "Three corridors serve three different markets, each needing its own timetable",
    "settles": {
     "kind": "qualitative",
@@ -2182,7 +2745,9 @@
    "adds": "Each caption names the market the corridor serves; the closing line says why one timetable pattern cannot serve all three",
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 22,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -2234,7 +2799,7 @@
   },
   {
    "id": "s3",
-   "n": 19,
+   "n": 21,
    "kind": "section",
    "role": "structural",
    "claim": "03 / The plan",
@@ -2259,7 +2824,7 @@
   },
   {
    "id": "p16",
-   "n": 20,
+   "n": 22,
    "claim": "Electrifying the Eastern line beats bi-mode trains on cost per journey from year six",
    "settles": {
     "kind": "comparison",
@@ -2268,7 +2833,9 @@
    "adds": "The closing line says what to commit now and what to keep in reserve",
    "highlight": null,
    "textReference": {
-    "task": "table-led"
+    "task": "table-led",
+    "floor": 100,
+    "ceiling": 483
    },
    "textPlan": [
     {
@@ -2350,7 +2917,7 @@
   },
   {
    "id": "p17",
-   "n": 21,
+   "n": 23,
    "claim": "Four levers add 11.7 million journeys, led by the off-peak timetable",
    "settles": {
     "kind": "count",
@@ -2359,7 +2926,9 @@
    "adds": "Each card says how its lever works and what it depends on, beyond the number",
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -2436,7 +3005,7 @@
   },
   {
    "id": "p18",
-   "n": 22,
+   "n": 24,
    "claim": "London and Manchester send three in five of the visitors from beyond the network",
    "settles": {
     "kind": "share",
@@ -2450,7 +3019,9 @@
     "0.8 m"
    ],
    "textReference": {
-    "task": "exhibit-with-commentary"
+    "task": "exhibit-with-commentary",
+    "floor": 112,
+    "ceiling": 282
    },
    "textPlan": [
     {
@@ -2547,7 +3118,7 @@
   },
   {
    "id": "p19",
-   "n": 23,
+   "n": 25,
    "claim": "The plan adds 11.7 million journeys a year by FY31, mostly after electrification",
    "settles": {
     "kind": "count",
@@ -2560,7 +3131,9 @@
     "29"
    ],
    "textReference": {
-    "task": "exhibit-with-commentary"
+    "task": "exhibit-with-commentary",
+    "floor": 112,
+    "ceiling": 282
    },
    "textPlan": [
     {
@@ -2682,7 +3255,7 @@
   },
   {
    "id": "p20",
-   "n": 24,
+   "n": 26,
    "claim": "Fare revenue passes its FY20 level in FY29, carried by off-peak travel",
    "settles": {
     "kind": "rate",
@@ -2691,7 +3264,9 @@
    "adds": "The callouts name the crossing year and the source of the growth",
    "highlight": null,
    "textReference": {
-    "task": "chart-led"
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
    },
    "textPlan": [
     {
@@ -2863,7 +3438,7 @@
   },
   {
    "id": "p21",
-   "n": 25,
+   "n": 27,
    "claim": "The plan costs £640 million, mostly in FY28-FY29, and pays back in eleven years",
    "settles": {
     "kind": "structure",
@@ -2872,7 +3447,9 @@
    "adds": "Each caption carries the finding of its own panel so the page reads without the title",
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -3084,7 +3661,7 @@
   },
   {
    "id": "p22",
-   "n": 26,
+   "n": 28,
    "claim": "Grant covers just over half the cost; Northvale must borrow or earn the rest",
    "settles": {
     "kind": "share",
@@ -3093,7 +3670,9 @@
    "adds": "The rail says which part is uncommitted and what that exposes",
    "highlight": null,
    "textReference": {
-    "task": "chart-led"
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
    },
    "textPlan": [
     {
@@ -3165,7 +3744,7 @@
   },
   {
    "id": "s4",
-   "n": 27,
+   "n": 29,
    "kind": "section",
    "role": "structural",
    "claim": "04 / Delivering it",
@@ -3190,7 +3769,7 @@
   },
   {
    "id": "p23",
-   "n": 28,
+   "n": 30,
    "claim": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
    "settles": {
     "kind": "sequence",
@@ -3202,7 +3781,9 @@
     "5.1 m"
    ],
    "textReference": {
-    "task": "diagram-with-commentary"
+    "task": "diagram-with-commentary",
+    "floor": 108,
+    "ceiling": 246
    },
    "textPlan": [
     {
@@ -3369,7 +3950,7 @@
   },
   {
    "id": "p24",
-   "n": 29,
+   "n": 31,
    "claim": "Four named owners carry one lever each, reporting monthly to the managing director",
    "settles": {
     "kind": "structure",
@@ -3378,7 +3959,9 @@
    "adds": "Each card states the owner's measure and deadline, not just the role",
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -3495,7 +4078,7 @@
   },
   {
    "id": "p25",
-   "n": 30,
+   "n": 32,
    "claim": "Two of seven 2027 milestones are at risk, both on the electrification path",
    "settles": {
     "kind": "count",
@@ -3508,7 +4091,9 @@
     "5.1 m"
    ],
    "textReference": {
-    "task": "table-with-commentary"
+    "task": "table-with-commentary",
+    "floor": 149,
+    "ceiling": 447
    },
    "textPlan": [
     {
@@ -3715,7 +4300,7 @@
   },
   {
    "id": "p26",
-   "n": 31,
+   "n": 33,
    "claim": "Service grows by a fifth while punctuality holds at 90% and unit cost falls",
    "settles": {
     "kind": "comparison",
@@ -3724,7 +4309,9 @@
    "adds": null,
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -3876,7 +4463,7 @@
   },
   {
    "id": "p27",
-   "n": 32,
+   "n": 34,
    "claim": "Fare reform should follow the new timetable, not lead it",
    "settles": {
     "kind": "qualitative",
@@ -3885,7 +4472,9 @@
    "adds": null,
    "highlight": "So the order matters",
    "textReference": {
-    "task": "text-page"
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
    },
    "textPlan": [
     {
@@ -3917,7 +4506,7 @@
   },
   {
    "id": "p28",
-   "n": 33,
+   "n": 35,
    "kind": "takeaways",
    "claim": "Four decisions put Northvale on the path to 60 million journeys",
    "settles": {
@@ -3927,7 +4516,9 @@
    "adds": null,
    "highlight": null,
    "textReference": {
-    "task": "text-page"
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
    },
    "textPlan": [
     {

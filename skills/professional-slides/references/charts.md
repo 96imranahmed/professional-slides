@@ -188,7 +188,7 @@ Default to compact large numbers - `k`, `m`, `bn`, usually one decimal - shared 
 
 Name the resource and state in rate/allowance labels. On a financing page, a bare “budget” naturally reads as money; an import-day allowance, remaining volume or crew-hour limit needs its own quantity and unit. Label exhaustion as such rather than making the reader infer whether zero means remaining allowance, delivered rate or spending.
 
-For a same-page comparison of two exhibits, declare `comparison: {kind: "matched", unit}` with identical chart types, periods, domains and value formats on both sides. The `chart-group` component lays out two to four coordinated children with one shared legend.
+For a same-page comparison of two exhibits, declare `comparison: {kind: "matched", unit}` with identical chart types, periods, domains and value formats on both sides. The `chart-group` component lays out two to four coordinated children with one shared legend. With `aligned: true` it is a row of two to four horizontal bar charts on one category axis - several measures for the same members, named once down the first column, each measure under its own heading with its own scale and value labels; a page writes it as ranking form `aligned-bars` ([Page types](page-types.md#evidence-depth)).
 
 ## Acceptance
 

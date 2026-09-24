@@ -847,7 +847,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   // level with its bar - rather than wrapping into the next bar's lane.
   const axisText = (text, width) => measureText(text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 });
   const noteTexts = horizontal && !hideCategoryLabels ? (props.categoryNotes || []).filter((n) => typeof n === "string" && n.trim()) : [];
-  const baseLabelWidth = Math.min(180, Math.max(72, Math.ceil(Math.max(...(props.comparisonDomain?.categories ?? categories).map(category => axisText(category, 180).width))) + 12));
+  const baseLabelWidth = barLabelColumn(props.comparisonDomain?.categories ?? categories);
   const noteWidth = noteTexts.length ? Math.min(220, Math.ceil(Math.max(...noteTexts.map((n) => axisText(n, 400).width))) + 12) : 0;
   const estimatedLane = horizontal ? Math.max(1, (frame.height - 56) / Math.max(1, categories.length)) : Infinity;
   const blockHeight = noteTexts.length ? Math.max(...noteTexts.map((n) => axisText(n, Math.max(baseLabelWidth, Math.min(240, noteWidth))).height)) + axisText("Ag", 180).height : 0;
@@ -2713,3 +2713,9 @@ export function registerCharts(registry) {
 }
 
 export const CHART_IDS = Object.freeze(chartDefinitions.map((chart) => chart.id));
+
+/** The width a horizontal bar chart gives its category labels: shared with a chart group that aligns bars on one axis. */
+export function barLabelColumn(categories) {
+  const width = (text) => measureText(String(text), 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width;
+  return Math.min(180, Math.max(72, Math.ceil(Math.max(...categories.map(width))) + 12));
+}
