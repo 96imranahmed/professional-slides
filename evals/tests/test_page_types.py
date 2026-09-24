@@ -87,6 +87,208 @@ console.log(JSON.stringify({{ refused, chosen: ok.findings.map((f) => f.code), u
         self.assertEqual(result['edited'], ['PAGE_TYPE_EDITED'])
 
 
+class BeyondOneColumnTests(unittest.TestCase):
+    """Pages that are not one exhibit with a text column beside it.
+
+    A generated deck drew two pages in five as one exhibit and a column, and
+    passed the variety contract, because the patterns strong decks use instead -
+    labelled row blocks, exhibits joined by arrows, a so-what bar - could not be
+    drawn, and the contract counted declared choices rather than drawn pages.
+    """
+
+    # Shared page parts, spliced into each probe.
+    PAGES = '''
+const S = { kind: 'qualitative', what: 'The operator statement of its plan' };
+const base = { takeaway: false, why: 'The page type fits the claim this page makes', settles: S };
+const point = (n) => 'The ' + n + ' constraint binds in the morning peak and lifting it takes a funded scheme';
+const rows = (extra = {}, n = 3) => ({ ...base, id: 'rows', type: 'parallel', form: 'labelled-rows', commentary: 'in-exhibit',
+  title: 'Three constraints hold the peak where it is: fleet, track and depot',
+  blocks: Array.from({ length: n }, (_, i) => ({ label: 'Constraint ' + (i + 1), points: [point('first'), point('second')], metric: { value: String(90 + i) + '%', label: 'of capacity used' } })), ...extra });
+const bars = (heading) => ({ type: 'chart.bar', heading, unit: 'minutes', categories: ['Leeds', 'York', 'Selby', 'Hull'], series: [{ name: 'x', values: [58, 49, 36, 24] }] });
+const sequence = (extra = {}) => ({ ...base, id: 'seq', type: 'panels', form: 'sequence', commentary: 'captions',
+  title: 'Faster trains win more journeys on every flow of the line',
+  exhibits: ['Journey time', 'Journeys won', 'Line journeys'].map((h, i) => ({ ...bars(h), caption: 'Step ' + (i + 1) + ' of the chain holds on every one of the four flows' })), ...extra });
+const ranked = (extra = {}) => ({ ...base, id: 'bar', type: 'ranking', form: 'bar', commentary: 'so-what-bar',
+  title: 'Northvale gives the smallest off-peak discount of seven operators',
+  exhibit: { heading: 'Off-peak discount', unit: '%', categories: ['A', 'B', 'C', 'D', 'E'], series: [{ name: 'x', values: [46, 41, 38, 29, 18] }], highlights: [{ category: 'E' }] },
+  bar: 'A deeper discount on an hourly service buys few riders, so the fare change follows the timetable', ...extra });
+const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+'''
+
+    def probe(self, body):
+        return run_node(f"import {{ compilePage, skeletonOf }} from '{KIT}';\n"
+                        f"import {{ compileDeck }} from '{AUTHOR}';\n"
+                        "import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';\n"
+                        "import { varietyFindings } from './skills/professional-slides/runtime/gates/variety_gates.mjs';\n"
+                        + self.PAGES + body)
+
+    def test_each_new_form_compiles_and_composes(self):
+        result = self.probe('''
+const charts = rows({ blocks: [0, 1].map((i) => ({ label: 'Area ' + (i + 1), points: [point('first'), point('second')], exhibit: bars('Journey time') })) });
+const pages = [rows(), { ...charts, id: 'rows-charts' }, rows({ id: 'rows-bar', commentary: 'so-what-bar', bar: 'The three constraints together cap the peak until the depot is extended in 2029' }, 5),
+  sequence(), sequence({ id: 'seq-two', commentary: 'so-what-bar', exhibits: sequence().exhibits.slice(0, 2).map(({ caption, ...ex }) => ex),
+    bar: 'Faster trains win journeys on every flow, so electrification leads the second phase of the plan' }), ranked()];
+const { spec, findings } = compileDeck({ deck: { schema: 'professional-slides.deck/v3', id: 'd' }, pages });
+const { deck } = composeAll(spec, '.');
+const nodes = (id) => deck.slides.find((s) => s.id === id).nodes;
+const count = (id, test) => nodes(id).filter(test).length;
+console.log(JSON.stringify({ findings: findings.map((f) => f.code), composed: deck.slides.map((s) => s.id),
+  layouts: Object.fromEntries(spec.slides.map((s) => [s.id, s.layout ?? s.arrange])),
+  labels: count('rows', (n) => n.role === 'side-panel'), labelsFive: count('rows-bar', (n) => n.role === 'side-panel'),
+  metrics: count('rows', (n) => n.role === 'metric-value'), rowCharts: count('rows-charts', (n) => n.role === 'chart-mark'),
+  arrows: count('seq', (n) => n.role === 'relationship-arrow'), arrowsTwo: count('seq-two', (n) => n.role === 'relationship-arrow'),
+  bars: ['rows-bar', 'seq-two', 'bar'].map((id) => count(id, (n) => n.role === 'insight-surface')),
+  closes: spec.slides.map((s) => s.soWhat?.style ?? null) }));
+''')
+        self.assertEqual(result['findings'], [])  # a short deck: the contract starts at twelve pages
+        self.assertEqual(sorted(result['composed']), sorted(['rows', 'rows-charts', 'rows-bar', 'seq', 'seq-two', 'bar']))
+        self.assertEqual(result['layouts']['rows'], 'labelled-rows')
+        self.assertEqual(result['layouts']['seq'], 'sequence')
+        self.assertEqual(result['labels'], 3)  # a filled label block per row
+        self.assertEqual(result['labelsFive'], 5)
+        self.assertEqual(result['metrics'], 3)  # and the row's number at its right
+        self.assertGreater(result['rowCharts'], 0)
+        self.assertEqual(result['arrows'], 2)  # an arrow between each step and the next
+        self.assertEqual(result['arrowsTwo'], 1)
+        self.assertEqual(result['bars'], [1, 1, 1])
+        self.assertEqual(result['closes'], [None, None, 'bar', None, 'bar', 'bar'])
+
+    def test_the_rows_fill_the_body(self):
+        result = self.probe('''
+const { spec } = compileDeck({ deck: { schema: 'professional-slides.deck/v3', id: 'd' }, pages: [rows({}, 4)] });
+const { deck } = composeAll(spec, '.');
+const panels = deck.slides[0].nodes.filter((n) => n.role === 'side-panel').map((n) => n.frame);
+const source = deck.slides[0].nodes.find((n) => n.role === 'source-text' || n.role === 'source');
+console.log(JSON.stringify({ heights: panels.map((f) => Math.round(f.height)), xs: panels.map((f) => Math.round(f.x)),
+  bottom: Math.round(Math.max(...panels.map((f) => f.y + f.height))) }));
+''')
+        self.assertEqual(len(set(result['heights'])), 1)  # the rows share the body equally
+        self.assertEqual(len(set(result['xs'])), 1)  # and the labels align down the left edge
+        self.assertGreater(result['bottom'], 600)  # to the foot of the page
+
+    def test_the_new_choices_are_checked_where_they_are_written(self):
+        result = self.probe('''
+const long = Array.from({ length: 60 }, () => 'word').join(' ');
+console.log(JSON.stringify({
+  rowsBelow: error(() => compilePage(rows({ commentary: 'below', points: ['a', 'b'] }))),
+  rowsSix: error(() => compilePage(rows({}, 6))),
+  longLabel: error(() => compilePage(rows({ blocks: rows().blocks.map((b, i) => (i ? b : { ...b, label: 'The whole fleet is in use every peak' })) }))),
+  oneBullet: error(() => compilePage(rows({ blocks: rows().blocks.map((b, i) => (i ? b : { ...b, points: ['One'] })) }))),
+  mixed: error(() => compilePage(rows({ blocks: rows().blocks.map((b, i) => (i ? b : { label: b.label, points: b.points })) }))),
+  chartsThree: error(() => compilePage(rows({ blocks: rows().blocks.map(({ metric, ...b }) => ({ ...b, exhibit: bars('Journey time') })) }))),
+  pageExhibit: error(() => compilePage(rows({ exhibit: bars('x') }))),
+  strayBlock: error(() => compilePage(rows({ highlight: ['first constraint', 'never written'] }))),
+  markedBlock: error(() => compilePage(rows({ highlight: ['first constraint'] }))),
+  seqFour: error(() => compilePage(sequence({ exhibits: [...sequence().exhibits, sequence().exhibits[0]] }))),
+  seqUnheaded: error(() => compilePage(sequence({ exhibits: sequence().exhibits.map((ex, i) => (i ? ex : { ...ex, heading: undefined })) }))),
+  barAndTakeaway: error(() => compilePage(ranked({ takeaway: 'Close on a line as well' }))),
+  noBar: error(() => compilePage(ranked({ bar: undefined }))),
+  barElsewhere: error(() => compilePage(ranked({ commentary: 'on-exhibit', exhibit: { ...ranked().exhibit, annotations: [{ category: 'E', text: 'Northvale discounts least of the seven operators in the set' }] } }))),
+  longBar: error(() => compilePage(ranked({ bar: long }))),
+  barPoints: error(() => compilePage(ranked({ points: ['a', 'b'] }))),
+  draftBar: error(() => compilePage(ranked({ bar: undefined }), 0, { draft: true })),
+}));
+''')
+        self.assertIn('"in-exhibit", "so-what-bar"', result['rowsBelow'])
+        self.assertIn('2 to 5', result['rowsSix'])
+        self.assertIn('is a sentence', result['longLabel'])
+        self.assertIn('two to four', result['oneBullet'])
+        self.assertIn('every row one or none', result['mixed'])
+        self.assertIn('2 blocks', result['chartsThree'])
+        self.assertIn('in its rows', result['pageExhibit'])
+        self.assertIn('never written', result['strayBlock'])  # a highlight is checked against the rows' bullets
+        self.assertIsNone(result['markedBlock'])
+        self.assertIn('2 to 3 steps', result['seqFour'])
+        self.assertIn('heading', result['seqUnheaded'])
+        self.assertIn('takeaway: false', result['barAndTakeaway'])
+        self.assertIn('write it as `bar`', result['noBar'])
+        self.assertIn('choose commentary "so-what-bar"', result['barElsewhere'])
+        self.assertIn('two lines', result['longBar'])
+        self.assertIn('second commentary', result['barPoints'])
+        self.assertIsNone(result['draftBar'])  # a draft spine need not carry its copy yet
+
+    def test_the_catalogue_and_schema_publish_the_new_forms(self):
+        result = run_node(f'''
+import {{ describeTypes, pageSchema }} from '{KIT}';
+const schema = pageSchema();
+const parallel = schema.properties.pages.items.oneOf.find((s) => s.properties.type?.const === 'parallel');
+const panels = schema.properties.pages.items.oneOf.find((s) => s.properties.type?.const === 'panels');
+console.log(JSON.stringify({{ types: describeTypes(), parallelForms: parallel.properties.form.enum, blocks: Boolean(parallel.properties.blocks),
+  panelsForms: panels.properties.form.enum, panelsCommentary: panels.properties.commentary.enum, bar: Boolean(panels.properties.bar) }}));
+''')
+        for published in ('labelled-rows 2-5 blocks', 'sequence 2-3 exhibits', '`so-what-bar`', '`bar`'):
+            self.assertIn(published, result['types'])
+        self.assertIn('labelled-rows', result['parallelForms'])
+        self.assertTrue(result['blocks'])
+        self.assertIn('sequence', result['panelsForms'])
+        self.assertIn('so-what-bar', result['panelsCommentary'])
+        self.assertTrue(result['bar'])
+
+    def test_the_worked_example_carries_every_new_form_and_passes(self):
+        result = run_node(f'''
+import fs from 'node:fs';
+import {{ compileDeck }} from '{AUTHOR}';
+const doc = JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json', 'utf8'));
+const {{ spec, findings }} = compileDeck(doc);
+const typed = spec.slides.filter((s) => s.pageType);
+console.log(JSON.stringify({{ findings: findings.map((f) => f.code), forms: typed.map((s) => s.pageType.form), commentary: typed.map((s) => s.pageType.commentary) }}));
+''')
+        self.assertEqual(result['findings'], [])
+        self.assertIn('labelled-rows', result['forms'])
+        self.assertIn('sequence', result['forms'])
+        self.assertIn('so-what-bar', result['commentary'])
+
+
+class DrawnVarietyTests(unittest.TestCase):
+    """The variety contract counts pages as a reader sees them."""
+
+    def test_skeletons_placements_and_closes_are_counted_as_drawn(self):
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+import {{ varietyFindings, VARIETY }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
+const S = {{ kind: 'qualitative', what: 'The operator statement of its plan' }};
+const base = {{ takeaway: false, why: 'The page type fits the claim this page makes', settles: S }};
+const years = ['2019', '2020', '2021', '2022', '2023'];
+const pts = ['Traffic fell to a fifth', 'It recovered by 2022'];
+const trend = compilePage({{ ...base, id: 't', type: 'trend', form: 'line', commentary: 'beside', points: pts, highlight: ['a fifth', 'by 2022'], title: 'Traffic recovered',
+  exhibit: {{ categories: years, series: [{{ name: 'x', values: [5, 1, 2, 4, 5] }}], highlights: [{{ category: '2020' }}] }} }});
+const stats = compilePage({{ ...base, id: 's', type: 'numbers', form: 'stat-list', commentary: 'beside', points: pts, highlight: ['a fifth', 'by 2022'], title: 'Three numbers',
+  exhibit: {{ items: [{{ value: '5m', label: 'a' }}, {{ value: '1m', label: 'b' }}, {{ value: '4m', label: 'c' }}] }} }});
+const steps = compilePage({{ ...base, id: 'm', type: 'mechanism', form: 'steps', commentary: 'beside-left', points: pts, highlight: ['a fifth', 'by 2022'], title: 'Three steps',
+  exhibit: {{ items: ['Grounded', 'Restarted', 'Recovered'] }} }});
+const full = compilePage({{ ...base, id: 'f', type: 'trend', form: 'line', commentary: 'on-exhibit', title: 'Traffic recovered',
+  exhibit: {{ categories: years, series: [{{ name: 'x', values: [5, 1, 2, 4, 5] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }});
+// Synthetic decks of fourteen pages, each spreading its types so only the rule under test fires.
+const TYPES = ['trend', 'ranking', 'composition', 'relationship', 'bridge', 'mechanism', 'scorecard', 'lookup', 'panels', 'schedule', 'numbers', 'parallel', 'place', 'options'];
+const page = (i, choice) => ({{ id: 'p' + i, title: 'Page ' + i, pageType: {{ type: TYPES[i], commentary: ['none', 'in-exhibit', 'captions', 'on-exhibit'][i % 4], takeaway: false, skeleton: 'skeleton ' + i, ...choice }} }});
+const deck = (choices) => ({{ slides: Array.from({{ length: 14 }}, (_, i) => page(i, choices(i))) }});
+const codes = (spec) => varietyFindings(spec).map((f) => f.code);
+const mirrored = deck((i) => (i < 5 ? {{ commentary: i % 2 ? 'beside-left' : 'beside' }} : {{}}));
+const drawn = deck((i) => (i < 2 ? {{ skeleton: 'exhibit-full · 1 chart · open' }} : {{}}));
+const repeated = deck((i) => (i < 4 ? {{ skeleton: 'exhibit-full · 1 chart · open' }} : {{}}));
+const bars = deck((i) => (i < 4 ? {{ commentary: 'so-what-bar' }} : {{}}));
+console.log(JSON.stringify({{ trend: trend.pageType.skeleton, stats: stats.pageType.skeleton, steps: steps.pageType.skeleton, full: full.pageType.skeleton,
+  mirrored: varietyFindings(mirrored).find((f) => f.code === 'VARIETY_COMMENTARY')?.measured ?? null,
+  drawn: codes(drawn), repeated: varietyFindings(repeated).find((f) => f.code === 'VARIETY_SIGNATURE') ?? null, bars: codes(bars),
+  caps: {{ commentary: VARIETY.commentaryShareMax, signature: VARIETY.signatureShareMax }} }}));
+''')
+        # A trend beside its points, a stat list beside its points and a mirrored
+        # staircase with its points on the left are one drawn page.
+        self.assertEqual(result['trend'], result['stats'])
+        self.assertEqual(result['trend'], result['steps'])
+        self.assertNotEqual(result['trend'], result['full'])
+        # Five column pages, three on the right and two on the left: one placement at 36%.
+        self.assertEqual(result['mirrored']['commentary'], 'beside')
+        self.assertEqual(result['mirrored']['pages'], 5)
+        self.assertEqual(result['drawn'], [])  # two of fourteen drawn alike is a deck, not a template
+        self.assertEqual(result['repeated']['measured']['pages'], 4)
+        self.assertEqual(result['repeated']['slide'], ['p0', 'p1', 'p2', 'p3'])  # the pages are named
+        self.assertIn('labelled-rows', result['repeated']['repair'])  # and the alternatives offered
+        self.assertIn('VARIETY_TAKEAWAY', result['bars'])  # a so-what bar is a close
+        self.assertLessEqual(result['caps']['commentary'], 0.3)
+        self.assertLessEqual(result['caps']['signature'], 0.2)
+
+
 class SourceChecksTests(unittest.TestCase):
     """What the forward test found only at build time is now refused where it is written."""
 

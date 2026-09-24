@@ -25,7 +25,7 @@
 //   node runtime/author-deck.mjs --types          the catalogue, for the author
 //   node runtime/author-deck.mjs <id>.pages.json  compile, gate, write the deck and plan
 
-import { REGISTRY } from "./registry.mjs";
+import { REGISTRY, measureInsight } from "./registry.mjs";
 import { trivialChart } from "./gates/craft_gates.mjs";
 import { calloutFits } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
@@ -39,11 +39,14 @@ export const COMMENTARY = Object.freeze({
   "on-exhibit": "callouts on the chart itself (`annotations`), no separate text",
   "in-exhibit": "the explanation lives in the exhibit's cells (an implication column, a findings matrix, labelled cards)",
   captions: "one finding under each panel (`caption` on every exhibit)",
+  "so-what-bar": "one implication in a filled bar across the foot of the exhibit (`bar` text); the page's close",
   none: "the exhibit carries the page alone",
 });
 
 const CHART = (name) => `chart.${name}`;
-const ANY_TEXT = ["beside", "beside-left", "below", "rail"];
+// The so-what bar closes whatever the page drew, so it joins every placement
+// list of a type whose evidence can end on one implication.
+const ANY_TEXT = ["beside", "beside-left", "below", "rail", "so-what-bar"];
 
 /**
  * The catalogue. `forms` maps each allowed form to the exhibit type or page
@@ -80,19 +83,21 @@ export const PAGE_TYPES = Object.freeze({
   },
   panels: {
     task: "one question answered for two to four cuts, measures or members side by side",
-    forms: { row: "row", grid: "grid", stack: "stack" },
-    commentary: ["captions", "below", "none"], exhibits: [2, 4],
+    // `sequence`: two or three exhibits read left to right with an arrow
+    // between each - cause and effect, before and after, input to result.
+    forms: { row: "row", grid: "grid", stack: "stack", sequence: "sequence" },
+    commentary: ["captions", "below", "so-what-bar", "none"], exhibits: [2, 4],
   },
   scorecard: {
     task: "options or members judged against criteria, each cell coded",
     forms: { harvey: "harvey", heatmap: "heatmap", rag: "rag", lights: "lights", check: "check", bars: "bars",
       progress: "progress", dot: "dot", trend: "trend", binary: "binary" },
-    commentary: ["in-exhibit", "beside", "below", "none"], exhibits: 1, table: true,
+    commentary: ["in-exhibit", "beside", "below", "so-what-bar", "none"], exhibits: 1, table: true,
   },
   lookup: {
     task: "measures a reader looks up and compares, grouped under their units",
     forms: { "measure-table": "measure-table", table: "table" },
-    commentary: ["in-exhibit", "beside", "below", "none"], exhibits: 1, table: true,
+    commentary: ["in-exhibit", "beside", "below", "so-what-bar", "none"], exhibits: 1, table: true,
   },
   matrix: {
     task: "findings down the side, their evidence in two or three columns across",
@@ -108,7 +113,7 @@ export const PAGE_TYPES = Object.freeze({
   schedule: {
     task: "what happens when: phases, milestones, workstreams",
     forms: { timeline: "timeline", gantt: "gantt", roadmap: "roadmap" },
-    commentary: ["beside", "below", "none"], exhibits: 1,
+    commentary: ["beside", "below", "so-what-bar", "none"], exhibits: 1,
   },
   numbers: {
     task: "a few measured numbers that carry the claim, with the evidence under them",
@@ -119,8 +124,13 @@ export const PAGE_TYPES = Object.freeze({
   },
   parallel: {
     task: "three to six parallel ideas, each headed, often with an icon",
-    forms: { cards: "cards", capsules: "capsules", "arrow-rows": "arrow-rows" },
-    commentary: ["in-exhibit", "below", "none"], exhibits: [0, 1],
+    // `labelled-rows`: two to five rows down the page, each a filled label
+    // block with its bullets beside it and, optionally, a number or a small
+    // exhibit at the right - three challenges, what changed in each area, a
+    // diagnosis. The same reading task as cards, read down instead of across,
+    // with room for the evidence each idea rests on.
+    forms: { cards: "cards", capsules: "capsules", "arrow-rows": "arrow-rows", "labelled-rows": "labelled-rows" },
+    commentary: ["in-exhibit", "below", "so-what-bar", "none"], exhibits: [0, 1],
   },
   profiles: {
     task: "who the named players are, with their marks and the numbers the deck compares",
@@ -192,7 +202,7 @@ export const familyOf = (type, form) => (type === "profiles" && form === "logo-t
 // Keys the compiler owns. Written by the author they would bypass the choices.
 const OWNED = ["layout", "shape", "arrange", "soWhat", "pageType"];
 // Keys of a typed page that are choices or authoring notes, not slide keys.
-const CHOICE_KEYS = ["type", "form", "commentary", "takeaway", "why", "series", "rail", "settles", "adds", "evidence"];
+const CHOICE_KEYS = ["type", "form", "commentary", "takeaway", "why", "series", "rail", "bar", "settles", "adds", "evidence"];
 
 const PERIOD = /^(?:(?:19|20)\d{2}(?:[EFP]|\s*[EF])?|FY\s?'?\d{2,4}.*|[QH][1-4]\b.*|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b.*|\d{4}[-–/]\d{2,4}.*)$/i;
 const exhibitsOf = (page) => [page.exhibit, ...(page.exhibits || [])].filter((e) => e && typeof e === "object");
@@ -218,6 +228,9 @@ export const LIMITS = Object.freeze({
   // A figure is a number, not a phrase: the renderers refuse a longer value.
   "stat-list": { key: "items", min: 2, max: 6, valueChars: 9 }, "fact-grid": { key: "items", min: 3, max: 9, valueChars: 10 },
   "chart.waffle": { key: "categories", min: 2 },
+  // Page constructions, checked on the page: a row block past five is too
+  // short to hold its bullets, and a sequence past three is a process diagram.
+  "labelled-rows": { key: "blocks", min: 2, max: 5 }, sequence: { key: "exhibits", min: 2, max: 3 },
 });
 // Callouts a chart carries before the plot runs out of clear corridors: past
 // three, the fourth note is commentary and belongs beside the chart.
@@ -226,6 +239,14 @@ export const CALLOUTS_MAX = 3;
 // size and runs to eight lines, measured here the way the renderer sets it.
 const RAIL_WIDTH = 373;
 export const railFits = (text) => { try { sideStatementLayout({ x: 0, y: 0, width: RAIL_WIDTH, height: 600 }, { text }); return true; } catch { return false; } };
+// The so-what bar runs the body's width and holds two lines: one implication,
+// measured the way the insight band sets it. A third line is an argument, and
+// an argument belongs beside the exhibit.
+const BAR_WIDTH = 1160;
+export const barFits = (text) => (measureInsight({ x: 0, y: 0, width: BAR_WIDTH, height: 400 }, { text, variant: "primary" }).body?.lines?.length ?? 99) <= 2;
+// A row block's label is a name set bold on the house colour, not a sentence:
+// it has to read at a glance down the left edge.
+const BLOCK_LABEL_WORDS = 5, BLOCK_CHART_ROWS = 2;
 
 // The least a page of each type carries to be worth a page. Below it the type
 // was chosen for less evidence than it needs: a three-phase roadmap, a two-part
@@ -252,7 +273,8 @@ const CONSTRUCTION_DATA = {
   "hero-number": ["kpi"], "metrics-over-exhibit": ["metrics", "exhibit"], "findings-matrix": ["rows (each with cells)"], "measure-table": ["columns", "rows"],
   text: ["paragraphs"], sidebar: ["panel", "paragraphs"], statement: ["text"], "executive-summary": ["points"], takeaways: ["items"],
   "picture-hero": ["pictures"], "picture-pair": ["pictures"], "picture-strip": ["pictures"], "photo-backdrop": ["photo", "exhibit"],
-  "two-up-contrast": ["exhibits"], "table-halves": ["exhibits"], row: ["exhibits"], grid: ["exhibits"], stack: ["exhibits"],
+  "two-up-contrast": ["exhibits"], "table-halves": ["exhibits"], row: ["exhibits"], grid: ["exhibits"], stack: ["exhibits"], sequence: ["exhibits"],
+  "labelled-rows": ["blocks (each a `label` of five words at most, two to four `points`, and on every row or none a `metric` { value, label } or a small `exhibit` - a two-row table, or a headed chart on a page of two blocks)"],
 };
 export function dataKeys(exhibitType) {
   if (CONSTRUCTION_DATA[exhibitType]) return CONSTRUCTION_DATA[exhibitType];
@@ -276,6 +298,74 @@ export function structureOf(slide) {
     (slide.points || []).length ? "points" : "", slide.panel ? "rail" : ""].join("|");
 }
 
+// How an exhibit reads at a glance: a plot, a grid of cells, or a drawn figure.
+const exhibitFamily = (ex) => (String(ex?.type ?? "").startsWith("chart.") ? "chart"
+  : ["table", "rows", "compare", "phase-table"].includes(ex?.type) ? "table" : "figure");
+
+/**
+ * The page as a reader sees it before reading a word: how the body is laid
+ * out, how many exhibits of which family, whether a text column or points sit
+ * with them, and how the page closes. The variety contract counts repeats of
+ * this, not of the declared type: a trend beside its points and a stat list
+ * beside its points declare two types and draw one page, and fifty such pages
+ * read as one page repeated whatever they declared.
+ *
+ * Mirrored columns are one skeleton - the reader does not notice which side
+ * the column is on. And beside a text column the exhibit's family drops out:
+ * that page reads as "an exhibit with its column" whether the exhibit is a
+ * chart, a table or a figure. Where the exhibit carries the page alone, its
+ * family is what the reader sees, so it stays.
+ */
+export function skeletonOf(slide) {
+  const exhibits = exhibitsOf(slide);
+  const column = ["exhibit-left", "exhibit-right"].includes(slide.layout);
+  const drawn = column ? "exhibit beside a column"
+    : slide.arrange ? `${slide.arrange} of exhibits`
+    : slide.shape ?? slide.role ?? (slide.kind && slide.kind !== "content" ? slide.kind : slide.layout ?? "exhibit-full");
+  const families = [...new Set(exhibits.map(exhibitFamily))].join("+");
+  const close = slide.soWhat ? (slide.soWhat?.style === "bar" ? "so-what bar" : "closing line") : "open";
+  return [drawn, exhibits.length ? `${exhibits.length} ${column ? "exhibit" : families}` : "",
+    (slide.points || []).length ? "points" : "", slide.panel ? "rail" : "", close].filter(Boolean).join(" · ");
+}
+
+/**
+ * A labelled-rows page's blocks: each a short label, two to four bullets, and
+ * - on every row or on none, so the right-hand column lines up - a number or
+ * a small exhibit that is the row's evidence.
+ */
+function checkBlocks(page, id, exhibits) {
+  if (exhibits.length) throw new Error(`${id}: a labelled-rows page carries its evidence in its rows - move the exhibit into a block's \`exhibit\`, or choose form "cards"`);
+  const blocks = page.blocks, { min, max } = LIMITS["labelled-rows"];
+  if (!Array.isArray(blocks) || blocks.length < min || blocks.length > max)
+    throw new Error(`${id}: a labelled-rows page carries ${min} to ${max} \`blocks\` - { label, points, and a metric or exhibit if the rows have evidence }; this one has ${Array.isArray(blocks) ? blocks.length : 0}`);
+  blocks.forEach((block, at) => {
+    const where = `${id}: block ${at + 1}`;
+    if (!block || typeof block !== "object" || typeof block.label !== "string" || !block.label.trim()) throw new Error(`${where} needs its \`label\``);
+    if (words(block.label).length > BLOCK_LABEL_WORDS) throw new Error(`${where}: the label "${block.label}" is a sentence; a row's label names the area in ${BLOCK_LABEL_WORDS} words or fewer and its bullets say what happened there`);
+    if (!Array.isArray(block.points) || block.points.length < 2 || block.points.length > 4) throw new Error(`${where} carries two to four \`points\` beside its label; it has ${Array.isArray(block.points) ? block.points.length : 0}`);
+    const keys = Object.keys(block).filter((key) => !["label", "points", "metric", "exhibit"].includes(key));
+    if (keys.length) throw new Error(`${where}: unknown key${keys.length === 1 ? "" : "s"} ${keys.map((k) => `\`${k}\``).join(", ")} - a block is { label, points, metric | exhibit }`);
+    if (block.metric && block.exhibit) throw new Error(`${where} carries a \`metric\` or an \`exhibit\` at its right, not both`);
+    if (block.metric && !(block.metric.value !== undefined && String(block.metric.value).trim() && block.metric.label)) throw new Error(`${where}: a block's \`metric\` is { value, label }`);
+    if (block.metric && String(block.metric.value).length > 10) throw new Error(`${where}: a block's metric is a figure of 10 characters at most ("${block.metric.value}"); put the unit in the label`);
+    if (block.exhibit) {
+      if (!block.exhibit.type) throw new Error(`${where}: name the block exhibit's \`type\` (chart.bar, chart.column, table, ...)`);
+      const keys = CONSTRUCTION_DATA[block.exhibit.type] ? [] : dataKeys(block.exhibit.type);
+      if (keys.length && !keys.some((key) => block.exhibit[key] !== undefined)) throw new Error(`${where}: a ${block.exhibit.type} exhibit reads ${keys.map((k) => `\`${k}\``).join(", ")} - none is given`);
+    }
+  });
+  const sides = blocks.filter((block) => block.metric || block.exhibit).length;
+  if (sides && sides !== blocks.length) throw new Error(`${id}: ${sides} of ${blocks.length} blocks carry a metric or exhibit at the right; give every row one or none, so the column lines up`);
+  // A chart keeps a 100px plot under its heading and above its axis, which a
+  // row takes only when the body is split in two: at three rows a two-bar
+  // chart came out 12px short. A number or a two-row table fits any row.
+  const charts = blocks.filter((block) => String(block.exhibit?.type ?? "").startsWith("chart.")).length;
+  if (charts && blocks.length > BLOCK_CHART_ROWS)
+    throw new Error(`${id}: a chart at the right of a row needs half the body's height, so it fits a page of ${BLOCK_CHART_ROWS} blocks; with ${blocks.length}, give each row a \`metric\` or a two-row table`);
+  const unheaded = blocks.filter((block) => String(block.exhibit?.type ?? "").startsWith("chart.") && !block.exhibit.heading).length;
+  if (unheaded) throw new Error(`${id}: a chart in a block carries its \`heading\` - the measure and, with \`unit\`, its unit`);
+}
+
 /**
  * Compile one typed page into a deck-spec slide. Throws with the choice to
  * make when a choice is missing or impossible; structural pages (`kind`
@@ -295,8 +385,16 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   const forms = Object.keys(type.forms);
   if (!forms.includes(page.form)) throw new Error(choose(id, "form", forms, page.form));
   if (!type.commentary.includes(page.commentary)) throw new Error(choose(id, "commentary", type.commentary, page.commentary));
+  // Row blocks carry their explanation in their own bullets; a band of points
+  // under five rows of bullets says it twice.
+  if (page.form === "labelled-rows" && !["in-exhibit", "so-what-bar"].includes(page.commentary))
+    throw new Error(choose(id, "commentary", ["in-exhibit", "so-what-bar"], page.commentary).replace("There is no default", "Each row's bullets are the commentary; there is no default"));
   if (page.takeaway === undefined || !(page.takeaway === false || (typeof page.takeaway === "string" && page.takeaway.trim())))
     throw new Error(`${id}: choose \`takeaway\` - false, or the closing sentence. Strong decks close about one page in ten on a line; most let the title carry the message.`);
+  if (page.commentary === "so-what-bar" && page.takeaway !== false)
+    throw new Error(`${id}: the so-what bar is the page's close; set \`takeaway: false\` - a closing line under the bar says the implication twice`);
+  if (page.bar !== undefined && page.commentary !== "so-what-bar")
+    throw new Error(`${id}: \`bar\` is the text of a so-what bar - choose commentary "so-what-bar" for it, or drop it`);
   if (typeof page.why !== "string" || page.why.trim().split(/\s+/).length < 4)
     throw new Error(`${id}: say in \`why\` why a ${page.type} page (${type.task}) is the right one for this claim`);
 
@@ -331,6 +429,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   const [lo, hi] = Array.isArray(type.exhibits) ? type.exhibits : [type.exhibits, type.exhibits];
   if (exhibits.length < lo || exhibits.length > hi)
     throw new Error(`${id}: a ${page.type} page carries ${lo === hi ? lo : `${lo} to ${hi}`} exhibit${hi === 1 ? "" : "s"}; this one has ${exhibits.length}`);
+  if (page.blocks !== undefined && page.form !== "labelled-rows") throw new Error(`${id}: \`blocks\` are the rows of a labelled-rows page - choose type "parallel", form "labelled-rows", or drop them`);
+  if (page.form === "labelled-rows") checkBlocks(page, id, exhibits);
 
   // The form sets the exhibit's type, so the form is the choice that counts.
   const setType = (ex, value) => {
@@ -433,6 +533,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   // Commentary: where the explanation lives decides the layout.
   const points = (page.points || []).length;
   const textless = ["on-exhibit", "in-exhibit", "captions", "none"].includes(page.commentary);
+  if (page.commentary === "so-what-bar" && points)
+    throw new Error(`${id}: commentary "so-what-bar" closes the exhibit on one implication in \`bar\`; the points are a second commentary - fold them into the bar, or choose "beside" or "below"`);
   if (textless && points && !["summary"].includes(page.type))
     throw new Error(`${id}: commentary "${page.commentary}" puts the explanation ${COMMENTARY[page.commentary].replace(/^the /, "")}; move the points there or choose "beside" or "below"`);
   // A draft is the spine: titles, types, data and evidence. The copy checks
@@ -446,7 +548,10 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   // A phrase that appears in no point marks nothing. Checked in a draft too,
   // since a draft with its points written would otherwise pass it on to the
   // full compile to find.
-  const stray = points ? phrases.filter((p) => p && !pointTexts.some((text) => text.includes(p))) : [];
+  // A labelled-rows page writes its points in its blocks, and is held to the same.
+  const blockTexts = page.form === "labelled-rows" ? (page.blocks || []).flatMap((block) => block?.points || [])
+    .map((point) => (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`).toLowerCase()) : [];
+  const stray = points || blockTexts.length ? phrases.filter((p) => p && ![...pointTexts, ...blockTexts].some((text) => text.includes(p))) : [];
   if (stray.length) throw new Error(`${id}: \`highlight\` "${stray[0]}" appears in none of the points; use a phrase exactly as a point writes it`);
   if (!draft && points >= 2 && ["beside", "beside-left", "below"].includes(page.commentary)) {
     const marked = (page.points || []).filter((point, at) => (point && typeof point === "object" && point.highlight) || phrases.some((p) => p && pointTexts[at].includes(p))).length;
@@ -480,9 +585,28 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     if (typeof page.rail === "string" && !railFits(page.rail)) throw new Error(`${id}: the rail runs past its eight lines (about ${railCapacity()} words); it is the page's one claim - cut it, or choose "beside" for an argument`);
     slide.panel = { text: String(page.rail ?? "").trim() || page.title };
   }
+  if (page.commentary === "so-what-bar") {
+    // The bar is the implication the exhibit leads to, so it is written as one:
+    // a sentence long enough to say what follows, short enough for two lines.
+    if (!draft && (typeof page.bar !== "string" || words(page.bar).length < 8))
+      throw new Error(`${id}: commentary "so-what-bar" closes the page on the implication - write it as \`bar\`, a sentence of eight words or more`);
+    if (typeof page.bar === "string" && !barFits(page.bar))
+      throw new Error(`${id}: the so-what bar runs past its two lines; it is one implication - cut it, or choose "beside" for an argument`);
+    if (typeof page.bar === "string" && overlap(page.title, page.bar) > 0.7)
+      throw new Error(`${id}: the bar "${page.bar}" repeats the title; say what follows from the evidence, not what it shows`);
+    if (typeof page.bar === "string" && page.bar.trim()) slide.soWhat = { text: page.bar.trim(), style: "bar" };
+  }
   const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
   if (page.type === "panels") {
     if (page.form === "grid" && exhibits.length < 3) throw new Error(`${id}: a grid of panels holds three or four; two sit in a row`);
+    if (page.form === "sequence") {
+      const { min, max } = LIMITS.sequence;
+      if (exhibits.length < min || exhibits.length > max) throw new Error(`${id}: a sequence reads left to right in ${min} to ${max} steps; this one has ${exhibits.length} - four are a grid, or a process diagram`);
+      // The arrow says "this leads to that"; each step names what it is, or the
+      // reader cannot say what led to what.
+      const unnamed = exhibits.filter((ex) => !(typeof ex.heading === "string" && ex.heading.trim()));
+      if (unnamed.length) throw new Error(`${id}: every step of a sequence carries its \`heading\` - the cause, the change, the result; ${unnamed.length} ${unnamed.length === 1 ? "has" : "have"} none`);
+    }
     slide.arrange = page.form;
     if (page.exhibit) { slide.exhibits = [page.exhibit, ...(page.exhibits || [])]; delete slide.exhibit; }
   } else if (page.type === "numbers") {
@@ -490,6 +614,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     else if (page.form === "metric-strip") { if (!(page.metrics || []).length) throw new Error(`${id}: a metric strip carries \`metrics\``); slide.layout = "metrics-over-exhibit"; }
     else slide.layout = layoutFor[page.commentary] ?? "exhibit-full";
   } else if (page.type === "picture") {
+    slide.layout = target;
+  } else if (page.type === "parallel" && page.form === "labelled-rows") {
     slide.layout = target;
   } else if (page.type === "options") {
     if (page.form === "compare") setType(primary, "compare");
@@ -524,6 +650,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     // The claim is the title: the build holds the two together.
     content: { claim: String(page.title ?? page.text ?? "").trim(), ...(settles ? { settles } : {}), adds: page.adds ?? null, ...(evidence.length ? { evidence } : {}) } };
   slide.pageType.structure = structureOf(slide);
+  // What the variety contract counts: the page as drawn, not as declared.
+  slide.pageType.skeleton = skeletonOf(slide);
   return slide;
 }
 
@@ -565,7 +693,9 @@ export function railCapacity() {
 export function describeTypes() {
   const lines = ["# Page types", "", "Every analytical page is one of these. Each choice is required; none has a default.", "",
     "`commentary` - where the explanation lives:", ...Object.entries(COMMENTARY).map(([k, v]) => `- \`${k}\`: ${v}`), "",
-    "`takeaway` - `false`, or the closing sentence (strong decks close about one page in ten on a line).", "",
+    "`takeaway` - `false`, or the closing sentence (strong decks close about one page in ten on a line or a band).", "",
+    "`bar` - with commentary `so-what-bar`, the implication set in a filled bar across the foot of the exhibit: a sentence of eight words or more that fits two lines. The bar is the page's close, so `takeaway` is `false`, and it counts toward the closing share.", "",
+    "Beyond one exhibit and a column: `parallel` form `labelled-rows` sets two to five `blocks` down the page, each a filled label with its bullets and an optional `metric` or small `exhibit` at the right; `panels` form `sequence` joins two or three headed exhibits with arrows (cause to effect, before to after).", "",
     "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log.", "",
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", "",
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point).", "",
@@ -594,6 +724,11 @@ export function pageSchema() {
       form: { enum: Object.keys(t.forms) }, commentary: { enum: t.commentary },
       takeaway: { oneOf: [{ const: false }, { type: "string", minLength: 8 }] },
       why: { type: "string", minLength: 20 }, series: { type: "string" }, rail: { type: "string" },
+      bar: { type: "string", minLength: 8, description: "with commentary so-what-bar: the implication in a filled bar under the exhibit, two lines at most" },
+      ...(t.forms["labelled-rows"] ? { blocks: { type: "array", minItems: 2, maxItems: 5, description: "form labelled-rows: the rows down the page", items: {
+        type: "object", required: ["label", "points"], additionalProperties: false,
+        properties: { label: { type: "string" }, points: { type: "array", minItems: 2, maxItems: 4 },
+          metric: { type: "object", required: ["value", "label"] }, exhibit: { type: "object", required: ["type"] } } } } } : {}),
       settles: { type: "object", required: ["kind", "what"], properties: { kind: { enum: SETTLES_KINDS }, what: { type: "string", minLength: 8 } } },
       adds: { oneOf: [{ type: "null" }, { type: "string", minLength: 8 }] },
       evidence: { type: "array", items: { type: "string" }, description: "insight ids from <id>.insights.json; with an insight log, required for data-bearing types and it derives settles" },

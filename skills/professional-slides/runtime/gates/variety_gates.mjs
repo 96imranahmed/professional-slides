@@ -14,6 +14,13 @@
 // line 9%, pages with two or more exhibits 24%, and 80% of chart pages mark
 // something on the plot. The deck that prompted them ran 100% closing lines
 // and about 95% bullets under the exhibit.
+//
+// Placement and repetition are measured on the page as drawn. A later deck
+// passed every rule with two pages in five drawn as one exhibit with a text
+// column beside it - strong decks draw 13% that way - because the rules counted
+// declared choices: "beside" and "beside-left" were two placements, and a trend
+// beside its points and a stat list beside its points were two signatures. The
+// reader sees one page each time, so the contract now counts one.
 
 export const VARIETY_CODES = Object.freeze({
   PAGE_TYPE_UNDECLARED: "the deck's pages were not authored as page types, so nothing chose their structure",
@@ -24,7 +31,7 @@ export const VARIETY_CODES = Object.freeze({
   VARIETY_COMMENTARY: "one commentary placement carries too much of the deck",
   VARIETY_TAKEAWAY: "too many pages close on a takeaway line",
   VARIETY_PANELS: "too few pages set evidence side by side",
-  VARIETY_SIGNATURE: "one combination of type, commentary and close repeats across the deck",
+  VARIETY_SIGNATURE: "one drawn page - layout, exhibits, text column and close - repeats across the deck",
   // Raised by author-deck.mjs: the page failed to compose; the rest of the deck is still checked.
   PAGE_DOES_NOT_COMPOSE: "a page could not be composed",
   // Advisory, raised by the page-type compiler (page-types.mjs) and listed in the author's summary.
@@ -34,12 +41,25 @@ export const VARIETY_CODES = Object.freeze({
 export const VARIETY = Object.freeze({
   from: 12,                 // content pages; shorter decks are probes
   typeShareMax: 0.25,       // strong decks: commonest type 23%
-  commentaryShareMax: 0.4,  // strong decks: commonest placement 27%
-  takeawayShareMax: 0.25,   // strong decks: 9% of pages close on a line or band
+  // Strong decks: commonest placement 27%, so the cap sits just outside it. At
+  // 40% it let two pages in five put their explanation in a column beside the
+  // exhibit; the worked example's commonest placement is under a quarter.
+  commentaryShareMax: 0.3,
+  takeawayShareMax: 0.25,   // strong decks: 9% of pages close on a line or band; a so-what bar is a close
   panelsShareMin: 0.12,     // strong decks: 24% of pages carry two or more exhibits
-  signatureShareMax: 0.15,  // strong decks: the commonest combination is 10%
+  // Keyed on the drawn skeleton, not the declared type. The commonest skeleton
+  // in strong decks is a full-width chart carrying its own callouts, about 16%
+  // of pages (declared, their commonest combination was 10%, under the old
+  // 15% cap); one exhibit beside a column is 13%.
+  signatureShareMax: 0.2,
   runMax: 2,                // three in a row of one type reads as one page repeated
 });
+
+// The pages a deck of one exhibit and a column is usually hiding, named in the
+// repairs so the author can reach for them.
+const ALTERNATIVES = "labelled row blocks for three challenges or what changed in each area (`parallel`, form `labelled-rows`), " +
+  "two or three exhibits joined by arrows for cause and effect or before and after (`panels`, form `sequence`), " +
+  "panels side by side, a scorecard or findings matrix, or the exhibit alone closed by a so-what bar (commentary `so-what-bar`)";
 
 const isContent = (slide) => (!slide.kind || slide.kind === "content" || slide.kind === "statement" || slide.kind === "takeaways") && slide.title !== undefined;
 const share = (n, of) => Math.round((n / of) * 100) / 100;
@@ -108,19 +128,25 @@ export function varietyFindings(spec, { structureOf } = {}) {
   }
   flush();
 
-  const commentary = tally((s) => s.pageType.commentary);
+  // A column on the left and a column on the right are one placement to a reader.
+  const placement = (s) => (s.pageType.commentary === "beside-left" ? "beside" : s.pageType.commentary);
+  const commentary = tally(placement);
   if (commentary[0][1] / n > VARIETY.commentaryShareMax) {
-    block("VARIETY_COMMENTARY", { commentary: commentary[0][0], pages: commentary[0][1], of: n, share: share(commentary[0][1], n),
+    const [top, count] = commentary[0];
+    block("VARIETY_COMMENTARY", { commentary: top, pages: count, of: n, share: share(count, n),
       mix: Object.fromEntries(commentary) }, VARIETY.commentaryShareMax,
-      `${commentary[0][1]} of ${n} pages put their explanation ${commentary[0][0] === "below" ? "in points under the exhibit" : `"${commentary[0][0]}"`}. ` +
+      `${count} of ${n} pages put their explanation ${top === "below" ? "in points under the exhibit" : top === "beside" ? "in a column beside the exhibit (either side)" : `"${top}"`}. ` +
       "In strong decks the explanation lives in several places: on the chart as callouts, in the table's cells, under each panel, in a " +
-      "column beside the exhibit, or nowhere because the exhibit and its title carry it. Choose the placement that puts each sentence " +
-      "where the eye already is for that page.");
+      "column beside the exhibit, in a so-what bar under it, or nowhere because the exhibit and its title carry it. Choose the placement " +
+      "that puts each sentence where the eye already is for that page" +
+      (top === "beside" || top === "below" ? ` - and ask whether the page is one exhibit at all: ${ALTERNATIVES}.` : "."));
   }
-  const closes = slides.filter((s) => s.pageType.takeaway).length;
+  // A so-what bar is a close as much as a closing line is: counted apart, a
+  // deck could close every page by moving the line into a bar.
+  const closes = slides.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length;
   if (closes / n > VARIETY.takeawayShareMax) {
     block("VARIETY_TAKEAWAY", { pages: closes, of: n, share: share(closes, n) }, VARIETY.takeawayShareMax,
-      `${closes} of ${n} pages close on a takeaway line. The title is the page's message; a closing line that restates it on every page ` +
+      `${closes} of ${n} pages close on a takeaway line or a so-what bar. The title is the page's message; a close that restates it on every page ` +
       "is a template, and strong decks use one on about one page in ten - where the implication goes beyond the title. Keep it there, " +
       "and let the rest end on their evidence.");
   }
@@ -131,11 +157,16 @@ export function varietyFindings(spec, { structureOf } = {}) {
       "measure for several members, two measures that together prove the claim, before and after - each with its own heading and a " +
       "caption under it. Find the pages where the reader would otherwise have to hold one chart in mind while turning to the next.");
   }
-  const signature = tally((s) => `${s.pageType.type} · ${s.pageType.commentary} · ${s.pageType.takeaway ? "close" : "open"}`);
+  // The drawn skeleton the compiler recorded (page-types.mjs skeletonOf); a
+  // deck compiled before it was recorded falls back to its declared choices.
+  const signatureOf = (s) => s.pageType.skeleton ?? `${s.pageType.type} · ${s.pageType.commentary} · ${s.pageType.takeaway ? "close" : "open"}`;
+  const signature = tally(signatureOf);
   if (signature[0][1] / n > VARIETY.signatureShareMax) {
-    block("VARIETY_SIGNATURE", { signature: signature[0][0], pages: signature[0][1], of: n }, VARIETY.signatureShareMax,
-      `${signature[0][1]} of ${n} pages are the same page: ${signature[0][0]}. Vary the commentary placement or the type where the ` +
-      "evidence allows; a deck's rhythm comes from pages that ask the reader to do different things.");
+    const ids = slides.filter((s) => signatureOf(s) === signature[0][0]).map((s) => s.id ?? null);
+    block("VARIETY_SIGNATURE", { signature: signature[0][0], pages: signature[0][1], of: n, ids }, VARIETY.signatureShareMax,
+      `${signature[0][1]} of ${n} pages are drawn as the same page: ${signature[0][0]}. They may declare different types, but a reader ` +
+      "sees one layout repeated. Go back to what each has to show and draw the pages that are not one exhibit as what they are: " +
+      `${ALTERNATIVES}. A deck's rhythm comes from pages that ask the reader to do different things.`, ids);
   }
   return findings;
 }
