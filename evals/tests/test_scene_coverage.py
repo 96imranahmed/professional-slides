@@ -63,8 +63,11 @@ def content_page(ident, nodes, **extra):
 
 
 def full_page(ident="full"):
-    """Rows of text from the top of the body to its foot."""
-    return content_page(ident, [text("paragraph", y, 40, lines=2) for y in range(162, 668, 46)])
+    """Rows of text from the top of the body to its foot: a page the build's
+    DECK_THIN_PAGES would pass too - its exhibit the body, its words over the floor."""
+    page = content_page(ident, [text("paragraph", y, 40, lines=2) for y in range(162, 668, 46)], planBodyWords=200)
+    page["componentInstances"][1]["frame"] = dict(FRAME)
+    return page
 
 
 def half_empty_page(ident="half"):
@@ -351,6 +354,16 @@ class DeckSceneVoidTests(unittest.TestCase):
         self.assertEqual(deck[0]["measured"], 5)
         self.assertEqual(deck[0]["severity"], "blocker")
         self.assertFalse(report["accepted"])
+
+    def test_the_scene_counts_what_the_build_counts(self):
+        # Pages the scene calls thin or small-exhibit, with no band of air: the
+        # build's DECK_THIN_PAGES blocks on them, so the author's count must too.
+        thin = [content_page(f"t{i}", [text("paragraph", y, 40, lines=2) for y in range(162, 668, 46)], planBodyWords=10)
+                for i in range(5)]
+        report = page_gates.run_gates({"slides": [cover()] + thin + [full_page(f"f{i}") for i in range(9)]})
+        codes = {f["code"] for f in report["findings"]}
+        self.assertNotIn("SCENE_VOID", codes)
+        self.assertLessEqual({"DECK_THIN_PAGES", "DECK_SCENE_VOID"}, codes)
 
     def test_a_few_half_empty_pages_do_not(self):
         report = page_gates.run_gates(self.deck(4, 10))

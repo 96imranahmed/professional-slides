@@ -913,8 +913,12 @@ def gate_hero_exhibit(slide_no, slide, findings, image=None):
         if len(inside) >= 2:
             exhibits = [sec] + [e for e in exhibits if e not in inside]
             break
-    if image is not None:
-        big = max(exhibits, key=lambda c: float((c.get("frame") or {}).get("width", 0)) * float((c.get("frame") or {}).get("height", 0)))
+    big = max(exhibits, key=lambda c: float((c.get("frame") or {}).get("width", 0)) * float((c.get("frame") or {}).get("height", 0)))
+    # A photograph fills its frame by being one: occupancy counts pixels darker
+    # than the page, and a light cabin or a sky reads as empty. Every picture
+    # page of two Emirates builds was flagged for it, and the two flags tipped a
+    # deck the scene had passed into DECK_THIN_PAGES at the build.
+    if image is not None and big.get("component") not in ("image-frame", "device-frame"):
         f = big.get("frame") or {}
         try:
             from PIL import Image
@@ -1564,6 +1568,11 @@ def gate_scene_void(slide_no, slide, findings):
     ))
 
 
+# DECK_THIN_PAGES's codes that the scene alone can raise: a deck the author's run
+# passes on these is not refused at the build by them.
+SCENE_EMPTY_CODES = {"SCENE_VOID", "THIN_PAGE", "HERO_EXHIBIT"}
+
+
 def gate_deck_scene_void(content_indexes, findings, voids=None):
     """DECK_SCENE_VOID. The scene's half-empty pages, counted across the deck.
 
@@ -1572,11 +1581,13 @@ def gate_deck_scene_void(content_indexes, findings, voids=None):
     words with a band of their body blank reached the build clean. This is
     the same count on the scene's own measure, in the same shape: one page
     with a band of air can be right, three pages in ten is how the deck is
-    being built. `voids` is SCENE_VOID's own findings when the run kept them
-    apart (`--only DECK_SCENE_VOID`); otherwise they are read from `findings`."""
+    being built. It counts the scene's own share of DECK_THIN_PAGES's codes -
+    SCENE_VOID, THIN_PAGE and HERO_EXHIBIT's area test - so the two agree.
+    `voids` is those findings when the run kept them apart (`--only
+    DECK_SCENE_VOID`); otherwise they are read from `findings`."""
     pages = len(content_indexes)
     flagged = sorted({f["slide"] for f in (findings if voids is None else voids)
-                      if f.get("code") == "SCENE_VOID" and f.get("slide")})
+                      if f.get("code") in SCENE_EMPTY_CODES and f.get("slide")})
     if (pages < SCENE_THRESHOLDS["deck_from"] or len(flagged) < SCENE_THRESHOLDS["deck_pages_min"]
             or len(flagged) / pages < SCENE_THRESHOLDS["deck_share"]):
         return
@@ -3224,6 +3235,13 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_scene_void(slide_no, slide, page)
                 scene_voids.extend(page)
                 findings.extend(f for f in page if wanted(f["code"]))
+                # The scene's other empty-page flags, which DECK_THIN_PAGES counts
+                # at the build: counted here too, so a deck the author's run
+                # passes is not blocked at the build by the same pages.
+                scene_only = []
+                gate_thin_page(slide_no, slide, scene_only)
+                gate_hero_exhibit(slide_no, slide, scene_only)
+                scene_voids.extend(f for f in scene_only if f["code"] in SCENE_EMPTY_CODES)
             if wanted("UNSOURCED_PICTURE"):
                 gate_unsourced_picture(slide_no, slide, findings)
             if wanted("UNSCALED_FIGURE"):
