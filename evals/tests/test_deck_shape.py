@@ -299,13 +299,17 @@ assert.equal(side(page,'full').items[0].props.distribute,true);
 // An airy deck spreads too. White space *between* the points is what airy
 // means; the same space pooled under the last one is an unfinished page.
 assert.equal(side(page,'airy').items[0].props.distribute,true,'an airy deck puts its air between the points');
-// A thin column narrows and gives the width to the exhibit.
-assert.equal(side(page,'balanced').size.width.fr,0.8);
+// A thin column narrows and gives the width to the exhibit - toward the depth
+// a well-made side column runs, never under the width a line of prose needs
+// (a third of the 1068px row at fr 1; 280px is fr 0.71).
+const thin=side(page,'balanced').size.width.fr;
+assert.ok(thin<1&&thin>0.7,`thin column fr ${thin}`);
 const deep={title:'T',exhibit:chart,points:[
  {lead:'Wealth nearly doubled',text:'Advisory fees grew 18% a year while lending margins compressed, so the mix shifted to fee income across the book.'},
  {lead:'Corporate slipped',text:'Lending margins compressed through the rate cycle and the corporate book lost a fifth of its contribution.'},
  {lead:'Retail held',text:'Deposit growth offset the fee decline, leaving retail flat against a falling market.'}]};
-assert.equal(side(deep,'balanced').size.width.fr,1);
+const deepFr=side(deep,'balanced').size.width.fr;
+assert.ok(deepFr<=1&&deepFr>=thin,`a deeper column narrows less (${deepFr} against ${thin})`);
 // A number alone in the column takes no filler heading.
 assert.equal(side({title:'T',exhibit:chart,kpi:{value:'78%',label:'share'}},'balanced').heading,undefined);
 assert.equal(side(page,'balanced').heading,'What it means');
@@ -616,22 +620,26 @@ assert.equal(boxes.length,2,'both statements are placed');
 // A reading, then its consequence: the first plain in the column, the second in
 // the box under it. Two equal boxes read as two unrelated labels.
 assert.deepEqual(boxes.map(b=>b.props.variant),['plain','tonal']);
-// Statements and nothing else are read against the exhibit, so the pair centres
-// on it rather than hugging the top of the track or spreading down it.
-assert.equal(column.leftover,'center');
+// Statements and nothing else sit together at the top of the track, level with
+// the exhibit: not spread down it (they would pin to opposite ends of an empty
+// track), and not centred on it (a band of air above them as tall as the one
+// below, which the band gates read by column).
+assert.equal(column.leftover,undefined);
 const one=composeSlide({title:'T',rows,insights:['Four in five workers are Black or African American']},0);
 const single=side(one);
 assert.equal(single.items.find(i=>i.component==='insight').props.variant,'tonal','one statement is the box');
-assert.equal(single.leftover,'center');
+assert.equal(single.leftover,undefined);
 assert.throws(()=>composeSlide({title:'T',rows,insights:['a','b','c']},0),/at most two insights/);
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
-    def test_a_commentary_column_centres_on_how_much_of_its_track_it_fills(self):
-        """The count was a proxy for the slack, and it got one long prose point
-        wrong: the column hugged the top of a 500px track and left the bottom
-        half of the page blank. Measure the fill instead."""
+    def test_a_short_commentary_column_narrows_and_starts_at_the_top(self):
+        """A column that fills little of its track used to centre on the
+        exhibit, which put a band of air above its first line as tall as the
+        one under its last. It starts at the top and narrows instead, so its
+        text runs deeper and the exhibit takes the width; the middle is the
+        author's to ask for."""
         result = run_node("""
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
@@ -642,14 +650,21 @@ const side=(page)=>{const walk=(item)=>String(item.id||'').endsWith('-side')?[it
   return page.items.flatMap(walk)[0];};
 const build=(points)=>side(composeSlide({id:'s',title:'Local supply falls together in the design drought',
   layout:'exhibit-left',pointsHeading:false,pointsStyle:'prose',exhibit,points},0));
-// One prose point against a headed chart leaves most of the track empty, so it
-// is read across from the exhibit rather than down from the title.
+// One prose point against a headed chart leaves most of the track empty: it
+// starts at the top, and the column narrows to give the chart the width.
 const sentence='Each weather state reduces several local sources together. No probability is assigned to the scenarios and the gaps between them are not confidence intervals.';
-assert.equal(build([{lead:'The model does not treat four districts as four independent hedges.',text:sentence}]).leftover,'center');
-// A column with enough body to fill its track starts at the top; the slack at
-// the foot is not a hole.
+const point={lead:'The model does not treat four districts as four independent hedges.',text:sentence};
+const short=build([point]);
+assert.notEqual(short.leftover,'center');
+assert.ok(short.size.width.fr<1,`a short column narrows (fr ${short.size.width.fr})`);
+// A column with enough body to fill its track keeps its width, and starts at the top too.
 const full=build(Array.from({length:5},(_,i)=>({lead:`Finding ${i+1}`,text:sentence})));
 assert.notEqual(full.leftover,'center');
+assert.ok(full.size.width.fr>=1);
+// The middle is still there for an author who asks for it.
+const asked=side(composeSlide({id:'s',title:'Local supply falls together in the design drought',
+  layout:'exhibit-left',pointsHeading:false,pointsStyle:'prose',pointsAlign:'middle',exhibit,points:[point]},0));
+assert.equal(asked.leftover,'center');
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

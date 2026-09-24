@@ -675,41 +675,74 @@ function normalizeFacts(props) {
   });
 }
 
+// How far a single row of fact tiles grows past its natural height.
+const FACT_ROW_GROWTH = 1.35;
+
+/** The most height a fact grid uses: a single row stops at FACT_ROW_GROWTH; two rows or more take the frame. */
+export function factGridCeiling(frame, props) {
+  const L = factGridLayout(frame, props);
+  return L.rows > 1 ? null : L.height * FACT_ROW_GROWTH;
+}
+
 export function factGridLayout(frame, props) {
   const items = normalizeFacts(props);
   const gap = v("space.4"), pad = v("space.4");
   const innerAt = (n) => (frame.width - gap * (n - 1)) / n - 2 * pad;
+  if (props.columns !== undefined && !(Number.isInteger(props.columns) && props.columns >= 1 && props.columns <= Math.min(4, items.length)))
+    throw new Error(`A fact grid's \`columns\` is how many tiles run across: a whole number from 1 to 4, and no more than its ${items.length} facts`);
   // Four tiles in a row fit the page's width but not a column beside
   // commentary; there the grid wraps to two rows rather than failing a page
   // whose choice of placement was sound.
   let columns = props.columns ?? (items.length <= 4 ? items.length : items.length <= 6 ? 3 : Math.min(4, Math.ceil(items.length / 2)));
   if (props.columns === undefined) while (columns > 1 && innerAt(columns) < 110) columns = columns === 4 && items.length === 4 ? 2 : columns - 1;
-  const rows = Math.ceil(items.length / columns);
-  const width = (frame.width - gap * (columns - 1)) / columns, inner = width - 2 * pad;
-  if (inner < 110) throw new Error("A fact grid this wide is too narrow per tile; use fewer columns");
-  const tiles = items.map((item) => {
-    const value = measure(item.value, inner, "type.metric", true, DISPLAY);
-    const label = measure(item.label, inner, "type.body", true);
-    const text = item.text ? measure(item.text, inner, "type.compact") : null;
-    const top = item.icon ? 28 + v("space.2") : 0;
-    return { item, value, label, text, height: 2 * pad + top + value.height + v("space.1") + label.height + (text ? v("space.1") + text.height : 0) + (item.gauge !== null ? v("space.2") + 6 : 0) };
-  });
-  const rowHeights = Array.from({ length: rows }, (_, r) => Math.max(...tiles.slice(r * columns, (r + 1) * columns).map((t) => t.height)));
-  return { tiles, columns, rows, width, inner, gap, pad, rowHeights, height: rowHeights.reduce((a, b) => a + b, 0) + gap * (rows - 1) };
+  const at = (n) => {
+    const rows = Math.ceil(items.length / n);
+    const width = (frame.width - gap * (n - 1)) / n, inner = width - 2 * pad;
+    const tiles = items.map((item) => {
+      const value = measure(item.value, inner, "type.metric", true, DISPLAY);
+      const label = measure(item.label, inner, "type.body", true);
+      const text = item.text ? measure(item.text, inner, "type.compact") : null;
+      const top = item.icon ? 28 + v("space.2") : 0;
+      return { item, value, label, text, height: 2 * pad + top + value.height + v("space.1") + label.height + (text ? v("space.1") + text.height : 0) + (item.gauge !== null ? v("space.2") + 6 : 0) };
+    });
+    const rowHeights = Array.from({ length: rows }, (_, r) => Math.max(...tiles.slice(r * n, (r + 1) * n).map((t) => t.height)));
+    return { tiles, columns: n, rows, width, inner, gap, pad, rowHeights, height: rowHeights.reduce((a, b) => a + b, 0) + gap * (rows - 1) };
+  };
+  let layout = at(columns);
+  // A single row of four or more that would leave more than a fifth of a
+  // given frame empty, even grown, wraps to two rows, which take the frame:
+  // four tiles in one row across a 500px body were a strip at the top with the
+  // rest of the page under it. An author's `columns` is kept.
+  if (props.columns === undefined && layout.rows === 1 && items.length >= 4 && Number.isFinite(frame.height) && layout.height * FACT_ROW_GROWTH < frame.height * 0.8) {
+    const wrapped = at(Math.ceil(items.length / 2));
+    if (wrapped.height <= frame.height) layout = wrapped;
+  }
+  if (layout.inner < 110) throw new Error("A fact grid this wide is too narrow per tile; use fewer columns");
+  return layout;
 }
 
 export function factGridNodes({ id, frame, props }) {
   const L = factGridLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`The fact grid needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a fact or its line`);
   const dark = props.tone === "dark", out = [];
-  const stretch = Math.min(1.35, (frame.height - L.gap * (L.rows - 1)) / (L.height - L.gap * (L.rows - 1)));
-  let y = frame.y + (frame.height - (L.height - L.gap * (L.rows - 1)) * stretch - L.gap * (L.rows - 1)) / 2;
+  // A grid of two rows or more takes the height its frame gives it: the tiles
+  // are the exhibit, and four tiles two by two beside the commentary grew by a
+  // third and then sat centred with a band of air above and below the grid.
+  // A single row still grows by a third at most - a row of tiles as tall as
+  // the page is a row of empty boxes - and sits at the top of its frame, the
+  // rest going to what follows (measureCeiling). Copy in a tile that grew is
+  // centred in it, the way a card's is; a gauge stays on the tile's foot.
+  const fit = (frame.height - L.gap * (L.rows - 1)) / (L.height - L.gap * (L.rows - 1));
+  const stretch = L.rows > 1 ? Math.max(1, fit) : Math.min(FACT_ROW_GROWTH, fit);
+  let y = frame.y;
   for (let r = 0; r < L.rows; r++) {
     const h = L.rowHeights[r] * stretch;
     L.tiles.slice(r * L.columns, (r + 1) * L.columns).forEach((t, c) => {
       const x = frame.x + c * (L.width + L.gap), tid = stableId(id, "fact", r * L.columns + c);
       out.push(fillRect(stableId(tid, "tile"), "fact-tile", { x, y, width: L.width, height: h }, dark ? PRIMARY : MUTED, { radius: "radius.small" }));
-      let ty = y + L.pad;
+      // `t.height` counts the gauge's band, which stays on the foot, so the
+      // copy centres in what is above it by the same half of the growth.
+      let ty = y + L.pad + Math.max(0, h - t.height) / 2;
       if (t.item.icon) { out.push(...iconMarker({ id: stableId(tid, "icon"), role: "fact-icon", x: x + L.pad, y: ty, size: 28, icon: t.item.icon, tone: dark ? "inverse" : "accent" })); ty += 28 + v("space.2"); }
       out.push(label(stableId(tid, "value"), "fact-value", { x: x + L.pad, y: ty, width: L.inner }, t.value, style("type.metric", dark ? WHITE : ACCENT, true, "left", DISPLAY)));
       ty += t.value.height + v("space.1");
@@ -1052,7 +1085,7 @@ const SAMPLES = {
   pictogram: { rows: [{ label: "(Insert population)", value: 6 }, { label: "(Insert comparison)", value: 3 }] },
   "arrow-rows": { items: [{ label: "(Insert scenario 1)", text: "(Insert what follows)" }, { label: "(Insert scenario 2)", text: "(Insert what follows)" }] },
   capsules: { items: [{ title: "(Insert priority 1)", text: "(Insert what it means)" }, { title: "(Insert priority 2)", text: "(Insert what it means)" }, { title: "(Insert priority 3)", text: "(Insert what it means)" }] },
-  "fact-grid": { items: [{ value: "63m", label: "(Insert what it counts)" }, { value: "1,200+", label: "(Insert what it counts)" }, { value: "47", label: "(Insert what it counts)" }] },
+  "fact-grid": { items: [{ value: "63m", label: "(Insert what it counts)" }, { value: "1,200+", label: "(Insert what it counts)" }, { value: "47%", label: "(Insert what share it measures)", gauge: 0.47 }], columns: 3 },
   "zone-matrix": { xAxis: { label: "(Insert axis)" }, yAxis: { label: "(Insert axis)" }, points: [{ label: "(Insert item)", x: 0.3, y: 0.7 }, { label: "(Insert item)", x: 0.8, y: 0.8 }] },
   "device-frame": { device: "laptop", image: { alt: "(Insert what the screenshot shows)" } },
   worksheet: { fields: [{ label: "(Insert field)", prompt: "(Insert the question it answers)", span: 3 }, { label: "(Insert field)", prompt: "(Insert the question)" }, { label: "(Insert field)", prompt: "(Insert the question)" }] },
@@ -1107,6 +1140,7 @@ export function registerFigures(registry) {
   for (const [id, [nodes, layout, preferredSize]] of Object.entries(RENDER)) {
     registry.set(id, { id, version: "1.0.0", category: "diagram", role: id, tokens: [...FIGURE_TOKENS], preferredSize,
       sample: SAMPLES[id], render: (input) => ({ nodes: nodes(input) }), measureContent: ({ frame, props }) => layout(frame, props),
+      ...(id === "fact-grid" ? { measureCeiling: ({ frame, props }) => factGridCeiling(frame, props) } : {}),
       guidance: GUIDANCE[id] });
   }
   return registry;

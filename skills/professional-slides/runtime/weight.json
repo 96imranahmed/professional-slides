@@ -63,24 +63,24 @@
     }
   },
   "geometryByFill": {
-    "$comment": "The geometric thresholds that move with fill, each set as a tail a page must stay out of, so a floor can be read as a promise: an `airy` deck avoids the emptiest few percent of well-made pages, a `balanced` deck the emptiest tenth, a `full` deck the emptiest quarter. A floor that rejects a third of good pages is not a floor on emptiness but a demand to be denser than most. The dead band and column-void ceilings sit in the same small tail. A page of type alone cannot reach ink_min at any honest length: see inkPerWord, which sets that page's floor instead.",
+    "$comment": "The geometric thresholds that move with fill, each set as a tail a page must stay out of, so a floor can be read as a promise: an `airy` deck avoids the emptiest few percent of well-made pages, a `balanced` deck the emptiest tenth, a `full` deck the emptiest quarter. A floor that rejects a third of good pages is not a floor on emptiness but a demand to be denser than most. The dead band and column-void ceilings sit in the same small tail. A column's internal void is held to internal_void_max, measured on its own height; `column_void_max` is a column's trailing band, set on the right-column band of well-made pages (columnVoidAbove: 0.13 flags 9.3% of them, 0.2 flags 4.3%), because a side column stopping above its neighbour is commoner on good pages than a page-wide dead band. A page of type alone cannot reach ink_min at any honest length: see inkPerWord, which sets that page's floor instead.",
     "full": {
       "ink_min": 0.118,
       "dead_band_max": 0.06,
       "internal_void_max": 0.12,
-      "column_void_max": 0.2
+      "column_void_max": 0.13
     },
     "balanced": {
       "ink_min": 0.077,
       "dead_band_max": 0.08,
       "internal_void_max": 0.13,
-      "column_void_max": 1.0
+      "column_void_max": 0.2
     },
     "airy": {
       "ink_min": 0.05,
       "dead_band_max": 0.14,
       "internal_void_max": 0.18,
-      "column_void_max": 1.0
+      "column_void_max": 0.2
     }
   },
   "inkPerWord": {

@@ -11,7 +11,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Ink coverage | `INK_COVERAGE` | at least 11.5% of the content area (14% on a `full` deck, 5% on an `airy` one) — set for pages with an exhibit, where a typical page's first quartile is 12.1%. A page with **no** exhibit is held instead to the ink its own word floor produces (0.00052 per word, measured by rendering: 4.4% at the balanced 95-word floor), because a page of type cannot reach 11.5% at any honest length |
 | Trailing dead band | `DEAD_BAND` | at most 8% (6% full, 14% airy) |
 | Internal void | `INTERNAL_VOID` | at most 22% between two content blocks (16% full, 32% airy) |
-| Right column stops short | `COLUMN_VOID` | at most 20% of the page, `full` decks only |
+| Half-empty column | `COLUMN_VOID` | `INTERNAL_VOID` and `DEAD_BAND` measured per column where the page's rows pass: the composer's columns (component frames grouped into rows, each row split where no frame crosses), each band a share of its column's height scaled as the body is to the page. A hole inside a column is held to the internal-void bar; a column that stops short to 20% (13% `full`), where a well-made page's right column lands 96% of the time. The finding names the column and the band |
 | Action title | `TITLE_LINES`, `TITLE_WORDS` | at most two lines, within 14 words |
 | Body type | `TYPE_RANGE` | 10 to 14 pt body, 8 to 11 pt chart furniture, 20 to 26 pt titles |
 | Characters per line | `CPL` | 35 to 90 |
@@ -35,7 +35,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Commentary column | `COLUMN_MONOTONY` | at most three consecutive pages marked with the same device (icon, numbered disc, hairline, prose) |
 | Deck shape | `DECK_FLAT` | past eight analytical pages, one page carries the detail: 282+ words, or a p80 a third above the median |
 | Thin pages | `DECK_THIN_PAGES` | blocks when 30% or more of 12+ content pages (and at least five) carry a thin or half-empty page finding |
-| Half-empty body, from the scene | `SCENE_VOID` | `INTERNAL_VOID` and `DEAD_BAND`'s own definition and thresholds, read off the rows the scene will draw (text by its glyph lines, fills where they show against the canvas, the band under the title included); card and panel interiors read by what they hold; runs at authoring, no render needed |
+| Half-empty body, from the scene | `SCENE_VOID` | `INTERNAL_VOID` and `DEAD_BAND`'s own definition and thresholds, read off the rows the scene will draw (text by its glyph lines, fills where they show against the canvas, the band under the title included); card and panel interiors read by what they hold; where the page's rows pass, its columns are read the same way (`COLUMN_VOID`'s measure) and the finding names the column; runs at authoring, no render needed, and the `author-deck --check` budget line marks the page with `!` and the band |
 | Half-empty pages across the deck | `DECK_SCENE_VOID` | blocks when 30% or more of 12+ content pages (and at least five) carry `SCENE_VOID` |
 | Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |
 | Marks in the exhibit | `PLOT_SPAN` | marks span `weight.plotSpan` of the exhibit frame (annotated and peer-aligned charts exempt) |

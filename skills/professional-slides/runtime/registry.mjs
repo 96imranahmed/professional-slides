@@ -167,6 +167,14 @@ function insightLayout(frame, props) {
  */
 export const measureInsight = (frame, props) => insightLayout(frame, props);
 
+/**
+ * The height a body points list needs at a width, in its own face, markers and
+ * gaps. A side column is narrowed against this rather than an Arial-14
+ * estimate, which put four lines where the page set three and stopped the
+ * column narrowing a fifth of the track short.
+ */
+export const measureList = (frame, props) => bodyListLayout(frame, props.items, props).height;
+
 // A reading note: the cream box a consulting page carries top-right to say how
 // to read it, or to flag a caveat. Compact type, hairline caution border.
 function calloutLayout(frame, props) {
