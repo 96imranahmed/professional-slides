@@ -34,36 +34,51 @@
     "Journeys recovered to 48.3 million in FY26 but growth slowed to 1.7%: peak trains run above 90% of their seats, so the peak cannot absorb the 11.7 million extra journeys.",
     "Off-peak trains run at 38% of their seats. Half-hourly stations grew off-peak journeys 3.7 times as fast as hourly ones, so frequency, not fares, is the main lever.",
     "Electrifying the Eastern line costs £390 million, beats bi-mode trains on cost per journey from year six and frees diesel units for the Dales line.",
-    "The £640 million plan pays back in eleven years on the central case, if the power upgrade lands by 2029 and punctuality holds at 90%."
+    "The £640 million plan pays back in eleven years on the central case, if the power upgrade lands by 2029 and punctuality holds at 90%.",
+    "Two of the seven 2027 milestones are at risk, both on the electrification path; the 5.1 million off-peak journeys depend on neither."
    ],
    "exhibit": {
     "type": "table",
     "columns": [
      "Lever",
      "Journeys added by FY31",
+     "Capital",
      "Condition"
     ],
     "rows": [
      [
       "Off-peak timetable",
       "+5.1m",
+      "£205m",
       "Crews and units released from the peak"
      ],
      [
       "Eastern electrification",
       "+3.8m",
+      "£390m",
       "Power supply upgraded by 2029"
      ],
      [
       "Fare reform",
       "+1.6m",
+      "None",
       "Introduced after the timetable change"
      ],
      [
       "New housing",
       "+1.2m",
+      "£45m",
       "Four station-adjacent sites built out"
-     ]
+     ],
+     {
+      "style": "total",
+      "cells": [
+       "Total",
+       "+11.7m",
+       "£640m",
+       "48.3m journeys in FY26 to 60.0m"
+      ]
+     }
     ],
     "treatment": "dimensions"
    },
@@ -357,7 +372,7 @@
    "highlight": [
     "27% below Westmoor",
     "The gap is off-peak",
-    "7 m"
+    "7 million journeys"
    ],
    "exhibit": {
     "categories": [
@@ -450,9 +465,10 @@
    "adds": "The column draws the consequence: off-peak growth is a leisure product, sold on frequency and reach, not on commuter fares",
    "title": "Leisure is two thirds of off-peak travel but only a seventh of the peak",
    "highlight": [
-    "a leisure product",
     "68%",
-    "Leisure is discretionary"
+    "Leisure is discretionary",
+    "thinnest timetable of the week",
+    "a leisure product"
    ],
    "exhibit": {
     "heading": "Journeys by purpose and time band, FY26",
@@ -505,15 +521,19 @@
    "points": [
     {
      "lead": "Two different markets",
-     "text": "Commuters are 68% of peak journeys but 18% of weekday off-peak journeys, where leisure trips make up two thirds of travel."
+     "text": "Commuters are 68% of peak journeys but 18% of weekday off-peak journeys, where leisure trips make up two thirds of travel and business trips only 7%."
     },
     {
      "lead": "Leisure is discretionary",
-     "text": "A leisure trip can go by car or not happen at all, so it responds to waiting time and reach far more than a commute does."
+     "text": "A leisure trip can go by car or not happen at all, so it responds to waiting time and reach far more than a commute does: lapsed leisure riders cite the wait twice as often as the fare."
+    },
+    {
+     "lead": "Weekends are almost all leisure",
+     "text": "Leisure is 88% of Saturday and 92% of Sunday journeys, yet Sunday runs the thinnest timetable of the week, with no train before 09:00 on three of the five lines."
     },
     {
      "lead": "Sell it differently",
-     "text": "Growth between the peaks is a leisure product: frequency, weekend service and destinations, not a cheaper season ticket."
+     "text": "Growth between the peaks is a leisure product: frequency, weekend service and destinations people want to reach, not a cheaper season ticket for the commuters who already travel."
     }
    ],
    "pointsHeading": false,
@@ -637,6 +657,7 @@
    "highlight": [
     "£17.60 per train-km",
     "electric",
+    "£2.30 less",
     "£16.40"
    ],
    "exhibit": {
@@ -716,8 +737,12 @@
      "text": "Five of the six lowest-cost operators run electric trains on their busiest lines; every operator above £19.00 still runs diesel on most of its network."
     },
     {
+     "lead": "Scale is not the reason",
+     "text": "Southdown carries almost as many journeys as Northvale at £2.30 less per train-km, because its units run 14 hours a day against Northvale's 11."
+    },
+    {
      "lead": "The plan closes a third",
-     "text": "Electric trains on the Eastern line take Northvale to £16.40 by FY31, which would place it sixth on today's figures."
+     "text": "Electric trains on the Eastern line take Northvale to £16.40 by FY31, which would place it sixth of twenty on today's figures, level with Oakfield Link."
     }
    ],
    "pointsHeading": false,
@@ -899,9 +924,9 @@
    "adds": "The points give the mechanism - dwell time at single-track sections - and why the off-peak does not share it",
    "title": "Each peak train added to the Eastern line has cost a point of punctuality",
    "highlight": [
-    "costs no punctuality",
-    "22",
-    "Off-peak trains share"
+    "5.1-point fall",
+    "none of that conflict",
+    "costs no punctuality"
    ],
    "exhibits": [
     {
@@ -990,19 +1015,21 @@
    "form": "labelled-rows",
    "commentary": "in-exhibit",
    "takeaway": false,
-   "why": "Three separate constraints each cap the peak on their own, and each needs its own evidence and its own number, so they read down the page as a diagnosis",
+   "why": "Four separate constraints each cap the peak on their own, and each needs its own evidence and its own number, so they read down the page as a diagnosis",
    "settles": {
     "kind": "count",
-    "what": "units in peak service, single-track sections and depot sidings in use, FY26"
+    "what": "units in peak service, peak shifts on overtime, single-track sections and depot sidings in use, FY26"
    },
    "adds": "Each row says what binds, where it binds and what lifting it would take, beyond the number at its right",
-   "title": "Three constraints hold the peak where it is: fleet, track and depot",
+   "title": "Four constraints hold the peak where it is: fleet, crews, track and depot",
    "highlight": [
     "none is held spare",
-    "two single-track sections",
-    "94% of its sidings",
     "not before 2029",
+    "rest-day overtime",
+    "not to the peak",
+    "two single-track sections",
     "£38 million",
+    "94% of its sidings",
     "£55 million"
    ],
    "blocks": [
@@ -1014,7 +1041,20 @@
      ],
      "metric": {
       "value": "58 of 58",
-      "label": "units in peak service"
+      "label": "units in peak service",
+      "delta": "0 held spare"
+     }
+    },
+    {
+     "label": "Crews are fully rostered",
+     "points": [
+      "Every peak diagram is covered, but 9% of peak shifts rely on rest-day overtime, so a new peak train would have no driver to run it.",
+      "Fourteen drivers in training qualify by mid-2027; the plan assigns them to the off-peak timetable, not to the peak."
+     ],
+     "metric": {
+      "value": "9%",
+      "label": "of peak shifts on rest-day overtime",
+      "delta": "14 drivers in training"
      }
     },
     {
@@ -1026,7 +1066,8 @@
      ],
      "metric": {
       "value": "2",
-      "label": "single-track sections on the Eastern line"
+      "label": "single-track sections on the Eastern line",
+      "delta": "£38m to double both"
      }
     },
     {
@@ -1037,7 +1078,8 @@
      ],
      "metric": {
       "value": "94%",
-      "label": "of depot sidings used overnight"
+      "label": "of depot sidings used overnight",
+      "delta": "+12 sidings planned"
      }
     }
    ],
@@ -1058,7 +1100,7 @@
    "title": "Frequency drives a loop: shorter waits win leisure trips that fund the next train",
    "highlight": [
     "twice as often as the fare",
-    "26 m",
+    "26 months",
     "Where the loop breaks"
    ],
    "exhibit": {
@@ -1093,11 +1135,11 @@
     },
     {
      "lead": "Each train pays back",
-     "text": "An added off-peak train on the Dales line covers its operating cost within 26 months once it carries 40 passengers a trip."
+     "text": "An added off-peak train on the Dales line covers its operating cost within 26 months once it carries 40 passengers a trip, and the average off-peak Dales train already carries 31."
     },
     {
      "lead": "Where the loop breaks",
-     "text": "It needs spare units and crews between the peaks; on the Coast line both are already committed, so the loop cannot start there."
+     "text": "It needs spare units and crews between the peaks; on the Coast line both are already committed until 2030, so the loop cannot start there before electrification releases diesel units."
     }
    ],
    "pointsHeading": false,
@@ -1305,6 +1347,16 @@
       ],
       "Extend half-hourly service to 22:00 on the Dales and Valley lines from the first timetable change"
      ]
+    },
+    {
+     "label": "Visitors are lost at Leeds",
+     "cells": [
+      [
+       "Visitors from beyond the network wait 31 minutes at Leeds on average",
+       "One in four continues by hire car or taxi instead"
+      ],
+      "Time the Dales service to the London and Manchester arrivals and sell through tickets"
+     ]
     }
    ],
    "source": "Source: illustrative data for a fictional operator; FY26 on-train and lapsed-rider surveys"
@@ -1393,6 +1445,10 @@
      {
       "quote": "Twice an hour and I would use it for everything. Once an hour, I have to plan my whole day around the timetable, and most days that isn't worth the effort.",
       "attribution": "Retired former commuter, Halifax (illustrative)"
+     },
+     {
+      "quote": "I came up from London for a walk in the Dales and waited forty minutes at Leeds for the connection. Next time I hired a car at the station and never looked back.",
+      "attribution": "Visitor from London, Leeds interchange (illustrative)"
      }
     ],
     "treatment": "contained",
@@ -1491,7 +1547,7 @@
    "why": "Electrification adds journeys through a chain - faster trains, a demand response to the time saved, more journeys - and each link needs its own evidence, read left to right",
    "settles": {
     "kind": "sequence",
-    "what": "Eastern line journey times today and electrified, journeys gained per minute saved, and Eastern line journeys FY26-FY31"
+    "what": "Eastern line journey times today and electrified, peak and off-peak journeys gained per minute saved, and Eastern line journeys FY26-FY31"
    },
    "adds": "Each caption states the link its panel proves, so the chain can be checked one step at a time",
    "title": "Electrification cuts 14 minutes from Leeds to Hull, adding 3.8 million journeys",
@@ -1529,7 +1585,7 @@
      "caption": "Electric trains accelerate faster between the stops, saving 5 to 14 minutes on each of the four flows"
     },
     {
-     "type": "chart.bar",
+     "type": "chart.stacked-bar",
      "heading": "Gain per minute saved",
      "unit": "k journeys",
      "categories": [
@@ -1540,16 +1596,25 @@
      ],
      "series": [
       {
-       "name": "Journeys per minute saved",
+       "name": "Peak",
        "values": [
-        125,
-        70,
-        90,
-        100
+        40,
+        20,
+        30,
+        35
+       ]
+      },
+      {
+       "name": "Off-peak",
+       "values": [
+        85,
+        50,
+        60,
+        65
        ]
       }
      ],
-     "caption": "Every minute saved wins 70 to 125 thousand journeys a year, most on the longest commuting flow"
+     "caption": "Every minute saved wins 70 to 125 thousand journeys a year, two thirds of them off-peak where seats are free"
     },
     {
      "type": "chart.column",
@@ -1567,17 +1632,22 @@
       {
        "name": "Journeys",
        "values": [
-        14.2,
-        14.3,
-        14.4,
-        14.5,
-        16.6,
-        18.0
+        14.6,
+        14.7,
+        14.8,
+        14.9,
+        17.0,
+        18.7
        ]
       }
      ],
-     "caption": "The line reaches 18.0 million journeys by FY31, a step up once electric trains run from FY30",
-     "change": true
+     "caption": "The line reaches 18.7 million journeys by FY31, 3.8 million more once electric trains run from FY30",
+     "annotations": [
+      {
+       "category": "FY30",
+       "text": "Electric trains enter service"
+      }
+     ]
     }
    ],
    "source": "Source: illustrative data for a fictional operator; timetable modelling and demand model central case"
@@ -1602,25 +1672,45 @@
       "icon": "clock",
       "title": "Off-peak timetable",
       "value": "+5.1m",
-      "text": "Half-hourly off-peak service on the Dales and Valley lines from December 2027, using units and crews released from the peak. Needs only the depot extension."
+      "text": "Half-hourly off-peak service on the Dales and Valley lines from December 2027, using units and crews released from the peak. Needs only the depot extension.",
+      "points": [
+       "Owner: Priya Shah",
+       "Capital: £205m, depot and fleet",
+       "Starts: December 2027"
+      ]
      },
      {
       "icon": "bolt",
       "title": "Eastern electrification",
       "value": "+3.8m",
-      "text": "Faster, more reliable electric trains between Leeds and Hull from 2030, and eleven diesel units freed for other lines. Depends on the 2029 power upgrade."
+      "text": "Faster, more reliable electric trains between Leeds and Hull from 2030, and eleven diesel units freed for other lines. Depends on the 2029 power upgrade.",
+      "points": [
+       "Owner: Tom Hardcastle",
+       "Capital: £390m",
+       "Starts: energised H2 2030"
+      ]
      },
      {
       "icon": "money",
       "title": "Fare reform",
       "value": "+1.6m",
-      "text": "Flexible part-time season tickets and off-peak day returns, launched in 2030 once the new timetable has run for a year and travel patterns are known."
+      "text": "Flexible part-time season tickets and off-peak day returns, launched in 2030 once the new timetable has run for a year and travel patterns are known.",
+      "points": [
+       "Owner: Aisha Karim",
+       "Capital: none",
+       "Starts: launch in 2030"
+      ]
      },
      {
       "icon": "building",
       "title": "New housing",
       "value": "+1.2m",
-      "text": "Four station-adjacent sites with 9,800 homes, served by the existing timetable without extra trains. Funded partly by £80 million of developer contributions."
+      "text": "Four station-adjacent sites with 9,800 homes, served by the existing timetable without extra trains. Funded partly by £80 million of developer contributions.",
+      "points": [
+       "Owner: Daniel Moss",
+       "Capital: £45m, stations",
+       "Starts: sites agreed by 2028"
+      ]
      }
     ]
    },
@@ -1642,8 +1732,8 @@
    "highlight": [
     "1.46 million of the 2.45 million",
     "Leeds is the gateway",
-    "31 m",
-    "0.8 m"
+    "31 minutes to 12",
+    "0.8 million of the 5.1 million"
    ],
    "exhibit": {
     "type": "map",
@@ -1775,9 +1865,9 @@
    "adds": "The points say how fast the path climbs and which year it depends on",
    "title": "The plan adds 11.7 million journeys a year by FY31, mostly after electrification",
    "highlight": [
-    "Six of the 11.7 million journeys",
     "2.7% a year",
-    "29"
+    "Six of the 11.7 million journeys",
+    "56.5 million"
    ],
    "kpi": {
     "value": "+11.7m",
@@ -1910,7 +2000,7 @@
    "why": "The cost of the plan has three parts the reader needs together - when it is spent, on what, and how quickly it pays back",
    "settles": {
     "kind": "structure",
-    "what": "capital cost by year and by lever, and payback under three demand cases"
+    "what": "capital cost by year and by lever, and value and payback under four demand cases"
    },
    "adds": "Each caption carries the finding of its own panel so the page reads without the title",
    "title": "The plan costs £640 million, mostly in FY28-FY29, and pays back in eleven years",
@@ -1939,21 +2029,23 @@
       }
      ],
      "caption": "Nearly three fifths of the spend falls in two years, when the overhead line is built",
-     "annotations": [
+     "highlights": [
       {
-       "category": "FY29",
-       "text": "Overhead line construction peaks"
+       "category": "FY28"
+      },
+      {
+       "category": "FY29"
       }
      ]
     },
     {
-     "type": "chart.bar",
+     "type": "chart.column",
      "heading": "Capital spend by lever",
      "unit": "£ million",
      "categories": [
-      "Electrification",
+      "Overhead line",
       "Depot",
-      "Fleet refurbishment",
+      "Fleet",
       "Stations"
      ],
      "series": [
@@ -1975,27 +2067,37 @@
      "columns": [
       "Case",
       "Journeys FY31",
+      "NPV",
       "Payback"
      ],
      "rows": [
       [
        "High",
        "62.0m",
+       "£310m",
        "9 years"
       ],
       [
        "Central",
        "60.0m",
+       "£190m",
        "11 years"
+      ],
+      [
+       "Central, one-year slip",
+       "56.2m",
+       "£150m",
+       "12 years"
       ],
       [
        "Low",
        "56.5m",
+       "£40m",
        "15 years"
       ]
      ],
      "treatment": "dimensions",
-     "caption": "Even the low case repays within the 30-year asset life of the overhead line"
+     "caption": "Even the low case repays within the 30-year asset life, and a one-year slip costs a year of payback"
     }
    ],
    "source": "Source: illustrative data for a fictional operator; 2026 prices"
@@ -2053,7 +2155,7 @@
    "title": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
    "highlight": [
     "about 1.9 million FY31 journeys",
-    "5.1 m"
+    "5.1 million journeys"
    ],
    "exhibit": {
     "periods": [
@@ -2154,14 +2256,14 @@
    "id": "p24",
    "type": "profiles",
    "form": "people",
-   "commentary": "in-exhibit",
+   "commentary": "below",
    "takeaway": false,
    "why": "Each lever has one accountable owner, and the reader needs to know who they are and what each is on the hook for",
    "settles": {
     "kind": "structure",
     "what": "the four lever owners and what each is accountable for"
    },
-   "adds": "Each card states the owner's measure and deadline, not just the role",
+   "adds": "The cards state each owner's measures and deadlines; the points say how the owners are held to them",
    "title": "Four named owners carry one lever each, reporting monthly to the managing director",
    "exhibit": {
     "items": [
@@ -2169,15 +2271,17 @@
       "name": "Priya Shah",
       "role": "Timetable and service",
       "points": [
-       "Owns the 5.1m off-peak journeys",
-       "Dales timetable live Dec 2027"
+       "Owns the 5.1m off-peak journeys and the crew plan",
+       "Dales timetable live in December 2027",
+       "Valley timetable live in May 2028"
       ]
      },
      {
       "name": "Tom Hardcastle",
       "role": "Electrification",
       "points": [
-       "Owns the £390m programme",
+       "Owns the £390m electrification programme",
+       "Power contract awarded by August 2027",
        "Eastern line energised by H2 2030"
       ]
      },
@@ -2185,21 +2289,47 @@
       "name": "Aisha Karim",
       "role": "Commercial and fares",
       "points": [
-       "Owns fare reform and revenue",
-       "New products launched 2030"
+       "Owns fare reform and off-peak revenue",
+       "Consultation opens in October 2027",
+       "New fare products launched in 2030"
       ]
      },
      {
       "name": "Daniel Moss",
       "role": "Property and stations",
       "points": [
-       "Owns developer contributions",
-       "Four housing sites agreed by 2028"
+       "Owns developer contributions and stations",
+       "Four housing sites agreed by 2028",
+       "£80m of contributions secured"
       ]
      }
     ]
    },
-   "source": "Source: illustrative; fictional names and roles"
+   "source": "Source: illustrative; fictional names and roles",
+   "points": [
+    {
+     "lead": "One owner per lever",
+     "text": "Each owner holds the journeys, the capital and the dates for one lever, so a slip has a name against it from the first month."
+    },
+    {
+     "lead": "Monthly to the managing director",
+     "text": "The programme board meets monthly and reviews every milestone against its due date, red rows first."
+    },
+    {
+     "lead": "Money follows milestones",
+     "text": "Capital is released to each lever in tranches as its milestones pass, so a stalled lever cannot draw ahead of its evidence."
+    },
+    {
+     "lead": "Electrification has the risk",
+     "text": "Tom Hardcastle carries both at-risk 2027 milestones; his report opens every board until the grid connection is signed."
+    }
+   ],
+   "highlight": [
+    "from the first month",
+    "red rows first",
+    "in tranches",
+    "both at-risk 2027 milestones"
+   ]
   },
   {
    "id": "p25",
@@ -2217,7 +2347,8 @@
    "highlight": [
     "six weeks late",
     "What recovers them",
-    "5.1 m"
+    "5.1 million off-peak journeys",
+    "off the critical path"
    ],
    "exhibit": {
     "columns": [
@@ -2286,6 +2417,10 @@
     {
      "lead": "The timetable is safe",
      "text": "All three timetable and depot milestones are on track or complete, so the 5.1 million off-peak journeys in the plan do not depend on either red row."
+    },
+    {
+     "lead": "Grey is not red",
+     "text": "The fare reform consultation has not started because it is not due until October; it sits off the critical path and waits on the timetable, not the grid."
     }
    ],
    "pointsHeading": false,
@@ -2363,10 +2498,10 @@
   {
    "id": "p27",
    "type": "argument",
-   "form": "memo",
+   "form": "sidebar",
    "commentary": "none",
    "takeaway": false,
-   "why": "The case for sequencing fares after the timetable is reasoning about cause and order, which reads best as prose",
+   "why": "The case for sequencing fares after the timetable is reasoning about cause and order, which reads best as prose, with its conclusion held in the panel beside it",
    "settles": {
     "kind": "qualitative",
     "what": "why fare reform should follow the timetable change rather than lead it"
@@ -2376,10 +2511,15 @@
    "highlight": "So the order matters",
    "paragraphs": [
     "Cheaper off-peak fares are the obvious lever, and the one most often proposed. On Northvale's evidence they are the weaker one: lapsed riders cite the wait for the next train twice as often as the fare, and the Coast line, which already sells the cheapest off-peak day return on the network, has the lowest off-peak growth.",
-    "A fare cut on an hourly service mostly discounts trips that would have been made anyway. The same cut on a half-hourly service reaches riders who have just been given a reason to come back, and the revenue it gives up is partly repaid by the extra journeys.",
-    "So the order matters. Run the new Dales and Valley timetables for a full year, measure who they bring back, and then design the part-time season ticket and the off-peak return around the travel patterns that result. Introduced first, fare reform would cost an estimated £6 million a year in lost revenue for about 0.4 million journeys; introduced second, it adds 1.6 million journeys for the same cost."
+    "A fare cut on an hourly service mostly discounts trips that would have been made anyway; the Coast line's cheaper day return found exactly that, as most of its tickets went to people already travelling. The same cut on a half-hourly service reaches riders who have just been given a reason to come back, and the revenue it gives up is partly repaid by the extra journeys.",
+    "So the order matters. Run the new Dales and Valley timetables for a full year, measure who they bring back, and then design the part-time season ticket and the off-peak return around the travel patterns that result.",
+    "The cost of waiting is small. Holding fare reform until 2030 forgoes at most 0.4 million journeys a year in FY28 and FY29, the whole of what a first-mover cut would buy, and it gives the demand model a full year of half-hourly data on which to price the new products. A fare designed on a year of evidence is also easier to defend to the regulator and to passengers than one designed on a forecast."
    ],
-   "source": "Source: illustrative data for a fictional operator; fare elasticity from the demand model"
+   "source": "Source: illustrative data for a fictional operator; fare elasticity from the demand model",
+   "panel": {
+    "kicker": "The order matters",
+    "text": "Introduced first, fare reform costs £6 million a year for 0.4 million journeys; introduced second, it adds 1.6 million journeys for the same cost."
+   }
   },
   {
    "id": "p28",
@@ -2390,15 +2530,16 @@
    "why": "The close restates the answer as the decisions the board is asked to take",
    "settles": {
     "kind": "qualitative",
-    "what": "the four decisions the plan asks of the board"
+    "what": "the five decisions the plan asks of the board"
    },
    "adds": null,
-   "title": "Four decisions put Northvale on the path to 60 million journeys",
+   "title": "Five decisions put Northvale on the path to 60 million journeys",
    "items": [
     "Approve the Dales and Valley half-hourly off-peak timetables for December 2027 and May 2028.",
     "Commit £390 million to electrify the Eastern line, with bi-mode trains as the fallback.",
     "Hold fare reform until the new timetables have run for a year, then launch in 2030.",
-    "Hold the peak timetable and a 90% punctuality floor while train-km rise by a fifth."
+    "Hold the peak timetable and a 90% punctuality floor while train-km rise by a fifth.",
+    "Sign the grid connection on the capacity study's draft findings, recovering four of the six weeks lost."
    ]
   }
  ]

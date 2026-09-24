@@ -102,7 +102,7 @@
    "highlight": [
     "27% below Westmoor",
     "The gap is off-peak",
-    "7 m"
+    "7 million journeys"
    ],
    "insight": "none"
   },
@@ -118,9 +118,10 @@
    "annotation": "none",
    "anchors": [],
    "highlight": [
-    "a leisure product",
     "68%",
-    "Leisure is discretionary"
+    "Leisure is discretionary",
+    "thinnest timetable of the week",
+    "a leisure product"
    ],
    "insight": "none"
   },
@@ -156,6 +157,7 @@
    "highlight": [
     "£17.60 per train-km",
     "electric",
+    "£2.30 less",
     "£16.40"
    ],
    "insight": "none"
@@ -209,29 +211,31 @@
    "annotation": "callout",
    "anchors": [],
    "highlight": [
-    "costs no punctuality",
-    "22",
-    "Off-peak trains share"
+    "5.1-point fall",
+    "none of that conflict",
+    "costs no punctuality"
    ],
    "insight": "none"
   },
   {
    "id": "p10b",
    "n": 16,
-   "title": "Three constraints hold the peak where it is: fleet, track and depot",
+   "title": "Four constraints hold the peak where it is: fleet, crews, track and depot",
    "exhibit": "text",
    "architecture": "card-grid",
-   "why": "Three separate constraints each cap the peak on their own, and each needs its own evidence and its own number, so they read down the page as a diagnosis",
+   "why": "Four separate constraints each cap the peak on their own, and each needs its own evidence and its own number, so they read down the page as a diagnosis",
    "pageType": "parallel/labelled-rows",
    "commentary": "in-exhibit",
    "annotation": "none",
    "anchors": [],
    "highlight": [
     "none is held spare",
-    "two single-track sections",
-    "94% of its sidings",
     "not before 2029",
+    "rest-day overtime",
+    "not to the peak",
+    "two single-track sections",
     "£38 million",
+    "94% of its sidings",
     "£55 million"
    ],
    "insight": "none"
@@ -249,7 +253,7 @@
    "anchors": [],
    "highlight": [
     "twice as often as the fare",
-    "26 m",
+    "26 months",
     "Where the loop breaks"
    ],
    "insight": "none"
@@ -393,8 +397,8 @@
    "highlight": [
     "1.46 million of the 2.45 million",
     "Leeds is the gateway",
-    "31 m",
-    "0.8 m"
+    "31 minutes to 12",
+    "0.8 million of the 5.1 million"
    ],
    "insight": "none"
   },
@@ -410,9 +414,9 @@
    "annotation": "callout",
    "anchors": [],
    "highlight": [
-    "Six of the 11.7 million journeys",
     "2.7% a year",
-    "29"
+    "Six of the 11.7 million journeys",
+    "56.5 million"
    ],
    "insight": "none"
   },
@@ -438,7 +442,7 @@
    "why": "The cost of the plan has three parts the reader needs together - when it is spent, on what, and how quickly it pays back",
    "pageType": "panels/row",
    "commentary": "captions",
-   "annotation": "callout",
+   "annotation": "highlight",
    "anchors": [],
    "insight": "none"
   },
@@ -477,7 +481,7 @@
    "anchors": [],
    "highlight": [
     "about 1.9 million FY31 journeys",
-    "5.1 m"
+    "5.1 million journeys"
    ],
    "insight": "rule"
   },
@@ -489,9 +493,15 @@
    "architecture": "card-grid",
    "why": "Each lever has one accountable owner, and the reader needs to know who they are and what each is on the hook for",
    "pageType": "profiles/people",
-   "commentary": "in-exhibit",
+   "commentary": "below",
    "annotation": "none",
    "anchors": [],
+   "highlight": [
+    "from the first month",
+    "red rows first",
+    "in tranches",
+    "both at-risk 2027 milestones"
+   ],
    "insight": "none"
   },
   {
@@ -509,7 +519,8 @@
    "highlight": [
     "six weeks late",
     "What recovers them",
-    "5.1 m"
+    "5.1 million off-peak journeys",
+    "off the critical path"
    ],
    "insight": "none"
   },
@@ -532,8 +543,8 @@
    "title": "Fare reform should follow the new timetable, not lead it",
    "exhibit": "text",
    "architecture": "text",
-   "why": "The case for sequencing fares after the timetable is reasoning about cause and order, which reads best as prose",
-   "pageType": "argument/memo",
+   "why": "The case for sequencing fares after the timetable is reasoning about cause and order, which reads best as prose, with its conclusion held in the panel beside it",
+   "pageType": "argument/sidebar",
    "commentary": "none",
    "annotation": "none",
    "anchors": [],
@@ -543,7 +554,7 @@
   {
    "id": "p28",
    "n": 38,
-   "title": "Four decisions put Northvale on the path to 60 million journeys",
+   "title": "Five decisions put Northvale on the path to 60 million journeys",
    "exhibit": "text",
    "architecture": "text",
    "why": "The close restates the answer as the decisions the board is asked to take",
