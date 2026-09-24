@@ -16,6 +16,8 @@ The executable contract is `runtime/core.mjs`; the content-to-composition planne
 | section | optional semantic grouping | owns heading, treatment, padding and a nested tree |
 | component | reusable visual and semantic unit | owns internal geometry and token consumption |
 
+A column flow gives a `fill` child no more than its ceiling. A component with a natural height declares one (`measureCeiling`: tables, wave roadmaps, processes and timelines, cards, gantts): its natural height plus the rhythm it can add legibly - one type step and capped row padding for a table, wider stage gaps for a roadmap, larger gaps and centred copy for a card. Past the ceiling the slack goes after the last block as one bottom margin, whatever the flow's `leftover` policy, so the commentary or takeaway stays against its exhibit instead of a band opening between them. Flows inside a row or grid are exempt: peers share one height and their bottom blocks one line.
+
 A section may contain any other composition, including more sections. A slide may have no sections, one, several peers, a progressive sequence or a layered exhibit. Section names stay content-defined (`market signal`, `implementation risk`, `source basis`) rather than being forced into two universal page regions.
 
 ## Selection

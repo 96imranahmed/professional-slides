@@ -10,9 +10,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { planDeck } from "./planner.mjs";
 import { composeAll } from "./compose-all.mjs";
-import { toDeckPlan, coverageFindings, budgetFindings } from "./compose.mjs";
+import { coverageFindings } from "./compose.mjs";
 import { metricsBackend } from "./font-metrics.mjs";
 import { runProcess, lastJson } from "./process.mjs";
 
@@ -182,9 +181,6 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   result.preflight = { ...(await readJson(preflightReport)), report: preflightReport, passed: pre.code === 0 };
   const coverage = coverageFindings(spec);
   if (coverage.length) { result.preflight.findings = [...(result.preflight.findings || []), ...coverage]; result.preflight.passed = false; result.preflight.accepted = false; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), MISSING_EVIDENCE: coverage.length }; }
-  // The page budget: what each page plans to carry, and the remedy that page's
-  // own data offers. Advisory - it reads the spec, not the rendered page - so it
-  // reports without failing the preflight.
   // Deck craft floors, read off the spec and the composed scene. A blocker
   // fails the preflight, so the deck is built for inspection but never delivered.
   const craft = craftFindings(spec, deck);
@@ -193,8 +189,6 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     for (const f of craft) result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), [f.code]: ((result.preflight.countsByCode || {})[f.code] || 0) + 1 };
     if (craft.some((f) => f.severity === "blocker")) { result.preflight.passed = false; result.preflight.accepted = false; }
   }
-  const budget = budgetFindings(spec);
-  if (budget.length) { result.preflight.findings = [...(result.preflight.findings || []), ...budget]; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), THIN_PLAN: budget.length }; }
   await fs.writeFile(preflightReport, JSON.stringify(result.preflight, null, 2) + "\n");
   if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory); }
 
@@ -248,7 +242,6 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       referenceFooterWords: density.footerWords?.referenceMedian ?? null,
       columnFill: density.columnFill?.median ?? null,
       plotSpan: density.plotSpan?.median ?? null,
-      plannedShortfalls: (result.preflight?.countsByCode || {}).THIN_PLAN || 0,
     };
   }
   const readbackOk = result.readback?.accepted === true && result.textCoverage?.accepted !== false;

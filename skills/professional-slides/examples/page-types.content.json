@@ -540,7 +540,11 @@
     "what": "journeys per route-km for all seven comparable regional operators"
    },
    "adds": "The column explains why intensity trails - route length and hourly off-peak service - and what the gap is worth",
-   "highlight": "27% below Westmoor",
+   "highlight": [
+    "27% below Westmoor",
+    "The gap is off-peak",
+    "7 m"
+   ],
    "textReference": {
     "task": "chart-with-commentary"
    },
@@ -681,7 +685,11 @@
     "what": "journey purpose mix in four time bands, from the FY26 passenger survey"
    },
    "adds": "The column draws the consequence: off-peak growth is a leisure product, sold on frequency and reach, not on commuter fares",
-   "highlight": "a leisure product",
+   "highlight": [
+    "a leisure product",
+    "68%",
+    "Leisure is discretionary"
+   ],
    "textReference": {
     "task": "chart-with-commentary"
    },
@@ -867,7 +875,11 @@
     "what": "off-peak trains per hour against off-peak journey growth at ten stations, FY23-FY26"
    },
    "adds": "The points quantify the gap between half-hourly and hourly stations and rule out the obvious alternative explanation, population growth",
-   "highlight": "16.5% on average",
+   "highlight": [
+    "16.5% on average",
+    "2",
+    "30 trains"
+   ],
    "textReference": {
     "task": "chart-with-commentary"
    },
@@ -1425,7 +1437,11 @@
     "what": "Eastern line peak trains per hour and punctuality, FY22-FY26"
    },
    "adds": "The points give the mechanism - dwell time at single-track sections - and why the off-peak does not share it",
-   "highlight": "costs no punctuality",
+   "highlight": [
+    "costs no punctuality",
+    "22",
+    "Off-peak trains share"
+   ],
    "textReference": {
     "task": "exhibit-with-commentary"
    },
@@ -1596,7 +1612,11 @@
     "what": "how an added off-peak train turns into revenue that funds the next one"
    },
    "adds": "The column puts a measured number on each link of the loop, and says where it breaks",
-   "highlight": "twice as often as the fare",
+   "highlight": [
+    "twice as often as the fare",
+    "26 m",
+    "Where the loop breaks"
+   ],
    "textReference": {
     "task": "diagram-with-commentary"
    },
@@ -2423,7 +2443,12 @@
     "what": "visitor journeys that start beyond the network, by origin city, FY26"
    },
    "adds": "The column says why Leeds is the connection that matters and what timing the connection is worth",
-   "highlight": "1.46 million of the 2.45 million",
+   "highlight": [
+    "1.46 million of the 2.45 million",
+    "Leeds is the gateway",
+    "31 m",
+    "0.8 m"
+   ],
    "textReference": {
     "task": "exhibit-with-commentary"
    },
@@ -2529,7 +2554,11 @@
     "what": "journeys added between FY26 and FY31 on the central case"
    },
    "adds": "The points say how fast the path climbs and which year it depends on",
-   "highlight": "Six of the 11.7 million journeys",
+   "highlight": [
+    "Six of the 11.7 million journeys",
+    "2.7% a year",
+    "29"
+   ],
    "textReference": {
     "task": "exhibit-with-commentary"
    },
@@ -3168,7 +3197,10 @@
     "what": "the start, finish and dependencies of six workstreams, 2027-2031"
    },
    "adds": "The points name the critical path and the one date that moves the target",
-   "highlight": "about 1.9 million FY31 journeys",
+   "highlight": [
+    "about 1.9 million FY31 journeys",
+    "5.1 m"
+   ],
    "textReference": {
     "task": "diagram-with-commentary"
    },
@@ -3470,7 +3502,11 @@
     "what": "status of the seven 2027 milestones"
    },
    "adds": "The column says what the at-risk milestones have in common and what would bring them back",
-   "highlight": "six weeks late",
+   "highlight": [
+    "six weeks late",
+    "What recovers them",
+    "5.1 m"
+   ],
    "textReference": {
     "task": "table-with-commentary"
    },

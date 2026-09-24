@@ -41,7 +41,7 @@ export const CARD_TONES = Object.freeze(["outline", "header", "numbered", "plain
 // The tones whose card carries an icon. The rest set a band, a numeral or a
 // figure in that space and have nowhere to put one.
 export const ICON_CARD_TONES = Object.freeze(["dark", "outline", "plain", "disc"]);
-export function cardsLayout(frame, props) {
+export function cardsLayout(frame, props, rhythm = 0) {
   const items = normalizeCards(props);
   const tone = props.tone ?? (items.some((i) => i.icon) ? "outline" : "numbered");
   if (!CARD_TONES.includes(tone)) throw new Error(`Unknown cards tone: ${tone}; use one of ${CARD_TONES.join(", ")}`);
@@ -63,7 +63,9 @@ export function cardsLayout(frame, props) {
   const inner = width - 2 * pad - (tone === "columns" ? v("space.4") : 0);
   if (inner < 80) throw new Error("Cards are too narrow for their padding; use fewer cards");
   const iconSize = Math.round(markerSize() * (tone === "disc" ? 3.5 : centred ? 2.5 : 1.75)), disc = markerSize();
-  const headGap = v("space.2"), bodyGap = v("space.3");
+  // `rhythm` opens the gaps inside a card that has height to spare (see
+  // `cardsNodes`): the space between the blocks grows before the padding does.
+  const headGap = v("space.2") + rhythm / 2, bodyGap = v("space.3") + rhythm;
   const measured = items.map((item) => {
     const statValueWidth = tone === "stat" && item.value ? Math.ceil(measure(item.value, inner, "type.heading", true).width) + 2 * v("space.3") : 0;
     const titleWidth = tone === "numbered" ? inner - disc - v("space.3") : tone === "stat" ? inner - statValueWidth : inner;
@@ -105,7 +107,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     nodes0.push(label(stableId(id, "question-text"), "card-question-text", { x: frame.x + pad, y: top + pad, width: qw - 2 * pad }, q, text("type.heading", WHITE, true)));
     frame = { ...frame, x: frame.x + qw + gap, width: frame.width - qw - gap };
   }
-  const L = cardsLayout(frame, props);
+  let L = cardsLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
   const nodes = nodes0;
   // Cards fill their frame so a row reads as one band - but only so far. Given
@@ -121,22 +123,39 @@ export function cardsNodes({ id, frame: frameIn, props }) {
   // Icon rows (`valign: "middle"`) keep their natural height and sit centred in the frame.
   if (props.valign === "middle" && frame.height > L.height) frame = { ...frame, y: frame.y + (frame.height - L.height) / 2, height: L.height };
   else if (fill && cardHeight < frame.height) frame = { ...frame, y: frame.y + (frame.height - cardHeight) / 2, height: cardHeight };
+  // A grown card set its copy from the top and left the lower half of the box
+  // empty (the Emirates Saudi-challengers page: three 386px boxes, the text
+  // ending at 260). The room goes to the card's rhythm first - the gaps
+  // between icon, title, figure and text open by up to 12px each - and what
+  // is left is split above and below the copy, so the content sits in the
+  // middle of its box. The row still starts level: every card takes the same
+  // rhythm and the same offset. Tones that hang a band from the card's top
+  // edge (header, dark, big-number) keep their copy under the band.
+  const anchored = ["header", "dark", "big-number"].includes(L.tone);
+  if (!L.open && cardHeight > L.height + 0.01) {
+    for (const rhythm of [v("space.3"), v("space.2"), v("space.1")]) {
+      const grown = cardsLayout(frame, props, rhythm);
+      if (grown.height <= cardHeight + 0.01) { L = grown; break; }
+    }
+  }
+  const offset = !L.open && !anchored ? Math.max(0, (cardHeight - L.height) / 2) : 0;
   L.items.forEach((m, index) => {
     const x = frame.x + index * (L.width + L.gap), cid = stableId(id, "card", index);
+    const top = frame.y + offset;
     if (L.tone === "stat") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, MUTED, "none", "radius.none"));
     else if (!L.open && L.tone !== "dark") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, SURFACE, RULE, "radius.small"));
-    let y = frame.y + L.pad;
+    let y = top + L.pad;
     const cx = x + L.pad;
     const align = L.centred ? "center" : "left";
     if (L.tone === "header") {
-      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: frame.y, width: L.width, height: m.bandHeight }, PRIMARY));
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: frame.y + v("space.2"), width: L.inner }, m.title, text("type.heading", WHITE, true)));
-      y = frame.y + m.bandHeight + L.pad;
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, PRIMARY));
+      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: top + v("space.2"), width: L.inner }, m.title, text("type.heading", WHITE, true)));
+      y = top + m.bandHeight + L.pad;
     } else if (L.tone === "dark") {
       // A navy tile carries icon and title in white; the copy sits below it on the page.
-      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: frame.y, width: L.width, height: m.bandHeight }, PRIMARY, "none", "radius.small"));
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, PRIMARY, "none", "radius.small"));
       const block = (m.item.icon ? L.iconSize + L.headGap : 0) + m.title.height;
-      let ty = frame.y + (m.bandHeight - block) / 2;
+      let ty = top + (m.bandHeight - block) / 2;
       if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: cx + (L.inner - L.iconSize) / 2, y: ty, size: L.iconSize, icon: m.item.icon, tone: "filled" })); ty += L.iconSize + L.headGap; }
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: ty, width: L.inner }, m.title, text("type.heading", WHITE, true, "center")));
     } else if (L.tone === "big-number") {
@@ -156,7 +175,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
       // the last line on both sides, dividing nothing.
       if (index) {
         const written = Math.max(...L.items.map((entry) => entry.height));
-        nodes.push(linePrimitive({ id: stableId(cid, "divider"), role: "card-divider", x1: x - L.gap / 2, y1: frame.y, x2: x - L.gap / 2, y2: frame.y + Math.min(cardHeight, written), style: { stroke: RULE, lineWidth: token("line.hairline") } }));
+        nodes.push(linePrimitive({ id: stableId(cid, "divider"), role: "card-divider", x1: x - L.gap / 2, y1: top, x2: x - L.gap / 2, y2: top + Math.min(cardHeight, written), style: { stroke: RULE, lineWidth: token("line.hairline") } }));
       }
       y += m.titleHeight;
     } else if (L.tone === "stat") {
@@ -179,15 +198,15 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     }
     if (m.value) {
       // A headline figure under the title (price, size, share) in the metric role.
-      const vy = frame.y + L.pad + (L.tone === "header" || L.tone === "dark" ? m.bandHeight : m.iconBlock + m.numberBlock + m.titleHeight) + L.bodyGap;
+      const vy = top + L.pad + (L.tone === "header" || L.tone === "dark" ? m.bandHeight : m.iconBlock + m.numberBlock + m.titleHeight) + L.bodyGap;
       nodes.push(label(stableId(cid, "value"), "card-value", { x: cx, y: vy, width: L.inner }, m.value, text("type.metric", PRIMARY, true, align)));
     }
     // Content starts level across the row (row rule), below the tallest header.
-    y = L.tone === "header" || L.tone === "dark" ? frame.y + L.headerHeight + L.pad : frame.y + L.pad + L.headerHeight;
+    y = L.tone === "header" || L.tone === "dark" ? top + L.headerHeight + L.pad : top + L.pad + L.headerHeight;
     let tx = cx, tw = L.inner;
     if (L.tone === "big-number") {
       // The copy band: muted, from the content line to the card's foot.
-      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: y + L.bodyGap, width: L.width, height: Math.max(0, cardHeight - (y + L.bodyGap - frame.y)) }, MUTED));
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: y + L.bodyGap, width: L.width, height: Math.max(0, cardHeight - (y + L.bodyGap - top)) }, MUTED));
       tx = cx + v("space.3"); tw = L.inner - 2 * v("space.3"); y += v("space.3");
     }
     if (m.body) { y += L.bodyGap; nodes.push(label(stableId(cid, "text"), "card-text", { x: tx, y, width: tw }, m.body, text("type.body", INK, false, align))); y += m.body.height; }
@@ -429,6 +448,16 @@ export function registerPanels(registry) {
     resolveVariant: (props = {}) => props.tone ?? (Array.isArray(props.items) && props.items.some((i) => i?.icon) ? "outline" : "numbered"),
     render: (input) => ({ nodes: cardsNodes(input) }),
     measureContent: ({ frame, props }) => cardsLayout(frame, props),
+    // The height the row can use: boxed cards grow to half as much again as
+    // they need (their copy centred, `cardsNodes`), an open column set keeps
+    // its natural height. Beyond it the frame's slack was split above and
+    // below the row - a gap between the cards and the commentary under them.
+    // A centred row and a question panel place themselves in any frame.
+    measureCeiling: ({ frame, props }) => {
+      if (props.valign === "middle" || (typeof props.question === "string" && props.question.trim())) return null;
+      const L = cardsLayout(frame, props);
+      return L.open ? L.height : L.height * 1.5;
+    },
     guidance: { useWhen: "three to five parallel pillars, principles, options or initiatives each with a title and a line of description", why: "equal cards make parallel things read as parallel; the row rule keeps their bodies level", actionTitle: "state what the set of pillars achieves together" }
   });
   registry.set("quadrants", {

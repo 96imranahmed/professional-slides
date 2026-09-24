@@ -16,7 +16,27 @@
 // reading task comes from the page type's exhibit family and whether the
 // composed page has a commentary column - the same test the composition audit
 // applies, so the two cannot disagree.
-import { GENERATED_ROLES } from "./text-contract.mjs";
+import { GENERATED_ROLES, textWords } from "./text-contract.mjs";
+
+// Lines the reading-task bank drops from body counts (text-contract NOTE_LINE).
+const NOTE_LINE = /^\s*(source|sources|note|notes|footnote)\b[:\s]/i;
+
+/**
+ * A composed page's body words, counted exactly as the text contract counts a
+ * text plan: body, exhibit and qualification blocks, notes excluded. The page
+ * gates read this number off the scene rather than keeping a second counter,
+ * so authoring and the build cannot disagree about whether a page is thin.
+ */
+export function bodyWordsOf(sceneSlides) {
+  let words = 0;
+  for (const slide of sceneSlides) for (const node of slide.nodes || []) {
+    if (node.type !== "text") continue;
+    const role = planRole(node.role);
+    const text = String(node.data?.textLayout?.source ?? node.text ?? "");
+    if (["body", "exhibit", "qualification"].includes(role) && !NOTE_LINE.test(text)) words += textWords(text);
+  }
+  return words;
+}
 
 const COMMENTARY_ROLES = new Set(["list-item", "list-lead", "paragraph"]);
 

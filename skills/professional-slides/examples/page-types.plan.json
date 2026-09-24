@@ -86,7 +86,11 @@
    "commentary": "beside",
    "annotation": "highlight",
    "anchors": [],
-   "highlight": "27% below Westmoor",
+   "highlight": [
+    "27% below Westmoor",
+    "The gap is off-peak",
+    "7 m"
+   ],
    "insight": "none"
   },
   {
@@ -100,7 +104,11 @@
    "commentary": "beside-left",
    "annotation": "none",
    "anchors": [],
-   "highlight": "a leisure product",
+   "highlight": [
+    "a leisure product",
+    "68%",
+    "Leisure is discretionary"
+   ],
    "insight": "none"
   },
   {
@@ -114,7 +122,11 @@
    "commentary": "below",
    "annotation": "none",
    "anchors": [],
-   "highlight": "16.5% on average",
+   "highlight": [
+    "16.5% on average",
+    "2",
+    "30 trains"
+   ],
    "insight": "none"
   },
   {
@@ -165,7 +177,11 @@
    "commentary": "below",
    "annotation": "callout",
    "anchors": [],
-   "highlight": "costs no punctuality",
+   "highlight": [
+    "costs no punctuality",
+    "22",
+    "Off-peak trains share"
+   ],
    "insight": "none"
   },
   {
@@ -179,7 +195,11 @@
    "commentary": "beside",
    "annotation": "none",
    "anchors": [],
-   "highlight": "twice as often as the fare",
+   "highlight": [
+    "twice as often as the fare",
+    "26 m",
+    "Where the loop breaks"
+   ],
    "insight": "none"
   },
   {
@@ -292,7 +312,12 @@
    "commentary": "beside",
    "annotation": "none",
    "anchors": [],
-   "highlight": "1.46 million of the 2.45 million",
+   "highlight": [
+    "1.46 million of the 2.45 million",
+    "Leeds is the gateway",
+    "31 m",
+    "0.8 m"
+   ],
    "insight": "none"
   },
   {
@@ -306,7 +331,11 @@
    "commentary": "beside",
    "annotation": "callout",
    "anchors": [],
-   "highlight": "Six of the 11.7 million journeys",
+   "highlight": [
+    "Six of the 11.7 million journeys",
+    "2.7% a year",
+    "29"
+   ],
    "insight": "none"
   },
   {
@@ -368,7 +397,10 @@
    "commentary": "below",
    "annotation": "none",
    "anchors": [],
-   "highlight": "about 1.9 million FY31 journeys",
+   "highlight": [
+    "about 1.9 million FY31 journeys",
+    "5.1 m"
+   ],
    "insight": "rule"
   },
   {
@@ -396,7 +428,11 @@
    "treatment": "rag",
    "annotation": "none",
    "anchors": [],
-   "highlight": "six weeks late",
+   "highlight": [
+    "six weeks late",
+    "What recovers them",
+    "5.1 m"
+   ],
    "insight": "none"
   },
   {

@@ -67,16 +67,6 @@ export function subtractAll(text, blocks, slide, scene) {
   }
   return { rest, lost };
 }
-function subtractGenerated(residual, slide) {
-  let rest = residual;
-  for (const node of slide?.nodes || []) {
-    if (node.type !== 'text' || !GENERATED_ROLES.test(String(node.role || ''))) continue;
-    const t = normalizeText(node.data?.textLayout?.source ?? node.text);
-    const at = t ? rest.indexOf(t) : -1;
-    if (at >= 0) rest = rest.slice(0, at) + ' ' + rest.slice(at + t.length);
-  }
-  return rest;
-}
 export function checkTextPlan(content, {required = false} = {}) {
   const enabled = required || content?.textContract === 'complete';
   const findings = [], scores = [];

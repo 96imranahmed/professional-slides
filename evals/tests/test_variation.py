@@ -34,7 +34,7 @@ console.log(JSON.stringify({ rows: [...new Set(rows)], free: [...new Set(free)].
 
     def test_unpinned_pages_vary_between_seeds_and_pinned_ones_do_not(self):
         result = run_node('''
-import { toDeckPlan, budgetFindings } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
 const page = (i) => ({ title: 'Revenue rose in every region while costs held flat ' + i,
   exhibit: { type: 'chart.column', categories: ['2021','2022','2023','2024'], series: [{ name: 'Revenue', values: [10, 12, 14, 15 + i] }] },
   points: [{ lead: 'Price led', text: 'List prices rose while volumes held across the period' }, { lead: 'Costs held', text: 'Headcount was flat across the four years' }] });
@@ -42,12 +42,10 @@ const slides = Array.from({ length: 10 }, (_, i) => page(i));
 const walk = (items) => (items || []).map(i => (i.layout || i.component) + (i.items ? '[' + walk(i.items) + ']' : '')).join(',');
 const shapes = (variation, pin) => toDeckPlan({ schema: 'professional-slides.deck/v3', id: 'd', variation, slides: pin ? slides.map(s => ({ ...s, layout: 'exhibit-left' })) : slides }, '.').slides.map(s => walk(s.items)).join('|');
 const seeds = ['a','b','c','d','e','f'];
-console.log(JSON.stringify({ free: new Set(seeds.map(v => shapes(v))).size, pinned: new Set(seeds.map(v => shapes(v, true))).size,
-  warned: budgetFindings({ schema: 'professional-slides.deck/v3', id: 'd', slides: slides.map(s => ({ ...s, layout: 'exhibit-left' })) }).some(f => f.code === 'LAYOUT_PINNED') }));
+console.log(JSON.stringify({ free: new Set(seeds.map(v => shapes(v))).size, pinned: new Set(seeds.map(v => shapes(v, true))).size }));
 ''')
         self.assertGreater(result['free'], 1)
         self.assertEqual(result['pinned'], 1)
-        self.assertTrue(result['warned'])
 
 
 if __name__ == '__main__':

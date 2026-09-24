@@ -23,7 +23,7 @@ const base = {{ id: 'p1', type: 'trend', form: 'line', commentary: 'on-exhibit',
   title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }};
 const error = (page) => {{ try {{ compilePage(page); return null; }} catch (e) {{ return e.message; }} }};
 const ok = compilePage(base);
-const side = compilePage({{ ...base, commentary: 'beside', points: ['One', 'Two'], takeaway: 'So what' }});
+const side = compilePage({{ ...base, commentary: 'beside', points: ['One', 'Two'], highlight: ['One', 'Two'], takeaway: 'So what' }});
 const panels = compilePage({{ id: 'p2', type: 'panels', form: 'row', commentary: 'captions', takeaway: false, why: 'Three airlines answer the same question side by side', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
   title: 'Each hub grew', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A', 'B', 'C', 'D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Hub ' + i + ' added traffic in every year of the run' }})) }});
 console.log(JSON.stringify({{
@@ -62,14 +62,14 @@ import {{ structureOf }} from '{KIT}';
 const years = ['2019','2020','2021','2022','2023'];
 const chart = (extra = {{}}) => ({{ categories: years, series: [{{ name: 'x', values: [1, 2, 3, 4, 5] }}], annotations: [{{ category: '2021', text: 'The turn came when grounded capacity returned to the network' }}], ...extra }});
 const stamped = Array.from({{ length: 14 }}, (_, i) => ({{ id: 's' + i, type: 'trend', form: 'line', commentary: 'below', takeaway: 'So what ' + i,
-  why: 'Every page takes the same shape here', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, exhibit: chart(), points: ['a', 'b', 'c'] }}));
+  why: 'Every page takes the same shape here', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, exhibit: chart(), points: ['a', 'b', 'c'], highlight: ['a', 'b', 'c'] }}));
 let refused = compileDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: stamped }}).findings.map((f) => f.code).sort();
 const kinds = [
   {{ type: 'trend', form: 'line', commentary: 'on-exhibit', exhibit: chart() }},
   {{ type: 'ranking', form: 'bar', commentary: 'beside', points: ['a'], exhibit: {{ categories: ['A','B','C','D','E'], series: [{{ name: 'x', values: [5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }},
   {{ type: 'panels', form: 'row', commentary: 'captions', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A','B','C','D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Segment ' + i + ' grew fastest where capacity was added first' }})) }},
   {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}]] }} }},
-  {{ type: 'mechanism', form: 'flow', commentary: 'below', points: ['a', 'b'], exhibit: {{ nodes: [] }} }},
+  {{ type: 'mechanism', form: 'flow', commentary: 'below', points: ['a', 'b'], highlight: ['a', 'b'], exhibit: {{ nodes: [{{ id: 'x' }}, {{ id: 'y' }}, {{ id: 'z' }}], edges: [] }} }},
   {{ type: 'numbers', form: 'hero-number', commentary: 'beside', kpi: {{ value: '5', label: 'x' }}, points: ['a'] }},
   {{ type: 'argument', form: 'memo', commentary: 'none', paragraphs: ['Prose.'] }},
 ];
@@ -217,6 +217,38 @@ console.log(JSON.stringify({{ failed: [...out.failedIds], composed: out.deck.sli
         self.assertEqual(result['failed'], ['b'])
         self.assertIn('m', result['composed'])  # the rest of the deck is still composed and checked
         self.assertIn('PAGE_DOES_NOT_COMPOSE', result['codes'])
+
+
+class PublishedLimitsTests(unittest.TestCase):
+    def test_limits_minimums_counts_highlights_and_the_answer_message(self):
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+import {{ runContentGates }} from './skills/professional-slides/runtime/gates/content_gates.mjs';
+const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
+const base = {{ takeaway: false, why: 'The page type fits the claim here', settles: {{ kind: 'share', what: 'The annual report split' }} }};
+const pie = (labels, values) => compilePage({{ ...base, id: 'c', type: 'composition', form: 'pie', commentary: 'beside', points: ['A point.'], title: 'Mix',
+  exhibit: {{ labels, values }} }});
+const road = (n) => compilePage({{ ...base, id: 'r', type: 'schedule', form: 'roadmap', commentary: 'none', title: 'Plan',
+  exhibit: {{ items: Array.from({{ length: n }}, (_, i) => ({{ label: 'Phase ' + i, date: '202' + i }})) }} }});
+const points = ['Cargo carried 2.4m tonnes, up 3%', 'Thirteen freighters flew in March', 'The margin is not disclosed'];
+const bars = {{ ...base, id: 'b', type: 'ranking', form: 'bar', commentary: 'beside', points, title: 'Ranked',
+  exhibit: {{ categories: ['A','B','C','D','E'], series: [{{ name: 'x', values: [5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }};
+const content = {{ question: 'Is Emirates the strongest Gulf airline system?', answer: 'Emirates is the strongest Gulf airline system today',
+  pages: [{{ id: 'p02', n: 2, claim: 'Revenue grew while costs held', settles: {{ kind: 'rate', what: 'x' }}, adds: null }}] }};
+const answer = runContentGates(content).findings.find((f) => f.code === 'CONTENT_ANSWER_UNCARRIED');
+console.log(JSON.stringify({{ six: error(() => pie(['a','b','c','d','e','f'], [1,1,1,1,1,1])), two: error(() => pie(['cargo','other'], [12, 88])),
+  small: error(() => pie(['Asia','Europe','Middle East'], [7, 4, 3])), three: error(() => road(3)), four: error(() => road(4)),
+  one: error(() => compilePage({{ ...bars, highlight: '2.4m tonnes' }})), each: error(() => compilePage({{ ...bars, highlight: ['2.4m tonnes', 'Thirteen freighters'] }})),
+  answer: answer?.repair ?? '' }}));
+''')
+        self.assertIn('2 to 5 labels', result['six'])
+        self.assertIn('numbers page', result['two'])
+        self.assertIn('small count', result['small'])
+        self.assertIn('four or more dated items', result['three'])
+        self.assertIsNone(result['four'])
+        self.assertIn('mark the finding in each point', result['one'])
+        self.assertIsNone(result['each'])
+        self.assertIn('p02', result['answer'])  # names where to say it and the closest title
 
 
 if __name__ == '__main__':

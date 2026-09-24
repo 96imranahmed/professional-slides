@@ -203,6 +203,31 @@ export function markedChart(ex) {
     || ["change", "cagr", "growth", "focusSeries"].some((key) => ex?.[key] !== undefined && ex[key] !== false);
 }
 
+// What each component can hold, as its renderer enforces it: published in the
+// catalogue and checked at compile, so an author learns a donut's five-part
+// limit from `--types`, not from a failed composition.
+export const LIMITS = Object.freeze({
+  "chart.pie": { key: "labels", min: 2, max: 5 }, "chart.donut": { key: "labels", min: 2, max: 5 },
+  "chart.slope": { key: "categories", min: 2, max: 4 }, "chart.treemap": { key: "items", min: 2, max: 20 },
+  "chart.sparklines": { key: "items", min: 2, max: 12 }, cycle: { key: "items", min: 3, max: 6 }, steps: { key: "items", min: 3, max: 6 },
+  people: { key: "items", min: 2, max: 5 }, logos: { key: "items", min: 2, max: 12 }, cards: { key: "items", min: 2, max: 6 },
+  takeaways: { key: "items", min: 2, max: 5 }, gantt: { key: "periods", min: 2 },
+});
+
+// The least a page of each type carries to be worth a page. Below it the type
+// was chosen for less evidence than it needs: a three-phase roadmap, a two-part
+// pie and a four-row matrix each left half a page empty on a real deck.
+const MINIMUM = Object.freeze({
+  composition: (ex, form) => ["pie", "donut", "treemap"].includes(form)
+    ? ((ex.labels || ex.items || []).length >= 3 || "a share of one thing is a numbers page - a composition shows three or more parts")
+    : ((ex.categories || []).length >= 2 && (ex.series || []).length >= 2) || (ex.series || []).length >= 3 || "a composition compares the mix across two or more members or periods, or shows three or more parts",
+  schedule: (ex, form) => form === "gantt" ? true : (ex.items || []).length >= 4 || "a timeline or roadmap of three items is a strip, not a page - four or more dated items, or pair it with the evidence behind them as panels",
+  parallel: (ex) => (ex.items || []).length >= 3 || "three or more parallel ideas",
+  mechanism: (ex) => ["nodes", "items", "stages", "layers", "branches", "pillars", "quadrants", "points", "flows"].some((key) => Array.isArray(ex[key]) && ex[key].length >= 3) || "a mechanism has three or more parts",
+  relationship: (ex) => (ex.points || ex.rows || []).length >= 5 || "a relationship needs five or more members to show one",
+  bridge: (ex) => (ex.categories || []).length >= 4 || "a bridge has a start, two or more steps and an end",
+});
+
 // The data an exhibit type reads, from its registered sample: what an author
 // has to supply, as against styling (heading, unit, annotations, ...).
 const STYLING = new Set(["heading", "unit", "annotations", "highlights", "focusSeries", "active", "treatment", "placement", "arrangement",
@@ -327,6 +352,22 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     if (keys.length && !keys.some((key) => ex[key] !== undefined))
       throw new Error(`${id}: a ${ex.type} exhibit reads ${keys.map((k) => `\`${k}\``).join(", ")} - none is given`);
   }
+  // What the component can hold, and what the type needs to be worth a page.
+  for (const ex of [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean)) {
+    const limit = LIMITS[ex.type], n = limit && Array.isArray(ex[limit.key]) ? ex[limit.key].length : null;
+    if (n !== null && (n < limit.min || (limit.max && n > limit.max)))
+      throw new Error(`${id}: a ${ex.type} holds ${limit.min}${limit.max ? ` to ${limit.max}` : " or more"} ${limit.key}; this one has ${n}`);
+  }
+  const minimum = primary && MINIMUM[page.type]?.(primary, page.form);
+  if (typeof minimum === "string") throw new Error(`${id}: ${minimum}`);
+  // Small counts are counted, not shared out: fourteen cities as 50% / 29% / 14%
+  // / 7% of a pie reads as precision the count does not have.
+  if (page.type === "composition" && ["pie", "donut", "treemap"].includes(page.form)) {
+    const values = (primary.values || (primary.items || []).map((item) => item.value) || []).map(Number);
+    const total = values.reduce((a, b) => a + b, 0);
+    if (values.length && values.every(Number.isInteger) && total < 25)
+      throw new Error(`${id}: ${total} items shared out as percentages overstates a small count - show the counts (a waffle, or a ranking of the parts)`);
+  }
   if (page.type === "composition" && ["pie", "donut"].includes(page.form)) {
     const values = (primary.values || []).map(Number), total = values.reduce((a, b) => a + b, 0);
     if (values.some((v) => v / total < 0.05)) throw new Error(`${id}: a part under 5% of the whole has no room in a ${page.form} slice; a waffle or a stacked bar shows small parts`);
@@ -377,6 +418,18 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     throw new Error(`${id}: commentary "${page.commentary}" puts the explanation ${COMMENTARY[page.commentary].replace(/^the /, "")}; move the points there or choose "beside" or "below"`);
   // A draft is the spine: titles, types, data and evidence. The copy checks
   // below wait for the full compile.
+  // The finding is marked in each point, not only the first: a page-level
+  // phrase is accented where it occurs, so a single phrase lit one point and
+  // left the rest grey. `highlight` takes a list - a phrase from each point -
+  // or a point carries its own.
+  if (!draft && points >= 2 && ["beside", "beside-left", "below"].includes(page.commentary)) {
+    const phrases = (Array.isArray(page.highlight) ? page.highlight : page.highlight ? [page.highlight] : []).map((p) => String(p).toLowerCase());
+    const marked = (page.points || []).filter((point) => {
+      const text = (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`).toLowerCase();
+      return (point && typeof point === "object" && point.highlight) || phrases.some((p) => p && text.includes(p));
+    }).length;
+    if (marked < Math.ceil(points / 2)) throw new Error(`${id}: mark the finding in each point - ${marked} of ${points} points carry a highlighted phrase; give \`highlight\` a list with a phrase from each point (the number or claim the reader should see first), or \`highlight\` on the point`);
+  }
   if (!draft && ["beside", "beside-left", "below"].includes(page.commentary) && !points && !page.paragraphs)
     throw new Error(`${id}: commentary "${page.commentary}" needs the points it places`);
   if (!draft && page.commentary === "on-exhibit" && primary?.type?.startsWith("chart.") && !(primary.annotations || []).length)
@@ -469,17 +522,29 @@ export function architectureOf(slide) {
   return ["on-exhibit", "none", "in-exhibit"].includes(t.commentary) ? "evidence-only" : "evidence-with-commentary";
 }
 
+/** How many words of ordinary prose a chart callout holds, by the renderer's own measure. */
+export function calloutCapacity() {
+  const words = "the operator added capacity on the busiest routes before demand returned in full".split(" ");
+  let n = 1;
+  while (n < 40 && calloutFits(Array.from({ length: n + 1 }, (_, i) => words[i % words.length]).join(" "))) n += 1;
+  return n;
+}
+
 /** The catalogue as the author reads it. */
 export function describeTypes() {
   const lines = ["# Page types", "", "Every analytical page is one of these. Each choice is required; none has a default.", "",
     "`commentary` - where the explanation lives:", ...Object.entries(COMMENTARY).map(([k, v]) => `- \`${k}\`: ${v}`), "",
     "`takeaway` - `false`, or the closing sentence (strong decks close about one page in ten on a line).", "",
     "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log.", "",
-    "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", ""];
+    "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", "",
+    "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point).", "",
+    `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box); \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, ""];
   for (const [name, t] of Object.entries(PAGE_TYPES)) {
     const n = Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits;
     const data = Object.entries(t.forms).map(([form, target]) => [form, dataKeys(target)]).filter(([, keys]) => keys.length);
     lines.push(`## ${name}`, t.task, "", `- form: ${Object.keys(t.forms).join(" | ")}`,
+      ...(() => { const limits = Object.entries(t.forms).map(([form, target]) => [form, LIMITS[target]]).filter(([, l]) => l);
+        return limits.length ? [`- holds: ${limits.map(([form, l]) => `${form} ${l.min}${l.max ? `-${l.max}` : "+"} ${l.key}`).join("; ")}`] : []; })(),
       ...(data.length ? [`- data: ${[...data.reduce((m, [form, keys]) => m.set(keys.join(", "), [...(m.get(keys.join(", ")) || []), form]), new Map())]
         .map(([keys, forms]) => forms.length === data.length ? keys : `${keys} (${forms.join(", ")})`).join("; ")}`] : []), `- commentary: ${t.commentary.join(" | ")}`, `- exhibits: ${n}` +
       (t.marked ? "; the chart marks its finding (annotation, highlight, reference line or rate)" : "") +

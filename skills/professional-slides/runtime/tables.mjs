@@ -751,6 +751,25 @@ function layoutLegend(id, scale, width, size, gap) {
  * words the widths are left as they are and the measurement fails, naming the
  * word.
  */
+// The inner width a drawn cell cannot go below (the same sums `contentLayout`
+// refuses on), or 0 for a cell of words.
+function minimumDrawnWidth(cell, props = {}) {
+  const gap = v(props.density === "compact" || props.density === "dense" ? "space.1" : "space.2");
+  if (cell.type === "rag") {
+    const state = RAG_STATES[cell.value];
+    return state ? Math.ceil(measure(cell.text || state.label, 100000, true, "type.label").width + 2 * v("space.3")) : 0;
+  }
+  if (cell.type === "lights") return 3 * v("icon.small") + 2 * gap;
+  if (cell.type === "progress") {
+    const value = Number(cell.value);
+    const label = measure(cell.text || `${Math.round(Number.isFinite(value) ? value : 0)}%`, 100000, true, "type.label").width;
+    return Math.ceil(Math.max(label, v("space.6")) + gap + v("space.6"));
+  }
+  if (cell.type === "trend") return v("icon.small") + v("space.2");
+  if (cell.type === "dot" || cell.type === "check") return v("icon.small") + (cell.type === "check" ? v("space.2") : 0);
+  return 0;
+}
+
 function widenForWords(model, widths, props, { padding, textSize, chevronInset }) {
   const longest = (text, bold, size) => Math.max(0, ...String(text ?? "").split(/\s+/).filter(Boolean).map((word) => measure(word, 100000, bold, size).width));
   const need = model.columns.map((column, c) => {
@@ -760,7 +779,18 @@ function widenForWords(model, widths, props, { padding, textSize, chevronInset }
     if (group && model.columns[c - 1]?.group !== column.group && model.columns[c + 1]?.group !== column.group) word = Math.max(word, longest(group, true, textSize));
     for (const row of model.cells) {
       const cell = row[c];
-      if (!cell || cell.blank || !["text", "category", "highlight", "number"].includes(cell.type ?? "text")) continue;
+      if (!cell || cell.blank) continue;
+      // A drawn cell has a width below which it does not exist: a status pill
+      // is its label plus its own padding, three lamps are three lamps. Only
+      // words were reserved, so a status column weighted by "at-risk" (84px
+      // against 444px sentence columns) came out narrower than "At risk" in a
+      // pill, and the table failed "status pill does not fit its column" the
+      // moment an edit lengthened another column - until the author pinned the
+      // column at 150px. The pill's measured width is now reserved before the
+      // rest is shared, like the longest word.
+      const drawn = minimumDrawnWidth(cell, props);
+      if (drawn) { word = Math.max(word, drawn); continue; }
+      if (!["text", "category", "highlight", "number"].includes(cell.type ?? "text")) continue;
       word = Math.max(word, longest(cell.text, cell.bold || cell.type === "category", bodySize(props)));
     }
     return Math.max(column.minWidth ?? v("space.6"), Math.ceil(word) + 2 * padding + 2);
@@ -975,11 +1005,53 @@ export function measureTable({ frame, props }) {
 // Degradation ladder for tables: body → compact → dense before refusing. A table
 // that loses its band height to a shared heading steps its type down one notch
 // rather than failing the page.
+const DENSITY_LADDER = Object.freeze(["body", "compact", "dense"]);
+
+/**
+ * The density a filling table is set at: one type step lighter than asked
+ * when the frame holds the table at that step.
+ *
+ * A findings matrix defaults to compact type, and on a page with nothing else
+ * to hold it the rows were padded out by the stretch cap and a 50px band still
+ * sat between the table and its takeaway. A designer handed that room sets the
+ * table a size up before padding it. Only when the composer chose the density
+ * (`typeStep`), only one step, and only when the whole table fits at it - an
+ * author's density, peer tables with shared rows and a table that is already
+ * at body type keep what they have.
+ */
+function fillDensity({ frame, props }) {
+  const start = props.density ?? "body";
+  const at = DENSITY_LADDER.indexOf(start);
+  if (at <= 0 || props.typeStep !== true || props.fillHeight !== true || props.rowAlignment || props._sharedRowHeights !== undefined || !Number.isFinite(frame.height)) return start;
+  try {
+    measureTable({ frame, props: { ...props, density: DENSITY_LADDER[at - 1], fillHeight: false } });
+    return DENSITY_LADDER[at - 1];
+  } catch {
+    return start;
+  }
+}
+
+/**
+ * The most height a filling table uses: its natural height at the density it
+ * will be set at, plus the capped row growth. Past that it stops, and the page
+ * keeps the rest as its bottom margin rather than a band under the table.
+ */
+export function tableCeiling({ frame, props }) {
+  if (props.fillHeight !== true || props.rowAlignment || props._sharedRowHeights !== undefined || !Number.isFinite(frame.height)) return null;
+  try {
+    return measureTable({ frame, props: { ...props, density: fillDensity({ frame, props }) } }).height;
+  } catch {
+    return null;
+  }
+}
+
 export function renderTable(input) {
   // Peer rows were measured at the authored density; a local fallback would
   // invalidate their shared geometry and silently change only one table.
   if (input.props.rowAlignment) return renderTableAt(input);
-  const ladder = ["body", "compact", "dense"];
+  const ladder = DENSITY_LADDER;
+  const stepped = fillDensity(input);
+  if (stepped !== (input.props.density ?? "body")) input = { ...input, props: { ...input.props, density: stepped } };
   const start = Math.max(0, ladder.indexOf(input.props.density ?? "body"));
   let lastError = null;
   for (let i = start; i < ladder.length; i += 1) {

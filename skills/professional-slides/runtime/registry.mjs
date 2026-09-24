@@ -27,7 +27,7 @@ import { timeGrid, datedLanes, SCHEDULE_TOKENS, SCHEDULE_VARIANTS } from "./sche
 import { registerSegmentedEvidence } from "./segmented-evidence.mjs";
 import { registerMedia } from "./media.mjs";
 import { registerCharts } from "./charts.mjs";
-import { renderTable, measureTable, TABLE_TOKENS } from "./tables.mjs";
+import { renderTable, measureTable, tableCeiling, TABLE_TOKENS } from "./tables.mjs";
 import { fitText, textStyle as baseTextStyle, measuredTextNode } from "./text-style.mjs";
 import { TABLE_VARIANTS } from "./table-fixtures.mjs";
 import { measureText, measureTextRuns, accentRuns } from "./text-layout.mjs";
@@ -836,6 +836,23 @@ function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY,
 }
 
 
+// A process rail is drawn in proportion to its frame (the rail at 48% of the
+// height, 32% on a roadmap), so a tall frame did not add rhythm: it moved the
+// rail down and opened an empty band above it and another under the labels.
+// The frame it can use is held to a quarter more than its sample height, or
+// the height its tallest label needs if that is more (the same sum the render
+// refuses on); past that the page keeps the rest as its bottom margin.
+function processCeiling(frame, props, roadmap = false, sample = roadmap ? 360 : 280) {
+  const items = (props.items || []).map((item) => typeof item === "string" ? { label: item } : item);
+  if (!items.length || !Number.isFinite(frame.width)) return null;
+  const span = frame.width / items.length, inset = tokenValue(token("space.2"));
+  const labelWidth = span - (roadmap ? 20 + 2 * inset : 12);
+  if (labelWidth <= 0) return null;
+  const tallest = Math.max(...items.map((item) => measureText([item.label, item.period, item.maturity, item.detail].filter(value => value !== undefined && value !== null && value !== "").join("\n"), labelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: true }).height));
+  const needed = roadmap ? Math.max(28 / 0.44, (28 + tallest + 2 * inset) / 0.68) : (28 + tallest) / 0.52;
+  return Math.ceil(Math.max(needed + 1, sample * 1.25));
+}
+
 function processNodes({ id, frame, props, roadmap = false, journey = false }) {
   const items = props.items;
   if (!Array.isArray(items) || !items.length) throw new Error(`${id} requires ordered stages`);
@@ -980,18 +997,37 @@ function waveRoadmapLayout(frame, props) {
   }));
   const maximum = key => Math.max(0, ...cells.map(cell => cell[key]?.height ?? 0));
   const rangeHeight = maximum("range"), headingHeight = maximum("heading");
-  const headingTop = rangeHeight ? rangeHeight + tokenValue(token("space.3")) : 0;
-  const railY = headingTop + headingHeight + gap + markerSize / 2;
-  const activitiesTop = railY + markerSize / 2 + gap;
   const activitiesHeight = maximum("activities"), deliverablesHeight = maximum("deliverables");
-  const deliverablesTop = activitiesTop + activitiesHeight + (activitiesHeight && deliverablesHeight ? gap : 0);
-  const height = (deliverablesHeight ? deliverablesTop + deliverablesHeight : activitiesHeight ? activitiesTop + activitiesHeight : railY + markerSize / 2) + inset;
-  return { cells, span, inset, width, markerSize, rangeHeight, headingTop, headingHeight, railY, activitiesTop, deliverablesTop, height };
+  // The room the roadmap can take as rhythm rather than leave as a gap. Drawn
+  // at its natural height at the top of a 406px frame, the Emirates roadmap
+  // left 180px between its last deliverable and the commentary under it. The
+  // stages now open up: most between the rail and the lists and between the
+  // two lists (up to 40px more each, so no gap passes 56px - wider, and the
+  // lists read as separate blocks with a band of nothing between them, which
+  // SCENE_VOID reports past a seventh of the body), less between the heading
+  // and its marker (32px) - a heading that drifts further from its marker
+  // stops labelling it - and least between the date and the heading (8px). Proportionally, so the gaps keep
+  // their relation to one another; past the caps the page keeps the rest as
+  // its bottom margin (`ceilingSize` in core).
+  const slots = { range: rangeHeight ? tokenValue(token("space.2")) : 0, heading: 32, activities: activitiesHeight || deliverablesHeight ? 40 : 0, deliverables: activitiesHeight && deliverablesHeight ? 40 : 0 };
+  const growth = Object.values(slots).reduce((sum, value) => sum + value, 0);
+  const natural = (spare) => {
+    const share = (key) => growth ? slots[key] * spare / growth : 0;
+    const headingTop = rangeHeight ? rangeHeight + tokenValue(token("space.3")) + share("range") : 0;
+    const railY = headingTop + headingHeight + gap + share("heading") + markerSize / 2;
+    const activitiesTop = railY + markerSize / 2 + gap + share("activities");
+    const deliverablesTop = activitiesTop + activitiesHeight + (activitiesHeight && deliverablesHeight ? gap + share("deliverables") : 0);
+    const height = (deliverablesHeight ? deliverablesTop + deliverablesHeight : activitiesHeight ? activitiesTop + activitiesHeight : railY + markerSize / 2) + inset;
+    return { headingTop, railY, activitiesTop, deliverablesTop, height };
+  };
+  const base = natural(0);
+  const spare = Number.isFinite(frame.height) ? Math.max(0, Math.min(growth, frame.height - base.height)) : 0;
+  return { cells, span, inset, width, markerSize, rangeHeight, headingHeight, ...natural(spare), naturalHeight: base.height, ceiling: base.height + growth };
 }
 
 function waveRoadmapNodes({ id, frame, props }) {
   const layout = waveRoadmapLayout(frame, props);
-  if (layout.height > frame.height) throw new Error(`Roadmap ${id} complete activity and deliverable rows need ${layout.height.toFixed(1)}px, but only ${frame.height}px is allocated; widen, regroup or split the stages`);
+  if (layout.height > frame.height + 0.01) throw new Error(`Roadmap ${id} complete activity and deliverable rows need ${layout.height.toFixed(1)}px, but only ${frame.height}px is allocated; widen, regroup or split the stages`);
   const railY = frame.y + layout.railY;
   const nodes = [openLine(stableId(id, "rail"), frame.x, railY, frame.x + frame.width, railY, "roadmap-rail", RULE, STANDARD, { endArrow: true })];
   layout.cells.forEach((cell, index) => {
@@ -1726,6 +1762,7 @@ function registerCore(registry) {
       };
       definition.render = input => renderTable({...input,props:normalize(input.props)});
       definition.measureContent = input => measureTable({...input,props:normalize(input.props)});
+      definition.measureCeiling = input => tableCeiling({...input,props:normalize(input.props)});
       definition.measureHeader = ({ frame, props = {} }) => {
         if (props.headerShape === "chevron") return null;
         const measured = measureTable({ frame: { ...frame, height: Infinity }, props: { ...normalize(props), fillHeight: false, headerBandHeight: undefined } });
@@ -1759,6 +1796,7 @@ function registerCore(registry) {
       const render = definition.render;
       definition.render = input => { definition.resolveVariant(input.props); return render(input); };
     }
+    if (definition.id === "process") definition.measureCeiling = ({ frame, props }) => processCeiling(frame, props, false, definition.preferredSize.height);
     if (definition.id === "timeline") {
       definition.version = "2.2.0";
       definition.tokens = [...new Set([...definition.tokens, ...SCHEDULE_TOKENS])];
@@ -1776,6 +1814,12 @@ function registerCore(registry) {
       const schedule = input => definition.resolveVariant(input.props) === "phase-hierarchy" ? renderPhaseHierarchy(input) : definition.resolveVariant(input.props) === "time-grid" ? timeGrid(input) : datedLanes(input);
       definition.render = input => definition.resolveVariant(input.props) === "process" ? render(input) : schedule(input);
       definition.measureIntrinsic = input => definition.resolveVariant(input.props) === "process" ? null : schedule({ ...input, id: input.id ?? "measure", frame: { ...input.frame, height: input.frame.height ?? Number.MAX_SAFE_INTEGER } });
+      // A dated schedule is drawn at its natural height from the top of its
+      // frame, so the frame beyond that height was a gap before the
+      // commentary; the process variant keeps its proportional ceiling.
+      definition.measureCeiling = input => definition.resolveVariant(input.props) === "process"
+        ? processCeiling(input.frame, input.props, false, 250)
+        : schedule({ ...input, id: "ceiling", frame: { ...input.frame, height: Number.MAX_SAFE_INTEGER } }).height;
     }
     if (definition.id === "funnel") {
       definition.version = "2.0.0";
@@ -1798,7 +1842,8 @@ function registerCore(registry) {
       definition.resolveVariant = props => props?.variant === "phase-workstreams" ? "phase-workstreams" : priorResolve(props);
       const priorRender = definition.render;
       definition.render = input => definition.resolveVariant(input.props) === "phase-workstreams" ? renderPhaseWorkstreams(input) : priorRender(input);
-      definition.measureIntrinsic = ({ frame, props }) => definition.resolveVariant(props) === "phase-workstreams" ? measurePhaseWorkstreams({frame,props}) : definition.resolveVariant(props) === "wave-columns" ? waveRoadmapLayout(frame, props) : null;
+      definition.measureIntrinsic = ({ frame, props }) => definition.resolveVariant(props) === "phase-workstreams" ? measurePhaseWorkstreams({frame,props}) : definition.resolveVariant(props) === "wave-columns" ? { height: waveRoadmapLayout({ ...frame, height: undefined }, props).naturalHeight } : null;
+      definition.measureCeiling = ({ frame, props }) => definition.resolveVariant(props) === "wave-columns" ? waveRoadmapLayout({ ...frame, height: undefined }, props).ceiling : definition.resolveVariant(props) === "process" ? processCeiling(frame, props, true) : null;
     }
     if (definition.id === "bullet-list") {
       definition.tokens.push("type.body", "space.2", "space.4", ...MARK_TOKENS, "color.positive", "color.negative");

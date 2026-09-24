@@ -4,6 +4,7 @@
 //   node runtime/author-deck.mjs --types                 the page-type catalogue, as the author reads it
 //   node runtime/author-deck.mjs --schema                the JSON Schema for a pages file
 //   node runtime/author-deck.mjs --example <type>        the worked example page(s) of a type
+//   node runtime/author-deck.mjs <id>.pages.json --log   what the author runs so far found, and what recurred
 //   node runtime/author-deck.mjs <id>.pages.json         compile to <id>.deck.json and <id>.plan.json
 //   node runtime/author-deck.mjs <id>.pages.json --check compile and gate, write nothing
 //   node runtime/author-deck.mjs <id>.pages.json --draft the title spine and page types only: the content plan's
@@ -112,12 +113,18 @@ export function sceneGateFindings(deck, python = process.env.RUNTIME_PYTHON || "
     const scene = path.join(dir, "scene.json"), out = path.join(dir, "gates.json");
     writeFileSync(scene, JSON.stringify(deck));
     const run = spawnSync(python, [fileURLToPath(new URL("./gates/page_gates.py", import.meta.url)), scene, "--report", out], { encoding: "utf8" });
-    if (run.error || ![0, 2].includes(run.status)) return { findings: [], advisories: [], ran: false };
+    if (run.error || ![0, 2].includes(run.status)) return { findings: [], advisories: [], budget: [], ran: false };
     const report = JSON.parse(readFileSync(out, "utf8"));
     const withId = (f) => { const slide = f.slide ? deck.slides[f.slide - 1] : null; return { ...f, id: slide ? slide.sourceSlideId ?? slide.id : undefined }; };
+    // Each page's budget as the build measures it: words against its floor and
+    // ceiling, the footer's share, how much of the body it fills. Printed before
+    // the author edits, so a fix does not push the page across a line unseen.
+    const budgetOut = path.join(dir, "budget.json");
+    const budgetRun = spawnSync(python, [fileURLToPath(new URL("./gates/page_gates.py", import.meta.url)), scene, "--budget", "--report", budgetOut], { encoding: "utf8" });
+    const budget = !budgetRun.error && [0, 2].includes(budgetRun.status) ? (() => { try { const b = JSON.parse(readFileSync(budgetOut, "utf8")); return Array.isArray(b) ? b : b.budget ?? b.pages ?? []; } catch { return []; } })() : [];
     // Advisories are listed in the summary: a thin page the build will note
     // should be seen by the author first.
-    return { ran: true, findings: (report.findings || []).filter((f) => f.severity === "blocker").map(withId),
+    return { ran: true, budget, findings: (report.findings || []).filter((f) => f.severity === "blocker").map(withId),
       advisories: (report.findings || []).filter((f) => f.severity !== "blocker" && f.slide).map(withId) };
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
@@ -133,7 +140,7 @@ export async function authorDeck(doc, { baseDir, insights = null, draft = false 
   // A draft has no copy yet, so the page gates - words, tables, footers - are
   // reported there, not enforced; the structure rules hold either way.
   return { spec, deck: composed.deck, failedIds, findings: [...failed, ...varietyFindings(spec, { structureOf }), ...(draft ? [] : scene.findings)],
-    pageGateAdvisories: [...(draft ? scene.findings : []), ...scene.advisories], pageGatesRan: scene.ran };
+    pageGateAdvisories: [...(draft ? scene.findings : []), ...scene.advisories], pageGatesRan: scene.ran, budget: scene.budget ?? [] };
 }
 
 /** The plan record (plan_gates.mjs) implied by the compiled deck. */
@@ -182,13 +189,36 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const doc = JSON.parse(await fs.readFile(path.resolve(file), "utf8"));
   const dir = path.dirname(path.resolve(file));
   const stem = doc.deck?.id ?? path.basename(file).replace(/\.pages\.json$/, "");
+  // Every run is logged beside the pages file. A finding that comes back run
+  // after run is the cost this tool exists to cut: it names a limit the author
+  // could not see or a message that did not say what to do, and belongs in the
+  // skill as a published budget or a better check (taste-review.md).
+  const logPath = path.join(dir, `${stem}.author-log.jsonl`);
+  const runs = (await fs.readFile(logPath, "utf8").catch(() => "")).split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  if (args.includes("--log")) {
+    const seen = new Map();
+    for (const run of runs) for (const f of run.findings) { const key = `${f.code}${f.id ? ` [${f.id}]` : ""}`; seen.set(key, (seen.get(key) || 0) + 1); }
+    console.log(JSON.stringify({ runs: runs.length, clean: runs.filter((r) => r.ok).length, recurring: Object.fromEntries([...seen].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1])) }, null, 1));
+    process.exit(0);
+  }
+  const log = async (entry) => fs.appendFile(logPath, JSON.stringify({ at: new Date().toISOString(), run: runs.length + 1, mode: args.includes("--draft") ? "draft" : "full", ...entry }) + "\n");
   // One run reports everything: every page that cannot compile or compose,
   // then every rule of the variety contract and of the content plan the deck
   // breaks. The author fixes them together and runs it again.
   let compiled;
   try { compiled = await authorDeck(doc, { baseDir: dir, insights: await readInsights(dir, stem), draft: args.includes("--draft") }); }
-  catch (error) { console.error(error.message); process.exit(2); }
-  const { spec, deck, findings, pageGateAdvisories = [], failedIds = new Set() } = compiled;
+  catch (error) {
+    await log({ ok: false, findings: (error.pageErrors ?? [error.message]).map((message) => ({ code: "COMPILE", id: message.split(":")[0] })) });
+    console.error(error.message); process.exit(2);
+  }
+  const { spec, deck, findings, pageGateAdvisories = [], failedIds = new Set(), budget = [] } = compiled;
+  // One line per analytical page: body words against floor and ceiling, the
+  // footer's share, and how full the body is; "!" marks a line to act on.
+  const ledger = budget.filter((b) => b.floor).map((b) => {
+    const flag = b.body < b.floor || (b.ceiling && b.body > b.ceiling) || (b.footerRatio ?? 0) > 0.3 ? "! " : "  ";
+    return `${flag}${String(b.id ?? b.slide).padEnd(6)} ${String(b.readingTask ?? "").padEnd(24)} ${b.body} words (floor ${Math.round(b.floor)}${b.ceiling ? `, ceiling ${b.ceiling}` : ""})` +
+      `${b.footer ? `, footer ${Math.round((b.footerRatio ?? 0) * 100)}%` : ""}${b.occupied !== undefined ? `, fills ${Math.round(b.occupied * 100)}%` : ""}`;
+  });
   const content = deriveContent(spec, deck);
   // A page that did not compose has no text to plan; its composition error is its finding.
   const contentReport = runContentGates({ ...content, pages: content.pages.filter((p) => !failedIds.has(p.id)) }, { required: true });
@@ -197,8 +227,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const draft = args.includes("--draft");
   const WORDS = new Set(["TEXT_COVERAGE_LOW", "TEXT_PLAN_INCOMPLETE"]);
   const blocking = [...findings, ...(contentReport.findings || []).filter((f) => (f.severity === "blocker" || f.severity === "blocking") && !(draft && WORDS.has(f.code)))];
+  await log({ ok: !blocking.length, findings: blocking.map((f) => ({ code: f.code, ...(f.id ?? f.page ? { id: String(f.id ?? f.page) } : {}) })) });
   if (blocking.length) {
-    console.error(`The deck is not ready; nothing was written. ${blocking.length} finding${blocking.length === 1 ? "" : "s"} to fix in ${path.basename(file)}:\n${report(blocking)}`);
+    console.error(`The deck is not ready; nothing was written. ${blocking.length} finding${blocking.length === 1 ? "" : "s"} to fix in ${path.basename(file)}:\n${report(blocking)}${ledger.length ? `\n\nPage budgets:\n${ledger.join("\n")}` : ""}`);
     process.exit(2);
   }
   const typed = spec.slides.filter((s) => s.pageType);
@@ -208,6 +239,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       .map((f) => `${f.code}${f.id ? ` [${f.id}]` : ""}`)
       .concat(typed.flatMap((s) => (s.pageType.advisories || []).map((a) => `${a.split(":")[0]} [${s.id}]: ${a.slice(a.indexOf(":") + 2)}`))) };
   if (draft) content.textContract = "draft";
+  if (ledger.length && (args.includes("--check") || draft)) console.error(`Page budgets:\n${ledger.join("\n")}\n`);
   if (args.includes("--check")) { console.log(JSON.stringify({ ok: true, ...summary }, null, 1)); process.exit(0); }
   await fs.writeFile(path.join(dir, `${stem}.deck.json`), JSON.stringify(spec, null, 1) + "\n");
   await fs.writeFile(path.join(dir, `${stem}.plan.json`), JSON.stringify(planOf(spec), null, 1) + "\n");

@@ -31,7 +31,7 @@ import { measureText, accentRuns } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { measureTable } from "./tables.mjs";
-import { resolveWeight, normalizeWeight, PICTURE_SHARE_MAX } from "./weight.mjs";
+import { resolveWeight, normalizeWeight } from "./weight.mjs";
 import { groupThousands } from "./draw.mjs";
 
 const V3 = "professional-slides.deck/v3";
@@ -210,8 +210,9 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
       items: [panel, { id: `${id}-caption`, component: "insight", props: { text: caption.trim(), variant: "neutral", align: "center" },
         size: captionHeight ? { width: { fr: 1 }, height: captionHeight } : HUG }] };
   }
+  const typeStep = exIn?._typeStep === true && size.height === "fill";
   const ex = tableAlias(exIn);
-  const { type, layout: _l, ...rest } = ex;
+  const { type, layout: _l, _typeStep: _t, _densityChosen: _d, ...rest } = ex;
   if (type === "image") return { id, component: "image-frame", props: { ...imageProps(ex.path ? ex : ex.image, baseDir), ...(ex.fit ? { fit: ex.fit } : {}) }, size };
   if (type === "cards" || type === "quadrants") {
     const { centre, ...sz } = size;
@@ -249,7 +250,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
   if (type === "swot") return { id, component: "quadrants", props: { quadrants: ["Strengths", "Weaknesses", "Opportunities", "Threats"].map((title, i) => ({ title, points: [rest.strengths, rest.weaknesses, rest.opportunities, rest.threats][i] || [] })) }, size };
   if (type === "table") {
     const styled = styleTable(rest);
-    return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
+    return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(typeStep ? { typeStep: true } : {}), ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
   }
   // The other table renderers reach the page by their component id rather than
   // through the `table` alias, and used to lose the one thing the alias does
@@ -1119,7 +1120,9 @@ export function paginateTable(slide, bodyScale = 1) {
   // rows rather than splitting them. `density` on the exhibit still wins.
   const ladder = ex.density === undefined ? ["body", "compact", "dense"] : [ex.density];
   const fits = ladder.find((density) => heightAt(density) <= available);
-  if (fits) return [fits === "body" || fits === ex.density ? slide : { ...slide, exhibit: { ...ex, density: fits } }];
+  // `_densityChosen`: the estimate picked this step, not the author, so the
+  // page may still set it a step up if the real frame holds it.
+  if (fits) return [fits === "body" || fits === ex.density ? slide : { ...slide, exhibit: { ...ex, density: fits, _densityChosen: true } }];
   const densest = ladder[ladder.length - 1];
   const perRow = Math.max(20, heightAt(densest) / Math.max(1, ex.rows.length));
   const rowsPerPage = Math.max(3, Math.floor(available / perRow));
@@ -1278,33 +1281,6 @@ function pictureCards(pictures, id, size) {
   return { id, component: "cards", props: { items, tone: "plain", valign: "middle" }, size };
 }
 
-/**
- * The share of the body a picture page is assumed to hand its photographs, for
- * the plan-time word floor.
- *
- * The rendered gate measures what the page actually drew; this is the estimate
- * before there is a page to measure. It is deliberately the low end - the band
- * takes the leftover height, so the real share is usually larger - which makes
- * the plan-time floor the stricter of the two. That is the right way round: an
- * author who acts on the plan-time message has acted on the rendered one too.
- * `beside` is the older `photo` strip on a page that also carries an exhibit: a
- * quarter of the row, not half the page.
- */
-const PICTURE_BAND = Object.freeze({ pair: 0.46, strip: 0.38, hero: 0.45, beside: 0.25 });
-
-function planPictureShare(slide) {
-  const n = pictureCount(slide);
-  if (n) {
-    if (n === 1) return Math.min(PICTURE_BAND.hero, PICTURE_SHARE_MAX);
-    // Pictures with nothing said about them fill the body: the page is the
-    // photographs, and the floor is capped rather than computed.
-    const described = slide.pictures.some((p) => p && typeof p === "object" && (p.label || p.text));
-    if (!described) return PICTURE_SHARE_MAX;
-    return Math.min(n === 2 ? PICTURE_BAND.pair : PICTURE_BAND.strip, PICTURE_SHARE_MAX);
-  }
-  if (slide.photo) return Math.min(slide.exhibit || slide.exhibits ? PICTURE_BAND.beside : PICTURE_BAND.hero, PICTURE_SHARE_MAX);
-  return 0;
-}
 
 // The body frame a content page lays out into, and the furniture between its
 // columns: used to measure a side column against what it holds before the
@@ -2679,7 +2655,14 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   const columnPoints = slide.points;
   const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints) : null;
   if (pointsStyle && Array.isArray(recentStyles)) recentStyles.unshift(pointsStyle);
-  const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
+  const exhibits = [...(slide.exhibits || (slide.exhibit ? [slide.exhibit] : []))];
+  // A lone table whose density the composer chose (a findings matrix defaults
+  // to compact, pagination picks the lightest step its estimate fits) may be
+  // set a type step up when its frame holds it (`fillDensity` in tables.mjs).
+  // An author's density is kept, and so are peer tables, which must share one
+  // type size, and the pages of a split table, which must match each other.
+  if (exhibits.length === 1 && ["table", "rows", "compare", "phase-table"].includes(exhibits[0]?.type) && ["exhibit-full", "metrics-over-exhibit", "exhibit-top", "exhibit-left", "exhibit-right"].includes(layout)
+      && (exhibits[0]?.density === undefined || exhibits[0]?._densityChosen === true)) exhibits[0] = { ...exhibits[0], _typeStep: true };
   const items = [];
   // Explicit layouts must preserve their author's commentary too. Side-only
   // fields cannot be silently dropped by a layout that has no side track.
@@ -3244,133 +3227,3 @@ export function toDeckPlan(specIn, baseDir) {
   throw new Error("Spec must be professional-slides.deck/v3 or carry a deckPlan");
 }
 
-/**
- * The page budget, read from the spec before anything is laid out.
- *
- * A gate that fires on a rendered page tells the author their page is thin; it
- * cannot tell them what to do about it, because by then the data is a scene. At
- * plan time the data is still data, so the budget can name the remedy: this
- * chart carries five of the nine categories you supplied, this table has no
- * derived column, this page carries one evidence element where the deck's
- * weight asks for two.
- *
- * Returns findings in the page-gates shape, so preflight prints them beside the
- * story gates. `THIN_PLAN` is the estimate; `THIN_PAGE` remains the measurement.
- */
-const PLAN_WORD = (value) => (typeof value === "string" ? value.trim().split(/\s+/).filter(Boolean).length : 0);
-
-// The keys that name a thing rather than say something: an id, a type, a file,
-// a colour. Everything else an exhibit holds is words on the page.
-const NOT_PROSE = new Set(["id", "type", "kind", "icon", "path", "image", "src", "component", "variant",
-  "tone", "style", "surface", "palette", "scale", "scales", "colour", "color", "layout", "shape", "fit",
-  "align", "valign", "density", "treatment", "orientation", "position", "placement", "series", "unit"]);
-function deepWords(value, depth = 0) {
-  if (depth > 6 || value == null) return 0;
-  if (typeof value === "string") return PLAN_WORD(value);
-  if (Array.isArray(value)) return value.reduce((sum, entry) => sum + deepWords(entry, depth + 1), 0);
-  if (typeof value !== "object") return 0;
-  let words = 0;
-  for (const [key, entry] of Object.entries(value)) {
-    if (NOT_PROSE.has(key) || /(Style|Color|Colour|Id)$/.test(key)) continue;
-    words += deepWords(entry, depth + 1);
-  }
-  return words;
-}
-
-function planWords(slide) {
-  let words = 0;
-  const text = (value) => { words += PLAN_WORD(value); };
-  const point = (item) => { if (typeof item === "string") text(item); else if (item && typeof item === "object") { text(item.lead); text(item.text); } };
-  (slide.points || []).forEach(point);
-  (Array.isArray(slide.insights) ? slide.insights : slide.insight ? [slide.insight] : []).forEach((entry) => { if (typeof entry === "string") text(entry); else if (entry) { text(entry.heading); text(entry.text); } });
-  text(slide.soWhat);
-  text(slide.subtitle);
-  if (slide.callout) { text(typeof slide.callout === "string" ? slide.callout : `${slide.callout.lead || ""} ${slide.callout.text || ""}`); }
-  if (slide.kpi) { text(slide.kpi.value); text(slide.kpi.label); text(slide.kpi.sublabel); }
-  (slide.metrics || []).forEach((metric) => { text(metric.value); text(metric.label); text(metric.sublabel); text(metric.delta); });
-  const rowsOf = (rows) => (rows || []).forEach((row) => {
-    if (Array.isArray(row)) { row.forEach((cell) => text(typeof cell === "string" ? cell : cell?.text ?? cell?.value)); return; }
-    text(row.label);
-    text(row.text);
-    (row.points || []).forEach(point);
-    (row.cells || []).forEach((cell) => {
-      if (typeof cell === "string") { text(cell); return; }
-      if (Array.isArray(cell)) { cell.forEach(point); return; }
-      if (!cell) return;
-      text(cell.text); text(cell.lead);
-      (cell.points || cell.items || []).forEach(point);
-    });
-  });
-  rowsOf(slide.rows);
-  (slide.pictures || []).forEach((picture) => { if (picture && typeof picture === "object") { text(picture.label); text(picture.text); (picture.points || []).forEach(point); } });
-  (slide.columns || []).forEach((column) => text(typeof column === "string" ? column : column?.label));
-  (slide.paragraphs || []).forEach(text);
-  text(slide.text);
-  if (slide.panel && typeof slide.panel === "object") { text(slide.panel.kicker); text(slide.panel.text); }
-  // The exhibit is walked rather than enumerated. Enumerating the fields meant
-  // reading `items` and `rows` and nothing else, so a page of quadrants, a
-  // framework of pillars, a compare of two columns and a tree of nodes each
-  // counted as zero words and were reported as thin while carrying a hundred
-  // - which taught an author to distrust the gate rather than the page.
-  for (const exhibit of [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean)) {
-    (exhibit.series || []).forEach((series) => { words += (series.values || []).length; });
-    words += deepWords(exhibit);
-  }
-  return words;
-}
-
-/** Prompts for checking completeness; never instructions to pad a short page. */
-function planRemedies(slide) {
-  const exhibits = [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean);
-  const out = ["check whether the claim has all necessary proof and compare its strongest merger alternative"];
-  if (exhibits.some(ex => String(ex.type || "").startsWith("chart.")))
-    out.push("retain the needed population, period and local comparator once; do not duplicate the plot as a table");
-  if (exhibits.some(ex => ex.type === "table" || ex.type === "rows"))
-    out.push("keep a complete lookup compact; add a row or derived field only when it answers a missing question");
-  if ((slide.points || []).length)
-    out.push("remove restatement and develop only the consequence or mechanism the evidence does not already show");
-  return out;
-}
-
-export function budgetFindings(spec) {
-  if (!isV3(spec) || !Array.isArray(spec.slides)) return [];
-  return [...layoutPinnedFindings(spec), ...pageBudgetFindings(spec)];
-}
-
-/**
- * A plan that names a layout on most of its pages decides every page's shape
- * by habit: two runs of one brief came out with 31 of 43 pages in the same
- * two shapes. Named layouts are for the page that needs one construction;
- * the rest are left to the chooser, which picks among the shapes that fit and
- * spreads them by the deck's `variation`.
- */
-function layoutPinnedFindings(spec) {
-  const content = spec.slides.filter((slide) => (!slide.kind || slide.kind === "content") && slide.title);
-  // A page compiled from a page type names its layout because its choices did.
-  const pinned = content.filter((slide) => slide.layout && slide.layout !== "auto" && !slide.pageType);
-  if (content.length < 8 || pinned.length / content.length <= 0.5) return [];
-  return [{ slide: null, code: "LAYOUT_PINNED", severity: "advisory", measured: Math.round(pinned.length / content.length * 100) / 100, threshold: 0.5,
-    repair: `${pinned.length} of ${content.length} content pages name a layout. Leave layout unset where the page does not need one construction; the chooser picks among the shapes that fit and the deck's variation spreads them.` }];
-}
-
-function pageBudgetFindings(spec) {
-  const weight = resolveWeight(spec, resolveFill(spec));
-  const floor = weight.pageWords || 0;
-  if (floor <= 0) return [];
-  const out = [];
-  spec.slides.forEach((slide, index) => {
-    if (slide.kind && slide.kind !== "content") return;                 // covers, dividers, statements, takeaways
-    if (!slide.title) return;
-    const estimate = planWords(slide);
-    // The picture takes the body the type would have filled, so the floor
-    // follows it here exactly as it does on the rendered page.
-    const pageFloor = Math.round(floor * (1 - planPictureShare(slide)));
-    if (pageFloor <= 0 || estimate >= pageFloor) return;
-    const remedies = planRemedies(slide);
-    out.push({
-      slide: index + 1, code: "THIN_PLAN", severity: "advisory", measured: estimate, threshold: pageFloor,
-      repair: `This page plans ${estimate} body words against a diagnostic reference of ${pageFloor}. Review completeness: ${remedies.slice(0, 3).join("; ")}. A complete short page is valid.`,
-    });
-  });
-  return out;
-}

@@ -263,7 +263,11 @@
   {
    "id": "p05",
    "title": "Northvale sits mid-table on journeys per route-km, 27% below the leading peer",
-   "highlight": "27% below Westmoor",
+   "highlight": [
+    "27% below Westmoor",
+    "The gap is off-peak",
+    "7 m"
+   ],
    "exhibit": {
     "heading": "Journeys per route-km, FY26",
     "unit": "thousand",
@@ -341,7 +345,11 @@
   {
    "id": "p06",
    "title": "Leisure is two thirds of off-peak travel but only a seventh of the peak",
-   "highlight": "a leisure product",
+   "highlight": [
+    "a leisure product",
+    "68%",
+    "Leisure is discretionary"
+   ],
    "exhibit": {
     "heading": "Journeys by purpose and time band, FY26",
     "unit": "% of journeys",
@@ -429,7 +437,11 @@
   {
    "id": "p07",
    "title": "Half-hourly off-peak stations grew off-peak journeys 3.7 times as fast as hourly ones",
-   "highlight": "16.5% on average",
+   "highlight": [
+    "16.5% on average",
+    "2",
+    "30 trains"
+   ],
    "exhibit": {
     "heading": "Off-peak service against off-peak journey growth, FY23-FY26",
     "xLabel": "Off-peak trains per weekday",
@@ -716,7 +728,11 @@
   {
    "id": "p10",
    "title": "Each peak train added to the Eastern line has cost a point of punctuality",
-   "highlight": "costs no punctuality",
+   "highlight": [
+    "costs no punctuality",
+    "22",
+    "Off-peak trains share"
+   ],
    "exhibits": [
     {
      "type": "chart.column",
@@ -807,7 +823,11 @@
   {
    "id": "p11",
    "title": "Frequency drives a loop: shorter waits win leisure trips that fund the next train",
-   "highlight": "twice as often as the fare",
+   "highlight": [
+    "twice as often as the fare",
+    "26 m",
+    "Where the loop breaks"
+   ],
    "exhibit": {
     "items": [
      {
@@ -1290,7 +1310,12 @@
   {
    "id": "p18",
    "title": "London and Manchester send three in five of the visitors from beyond the network",
-   "highlight": "1.46 million of the 2.45 million",
+   "highlight": [
+    "1.46 million of the 2.45 million",
+    "Leeds is the gateway",
+    "31 m",
+    "0.8 m"
+   ],
    "exhibit": {
     "type": "map",
     "geography": "country:GBR",
@@ -1414,6 +1439,9 @@
     "takeaway": false,
     "why": "Where the visitors come from is the claim, so the origin cities are drawn on the map, sized by the journeys they send, with their routes into Leeds",
     "family": "exhibit",
+    "advisories": [
+     "MAP_COARSE: the markers span 4.1 degrees; the built-in 1:110m coastline is coarse at that scale - import a 1:10m or 1:50m geography (runtime/import-geography.mjs) and pass it as `geography`"
+    ],
     "content": {
      "claim": "London and Manchester send three in five of the visitors from beyond the network",
      "settles": {
@@ -1428,7 +1456,11 @@
   {
    "id": "p19",
    "title": "The plan adds 11.7 million journeys a year by FY31, mostly after electrification",
-   "highlight": "Six of the 11.7 million journeys",
+   "highlight": [
+    "Six of the 11.7 million journeys",
+    "2.7% a year",
+    "29"
+   ],
    "kpi": {
     "value": "+11.7m",
     "label": "journeys a year by FY31",
@@ -1737,7 +1769,10 @@
   {
    "id": "p23",
    "title": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
-   "highlight": "about 1.9 million FY31 journeys",
+   "highlight": [
+    "about 1.9 million FY31 journeys",
+    "5.1 m"
+   ],
    "exhibit": {
     "periods": [
      "H1 27",
@@ -1916,7 +1951,11 @@
   {
    "id": "p25",
    "title": "Two of seven 2027 milestones are at risk, both on the electrification path",
-   "highlight": "six weeks late",
+   "highlight": [
+    "six weeks late",
+    "What recovers them",
+    "5.1 m"
+   ],
    "exhibit": {
     "columns": [
      "Milestone",

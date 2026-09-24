@@ -266,6 +266,13 @@ export function runContentGates(content, options = {}) {
     const carried = Math.max(0, ...claims.map((c) => overlap(answer, c)));
     if (coverage < CONTENT_THRESHOLDS.answerCoverageMin || carried < CONTENT_THRESHOLDS.answerCarriedMin) {
       const missing = [...answerWords].filter((w) => !union.has(w));
+      // Where to say it, and how close the deck already is: the executive
+      // summary's title (the first analytical page) is where a deck states its
+      // answer. Naming it saved an author three rounds of guessing which title
+      // the rule wanted.
+      const best = pages.map((p) => ({ id: p.id ?? p.n, claim: String(p.claim ?? ""), score: overlap(answer, String(p.claim ?? "")) })).sort((a, b) => b.score - a.score)[0];
+      const opener = pages.find((p) => p.role !== "structural" && !p.kind);
+      const where = ` State it in the title of ${opener ? `\`${opener.id ?? opener.n}\` (the opening page)` : "the opening page"}; the closest title now is ${best ? `\`${best.id}\`: "${best.claim.slice(0, 90)}"` : "none"}.`;
       findings.push(finding(null, "CONTENT_ANSWER_UNCARRIED",
         { coverage: round(coverage), carried: round(carried), unclaimed: missing.slice(0, 8) },
         { coverage: CONTENT_THRESHOLDS.answerCoverageMin, carried: CONTENT_THRESHOLDS.answerCarriedMin },
@@ -273,10 +280,10 @@ export function runContentGates(content, options = {}) {
           ? "The answer promises something no page proves. Either a page has to claim it - "
             + `nothing in this deck claims ${missing.slice(0, 4).map((w) => `"${w}"`).join(", ")} - `
             + "or the answer is wider than the evidence and should be narrowed to what the "
-            + "deck can actually settle."
+            + "deck can actually settle." + where
           : "No single page states the answer. The claims between them cover it, which means "
             + "the reader can assemble it - but a deck leads with its answer rather than "
-            + "leaving it to be inferred from twenty pages. Write the page that says it."));
+            + "leaving it to be inferred from twenty pages. Write the page that says it." + where));
     }
     const against = contradictions(answer, pages);
     if (against.length) {

@@ -29,12 +29,13 @@ Measured on the rendered page before review. The report records severity. `runti
 | Opening summary | `NO_SUMMARY` | the first analytical page declares `role: "executive-summary"` before the first section; the shape preset is optional and metrics do not establish the role |
 | Body text floor | `THIN_PAGE` | the deck's `weight.pageWords`, counted in the body alone (95 balanced, 120 full); a typical well-made page carries 128 body words |
 | Notes carrying the page | `NOTE_HEAVY` | the footer stays under a third of the page's text |
-| Plan-time shortfall | `THIN_PLAN` | preflight: what the page will carry against the floor, with the remedy its own data offers |
 | Chart annotation | `UNANNOTATED` | a bracket, a flag, a change bubble, a base or an observation on any plot of three marks or more |
 | Page architecture | `PAGE_SHAPE_FLAT` | at least three distinct evidence relationships per ten analytical pages, none past 40%. Chart/table above two or three commentary columns, with or without an insight strip, counts once; mirrored arrangements also count once. The finding reports `constrainedPages` to locate evidence that needs redesign. Change the relationship when the argument warrants it; adding commentary or furniture does not create a new architecture |
 | Commentary column | `COLUMN_MONOTONY` | at most three consecutive pages marked with the same device (icon, numbered disc, hairline, prose) |
 | Deck shape | `DECK_FLAT` | past eight analytical pages, one page carries the detail: 282+ words, or a p80 a third above the median |
 | Thin pages | `DECK_THIN_PAGES` | blocks when 30% or more of 12+ content pages (and at least five) carry a thin or half-empty page finding |
+| Half-empty body, from the scene | `SCENE_VOID` | no band inside the content deeper than 13% of the content frame, none above or below it deeper than 30%; card and panel interiors read by what they hold; runs at authoring, no render needed |
+| Half-empty pages across the deck | `DECK_SCENE_VOID` | blocks when 30% or more of 12+ content pages (and at least five) carry `SCENE_VOID` |
 | Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |
 | Marks in the exhibit | `PLOT_SPAN` | marks span `weight.plotSpan` of the exhibit frame (annotated and peer-aligned charts exempt) |
 | Table against its budget | `THIN_TABLE` | uses `weight.tableFill` of the page's row budget |
@@ -60,7 +61,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | What the deck draws, by device family | `DECK_VOCABULARY` | advisory: at least four of ten device families (icon, picture, score, value pill, in-cell bar, heat, state, growth, reference, annotation) drawn somewhere in a deck of twelve analytical pages or more. A vocabulary floor, not a target rate: what share of pages carry a harvey ball cannot be read off a render. Measured on the composed scene, because a plan can record a treatment the page never draws |
 | What the deck does, page after page | `DECK_CRAFT` | advisory legacy screen: a phrase emphasised on at least 35% of pages (well-made decks run 51%), a source on at least 50% (they run 67%), at least 11 drawn elements a page (the typical median is 32), no single table device on more than 60% of the tables, and a drawn mark in the gutter between an exhibit and its commentary on no more than 40% of the pages that pair the two - well-made decks state that relation in words far more often than they draw it. These counts never require decoration |
 
-Two more findings share the shape but fire before the page is rendered, from the composer rather than the gates: `THIN_PLAN` (what the page will carry against its floor, with the remedy that page's own data offers) and `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
+One more finding shares the shape but fires before the page is rendered, from the composer rather than the gates: `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
 
 `page_gates.GATE_CODES` is the list this table is checked against — a code cannot be renamed in the gates without this table failing, and a gate cannot emit a code that is not in it.
 
