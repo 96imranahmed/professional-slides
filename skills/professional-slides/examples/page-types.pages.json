@@ -125,7 +125,7 @@
       "name": "Journeys",
       "values": [
        47.2,
-       49.0,
+       49,
        51.8,
        52.4,
        14.9,
@@ -155,6 +155,118 @@
     ]
    },
    "source": "Source: illustrative data for a fictional operator; financial years ending March"
+  },
+  {
+   "id": "p03b",
+   "type": "trend",
+   "form": "indexed",
+   "commentary": "rail",
+   "takeaway": false,
+   "why": "Whether the stall is Northvale's or the market's is settled by setting its recovery against every peer's from the same base year",
+   "settles": {
+    "kind": "rate",
+    "what": "journeys FY19-FY26 for Northvale and five regional peers, each indexed to FY19"
+   },
+   "adds": "The rail says what separates the two operators that recovered fully from the rest",
+   "title": "Northvale's journeys have recovered more slowly than all five regional peers since FY19",
+   "rail": "The two peers back above FY19 added off-peak frequency in FY23; Northvale kept its hourly off-peak timetable, and its recovery flattened a year later.",
+   "exhibit": {
+    "heading": "Journeys by operator",
+    "unit": "Index, FY19 = 100",
+    "categories": [
+     "FY19",
+     "FY20",
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "indexBase": "FY19",
+    "subject": "Northvale Rail",
+    "series": [
+     {
+      "name": "Westmoor Trains",
+      "values": [
+       61,
+       61.8,
+       18.9,
+       42.1,
+       55.6,
+       60.2,
+       62.4,
+       63.9
+      ]
+     },
+     {
+      "name": "Southdown Rail",
+      "values": [
+       44.2,
+       44.9,
+       13.6,
+       30.8,
+       40.5,
+       43.8,
+       45.1,
+       46
+      ]
+     },
+     {
+      "name": "Lakeside Lines",
+      "values": [
+       38.5,
+       38.9,
+       11.2,
+       25.9,
+       33.8,
+       36,
+       37.1,
+       37.6
+      ]
+     },
+     {
+      "name": "Fenland Rail",
+      "values": [
+       22.4,
+       22.6,
+       6.3,
+       14.8,
+       19.4,
+       20.8,
+       21.3,
+       21.7
+      ]
+     },
+     {
+      "name": "Highland Link",
+      "values": [
+       18.3,
+       18.4,
+       5.1,
+       11.6,
+       15.1,
+       16.2,
+       16.9,
+       17.4
+      ]
+     },
+     {
+      "name": "Northvale Rail",
+      "values": [
+       51.8,
+       52.4,
+       14.9,
+       31.6,
+       42.8,
+       46.1,
+       47.5,
+       48.3
+      ]
+     }
+    ]
+   },
+   "source": "Source: illustrative data for fictional operators; financial years ending March"
   },
   {
    "id": "p04",
@@ -232,15 +344,15 @@
   {
    "id": "p05",
    "type": "ranking",
-   "form": "bar",
-   "commentary": "beside",
+   "form": "aligned-bars",
+   "commentary": "below",
    "takeaway": false,
-   "why": "Where Northvale stands among all seven regional operators on one intensity measure is the claim, so the whole set is ranked and Northvale marked",
+   "why": "Where Northvale stands among all seven regional operators is the claim, and the reason sits in two more measures for the same operators, so the three share one axis with Northvale marked",
    "settles": {
     "kind": "rank",
-    "what": "journeys per route-km for all seven comparable regional operators"
+    "what": "journeys per route-km, off-peak trains per hour and peak load factor for all seven comparable regional operators, FY26"
    },
-   "adds": "The column explains why intensity trails - route length and hourly off-peak service - and what the gap is worth",
+   "adds": "The column explains why intensity trails - hourly off-peak service on full-peak lines - and what the gap is worth",
    "title": "Northvale sits mid-table on journeys per route-km, 27% below the leading peer",
    "highlight": [
     "27% below Westmoor",
@@ -248,8 +360,6 @@
     "7 m"
    ],
    "exhibit": {
-    "heading": "Journeys per route-km, FY26",
-    "unit": "thousand",
     "categories": [
      "Westmoor Trains",
      "Southdown Rail",
@@ -262,6 +372,7 @@
     "series": [
      {
       "name": "Journeys per route-km",
+      "unit": "thousand, FY26",
       "values": [
        142,
        131,
@@ -271,17 +382,40 @@
        88,
        71
       ]
+     },
+     {
+      "name": "Off-peak frequency",
+      "unit": "trains an hour",
+      "values": [
+       2.6,
+       2.4,
+       2.1,
+       1.4,
+       1.8,
+       1.2,
+       1
+      ],
+      "valueFormat": {
+       "decimals": 1
+      }
+     },
+     {
+      "name": "Peak load factor",
+      "unit": "% of seats",
+      "values": [
+       94,
+       92,
+       90,
+       95,
+       86,
+       81,
+       78
+      ]
      }
     ],
     "highlights": [
      {
       "category": "Northvale Rail"
-     }
-    ],
-    "referenceLines": [
-     {
-      "value": 107.5,
-      "label": "Peer median 108"
      }
     ]
    },
@@ -488,6 +622,108 @@
    "source": "Source: illustrative data for a fictional operator; ticket sales by origin station"
   },
   {
+   "id": "p07b",
+   "type": "ranking",
+   "form": "distribution",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "The claim is where Northvale's unit cost sits in the whole field of regional operators, so all twenty are sorted and Northvale marked",
+   "settles": {
+    "kind": "rank",
+    "what": "operating cost per train-km, FY26, for all twenty regional operators"
+   },
+   "adds": "The points say what separates the low-cost operators from Northvale and how much of the gap the plan closes",
+   "title": "Northvale's cost per train-km is ninth of twenty, £3.40 above the lowest-cost operator",
+   "highlight": [
+    "£17.60 per train-km",
+    "electric",
+    "£16.40"
+   ],
+   "exhibit": {
+    "heading": "Operating cost per train-km, FY26",
+    "unit": "£",
+    "categories": [
+     "Westmoor Trains",
+     "Lakeside Lines",
+     "Southdown Rail",
+     "Kestrel Coast Rail",
+     "Mereside Trains",
+     "Oakfield Link",
+     "Fenland Rail",
+     "Stonebeck Rail",
+     "Northvale Rail",
+     "Linmouth Rail",
+     "Brackenmoor Lines",
+     "Calderbrook Trains",
+     "Harrowdale Rail",
+     "Highland Link",
+     "Pembrook Rail",
+     "Thornfield Trains",
+     "Ravensholt Lines",
+     "Marches Rail",
+     "Dunmore Link",
+     "Upland Rail"
+    ],
+    "series": [
+     {
+      "name": "Cost per train-km",
+      "values": [
+       14.2,
+       14.9,
+       15.3,
+       15.8,
+       16.1,
+       16.4,
+       16.9,
+       17.2,
+       17.6,
+       17.9,
+       18.3,
+       18.6,
+       19,
+       19.4,
+       19.9,
+       20.5,
+       21.2,
+       21.8,
+       22.7,
+       24.1
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Northvale Rail"
+     }
+    ],
+    "valueFormat": {
+     "decimals": 1
+    },
+    "referenceLines": [
+     {
+      "value": 18.1,
+      "label": "Median £18.10"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Ninth of twenty",
+     "text": "At £17.60 per train-km Northvale sits just below the field's median of £18.10, and £3.40 above Westmoor, the lowest-cost operator."
+    },
+    {
+     "lead": "The cheapest run electric",
+     "text": "Five of the six lowest-cost operators run electric trains on their busiest lines; every operator above £19.00 still runs diesel on most of its network."
+    },
+    {
+     "lead": "The plan closes a third",
+     "text": "Electric trains on the Eastern line take Northvale to £16.40 by FY31, which would place it sixth on today's figures."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for fictional operators; operating cost excludes track access charges"
+  },
+  {
    "id": "p08",
    "type": "lookup",
    "form": "measure-table",
@@ -658,7 +894,7 @@
    "why": "Two measures of the same line over the same years - trains added and punctuality lost - only prove the claim read together",
    "settles": {
     "kind": "comparison",
-    "what": "Eastern line peak trains per hour and punctuality, FY22-FY26"
+    "what": "Eastern line peak trains per hour and punctuality, FY19-FY26"
    },
    "adds": "The points give the mechanism - dwell time at single-track sections - and why the off-peak does not share it",
    "title": "Each peak train added to the Eastern line has cost a point of punctuality",
@@ -673,6 +909,9 @@
      "heading": "Eastern line peak trains per hour",
      "unit": "trains",
      "categories": [
+      "FY19",
+      "FY20",
+      "FY21",
       "FY22",
       "FY23",
       "FY24",
@@ -683,6 +922,9 @@
       {
        "name": "Peak trains per hour",
        "values": [
+        9,
+        9,
+        7,
         9,
         10,
         11,
@@ -703,6 +945,9 @@
      "heading": "Eastern line punctuality",
      "unit": "% on time",
      "categories": [
+      "FY19",
+      "FY20",
+      "FY21",
       "FY22",
       "FY23",
       "FY24",
@@ -713,10 +958,13 @@
       {
        "name": "Punctuality",
        "values": [
+        90.9,
+        90.6,
+        93.4,
         91.2,
         89.8,
         88.1,
-        87.0,
+        87,
         86.1
        ]
       }
@@ -1067,13 +1315,13 @@
    "form": "bar",
    "commentary": "so-what-bar",
    "takeaway": false,
-   "why": "Where Northvale's off-peak discount stands among all seven operators is the claim, so the whole set is ranked with Northvale marked and the implication set in a bar beneath it",
+   "why": "Where Northvale's off-peak discount stands among all nine operators is the claim, so the whole set is ranked with Northvale marked and the implication set in a bar beneath it",
    "settles": {
     "kind": "rank",
-    "what": "off-peak return discount to the peak fare for all seven comparable regional operators, FY26"
+    "what": "off-peak return discount to the peak fare for all nine comparable regional operators, FY26"
    },
    "adds": "The bar says what the ranking means for the order of the plan: the fare change waits for the timetable",
-   "title": "Northvale gives the smallest off-peak discount of seven operators: 18% against a 35% median",
+   "title": "Northvale gives the smallest off-peak discount of nine operators: 18% against a 35% median",
    "exhibit": {
     "heading": "Off-peak return discount to the peak fare, FY26",
     "unit": "% off the peak fare",
@@ -1081,9 +1329,11 @@
      "Southdown Rail",
      "Westmoor Trains",
      "Lakeside Lines",
+     "Coastway",
      "Marches Rail",
      "Fenland Rail",
      "Highland Link",
+     "Valley Lines",
      "Northvale Rail"
     ],
     "series": [
@@ -1093,9 +1343,11 @@
        46,
        41,
        38,
+       36,
        35,
        29,
        24,
+       21,
        18
       ]
      }
@@ -1553,7 +1805,7 @@
        51.8,
        54.4,
        57.3,
-       60.0
+       60
       ]
      }
     ],

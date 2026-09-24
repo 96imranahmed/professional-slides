@@ -28,10 +28,10 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
-import { compilePage, describeTypes, pageSchema, structureOf, architectureOf, SHAPES } from "./page-types.mjs";
+import { compilePage, describeTypes, pageSchema, structureOf, architectureOf, SHAPES, breadthProblem } from "./page-types.mjs";
 import { deriveContent } from "./derive-content.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
-import { varietyFindings } from "./gates/variety_gates.mjs";
+import { varietyFindings, evidenceDepth } from "./gates/variety_gates.mjs";
 import { SLIDE_KEYS } from "./compose.mjs";
 import { composeAll } from "./compose-all.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
@@ -95,7 +95,8 @@ export function compileDeck(doc, { insights = null, draft = false, partial = fal
 /**
  * The insight log beside the pages file, keyed by id, or null. Each insight
  * records the `shape` of the data behind it, which decides the page types it
- * can carry (page-types.mjs TYPE_SHAPES).
+ * can carry (page-types.mjs TYPE_SHAPES), and how wide that data is (`breadth`
+ * or `data`), which a chart-bearing shape must be to carry a page at all.
  */
 export async function readInsights(baseDir, stem) {
   const raw = await fs.readFile(path.join(baseDir, `${stem}.insights.json`), "utf8").catch(() => null);
@@ -103,6 +104,11 @@ export async function readInsights(baseDir, stem) {
   const items = JSON.parse(raw).insights || [];
   const unshaped = items.filter((item) => !SHAPES[item.shape]).map((item) => item.id ?? "?");
   if (unshaped.length) throw new Error(`The insight log records no data shape for ${unshaped.join(", ")}: give each insight a \`shape\` - one of ${Object.keys(SHAPES).join(", ")} - so the pages can be checked against the evidence they rest on`);
+  // A shape is only as good as its breadth: a four-year "series" or a
+  // three-member "peer set" becomes a chart page too thin to argue anything.
+  // Every narrow insight is named at once, before a page rests on it.
+  const narrow = items.map(breadthProblem).filter(Boolean);
+  if (narrow.length) throw new Error(`The insight log's data is too narrow for ${narrow.length} insight${narrow.length === 1 ? "" : "s"}:\n- ${narrow.join("\n- ")}`);
   return new Map(items.map((item) => [item.id, item]));
 }
 
@@ -164,7 +170,7 @@ export function planOf(spec) {
     if (slide.kind && !t) Object.assign(record, { kind: slide.kind, exhibit: "text", architecture: "text", why: "Section structure" });
     else {
       const exhibit = t.type === "panels" ? "paired" : t.type === "matrix" ? "rows" : t.type === "picture" ? t.form : t.type === "argument" ? "text"
-        : t.type === "statement" && t.form === "statement" ? "text" : t.type === "numbers" && !ex ? "metrics" : ex?.type ?? "text";
+        : t.type === "statement" && t.form === "statement" ? "text" : t.type === "numbers" && !ex ? "metrics" : ex?.type === "chart-group" && ex.aligned ? "chart.bar" : ex?.type ?? "text";
       Object.assign(record, {
         exhibit, architecture: architectureOf(slide), why: t.why, pageType: `${t.type}/${t.form}`, commentary: t.commentary,
         treatment: t.type === "scorecard" ? t.form : ex?.type === "table" ? (ex.treatment ?? "standard") : undefined,
@@ -248,7 +254,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   const typed = spec.slides.filter((s) => s.pageType);
   const mix = (key) => Object.fromEntries([...typed.reduce((m, s) => m.set(s.pageType[key], (m.get(s.pageType[key]) || 0) + 1), new Map())].sort((a, b) => b[1] - a[1]));
+  // What the chart pages plot, against strong decks' ~22 a page: the numbers
+  // behind EVIDENCE_DEPTH, printed on every run so a thin deck is seen before it is gated.
+  const depth = evidenceDepth([...spec.slides, ...(spec.appendix || [])]);
   const summary = { ...(draft ? { draft: true } : {}), pages: typed.length, types: mix("type"), commentary: mix("commentary"), closes: typed.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length,
+    plotted: { chartPages: depth.chartPages, median: depth.median, range: [depth.min, depth.max], thinnest: depth.thinnest, strongDecks: "about 22 a chart page, the middle half 10 to 48" },
     advisories: [...(contentReport.findings || []).filter((f) => !["blocker", "blocking"].includes(f.severity) || (draft && WORDS.has(f.code))), ...pageGateAdvisories]
       .map((f) => `${f.code}${f.id ? ` [${f.id}]` : ""}`)
       .concat(typed.flatMap((s) => (s.pageType.advisories || []).map((a) => `${a.split(":")[0]} [${s.id}]: ${a.slice(a.indexOf(":") + 2)}`))) };

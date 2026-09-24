@@ -18,9 +18,9 @@ class CompileTests(unittest.TestCase):
     def test_every_choice_is_required_and_sets_the_structure(self):
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
-const years = ['2019','2020','2021','2022','2023'];
+const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
 const base = {{ id: 'p1', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim and sits where it happens', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
-  title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }};
+  title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }};
 const error = (page) => {{ try {{ compilePage(page); return null; }} catch (e) {{ return e.message; }} }};
 const ok = compilePage(base);
 const side = compilePage({{ ...base, commentary: 'beside', points: ['One', 'Two'], highlight: ['One', 'Two'], takeaway: 'So what' }});
@@ -59,14 +59,14 @@ class VarietyContractTests(unittest.TestCase):
 import {{ compileDeck }} from '{AUTHOR}';
 import {{ varietyFindings }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
 import {{ structureOf }} from '{KIT}';
-const years = ['2019','2020','2021','2022','2023'];
-const chart = (extra = {{}}) => ({{ categories: years, series: [{{ name: 'x', values: [1, 2, 3, 4, 5] }}], annotations: [{{ category: '2021', text: 'The turn came when grounded capacity returned to the network' }}], ...extra }});
+const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
+const chart = (extra = {{}}) => ({{ categories: years, series: [{{ name: 'x', values: [1, 2, 3, 4, 5, 6, 7, 8] }}], annotations: [{{ category: '2021', text: 'The turn came when grounded capacity returned to the network' }}], ...extra }});
 const stamped = Array.from({{ length: 14 }}, (_, i) => ({{ id: 's' + i, type: 'trend', form: 'line', commentary: 'below', takeaway: 'So what ' + i,
   why: 'Every page takes the same shape here', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, exhibit: chart(), points: ['a', 'b', 'c'], highlight: ['a', 'b', 'c'] }}));
 let refused = compileDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: stamped }}).findings.map((f) => f.code).sort();
 const kinds = [
   {{ type: 'trend', form: 'line', commentary: 'on-exhibit', exhibit: chart() }},
-  {{ type: 'ranking', form: 'bar', commentary: 'beside', points: ['a'], exhibit: {{ categories: ['A','B','C','D','E'], series: [{{ name: 'x', values: [5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }},
+  {{ type: 'ranking', form: 'bar', commentary: 'beside', points: ['a'], exhibit: {{ categories: ['A','B','C','D','E','F','G','H'], series: [{{ name: 'x', values: [8,7,6,5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }},
   {{ type: 'panels', form: 'row', commentary: 'captions', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A','B','C','D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Segment ' + i + ' grew fastest where capacity was added first' }})) }},
   {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}]] }} }},
   {{ type: 'mechanism', form: 'flow', commentary: 'below', points: ['a', 'b'], highlight: ['a', 'b'], exhibit: {{ nodes: [{{ id: 'x' }}, {{ id: 'y' }}, {{ id: 'z' }}], edges: [] }} }},
@@ -80,8 +80,9 @@ const edited = structuredClone(ok.spec); edited.slides[0].layout = 'exhibit-top'
 console.log(JSON.stringify({{ refused, chosen: ok.findings.map((f) => f.code), untyped,
   edited: varietyFindings(edited, {{ structureOf }}).map((f) => f.code) }}));
 ''')
-        self.assertEqual(result['refused'], ['VARIETY_COMMENTARY', 'VARIETY_SIGNATURE', 'VARIETY_TAKEAWAY',
-                                             'VARIETY_TYPE_RANGE', 'VARIETY_TYPE_RUN', 'VARIETY_TYPE_SHARE'])  # panels counts from 15 pages
+        # Panels counts from 15 pages; fourteen trends of eight values each sit on the page floor, so the deck is thin too.
+        self.assertEqual(result['refused'], ['EVIDENCE_DEPTH', 'VARIETY_COMMENTARY', 'VARIETY_SIGNATURE', 'VARIETY_TAKEAWAY',
+                                             'VARIETY_TYPE_RANGE', 'VARIETY_TYPE_RUN', 'VARIETY_TYPE_SHARE'])
         self.assertEqual(result['chosen'], [])
         self.assertEqual(result['untyped'], ['PAGE_TYPE_UNDECLARED'])
         self.assertEqual(result['edited'], ['PAGE_TYPE_EDITED'])
@@ -296,9 +297,9 @@ class SourceChecksTests(unittest.TestCase):
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
 import {{ compileDeck }} from '{AUTHOR}';
-const years = ['2019','2020','2021','2022','2023'];
+const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
 const trend = (annotations) => ({{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim here', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
-  title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5] }}], annotations }} }});
+  title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations }} }});
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
 const pair = {{ type: 'chart.column', categories: ['H1 25', 'H1 26'], series: [{{ name: 'x', values: [46, 31] }}], caption: 'Guests fell by a third in the first half' }};
 console.log(JSON.stringify({{
@@ -327,12 +328,12 @@ import {{ compilePage }} from '{KIT}';
 import {{ authorDeck }} from '{AUTHOR}';
 import {{ deriveContent }} from './skills/professional-slides/runtime/derive-content.mjs';
 import {{ runContentGates }} from './skills/professional-slides/runtime/gates/content_gates.mjs';
-const years = ['2019','2020','2021','2022','2023'];
+const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
 const S = {{ kind: 'rate', what: 'The operator annual reports, five years' }};
 const long = 'Traffic fell to a fifth when the network was grounded and recovered only as aircraft returned from storage in stages';
 const trend = {{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim here', settles: S,
-  title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5] }}], annotations: [{{ category: '2020', text: long }}] }} }};
+  title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: long }}] }} }};
 const strip = {{ id: 'm', type: 'numbers', form: 'metric-strip', commentary: 'below', points: ['a'], takeaway: false, why: 'Three numbers carry this claim', settles: S,
   title: 'Three numbers', metrics: [{{ value: '1', label: 'a' }}], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1']] }} }};
 // A short argument page: its content plan is derived from the composed page and held to the text-page floor.
@@ -361,10 +362,10 @@ import {{ composeAll }} from './skills/professional-slides/runtime/compose-all.m
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
 const insights = new Map([['i1', {{ id: 'i1', shape: 'fact', finding: 'Two airlines carried 53m and 42m.' }}], ['i2', {{ id: 'i2', shape: 'peer-set', finding: 'Ten airlines ranked by orders.' }}]]);
 const ranking = (evidence) => ({{ id: 'r', type: 'ranking', form: 'bar', commentary: 'beside', takeaway: false, why: 'Where every member stands is the claim', evidence,
-  title: 'The book leads the set', points: ['A point.'], exhibit: {{ categories: ['A','B','C','D','E'], series: [{{ name: 'x', values: [5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }});
+  title: 'The book leads the set', points: ['A point.'], exhibit: {{ categories: ['A','B','C','D','E','F','G','H'], series: [{{ name: 'x', values: [8,7,6,5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }});
 const derived = compilePage(ranking(['i2']), 0, {{ insights }});
 const onExhibit = {{ id: 'o', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim here', settles: {{ kind: 'rate', what: 'Five years of reports' }},
-  title: 'Traffic fell and recovered', exhibit: {{ categories: ['2019','2020','2021','2022','2023'], series: [{{ name: 'x', values: [5,1,2,4,5] }}], highlights: [{{ category: '2020' }}] }} }};
+  title: 'Traffic fell and recovered', exhibit: {{ categories: ['2019','2020','2021','2022','2023','2024','2025','2026'], series: [{{ name: 'x', values: [5,1,2,4,5,6,6,7] }}], highlights: [{{ category: '2020' }}] }} }};
 let all = null;
 try {{ composeAll({{ schema: 'professional-slides.deck/v3', id: 'x', slides: [
   {{ id: 'a', title: 'One bad chart page here', exhibit: {{ type: 'chart.bar', categories: ['A', 'B'], series: [{{ name: 'x', values: [1] }}] }} }},
@@ -434,7 +435,7 @@ const road = (n) => compilePage({{ ...base, id: 'r', type: 'schedule', form: 'ro
   exhibit: {{ items: Array.from({{ length: n }}, (_, i) => ({{ label: 'Phase ' + i, date: '202' + i }})) }} }});
 const points = ['Cargo carried 2.4m tonnes, up 3%', 'Thirteen freighters flew in March', 'The margin is not disclosed'];
 const bars = {{ ...base, id: 'b', type: 'ranking', form: 'bar', commentary: 'beside', points, title: 'Ranked',
-  exhibit: {{ categories: ['A','B','C','D','E'], series: [{{ name: 'x', values: [5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }};
+  exhibit: {{ categories: ['A','B','C','D','E','F','G','H'], series: [{{ name: 'x', values: [8,7,6,5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }};
 const content = {{ question: 'Is Emirates the strongest Gulf airline system?', answer: 'Emirates is the strongest Gulf airline system today',
   pages: [{{ id: 'p02', n: 2, claim: 'Revenue grew while costs held', settles: {{ kind: 'rate', what: 'x' }}, adds: null }}] }};
 const answer = runContentGates(content).findings.find((f) => f.code === 'CONTENT_ANSWER_UNCARRIED');
@@ -465,14 +466,14 @@ const waffle = (series) => compilePage({{ ...base, id: 'w', type: 'composition',
   exhibit: {{ categories: ['Asia', 'Europe', 'Middle East', 'Africa'], series }} }}, 0, {{ draft: true }});
 const facts = (value) => compilePage({{ ...base, id: 'f', type: 'numbers', form: 'fact-grid', commentary: 'none', title: 'Cash',
   exhibit: {{ items: [value, '32.0bn', '56.2bn'].map((v) => ({{ value: v, label: 'AED' }})) }} }});
-const years = ['2019','2020','2021','2022'];
+const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
 const callouts = (n) => compilePage({{ ...base, id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', title: 'Traffic',
-  exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 3, 5] }}], annotations: Array.from({{ length: n }}, (_, i) => ({{ category: years[i], text: 'The network was grounded and traffic fell to a fifth' }})) }} }});
+  exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 3, 5, 6, 6, 7, 7] }}], annotations: Array.from({{ length: n }}, (_, i) => ({{ category: years[i], text: 'The network was grounded and traffic fell to a fifth' }})) }} }});
 const rail = (text) => compilePage({{ ...base, id: 'r', type: 'trend', form: 'line', commentary: 'rail', rail: text, title: 'Traffic',
-  exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 3, 5] }}], highlights: [{{ category: '2020' }}] }} }});
+  exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 3, 5, 6, 6, 7, 7] }}], highlights: [{{ category: '2020' }}] }} }});
 const stray = (draft) => error(() => compilePage({{ ...base, id: 's', type: 'trend', form: 'line', commentary: 'beside', title: 'Traffic',
   points: ['Traffic fell to a fifth', 'It recovered by 2022'], highlight: ['a fifth', 'never written'],
-  exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 3, 5] }}], highlights: [{{ category: '2020' }}] }} }}, 0, {{ draft }}));
+  exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 3, 5, 6, 6, 7, 7] }}], highlights: [{{ category: '2020' }}] }} }}, 0, {{ draft }}));
 console.log(JSON.stringify({{
   waffle: error(() => waffle([{{ name: 'Outstations', values: [7, 4, 2, 1] }}])),
   waffleTwo: error(() => waffle([{{ name: 'a', values: [7, 4, 2, 1] }}, {{ name: 'b', values: [1, 1, 1, 1] }}])),
@@ -527,6 +528,174 @@ console.log(JSON.stringify(Object.fromEntries(Object.keys(READING_TASK_BANK).map
 ''')
         for task, budget in result.items():
             self.assertGreater(budget['ceiling'], budget['floor'], task)
+
+
+class EvidenceDepthTests(unittest.TestCase):
+    """A generated fifty-page deck's chart pages plotted a median of five values
+    against about twenty-two on strong decks' pages. What a page plots is now
+    counted, floored at compile, held to a deck median, and required of the
+    insight log's data before any page rests on it."""
+
+    def test_the_counter_counts_what_each_exhibit_draws(self):
+        result = run_node(f'''
+import {{ plottedValues }} from '{KIT}';
+const years = ['2019','2020','2021','2022'];
+console.log(JSON.stringify({{
+  line: plottedValues({{ type: 'chart.line', categories: years, series: [{{ name: 'a', values: [1, 2, 3, 4] }}, {{ name: 'b', values: [1, null, 3, 4] }}] }}),
+  scatter: plottedValues({{ type: 'chart.scatter', points: [{{ x: 1, y: 2 }}, {{ x: 2, y: 3 }}, {{ x: 3, y: 1 }}] }}),
+  waffle: plottedValues({{ type: 'chart.waffle', categories: ['a', 'b', 'c'], series: [{{ name: 'n', values: [40, 30, 30] }}] }}),
+  pie: plottedValues({{ type: 'chart.pie', labels: ['a', 'b', 'c'], values: [5, 3, 2] }}),
+  grid: plottedValues({{ type: 'chart.bubble-grid', rows: ['a', 'b'], columns: ['x', 'y', 'z'], values: [[1, 2, 3], [4, 5, 6]] }}),
+  boxes: plottedValues({{ type: 'chart.boxplot', categories: ['a', 'b'], boxes: [{{ min: 1, q1: 2, median: 3, q3: 4, max: 5 }}, {{ min: 1, q1: 2, median: 3, q3: 4, max: 5 }}] }}),
+  table: plottedValues({{ type: 'table', columns: ['Line', 'FY25', 'FY26', 'Note'], rows: [['FY24 line', '12', '14', 'up'], ['Coast', {{ value: 9 }}, '11%', 'flat']] }}),
+  group: plottedValues({{ type: 'chart-group', charts: [0, 1].map(() => ({{ component: 'chart.bar', props: {{ categories: ['a', 'b', 'c'], series: [{{ name: 'x', values: [3, 2, 1] }}] }} }})) }}),
+  panels: plottedValues([{{ type: 'chart.column', categories: years, series: [{{ name: 'x', values: [1, 2, 3, 4] }}] }}, {{ type: 'chart.pie', labels: ['a', 'b'], values: [1, 2] }}]),
+}}));
+''')
+        self.assertEqual(result['line'], 7)  # a missing value is not plotted
+        self.assertEqual(result['scatter'], 3)
+        self.assertEqual(result['waffle'], 3)  # a waffle counts its parts, not its squares
+        self.assertEqual(result['pie'], 3)
+        self.assertEqual(result['grid'], 6)
+        self.assertEqual(result['boxes'], 10)  # five figures a box
+        self.assertEqual(result['table'], 4)  # numeric cells, not the row label
+        self.assertEqual(result['group'], 6)
+        self.assertEqual(result['panels'], 6)
+
+    def test_a_thin_chart_page_is_refused_with_the_way_to_deepen_it(self):
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
+const base = {{ takeaway: false, why: 'The page type fits the claim here', settles: {{ kind: 'rate', what: 'The operator annual reports' }}, title: 'Traffic', commentary: 'beside', points: ['A point.'] }};
+const years = ['2019','2020','2021','2022'];
+const trend = (series) => compilePage({{ ...base, id: 't', type: 'trend', form: 'line', exhibit: {{ categories: years, series, highlights: [{{ category: '2020' }}] }} }}, 0, {{ draft: true }});
+const bridge = (n) => compilePage({{ ...base, id: 'b', type: 'bridge', form: 'waterfall', exhibit: {{ categories: Array.from({{ length: n }}, (_, i) => 'Step ' + i), values: Array.from({{ length: n }}, (_, i) => i ? 1 : 10), totals: [0, n - 1] }} }}, 0, {{ draft: true }});
+const panel = (n) => ({{ type: 'chart.column', categories: years.slice(0, n), series: [{{ name: 'x', values: [1, 2, 3, 4].slice(0, n) }}], caption: 'Each panel says what it adds to the other one here' }});
+const ok = trend([{{ name: 'a', values: [5, 1, 3, 5] }}, {{ name: 'b', values: [4, 2, 3, 4] }}]);
+console.log(JSON.stringify({{
+  thin: error(() => trend([{{ name: 'a', values: [5, 1, 3, 5] }}])), deep: ok.pageType,
+  bridgeFour: error(() => bridge(4)), bridgeFive: error(() => bridge(5)),
+  donut: error(() => compilePage({{ ...base, id: 'd', type: 'composition', form: 'donut', exhibit: {{ labels: ['a', 'b', 'c', 'd'], values: [40, 30, 20, 10] }} }}, 0, {{ draft: true }})),
+  panels: error(() => compilePage({{ ...base, id: 'p', type: 'panels', form: 'row', commentary: 'captions', points: undefined, exhibits: [panel(3), panel(3)] }}, 0, {{ draft: true }})),
+  ranking: error(() => compilePage({{ ...base, id: 'r', type: 'ranking', form: 'bar', exhibit: {{ categories: ['A','B','C','D','E'], series: [{{ name: 'x', values: [5, 4, 3, 2, 1] }}], highlights: [{{ category: 'A' }}] }} }}, 0, {{ draft: true }})),
+}}));
+''')
+        self.assertIn('plots 4 values', result['thin'])
+        self.assertIn('indexed', result['thin'])  # the message names the way to deepen a trend
+        self.assertEqual(result['deep']['values'], 8)  # a second series doubles a four-period trend
+        self.assertTrue(result['deep']['chart'])
+        self.assertIn('plots 4 values', result['bridgeFour'])  # start, two steps and end restate a difference
+        self.assertIsNone(result['bridgeFive'])  # a bridge's steps are the drivers it has: five bars is a bridge
+        self.assertIsNone(result['donut'])  # one whole's parts are not floored
+        self.assertIn('plots 6 values', result['panels'])
+        self.assertIn('distribution', result['ranking'])
+
+    def test_the_deck_median_is_gated_and_reported(self):
+        result = run_node('''
+import { varietyFindings, evidenceDepth } from './skills/professional-slides/runtime/gates/variety_gates.mjs';
+const types = ['trend', 'ranking', 'composition', 'relationship', 'bridge', 'panels', 'scorecard', 'mechanism'];
+const deck = (values, charts) => ({ slides: Array.from({ length: 16 }, (_, i) => ({ id: 'p' + i, title: 'Finding ' + i,
+  pageType: { type: types[i % 8], commentary: ['beside', 'below', 'none', 'rail'][i % 4], takeaway: false, ...(i < charts ? { chart: true, values: values[i % values.length] } : { values: 30 }) } })) });
+const codes = (spec) => varietyFindings(spec).map((f) => f.code);
+console.log(JSON.stringify({ thin: codes(deck([9, 10, 12], 12)), deep: codes(deck([12, 18, 30], 12)), depth: evidenceDepth(deck([9, 10, 12], 12).slides),
+  few: codes(deck([9], 7)) }));
+''')
+        self.assertIn('EVIDENCE_DEPTH', result['thin'])
+        self.assertNotIn('EVIDENCE_DEPTH', result['deep'])
+        self.assertEqual(result['depth']['chartPages'], 12)
+        self.assertEqual(result['depth']['median'], 10)
+        self.assertEqual(len(result['depth']['thinnest']), 5)
+        self.assertNotIn('EVIDENCE_DEPTH', result['few'])  # under eight chart pages a median says little
+
+    def test_an_insight_records_breadth_its_shape_needs(self):
+        result = run_node(f'''
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import {{ breadthProblem, breadthOf }} from '{KIT}';
+import {{ readInsights }} from '{AUTHOR}';
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'insights-'));
+const log = (insights) => {{ fs.writeFileSync(path.join(dir, 'd.insights.json'), JSON.stringify({{ insights }})); return readInsights(dir, 'd').then(() => null, (e) => e.message); }};
+const series = (breadth) => ({{ id: 's', shape: 'series', breadth }});
+console.log(JSON.stringify({{
+  short: breadthProblem(series({{ periods: 4, series: 1 }})), peers: breadthProblem(series({{ periods: 4, series: 3 }})), long: breadthProblem(series({{ periods: 8 }})),
+  fewPeers: breadthProblem({{ id: 'r', shape: 'peer-set', breadth: {{ members: 4 }} }}),
+  fromData: breadthOf({{ shape: 'series', data: {{ categories: ['2019', '2020', '2021', '2022'], series: [{{ name: 'a' }}, {{ name: 'b' }}] }} }}),
+  bridgeData: breadthProblem({{ id: 'b', shape: 'bridge', data: {{ categories: ['Start', 'Price', 'End'] }} }}),
+  unrecorded: breadthProblem({{ id: 'u', shape: 'peer-set' }}), fact: breadthProblem({{ id: 'f', shape: 'fact' }}),
+  logged: await log([{{ id: 'a', shape: 'peer-set', breadth: {{ members: 3 }} }}, {{ id: 'b', shape: 'series' }}, {{ id: 'c', shape: 'fact' }}]),
+  clean: await log([{{ id: 'a', shape: 'peer-set', breadth: {{ members: 12 }} }}, {{ id: 'c', shape: 'qualitative' }}]),
+}}));
+''')
+        self.assertIn('research task', result['short'])
+        self.assertIsNone(result['peers'])  # four periods for the subject and its peers is a series
+        self.assertIsNone(result['long'])
+        self.assertIn('4 members', result['fewPeers'])
+        self.assertEqual(result['fromData'], {'periods': 4, 'series': 2})
+        self.assertIn('1 steps', result['bridgeData'])
+        self.assertIn('record how wide', result['unrecorded'])  # an old log is told what to add
+        self.assertIsNone(result['fact'])
+        self.assertIn('2 insights', result['logged'])  # every narrow insight named at once
+        self.assertIsNone(result['clean'])
+
+    def test_the_many_value_forms_compile_and_compose(self):
+        result = run_node(f'''
+import {{ compilePage, describeTypes, pageSchema }} from '{KIT}';
+import {{ composeAll }} from './skills/professional-slides/runtime/compose-all.mjs';
+const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
+const base = {{ takeaway: false, why: 'The page type fits the claim here', settles: {{ kind: 'rank', what: 'The operator annual reports' }} }};
+const years = ['FY19','FY20','FY21','FY22','FY23','FY24'];
+const peers = ['Subject', 'Peer A', 'Peer B', 'Peer C'];
+const indexed = {{ ...base, id: 'i', type: 'trend', form: 'indexed', commentary: 'none', title: 'The subject recovered more slowly than every peer since FY19',
+  exhibit: {{ heading: 'Journeys by operator', categories: years, indexBase: 'FY19', subject: 'Subject',
+    series: peers.map((name, k) => ({{ name, values: years.map((_, t) => 50 * (k + 1) * (1 + t * (0.02 + k * 0.01))) }})) }} }};
+indexed.commentary = 'rail'; indexed.rail = 'The peers that added off-peak frequency recovered first; the subject kept its hourly timetable.';
+const members = Array.from({{ length: 20 }}, (_, i) => 'Operator ' + String.fromCharCode(65 + i));
+const distribution = {{ ...base, id: 'd', type: 'ranking', form: 'distribution', commentary: 'rail', rail: 'The subject sits ninth of twenty on unit cost, just under the median of the field.',
+  title: 'The subject is ninth of twenty on cost per train-km', exhibit: {{ heading: 'Cost per train-km', categories: members,
+    series: [{{ name: 'Cost', values: members.map((_, i) => 14 + i * 0.5) }}], highlights: [{{ category: 'Operator I' }}] }} }};
+const aligned = {{ ...base, id: 'a', type: 'ranking', form: 'aligned-bars', commentary: 'below', points: ['The subject is mid-table on intensity.', 'Its off-peak runs hourly.'],
+  highlight: ['mid-table', 'hourly'], title: 'The subject is mid-table on intensity because its off-peak runs hourly',
+  exhibit: {{ categories: members.slice(0, 8), highlights: [{{ category: 'Operator D' }}], series: [
+    {{ name: 'Journeys per km', unit: 'thousand', values: [142, 131, 118, 104, 97, 88, 71, 60] }},
+    {{ name: 'Off-peak frequency', unit: 'trains an hour', values: [2.6, 2.4, 2.1, 1.4, 1.8, 1.2, 1.0, 1.1], valueFormat: {{ decimals: 1 }} }},
+    {{ name: 'Peak load', unit: '%', values: [94, 92, 90, 95, 86, 81, 78, 75] }}] }} }};
+const pages = [indexed, distribution, aligned].map((p, i) => compilePage(p, i));
+let composed = null, pageErrors = null;
+try {{ composed = composeAll({{ schema: 'professional-slides.deck/v3', id: 'forms', slides: pages }}, '.'); }} catch (e) {{ pageErrors = e.pageErrors ?? [e.message]; }}
+const group = composed?.deck.slides[2].nodes ?? [];
+const labelled = [...new Set(group.filter((n) => n.role === 'category-label').map((n) => n.data?.childChart))];
+const bars = group.filter((n) => n.role === 'chart-mark' && n.data?.childChart);
+const lanes = [...new Set(bars.map((n) => n.data.childChart))].map((c) => bars.filter((n) => n.data.childChart === c).map((n) => Math.round(n.frame.y)));
+const schema = pageSchema().properties.pages.items.oneOf.find((s) => s.properties.type.const === 'ranking');
+console.log(JSON.stringify({{ pageErrors, line: pages[0].exhibit, group: pages[2].exhibit.type, aligned: pages[2].exhibit.aligned, values: pages.map((p) => p.pageType.values),
+  labelled, lanes, unsorted: error(() => compilePage({{ ...distribution, exhibit: {{ ...distribution.exhibit, series: [{{ name: 'Cost', values: members.map((_, i) => (i % 2 ? 14 : 20) + i) }}] }} }})),
+  unmarked: error(() => compilePage({{ ...distribution, exhibit: {{ ...distribution.exhibit, highlights: [] }} }})),
+  short: error(() => compilePage({{ ...distribution, exhibit: {{ ...distribution.exhibit, categories: members.slice(0, 12), series: [{{ name: 'Cost', values: members.slice(0, 12).map((_, i) => i) }}] }} }})),
+  noBase: error(() => compilePage({{ ...indexed, exhibit: {{ ...indexed.exhibit, indexBase: 'FY10' }} }})),
+  twoPeers: error(() => compilePage({{ ...indexed, exhibit: {{ ...indexed.exhibit, series: indexed.exhibit.series.slice(0, 3) }} }})),
+  besideThree: error(() => compilePage({{ ...aligned, commentary: 'beside' }})),
+  catalogue: describeTypes(), schema: JSON.stringify(schema.allOf ?? []) }}));
+''')
+        self.assertIsNone(result['pageErrors'])  # all three forms compose
+        line = result['line']
+        self.assertEqual(line['type'], 'chart.line')
+        self.assertTrue(all(s['values'][0] == 100 for s in line['series']))  # rebased by the compiler, not by hand
+        self.assertEqual(line['focusSeries'], 'Subject')
+        self.assertNotIn('indexBase', line)
+        self.assertEqual(result['group'], 'chart-group')
+        self.assertTrue(result['aligned'])
+        self.assertEqual(result['values'], [24, 20, 24])
+        self.assertEqual(len(result['labelled']), 1)  # the members are named once, down the first column
+        self.assertEqual(len(result['lanes']), 3)
+        self.assertTrue(all(lane == result['lanes'][0] for lane in result['lanes']))  # every measure's bars level with its member
+        self.assertIn('sorted', result['unsorted'])
+        self.assertIn('marks the subject', result['unmarked'])
+        self.assertIn('15 to 40 categories', result['short'])
+        self.assertIn('indexBase', result['noBase'])
+        self.assertIn('4 to 8 series', result['twoPeers'])
+        self.assertIn('hold two measures', result['besideThree'])
+        for published in ('distribution 15-40 categories', 'aligned-bars 2-4 series', 'indexed 4-8 series', 'plots 8+ values', 'indexBase'):
+            self.assertIn(published, result['catalogue'])
+        self.assertIn('aligned-bars', result['schema'])
 
 
 if __name__ == '__main__':

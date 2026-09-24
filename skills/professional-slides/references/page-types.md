@@ -53,8 +53,8 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 
 | Type | Reading task | Forms |
 | --- | --- | --- |
-| `trend` | a measure over four or more periods, its rate or break marked | line, column, stacked-column, area, stacked-area, combo, slope |
-| `ranking` | the whole set on one measure, the subject marked | bar, column, lollipop, dumbbell, bullet |
+| `trend` | a measure over four or more periods, its rate or break marked | line, column, stacked-column, area, stacked-area, combo, slope, indexed |
+| `ranking` | the whole set on one measure, the subject marked | bar, column, lollipop, dumbbell, bullet, distribution, aligned-bars |
 | `composition` | what a whole is made of | stacked-bar, stacked-column, marimekko, waffle, donut, treemap, pie |
 | `relationship` | two measures across the members | scatter, bubble, bubble-grid |
 | `bridge` | what a change between totals is made of | waterfall |
@@ -104,11 +104,11 @@ Each insight in `<id>.insights.json` records the `shape` of the data behind it, 
 
 | Shape | Means | Carries |
 | --- | --- | --- |
-| `series` | one measure over four or more periods | trend, numbers, panels, lookup |
-| `peer-set` | one measure for every member of the set | ranking, scorecard, profiles, numbers, panels, lookup |
-| `mix` | the parts of a whole | composition, numbers, panels, lookup |
-| `measure-pair` | two measures for each member | relationship, scorecard, numbers, panels, lookup |
-| `bridge` | the steps between two totals | bridge, numbers, panels, lookup |
+| `series` | one measure over six or more periods, or four for two or more series | trend, numbers, panels, lookup |
+| `peer-set` | one measure for every member of the set, six or more | ranking, scorecard, profiles, numbers, panels, lookup |
+| `mix` | the parts of a whole, three or more | composition, numbers, panels, lookup |
+| `measure-pair` | two measures for each of eight or more members | relationship, scorecard, numbers, panels, lookup |
+| `bridge` | three or more steps between two totals | bridge, numbers, panels, lookup |
 | `geography` | places with coordinates or regions | place |
 | `schedule` | dated phases, milestones or workstreams | schedule |
 | `roster` | the named members and their attributes | profiles, scorecard, lookup |
@@ -116,6 +116,8 @@ Each insight in `<id>.insights.json` records the `shape` of the data behind it, 
 | `qualitative` | sourced statements, judgements or mechanisms | scorecard and the text and diagram types |
 
 With an insight log beside the pages file, every data-bearing page names its insights in `evidence`, and a ranking whose insights hold no peer set is refused: the missing data is a research task, found before the page is written rather than by the storyline critic or the review.
+
+Each chart-bearing shape also records its breadth - `breadth: { periods, series }` for a series, `{ members }` for a peer set or measure pair, `{ parts }` for a mix, `{ steps }` for a bridge - or the `data` itself, from which the counts are read. The log is refused when a shape is narrower than the table above says (a four-year series of one measure, a peer set of four), naming every such insight at once with what to find: the longer window, the peers' series, the rest of the set. An insight with no breadth recorded is refused with the keys to add; `fact`, `qualitative`, `roster`, `schedule` and `geography` need none.
 
 The summary lists advisories the compiler can see without blocking: `MAP_COARSE` names a place page whose markers span under twenty degrees on the built-in 1:110m coastline, which is coarse at that scale - import a 1:10m or 1:50m geography with `runtime/import-geography.mjs` and pass it as the map's `geography`.
 
@@ -127,13 +129,32 @@ The compiler checks what each type implies. A trend runs over four or more perio
 
 Each component's limits are published in `--types` (`holds:` - a donut takes two to five parts, cards two to six, steps three to six, a stat-list value nine characters and a fact-grid value ten) and checked at compile, with the capacities the renderer measures: a chart callout about ten words and a chart three callouts (a fourth note is commentary), a rail about forty words (eight lines at heading size). Every `numbers` form sets its figures against one exhibit - the proof beside a hero number, the tiles of a grid, the chart under a strip.
 
-Each type also has a minimum it needs to be worth a page: a composition shows three or more parts, or the mix across two or more members or periods - a share of one thing is a numbers page; a timeline or roadmap has four or more dated items; a mechanism three or more parts; a relationship five or more members; a bridge a start, two steps and an end. Small counts are counted, not shared out: fourteen cities as percentages of a pie overstates what the count can say - use form `waffle`, with the parts as `categories` and one series of whole counts.
+Each type also has a minimum it needs to be worth a page: a composition shows three or more parts, or the mix across two or more members or periods - a share of one thing is a numbers page; a timeline or roadmap has four or more dated items; a mechanism three or more parts; a relationship five or more members; a bridge a start, two steps and an end - and every chart page the evidence floor below. Small counts are counted, not shared out: fourteen cities as percentages of a pie overstates what the count can say - use form `waffle`, with the parts as `categories` and one series of whole counts.
 
 On a page with commentary points, mark the finding in each point: `highlight` takes a list, with the number or claim from each point the reader should see first, or a point carries its own `highlight`. A single phrase lights one point and leaves the rest grey. A phrase that appears in no point is refused in a draft too, once the points are written.
 
 Moving the explanation off the page's text column is a choice to write it somewhere else, not to drop it. Callouts on a chart carry ten or more words between them - the mechanism and the qualification, not labels - and each is measured against the chart's callout box, which holds about twelve words; every caption is a sentence of eight words or more that says what its panel shows and does not repeat the title or the panel heading; a rail is a developed claim of ten words or more. An executive summary with no exhibit renders as a list; give it `metrics` or an exhibit when the page would otherwise be half empty.
 
 Choose the type from the claim, then the placement from where the reader's eye already is. The same evidence can take different pages: a peer comparison can be a ranking with callouts, panels of the same measure for three periods, or a scorecard. Pick the one whose reading task is the claim's, and then look at the neighbours - the page before and after should ask the reader to do something different.
+
+## Evidence depth
+
+Strong decks' chart pages plot a median of about 22 values (the middle half 10 to 48); a generated fifty-page deck's plotted 5, every chart one series at its type's minimum. The compiler counts what each page plots (`plottedValues`: bars, points on lines, dots, slices, a box's five figures, numeric cells; a waffle counts its parts, a chart group and a panels page the sum) and records it as `pageType.values`.
+
+| Rule | Where | Threshold |
+| --- | --- | --- |
+| A chart page's floor | compile | 8 values on trend, ranking, composition, relationship and panels with a chart; a bridge 5 (its steps are the drivers it has); pie, donut, treemap and waffle not floored (one whole's parts) |
+| `EVIDENCE_DEPTH` | variety contract | from eight chart pages, the median chart page plots 15 or more |
+
+The refusal names how to deepen: the peer set, a prior period or a benchmark as a second series, a longer window. Three forms are built for many values:
+
+| Form | What it draws | Holds |
+| --- | --- | --- |
+| trend `indexed` | the raw series, rebased by the compiler to 100 at `indexBase`, the `subject` in colour and its peers grey | 4 to 8 series |
+| ranking `distribution` | the whole field sorted, the subject marked in `highlights` | 15 to 40 members, one series |
+| ranking `aligned-bars` | several measures for the same members on one category axis, one headed bar column per measure (`series: [{ name, unit, values }]`) | 2 to 4 measures; 2 beside a text column; no callouts |
+
+`--check` prints `plotted`: the chart pages, their median, range and the five thinnest.
 
 ## The variety contract
 
@@ -149,6 +170,7 @@ Choose the type from the claim, then the placement from where the reader's eye a
 | `VARIETY_TAKEAWAY` | at most 25% of pages close on a takeaway line or a so-what bar |
 | `VARIETY_PANELS` | from fifteen pages, at least 12% set two or more exhibits side by side |
 | `VARIETY_SIGNATURE` | no one drawn page - its layout, how many exhibits of which family, a text column or points, a rail, its close - is more than 20% of the pages |
+| `EVIDENCE_DEPTH` | from eight chart pages, the median chart page plots 15 values or more |
 
 The limits sit outside what strong decks measure, so a deck that chose each page for its claim passes them with room. Placement and repetition are counted on the page as drawn, not as declared: a column on the left and one on the right are one placement to a reader, and a trend beside its points and a stat list beside its points are one page. The compiler records each page's drawn skeleton in its `pageType`, and `VARIETY_SIGNATURE` names the pages that share the commonest. Do not rotate choices to meet them: a deck that breaks one has pages whose type was not chosen from the claim, and the fix is to ask of each such page what it has to show.
 

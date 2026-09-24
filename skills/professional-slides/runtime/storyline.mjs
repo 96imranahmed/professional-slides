@@ -17,7 +17,7 @@
 // The review is bound to the story's structure - page ids, titles, exhibit
 // types and the data each exhibit plots - so rewording a sentence does not
 // invalidate it, and changing what a page argues or shows does.
-import { SHAPES } from "./page-types.mjs";
+import { SHAPES, breadthOf, breadthProblem, plottedValues } from "./page-types.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -56,11 +56,15 @@ const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter(
 /** What an exhibit shows, in a line a reviewer can judge without seeing it drawn. */
 export function describeExhibit(ex) {
   const type = String(ex.type ?? "?");
-  const cats = ex.categories || ex.rows || ex.labels || [];
-  const series = Array.isArray(ex.series) ? ex.series.map((s) => s?.name).filter(Boolean) : [];
+  // Aligned bars are a chart group of one category axis: its members and measures are the charts'.
+  const group = type === "chart-group" && Array.isArray(ex.charts) ? ex.charts : null;
+  const cats = ex.categories || ex.rows || ex.labels || group?.[0]?.props?.categories || [];
+  const series = group ? group.map((c) => c?.heading).filter(Boolean) : Array.isArray(ex.series) ? ex.series.map((s) => s?.name).filter(Boolean) : [];
   const form = type.startsWith("chart.") ? (trivialChart(ex) ? "TWO-NUMBER" : trendChart(ex) ? "trend" : cats.length >= 5 ? "ranked set" : "comparison") : null;
   const parts = [type];
   if (form) parts.push(`[${form}]`);
+  // How much it plots, against strong decks' ~22 values a chart page.
+  if (type.startsWith("chart")) parts.push(`plots ${plottedValues(ex)} values`);
   if (ex.heading) parts.push(`"${ex.heading}"`);
   if (Array.isArray(cats) && cats.length) parts.push(`${cats.length} categories: ${cats.slice(0, 12).map((c) => typeof c === "object" ? (c.label ?? c.text ?? JSON.stringify(c)) : c).join(", ")}${cats.length > 12 ? ", ..." : ""}`);
   if (series.length) parts.push(`series: ${series.join(", ")}`);
@@ -96,6 +100,8 @@ const EVIDENCE_KEYS = ["categories", "rows", "columns", "values", "markers", "ro
 function exhibitEvidence(ex) {
   const out = { type: ex.type ?? null, series: (ex.series || []).map((x) => ({ name: x?.name ?? null, values: x?.values ?? null })) };
   for (const key of EVIDENCE_KEYS) if (ex[key] !== undefined) out[key] = ex[key];
+  // A chart group's evidence is its charts' data, not their headings.
+  if (Array.isArray(ex.charts)) out.charts = ex.charts.map((c) => exhibitEvidence({ type: c?.component, ...(c?.props || {}) }));
   return out;
 }
 
@@ -147,11 +153,13 @@ export function checkInsights(log, sources = []) {
     // recorded here, at the data stage, a missing series or peer set is a
     // research task now rather than a weak page the critic finds later.
     if (!SHAPES[item?.shape]) problems.push(`${item?.id ?? "?"}: record the data's \`shape\` - one of ${Object.keys(SHAPES).join(", ")}`);
+    // And its breadth: a four-year series or a three-member peer set is a thin page waiting to be written.
+    else if (breadthProblem(item)) problems.push(breadthProblem(item));
     const missing = (item?.sources || []).filter((f) => !have.has(f));
     if (!(item?.sources || []).length) problems.push(`${item?.id ?? "?"}: no source file`);
     else if (missing.length) problems.push(`${item?.id ?? "?"}: source not in sources/: ${missing.join(", ")}`);
   }
-  return { present: true, items: items.map((i) => ({ id: i.id, finding: i.finding, shape: i.shape ?? null, strength: i.strength ?? null, calculation: i.calculation ?? null, sources: i.sources ?? [] })), problems };
+  return { present: true, items: items.map((i) => ({ id: i.id, finding: i.finding, shape: i.shape ?? null, breadth: breadthOf(i), strength: i.strength ?? null, calculation: i.calculation ?? null, sources: i.sources ?? [] })), problems };
 }
 
 export function storylinePrompt(packet) {

@@ -70,6 +70,7 @@ Data is not yet a finding. Before a title is written, work the downloaded data t
     { "id": "i-launch-ramp",
       "finding": "Riyadh Air opened 14 destinations in its first 16 weeks, faster than Etihad's first year",
       "shape": "series",
+      "breadth": { "periods": 16, "series": 5 },
       "calculation": "destinations by month since first scheduled flight, per carrier; Etihad from its 2003-06 launch records",
       "sources": ["sources/riyadh-air-routes-2026-09.csv", "sources/etihad-destinations-2003-2006.csv"],
       "soWhat": "the ramp, not the size, is the evidence for 'up and coming'",
@@ -169,6 +170,8 @@ Settle evidence before naming components or layouts. For each page record `claim
 `settles.kind` is `count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure` or `qualitative`; its actual evidence, basis and audience question govern the later encoding. Choose each page's [page type](page-types.md) here, while the claim is being written, not when the page is drawn: what the page `settles` usually names it (a `rank` is a ranking, a `rate` a trend, a `structure` a mechanism or a composition, several `comparison`s of one question a panels page), and where its explanation lives follows from the evidence. The storyline critique sees the types and judges the sequence's rhythm with the argument. `adds: null` means commentary is unnecessary. `highlight` is an exact phrase for emphasis or null; it is not an instruction to infer a chart maximum.
 
 Every insight records the `shape` of its data - `series`, `peer-set`, `mix`, `measure-pair`, `bridge`, `geography`, `schedule`, `roster`, `fact` or `qualitative` - because the shape decides which [page types](page-types.md#evidence-shapes) it can carry. A title that needs a ranking and has only two numbers is found here, as a dataset still to find.
+
+A shape also records its breadth - `breadth: { periods, series }`, `{ members }`, `{ parts }` or `{ steps }`, or the `data` itself - and the log is refused when a chart-bearing shape is too narrow: a series under six periods (four with the peers or a benchmark beside it), a peer set under six members, a measure pair under eight. Strong decks' chart pages plot about 22 values; a deck researched to the subject and one comparator plots five. Widen the dataset here - the longer window, the peers' series, the whole set - while it is still research, not when a page is refused for plotting too little.
 
 ### Complete visible copy and reference text gate
 

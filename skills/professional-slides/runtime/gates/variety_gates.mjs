@@ -32,6 +32,7 @@ export const VARIETY_CODES = Object.freeze({
   VARIETY_TAKEAWAY: "too many pages close on a takeaway line",
   VARIETY_PANELS: "too few pages set evidence side by side",
   VARIETY_SIGNATURE: "one drawn page - layout, exhibits, text column and close - repeats across the deck",
+  EVIDENCE_DEPTH: "the deck's chart pages plot too few values: the median chart page is thinner than strong decks'",
   // Raised by author-deck.mjs: the page failed to compose; the rest of the deck is still checked.
   PAGE_DOES_NOT_COMPOSE: "a page could not be composed",
   // Advisory, raised by the page-type compiler (page-types.mjs) and listed in the author's summary.
@@ -53,6 +54,15 @@ export const VARIETY = Object.freeze({
   // 15% cap); one exhibit beside a column is 13%.
   signatureShareMax: 0.2,
   runMax: 2,                // three in a row of one type reads as one page repeated
+  // Evidence depth: strong decks' chart pages plot a median of about 22 values
+  // (the middle half 10 to 48); a generated fifty-page deck's plotted 5. Each
+  // page is floored at 8 when it compiles (page-types.mjs EVIDENCE_FLOOR), and
+  // a deck of pages that all sit on the floor is still thin: the median chart
+  // page has to reach 15, between strong decks' lower quartile and median, so
+  // half the charts carry a peer set, a second series or a longer window. Read
+  // from eight chart pages, where a median means something.
+  evidenceFrom: 8,
+  evidenceMedianMin: 15,
 });
 
 // The pages a deck of one exhibit and a column is usually hiding, named in the
@@ -60,6 +70,19 @@ export const VARIETY = Object.freeze({
 const ALTERNATIVES = "labelled row blocks for three challenges or what changed in each area (`parallel`, form `labelled-rows`), " +
   "two or three exhibits joined by arrows for cause and effect or before and after (`panels`, form `sequence`), " +
   "panels side by side, a scorecard or findings matrix, or the exhibit alone closed by a so-what bar (commentary `so-what-bar`)";
+/**
+ * What the deck's chart pages plot, from the counts the compiler recorded on
+ * each page (`pageType.values`): how many chart pages, their median and range,
+ * and the five thinnest - read by the gate below and printed in the author's summary.
+ */
+export function evidenceDepth(slides) {
+  const charts = slides.filter((s) => s.pageType?.chart && Number.isFinite(s.pageType.values));
+  const values = charts.map((s) => s.pageType.values).sort((a, b) => a - b);
+  const mid = values.length / 2;
+  const median = values.length ? (values.length % 2 ? values[Math.floor(mid)] : (values[mid - 1] + values[mid]) / 2) : 0;
+  const thinnest = [...charts].sort((a, b) => a.pageType.values - b.pageType.values).slice(0, 5).map((s) => `${s.id ?? "?"} (${s.pageType.values})`);
+  return { chartPages: charts.length, median, min: values[0] ?? 0, max: values.at(-1) ?? 0, thinnest };
+}
 
 const isContent = (slide) => (!slide.kind || slide.kind === "content" || slide.kind === "statement" || slide.kind === "takeaways") && slide.title !== undefined;
 const share = (n, of) => Math.round((n / of) * 100) / 100;
@@ -156,6 +179,15 @@ export function varietyFindings(spec, { structureOf } = {}) {
       `${panels} of ${n} pages set evidence side by side. A quarter of a strong deck's pages carry two to four exhibits - the same ` +
       "measure for several members, two measures that together prove the claim, before and after - each with its own heading and a " +
       "caption under it. Find the pages where the reader would otherwise have to hold one chart in mind while turning to the next.");
+  }
+  const depth = evidenceDepth(slides);
+  if (depth.chartPages >= VARIETY.evidenceFrom && depth.median < VARIETY.evidenceMedianMin) {
+    block("EVIDENCE_DEPTH", depth, VARIETY.evidenceMedianMin,
+      `The median chart page plots ${depth.median} values across ${depth.chartPages} chart pages; strong decks' chart pages plot about 22 ` +
+      `(the middle half 10 to 48), and this deck's median has to reach ${VARIETY.evidenceMedianMin}. Deepen the thinnest - ${depth.thinnest.join(", ")} - ` +
+      "with the evidence a sharp team would have gathered: the whole peer set sorted (ranking form `distribution`), several measures for the " +
+      "same members (`aligned-bars`), the subject indexed against its peers (trend form `indexed`), a prior period or a benchmark as a second " +
+      "series, a longer window. Where the data stops, that is a research task, not a styling one.", depth.thinnest.map((t) => t.split(" ")[0]));
   }
   // The drawn skeleton the compiler recorded (page-types.mjs skeletonOf); a
   // deck compiled before it was recorded falls back to its declared choices.
