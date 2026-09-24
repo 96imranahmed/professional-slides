@@ -82,8 +82,20 @@ export function storyStructure(spec) {
   const pages = [...(spec.slides || []), ...(spec.appendix || [])];
   return pages.map((s, i) => ({
     id: s.id ?? `p${i + 1}`, kind: s.kind ?? "content", title: String(s.title ?? s.text ?? ""),
-    exhibits: exhibitsOf(s).map((ex) => ({ type: ex.type, categories: ex.categories ?? ex.rows ?? null, series: (ex.series || []).map((x) => x?.name ?? null) }))
+    exhibits: exhibitsOf(s).map(exhibitEvidence)
   }));
+}
+
+// What an exhibit asserts, as opposed to how it is drawn: its categories or
+// rows, every plotted value, and the data of the non-chart exhibits (markers,
+// items, nodes). A trend that reverses or a ranking that reorders after the
+// critique changes the story, so it changes the binding; a new colour or a
+// moved label does not.
+const EVIDENCE_KEYS = ["categories", "rows", "columns", "values", "markers", "routes", "items", "nodes", "edges", "links", "points", "steps", "phases", "tasks"];
+function exhibitEvidence(ex) {
+  const out = { type: ex.type ?? null, series: (ex.series || []).map((x) => ({ name: x?.name ?? null, values: x?.values ?? null })) };
+  for (const key of EVIDENCE_KEYS) if (ex[key] !== undefined) out[key] = ex[key];
+  return out;
 }
 
 export function storylineBinding(spec) {
@@ -103,7 +115,8 @@ export async function buildStorylinePacket(specPath, outputDirectory) {
     const planned = byId.get(s.id) || {};
     const body = (planned.textPlan || []).filter((b) => ["body", "qualification"].includes(b.role)).map((b) => b.text);
     return { n: i + 1, id: s.id ?? null, kind: s.kind ?? "content", title: s.title ?? s.text ?? "", claim: planned.claim ?? null,
-      settles: planned.settles ?? null, exhibits: exhibitsOf(s).map(describeExhibit), commentary: body.slice(0, 6), source: s.source ?? null };
+      settles: planned.settles ?? null, exhibits: exhibitsOf(s).map(describeExhibit), commentary: body.slice(0, 6), source: s.source ?? null,
+      ...(s.pageType ? { page: `${s.pageType.type}/${s.pageType.form}, explanation ${s.pageType.commentary}${s.pageType.takeaway ? ", closes on a line" : ""}` } : {}) };
   });
   const contentPages = pages.filter((p) => p.kind === "content").length;
   const targetPages = Number.isFinite(spec.targetPages) ? spec.targetPages : spec.purpose === "evaluation" ? 50 : null;
@@ -138,7 +151,7 @@ export function checkInsights(log, sources = []) {
 
 export function storylinePrompt(packet) {
   const spine = packet.pages.map((p) => p.kind === "content" || !p.kind
-    ? `${p.n}. [${p.id}] ${p.title}\n     shows: ${p.exhibits.join(" + ") || "text only"}${p.commentary.length ? `\n     says: ${p.commentary.join(" / ").slice(0, 400)}` : ""}`
+    ? `${p.n}. [${p.id}] ${p.title}${p.page ? `\n     page: ${p.page}` : ""}\n     shows: ${p.exhibits.join(" + ") || "text only"}${p.commentary.length ? `\n     says: ${p.commentary.join(" / ").slice(0, 400)}` : ""}`
     : `${p.n}. -- ${p.kind}: ${p.title}`).join("\n");
   return `You are a senior partner reviewing a team's storyline before a single slide is drawn - the problem-solving session where a weak story gets taken apart. You did not write it and you owe it nothing. Be adversarial and specific: your job is to find where the argument is thin, obvious, unproven or badly built, and to say exactly what would make it strong. Judge from this packet alone: do not search the web or open other files. Keep it short: at most ten weak pages, five missing analyses and five top fixes.
 
@@ -160,6 +173,7 @@ Work through it in this order.
 2. The pillars. Read the section titles and page titles alone. Do they form a MECE set of reasons that together prove the answer, in an order a reader follows? Name overlaps and gaps. For each pillar give your verdict and the strongest counter-argument a sceptic would raise, and whether the storyline answers it.
 3. Insight depth, page by page. The bar is a deck that feels important: every page carries evidence a reader could not have assembled in five minutes, and the charts and tables are dense with real data. Flag every page that reports a count, a fact or a comparison of two numbers without an implication; every chart marked TWO-NUMBER or comparing two or three categories where the whole set exists; every table marked PLAIN GRID, or whose cells are mostly words where the comparison is quantitative, or that has too few rows and columns to be worth a page; every page whose title a reader would shrug at; every claim the listed evidence does not prove. For each, say what the page should show instead - the trend over five or more years with its growth rate, the whole peer set ranked on the same basis, the share and how it moved, the ratio that removes size, the benchmark gap, the network on a map, the scorecard that judges every player on every criterion with the numbers in the cells.
 4. Missing analyses. What would a strong team have run that is not here? Name each analysis, why it matters to the answer, and the public data that would support it (annual reports, regulators, industry bodies, schedules, order books).
+   Where pages carry a "page:" line - the page type the author chose, and where its explanation lives - judge whether that type is the claim's reading task (a ranking for where the whole set stands, a trend for a change with its rate, panels for one question across several cuts, a scorecard for judging members on criteria), and whether neighbouring pages ask the reader to do different things. Name any page whose type does not fit its claim and the type it should be.
 5. Cut or merge. Which pages repeat each other, preview what follows, or exist to reach a page count? A long deck is legitimate when the brief asks for one: never recommend a total below the requested length. Where you merge duplicates, say which missing analysis should take the freed pages.
    Check the insight log against the pages: an insight with no page, a page whose title no insight supports, and a title that restates a fact rather than a finding.
 6. Verdict. "ready" only if the answer is sharp, the pillars hold, the evidence on the decisive pages is genuinely analytical (trends, ranked peer sets, shares, ratios, maps, judging tables - not two-number comparisons), and no missing analysis would change the answer. Otherwise "revise". Rate the storyline out of ten against what a top team would bring to this question. Rank the fixes that matter most.
@@ -167,10 +181,36 @@ Work through it in this order.
 Bind the review to ${packet.binding}. Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_SCHEMA)}`;
 }
 
+/** The subset of JSON Schema the review schema uses, checked field by field. Extra fields (authorResponse) are allowed. */
+function schemaErrors(value, schema, at) {
+  const errors = [];
+  const kind = Array.isArray(value) ? "array" : value === null ? "null" : typeof value;
+  if (schema.type && schema.type !== kind) return [`${at} must be ${schema.type === "object" ? "an object" : `a ${schema.type}`}`];
+  if (schema.enum && !schema.enum.includes(value)) errors.push(`${at} must be one of ${schema.enum.join(", ")}`);
+  if (kind === "string") {
+    if (schema.minLength && value.trim().length < schema.minLength) errors.push(`${at} must be at least ${schema.minLength} characters`);
+    if (schema.pattern && !new RegExp(schema.pattern).test(value)) errors.push(`${at} is malformed`);
+  }
+  if (kind === "number" && ((schema.minimum !== undefined && value < schema.minimum) || (schema.maximum !== undefined && value > schema.maximum)))
+    errors.push(`${at} must be between ${schema.minimum} and ${schema.maximum}`);
+  if (kind === "array") {
+    if (schema.minItems && value.length < schema.minItems) errors.push(`${at} needs at least ${schema.minItems} item${schema.minItems === 1 ? "" : "s"}`);
+    if (schema.items) value.forEach((item, i) => errors.push(...schemaErrors(item, schema.items, `${at}[${i}]`)));
+  }
+  if (kind === "object") {
+    for (const key of schema.required || []) if (value[key] === undefined) errors.push(`${at} is missing \`${key}\``);
+    for (const [key, sub] of Object.entries(schema.properties || {})) if (value[key] !== undefined) errors.push(...schemaErrors(value[key], sub, `${at}.${key}`));
+  }
+  return errors;
+}
+
 export function validateStorylineReview(review, spec) {
   const errors = [];
   if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (references/storylining.md#stress-test-the-storyline)"];
-  if (!STORYLINE_VERDICTS.includes(review.verdict)) errors.push("storyline review verdict must be ready or revise");
+  // The whole record, not just the verdict: a truncated or hand-written
+  // `{ verdict: "ready", binding }` is not a critique.
+  errors.push(...schemaErrors(review, STORYLINE_SCHEMA, "storyline review"));
+  if (!STORYLINE_VERDICTS.includes(review.verdict) && !errors.length) errors.push("storyline review verdict must be ready or revise");
   if (review.binding !== storylineBinding(spec)) errors.push("storyline review is for a different storyline: the titles, pages or exhibits changed since it was written; run the critique again");
   // One critique and one revision is the default. A storyline the critic
   // called "revise" passes once the author has revised and answered each fix

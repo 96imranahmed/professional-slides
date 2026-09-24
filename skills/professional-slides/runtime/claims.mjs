@@ -57,6 +57,8 @@ export function figureShown(figure, printed) {
   const tolerance = 0.5 * 10 ** -figure.decimals + 1e-9;
   return printed.some((value) => [1e-9, 1e-6, 1e-3, 1, 1e3, 1e6, 1e9].some((scale) => Math.abs(value * scale - figure.value) <= tolerance));
 }
+// Page furniture: numbering, navigation, footers, sources and notes.
+const FURNITURE = /^(page-number|footer|source|footnote|note|tracker|agenda|divider-(number|contents)|section-(number|title)|cover-(date|subtitle)|date|kicker|tag|picture-credit|image-credit)/;
 const isYear = (figure) => figure.decimals === 0 && figure.value >= 1900 && figure.value <= 2100;
 
 export function buildLedger(scene) {
@@ -76,8 +78,10 @@ export function buildLedger(scene) {
   const findings = [];
   // A summary figure that no proving page shows: the reader is asked to take it
   // on trust, and the review will ask where it came from.
+  // Only evidence proves a figure: a page number "3", a date or a source line
+  // printed elsewhere does not show "3 markets".
   const printed = slides.filter(({ slide }) => !SUMMARY_ROLES.has(slide.role))
-    .flatMap(({ slide }) => slide.nodes.filter((n) => n.type === "text").flatMap((n) => numbersIn(textOf(n)).map((f) => f.value)));
+    .flatMap(({ slide }) => slide.nodes.filter((n) => n.type === "text" && !FURNITURE.test(String(n.role ?? ""))).flatMap((n) => numbersIn(textOf(n)).map((f) => f.value)));
   for (const claim of unique) {
     if (!SUMMARY_ROLES.has(scene.slides[claim.page - 1].role)) continue;
     const missing = [...new Set(numbersIn(claim.text).filter((f) => !isYear(f) && !figureShown(f, printed)).map((f) => f.raw))];

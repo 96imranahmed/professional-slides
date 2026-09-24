@@ -141,6 +141,13 @@ export async function autoFillLogos(spec, baseDir, { hint, fetchMissing = true }
     if (!fetchMissing) continue;
     try { await fs.mkdir(directory, { recursive: true }); results.push(await fetchLogo(player, directory, hint)); } catch (error) { results.push({ name: player.name, error: error.message }); }
   }
+  // A logo fetched here keeps its provenance: without the record, the next
+  // build reuses the file and credits it only as "<name> logo".
+  const fresh = results.filter((r) => r.path && r.article);
+  if (fresh.length) {
+    for (const { path: p, ...rest } of fresh) records.set(rest.name, { ...rest, saved: path.relative(baseDir, p) });
+    await fs.writeFile(path.join(directory, "sources.json"), JSON.stringify([...records.values()], null, 2) + "\n");
+  }
   return { filled: fillLogos(spec, results, baseDir), fetched: results.filter((r) => r.path).map((r) => r.name), failed: results.filter((r) => !r.path).map((r) => `${r.name}: ${r.error}`) };
 }
 

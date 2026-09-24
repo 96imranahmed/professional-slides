@@ -186,9 +186,24 @@ export function verificationScope(prior, current) {
   const ids = Object.keys(current);
   const changed = ids.filter((id) => prior.slideHashes[id] !== current[id]);
   const blocked = [...new Set(blocking.map((f) => f.slide).filter((id) => id && current[id]))];
-  const mustInspect = ids.filter((id) => changed.includes(id) || blocked.includes(id));
+  // A deleted slide has no hash to compare, so on its own it would leave
+  // nothing to read - delete the closing page and the review inherits a verdict
+  // on evidence that is gone. The pages either side of each deletion are read
+  // again, since the sequence there changed; with no page left beside it, the
+  // whole deck is reviewed.
+  const priorIds = Object.keys(prior.slideHashes);
+  const deleted = priorIds.filter((id) => !(id in current));
+  const neighbours = new Set();
+  for (const id of deleted) {
+    const at = priorIds.indexOf(id);
+    const before = priorIds.slice(0, at).reverse().find((other) => other in current);
+    const after = priorIds.slice(at + 1).find((other) => other in current);
+    if (!before && !after) return null;
+    for (const other of [before, after]) if (other) neighbours.add(other);
+  }
+  const mustInspect = ids.filter((id) => changed.includes(id) || blocked.includes(id) || neighbours.has(id));
   const inheritedDensity = (prior.review.density?.pages || []).filter((p) => p.verdict === "right" && !mustInspect.includes(p.slide) && current[p.slide]);
-  return { basedOn: prior.binding, changed, mustInspect, priorBlocking: blocking, inheritedDensity, priorRating: prior.review.rating };
+  return { basedOn: prior.binding, changed, deleted, mustInspect, priorBlocking: blocking, inheritedDensity, priorRating: prior.review.rating };
 }
 
 /** A verification review carries forward the density verdicts of pages it did not need to reread. */

@@ -166,7 +166,7 @@ function sceneStatistics(scene) {
   let tables = 0, tablesTreated = 0, charts = 0, chartsAnnotated = 0, icons = 0, logos = 0, pictures = 0;
   const kinds = new Set();
   for (const slide of scene?.slides || []) {
-    if (!slide.nodes?.some((n) => n.role === "action-title") || slide.id === "picture-credits") continue;
+    if (!slide.nodes?.some((n) => n.role === "action-title") || /^picture-credits(?:-\d+)?$/.test(String(slide.id ?? ""))) continue;
     const components = (slide.componentInstances || []).map((c) => String(c.component));
     for (const c of components) if (!["slide-chrome", "section", "page-template", "chrome"].includes(c)) kinds.add(c);
     const roles = slide.nodes.map((n) => String(n.role ?? ""));
@@ -174,7 +174,9 @@ function sceneStatistics(scene) {
       tables += 1;
       if (roles.some((r) => TREATMENT.test(r))) tablesTreated += 1;
     }
-    if (components.some((c) => c.startsWith("chart."))) {
+    // A chart-group composes its charts inside one instance, so its name does
+    // not start with "chart."; its plotted marks still say it is a chart page.
+    if (components.some((c) => c.startsWith("chart.") || c === "chart-group") || roles.includes("chart-mark")) {
       charts += 1;
       if (slide.nodes.some((n) => n.data?.highlighted) || roles.some((r) => ANNOTATION.test(r))) chartsAnnotated += 1;
     }

@@ -303,7 +303,7 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
   // lands on a marker that comes later in the list.
   const occupied = markers.map((marker) => {
     const [x, y] = markerCoordinate(marker, geography, projected);
-    const r = (marker.size ?? (marker.hub ? 16 : 10)) / 2 + 1;
+    const r = drawnDiameter(marker, maxValue) / 2 + 1;
     return { x: x - r, y: y - r, width: 2 * r, height: 2 * r };
   });
   const nodes = [];
@@ -333,8 +333,7 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
     // world without covering the country around it. A hub is a ring with a dot
     // in it. A marker carrying a value is sized by area against the largest
     // value on the map (valueDiameter), so the size legend reads true.
-    const valued = Number.isFinite(marker.value) && maxValue > 0;
-    const size = marker.size ?? (valued ? valueDiameter(marker.value, maxValue) : marker.hub ? 16 : 10);
+    const size = drawnDiameter(marker, maxValue);
     const markerFrame = { x: centerX - size / 2, y: centerY - size / 2, width: size, height: size };
     nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: marker.hub ? PRIMARY : INK, lineWidth: marker.hub ? token("line.standard") : HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, hub: Boolean(marker.hub) } }));
     if (marker.hub) {
@@ -428,6 +427,12 @@ function routeNodes({ id, geography, projected, markers, routes }) {
 // of twice the area. The largest value on the map is 32px across; nothing
 // falls under 5px, so the smallest city stays visible.
 const VALUE_MAX_DIAMETER = 32, VALUE_MIN_DIAMETER = 5;
+/** A marker's drawn diameter: its own size, else by value against the largest, else hub or dot. The label collision map uses the same. */
+function drawnDiameter(marker, maxValue) {
+  const valued = Number.isFinite(marker?.value) && maxValue > 0;
+  return marker?.size ?? (valued ? valueDiameter(marker.value, maxValue) : marker?.hub ? 16 : 10);
+}
+
 export function valueDiameter(value, maxValue) {
   return Math.max(VALUE_MIN_DIAMETER, VALUE_MAX_DIAMETER * Math.sqrt(Math.max(0, value) / maxValue));
 }

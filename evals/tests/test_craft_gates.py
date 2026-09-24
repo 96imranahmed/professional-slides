@@ -138,7 +138,7 @@ const spec = { cover: { image: { alt: 'A 787 on approach', search: 'Riyadh Air 7
 console.log(JSON.stringify({ choice: chooseCommonsPhoto(pages), none: chooseCommonsPhoto(pages.slice(0, 3)), wanted: picturePlaceholders(spec).map(p => p.alt) }));
 ''')
         self.assertEqual(result['choice']['title'], 'File:Aircraft at LHR.jpg')  # landscape wins over the earlier portrait
-        self.assertEqual(result['choice']['credit'], 'Photo: Jo Bloggs, CC BY 4.0, via Wikimedia Commons')
+        self.assertEqual(result['choice']['credit'], 'Photo: Jo Bloggs, CC BY 4.0, via Wikimedia Commons: d6')  # the source page travels with the credit
         self.assertIsNone(result['none'])  # a map, a non-commercial licence and a PNG are all refused
         self.assertEqual(result['wanted'], ['A 787 on approach'])
 

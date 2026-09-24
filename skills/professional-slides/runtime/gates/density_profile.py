@@ -141,7 +141,9 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
         plan = planned.get(pid) or planned.get(slide.get("id")) or {}
         reference = plan.get("textReference") or {}
         task = reference.get("task")
-        if task in STRUCTURAL_TASKS or is_cover(slide, index - 1) or slide.get("id") == "picture-credits":
+        # Generated pages - the contents pages composition inserts and the
+        # picture credits, split or not - carry no reading task of their own.
+        if task in STRUCTURAL_TASKS or is_cover(slide, index - 1) or re.match(r"^(agenda-\d+|picture-credits(?:-\d+)?)$", str(slide.get("id") or "")):
             continue
         text = extract(pdf, index)
         header = header_lines(slide) or None

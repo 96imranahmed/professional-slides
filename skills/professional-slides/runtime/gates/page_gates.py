@@ -96,7 +96,8 @@ DATA_COMPONENTS = {
 ARGUMENT_COMPONENTS = {"insight", "callout", "bullet-list", "evidence-note", "status-list"}
 # Pages carried by pictures rather than measurement.
 QUALITATIVE_COMPONENTS = {"image-frame", "logos", "logo-collage", "people", "quote-cluster", "icon-trends"}
-GENERATED_PAGES = {"picture-credits"}
+# The picture credits, and its continuation pages when a long list paginates.
+GENERATED_PAGE = re.compile(r"^picture-credits(?:-\d+)?$")
 STRUCTURE_COMPONENTS = {"section-divider", "agenda", "tracker-page", "statement", "takeaways"}
 # A photograph, not an icon, a logo mark or a spot image: a well-made deck
 # carries a small image on about half their pages (median 0.5% of the page), and
@@ -2627,7 +2628,7 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
             raise ValueError(f"Unknown density profile: {slide_profile}")
         # The picture-credits page is written by the runtime, not argued: it
         # is a list of attributions and no page gate has anything to say to it.
-        if slide.get("id") in GENERATED_PAGES:
+        if GENERATED_PAGE.match(str(slide.get("id") or "")):
             continue
         cover = is_cover(slide, index)
         if cover:

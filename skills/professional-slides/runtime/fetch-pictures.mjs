@@ -57,7 +57,9 @@ export function chooseCommonsPhoto(pages) {
     ok.push({
       title: page.title, landscape: info.width >= info.height * 1.15,
       url: info.thumburl || info.url, page: info.descriptionurl, license, licenseUrl: meta.LicenseUrl?.value ?? null, artist,
-      credit: `Photo: ${artist}, ${license}, via Wikimedia Commons`,
+      // The credits page prints this string, so it carries the links a reader
+      // needs to trace the file and its licence.
+      credit: `Photo: ${artist}, ${license}${meta.LicenseUrl?.value ? ` (${meta.LicenseUrl.value})` : ""}, via Wikimedia Commons${info.descriptionurl ? `: ${info.descriptionurl}` : ""}`,
     });
   }
   return ok.find((c) => c.landscape) ?? ok[0] ?? null;

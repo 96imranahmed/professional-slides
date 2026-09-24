@@ -29,7 +29,10 @@ export function cagr(first, last, years) {
 export function summarise(table, source) {
   const years = [...table.years].sort((a, b) => a - b);
   const entities = table.entities.filter((e) => table.values.get(e)?.size);
-  const csv = [["year", ...entities].join(","), ...years.map((y) => [y, ...entities.map((e) => table.values.get(e).get(y) ?? "")].join(","))].join("\n") + "\n";
+  // Entity names carry commas ("Korea, Rep.", "Egypt, Arab Rep."), so every field is escaped.
+  const field = (v) => { const t = String(v ?? ""); return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const row = (cells) => cells.map(field).join(",");
+  const csv = [row(["year", ...entities]), ...years.map((y) => row([y, ...entities.map((e) => table.values.get(e).get(y) ?? "")]))].join("\n") + "\n";
   const series = entities.map((name) => {
     const points = years.filter((y) => Number.isFinite(table.values.get(name).get(y)));
     const [a, b] = [points[0], points.at(-1)];
