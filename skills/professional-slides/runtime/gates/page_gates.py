@@ -209,7 +209,7 @@ THRESHOLDS = {
     "cpl_max": 90,
     "hero_area_min": 0.40,
     "monotony_max": 0.35,
-    "column_void_max": 1.0,
+    "column_void_max": 0.2,  # a column's trailing band on its own height (column_bands); a well-made page's right column exceeds it 4.3% of the time
     "image_pages_max": 0.30,   # photographs on more than three pages in ten
     "photo_area_min": 0.03,    # a photograph covers 3% of the page; smaller images are marks (logos, icons, spot art)
     "image_run_max": 2,        # consecutive analytical pages carrying photographs
@@ -404,7 +404,7 @@ GATE_CODES = {
     "INK_COVERAGE": "the content area carries too little ink to read as a page",
     "DEAD_BAND": "a trailing band of nothing under the content",
     "INTERNAL_VOID": "a gap between two content blocks the page does nothing with",
-    "COLUMN_VOID": "the right column stops well above the footer",
+    "COLUMN_VOID": "a column of the page leaves a band empty that the page-wide bands cannot see",
     "TITLE_LINES": "an action title over two lines",
     "TITLE_WORDS": "an action title past the word budget",
     "TYPE_RANGE": "type set outside the approved range for its role",
@@ -501,32 +501,37 @@ def finding(slide_no, code, measured, threshold, repair):
     }
 
 
-def gate_column_void(slide_no, matrix, findings):
-    """COLUMN_VOID. A page whose deck asks to read full must not leave a column
-    empty below its content: a side column that stops halfway down is the
-    commonest way a page reads empty while the page-wide bands stay inside
-    their thresholds. Runs only for `fill: "full"` decks, and only where
-    numpy is available to slice the render."""
+def gate_column_void(slide_no, slide, matrix, findings):
+    """COLUMN_VOID. INTERNAL_VOID and DEAD_BAND by column (column_bands), on
+    the render. Only asked where the page-wide bands pass: a band across the
+    whole page is already its own finding, and one hole is one finding.
+
+    It used to measure a fixed strip from 60% of the width, only its trailing
+    band, only on `full` decks; the waffle floating in the left half of a
+    two-chart page was in no strip it read. Needs numpy to slice the render."""
     if matrix is None:
         return
-    body_top = 140
-    # The composed side column starts at 62% of the width (a 2:1 chart page) and
-    # at 60% for a 3:2 table page; take the wider of the two so a narrow column
-    # is measured whole.
-    for name, x0 in (("side", int(CANVAS_W * 0.60)),):
-        column = matrix[body_top:FOOTER_TOP, x0:CANVAS_W]
-        rows = column.sum(axis=1)
-        if not rows.any():
-            continue  # a page with nothing in that column is a full-width page
-        last = max(y for y, value in enumerate(rows) if value > 2)
-        band = (len(rows) - 1 - last) / float(CANVAS_H)
-        if band > THRESHOLDS["column_void_max"]:
-            findings.append(finding(
-                slide_no, "COLUMN_VOID", round(band, 4), THRESHOLDS["column_void_max"],
-                "Inspect the right column for balance and a missing consequence. "
-                "A complete sparse group may remain centered; do not add content "
-                "merely to reach the footer.",
-            ))
+    page = void_bands(matrix.sum(axis=1).tolist())
+    if page["internalVoid"] > THRESHOLDS["internal_void_max"] or page["deadBand"] > THRESHOLDS["dead_band_max"]:
+        return
+    column = column_bands(slide, render_column_rows(matrix))
+    if column is None:
+        return
+    findings.append(finding(
+        slide_no, "COLUMN_VOID",
+        {"column": column["name"], "band": round(column["band"], 4), "from": column["from"], "to": column["to"],
+         "internalVoid": round(column["internalVoid"], 4), "deadBand": round(column["deadBand"], 4)},
+        column["threshold"],
+        column_repair(column),
+    ))
+
+
+def column_repair(column):
+    return ("The {} column is empty from y {} to {} while the page beside it is full. Set the group at the top "
+            "of its column and give the height to what can use it - the exhibit at its frame's size, the "
+            "commentary moved under a short exhibit, a table with the rows or treated column it was given the "
+            "height for - or narrow the column. Do not stretch rows or pad text to cover the band.").format(
+                column["name"], column["from"], column["to"])
 
 
 
@@ -561,7 +566,7 @@ VOID_TOP = 140
 ROW_MIN = 3
 
 
-def void_bands(rows):
+def void_bands(rows, top=VOID_TOP, bottom=FOOTER_TOP, scale=CANVAS_H):
     """DEAD_BAND and INTERNAL_VOID's one definition, read off `rows[y]`, the
     occupied pixels on each canvas row. The render's gates pass the rows of the
     PNG; SCENE_VOID passes the rows the scene will draw (scene_rows), so the
@@ -571,19 +576,121 @@ def void_bands(rows):
     `internalVoid` the tallest empty run between VOID_TOP and that row - a
     takeaway pinned to the bottom with nothing above it is as empty as a
     trailing band, and so is a strip of air under the title. Both are shares
-    of the canvas height; `voidTop`/`voidBottom` place the run."""
-    last_ink = next((y for y in range(FOOTER_TOP - 1, -1, -1) if rows[y] > ROW_MIN), None)
-    dead = 1.0 if last_ink is None else (FOOTER_TOP - 1 - last_ink) / float(CANVAS_H)
+    of the canvas height; `voidTop`/`voidBottom` place the run.
+
+    A column is measured by the same definition over its own region: `top`
+    and `bottom` bound it, and `scale` is what the shares are taken of
+    (column_bands sets it so a column as tall as the body is held to the
+    page's own bar in pixels)."""
+    last_ink = next((y for y in range(bottom - 1, top - 1, -1) if rows[y] > ROW_MIN), None)
+    dead = (bottom - 1 - (top - 1 if last_ink is None else last_ink)) / float(scale)
     run, longest, where = 0, 0, (None, None)
-    for y in range(VOID_TOP, (last_ink if last_ink is not None else VOID_TOP) + 1):
+    for y in range(top, (last_ink if last_ink is not None else top) + 1):
         if rows[y] > ROW_MIN:
             run = 0
         else:
             run += 1
             if run > longest:
                 longest, where = run, (y + 1 - run, y + 1)
-    return {"deadBand": dead, "internalVoid": longest / float(CANVAS_H), "lastInk": last_ink,
+    return {"deadBand": dead, "internalVoid": longest / float(scale), "lastInk": last_ink,
             "voidTop": where[0], "voidBottom": where[1]}
+
+
+# A region narrower or shorter than this is a strip - a caption row, a tile's
+# label - not a column a reader sees as half empty.
+COLUMN_MIN_WIDTH = 160
+COLUMN_MIN_HEIGHT = 120
+
+
+def page_columns(slide):
+    """The page's columns, read off the composer's own regions: the frames of
+    its component instances, grouped into rows (frames that share any height)
+    and each row into columns (frames that share any width). A row that splits
+    gives one region per column, from the row's top to its foot; a page with
+    no split gives none, and the page-wide bands are the whole measure.
+
+    The band gates read whole rows of the canvas, so a column was only called
+    empty when its neighbour was too. A waffle floating in a tall plot beside a
+    filled bar chart, and a four-row table stopping halfway down beside a full
+    column of points, both passed: the chart and the points beside them filled
+    every row the empty half left empty."""
+    boxes = []
+    for instance in slide.get("componentInstances", []):
+        if str(instance.get("component") or "") in ("slide-chrome", "section"):
+            continue
+        frame = instance.get("frame") or {}
+        x, y = float(frame.get("x") or 0), float(frame.get("y") or 0)
+        width, height = float(frame.get("width") or 0), float(frame.get("height") or 0)
+        top, bottom = max(y, VOID_TOP), min(y + height, FOOTER_TOP)
+        if width > 0 and bottom > top:
+            boxes.append((x, top, x + width, bottom))
+
+    def spans(items, low, high):
+        # Boxes whose [low, high] extents overlap, merged: [start, end, members].
+        out = []
+        for item in sorted(items, key=lambda b: b[low]):
+            if out and item[low] < out[-1][1] - 1:
+                out[-1][1] = max(out[-1][1], item[high])
+                out[-1][2].append(item)
+            else:
+                out.append([item[low], item[high], [item]])
+        return out
+
+    columns = []
+    for top, bottom, members in spans(boxes, 1, 3):
+        split = spans(members, 0, 2)
+        if bottom - top < COLUMN_MIN_HEIGHT or len(split) < 2:
+            continue
+        names = {2: ("left", "right"), 3: ("left", "middle", "right")}.get(len(split))
+        for index, (x0, x1, _) in enumerate(split):
+            if x1 - x0 >= COLUMN_MIN_WIDTH:
+                columns.append({"name": names[index] if names else f"column {index + 1} of {len(split)}",
+                                "x0": int(math.floor(x0)), "x1": int(math.ceil(x1)),
+                                "top": int(math.floor(top)), "bottom": int(math.ceil(bottom))})
+    return columns
+
+
+def column_bands(slide, column_rows):
+    """The page's emptiest column by void_bands, or None when every column is
+    within the bars. `column_rows(x0, x1)` gives the occupied pixels on each
+    canvas row between x0 and x1 - the render's matrix or the scene's mask.
+
+    Same definition, relative to the column's height: the share is taken of
+    the column scaled as the body is to the canvas, so a column as tall as the
+    body is held to the page's own bar in pixels and a column in a shorter row
+    to the same share of its own height. A hole inside the column - a waffle
+    floating mid-plot, points centred with air above and below - is held to
+    `internal_void_max`. A column that simply stops short is held to
+    `column_void_max`, the tail of the right-column band on well-made pages:
+    held to the page's dead band, a third of good side columns would fail."""
+    worst = None
+    for column in page_columns(slide):
+        top, bottom = column["top"], column["bottom"]
+        scale = (bottom - top) * CANVAS_H / float(FOOTER_TOP - VOID_TOP)
+        bands = void_bands(column_rows(column["x0"], column["x1"]), top, bottom, scale)
+        if bands["lastInk"] is None:
+            continue  # nothing drawn there at all: an unmeasured frame, not a half-empty one
+        hole = bands["internalVoid"] / THRESHOLDS["internal_void_max"]
+        short = bands["deadBand"] / THRESHOLDS["column_void_max"]
+        over = max(hole, short)
+        if over > 1 and (worst is None or over > worst["over"]):
+            internal = hole >= short
+            worst = {**column, "over": over, "internalVoid": bands["internalVoid"], "deadBand": bands["deadBand"],
+                     "band": bands["internalVoid"] if internal else bands["deadBand"],
+                     "threshold": THRESHOLDS["internal_void_max" if internal else "column_void_max"],
+                     "from": bands["voidTop"] if internal else bands["lastInk"] + 1,
+                     "to": bands["voidBottom"] if internal else bottom}
+    return worst
+
+
+def scene_column_rows(mask):
+    """column_bands' reader for the scene: the mask scene_mask draws."""
+    return lambda x0, x1: [row[x0:x1].count(1) for row in mask]
+
+
+def render_column_rows(matrix):
+    """column_bands' reader for the render: the occupied matrix of the PNG."""
+    return lambda x0, x1: matrix[:, x0:x1].sum(axis=1).tolist()
 
 
 def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=False):
@@ -1247,7 +1354,14 @@ GLYPH_BAND = (0.15, 0.9)
 
 def scene_rows(slide):
     """The occupied pixels on each canvas row above the footer, drawn from the
-    scene the way the render's void gates read the PNG.
+    scene the way the render's void gates read the PNG (scene_mask)."""
+    return [row.count(1) for row in scene_mask(slide)]
+
+
+def scene_mask(slide):
+    """The canvas above the footer as rows of occupied (1) and empty (0)
+    pixels, drawn from the scene the way the render's void gates read the PNG.
+    scene_rows counts it by row; column_bands slices it by column.
 
     SCENE_VOID measured node boxes in the content frame and missed what the
     build then flagged: on the Emirates deck it named none of the seven pages
@@ -1390,7 +1504,7 @@ def scene_rows(slide):
                float(frame.get("width") or 0), float(frame.get("height") or 0))
         if not any(inside(b, box) for b in marks):
             paint(*box)
-    return [row.count(1) for row in rows]
+    return rows
 
 
 def gate_scene_void(slide_no, slide, findings):
@@ -1408,8 +1522,13 @@ def gate_scene_void(slide_no, slide, findings):
     inside of a card, which the render cannot see). Like the render's gates it is a question - a chart that
     wants air, a sparse group centred on purpose - and across the deck the
     habit blocks at DECK_SCENE_VOID.
+
+    Where the page's rows pass, its columns are asked the same question
+    (column_bands, the render's COLUMN_VOID): the finding names the column,
+    and it stays one advisory for the page.
     """
-    bands = void_bands(scene_rows(slide))
+    mask = scene_mask(slide)
+    bands = void_bands([row.count(1) for row in mask])
     hole, dead = bands["internalVoid"], bands["deadBand"]
     if hole > THRESHOLDS["internal_void_max"]:
         where, measured, threshold = (bands["voidTop"], bands["voidBottom"]), hole, THRESHOLDS["internal_void_max"]
@@ -1417,6 +1536,20 @@ def gate_scene_void(slide_no, slide, findings):
         top = bands["lastInk"] + 1 if bands["lastInk"] is not None else VOID_TOP
         where, measured, threshold = (top, FOOTER_TOP), dead, THRESHOLDS["dead_band_max"]
     else:
+        # The page's rows pass; one of its columns may not (column_bands, the
+        # render's COLUMN_VOID). Still one page-level advisory, so the deck
+        # count reads a half-empty column as the half-empty page it is.
+        column = column_bands(slide, scene_column_rows(mask))
+        if column is None:
+            return
+        findings.append(finding(
+            slide_no, "SCENE_VOID",
+            {"band": round(column["band"], 4), "from": column["from"], "to": column["to"],
+             "internalVoid": round(hole, 4), "deadBand": round(dead, 4), "column": column["name"],
+             "columnInternalVoid": round(column["internalVoid"], 4), "columnDeadBand": round(column["deadBand"], 4)},
+            column["threshold"],
+            column_repair(column),
+        ))
         return
     findings.append(finding(
         slide_no, "SCENE_VOID",
@@ -3060,8 +3193,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                     text_page = not any(is_exhibit(c) for c in slide.get("componentInstances", []))
                     if rows is not None:
                         gate_ink_and_dead_band(slide_no, rows, page, occupied, text_page=text_page)
-                    if THRESHOLDS["column_void_max"] < 1.0 and wanted("COLUMN_VOID"):
-                        gate_column_void(slide_no, load_ink_matrix(path, SURFACE_LUMINANCE), page)
+                    if wanted("COLUMN_VOID"):
+                        gate_column_void(slide_no, slide, load_ink_matrix(path, SURFACE_LUMINANCE), page)
                     # A page carried by a qualifying hero exhibit is not empty,
                     # however thin its marks (a line chart, a map): INK_COVERAGE
                     # then defers to the hero and band gates.
@@ -3248,7 +3381,10 @@ def page_budget(scene, profile=None):
         if slide_profile not in PROFILES:
             raise ValueError(f"Unknown density profile: {slide_profile}")
         _band_body, footer, ratio = footer_share(slide)
-        bands = void_bands(scene_rows(slide))
+        mask = scene_mask(slide)
+        bands = void_bands([row.count(1) for row in mask])
+        page_void = bands["internalVoid"] > THRESHOLDS["internal_void_max"] or bands["deadBand"] > THRESHOLDS["dead_band_max"]
+        column = None if page_void else column_bands(slide, scene_column_rows(mask))
         out.append({
             "slide": index + 1,
             "id": slide.get("id"),
@@ -3262,7 +3398,12 @@ def page_budget(scene, profile=None):
             # and the advisory are the same finding.
             "internalVoid": round(bands["internalVoid"], 3),
             "deadBand": round(bands["deadBand"], 3),
-            "void": bands["internalVoid"] > THRESHOLDS["internal_void_max"] or bands["deadBand"] > THRESHOLDS["dead_band_max"],
+            "void": page_void or column is not None,
+            # A column's band the page's rows cannot see (column_bands, which
+            # SCENE_VOID also reads): which column, its share of the column's
+            # own height, and where it runs.
+            "columnVoid": {"column": column["name"], "band": round(column["band"], 3),
+                           "from": column["from"], "to": column["to"]} if column else None,
         })
     return out
 

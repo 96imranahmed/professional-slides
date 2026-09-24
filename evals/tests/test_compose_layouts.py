@@ -40,10 +40,12 @@ const page=composeSlide({title:'Two findings support the decision',layout:'text'
 const list=page.items.find(i=>i.component==='bullet-list');
 assert.equal(list.size.height,'fill');
 assert.equal(list.props.distribute,true);
-assert.notEqual(list.props.centre,false);
+assert.equal(list.props.centre,false);
 const rendered=createRegistry().get('bullet-list').render({id:'summary',frame:{x:60,y:140,width:1160,height:500},props:list.props}).nodes.filter(n=>n.type==='text');
-const top=Math.min(...rendered.map(n=>n.frame.y)),bottom=Math.max(...rendered.map(n=>n.frame.y+n.frame.height));
-assert.ok(Math.abs((top-140)-(640-bottom))<3,'a sparse sole list has balanced top and bottom space');
+const top=Math.min(...rendered.map(n=>n.frame.y));
+// A sparse sole list opens its gaps and starts under the title: centred, it
+// carried a band of air above its first point as tall as the one below.
+assert.ok(Math.abs(top-140)<3,'a sparse sole list starts at the top of its track');
 assert.deepEqual(list.props.items,points);
 const shared=composeSlide({title:'Two findings support the decision',layout:'text',points,paragraphs:['An authored qualification remains alongside the findings.']},0);
 assert.equal(shared.items.find(i=>i.component==='bullet-list').size.height,'hug');
@@ -81,18 +83,20 @@ assert.equal(find(thin.items,i=>i.component==='metric'),null);
 // Side ratios: chart 2:1, table 3:2.
 const chartSide=composeSlide({title:'T',exhibit:{type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]},points:['p']},0);
 // The implication chevron sits between the exhibit and its consequences, and
-// the column's width is negotiated against what it holds: one short point does
-// not earn a full track, three sentences do.
-assert.deepEqual(chartSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[2,0.8]);
+// the column's width is negotiated against what it holds: a column that does
+// not run four fifths down its track narrows - beside a chart down to the
+// width a line of prose needs (280px, fr 0.71), beside a table by a fifth at
+// most - and one that does keeps its ratio.
+const fr=(page)=>page.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr);
+const [chartFr,sideFr]=fr(chartSide);
+assert.equal(chartFr,2);assert.ok(sideFr<1&&sideFr>=0.71,`one short point narrows its column (${sideFr})`);
 const deepPoints=['Wealth nearly doubled on advisory fees while lending margins compressed across the book','Corporate slipped as the rate cycle ran and the book lost a fifth of its contribution','Retail held flat as deposit growth offset the fee decline in a falling market'];
-const fullColumn=composeSlide({title:'T',exhibit:{type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]},points:deepPoints},0);
-assert.deepEqual(fullColumn.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[2,1]);
 // A table's column starts at 3:2 and is measured the same way: the wider the
 // track, the more it has to carry to keep it.
 const tableSide=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:deepPoints},0);
-assert.deepEqual(tableSide.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[3,1.6]);
-const tableSideFull=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:[...deepPoints,...deepPoints]},0);
-assert.deepEqual(tableSideFull.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr),[3,2]);
+assert.ok(fr(tableSide)[1]<2&&fr(tableSide)[1]>=1.6,`three sentences do not fill a 3:2 track (${fr(tableSide)[1]})`);
+const tableSideFull=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:[...deepPoints,...deepPoints,...deepPoints]},0);
+assert.deepEqual(fr(tableSideFull),[3,2]);
 // Auto-stack: two charts on one category set with points.
 const stack=composeSlide({title:'T',exhibits:[{type:'chart.column',categories:['a','b'],series:[{name:'s',values:[1,2]}]},{type:'chart.line',categories:['a','b'],series:[{name:'m',values:[3,4]}]}],points:['p']},0);
 assert.ok(find(stack.items,i=>i.id==='s01-stack'));

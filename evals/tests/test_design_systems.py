@@ -66,7 +66,9 @@ for (const design of ['consulting', 'editorial', 'journal', 'keynote']) {
   const row = items.find(i => i.layout === 'flow.row');
   out[design] = { first: row?.items?.[0]?.id ?? null, takeaway: items.find(i => i.component === 'insight')?.props?.variant ?? null,
     subtitle: slide.subtitle ?? null, stacked: items.some(i => i.id === 'd01-below' || /-below$/.test(i.id || '')),
-    panel: items.find(i => i.treatment)?.treatment ?? null };
+    // An open section is a region, not a panel: the column is one now that it
+    // starts at the top rather than sitting in a centring flow.
+    panel: items.find(i => i.treatment && i.treatment !== 'open')?.treatment ?? null };
 }
 console.log(JSON.stringify(out));
 ''')

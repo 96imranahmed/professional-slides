@@ -33,7 +33,7 @@ import page_gates  # noqa: E402
 
 FRAME = {"x": 72, "y": 162, "width": 1136, "height": 506}
 BUDGET_KEYS = {"slide", "id", "readingTask", "body", "floor", "ceiling", "footer",
-               "footerRatio", "internalVoid", "deadBand", "void"}
+               "footerRatio", "internalVoid", "deadBand", "void", "columnVoid"}
 
 
 def bands(slide):
@@ -370,6 +370,182 @@ class DeckSceneVoidTests(unittest.TestCase):
         self.assertIn("SCENE_VOID", page_gates.ADVISORY_CODES)
         self.assertNotIn("DECK_SCENE_VOID", page_gates.ADVISORY_CODES)
         self.assertLessEqual({"SCENE_VOID", "DECK_SCENE_VOID"}, page_gates.emitted_codes())
+
+
+def instance(ident, component, x, y, width, height):
+    return {"id": ident, "component": component, "frame": {"x": x, "y": y, "width": width, "height": height}}
+
+
+def two_panel_page(ident="float", left_nodes=None, right_nodes=None, left="chart.waffle", right="chart.bar",
+                   row_bottom=592):
+    """Emirates p39's shape: two panels side by side, each headed, over a row of
+    captions. The right panel is full; the left is whatever it is given."""
+    height = row_bottom - 162
+    nodes = []
+    for x in (72, 648):
+        nodes.append(text("section-heading", 162, 24, x=x, width=560, lines=1))
+    nodes += left_nodes or []
+    nodes += right_nodes if right_nodes is not None else [
+        text("category-label", y, 60, x=656, width=540, lines=3) for y in range(210, row_bottom - 50, 66)]
+    for x in (72, 648):
+        nodes.append(text("insight-body", 616, 40, x=x + 16, width=528, lines=2))
+    page = content_page(ident, nodes)
+    page["componentInstances"] = [
+        {"id": "chrome", "component": "slide-chrome", "frame": {"x": 0, "y": 0, "width": 1280, "height": 720}},
+        instance(f"{ident}-a", left, 72, 162, 560, height), instance(f"{ident}-b", right, 648, 162, 560, height),
+        instance(f"{ident}-c", "insight", 72, 604, 560, 64), instance(f"{ident}-d", "insight", 648, 604, 560, 64)]
+    return page
+
+
+def floating_waffle(ident="float"):
+    """Two rows of dots and their labels in the middle of a 430px plot."""
+    return two_panel_page(ident, left_nodes=[
+        text("data-label", 360, 24, x=72, width=500, lines=1),
+        styled(rect("chart-mark", 388, 52, x=84, width=400), fill={"value": "#333333"}),
+        text("category-label", 452, 16, x=78, width=500, lines=1)])
+
+
+def short_table_page(ident="table", rows=4):
+    """Emirates p11: a number and three points down the left third, a table of
+    a few rows in the right two thirds stopping well above the footer."""
+    nodes = [text("metric-value", 190, 60, x=72, width=373, lines=1),
+             text("metric-label", 255, 40, x=72, width=373, lines=2)]
+    nodes += [text("list-item", y, 80, x=72, width=373, lines=4) for y in (356, 452, 548)]
+    nodes.append(rect("table-header", 174, 44, x=461, width=747))
+    nodes += [text("table-cell-text", 230 + r * 72, 20, x=473, width=700, lines=1) for r in range(rows)]
+    page = content_page(ident, nodes)
+    page["componentInstances"] = [
+        {"id": "chrome", "component": "slide-chrome", "frame": {"x": 0, "y": 0, "width": 1280, "height": 720}},
+        instance(f"{ident}-t", "table", 461, 174, 747, 494), instance(f"{ident}-m", "metric", 72, 190, 373, 150),
+        instance(f"{ident}-l", "bullet-list", 72, 356, 373, 296)]
+    for node in page["nodes"]:
+        if node["role"] == "table-header":
+            node["style"] = {"fill": {"value": "#221E1A"}}
+    return page
+
+
+class ColumnVoidTests(unittest.TestCase):
+    """The band gates read whole rows, so a half-empty column was invisible
+    while its neighbour was full. void_bands is now asked of each column too."""
+
+    def test_columns_come_from_the_composers_regions(self):
+        columns = page_gates.page_columns(floating_waffle())
+        # The two panels split; the caption row under them is a strip, not a row of columns.
+        self.assertEqual([(c["name"], c["x0"], c["x1"], c["top"], c["bottom"]) for c in columns],
+                         [("left", 72, 632, 162, 592), ("right", 648, 1208, 162, 592)])
+        table = page_gates.page_columns(short_table_page())
+        self.assertEqual([(c["name"], c["x0"], c["x1"]) for c in table], [("left", 72, 445), ("right", 461, 1208)])
+        # A page of one full-width exhibit has no columns; one without frames neither.
+        self.assertEqual(page_gates.page_columns(half_empty_page()), [])
+        wide = content_page("w", [])
+        wide["componentInstances"].append(instance("w-1", "chart.column", 72, 162, 1136, 506))
+        self.assertEqual(page_gates.page_columns(wide), [])
+
+    def test_a_waffle_floating_beside_a_full_panel_is_named(self):
+        page = floating_waffle()
+        # The page's rows are full: the panel beside it fills every row the waffle leaves.
+        bands = page_gates.void_bands(page_gates.scene_rows(page))
+        self.assertLess(bands["internalVoid"], page_gates.THRESHOLDS["internal_void_max"])
+        self.assertLess(bands["deadBand"], page_gates.THRESHOLDS["dead_band_max"])
+        found = []
+        page_gates.gate_scene_void(2, page, found)
+        self.assertEqual([f["code"] for f in found], ["SCENE_VOID"])
+        measured = found[0]["measured"]
+        self.assertEqual(measured["column"], "left")
+        self.assertEqual(found[0]["threshold"], page_gates.THRESHOLDS["internal_void_max"])
+        # From the heading's last glyph row to the counts over the dots.
+        self.assertTrue(175 <= measured["from"] <= 192 and 360 <= measured["to"] <= 366, measured)
+        self.assertIn("left column", found[0]["repair"])
+
+    def test_a_short_table_beside_a_full_column_is_named(self):
+        found = []
+        page_gates.gate_scene_void(2, short_table_page(), found)
+        self.assertEqual([f["code"] for f in found], ["SCENE_VOID"])
+        self.assertEqual(found[0]["measured"]["column"], "right")
+        self.assertEqual(found[0]["threshold"], page_gates.THRESHOLDS["column_void_max"])
+        self.assertEqual(found[0]["measured"]["to"], page_gates.FOOTER_TOP)
+
+    def test_a_column_ending_a_little_short_passes(self):
+        # A side column is allowed the tail a well-made page's right column
+        # shows (column_void_max, a fifth of its height), not the page's
+        # dead-band bar: six rows reach close enough to the foot.
+        found = []
+        page_gates.gate_scene_void(2, short_table_page(rows=6), found)
+        self.assertEqual(found, [])
+        # The same waffle grown to fill its plot passes.
+        grown = two_panel_page("grown", left_nodes=[
+            text("data-label", 200, 24, x=72, width=500, lines=1),
+            styled(rect("chart-mark", 228, 280, x=84, width=400), fill={"value": "#333333"}),
+            text("category-label", 520, 16, x=78, width=500, lines=1)])
+        found = []
+        page_gates.gate_scene_void(2, grown, found)
+        self.assertEqual(found, [])
+
+    def test_one_page_one_finding(self):
+        # A page whose rows already fail is named by the page's band, once; the
+        # columns are only asked when the page passes.
+        page = half_empty_page()
+        page["componentInstances"] += [instance("h-1", "table", 72, 162, 560, 506), instance("h-2", "table", 648, 162, 560, 506)]
+        found = []
+        page_gates.gate_scene_void(2, page, found)
+        self.assertEqual(len(found), 1)
+        self.assertNotIn("column", found[0]["measured"])
+
+    def test_the_render_reads_the_same_column(self):
+        # COLUMN_VOID on the render and SCENE_VOID on the scene are one
+        # definition: handed the scene's own mask as the render's matrix, the
+        # pixel gate names the same column, band and bar.
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not installed")
+        for page in (floating_waffle(), short_table_page()):
+            mask = page_gates.scene_mask(page)
+            matrix = np.zeros((page_gates.CANVAS_H, page_gates.CANVAS_W), dtype=bool)
+            matrix[:page_gates.FOOTER_TOP] = np.array([list(row) for row in mask], dtype=bool)
+            pixel, scene = [], []
+            page_gates.gate_column_void(2, page, matrix, pixel)
+            page_gates.gate_scene_void(2, page, scene)
+            self.assertEqual([f["code"] for f in pixel], ["COLUMN_VOID"])
+            for key in ("column", "band", "from", "to"):
+                self.assertEqual(pixel[0]["measured"][key], scene[0]["measured"][key], key)
+            self.assertEqual(pixel[0]["threshold"], scene[0]["threshold"])
+        # A page whose rows fail is DEAD_BAND's or INTERNAL_VOID's, not a column's.
+        page = half_empty_page()
+        page["componentInstances"] += [instance("h-1", "table", 72, 162, 560, 506), instance("h-2", "table", 648, 162, 560, 506)]
+        matrix = np.zeros((page_gates.CANVAS_H, page_gates.CANVAS_W), dtype=bool)
+        matrix[:page_gates.FOOTER_TOP] = np.array([list(row) for row in page_gates.scene_mask(page)], dtype=bool)
+        found = []
+        page_gates.gate_column_void(2, page, matrix, found)
+        self.assertEqual(found, [])
+
+    def test_the_deck_counts_half_empty_columns(self):
+        scene = {"slides": [cover()] + [floating_waffle(f"w{i}") for i in range(5)] + [full_page(f"f{i}") for i in range(9)]}
+        report = page_gates.run_gates(scene)
+        self.assertEqual(report["countsByCode"].get("SCENE_VOID"), 5)
+        deck = [f for f in report["findings"] if f["code"] == "DECK_SCENE_VOID"]
+        self.assertEqual([f["measured"] for f in deck], [5])
+
+    def test_the_code_is_registered_and_advisory(self):
+        self.assertIn("COLUMN_VOID", page_gates.GATE_CODES)
+        self.assertIn("COLUMN_VOID", page_gates.ADVISORY_CODES)
+        self.assertIn("COLUMN_VOID", page_gates.emitted_codes())
+        self.assertIn("COLUMN_VOID", page_gates.EMPTY_PAGE_CODES)
+        index = (ROOT / "skills" / "professional-slides" / "references" / "evaluation" / "index.md").read_text(encoding="utf-8")
+        self.assertIn("`COLUMN_VOID`", index)
+        # The column's trailing bar moves with fill and sits in the corpus's tail.
+        levels = page_gates.FILL_LEVELS
+        exceed = page_gates.REFERENCE_PAGE["exceedance"]["columnVoidAbove"]
+        for fill in ("full", "balanced", "airy"):
+            self.assertLess(exceed[str(levels[fill]["column_void_max"])], 0.10, fill)
+        self.assertLessEqual(levels["full"]["column_void_max"], levels["balanced"]["column_void_max"])
+
+    def test_the_budget_names_the_column(self):
+        budget = page_gates.page_budget({"slides": [cover(), floating_waffle("p2"), full_page("p3")]})
+        self.assertTrue(budget[0]["void"])
+        self.assertEqual(budget[0]["columnVoid"]["column"], "left")
+        self.assertIsNone(budget[1]["columnVoid"])
+        self.assertFalse(budget[1]["void"])
 
 
 class BudgetTests(unittest.TestCase):

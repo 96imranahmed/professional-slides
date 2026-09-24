@@ -108,6 +108,17 @@ def good_slide():
                 "and Alvarado trails it by nine points in the two grades that matter.",
                 "That gap decides the shortlist before any visit is scheduled.",
             ], x=700, y=200, width=520, height=90),
+            # The commentary runs down the chart's height: three lines at the
+            # top of a column beside a 440px chart is the half-empty column
+            # SCENE_VOID reads by column.
+            text("p2", "paragraph", 12, [
+                "The nine points are the whole of the difference between them,",
+                "and neither school moved by more than two points in three years.",
+            ], x=700, y=330, width=520, height=60),
+            text("p3", "paragraph", 12, [
+                "So the reading bar settles the order and the visits settle the fit,",
+                "which is the sequence the shortlist memo asks the panel to follow.",
+            ], x=700, y=450, width=520, height=60),
             text("a1", "axis-label", 10, ["0"], x=60, y=600, width=40, height=14),
             text("a2", "axis-label", 10, ["25"], x=60, y=500, width=40, height=14),
             text("a3", "axis-label", 10, ["50"], x=60, y=400, width=40, height=14),
@@ -121,7 +132,7 @@ def good_slide():
             {"id": "s02-0", "instanceId": "s02:s02-0", "component": "chart.column",
              "frame": {"x": 60, "y": 178, "width": 600, "height": 440}},
             {"id": "s02-1", "instanceId": "s02:s02-1", "component": "paragraph",
-             "frame": {"x": 700, "y": 190, "width": 520, "height": 110}},
+             "frame": {"x": 700, "y": 190, "width": 520, "height": 330}},
         ],
     }
 

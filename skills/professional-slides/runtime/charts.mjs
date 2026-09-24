@@ -1720,6 +1720,10 @@ function highlightedCategory(props) {
   return name === undefined || name === null ? null : String(name);
 }
 
+// A unit dot grows to about three lines of label type; past that it stops
+// reading as one of many and starts reading as a bubble with a size to read.
+const WAFFLE_DOT_MAX = 48;
+
 function waffleLayout(frameIn, props) {
   // A hug measurement passes no height: size the dots from the width alone.
   const frame = Number.isFinite(frameIn.height) ? frameIn : { ...frameIn, height: 400 };
@@ -1732,12 +1736,26 @@ function waffleLayout(frameIn, props) {
   if (percent && values.some((v) => v > 100)) throw new Error("Unit chart percent values run 0–100");
   const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: 0, valueLabelInset: 0, centerPlot: false });
   const slot = plot.width / categories.length;
-  const columns = percent ? 10 : Math.max(4, Math.min(10, Math.ceil(Math.sqrt(Math.max(1, ...values)))));
-  const rows = percent ? 10 : Math.max(1, ...values.map((v) => Math.ceil(v / columns)));
   const gapRatio = 0.45;
   const categoryLayouts = categories.map((c) => measureText(String(c), slot - 12, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
   const labelBand = 30, categoryBand = Math.max(...categoryLayouts.map((l) => l.height)) + 16;
-  const cell = Math.max(4, Math.min((slot - 24) / (columns + (columns - 1) * gapRatio), (plot.height - labelBand - categoryBand) / (rows + (rows - 1) * gapRatio)));
+  const most = Math.max(1, ...values);
+  const shape = (columns) => {
+    const rows = Math.max(1, ...values.map((v) => Math.ceil(v / columns)));
+    const cell = Math.max(4, Math.min(WAFFLE_DOT_MAX, (slot - 24) / (columns + (columns - 1) * gapRatio), (plot.height - labelBand - categoryBand) / (rows + (rows - 1) * gapRatio)));
+    return { columns, rows, cell };
+  };
+  // The block takes the shape that gives its dots the most room in the plot,
+  // up to WAFFLE_DOT_MAX; among shapes that reach it, the widest. The columns
+  // were fixed at four or more from the count alone, so fourteen dots in four
+  // groups drew as rows of two 21px dots across a 400px plot - a strip
+  // centred in air, where two columns of four give dots twice the size.
+  let best = null;
+  if (!percent) for (let columns = Math.min(10, most); columns >= 1; columns -= 1) {
+    const next = shape(columns);
+    if (!best || next.cell > best.cell + 0.5) best = next;
+  }
+  const { columns, rows, cell } = best ?? shape(10);
   const pitch = cell * (1 + gapRatio);
   const blockWidth = columns * cell + (columns - 1) * cell * gapRatio, blockHeight = rows * cell + (rows - 1) * cell * gapRatio;
   return { categories, values, percent, plot, slot, columns, rows, categoryLayouts, labelBand, categoryBand, cell, pitch, blockWidth, blockHeight, height: (plot.y - frame.y) + labelBand + blockHeight + categoryBand + 8 };
@@ -1751,7 +1769,10 @@ function waffleChart({ id, frame, props }) {
     const lit = picked !== null && String(category) === picked;
     const dotFill = lit ? token("color.accent") : fill;
     const x0 = plot.x + index * slot + (slot - blockWidth) / 2;
-    const y0 = plot.y + labelBand + (plot.height - labelBand - categoryBand - blockHeight) / 2;
+    // Under the heading, not centred in the plot: what the dots leave is one
+    // band at the foot, which a column gives to the block under it
+    // (measureCeiling), rather than a band above the counts and another below.
+    const y0 = plot.y + labelBand;
     const count = values[index];
     const total = percent ? 100 : count;
     for (let i = 0; i < total; i += 1) {
@@ -2684,7 +2705,16 @@ export function registerCharts(registry) {
       // Row rule: a chart's heading band (heading + unit line) is a ruled header
       // like a section's, so peers beside it take the same band height and the
       // rules line up. The compiler passes the shared height back as headerBandHeight.
-      ...(chart.id === "chart.waffle" ? { measureContent: ({ frame, props = {} }) => ({ height: waffleLayout(frame, props).height }) } : {}),
+      // A waffle's height is its heading band and its block, measured in the
+      // frame the block will get: the heading is drawn above the chart's own
+      // frame (render, below), and left out the ceiling cut the block short.
+      ...(chart.id === "chart.waffle" ? (() => {
+        const height = ({ frame, props = {} }) => {
+          const heading = String(props.heading ?? "").trim() ? registry.get("chart-title").measureContent({ frame, props: headingProps(props) }).height : 0;
+          return heading + waffleLayout({ ...frame, y: frame.y + heading, height: Number.isFinite(frame.height) ? frame.height - heading : frame.height }, props).height;
+        };
+        return { measureContent: (input) => ({ height: height(input) }), measureCeiling: height };
+      })() : {}),
       ...(EXTRA_CHARTS.some((c) => c.id === chart.id) ? { measureContent: ({ frame, props = {} }) => {
         const headingHeight = String(props.heading ?? "").trim()
           ? registry.get("chart-title").measureContent({ frame, props: headingProps(props) }).height : 0;

@@ -24,7 +24,7 @@
 // "quadrants", "swot", "compare", "phase-table", "rows".
 import { applyDesign } from "./design-systems.mjs";
 import { mapAll } from "./core.mjs";
-import { measureInsight } from "./registry.mjs";
+import { measureInsight, measureList } from "./registry.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { measureText, accentRuns } from "./text-layout.mjs";
@@ -308,7 +308,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
  * heading (chart-title); anything else is wrapped in a headed section.
  */
 const DIAGRAM_TYPES = ["cards", "quadrants", "swot", "metrics", "cycle", "steps", "people", "logos", "framework", "relationship-network", "map", "process", "chevron-process", "timeline", "roadmap", "tree", "organization", "funnel", "matrix", "journey", "image"];
-/** A diagram carries no heading band unless the author gives it one; its side column then centres instead. */
+/** A diagram carries no heading band unless the author gives it one; its side column then starts at the diagram's top. */
 function unheaded(ex) { return DIAGRAM_TYPES.includes(ex.type) && !ex.panelHeading; }
 function headedPanel(ex, item, id, align = true) {
   if (unheaded(ex)) return item;
@@ -1067,10 +1067,15 @@ function pointsBelowHeight(slide) {
   const points = Array.isArray(slide.points) ? slide.points : [];
   const below = slide.layout === "exhibit-top" || (!slide.layout && (LAYOUT.shapeBias?.["exhibit-top"] ?? 0) > 0 && points.length >= 2 && points.length <= 4);
   if (!below || !points.length) return 0;
-  const perLine = Math.max(20, Math.floor((BODY_WIDTH - COLUMN_GAP * (points.length - 1)) / points.length / 6.4));
+  // In rows as exhibitOverCommentary sets them: three across at most, four two by two.
+  const perRow = points.length <= 3 ? points.length : points.length === 4 ? 2 : 3;
+  const perLine = Math.max(20, Math.floor((BODY_WIDTH - COLUMN_GAP * (perRow - 1)) / perRow / 6.4));
   const text = (point) => typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`;
-  const lines = Math.max(...points.map((point) => Math.ceil(text(point).length / perLine)));
-  return (lines + 1) * 18 + 22;
+  let height = 22;
+  for (let at = 0; at < points.length; at += perRow) {
+    height += (Math.max(...points.slice(at, at + perRow).map((point) => Math.ceil(text(point).length / perLine))) + 1) * 18;
+  }
+  return height;
 }
 
 export function paginateTable(slide, bodyScale = 1) {
@@ -1287,11 +1292,14 @@ function pictureCards(pictures, id, size) {
 // columns: used to measure a side column against what it holds before the
 // planner turns fractions into pixels.
 const BODY_WIDTH = 1160, BODY_HEIGHT = 508, CONNECTOR_WIDTH = 44, COLUMN_GAP = 16;
-// A commentary column filling two thirds of its track or less is read across
-// from the exhibit rather than down from the title, so it centres on the
-// exhibit. Above that it has enough body to start at the top and the slack at
-// the foot is not a hole.
-const SIDE_COLUMN_SLACK = 0.66;
+// How deep a commentary column should run down its track: the gates hold a
+// column's trailing band to a fifth of its height (column_void_max), so a
+// column that narrows to reach four fifths clears it with the list's own gaps
+// to spare. A short column narrows toward this, giving the exhibit the width,
+// and stops at SIDE_COLUMN_MIN_WIDTH: below it a line of body type holds too
+// few characters to read as prose (CPL's floor of 35).
+const SIDE_COLUMN_DEPTH = 0.8;
+const SIDE_COLUMN_MIN_WIDTH = 280;
 
 /**
  * The bridge between the evidence and what is read off it, in the gutter.
@@ -1334,6 +1342,11 @@ function bridgeVariant(slide, id) {
   return BRIDGE_VARIANTS.get(asked);
 }
 const LIST_BODY_PX = 14, LIST_ITEM_GAP = 16, LIST_LEAD_GAP = 4, LIST_MARKER_OFFSET = 22;
+/** A composed points list's height at a width, by the list's own measure. */
+function listDepth(list, width) {
+  try { return measureList({ x: 0, y: 0, width, height: BODY_HEIGHT }, list.props); } catch { return pointsHeight(list.props.items, width); }
+}
+
 /** The height a points list wants at a given column width. */
 function pointsHeight(points, width) {
   const textWidth = Math.max(60, width - LIST_MARKER_OFFSET);
@@ -1399,7 +1412,7 @@ function resolvePointsStyle(slide, points) {
   return LAYOUT.variation?.leadPoints ?? "prose";
 }
 
-function pointsItem(points, id, tone, fill, inColumn = false, style = null, centre = true) {
+function pointsItem(points, id, tone, fill, inColumn = false, style = null, centre = false) {
   // The side column is a track, not a shelf: its points spread down it. A list
   // that hugs the top of a 500px column leaves two fifths of it empty, which is
   // how a page carrying real content still reads as thin. A list under a row of
@@ -1408,14 +1421,16 @@ function pointsItem(points, id, tone, fill, inColumn = false, style = null, cent
   // This used to be off on an airy deck, on the reading that white space is the
   // point there. It is, but white space between the points is what "airy"
   // means; all of it pooled under the last one is just an unfinished page. The
-  // gap opens to its cap on every deck now, and the list centres what the cap
-  // leaves over, so an airy column is the same block with more air in it.
+  // gap opens to its cap on every deck now.
   //
-  // `centre` is false where the list does not own its track. Centring the
-  // leftover under a kpi or an insight opens a void between that block and the
-  // first point - the list floats away from the thing it is reading from - and
-  // in a two-column split it lands the two halves on different tops, which is
-  // two lists rather than one. Both were visible on the first cold run.
+  // What the cap leaves over stays at the foot: the list starts at the top of
+  // its track. Centring it was first stopped where the list did not own its
+  // track - under a kpi or an insight the list floated away from the thing it
+  // was reading from, and in a two-column split the halves landed on
+  // different tops - and then everywhere, because a list that owns its track
+  // and centres in it is a band of air above its first point as tall as the
+  // one under its last. `centre: true` is for an author who asked for the
+  // middle (`pointsAlign`).
   const distribute = inColumn && points.length > 1;
   const shape = style && POINT_STYLES[style] ? POINT_STYLES[style] : {};
   if (style === "checklist") points = points.map((p) => {
@@ -2319,8 +2334,13 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
       // (charts.mjs chartFrame), so the plots still share one top line.
       return (rows ? 52 + (rows - 1) * 26 : 28) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top + evidenceBandSpan({ annotations: ex.annotations || [] }, { compact: true });
     };
-    const inset = Math.max(...charts.map(topBand));
-    for (const ex of charts) { ex.plotTopInset = inset; if (charts.some(decorated)) ex.native = false; }
+    // A plot with no value axis - a waffle's dots, a treemap's tiles, a pie -
+    // has no baseline to share. Handed the row's band, a waffle beside an
+    // annotated bar chart drew its dots under a strip of air as tall as its
+    // neighbour's callout.
+    const aligned = charts.filter((ex) => !["chart.waffle", "chart.treemap", "chart.pie", "chart.donut"].includes(ex.type));
+    const inset = Math.max(0, ...aligned.map(topBand));
+    for (const ex of charts) { if (aligned.includes(ex)) ex.plotTopInset = inset; if (charts.some(decorated)) ex.native = false; }
   }
   // Chart beside a narrow table (three columns or fewer): the chart takes 3:2.
   const panelSize = (ex, index) => {
@@ -2337,8 +2357,10 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     // explicitly authored alternative; a standalone schedule stays centred.
     const ex = sourceEx.type === "gantt" && sourceEx.valign === undefined && exhibits.some(peer => peer.type === "table")
       ? { ...sourceEx, valign: "top" } : sourceEx;
+    // A figure with a natural size hugs it at the top of its panel, level
+    // with its peers' first lines, rather than centring in the panel's height.
     const panel = centredFigure(ex)
-      ? { id: `${id}-figure-${i}`, layout: "flow.column", leftover: "center", size: panelSize(ex, i), items: [exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, HUG)] }
+      ? { id: `${id}-figure-${i}`, layout: "flow.column", size: panelSize(ex, i), items: [exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, HUG)] }
       : { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex, i) };
     // Charts own their heading inside the component. An empty section above
     // an unheaded peer table would add a second, invisible heading band and
@@ -2422,10 +2444,18 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
   // them in based on earlier pages does not create a new evidence relationship.
   const headBelow = !columns.every((column) => column.heading)
     ? belowHeading : slide.pointsHeading || null;
+  // Four points across the body are four 270px columns, under the measure
+  // prose needs, and the page failed CPL ("the column is too narrow for
+  // prose") for a choice of placement that was sound. Up to three run in one
+  // row; four go two by two and more three across, reading along each row.
+  const perRow = columns.length <= 3 ? columns.length : columns.length === 4 ? 2 : 3;
+  const rows = [];
+  for (let at = 0; at < columns.length; at += perRow) rows.push(columns.slice(at, at + perRow));
   items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
     headedPanel(exhibits[0], item, `${id}-exhibit`, false),
-    { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}),
-      layout: "flow.row", size: HUG, items: columns },
+    { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}), size: HUG,
+      ...(rows.length === 1 ? { layout: "flow.row", items: columns }
+        : { layout: "flow.column", items: rows.map((row, r) => ({ id: `${id}-below-${r}`, layout: "flow.row", size: HUG, items: row })) }) },
   ] });
 }
 
@@ -2437,7 +2467,7 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
 // A staircase, a cycle and a chevron process are figures with a natural size: a
 // three-step staircase wants about 230px whatever the page offers it, and
 // handed the whole body it spreads into small islands with a hundred pixels of
-// nothing between them. They hug and centre, like the icon cards.
+// nothing between them. They hug their natural size at the top of their region.
 const centredCards = (ex) => ex.type === "cards" && ex.tone !== "header" && ex.tone !== "numbered" && (ex.items || []).every((i) => i.icon && !(i.points || []).length);
 const centredFigure = (ex) => ["steps", "cycle", "chevron-process"].includes(ex?.type)
   || (ex?.type === "roadmap" && ["phase-workstreams", "wave-columns"].includes(ex.variant));
@@ -2468,16 +2498,14 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   // band and the points start level with the plot, not with the heading text.
   // `pointsAlign: "middle"` centres the points on the exhibit instead.
   const tone = sideTreatment(slide);
-  // The list centres its leftover only when it owns the track. Under a kpi or
-  // an insight, centring opens a void between that block and the first point
-  // - the list floats away from the thing it is reading from.
-  const sharesColumn = Boolean(slide.kpi) || Boolean(slide.insight) || Boolean(slide.insights?.length);
-  // Nor when a heading sits above it. Centring the leftover put a hand's
-  // width of blank between "What it means" and the first thing it meant, on
-  // every headed column in the deck: a heading is where the eye starts, so
-  // the first point belongs under its rule and the slack belongs at the foot.
-  const headed = slide.pointsHeading !== false && !sharesColumn;
-  const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle, !sharesColumn && !headed) : null;
+  // The list starts at the top of its track, level with the exhibit, and
+  // spreads its gaps to their cap; what the cap leaves is the column's foot.
+  // It used to centre whenever it owned an unheaded track, and every such
+  // column carried a band of air above its first point as tall as the one
+  // under its last: the gates read by column, and on a fifty-page deck eight
+  // commentary columns were holes top and bottom. The answer to a column that
+  // still ends high is a narrower column (sideFr, below), not a centred one.
+  const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle, false) : null;
   // `kpi: { value, label }`: the one big number the chart proves, in the accent
   // at the top of the side column, above the points.
   const kpiTile = slide.kpi ? { id: `${id}-kpi`, component: "metric", props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } } : null;
@@ -2526,51 +2554,42 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   // The column's width is negotiated with its content, not fixed by the
   // layout: forty words in a 361px track leave two fifths of the column
   // empty, and the exhibit beside it wanted that width anyway. A short column
-  // narrows (its text then wraps to more lines, and the hero grows); a column
-  // that would overrun widens.
+  // narrows until it runs SIDE_COLUMN_DEPTH down its track or reaches
+  // SIDE_COLUMN_MIN_WIDTH (its text wraps to more lines, and the hero grows);
+  // a column that would overrun widens. One step at 0.8 left a three-point
+  // column filling three fifths of its track and the rest of it air.
   const sideColumns = heroFr + baseSideFr + (slide.photo ? 1 : 0);
   const sideTrack = (fr) => Math.max(140, (BODY_WIDTH - CONNECTOR_WIDTH - COLUMN_GAP * sideColumns) * (fr / (heroFr + fr + (slide.photo ? 1 : 0))));
   const sideExtras = (kpiTile ? 126 : 0) + insightBoxes.length * 104 + (heading ? 44 : 0);
   const sideFr = (() => {
     if (fill === "airy" || !list) return baseSideFr;
-    const natural = sideExtras + pointsHeight(slide.points, sideTrack(baseSideFr));
+    const depth = (fr) => (sideExtras + listDepth(list, sideTrack(fr))) / BODY_HEIGHT;
     // A photograph strip takes a quarter of the row, which leaves the
     // commentary a 267px gutter that nothing reads comfortably. The column
     // keeps a floor of 300px; the photograph gives up the width.
     if (slide.photo && sideTrack(baseSideFr) < 300) return baseSideFr * 1.25;
-    if (natural < BODY_HEIGHT * 0.45) return baseSideFr * 0.8;
-    if (natural > BODY_HEIGHT * 0.98) return baseSideFr * 1.2;
-    return baseSideFr;
+    if (depth(baseSideFr) > 0.98) return baseSideFr * 1.2;
+    // The width goes to an exhibit that can use it. A chart's plot scales with
+    // its frame; a table set wider wraps less and ends higher, trading the
+    // column's band for one under the table, so beside a table the column
+    // gives up a fifth at most.
+    const floor = heroFr === 3 ? baseSideFr * 0.8 : 0;
+    let fr = baseSideFr;
+    while (depth(fr) < SIDE_COLUMN_DEPTH && fr * 0.95 >= floor - 1e-9 && sideTrack(fr * 0.95) >= SIDE_COLUMN_MIN_WIDTH) fr *= 0.95;
+    return fr;
   })();
-  // How much of the track the column will actually occupy, at the width it
-  // ended up with. This is what decides whether the column is read down from
-  // the title or across from the exhibit; the point count was only ever a
-  // proxy for it, and it got the answer wrong for one long prose point.
-  const sideFill = (sideExtras + (list ? pointsHeight(slide.points, sideTrack(sideFr)) : 0)) / BODY_HEIGHT;
   // A column of statements and nothing else - one box, or a statement above a
-  // box - is read against the exhibit beside it, so it centres on the exhibit
-  // rather than hugging the top of the track. Anything with a list in it has
-  // something that can spread instead. `pointsAlign` overrides either way.
+  // box - has nothing that can spread down the track.
   const boxesOnly = sideItems.length > 0 && sideItems.every((item) => insightBoxes.includes(item));
-  // A short unheaded column of two or three points is also read against the
-  // exhibit rather than down from the title, so it centres too. Three bullets
-  // hugging the top of a 500px track with the bottom half empty is the page
-  // that reads as unfinished; centred, the two halves balance. A headed
-  // column keeps its top - the heading is what the eye starts from.
-  // Measured, not counted: a column that leaves more than a third of its
-  // track empty is read against the exhibit beside it, so it centres. One
-  // prose point under a headed chart hugged the top and left the bottom half
-  // of the page blank, which is the page that reads as unfinished - and the
-  // old test could not see it, because it asked how many points there were
-  // rather than how much of the column they filled.
-  const shortList = list && !heading && sideItems.length <= 1 && sideFill <= SIDE_COLUMN_SLACK;
-  // A headed column starts under its own heading. Centring the block as well
-  // left a hand's width of blank between the rule and the first line, on a
-  // page whose heading says "What it means" and then appears to mean it two
-  // inches lower.
-  const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && !heading
-    && (boxesOnly || sideItems.length <= 1)
-    && (unheaded(exhibits[0]) || (insightBox && !list) || tone !== "open" || shortList));
+  // Every column starts at the top of its track, level with the exhibit;
+  // `pointsAlign: "middle"` centres it on the exhibit when the author asks.
+  // A short column used to centre by default - statements alone, an unheaded
+  // list filling two thirds of its track or less, anything beside a diagram
+  // or on a toned panel - on the reading that three points hugging the top of
+  // a 500px track look unfinished. Centred, they were a hole above as well as
+  // below: read by column, the band gates named eight such columns on one
+  // fifty-page deck. A headed column already started under its heading.
+  const centre = slide.pointsAlign === "middle";
   // A toned panel is always a section (it needs a surface); it takes the
   // heading unless the author suppresses it with `pointsHeading: false`.
   // A column of several blocks (a number, a box, the points) spreads them down
@@ -2579,7 +2598,7 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   // Spreading blocks down the track works when one of them can absorb the
   // slack (a points list, which spreads its own items). Statements alone have
   // nothing to absorb it, so distributing would pin them to opposite ends of
-  // an empty track; they sit together, centred, instead.
+  // an empty track; they sit together at the top instead.
   if (centre && list) { list.size = HUG; list.props = { ...list.props, distribute: false }; }
   const spread = !centre && fill !== "airy" && sideItems.length > 1 && !boxesOnly ? "distribute" : null;
   const side = tone === "open" && centre && !heading
@@ -2693,17 +2712,23 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   // A staircase, a cycle and a chevron process are all figures with a natural
   // size: a three-step staircase wants about 230px whatever the page offers it,
   // and handed the whole body it spreads into small islands with a hundred
-  // pixels of nothing between them. They hug and centre, like the icon cards.
+  // pixels of nothing between them. They hug their natural size at the top of
+  // the body with the points directly under them, and the frame's slack is
+  // its foot: centred in it, the staircase carried as much air above as
+  // below, and the points under the page sat under the lower band.
 
   // `metrics-over-exhibit` is `exhibit-full` with the measures above it: the
   // exhibit still takes the whole width and the height the strip leaves.
   const fullWidth = layout === "exhibit-full" || layout === "metrics-over-exhibit";
+  let pointsPlaced = false;
   if (fullWidth && (centredCards(exhibits[0]) || centredFigure(exhibits[0]))) {
     // Icon cards with a line each hug their content and sit centred in the
     // space above the takeaway; header and numbered cards fill the page as columns.
+    const below = centredFigure(exhibits[0]) && layout === "exhibit-full" && slide.points?.length
+      ? [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle)] : [];
+    pointsPlaced = below.length > 0;
     items.push(centredFigure(exhibits[0])
-      ? { id: `${id}-figure-frame`, layout: "flow.column", leftover: "center", size: SIZE,
-          items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, HUG)] }
+      ? { id: `${id}-figure-frame`, layout: "flow.column", size: SIZE, items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, HUG), ...below] }
       : exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { ...SIZE, centre: true }));
   } else if (fullWidth) {
     const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
@@ -2740,8 +2765,11 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     const sideItems = [kpi];
     if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
     const hero = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" });
+    // The number and its points start at the top of the column, level with
+    // the exhibit; centred, the column carried air above the number as tall
+    // as the band under its last point.
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
-      { id: `${id}-side`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, leftover: "center", items: sideItems },
+      { id: `${id}-side`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: sideItems },
       headedPanel(exhibits[0], hero, `${id}-exhibit`, false),
     ] });
   } else if (layout === "split-tone") {
@@ -2769,7 +2797,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       if (slide.kpi) sideItems.push({ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } });
       const insights = slide.insights || (slide.insight ? [slide.insight] : []);
       for (const [at, insight] of insights.entries()) sideItems.push({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insights.length > 1 && at === 0 ? "plain" : "tonal", ...(slide.highlight === undefined ? {} : { highlight: slide.highlight }), ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG });
-      if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle, sideItems.length === 0));
+      if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle));
       const side = { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: sideTreatment(slide), size: { width: { fr: slide.kpi || insights.length ? 1.5 : 1 }, height: "fill" }, items: sideItems };
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
     } else items.push({ ...stacked, size: SIZE });
@@ -2809,8 +2837,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       ...(slide.kpi ? [{ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } }] : []),
       ...insightSpecs.map((insight, at) => ({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insightSpecs.length > 1 && at === 0 ? "plain" : "tonal", ...(slide.highlight === undefined ? {} : { highlight: slide.highlight }), ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG })),
       ...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })),
-      ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle,
-        !slide.kpi && !insightSpecs.length && !(slide.paragraphs || []).length)] : []),
+      ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle)] : []),
     ];
     const column = { id: `${id}-side`, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: 1.2 }, height: "fill" }, items: copy };
     // The picture's own line sits under it as a statement box, the way a
@@ -2842,8 +2869,11 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     if (slide.points?.length) body.push(pointsItem(slide.points, `${id}-points`, "open", fill, !exhibits.length, pointsStyle));
     for (const [at, text] of (slide.paragraphs || []).entries()) body.push({ id: `${id}-p${at}`, component: "paragraph", props: { text }, size: HUG });
     if (!body.length) throw new Error(`${id}: a sidebar page needs an exhibit, points or paragraphs beside its panel`);
+    // The copy starts level with the panel's top edge. Centred beside a
+    // full-height panel, three paragraphs sat under 125px of air with as much
+    // again below them.
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [panelBox,
-      { id: `${id}-body`, layout: "flow.column", ...(exhibits.length ? {} : { leftover: "center" }), size: { width: { fr: 2 }, height: "fill" }, items: body }] });
+      { id: `${id}-body`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: body }] });
   } else if (layout === "photo-backdrop") {
     // The exhibit on a card over a full-bleed photograph of what it measures:
     // "numbers over the thing itself". The photo sets
@@ -2887,7 +2917,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       // the spare height into one internal void. A list followed by authored
       // paragraphs still shares the track and keeps its natural height.
       items.push(pointsItem(points, `${id}-points`, tone, fill,
-        !(slide.paragraphs || []).length, pointsStyle, items.length === 0));
+        !(slide.paragraphs || []).length, pointsStyle));
     }
     const document = documentItem(slide, id, points.length);
     if (document) items.push(document);
@@ -2895,7 +2925,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   }
   // These full-width/paired layouts used to discard supplied points. Keep
   // them in a measured track below the evidence, just like the two-up recipe.
-  if (["exhibit-full", "table-halves", "split-tone"].includes(layout) && slide.points?.length) {
+  if (["exhibit-full", "table-halves", "split-tone"].includes(layout) && slide.points?.length && !pointsPlaced) {
     items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
   }
   // Authored prose on a full-width page goes under the evidence, for the same
