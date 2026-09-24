@@ -642,12 +642,40 @@ def page_columns(slide):
         if bottom - top < COLUMN_MIN_HEIGHT or len(split) < 2:
             continue
         names = {2: ("left", "right"), 3: ("left", "middle", "right")}.get(len(split))
+        # Every cell of the row, strips included, so column_bands can ask
+        # whether a neighbour is a block drawn the row's full height.
+        cells = [(int(math.floor(x0)), int(math.ceil(x1))) for x0, x1, _ in split]
         for index, (x0, x1, _) in enumerate(split):
             if x1 - x0 >= COLUMN_MIN_WIDTH:
                 columns.append({"name": names[index] if names else f"column {index + 1} of {len(split)}",
                                 "x0": int(math.floor(x0)), "x1": int(math.ceil(x1)),
-                                "top": int(math.floor(top)), "bottom": int(math.ceil(bottom))})
+                                "top": int(math.floor(top)), "bottom": int(math.ceil(bottom)),
+                                "neighbours": [cell for at, cell in enumerate(cells) if at != index]})
     return columns
+
+
+# A block is solid when its cell is drawn across this share of its width on
+# this share of its rows: a filled label block, not a chart with a gridline.
+SOLID_WIDTH, SOLID_ROWS = 0.85, 0.95
+
+
+def solid_cell(rows, x0, x1, top, bottom):
+    """Whether the cell between x0 and x1 is a filled block from `top` to
+    `bottom`. `rows` is column_rows(x0, x1)."""
+    need = SOLID_WIDTH * (x1 - x0)
+    full = sum(1 for y in range(top, bottom) if rows[y] >= need)
+    return full >= SOLID_ROWS * (bottom - top)
+
+
+def anchored(rows, top, bottom):
+    """Whether a column's ink sits centred on its row: the air above it and
+    the air below within a quarter of each other (or 12px, the scene's and
+    the render's disagreement on where a glyph starts, with room)."""
+    inked = [y for y in range(top, bottom) if rows[y] > ROW_MIN]
+    if not inked:
+        return False
+    above, below = inked[0] - top, bottom - 1 - inked[-1]
+    return abs(above - below) <= max(12, 0.25 * (above + below))
 
 
 def column_bands(slide, column_rows):
@@ -662,12 +690,35 @@ def column_bands(slide, column_rows):
     floating mid-plot, points centred with air above and below - is held to
     `internal_void_max`. A column that simply stops short is held to
     `column_void_max`, the tail of the right-column band on well-made pages:
-    held to the page's dead band, a third of good side columns would fail."""
+    held to the page's dead band, a third of good side columns would fail.
+
+    One cell is read with its row rather than as a region of its own: one
+    centred beside a filled block drawn the row's full height. That is a
+    labelled row - a label block down the left, its bullets and its number
+    centred against it - and the block fills every line of the row, so the
+    row reads full across and the air above and below the centred bullets is
+    the row's margin, not a hole. Measured as its own region, a three-row page
+    (164px rows, two bullets each) failed on every row and only four rows or
+    more passed. So the row's centred cells are measured together - the
+    number beside the bullets reads with the bullets, as the row is read -
+    and held to the page's bars in pixels, not to the row's height: a single
+    line centred in a 400px row still fails."""
+    columns = page_columns(slide)
+    rows_of = {id(column): column_rows(column["x0"], column["x1"]) for column in columns}
+    together = {}
+    for column in columns:
+        top, bottom, rows = column["top"], column["bottom"], rows_of[id(column)]
+        if anchored(rows, top, bottom) and any(solid_cell(column_rows(x0, x1), x0, x1, top, bottom)
+                                               for x0, x1 in column.get("neighbours", [])):
+            together.setdefault((top, bottom), []).append(column)
+    read_with_row = {id(c): [sum(values) for values in zip(*(rows_of[id(m)] for m in members))]
+                     for members in together.values() for c in members}
     worst = None
-    for column in page_columns(slide):
+    for column in columns:
         top, bottom = column["top"], column["bottom"]
-        scale = (bottom - top) * CANVAS_H / float(FOOTER_TOP - VOID_TOP)
-        bands = void_bands(column_rows(column["x0"], column["x1"]), top, bottom, scale)
+        rows = read_with_row.get(id(column), rows_of[id(column)])
+        scale = CANVAS_H if id(column) in read_with_row else (bottom - top) * CANVAS_H / float(FOOTER_TOP - VOID_TOP)
+        bands = void_bands(rows, top, bottom, scale)
         if bands["lastInk"] is None:
             continue  # nothing drawn there at all: an unmeasured frame, not a half-empty one
         hole = bands["internalVoid"] / THRESHOLDS["internal_void_max"]

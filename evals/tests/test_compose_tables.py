@@ -337,15 +337,16 @@ console.log('{}');
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
 const items=[...Array(6)].map((_,i)=>({icon:'target',title:`Card ${i}`,text:'A line about it.'}));
+const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const grid=composeSlide({title:'A title that states the finding here',exhibit:{type:'cards',tone:'plain',items,columns:3}},0);
-const block=grid.items.find(i=>i.id==='s01-exhibit');
+const block=find(grid.items,i=>i.id==='s01-exhibit');
 assert.equal(block.layout,'flow.column');
 assert.equal(block.items.length,2,'six cards at three a row is two rows');
 assert.ok(block.items.every(r=>r.component==='cards'&&r.props.items.length===3));
 assert.equal(block.items[0].props.columns,undefined,'the row does not re-wrap itself');
 // A row that fits stays one row.
 const row=composeSlide({title:'A title that states the finding here',exhibit:{type:'cards',tone:'plain',items:items.slice(0,3),columns:3}},0);
-assert.equal(row.items.find(i=>i.id==='s01-exhibit').component,'cards');
+assert.equal(find(row.items,i=>i.id==='s01-exhibit').component,'cards');
 
 // Icons and point count do not substitute cards for an authored list.
 const page=(n)=>composeSlide({title:'A title that states the finding here',

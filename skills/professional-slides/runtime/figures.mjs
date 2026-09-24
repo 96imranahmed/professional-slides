@@ -967,9 +967,14 @@ export function speechNodes({ id, frame, props }) {
 // The panel of a sidebar page: the statement set large in a filled column, a
 // short accent bar above it. A question, a claim or the page's single figure;
 // the evidence sits beside it.
+//
+// The statement keeps a heading's measure, about 45 characters, however wide
+// the panel: beside a short memo the panel takes the width the prose leaves,
+// and a 700px statement ran as two long lines across it.
+const STATEMENT_MEASURE = 440;
 export function sideStatementLayout(frame, props) {
   if (!clean(props.text)) throw new Error("A side statement needs its text");
-  const inner = frame.width - 2 * v("space.5");
+  const inner = Math.min(frame.width - 2 * v("space.5"), STATEMENT_MEASURE);
   const text = measure(props.text, inner, "type.heading", true, DISPLAY);
   if (text.lines.length > 8) throw new Error("A side statement runs to eight lines at most; it is the page's reading, not its argument");
   const kicker = clean(props.kicker) ? measure(props.kicker, inner, "type.label", true) : null;

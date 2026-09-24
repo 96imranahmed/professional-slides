@@ -3750,6 +3750,11 @@
      "id": "p17-p17-exhibit-card-3:point:2",
      "role": "exhibit",
      "text": "Starts: sites agreed by 2028"
+    },
+    {
+     "id": "p17-p17-sowhat:body",
+     "role": "body",
+     "text": "Over half the gain arrives before the wires are energised, so a late power upgrade delays a third of the plan rather than stopping it."
     }
    ]
   },
@@ -4528,8 +4533,66 @@
    ]
   },
   {
-   "id": "s4",
+   "id": "p22b",
    "n": 32,
+   "claim": "Northvale should borrow the £160 million gap, not cut the plan to its grant",
+   "settles": {
+    "kind": "qualitative",
+    "what": "why the funding gap should be borrowed rather than cut from the programme"
+   },
+   "adds": null,
+   "highlight": null,
+   "textReference": {
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
+   },
+   "textPlan": [
+    {
+     "id": "p22b-chrome:title",
+     "role": "title",
+     "text": "Northvale should borrow the £160 million gap, not cut the plan to its grant"
+    },
+    {
+     "id": "p22b-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for a fictional operator; funding plan and demand model central case"
+    },
+    {
+     "id": "p22b-p22b-panel:kicker",
+     "role": "exhibit",
+     "text": "The recommendation"
+    },
+    {
+     "id": "p22b-p22b-panel:text",
+     "role": "exhibit",
+     "text": "Borrow the £160 million in tranches against the electrification milestones; cutting to the grant gives up 3.8 million journeys a year."
+    },
+    {
+     "id": "p22b-p22b-doc-0-p0:text",
+     "role": "body",
+     "text": "Only the £340 million grant is committed, so the tempting answer is to cut the programme to fit it. That answer drops electrification, which is 61% of the capital and carries 3.8 million of the 11.7 million new journeys, and it keeps the Eastern line running diesel units the rest of the network needs back."
+    },
+    {
+     "id": "p22b-p22b-doc-0-p1:text",
+     "role": "body",
+     "text": "Borrowing the £160 million is the better risk. The loan is repaid from fare revenue, which passes its FY20 level in FY29 on the central case, the year the covenant is first tested. Even the low demand case repays the whole programme within the 30-year life of the overhead line, in fifteen years rather than eleven."
+    },
+    {
+     "id": "p22b-p22b-doc-0-p2:text",
+     "role": "body",
+     "text": "The real exposure is timing, not scale. A one-year slip in the power upgrade costs a year of payback and pushes fare revenue past the first covenant test, so the loan should be drawn in tranches as the electrification milestones pass rather than all at the start."
+    },
+    {
+     "id": "p22b-p22b-doc-0-p3:text",
+     "role": "body",
+     "text": "That makes the loan the programme board's instrument as much as the treasurer's. Each tranche is released against a milestone, so a stalled lever cannot draw ahead of its evidence, and the board sees the cost of a slip in the month it happens."
+    }
+   ]
+  },
+  {
+   "id": "s4",
+   "n": 33,
    "kind": "section",
    "role": "structural",
    "claim": "04 / Delivering it",
@@ -4554,7 +4617,7 @@
   },
   {
    "id": "p23",
-   "n": 33,
+   "n": 34,
    "claim": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
    "settles": {
     "kind": "sequence",
@@ -4735,7 +4798,7 @@
   },
   {
    "id": "p24",
-   "n": 34,
+   "n": 35,
    "claim": "Four named owners carry one lever each, reporting monthly to the managing director",
    "settles": {
     "kind": "structure",
@@ -4928,7 +4991,7 @@
   },
   {
    "id": "p25",
-   "n": 35,
+   "n": 36,
    "claim": "Two of seven 2027 milestones are at risk, both on the electrification path",
    "settles": {
     "kind": "count",
@@ -5161,7 +5224,7 @@
   },
   {
    "id": "p26",
-   "n": 36,
+   "n": 37,
    "claim": "Service grows by a fifth while punctuality holds at 90% and unit cost falls",
    "settles": {
     "kind": "comparison",
@@ -5324,7 +5387,7 @@
   },
   {
    "id": "p27",
-   "n": 37,
+   "n": 38,
    "claim": "Fare reform should follow the new timetable, not lead it",
    "settles": {
     "kind": "qualitative",
@@ -5359,22 +5422,22 @@
      "text": "Introduced first, fare reform costs £6 million a year for 0.4 million journeys; introduced second, it adds 1.6 million journeys for the same cost."
     },
     {
-     "id": "p27-p27-p0:text",
+     "id": "p27-p27-doc-0-p0:text",
      "role": "body",
      "text": "Cheaper off-peak fares are the obvious lever, and the one most often proposed. On Northvale's evidence they are the weaker one: lapsed riders cite the wait for the next train twice as often as the fare, and the Coast line, which already sells the cheapest off-peak day return on the network, has the lowest off-peak growth."
     },
     {
-     "id": "p27-p27-p1:text",
+     "id": "p27-p27-doc-0-p1:text",
      "role": "body",
      "text": "A fare cut on an hourly service mostly discounts trips that would have been made anyway; the Coast line's cheaper day return found exactly that, as most of its tickets went to people already travelling. The same cut on a half-hourly service reaches riders who have just been given a reason to come back, and the revenue it gives up is partly repaid by the extra journeys."
     },
     {
-     "id": "p27-p27-p2:text",
+     "id": "p27-p27-doc-0-p2:text",
      "role": "body",
      "text": "So the order matters. Run the new Dales and Valley timetables for a full year, measure who they bring back, and then design the part-time season ticket and the off-peak return around the travel patterns that result."
     },
     {
-     "id": "p27-p27-p3:text",
+     "id": "p27-p27-doc-0-p3:text",
      "role": "body",
      "text": "The cost of waiting is small. Holding fare reform until 2030 forgoes at most 0.4 million journeys a year in FY28 and FY29, the whole of what a first-mover cut would buy, and it gives the demand model a full year of half-hourly data on which to price the new products. A fare designed on a year of evidence is also easier to defend to the regulator and to passengers than one designed on a forecast."
     }
@@ -5382,7 +5445,7 @@
   },
   {
    "id": "p28",
-   "n": 38,
+   "n": 39,
    "kind": "takeaways",
    "claim": "Five decisions put Northvale on the path to 60 million journeys",
    "settles": {

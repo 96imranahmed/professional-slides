@@ -167,7 +167,7 @@ const middle=composeSlide({title:'T',layout:'exhibit-left',pointsHeading:false,p
 const text=composeSlide({title:'T',layout:'text',points:['First finding.','Second finding.']},0);
 console.log(JSON.stringify({
   hero:find(hero.items,i=>i.id==='s01-side').leftover??null,
-  sidebar:find(sidebar.items,i=>i.id==='s01-body').leftover??null,
+  sidebar:find(sidebar.items,i=>i.id==='s01-document').leftover??null,
   beside:find(beside.items,i=>i.id==='s01-side').leftover??null,
   besideList:find(beside.items,i=>i.id==='s01-points').props.centre,
   middle:find(middle.items,i=>i.id==='s01-side').leftover??null,

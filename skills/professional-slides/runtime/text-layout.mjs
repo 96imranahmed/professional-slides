@@ -82,14 +82,51 @@ export function measureTextRuns(runs, width, { fontFamily = activeDesignTokens()
   return { source, sourceRuns: merge(runs), text: lines.join('\n'), lines, runs: measuredRuns.length ? measuredRuns : [{text:'',bold:false}], width: Math.max(...lineRuns.map(runWidth)), lineHeight, height: lines.length * lineHeight };
 }
 
+// A letter or a digit: what a highlighted phrase must not run into.
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+
+/**
+ * Where `phrase` occurs in `text` as whole words, from `from`, or -1. An end
+ * of the phrase that is a letter or a digit must meet a character that is
+ * neither: "22" is not in "FY22", "29" is not in "2029" and "26 m" is not in
+ * "26 months". Substring matching lit exactly those - half a year, half a
+ * word - in the house colour. An end that is punctuation ("£38", "90%") is
+ * matched as written. One rule for every place a highlight is matched: the
+ * runs it becomes (accentRuns), the page's phrase pushed down to its points
+ * (compose) and the compile check that the phrase is in a point (page-types).
+ */
+export function phraseAt(text, phrase, from = 0, { ignoreCase = false } = {}) {
+  const source = ignoreCase ? String(text ?? "").toLowerCase() : String(text ?? "");
+  const wanted = ignoreCase ? String(phrase ?? "").toLowerCase() : String(phrase ?? "");
+  if (!wanted) return -1;
+  const opens = WORD_CHAR.test(wanted[0]), closes = WORD_CHAR.test(wanted.at(-1));
+  // A number carries its decimal point and thousands separator inside it:
+  // "3" is not in "3.7", nor "800" in "9,800".
+  const digit = (c) => /\d/.test(c ?? "");
+  const separator = (c) => c === "." || c === ",";
+  for (let at = source.indexOf(wanted, from); at >= 0; at = source.indexOf(wanted, at + 1)) {
+    if (opens && at > 0 && WORD_CHAR.test(source[at - 1])) continue;
+    if (digit(wanted[0]) && separator(source[at - 1]) && digit(source[at - 2])) continue;
+    const end = at + wanted.length;
+    if (closes && end < source.length && WORD_CHAR.test(source[end])) continue;
+    if (digit(wanted.at(-1)) && separator(source[end]) && digit(source[end + 1])) continue;
+    return at;
+  }
+  return -1;
+}
+
+/** Whether `phrase` occurs in `text` as whole words (phraseAt). */
+export const hasPhrase = (text, phrase, options) => phraseAt(text, phrase, 0, options) >= 0;
+
 /**
  * Split a sentence into runs at the phrases the page wants to carry in the
  * accent. This is the commonest emphasis in a well-made deck: the figure or the
  * finding is set in the house colour inside a sentence that otherwise reads as
  * ink ("Improved quality of care for patients"), rather than bolded whole or
  * split onto its own line. `phrases` is one string or several; each is matched
- * in order of appearance, once. Unmatched phrases throw: a highlight that does
- * not occur in the text is a typo, and silently dropping it hides the typo.
+ * as whole words (phraseAt) wherever it appears. Unmatched phrases throw: a
+ * highlight that does not occur in the text is a typo, and silently dropping
+ * it hides the typo.
  */
 export function accentRuns(text, phrases, { bold = true, accent = true, strict = true } = {}) {
   const list = (Array.isArray(phrases) ? phrases : phrases === undefined || phrases === null ? [] : [phrases])
@@ -99,19 +136,25 @@ export function accentRuns(text, phrases, { bold = true, accent = true, strict =
   // `strict: false` is for a block that is one of several (the items of a table
   // cell): the phrase belongs to one of them, and the caller checks that it
   // matched somewhere rather than in every block.
-  if (!strict && !list.some((phrase) => source.includes(phrase))) return null;
+  if (!strict && !list.some((phrase) => hasPhrase(source, phrase))) return null;
   for (const phrase of list) {
-    if (strict && !source.includes(phrase)) throw new Error(`highlight "${phrase}" does not occur in "${source}"`);
+    if (strict && !hasPhrase(source, phrase)) {
+      throw new Error(source.includes(phrase)
+        ? `highlight "${phrase}" occurs in "${source}" only inside a longer word or number; highlight the whole word`
+        : `highlight "${phrase}" does not occur in "${source}"`);
+    }
   }
+  // Matched on the whole source, so the boundary test sees the character
+  // before each phrase; the runs are cut from the positions found.
   const runs = [];
-  let rest = source;
-  while (rest.length) {
-    const hits = list.map((phrase) => ({ phrase, at: rest.indexOf(phrase) })).filter((hit) => hit.at >= 0).sort((a, b) => a.at - b.at);
-    if (!hits.length) { runs.push({ text: rest, bold: false }); break; }
+  let from = 0;
+  while (from < source.length) {
+    const hits = list.map((phrase) => ({ phrase, at: phraseAt(source, phrase, from) })).filter((hit) => hit.at >= 0).sort((a, b) => a.at - b.at);
+    if (!hits.length) { runs.push({ text: source.slice(from), bold: false }); break; }
     const { phrase, at } = hits[0];
-    if (at > 0) runs.push({ text: rest.slice(0, at), bold: false });
+    if (at > from) runs.push({ text: source.slice(from, at), bold: false });
     runs.push({ text: phrase, bold, ...(accent ? { accent: true } : {}) });
-    rest = rest.slice(at + phrase.length);
+    from = at + phrase.length;
   }
   return runs.filter((run) => run.text.length);
 }

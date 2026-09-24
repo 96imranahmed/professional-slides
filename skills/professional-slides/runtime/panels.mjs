@@ -92,56 +92,58 @@ export function cardsLayout(frame, props, rhythm = 0) {
   return { items: measured, tone, centred, open, gap, pad, width, inner, iconSize, disc, headGap, bodyGap, headerHeight, height: Math.max(...measured.map((m) => m.height - (m.iconBlock + m.numberBlock + m.bandHeight + m.titleHeight + m.valueHeight) + headerHeight)) };
 }
 
+// The most a boxed card's rhythm opens: the gaps between icon, title, figure
+// and text grow by up to 12px each when the frame has the height.
+const CARD_RHYTHMS = ["space.3", "space.2", "space.1"];
+
+/**
+ * The card set a frame takes: the layout with the most rhythm that fits, so
+ * the box is as tall as its copy and never taller. `cardsNodes` draws it and
+ * the ceiling reports it, so the flow knows where the row ends.
+ */
+function grownCards(frame, props) {
+  const L = cardsLayout(frame, props);
+  if (L.open) return L;
+  for (const rhythm of CARD_RHYTHMS) {
+    const grown = cardsLayout(frame, props, v(rhythm));
+    if (grown.height <= frame.height + 0.01) return grown;
+  }
+  return L;
+}
+
 export function cardsNodes({ id, frame: frameIn, props }) {
   let frame = frameIn;
-  const nodes0 = [];
   // A question panel (the survey deck's "Should companies prioritize investments?")
   // takes the left quarter in dark grey; the cards answer it to the right.
-  if (typeof props.question === "string" && props.question.trim()) {
-    const qw = Math.round(frame.width * 0.24), gap = v("space.4"), pad = v("space.4");
-    const q = measure(props.question, qw - 2 * pad, "type.heading", true);
-    const L0 = cardsLayout({ ...frame, x: frame.x + qw + gap, width: frame.width - qw - gap }, props);
-    const h = props.valign === "middle" ? L0.height : frame.height;
-    const top = props.valign === "middle" && frame.height > h ? frame.y + (frame.height - h) / 2 : frame.y;
-    nodes0.push(rect(stableId(id, "question"), "card-question", { x: frame.x, y: top, width: qw, height: h }, SECONDARY, "none", "radius.none"));
-    nodes0.push(label(stableId(id, "question-text"), "card-question-text", { x: frame.x + pad, y: top + pad, width: qw - 2 * pad }, q, text("type.heading", WHITE, true)));
-    frame = { ...frame, x: frame.x + qw + gap, width: frame.width - qw - gap };
+  const asked = typeof props.question === "string" && props.question.trim();
+  const qw = Math.round(frame.width * 0.24), qgap = v("space.4"), qpad = v("space.4");
+  const q = asked ? measure(props.question, qw - 2 * qpad, "type.heading", true) : null;
+  if (asked) frame = { ...frame, x: frame.x + qw + qgap, width: frame.width - qw - qgap };
+  const natural = cardsLayout(frame, props);
+  if (natural.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(natural.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
+  // Cards are as tall as their copy, at the top of their frame, the copy
+  // starting under the box's top edge. They used to grow to half as much
+  // again as they needed and centre the copy in the box, so four cards
+  // running the page's height carried 80px of air above every icon and as
+  // much under the last line: the short group centred in its region that the
+  // columns check reads as a hole. The room goes to the card's rhythm first -
+  // the gaps between icon, title, figure and text open by up to 12px each -
+  // and what is left is the frame's, below the row, for the flow to give to
+  // what follows (the ceiling reports the row's height). An open column set
+  // keeps its natural height. `valign: "middle"` still centres the row when
+  // the author asks.
+  const L = props.valign === "middle" ? natural : grownCards(frame, props);
+  const cardHeight = L.height;
+  if (props.valign === "middle" && frame.height > L.height) frame = { ...frame, y: frame.y + (frame.height - L.height) / 2 };
+  const nodes = [];
+  if (asked) {
+    const h = Math.max(cardHeight, q.height + 2 * qpad);
+    nodes.push(rect(stableId(id, "question"), "card-question", { x: frameIn.x, y: frame.y, width: qw, height: h }, SECONDARY, "none", "radius.none"));
+    nodes.push(label(stableId(id, "question-text"), "card-question-text", { x: frameIn.x + qpad, y: frame.y + qpad, width: qw - 2 * qpad }, q, text("type.heading", WHITE, true)));
   }
-  let L = cardsLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
-  const nodes = nodes0;
-  // Cards fill their frame so a row reads as one band - but only so far. Given
-  // a body track and three short cards, filling meant three bordered boxes 55%
-  // empty, with the text sitting in the top third of each: a box two lines tall
-  // around one line of text is a defect, and three of them is a page. The band
-  // grows to half as much again as it needs and then centres in what is left.
-  const fill = frame.height >= L.height && props.valign !== "middle";
-  // An open column set is type in two tracks rather than a band of boxes, so
-  // it keeps its natural height and centres; boxed cards grow to half as much
-  // again as they need.
-  const cardHeight = fill ? Math.min(frame.height, L.height * (L.open ? 1 : 1.5)) : L.height;
-  // Icon rows (`valign: "middle"`) keep their natural height and sit centred in the frame.
-  if (props.valign === "middle" && frame.height > L.height) frame = { ...frame, y: frame.y + (frame.height - L.height) / 2, height: L.height };
-  else if (fill && cardHeight < frame.height) frame = { ...frame, y: frame.y + (frame.height - cardHeight) / 2, height: cardHeight };
-  // A grown card set its copy from the top and left the lower half of the box
-  // empty (the Emirates Saudi-challengers page: three 386px boxes, the text
-  // ending at 260). The room goes to the card's rhythm first - the gaps
-  // between icon, title, figure and text open by up to 12px each - and what
-  // is left is split above and below the copy, so the content sits in the
-  // middle of its box. The row still starts level: every card takes the same
-  // rhythm and the same offset. Tones that hang a band from the card's top
-  // edge (header, dark, big-number) keep their copy under the band.
-  const anchored = ["header", "dark", "big-number"].includes(L.tone);
-  if (!L.open && cardHeight > L.height + 0.01) {
-    for (const rhythm of [v("space.3"), v("space.2"), v("space.1")]) {
-      const grown = cardsLayout(frame, props, rhythm);
-      if (grown.height <= cardHeight + 0.01) { L = grown; break; }
-    }
-  }
-  const offset = !L.open && !anchored ? Math.max(0, (cardHeight - L.height) / 2) : 0;
   L.items.forEach((m, index) => {
     const x = frame.x + index * (L.width + L.gap), cid = stableId(id, "card", index);
-    const top = frame.y + offset;
+    const top = frame.y;
     if (L.tone === "stat") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, MUTED, "none", "radius.none"));
     else if (!L.open && L.tone !== "dark") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, SURFACE, RULE, "radius.small"));
     let y = top + L.pad;
@@ -448,15 +450,15 @@ export function registerPanels(registry) {
     resolveVariant: (props = {}) => props.tone ?? (Array.isArray(props.items) && props.items.some((i) => i?.icon) ? "outline" : "numbered"),
     render: (input) => ({ nodes: cardsNodes(input) }),
     measureContent: ({ frame, props }) => cardsLayout(frame, props),
-    // The height the row can use: boxed cards grow to half as much again as
-    // they need (their copy centred, `cardsNodes`), an open column set keeps
-    // its natural height. Beyond it the frame's slack was split above and
-    // below the row - a gap between the cards and the commentary under them.
-    // A centred row and a question panel place themselves in any frame.
+    // The height the row uses: its copy with the rhythm the frame allows
+    // (grownCards, as `cardsNodes` draws it). Past it the slack goes after the
+    // row, to what follows it. A centred row places itself in any frame.
     measureCeiling: ({ frame, props }) => {
-      if (props.valign === "middle" || (typeof props.question === "string" && props.question.trim())) return null;
-      const L = cardsLayout(frame, props);
-      return L.open ? L.height : L.height * 1.5;
+      if (props.valign === "middle") return null;
+      if (!(typeof props.question === "string" && props.question.trim())) return grownCards(frame, props).height;
+      const qw = Math.round(frame.width * 0.24), pad = v("space.4");
+      const q = measure(props.question, qw - 2 * pad, "type.heading", true);
+      return Math.max(grownCards({ ...frame, width: frame.width - qw - v("space.4") }, props).height, q.height + 2 * pad);
     },
     guidance: { useWhen: "three to five parallel pillars, principles, options or initiatives each with a title and a line of description", why: "equal cards make parallel things read as parallel; the row rule keeps their bodies level", actionTitle: "state what the set of pillars achieves together" }
   });

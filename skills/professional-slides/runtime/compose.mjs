@@ -24,10 +24,10 @@
 // "quadrants", "swot", "compare", "phase-table", "rows".
 import { applyDesign } from "./design-systems.mjs";
 import { mapAll } from "./core.mjs";
-import { measureInsight, measureList } from "./registry.mjs";
+import { measureInsight, measureList, measureProse, proseMeasure } from "./registry.mjs";
 import fs from "node:fs";
 import path from "node:path";
-import { measureText, accentRuns } from "./text-layout.mjs";
+import { measureText, accentRuns, hasPhrase } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
 import { defaultFocusIndex } from "./charts.mjs";
 import { legendRowCount } from "./legends.mjs";
@@ -1207,19 +1207,95 @@ function documentItem(slide, id, pointCount) {
   const asked = slide.textColumns;
   if (asked !== undefined && ![1, 2, 3].includes(asked)) throw new Error(`${id}: textColumns is 1, 2 or 3`);
   const count = Math.min(asked ?? Math.min(3, Math.ceil(total / DOCUMENT_COLUMN_WORDS)), paragraphs.length) || 1;
-  // Balance columns by words, keeping paragraphs whole and in reading order.
-  const columns = Array.from({ length: count }, () => []);
-  let at = 0, filled = 0;
-  for (const text of paragraphs) {
-    if (at < count - 1 && filled >= total * (at + 1) / count) at += 1;
-    columns[at].push(text); filled += wordsIn(text);
-  }
+  const columns = balancedColumns(paragraphs, count);
   const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4",
     size: { width: { fr: 1 }, height: "fill" },
     items: texts.map((text, i) => ({ id: `${id}-doc-${c}-p${i}`, component: "paragraph", props: { text }, size: HUG })) });
   return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6", size: SIZE,
     items: columns.filter((texts) => texts.length).map(column) };
 }
+
+/** Paragraphs into `count` columns balanced by words, whole and in reading order. */
+function balancedColumns(paragraphs, count) {
+  const total = paragraphs.reduce((sum, p) => sum + wordsIn(p), 0);
+  const columns = Array.from({ length: count }, () => []);
+  let at = 0, filled = 0;
+  for (const text of paragraphs) {
+    if (at < count - 1 && filled >= total * (at + 1) / count) at += 1;
+    columns[at].push(text); filled += wordsIn(text);
+  }
+  return columns.filter((texts) => texts.length);
+}
+
+// The depth prose may reach: the body less a line, so a two-line title (a
+// body some 14px shorter) still takes it; and the depth that reads as a full
+// column, some 70px above the foot, well inside the column check's bar. The
+// gaps are the document columns' own (space.4 between paragraphs, space.6
+// between columns).
+const PROSE_DEPTH = 488, PROSE_FULL = 440, PROSE_PARAGRAPH_GAP = 16, PROSE_COLUMN_GAP = 32;
+
+/**
+ * Prose beside a panel, in one column or two, each as narrow as lets the
+ * prose reach the foot of the body and no wider than a paragraph's measure;
+ * the panel beside it takes the rest of the width. `room` is the width the
+ * prose may take at most.
+ *
+ * The prose used to be handed a fixed share of the row. A memo in two equal
+ * columns needed some 500 words to reach the foot, against a text page's
+ * ceiling of 329, so every memo page stopped halfway down; a sidebar's copy in
+ * two thirds of the row stopped at the paragraph's measure, 165px short of its
+ * column's right edge, a strip of nothing the height of the page. Sized to the
+ * text, 150 to 330 words fill the page: one column from the measure's floor
+ * (45 characters) to its cap (80), and two when one at the cap runs past the
+ * foot.
+ */
+function proseBeside(paragraphs, id, room) {
+  const { widest, narrowest } = proseMeasure();
+  const depth = (texts, width) => texts.reduce((sum, text) => sum + measureProse(text, width), 0) + PROSE_PARAGRAPH_GAP * (texts.length - 1);
+  // One column, or two broken where the deeper of them is shallowest at that
+  // width: between paragraphs, or inside one at a sentence, as a column of
+  // type runs on. Balanced by whole paragraphs, 91, 71 and 94 words went left
+  // and 78 right, and the right column stopped a quarter of the page short.
+  const sentences = (text) => text.split(/(?<=[.!?])\s+(?=[A-Z0-9£$€"“])/);
+  const breaks = paragraphs.flatMap((text, at) => {
+    const parts = sentences(text);
+    const whole = at ? [[paragraphs.slice(0, at), paragraphs.slice(at)]] : [];
+    return [...whole, ...parts.slice(1).map((_, cut) => [
+      [...paragraphs.slice(0, at), parts.slice(0, cut + 1).join(" ")],
+      [parts.slice(cut + 1).join(" "), ...paragraphs.slice(at + 1)]])];
+  });
+  const deepest = (columns, width) => Math.max(...columns.map((texts) => depth(texts, width)));
+  const split = (count, width) => count === 1 || !breaks.length ? [paragraphs]
+    : breaks.reduce((best, columns) => (deepest(columns, width) < deepest(best, width) ? columns : best));
+  const most = (count) => Math.min(widest, Math.floor((room - PROSE_COLUMN_GAP * (count - 1)) / count));
+  const counts = breaks.length ? [1, 2] : [1];
+  // Of the widths at which the prose fits, the widest that still reaches
+  // PROSE_FULL: the narrowest that fits put 263 words in a 474px column
+  // beside a panel half as wide again, the prose reading as the aside. Prose
+  // too short to reach it at any width takes the narrowest, its deepest.
+  let chosen = null;
+  for (const count of counts) {
+    const fits = [];
+    for (let width = Math.min(narrowest, most(count)); width <= most(count); width += 8) {
+      const columns = split(count, width), reach = deepest(columns, width);
+      if (reach <= PROSE_DEPTH) fits.push({ columns, width, reach });
+    }
+    chosen = fits.filter((fit) => fit.reach >= PROSE_FULL).at(-1) ?? fits[0] ?? null;
+    if (chosen) break;
+  }
+  // Longer than two columns at the measure hold: the widest, and the overflow
+  // is the layout's to report.
+  if (!chosen) chosen = { columns: split(counts.at(-1), most(counts.at(-1))), width: most(counts.at(-1)) };
+  const { columns, width } = chosen;
+  const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4", size: { width, height: "fill" },
+    items: texts.map((text, i) => ({ id: `${id}-doc-${c}-p${i}`, component: "paragraph", props: { text }, size: HUG })) });
+  return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6",
+    size: { width: columns.length * width + PROSE_COLUMN_GAP * (columns.length - 1), height: "fill" }, items: columns.map(column) };
+}
+
+// The least a panel beside prose keeps: a statement in heading type needs
+// about this much to stay within its eight lines.
+const PANEL_MIN_WIDTH = 300;
 
 /** `photo: { path, alt, credit }` on a content page: a cropped photograph column. */
 function photoStrip(slide, id, baseDir, fr = 1) {
@@ -2138,10 +2214,9 @@ function highlightThePhrase(slide) {
   const phrases = (Array.isArray(declared) ? declared : [declared])
     .map((p) => String(p ?? "").trim()).filter(Boolean);
   if (!phrases.length) return slide;
-  const inside = (text) => {
-    const haystack = String(text ?? "").toLowerCase();
-    return phrases.filter((p) => haystack.includes(p.toLowerCase()));
-  };
+  // As whole words (phraseAt): "22" offered to "FY22" would be accepted here
+  // and then lit as half a year.
+  const inside = (text) => phrases.filter((p) => hasPhrase(text, p, { ignoreCase: true }));
   // The phrase stays on the slide: `soWhat` and the insight boxes are built
   // later, from the slide, and they set it in the accent too.
   const next = { ...slide };
@@ -2780,14 +2855,14 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   const fullWidth = layout === "exhibit-full" || layout === "metrics-over-exhibit";
   let pointsPlaced = false;
   if (fullWidth && (centredCards(exhibits[0]) || centredFigure(exhibits[0]))) {
-    // Icon cards with a line each hug their content and sit centred in the
-    // space above the takeaway; header and numbered cards fill the page as columns.
-    const below = centredFigure(exhibits[0]) && layout === "exhibit-full" && slide.points?.length
+    // Icon cards with a line each hug their content at the top of the body,
+    // like the figures, with the points under them; centred, they carried as
+    // much air above the row as below it. Header and numbered cards fill the
+    // page as columns.
+    const below = layout === "exhibit-full" && slide.points?.length
       ? [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle)] : [];
     pointsPlaced = below.length > 0;
-    items.push(centredFigure(exhibits[0])
-      ? { id: `${id}-figure-frame`, layout: "flow.column", size: SIZE, items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, HUG), ...below] }
-      : exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { ...SIZE, centre: true }));
+    items.push({ id: `${id}-figure-frame`, layout: "flow.column", size: SIZE, items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, HUG), ...below] });
   } else if (fullWidth) {
     const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
     if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
@@ -2931,9 +3006,13 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     if (!body.length) throw new Error(`${id}: a sidebar page needs an exhibit, points or paragraphs beside its panel`);
     // The copy starts level with the panel's top edge. Centred beside a
     // full-height panel, three paragraphs sat under 125px of air with as much
-    // again below them.
+    // again below them. Prose alone is sized to reach the foot at a readable
+    // measure (proseBeside) and the panel takes the rest; in two thirds of the
+    // row it stopped at the measure, 165px short of its column's edge.
+    const proseOnly = !exhibits.length && !slide.points?.length;
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [panelBox,
-      { id: `${id}-body`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: body }] });
+      proseOnly ? proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH)
+        : { id: `${id}-body`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: body }] });
   } else if (layout === "photo-backdrop") {
     // The exhibit on a card over a full-bleed photograph of what it measures:
     // "numbers over the thing itself". The photo sets
@@ -2979,9 +3058,24 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       items.push(pointsItem(points, `${id}-points`, tone, fill,
         !(slide.paragraphs || []).length, pointsStyle));
     }
-    const document = documentItem(slide, id, points.length);
+    // A memo: the prose first at a readable measure, sized to reach the foot
+    // (proseBeside), and its panel - the conclusion or the figures to keep -
+    // down the right in the tint. Without the panel the memo was one to three
+    // equal columns, which a text page's word ceiling could not fill.
+    const memo = slide.panel && (slide.paragraphs || []).length && !points.length;
+    if (memo) {
+      const panel = slide.panel;
+      if (typeof panel.text !== "string" || !panel.text.trim()) throw new Error(`${id}: a memo's \`panel\` carries \`text\`, the conclusion the reader keeps`);
+      const tone = panel.tone ?? "tint";
+      if (!["dark", "primary", "muted", "tint"].includes(tone)) throw new Error(`${id}: panel.tone is dark, primary, muted or tint`);
+      items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
+        proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH),
+        { id: `${id}-panel`, component: "side-statement", props: { text: panel.text.trim(), tone, ...(panel.kicker ? { kicker: panel.kicker } : {}) },
+          size: { width: { fr: 1 }, height: "fill" } }] });
+    }
+    const document = memo ? null : documentItem(slide, id, points.length);
     if (document) items.push(document);
-    else for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
+    else if (!memo) for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
   }
   // These full-width/paired layouts used to discard supplied points. Keep
   // them in a measured track below the evidence, just like the two-up recipe.

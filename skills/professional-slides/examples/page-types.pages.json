@@ -1656,9 +1656,9 @@
    "id": "p17",
    "type": "parallel",
    "form": "cards",
-   "commentary": "in-exhibit",
+   "commentary": "so-what-bar",
    "takeaway": false,
-   "why": "The four levers are parallel and independent, each with its own size, owner and dependency, so they read as four columns",
+   "why": "The four levers are parallel and independent, each with its own size, owner and dependency, so they read as four columns; the bar says which of them can start without new trains",
    "settles": {
     "kind": "count",
     "what": "journeys each of the four levers adds by FY31"
@@ -1714,7 +1714,8 @@
      }
     ]
    },
-   "source": "Source: illustrative data for a fictional operator; demand model central case"
+   "source": "Source: illustrative data for a fictional operator; demand model central case",
+   "bar": "Over half the gain arrives before the wires are energised, so a late power upgrade delays a third of the plan rather than stopping it."
   },
   {
    "id": "p18",
@@ -2133,6 +2134,31 @@
     ]
    },
    "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "p22b",
+   "type": "argument",
+   "form": "memo",
+   "commentary": "none",
+   "takeaway": false,
+   "why": "Whether to borrow or to cut is a judgement about risk and timing, which reads best as reasoning, with the recommendation held in the panel beside it",
+   "settles": {
+    "kind": "qualitative",
+    "what": "why the funding gap should be borrowed rather than cut from the programme"
+   },
+   "adds": null,
+   "title": "Northvale should borrow the £160 million gap, not cut the plan to its grant",
+   "paragraphs": [
+    "Only the £340 million grant is committed, so the tempting answer is to cut the programme to fit it. That answer drops electrification, which is 61% of the capital and carries 3.8 million of the 11.7 million new journeys, and it keeps the Eastern line running diesel units the rest of the network needs back.",
+    "Borrowing the £160 million is the better risk. The loan is repaid from fare revenue, which passes its FY20 level in FY29 on the central case, the year the covenant is first tested. Even the low demand case repays the whole programme within the 30-year life of the overhead line, in fifteen years rather than eleven.",
+    "The real exposure is timing, not scale. A one-year slip in the power upgrade costs a year of payback and pushes fare revenue past the first covenant test, so the loan should be drawn in tranches as the electrification milestones pass rather than all at the start.",
+    "That makes the loan the programme board's instrument as much as the treasurer's. Each tranche is released against a milestone, so a stalled lever cannot draw ahead of its evidence, and the board sees the cost of a slip in the month it happens."
+   ],
+   "source": "Source: illustrative data for a fictional operator; funding plan and demand model central case",
+   "panel": {
+    "kicker": "The recommendation",
+    "text": "Borrow the £160 million in tranches against the electrification milestones; cutting to the grant gives up 3.8 million journeys a year."
+   }
   },
   {
    "id": "s4",

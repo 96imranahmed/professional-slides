@@ -376,12 +376,12 @@
    "title": "Four levers add 11.7 million journeys, led by the off-peak timetable",
    "exhibit": "cards",
    "architecture": "card-grid",
-   "why": "The four levers are parallel and independent, each with its own size, owner and dependency, so they read as four columns",
+   "why": "The four levers are parallel and independent, each with its own size, owner and dependency, so they read as four columns; the bar says which of them can start without new trains",
    "pageType": "parallel/cards",
-   "commentary": "in-exhibit",
+   "commentary": "so-what-bar",
    "annotation": "none",
    "anchors": [],
-   "insight": "none"
+   "insight": "band"
   },
   {
    "id": "p18",
@@ -460,8 +460,21 @@
    "insight": "none"
   },
   {
-   "id": "s4",
+   "id": "p22b",
    "n": 32,
+   "title": "Northvale should borrow the £160 million gap, not cut the plan to its grant",
+   "exhibit": "text",
+   "architecture": "text",
+   "why": "Whether to borrow or to cut is a judgement about risk and timing, which reads best as reasoning, with the recommendation held in the panel beside it",
+   "pageType": "argument/memo",
+   "commentary": "none",
+   "annotation": "none",
+   "anchors": [],
+   "insight": "none"
+  },
+  {
+   "id": "s4",
+   "n": 33,
    "title": "04 / Delivering it",
    "kind": "section",
    "exhibit": "text",
@@ -470,7 +483,7 @@
   },
   {
    "id": "p23",
-   "n": 33,
+   "n": 34,
    "title": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
    "exhibit": "gantt",
    "architecture": "gantt",
@@ -487,7 +500,7 @@
   },
   {
    "id": "p24",
-   "n": 34,
+   "n": 35,
    "title": "Four named owners carry one lever each, reporting monthly to the managing director",
    "exhibit": "people",
    "architecture": "card-grid",
@@ -506,7 +519,7 @@
   },
   {
    "id": "p25",
-   "n": 35,
+   "n": 36,
    "title": "Two of seven 2027 milestones are at risk, both on the electrification path",
    "exhibit": "table",
    "architecture": "matrix",
@@ -526,7 +539,7 @@
   },
   {
    "id": "p26",
-   "n": 36,
+   "n": 37,
    "title": "Service grows by a fifth while punctuality holds at 90% and unit cost falls",
    "exhibit": "chart.column",
    "architecture": "metrics-over-evidence",
@@ -539,7 +552,7 @@
   },
   {
    "id": "p27",
-   "n": 37,
+   "n": 38,
    "title": "Fare reform should follow the new timetable, not lead it",
    "exhibit": "text",
    "architecture": "text",
@@ -553,7 +566,7 @@
   },
   {
    "id": "p28",
-   "n": 38,
+   "n": 39,
    "title": "Five decisions put Northvale on the path to 60 million journeys",
    "exhibit": "text",
    "architecture": "text",

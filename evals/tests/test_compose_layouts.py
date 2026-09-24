@@ -59,8 +59,10 @@ import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const cards=composeSlide({title:'T',exhibit:{type:'cards',items:[{icon:'target',title:'A',text:'a'},{icon:'rocket',title:'B',text:'b'}]}},0);
-assert.equal(find(cards.items,i=>i.component==='cards').props.valign,'middle','icon cards centre in the page');
-assert.equal(find(cards.items,i=>i.component==='cards').size.height,'fill');
+// Icon cards hug their copy at the top of the body; centred, they carried as
+// much air above the row as below it.
+assert.equal(find(cards.items,i=>i.component==='cards').props.valign,undefined,'icon cards start at the top of the page');
+assert.equal(find(cards.items,i=>i.component==='cards').size.height,'hug');
 const header=composeSlide({title:'T',exhibit:{type:'cards',tone:'header',items:[{title:'A',points:['x']},{title:'B',points:['y']}]}},0);
 assert.equal(header.items[0].component,'cards');assert.equal(header.items[0].size.height,'fill');
 const swot=composeSlide({title:'T',exhibit:{type:'swot',strengths:['s'],weaknesses:['w'],opportunities:['o'],threats:['t']}},0);

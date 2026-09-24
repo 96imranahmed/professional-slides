@@ -29,6 +29,7 @@ import { REGISTRY, measureInsight } from "./registry.mjs";
 import { trivialChart } from "./gates/craft_gates.mjs";
 import { calloutFits } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
+import { hasPhrase } from "./text-layout.mjs";
 
 // Where the page's explanation lives. Each maps onto what the composer draws.
 export const COMMENTARY = Object.freeze({
@@ -400,6 +401,7 @@ const CONSTRUCTION_DATA = {
 };
 // Forms that read more than their component's sample says.
 const FORM_DATA = {
+  "argument/memo": ["paragraphs (150 to 330 words)", "panel ({ text, kicker }: the conclusion or the figures to keep, down the right)"],
   "trend/indexed": ["categories", "series (raw values, the subject and three or more peers)", "indexBase (the period set to 100)", "subject (the series in colour)"],
   "ranking/distribution": ["categories (15 to 40 members, sorted by the value)", "series (one measure)", "highlights (the subject)"],
 };
@@ -748,10 +750,22 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   // A labelled-rows page writes its points in its blocks, and is held to the same.
   const blockTexts = page.form === "labelled-rows" ? (page.blocks || []).flatMap((block) => block?.points || [])
     .map((point) => (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`).toLowerCase()) : [];
-  const stray = points || blockTexts.length ? phrases.filter((p) => p && ![...pointTexts, ...blockTexts].some((text) => text.includes(p))) : [];
-  if (stray.length) throw new Error(`${id}: \`highlight\` "${stray[0]}" appears in none of the points; use a phrase exactly as a point writes it`);
+  // Found as whole words, by the rule the accent is set by (phraseAt): "22"
+  // passed here on "FY22" and was then drawn as half a year in the accent.
+  const texts = [...pointTexts, ...blockTexts];
+  const stray = points || blockTexts.length ? phrases.filter((p) => p && !texts.some((text) => hasPhrase(text, p))) : [];
+  if (stray.length) {
+    // Quoted as the point writes it: the texts above are lowercased to match.
+    const written = [...(page.points || []), ...(page.form === "labelled-rows" ? (page.blocks || []).flatMap((block) => block?.points || []) : [])]
+      .map((point) => (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`));
+    const partWord = written.find((text) => text.toLowerCase().includes(stray[0]));
+    const at = partWord ? partWord.toLowerCase().indexOf(stray[0]) : -1;
+    throw new Error(partWord
+      ? `${id}: \`highlight\` "${stray[0]}" occurs only inside a longer word or number ("${partWord.slice(Math.max(0, at - 12), at + stray[0].length + 12).trim()}"), so it would light half a word; highlight the whole word or figure as the point writes it`
+      : `${id}: \`highlight\` "${stray[0]}" appears in none of the points; use a phrase exactly as a point writes it`);
+  }
   if (!draft && points >= 2 && ["beside", "beside-left", "below"].includes(page.commentary)) {
-    const marked = (page.points || []).filter((point, at) => (point && typeof point === "object" && point.highlight) || phrases.some((p) => p && pointTexts[at].includes(p))).length;
+    const marked = (page.points || []).filter((point, at) => (point && typeof point === "object" && point.highlight) || phrases.some((p) => p && hasPhrase(pointTexts[at], p))).length;
     if (marked < Math.ceil(points / 2)) throw new Error(`${id}: mark the finding in each point - ${marked} of ${points} points carry a highlighted phrase; give \`highlight\` a list with a phrase from each point (the number or claim the reader should see first), or \`highlight\` on the point`);
   }
   if (!draft && ["beside", "beside-left", "below"].includes(page.commentary) && !points && !page.paragraphs)
@@ -821,6 +835,12 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     if (!(page.paragraphs || []).length && !points) throw new Error(`${id}: an argument page carries its \`paragraphs\``);
     slide.layout = target;
     if (page.form === "sidebar" && !page.panel) throw new Error(`${id}: a sidebar argument sets its claim in \`panel\``);
+    // A memo's prose runs at a readable measure, which a text page's words
+    // fill down but not across: the width it leaves is the panel's. Without
+    // one the memo was set in equal columns that needed some 500 words to
+    // reach the foot, and every memo page stopped halfway down.
+    if (page.form === "memo" && (page.paragraphs || []).length && !page.panel)
+      throw new Error(`${id}: a memo sets its prose at a readable measure with a \`panel\` beside it - { text, kicker } carrying the conclusion or the figures the reader keeps - which takes the width the prose leaves`);
   } else if (page.type === "statement") {
     if (page.form === "statement") { slide.kind = "statement"; if (!page.text) throw new Error(`${id}: a statement page carries its \`text\``); }
     else { if (!primary) throw new Error(`${id}: a quotes page carries a quote-cluster exhibit`); setType(primary, "quote-cluster"); }

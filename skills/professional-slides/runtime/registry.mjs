@@ -109,6 +109,17 @@ function paragraphMeasure(frameWidth, props = {}) {
   return Math.min(frameWidth, Math.round(tokenValue(BODY) * 96 / 72 * 0.47 * 80));
 }
 
+/**
+ * Prose as a paragraph sets it: the widest line a paragraph runs to (the
+ * measure cap), the narrowest a column of prose should be (45 characters),
+ * and the height `text` takes at `width`. The composer sizes a column of
+ * prose with these rather than handing it a track: a paragraph in a track
+ * wider than the cap stops short of the track's right edge, and the rest of
+ * the track is a strip of nothing down the page.
+ */
+export const proseMeasure = () => ({ widest: paragraphMeasure(Infinity), narrowest: Math.round(tokenValue(BODY) * 96 / 72 * 0.47 * 45) });
+export const measureProse = (text, width) => measureText(text, paragraphMeasure(width), { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false, wrapWidthRatio: 1 }).height;
+
 // `fitText` and the measured node now live in text-style.mjs, beside the
 // style object they measure; re-exported here because this is where callers
 // have always found it.

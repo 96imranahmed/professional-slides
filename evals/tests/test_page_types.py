@@ -71,7 +71,7 @@ const kinds = [
   {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}]] }} }},
   {{ type: 'mechanism', form: 'flow', commentary: 'below', points: ['a', 'b'], highlight: ['a', 'b'], exhibit: {{ nodes: [{{ id: 'x' }}, {{ id: 'y' }}, {{ id: 'z' }}], edges: [] }} }},
   {{ type: 'numbers', form: 'hero-number', commentary: 'beside', kpi: {{ value: '5', label: 'x' }}, points: ['a'], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1']] }} }},
-  {{ type: 'argument', form: 'memo', commentary: 'none', paragraphs: ['Prose.'] }},
+  {{ type: 'argument', form: 'memo', commentary: 'none', paragraphs: ['Prose.'], panel: {{ text: 'The conclusion the reader keeps.' }} }},
 ];
 const chosen = Array.from({{ length: 14 }}, (_, i) => ({{ id: 'c' + i, takeaway: i % 7 === 0 ? 'Close' : false, why: 'Chosen for what this page has to show', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, ...structuredClone(kinds[i % kinds.length]) }}));
 const ok = compileDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: chosen }});
@@ -339,7 +339,7 @@ const strip = {{ id: 'm', type: 'numbers', form: 'metric-strip', commentary: 'be
 // A short argument page: its content plan is derived from the composed page and held to the text-page floor.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
 const memo = {{ id: 'm1', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, why: 'A short argument page for the test',
-  settles: {{ kind: 'qualitative', what: 'The operator statement of its plan' }}, adds: null, title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'] }};
+  settles: {{ kind: 'qualitative', what: 'The operator statement of its plan' }}, adds: null, title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year.' }} }};
 const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [memo] }}, {{ baseDir: dir }});
 const content = deriveContent(out.spec, out.deck);
 const page = content.pages.find((p) => p.id === 'm1');
@@ -413,7 +413,7 @@ const S = {{ kind: 'qualitative', what: 'The operator statement of its plan' }};
 const broken = {{ id: 'b', type: 'lookup', form: 'table', commentary: 'none', takeaway: false, why: 'The measures are looked up here', settles: S,
   title: 'The measures sit in one table', exhibit: {{ columns: ['A', 'B'], rows: [['x']] }} }};
 const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, why: 'A short argument page for the test', settles: S,
-  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'] }};
+  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year.' }} }};
 const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [broken, memo] }}, {{ baseDir: dir }});
 console.log(JSON.stringify({{ failed: [...out.failedIds], composed: out.deck.slides.map((s) => s.id), codes: out.findings.map((f) => f.code) }}));
 ''')
@@ -510,7 +510,7 @@ const S = {{ kind: 'qualitative', what: 'The operator statement of its plan' }};
 const bad = {{ id: 'bad', type: 'trend', form: 'line', commentary: 'none', takeaway: false, why: 'The page type fits the claim here', settles: S, title: 'Two years',
   exhibit: {{ categories: ['2019', '2020'], series: [{{ name: 'x', values: [1, 2] }}] }} }};
 const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, why: 'A short argument page for the test', settles: S,
-  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'] }};
+  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year.' }} }};
 const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [bad, memo] }}, {{ baseDir: dir }});
 console.log(JSON.stringify({{ codes: out.findings.map((f) => f.code + ':' + (f.id ?? '')), composed: out.deck.slides.map((s) => s.id),
   floor: out.deck.slides.find((s) => s.id === 'm')?.wordFloor ?? null, ceiling: out.deck.slides.find((s) => s.id === 'm')?.wordCeiling ?? null }}));
