@@ -24,3 +24,4 @@ Claude outputs/
 
 # Per-deck authoring logs (author-deck.mjs)
 *.author-log.jsonl
+.claude/worktrees/

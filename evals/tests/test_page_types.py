@@ -111,7 +111,7 @@ const sequence = (extra = {}) => ({ ...base, id: 'seq', type: 'panels', form: 's
   exhibits: ['Journey time', 'Journeys won', 'Line journeys'].map((h, i) => ({ ...bars(h), caption: 'Step ' + (i + 1) + ' of the chain holds on every one of the four flows' })), ...extra });
 const ranked = (extra = {}) => ({ ...base, id: 'bar', type: 'ranking', form: 'bar', commentary: 'so-what-bar',
   title: 'Northvale gives the smallest off-peak discount of seven operators',
-  exhibit: { heading: 'Off-peak discount', unit: '%', categories: ['A', 'B', 'C', 'D', 'E'], series: [{ name: 'x', values: [46, 41, 38, 29, 18] }], highlights: [{ category: 'E' }] },
+  exhibit: { heading: 'Off-peak discount', unit: '%', categories: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'], series: [{ name: 'x', values: [46, 41, 38, 36, 35, 29, 24, 21, 18] }], highlights: [{ category: 'I' }] },
   bar: 'A deeper discount on an hourly service buys few riders, so the fare change follows the timetable', ...extra });
 const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
 '''
@@ -249,16 +249,16 @@ import {{ compilePage }} from '{KIT}';
 import {{ varietyFindings, VARIETY }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
 const S = {{ kind: 'qualitative', what: 'The operator statement of its plan' }};
 const base = {{ takeaway: false, why: 'The page type fits the claim this page makes', settles: S }};
-const years = ['2019', '2020', '2021', '2022', '2023'];
+const years = ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
 const pts = ['Traffic fell to a fifth', 'It recovered by 2022'];
 const trend = compilePage({{ ...base, id: 't', type: 'trend', form: 'line', commentary: 'beside', points: pts, highlight: ['a fifth', 'by 2022'], title: 'Traffic recovered',
-  exhibit: {{ categories: years, series: [{{ name: 'x', values: [5, 1, 2, 4, 5] }}], highlights: [{{ category: '2020' }}] }} }});
+  exhibit: {{ categories: years, series: [{{ name: 'x', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], highlights: [{{ category: '2020' }}] }} }});
 const stats = compilePage({{ ...base, id: 's', type: 'numbers', form: 'stat-list', commentary: 'beside', points: pts, highlight: ['a fifth', 'by 2022'], title: 'Three numbers',
   exhibit: {{ items: [{{ value: '5m', label: 'a' }}, {{ value: '1m', label: 'b' }}, {{ value: '4m', label: 'c' }}] }} }});
 const steps = compilePage({{ ...base, id: 'm', type: 'mechanism', form: 'steps', commentary: 'beside-left', points: pts, highlight: ['a fifth', 'by 2022'], title: 'Three steps',
   exhibit: {{ items: ['Grounded', 'Restarted', 'Recovered'] }} }});
 const full = compilePage({{ ...base, id: 'f', type: 'trend', form: 'line', commentary: 'on-exhibit', title: 'Traffic recovered',
-  exhibit: {{ categories: years, series: [{{ name: 'x', values: [5, 1, 2, 4, 5] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }});
+  exhibit: {{ categories: years, series: [{{ name: 'x', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }});
 // Synthetic decks of fourteen pages, each spreading its types so only the rule under test fires.
 const TYPES = ['trend', 'ranking', 'composition', 'relationship', 'bridge', 'mechanism', 'scorecard', 'lookup', 'panels', 'schedule', 'numbers', 'parallel', 'place', 'options'];
 const page = (i, choice) => ({{ id: 'p' + i, title: 'Page ' + i, pageType: {{ type: TYPES[i], commentary: ['none', 'in-exhibit', 'captions', 'on-exhibit'][i % 4], takeaway: false, skeleton: 'skeleton ' + i, ...choice }} }});
