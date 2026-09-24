@@ -506,8 +506,11 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
       const measured = measureText(text, Math.min(240, plot.width * 0.45), { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(CHART_ANNOTATION), bold: true, wrapWidthRatio: 1 });
       const labelWidth = Math.ceil(measured.width) + 2;
       const labelHeight = measured.height;
+      // Outside, the gutter holds nothing else, so a line at the very top or
+      // foot of the plot (a target equal to the tallest column, on a tight
+      // scale) keeps its label inside the plot's height rather than losing it.
       const labelCandidates = reference.placement === "outside-end" ? [
-        { x: plot.x + plot.width + tokenValue(token("space.3")), y: y-labelHeight/2, width: labelWidth, height: labelHeight, align: "left" }
+        { x: plot.x + plot.width + tokenValue(token("space.3")), y: Math.max(plot.y, Math.min(plot.y + plot.height - labelHeight, y - labelHeight / 2)), width: labelWidth, height: labelHeight, align: "left" }
       ] : [
         { x: plot.x + plot.width - labelWidth - 4, y: y - labelHeight - 8, width: labelWidth, height: labelHeight, align: "right" },
         { x: plot.x + 8, y: y - labelHeight - 8, width: labelWidth, height: labelHeight, align: "left" },
@@ -515,7 +518,7 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
         { x: plot.x + 8, y: y + 8, width: labelWidth, height: labelHeight, align: "left" }
       ];
       const labelFrame = labelCandidates.find((candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (reference.placement === "outside-end" || (props.referenceLines || []).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4)));
-      if (!labelFrame) throw new Error("No collision-free reference-line label position; revise the chart composition");
+      if (!labelFrame) throw Object.assign(new Error(`No collision-free reference-line label position${reference.placement === "outside-end" ? " outside the plot" : allowOutsideReferenceLabels ? "; set placement: \"outside-end\" or revise the chart composition" : "; revise the chart composition"}`), { referenceIndex: index });
       overlay.push(textPrimitive({
         id: stableId(id, "reference-label", index),
         role: "chart-reference-label",
@@ -685,7 +688,34 @@ function normalizeDeltas(props, categories) {
   return map;
 }
 
-function categoricalChart({ id, frame, props, horizontal = false, stacked = false, tokens = TOKENS }) {
+/**
+ * A reference label that finds no free corner inside the plot moves outside.
+ *
+ * Callouts take the band above the plot and drop leaders through it, value
+ * labels ride the column tops, and a target line near the tallest column has
+ * all four inside corners taken: a Qatar traffic page with two callouts and an
+ * "Emirates FY26: 53.2m" line threw rather than render. `placement:
+ * "outside-end"` already solved it by hand - the label in a right gutter,
+ * level with its line - but the gutter narrows the plot, so it has to be
+ * decided before the marks are laid out. The chart renders once as authored;
+ * a line whose label was left to the chart (no `placement`) and failed inside
+ * is set outside-end and the chart renders again, one line at a time. A
+ * horizontal chart has no right gutter on its value axis, and an author who
+ * asked for "inside" meant it, so both keep the error.
+ */
+function categoricalChart(context) {
+  let props = context.props;
+  for (;;) {
+    try { return categoricalChartOnce({ ...context, props }); }
+    catch (error) {
+      const reference = props.referenceLines?.[error.referenceIndex];
+      if (!reference || context.horizontal || reference.placement !== undefined) throw error;
+      props = { ...props, referenceLines: props.referenceLines.map((line, index) => index === error.referenceIndex ? { ...line, placement: "outside-end" } : line) };
+    }
+  }
+}
+
+function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = false, tokens = TOKENS }) {
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props);
   const stackLabels = stackLabelPlan(props, categories, series, stacked);
@@ -698,7 +728,21 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     if (props.colorIndices !== undefined) throw new Error("focusSeries conflicts with an explicit colour-index mapping");
   }
   const chartProps = { ...props, highlights };
-  const showLegend = props.legend !== false && series.length > 1;
+  // `forecastFrom` greys every column from that category on, and grey alone
+  // is a colour the reader has to decode with nothing to decode it against:
+  // a Qatar traffic page showed three dark and three grey columns and never
+  // said the grey ones were a required path, not traffic. Where the tint
+  // applies (one unstacked series) the chart keys it - a legend naming the
+  // actual and forecast runs (`actualLabel`/`forecastLabel`, "Actual" and
+  // "Forecast" by default) - and draws a dashed divider at the boundary, so
+  // the split survives greyscale printing and a reader who cannot tell the
+  // tints apart. The key is not the series legend: the composer sets `legend:
+  // false` on every single-series chart, which says there is no series list
+  // to show, not that the forecast needs no key; `forecastKey: false` drops it.
+  const forecastKeyed = props.forecastFrom !== undefined && !stacked && series.length === 1;
+  if (forecastKeyed && [props.actualLabel, props.forecastLabel].some(label => label !== undefined && (typeof label !== "string" || !label.trim()))) throw new Error("actualLabel and forecastLabel must be nonempty text");
+  const forecastLegend = forecastKeyed ? [...(categories.indexOf(props.forecastFrom) > 0 ? [props.actualLabel?.trim() || "Actual"] : []), props.forecastLabel?.trim() || "Forecast"] : [];
+  const showLegend = forecastKeyed ? props.forecastKey !== false : props.legend !== false && series.length > 1;
   const values = series.flatMap((item) => item.values);
   // Every mark carries its value while the marks are countable: a well-made
   // page prints twelve labels as readily as four, and a labelled mark is a
@@ -765,7 +809,7 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     // Horizontal categories live to the left; only an exposed value axis
     // needs a bottom label band. The column-chart gutter left bars floating.
     bottomInset: horizontal ? (showValueAxis ? 32 : 12) : 56,
-    topLegend: showLegend ? legendRowsFor(series.map((item) => item.name), frame) : false,
+    topLegend: showLegend ? legendRowsFor(forecastKeyed ? forecastLegend : series.map((item) => item.name), frame) : false,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
@@ -849,7 +893,11 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
     if (twoMarkContrast) return categoryIndex === 0 ? primary : comparator;
     return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
   };
-  const legendItems = series.map((item, seriesIndex) => ({ label: item.name, colorIndex: colorIndexFor(seriesIndex, 0), color: colorFor(seriesIndex, 0) }));
+  const legendItems = forecastKeyed
+    ? forecastLegend.map((label, index) => index === forecastLegend.length - 1
+      ? { label, key: "forecast", colorIndex: SERIES.findIndex(color => color.tokenId === "color.chartSeries6"), color: token("color.chartSeries6") }
+      : { label, key: "actual", colorIndex: colorIndexFor(0, 0), color: SERIES[colorIndexFor(0, 0)] })
+    : series.map((item, seriesIndex) => ({ label: item.name, colorIndex: colorIndexFor(seriesIndex, 0), color: colorFor(seriesIndex, 0) }));
   const nodes = showLegend ? topLegend({ id, frame, items: legendItems }) : [];
   const pointMap = new Map();
   const categoryMap = new Map();
@@ -962,8 +1010,8 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
         }));
       }
       const point = horizontal
-        ? { x: xScale(end), y: bar.y + bar.height / 2, changeX: xScale(end) + (value >= 0 ? 12 : -12), changeY: bar.y + bar.height / 2, leaderY: bar.y }
-        : { x: bar.x + bar.width / 2, y: yScale(end), changeX: bar.x + bar.width / 2, changeY: yScale(end) + (value >= 0 ? -(showDataLabels ? 38 : 16) : (showDataLabels ? 38 : 16)), leaderX: bar.x + bar.width };
+        ? { x: xScale(end), y: bar.y + bar.height / 2, changeX: xScale(end) + (value >= 0 ? 12 : -12), changeY: bar.y + bar.height / 2 }
+        : { x: bar.x + bar.width / 2, y: yScale(end), changeX: bar.x + bar.width / 2, changeY: yScale(end) + (value >= 0 ? -(showDataLabels ? 38 : 16) : (showDataLabels ? 38 : 16)) };
       pointMap.set(`${item.name}:${category}`, point);
       if (segmentGrowth && category === segmentGrowth.to) segmentMids.set(item.name, bar.y + bar.height / 2);
       if (series.length === 1) pointMap.set(`value:${category}`, point);
@@ -1113,6 +1161,14 @@ function categoricalChart({ id, frame, props, horizontal = false, stacked = fals
       : { x: categoryMap.get(category).labelCenter - Math.min(iconW, categorySpan - 8) / 2, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: Math.min(iconW, categorySpan - 8), height: iconH },
       logoMarks ? { area: iconW * iconH * 0.6, align: horizontal ? "right" : "center" } : {}));
   });
+  if (forecastKeyed && forecastIndex > 0) {
+    // Midway between the last actual and the first forecast mark, across the
+    // plot, dashed as the period dividers are: the non-colour half of the key.
+    const at = (horizontal ? plot.y : plot.x) + forecastIndex * categorySpan;
+    nodes.push(linePrimitive({ id: stableId(id, "forecast-divider"), role: "chart-forecast-divider",
+      ...(horizontal ? { x1: plot.x, y1: at, x2: plot.x + plot.width, y2: at } : { x1: at, y1: plot.y, x2: at, y2: plot.y + plot.height }),
+      style: lineStyle(SECONDARY, token("line.hairline"), "dash"), data: { forecastFrom: props.forecastFrom } }));
+  }
   for(const [i,group] of categoryGroups.entries()) {
     const start=categories.indexOf(group.categories[0]),end=start+group.categories.length;
     const x1=categoryMap.get(categories[start]).labelCenter-categorySpan/2+8,x2=categoryMap.get(categories[end-1]).labelCenter+categorySpan/2-8;
@@ -1499,7 +1555,7 @@ function waterfall({ id, frame, props }) {
     nodes.push(rectPrimitive({ id: stableId(id, "bar", category), role: "chart-mark", frame: bar, style: fillStyle(fill) }));
     nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`, style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
     if (index > 0) nodes.push(linePrimitive({ id: stableId(id, "connector", index), role: "chart-connector", x1: plot.x + (index - 1) * span + span * 0.8, y1: yScale(previous), x2: plot.x + index * span + span * 0.2, y2: yScale(previous), style: lineStyle(SECONDARY, token("line.hairline"), "dash") }));
-    const point = { x: bar.x + bar.width / 2, y: bar.y, changeX: bar.x + bar.width / 2, changeY: bar.y - 38, leaderX: bar.x + bar.width };
+    const point = { x: bar.x + bar.width / 2, y: bar.y, changeX: bar.x + bar.width / 2, changeY: bar.y - 38 };
     pointMap.set(`value:${category}`, point);
     pointMap.set(`category:${category}`, point);
     categoryMap.set(category, { x: bar.x, y: plot.y, width: bar.width, height: plot.height });
@@ -1715,7 +1771,7 @@ function rangeChart({ id, frame, props }) {
     nodes.push(textPrimitive({ id: stableId(id, "high-label", category), role: "data-label", frame: { x: x1 + 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(high, props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { category, end: "high" } }));
     nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: frame.x, y: y - 2, width: categoryWidth, height: barHeight + 4 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "left"), data: { category } }));
     if (index) nodes.push(linePrimitive({ id: stableId(id, "row-rule", index), role: "chart-gridline", x1: frame.x, y1: plot.y + index * rowSpan, x2: plot.x + plot.width + labelWidth, y2: plot.y + index * rowSpan, style: lineStyle() }));
-    const point = { x: x1, y: y + barHeight / 2, changeX: x1 + 12, changeY: y + barHeight / 2, leaderY: y };
+    const point = { x: x1, y: y + barHeight / 2, changeX: x1 + 12, changeY: y + barHeight / 2 };
     pointMap.set(`value:${category}`, point); pointMap.set(`range:${category}`, point);
     categoryMap.set(category, { x: plot.x, y: plot.y + index * rowSpan, width: plot.width, height: rowSpan });
   });
@@ -1794,7 +1850,7 @@ function comboChart({ id, frame, props }) {
       text: category,
       style: textStyle(AXIS_LABEL)
     }));
-    const barPoint = { x, y: barValueY, leaderX: bar.x + bar.width, changeX: x, changeY: barValueY + (barSeries.values[index] >= 0 ? -16 : 16) };
+    const barPoint = { x, y: barValueY, changeX: x, changeY: barValueY + (barSeries.values[index] >= 0 ? -16 : 16) };
     const lineY = lineScale(lineSeries.values[index]);
     const linePoint = { x, y: lineY, changeX: x, changeY: lineY - 16 };
     if (showDataLabels) {
@@ -2062,19 +2118,65 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
   const availableHeight = frame.height - legendHeight;
   const outside = variant === "outside-labels";
   const labelWidth = outside ? Math.max(...props.labels.map(label => measureText(label, frame.width, { fontSize: tokenValue(CHART_ANNOTATION), fontFamily: tokenValue(token("font.bodySemibold")), bold: tokenDefinition("font.bodySemibold").nativeBold, wrapWidthRatio: 1 }).width)) : 0;
-  const gutter = outside ? labelWidth + 24 : 16;
-  const size = Math.min(frame.width - 2 * gutter, availableHeight - 32);
-  if (size < 140) throw new Error("Pie/donut and labels do not fit; enlarge the section or use a legend");
-  const circle = { x: frame.x + (frame.width - size) / 2, y: frame.y + legendHeight + (availableHeight - size) / 2, width: size, height: size };
   const total = props.values.reduce((sum, value) => sum + value, 0);
+  const sweeps = [];
+  props.values.reduce((start, value) => { sweeps.push({ mid: (start + 180 * value / total) * Math.PI / 180, half: Math.PI * value / total }); return start + 360 * value / total; }, -90);
+  const percentages = props.values.map(value => Math.round(100 * value / total));
+  // Each percentage is measured at its own width. The label box used to be a
+  // fixed 64px measured at a 64px cap, so its frame never said how wide its
+  // text was; the fit test below and the box drawn now share one measurement.
+  const labelMetrics = percentages.map(percentage => measureText(`${percentage}%`, 1000, { fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 }));
+  const OUTSIDE_GAP = 8;
+  // Where each percentage goes for a circle of `size` centred at (cx, cy):
+  // inside its slice when the slice holds the text plus clearance, otherwise
+  // just beyond the rim at the slice's mid-angle. Outside is not available to
+  // the outside-labels variant, whose rim already carries the category names.
+  const placeLabels = (size, cx, cy) => props.values.map((value, index) => {
+    if (!value) return null;
+    const measured = labelMetrics[index], { mid, half } = sweeps[index];
+    const labelRadius = donut ? 0.365 : 0.29;
+    const dx = Math.cos(mid) * size * labelRadius, dy = Math.sin(mid) * size * labelRadius;
+    // Test visible text plus clearance against its own sector, not the circular
+    // bounding box shared by every slice. Donuts must also clear the inner hole.
+    const halfWidth = measured.width / 2 + 4, halfHeight = Math.max(28, measured.height) / 2 + 4;
+    const cornersFit = [-1, 1].every(sx => [-1, 1].every(sy => {
+      const x = dx + sx * halfWidth, y = dy + sy * halfHeight;
+      const delta = Math.atan2(y, x) - mid;
+      return Math.hypot(x, y) <= size / 2 && Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta))) <= half;
+    }));
+    const holeClear = !donut || Math.hypot(Math.max(0, Math.abs(dx) - halfWidth), Math.max(0, Math.abs(dy) - halfHeight)) >= size * 0.23;
+    const width = Math.ceil(measured.width) + 8, height = Math.max(28, Math.ceil(measured.height));
+    if (cornersFit && holeClear) return { placement: "inside", frame: { x: cx + dx - width / 2, y: cy + dy - height / 2, width, height } };
+    // Beyond the rim the box sits tangent to the circle: its centre moves out
+    // by half its own extent along the mid-angle, so a label at the top clears
+    // the rim by the gap and one at the side starts the gap from it.
+    const rx = cx + Math.cos(mid) * (size / 2 + OUTSIDE_GAP), ry = cy + Math.sin(mid) * (size / 2 + OUTSIDE_GAP);
+    const inkHeight = Math.ceil(measured.height);
+    return { placement: "outside", frame: { x: rx + Math.cos(mid) * width / 2 - width / 2, y: ry + Math.sin(mid) * inkHeight / 2 - inkHeight / 2, width, height: inkHeight } };
+  });
+  const layout = (gutterX, gutterY) => {
+    const size = Math.min(frame.width - 2 * gutterX, availableHeight - 2 * gutterY);
+    const circle = { x: frame.x + (frame.width - size) / 2, y: frame.y + legendHeight + (availableHeight - size) / 2, width: size, height: size };
+    return { size, circle, labels: props.dataLabels === false ? [] : placeLabels(size, circle.x + size / 2, circle.y + size / 2) };
+  };
+  let { size, circle, labels } = layout(outside ? labelWidth + 24 : 16, 16);
+  const outsideLabels = labels.filter(label => label?.placement === "outside");
+  if (outsideLabels.length && !outside) {
+    // A slice too thin for its percentage takes it outside, and the circle
+    // gives up the margin that label needs. Shrinking the circle can only make
+    // slices thinner, so the second pass may move more labels out; it reserves
+    // for the widest percentage so whichever go out have room.
+    const widest = Math.max(...labelMetrics.map(m => Math.ceil(m.width) + 8)), tallest = Math.max(...labelMetrics.map(m => Math.ceil(m.height)));
+    ({ size, circle, labels } = layout(16 + widest + OUTSIDE_GAP, 16 + tallest + OUTSIDE_GAP));
+  }
+  if (size < 140) throw new Error("Pie/donut and labels do not fit; enlarge the section or use a legend");
   const colorIndices = props.labels.map((label, index) => props.categoryKeys ? props.categoryKeys.indexOf(label) : index);
   if (colorIndices.some(i => i < 0 || i >= SERIES.length)) throw new Error("Pie/donut category is missing from the shared legend mapping");
   const nodes = showLegend ? legendNodes({ id: stableId(id, "legend"), frame: { x: frame.x + 16, y: frame.y + 7, width: frame.width - 32, height: 28 }, props: { placement: "top-right", items: props.labels.map((label, index) => ({ label, colorIndex: colorIndices[index] })) } }) : [];
   let angle = -90;
-  const labelAngles = [];
+  const labelAngles = sweeps.map(sweep => sweep.mid);
   props.values.forEach((value, index) => {
     const sweep = 360 * value / total;
-    labelAngles.push((angle + sweep / 2) * Math.PI / 180);
     if (!value) return;
     nodes.push(wedgePrimitive({
       id: stableId(id, "segment", index, props.labels[index]),
@@ -2090,27 +2192,18 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
   if (donut) nodes.push(ellipsePrimitive({ id: stableId(id, "donut-hole"), role: "chart-hole", frame: { x: circle.x + size * 0.27, y: circle.y + size * 0.27, width: size * 0.46, height: size * 0.46 }, style: fillStyle(token("color.canvas")) }));
   const cx = circle.x + circle.width / 2;
   const cy = circle.y + circle.height / 2;
-  if (props.dataLabels !== false) props.values.forEach((value, index) => {
-    if (!value) return;
-    const labelRadius = donut ? 0.365 : 0.29;
-    const insideX = cx + Math.cos(labelAngles[index]) * size * labelRadius;
-    const insideY = cy + Math.sin(labelAngles[index]) * size * labelRadius;
+  const plotBounds = { x: frame.x, y: frame.y + legendHeight, width: frame.width, height: availableHeight };
+  labels.forEach((label, index) => {
+    if (!label) return;
     const background = tokens[SERIES[colorIndices[index]].tokenId].value;
-    const foreground = contrastRatio(background, tokens["color.onPrimary"].value) >= contrastRatio(background, tokens["color.ink"].value) ? token("color.onPrimary") : INK;
-    const percentage = Math.round(100 * value / total), text = `${percentage}%`;
-    const measured = measureText(text, 64, { fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 });
-    // Test visible text plus clearance against its own sector, not the circular
-    // bounding box shared by every slice. Donuts must also clear the inner hole.
-    const halfWidth = measured.width / 2 + 4, halfHeight = Math.max(28, measured.height) / 2 + 4;
-    const dx = insideX - cx, dy = insideY - cy, halfSweep = Math.PI * value / total;
-    const cornersFit = [-1, 1].every(sx => [-1, 1].every(sy => {
-      const x = dx + sx * halfWidth, y = dy + sy * halfHeight;
-      const delta = Math.atan2(y, x) - labelAngles[index];
-      return Math.hypot(x, y) <= size / 2 && Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta))) <= halfSweep;
-    }));
-    const holeClear = !donut || Math.hypot(Math.max(0, Math.abs(dx) - halfWidth), Math.max(0, Math.abs(dy) - halfHeight)) >= size * 0.23;
-    if (!percentage || measured.height > 28 || !cornersFit || !holeClear) throw new Error(`Pie/donut percentage for ${props.labels[index]} does not fit its slice; enlarge the chart or use a bar/stacked-bar encoding`);
-    nodes.push(textPrimitive({ id: stableId(id, "percentage", index), role: "data-label", frame: { x: insideX - 32, y: insideY - 14, width: 64, height: 28 }, text, style: textStyle(CHART_LABEL, foreground, labelBold(), "center"), data: { categoryKey: props.labels[index], contrast: contrastRatio(background, tokens[foreground.tokenId].value) } }));
+    const onFill = label.placement === "inside";
+    const foreground = onFill && contrastRatio(background, tokens["color.onPrimary"].value) >= contrastRatio(background, tokens["color.ink"].value) ? token("color.onPrimary") : INK;
+    const text = `${percentages[index]}%`, { frame: box } = label;
+    if (!percentages[index] || (onFill && labelMetrics[index].height > 28) || (!onFill && outside)) throw new Error(`Pie/donut percentage for ${props.labels[index]} does not fit its slice; enlarge the chart or use a bar/stacked-bar encoding`);
+    if (!onFill && (box.x < plotBounds.x || box.y < plotBounds.y || box.x + box.width > plotBounds.x + plotBounds.width || box.y + box.height > plotBounds.y + plotBounds.height
+      || labels.some((other, j) => j !== index && other && !(box.x + box.width <= other.frame.x || other.frame.x + other.frame.width <= box.x || box.y + box.height <= other.frame.y || other.frame.y + other.frame.height <= box.y))))
+      throw new Error(`Pie/donut percentage for ${props.labels[index]} fits neither its slice nor the rim beside it; enlarge the chart, merge thin slices or use a bar/stacked-bar encoding`);
+    nodes.push(textPrimitive({ id: stableId(id, "percentage", index), role: "data-label", frame: box, text, style: textStyle(CHART_LABEL, foreground, labelBold(), onFill ? "center" : Math.abs(Math.cos(labelAngles[index])) < 0.2 ? "center" : Math.cos(labelAngles[index]) > 0 ? "left" : "right"), data: { categoryKey: props.labels[index], placement: label.placement, contrast: contrastRatio(onFill ? background : tokens["color.canvas"].value, tokens[foreground.tokenId].value) } }));
   });
   if (outside) {
     props.values.forEach((value, index) => {

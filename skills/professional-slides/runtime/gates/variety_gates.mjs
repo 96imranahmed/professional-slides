@@ -25,7 +25,7 @@ export const VARIETY_CODES = Object.freeze({
   VARIETY_TAKEAWAY: "too many pages close on a takeaway line",
   VARIETY_PANELS: "too few pages set evidence side by side",
   VARIETY_SIGNATURE: "one combination of type, commentary and close repeats across the deck",
-  THIN_PAGES_PLANNED: "nearly a third of the pages plan fewer words than the deck's weight asks",
+  THIN_PAGES_PLANNED: "a fifth or more of the pages carry fewer words than the deck's weight asks",
 });
 
 export const VARIETY = Object.freeze({
@@ -36,6 +36,7 @@ export const VARIETY = Object.freeze({
   panelsShareMin: 0.12,     // strong decks: 24% of pages carry two or more exhibits
   signatureShareMax: 0.15,  // strong decks: the commonest combination is 10%
   runMax: 2,                // three in a row of one type reads as one page repeated
+  thinShareMax: 0.2,        // pages under the word floor at authoring; the render blocks at 30% with empty space counted
 });
 
 const isContent = (slide) => (!slide.kind || slide.kind === "content" || slide.kind === "statement" || slide.kind === "takeaways") && slide.title !== undefined;
@@ -132,8 +133,10 @@ export function varietyFindings(spec, { structureOf, thin = null } = {}) {
   if (thin) {
     const ids = new Set(slides.map((s) => s.id));
     const planned = thin.filter((f) => ids.has(f.id));
-    if (planned.length >= 5 && planned.length / n >= 0.3) {
-      block("THIN_PAGES_PLANNED", { pages: planned.length, of: n, ids: planned.map((f) => `${f.id} (${f.words}/${f.floor})`) }, 0.3,
+    // A fifth, not the third the rendered deck is held to: the render adds the
+    // empty-space findings words cannot see, so authoring leaves room for them.
+    if (planned.length >= 5 && planned.length / n >= VARIETY.thinShareMax) {
+      block("THIN_PAGES_PLANNED", { pages: planned.length, of: n, ids: planned.map((f) => `${f.id} (${f.words}/${f.floor})`) }, VARIETY.thinShareMax,
         `${planned.length} of ${n} pages plan fewer words than the deck's weight asks. The explanation belongs somewhere on each: callouts on ` +
         "the chart that carry the mechanism and the qualification (a sentence each, not a label), a caption under each panel that says " +
         "what that panel shows, an implication column in the table, labelled cards, or a column beside the exhibit. A page whose " +

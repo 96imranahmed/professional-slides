@@ -227,9 +227,53 @@ function verticalPlacement({ annotation, index, target, plot, bandIndex, topBand
   return { annotation, index, target, frame, leader, side: "above" };
 }
 
+/**
+ * Where a callout's leader lands: the mark's centre on the category axis, at
+ * its value end - the top-centre of a column, the end-centre of a bar.
+ *
+ * Column points used to carry `leaderX` at the bar's right edge (and bars
+ * `leaderY` at their top edge), which kept the leader clear of the value label
+ * centred on the column but landed the dot on a corner: on a page of six
+ * columns the reader followed it to the gap between two bars, not to the one
+ * the note is about. The target is the point itself now, and the leader stops
+ * short of the mark's own value label instead - the label sits on the same
+ * centre line directly above the mark, so ending the leader at its top keeps
+ * the dot on the mark's axis without striking through the number. The label is
+ * found by its category, not only by sitting on the mark: a reference line
+ * through a label lifts it clear of the line, and a lifted label is still the
+ * one the leader would strike. A negative
+ * column's value end is its foot, and a leader from the band above would run
+ * down the whole bar to reach it, so it lands on the column's top (the
+ * baseline) instead.
+ */
+function leaderTarget(target, obstacles, annotation) {
+  const x = target.x;
+  const hanging = obstacles.find((node) => node.role === "chart-mark"
+    && x >= node.frame.x && x <= node.frame.x + node.frame.width
+    && Math.abs(node.frame.y + node.frame.height - target.y) <= 1 && node.frame.height > 2);
+  if (hanging) return { x, y: hanging.frame.y };
+  // A range band prints its high value four pixels past its end, level with
+  // the centre, so a dot on the end-centre sat on the number. When the mark's
+  // own label is closer to the end than the dot's radius, the dot steps back
+  // inside the bar by its radius and a gap - still the end of the bar, clear
+  // of the figure. (A bar's label keeps a wider gap and needs no step.)
+  const reach = ENDPOINT_DIAMETER / 2 + 3;
+  const beside = obstacles.find((node) => node.role === "data-label" && node.data?.category === annotation.category
+    && target.y >= node.frame.y && target.y <= node.frame.y + node.frame.height
+    && (Math.abs(node.frame.x - x) <= ENDPOINT_DIAMETER / 2 + 1 || Math.abs(node.frame.x + node.frame.width - x) <= ENDPOINT_DIAMETER / 2 + 1));
+  const stepped = beside && { x: beside.frame.x >= x - 1 ? x - reach : x + reach, y: target.y };
+  if (stepped && obstacles.some((node) => node.role === "chart-mark" && pointInsideFrame(stepped, node.frame))) return stepped;
+  const ownLabel = obstacles
+    .filter((node) => node.role === "data-label"
+      && x >= node.frame.x && x <= node.frame.x + node.frame.width
+      && node.frame.y + node.frame.height <= target.y + 2
+      && (node.data?.category === annotation.category || node.frame.y + node.frame.height >= target.y - 16))
+    .sort((a, b) => a.frame.y - b.frame.y)[0];
+  return { x, y: ownLabel ? ownLabel.frame.y - ENDPOINT_DIAMETER / 2 - 3 : target.y };
+}
+
 function standardPlacement({ annotation, index, target, plot, bandIndex, topBandCount, obstacles, placements, id }) {
-  const targetX = target.leaderX ?? target.x;
-  const targetY = target.leaderY ?? target.y;
+  const { x: targetX, y: targetY } = leaderTarget(target, obstacles, annotation);
   const { width, height } = evidenceBoxSize(annotation);
   const frame = {
     x: Math.max(plot.x - 12, Math.min(plot.x + plot.width + 12 - width, targetX - width / 2)),
@@ -815,4 +859,9 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
   }
   });
   return nodes;
+}
+
+/** Whether an evidence callout's text fits its box: the renderer's own measure, for the page-type compiler. */
+export function calloutFits(text) {
+  return measureEvidenceText({ text: String(text ?? "") }).height <= EVIDENCE_BOX_HEIGHT - EVIDENCE_PAD_Y;
 }

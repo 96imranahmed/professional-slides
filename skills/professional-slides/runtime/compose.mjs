@@ -3299,6 +3299,7 @@ function planWords(slide) {
   (slide.columns || []).forEach((column) => text(typeof column === "string" ? column : column?.label));
   (slide.paragraphs || []).forEach(text);
   text(slide.text);
+  if (slide.panel && typeof slide.panel === "object") { text(slide.panel.kicker); text(slide.panel.text); }
   // The exhibit is walked rather than enumerated. Enumerating the fields meant
   // reading `items` and `rows` and nothing else, so a page of quadrants, a
   // framework of pillars, a compare of two columns and a tree of nodes each

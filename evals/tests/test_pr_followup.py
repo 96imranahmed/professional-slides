@@ -199,7 +199,7 @@ import {compileDeck} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const cases=[];
 for (const type of ['column','bar']) for (const labels of [true,false]) for (const axis of [true,false])
- for (const extra of [{},{colorIndices:[2]},{highlights:[{category:'B',style:'bar'}]},{forecastFrom:'B'}])
+ for (const extra of [{},{colorIndices:[2]},{highlights:[{category:'B',style:'bar'}]}])
   cases.push({component:'chart.'+type,props:{categories:['A','B'],series:[{name:'Revenue',values:[20,40]}],dataLabels:labels,showValueAxis:axis,...extra}});
 const slides=cases.map((c,i)=>({id:'s'+i,composition:{nodeType:'component',id:'plot',...c,frame:{x:60,y:160,width:1000,height:460}}}));
 console.log(JSON.stringify(compileDeck({id:'charts',slides},REGISTRY)));
@@ -215,6 +215,21 @@ console.log(JSON.stringify(compileDeck({id:'charts',slides},REGISTRY)));
                 for point, mark in zip(series.points, marks):
                     color = point.format.fill.fore_color.rgb if point.format.fill.type else series.format.fill.fore_color.rgb
                     self.assertEqual(str(color), mark['style']['fill']['value'].lstrip('#').upper())
+
+    def test_a_keyed_forecast_stays_drawn(self):
+        # `forecastFrom` used to be a native case above: PowerPoint kept the
+        # grey per-point tint and nothing said what grey meant. The drawn chart
+        # now keys the forecast (legend entry, dashed boundary), which Office
+        # cannot place against its own plot, so the chart is assembled as shapes.
+        scene = run_node('''
+import {compileDeck} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const slides=[{id:'f',composition:{nodeType:'component',id:'plot',component:'chart.column',props:{categories:['A','B','C'],series:[{name:'Revenue',values:[20,40,45]}],forecastFrom:'B'},frame:{x:60,y:160,width:1000,height:460}}}];
+console.log(JSON.stringify(compileDeck({id:'charts',slides},REGISTRY)));
+''')
+        source = scene['slides'][0]
+        self.assertIsNone(source['componentInstances'][0].get('nativeChart'))
+        self.assertTrue(any(n['role'] == 'chart-forecast-divider' for n in source['nodes']))
 
 
 if __name__ == '__main__':

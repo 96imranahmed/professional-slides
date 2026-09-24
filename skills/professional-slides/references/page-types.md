@@ -5,7 +5,7 @@ A deck is authored page by page as **page types**, in `<id>.pages.json`, and com
 ```bash
 node runtime/author-deck.mjs --types              # the catalogue: every type, its forms and placements
 node runtime/author-deck.mjs --schema             # JSON Schema for a pages file
-node runtime/author-deck.mjs <id>.pages.json      # compile to <id>.deck.json and <id>.plan.json, or refuse
+node runtime/author-deck.mjs <id>.pages.json      # compile, compose in memory, gate; write <id>.deck.json and <id>.plan.json, or refuse
 ```
 
 ## Why types, not layouts
@@ -72,11 +72,13 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 | `statement` | one sentence, or the voices behind it | statement, quotes |
 | `summary` | the answer and its proof | executive-summary, takeaways |
 
+The compiler then composes the deck in memory, as the build will, filling logos, photographs and places from what is already on disk. A composition error surfaces here rather than at the build, and the thin-page rule counts words on the composed pages with the build's own check, so the number the author sees is the number the build will see.
+
 `--types` prints the data each form reads (a pie or donut takes `labels` and `values`, a treemap `items`, a flow `nodes` and `edges`); the compiler names the missing keys, and refuses any page key the composer does not read, on every page at once.
 
-The compiler checks what each type implies. A trend runs over four or more periods; a ranking shows four or more members; trend and ranking charts mark their finding on the plot; a scorecard codes at least one column in its form; `on-exhibit` needs `annotations`; `captions` needs a `caption` on every panel; a text-free placement refuses `points`, because it says the text lives somewhere else. Two or three numbers are a `numbers` page, not a chart, and not a panel either: a panel plotting two numbers is refused. A pie or donut with a part under 5% is refused for a waffle or a stacked bar; a metric strip sits over exactly one exhibit.
+The compiler checks what each type implies. A trend runs over four or more periods; a ranking shows four or more members; trend and ranking charts mark their finding on the plot; a scorecard codes at least one column in its form; `on-exhibit` needs `annotations`; `captions` needs a `caption` on every panel; a text-free placement refuses `points`, because it says the text lives somewhere else. Two or three numbers are a `numbers` page, not a chart, and not a panel either: a panel plotting two numbers is refused. A pie or donut with a part under 5% is refused for a waffle or a stacked bar; a metric strip sits over exactly one exhibit and takes commentary `none`, since its numbers and exhibit fill the page.
 
-Moving the explanation off the page's text column is a choice to write it somewhere else, not to drop it. Callouts on a chart carry ten or more words between them - the mechanism and the qualification, not labels; every caption is a sentence of eight words or more that says what its panel shows and does not repeat the title or the panel heading; a rail is a developed claim of ten words or more. An executive summary with no exhibit renders as a list; give it `metrics` or an exhibit when the page would otherwise be half empty.
+Moving the explanation off the page's text column is a choice to write it somewhere else, not to drop it. Callouts on a chart carry ten or more words between them - the mechanism and the qualification, not labels - and each is measured against the chart's callout box, which holds about twelve words; every caption is a sentence of eight words or more that says what its panel shows and does not repeat the title or the panel heading; a rail is a developed claim of ten words or more. An executive summary with no exhibit renders as a list; give it `metrics` or an exhibit when the page would otherwise be half empty.
 
 Choose the type from the claim, then the placement from where the reader's eye already is. The same evidence can take different pages: a peer comparison can be a ranking with callouts, panels of the same measure for three periods, or a scorecard. Pick the one whose reading task is the claim's, and then look at the neighbours - the page before and after should ask the reader to do something different.
 
@@ -94,6 +96,6 @@ Choose the type from the claim, then the placement from where the reader's eye a
 | `VARIETY_TAKEAWAY` | at most 25% of pages close on a takeaway line |
 | `VARIETY_PANELS` | from fifteen pages, at least 12% set two or more exhibits side by side |
 | `VARIETY_SIGNATURE` | no one combination of type, placement and close is more than 15% of the pages |
-| `THIN_PAGES_PLANNED` | fewer than 30% of pages (or fewer than five) plan fewer words than the deck's weight asks, counted over points, callouts, captions, cells and labels |
+| `THIN_PAGES_PLANNED` | fewer than 20% of pages (or fewer than five) fall under the deck's word floor on the composed page - a fifth, not the third the rendered deck is held to, because the render adds the empty-space findings words cannot see |
 
 The limits sit outside what strong decks measure, so a deck that chose each page for its claim passes them with room. Do not rotate choices to meet them: a deck that breaks one has pages whose type was not chosen from the claim, and the fix is to ask of each such page what it has to show.

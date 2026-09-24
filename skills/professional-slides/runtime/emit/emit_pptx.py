@@ -613,7 +613,18 @@ class Emitter:
                 # end labels retain their separate right-side placement below.
                 dl.position = XL_LABEL_POSITION.ABOVE
             elif kind in ("pie", "donut"):
-                dl.position = XL_LABEL_POSITION.OUTSIDE_END if kind == "pie" else XL_LABEL_POSITION.CENTER
+                # The scene prints each slice's share ("54%") inside the slice,
+                # measured to fit it (charts.mjs partToWhole). The native chart
+                # printed the raw value outside the rim instead, where
+                # LibreOffice gives an outside label only the sliver between
+                # the pie and the frame edge: "75.8" wrapped one character per
+                # line down the side of a Saudia pie. The native labels now say
+                # what the scene says, where it says it; a scene that had to
+                # set a share outside stays drawn (core.mjs nativeChartSpec).
+                dl.show_value = False
+                dl.show_percentage = True
+                dl.number_format = "0%"
+                dl.position = XL_LABEL_POSITION.CENTER
         # series colours from the palette (comparator series grey when the runtime would)
         idx = spec.get("colorIndices")
         accent = self.colors.get("color.accent") or self.colors.get("color.componentPrimary")
@@ -734,6 +745,27 @@ class Emitter:
                     c = self.series_colors[j % len(self.series_colors)]
                     if c:
                         pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(c)
+                    if c and spec.get("dataLabels", True):
+                        # A share sits on its slice: white on a dark fill, ink
+                        # on a light one, as the scene chose. The per-point
+                        # label python-pptx creates shows the value and no
+                        # percentage, so it is set back to the series policy.
+                        lab = pt.data_label
+                        lab.font.size = Pt(11); lab.font.bold = bool(spec.get("labelBold", True))
+                        # The scene's rule (strongest contrast of the two),
+                        # not a luminance cut: a tan slice took white at 2.5:1
+                        # where ink reads at 6:1.
+                        on, ink = self.colors.get("color.onPrimary", "#FFFFFF"), self.colors.get("color.ink", "#000000")
+                        ratio = lambda a, b: (max(_luminance(a), _luminance(b)) + 0.05) / (min(_luminance(a), _luminance(b)) + 0.05)
+                        lab.font.color.rgb = rgb(on if ratio(c, on) >= ratio(c, ink) else ink)
+                        dlbl = lab._dLbl
+                        if dlbl is not None:
+                            if dlbl.find(qn("c:numFmt")) is None:
+                                fmt_el = etree.Element(qn("c:numFmt")); fmt_el.set("formatCode", "0%"); fmt_el.set("sourceLinked", "0")
+                                dlbl.find(qn("c:idx")).addnext(fmt_el)
+                            for tag, val in (("c:showVal", "0"), ("c:showPercent", "1")):
+                                if dlbl.find(qn(tag)) is not None:
+                                    dlbl.find(qn(tag)).set("val", val)
         if kind == "donut" and spec.get("center"):
             # The centre KPI: a text box over the hole (value bold, label under).
             center = spec["center"] if isinstance(spec["center"], dict) else {"value": str(spec["center"])}

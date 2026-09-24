@@ -13,8 +13,15 @@ const frame={x:60,y:60,width:1160,height:580};
 const nodes=renderTable({id:'logos',frame,props}).nodes;
 const logos=nodes.filter(n=>n.role==='table-logo');
 assert.equal(logos.length,2);
-assert.equal(logos[0].frame.height,logos[1].frame.height);
+// Logos share a visual area, not a height. Held to one body line (the old
+// equal-height rule) a square or upright mark shrank to a speck beside a
+// wordmark; now each gets the same ink up to the 40px cell, so a wide mark
+// runs long and low and a squarer one stands taller.
+const area=n=>n.frame.width*n.frame.height;
+assert.ok(logos.every(n=>n.frame.height<=n.data.cellHeight+1e-6&&n.data.cellHeight>=40));
+assert.ok(Math.abs(area(logos[0])-area(logos[1]))/Math.max(area(logos[0]),area(logos[1]))<0.1);
 assert.notEqual(logos[0].frame.width,logos[1].frame.width);
+assert.notEqual(logos[0].frame.height,logos[1].frame.height);
 for(const n of logos) assert.ok(Math.abs(n.frame.width/n.frame.height-n.data.width/n.data.height)<1e-3);
 const surfaces=nodes.filter(n=>n.role==='table-cell');
 assert.ok(surfaces.some(n=>n.data.cellType==='category'&&n.style.fill.tokenId==='color.componentPrimary'));

@@ -23,7 +23,10 @@ const chart=REGISTRY.get('chart.column');
 const nodes=chart.render({id:'bars',frame,props:{...chart.sample,dataLabels:false,referenceLines:[],annotations:[{category:'2026',text:'Evidence'}]}}).nodes;
 const mark=nodes.find(n=>n.role==='chart-mark'&&n.data.category==='2026');
 const leader=nodes.find(n=>n.role==='annotation-leader').data;
-assert.ok(Math.abs(leader.x2-mark.frame.x-mark.frame.width)<.001);
+// The leader lands on the column's top-centre. It used to land on the right
+// edge (`leaderX`), which on a row of columns pointed at the gap between two
+// bars; with no value label on the column the dot sits on the top itself.
+assert.ok(Math.abs(leader.x2-mark.frame.x-mark.frame.width/2)<.001);
 assert.ok(Math.abs(leader.y2-mark.frame.y)<.001);
 console.log(JSON.stringify({accepted:true}));
 """)

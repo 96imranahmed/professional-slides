@@ -27,6 +27,7 @@
 
 import { REGISTRY } from "./registry.mjs";
 import { trivialChart } from "./gates/craft_gates.mjs";
+import { calloutFits } from "./chart-annotations.mjs";
 
 // Where the page's explanation lives. Each maps onto what the composer draws.
 export const COMMENTARY = Object.freeze({
@@ -176,7 +177,15 @@ export function markedChart(ex) {
 // has to supply, as against styling (heading, unit, annotations, ...).
 const STYLING = new Set(["heading", "unit", "annotations", "highlights", "focusSeries", "active", "treatment", "placement", "arrangement",
   "attributionAlign", "variant", "conclusion", "center", "today", "totals", "targets", "ranges", "highlight", "centerId", "ringOrder", "referenceLines", "legend", "dataLabels"]);
+// Page constructions that are not registered components, with what they read.
+const CONSTRUCTION_DATA = {
+  "hero-number": ["kpi"], "metrics-over-exhibit": ["metrics", "exhibit"], "findings-matrix": ["rows (each with cells)"], "measure-table": ["columns", "rows"],
+  text: ["paragraphs"], sidebar: ["panel", "paragraphs"], statement: ["text"], "executive-summary": ["points"], takeaways: ["items"],
+  "picture-hero": ["pictures"], "picture-pair": ["pictures"], "picture-strip": ["pictures"], "photo-backdrop": ["photo", "exhibit"],
+  "two-up-contrast": ["exhibits"], "table-halves": ["exhibits"], row: ["exhibits"], grid: ["exhibits"], stack: ["exhibits"],
+};
 export function dataKeys(exhibitType) {
+  if (CONSTRUCTION_DATA[exhibitType]) return CONSTRUCTION_DATA[exhibitType];
   const sample = REGISTRY.get(exhibitType)?.sample;
   return sample ? Object.keys(sample).filter((key) => !STYLING.has(key)) : [];
 }
@@ -253,7 +262,7 @@ export function compilePage(pageIn, index = 0) {
   const primary = slide.exhibit ?? slide.exhibits?.[0];
   // The exhibit carries the data its form reads, named before the build has to.
   for (const ex of [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean)) {
-    const keys = dataKeys(ex.type);
+    const keys = CONSTRUCTION_DATA[ex.type] ? [] : dataKeys(ex.type);
     if (keys.length && !keys.some((key) => ex[key] !== undefined))
       throw new Error(`${id}: a ${ex.type} exhibit reads ${keys.map((k) => `\`${k}\``).join(", ")} - none is given`);
   }
@@ -262,6 +271,8 @@ export function compilePage(pageIn, index = 0) {
     if (values.some((v) => v / total < 0.05)) throw new Error(`${id}: a part under 5% of the whole has no room in a ${page.form} slice; a waffle or a stacked bar shows small parts`);
   }
   if (page.type === "numbers" && page.form === "metric-strip" && exhibits.length !== 1) throw new Error(`${id}: a metric strip sits over one exhibit`);
+  // The strip and its exhibit fill the page; the composer has no room for points.
+  if (page.type === "numbers" && page.form === "metric-strip" && page.commentary !== "none") throw new Error(`${id}: a metric strip's numbers and exhibit carry the page - choose commentary "none", or a hero-number page for a number with its argument beside it`);
   if (page.type === "panels") {
     const flat = exhibits.filter((ex) => trivialChart(ex));
     if (flat.length) throw new Error(`${id}: ${flat.length} panel${flat.length === 1 ? " plots" : "s plot"} two numbers of one series; two numbers are a metric pair - set them as a numbers page, or give each panel the whole set or the series over time`);
@@ -319,6 +330,10 @@ export function compilePage(pageIn, index = 0) {
     }
   }
   if (page.commentary === "on-exhibit" && primary?.type?.startsWith("chart.")) {
+    // Each callout is measured the way the chart will set it: a box that holds
+    // two lines, so a paragraph belongs in two callouts or beside the chart.
+    const long = (primary.annotations || []).filter((a) => !calloutFits(a.text));
+    if (long.length) throw new Error(`${id}: ${long.length} callout${long.length === 1 ? " is" : "s are"} too long for the chart's callout box ("${long[0].text}"); a callout holds about twelve words - split it, or choose "beside" for the argument`);
     const said = (primary.annotations || []).reduce((n, a) => n + words(a.text).length, 0);
     if (said < 10) throw new Error(`${id}: moving the explanation onto the chart means writing it there - the callouts carry ${said} words; give them the mechanism and the qualification (10 or more words between them), or choose "beside"`);
   }

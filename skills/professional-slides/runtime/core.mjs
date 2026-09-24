@@ -782,12 +782,20 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // Labels set outside the wedges with leaders are placed against the drawn
   // circle; PowerPoint cannot reproduce them, so that variant stays drawn.
   if (["pie", "donut"].includes(type) && (props.outsideLabels || props.variant === "outside-labels")) return null;
+  // Likewise a share too wide for its slice, which the scene sets beyond the
+  // rim beside it: PowerPoint's outside-end label is placed and wrapped by the
+  // renderer, and LibreOffice squeezes it into the frame margin.
+  if (["pie", "donut"].includes(type) && renderedNodes?.some(node => node.role === "data-label" && node.data?.placement === "outside")) return null;
   // Explicit numeric x positions and keyed point labels are not a categorical
   // native line. Preserve their spacing and selected labels as editable shapes.
   if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;
   // External stack labels and their leaders use measured scene coordinates;
   // Office repositioning the labels would detach those leaders from the text.
   if (renderedNodes?.some(node => node.role === "data-label" && node.data?.external)) return null;
+  // The forecast key and its dashed boundary are placed against the measured
+  // plot; PowerPoint keeps the per-point tint but has no legend entry for part
+  // of a series and would float the divider, so a keyed forecast stays drawn.
+  if (renderedNodes?.some(node => node.role === "chart-forecast-divider" || (node.role === "legend-swatch" && node.data?.categoryKey === "forecast"))) return null;
   if (Array.isArray(props.categoryNotes) && props.categoryNotes.some((note) => typeof note === "string" && note.trim())) return null;
   // Signed bars need the measured zero baseline and label gutters. Native
   // horizontal axes can move category labels into the bars; native columns

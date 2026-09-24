@@ -1,4 +1,5 @@
 import { mediaNode } from "./media.mjs";
+import { logoFrame } from "./charts.mjs";
 import { formatValue } from "./value-format.mjs";
 import {
   token,
@@ -50,6 +51,16 @@ const PHOTO_CELL_HEIGHT = 64;
 // thumbnail so its width is still enough to recognise.
 const PORTRAIT_PHOTO_HEIGHT = 84;
 const isPortrait = (media) => media?.width > 0 && media?.height > media.width * 1.15;
+// A logo cell's height and the ink each logo in it gets. Held to one body line
+// (20px), a wordmark kept its width but a square or upright mark shrank to a
+// 17x20 speck beside it - the Emirates and Saudia marks on a rival table were
+// the smallest things on the page. The cell now takes two lines and every logo
+// the same visual area (`logoFrame`, as chart category logos do), so a wide
+// wordmark runs long and low and a square mark stands to the cell's height.
+const LOGO_CELL_HEIGHT = 40;
+const LOGO_AREA = LOGO_CELL_HEIGHT * LOGO_CELL_HEIGHT * 2;
+// Below this a wordmark squeezed by a narrow column stops being legible.
+const LOGO_MIN_HEIGHT = 12;
 // Cells that may lead with an icon before their label.
 const ICON_LED_CELLS = new Set(["category", "text"]);
 // Outlook cells (as in a sector outlook table): an arrow in a ring, green up, grey flat, red down.
@@ -293,19 +304,32 @@ function resolveWidths(columns, props, width) {
       );
     return props.columnWidths.map((w) => w * width);
   }
+  // A `width` under one is a share of the table, as `columnWidths` are, when
+  // other columns carry weights. The composer weights every column by the
+  // measured width of its text (84 to 444), so an author's `width: 0.6` on a
+  // logo column read as a weight of 0.6 against those and came out at one
+  // pixel: "Table column is narrower than its minimum width". Only beside
+  // such weights (a width of one or more) is a fraction a share; fractions
+  // among themselves, or beside unweighted columns, divide in proportion as
+  // they always have.
+  const share = (c) => typeof c.width === "number" && c.width > 0 && c.width < 1;
+  const shares = columns.some((c) => typeof c.width === "number" && c.width >= 1);
   const fixed = columns.map((c) =>
-    typeof c.width === "object" ? c.width.px : 0,
+    typeof c.width === "object" ? c.width.px : shares && share(c) ? c.width * width : 0,
   );
   if (fixed.some((n) => !Number.isFinite(n) || n < 0) || sum(fixed) >= width)
-    throw new Error("Invalid fixed table column widths");
+    throw new Error(shares && columns.some(share)
+      ? `Table column width fractions (${columns.filter(share).map((c) => c.width).join(", ")}) leave no width for the other columns; a width under one is a share of the table`
+      : "Invalid fixed table column widths");
   const weights = columns.map((c, i) => (fixed[i] ? 0 : (c.width ?? 1)));
   if (weights.some((n) => !Number.isFinite(n) || n < 0))
     throw new Error("Table widths must be positive weights or {px}");
   const widths = columns.map(
     (c, i) => fixed[i] || ((width - sum(fixed)) * weights[i]) / sum(weights),
   );
-  if (widths.some((w, i) => w < (columns[i].minWidth ?? v("space.6"))))
-    throw new Error("Table column is narrower than its minimum width");
+  const narrow = widths.findIndex((w, i) => w < (columns[i].minWidth ?? v("space.6")));
+  if (narrow >= 0)
+    throw new Error(`Table column ${JSON.stringify(columns[narrow].label ?? narrow)} is narrower than its minimum width (${Math.round(widths[narrow])}px)`);
   return widths;
 }
 
@@ -433,11 +457,13 @@ function contentLayout(cell, width, props, used) {
   if (["binary", "harvey", "heatmap", "bars"].includes(cell.type))
     cell.scaleRecord = scaleFor(cell, props, used);
   if (cell.type === "logo") {
-    const height = measure("M", inner, false, bodySize(props)).lineHeight;
+    const height = Math.max(LOGO_CELL_HEIGHT, measure("M", inner, false, bodySize(props)).lineHeight);
     const media = cell.media;
-    const node = mediaNode({id:"logo-measure", frame:{x:0,y:0,width:inner,height}, props:media, role:"table-logo"});
-    if (node.frame.height < height - 0.01) throw new Error("Logo column must fit every logo at the shared body-height; widen the column");
-    return {height, padding, mediaWidth:node.frame.width};
+    // mediaNode validates the embedded bitmap; logoFrame sizes it.
+    mediaNode({id:"logo-measure", frame:{x:0,y:0,width:inner,height}, props:media, role:"table-logo"});
+    const logo = logoFrame({ x: 0, y: 0, width: inner, height }, media.width, media.height, { area: LOGO_AREA });
+    if (logo.height < LOGO_MIN_HEIGHT) throw new Error(`Logo column is too narrow for ${media.alt || "a logo"} at a legible size (${Math.round(logo.height)}px tall); widen the column`);
+    return {height, padding, logo};
   }
   if (cell.type === "photo") {
     // A photograph leading a row: component and category tables often
@@ -1265,8 +1291,9 @@ function renderTableAt({ id, frame, props }) {
             l.blocks[0], textStyle(false, t("color.textSecondary"), "center", "type.label"), data);
         }
       } else if (cell.type === "logo") {
-        const logo = mediaNode({id:stableId(cellId,"logo"),frame:{x:inner.x,y:area.y+(height-l.height)/2,width:inner.width,height:l.height},props:cell.media,role:"table-logo"});
-        logo.data = {...logo.data,...data,sharedHeight:l.height};
+        const box = logoFrame({ x: inner.x, y: area.y + (height - l.height) / 2, width: inner.width, height: l.height }, cell.media.width, cell.media.height, { area: LOGO_AREA });
+        const logo = mediaNode({id:stableId(cellId,"logo"),frame:box,props:cell.media,role:"table-logo"});
+        logo.data = {...logo.data,...data,cellHeight:l.height,logoArea:LOGO_AREA};
         nodes.push(logo);
       } else if (cell.type === "implication") {
         // `draw: false` keeps the gutter and leaves the row unmarked: the

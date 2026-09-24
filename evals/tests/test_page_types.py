@@ -119,6 +119,31 @@ console.log(JSON.stringify({{
         self.assertIn('under 5%', result['sliver'])
         self.assertIn('highlightRow', result['unknownKey'])
 
+    def test_callouts_are_measured_and_the_composed_deck_is_counted(self):
+        result = run_node(f'''
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import {{ compilePage }} from '{KIT}';
+import {{ authorDeck }} from '{AUTHOR}';
+const years = ['2019','2020','2021','2022','2023'];
+const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
+const long = 'Traffic fell to a fifth when the network was grounded and recovered only as aircraft returned from storage in stages';
+const trend = {{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim here',
+  title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5] }}], annotations: [{{ category: '2020', text: long }}] }} }};
+const strip = {{ id: 'm', type: 'numbers', form: 'metric-strip', commentary: 'below', points: ['a'], takeaway: false, why: 'Three numbers carry this claim',
+  title: 'Three numbers', metrics: [{{ value: '1', label: 'a' }}], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1']] }} }};
+// Thirteen one-point pages: thin on the composed page, which is what the build counts.
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
+const pages = Array.from({{ length: 13 }}, (_, i) => ({{ id: 'p' + i, type: 'argument', form: 'memo', commentary: 'none', takeaway: false,
+  why: 'A short argument page for the test', title: 'Finding number ' + i + ' is stated here', paragraphs: ['One short sentence.'] }}));
+const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages }}, {{ baseDir: dir }});
+console.log(JSON.stringify({{ long: error(() => compilePage(trend)), strip: error(() => compilePage(strip)),
+  counted: out.thinCounted, codes: out.findings.map((f) => f.code) }}));
+''')
+        self.assertIn('callout box', result['long'])
+        self.assertIn('metric strip', result['strip'])
+        self.assertEqual(result['counted'], 'composed')  # the build's own word check, on the composed pages
+        self.assertIn('THIN_PAGES_PLANNED', result['codes'])
+
 
 if __name__ == '__main__':
     unittest.main()
