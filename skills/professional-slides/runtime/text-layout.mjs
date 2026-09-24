@@ -33,7 +33,7 @@ export function measureText(text, width, { fontFamily = activeDesignTokens()?.["
         lines.push(line);
         line = word;
       } else line = candidate;
-      if (measureWidth(ctx,line).width > width + 0.01) throw new Error(`Unbreakable text exceeds its width: ${line}`);
+      if (measureWidth(ctx,line).width > width + 0.01) throw new Error(`Unbreakable text exceeds its width: ${line} (${Math.ceil(measureWidth(ctx,line).width)}px in ${Math.floor(width)}px); widen its box, or shorten or hyphenate the word`);
     }
     lines.push(line);
   }
@@ -71,7 +71,7 @@ export function measureTextRuns(runs, width, { fontFamily = activeDesignTokens()
       const candidate = merge([...line, ...(line.length ? [{ text: ' ', bold: line.at(-1).bold, ...(line.at(-1).accent ? { accent: true } : {}) }] : []), ...word]);
       if (line.length && runWidth(candidate) > width * wrapWidthRatio) { lineRuns.push(line); line = merge(word); }
       else line = candidate;
-      if (runWidth(line) > width + 0.01) throw new Error(`Unbreakable text exceeds its width: ${match[0]}`);
+      if (runWidth(line) > width + 0.01) throw new Error(`Unbreakable text exceeds its width: ${match[0]} (${Math.ceil(runWidth(line))}px in ${Math.floor(width)}px); widen its box, or shorten or hyphenate the word`);
     }
     lineRuns.push(line);
     offset += paragraph.length + 1;

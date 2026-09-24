@@ -238,7 +238,7 @@ function normalize(props) {
     return row.cells.map((value, c) => {
       if (occupied[r][c]) {
         if (value !== null)
-          throw new Error("Table row span collides with a populated cell");
+          throw new Error("Table row span collides with a populated cell; put null in the cells a rowSpan covers");
         return null;
       }
       if (value === null || value === undefined)
@@ -246,15 +246,21 @@ function normalize(props) {
           "Missing table evidence must be explicit, not a blank cell",
         );
       const column = columns[c];
+      // A group row is one label across a grey band; its other cells stay blank.
+      const bandRow = groupRow || (row.style ?? props.rowStyle) === "total";
       const cell = {
         ...column,
         ...(typeof value === "object" && !Array.isArray(value)
           ? value
           : { text: String(value), value }),
       };
-      // A group row is one label across a grey band; its other cells stay blank.
-      const bandRow = groupRow || (row.style ?? props.rowStyle) === "total";
-      const emptyValue = typeof value === "string" && !value.trim();
+      // A total row's filler is whitespace however it arrives: the composer's
+      // verdict styling wraps the total row's " " in `{ text: " ", type:
+      // "highlight" }`, which is still no evidence, and failed the table as
+      // "Table cell requires nonempty text".
+      const emptyValue = (typeof value === "string" && !value.trim())
+        || (bandRow && value && typeof value === "object" && !Array.isArray(value) && typeof value.text === "string" && !value.text.trim()
+          && ["values", "items", "media", "value", "state", "score", "number"].every((key) => value[key] === undefined));
       // `{ blank: true }` is an explicit empty cell: the shorter side of a
       // compare, where a padded " " would read as a missing value.
       if ((emptyValue && (bandRow ? c > 0 : c === 0)) || (value && typeof value === "object" && value.blank === true)) { cell.blank = true; cell.type = "text"; }
@@ -327,9 +333,15 @@ function resolveWidths(columns, props, width) {
   const widths = columns.map(
     (c, i) => fixed[i] || ((width - sum(fixed)) * weights[i]) / sum(weights),
   );
-  const narrow = widths.findIndex((w, i) => w < (columns[i].minWidth ?? v("space.6")));
+  return widths;
+}
+
+// After widening (widenForWords), a column still under its minimum means the
+// table as a whole is too narrow for its columns.
+function assertMinimumWidths(columns, widths) {
+  const narrow = widths.findIndex((w, i) => w < (columns[i].minWidth ?? v("space.6")) - 0.01);
   if (narrow >= 0)
-    throw new Error(`Table column ${JSON.stringify(columns[narrow].label ?? narrow)} is narrower than its minimum width (${Math.round(widths[narrow])}px)`);
+    throw new Error(`Table column ${JSON.stringify(columns[narrow].label ?? narrow)} is narrower than its minimum width (${Math.round(widths[narrow])}px); widen the table, drop a column, or give this column a larger width`);
   return widths;
 }
 
@@ -453,7 +465,7 @@ function contentLayout(cell, width, props, used) {
   const marker =
     cell.type === "binary" || dense ? v("icon.small") : v("icon.medium");
   const inner = width - padding * 2;
-  if (inner <= 0) throw new Error("Table cell is too narrow for padding");
+  if (inner <= 0) throw new Error("Table cell is too narrow for padding; widen the column or use compact density");
   if (["binary", "harvey", "heatmap", "bars"].includes(cell.type))
     cell.scaleRecord = scaleFor(cell, props, used);
   if (cell.type === "logo") {
@@ -505,7 +517,7 @@ function contentLayout(cell, width, props, used) {
       ...labels.map((s) => measure(s, inner, true, size).height),
     );
     if (inner - labelWidth - gap < v("space.6"))
-      throw new Error("Bar cell leaves no usable plot width");
+      throw new Error("Bar cell leaves no usable plot width; widen the column or shorten its value labels");
     return {
       height: cell.values.length * rowHeight + (cell.values.length - 1) * gap,
       padding,
@@ -532,7 +544,7 @@ function contentLayout(cell, width, props, used) {
   if (cell.type === "lights") {
     if (!LIGHT_STATES[cell.value]) throw new Error("Table lights cells take green, amber or red");
     const dot = v("icon.small");
-    if (inner < 3 * dot + 2 * gap) throw new Error("Table lights cell is too narrow for three lamps");
+    if (inner < 3 * dot + 2 * gap) throw new Error("Table lights cell is too narrow for three lamps; widen the column");
     return { padding, offset: 0, blocks: [], bold, size, marker, numberMarker: 0, numberWidth: 0, blockHeight: 0, lights: { dot, gap }, height: dot };
   }
   if (cell.type === "progress") {
@@ -540,19 +552,19 @@ function contentLayout(cell, width, props, used) {
     if (!(value >= 0 && value <= 100)) throw new Error("Table progress cells take a percentage from 0 to 100");
     const label = measure(cell.text || `${Math.round(value)}%`, inner, true, "type.label");
     const labelWidth = Math.max(label.width, v("space.6"));
-    if (inner - labelWidth - gap < v("space.6")) throw new Error("Table progress cell leaves no bar width");
+    if (inner - labelWidth - gap < v("space.6")) throw new Error("Table progress cell leaves no bar width; widen the column");
     return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, progress: { value, labelWidth, barHeight: v("space.2") }, height: Math.max(label.height, v("space.2")) };
   }
   if (cell.type === "trend") {
     const key = { up: "up", positive: "up", strong: "up", improving: "up", flat: "flat", neutral: "flat", moderate: "flat", stable: "flat", down: "down", negative: "down", weak: "down", declining: "down" }[String(cell.value).toLowerCase()];
     if (!key) throw new Error(`Table trend cells take up, flat or down (got ${cell.value})`);
     const size = v("icon.small") + v("space.2");
-    if (inner < size) throw new Error("Table trend cell is too narrow for its mark");
+    if (inner < size) throw new Error("Table trend cell is too narrow for its mark; widen the column");
     return { padding, offset: 0, blocks: [], bold, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: 0, trend: { size, key }, height: size };
   }
   if (cell.type === "dot" || cell.type === "check") {
     const size = v("icon.small") + (cell.type === "check" ? v("space.2") : 0);
-    if (inner < size) throw new Error("Table mark cell is too narrow for its mark");
+    if (inner < size) throw new Error("Table mark cell is too narrow for its mark; widen the column");
     return { padding, offset: 0, blocks: [], bold, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: 0, mark: { size, on: cell.value === true || cell.value === "yes" || cell.value === "done" }, height: size };
   }
   if (cell.type === "binary") {
@@ -727,6 +739,42 @@ function layoutLegend(id, scale, width, size, gap) {
   };
 }
 
+/**
+ * Widen any column narrower than the longest word it must print.
+ *
+ * Text wraps at spaces, so a column narrower than one of its words cannot
+ * print it: "Performance" as a group band over a single narrow score column,
+ * or "Score" in a column weighted to 40px, failed the table with "Unbreakable
+ * text exceeds its width". A designer gives such a column the width of its
+ * longest word and takes it from the columns with room to spare, in
+ * proportion to that room. When the table as a whole is too narrow for its
+ * words the widths are left as they are and the measurement fails, naming the
+ * word.
+ */
+function widenForWords(model, widths, props, { padding, textSize, chevronInset }) {
+  const longest = (text, bold, size) => Math.max(0, ...String(text ?? "").split(/\s+/).filter(Boolean).map((word) => measure(word, 100000, bold, size).width));
+  const need = model.columns.map((column, c) => {
+    let word = Math.max(longest(column.label, true, textSize) + 2 * chevronInset, longest(column.unit, false, "type.label"));
+    // A group band over this column alone must fit its label in this column.
+    const group = column.group === undefined || column.group === null ? null : String(column.group);
+    if (group && model.columns[c - 1]?.group !== column.group && model.columns[c + 1]?.group !== column.group) word = Math.max(word, longest(group, true, textSize));
+    for (const row of model.cells) {
+      const cell = row[c];
+      if (!cell || cell.blank || !["text", "category", "highlight", "number"].includes(cell.type ?? "text")) continue;
+      word = Math.max(word, longest(cell.text, cell.bold || cell.type === "category", bodySize(props)));
+    }
+    return Math.max(column.minWidth ?? v("space.6"), Math.ceil(word) + 2 * padding + 2);
+  });
+  // A width the author fixed in pixels is theirs: it neither widens nor gives up room.
+  const fixed = model.columns.map((column) => typeof column.width === "object" && column.width !== null);
+  const deficit = widths.reduce((total, width, c) => total + (fixed[c] ? 0 : Math.max(0, need[c] - width)), 0);
+  if (deficit <= 0) return widths;
+  const slack = widths.map((width, c) => fixed[c] ? 0 : Math.max(0, width - need[c]));
+  const room = sum(slack);
+  if (room < deficit) return widths;
+  return widths.map((width, c) => fixed[c] ? width : width < need[c] ? need[c] : width - (slack[c] / room) * deficit);
+}
+
 export function measureTable({ frame, props }) {
   const model = normalize(props),
     density = props.density ?? "body";
@@ -739,13 +787,15 @@ export function measureTable({ frame, props }) {
   if (!["body", "compact", "dense"].includes(density))
     throw new Error("Unknown table density");
   const tableProps = { ...props, density },
-    widths = resolveWidths(model.columns, tableProps, frame.width),
     used = new Map();
   const compact = density !== "body",
     padding = v(
       density === "dense" ? "space.1" : compact ? "space.2" : "space.3",
     ),
     gap = v(compact ? "space.1" : "space.2");
+  const widths = assertMinimumWidths(model.columns, widenForWords(model, resolveWidths(model.columns, tableProps, frame.width), tableProps, {
+    padding, chevronInset: props.headerShape === "chevron" ? v("space.5") : 0,
+    textSize: density === "dense" ? "type.label" : density === "compact" ? "type.compact" : "type.body" }));
   if (props.rowSpacing !== undefined && !["normal", "tight"].includes(props.rowSpacing))
     throw new Error("Table rowSpacing must be normal or tight");
   // Compact line spacing and compact type are separate decisions. A long
@@ -822,7 +872,7 @@ export function measureTable({ frame, props }) {
     }
     const plotWidth = Math.min(...group.flatMap(({ column, entries }) =>
       entries.map(({ layout }) => widths[column] - 2 * padding - layout.labelWidth - gap)));
-    if (plotWidth < v("space.6")) throw new Error("Bar column leaves no usable plot width");
+    if (plotWidth < v("space.6")) throw new Error("Bar column leaves no usable plot width; widen the column or shorten its value labels");
     group.forEach(({ column, entries }) => entries.forEach(({ layout }) => {
       layout.labelWidth = widths[column] - 2 * padding - gap - plotWidth;
     }));

@@ -142,7 +142,7 @@ function insightLayout(frame, props) {
   const markerGap = marker ? tokenValue(token("space.3")) : 0;
   const bodySize = props.variant === "statement" ? token("type.heading") : BODY;
   const width = frame.width - 2 * paddingX - marker - markerGap;
-  if (width <= 0) throw new Error("Insight width cannot contain its theme padding");
+  if (width <= 0) throw new Error("Insight width cannot contain its theme padding; give the insight a wider frame");
   const options = { fontFamily: tokenValue(FONT), wrapWidthRatio: 1 };
   const heading = props.heading ? measureText(props.heading, width, { ...options, fontSize: tokenValue(token("type.heading")), bold: true }) : null;
   const gap = heading ? tokenValue(token("space.2")) : 0;
@@ -160,6 +160,13 @@ function insightLayout(frame, props) {
   return { body, bodySize, bar, lines: null, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: (bar ? contentHeight : Math.max(contentHeight, marker)) + 2 * paddingY };
 }
 
+/**
+ * The height an insight box needs at a width, in its own face and padding.
+ * The composer's row of captioned panels shares one caption height; measured
+ * with this rather than an Arial-14 estimate it never under-allocates the box.
+ */
+export const measureInsight = (frame, props) => insightLayout(frame, props);
+
 // A reading note: the cream box a consulting page carries top-right to say how
 // to read it, or to flag a caveat. Compact type, hairline caution border.
 function calloutLayout(frame, props) {
@@ -169,7 +176,7 @@ function calloutLayout(frame, props) {
   const outline = props.tone === "outline";
   const paddingX = tokenValue(token(outline ? "space.4" : "space.3")), paddingY = tokenValue(token(outline ? "space.4" : "space.2"));
   const width = frame.width - 2 * paddingX;
-  if (width <= 0) throw new Error("Callout has no text width");
+  if (width <= 0) throw new Error("Callout has no text width; give the callout a wider frame");
   const options = { fontFamily: tokenValue(FONT), fontSize: tokenValue(outline ? BODY : COMPACT), wrapWidthRatio: 1 };
   const lead = props.lead?.trim() ? measureText(props.lead, width, { ...options, bold: true }) : null;
   const body = measureText(props.text, width, { ...options, bold: outline });
@@ -178,8 +185,14 @@ function calloutLayout(frame, props) {
 }
 
 function calloutNodes({ id, frame, props }) {
-  const layout = calloutLayout(frame, props);
-  if (layout.height > frame.height + 0.01) throw new Error(`Callout overflows its ${frame.height}px box; shorten the note`);
+  let layout = calloutLayout(frame, props);
+  // As with the insight: a box a few pixels short closes its vertical padding
+  // (to a 4px floor) instead of failing.
+  if (layout.height > frame.height + 0.01) {
+    const paddingY = layout.paddingY - (layout.height - frame.height) / 2;
+    if (paddingY < tokenValue(token("space.1")) - 0.01) throw new Error(`Callout overflows its ${frame.height}px box by ${Math.ceil(layout.height - frame.height)}px; give it the space or shorten the note`);
+    layout = { ...layout, paddingY, height: frame.height };
+  }
   const height = layout.outline && props.fill ? frame.height : layout.height;
   const color = layout.outline ? token("color.accent") : INK;
   const nodes = [rectPrimitive({ id: stableId(id, "surface"), role: "callout-surface", frame: { ...frame, height }, style: layout.outline ? boxStyle(SURFACE, token("color.accent"), HAIRLINE, token("radius.none")) : boxStyle(token("color.calloutTint"), props.tone === "caution" ? token("color.caution") : "none", HAIRLINE, token("radius.none")) })];
@@ -191,7 +204,15 @@ function calloutNodes({ id, frame, props }) {
 
 function insightNodes({ id, frame, props }) {
   const layout = insightLayout(frame, props), variant = props.variant ?? "tonal";
-  if (layout.height > frame.height) throw new Error(`Insight overflows its ${frame.height}px box by ${Math.ceil(layout.height - frame.height)}px; give it the space or shorten the sentence`);
+  // The content is centred in the frame, so a box a few pixels short of the
+  // measured height gives the difference up from its padding rather than
+  // failing: a caption sized by an estimate (a row of captioned panels shares
+  // one height, measured in a different face) overflowed its 80px box by 2px.
+  // The padding keeps a 4px floor on each side; only content taller than the
+  // box less that floor is a sentence the box cannot hold.
+  const floor = tokenValue(token("space.1"));
+  const content = layout.bar ? layout.contentHeight : Math.max(layout.contentHeight, layout.marker);
+  if (layout.height > frame.height && content + 2 * Math.min(floor, layout.paddingY) > frame.height) throw new Error(`Insight overflows its ${frame.height}px box by ${Math.ceil(layout.height - frame.height)}px even with its padding closed to ${floor}px; give it ${Math.ceil(layout.height - frame.height)}px more height or shorten the sentence`);
   const fill = variant === "primary" ? PRIMARY : variant === "neutral" ? MUTED_SURFACE : variant === "dotted" ? "none" : PRIMARY_TINT;
   const foreground = variant === "primary" ? WHITE : INK;
   const nodes = ["plain", "rule", "statement"].includes(variant) ? [] : [rectPrimitive({ id: stableId(id, "surface"), role: "insight-surface", frame, style: boxStyle(fill, "none", HAIRLINE, SMALL_RADIUS) })];
@@ -518,7 +539,7 @@ function chartTitleLayout(frame, props) {
   if (inline) heading = inlineHeading;
   const unitSize = inline ? token("type.heading") : COMPACT;
   const unit = inline ? inlineMeasure : measureUnit(COMPACT);
-  if (unit && unit.lines.length !== 1) throw new Error("Chart unit must fit on one line");
+  if (unit && unit.lines.length !== 1) throw new Error("Chart unit must fit on one line; shorten the unit (e.g. \"$m\" not \"millions of US dollars\")");
   // `unitPlacement: "inline"` (the composer's choice for a chart beside a text
   // column) sets the unit after the heading on the same line, in grey, so the
   // heading band is one line and level with the side column's heading. It
@@ -539,7 +560,7 @@ function chartTitleLayout(frame, props) {
 }
 function chartTitleNodes({ id, frame, props }) {
   const layout = chartTitleLayout(frame, props);
-  if (layout.height > frame.height) throw new Error(`Chart title ${id} exceeds its allocated height`);
+  if (layout.height > frame.height) throw new Error(`Chart title ${id} exceeds its allocated height; shorten the heading or unit, or allocate more height`);
   const blockTop = frame.y + layout.padY;
   const nodes = [];
   if (layout.band) nodes.push(rectPrimitive({ id: stableId(id, "band"), role: "chart-heading-band", frame: { x: frame.x, y: frame.y, width: frame.width, height: layout.heading.height + 2 * layout.padY }, style: boxStyle(SECONDARY, "none", HAIRLINE, token("radius.none")) }));
@@ -641,7 +662,7 @@ function bodyListLayout(frame, itemsIn, props = {}) {
   const gap = tokenValue(token(marker === "rule" ? "space.4" : plain ? "space.2" : iconList && !ringed ? "space.4" : "space.3"));
   const leadGap = tokenValue(token("space.1"));
   const markerSquare = tokenValue(token("space.1"));
-  if (frame.width <= offset) throw new Error("Body bullet list has no text width");
+  if (frame.width <= offset) throw new Error("Body bullet list has no text width; give the list a wider frame");
   const width = frame.width - offset;
   const font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 };
   const subIndent = tokenValue(token("space.5"));
@@ -1050,7 +1071,7 @@ function matrixNodes({ id, frame, props }) {
 
 function lightChevronNode(id, frame) {
   const height = tokenValue(token("icon.medium")), width = height * 0.75;
-  if (frame.width < width || frame.height < height) throw new Error("Chevron needs room for its canonical optical size");
+  if (frame.width < width || frame.height < height) throw new Error("Chevron needs room for its canonical optical size; widen its gutter");
   return shapePrimitive({ id: stableId(id, "chevron"), role: "relationship-chevron", geometry: "chevron", frame: { x: frame.x + (frame.width - width) / 2, y: frame.y + (frame.height - height) / 2, width, height }, style: { fill: PRIMARY, stroke: "none", lineWidth: HAIRLINE }, data: { relation: "implies", arrowVariant: "chevron" } });
 }
 
@@ -1327,7 +1348,7 @@ function registerCore(registry) {
         : panelWidth ? panelWidth - CHROME.left - 24 : dividerStyle === "numbered" ? frame.width * 0.58 - CHROME.left : frame.width - CHROME.left - CHROME.right;
       const titleBold = dividerLayout !== "editorial";
       const title = measureText(props.title, width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")), bold: titleBold, wrapWidthRatio: 1 });
-      if (title.lines.length > (panelWidth ? 3 : 2) || title.height > frame.height - 2 * CHROME.bodyTop) throw new Error("Section divider title exceeds its allocated space");
+      if (title.lines.length > (panelWidth ? 3 : 2) || title.height > frame.height - 2 * CHROME.bodyTop) throw new Error("Section divider title exceeds its allocated space; shorten the section title");
       const background = dividerLayout === "keynote" ? PRIMARY : inverse ? INK : token("color.canvas"), foreground = inverse ? WHITE : INK;
       if (contrastRatio(tokenValue(background), tokenValue(foreground)) < 4.5) throw new Error("Section divider title contrast must be at least 4.5:1");
       // A short accent rule above the title and the section's one-line summary

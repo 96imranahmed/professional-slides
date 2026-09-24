@@ -363,8 +363,30 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
       ].map(([x, y, align]) => ({ frame: { x, y, width, height }, align }));
       const inside = (f) => f.x >= frame.x && f.y >= frame.y && f.x + f.width <= frame.x + frame.width && f.y + f.height <= frame.y + frame.height;
       const clear = (f) => !occupied.some((o) => f.x < o.x + o.width && o.x < f.x + f.width && f.y < o.y + o.height && o.y < f.y + f.height);
-      const chosen = candidates.find((c) => inside(c.frame) && clear(c.frame)) ?? candidates.find((c) => inside(c.frame)) ?? candidates[0];
+      let chosen = candidates.find((c) => inside(c.frame) && clear(c.frame));
+      let leader = null;
+      if (!chosen) {
+        // A dense cluster (a regional network's neighbouring towns) takes
+        // every position touching the marker. The label moves further out -
+        // rings of 28, 44 and 64px in eight directions - with a hairline
+        // leader back to its marker, rather than printing over a neighbour.
+        const pathClear = (x1, y1, x2, y2) => { for (let t = 0.1; t < 1; t += 0.1) { const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t; if (occupied.some((o) => x > o.x && x < o.x + o.width && y > o.y && y < o.y + o.height)) return false; } return true; };
+        ring: for (const reach of [28, 44, 64]) for (const degrees of [0, 180, -45, 45, -135, 135, -90, 90]) {
+          const ux = Math.cos(degrees * Math.PI / 180), uy = Math.sin(degrees * Math.PI / 180);
+          const cx = centerX + ux * (half + reach + width / 2 * Math.abs(ux)), cy = centerY + uy * (half + reach + height / 2 * Math.abs(uy));
+          const f = { x: cx - width / 2, y: cy - height / 2, width, height };
+          if (!inside(f) || !clear(f)) continue;
+          const x1 = centerX + ux * (half + 2), y1 = centerY + uy * (half + 2);
+          const x2 = Math.max(f.x - 2, Math.min(f.x + f.width + 2, cx - ux * (width / 2 + 2))), y2 = Math.max(f.y, Math.min(f.y + f.height, cy - uy * (height / 2 + 2)));
+          if (!pathClear(x1, y1, x2, y2)) continue;
+          chosen = { frame: f, align: Math.abs(ux) < 0.3 ? "center" : ux > 0 ? "left" : "right" };
+          leader = { x1, y1, x2, y2 };
+          break ring;
+        }
+      }
+      chosen = chosen ?? candidates.find((c) => inside(c.frame)) ?? candidates[0];
       occupied.push(chosen.frame);
+      if (leader) nodes.push(linePrimitive({ id: stableId(id, "marker-label-leader", index), role: "map-label-leader", ...leader, style: { stroke: SECONDARY, lineWidth: HAIRLINE }, data: { markerIndex: index } }));
       nodes.push(rectPrimitive({ id: stableId(id, "marker-label-backing", index), role: "map-label-backing", frame: { x: chosen.frame.x - 1, y: chosen.frame.y + 1, width: chosen.frame.width + 2, height: chosen.frame.height - 2 }, style: { fill: token("color.canvas"), stroke: "none", lineWidth: HAIRLINE, radius: token("radius.small") } }));
       nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: chosen.frame, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: marker.hub ? INK : SECONDARY, bold: true, align: chosen.align, valign: "mid" }, data: { textLayout: measured } }));
     }
@@ -373,18 +395,34 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
 }
 
 // `crop: "fit"` frames the map on its markers: a network from one hub read on
-// a map of the whole world is a cluster of dots in a tenth of the frame. The
-// crop keeps a margin of a sixth of the span, and never narrows below 36
-// degrees of longitude or 24 of latitude, so the places keep their context.
-function fitBounds(markers, geography) {
+// a map of the whole world is a cluster of dots in a tenth of the frame.
+//
+// The crop follows the network's own extent. It used never to narrow below 36
+// degrees of longitude, so a regional network - a UK operator's routes over
+// six degrees - rendered at the scale of Europe: markers on top of each
+// other, labels clipped at the frame and routes too short to draw, silently.
+// Now the span keeps a margin of a sixth of itself (at least half a degree),
+// a single place gets a 6 by 4 degree window around it, and the window then
+// widens on its shorter side to the frame's shape, so the map fills the
+// frame with context rather than letterboxing inside it.
+const FIT_MIN_LON = 1.5, FIT_MIN_LAT = 1, FIT_SINGLE = [6, 4];
+function fitBounds(markers, geography, frame = null) {
   const points = markers.filter((m) => Number.isFinite(m?.longitude) && Number.isFinite(m?.latitude)).map((m) => [m.longitude, m.latitude]);
-  if (points.length < 2) throw new Error('crop: "fit" needs at least two markers with longitude and latitude');
+  if (!points.length) throw new Error('crop: "fit" needs at least one marker with longitude and latitude; give the markers coordinates or drop crop');
   let [minLon, minLat, maxLon, maxLat] = points.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [Infinity, Infinity, -Infinity, -Infinity]);
   const grow = (lo, hi, min) => { const span = Math.max(hi - lo, min), mid = (lo + hi) / 2; return [mid - span / 2, mid + span / 2]; };
-  [minLon, maxLon] = grow(minLon, maxLon, 36); [minLat, maxLat] = grow(minLat, maxLat, 24);
-  const padLon = (maxLon - minLon) / 6, padLat = (maxLat - minLat) / 6;
+  const single = points.length === 1 || (maxLon - minLon < 1e-6 && maxLat - minLat < 1e-6);
+  [minLon, maxLon] = grow(minLon, maxLon, single ? FIT_SINGLE[0] : FIT_MIN_LON); [minLat, maxLat] = grow(minLat, maxLat, single ? FIT_SINGLE[1] : FIT_MIN_LAT);
+  const padLon = Math.max(0.5, (maxLon - minLon) / 6), padLat = Math.max(0.5, (maxLat - minLat) / 6);
+  minLon -= padLon; maxLon += padLon; minLat -= padLat; maxLat += padLat;
+  if (frame && frame.width > 0 && frame.height > 0) {
+    const k = Math.max(0.25, Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
+    const target = frame.width / frame.height, shape = ((maxLon - minLon) * k) / (maxLat - minLat);
+    if (shape < target) [minLon, maxLon] = grow(minLon, maxLon, (maxLat - minLat) * target / k);
+    else [minLat, maxLat] = grow(minLat, maxLat, (maxLon - minLon) * k / target);
+  }
   const [gw, gs, ge, gn] = geography.bounds;
-  return [Math.max(gw, minLon - padLon), Math.max(gs, minLat - padLat), Math.min(ge, maxLon + padLon), Math.min(gn, maxLat + padLat)];
+  return [Math.max(gw, minLon), Math.max(gs, minLat), Math.min(ge, maxLon), Math.min(gn, maxLat)];
 }
 
 // Routes: a curved line from one marker to another, the hub-and-spoke picture
@@ -512,11 +550,11 @@ export function mapNodes({ id, frame, props = {} }) {
   if (absentHighlights.length) throw new Error(`Highlighted countries are outside ${geography.id}: ${absentHighlights.join(", ")}`);
   if (props.routes !== undefined && !Array.isArray(props.routes)) throw new Error("Map routes must be an array of { from, to }");
   if (props.crop !== undefined && props.crop !== "fit") throw new Error('Map crop must be "fit" (crop to the markers and routes)');
-  const bounds = props.crop === "fit" ? fitBounds(props.markers || [], geography) : geography.bounds;
   // A size legend takes a strip under the map, so it never sits on land.
   const legend = sizeLegendSpec(props, props.markers || []);
   const outer = frame;
   if (legend) frame = { ...frame, height: frame.height - legend.height - 8 };
+  const bounds = props.crop === "fit" ? fitBounds(props.markers || [], geography, frame) : geography.bounds;
   const projected = projection(frame, bounds);
   const recede = Boolean((props.markers || []).length || (props.routes || []).length);
   const nodes = geography.countries.map((country) => {

@@ -21,6 +21,10 @@ gates/page_gates.py  deterministic page gates (ink, dead band, internal void, he
 reviewer.mjs       one full review prompt + schema + artifact binding; verification rounds scoped to changed/blocked slides; backends codex | claude | packet
 claims.mjs         claim ledger (claims.json) for the author's self-check, and its validation
 build-deck.mjs     assets → plan → scene → claims → pptx → render → readback → gates
+page-types.mjs     the page types: required choices, the structure they compile to, evidence shapes
+author-deck.mjs    pages file (the dot-dash) -> deck, plan and content plan; every finding in one run; --draft, --types, --schema
+compose-all.mjs    composition that reports every failing page in one run, and each page's reading task
+derive-content.mjs the content plan and text plan read off the composed pages
 fetch-logos.mjs    player logos from Wikipedia infoboxes, trimmed to the mark (run by the build)
 fetch-pictures.mjs photographs for `{ alt }` placeholders from Wikimedia Commons, free licences only (run by the build)
 fetch-places.mjs   coordinates for map markers that name a place, cached in assets/places.json (run by the build)

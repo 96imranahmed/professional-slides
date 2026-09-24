@@ -23,6 +23,8 @@
 // exhibit.type: any registered component id, or the aliases "table", "image", "metrics", "cards",
 // "quadrants", "swot", "compare", "phase-table", "rows".
 import { applyDesign } from "./design-systems.mjs";
+import { mapAll } from "./core.mjs";
+import { measureInsight } from "./registry.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { measureText, accentRuns } from "./text-layout.mjs";
@@ -2291,8 +2293,9 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     // captions its panels or carries a list, not both.
     if (slide.points?.length) throw new Error(`${id}: panel captions are the commentary; drop the page's points or the captions`);
     const width = Math.max(160, (BODY_WIDTH - COLUMN_GAP * (exhibits.length - 1)) / exhibits.length);
-    const padding = 32;
-    const height = Math.max(...captioned.map((ex) => measureText(ex.caption.trim(), width - padding, { fontFamily: "Arial", fontSize: 14, wrapWidthRatio: 1 }).height)) + padding;
+    // Measured by the insight box itself - its face, weight and padding - so the
+    // shared height never under-allocates the caption it is for.
+    const height = Math.max(...captioned.map((ex) => measureInsight({ x: 0, y: 0, width, height: 1000 }, { text: ex.caption.trim(), variant: "neutral", align: "center" }).height));
     for (const ex of captioned) ex.captionHeight = Math.ceil(height);
   }
   // Peer charts with one unit share one value scale, or the comparison lies.
@@ -3157,14 +3160,15 @@ function composeDeckWith(spec, baseDir) {
     if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, resolveReferences(v)]));
     return value;
   };
-  for (const raw of expanded) {
+  // Every page is composed and every failure reported together.
+  mapAll(expanded, (raw) => {
     const { sourceSlideId, ...page } = resolveReferences(raw);
     const composed = composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles);
     if (sourceSlideId) composed.sourceSlideId = sourceSlideId;
     slides.push(composed);
     recent.splice(4);
     recentStyles.splice(9);
-  }
+  }, (raw, index) => raw?.sourceSlideId ?? raw?.id ?? `page-${index + 1}`);
   return {
     id: spec.id,
     palette: spec.palette || "midnight",

@@ -131,5 +131,23 @@ console.log(JSON.stringify(auditContent(spec, scene).findings.map(f => f.code)))
         self.assertEqual(result, [])
 
 
+class ShortBlockTests(unittest.TestCase):
+    def test_a_short_planned_number_does_not_match_inside_generated_text(self):
+        # A data label "4" took the "4" out of the tracker's "04 / The rivals
+        # are real", and the rest of the tracker was reported as unplanned.
+        result = run_node('''
+import { auditTextPlan, locate } from './skills/professional-slides/runtime/text-contract.mjs';
+const scene = { slides: [{ id: 'p', nodes: [
+  { type: 'text', role: 'tracker-compact-label', text: '04 / The rivals are real' },
+  { type: 'text', role: 'action-title', text: 'Four rivals matter' },
+  { type: 'text', role: 'data-label', text: '4' }] }] };
+const content = { textContract: 'complete', pages: [{ id: 'p', textPlan: [{ id: 't', role: 'title', text: 'Four rivals matter' }, { id: 'd', role: 'exhibit', text: '4' }] }] };
+console.log(JSON.stringify({ codes: auditTextPlan(content, scene).findings.map((f) => f.code), inside: locate('x 04 y', '4').at, whole: locate('x 04 4 y', '4').at }));
+''')
+        self.assertNotIn('TEXT_UNPLANNED', result['codes'])
+        self.assertEqual(result['inside'], -1)
+        self.assertEqual(result['whole'], 5)
+
+
 if __name__ == '__main__':
     unittest.main()

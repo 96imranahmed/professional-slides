@@ -102,12 +102,29 @@ export const REVIEW_SCHEMA = {
           code: { type: "string", pattern: "^[A-Z][A-Z0-9_]+$" },
           severity: { type: "string", enum: SEVERITIES },
           reason: { type: "string", minLength: 20 },
-          repair: { type: "string" }
+          repair: { type: "string" },
+          // Optional, for backward compatibility: a review written before the
+          // field existed still validates. See CHECKABLE below.
+          checkable: {
+            type: ["object", "null"], additionalProperties: false, required: ["rule", "measure"],
+            properties: {
+              rule: { type: "string", minLength: 10 },
+              measure: { type: "string", minLength: 10 }
+            }
+          }
         }
       }
     }
   }
 };
+
+// A finding a deterministic check could have caught before the build names the
+// check it wants: `rule` (what must hold, said as a rule) and `measure` (what
+// to measure and against what threshold). Judgement - the argument, emphasis,
+// whether a page is worth reading - leaves it null. Every checkable finding is
+// a review spent on something code should have refused, so recordReview keeps
+// them as candidates for a compile-time or composition check.
+export const CHECKABLE = "checkable: { rule, measure } when a deterministic check on the pages file, the composed scene or the render could have caught the defect before the build (a callout covering a data label, a title over two lines, a caption repeating its heading); null for judgement (the argument, emphasis, whether the page is worth reading, whether the evidence supports the claim)";
 
 export function validateReview(review, slideIds) {
   const errors = [];
@@ -124,6 +141,15 @@ export function validateReview(review, slideIds) {
     if (["major", "blocker"].includes(f.severity)) {
       if (f.code === "EDITORIAL") errors.push(`${at}: EDITORIAL cannot be ${f.severity}`);
       if (typeof f.repair !== "string" || f.repair.trim().length < 40 || !/\b(add|replace|move|merge|cut|rewrite|split|show|plot|label|reduce|enlarge|use|drop|state|cite)\b/i.test(f.repair)) errors.push(`${at}: a ${f.severity} finding needs a concrete repair sentence`);
+    }
+    if (f.checkable !== undefined && f.checkable !== null) {
+      const c = f.checkable;
+      if (typeof c !== "object" || Array.isArray(c)) errors.push(`${at}: checkable must be { rule, measure } or null`);
+      else {
+        for (const key of ["rule", "measure"]) if (typeof c[key] !== "string" || c[key].trim().length < 10) errors.push(`${at}: checkable.${key} must say ${key === "rule" ? "what must hold" : "what to measure and against what"}`);
+        const extra = Object.keys(c).filter((key) => !["rule", "measure"].includes(key));
+        if (extra.length) errors.push(`${at}: checkable takes rule and measure only (got ${extra.join(", ")})`);
+      }
     }
   }
   const blocking = review.findings.some((f) => ["major", "blocker"].includes(f.severity));
@@ -156,6 +182,58 @@ export async function slideHashes(directory) {
 }
 
 const HISTORY = "review-history";
+export const CHECK_CANDIDATES = "check-candidates.json";
+
+/**
+ * The findings a machine check could have caught: every finding with a
+ * non-null `checkable`, as { slide, code, severity, rule, measure, reason }.
+ * These are the review's evidence that a rule is still living in a reviewer's
+ * head rather than in code (references/taste-review.md).
+ */
+export function checkCandidates(review) {
+  return (review?.findings || [])
+    .filter((f) => f && f.checkable && typeof f.checkable === "object" && typeof f.checkable.rule === "string" && f.checkable.rule.trim())
+    .map((f) => ({ slide: f.slide ?? null, code: f.code, severity: f.severity, rule: f.checkable.rule.trim(),
+      measure: String(f.checkable.measure ?? "").trim(), reason: f.reason }));
+}
+
+/**
+ * Merge a review's check candidates into review-history/check-candidates.json.
+ * One entry per (code, rule): a rule raised again, on another page or in a
+ * later review, adds its slide and review to the entry and counts it, so the
+ * file ranks the checks worth writing by how often a review had to do their job.
+ */
+export async function recordCheckCandidates(directory, review, reviewFile = null) {
+  const found = checkCandidates(review);
+  const file = path.join(directory, HISTORY, CHECK_CANDIDATES);
+  const current = await fs.readFile(file, "utf8").then(JSON.parse).catch(() => null);
+  const candidates = Array.isArray(current?.candidates) ? current.candidates : [];
+  const key = (c) => `${c.code}\u0000${c.rule.toLowerCase()}`;
+  const byKey = new Map(candidates.map((c) => [key(c), c]));
+  const recordedAt = new Date().toISOString();
+  const from = reviewFile ? path.basename(reviewFile) : null;
+  for (const c of found) {
+    const entry = byKey.get(key(c));
+    if (entry) {
+      entry.count = (entry.count ?? 1) + 1;
+      if (c.slide && !entry.slides.includes(c.slide)) entry.slides.push(c.slide);
+      if (from && !entry.reviews.includes(from)) entry.reviews.push(from);
+      entry.lastSeen = recordedAt;
+    } else {
+      const fresh = { code: c.code, rule: c.rule, measure: c.measure, severity: c.severity, slides: c.slide ? [c.slide] : [],
+        reason: c.reason, reviews: from ? [from] : [], count: 1, firstSeen: recordedAt, lastSeen: recordedAt };
+      candidates.push(fresh);
+      byKey.set(key(c), fresh);
+    }
+  }
+  if (!found.length && !current) return { file: null, added: 0, candidates };
+  candidates.sort((a, b) => (b.count ?? 1) - (a.count ?? 1));
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, JSON.stringify({ schema: "professional-slides.check-candidates/v1",
+    note: "Review findings a deterministic check could have caught. Turn each into a compile-time or composition check in its owner (SKILL.md, Iterate the reusable skill), then remove it here.",
+    candidates }, null, 2) + "\n");
+  return { file, added: found.length, candidates };
+}
 
 /** Keep a validated review with the slide hashes it was bound to, so the next one can be scoped. */
 export async function recordReview(directory, review) {
@@ -164,6 +242,7 @@ export async function recordReview(directory, review) {
   const n = (await fs.readdir(dir)).filter((f) => /^review-\d+\.json$/.test(f)).length + 1;
   const file = path.join(dir, `review-${n}.json`);
   await fs.writeFile(file, JSON.stringify({ review, binding: review.binding, slideHashes: await slideHashes(directory), recordedAt: new Date().toISOString() }, null, 2) + "\n");
+  await recordCheckCandidates(directory, review, file);
   return file;
 }
 
@@ -355,6 +434,8 @@ ${Object.entries(packet.codes).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
 
 Severity: blocker (must fix before any reader sees it), major (fix before delivery), minor (advisory), none. Design codes (DEAD_SPACE, LAYOUT_MONOTONY, NO_HERO_EXHIBIT, OVERSIZED_TYPE, WALL_OF_TEXT, BURIED_NUMBER, HEDGED_TITLE, TITLE_TOO_LONG, INCONSISTENT_ENCODING) may be major. A large empty band, one layout repeated across most pages, and prose where an exhibit belongs are defects, not preferences. Every major or blocker finding needs a repair sentence saying exactly what to add, replace, move, merge, cut, plot or rewrite.
 
+${checkablePrompt()}
+
 Deterministic gate findings already computed (confirm, refine or explain why they do not matter):
 ${packet.slides.flatMap((s) => s.gateFindings.map((f) => `- slide ${s.index} ${f.code}: ${f.measured ?? ""} (threshold ${f.threshold ?? ""})`)).join("\n") || "- none"}
 
@@ -407,12 +488,19 @@ ${packet.titles.join("\n")}
 Do three things. (1) For every earlier finding, check the repair on the page: if it is fixed, drop it; if not, raise it again at its severity. A deck-level finding is checked against the titles, montage and the changed pages. (2) Read every listed page as a first reader would, and raise any major or blocker defect on it, including one the repair introduced. (3) Check the changed pages against their neighbours in the sequence for a new contradiction or repetition. Do not raise new findings on pages that are not listed: they were accepted as they stand. Use the same codes and severities as the full review:
 ${Object.entries(packet.codes).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
 
+${checkablePrompt()}
+
 ${densityPrompt(packet.density, scope.mustInspect)}
 
 Record inspectedSlides as exactly these IDs once you have read them: ${JSON.stringify(scope.mustInspect)}. Bind this review to ${packet.binding}. The earlier rating was ${scope.priorRating ?? "not recorded"}; rate the repaired deck out of ten on what you now see.
 
 Return ONLY JSON matching this schema: ${JSON.stringify(packet.schema)}
 Set accepted=false if any finding is major or blocker. The summary is two sentences: which repairs held and what, if anything, must still change.`;
+}
+
+/** What the reviewer is told about `checkable`: the review judges what code cannot. */
+export function checkablePrompt() {
+  return `CHECKABLE FINDINGS. The review is for judgement; a defect a machine could have measured is a check the skill is missing. On every finding set ${CHECKABLE}. Write rule as the constraint a check would enforce ("a chart callout never overlaps a data label") and measure as what it would compute and against what threshold ("intersection area of each callout box with each value-label box in the scene; any overlap fails"). Fill it whether or not a deterministic gate already reported the defect: a gate that fired and was ignored, or fired too late to act on, is still a check that did not stop the page. Leave it null when the call is judgement - whether the argument holds, what deserves emphasis, whether the page earns its place.`;
 }
 
 /** The density pass: the profile's comparison and flags, put to the reviewer as questions. */

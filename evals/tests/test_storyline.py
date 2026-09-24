@@ -28,7 +28,8 @@ console.log(JSON.stringify({
   bare: validateStorylineReview({ verdict: 'ready', binding }, spec), revalued: storylineBinding(revalued) !== binding,
   twoNumber: describeExhibit({ type: 'chart.column', categories: ['A', 'B'], series: [{ name: 'x', values: [1, 2] }] }),
   plainTable: describeExhibit({ type: 'table', columns: ['Airline', 'Note'], rows: [['A', 'words'], ['B', 'more words']] }),
-  insights: checkInsights({ insights: [{ id: 'i1', finding: 'f', calculation: 'c', sources: ['sources/x.csv'] }, { id: 'i2', finding: 'f', sources: ['sources/y.csv'] }] }, ['x.csv']).problems,
+  insights: checkInsights({ insights: [{ id: 'i1', finding: 'f', calculation: 'c', shape: 'series', sources: ['sources/x.csv'] }, { id: 'i2', finding: 'f', shape: 'fact', sources: ['sources/y.csv'] }] }, ['x.csv']).problems,
+  unshaped: checkInsights({ insights: [{ id: 'i3', finding: 'f', calculation: 'c', sources: ['sources/x.csv'] }] }, ['x.csv']).problems,
   none: checkInsights(null).problems }));
 ''')
         self.assertTrue(result['same'])
@@ -43,6 +44,7 @@ console.log(JSON.stringify({
         self.assertIn('PLAIN GRID', result['plainTable'])
         self.assertIn('0 of 4 cells carry a number', result['plainTable'])
         self.assertEqual(len(result['insights']), 2)  # i2: no calculation, and its source is missing
+        self.assertTrue(any('shape' in p for p in result['unshaped']))  # the data's shape decides the pages it can carry
         self.assertIn('no insight log', result['none'][0])
 
 

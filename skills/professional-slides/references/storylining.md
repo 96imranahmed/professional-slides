@@ -69,6 +69,7 @@ Data is not yet a finding. Before a title is written, work the downloaded data t
   "insights": [
     { "id": "i-launch-ramp",
       "finding": "Riyadh Air opened 14 destinations in its first 16 weeks, faster than Etihad's first year",
+      "shape": "series",
       "calculation": "destinations by month since first scheduled flight, per carrier; Etihad from its 2003-06 launch records",
       "sources": ["sources/riyadh-air-routes-2026-09.csv", "sources/etihad-destinations-2003-2006.csv"],
       "soWhat": "the ramp, not the size, is the evidence for 'up and coming'",
@@ -167,7 +168,11 @@ Settle evidence before naming components or layouts. For each page record `claim
 
 `settles.kind` is `count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure` or `qualitative`; its actual evidence, basis and audience question govern the later encoding. Choose each page's [page type](page-types.md) here, while the claim is being written, not when the page is drawn: what the page `settles` usually names it (a `rank` is a ranking, a `rate` a trend, a `structure` a mechanism or a composition, several `comparison`s of one question a panels page), and where its explanation lives follows from the evidence. The storyline critique sees the types and judges the sequence's rhythm with the argument. `adds: null` means commentary is unnecessary. `highlight` is an exact phrase for emphasis or null; it is not an instruction to infer a chart maximum.
 
+Every insight records the `shape` of its data - `series`, `peer-set`, `mix`, `measure-pair`, `bridge`, `geography`, `schedule`, `roster`, `fact` or `qualitative` - because the shape decides which [page types](page-types.md#evidence-shapes) it can carry. A title that needs a ranking and has only two numbers is found here, as a dataset still to find.
+
 ### Complete visible copy and reference text gate
+
+A deck authored as [page types](page-types.md#the-pages-file-is-the-dot-dash) does not write this file by hand: `author-deck.mjs` derives the content plan - claims, `settles`, `adds`, the complete text plan and each page's reading task - from the pages file and its composition, and runs these gates on it in the same pass. What follows is the contract that derived file meets.
 
 The dot-dash is the full writing draft, not a promise to write later. Set `textContract: "complete"` on the content file. For **every page**, add `textPlan: [{id, role, text}]`, with unique block IDs, final wording and roles `title`, `body`, `exhibit`, `qualification`, `source` or `furniture`. List all headings, developed explanation, table cells, chart categories/legends/formatted values/units, annotations, notes and sources. Include recurring shell text as furniture and plan page-number formatting explicitly (for example, `02`); `{{page:stable-id}}` references resolve at composition. Furniture is excluded from density scores, but its wording must survive the same composition and export checks. Plan copy from the evidence and authoring inputs before rendering; never scrape the finished slide to create a retrospectively passing plan.
 

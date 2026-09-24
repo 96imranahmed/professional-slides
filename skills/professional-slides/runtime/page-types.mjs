@@ -156,10 +156,40 @@ export const PAGE_TYPES = Object.freeze({
   },
 });
 
+// What kind of evidence settles a claim (the content plan's vocabulary), and
+// the shape of the data behind it (the insight log's). A page type can only be
+// chosen where the evidence has its shape: a ranking needs the whole peer set,
+// a trend a series over time. A page whose evidence lacks the shape is a
+// research task, found here rather than by the storyline critic or the review.
+export const SETTLES_KINDS = ["count", "share", "rank", "rate", "sequence", "comparison", "structure", "qualitative"];
+export const SHAPES = Object.freeze({
+  series: { kind: "rate", means: "one measure over four or more periods" },
+  "peer-set": { kind: "rank", means: "one measure for every member of the set" },
+  mix: { kind: "share", means: "the parts of a whole" },
+  "measure-pair": { kind: "comparison", means: "two measures for each member" },
+  bridge: { kind: "structure", means: "the steps between two totals" },
+  geography: { kind: "structure", means: "places with coordinates or regions" },
+  schedule: { kind: "sequence", means: "dated phases, milestones or workstreams" },
+  roster: { kind: "count", means: "the named members and their attributes" },
+  fact: { kind: "count", means: "a few measured numbers" },
+  qualitative: { kind: "qualitative", means: "sourced statements, judgements or mechanisms" },
+});
+const QUANT = ["series", "peer-set", "mix", "measure-pair", "bridge", "fact"];
+export const TYPE_SHAPES = Object.freeze({
+  trend: ["series"], ranking: ["peer-set"], composition: ["mix"], relationship: ["measure-pair"], bridge: ["bridge"],
+  place: ["geography"], schedule: ["schedule"], profiles: ["roster", "peer-set"], numbers: [...QUANT],
+  panels: [...QUANT], scorecard: ["peer-set", "roster", "qualitative", "measure-pair"], lookup: [...QUANT, "roster"],
+});
+// The exhibit family each type reads as, for its reading task (reading-tasks.json).
+const FAMILY = { trend: "chart", ranking: "chart", composition: "chart", relationship: "chart", bridge: "chart",
+  scorecard: "table", lookup: "table", matrix: "table", mechanism: "diagram", schedule: "diagram",
+  argument: "text", statement: "text", summary: "text" };
+export const familyOf = (type, form) => (type === "profiles" && form === "logo-table") || (type === "options" && form !== "two-up") ? "table" : FAMILY[type] ?? "exhibit";
+
 // Keys the compiler owns. Written by the author they would bypass the choices.
 const OWNED = ["layout", "shape", "arrange", "soWhat", "pageType"];
 // Keys of a typed page that are choices or authoring notes, not slide keys.
-const CHOICE_KEYS = ["type", "form", "commentary", "takeaway", "why", "series", "rail"];
+const CHOICE_KEYS = ["type", "form", "commentary", "takeaway", "why", "series", "rail", "settles", "adds", "evidence"];
 
 const PERIOD = /^(?:(?:19|20)\d{2}(?:[EFP]|\s*[EF])?|FY\s?'?\d{2,4}.*|[QH][1-4]\b.*|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b.*|\d{4}[-–/]\d{2,4}.*)$/i;
 const exhibitsOf = (page) => [page.exhibit, ...(page.exhibits || [])].filter((e) => e && typeof e === "object");
@@ -211,7 +241,7 @@ export function structureOf(slide) {
  * make when a choice is missing or impossible; structural pages (`kind`
  * cover, section, agenda) pass through unchanged.
  */
-export function compilePage(pageIn, index = 0) {
+export function compilePage(pageIn, index = 0, { insights = null, draft = false } = {}) {
   if (!pageIn || typeof pageIn !== "object") throw new Error(`page ${index + 1} is not an object`);
   const page = structuredClone(pageIn);
   const id = page.id ?? `page-${index + 1}`;
@@ -229,6 +259,30 @@ export function compilePage(pageIn, index = 0) {
     throw new Error(`${id}: choose \`takeaway\` - false, or the closing sentence. Strong decks close about one page in ten on a line; most let the title carry the message.`);
   if (typeof page.why !== "string" || page.why.trim().split(/\s+/).length < 4)
     throw new Error(`${id}: say in \`why\` why a ${page.type} page (${type.task}) is the right one for this claim`);
+
+  // The content decisions, made before the layout ones and checked first:
+  // what settles the claim, and what the commentary adds. With an insight log
+  // the page names the insights it rests on, and they settle it.
+  let settles = page.settles;
+  const evidence = Array.isArray(page.evidence) ? page.evidence : [];
+  if (insights) {
+    const needs = TYPE_SHAPES[page.type];
+    if (needs && !evidence.length) throw new Error(`${id}: name the insights this ${page.type} page rests on in \`evidence\` (ids from the insight log)`);
+    const found = evidence.map((key) => insights.get(key));
+    const unknown = evidence.filter((key, i) => !found[i]);
+    if (unknown.length) throw new Error(`${id}: \`evidence\` names ${unknown.join(", ")}, which the insight log does not hold`);
+    if (needs && !found.some((item) => needs.includes(item.shape)))
+      throw new Error(`${id}: a ${page.type} page needs evidence shaped as ${needs.map((s) => `${s} (${SHAPES[s].means})`).join(" or ")}; its insights are ${[...new Set(found.map((i) => i.shape ?? "unshaped"))].join(", ")}. Find that data, or choose the type the evidence supports`);
+    if (!settles && found.length) {
+      const lead = found.find((item) => !needs || needs.includes(item.shape)) ?? found[0];
+      settles = { kind: SHAPES[lead.shape]?.kind ?? "qualitative", what: found.map((item) => item.finding).join(" ") };
+    }
+  }
+  if (!["statement", "summary"].includes(page.type)) {
+    if (!settles || !SETTLES_KINDS.includes(settles.kind) || typeof settles.what !== "string" || !settles.what.trim())
+      throw new Error(`${id}: say what settles the claim - \`settles: { kind, what }\`, kind one of ${SETTLES_KINDS.join(", ")}${insights ? ", or name its insights in `evidence`" : ""}`);
+  }
+  if (page.adds !== undefined && page.adds !== null && typeof page.adds !== "string") throw new Error(`${id}: \`adds\` is what the commentary says that the exhibit cannot - a sentence, or null`);
 
   const slide = {};
   for (const [key, value] of Object.entries(page)) if (!CHOICE_KEYS.includes(key)) slide[key] = value;
@@ -259,6 +313,13 @@ export function compilePage(pageIn, index = 0) {
       throw new Error(`${id}: ${page.form === "photo-backdrop" ? "a photo-backdrop page carries a `photo` and one exhibit" : `a ${page.form} page carries its \`pictures\``}`);
   }
 
+  // Types the form implies for every exhibit it carries, set before any check reads them.
+  if (page.type === "place") setType(slide.exhibit, "map");
+  if (type.table && slide.exhibit) setType(slide.exhibit, "table");
+  if (page.type === "statement" && page.form === "quotes" && slide.exhibit) setType(slide.exhibit, "quote-cluster");
+  if (page.type === "options" && page.form === "compare" && slide.exhibit) setType(slide.exhibit, "compare");
+  const untyped = [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object" && !ex.type);
+  if (untyped.length) throw new Error(`${id}: ${untyped.length === 1 ? "the exhibit has" : `${untyped.length} exhibits have`} no \`type\`; a ${page.type}/${page.form} page does not set it, so name it (table, chart.bar, map, ...)`);
   const primary = slide.exhibit ?? slide.exhibits?.[0];
   // The exhibit carries the data its form reads, named before the build has to.
   for (const ex of [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean)) {
@@ -314,22 +375,24 @@ export function compilePage(pageIn, index = 0) {
   const textless = ["on-exhibit", "in-exhibit", "captions", "none"].includes(page.commentary);
   if (textless && points && !["summary"].includes(page.type))
     throw new Error(`${id}: commentary "${page.commentary}" puts the explanation ${COMMENTARY[page.commentary].replace(/^the /, "")}; move the points there or choose "beside" or "below"`);
-  if (["beside", "beside-left", "below"].includes(page.commentary) && !points && !page.paragraphs)
+  // A draft is the spine: titles, types, data and evidence. The copy checks
+  // below wait for the full compile.
+  if (!draft && ["beside", "beside-left", "below"].includes(page.commentary) && !points && !page.paragraphs)
     throw new Error(`${id}: commentary "${page.commentary}" needs the points it places`);
-  if (page.commentary === "on-exhibit" && primary?.type?.startsWith("chart.") && !(primary.annotations || []).length)
+  if (!draft && page.commentary === "on-exhibit" && primary?.type?.startsWith("chart.") && !(primary.annotations || []).length)
     throw new Error(`${id}: commentary "on-exhibit" writes the explanation as callouts on the chart - give the exhibit \`annotations\` ({ category, text })`);
-  if (page.commentary === "captions") {
+  if (!draft && page.commentary === "captions") {
     const bare = exhibits.filter((e) => !(typeof e.caption === "string" && e.caption.trim()));
     if (page.type === "picture" ? !(page.pictures || []).every((p) => p.label || p.line) : bare.length)
       throw new Error(`${id}: commentary "captions" puts one finding under each panel - every exhibit needs its \`caption\``);
   }
-  if (page.commentary === "captions" && page.type !== "picture") {
+  if (!draft && page.commentary === "captions" && page.type !== "picture") {
     for (const ex of exhibits) {
       if (words(ex.caption).length < 8) throw new Error(`${id}: a caption is the panel's finding in a sentence - eight words or more, not a label ("${ex.caption}")`);
       if (overlap(`${page.title} ${ex.heading ?? ""}`, ex.caption) > 0.7) throw new Error(`${id}: the caption "${ex.caption}" repeats the title or the panel heading; say what this panel shows that the others do not`);
     }
   }
-  if (page.commentary === "on-exhibit" && primary?.type?.startsWith("chart.")) {
+  if (!draft && page.commentary === "on-exhibit" && primary?.type?.startsWith("chart.")) {
     // Each callout is measured the way the chart will set it: a box that holds
     // two lines, so a paragraph belongs in two callouts or beside the chart.
     const long = (primary.annotations || []).filter((a) => !calloutFits(a.text));
@@ -338,8 +401,8 @@ export function compilePage(pageIn, index = 0) {
     if (said < 10) throw new Error(`${id}: moving the explanation onto the chart means writing it there - the callouts carry ${said} words; give them the mechanism and the qualification (10 or more words between them), or choose "beside"`);
   }
   if (page.commentary === "rail") {
-    if (typeof page.rail !== "string" || words(page.rail).length < 10) throw new Error(`${id}: commentary "rail" sets one developed claim in the side panel - write it as \`rail\`, ten words or more`);
-    slide.panel = { text: page.rail.trim() };
+    if (!draft && (typeof page.rail !== "string" || words(page.rail).length < 10)) throw new Error(`${id}: commentary "rail" sets one developed claim in the side panel - write it as \`rail\`, ten words or more`);
+    slide.panel = { text: String(page.rail ?? "").trim() || page.title };
   }
   const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
   if (page.type === "panels") {
@@ -373,7 +436,9 @@ export function compilePage(pageIn, index = 0) {
 
   if (typeof page.takeaway === "string") slide.soWhat = page.takeaway.trim();
   slide.pageType = { type: page.type, form: page.form, commentary: page.commentary, takeaway: typeof page.takeaway === "string",
-    ...(page.series ? { series: String(page.series) } : {}), why: page.why.trim() };
+    ...(page.series ? { series: String(page.series) } : {}), why: page.why.trim(), family: familyOf(page.type, page.form),
+    // The claim is the title: the build holds the two together.
+    content: { claim: String(page.title ?? page.text ?? "").trim(), ...(settles ? { settles } : {}), adds: page.adds ?? null, ...(evidence.length ? { evidence } : {}) } };
   slide.pageType.structure = structureOf(slide);
   return slide;
 }
@@ -401,7 +466,8 @@ export function describeTypes() {
   const lines = ["# Page types", "", "Every analytical page is one of these. Each choice is required; none has a default.", "",
     "`commentary` - where the explanation lives:", ...Object.entries(COMMENTARY).map(([k, v]) => `- \`${k}\`: ${v}`), "",
     "`takeaway` - `false`, or the closing sentence (strong decks close about one page in ten on a line).", "",
-    "`why` - one sentence on why this type fits the claim.", ""];
+    "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log.", "",
+    "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", ""];
   for (const [name, t] of Object.entries(PAGE_TYPES)) {
     const n = Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits;
     const data = Object.entries(t.forms).map(([form, target]) => [form, dataKeys(target)]).filter(([, keys]) => keys.length);
@@ -424,6 +490,9 @@ export function pageSchema() {
       form: { enum: Object.keys(t.forms) }, commentary: { enum: t.commentary },
       takeaway: { oneOf: [{ const: false }, { type: "string", minLength: 8 }] },
       why: { type: "string", minLength: 20 }, series: { type: "string" }, rail: { type: "string" },
+      settles: { type: "object", required: ["kind", "what"], properties: { kind: { enum: SETTLES_KINDS }, what: { type: "string", minLength: 8 } } },
+      adds: { oneOf: [{ type: "null" }, { type: "string", minLength: 8 }] },
+      evidence: { type: "array", items: { type: "string" }, description: "insight ids from <id>.insights.json; with an insight log, required for data-bearing types and it derives settles" },
     },
     not: { anyOf: OWNED.map((key) => ({ required: [key] })) },
   }));

@@ -207,35 +207,71 @@ function squarify(items, frame) {
   }
   return rects;
 }
+// A measurement that answers "does not fit" instead of throwing: one word
+// wider than a small tile ("Telecommunications" in a 90px tile) is a tile
+// that takes the key, not a chart that fails.
+const measureIfFits = (text, width, options) => {
+  try { return measure(text, width, options); } catch (error) { if (/Unbreakable/.test(error.message)) return null; throw error; }
+};
+// What a tile can show: its name and value (two blocks), its name alone, or
+// nothing - in which case it takes a number and its entry in the key below.
+function tileText(item, tile, total, props) {
+  const label = measureIfFits(item.label, Math.max(10, tile.width - 12), { bold: true });
+  const value = `${formatValue(item.value, props)} (${Math.round(100 * item.value / total)}%)`;
+  const valueLayout = measureIfFits(value, Math.max(10, tile.width - 12));
+  if (label && valueLayout && tile.width >= label.width + 12 && tile.height >= label.height + valueLayout.height + 12) return { label, valueLayout };
+  if (label && tile.width >= label.width + 12 && tile.height >= label.height + 12) return { label, valueLayout: null };
+  return null;
+}
+const tileOf = (r) => ({ x: r.x + 1, y: r.y + 1, width: Math.max(0, r.width - 2), height: Math.max(0, r.height - 2) });
+const keyEntry = (number, item, total, props) => `${number} ${item.label} ${formatValue(item.value, props)} (${Math.round(100 * item.value / total)}%)`;
 function treemapLayout(frameIn, props) {
   const frame = probe(frameIn);
   const items = (props.items || []).map((it) => ({ label: it?.label, value: Number(it?.value) }));
   if (items.length < 2 || items.length > 20 || items.some((it) => typeof it.label !== "string" || !it.label.trim() || !(it.value > 0))) throw new Error("Treemap takes two to twenty items with a label and a positive value");
   const sorted = [...items].sort((a, b) => b.value - a.value);
+  const total = sorted.reduce((sum, it) => sum + it.value, 0);
   const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: 0, valueLabelInset: 0, centerPlot: false });
-  const body = { x: plot.x, y: plot.y, width: plot.width, height: plot.height + 40 };
-  return { items: sorted, plot, body, rects: squarify(sorted, body), height: aspectHeight(frame, plot) };
+  // Tiles too small for their name are numbered and named in a key under the
+  // map; the key's height comes out of the map, which can only make more tiles
+  // small, so the split is settled over a few passes.
+  let keyed = [], key = null, body = null, rects = null;
+  for (let pass = 0; pass < 4; pass += 1) {
+    const keyHeight = key ? key.height + 8 : 0;
+    body = { x: plot.x, y: plot.y, width: plot.width, height: plot.height + 40 - keyHeight };
+    rects = squarify(sorted, body);
+    const next = rects.filter(({ item, frame: r }) => !tileText(item, tileOf(r), total, props)).map(({ item }) => item);
+    const nextKey = next.length ? measure(next.map((item, index) => keyEntry(index + 1, item, total, props)).join("  ·  "), plot.width) : null;
+    const settled = next.length === keyed.length && next.every((item, index) => item === keyed[index]);
+    keyed = next; key = nextKey;
+    if (settled) break;
+  }
+  return { items: sorted, plot, body, rects, keyed, key, height: aspectHeight(frame, plot) };
 }
 function treemapChart({ id, frame, props, tokens = TOKENS }) {
-  const { items, rects } = treemapLayout(frame, props);
+  const { items, rects, keyed, key, body } = treemapLayout(frame, props);
   const total = items.reduce((s, it) => s + it.value, 0);
   const hasFocus = items.some(item => highlighted(props, item.label));
   const nodes = [];
   rects.forEach(({ item, frame: r }, index) => {
     const fill = highlighted(props, item.label) ? ACCENT : hasFocus ? token("color.chartComparator") : colorFor(props, Math.min(index, 5));
-    const gap = 2;
-    const tile = { x: r.x + gap / 2, y: r.y + gap / 2, width: Math.max(0, r.width - gap), height: Math.max(0, r.height - gap) };
+    const tile = tileOf(r);
     nodes.push(rectPrimitive({ id: stableId(id, "tile", item.label), role: "chart-mark", frame: tile, style: fillStyle(fill, token("color.surface")), data: { label: item.label, value: item.value, share: item.value / total } }));
     const white = contrastRatio(tokens[fill.tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[fill.tokenId].value, tokens["color.ink"].value);
     const color = white ? token("color.onPrimary") : INK;
-    const label = measure(item.label, Math.max(10, tile.width - 12), { bold: true });
-    const value = `${formatValue(item.value, props)} (${Math.round(100 * item.value / total)}%)`;
-    const valueLayout = measure(value, Math.max(10, tile.width - 12));
-    if (tile.width >= label.width + 12 && tile.height >= label.height + valueLayout.height + 12) {
+    const text = tileText(item, tile, total, props);
+    if (text) {
+      const { label, valueLayout } = text;
       nodes.push(textPrimitive({ id: stableId(id, "label", item.label), role: "data-label", frame: { x: tile.x + 6, y: tile.y + 6, width: tile.width - 12, height: label.height }, text: label.text, style: { ...textStyle(CHART_LABEL, color, true, "left"), valign: "top", lineHeight: label.lineHeight, wrap: false }, data: { label: item.label, textLayout: label } }));
-      nodes.push(textPrimitive({ id: stableId(id, "value", item.label), role: "data-label", frame: { x: tile.x + 6, y: tile.y + 6 + label.height + 2, width: tile.width - 12, height: valueLayout.height }, text: valueLayout.text, style: { ...textStyle(CHART_LABEL, color, false, "left"), valign: "top", lineHeight: valueLayout.lineHeight, wrap: false }, data: { label: item.label, textLayout: valueLayout } }));
+      if (valueLayout) nodes.push(textPrimitive({ id: stableId(id, "value", item.label), role: "data-label", frame: { x: tile.x + 6, y: tile.y + 6 + label.height + 2, width: tile.width - 12, height: valueLayout.height }, text: valueLayout.text, style: { ...textStyle(CHART_LABEL, color, false, "left"), valign: "top", lineHeight: valueLayout.lineHeight, wrap: false }, data: { label: item.label, textLayout: valueLayout } }));
+      return;
     }
+    // A keyed tile carries its number when the tile can hold it.
+    const number = keyed.indexOf(item) + 1;
+    const numeral = measure(String(number), 100, { bold: true });
+    if (tile.width >= numeral.width + 6 && tile.height >= numeral.height + 4) nodes.push(textPrimitive({ id: stableId(id, "key-number", item.label), role: "data-label", frame: { x: tile.x + (tile.width - numeral.width - 2) / 2, y: tile.y + (tile.height - numeral.height) / 2, width: numeral.width + 2, height: numeral.height }, text: String(number), style: { ...textStyle(CHART_LABEL, color, true, "center"), valign: "top", lineHeight: numeral.lineHeight, wrap: false }, data: { label: item.label, keyNumber: number, textLayout: numeral } }));
   });
+  if (key) nodes.push(textPrimitive({ id: stableId(id, "key"), role: "chart-annotation", frame: { x: body.x, y: body.y + body.height + 8, width: body.width, height: key.height }, text: key.text, style: { ...textStyle(CHART_LABEL, SECONDARY, false, "left"), valign: "top", lineHeight: key.lineHeight, wrap: false }, data: { keyedItems: keyed.map(item => item.label), textLayout: key } }));
   return nodes;
 }
 
@@ -258,7 +294,7 @@ function radarChart({ id, frame, props }) {
   const nodes = props.legend !== false && series.length > 1 ? topLegend({ id, frame, items: series.map((s, i) => ({ label: s.name, colorIndex: props.colorIndices?.[i] ?? i })), variant: "line" }) : [];
   for (const ring of [0.25, 0.5, 0.75, 1]) {
     const pts = categories.map((_, i) => at(i, radius * ring));
-    nodes.push(shapePrimitive({ id: stableId(id, "ring", ring), role: "chart-gridline", geometry: "customPolygon", frame: plot, style: { fill: "none", stroke: GRID, lineWidth: token("line.hairline") }, data: { paths: [pts.map((p) => norm(plot, p.x, p.y))] } }));
+    nodes.push(shapePrimitive({ id: stableId(id, "ring", ring), role: "chart-gridline", geometry: "customPolygon", frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height }, style: { fill: "none", stroke: GRID, lineWidth: token("line.hairline") }, data: { paths: [pts.map((p) => norm(plot, p.x, p.y))] } }));
   }
   categories.forEach((c, i) => {
     const end = at(i, radius), label = at(i, radius + 20);
@@ -270,7 +306,7 @@ function radarChart({ id, frame, props }) {
     const focus = highlighted(props, sr.name) || series.length === 1;
     const color = colorFor(props, si);
     const pts = sr.values.map((v, i) => at(i, radius * Math.max(0, Math.min(1, v / max))));
-    nodes.push(shapePrimitive({ id: stableId(id, "polygon", sr.name), role: "chart-area", geometry: "customPolygon", frame: plot, style: { fill: focus ? color : "none", stroke: color, lineWidth: token("line.standard"), ...(focus ? { opacity: 0.25 } : {}) }, data: { paths: [pts.map((p) => norm(plot, p.x, p.y))], series: sr.name } }));
+    nodes.push(shapePrimitive({ id: stableId(id, "polygon", sr.name), role: "chart-area", geometry: "customPolygon", frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height }, style: { fill: focus ? color : "none", stroke: color, lineWidth: token("line.standard"), ...(focus ? { opacity: 0.25 } : {}) }, data: { paths: [pts.map((p) => norm(plot, p.x, p.y))], series: sr.name } }));
     pts.forEach((p, i) => nodes.push(ellipsePrimitive({ id: stableId(id, "point", sr.name, categories[i]), role: "chart-mark", frame: { x: p.x - 4, y: p.y - 4, width: 8, height: 8 }, style: fillStyle(color), data: { series: sr.name, category: categories[i], value: sr.values[i] } })));
   });
   return nodes;
@@ -335,7 +371,7 @@ function stackedAreaChart({ id, frame, props }) {
   layers.forEach(({ sr, lower, upper }, si) => {
     const top = upper.map((v, i) => norm(plot, xAt(i), yAt(v)));
     const bottom = lower.map((v, i) => norm(plot, xAt(i), yAt(v))).reverse();
-    nodes.push(shapePrimitive({ id: stableId(id, "layer", sr.name), role: "chart-area", geometry: "customPolygon", frame: plot, style: { fill: colorFor(props, si), stroke: token("color.surface"), lineWidth: token("line.hairline") }, data: { paths: [[...top, ...bottom]], series: sr.name } }));
+    nodes.push(shapePrimitive({ id: stableId(id, "layer", sr.name), role: "chart-area", geometry: "customPolygon", frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height }, style: { fill: colorFor(props, si), stroke: token("color.surface"), lineWidth: token("line.hairline") }, data: { paths: [[...top, ...bottom]], series: sr.name } }));
     const last = categories.length - 1, mid = (upper[last] + lower[last]) / 2;
     if (upper[last] - lower[last] > 0) nodes.push(textPrimitive({ id: stableId(id, "end-label", sr.name), role: "data-label", frame: { x: plot.x + plot.width + 6, y: yAt(mid) - 10, width: 64, height: 20 }, text: formatValue(sr.values[last], props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { series: sr.name } }));
   });

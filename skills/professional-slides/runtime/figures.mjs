@@ -484,7 +484,7 @@ export function sankeyLayout(frame, props) {
 
 export function sankeyNodes({ id, frame, props }) {
   const L = sankeyLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`The sankey needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px`);
+  if (L.height > frame.height + 0.01) throw new Error(`The sankey needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a node or give the sankey more height`);
   const out = [], bar = 14, gap = v("space.2");
   const total = L.flows.reduce((s, f) => s + f.value, 0);
   const place = (nodes, key) => {
@@ -553,7 +553,7 @@ export function pictogramLayout(frame, props) {
 
 export function pictogramNodes({ id, frame, props }) {
   const L = pictogramLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`The pictogram needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px`);
+  if (L.height > frame.height + 0.01) throw new Error(`The pictogram needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a row or give it more height`);
   const out = [], gap = v("space.5") + Math.min(v("space.5"), (frame.height - L.height) / Math.max(1, L.rows.length - 1));
   let y = frame.y + Math.max(0, (frame.height - L.height - (gap - v("space.5")) * (L.rows.length - 1)) / 2);
   L.rows.forEach((r, i) => {
@@ -596,7 +596,7 @@ export function arrowRowsLayout(frame, props) {
 
 export function arrowRowsNodes({ id, frame, props }) {
   const L = arrowRowsLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`The arrow rows need ${Math.ceil(L.height)}px and have ${Math.floor(frame.height)}px`);
+  if (L.height > frame.height + 0.01) throw new Error(`The arrow rows need ${Math.ceil(L.height)}px and have ${Math.floor(frame.height)}px; drop a row or shorten the labels`);
   const out = [], room = frame.height - L.height, gap = L.gap + Math.min(room / Math.max(1, L.rows.length - 1), L.gap * 2);
   const used = L.rows.reduce((s, r) => s + r.height, 0) + gap * (L.rows.length - 1);
   let y = frame.y + Math.max(0, (frame.height - used) / 2);
@@ -1007,7 +1007,7 @@ function annulus(size, outer, inner, from, to) {
 
 export function radialBarsNodes({ id, frame, props }) {
   const L = radialBarsLayout(frame, props);
-  if (L.height > frame.height + 0.01 || L.width > frame.width + 0.01) throw new Error("The radial bar does not fit its frame");
+  if (L.height > frame.height + 0.01 || L.width > frame.width + 0.01) throw new Error("The radial bar does not fit its frame; give it a squarer, larger frame or drop a ring");
   const cx = frame.x + (frame.width - L.width) / 2 + L.left, cy = frame.y + (frame.height - L.height) / 2 + L.R;
   const square = { x: cx - L.R, y: cy - L.R, width: 2 * L.R, height: 2 * L.R };
   const size = 2 * L.R, out = [];

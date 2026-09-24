@@ -34,6 +34,39 @@ export const GENERATED_PAGE = /^(agenda-\d+|appendix-divider|picture-credits(?:-
 // text checks but is not an analytical page, so no reading-task floor applies.
 const STRUCTURAL_KINDS = new Set(['cover', 'section', 'divider', 'agenda', 'statement', 'takeaways']);
 const structural = page => page.role === 'structural' || STRUCTURAL_KINDS.has(page.kind);
+// Where a planned block occurs in the page text. A short or numeric block ("4",
+// "18") matches only as a whole token: found as a substring it took the "4" out
+// of "04 / The rivals are real" and left the rest reported as unplanned.
+export function locate(text, needle) {
+  if (needle.length > 4 && !/^[\d.,%\s]+$/.test(needle)) { const at = text.indexOf(needle); return { at, length: needle.length }; }
+  const match = new RegExp(`(^|\\s)${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s|$)`, "u").exec(text);
+  return match ? { at: match.index + match[1].length, length: needle.length } : { at: -1, length: 0 };
+}
+/**
+ * Take every planned block and every piece of generated text out of a page's
+ * text, longest first, each at a whole-token match. Longest first across both
+ * lists: a generated section number "01" and a planned title "01 / The plan"
+ * each find their own occurrence only if the title goes first. Returns the
+ * residue and the planned blocks that were not found.
+ */
+export function subtractAll(text, blocks, slide, scene) {
+  const generated = (slide?.nodes || []).filter((n) => n.type === 'text' && GENERATED_ROLES.test(String(n.role || '')))
+    .map((n) => ({ needle: normalizeText(n.data?.textLayout?.source ?? n.text), generated: true })).filter((g) => g.needle);
+  const planned = blocks.map((block) => ({ block, needle: normalizeText(resolvePages(block.text, scene)) }));
+  const lost = [];
+  let rest = text;
+  for (const item of [...planned, ...generated].sort((a, b) => b.needle.length - a.needle.length || (a.generated ? 1 : -1))) {
+    let { at, length } = locate(rest, item.needle);
+    if (at < 0 && !item.generated && /\p{L}/u.test(item.needle)) {
+      // PDF extraction can split a kerned pair inside a word ("T ony").
+      const loose = new RegExp([...item.needle.replace(/\s+/g, '')].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s?'), 'u').exec(rest);
+      if (loose) { at = loose.index; length = loose[0].length; }
+    }
+    if (at >= 0) rest = rest.slice(0, at) + ' ' + rest.slice(at + length);
+    else if (!item.generated) lost.push(item.block);
+  }
+  return { rest, lost };
+}
 function subtractGenerated(residual, slide) {
   let rest = residual;
   for (const node of slide?.nodes || []) {
@@ -104,12 +137,9 @@ export function auditTextPlan(content, scene) {
     if (actual.length!==1 || actual[0].id!==page.id) { findings.push({id:page.id,code:'TEXT_PLAN_PAGINATION',pages:actual.map(s=>s.id),reason:'Reconcile split pages into individual dot-dash text plans and reference comparisons before export.',severity:'blocking'}); continue; }
     // Whitespace wrapping is immaterial; wording and repeated occurrences are not.
     let text = normalizeText(actual.flatMap(s=>s.nodes.filter(n=>n.type==='text').map(n=>n.data?.textLayout?.source ?? n.text)).join(' '));
-    for (const block of [...(page.textPlan || [])].sort((a,b)=>b.text.length-a.text.length)) {
-      const needle = normalizeText(resolvePages(block.text,scene)), at = text.indexOf(needle);
-      if (at<0) findings.push({id:page.id,block:block.id,code:'TEXT_PLAN_LOST',text:block.text,severity:'blocking'});
-      else if (at>=0) text = text.slice(0,at)+' '+text.slice(at+needle.length);
-    }
-    text = subtractGenerated(text, actual[0]);
+    const taken = subtractAll(text, page.textPlan || [], actual[0], scene);
+    for (const block of taken.lost) findings.push({id:page.id,block:block.id,code:'TEXT_PLAN_LOST',text:block.text,severity:'blocking'});
+    text = taken.rest;
     if (!findings.some(f=>f.id===page.id && f.severity==='blocking') && /[\p{L}\p{N}]/u.test(text)) findings.push({id:page.id,code:'TEXT_UNPLANNED',text:normalizeText(text),severity:'blocking'});
     const mismatch = readingTaskMismatch(page.textReference?.task, actual[0]);
     if (mismatch) findings.push({id:page.id,code:'TEXT_TASK_MISMATCH',...mismatch,severity:'blocking'});
@@ -160,19 +190,9 @@ export function auditExportText(content, scene, pageTexts) {
     // with letters that is not found as written is tried again with optional
     // whitespace between its characters. Numbers are matched as written, so a
     // short cell cannot be found across the gap between two others.
-    let actual = normalizeText(texts.join(' '));
-    for (const block of [...(page.textPlan || [])].sort((a,b)=>b.text.length-a.text.length)) {
-      const needle = normalizeText(resolvePages(block.text,scene));
-      let at = actual.indexOf(needle), length = needle.length;
-      if (at < 0 && /\p{L}/u.test(needle)) {
-        const loose = new RegExp([...needle.replace(/\s+/g, '')].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s?'), 'u');
-        const match = loose.exec(actual);
-        if (match) { at = match.index; length = match[0].length; }
-      }
-      if (at<0) findings.push({id:page.id,block:block.id,code:'TEXT_EXPORT_LOST',text:block.text,severity:'blocking'});
-      else actual = actual.slice(0,at)+' '+actual.slice(at+length);
-    }
-    actual = subtractGenerated(actual, scene.slides.find(s=>s.id===page.id || s.sourceSlideId===page.id));
+    const taken = subtractAll(normalizeText(texts.join(' ')), page.textPlan || [], scene.slides.find(s=>s.id===page.id || s.sourceSlideId===page.id), scene);
+    for (const block of taken.lost) findings.push({id:page.id,block:block.id,code:'TEXT_EXPORT_LOST',text:block.text,severity:'blocking'});
+    const actual = taken.rest;
     if (!findings.some(f=>f.id===page.id && f.severity==='blocking') && /[\p{L}\p{N}]/u.test(actual)) findings.push({id:page.id,code:'TEXT_EXPORT_UNPLANNED',text:normalizeText(actual),severity:'blocking'});
   }
   return {...check,stage:'saved-pdf',accepted:!findings.some(f=>f.severity==='blocking'),findings};

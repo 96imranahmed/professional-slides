@@ -267,7 +267,7 @@ function ringMetricNodes({ id, frame, props }) {
   for (const candidate of ["type.metric", "type.heading", "type.compact"]) {
     try { value = measureText(String(props.value), hole - 8, { fontFamily: tokenValue(DISPLAY), fontSize: v(candidate), bold: true, wrapWidthRatio: 1 }); valueSize = candidate; if (value.lines.length === 1) break; } catch { value = null; }
   }
-  if (!value) throw new Error("Ring metric is too small for its value");
+  if (!value) throw new Error("Ring metric is too small for its value; give the ring more room or shorten the value");
   nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: circle.x + (size - hole) / 2 + 4, y: circle.y + (size - value.height) / 2, width: hole - 8, height: value.height }, text: value.text, style: { fontFamily: DISPLAY, fontSize: token(valueSize), color: INK, bold: true, align: "center", valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
   if (labelLayout) nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + v("space.2"), y: circle.y + size + gap, width: frame.width - 2 * v("space.2") }, labelLayout, text("type.compact", SECONDARY, false, "center")));
   return nodes;
@@ -293,7 +293,7 @@ export function metricNodes({ id, frame, props }) {
   const delta = props.delta ? measure(props.delta, width, "type.label", true) : null;
   const gap = v("space.1");
   const total = value.height + (labelLayout ? gap + labelLayout.height : 0) + (sub ? gap + sub.height : 0) + (delta ? gap + delta.height : 0);
-  if (total > frame.height + 0.01) throw new Error("Metric tile is too short for its value, label and delta");
+  if (total > frame.height + 0.01) throw new Error("Metric tile is too short for its value, label and delta; give the tile more height or drop the delta");
   const nodes = [];
   if (ink_) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, INK, "none", "radius.none"));
   else if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));

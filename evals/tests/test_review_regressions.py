@@ -18,7 +18,12 @@ for(const direction of ['left','right','up','down']) {
 }
 assert.throws(()=>d.render({id:'bad',frame,props:{text:'Evidence',direction:'diagonal'}}));
 assert.throws(()=>d.render({id:'bad',frame,props:{text:'Evidence',border:'no'}}));
-assert.throws(()=>renderEvidenceAnnotations({id:'cross',plot:{x:0,y:120,width:760,height:300},props:{annotations:[{category:'A',text:'Evidence'}]},pointMap:new Map([['value:A',{x:300,y:350}]]),obstacles:[{role:'chart-mark',frame:{x:280,y:160,width:40,height:100}}]}),/clearance/);
+// A band leader that would cross another mark is a conflict the chart
+// resolves (it used to throw "insufficient clearance"): the box moves beside
+// its point, and neither box nor leader touches the mark in the way.
+const crossed=renderEvidenceAnnotations({id:'cross',plot:{x:0,y:120,width:760,height:300},props:{annotations:[{category:'A',text:'Evidence'}]},pointMap:new Map([['value:A',{x:300,y:350}]]),obstacles:[{role:'chart-mark',frame:{x:280,y:160,width:40,height:100}}]}).placements[0];
+assert.equal(crossed.placement,'beside');
+assert.ok(crossed.frame.y>260&&Math.min(crossed.leader.y1,crossed.leader.y2)>260);
 const chart=REGISTRY.get('chart.column');
 const nodes=chart.render({id:'bars',frame,props:{...chart.sample,dataLabels:false,referenceLines:[],annotations:[{category:'2026',text:'Evidence'}]}}).nodes;
 const mark=nodes.find(n=>n.role==='chart-mark'&&n.data.category==='2026');

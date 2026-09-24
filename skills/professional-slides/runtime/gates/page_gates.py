@@ -1034,9 +1034,21 @@ def gate_unsourced_picture(slide_no, slide, findings):
     ))
 
 
+READING_TASK_FLOORS = {task: spec["bodyWords"]["q1"] for task, spec in json.loads(
+    (Path(__file__).resolve().parent.parent / "reading-tasks.json").read_text(encoding="utf-8"))["tasks"].items()}
+
+
 def gate_thin_page(slide_no, slide, findings):
-    """THIN_PAGE. Advisory body-word diagnostic, alongside matched text coverage."""
-    floor = WEIGHT.get("pageWords") or 0
+    """THIN_PAGE. Advisory body-word diagnostic, alongside matched text coverage.
+
+    A page composed from a page type carries its reading task, and is held to
+    that task's lower quartile - the same floor the text contract applies. A
+    chart carrying its own callouts reads at 42 words; a table with commentary
+    at 149. One flat 95-word floor for both passed the second and failed the
+    first, and pushed authors off the callout page onto the commentary column.
+    """
+    task_floor = READING_TASK_FLOORS.get(slide.get("readingTask") or "")
+    floor = task_floor if task_floor is not None else (WEIGHT.get("pageWords") or 0)
     if floor <= 0:
         return
     floor = int(round(floor * (1.0 - picture_share(slide))))

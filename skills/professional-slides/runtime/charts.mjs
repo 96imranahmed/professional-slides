@@ -33,8 +33,10 @@ import {
 } from "./horizons.mjs";
 import {
   chartAnnotationBands,
-  EVIDENCE_CALLOUT_BAND,
   evidenceAnnotationTopBandCount,
+  evidenceBandSpan,
+  evidenceRailWidth,
+  releasedEvidenceProps,
   renderAnnotationRail,
   renderChangeAnnotations,
   renderEvidenceAnnotations
@@ -60,6 +62,16 @@ export const SERIES = [
 
 export const MIN_PLOT_HEIGHT = 100;
 
+/**
+ * The plot rectangle inside a chart's frame, after the bands above it (legend,
+ * callouts, change annotations, periods) and the gutters beside it.
+ *
+ * When full-height callout bands would leave the plot under its minimum, the
+ * bands close up to the boxes' own measured heights (`plot.evidenceCompact`)
+ * before the chart gives up: a two-callout chart in a 300px panel lost 176px
+ * of plot to 88px bands holding one-line notes. Only a plot that is short even
+ * with compact bands throws, naming what to change.
+ */
 export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, bottomInset = 56, periodBand = 0 } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
   leftInset = Math.max(leftInset, bands.left);
@@ -67,17 +79,25 @@ export function chartFrame(frame, { topLegend = false, annotations = [], changeA
   // plots start (and end) on the same lines and one value scale means one pixel scale.
   // topLegend may be a row count (a wrapped legend takes 24px per extra row).
   const legendRows = topLegend === true ? 1 : Number(topLegend) || 0;
-  const top = Math.max(Number(topInset) || 0, (legendRows ? 52 + (legendRows - 1) * 26 : 28) + totalLabelInset + evidenceAnnotationTopBandCount({ annotations }) * EVIDENCE_CALLOUT_BAND + bands.top + periodBand);
+  const topFor = (compact) => Math.max(Number(topInset) || 0, (legendRows ? 52 + (legendRows - 1) * 26 : 28) + totalLabelInset + evidenceBandSpan({ annotations }, { compact }) + bands.top + periodBand);
   // Reserve the actual last metric row plus a trailing theme gap, not another full row band.
   const bottom = bands.bottom ? Math.max(bottomInset, 40 + bands.bottom + tokenValue(token("space.3"))) : bottomInset;
-  const rightInset = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16);
-  if (frame.height - bottom - top < MIN_PLOT_HEIGHT) throw new Error("Chart annotation bands leave insufficient plot height; enlarge or split the exhibit");
-  if (frame.width - leftInset - rightInset < 120) throw new Error("Chart has insufficient plot width; enlarge or split the exhibit");
+  // Callouts the chart moved into a right-hand rail (see renderEvidenceAnnotations) take their width from the plot.
+  const railWidth = evidenceRailWidth({ annotations });
+  const rightInset = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16) + railWidth;
+  let top = topFor(false), compact = false;
+  if (frame.height - bottom - top < MIN_PLOT_HEIGHT && evidenceAnnotationTopBandCount({ annotations })) { top = topFor(true); compact = true; }
+  if (frame.height - bottom - top < MIN_PLOT_HEIGHT) throw new Error(`Chart annotation bands leave insufficient plot height (${Math.max(0, Math.floor(frame.height - bottom - top))}px of the ${MIN_PLOT_HEIGHT}px minimum, even with compact callout bands); give the chart ${Math.ceil(MIN_PLOT_HEIGHT - (frame.height - bottom - top))}px more height, drop an annotation, or split the exhibit`);
+  if (frame.width - leftInset - rightInset < 120) throw new Error(`Chart has insufficient plot width (${Math.max(0, Math.floor(frame.width - leftInset - rightInset))}px of the 120px minimum after its labels and gutters); widen the chart, shorten category labels, or split the exhibit`);
   return {
     x: frame.x + leftInset,
     y: frame.y + top,
     width: frame.width - leftInset - rightInset,
-    height: Math.max(MIN_PLOT_HEIGHT, frame.height - bottom - top)
+    height: Math.max(MIN_PLOT_HEIGHT, frame.height - bottom - top),
+    // Where a callout moved beside its mark may reach: the chart's own frame.
+    limits: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+    ...(railWidth ? { railWidth } : {}),
+    ...(compact ? { evidenceCompact: true } : {})
   };
 }
 
@@ -493,15 +513,26 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
     for (const [index, reference] of (props.referenceLines || []).entries()) {
       if(reference.placement === "outside-end" && !allowOutsideReferenceLabels) throw new Error("Outside reference labels are supported only on column charts");
       const y = yScale(reference.value);
-      underlay.push(linePrimitive({
-        id: stableId(id, "reference-line", index),
-        role: "chart-reference-line",
-        x1: plot.x,
-        y1: y,
-        x2: plot.x + plot.width,
-        y2: y,
-        style: lineStyle(token("color.componentPrimary"), token("line.standard"), "dash")
-      }));
+      // A value label the chart left in place across this line (its column
+      // too short to take the label inside) interrupts the line, as the
+      // horizontal guide already does around a bar's value.
+      const gaps = obstacles.filter(node => node.role === "data-label" && node.data?.referenceGap)
+        .map(node => { const ink = measureDataLabel(node.text), top = node.frame.y + (node.frame.height - ink.height) / 2, left = node.frame.x + (node.frame.width - ink.width) / 2; return { top, bottom: top + ink.height, left: left - 4, right: left + ink.width + 4 }; })
+        .filter(gap => y >= gap.top - 3 && y <= gap.bottom + 3)
+        .sort((a, b) => a.left - b.left);
+      let cursor = plot.x, segment = 0;
+      for (const [start, end] of [...gaps.map(gap => [gap.left, gap.right]), [plot.x + plot.width, plot.x + plot.width]]) {
+        if (start > cursor) underlay.push(linePrimitive({
+          id: segment ? stableId(id, "reference-line", index, segment) : stableId(id, "reference-line", index),
+          role: "chart-reference-line",
+          x1: cursor,
+          y1: y,
+          x2: Math.min(start, plot.x + plot.width),
+          y2: y,
+          style: lineStyle(token("color.componentPrimary"), token("line.standard"), "dash")
+        })), segment += 1;
+        cursor = Math.max(cursor, end);
+      }
       const text = reference.label || String(reference.value);
       const measured = measureText(text, Math.min(240, plot.width * 0.45), { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(CHART_ANNOTATION), bold: true, wrapWidthRatio: 1 });
       const labelWidth = Math.ceil(measured.width) + 2;
@@ -515,7 +546,11 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
         { x: plot.x + plot.width - labelWidth - 4, y: y - labelHeight - 8, width: labelWidth, height: labelHeight, align: "right" },
         { x: plot.x + 8, y: y - labelHeight - 8, width: labelWidth, height: labelHeight, align: "left" },
         { x: plot.x + plot.width - labelWidth - 4, y: y + 8, width: labelWidth, height: labelHeight, align: "right" },
-        { x: plot.x + 8, y: y + 8, width: labelWidth, height: labelHeight, align: "left" }
+        { x: plot.x + 8, y: y + 8, width: labelWidth, height: labelHeight, align: "left" },
+        // Then along the line: a designer sets the label wherever the line
+        // runs clear - between two columns, over a dip - before giving up on
+        // the plot, which a line chart (with no outside gutter) cannot leave.
+        ...[0.5, 0.25, 0.75, 0.375, 0.625, 0.125, 0.875].flatMap(at => [y - labelHeight - 8, y + 8].map(top => ({ x: plot.x + (plot.width - labelWidth) * at, y: top, width: labelWidth, height: labelHeight, align: "center" })))
       ];
       const labelFrame = labelCandidates.find((candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (reference.placement === "outside-end" || (props.referenceLines || []).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4)));
       if (!labelFrame) throw Object.assign(new Error(`No collision-free reference-line label position${reference.placement === "outside-end" ? " outside the plot" : allowOutsideReferenceLabels ? "; set placement: \"outside-end\" or revise the chart composition" : "; revise the chart composition"}`), { referenceIndex: index });
@@ -836,7 +871,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   if(!horizontal) {
     plot.categoryLabelHeight=iconSlot + Math.max(...categoryLayouts.map(label=>label.height)) + (categoryNotes.some(Boolean) ? Math.max(...categoryLayouts.map(label=>label.lineHeight)) : 0);
     plot.height-=Math.max(0,plot.categoryLabelHeight-28);
-    if(plot.height<100)throw new Error("Category labels leave insufficient plot height");
+    if(plot.height<100)throw new Error(`Category labels leave insufficient plot height (${Math.floor(plot.height)}px of 100px): they wrap to ${Math.max(...categoryLayouts.map(label=>label.lines?.length??1))} lines in ${Math.floor(plot.width/categories.length-8)}px slots; shorten them, use a bar chart for long names, or give the chart more height`);
   }
   const categoryGroups=props.categoryGroups ?? [];
   if(!Array.isArray(categoryGroups) || (horizontal && categoryGroups.length)) throw new Error("Category groups require an array on a horizontal category axis");
@@ -851,7 +886,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   const groupLayouts=categoryGroups.map(group=>measureText(group.label,plot.width/categories.length*group.categories.length-16,{fontFamily:tokenValue(FONT),fontSize:tokenValue(AXIS_LABEL)}));
   plot.categoryGroupHeight=categoryGroups.length?Math.max(...groupLayouts.map(m=>m.height))+tokenValue(token("space.3"))*2:0;
   plot.height-=plot.categoryGroupHeight;
-  if(plot.height<100)throw new Error("Category groups leave insufficient plot height");
+  if(plot.height<100)throw new Error(`Category groups leave insufficient plot height (${Math.floor(plot.height)}px of 100px); shorten the group labels or give the chart more height`);
   const stackExtents = categories.flatMap((_, categoryIndex) => {
     if (!stacked) return series.map(item => item.values[categoryIndex]);
     const categoryValues = series.map(item => item.values[categoryIndex]);
@@ -1073,13 +1108,29 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
         const mark = marks.find(mark => mark.data.series === label.data.series);
         const metrics = measureDataLabel(label.text);
         if (metrics.width <= mark.frame.width - 4 && metrics.height <= mark.frame.height) continue;
-        if (horizontal) throw new Error("Stacked bar label does not fit its segment; enlarge the chart or use stacked columns with external labels");
-        const x = mark.frame.x + mark.frame.width + 6;
-        const boundary = plot.x + (categoryIndex + 1) * categorySpan;
-        if (x + metrics.width > boundary) throw new Error("External stack label exceeds its category lane; enlarge the chart or reduce categories");
+        if (horizontal) {
+          // A segment too thin for its value prints it just above the bar (or
+          // below, at the foot of the lane), centred on the segment, in the
+          // gap between bars - a designer's move, rather than failing the chart.
+          const centre = Math.max(plot.x, Math.min(plot.x + plot.width + barLabelGap - metrics.width, mark.frame.x + mark.frame.width / 2 - metrics.width / 2));
+          const taken = [...nodes.filter(node => node.role === "chart-mark").map(node => node.frame), ...nodes.filter(node => node.role === "data-label" && node !== label && node.data.outside).map(node => node.frame)];
+          const clearOf = (f, o) => f.x + f.width + 2 <= o.x || o.x + o.width + 2 <= f.x || f.y + f.height + 1 <= o.y || o.y + o.height + 1 <= f.y;
+          const spot = [{ x: centre, y: mark.frame.y - metrics.height - 2 }, { x: centre, y: mark.frame.y + mark.frame.height + 2 }]
+            .map(p => ({ ...p, width: metrics.width, height: metrics.height }))
+            .find(f => f.y >= frame.y && f.y + f.height <= plot.y + plot.height + (showValueAxis ? 0 : 10) && taken.every(o => clearOf(f, o)));
+          if (!spot) throw new Error("Stacked bar label fits neither its segment nor the gap beside its bar; enlarge the chart, merge the thin segments, or use stacked columns with external labels");
+          Object.assign(label, textPrimitive({ id: label.id, role: label.role, frame: spot, text: label.text, data: { ...label.data, outside: true }, style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
+          continue;
+        }
+        const boundary = plot.x + (categoryIndex + 1) * categorySpan, laneStart = plot.x + categoryIndex * categorySpan;
+        // Right of the column, or - when the lane ends first - left of it.
+        let x = mark.frame.x + mark.frame.width + 6;
+        if (x + metrics.width > boundary && mark.frame.x - 6 - metrics.width >= laneStart) x = mark.frame.x - 6 - metrics.width;
+        if (x + metrics.width > boundary) throw new Error("External stack label fits neither side of its column within the category lane; enlarge the chart or reduce categories");
         label.frame = { x, y: Math.max(plot.y, Math.min(mark.frame.y + (mark.frame.height - metrics.height) / 2, plot.y + plot.height - metrics.height)), width: metrics.width, height: metrics.height };
-        Object.assign(label, textPrimitive({ id: label.id, role: label.role, frame: label.frame, text: label.text, data: { ...label.data, external: true }, style: textStyle(CHART_LABEL, INK, labelBold(), "left") }));
-        nodes.push(linePrimitive({ id: stableId(label.id, "leader"), role: "data-label-leader", x1: mark.frame.x + mark.frame.width, y1: mark.frame.y + mark.frame.height / 2, x2: x - 2, y2: label.frame.y + metrics.height / 2, style: lineStyle(INK) }));
+        const leftSide = x < mark.frame.x;
+        Object.assign(label, textPrimitive({ id: label.id, role: label.role, frame: label.frame, text: label.text, data: { ...label.data, external: true, ...(leftSide ? { side: "left" } : {}) }, style: textStyle(CHART_LABEL, INK, labelBold(), leftSide ? "right" : "left") }));
+        nodes.push(linePrimitive({ id: stableId(label.id, "leader"), role: "data-label-leader", x1: leftSide ? mark.frame.x : mark.frame.x + mark.frame.width, y1: mark.frame.y + mark.frame.height / 2, x2: leftSide ? x + metrics.width + 2 : x - 2, y2: label.frame.y + metrics.height / 2, style: lineStyle(INK) }));
       }
       const external = labels.filter(label => label.data.external).sort((a,b) => a.frame.y-b.frame.y);
       const separation = tokenValue(token("space.1"));
@@ -1092,15 +1143,16 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
       }
       for (const label of external) {
         const mark=marks.find(mark=>mark.data.series===label.data.series);
-        Object.assign(label,textPrimitive({id:label.id,role:label.role,frame:label.frame,text:label.text,data:label.data,style:textStyle(CHART_LABEL,INK,true,"left")}));
+        const leftSide=label.data.side==="left";
+        Object.assign(label,textPrimitive({id:label.id,role:label.role,frame:label.frame,text:label.text,data:label.data,style:textStyle(CHART_LABEL,INK,true,leftSide?"right":"left")}));
         const leader=nodes.find(node=>node.id===stableId(label.id,"leader"));
-        Object.assign(leader,linePrimitive({id:leader.id,role:"data-label-leader",x1:mark.frame.x+mark.frame.width,y1:mark.frame.y+mark.frame.height/2,x2:label.frame.x-2,y2:label.frame.y+label.frame.height/2,style:lineStyle(INK)}));
+        Object.assign(leader,linePrimitive({id:leader.id,role:"data-label-leader",x1:leftSide?mark.frame.x:mark.frame.x+mark.frame.width,y1:mark.frame.y+mark.frame.height/2,x2:leftSide?label.frame.x+label.frame.width+2:label.frame.x-2,y2:label.frame.y+label.frame.height/2,style:lineStyle(INK)}));
       }
     }
     if (totalTexts.has(category)) {
       const text = totalTexts.get(category), metrics = measureDataLabel(text);
       if ((!horizontal && metrics.width > categorySpan - 8) || (horizontal && metrics.height > groupSpan))
-        throw new Error("Stack total label does not fit its category lane");
+        throw new Error("Stack total label does not fit its category lane; shorten the value format (fewer decimals, a compact unit), reduce categories, or widen the chart");
       const endpoint = stackLabels.totals.get(category).endpoint;
       nodes.push(textPrimitive({ id: stableId(id, "stack-total", category), role: "data-label",
         frame: horizontal
@@ -1177,10 +1229,40 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     for(const [part,a,b,c,d] of [["span",x1,y,x2,y],["left",x1,y-4,x1,y],["right",x2,y-4,x2,y]])nodes.push(linePrimitive({id:stableId(id,"category-group",group.id,part),role:"category-group-rule",x1:a,y1:b,x2:c,y2:d,style:lineStyle(SECONDARY),data}));
     nodes.push(textPrimitive({id:stableId(id,"category-group",group.id,"label"),role:"category-group-label",frame:{x:x1,y:y+4,width:x2-x1,height:groupLayouts[i].height},text:groupLayouts[i].text,style:{...textStyle(AXIS_LABEL,SECONDARY),valign:"top",lineHeight:groupLayouts[i].lineHeight,wrap:false},data:{...data,textLayout:groupLayouts[i]}}));
   }
-  if(!horizontal && !stacked) for(const label of nodes.filter(n=>n.role === "data-label")) {
-    const lines=(props.referenceLines||[]).map(r=>yScale(r.value)).sort((a,b)=>b-a);
-    for(const y of lines) if(y>=label.frame.y-4&&y<=label.frame.y+label.frame.height+4) label.frame.y=y-label.frame.height-6;
-    if(label.frame.y<frame.y)throw new Error("Reference lines leave no room for value labels");
+  // A value label a reference line runs through stays on its column. It used
+  // to be lifted to sit above the line, which left a label on a column just
+  // under a target floating 45px over its own mark, and threw when the lift
+  // left the frame. Now, in order: a line through the label's edge nudges it
+  // a few pixels clear; a column tall enough takes the label inside its top,
+  // under the line; otherwise the label keeps its place and the reference line
+  // is broken around it (see `referenceGaps` in decorations).
+  if(!horizontal && !stacked && (props.referenceLines||[]).length) for(const label of nodes.filter(n=>n.role === "data-label" && n.data?.series !== undefined)) {
+    const lines=(props.referenceLines||[]).map(r=>yScale(r.value));
+    const ink=measureDataLabel(label.text), pad=(label.frame.height-ink.height)/2;
+    const clear=(top)=>lines.every(y=>y<top-3||y>top+ink.height+3);
+    const inkTop=label.frame.y+pad;
+    if(clear(inkTop)) continue;
+    const categoryIndex=categories.indexOf(label.data.category), seriesIndex=series.findIndex(item=>item.name===label.data.series);
+    const value=series[seriesIndex]?.values[categoryIndex];
+    const mark=nodes.find(n=>n.role==="chart-mark"&&n.data.category===label.data.category&&n.data.series===label.data.series);
+    const upward=value>=0;
+    // 1. A nudge of up to eight pixels away from the mark's end.
+    const crossing=lines.filter(y=>y>=inkTop-3&&y<=inkTop+ink.height+3);
+    const nudged=upward?Math.min(...crossing)-3-ink.height:Math.max(...crossing)+3;
+    if(Math.abs(nudged-inkTop)<=8&&clear(nudged)&&nudged>=frame.y){ label.frame={...label.frame,y:nudged,height:ink.height}; label.data={...label.data,referenceNudge:Math.round(nudged-inkTop)}; continue; }
+    // 2. Inside the column's end, on the far side of the line from the label's old place.
+    if(mark&&upward){
+      // Six pixels under the column's top: a callout leader landing on that top keeps its corridor clear of the figure.
+      const top=Math.max(mark.frame.y+6,Math.max(...crossing)+4);
+      if(top+ink.height+4<=mark.frame.y+mark.frame.height&&clear(top)&&ink.width<=mark.frame.width-4){
+        const fill=colorFor(seriesIndex,categoryIndex);
+        const color=contrastRatio(tokens[fill.tokenId].value,tokens["color.onPrimary"].value)>=contrastRatio(tokens[fill.tokenId].value,tokens["color.ink"].value)?token("color.onPrimary"):INK;
+        Object.assign(label,textPrimitive({id:label.id,role:label.role,frame:{x:mark.frame.x,y:top-pad,width:mark.frame.width,height:label.frame.height},text:label.text,style:textStyle(CHART_LABEL,color,labelBold(),"center"),data:{...label.data,placement:"inside",referenceInside:true}}));
+        continue;
+      }
+    }
+    // 3. Stay put; the reference line breaks around the label.
+    label.data={...label.data,referenceGap:true};
   }
   if (segmentGrowth) {
     // Heading and one rate per segment, right of the plot, level with the last stack's segments.
@@ -1411,7 +1493,7 @@ function lineChart({ id, frame, props, area = false }) {
         id: stableId(id, "area", item.name),
         role: "chart-area",
         geometry: "customPolygon",
-        frame: plot,
+        frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height },
         style: { fill: lineColor(seriesIndex), stroke: "none", lineWidth: token("line.hairline"), opacity: 0.18 },
         data: { paths: [polygonPoints], series: item.name, baselineValue }
       }));
@@ -1518,7 +1600,7 @@ function waterfall({ id, frame, props }) {
   });
   // Reserve a label row below negative endpoints, above category labels.
   plot.height -= 30;
-  if (plot.height < 100) throw new Error("Waterfall needs room for endpoint labels");
+  if (plot.height < 100) throw new Error("Waterfall needs room for endpoint labels (a plot of at least 100px after a 30px label row); give the chart more height");
   // The category labels are measured against the slot they have and wrap into
   // it. Set unmeasured at the slot's width, a label longer than its slot prints
   // straight over its neighbours - which is how "Superman (2025)", "Other DC
@@ -1700,7 +1782,7 @@ function marimekkoLayout(frameIn, props) {
   if (!categories.length || !series.length || series.some((sr) => !Array.isArray(sr.values) || sr.values.length !== categories.length || sr.values.some((v) => !(Number.isFinite(v) && v >= 0)))) throw new Error("Marimekko requires categories and series of non-negative values, one per category");
   const totals = categories.map((_, i) => series.reduce((sum, sr) => sum + sr.values[i], 0));
   const widths = Array.isArray(props.widths) ? props.widths : totals;
-  if (widths.length !== categories.length || widths.some((w) => !(Number.isFinite(w) && w > 0))) throw new Error("Marimekko widths must be positive, one per category");
+  if (widths.length !== categories.length || widths.some((w) => !(Number.isFinite(w) && w > 0))) throw new Error("Marimekko widths must be positive, one per category; give every category a positive total");
   const showLegend = props.legend !== false && series.length > 1;
   const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: showLegend ? legendRowsFor(series.map((sr) => sr.name), frame) : false, leftInset: 8, valueLabelInset: 8, totalLabelInset: 26, centerPlot: false });
   const categoryLayouts = categories.map((c, i) => measureText(String(c), Math.max(72, plot.width * widths[i] / widths.reduce((a, b) => a + b, 0) - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
@@ -1800,7 +1882,7 @@ function comboChart({ id, frame, props }) {
   // Reserve their label clearance before scaling, including when the primary
   // value axis is visible; padding its domain alone allowed the line to cross labels.
   const barPlot = secondary ? { ...plot, y: plot.y + plot.height * 0.35 + 40, height: plot.height * 0.65 - 40 } : plot;
-  if (barPlot.height < 40) throw new Error("Combo chart needs more height for separate scales and labels");
+  if (barPlot.height < 40) throw new Error("Combo chart needs more height for separate scales and labels; give it more height or drop secondaryAxis");
   const bounds = numericBounds(withReferenceValues(secondary ? barSeries.values : series.flatMap(item => item.values), props), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
   const lineBounds = secondary ? numericBounds(lineSeries.values, { min: props.y2Min, max: props.y2Max, axis: "y", tight: true }) : bounds;
   const yScale = (value) => barPlot.y + barPlot.height - (value - bounds.min) / bounds.span * barPlot.height;
@@ -2070,8 +2152,16 @@ function scatter({ id, frame, props, bubble = false }) {
   for (const label of nodes.filter((node) => node.role === "data-label")) {
     const point = pointMap.get(`value:${label.text}`);
     const mark = marks.find((node) => node.id === stableId(id, "point", label.text));
-    const measured = measureText(label.text, label.frame.width, { fontSize: tokenValue(CHART_LABEL) });
-    const width = Math.ceil(measured.width) + 2, height = 24;
+    // Measured in the face it prints in - a focus label is bold - and at the
+    // width it needs: a fixed 96px box failed "Scarborough" in bold as
+    // unbreakable text. A name up to 220px sets on one line; a longer one
+    // wraps at 220px and the box takes its lines.
+    const face = { fontFamily: tokenValue(label.style.bold ? token("font.bodySemibold") : FONT), fontSize: tokenValue(CHART_LABEL), bold: label.style.bold === true, wrapWidthRatio: 1 };
+    const single = measureText(label.text, 100000, face);
+    const measured = single.width <= 220 ? single : measureText(label.text, 220, face);
+    const width = Math.ceil(measured.width) + 2, height = Math.max(24, Math.ceil(measured.height));
+    if (measured.lines?.length > 1) label.text = measured.text;
+    label.style = { ...label.style, ...(measured.lines?.length > 1 ? { lineHeight: measured.lineHeight } : {}), wrap: false };
     // A bubble wide enough to carry its name takes the label inside, in white,
     // as on a positioning matrix; the smaller ones keep an outside label.
     if (bubble && mark.frame.width >= width + 12 && mark.frame.height >= height + 4) {
@@ -2093,9 +2183,50 @@ function scatter({ id, frame, props, bubble = false }) {
       { x: mark.frame.x + mark.frame.width + gap * 3, y: point.y - height / 2, width, height },
       { x: mark.frame.x - width - gap * 3, y: point.y - height / 2, width, height }
     ];
-    const candidate = candidates.find((candidate) => candidate.x >= plot.x && candidate.x + width <= plot.x + plot.width && candidate.y >= plot.y && candidate.y + height <= plot.y + plot.height && [...placed, ...labelObstacles].every((other) => !intersects(candidate, other)));
-    if (!candidate) throw new Error(`No collision-free position for scatter label ${label.text}; enlarge the exhibit or reduce labelled points`);
+    const free = (candidate) => candidate.x >= plot.x && candidate.x + width <= plot.x + plot.width && candidate.y >= plot.y && candidate.y + height <= plot.y + plot.height && [...placed, ...labelObstacles].every((other) => !intersects(candidate, other));
+    let candidate = candidates.find(free);
+    // In a cluster every position touching the point is taken. The label then
+    // moves further out - rings at growing distances, sixteen directions each,
+    // nearest first - and a hairline leader runs from the point's edge to it,
+    // as a designer labels a crowded scatter, instead of the chart failing.
+    // The leader may not cross another point or label on its way.
+    let leader = null;
+    if (!candidate) {
+      const r = mark.frame.width / 2;
+      const clearPath = (x1, y1, x2, y2) => {
+        const steps = Math.max(2, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 3));
+        for (let i = 1; i < steps; i++) {
+          const x = x1 + (x2 - x1) * i / steps, y = y1 + (y2 - y1) * i / steps;
+          if ([...placed, ...labelObstacles.filter((frame) => frame !== mark.frame)].some((f) => x > f.x - 1 && x < f.x + f.width + 1 && y > f.y - 1 && y < f.y + f.height + 1)) return false;
+        }
+        return true;
+      };
+      search: for (const distance of [14, 26, 42, 62, 88]) {
+        for (const degrees of [0, 180, -45, -135, 45, 135, -90, 90, -22.5, -157.5, 22.5, 157.5, -67.5, -112.5, 67.5, 112.5]) {
+          const angle = degrees * Math.PI / 180;
+          const ux = Math.cos(angle), uy = Math.sin(angle);
+          // The box's nearest edge sits `distance` beyond the mark's rim.
+          const cx = point.x + ux * (r + distance + width / 2 * Math.abs(ux)), cy = point.y + uy * (r + distance + height / 2 * Math.abs(uy));
+          const box = { x: cx - width / 2, y: cy - height / 2, width, height };
+          if (!free(box)) continue;
+          const x1 = point.x + ux * (r + 2), y1 = point.y + uy * (r + 2);
+          // Walk out along the ray and stop 3px short of the label's ink box.
+          const inkBox = { x: box.x + (width - measured.width) / 2 - 3, y: cy - measured.height / 2 - 3, width: measured.width + 6, height: measured.height + 6 };
+          let t = 0;
+          while (t < distance + width && !(x1 + ux * t > inkBox.x && x1 + ux * t < inkBox.x + inkBox.width && y1 + uy * t > inkBox.y && y1 + uy * t < inkBox.y + inkBox.height)) t += 1;
+          const x2 = x1 + ux * Math.max(0, t - 1), y2 = y1 + uy * Math.max(0, t - 1);
+          if (t < 6 || !clearPath(x1, y1, x2, y2)) continue;
+          candidate = box; leader = { x1, y1, x2, y2 };
+          break search;
+        }
+      }
+    }
+    if (!candidate) throw new Error(`No collision-free position for scatter label ${label.text}, even with a leader up to 88px from its point; enlarge the exhibit, set showLabel: false on points the page does not discuss, or reduce labelled points`);
     label.frame = candidate;
+    if (leader) {
+      label.data = { ...label.data, leader: true };
+      nodes.push(linePrimitive({ id: stableId(label.id, "leader"), role: "data-label-leader", ...leader, style: lineStyle(SECONDARY, token("line.hairline")), data: { point: label.text } }));
+    }
     placed.push(candidate);
   }
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, allowAnnotationRail: false });
@@ -2113,19 +2244,25 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
   if ((props.changeAnnotations || []).length || props.annotationRail) throw new Error("Pie and donut charts do not support ordered change annotations; use direct segment labels or another encoding");
   const variant = resolvePartToWholeVariant(props);
   const showLegend = variant === "legend-top-right";
-  const legendHeight = showLegend ? 48 : 0;
+  // A key that outruns one row wraps (26px a row) rather than failing to fit.
+  const legendRowsOf = (labels) => showLegend ? legendRowCount(labels, frame.width - 32) : 0;
+  let legendRows = legendRowsOf(Array.isArray(props.labels) ? props.labels.filter(label => typeof label === "string") : []);
+  let legendHeight = showLegend ? 48 + Math.max(0, legendRows - 1) * 26 : 0;
   if (!Array.isArray(props.labels) || !Array.isArray(props.values) || props.values.length < 2 || props.values.length > 5 || props.labels.length !== props.values.length || props.labels.some(label => typeof label !== "string" || !label.trim()) || new Set(props.labels).size !== props.labels.length || props.values.some(v => !Number.isFinite(v) || v < 0) || props.values.filter(v => v > 0).length < 2) throw new Error("Pie/donut needs two to five unique categories and at least two positive finite values");
-  const availableHeight = frame.height - legendHeight;
+  let availableHeight = frame.height - legendHeight;
   const outside = variant === "outside-labels";
-  const labelWidth = outside ? Math.max(...props.labels.map(label => measureText(label, frame.width, { fontSize: tokenValue(CHART_ANNOTATION), fontFamily: tokenValue(token("font.bodySemibold")), bold: tokenDefinition("font.bodySemibold").nativeBold, wrapWidthRatio: 1 }).width)) : 0;
+  let labelWidth = outside ? Math.max(...props.labels.map(label => measureText(label, frame.width, { fontSize: tokenValue(CHART_ANNOTATION), fontFamily: tokenValue(token("font.bodySemibold")), bold: tokenDefinition("font.bodySemibold").nativeBold, wrapWidthRatio: 1 }).width)) : 0;
   const total = props.values.reduce((sum, value) => sum + value, 0);
   const sweeps = [];
   props.values.reduce((start, value) => { sweeps.push({ mid: (start + 180 * value / total) * Math.PI / 180, half: Math.PI * value / total }); return start + 360 * value / total; }, -90);
   const percentages = props.values.map(value => Math.round(100 * value / total));
+  // A slice under half a percent rounds to "0%", which reads as no slice at
+  // all; it prints as "<1%" instead of failing the chart.
+  const percentText = (index) => percentages[index] ? `${percentages[index]}%` : "<1%";
   // Each percentage is measured at its own width. The label box used to be a
   // fixed 64px measured at a 64px cap, so its frame never said how wide its
   // text was; the fit test below and the box drawn now share one measurement.
-  const labelMetrics = percentages.map(percentage => measureText(`${percentage}%`, 1000, { fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 }));
+  const labelMetrics = percentages.map((_, index) => measureText(percentText(index), 1000, { fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 }));
   const OUTSIDE_GAP = 8;
   // Where each percentage goes for a circle of `size` centred at (cx, cy):
   // inside its slice when the slice holds the text plus clearance, otherwise
@@ -2154,25 +2291,69 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
     const inkHeight = Math.ceil(measured.height);
     return { placement: "outside", frame: { x: rx + Math.cos(mid) * width / 2 - width / 2, y: ry + Math.sin(mid) * inkHeight / 2 - inkHeight / 2, width, height: inkHeight } };
   });
-  const layout = (gutterX, gutterY) => {
-    const size = Math.min(frame.width - 2 * gutterX, availableHeight - 2 * gutterY);
-    const circle = { x: frame.x + (frame.width - size) / 2, y: frame.y + legendHeight + (availableHeight - size) / 2, width: size, height: size };
-    return { size, circle, labels: props.dataLabels === false ? [] : placeLabels(size, circle.x + size / 2, circle.y + size / 2) };
+  let plotBounds = { x: frame.x, y: frame.y + legendHeight, width: frame.width, height: availableHeight };
+  const boxesMeet = (a, b) => !(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y);
+  const inBounds = (box) => box.x >= plotBounds.x && box.y >= plotBounds.y && box.x + box.width <= plotBounds.x + plotBounds.width && box.y + box.height <= plotBounds.y + plotBounds.height;
+  // When thin neighbouring slices put their outside percentages on the same
+  // spot at the rim, those labels move to a column beside the circle - right
+  // of it for slices on the right half, left for the left - stacked in reading
+  // order, each with a leader back to its slice's rim.
+  const columns = (labels, circle) => {
+    const cx = circle.x + circle.width / 2, r = circle.width / 2;
+    for (const side of [-1, 1]) {
+      const group = labels.filter((label, index) => label?.placement === "outside" && (Math.cos(sweeps[index].mid) >= 0 ? 1 : -1) === side).sort((a, b) => a.frame.y - b.frame.y);
+      for (const label of group) label.frame = { ...label.frame, x: side > 0 ? cx + r + OUTSIDE_GAP * 2 : cx - r - OUTSIDE_GAP * 2 - label.frame.width, y: Math.max(plotBounds.y, Math.min(plotBounds.y + plotBounds.height - label.frame.height, label.frame.y)) };
+      for (let i = 1; i < group.length; i++) group[i].frame.y = Math.max(group[i].frame.y, group[i - 1].frame.y + group[i - 1].frame.height + 2);
+      for (let i = group.length - 1; i >= 0; i--) group[i].frame.y = Math.min(group[i].frame.y, (i === group.length - 1 ? plotBounds.y + plotBounds.height : group[i + 1].frame.y - 2) - group[i].frame.height);
+    }
+    return labels;
   };
+  const layoutAt = (size, stacked = false) => {
+    const circle = { x: frame.x + (frame.width - size) / 2, y: frame.y + legendHeight + (availableHeight - size) / 2, width: size, height: size };
+    let labels = props.dataLabels === false ? [] : placeLabels(size, circle.x + size / 2, circle.y + size / 2).map(label => label && { ...label, natural: { ...label.frame } });
+    if (stacked) labels = columns(labels, circle);
+    return { size, circle, labels };
+  };
+  const layout = (gutterX, gutterY) => layoutAt(Math.min(frame.width - 2 * gutterX, availableHeight - 2 * gutterY));
+  const fits = ({ labels }) => labels.every((label, index) => !label || label.placement === "inside" || (!outside && inBounds(label.frame) && labels.every((other, j) => j === index || !other || !boxesMeet(label.frame, other.frame))));
   let { size, circle, labels } = layout(outside ? labelWidth + 24 : 16, 16);
-  const outsideLabels = labels.filter(label => label?.placement === "outside");
-  if (outsideLabels.length && !outside) {
+  // Percentages the chart could not place beside their slices go into the key
+  // instead ("Other 2%"), the way a designer abbreviates a crowded pie.
+  let keyed = new Set();
+  if (!fits({ labels })) {
     // A slice too thin for its percentage takes it outside, and the circle
-    // gives up the margin that label needs. Shrinking the circle can only make
-    // slices thinner, so the second pass may move more labels out; it reserves
-    // for the widest percentage so whichever go out have room.
-    const widest = Math.max(...labelMetrics.map(m => Math.ceil(m.width) + 8)), tallest = Math.max(...labelMetrics.map(m => Math.ceil(m.height)));
-    ({ size, circle, labels } = layout(16 + widest + OUTSIDE_GAP, 16 + tallest + OUTSIDE_GAP));
+    // gives up the margin that label needs: the largest circle, stepping down,
+    // whose outside labels all sit inside the frame and clear of each other.
+    // Shrinking the circle can only make slices thinner, so each step places
+    // every label again.
+    const largest = size;
+    let found = null;
+    for (let trial = Math.floor(largest); trial >= 140 && !found; trial -= 4) {
+      for (const stacked of [false, true]) {
+        const candidate = layoutAt(trial, stacked);
+        if (!found && fits(candidate)) found = candidate;
+      }
+    }
+    if (found) ({ size, circle, labels } = found);
+    else if (showLegend || outside) {
+      keyed = new Set(labels.map((label, index) => label && label.placement === "outside" ? index : -1).filter(index => index >= 0));
+      if (showLegend) {
+        // The key's items grow by their percentage; a key that now wraps takes its extra row from the circle.
+        legendRows = legendRowsOf(props.labels.map((label, index) => keyed.has(index) ? `${label} ${percentText(index)}` : label));
+        legendHeight = 48 + Math.max(0, legendRows - 1) * 26;
+        availableHeight = frame.height - legendHeight;
+        plotBounds = { x: frame.x, y: frame.y + legendHeight, width: frame.width, height: availableHeight };
+      }
+      if (outside) labelWidth = Math.max(...props.labels.map((label, index) => measureText(keyed.has(index) ? `${label} ${percentText(index)}` : label, frame.width, { fontSize: tokenValue(CHART_ANNOTATION), fontFamily: tokenValue(token("font.bodySemibold")), bold: tokenDefinition("font.bodySemibold").nativeBold, wrapWidthRatio: 1 }).width));
+      ({ size, circle, labels } = layout(outside ? labelWidth + 24 : 16, 16));
+      labels = labels.map((label, index) => keyed.has(index) || (label && label.placement === "outside") ? null : label);
+      keyed = new Set([...keyed, ...labels.map((label, index) => !label && props.values[index] && props.dataLabels !== false ? index : -1).filter(index => index >= 0)]);
+    }
   }
-  if (size < 140) throw new Error("Pie/donut and labels do not fit; enlarge the section or use a legend");
+  if (size < 140) throw new Error(`Pie/donut circle would be ${Math.floor(size)}px across (minimum 140px) in a ${Math.floor(frame.width)}x${Math.floor(frame.height)}px frame; give the chart more room, drop the legend for a shared one, or use a bar encoding`);
   const colorIndices = props.labels.map((label, index) => props.categoryKeys ? props.categoryKeys.indexOf(label) : index);
   if (colorIndices.some(i => i < 0 || i >= SERIES.length)) throw new Error("Pie/donut category is missing from the shared legend mapping");
-  const nodes = showLegend ? legendNodes({ id: stableId(id, "legend"), frame: { x: frame.x + 16, y: frame.y + 7, width: frame.width - 32, height: 28 }, props: { placement: "top-right", items: props.labels.map((label, index) => ({ label, colorIndex: colorIndices[index] })) } }) : [];
+  const nodes = showLegend ? legendNodes({ id: stableId(id, "legend"), frame: { x: frame.x + 16, y: frame.y + 7, width: frame.width - 32, height: 28 + Math.max(0, legendRows - 1) * 26 }, props: { placement: "top-right", items: props.labels.map((label, index) => ({ label: keyed.has(index) ? `${label} ${percentText(index)}` : label, colorIndex: colorIndices[index], ...(keyed.has(index) ? { key: label } : {}) })) } }) : [];
   let angle = -90;
   const labelAngles = sweeps.map(sweep => sweep.mid);
   props.values.forEach((value, index) => {
@@ -2192,26 +2373,47 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
   if (donut) nodes.push(ellipsePrimitive({ id: stableId(id, "donut-hole"), role: "chart-hole", frame: { x: circle.x + size * 0.27, y: circle.y + size * 0.27, width: size * 0.46, height: size * 0.46 }, style: fillStyle(token("color.canvas")) }));
   const cx = circle.x + circle.width / 2;
   const cy = circle.y + circle.height / 2;
-  const plotBounds = { x: frame.x, y: frame.y + legendHeight, width: frame.width, height: availableHeight };
   labels.forEach((label, index) => {
     if (!label) return;
     const background = tokens[SERIES[colorIndices[index]].tokenId].value;
     const onFill = label.placement === "inside";
     const foreground = onFill && contrastRatio(background, tokens["color.onPrimary"].value) >= contrastRatio(background, tokens["color.ink"].value) ? token("color.onPrimary") : INK;
-    const text = `${percentages[index]}%`, { frame: box } = label;
-    if (!percentages[index] || (onFill && labelMetrics[index].height > 28) || (!onFill && outside)) throw new Error(`Pie/donut percentage for ${props.labels[index]} does not fit its slice; enlarge the chart or use a bar/stacked-bar encoding`);
-    if (!onFill && (box.x < plotBounds.x || box.y < plotBounds.y || box.x + box.width > plotBounds.x + plotBounds.width || box.y + box.height > plotBounds.y + plotBounds.height
-      || labels.some((other, j) => j !== index && other && !(box.x + box.width <= other.frame.x || other.frame.x + other.frame.width <= box.x || box.y + box.height <= other.frame.y || other.frame.y + other.frame.height <= box.y))))
-      throw new Error(`Pie/donut percentage for ${props.labels[index]} fits neither its slice nor the rim beside it; enlarge the chart, merge thin slices or use a bar/stacked-bar encoding`);
+    const text = percentText(index), { frame: box } = label;
+    // Every label reaching here was placed by the layout above: inside its
+    // slice, outside at the rim clear of the frame edge and its neighbours, or
+    // keyed. Only a variant with no key and no room at the rim is left.
+    if (!onFill && (outside || !inBounds(box) || labels.some((other, j) => j !== index && other && boxesMeet(box, other.frame))))
+      throw new Error(`Pie/donut percentage for ${props.labels[index]} fits neither its slice nor the rim beside it, and the shared-legend variant has no key to carry it; enlarge the chart, merge thin slices into "Other", or use a bar encoding`);
+    // A label the layout stepped away from its slice's rim point gets a leader back to the slice.
+    const natural = label.natural;
+    if (!onFill && natural && Math.hypot(natural.x - box.x, natural.y - box.y) > 3) {
+      const mid = labelAngles[index], r = size / 2 + 3;
+      const x1 = cx + Math.cos(mid) * r, y1 = cy + Math.sin(mid) * r;
+      const x2 = Math.cos(mid) >= 0 ? box.x : box.x + box.width, y2 = box.y + box.height / 2;
+      nodes.push(linePrimitive({ id: stableId(id, "percentage-leader", index), role: "data-label-leader", x1, y1, x2, y2, style: lineStyle(SECONDARY, token("line.hairline")), data: { categoryKey: props.labels[index] } }));
+    }
     nodes.push(textPrimitive({ id: stableId(id, "percentage", index), role: "data-label", frame: box, text, style: textStyle(CHART_LABEL, foreground, labelBold(), onFill ? "center" : Math.abs(Math.cos(labelAngles[index])) < 0.2 ? "center" : Math.cos(labelAngles[index]) > 0 ? "left" : "right"), data: { categoryKey: props.labels[index], placement: label.placement, contrast: contrastRatio(onFill ? background : tokens["color.canvas"].value, tokens[foreground.tokenId].value) } }));
   });
   if (outside) {
-    props.values.forEach((value, index) => {
-      if (!value) return;
-      const right = Math.cos(labelAngles[index]) >= 0;
-      const outsideY = cy + Math.sin(labelAngles[index]) * size * 0.48;
-      nodes.push(textPrimitive({ id: stableId(id, "outside-label", index), role: "category-label", frame: { x: right ? circle.x + size + 16 : circle.x - labelWidth - 16, y: outsideY - 14, width: labelWidth, height: 28 }, text: props.labels[index], style: { ...textStyle(CHART_ANNOTATION, INK, false, right ? "left" : "right"), ...chartAnnotationStyle(), wrap: false }, data: { directAnnotation: true, textLayout: { lines: [props.labels[index]] } } }));
-    });
+    // Names of neighbouring thin slices fall on the same height at the rim;
+    // on each side they stack 28px apart in reading order, and one moved off
+    // its slice's height takes a leader back to the rim.
+    const rows = props.values.map((value, index) => value ? { index, right: Math.cos(labelAngles[index]) >= 0, y: cy + Math.sin(labelAngles[index]) * size * 0.48 - 14 } : null).filter(Boolean);
+    for (const right of [true, false]) {
+      const group = rows.filter(row => row.right === right).sort((a, b) => a.y - b.y);
+      for (let i = 1; i < group.length; i++) group[i].y = Math.max(group[i].y, group[i - 1].y + 28);
+      for (let i = group.length - 1; i >= 0; i--) group[i].y = Math.max(plotBounds.y, Math.min(group[i].y, (i === group.length - 1 ? plotBounds.y + plotBounds.height : group[i + 1].y) - 28));
+    }
+    for (const { index, right, y } of rows) {
+      const name = keyed.has(index) ? `${props.labels[index]} ${percentText(index)}` : props.labels[index];
+      const natural = cy + Math.sin(labelAngles[index]) * size * 0.48 - 14;
+      const x = right ? circle.x + size + 16 : circle.x - labelWidth - 16;
+      if (Math.abs(natural - y) > 6) {
+        const r = size / 2 + 3;
+        nodes.push(linePrimitive({ id: stableId(id, "outside-leader", index), role: "data-label-leader", x1: cx + Math.cos(labelAngles[index]) * r, y1: cy + Math.sin(labelAngles[index]) * r, x2: right ? x - 4 : x + labelWidth + 4, y2: y + 14, style: lineStyle(SECONDARY, token("line.hairline")), data: { categoryKey: props.labels[index] } }));
+      }
+      nodes.push(textPrimitive({ id: stableId(id, "outside-label", index), role: "category-label", frame: { x, y, width: labelWidth, height: 28 }, text: name, style: { ...textStyle(CHART_ANNOTATION, INK, false, right ? "left" : "right"), ...chartAnnotationStyle(), wrap: false }, data: { directAnnotation: true, textLayout: { lines: [name] }, ...(keyed.has(index) ? { keyedPercentage: percentText(index) } : {}) } }));
+    }
   }
   return nodes;
 }
@@ -2374,6 +2576,36 @@ function chartExamples(id) {
   return {};
 }
 
+/**
+ * Render a chart and let it resolve its own layout conflicts.
+ *
+ * A renderer that meets a conflict it can fix by laying the chart out again -
+ * a callout with no clear position that needs a right-hand rail - throws an
+ * error carrying `retry(props)`, the props to render with instead; this loop
+ * applies it. A render that succeeds but moved a callout out of the band
+ * reserved above the plot renders once more with that band released, keeping
+ * the first result if the second cannot be laid out. Errors without `retry`
+ * are the author's to fix and pass through unchanged.
+ */
+function renderResolved(render, context) {
+  let props = context.props, first = null;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    let nodes;
+    try { nodes = render({ ...context, props }); }
+    catch (error) {
+      if (typeof error.retry === "function" && attempt < 5) { props = error.retry(props); continue; }
+      if (first) return first;
+      throw error;
+    }
+    if (first) return nodes;
+    const released = releasedEvidenceProps(nodes, props);
+    if (!released) return nodes;
+    first = nodes;
+    props = released;
+  }
+  return first;
+}
+
 export function registerCharts(registry) {
   const headingProps = props => ({ heading: props.heading, unit: props.unit, variant: props.titleVariant,
     ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}),
@@ -2424,11 +2656,11 @@ export function registerCharts(registry) {
         if (Array.isArray(props.series) && props.series.some(item => item.tone !== undefined)) throw new Error("Chart series cannot use status tone; positive/negative colours belong to short text labels or check/cross icons. Use chart palette series colours for marks.");
         if (!String(props.heading ?? "").trim()) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
-          return { nodes: chart.render({ id, frame, tokens, props }) };
+          return { nodes: renderResolved(chart.render, { id, frame, tokens, props }) };
         }
         const title = registry.get("chart-title"), titleProps = headingProps(props);
         const height = title.measureContent({ frame, props: titleProps }).height;
-        return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...chart.render({ id, frame: { ...frame, y: frame.y + height, height: frame.height - height }, tokens, props })] };
+        return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...renderResolved(chart.render, { id, frame: { ...frame, y: frame.y + height, height: frame.height - height }, tokens, props })] };
       }
     });
   }

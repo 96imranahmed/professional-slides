@@ -859,6 +859,30 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   };
 }
 
+/**
+ * Map every item, collecting every failure rather than stopping at the first.
+ * A deck with six broken pages used to take six builds to learn so; now one
+ * run names them all, each with its page. `label(item, index)` names the page.
+ */
+export function mapAll(items, fn, label = (item, index) => item?.id ?? `slide-${index + 1}`) {
+  const results = [], errors = [];
+  items.forEach((item, index) => {
+    try { results.push(fn(item, index)); }
+    catch (error) {
+      for (const message of error.pageErrors ?? [error.message]) {
+        const name = label(item, index);
+        errors.push(message.startsWith(`${name}:`) || message.includes(`${name}:`) ? message : `${name}: ${message}`);
+      }
+    }
+  });
+  if (errors.length) {
+    const error = new Error(errors.length === 1 ? errors[0] : `${errors.length} pages could not be composed:\n- ${errors.join("\n- ")}`);
+    error.pageErrors = errors;
+    throw error;
+  }
+  return results;
+}
+
 export function compileDeck(deckSpec, registry, {slideCache}={}) {
   configureChrome(deckSpec.chrome || null);
   try { return compileDeckInner(deckSpec, registry, {slideCache}); } finally { configureChrome(null); }
@@ -882,7 +906,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   const typography = resolveTypography(deckSpec.typography, designTokens);
   const pageTemplate = registry.get("page-template")?.resolveTemplate(deckSpec.pageTemplate);
   return withDesignTokens(designTokens, () => {
-  const slides = deckSpec.slides.map((slideSpec, slideIndex) => {
+  const slides = mapAll(deckSpec.slides, (slideSpec, slideIndex) => {
     const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate,chrome:CHROME}) : null;
     if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
     const slideId = slideSpec.id || `slide-${slideIndex + 1}`;

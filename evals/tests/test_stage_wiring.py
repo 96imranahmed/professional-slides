@@ -137,8 +137,14 @@ class ExampleContentPlanTests(unittest.TestCase):
                 name = plan_path.name.replace(".content.json", "")
                 deck = json.loads((EXAMPLES / f"{name}.deck.json").read_text(encoding="utf-8"))
                 plan = json.loads(plan_path.read_text(encoding="utf-8"))
-                titles = [str(s.get("title", "")) for s in deck["slides"]
-                          if s.get("kind") in (None, "content")]
+                if plan.get("derivedFrom") == "pages":
+                    # Derived by author-deck.mjs: every page of the deck, cover and
+                    # sections included, as the build's stage contract requires.
+                    pages = ([{"title": deck["cover"]["title"]}] if deck.get("cover") else []) + deck["slides"] + deck.get("appendix", [])
+                    titles = [str(s.get("title", s.get("text", ""))) for s in pages]
+                else:
+                    titles = [str(s.get("title", "")) for s in deck["slides"]
+                              if s.get("kind") in (None, "content")]
                 self.assertEqual(len(plan["pages"]), len(titles))
                 for page, title in zip(plan["pages"], titles):
                     self.assertEqual(page["claim"], title)

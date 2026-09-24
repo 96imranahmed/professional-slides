@@ -11,6 +11,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { planDeck } from "./planner.mjs";
+import { composeAll } from "./compose-all.mjs";
 import { toDeckPlan, coverageFindings, budgetFindings } from "./compose.mjs";
 import { metricsBackend } from "./font-metrics.mjs";
 import { runProcess, lastJson } from "./process.mjs";
@@ -122,7 +123,6 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // deck whose pages were never typed, whose compiled structure was edited by
   // hand, or whose choices add up to one page repeated. It is the same check
   // the author ran, so a deck that compiled passes it here.
-  // Words are counted after composition, below, by the same check the author ran.
   const variety = varietyFindings(spec, { structureOf });
   if (variety.length) {
     const reportAt = path.join(directory, "variety-gates.json");
@@ -152,8 +152,8 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     }
   }
 
-  const deckPlan = toDeckPlan(spec, baseDir);
-  const { deck, decisions } = planDeck(deckPlan);
+  // Every failing page reported in one run (compose-all.mjs).
+  const { deck, decisions } = composeAll(spec, baseDir);
   // An evaluation of the skill is judged on a deck long enough to show its
   // rhythm, repetition and weakest page; a short one is a diagnostic. The rule
   // lived in the skill's prose and nothing held a deck to it, so three
@@ -192,16 +192,6 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     result.preflight.findings = [...(result.preflight.findings || []), ...craft];
     for (const f of craft) result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), [f.code]: ((result.preflight.countsByCode || {})[f.code] || 0) + 1 };
     if (craft.some((f) => f.severity === "blocker")) { result.preflight.passed = false; result.preflight.accepted = false; }
-  }
-  // The thin-page rule the author ran on the composed deck, run here on the
-  // same composition before anything is emitted or rendered.
-  const thinCodes = (result.preflight.findings || []).filter((f) => f.code === "THIN_PAGE" && f.slide)
-    .map((f) => ({ id: deck.slides[f.slide - 1]?.sourceSlideId ?? deck.slides[f.slide - 1]?.id, words: f.measured, floor: f.threshold })).filter((f) => f.id);
-  const thinPlanned = varietyFindings(spec, { structureOf, thin: thinCodes }).filter((f) => f.code === "THIN_PAGES_PLANNED");
-  if (thinPlanned.length) {
-    result.preflight.findings = [...(result.preflight.findings || []), ...thinPlanned];
-    result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), THIN_PAGES_PLANNED: 1 };
-    result.preflight.passed = false; result.preflight.accepted = false;
   }
   const budget = budgetFindings(spec);
   if (budget.length) { result.preflight.findings = [...(result.preflight.findings || []), ...budget]; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), THIN_PLAN: budget.length }; }

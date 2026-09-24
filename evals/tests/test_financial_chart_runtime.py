@@ -461,7 +461,13 @@ assert.ok(speech.some(n=>n.geometry==='polygon')||speech.some(n=>n.role==='annot
 assert.throws(()=>line.render({id:'bad-treatment',frame,props:{...base,annotations:[{category:'Q3',text:'Bad',treatment:'shout'}]}}),/Unknown chart evidence annotation treatment/);
 assert.throws(()=>line.render({id:'bad-orientation',frame,props:{...base,annotations:[{category:'Q3',text:'Bad',treatment:'orthogonal-dot',orientation:'diagonal'}]}}),/Unknown orthogonal chart annotation orientation/);
 const cramped={categories:['Q1','Q2'],series:[{name:'Measure',values:[30,40]}],yMax:50,dataLabels:true,legend:false,highlights:[],referenceLines:[],annotations:[{category:'Q1',text:'No corridor',treatment:'orthogonal-dot',orientation:'horizontal',side:'left'}]};
-assert.throws(()=>line.render({id:'cramped',frame:{x:60,y:150,width:390,height:360},props:cramped}),/insufficient clearance for a horizontal orthogonal-dot annotation/);
+// No corridor for the requested side is a layout conflict the chart resolves,
+// not an author error: it used to throw and recommend another treatment. The
+// box now moves beside its mark (here above it) and the leader still ends on it.
+const crampedNodes=line.render({id:'cramped',frame:{x:60,y:150,width:390,height:360},props:cramped}).nodes;
+const crampedBox=crampedNodes.find(n=>n.role==='annotation-surface');
+assert.equal(crampedBox.data.evidencePlacement,'beside');
+assert.ok(crampedBox.frame.x>=60&&crampedBox.frame.x+crampedBox.frame.width<=450);
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

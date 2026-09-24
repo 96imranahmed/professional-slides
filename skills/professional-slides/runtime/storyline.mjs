@@ -17,6 +17,7 @@
 // The review is bound to the story's structure - page ids, titles, exhibit
 // types and the data each exhibit plots - so rewording a sentence does not
 // invalidate it, and changing what a page argues or shows does.
+import { SHAPES } from "./page-types.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -142,11 +143,15 @@ export function checkInsights(log, sources = []) {
   const problems = [];
   for (const item of items) {
     if (!item?.finding || !item?.calculation) problems.push(`${item?.id ?? "?"}: a finding needs its statement and the calculation behind it`);
+    // The shape of the data decides which pages it can carry (page-types.mjs):
+    // recorded here, at the data stage, a missing series or peer set is a
+    // research task now rather than a weak page the critic finds later.
+    if (!SHAPES[item?.shape]) problems.push(`${item?.id ?? "?"}: record the data's \`shape\` - one of ${Object.keys(SHAPES).join(", ")}`);
     const missing = (item?.sources || []).filter((f) => !have.has(f));
     if (!(item?.sources || []).length) problems.push(`${item?.id ?? "?"}: no source file`);
     else if (missing.length) problems.push(`${item?.id ?? "?"}: source not in sources/: ${missing.join(", ")}`);
   }
-  return { present: true, items: items.map((i) => ({ id: i.id, finding: i.finding, strength: i.strength ?? null, calculation: i.calculation ?? null, sources: i.sources ?? [] })), problems };
+  return { present: true, items: items.map((i) => ({ id: i.id, finding: i.finding, shape: i.shape ?? null, strength: i.strength ?? null, calculation: i.calculation ?? null, sources: i.sources ?? [] })), problems };
 }
 
 export function storylinePrompt(packet) {

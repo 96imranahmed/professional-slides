@@ -4,6 +4,7 @@ import {
   absolute,
   assertSectionHeadingProps,
   compileDeck,
+  mapAll,
   component as componentNode,
   flow,
   grid,
@@ -470,7 +471,7 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
   // in a numbered deck and the printed footer ran 45, 46, then nothing, then
   // 49. A divider is the exception a reader expects: a full-bleed navy page
   // with a numeral on it already says where it is.
-  const planned = deckPlan.slides.map((slide, index) => slide.kind === "cover"
+  const planned = mapAll(deckPlan.slides, (slide, index) => slide.kind === "cover"
     ? planCover(slide)
     : slide.kind === "tracker" ? planTracker(slide, registry)
     : slide.kind === "divider" ? planDivider(slide)

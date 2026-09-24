@@ -5,7 +5,7 @@ A deck is authored page by page as **page types**, in `<id>.pages.json`, and com
 ```bash
 node runtime/author-deck.mjs --types              # the catalogue: every type, its forms and placements
 node runtime/author-deck.mjs --schema             # JSON Schema for a pages file
-node runtime/author-deck.mjs <id>.pages.json      # compile, compose in memory, gate; write <id>.deck.json and <id>.plan.json, or refuse
+node runtime/author-deck.mjs <id>.pages.json      # compile, compose in memory, gate; write <id>.deck.json, .plan.json and .content.json, or refuse
 ```
 
 ## Why types, not layouts
@@ -41,6 +41,8 @@ Every analytical page carries:
 - `commentary` - where the explanation lives: `beside`, `beside-left` (a column), `below` (points under the exhibit), `rail` (one claim in a filled side panel, written as `rail`), `on-exhibit` (callouts on the chart, `annotations`), `in-exhibit` (in the table's cells, the matrix, the cards), `captions` (a `caption` under every panel) or `none` (the exhibit and title carry it);
 - `takeaway` - `false`, or the closing sentence, kept for the page whose implication goes beyond its title;
 - `why` - one sentence on why this type fits this claim;
+- `settles: { kind, what }` - what settles the claim and what kind of thing it is (`count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure`, `qualitative`). With an insight log, name the insights instead - `evidence: ["i3", "i7"]` - and `settles` is derived from them;
+- `adds` - what the commentary says that the exhibit cannot, or `null`;
 - the content: `title`, `exhibit` or `exhibits`, `points`, `rows`, `kpi`, `metrics`, `pictures`, `source`, `highlight`, `subtitle` and the other slide keys.
 
 The compiler owns `layout`, `shape`, `arrange` and `soWhat`, and writes a `pageType` record on each compiled slide: the type, its choices and the structure they produced. Writing those keys by hand is refused. The build recomputes each page's structure and refuses a deck whose compiled structure was edited after compiling (`PAGE_TYPE_EDITED`): change the choice in the pages file and recompile.
@@ -72,7 +74,34 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 | `statement` | one sentence, or the voices behind it | statement, quotes |
 | `summary` | the answer and its proof | executive-summary, takeaways |
 
-The compiler then composes the deck in memory, as the build will, filling logos, photographs and places from what is already on disk. A composition error surfaces here rather than at the build, and the thin-page rule counts words on the composed pages with the build's own check, so the number the author sees is the number the build will see.
+The compiler then composes the deck in memory, as the build will, filling logos, photographs and places from what is already on disk. Every page that fails to compose is reported in the same run, not one per build.
+
+## The pages file is the dot-dash
+
+Write it in two passes. `--draft` compiles the title spine with its page types, data and evidence, and writes the deck for the [storyline critique](storylining.md#stress-test-the-storyline) with the word floors reported rather than enforced; the copy - callouts, captions, points - is written after the critique, and the full compile holds it to every rule. A new deck cannot be built from a draft: the build holds its content plan to the complete text contract.
+
+There is one authored record of the deck. `author-deck.mjs` writes the other three from it: the deck spec, the plan, and the content plan (`<id>.content.json`). The content plan's claim is each page's title; its `settles` and `adds` come from the page; its text plan is the page's copy as composed, so chart labels, formatted values and cells no longer have to be listed by hand; its reading task is the page type's exhibit family (chart, table, diagram, exhibit, text) and whether the composed page has a commentary column.
+
+The content gates then run in the same pass - claims that are topics, commentary that restates the exhibit, an answer no claim carries - and every page is held to the lower quartile of body words for its reading task (`TEXT_COVERAGE_LOW`): a chart carrying its own callouts from about 42 words, a table with commentary from about 149. The page gates' `THIN_PAGE` uses the same floor, so authoring and the build agree. Do not edit the three written files; change the pages file and run it again.
+
+## Evidence shapes
+
+Each insight in `<id>.insights.json` records the `shape` of the data behind it, and a page type can only rest on evidence of its shape:
+
+| Shape | Means | Carries |
+| --- | --- | --- |
+| `series` | one measure over four or more periods | trend, numbers, panels, lookup |
+| `peer-set` | one measure for every member of the set | ranking, scorecard, profiles, numbers, panels, lookup |
+| `mix` | the parts of a whole | composition, numbers, panels, lookup |
+| `measure-pair` | two measures for each member | relationship, scorecard, numbers, panels, lookup |
+| `bridge` | the steps between two totals | bridge, numbers, panels, lookup |
+| `geography` | places with coordinates or regions | place |
+| `schedule` | dated phases, milestones or workstreams | schedule |
+| `roster` | the named members and their attributes | profiles, scorecard, lookup |
+| `fact` | a few measured numbers | numbers, panels, lookup |
+| `qualitative` | sourced statements, judgements or mechanisms | scorecard and the text and diagram types |
+
+With an insight log beside the pages file, every data-bearing page names its insights in `evidence`, and a ranking whose insights hold no peer set is refused: the missing data is a research task, found before the page is written rather than by the storyline critic or the review.
 
 `--types` prints the data each form reads (a pie or donut takes `labels` and `values`, a treemap `items`, a flow `nodes` and `edges`); the compiler names the missing keys, and refuses any page key the composer does not read, on every page at once.
 
@@ -96,6 +125,9 @@ Choose the type from the claim, then the placement from where the reader's eye a
 | `VARIETY_TAKEAWAY` | at most 25% of pages close on a takeaway line |
 | `VARIETY_PANELS` | from fifteen pages, at least 12% set two or more exhibits side by side |
 | `VARIETY_SIGNATURE` | no one combination of type, placement and close is more than 15% of the pages |
-| `THIN_PAGES_PLANNED` | fewer than 20% of pages (or fewer than five) fall under the deck's word floor on the composed page - a fifth, not the third the rendered deck is held to, because the render adds the empty-space findings words cannot see |
 
 The limits sit outside what strong decks measure, so a deck that chose each page for its claim passes them with room. Do not rotate choices to meet them: a deck that breaks one has pages whose type was not chosen from the claim, and the fix is to ask of each such page what it has to show.
+
+## Worked examples
+
+`examples/page-types.pages.json` is a complete pages file - a fictional regional rail operator's growth plan, with illustrative numbers - that uses every page type at least once, with its `form`, `commentary`, `takeaway`, `why`, `settles` and `adds` filled in and each page's explanation written where its commentary says it lives. Before writing a page, find the example page of the type you are writing, copy its shape, and replace the content: the keys, the data shape its form reads and the length of its callouts, captions and points are the ones that compile and build.

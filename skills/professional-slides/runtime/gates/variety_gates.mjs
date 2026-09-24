@@ -25,7 +25,6 @@ export const VARIETY_CODES = Object.freeze({
   VARIETY_TAKEAWAY: "too many pages close on a takeaway line",
   VARIETY_PANELS: "too few pages set evidence side by side",
   VARIETY_SIGNATURE: "one combination of type, commentary and close repeats across the deck",
-  THIN_PAGES_PLANNED: "a fifth or more of the pages carry fewer words than the deck's weight asks",
 });
 
 export const VARIETY = Object.freeze({
@@ -36,7 +35,6 @@ export const VARIETY = Object.freeze({
   panelsShareMin: 0.12,     // strong decks: 24% of pages carry two or more exhibits
   signatureShareMax: 0.15,  // strong decks: the commonest combination is 10%
   runMax: 2,                // three in a row of one type reads as one page repeated
-  thinShareMax: 0.2,        // pages under the word floor at authoring; the render blocks at 30% with empty space counted
 });
 
 const isContent = (slide) => (!slide.kind || slide.kind === "content" || slide.kind === "statement" || slide.kind === "takeaways") && slide.title !== undefined;
@@ -46,7 +44,10 @@ const share = (n, of) => Math.round((n / of) * 100) / 100;
  * Findings for a deck's content slides. `structureOf` is passed in so the
  * gate and the compiler share one definition without a circular import.
  */
-export function varietyFindings(spec, { structureOf, thin = null } = {}) {
+// Words are not this file's business: the text contract holds every page to
+// the floor for its reading task, on the text of the composed page
+// (derive-content.mjs), and the rendered deck's empty space is DECK_THIN_PAGES.
+export function varietyFindings(spec, { structureOf } = {}) {
   if (spec.purpose === "catalogue") return [];
   const slides = [...(spec.slides || []), ...(spec.appendix || [])].filter(isContent);
   const findings = [];
@@ -125,23 +126,6 @@ export function varietyFindings(spec, { structureOf, thin = null } = {}) {
       `${panels} of ${n} pages set evidence side by side. A quarter of a strong deck's pages carry two to four exhibits - the same ` +
       "measure for several members, two measures that together prove the claim, before and after - each with its own heading and a " +
       "caption under it. Find the pages where the reader would otherwise have to hold one chart in mind while turning to the next.");
-  }
-  // Thin pages, from the plan's word estimate (compose.mjs budgetFindings):
-  // the same pattern the rendered deck's DECK_THIN_PAGES blocks, caught while
-  // the words can still be written. Moving the explanation onto the exhibit is
-  // a choice to write it there, not to drop it.
-  if (thin) {
-    const ids = new Set(slides.map((s) => s.id));
-    const planned = thin.filter((f) => ids.has(f.id));
-    // A fifth, not the third the rendered deck is held to: the render adds the
-    // empty-space findings words cannot see, so authoring leaves room for them.
-    if (planned.length >= 5 && planned.length / n >= VARIETY.thinShareMax) {
-      block("THIN_PAGES_PLANNED", { pages: planned.length, of: n, ids: planned.map((f) => `${f.id} (${f.words}/${f.floor})`) }, VARIETY.thinShareMax,
-        `${planned.length} of ${n} pages plan fewer words than the deck's weight asks. The explanation belongs somewhere on each: callouts on ` +
-        "the chart that carry the mechanism and the qualification (a sentence each, not a label), a caption under each panel that says " +
-        "what that panel shows, an implication column in the table, labelled cards, or a column beside the exhibit. A page whose " +
-        "commentary is `none` has to carry its explanation in the exhibit and the title.", planned.map((f) => f.id));
-    }
   }
   const signature = tally((s) => `${s.pageType.type} · ${s.pageType.commentary} · ${s.pageType.takeaway ? "close" : "open"}`);
   if (signature[0][1] / n > VARIETY.signatureShareMax) {
