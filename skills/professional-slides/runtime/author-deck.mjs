@@ -59,24 +59,30 @@ export async function composeForAuthoring(spec, baseDir) {
 
 /**
  * Compile a pages document into a deck spec. Throws with every impossible
- * page and the choice to make. The thin-page rule reads the plan's word
- * estimate; `authorDeck` composes the deck and reads the composed pages.
+ * page and the choice to make - or, `partial`, leaves those pages out and
+ * returns their errors as `compileErrors`, so the pages that do compile are
+ * still composed, gated and budgeted in the same run. One page that did not
+ * compile used to hide every other finding, and every budget line with them.
  */
-export function compileDeck(doc, { insights = null, draft = false } = {}) {
+export function compileDeck(doc, { insights = null, draft = false, partial = false } = {}) {
   if (!doc || typeof doc !== "object" || !doc.deck || !Array.isArray(doc.pages)) throw new Error("A pages file is { deck: {...}, pages: [...] }");
   if (doc.deck.slides || doc.deck.appendix) throw new Error("`deck` carries the deck-level keys only; the pages go in `pages` and `appendix`");
   const errors = [];
   const compile = (list, offset = 0) => list.map((page, i) => {
-    try { return compilePage(page, offset + i, { insights, draft }); } catch (error) { errors.push(error.message); return null; }
-  });
-  const slides = compile(doc.pages);
-  const appendix = compile(doc.appendix || [], doc.pages.length);
-  // Every key checked now, on every page, rather than one at a time by the build.
-  [...slides, ...appendix].forEach((slide, i) => {
-    if (!slide) return;
+    let slide;
+    try { slide = compilePage(page, offset + i, { insights, draft }); } catch (error) { errors.push(error.message); return null; }
+    // Every key checked now, on every page, rather than one at a time by the build.
     const unknown = Object.keys(slide).filter((key) => !(key in SLIDE_KEYS));
-    if (unknown.length) errors.push(`${slide.id ?? `page ${i + 1}`}: unknown page key${unknown.length === 1 ? "" : "s"} ${unknown.map((k) => `\`${k}\``).join(", ")} - a key the composer does not read (an exhibit's own props go inside the exhibit)`);
+    if (!unknown.length) return slide;
+    errors.push(`${slide.id ?? `page ${offset + i + 1}`}: unknown page key${unknown.length === 1 ? "" : "s"} ${unknown.map((k) => `\`${k}\``).join(", ")} - a key the composer does not read (an exhibit's own props go inside the exhibit)`);
+    return null;
   });
+  const slides = compile(doc.pages).filter(Boolean);
+  const appendix = compile(doc.appendix || [], doc.pages.length).filter(Boolean);
+  if (partial) {
+    const spec = { ...doc.deck, slides, ...(appendix.length ? { appendix } : {}) };
+    return { spec, findings: varietyFindings(spec, { structureOf }), compileErrors: errors };
+  }
   if (errors.length) {
     const error = new Error(`${errors.length} page${errors.length === 1 ? "" : "s"} could not be compiled:\n- ${errors.join("\n- ")}`);
     error.pageErrors = errors;
@@ -131,15 +137,19 @@ export function sceneGateFindings(deck, python = process.env.RUNTIME_PYTHON || "
 
 /** Compile, compose in memory, and gate the composed pages: what the CLI runs. */
 export async function authorDeck(doc, { baseDir, insights = null, draft = false } = {}) {
-  const { spec } = compileDeck(doc, { insights, draft });
+  const { spec, compileErrors } = compileDeck(doc, { insights, draft, partial: true });
   const composed = await composeForAuthoring(spec, baseDir);
-  if (composed.error) { const error = new Error(composed.error); error.pageErrors = composed.pageErrors ?? [composed.error]; throw error; }
-  const failed = (composed.pageErrors || []).map((message) => ({ code: "PAGE_DOES_NOT_COMPOSE", id: message.match(/^(?:Cannot render )?([^:\s]+):/)?.[1], repair: message }));
+  if (composed.error) { const error = new Error([...compileErrors, composed.error].join("\n- ")); error.pageErrors = [...compileErrors, ...(composed.pageErrors ?? [composed.error])]; throw error; }
+  const pageId = (message) => message.match(/^(?:Cannot render )?([^:\s]+):/)?.[1];
+  // A page that did not compile is left out of everything after; the variety
+  // contract reads the pages that did, so it is re-read once they all do.
+  const failed = [...compileErrors.map((message) => ({ code: "COMPILE", id: pageId(message), repair: message })),
+    ...(composed.pageErrors || []).map((message) => ({ code: "PAGE_DOES_NOT_COMPOSE", id: pageId(message), repair: message }))];
   const failedIds = new Set(failed.map((f) => f.id).filter(Boolean));
   const scene = sceneGateFindings(composed.deck);
   // A draft has no copy yet, so the page gates - words, tables, footers - are
   // reported there, not enforced; the structure rules hold either way.
-  return { spec, deck: composed.deck, failedIds, findings: [...failed, ...varietyFindings(spec, { structureOf }), ...(draft ? [] : scene.findings)],
+  return { spec, deck: composed.deck, failedIds, compiled: !compileErrors.length, findings: [...failed, ...varietyFindings(spec, { structureOf }), ...(draft ? [] : scene.findings)],
     pageGateAdvisories: [...(draft ? scene.findings : []), ...scene.advisories], pageGatesRan: scene.ran, budget: scene.budget ?? [] };
 }
 
@@ -208,16 +218,19 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   let compiled;
   try { compiled = await authorDeck(doc, { baseDir: dir, insights: await readInsights(dir, stem), draft: args.includes("--draft") }); }
   catch (error) {
-    await log({ ok: false, findings: (error.pageErrors ?? [error.message]).map((message) => ({ code: "COMPILE", id: message.split(":")[0] })) });
+    await log({ ok: false, findings: (error.pageErrors ?? [error.message]).map((message) => ({ code: "COMPILE", id: message.split(":")[0], message })) });
     console.error(error.message); process.exit(2);
   }
   const { spec, deck, findings, pageGateAdvisories = [], failedIds = new Set(), budget = [] } = compiled;
   // One line per analytical page: body words against floor and ceiling, the
-  // footer's share, and how full the body is; "!" marks a line to act on.
+  // footer's share, and any band of the page the render will call empty (the
+  // build's INTERNAL_VOID and DEAD_BAND, measured on the scene); "!" marks a
+  // line to act on. A bare "fills 22%" with no bar beside it was read past.
   const ledger = budget.filter((b) => b.floor).map((b) => {
-    const flag = b.body < b.floor || (b.ceiling && b.body > b.ceiling) || (b.footerRatio ?? 0) > 0.3 ? "! " : "  ";
+    const flag = b.body < b.floor || (b.ceiling && b.body > b.ceiling) || (b.footerRatio ?? 0) > 0.3 || b.void ? "! " : "  ";
+    const band = b.void ? `, empty ${b.internalVoid >= b.deadBand ? "band inside the body" : "band under the body"} ${Math.round(Math.max(b.internalVoid, b.deadBand) * 720)}px` : "";
     return `${flag}${String(b.id ?? b.slide).padEnd(6)} ${String(b.readingTask ?? "").padEnd(24)} ${b.body} words (floor ${Math.round(b.floor)}${b.ceiling ? `, ceiling ${b.ceiling}` : ""})` +
-      `${b.footer ? `, footer ${Math.round((b.footerRatio ?? 0) * 100)}%` : ""}${b.occupied !== undefined ? `, fills ${Math.round(b.occupied * 100)}%` : ""}`;
+      `${b.footer ? `, footer ${Math.round((b.footerRatio ?? 0) * 100)}%` : ""}${band}`;
   });
   const content = deriveContent(spec, deck);
   // A page that did not compose has no text to plan; its composition error is its finding.
@@ -227,7 +240,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const draft = args.includes("--draft");
   const WORDS = new Set(["TEXT_COVERAGE_LOW", "TEXT_PLAN_INCOMPLETE"]);
   const blocking = [...findings, ...(contentReport.findings || []).filter((f) => (f.severity === "blocker" || f.severity === "blocking") && !(draft && WORDS.has(f.code)))];
-  await log({ ok: !blocking.length, findings: blocking.map((f) => ({ code: f.code, ...(f.id ?? f.page ? { id: String(f.id ?? f.page) } : {}) })) });
+  // The message is kept, so `--log` can say which limit keeps coming back.
+  await log({ ok: !blocking.length, findings: blocking.map((f) => ({ code: f.code, ...(f.id ?? f.page ? { id: String(f.id ?? f.page) } : {}), ...(f.repair ?? f.reason ? { message: String(f.repair ?? f.reason).slice(0, 300) } : {}) })) });
   if (blocking.length) {
     console.error(`The deck is not ready; nothing was written. ${blocking.length} finding${blocking.length === 1 ? "" : "s"} to fix in ${path.basename(file)}:\n${report(blocking)}${ledger.length ? `\n\nPage budgets:\n${ledger.join("\n")}` : ""}`);
     process.exit(2);

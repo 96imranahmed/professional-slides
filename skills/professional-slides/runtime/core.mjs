@@ -946,7 +946,17 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     ? renderedNodes.some(node => node.role === "axis-label")
     : props.showValueAxis ?? (props.gridlines === true || !dataLabels);
   const ticks = (renderedNodes || []).filter(node => node.role === "axis-label" && Number.isFinite(node.data?.value)).map(node => node.data.value).sort((a,b)=>a-b);
+  // A two-mark contrast paints one peer in the primary and the other grey, and
+  // which one is the scene's decision (charts.mjs defaultFocusIndex: the named
+  // focus, else the latest period, else the first). The emitter used to grey
+  // the second series and colour the first, so a "2019 | 2024" chart drawn
+  // right in the scene came out backwards in PowerPoint. It now paints the mark
+  // the scene painted.
+  const marks = (renderedNodes || []).filter(node => node.role === "chart-mark");
+  const primaryMark = marks.some(node => node.style?.fill?.tokenId === "color.chartComparator") ? marks.find(node => node.style?.fill?.tokenId === "color.componentPrimary") : undefined;
+  const focusIndex = primaryMark ? (series.length === 2 ? series.findIndex(item => item.name === primaryMark.data?.series) : categories.indexOf(primaryMark.data?.category)) : -1;
   return {
+    ...(focusIndex >= 0 ? { focusIndex } : {}),
     labelBold,
     type,
     categories,

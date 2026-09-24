@@ -28,6 +28,7 @@
 import { REGISTRY } from "./registry.mjs";
 import { trivialChart } from "./gates/craft_gates.mjs";
 import { calloutFits } from "./chart-annotations.mjs";
+import { sideStatementLayout } from "./figures.mjs";
 
 // Where the page's explanation lives. Each maps onto what the composer draws.
 export const COMMENTARY = Object.freeze({
@@ -112,7 +113,9 @@ export const PAGE_TYPES = Object.freeze({
   numbers: {
     task: "a few measured numbers that carry the claim, with the evidence under them",
     forms: { "hero-number": "hero-number", "metric-strip": "metrics-over-exhibit", "fact-grid": "fact-grid", "stat-list": "stat-list" },
-    commentary: ["beside", "below", "none"], exhibits: [0, 1],
+    // Every numbers form sets its figures against one exhibit: the proof beside
+    // a hero number, the tiles of a grid, the chart under a strip.
+    commentary: ["beside", "below", "none"], exhibits: 1,
   },
   parallel: {
     task: "three to six parallel ideas, each headed, often with an icon",
@@ -212,13 +215,25 @@ export const LIMITS = Object.freeze({
   "chart.sparklines": { key: "items", min: 2, max: 12 }, cycle: { key: "items", min: 3, max: 6 }, steps: { key: "items", min: 3, max: 6 },
   people: { key: "items", min: 2, max: 5 }, logos: { key: "items", min: 2, max: 12 }, cards: { key: "items", min: 2, max: 6 },
   takeaways: { key: "items", min: 2, max: 5 }, gantt: { key: "periods", min: 2 },
+  // A figure is a number, not a phrase: the renderers refuse a longer value.
+  "stat-list": { key: "items", min: 2, max: 6, valueChars: 9 }, "fact-grid": { key: "items", min: 3, max: 9, valueChars: 10 },
+  "chart.waffle": { key: "categories", min: 2 },
 });
+// Callouts a chart carries before the plot runs out of clear corridors: past
+// three, the fourth note is commentary and belongs beside the chart.
+export const CALLOUTS_MAX = 3;
+// The rail's panel is a third of the body row; its statement is set at heading
+// size and runs to eight lines, measured here the way the renderer sets it.
+const RAIL_WIDTH = 373;
+export const railFits = (text) => { try { sideStatementLayout({ x: 0, y: 0, width: RAIL_WIDTH, height: 600 }, { text }); return true; } catch { return false; } };
 
 // The least a page of each type carries to be worth a page. Below it the type
 // was chosen for less evidence than it needs: a three-phase roadmap, a two-part
 // pie and a four-row matrix each left half a page empty on a real deck.
 const MINIMUM = Object.freeze({
-  composition: (ex, form) => ["pie", "donut", "treemap"].includes(form)
+  composition: (ex, form) => form === "waffle"
+    ? ((ex.series || []).length === 1 && (ex.categories || []).length >= 2) || "a waffle counts the members of each part - `categories` for the parts and one series of whole counts"
+    : ["pie", "donut", "treemap"].includes(form)
     ? ((ex.labels || ex.items || []).length >= 3 || "a share of one thing is a numbers page - a composition shows three or more parts")
     : ((ex.categories || []).length >= 2 && (ex.series || []).length >= 2) || (ex.series || []).length >= 3 || "a composition compares the mix across two or more members or periods, or shows three or more parts",
   schedule: (ex, form) => form === "gantt" ? true : (ex.items || []).length >= 4 || "a timeline or roadmap of three items is a strip, not a page - four or more dated items, or pair it with the evidence behind them as panels",
@@ -357,6 +372,10 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     const limit = LIMITS[ex.type], n = limit && Array.isArray(ex[limit.key]) ? ex[limit.key].length : null;
     if (n !== null && (n < limit.min || (limit.max && n > limit.max)))
       throw new Error(`${id}: a ${ex.type} holds ${limit.min}${limit.max ? ` to ${limit.max}` : " or more"} ${limit.key}; this one has ${n}`);
+    const long = limit?.valueChars && (ex.items || []).find((item) => String(item?.value ?? "").length > limit.valueChars);
+    if (long) throw new Error(`${id}: a ${ex.type} value is a figure of ${limit.valueChars} characters at most ("${long.value}"); put the unit in the label`);
+    if (ex.type?.startsWith("chart.") && (ex.annotations || []).length > CALLOUTS_MAX)
+      throw new Error(`${id}: a chart carries ${CALLOUTS_MAX} callouts at most (this one has ${ex.annotations.length}); the rest is commentary - choose "beside" or "rail" for it`);
   }
   const minimum = primary && MINIMUM[page.type]?.(primary, page.form);
   if (typeof minimum === "string") throw new Error(`${id}: ${minimum}`);
@@ -366,7 +385,7 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     const values = (primary.values || (primary.items || []).map((item) => item.value) || []).map(Number);
     const total = values.reduce((a, b) => a + b, 0);
     if (values.length && values.every(Number.isInteger) && total < 25)
-      throw new Error(`${id}: ${total} items shared out as percentages overstates a small count - show the counts (a waffle, or a ranking of the parts)`);
+      throw new Error(`${id}: ${total} items shared out as percentages overstates a small count - show the counts (form "waffle": the parts as \`categories\`, one series of counts)`);
   }
   if (page.type === "composition" && ["pie", "donut"].includes(page.form)) {
     const values = (primary.values || []).map(Number), total = values.reduce((a, b) => a + b, 0);
@@ -422,12 +441,15 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   // phrase is accented where it occurs, so a single phrase lit one point and
   // left the rest grey. `highlight` takes a list - a phrase from each point -
   // or a point carries its own.
+  const phrases = (Array.isArray(page.highlight) ? page.highlight : page.highlight ? [page.highlight] : []).map((p) => String(p).toLowerCase());
+  const pointTexts = (page.points || []).map((point) => (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`).toLowerCase());
+  // A phrase that appears in no point marks nothing. Checked in a draft too,
+  // since a draft with its points written would otherwise pass it on to the
+  // full compile to find.
+  const stray = points ? phrases.filter((p) => p && !pointTexts.some((text) => text.includes(p))) : [];
+  if (stray.length) throw new Error(`${id}: \`highlight\` "${stray[0]}" appears in none of the points; use a phrase exactly as a point writes it`);
   if (!draft && points >= 2 && ["beside", "beside-left", "below"].includes(page.commentary)) {
-    const phrases = (Array.isArray(page.highlight) ? page.highlight : page.highlight ? [page.highlight] : []).map((p) => String(p).toLowerCase());
-    const marked = (page.points || []).filter((point) => {
-      const text = (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`).toLowerCase();
-      return (point && typeof point === "object" && point.highlight) || phrases.some((p) => p && text.includes(p));
-    }).length;
+    const marked = (page.points || []).filter((point, at) => (point && typeof point === "object" && point.highlight) || phrases.some((p) => p && pointTexts[at].includes(p))).length;
     if (marked < Math.ceil(points / 2)) throw new Error(`${id}: mark the finding in each point - ${marked} of ${points} points carry a highlighted phrase; give \`highlight\` a list with a phrase from each point (the number or claim the reader should see first), or \`highlight\` on the point`);
   }
   if (!draft && ["beside", "beside-left", "below"].includes(page.commentary) && !points && !page.paragraphs)
@@ -455,6 +477,7 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   }
   if (page.commentary === "rail") {
     if (!draft && (typeof page.rail !== "string" || words(page.rail).length < 10)) throw new Error(`${id}: commentary "rail" sets one developed claim in the side panel - write it as \`rail\`, ten words or more`);
+    if (typeof page.rail === "string" && !railFits(page.rail)) throw new Error(`${id}: the rail runs past its eight lines (about ${railCapacity()} words); it is the page's one claim - cut it, or choose "beside" for an argument`);
     slide.panel = { text: String(page.rail ?? "").trim() || page.title };
   }
   const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
@@ -530,6 +553,14 @@ export function calloutCapacity() {
   return n;
 }
 
+/** How many words of ordinary prose the rail's panel holds, by the renderer's own measure. */
+export function railCapacity() {
+  const words = "the operator added capacity on the busiest routes before demand returned in full".split(" ");
+  let n = 1;
+  while (n < 120 && railFits(Array.from({ length: n + 1 }, (_, i) => words[i % words.length]).join(" "))) n += 1;
+  return n;
+}
+
 /** The catalogue as the author reads it. */
 export function describeTypes() {
   const lines = ["# Page types", "", "Every analytical page is one of these. Each choice is required; none has a default.", "",
@@ -538,13 +569,13 @@ export function describeTypes() {
     "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log.", "",
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", "",
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point).", "",
-    `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box); \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, ""];
+    `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, ""];
   for (const [name, t] of Object.entries(PAGE_TYPES)) {
     const n = Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits;
     const data = Object.entries(t.forms).map(([form, target]) => [form, dataKeys(target)]).filter(([, keys]) => keys.length);
     lines.push(`## ${name}`, t.task, "", `- form: ${Object.keys(t.forms).join(" | ")}`,
       ...(() => { const limits = Object.entries(t.forms).map(([form, target]) => [form, LIMITS[target]]).filter(([, l]) => l);
-        return limits.length ? [`- holds: ${limits.map(([form, l]) => `${form} ${l.min}${l.max ? `-${l.max}` : "+"} ${l.key}`).join("; ")}`] : []; })(),
+        return limits.length ? [`- holds: ${limits.map(([form, l]) => `${form} ${l.min}${l.max ? `-${l.max}` : "+"} ${l.key}${l.valueChars ? ` (values ${l.valueChars} characters at most)` : ""}`).join("; ")}`] : []; })(),
       ...(data.length ? [`- data: ${[...data.reduce((m, [form, keys]) => m.set(keys.join(", "), [...(m.get(keys.join(", ")) || []), form]), new Map())]
         .map(([keys, forms]) => forms.length === data.length ? keys : `${keys} (${forms.join(", ")})`).join("; ")}`] : []), `- commentary: ${t.commentary.join(" | ")}`, `- exhibits: ${n}` +
       (t.marked ? "; the chart marks its finding (annotation, highlight, reference line or rate)" : "") +

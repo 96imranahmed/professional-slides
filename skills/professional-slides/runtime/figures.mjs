@@ -677,8 +677,14 @@ function normalizeFacts(props) {
 
 export function factGridLayout(frame, props) {
   const items = normalizeFacts(props);
-  const columns = props.columns ?? (items.length <= 4 ? items.length : items.length <= 6 ? 3 : Math.min(4, Math.ceil(items.length / 2)));
-  const rows = Math.ceil(items.length / columns), gap = v("space.4"), pad = v("space.4");
+  const gap = v("space.4"), pad = v("space.4");
+  const innerAt = (n) => (frame.width - gap * (n - 1)) / n - 2 * pad;
+  // Four tiles in a row fit the page's width but not a column beside
+  // commentary; there the grid wraps to two rows rather than failing a page
+  // whose choice of placement was sound.
+  let columns = props.columns ?? (items.length <= 4 ? items.length : items.length <= 6 ? 3 : Math.min(4, Math.ceil(items.length / 2)));
+  if (props.columns === undefined) while (columns > 1 && innerAt(columns) < 110) columns = columns === 4 && items.length === 4 ? 2 : columns - 1;
+  const rows = Math.ceil(items.length / columns);
   const width = (frame.width - gap * (columns - 1)) / columns, inner = width - 2 * pad;
   if (inner < 110) throw new Error("A fact grid this wide is too narrow per tile; use fewer columns");
   const tiles = items.map((item) => {

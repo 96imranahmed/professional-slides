@@ -16,7 +16,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Body type | `TYPE_RANGE` | 10 to 14 pt body, 8 to 11 pt chart furniture, 20 to 26 pt titles |
 | Characters per line | `CPL` | 35 to 90 |
 | Takeaway band length | `TAKEAWAY_LONG` | at most three lines; one or two is the norm |
-| Body words, exhibit page | `WORDS` | the target body band, 128 prose words (`live-pitch` 77, `pre-read` 179, `appendix` 224). A text page is held to the text-page target instead: 196 words, `live-pitch` 127, `pre-read` 282, `appendix` 352. Table cells and chart furniture are evidence, not prose |
+| Body words, exhibit page | `WORDS` | a page composed from a page type: its reading task's outlier fence (upper quartile plus 1.5 times the spread) on the same body count as its floor. Otherwise the target body band, 128 prose words (`live-pitch` 77, `pre-read` 179, `appendix` 224). A text page is held to the text-page target instead: 196 words, `live-pitch` 127, `pre-read` 282, `appendix` 352. Table cells and chart furniture are evidence, not prose |
 | Hero exhibit, analytical page | `HERO_EXHIBIT` | at least 40% of the content area, carrying ink |
 | Layout repetition | `LAYOUT_MONOTONY` | no layout signature on more than 35% of content pages |
 | Page families | `PAGE_VARIETY` | at least three families across ten pages or more |
@@ -34,7 +34,7 @@ Measured on the rendered page before review. The report records severity. `runti
 | Commentary column | `COLUMN_MONOTONY` | at most three consecutive pages marked with the same device (icon, numbered disc, hairline, prose) |
 | Deck shape | `DECK_FLAT` | past eight analytical pages, one page carries the detail: 282+ words, or a p80 a third above the median |
 | Thin pages | `DECK_THIN_PAGES` | blocks when 30% or more of 12+ content pages (and at least five) carry a thin or half-empty page finding |
-| Half-empty body, from the scene | `SCENE_VOID` | no band inside the content deeper than 13% of the content frame, none above or below it deeper than 30%; card and panel interiors read by what they hold; runs at authoring, no render needed |
+| Half-empty body, from the scene | `SCENE_VOID` | `INTERNAL_VOID` and `DEAD_BAND`'s own definition and thresholds, read off the rows the scene will draw (text by its glyph lines, fills where they show against the canvas, the band under the title included); card and panel interiors read by what they hold; runs at authoring, no render needed |
 | Half-empty pages across the deck | `DECK_SCENE_VOID` | blocks when 30% or more of 12+ content pages (and at least five) carry `SCENE_VOID` |
 | Commentary column | `THIN_COLUMN`, `POINT_DEPTH` | reaches `weight.columnFill` of its track; points average `weight.pointWords` |
 | Marks in the exhibit | `PLOT_SPAN` | marks span `weight.plotSpan` of the exhibit frame (annotated and peer-aligned charts exempt) |

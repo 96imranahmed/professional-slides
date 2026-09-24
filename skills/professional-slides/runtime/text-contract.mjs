@@ -1,5 +1,6 @@
 // The dot-dash's visible copy is the source of truth through composition/export.
 import { readFileSync } from 'node:fs';
+import { PICTURE_SHARE_MAX } from "./weight.mjs";
 
 const roles = new Set(['title', 'body', 'exhibit', 'qualification', 'source', 'furniture']);
 
@@ -101,7 +102,11 @@ export function checkTextPlan(content, {required = false} = {}) {
         + `(median block ${TEXT_FORM.wordsPerBlock.median} words, median page ${TEXT_FORM.blocksPerPage.median} blocks). `
         + 'Split it into two or three points that each make their own claim, rather than shortening the sentence.');
     }
-    const median = target.bodyWords.median, floor = target.bodyWords.q1;
+    // The page's own floor when its composition set one (a photograph's share
+    // taken off, derive-content.mjs wordBudgetOf), never below what the
+    // largest allowed photograph could take off.
+    const median = target.bodyWords.median;
+    const floor = Number.isFinite(ref.floor) ? Math.min(target.bodyWords.q1, Math.max(ref.floor, Math.round(target.bodyWords.q1 * (1 - PICTURE_SHARE_MAX)))) : target.bodyWords.q1;
     const score = {id:page.id,page:page.n,task:ref.task,bodyWords,totalWords,proseBlocks:prose.length,longestBlock:longest,referenceBodyMedian:median,referenceBodyLowerQuartile:floor,referenceTotalMedian:target.totalWords.median,textCoverageScore:median ? Math.round(bodyWords/median*100) : null,explanation:ref.rationale || null};
     scores.push(score);
     // The floor is hard. It used to give way to a written rationale, and the

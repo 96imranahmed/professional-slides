@@ -553,6 +553,39 @@ def text_page_ink_floor():
     return INK_PER_WORD["value"] * INK_PER_WORD["tolerance"] * (WEIGHT.get("pageWords") or 0)
 
 
+# Where the body starts for INTERNAL_VOID: just under a two-line title. A run
+# that starts here is the air between the title and the first block.
+VOID_TOP = 140
+# A row counts as content once it carries more than a hairline: a column rule
+# or a vertical connector running through an empty band does not fill it.
+ROW_MIN = 3
+
+
+def void_bands(rows):
+    """DEAD_BAND and INTERNAL_VOID's one definition, read off `rows[y]`, the
+    occupied pixels on each canvas row. The render's gates pass the rows of the
+    PNG; SCENE_VOID passes the rows the scene will draw (scene_rows), so the
+    author hears at authoring the bands the build will report.
+
+    `deadBand` is the trailing band from the last occupied row to the footer;
+    `internalVoid` the tallest empty run between VOID_TOP and that row - a
+    takeaway pinned to the bottom with nothing above it is as empty as a
+    trailing band, and so is a strip of air under the title. Both are shares
+    of the canvas height; `voidTop`/`voidBottom` place the run."""
+    last_ink = next((y for y in range(FOOTER_TOP - 1, -1, -1) if rows[y] > ROW_MIN), None)
+    dead = 1.0 if last_ink is None else (FOOTER_TOP - 1 - last_ink) / float(CANVAS_H)
+    run, longest, where = 0, 0, (None, None)
+    for y in range(VOID_TOP, (last_ink if last_ink is not None else VOID_TOP) + 1):
+        if rows[y] > ROW_MIN:
+            run = 0
+        else:
+            run += 1
+            if run > longest:
+                longest, where = run, (y + 1 - run, y + 1)
+    return {"deadBand": dead, "internalVoid": longest / float(CANVAS_H), "lastInk": last_ink,
+            "voidTop": where[0], "voidBottom": where[1]}
+
+
 def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=False):
     """INK_COVERAGE and DEAD_BAND. COVER_EXEMPT. Needs the render.
     `rows` counts ink; `occupied` (default: rows) counts designed surfaces too.
@@ -571,16 +604,8 @@ def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=Fa
             "The page is mostly empty. Give the hero exhibit the leftover height "
             "(leftover: fill) or add the evidence the title claims.",
         ))
-    # A row counts as content once it carries more than a hairline of ink.
-    last_ink = None
-    for y in range(FOOTER_TOP - 1, -1, -1):
-        if content_rows[y] > 3:
-            last_ink = y
-            break
-    if last_ink is None:
-        band = 1.0
-    else:
-        band = (FOOTER_TOP - 1 - last_ink) / float(CANVAS_H)
+    bands = void_bands(content_rows)
+    band, void = bands["deadBand"], bands["internalVoid"]
     if band > THRESHOLDS["dead_band_max"]:
         findings.append(finding(
             slide_no, "DEAD_BAND", round(band, 4), THRESHOLDS["dead_band_max"],
@@ -589,17 +614,6 @@ def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=Fa
             "group when appropriate. Do not stretch rows or add content merely "
             "to occupy the band.",
         ))
-    # INTERNAL_VOID: the largest empty band *between* content rows below the title.
-    # A takeaway pinned to the bottom with nothing above it is as empty as a trailing band.
-    body_top = 140
-    run, longest = 0, 0
-    for y in range(body_top, (last_ink if last_ink is not None else body_top) + 1):
-        if content_rows[y] > 3:
-            run = 0
-        else:
-            run += 1
-            longest = max(longest, run)
-    void = longest / float(CANVAS_H)
     if void > THRESHOLDS["internal_void_max"]:
         findings.append(finding(
             slide_no, "INTERNAL_VOID", round(void, 4), THRESHOLDS["internal_void_max"],
@@ -727,8 +741,16 @@ def gate_takeaway_long(slide_no, slide, findings):
 
 
 def words_limit(slide, profile):
-    """The WORDS ceiling for one page: the exhibit page's prose budget when an
-    exhibit carries it, the benchmark page's when its evidence is its prose."""
+    """The WORDS ceiling for one page. A page composed from a page type carries
+    its own (`wordCeiling`: its reading task's outlier fence, on the same body
+    count as its floor - derive-content.mjs wordBudgetOf). Otherwise the exhibit
+    page's prose budget when an exhibit carries it, the benchmark page's when
+    its evidence is its prose. One flat 148 for every task sat under the
+    reference median of a chart page with commentary and one word under a table
+    page's floor."""
+    own = slide.get("wordCeiling")
+    if isinstance(own, (int, float)) and not isinstance(own, bool) and own > 0:
+        return int(own)
     has_exhibit = any(is_exhibit(c) for c in slide.get("componentInstances", []))
     return PROFILES[profile]["words_exhibit" if has_exhibit else "words_text"]
 
@@ -736,6 +758,17 @@ def words_limit(slide, profile):
 def gate_words(slide_no, slide, findings, profile):
     """WORDS. COVER_EXEMPT. Body prose only: no source, page number, notes — and no
     table cells, which are structured evidence rather than prose (dense is fine)."""
+    if slide.get("wordCeiling"):
+        # The page's own ceiling is on the page's own count.
+        total = body_words(slide)
+        limit = words_limit(slide, profile)
+        if total > limit:
+            findings.append(finding(
+                slide_no, "WORDS", total, limit,
+                "Above the fence for pages doing this job: cut the page to its "
+                "claim, its evidence and its consequence, or split it in two.",
+            ))
+        return
     total = 0
     for node in text_nodes(slide):
         role = node.get("role")
@@ -1078,9 +1111,13 @@ READING_TASK_FLOORS = {task: spec["bodyWords"]["q1"] for task, spec in json.load
 
 
 def body_floor(slide):
-    """The body-word floor one page is held to: its reading task's lower
-    quartile (the deck's `pageWords` when the page carries no task), cut by the
-    share of the body a photograph holds."""
+    """The body-word floor one page is held to: the page's own `wordFloor` when
+    its composition set one (the one the text contract holds it to), else its
+    reading task's lower quartile (the deck's `pageWords` when the page carries
+    no task), cut by the share of the body a photograph holds."""
+    own = slide.get("wordFloor")
+    if isinstance(own, (int, float)) and not isinstance(own, bool) and own >= 0:
+        return int(own)
     task_floor = READING_TASK_FLOORS.get(slide.get("readingTask") or "")
     floor = task_floor if task_floor is not None else (WEIGHT.get("pageWords") or 0)
     if floor <= 0:
@@ -1138,8 +1175,8 @@ def gate_thin_page(slide_no, slide, findings):
 
 # --- scene coverage ---------------------------------------------------------
 #
-# How full the page's body is, read off the node frames rather than off the
-# render. The pixel gates (INK_COVERAGE, DEAD_BAND, INTERNAL_VOID) only run at
+# How full the page's body is, read off the scene rather than off the render
+# (scene_rows, measured by void_bands as the render's rows are). The pixel gates (INK_COVERAGE, DEAD_BAND, INTERNAL_VOID) only run at
 # the build, and the build is the most expensive place to learn that a page is
 # half empty: a three-phase roadmap with its lower half blank, three cards whose
 # boxes are empty below their first paragraph and a four-row matrix with a
@@ -1156,28 +1193,7 @@ def gate_thin_page(slide_no, slide, findings):
 SCENE_MARK_ROLE = re.compile(r"^(chart-|map-|table-(bar|bubble|progress|rating|check|trend|implication|status)|"
                              r"metric-ring|gantt-(bar|milestone)|legend-|spectrum-|fact-gauge|matrix-point)")
 SCENE_SHAPE_TYPES = {"rect", "ellipse", "shape", "wedge"}
-SCENE_SKIP_ROLES = FOOTER_ROLES | TITLE_ROLES | TITLE_BAND_ROLES | {"tracker-compact-label", "tracker-compact-marker-label",
-                                                                     "title-band", "title-tab"}
-# A row counts as occupied once more than a hairline crosses it - the render's
-# band gates use the same three pixels, so a column rule or a vertical
-# connector running through an empty band does not fill it.
-SCENE_ROW_MIN = 3
 SCENE_THRESHOLDS = {
-    # Calibrated on the fifty-page Emirates deck (output/emirates-v3), whose
-    # renders measure the same bands to within 0.02 on every page but the one
-    # with cards. The three pages found half empty by eye carry a hole of 0.15
-    # (a four-row matrix with a blank band above its pinned takeaway), 0.22
-    # (three cards empty below their paragraph) and 0.40 (a roadmap with
-    # nothing under its phases); the seven pages read as good carry at most
-    # 0.095 (the gap under a chart's heading and legend). The bar sits between,
-    # at 66px of a 506px body - three lines of body type and their leading -
-    # clear of a chart's headroom under its heading, which runs to 0.123 on
-    # the deck's earlier build and is a chart's air, not a missing block.
-    "internal_band_max": 0.13,
-    # A band under the last block (or over the first): a table of five rows
-    # that ends with a quarter of the body below it read as good (0.25), so
-    # the bar is a third - the "lower third blank" a reader does notice.
-    "edge_band_max": 0.30,
     "deck_share": 0.30,     # the share of content pages DECK_THIN_PAGES blocks at
     "deck_from": 12,        # content pages before the deck-level check applies
     "deck_pages_min": 5,
@@ -1208,160 +1224,210 @@ def _text_box(node):
     return x, y, width, height
 
 
-def scene_boxes(slide):
-    """The boxes the page's content will ink, from the scene alone.
+def _color(value):
+    """A style colour as #RRGGBB, or None for none, transparent or a gradient."""
+    if isinstance(value, dict):
+        value = value.get("value")
+    if not isinstance(value, str) or not re.match(r"^#[0-9a-fA-F]{6}$", value.strip()):
+        return None
+    return value.strip()
 
-    Returns `(ink, containers)`. `ink` is text by its measured lines, pictures,
-    marks, rules and free-standing shapes by their frames; title, tracker and
-    footer text is the page's furniture and is left out. `containers` is each
-    container's used part: as far down as its contents reach, plus the padding
-    it keeps above them - a tinted callout hugging its sentence is full, a card
-    drawn twice the height of its paragraph is half empty, and that half is
-    what the band measures.
+
+def _grey(color):
+    """The luminance Pillow's "L" conversion gives the colour on the render."""
+    r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+    return r * 299 / 1000 + g * 587 / 1000 + b * 114 / 1000
+
+
+# Where a line's ink sits in the face centred on its line: from about the cap
+# height to the descenders. Fitted on 213 rendered pages of five decks, it puts
+# the scene's last row of ink within two pixels of the PNG's on average.
+GLYPH_BAND = (0.15, 0.9)
+
+
+def scene_rows(slide):
+    """The occupied pixels on each canvas row above the footer, drawn from the
+    scene the way the render's void gates read the PNG.
+
+    SCENE_VOID measured node boxes in the content frame and missed what the
+    build then flagged: on the Emirates deck it named none of the seven pages
+    the render's band gates did, because a number tile's box was counted where
+    the render sees a value and a label, a staircase's frame where it sees
+    three steps, and the air between the title and a vertically centred block
+    fell in the lenient edge band. So this draws what is drawn: text by its
+    measured lines and each line by its glyph band (GLYPH_BAND of the face
+    centred on its line); a shape by its fill when
+    the fill shows against the canvas and by its outline when only the stroke
+    does; a rule by its stroke. What shows is the render's test,
+    SURFACE_LUMINANCE held at its distance from this page's canvas
+    (ink.relative), so a white card on a cream page is air and a tinted one is
+    surface, as they are in the PNG. Title and tracker are drawn too: the
+    render sees them, and the band under a title is the page's first hole.
+
+    One thing the render cannot read and this does: the inside of a container.
+    A card or tile drawn to the height of its row with one short paragraph at
+    the top shows as surface in the PNG, and counting it filled is how three
+    cards empty below their paragraphs passed. A box that holds text is drawn
+    to the depth its contents reach, plus the padding it keeps above them, and
+    its bottom edge where it is drawn.
     """
-    texts, shapes, ink = [], [], []
-    for node in slide.get("nodes", []):
-        frame = node.get("frame") or {}
-        if not frame:
-            continue
-        role = str(node.get("role") or "")
-        kind = node.get("type")
-        if role in SCENE_SKIP_ROLES:
-            continue
-        box = (float(frame.get("x") or 0), float(frame.get("y") or 0),
-               float(frame.get("width") or 0), float(frame.get("height") or 0))
-        if kind == "text":
-            if word_count(source_text(node)):
-                texts.append(_text_box(node))
-        elif kind in SCENE_SHAPE_TYPES and not SCENE_MARK_ROLE.match(role):
-            shapes.append(box)
-        else:
-            ink.append(box)
+    tokens = slide.get("tokens") or {}
+    canvas = _color(tokens.get("color.canvas")) or "#FFFFFF"
+    nodes = [n for n in slide.get("nodes", []) if n.get("frame")]
+    # A surface drawn over the whole canvas is the page's background, as the
+    # render's commonest grey would say.
+    for node in nodes:
+        frame = node["frame"]
+        if (node.get("type") in SCENE_SHAPE_TYPES and float(frame.get("width") or 0) >= CANVAS_W
+                and float(frame.get("height") or 0) >= CANVAS_H and _color((node.get("style") or {}).get("fill"))):
+            canvas = _color(node["style"]["fill"])
+    background = _grey(canvas)
+    margin = 255 - SURFACE_LUMINANCE
+    rows = [bytearray(CANVAS_W) for _ in range(FOOTER_TOP)]
 
-    def inside(box, x, y, w, h):
+    def shows(value, opacity=1.0):
+        color = _color(value)
+        if color is None:
+            return False
+        opacity = opacity if isinstance(opacity, (int, float)) else 1.0
+        grey = background + (_grey(color) - background) * opacity
+        # Darker than the page by the render's margin; on a dark page, where
+        # the render's darker-than test sees nothing, lighter.
+        return grey < background - margin if background >= 128 else grey > background + margin
+
+    def paint(x, y, w, h):
+        x0, x1 = max(0, int(math.floor(x))), min(CANVAS_W, int(math.ceil(x + w)))
+        y0, y1 = max(0, int(math.floor(y))), min(FOOTER_TOP, int(math.ceil(y + h)))
+        if x0 >= x1 or y0 >= y1:
+            return
+        span = b"\x01" * (x1 - x0)
+        for row in rows[y0:y1]:
+            row[x0:x1] = span
+
+    def number(value, default=0.0):
+        if isinstance(value, dict):
+            value = value.get("value")
+        return float(value) if isinstance(value, (int, float)) else default
+
+    def inside(box, outer):
         bx, by, bw, bh = box
+        x, y, w, h = outer
         return x - 1 <= bx + bw / 2 <= x + w + 1 and y - 1 <= by + bh / 2 <= y + h + 1 and w * h > bw * bh
 
-    # A chart whose marks the scene does not carry - a sketched scene, a
-    # fixture - is read by its frame: the render will draw it there, and a
-    # page cannot be called empty for lacking marks it was never given. A
-    # chart that carries its marks is read by them.
-    drawn = [box for box in shapes + ink]
+    # What each node draws, and where: (node, box, kind) with text by its ink box.
+    drawn = []
+    for node in nodes:
+        kind, style, frame = node.get("type"), node.get("style") or {}, node["frame"]
+        box = (float(frame.get("x") or 0), float(frame.get("y") or 0),
+               float(frame.get("width") or 0), float(frame.get("height") or 0))
+        opacity = style.get("opacity", 1.0)
+        if kind == "text":
+            if word_count(source_text(node)) and shows(style.get("color") or "#000000", opacity):
+                drawn.append((node, _text_box(node), "text"))
+        elif kind == "image":
+            drawn.append((node, box, "image"))
+        elif kind == "line":
+            if shows(style.get("stroke"), opacity):
+                drawn.append((node, box, "line"))
+        elif kind in SCENE_SHAPE_TYPES:
+            if shows(style.get("fill"), opacity):
+                drawn.append((node, box, "fill"))
+            elif style.get("stroke") != "none" and shows(style.get("stroke"), opacity):
+                drawn.append((node, box, "outline"))
+
+    texts = [box for _, box, kind in drawn if kind == "text"]
+    for node, (x, y, w, h), kind in drawn:
+        style = node.get("style") or {}
+        stroke = max(1.0, number(style.get("lineWidth"), 1.0))
+        if kind == "text":
+            layout = layout_of(node)
+            if not isinstance(layout.get("lines"), list):
+                paint(x, y, w, h)  # unmeasured: the frame is all there is to go on
+                continue
+            lines = max(1, len(layout["lines"]))
+            pitch = number(layout.get("lineHeight"), number(style.get("lineHeight"), h / lines))
+            face = min(pitch, (font_size(node) or 12) * 4 / 3)
+            for index in range(lines):
+                top = y + index * pitch + (pitch - face) / 2
+                if top >= y + h:
+                    break
+                paint(x, top + face * GLYPH_BAND[0], w, face * (GLYPH_BAND[1] - GLYPH_BAND[0]))
+        elif kind == "image":
+            paint(x, y, w, h)
+        elif kind == "line":
+            # Row by row a slanted rule crosses width/height pixels plus its
+            # stroke whichever way it leans, so its box is walked a row at a time.
+            if h < 1 or w < 1:
+                paint(x - (stroke / 2 if w < 1 else 0), y - (stroke / 2 if h < 1 else 0), max(w, stroke), max(h, stroke))
+            else:
+                step = w / h
+                for dy in range(int(math.ceil(h))):
+                    paint(x + dy * step, y + dy, step + stroke, 1)
+        else:
+            depth = h
+            # Only a box contains: an arc or a wedge with its labels inside
+            # its bounds (a radial bar's rings) is a mark, drawn whole.
+            if (node.get("type") == "rect" and not SCENE_MARK_ROLE.match(str(node.get("role") or ""))
+                    and any(inside(t, (x, y, w, h)) for t in texts)):
+                held = [b for other, b, _ in drawn if other is not node and inside(b, (x, y, w, h))]
+                top, bottom = min(b[1] for b in held), max(b[1] + b[3] for b in held)
+                depth = min(h, (bottom - y) + max(0.0, top - y))
+            if kind == "fill":
+                paint(x, y, w, depth)
+            else:
+                for edge in ((x, y, w, stroke), (x, y + h - stroke, w, stroke),
+                             (x, y, stroke, depth), (x + w - stroke, y, stroke, depth)):
+                    paint(*edge)
+
+    # A chart whose marks the scene does not carry - labels alone, a sketched
+    # scene - is read by its frame: the render will draw it there.
+    marks = [b for _, b, kind in drawn if kind != "text"]
     for instance in slide.get("componentInstances", []):
         frame = instance.get("frame") or {}
         if not str(instance.get("component") or "").startswith("chart.") or not frame.get("height"):
             continue
         box = (float(frame.get("x") or 0), float(frame.get("y") or 0),
                float(frame.get("width") or 0), float(frame.get("height") or 0))
-        if not any(inside(b, *box) for b in drawn):
-            ink.append(box)
-
-    holders = [box for box in shapes if any(inside(t, *box) for t in texts)]
-    ink = texts + ink + [box for box in shapes if box not in holders]
-    containers = []
-    for x, y, w, h in holders:
-        held = [b for b in ink if inside(b, x, y, w, h)]
-        top = min(b[1] for b in held)
-        bottom = max(b[1] + b[3] for b in held)
-        containers.append((x, y, w, min(h, (bottom - y) + max(0.0, top - y))))
-    return ink, containers
-
-
-def _paint(boxes, fx, fy, fw, fh):
-    """Rows of the content frame, one byte per pixel, set where a box covers."""
-    rows = [bytearray(fw) for _ in range(fh)]
-    for x, y, w, h in boxes:
-        # A rule is drawn a point thick however the scene sizes it.
-        x0, x1 = max(0, int(math.floor(x)) - fx), min(fw, int(math.ceil(x + max(w, 1.0))) - fx)
-        y0, y1 = max(0, int(math.floor(y)) - fy), min(fh, int(math.ceil(y + max(h, 1.0))) - fy)
-        if x0 >= x1 or y0 >= y1:
-            continue
-        span = b"\x01" * (x1 - x0)
-        for row in rows[y0:y1]:
-            row[x0:x1] = span
-    return rows
-
-
-def scene_coverage(slide):
-    """How full the page's body is, before anything is rendered.
-
-    `occupied` is the share of the content frame the union of the ink boxes
-    covers. `largestEmptyBand` is the tallest horizontal band across the whole
-    frame that nothing crosses (containers counted to their used depth), as a
-    share of the frame's height, wherever it falls; `internalBand` is the
-    tallest one with content above and below it, and `edgeBand` the tallest
-    one above the first block or below the last. The two are told apart
-    because they are different defects: a band inside the page is a hole - a
-    roadmap's phases over nothing, cards empty below their paragraph, a
-    takeaway pinned to the foot of the frame with air above it - while a band
-    under the last block is a complete group that ends early, which the render
-    reads as DEAD_BAND and may be right.
-    """
-    frame = content_frame(slide)
-    fx, fy = int(round(float(frame.get("x") or 0))), int(round(float(frame.get("y") or 0)))
-    fw, fh = int(round(float(frame.get("width") or 0))), int(round(float(frame.get("height") or 0)))
-    out = {"occupied": 0.0, "largestEmptyBand": 0.0, "internalBand": 0.0, "edgeBand": 0.0,
-           "bandTop": None, "bandBottom": None, "internalTop": None, "internalBottom": None}
-    if fw <= 0 or fh <= 0:
-        return out
-    ink, containers = scene_boxes(slide)
-    ink_rows = _paint(ink, fx, fy, fw, fh)
-    out["occupied"] = round(sum(row.count(1) for row in ink_rows) / float(fw * fh), 3)
-    used = _paint(containers, fx, fy, fw, fh)
-    counts = [max(a.count(1), b.count(1)) for a, b in zip(ink_rows, used)]
-    filled = [y for y, covered in enumerate(counts) if covered > SCENE_ROW_MIN]
-    # (height, top, bottom) of every empty run of rows.
-    runs, start = [], None
-    for y in range(fh + 1):
-        empty = y < fh and counts[y] <= SCENE_ROW_MIN
-        if empty and start is None:
-            start = y
-        elif not empty and start is not None:
-            runs.append((y - start, start, y))
-            start = None
-    inner = [r for r in runs if filled and filled[0] < r[1] and r[2] <= filled[-1]]
-    edge = [r for r in runs if r not in inner]
-    if runs:
-        widest = max(runs)
-        out.update(largestEmptyBand=round(widest[0] / float(fh), 3), bandTop=fy + widest[1], bandBottom=fy + widest[2])
-    if inner:
-        hole = max(inner)
-        out.update(internalBand=round(hole[0] / float(fh), 3), internalTop=fy + hole[1], internalBottom=fy + hole[2])
-    if edge:
-        out["edgeBand"] = round(max(edge)[0] / float(fh), 3)
-    return out
+        if not any(inside(b, box) for b in marks):
+            paint(*box)
+    return [row.count(1) for row in rows]
 
 
 def gate_scene_void(slide_no, slide, findings):
-    """SCENE_VOID. Advisory. A band of the page's body that nothing crosses,
-    measured on the composed scene so the author hears it before the build.
+    """SCENE_VOID. Advisory. The render's INTERNAL_VOID and DEAD_BAND, read off
+    the composed scene so the author hears them before the build.
 
-    It reads what the render's INTERNAL_VOID and DEAD_BAND read, and one thing
-    they cannot: the inside of a card or a panel, which the render counts as
-    occupied because the surface is drawn. A hole between two blocks is held
-    to a seventh of the body; a band above the first block or under the last
-    to a third, because a complete group that ends early is often right and a
-    group with a hole in it rarely is. Like the render's gates it is a question
-    - a chart that wants air, a sparse group centred on purpose - and across
-    the deck the habit blocks at DECK_SCENE_VOID.
+    One definition (void_bands) and one set of thresholds (THRESHOLDS
+    `internal_void_max`, `dead_band_max`) serve both: the pixel gates count the
+    PNG's rows, this counts the rows the scene will draw (scene_rows). It used
+    to measure node boxes against its own looser bars - a seventh of the body
+    inside, a third of the frame at the edges - and on the Emirates deck it
+    named at most one of the seven pages the build then flagged; drawn as the
+    render draws, it names the same seven, and on four more decks the same
+    pages give or take one each way (a dead band a pixel under the bar; the
+    inside of a card, which the render cannot see). Like the render's gates it is a question - a chart that
+    wants air, a sparse group centred on purpose - and across the deck the
+    habit blocks at DECK_SCENE_VOID.
     """
-    coverage = scene_coverage(slide)
-    hole, edge = coverage["internalBand"], coverage["edgeBand"]
-    if hole > SCENE_THRESHOLDS["internal_band_max"]:
-        where, measured, threshold = (coverage["internalTop"], coverage["internalBottom"]), hole, SCENE_THRESHOLDS["internal_band_max"]
-    elif edge > SCENE_THRESHOLDS["edge_band_max"]:
-        where, measured, threshold = (coverage["bandTop"], coverage["bandBottom"]), edge, SCENE_THRESHOLDS["edge_band_max"]
+    bands = void_bands(scene_rows(slide))
+    hole, dead = bands["internalVoid"], bands["deadBand"]
+    if hole > THRESHOLDS["internal_void_max"]:
+        where, measured, threshold = (bands["voidTop"], bands["voidBottom"]), hole, THRESHOLDS["internal_void_max"]
+    elif dead > THRESHOLDS["dead_band_max"]:
+        top = bands["lastInk"] + 1 if bands["lastInk"] is not None else VOID_TOP
+        where, measured, threshold = (top, FOOTER_TOP), dead, THRESHOLDS["dead_band_max"]
     else:
         return
     findings.append(finding(
         slide_no, "SCENE_VOID",
-        {"band": measured, "from": where[0], "to": where[1], "internalBand": hole, "edgeBand": edge,
-         "occupied": coverage["occupied"]},
+        {"band": round(measured, 4), "from": where[0], "to": where[1],
+         "internalVoid": round(hole, 4), "deadBand": round(dead, 4)},
         threshold,
-        "A band of the body (y {}-{}) carries nothing. Give the exhibit the height - the phases or rows "
-        "with their detail, the chart at the frame's size - size cards to what they hold, set the "
-        "commentary beside the exhibit rather than under a strip of air, or merge the page with a "
-        "neighbour. Do not stretch rows or pad text to cover the band.".format(*where),
+        "A band of the page (y {}-{}) carries nothing. Give the exhibit the height - the phases or rows "
+        "with their detail, the chart at the frame's size - size tiles and cards to what they hold, start "
+        "the body under the title rather than centring it in air, set the commentary beside the exhibit "
+        "rather than under a strip of air, or merge the page with a neighbour. Do not stretch rows or pad "
+        "text to cover the band.".format(*where),
     ))
 
 
@@ -3166,7 +3232,7 @@ def page_budget(scene, profile=None):
     the floor its reading task sets and the ceiling WORDS holds it to, the
     footer's share of its text, and how much of its body the composed scene
     fills. Every number is the one the gates read - the unified body count,
-    `body_floor`, `words_limit`, `footer_share`, `scene_coverage` - so the
+    `body_floor`, `words_limit`, `footer_share`, `void_bands` - so the
     budget and the findings cannot disagree. Covers, structural and generated
     pages carry no budget and are left out; `slide` is the page's position in
     the deck.
@@ -3182,7 +3248,7 @@ def page_budget(scene, profile=None):
         if slide_profile not in PROFILES:
             raise ValueError(f"Unknown density profile: {slide_profile}")
         _band_body, footer, ratio = footer_share(slide)
-        coverage = scene_coverage(slide)
+        bands = void_bands(scene_rows(slide))
         out.append({
             "slide": index + 1,
             "id": slide.get("id"),
@@ -3192,8 +3258,11 @@ def page_budget(scene, profile=None):
             "ceiling": words_limit(slide, slide_profile),
             "footer": footer,
             "footerRatio": round(ratio, 3) if ratio is not None else 0.0,
-            "occupied": coverage["occupied"],
-            "largestEmptyBand": coverage["largestEmptyBand"],
+            # SCENE_VOID's own measure and bars, so a "!" on the budget line
+            # and the advisory are the same finding.
+            "internalVoid": round(bands["internalVoid"], 3),
+            "deadBand": round(bands["deadBand"], 3),
+            "void": bands["internalVoid"] > THRESHOLDS["internal_void_max"] or bands["deadBand"] > THRESHOLDS["dead_band_max"],
         })
     return out
 
@@ -3207,8 +3276,8 @@ def main(argv=None):
     parser.add_argument("--profile", default=None, choices=sorted(PROFILES))
     parser.add_argument("--only", default=None, help="Comma-separated gate codes to run")
     parser.add_argument("--budget", action="store_true",
-                        help="Write each content page's budget (body, floor, ceiling, footer, occupied, "
-                             "largestEmptyBand) instead of the gate report")
+                        help="Write each content page's budget (body, floor, ceiling, footer, internalVoid, "
+                             "deadBand, void) instead of the gate report")
     args = parser.parse_args(argv)
 
     scene = load_scene(args.scene)

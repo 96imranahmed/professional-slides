@@ -16,7 +16,8 @@
 // reading task comes from the page type's exhibit family and whether the
 // composed page has a commentary column - the same test the composition audit
 // applies, so the two cannot disagree.
-import { GENERATED_ROLES, textWords } from "./text-contract.mjs";
+import { GENERATED_ROLES, READING_TASK_BANK, textWords } from "./text-contract.mjs";
+import { PICTURE_SHARE_MAX } from "./weight.mjs";
 
 // Lines the reading-task bank drops from body counts (text-contract NOTE_LINE).
 const NOTE_LINE = /^\s*(source|sources|note|notes|footnote)\b[:\s]/i;
@@ -52,6 +53,35 @@ export function planRole(role) {
   return "exhibit";
 }
 
+// A photograph smaller than this is an icon or a thumbnail, not the page's subject.
+const PHOTO_MIN_AREA = 0.03 * 1280 * 720;
+
+/** How much of the page's body a photograph holds, capped so a larger photo cannot buy a page out of its argument. */
+export function pictureShareOf(slide) {
+  const frame = slide.contentFrame ?? { width: 1160, height: 506 };
+  const area = (frame.width || 0) * (frame.height || 0);
+  if (area <= 0) return 0;
+  const covered = (slide.nodes || []).filter((n) => n.type === "image" || n.role === "image-frame")
+    .map((n) => (n.frame?.width || 0) * (n.frame?.height || 0)).filter((a) => a >= PHOTO_MIN_AREA).reduce((a, b) => a + b, 0);
+  return Math.min(covered / area, PICTURE_SHARE_MAX);
+}
+
+/**
+ * The page's word budget, set once and read by every check: the floor is the
+ * lower quartile of pages doing its reading task, less the share of the body a
+ * photograph holds; the ceiling is the task's outlier fence (the upper
+ * quartile plus one and a half times the spread), counted on the same words.
+ * The author's budget line, the page gates and the text contract used to
+ * derive these three ways - a photo page's floor was 71 in one and 112 in
+ * another, and a table page's floor sat above the one flat ceiling of 148.
+ */
+export function wordBudgetOf(task, slide) {
+  const bank = READING_TASK_BANK[task]?.bodyWords;
+  if (!bank) return null;
+  const share = slide ? pictureShareOf(slide) : 0;
+  return { floor: Math.round(bank.q1 * (1 - share)), ceiling: Math.round(bank.q3 + 1.5 * (bank.q3 - bank.q1)) };
+}
+
 /** The reading task a composed page performs: its exhibit family, and whether it has a commentary column. */
 export function readingTaskOf(family, sceneSlides) {
   if (family === "text") return "text-page";
@@ -84,7 +114,9 @@ export function deriveContent(spec, deck) {
       adds: content.adds ?? null,
       highlight: page.highlight ?? null,
       ...(content.evidence ? { evidence: content.evidence } : {}),
-      ...(t ? { textReference: { task: readingTaskOf(t.family, scene) } } : {}),
+      ...(t ? { textReference: (() => { const task = readingTaskOf(t.family, scene);
+        const budget = scene[0]?.wordFloor !== undefined ? { floor: scene[0].wordFloor, ceiling: scene[0].wordCeiling } : wordBudgetOf(task, scene[0]);
+        return { task, ...(budget ?? {}) }; })() } : {}),
       textPlan: blocks,
     });
   });

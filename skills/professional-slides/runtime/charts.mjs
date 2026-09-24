@@ -728,6 +728,44 @@ function normalizeDeltas(props, categories) {
   return map;
 }
 
+// Words that place a series in time without a date: the early ones name the
+// reference a change is measured from, the late ones the state the page is
+// about. "Actual" sits late because it is read against a plan or a budget.
+const PERIOD_EARLY = /\b(?:before|pre|prior|previous|baseline|base year|historic(?:al)?|old|original|plan|budget|last year)\b/i;
+const PERIOD_LATE = /\b(?:after|post|current|today|now|latest|forecast|projected|projection|outlook|estimate|future|target|new|next|actual|this year|pro forma)\b/i;
+
+/** Where a name sits in time, or null when it does not read as a period. */
+function periodKey(name) {
+  const text = String(name ?? "");
+  const full = text.match(/(?<!\d)((?:19|20)\d{2})(?!\d)/)?.[1], short = text.match(/\b(?:FY|CY)\s*'?(\d{2})(?!\d)/i)?.[1];
+  const year = full ? Number(full) : short ? 2000 + Number(short) : 0;
+  const sub = Number(text.match(/\bQ([1-4])\b/i)?.[1] ?? 0) || Number(text.match(/\bH([12])\b/i)?.[1] ?? 0) * 2;
+  if (year) return year * 10 + sub;
+  if (sub) return sub;
+  if (PERIOD_LATE.test(text)) return 1e6;
+  if (PERIOD_EARLY.test(text)) return -1e6;
+  return null;
+}
+
+/**
+ * The peer a two-mark contrast paints in the primary when the author named
+ * none. It used to be the first, and a comparison written in time order
+ * ("2019", "2024"; "FY2024-25", "FY2025-26"; "Pre-COVID", "Current") painted
+ * the old year red and the year the title is about grey - three pages of an
+ * Emirates deck read backwards. When every name reads as a period, the latest
+ * is the point (the last on a tie); otherwise the first stays the subject, as
+ * peers are written subject first ("Emirates", "Qatar"). An explicit
+ * `focusSeries` always wins. The change bracket reads focus minus the other,
+ * so it follows the same choice (compose.mjs).
+ */
+export function defaultFocusIndex(names, focus) {
+  if (focus !== undefined) return names.indexOf(focus);
+  const keys = names.map(periodKey);
+  if (keys.length < 2 || keys.some((key) => key === null)) return 0;
+  const latest = Math.max(...keys);
+  return keys.filter((key) => key === latest).length === 1 ? keys.indexOf(latest) : names.length - 1;
+}
+
 /**
  * A reference label that finds no free corner inside the plot moves outside.
  *
@@ -921,6 +959,8 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   };
   const forecastIndex = props.forecastFrom !== undefined ? categories.indexOf(props.forecastFrom) : -1;
   if (props.forecastFrom !== undefined && forecastIndex < 0) throw new Error("forecastFrom must name a chart category");
+  const focusSeriesIndex = twoSeriesContrast ? defaultFocusIndex(series.map((item) => item.name), props.focusSeries) : -1;
+  const focusCategoryIndex = twoMarkContrast ? defaultFocusIndex(categories) : -1;
   const colorFor = (seriesIndex, categoryIndex) => {
     const accent = token("color.accent"), primary = token("color.componentPrimary"), comparator = token("color.chartComparator");
     // Highlight the answer: the bar the title is about takes the accent; the
@@ -929,8 +969,8 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     if (forecastIndex >= 0 && categoryIndex >= forecastIndex && !stacked && series.length === 1) return token("color.chartSeries6");
     if (barHighlight) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
     if (props.colorIndices !== undefined || stacked) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
-    if (twoSeriesContrast) return series[seriesIndex].name === (props.focusSeries ?? series[0].name) ? primary : comparator;
-    if (twoMarkContrast) return categoryIndex === 0 ? primary : comparator;
+    if (twoSeriesContrast) return seriesIndex === focusSeriesIndex ? primary : comparator;
+    if (twoMarkContrast) return categoryIndex === focusCategoryIndex ? primary : comparator;
     return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
   };
   const legendItems = forecastKeyed

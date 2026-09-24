@@ -481,7 +481,7 @@ import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
 const frame={x:60,y:160,width:760,height:420};
 const slide=props=>({id:'chart',composition:component({id:'chart',component:'chart.column',frame,props})});
 for(const palette of ['midnight','evergreen','crimson']) {
-  const deck=compileDeck({palette,slides:[slide({categories:['Current','Future'],series:[{name:'Measure',values:[80,150]}]})]},REGISTRY);
+  const deck=compileDeck({palette,slides:[slide({categories:['Dubai','Doha'],series:[{name:'Measure',values:[80,150]}]})]},REGISTRY);
   const marks=deck.slides[0].nodes.filter(n=>n.role==='chart-mark');
   assert.equal(marks.length,2);
   assert.equal(marks[0].style.fill.tokenId,'color.componentPrimary');
@@ -528,6 +528,50 @@ assert.throws(()=>render('chart.stacked-column',base),/two unstacked series/);
 assert.throws(()=>render('chart.column',{...base,series:[...base.series,{name:'Third',values:[20,30]}]}),/two unstacked series/);
 const explicit=render('chart.column',{...base,focusSeries:undefined,colorIndices:[2,4]}).filter(n=>n.role==='chart-mark');
 assert.deepEqual([...new Set(explicit.map(n=>n.style.fill.tokenId))],['color.chartSeries3','color.chartSeries5']);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_two_mark_contrast_defaults_to_the_latest_period(self):
+        # A comparison written in time order used to paint the old year in the
+        # primary and the year the title is about grey. With no focusSeries the
+        # latest period is the point; peers keep the first; a named focus wins;
+        # the native chart and the change bracket follow the scene.
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {defaultFocusIndex} from './skills/professional-slides/runtime/charts.mjs';
+import {changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
+const frame={x:60,y:160,width:900,height:460};
+const compiled=(kind,props)=>compileDeck({palette:'crimson',slides:[{id:'f',composition:component({id:'f',component:kind,frame,props})}]},REGISTRY).slides[0];
+const primary=(kind,props,key='series')=>[...new Set(compiled(kind,props).nodes.filter(n=>n.role==='chart-mark'&&n.style.fill.tokenId==='color.componentPrimary').map(n=>n.data[key]))];
+const pair=(a,b)=>({categories:['Revenue','Profit'],series:[{name:a,values:[40,50]},{name:b,values:[55,70]}]});
+for(const kind of ['chart.column','chart.bar']) {
+  for(const [a,b,latest] of [['2019','2024','2024'],['2024','2019','2024'],['FY23','FY24','FY24'],['FY2024-25','FY2025-26','FY2025-26'],
+    ['Before','After','After'],['After','Before','After'],['Pre-COVID','Current','Current'],['2025 estimate','2026 forecast','2026 forecast'],['Q4 2024','Q1 2025','Q1 2025']])
+    assert.deepEqual(primary(kind,pair(a,b)),[latest],`${kind} ${a}|${b}`);
+  assert.deepEqual(primary(kind,pair('Emirates','Qatar')),['Emirates'],'peers keep the first as the subject');
+  assert.deepEqual(primary(kind,{...pair('2019','2024'),focusSeries:'2019'}),['2019'],'a named focus wins');
+  assert.deepEqual(primary(kind,{categories:['FY24','FY25'],series:[{name:'Revenue',values:[80,95]}]},'category'),['FY25']);
+  assert.deepEqual(primary(kind,{categories:['Dubai','Doha'],series:[{name:'Revenue',values:[80,95]}]},'category'),['Dubai']);
+}
+// The comparator stays the grey, and the legend keys the same fills.
+const nodes=compiled('chart.column',pair('2019','2024')).nodes;
+for(const mark of nodes.filter(n=>n.role==='chart-mark')) {
+  assert.equal(mark.style.fill.tokenId,mark.data.series==='2024'?'color.componentPrimary':'color.chartComparator');
+  assert.equal(nodes.find(n=>n.role==='legend-swatch'&&n.data.categoryKey===mark.data.series).style.fill.value,mark.style.fill.value);
+}
+// The native chart paints the peer the scene painted.
+const native=s=>s.componentInstances.find(c=>c.nativeChart)?.nativeChart;
+assert.equal(native(compiled('chart.column',pair('2019','2024'))).focusIndex,1);
+assert.equal(native(compiled('chart.column',pair('Emirates','Qatar'))).focusIndex,0);
+assert.equal(native(compiled('chart.column',{categories:['FY24','FY25'],series:[{name:'Revenue',values:[80,95]}]})).focusIndex,1);
+// The change bracket reads the focus minus the other: latest minus earliest.
+const bracket=changeFromContent({type:'chart.column',change:true,...pair('2019','2024')},'Revenue grew').changeAnnotations[0];
+assert.equal(bracket.end.series,'2024'); assert.equal(bracket.start.series,'2019'); assert.equal(bracket.text,'+15');
+assert.equal(defaultFocusIndex(['Plan','Actual']),1);
+assert.equal(defaultFocusIndex(['Retail','2024']),0,'a name that is not a period keeps the first');
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])

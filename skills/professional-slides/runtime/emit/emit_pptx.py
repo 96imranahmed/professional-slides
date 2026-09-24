@@ -635,8 +635,14 @@ class Emitter:
         for i, ser in enumerate(plot.series):
             ci = idx[i] if idx and i < len(idx) else i
             color = self.series_colors[ci % len(self.series_colors)] if self.series_colors else None
-            if len(spec["series"]) == 2 and i == 1 and not idx and not is_range and kind not in ("line", "area"):
-                color = self.colors.get("color.chartComparator", color)
+            if len(spec["series"]) == 2 and not idx and not is_range and kind not in ("line", "area"):
+                # The scene decides which peer is the point (focusIndex, from
+                # its painted marks); without one the second is the grey.
+                focus = spec.get("focusIndex")
+                if focus is not None and i == focus:
+                    color = self.colors.get("color.componentPrimary", color)
+                elif i == (1 if focus is None else 1 - focus):
+                    color = self.colors.get("color.chartComparator", color)
             if is_range and i == 0:
                 # invisible base: the bar floats from low to high
                 ser.format.fill.background(); ser.format.line.fill.background()
@@ -711,7 +717,7 @@ class Emitter:
                         elif kind in ("column", "bar") and forecast_index is not None and forecast_index >= 0 and j >= forecast_index and forecast:
                             point_color = forecast
                         elif two_mark_contrast:
-                            point_color = self.colors.get("color.componentPrimary" if j == 0 else "color.chartComparator", color)
+                            point_color = self.colors.get("color.componentPrimary" if j == spec.get("focusIndex", 0) else "color.chartComparator", color)
                         if point_color:
                             pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(point_color)
                 if kind == "line" and spec.get("endLabels"):

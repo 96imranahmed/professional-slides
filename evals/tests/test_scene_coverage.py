@@ -6,9 +6,10 @@ page's body is before anything is rendered.
   plan. THIN_PAGE and the density report read that number when it is there,
   so authoring and the build cannot disagree about whether a page is thin;
   scenes without it keep the band count.
-* SCENE_VOID. A band of the body that nothing crosses, measured on node
-  frames: a roadmap with its lower half blank, cards empty below their
-  paragraph. The render's band gates only run at the build; this runs at
+* SCENE_VOID. The render's INTERNAL_VOID and DEAD_BAND - one definition, one
+  pair of thresholds - read off the rows the scene will draw: text by its
+  glyph lines, a fill where it shows against the canvas, and a card by what it
+  holds. The render's band gates only run at the build; this runs at
   authoring. DECK_SCENE_VOID blocks the habit, in the shape of
   DECK_THIN_PAGES.
 * `--budget`. Each content page's body, floor, ceiling, footer and fill, for
@@ -32,7 +33,11 @@ import page_gates  # noqa: E402
 
 FRAME = {"x": 72, "y": 162, "width": 1136, "height": 506}
 BUDGET_KEYS = {"slide", "id", "readingTask", "body", "floor", "ceiling", "footer",
-               "footerRatio", "occupied", "largestEmptyBand"}
+               "footerRatio", "internalVoid", "deadBand", "void"}
+
+
+def bands(slide):
+    return page_gates.void_bands(page_gates.scene_rows(slide))
 
 
 def text(role, y, height, words=12, x=72, width=1136, lines=None):
@@ -126,35 +131,31 @@ class UnifiedCounterTests(unittest.TestCase):
 
 class SceneVoidTests(unittest.TestCase):
     def test_a_full_page_has_no_band(self):
-        coverage = page_gates.scene_coverage(full_page())
-        self.assertLess(coverage["largestEmptyBand"], 0.05)
-        self.assertGreater(coverage["occupied"], 0.5)
+        self.assertLess(bands(full_page())["internalVoid"], 0.05)
         found = []
         page_gates.gate_scene_void(1, full_page(), found)
         self.assertEqual(found, [])
 
     def test_a_half_empty_page_is_flagged_with_its_band(self):
-        coverage = page_gates.scene_coverage(half_empty_page())
         # Text ends at 380 (nine lines from 200), commentary starts at 608.
-        self.assertEqual((coverage["internalTop"], coverage["internalBottom"]), (380, 608))
-        self.assertAlmostEqual(coverage["internalBand"], 228 / 506, places=2)
-        self.assertEqual(coverage["largestEmptyBand"], coverage["internalBand"])
         found = []
         page_gates.gate_scene_void(1, half_empty_page(), found)
         self.assertEqual([f["code"] for f in found], ["SCENE_VOID"])
-        self.assertEqual((found[0]["measured"]["from"], found[0]["measured"]["to"]), (380, 608))
-        self.assertIn("380-608", found[0]["repair"])
+        # The gate reads glyphs, not line boxes: the band runs from the ninth
+        # line's ink to the commentary's, a few pixels inside the frames.
+        top, bottom = found[0]["measured"]["from"], found[0]["measured"]["to"]
+        self.assertTrue(372 <= top <= 380 and 608 <= bottom <= 616, (top, bottom))
+        self.assertEqual(found[0]["threshold"], page_gates.THRESHOLDS["internal_void_max"])
+        self.assertIn(f"{top}-{bottom}", found[0]["repair"])
 
     def test_text_is_measured_by_its_lines_not_its_frame(self):
         # A frame sized for the body holding two lines of text is two lines of ink.
         page = content_page("p", [text("paragraph", 162, 506, lines=2)])
-        self.assertAlmostEqual(page_gates.scene_coverage(page)["edgeBand"], (506 - 40) / 506, places=2)
+        self.assertGreater(bands(page)["deadBand"], 0.5)
 
     def test_a_card_is_read_by_what_it_holds(self):
         # The render counts a card surface as occupied; the scene reads its
         # interior, and three cards empty below their paragraph are a hole.
-        coverage = page_gates.scene_coverage(empty_cards_page())
-        self.assertGreater(coverage["largestEmptyBand"], 0.5)
         found = []
         page_gates.gate_scene_void(1, empty_cards_page(), found)
         self.assertEqual([f["code"] for f in found], ["SCENE_VOID"])
@@ -162,16 +163,20 @@ class SceneVoidTests(unittest.TestCase):
     def test_a_panel_hugging_its_text_is_full(self):
         page = content_page("p", [rect("insight-surface", 162, 506)]
                             + [text("paragraph", y, 40, lines=2) for y in range(178, 640, 46)])
-        self.assertLess(page_gates.scene_coverage(page)["largestEmptyBand"], 0.05)
+        self.assertLess(bands(page)["internalVoid"], page_gates.THRESHOLDS["internal_void_max"])
 
-    def test_a_short_trailing_band_is_not_a_hole(self):
-        # A complete group that ends a quarter of the body early reads as
-        # finished; the same band between two blocks does not.
-        trailing = content_page("t", [text("paragraph", 162, 380, lines=19)])
-        found = []
-        page_gates.gate_scene_void(1, trailing, found)
-        self.assertEqual(found, [])
-        self.assertGreater(page_gates.scene_coverage(trailing)["edgeBand"], page_gates.SCENE_THRESHOLDS["internal_band_max"])
+    def test_a_trailing_band_is_read_as_the_render_reads_it(self):
+        # The render's DEAD_BAND bar, not a looser one of the scene's own: a
+        # group that stops a line or two short of the footer passes, one that
+        # leaves a quarter of the body under it is the band the build reports.
+        for lines, flagged in ((23, False), (19, True)):
+            trailing = content_page("t", [text("paragraph", 162, 20 * lines, lines=lines)])
+            found = []
+            page_gates.gate_scene_void(1, trailing, found)
+            self.assertEqual(bool(found), flagged, lines)
+            if flagged:
+                self.assertEqual(found[0]["threshold"], page_gates.THRESHOLDS["dead_band_max"])
+                self.assertEqual(found[0]["measured"]["to"], page_gates.FOOTER_TOP)
 
     def test_a_chart_the_scene_does_not_draw_is_read_by_its_frame(self):
         # A sketched chart (no marks in the scene) cannot be called empty; a
@@ -179,14 +184,15 @@ class SceneVoidTests(unittest.TestCase):
         page = content_page("p", [text("paragraph", 162, 40, lines=2), text("paragraph", 628, 40, lines=2)])
         page["componentInstances"].append({"id": "p-1", "component": "chart.column",
                                            "frame": {"x": 72, "y": 210, "width": 700, "height": 410}})
-        self.assertLess(page_gates.scene_coverage(page)["internalBand"], 0.05)
-        page["nodes"].append({"type": "rect", "role": "chart-mark", "frame": {"x": 100, "y": 580, "width": 40, "height": 40}})
-        self.assertGreater(page_gates.scene_coverage(page)["internalBand"], 0.5)
+        self.assertLess(bands(page)["internalVoid"], 0.05)
+        page["nodes"].append({"type": "rect", "role": "chart-mark", "frame": {"x": 100, "y": 580, "width": 40, "height": 40},
+                              "style": {"fill": {"value": "#333333"}}})
+        self.assertGreater(bands(page)["internalVoid"], 0.45)
 
     def test_furniture_is_not_the_body(self):
         # A footer line under an empty body does not close the band.
         page = content_page("p", [text("paragraph", 162, 60, lines=3), text("source-text", 660, 12)])
-        self.assertGreater(page_gates.scene_coverage(page)["edgeBand"], 0.8)
+        self.assertGreater(bands(page)["deadBand"], 0.5)
 
     def test_scene_void_runs_without_renders_and_skips_structural_pages(self):
         scene = {"slides": [cover(), half_empty_page("a"),
@@ -198,6 +204,139 @@ class SceneVoidTests(unittest.TestCase):
         self.assertEqual([f["slide"] for f in voids], [2])
         self.assertEqual(voids[0]["severity"], "advisory")
         self.assertNotIn("DECK_SCENE_VOID", report["countsByCode"])
+
+
+CANVAS = "#FAF7F2"   # a cream page
+TINT = "#F0EBE3"     # a tile on it, darker by more than the render's margin
+
+
+def styled(node, **style):
+    node["style"] = {**node.get("style", {}), **style}
+    return node
+
+
+def cream_page(ident, nodes):
+    page = content_page(ident, nodes)
+    page["nodes"][0] = text("action-title", 58, 80, words=8, lines=2)  # a two-line title, to y 138
+    page["tokens"] = {"color.canvas": {"value": CANVAS}}
+    return page
+
+
+def tiles_page(ident="tiles", top=291):
+    """Emirates p11: four number tiles, each a value and a short label at the top
+    of a tall tinted box, floating mid-page beside three short points."""
+    nodes = []
+    for column in range(4):
+        x = 72 + column * 191
+        nodes.append(styled(rect("fact-tile", top, 259, x=x, width=175), fill={"value": TINT}))
+        nodes.append(text("fact-value", top + 16, 44, x=x + 16, width=143, lines=1))
+        nodes.append(text("fact-label", top + 64, 60, x=x + 16, width=143, lines=3))
+    for index, y in enumerate((249, 369, 509)):
+        nodes.append(text("list-item", y, 80 if index == 1 else 60, x=835, width=373, lines=4 if index == 1 else 3))
+    return cream_page(ident, nodes)
+
+
+class SceneMatchesRenderTests(unittest.TestCase):
+    """SCENE_VOID is the render's INTERNAL_VOID and DEAD_BAND, drawn from the scene."""
+
+    def pixel_codes(self, rows):
+        found = []
+        page_gates.gate_ink_and_dead_band(2, rows, found, rows)
+        return {f["code"] for f in found} & {"INTERNAL_VOID", "DEAD_BAND"}
+
+    def test_one_definition_serves_both(self):
+        # The pixel gates, handed the rows the scene draws, report the band
+        # SCENE_VOID reports, at the same bar.
+        for page in (tiles_page(), full_page(), half_empty_page(), cream_page("c", [text("paragraph", 162, 480, lines=24)])):
+            rows = page_gates.scene_rows(page)
+            bands = page_gates.void_bands(rows)
+            found = []
+            page_gates.gate_scene_void(2, page, found)
+            codes = self.pixel_codes(rows)
+            self.assertEqual(bool(found), bool(codes), page["id"])
+            if found:
+                self.assertAlmostEqual(found[0]["measured"]["internalVoid"], round(bands["internalVoid"], 4))
+                self.assertAlmostEqual(found[0]["measured"]["deadBand"], round(bands["deadBand"], 4))
+
+    def test_void_bands_reads_rows_as_the_render_did(self):
+        rows = [0] * page_gates.FOOTER_TOP
+        for y in list(range(40, 138)) + list(range(260, 580)):
+            rows[y] = 100
+        rows[400] = page_gates.ROW_MIN  # a hairline crossing a band does not fill it
+        bands = page_gates.void_bands(rows)
+        self.assertEqual((bands["voidTop"], bands["voidBottom"]), (page_gates.VOID_TOP, 260))
+        self.assertAlmostEqual(bands["internalVoid"], 120 / page_gates.CANVAS_H)
+        self.assertEqual(bands["lastInk"], 579)
+        self.assertAlmostEqual(bands["deadBand"], 80 / page_gates.CANVAS_H)
+
+    def test_number_tiles_floating_mid_page_are_flagged(self):
+        # The old frame measure passed this page and the build flagged it: the
+        # air under the title is a hole, and so is the band under the points.
+        found = []
+        page_gates.gate_scene_void(2, tiles_page(), found)
+        self.assertEqual([f["code"] for f in found], ["SCENE_VOID"])
+        measured = found[0]["measured"]
+        self.assertEqual(measured["from"], page_gates.VOID_TOP)
+        self.assertGreater(measured["internalVoid"], page_gates.THRESHOLDS["internal_void_max"])
+        self.assertGreater(measured["deadBand"], page_gates.THRESHOLDS["dead_band_max"])
+        # The same tiles started under the title leave no hole there.
+        self.assertLess(page_gates.void_bands(page_gates.scene_rows(tiles_page(top=170)))["internalVoid"],
+                        page_gates.THRESHOLDS["internal_void_max"])
+
+    def test_a_fill_counts_where_it_shows_against_the_canvas(self):
+        # A band drawn in the canvas colour, or in white on a cream page, is
+        # air in the render; a tinted one is surface.
+        def page(fill):
+            band = styled(rect("band", 300, 300), fill={"value": fill})
+            return cream_page("b", [text("paragraph", 162, 60, lines=3), band, text("paragraph", 610, 40, lines=2)])
+        for fill, flagged in ((CANVAS, True), ("#FFFFFF", True), (TINT, False), ("#221E1A", False)):
+            found = []
+            page_gates.gate_scene_void(2, page(fill), found)
+            self.assertEqual(bool(found), flagged, fill)
+        # An outline shows by its edges: three bordered boxes put six pixels
+        # on every row they cross, which fills the row, as in the render.
+        boxes = [styled(rect("frame", 240, 380, x=72 + i * 384, width=368), fill="none",
+                        stroke={"value": "#8A8178"}, lineWidth={"value": 1}) for i in range(3)]
+        rows = page_gates.scene_rows(cream_page("o", [text("paragraph", 162, 40, lines=2)] + boxes))
+        self.assertEqual(rows[400], 6)
+        self.assertEqual(rows[240], 3 * 368)
+
+    def test_a_tinted_card_is_read_by_what_it_holds(self):
+        # The render sees a tinted card as surface to its foot; the scene reads
+        # it to the depth of its paragraph, so three cards empty below their
+        # copy over a pinned takeaway are the hole they look like.
+        nodes = []
+        for column in range(3):
+            x = 72 + column * 384
+            nodes.append(styled(rect("card-surface", 162, 420, x=x, width=368), fill={"value": TINT}))
+            nodes.append(text("card-text", 180, 100, x=x + 16, width=336, lines=5))
+        nodes.append(text("takeaway", 600, 40, lines=2))
+        found = []
+        page_gates.gate_scene_void(2, cream_page("cards", nodes), found)
+        self.assertEqual([f["code"] for f in found], ["SCENE_VOID"])
+        self.assertGreater(found[0]["measured"]["internalVoid"], page_gates.THRESHOLDS["internal_void_max"])
+        # Copy that fills its card fills the rows.
+        nodes = [n for n in nodes if n["role"] != "card-text"]
+        for column in range(3):
+            nodes.append(text("card-text", 180, 400, x=72 + column * 384 + 16, width=336, lines=20))
+        found = []
+        page_gates.gate_scene_void(2, cream_page("cards", nodes), found)
+        self.assertEqual(found, [])
+
+    def test_an_arc_holding_its_labels_is_a_mark(self):
+        # A radial bar's rings carry their labels inside their bounds; only a
+        # box is a container, so the ring is drawn whole.
+        ring = {"type": "shape", "role": "radial-arc", "frame": {"x": 206, "y": 164, "width": 472, "height": 472},
+                "style": {"fill": {"value": "#16814B"}}}
+        page = cream_page("r", [ring, text("radial-label", 172, 16, x=253, width=131, lines=1)])
+        self.assertLess(page_gates.void_bands(page_gates.scene_rows(page))["deadBand"], page_gates.THRESHOLDS["dead_band_max"])
+
+    def test_a_dark_page_reads_light_ink(self):
+        surface = styled(rect("takeaways-surface", 0, 720, x=0, width=1280), fill={"value": "#221E1A"})
+        words = styled(text("takeaways-item", 162, 480, lines=24), color={"value": "#FFFFFF"})
+        rows = page_gates.scene_rows(cream_page("d", [surface, words]))
+        self.assertGreater(rows[290], page_gates.ROW_MIN)
+        self.assertLessEqual(rows[150], page_gates.ROW_MIN, "the surface itself is the page, not ink")
 
 
 class DeckSceneVoidTests(unittest.TestCase):
@@ -249,11 +388,12 @@ class BudgetTests(unittest.TestCase):
         self.assertEqual(first["readingTask"], "table-led")
         self.assertEqual(first["body"], 140)
         self.assertEqual(first["floor"], page_gates.READING_TASK_FLOORS["table-led"])
-        self.assertEqual(first["ceiling"], page_gates.PROFILES["executive"]["words_exhibit"])
+        self.assertEqual(first["ceiling"], page_gates.PROFILES["executive"]["words_exhibit"])  # no wordCeiling on the scene
         # The footer share is NOTE_HEAVY's: the band count, not the plan's.
         self.assertEqual(first["footer"], 10)
         self.assertAlmostEqual(first["footerRatio"], 10 / 40, places=3)
-        self.assertGreater(budget[1]["largestEmptyBand"], page_gates.SCENE_THRESHOLDS["internal_band_max"])
+        self.assertTrue(budget[1]["void"])  # the page SCENE_VOID names
+        self.assertFalse(budget[0]["void"] and budget[0]["internalVoid"] > page_gates.THRESHOLDS["internal_void_max"])
 
     def test_the_cli_writes_the_budget(self):
         with tempfile.TemporaryDirectory() as tmp:

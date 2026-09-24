@@ -70,7 +70,7 @@ const kinds = [
   {{ type: 'panels', form: 'row', commentary: 'captions', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A','B','C','D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Segment ' + i + ' grew fastest where capacity was added first' }})) }},
   {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}]] }} }},
   {{ type: 'mechanism', form: 'flow', commentary: 'below', points: ['a', 'b'], highlight: ['a', 'b'], exhibit: {{ nodes: [{{ id: 'x' }}, {{ id: 'y' }}, {{ id: 'z' }}], edges: [] }} }},
-  {{ type: 'numbers', form: 'hero-number', commentary: 'beside', kpi: {{ value: '5', label: 'x' }}, points: ['a'] }},
+  {{ type: 'numbers', form: 'hero-number', commentary: 'beside', kpi: {{ value: '5', label: 'x' }}, points: ['a'], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1']] }} }},
   {{ type: 'argument', form: 'memo', commentary: 'none', paragraphs: ['Prose.'] }},
 ];
 const chosen = Array.from({{ length: 14 }}, (_, i) => ({{ id: 'c' + i, takeaway: i % 7 === 0 ? 'Close' : false, why: 'Chosen for what this page has to show', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, ...structuredClone(kinds[i % kinds.length]) }}));
@@ -249,6 +249,82 @@ console.log(JSON.stringify({{ six: error(() => pie(['a','b','c','d','e','f'], [1
         self.assertIn('mark the finding in each point', result['one'])
         self.assertIsNone(result['each'])
         self.assertIn('p02', result['answer'])  # names where to say it and the closest title
+
+
+class RerunGapsTests(unittest.TestCase):
+    """What the last authored deck found: each limit it met only by failing."""
+
+    def test_waffle_hero_values_callouts_rail_and_stray_highlights(self):
+        result = run_node(f'''
+import {{ compilePage, describeTypes, railCapacity }} from '{KIT}';
+const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
+const base = {{ takeaway: false, why: 'The page type fits the claim here', settles: {{ kind: 'count', what: 'The route page count' }} }};
+const waffle = (series) => compilePage({{ ...base, id: 'w', type: 'composition', form: 'waffle', commentary: 'beside', title: 'Outstations by region',
+  exhibit: {{ categories: ['Asia', 'Europe', 'Middle East', 'Africa'], series }} }}, 0, {{ draft: true }});
+const facts = (value) => compilePage({{ ...base, id: 'f', type: 'numbers', form: 'fact-grid', commentary: 'none', title: 'Cash',
+  exhibit: {{ items: [value, '32.0bn', '56.2bn'].map((v) => ({{ value: v, label: 'AED' }})) }} }});
+const years = ['2019','2020','2021','2022'];
+const callouts = (n) => compilePage({{ ...base, id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', title: 'Traffic',
+  exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 3, 5] }}], annotations: Array.from({{ length: n }}, (_, i) => ({{ category: years[i], text: 'The network was grounded and traffic fell to a fifth' }})) }} }});
+const rail = (text) => compilePage({{ ...base, id: 'r', type: 'trend', form: 'line', commentary: 'rail', rail: text, title: 'Traffic',
+  exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 3, 5] }}], highlights: [{{ category: '2020' }}] }} }});
+const stray = (draft) => error(() => compilePage({{ ...base, id: 's', type: 'trend', form: 'line', commentary: 'beside', title: 'Traffic',
+  points: ['Traffic fell to a fifth', 'It recovered by 2022'], highlight: ['a fifth', 'never written'],
+  exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 3, 5] }}], highlights: [{{ category: '2020' }}] }} }}, 0, {{ draft }}));
+console.log(JSON.stringify({{
+  waffle: error(() => waffle([{{ name: 'Outstations', values: [7, 4, 2, 1] }}])),
+  waffleTwo: error(() => waffle([{{ name: 'a', values: [7, 4, 2, 1] }}, {{ name: 'b', values: [1, 1, 1, 1] }}])),
+  hero: error(() => compilePage({{ ...base, id: 'h', type: 'numbers', form: 'hero-number', commentary: 'beside', title: 'Target', kpi: {{ value: '2.3x', label: 'target' }}, points: ['a', 'b'] }}, 0, {{ draft: true }})),
+  longValue: error(() => facts('AED54.9 billion')), shortValue: error(() => facts('54.9bn')),
+  threeCallouts: error(() => callouts(3)), fourCallouts: error(() => callouts(4)),
+  longRail: error(() => rail(Array.from({{ length: 80 }}, () => 'word').join(' '))),
+  shortRail: error(() => rail('Traffic fell to a fifth in 2020 and was back by 2022')),
+  strayDraft: stray(true), strayFull: stray(false),
+  capacity: railCapacity(), catalogue: describeTypes(),
+}}));
+''')
+        self.assertIsNone(result['waffle'])  # one series of whole counts: the small-count page the pie refuses
+        self.assertIn('one series', result['waffleTwo'])
+        self.assertIn('1 exhibit', result['hero'])  # named at compile, not a TypeError at composition
+        self.assertIn('10 characters', result['longValue'])
+        self.assertIsNone(result['shortValue'])
+        self.assertIsNone(result['threeCallouts'])
+        self.assertIn('3 callouts at most', result['fourCallouts'])
+        self.assertIn('eight lines', result['longRail'])
+        self.assertIsNone(result['shortRail'])
+        self.assertIn('never written', result['strayDraft'])  # a draft with its points written checks them
+        self.assertIn('never written', result['strayFull'])
+        self.assertGreater(result['capacity'], 20)
+        for published in ('3 callouts', 'rail about', 'values 10 characters'):
+            self.assertIn(published, result['catalogue'])
+
+    def test_one_compile_error_leaves_the_rest_gated_and_budgeted(self):
+        result = run_node(f'''
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import {{ authorDeck }} from '{AUTHOR}';
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
+const S = {{ kind: 'qualitative', what: 'The operator statement of its plan' }};
+const bad = {{ id: 'bad', type: 'trend', form: 'line', commentary: 'none', takeaway: false, why: 'The page type fits the claim here', settles: S, title: 'Two years',
+  exhibit: {{ categories: ['2019', '2020'], series: [{{ name: 'x', values: [1, 2] }}] }} }};
+const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, why: 'A short argument page for the test', settles: S,
+  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'] }};
+const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [bad, memo] }}, {{ baseDir: dir }});
+console.log(JSON.stringify({{ codes: out.findings.map((f) => f.code + ':' + (f.id ?? '')), composed: out.deck.slides.map((s) => s.id),
+  floor: out.deck.slides.find((s) => s.id === 'm')?.wordFloor ?? null, ceiling: out.deck.slides.find((s) => s.id === 'm')?.wordCeiling ?? null }}));
+''')
+        self.assertIn('COMPILE:bad', result['codes'])
+        self.assertIn('m', result['composed'])  # the page that compiled was composed and gated in the same run
+        self.assertEqual(result['floor'], 121)  # text-page q1 (120.5), the one floor every check reads
+        self.assertGreater(result['ceiling'], result['floor'])
+
+    def test_every_budget_ceiling_sits_above_its_floor(self):
+        result = run_node('''
+import { READING_TASK_BANK } from './skills/professional-slides/runtime/text-contract.mjs';
+import { wordBudgetOf } from './skills/professional-slides/runtime/derive-content.mjs';
+console.log(JSON.stringify(Object.fromEntries(Object.keys(READING_TASK_BANK).map((task) => [task, wordBudgetOf(task)]))));
+''')
+        for task, budget in result.items():
+            self.assertGreater(budget['ceiling'], budget['floor'], task)
 
 
 if __name__ == '__main__':

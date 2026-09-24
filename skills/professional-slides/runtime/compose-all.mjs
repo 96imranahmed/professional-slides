@@ -9,7 +9,7 @@
 // same run as one that failed earlier.
 import { toDeckPlan } from "./compose.mjs";
 import { planDeck } from "./planner.mjs";
-import { readingTaskOf, bodyWordsOf } from "./derive-content.mjs";
+import { readingTaskOf, bodyWordsOf, wordBudgetOf } from "./derive-content.mjs";
 
 // Each composed page carries its reading task, so every word check - the
 // author's, the page gates', the text contract's - holds it to one floor: the
@@ -18,7 +18,11 @@ function withReadingTasks(result, spec) {
   const byId = new Map([...(spec.slides || []), ...(spec.appendix || [])].filter((s) => s.id && s.pageType).map((s) => [s.id, s]));
   for (const slide of result.deck.slides) {
     const source = byId.get(slide.sourceSlideId ?? slide.id);
-    if (source) slide.readingTask = readingTaskOf(source.pageType.family, [slide]);
+    if (source) {
+      slide.readingTask = readingTaskOf(source.pageType.family, [slide]);
+      const budget = wordBudgetOf(slide.readingTask, slide);
+      if (budget) { slide.wordFloor = budget.floor; slide.wordCeiling = budget.ceiling; }
+    }
     // One counter: the page gates read this rather than counting again.
     slide.planBodyWords = bodyWordsOf([slide]);
   }

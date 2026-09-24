@@ -29,6 +29,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { measureText, accentRuns } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
+import { defaultFocusIndex } from "./charts.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { measureTable } from "./tables.mjs";
 import { resolveWeight, normalizeWeight } from "./weight.mjs";
@@ -1812,9 +1813,10 @@ export function changeFromContent(ex, title) {
     return text ? { ...out, changeAnnotations: [{ start: from, end: to, style, text }] } : ex;
   }
   if (series.length === 2 && categories.length <= 6 && (ex.change === true || GAP_WORDS.test(String(title || "")))) {
-    // The subject is the focus series when one is named, else the first series;
-    // the bubble reads subject minus comparator.
-    const focus = series.find((sr) => sr.name === ex.focusSeries) || series[0], base = series.find((sr) => sr !== focus);
+    // The subject is the series the chart paints in the primary (the named
+    // focus, else the latest period, else the first); the bubble reads subject
+    // minus comparator, so a "2019 | 2024" pair reads 2024 minus 2019.
+    const focus = series[Math.max(0, defaultFocusIndex(series.map((sr) => sr.name), ex.focusSeries))], base = series.find((sr) => sr !== focus);
     const annotations = categories.map((c, i) => ({ start: { category: c, series: base.name }, end: { category: c, series: focus.name }, style: "bracket", text: percentUnit ? signed(focus.values[i] - base.values[i], " pp") : signed(focus.values[i] - base.values[i]) }));
     return { ...out, changeAnnotations: annotations };
   }
@@ -2382,9 +2384,13 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
   // of the chart; under a full-width table, the width of the page. Hugging its own measure and centring, this sat in the middle of an
   // empty support region related to the table above it by nothing.
   const loneBand = slide.points.length === 1;
-  const columns = slide.points.map((point, at) => {
-    const entry = typeof point === "string" ? { text: point } : point;
-    const hoist = entry.lead && standsAlone(entry.text);
+  // One style for the row: decided point by point, a sentence that began in
+  // lower case ("flydubai is ...") ran its lead inline while its neighbour's
+  // lead stood as a heading, and one band read as two devices.
+  const entries = slide.points.map((point) => (typeof point === "string" ? { text: point } : point));
+  const hoistAll = entries.every((entry) => entry.lead && standsAlone(entry.text));
+  const columns = entries.map((entry, at) => {
+    const hoist = hoistAll;
     const text = hoist ? entry.text : [entry.lead, entry.text].filter(Boolean).join(" ");
     // A lead that stays in the sentence still leads it: it runs in bold, the
     // way a well-made page sets the phrase that carries the finding.
