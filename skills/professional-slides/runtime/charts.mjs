@@ -202,7 +202,16 @@ export function numericBounds(values, { min, max, axis = "y", includeZero = fals
 
 // A target or capacity is part of the quantitative comparison. Include it in
 // automatic domains; numericBounds also rejects it outside an explicit domain.
-const withReferenceValues = (values, props) => [...values, ...(props.referenceLines || []).map(reference => reference.value)];
+// A reference line at or near the top of the data - "FY19 peak", a target the
+// last bar reaches - had no room above it for its label or the bars' value
+// labels, and failed with "Reference lines leave no room for value labels".
+// The domain now reaches 15% past such a line, as an author setting yMax would.
+const withReferenceValues = (values, props) => {
+  const references = (props.referenceLines || []).map(reference => reference.value).filter(Number.isFinite);
+  const top = Math.max(...values.filter(Number.isFinite));
+  const headroom = props.yMax === undefined && props.xMax === undefined ? references.filter(v => v > 0 && v >= top * 0.9).map(v => v * 1.15) : [];
+  return [...values, ...references, ...headroom];
+};
 
 const HIGHLIGHT_STYLES = Object.freeze(["bar", "region-box", "region-tint"]);
 const REGION_HIGHLIGHT_INLINE_PAD = 12;

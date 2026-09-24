@@ -75,7 +75,7 @@ function tableAlias(ex) {
     const left = ex.left || {}, right = ex.right || {};
     const l = left.points || (left.text ? [left.text] : []), r = right.points || (right.text ? [right.text] : []);
     const n = Math.max(l.length, r.length);
-    const rows = Array.from({ length: n }, (_, i) => [l[i] ?? "", r[i] ?? ""].map((cell) => (typeof cell === "string" && !cell.trim() ? { type: "text", text: " " } : cell)));
+    const rows = Array.from({ length: n }, (_, i) => [l[i] ?? "", r[i] ?? ""].map((cell) => (typeof cell === "string" && !cell.trim() ? { blank: true } : cell)));
     // The tinted column is the one the page decides for. Before/after pages
     // decide for "after", which is the default; a comparison of two options
     // names its side with `winner` ("left", "right" or a heading), and
@@ -1938,6 +1938,7 @@ export const SLIDE_KEYS = Object.freeze({
   notes: "the speaker notes, which print in the file and never on the page",
   // the rest
   serves: "which ranked criteria this page answers",
+  pageType: "the page type and choices the page was compiled from (author-deck.mjs); the build checks the structure still matches",
   tone: "dark or light, on the fixed-shape pages",
   accent: "an accent phrase inside a statement",
   style: "a per-kind style switch (an agenda in columns, say)",
@@ -3337,7 +3338,8 @@ export function budgetFindings(spec) {
  */
 function layoutPinnedFindings(spec) {
   const content = spec.slides.filter((slide) => (!slide.kind || slide.kind === "content") && slide.title);
-  const pinned = content.filter((slide) => slide.layout && slide.layout !== "auto");
+  // A page compiled from a page type names its layout because its choices did.
+  const pinned = content.filter((slide) => slide.layout && slide.layout !== "auto" && !slide.pageType);
   if (content.length < 8 || pinned.length / content.length <= 0.5) return [];
   return [{ slide: null, code: "LAYOUT_PINNED", severity: "advisory", measured: Math.round(pinned.length / content.length * 100) / 100, threshold: 0.5,
     repair: `${pinned.length} of ${content.length} content pages name a layout. Leave layout unset where the page does not need one construction; the chooser picks among the shapes that fit and the deck's variation spreads them.` }];

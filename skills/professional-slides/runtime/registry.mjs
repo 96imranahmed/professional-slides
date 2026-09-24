@@ -460,7 +460,9 @@ function assertChartTitleCopy(props = {}) {
     if (field === "unit" && /^(?:index\s*[,;:]?\s*)?(?:base|baseline)\s*=\s*(?:1|100)\s*$/i.test(copy.trim())) continue;
     const year = "(?:19|20)\\d{2}";
     const fiscalYear = `(?:${year}|\\d{2})`;
-    const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:\\s+${year})?|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
+    const month = "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
+    // "March 2026" is the date the measure is taken at, as "FY26" is.
+    const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:\\s+${year})?|${month}\\.?\\s+${year}|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
     copy = copy.replace(new RegExp(`\\bindex(?:ed)?\\b[^\\d]*${year}\\s*=\\s*100\\b`, "gi"), "index base"); // "Index, 2021 = 100" names the base, not a result
     copy = copy.replace(/\b[nN]\s*=\s*[\d,.]+\b/g, "sample size"); // "n = 240" is the population, not a result
     copy = copy.replace(new RegExp(`\\b${period}\\b(?![\\d.%])`, "gi"), "period");

@@ -2,7 +2,7 @@
 
 Composition is an open tree, not a catalogue of page silhouettes. Start from the approved title, list the content items the page needs, and choose the smallest tree that makes their relationships legible. Each item declares its semantic job, registered component, content, relationship to its peers and relative weight.
 
-The executable contract is `runtime/core.mjs`; the content-to-composition planner is `runtime/planner.mjs`.
+The executable contract is `runtime/core.mjs`; the content-to-composition planner is `runtime/planner.mjs`. Decks are authored as [page types](page-types.md), which compile to the deck-spec keys below: the page type's `commentary` and `form` choices set `layout`, `shape`, `arrange` and the exhibit's type, so the presets named here are what the compiler targets, not keys an author writes.
 
 ## Primitives
 

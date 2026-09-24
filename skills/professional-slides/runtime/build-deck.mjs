@@ -21,6 +21,8 @@ import { auditContent } from "./content-audit.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
 import { runPlanGates } from "./gates/plan_gates.mjs";
 import { craftFindings } from "./gates/craft_gates.mjs";
+import { varietyFindings } from "./gates/variety_gates.mjs";
+import { structureOf } from "./page-types.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
@@ -114,6 +116,22 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     stages[stage] = parsed;
   }
   validateStageContract(spec, stages);
+
+  // The variety contract, before anything is composed. A deck's structure is
+  // chosen page by page in its pages file (author-deck.mjs); this refuses a long
+  // deck whose pages were never typed, whose compiled structure was edited by
+  // hand, or whose choices add up to one page repeated. It is the same check
+  // the author ran, so a deck that compiled passes it here.
+  const variety = varietyFindings(spec, { structureOf, thin: budgetFindings(spec).filter((f) => f.code === "THIN_PLAN" && f.slide)
+    .map((f) => ({ id: spec.slides[f.slide - 1]?.id, words: f.measured, floor: f.threshold })) });
+  if (variety.length) {
+    const reportAt = path.join(directory, "variety-gates.json");
+    await fs.writeFile(reportAt, JSON.stringify({ accepted: false, findings: variety }, null, 2) + "\n");
+    result.stages.variety = { state: "rejected", report: reportAt };
+    throw new Error(`The variety contract rejected ${path.basename(specPath)}: ${variety.map((f) => f.code).join(", ")}. `
+      + `${variety[0].repair} See ${reportAt}.`);
+  }
+  result.stages.variety = { state: "accepted" };
 
   // The content stage stops being a checkpoint and becomes an input.
   //

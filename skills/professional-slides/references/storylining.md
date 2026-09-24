@@ -165,7 +165,7 @@ Settle evidence before naming components or layouts. For each page record `claim
 }
 ```
 
-`settles.kind` is `count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure` or `qualitative`; its actual evidence, basis and audience question govern the later encoding. `adds: null` means commentary is unnecessary. `highlight` is an exact phrase for emphasis or null; it is not an instruction to infer a chart maximum.
+`settles.kind` is `count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure` or `qualitative`; its actual evidence, basis and audience question govern the later encoding. Choose each page's [page type](page-types.md) here, while the claim is being written, not when the page is drawn: what the page `settles` usually names it (a `rank` is a ranking, a `rate` a trend, a `structure` a mechanism or a composition, several `comparison`s of one question a panels page), and where its explanation lives follows from the evidence. The storyline critique sees the types and judges the sequence's rhythm with the argument. `adds: null` means commentary is unnecessary. `highlight` is an exact phrase for emphasis or null; it is not an instruction to infer a chart maximum.
 
 ### Complete visible copy and reference text gate
 

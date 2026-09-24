@@ -244,7 +244,9 @@ function normalize(props) {
       // A group row is one label across a grey band; its other cells stay blank.
       const bandRow = groupRow || (row.style ?? props.rowStyle) === "total";
       const emptyValue = typeof value === "string" && !value.trim();
-      if (emptyValue && (bandRow ? c > 0 : c === 0)) { cell.blank = true; cell.type = "text"; }
+      // `{ blank: true }` is an explicit empty cell: the shorter side of a
+      // compare, where a padded " " would read as a missing value.
+      if ((emptyValue && (bandRow ? c > 0 : c === 0)) || (value && typeof value === "object" && value.blank === true)) { cell.blank = true; cell.type = "text"; }
       if (bandRow) cell.bold = true;
       if (!CELL_TYPES.includes(cell.type))
         throw new Error(`Unknown table cell type: ${cell.type}`);
