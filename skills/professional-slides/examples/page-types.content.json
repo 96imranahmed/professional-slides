@@ -47,7 +47,9 @@
    "adds": "Each point carries the condition under which its lever delivers, which the table does not show",
    "highlight": "frequency, not fares, is the main lever",
    "textReference": {
-    "task": "text-page"
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
    },
    "textPlan": [
     {
@@ -179,7 +181,9 @@
    "adds": null,
    "highlight": null,
    "textReference": {
-    "task": "text-page"
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
    },
    "textPlan": [
     {
@@ -230,7 +234,9 @@
    "adds": "The callouts say why the series broke and why it has stalled, which the line alone cannot",
    "highlight": null,
    "textReference": {
-    "task": "chart-led"
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
    },
    "textPlan": [
     {
@@ -381,7 +387,9 @@
    "adds": "Each caption states what its panel shows that the other does not: no room in one, two-thirds empty in the other",
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -546,7 +554,9 @@
     "7 m"
    ],
    "textReference": {
-    "task": "chart-with-commentary"
+    "task": "chart-with-commentary",
+    "floor": 96,
+    "ceiling": 293
    },
    "textPlan": [
     {
@@ -691,7 +701,9 @@
     "Leisure is discretionary"
    ],
    "textReference": {
-    "task": "chart-with-commentary"
+    "task": "chart-with-commentary",
+    "floor": 96,
+    "ceiling": 293
    },
    "textPlan": [
     {
@@ -881,7 +893,9 @@
     "30 trains"
    ],
    "textReference": {
-    "task": "chart-with-commentary"
+    "task": "chart-with-commentary",
+    "floor": 96,
+    "ceiling": 293
    },
    "textPlan": [
     {
@@ -1002,7 +1016,9 @@
    "adds": "The implication column says what each line's row means for the plan",
    "highlight": "electrifying first",
    "textReference": {
-    "task": "table-led"
+    "task": "table-led",
+    "floor": 100,
+    "ceiling": 483
    },
    "textPlan": [
     {
@@ -1323,7 +1339,9 @@
    "adds": "The callouts give the mechanism behind the largest loss and the largest gain",
    "highlight": null,
    "textReference": {
-    "task": "chart-led"
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
    },
    "textPlan": [
     {
@@ -1443,7 +1461,9 @@
     "Off-peak trains share"
    ],
    "textReference": {
-    "task": "exhibit-with-commentary"
+    "task": "exhibit-with-commentary",
+    "floor": 112,
+    "ceiling": 282
    },
    "textPlan": [
     {
@@ -1604,8 +1624,123 @@
    ]
   },
   {
-   "id": "p11",
+   "id": "p10b",
    "n": 14,
+   "claim": "Three constraints hold the peak where it is: fleet, track and depot",
+   "settles": {
+    "kind": "count",
+    "what": "units in peak service, single-track sections and depot sidings in use, FY26"
+   },
+   "adds": "Each row says what binds, where it binds and what lifting it would take, beyond the number at its right",
+   "highlight": [
+    "none is held spare",
+    "two single-track sections",
+    "94% of its sidings",
+    "not before 2029",
+    "£38 million",
+    "£55 million"
+   ],
+   "textReference": {
+    "task": "exhibit-with-commentary",
+    "floor": 112,
+    "ceiling": 282
+   },
+   "textPlan": [
+    {
+     "id": "p10b-chrome:title",
+     "role": "title",
+     "text": "Three constraints hold the peak where it is: fleet, track and depot"
+    },
+    {
+     "id": "p10b-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for a fictional operator; fleet diagram, track layout and depot plan, FY26"
+    },
+    {
+     "id": "p10b-p10b-label-0:text",
+     "role": "exhibit",
+     "text": "The fleet is fully used"
+    },
+    {
+     "id": "p10b-p10b-metric-0:value",
+     "role": "exhibit",
+     "text": "58 of 58"
+    },
+    {
+     "id": "p10b-p10b-metric-0:label",
+     "role": "exhibit",
+     "text": "units in peak service"
+    },
+    {
+     "id": "p10b-p10b-label-1:text",
+     "role": "exhibit",
+     "text": "Single track east of Selby"
+    },
+    {
+     "id": "p10b-p10b-metric-1:value",
+     "role": "exhibit",
+     "text": "2"
+    },
+    {
+     "id": "p10b-p10b-metric-1:label",
+     "role": "exhibit",
+     "text": "single-track sections on the Eastern line"
+    },
+    {
+     "id": "p10b-p10b-label-2:text",
+     "role": "exhibit",
+     "text": "The depot is almost full"
+    },
+    {
+     "id": "p10b-p10b-metric-2:value",
+     "role": "exhibit",
+     "text": "94%"
+    },
+    {
+     "id": "p10b-p10b-metric-2:label",
+     "role": "exhibit",
+     "text": "of depot sidings used overnight"
+    },
+    {
+     "id": "p10b-p10b-points-0:item:0",
+     "role": "body",
+     "text": "All 58 units run in the morning peak and none is held spare, so a failure cancels a train rather than swapping in a replacement."
+    },
+    {
+     "id": "p10b-p10b-points-0:item:1",
+     "role": "body",
+     "text": "New units are on order but not before 2029, when electrification releases eleven diesel units for other lines."
+    },
+    {
+     "id": "p10b-p10b-points-1:item:0",
+     "role": "body",
+     "text": "The Eastern line runs through two single-track sections where trains in opposite directions wait for each other."
+    },
+    {
+     "id": "p10b-p10b-points-1:item:1",
+     "role": "body",
+     "text": "Each extra peak train adds a crossing, which is why punctuality fell as the timetable grew."
+    },
+    {
+     "id": "p10b-p10b-points-1:item:2",
+     "role": "body",
+     "text": "Doubling both sections would cost about £38 million and is not in the funded plan."
+    },
+    {
+     "id": "p10b-p10b-points-2:item:0",
+     "role": "body",
+     "text": "The Dales depot stables trains overnight in 94% of its sidings, so no more units can be based there."
+    },
+    {
+     "id": "p10b-p10b-points-2:item:1",
+     "role": "body",
+     "text": "The planned extension adds twelve sidings for £55 million and is the one dependency of the off-peak timetable."
+    }
+   ]
+  },
+  {
+   "id": "p11",
+   "n": 15,
    "claim": "Frequency drives a loop: shorter waits win leisure trips that fund the next train",
    "settles": {
     "kind": "sequence",
@@ -1618,7 +1753,9 @@
     "Where the loop breaks"
    ],
    "textReference": {
-    "task": "diagram-with-commentary"
+    "task": "diagram-with-commentary",
+    "floor": 108,
+    "ceiling": 246
    },
    "textPlan": [
     {
@@ -1745,7 +1882,7 @@
   },
   {
    "id": "p12",
-   "n": 15,
+   "n": 16,
    "claim": "The Dales and Valley lines can grow now; the Coast line cannot",
    "settles": {
     "kind": "comparison",
@@ -1754,7 +1891,9 @@
    "adds": "The implication column turns each row of scores into a sequencing decision",
    "highlight": "December 2027 timetable",
    "textReference": {
-    "task": "table-led"
+    "task": "table-led",
+    "floor": 100,
+    "ceiling": 483
    },
    "textPlan": [
     {
@@ -1966,7 +2105,7 @@
   },
   {
    "id": "p13",
-   "n": 16,
+   "n": 17,
    "claim": "Passengers name the wait, not the fare, as what keeps them off trains",
    "settles": {
     "kind": "qualitative",
@@ -1975,7 +2114,9 @@
    "adds": "The third column turns each finding into a design choice for the timetable or the fares",
    "highlight": null,
    "textReference": {
-    "task": "table-led"
+    "task": "table-led",
+    "floor": 100,
+    "ceiling": 483
    },
    "textPlan": [
     {
@@ -2086,8 +2227,126 @@
    ]
   },
   {
+   "id": "p13b",
+   "n": 18,
+   "claim": "Northvale gives the smallest off-peak discount of seven operators: 18% against a 35% median",
+   "settles": {
+    "kind": "rank",
+    "what": "off-peak return discount to the peak fare for all seven comparable regional operators, FY26"
+   },
+   "adds": "The bar says what the ranking means for the order of the plan: the fare change waits for the timetable",
+   "highlight": null,
+   "textReference": {
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
+   },
+   "textPlan": [
+    {
+     "id": "p13b-chrome:title",
+     "role": "title",
+     "text": "Northvale gives the smallest off-peak discount of seven operators: 18% against a 35% median"
+    },
+    {
+     "id": "p13b-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for fictional operators; standard off-peak and anytime day returns, FY26"
+    },
+    {
+     "id": "p13b-p13b-exhibit-heading:heading",
+     "role": "body",
+     "text": "Off-peak return discount to the peak fare, FY26,"
+    },
+    {
+     "id": "p13b-p13b-exhibit-heading:unit",
+     "role": "exhibit",
+     "text": "% off the peak fare"
+    },
+    {
+     "id": "p13b-p13b-exhibit:value-label:discount:southdown-rail",
+     "role": "exhibit",
+     "text": "46"
+    },
+    {
+     "id": "p13b-p13b-exhibit:category:southdown-rail",
+     "role": "exhibit",
+     "text": "Southdown Rail"
+    },
+    {
+     "id": "p13b-p13b-exhibit:value-label:discount:westmoor-trains",
+     "role": "exhibit",
+     "text": "41"
+    },
+    {
+     "id": "p13b-p13b-exhibit:category:westmoor-trains",
+     "role": "exhibit",
+     "text": "Westmoor Trains"
+    },
+    {
+     "id": "p13b-p13b-exhibit:value-label:discount:lakeside-lines",
+     "role": "exhibit",
+     "text": "38"
+    },
+    {
+     "id": "p13b-p13b-exhibit:category:lakeside-lines",
+     "role": "exhibit",
+     "text": "Lakeside Lines"
+    },
+    {
+     "id": "p13b-p13b-exhibit:value-label:discount:marches-rail",
+     "role": "exhibit",
+     "text": "35"
+    },
+    {
+     "id": "p13b-p13b-exhibit:category:marches-rail",
+     "role": "exhibit",
+     "text": "Marches Rail"
+    },
+    {
+     "id": "p13b-p13b-exhibit:value-label:discount:fenland-rail",
+     "role": "exhibit",
+     "text": "29"
+    },
+    {
+     "id": "p13b-p13b-exhibit:category:fenland-rail",
+     "role": "exhibit",
+     "text": "Fenland Rail"
+    },
+    {
+     "id": "p13b-p13b-exhibit:value-label:discount:highland-link",
+     "role": "exhibit",
+     "text": "24"
+    },
+    {
+     "id": "p13b-p13b-exhibit:category:highland-link",
+     "role": "exhibit",
+     "text": "Highland Link"
+    },
+    {
+     "id": "p13b-p13b-exhibit:value-label:discount:northvale-rail",
+     "role": "exhibit",
+     "text": "18"
+    },
+    {
+     "id": "p13b-p13b-exhibit:category:northvale-rail",
+     "role": "exhibit",
+     "text": "Northvale Rail"
+    },
+    {
+     "id": "p13b-p13b-exhibit:reference-label:0",
+     "role": "exhibit",
+     "text": "Peer median 35%"
+    },
+    {
+     "id": "p13b-p13b-sowhat:body",
+     "role": "body",
+     "text": "A deeper discount on an hourly service buys few new riders, so fare reform follows the half-hourly timetable in 2030 rather than leading it"
+    }
+   ]
+  },
+  {
    "id": "p14",
-   "n": 17,
+   "n": 19,
    "claim": "Lapsed riders blame the hourly service, not the fare, for driving instead",
    "settles": {
     "kind": "qualitative",
@@ -2096,7 +2355,9 @@
    "adds": null,
    "highlight": null,
    "textReference": {
-    "task": "text-page"
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
    },
    "textPlan": [
     {
@@ -2173,7 +2434,7 @@
   },
   {
    "id": "p15",
-   "n": 18,
+   "n": 20,
    "claim": "Three corridors serve three different markets, each needing its own timetable",
    "settles": {
     "kind": "qualitative",
@@ -2182,7 +2443,9 @@
    "adds": "Each caption names the market the corridor serves; the closing line says why one timetable pattern cannot serve all three",
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 22,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -2234,7 +2497,7 @@
   },
   {
    "id": "s3",
-   "n": 19,
+   "n": 21,
    "kind": "section",
    "role": "structural",
    "claim": "03 / The plan",
@@ -2259,7 +2522,7 @@
   },
   {
    "id": "p16",
-   "n": 20,
+   "n": 22,
    "claim": "Electrifying the Eastern line beats bi-mode trains on cost per journey from year six",
    "settles": {
     "kind": "comparison",
@@ -2268,7 +2531,9 @@
    "adds": "The closing line says what to commit now and what to keep in reserve",
    "highlight": null,
    "textReference": {
-    "task": "table-led"
+    "task": "table-led",
+    "floor": 100,
+    "ceiling": 483
    },
    "textPlan": [
     {
@@ -2349,8 +2614,256 @@
    ]
   },
   {
+   "id": "p16b",
+   "n": 23,
+   "claim": "Electrification cuts 14 minutes from Leeds to Hull, adding 3.8 million journeys",
+   "settles": {
+    "kind": "sequence",
+    "what": "Eastern line journey times today and electrified, journeys gained per minute saved, and Eastern line journeys FY26-FY31"
+   },
+   "adds": "Each caption states the link its panel proves, so the chain can be checked one step at a time",
+   "highlight": null,
+   "textReference": {
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
+   },
+   "textPlan": [
+    {
+     "id": "p16b-chrome:title",
+     "role": "title",
+     "text": "Electrification cuts 14 minutes from Leeds to Hull, adding 3.8 million journeys"
+    },
+    {
+     "id": "p16b-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for a fictional operator; timetable modelling and demand model central case"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0-heading:heading",
+     "role": "body",
+     "text": "Journey time by flow,"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0-heading:unit",
+     "role": "exhibit",
+     "text": "minutes"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:label:0",
+     "role": "exhibit",
+     "text": "Today"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:label:1",
+     "role": "exhibit",
+     "text": "Electrified"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:value-label:today:leeds-hull",
+     "role": "exhibit",
+     "text": "58"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:value-label:electrified:leeds-hull",
+     "role": "exhibit",
+     "text": "44"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:category:leeds-hull",
+     "role": "exhibit",
+     "text": "Leeds-Hull"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:value-label:today:york-hull",
+     "role": "exhibit",
+     "text": "49"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:value-label:electrified:york-hull",
+     "role": "exhibit",
+     "text": "38"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:category:york-hull",
+     "role": "exhibit",
+     "text": "York-Hull"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:value-label:today:selby-hull",
+     "role": "exhibit",
+     "text": "36"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:value-label:electrified:selby-hull",
+     "role": "exhibit",
+     "text": "27"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:category:selby-hull",
+     "role": "exhibit",
+     "text": "Selby-Hull"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:value-label:today:leeds-selby",
+     "role": "exhibit",
+     "text": "24"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:value-label:electrified:leeds-selby",
+     "role": "exhibit",
+     "text": "19"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0:category:leeds-selby",
+     "role": "exhibit",
+     "text": "Leeds-Selby"
+    },
+    {
+     "id": "p16b-p16b-exhibit-0-caption:body",
+     "role": "body",
+     "text": "Electric trains accelerate faster between the stops, saving 5 to 14 minutes on each of the four flows"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1-heading:heading",
+     "role": "body",
+     "text": "Gain per minute saved,"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1-heading:unit",
+     "role": "exhibit",
+     "text": "k journeys"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1:value-label:journeys-per-minute-saved:leeds-hull",
+     "role": "exhibit",
+     "text": "125"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1:category:leeds-hull",
+     "role": "exhibit",
+     "text": "Leeds-Hull"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1:value-label:journeys-per-minute-saved:york-hull",
+     "role": "exhibit",
+     "text": "70"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1:category:york-hull",
+     "role": "exhibit",
+     "text": "York-Hull"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1:value-label:journeys-per-minute-saved:selby-hull",
+     "role": "exhibit",
+     "text": "90"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1:category:selby-hull",
+     "role": "exhibit",
+     "text": "Selby-Hull"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1:value-label:journeys-per-minute-saved:leeds-selby",
+     "role": "exhibit",
+     "text": "100"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1:category:leeds-selby",
+     "role": "exhibit",
+     "text": "Leeds-Selby"
+    },
+    {
+     "id": "p16b-p16b-exhibit-1-caption:body",
+     "role": "body",
+     "text": "Every minute saved wins 70 to 125 thousand journeys a year, most on the longest commuting flow"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2-heading:heading",
+     "role": "body",
+     "text": "Eastern line journeys,"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2-heading:unit",
+     "role": "exhibit",
+     "text": "million"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:value-label:journeys:fy26",
+     "role": "exhibit",
+     "text": "14.2"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:category:fy26",
+     "role": "exhibit",
+     "text": "FY26"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:value-label:journeys:fy27",
+     "role": "exhibit",
+     "text": "14.3"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:category:fy27",
+     "role": "exhibit",
+     "text": "FY27"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:value-label:journeys:fy28",
+     "role": "exhibit",
+     "text": "14.4"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:category:fy28",
+     "role": "exhibit",
+     "text": "FY28"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:value-label:journeys:fy29",
+     "role": "exhibit",
+     "text": "14.5"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:category:fy29",
+     "role": "exhibit",
+     "text": "FY29"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:value-label:journeys:fy30",
+     "role": "exhibit",
+     "text": "16.6"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:category:fy30",
+     "role": "exhibit",
+     "text": "FY30"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:value-label:journeys:fy31",
+     "role": "exhibit",
+     "text": "18"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:category:fy31",
+     "role": "exhibit",
+     "text": "FY31"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2:change-label:0",
+     "role": "exhibit",
+     "text": "+27%"
+    },
+    {
+     "id": "p16b-p16b-exhibit-2-caption:body",
+     "role": "body",
+     "text": "The line reaches 18.0 million journeys by FY31, a step up once electric trains run from FY30"
+    }
+   ]
+  },
+  {
    "id": "p17",
-   "n": 21,
+   "n": 24,
    "claim": "Four levers add 11.7 million journeys, led by the off-peak timetable",
    "settles": {
     "kind": "count",
@@ -2359,7 +2872,9 @@
    "adds": "Each card says how its lever works and what it depends on, beyond the number",
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -2436,7 +2951,7 @@
   },
   {
    "id": "p18",
-   "n": 22,
+   "n": 25,
    "claim": "London and Manchester send three in five of the visitors from beyond the network",
    "settles": {
     "kind": "share",
@@ -2450,7 +2965,9 @@
     "0.8 m"
    ],
    "textReference": {
-    "task": "exhibit-with-commentary"
+    "task": "exhibit-with-commentary",
+    "floor": 112,
+    "ceiling": 282
    },
    "textPlan": [
     {
@@ -2547,7 +3064,7 @@
   },
   {
    "id": "p19",
-   "n": 23,
+   "n": 26,
    "claim": "The plan adds 11.7 million journeys a year by FY31, mostly after electrification",
    "settles": {
     "kind": "count",
@@ -2560,7 +3077,9 @@
     "29"
    ],
    "textReference": {
-    "task": "exhibit-with-commentary"
+    "task": "exhibit-with-commentary",
+    "floor": 112,
+    "ceiling": 282
    },
    "textPlan": [
     {
@@ -2682,7 +3201,7 @@
   },
   {
    "id": "p20",
-   "n": 24,
+   "n": 27,
    "claim": "Fare revenue passes its FY20 level in FY29, carried by off-peak travel",
    "settles": {
     "kind": "rate",
@@ -2691,7 +3210,9 @@
    "adds": "The callouts name the crossing year and the source of the growth",
    "highlight": null,
    "textReference": {
-    "task": "chart-led"
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
    },
    "textPlan": [
     {
@@ -2863,7 +3384,7 @@
   },
   {
    "id": "p21",
-   "n": 25,
+   "n": 28,
    "claim": "The plan costs £640 million, mostly in FY28-FY29, and pays back in eleven years",
    "settles": {
     "kind": "structure",
@@ -2872,7 +3393,9 @@
    "adds": "Each caption carries the finding of its own panel so the page reads without the title",
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -3084,7 +3607,7 @@
   },
   {
    "id": "p22",
-   "n": 26,
+   "n": 29,
    "claim": "Grant covers just over half the cost; Northvale must borrow or earn the rest",
    "settles": {
     "kind": "share",
@@ -3093,7 +3616,9 @@
    "adds": "The rail says which part is uncommitted and what that exposes",
    "highlight": null,
    "textReference": {
-    "task": "chart-led"
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
    },
    "textPlan": [
     {
@@ -3165,7 +3690,7 @@
   },
   {
    "id": "s4",
-   "n": 27,
+   "n": 30,
    "kind": "section",
    "role": "structural",
    "claim": "04 / Delivering it",
@@ -3190,7 +3715,7 @@
   },
   {
    "id": "p23",
-   "n": 28,
+   "n": 31,
    "claim": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
    "settles": {
     "kind": "sequence",
@@ -3202,7 +3727,9 @@
     "5.1 m"
    ],
    "textReference": {
-    "task": "diagram-with-commentary"
+    "task": "diagram-with-commentary",
+    "floor": 108,
+    "ceiling": 246
    },
    "textPlan": [
     {
@@ -3369,7 +3896,7 @@
   },
   {
    "id": "p24",
-   "n": 29,
+   "n": 32,
    "claim": "Four named owners carry one lever each, reporting monthly to the managing director",
    "settles": {
     "kind": "structure",
@@ -3378,7 +3905,9 @@
    "adds": "Each card states the owner's measure and deadline, not just the role",
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -3495,7 +4024,7 @@
   },
   {
    "id": "p25",
-   "n": 30,
+   "n": 33,
    "claim": "Two of seven 2027 milestones are at risk, both on the electrification path",
    "settles": {
     "kind": "count",
@@ -3508,7 +4037,9 @@
     "5.1 m"
    ],
    "textReference": {
-    "task": "table-with-commentary"
+    "task": "table-with-commentary",
+    "floor": 149,
+    "ceiling": 447
    },
    "textPlan": [
     {
@@ -3715,7 +4246,7 @@
   },
   {
    "id": "p26",
-   "n": 31,
+   "n": 34,
    "claim": "Service grows by a fifth while punctuality holds at 90% and unit cost falls",
    "settles": {
     "kind": "comparison",
@@ -3724,7 +4255,9 @@
    "adds": null,
    "highlight": null,
    "textReference": {
-    "task": "exhibit-led"
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
    },
    "textPlan": [
     {
@@ -3876,7 +4409,7 @@
   },
   {
    "id": "p27",
-   "n": 32,
+   "n": 35,
    "claim": "Fare reform should follow the new timetable, not lead it",
    "settles": {
     "kind": "qualitative",
@@ -3885,7 +4418,9 @@
    "adds": null,
    "highlight": "So the order matters",
    "textReference": {
-    "task": "text-page"
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
    },
    "textPlan": [
     {
@@ -3917,7 +4452,7 @@
   },
   {
    "id": "p28",
-   "n": 33,
+   "n": 36,
    "kind": "takeaways",
    "claim": "Four decisions put Northvale on the path to 60 million journeys",
    "settles": {
@@ -3927,7 +4462,9 @@
    "adds": null,
    "highlight": null,
    "textReference": {
-    "task": "text-page"
+    "task": "text-page",
+    "floor": 121,
+    "ceiling": 329
    },
    "textPlan": [
     {

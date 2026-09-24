@@ -72,7 +72,8 @@
      },
      "adds": "Each point carries the condition under which its lever delivers, which the table does not show"
     },
-    "structure": "|||executive-summary|||table|points|"
+    "structure": "|||executive-summary|||table|points|",
+    "skeleton": "executive-summary · 1 table · points · open"
    }
   },
   {
@@ -97,7 +98,8 @@
      },
      "adds": null
     },
-    "structure": "statement||||||||"
+    "structure": "statement||||||||",
+    "skeleton": "statement · open"
    }
   },
   {
@@ -176,7 +178,8 @@
      },
      "adds": "The callouts say why the series broke and why it has stalled, which the line alone cannot"
     },
-    "structure": "|exhibit-full|||||chart.line||"
+    "structure": "|exhibit-full|||||chart.line||",
+    "skeleton": "exhibit-full · 1 chart · open"
    }
   },
   {
@@ -257,7 +260,8 @@
      },
      "adds": "Each caption states what its panel shows that the other does not: no room in one, two-thirds empty in the other"
     },
-    "structure": "||||row||chart.bar+chart.bar||"
+    "structure": "||||row||chart.bar+chart.bar||",
+    "skeleton": "row of exhibits · 2 chart · open"
    }
   },
   {
@@ -339,7 +343,8 @@
      },
      "adds": "The column explains why intensity trails - route length and hourly off-peak service - and what the gap is worth"
     },
-    "structure": "|exhibit-left|||||chart.bar|points|"
+    "structure": "|exhibit-left|||||chart.bar|points|",
+    "skeleton": "exhibit beside a column · 1 exhibit · points · open"
    }
   },
   {
@@ -431,7 +436,8 @@
      },
      "adds": "The column draws the consequence: off-peak growth is a leisure product, sold on frequency and reach, not on commuter fares"
     },
-    "structure": "|exhibit-right|||||chart.stacked-column|points|"
+    "structure": "|exhibit-right|||||chart.stacked-column|points|",
+    "skeleton": "exhibit beside a column · 1 exhibit · points · open"
    }
   },
   {
@@ -542,7 +548,8 @@
      },
      "adds": "The points quantify the gap between half-hourly and hourly stations and rule out the obvious alternative explanation, population growth"
     },
-    "structure": "|exhibit-top|||||chart.scatter|points|"
+    "structure": "|exhibit-top|||||chart.scatter|points|",
+    "skeleton": "exhibit-top · 1 chart · points · open"
    }
   },
   {
@@ -656,7 +663,8 @@
      },
      "adds": "The implication column says what each line's row means for the plan"
     },
-    "structure": "||measure-table||||table||"
+    "structure": "||measure-table||||table||",
+    "skeleton": "measure-table · 1 table · open"
    }
   },
   {
@@ -722,7 +730,8 @@
      },
      "adds": "The callouts give the mechanism behind the largest loss and the largest gain"
     },
-    "structure": "|exhibit-full|||||chart.waterfall||"
+    "structure": "|exhibit-full|||||chart.waterfall||",
+    "skeleton": "exhibit-full · 1 chart · open"
    }
   },
   {
@@ -817,7 +826,76 @@
      },
      "adds": "The points give the mechanism - dwell time at single-track sections - and why the off-peak does not share it"
     },
-    "structure": "||||row||chart.column+chart.line|points|"
+    "structure": "||||row||chart.column+chart.line|points|",
+    "skeleton": "row of exhibits · 2 chart · points · open"
+   }
+  },
+  {
+   "id": "p10b",
+   "title": "Three constraints hold the peak where it is: fleet, track and depot",
+   "highlight": [
+    "none is held spare",
+    "two single-track sections",
+    "94% of its sidings",
+    "not before 2029",
+    "£38 million",
+    "£55 million"
+   ],
+   "blocks": [
+    {
+     "label": "The fleet is fully used",
+     "points": [
+      "All 58 units run in the morning peak and none is held spare, so a failure cancels a train rather than swapping in a replacement.",
+      "New units are on order but not before 2029, when electrification releases eleven diesel units for other lines."
+     ],
+     "metric": {
+      "value": "58 of 58",
+      "label": "units in peak service"
+     }
+    },
+    {
+     "label": "Single track east of Selby",
+     "points": [
+      "The Eastern line runs through two single-track sections where trains in opposite directions wait for each other.",
+      "Each extra peak train adds a crossing, which is why punctuality fell as the timetable grew.",
+      "Doubling both sections would cost about £38 million and is not in the funded plan."
+     ],
+     "metric": {
+      "value": "2",
+      "label": "single-track sections on the Eastern line"
+     }
+    },
+    {
+     "label": "The depot is almost full",
+     "points": [
+      "The Dales depot stables trains overnight in 94% of its sidings, so no more units can be based there.",
+      "The planned extension adds twelve sidings for £55 million and is the one dependency of the off-peak timetable."
+     ],
+     "metric": {
+      "value": "94%",
+      "label": "of depot sidings used overnight"
+     }
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; fleet diagram, track layout and depot plan, FY26",
+   "layout": "labelled-rows",
+   "pageType": {
+    "type": "parallel",
+    "form": "labelled-rows",
+    "commentary": "in-exhibit",
+    "takeaway": false,
+    "why": "Three separate constraints each cap the peak on their own, and each needs its own evidence and its own number, so they read down the page as a diagnosis",
+    "family": "exhibit",
+    "content": {
+     "claim": "Three constraints hold the peak where it is: fleet, track and depot",
+     "settles": {
+      "kind": "count",
+      "what": "units in peak service, single-track sections and depot sidings in use, FY26"
+     },
+     "adds": "Each row says what binds, where it binds and what lifting it would take, beyond the number at its right"
+    },
+    "structure": "|labelled-rows|||||||",
+    "skeleton": "labelled-rows · open"
    }
   },
   {
@@ -886,7 +964,8 @@
      },
      "adds": "The column puts a measured number on each link of the loop, and says where it breaks"
     },
-    "structure": "|exhibit-left|||||cycle|points|"
+    "structure": "|exhibit-left|||||cycle|points|",
+    "skeleton": "exhibit beside a column · 1 exhibit · points · open"
    }
   },
   {
@@ -1040,7 +1119,8 @@
      },
      "adds": "The implication column turns each row of scores into a sequencing decision"
     },
-    "structure": "|exhibit-full||||close|table||"
+    "structure": "|exhibit-full||||close|table||",
+    "skeleton": "exhibit-full · 1 table · closing line"
    }
   },
   {
@@ -1110,7 +1190,75 @@
      },
      "adds": "The third column turns each finding into a design choice for the timetable or the fares"
     },
-    "structure": "||findings-matrix||||||"
+    "structure": "||findings-matrix||||||",
+    "skeleton": "findings-matrix · open"
+   }
+  },
+  {
+   "id": "p13b",
+   "title": "Northvale gives the smallest off-peak discount of seven operators: 18% against a 35% median",
+   "exhibit": {
+    "heading": "Off-peak return discount to the peak fare, FY26",
+    "unit": "% off the peak fare",
+    "categories": [
+     "Southdown Rail",
+     "Westmoor Trains",
+     "Lakeside Lines",
+     "Marches Rail",
+     "Fenland Rail",
+     "Highland Link",
+     "Northvale Rail"
+    ],
+    "series": [
+     {
+      "name": "Discount",
+      "values": [
+       46,
+       41,
+       38,
+       35,
+       29,
+       24,
+       18
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Northvale Rail"
+     }
+    ],
+    "referenceLines": [
+     {
+      "value": 35,
+      "label": "Peer median 35%"
+     }
+    ],
+    "type": "chart.bar"
+   },
+   "source": "Source: illustrative data for fictional operators; standard off-peak and anytime day returns, FY26",
+   "soWhat": {
+    "text": "A deeper discount on an hourly service buys few new riders, so fare reform follows the half-hourly timetable in 2030 rather than leading it",
+    "style": "bar"
+   },
+   "layout": "exhibit-full",
+   "pageType": {
+    "type": "ranking",
+    "form": "bar",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "why": "Where Northvale's off-peak discount stands among all seven operators is the claim, so the whole set is ranked with Northvale marked and the implication set in a bar beneath it",
+    "family": "chart",
+    "content": {
+     "claim": "Northvale gives the smallest off-peak discount of seven operators: 18% against a 35% median",
+     "settles": {
+      "kind": "rank",
+      "what": "off-peak return discount to the peak fare for all seven comparable regional operators, FY26"
+     },
+     "adds": "The bar says what the ranking means for the order of the plan: the fare change waits for the timetable"
+    },
+    "structure": "|exhibit-full||||close|chart.bar||",
+    "skeleton": "exhibit-full · 1 chart · so-what bar"
    }
   },
   {
@@ -1151,7 +1299,8 @@
      },
      "adds": null
     },
-    "structure": "||||||quote-cluster||"
+    "structure": "||||||quote-cluster||",
+    "skeleton": "exhibit-full · 1 figure · open"
    }
   },
   {
@@ -1198,7 +1347,8 @@
      },
      "adds": "Each caption names the market the corridor serves; the closing line says why one timetable pattern cannot serve all three"
     },
-    "structure": "|picture-strip||||close|||"
+    "structure": "|picture-strip||||close|||",
+    "skeleton": "picture-strip · closing line"
    }
   },
   {
@@ -1251,7 +1401,117 @@
      },
      "adds": "The closing line says what to commit now and what to keep in reserve"
     },
-    "structure": "|||||close|compare||"
+    "structure": "|||||close|compare||",
+    "skeleton": "exhibit-full · 1 table · closing line"
+   }
+  },
+  {
+   "id": "p16b",
+   "title": "Electrification cuts 14 minutes from Leeds to Hull, adding 3.8 million journeys",
+   "exhibits": [
+    {
+     "type": "chart.bar",
+     "heading": "Journey time by flow",
+     "unit": "minutes",
+     "categories": [
+      "Leeds-Hull",
+      "York-Hull",
+      "Selby-Hull",
+      "Leeds-Selby"
+     ],
+     "series": [
+      {
+       "name": "Today",
+       "values": [
+        58,
+        49,
+        36,
+        24
+       ]
+      },
+      {
+       "name": "Electrified",
+       "values": [
+        44,
+        38,
+        27,
+        19
+       ]
+      }
+     ],
+     "caption": "Electric trains accelerate faster between the stops, saving 5 to 14 minutes on each of the four flows"
+    },
+    {
+     "type": "chart.bar",
+     "heading": "Gain per minute saved",
+     "unit": "k journeys",
+     "categories": [
+      "Leeds-Hull",
+      "York-Hull",
+      "Selby-Hull",
+      "Leeds-Selby"
+     ],
+     "series": [
+      {
+       "name": "Journeys per minute saved",
+       "values": [
+        125,
+        70,
+        90,
+        100
+       ]
+      }
+     ],
+     "caption": "Every minute saved wins 70 to 125 thousand journeys a year, most on the longest commuting flow"
+    },
+    {
+     "type": "chart.column",
+     "heading": "Eastern line journeys",
+     "unit": "million",
+     "categories": [
+      "FY26",
+      "FY27",
+      "FY28",
+      "FY29",
+      "FY30",
+      "FY31"
+     ],
+     "series": [
+      {
+       "name": "Journeys",
+       "values": [
+        14.2,
+        14.3,
+        14.4,
+        14.5,
+        16.6,
+        18
+       ]
+      }
+     ],
+     "caption": "The line reaches 18.0 million journeys by FY31, a step up once electric trains run from FY30",
+     "change": true
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; timetable modelling and demand model central case",
+   "arrange": "sequence",
+   "pageType": {
+    "type": "panels",
+    "form": "sequence",
+    "commentary": "captions",
+    "takeaway": false,
+    "why": "Electrification adds journeys through a chain - faster trains, a demand response to the time saved, more journeys - and each link needs its own evidence, read left to right",
+    "family": "exhibit",
+    "content": {
+     "claim": "Electrification cuts 14 minutes from Leeds to Hull, adding 3.8 million journeys",
+     "settles": {
+      "kind": "sequence",
+      "what": "Eastern line journey times today and electrified, journeys gained per minute saved, and Eastern line journeys FY26-FY31"
+     },
+     "adds": "Each caption states the link its panel proves, so the chain can be checked one step at a time"
+    },
+    "structure": "||||sequence||chart.bar+chart.bar+chart.column||",
+    "skeleton": "sequence of exhibits · 3 chart · open"
    }
   },
   {
@@ -1304,7 +1564,8 @@
      },
      "adds": "Each card says how its lever works and what it depends on, beyond the number"
     },
-    "structure": "|exhibit-full|||||cards||"
+    "structure": "|exhibit-full|||||cards||",
+    "skeleton": "exhibit-full · 1 figure · open"
    }
   },
   {
@@ -1450,7 +1711,8 @@
      },
      "adds": "The column says why Leeds is the connection that matters and what timing the connection is worth"
     },
-    "structure": "|exhibit-left|||||map|points|"
+    "structure": "|exhibit-left|||||map|points|",
+    "skeleton": "exhibit beside a column · 1 exhibit · points · open"
    }
   },
   {
@@ -1522,7 +1784,8 @@
      },
      "adds": "The points say how fast the path climbs and which year it depends on"
     },
-    "structure": "|hero-number|||||chart.line|points|"
+    "structure": "|hero-number|||||chart.line|points|",
+    "skeleton": "hero-number · 1 chart · points · open"
    }
   },
   {
@@ -1607,7 +1870,8 @@
      },
      "adds": "The callouts name the crossing year and the source of the growth"
     },
-    "structure": "|exhibit-full|||||chart.stacked-column||"
+    "structure": "|exhibit-full|||||chart.stacked-column||",
+    "skeleton": "exhibit-full · 1 chart · open"
    }
   },
   {
@@ -1714,7 +1978,8 @@
      },
      "adds": "Each caption carries the finding of its own panel so the page reads without the title"
     },
-    "structure": "||||row||chart.column+chart.bar+table||"
+    "structure": "||||row||chart.column+chart.bar+table||",
+    "skeleton": "row of exhibits · 3 chart+table · open"
    }
   },
   {
@@ -1757,7 +2022,8 @@
      },
      "adds": "The rail says which part is uncommitted and what that exposes"
     },
-    "structure": "|sidebar|||||chart.donut||rail"
+    "structure": "|sidebar|||||chart.donut||rail",
+    "skeleton": "sidebar · 1 chart · rail · open"
    }
   },
   {
@@ -1885,7 +2151,8 @@
      },
      "adds": "The points name the critical path and the one date that moves the target"
     },
-    "structure": "|exhibit-top||||close|gantt|points|"
+    "structure": "|exhibit-top||||close|gantt|points|",
+    "skeleton": "exhibit-top · 1 figure · points · closing line"
    }
   },
   {
@@ -1945,7 +2212,8 @@
      },
      "adds": "Each card states the owner's measure and deadline, not just the role"
     },
-    "structure": "|exhibit-full|||||people||"
+    "structure": "|exhibit-full|||||people||",
+    "skeleton": "exhibit-full · 1 figure · open"
    }
   },
   {
@@ -2044,7 +2312,8 @@
      },
      "adds": "The column says what the at-risk milestones have in common and what would bring them back"
     },
-    "structure": "|exhibit-left|||||table|points|"
+    "structure": "|exhibit-left|||||table|points|",
+    "skeleton": "exhibit beside a column · 1 exhibit · points · open"
    }
   },
   {
@@ -2121,7 +2390,8 @@
      },
      "adds": null
     },
-    "structure": "|metrics-over-exhibit|||||chart.column||"
+    "structure": "|metrics-over-exhibit|||||chart.column||",
+    "skeleton": "metrics-over-exhibit · 1 chart · open"
    }
   },
   {
@@ -2150,7 +2420,8 @@
      },
      "adds": null
     },
-    "structure": "|text|||||||"
+    "structure": "|text|||||||",
+    "skeleton": "text · open"
    }
   },
   {
@@ -2178,7 +2449,8 @@
      },
      "adds": null
     },
-    "structure": "takeaways||||||||"
+    "structure": "takeaways||||||||",
+    "skeleton": "takeaways · open"
    }
   }
  ]

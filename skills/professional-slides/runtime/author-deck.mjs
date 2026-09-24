@@ -171,7 +171,7 @@ export function planOf(spec) {
         annotation: (ex?.annotations || []).length ? "callout" : (ex?.highlights || []).length ? "highlight" : "none",
         anchors: [...(slide.points || []).filter((p) => p && typeof p === "object" && p.icon).map((p) => ({ icon: p.icon })),
           ...(slide.photo ? [{ photo: slide.photo.alt ?? "photo" }] : []), ...(slide.pictures || []).map((p) => ({ photo: p.alt ?? p.label ?? "photo" }))],
-        highlight: slide.highlight, insight: t.takeaway ? "rule" : "none",
+        highlight: slide.highlight, insight: t.takeaway ? "rule" : t.commentary === "so-what-bar" ? "band" : "none",
         ...(t.series ? { series: t.series } : {}),
       });
     }
@@ -248,7 +248,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   const typed = spec.slides.filter((s) => s.pageType);
   const mix = (key) => Object.fromEntries([...typed.reduce((m, s) => m.set(s.pageType[key], (m.get(s.pageType[key]) || 0) + 1), new Map())].sort((a, b) => b[1] - a[1]));
-  const summary = { ...(draft ? { draft: true } : {}), pages: typed.length, types: mix("type"), commentary: mix("commentary"), closes: typed.filter((s) => s.pageType.takeaway).length,
+  const summary = { ...(draft ? { draft: true } : {}), pages: typed.length, types: mix("type"), commentary: mix("commentary"), closes: typed.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length,
     advisories: [...(contentReport.findings || []).filter((f) => !["blocker", "blocking"].includes(f.severity) || (draft && WORDS.has(f.code))), ...pageGateAdvisories]
       .map((f) => `${f.code}${f.id ? ` [${f.id}]` : ""}`)
       .concat(typed.flatMap((s) => (s.pageType.advisories || []).map((a) => `${a.split(":")[0]} [${s.id}]: ${a.slice(a.indexOf(":") + 2)}`))) };

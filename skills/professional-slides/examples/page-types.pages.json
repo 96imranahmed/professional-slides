@@ -737,6 +737,65 @@
    "source": "Source: illustrative data for a fictional operator; punctuality is arrivals within five minutes"
   },
   {
+   "id": "p10b",
+   "type": "parallel",
+   "form": "labelled-rows",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Three separate constraints each cap the peak on their own, and each needs its own evidence and its own number, so they read down the page as a diagnosis",
+   "settles": {
+    "kind": "count",
+    "what": "units in peak service, single-track sections and depot sidings in use, FY26"
+   },
+   "adds": "Each row says what binds, where it binds and what lifting it would take, beyond the number at its right",
+   "title": "Three constraints hold the peak where it is: fleet, track and depot",
+   "highlight": [
+    "none is held spare",
+    "two single-track sections",
+    "94% of its sidings",
+    "not before 2029",
+    "£38 million",
+    "£55 million"
+   ],
+   "blocks": [
+    {
+     "label": "The fleet is fully used",
+     "points": [
+      "All 58 units run in the morning peak and none is held spare, so a failure cancels a train rather than swapping in a replacement.",
+      "New units are on order but not before 2029, when electrification releases eleven diesel units for other lines."
+     ],
+     "metric": {
+      "value": "58 of 58",
+      "label": "units in peak service"
+     }
+    },
+    {
+     "label": "Single track east of Selby",
+     "points": [
+      "The Eastern line runs through two single-track sections where trains in opposite directions wait for each other.",
+      "Each extra peak train adds a crossing, which is why punctuality fell as the timetable grew.",
+      "Doubling both sections would cost about £38 million and is not in the funded plan."
+     ],
+     "metric": {
+      "value": "2",
+      "label": "single-track sections on the Eastern line"
+     }
+    },
+    {
+     "label": "The depot is almost full",
+     "points": [
+      "The Dales depot stables trains overnight in 94% of its sidings, so no more units can be based there.",
+      "The planned extension adds twelve sidings for £55 million and is the one dependency of the off-peak timetable."
+     ],
+     "metric": {
+      "value": "94%",
+      "label": "of depot sidings used overnight"
+     }
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; fleet diagram, track layout and depot plan, FY26"
+  },
+  {
    "id": "p11",
    "type": "mechanism",
    "form": "cycle",
@@ -1003,6 +1062,60 @@
    "source": "Source: illustrative data for a fictional operator; FY26 on-train and lapsed-rider surveys"
   },
   {
+   "id": "p13b",
+   "type": "ranking",
+   "form": "bar",
+   "commentary": "so-what-bar",
+   "takeaway": false,
+   "why": "Where Northvale's off-peak discount stands among all seven operators is the claim, so the whole set is ranked with Northvale marked and the implication set in a bar beneath it",
+   "settles": {
+    "kind": "rank",
+    "what": "off-peak return discount to the peak fare for all seven comparable regional operators, FY26"
+   },
+   "adds": "The bar says what the ranking means for the order of the plan: the fare change waits for the timetable",
+   "title": "Northvale gives the smallest off-peak discount of seven operators: 18% against a 35% median",
+   "exhibit": {
+    "heading": "Off-peak return discount to the peak fare, FY26",
+    "unit": "% off the peak fare",
+    "categories": [
+     "Southdown Rail",
+     "Westmoor Trains",
+     "Lakeside Lines",
+     "Marches Rail",
+     "Fenland Rail",
+     "Highland Link",
+     "Northvale Rail"
+    ],
+    "series": [
+     {
+      "name": "Discount",
+      "values": [
+       46,
+       41,
+       38,
+       35,
+       29,
+       24,
+       18
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Northvale Rail"
+     }
+    ],
+    "referenceLines": [
+     {
+      "value": 35,
+      "label": "Peer median 35%"
+     }
+    ]
+   },
+   "bar": "A deeper discount on an hourly service buys few new riders, so fare reform follows the half-hourly timetable in 2030 rather than leading it",
+   "source": "Source: illustrative data for fictional operators; standard off-peak and anytime day returns, FY26"
+  },
+  {
    "id": "p14",
    "type": "statement",
    "form": "quotes",
@@ -1116,6 +1229,106 @@
     "winner": "left"
    },
    "source": "Source: illustrative data for a fictional operator; 30-year appraisal at a 3.5% discount rate"
+  },
+  {
+   "id": "p16b",
+   "type": "panels",
+   "form": "sequence",
+   "commentary": "captions",
+   "takeaway": false,
+   "why": "Electrification adds journeys through a chain - faster trains, a demand response to the time saved, more journeys - and each link needs its own evidence, read left to right",
+   "settles": {
+    "kind": "sequence",
+    "what": "Eastern line journey times today and electrified, journeys gained per minute saved, and Eastern line journeys FY26-FY31"
+   },
+   "adds": "Each caption states the link its panel proves, so the chain can be checked one step at a time",
+   "title": "Electrification cuts 14 minutes from Leeds to Hull, adding 3.8 million journeys",
+   "exhibits": [
+    {
+     "type": "chart.bar",
+     "heading": "Journey time by flow",
+     "unit": "minutes",
+     "categories": [
+      "Leeds-Hull",
+      "York-Hull",
+      "Selby-Hull",
+      "Leeds-Selby"
+     ],
+     "series": [
+      {
+       "name": "Today",
+       "values": [
+        58,
+        49,
+        36,
+        24
+       ]
+      },
+      {
+       "name": "Electrified",
+       "values": [
+        44,
+        38,
+        27,
+        19
+       ]
+      }
+     ],
+     "caption": "Electric trains accelerate faster between the stops, saving 5 to 14 minutes on each of the four flows"
+    },
+    {
+     "type": "chart.bar",
+     "heading": "Gain per minute saved",
+     "unit": "k journeys",
+     "categories": [
+      "Leeds-Hull",
+      "York-Hull",
+      "Selby-Hull",
+      "Leeds-Selby"
+     ],
+     "series": [
+      {
+       "name": "Journeys per minute saved",
+       "values": [
+        125,
+        70,
+        90,
+        100
+       ]
+      }
+     ],
+     "caption": "Every minute saved wins 70 to 125 thousand journeys a year, most on the longest commuting flow"
+    },
+    {
+     "type": "chart.column",
+     "heading": "Eastern line journeys",
+     "unit": "million",
+     "categories": [
+      "FY26",
+      "FY27",
+      "FY28",
+      "FY29",
+      "FY30",
+      "FY31"
+     ],
+     "series": [
+      {
+       "name": "Journeys",
+       "values": [
+        14.2,
+        14.3,
+        14.4,
+        14.5,
+        16.6,
+        18.0
+       ]
+      }
+     ],
+     "caption": "The line reaches 18.0 million journeys by FY31, a step up once electric trains run from FY30",
+     "change": true
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; timetable modelling and demand model central case"
   },
   {
    "id": "p17",

@@ -38,8 +38,8 @@ Every analytical page carries:
 
 - `type` - the reading task (below);
 - `form` - which exhibit or construction carries it; the form sets the exhibit's `type`;
-- `commentary` - where the explanation lives: `beside`, `beside-left` (a column), `below` (points under the exhibit), `rail` (one claim in a filled side panel, written as `rail`), `on-exhibit` (callouts on the chart, `annotations`), `in-exhibit` (in the table's cells, the matrix, the cards), `captions` (a `caption` under every panel) or `none` (the exhibit and title carry it);
-- `takeaway` - `false`, or the closing sentence, kept for the page whose implication goes beyond its title;
+- `commentary` - where the explanation lives: `beside`, `beside-left` (a column), `below` (points under the exhibit), `rail` (one claim in a filled side panel, written as `rail`), `on-exhibit` (callouts on the chart, `annotations`), `in-exhibit` (in the table's cells, the matrix, the cards, the row blocks), `captions` (a `caption` under every panel), `so-what-bar` (one implication in a filled bar under the exhibit, written as `bar`) or `none` (the exhibit and title carry it);
+- `takeaway` - `false`, or the closing sentence, kept for the page whose implication goes beyond its title (`false` on a `so-what-bar` page: the bar is its close);
 - `why` - one sentence on why this type fits this claim;
 - `settles: { kind, what }` - what settles the claim and what kind of thing it is (`count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure`, `qualitative`). With an insight log, name the insights instead - `evidence: ["i3", "i7"]` - and `settles` is derived from them;
 - `adds` - what the commentary says that the exhibit cannot, or `null`;
@@ -58,14 +58,14 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 | `composition` | what a whole is made of | stacked-bar, stacked-column, marimekko, waffle, donut, treemap, pie |
 | `relationship` | two measures across the members | scatter, bubble, bubble-grid |
 | `bridge` | what a change between totals is made of | waterfall |
-| `panels` | one question for two to four cuts, side by side | row, grid, stack |
+| `panels` | one question for two to four cuts, side by side | row, grid, stack, sequence |
 | `scorecard` | members judged against criteria, cells coded | harvey, heatmap, rag, lights, check, bars, progress, dot, trend, binary |
 | `lookup` | measures to look up under their units | measure-table, table |
 | `matrix` | findings down the side, evidence across | findings-matrix |
 | `mechanism` | how a system works | flow, tree, cycle, steps, framework, layers, funnel, sankey, quadrants, ... |
 | `schedule` | what happens when | timeline, gantt, roadmap |
 | `numbers` | a few numbers that carry the claim | hero-number, metric-strip, fact-grid, stat-list |
-| `parallel` | three to six parallel ideas (give each card an `icon` for icon columns) | cards, capsules, arrow-rows |
+| `parallel` | three to six parallel ideas (give each card an `icon` for icon columns) | cards, capsules, arrow-rows, labelled-rows |
 | `profiles` | who the players are, with their marks | logos, people, logo-table, cards |
 | `place` | where things are | map |
 | `picture` | what the subject looks like | picture-hero, picture-pair, picture-strip, photo-backdrop |
@@ -73,6 +73,20 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 | `argument` | reasoning in prose | memo, sidebar |
 | `statement` | one sentence, or the voices behind it | statement, quotes |
 | `summary` | the answer and its proof | executive-summary, takeaways |
+
+## Beyond one exhibit and a column
+
+A generated deck drew two pages in five as one exhibit with a text column beside it; strong decks draw about one in eight that way and put a quarter of their pages on two or more exhibits. Three pages carry what those columns were holding:
+
+| Page | Choose it for | Write |
+| --- | --- | --- |
+| Labelled row blocks - `parallel`, form `labelled-rows` | three challenges, what changed in each area, a diagnosis: parallel ideas that each have evidence | `blocks`: two to five `{ label, points }`, and on every row or none a `metric` `{ value, label }` or a small `exhibit` at the right |
+| Exhibits joined by arrows - `panels`, form `sequence` | cause and effect, before and after, input to adjustment to result | two or three `exhibits`, each with its `heading`; commentary `captions`, `below`, `so-what-bar` or `none` |
+| So-what bar - commentary `so-what-bar` | an exhibit whose implication goes beyond the title and is one sentence | `bar`: eight words or more, two lines at most; `takeaway: false` |
+
+Each row block is a filled label on the house colour - five words at most, read down the left edge as the page's outline - with two to four bullets beside it; the rows share the body height, so the page fills to its foot. The commentary is `in-exhibit`, since the bullets are the explanation, or `so-what-bar` to close the rows on what they add up to. A headed chart at the right of a row keeps its plot only on a page of two blocks; on three or more, give each row a number or a two-row table.
+
+The bar is drawn in the house colour with the implication in bold white, in every design system. It is a close, so it counts toward the closing share with the takeaway line: a deck cannot close every page by moving the line into a bar.
 
 The compiler then composes the deck in memory, as the build will, filling logos, photographs and places from what is already on disk. Every page that fails to compose is reported in the same run, not one per build.
 
@@ -131,13 +145,13 @@ Choose the type from the claim, then the placement from where the reader's eye a
 | `VARIETY_TYPE_SHARE` | no type is more than 25% of the pages |
 | `VARIETY_TYPE_RANGE` | at least one type per five pages, up to eight |
 | `VARIETY_TYPE_RUN` | no three pages of one type in a row, unless they share a `series` (one template on purpose) |
-| `VARIETY_COMMENTARY` | no placement is more than 40% of the pages |
-| `VARIETY_TAKEAWAY` | at most 25% of pages close on a takeaway line |
+| `VARIETY_COMMENTARY` | no placement is more than 30% of the pages; `beside` and `beside-left` count as one |
+| `VARIETY_TAKEAWAY` | at most 25% of pages close on a takeaway line or a so-what bar |
 | `VARIETY_PANELS` | from fifteen pages, at least 12% set two or more exhibits side by side |
-| `VARIETY_SIGNATURE` | no one combination of type, placement and close is more than 15% of the pages |
+| `VARIETY_SIGNATURE` | no one drawn page - its layout, how many exhibits of which family, a text column or points, a rail, its close - is more than 20% of the pages |
 
-The limits sit outside what strong decks measure, so a deck that chose each page for its claim passes them with room. Do not rotate choices to meet them: a deck that breaks one has pages whose type was not chosen from the claim, and the fix is to ask of each such page what it has to show.
+The limits sit outside what strong decks measure, so a deck that chose each page for its claim passes them with room. Placement and repetition are counted on the page as drawn, not as declared: a column on the left and one on the right are one placement to a reader, and a trend beside its points and a stat list beside its points are one page. The compiler records each page's drawn skeleton in its `pageType`, and `VARIETY_SIGNATURE` names the pages that share the commonest. Do not rotate choices to meet them: a deck that breaks one has pages whose type was not chosen from the claim, and the fix is to ask of each such page what it has to show.
 
 ## Worked examples
 
-`examples/page-types.pages.json` is a complete pages file - a fictional regional rail operator's growth plan, with illustrative numbers - that uses every page type at least once, with its `form`, `commentary`, `takeaway`, `why`, `settles` and `adds` filled in and each page's explanation written where its commentary says it lives. Before writing a page, find the example page of the type you are writing, copy its shape, and replace the content: the keys, the data shape its form reads and the length of its callouts, captions and points are the ones that compile and build.
+`examples/page-types.pages.json` is a complete pages file - a fictional regional rail operator's growth plan, with illustrative numbers - that uses every page type at least once, with its `form`, `commentary`, `takeaway`, `why`, `settles` and `adds` filled in and each page's explanation written where its commentary says it lives. Before writing a page, find the example page of the type you are writing, copy its shape, and replace the content: the keys, the data shape its form reads and the length of its callouts, captions and points are the ones that compile and build. Page `p10b` is labelled row blocks with a number on each row, `p13b` a ranking closed by a so-what bar, and `p16b` three exhibits joined by arrows.

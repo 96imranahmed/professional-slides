@@ -1472,6 +1472,15 @@ const TAKEAWAY_VARIANT = { band: "tonal", rule: "rule", statement: "statement", 
 
 function soWhatItem(text, id, highlight, tinted = true) {
   const accent = highlight === undefined || highlight === null ? {} : { highlight };
+  // `{ text, style: "bar" }`: the so-what bar, a band in the house colour with
+  // the implication in bold white across the foot of the exhibit. It is a
+  // different device from the closing line - the page's commentary lives in
+  // it, not after it - so it is drawn the same way in every design system,
+  // and it stays filled beside a callout: it is the page's one box.
+  if (text && typeof text === "object" && !Array.isArray(text)) {
+    if (text.style !== "bar" || typeof text.text !== "string" || !text.text.trim()) throw new Error("A soWhat object is the so-what bar: { text, style: \"bar\" }");
+    return { id, component: "insight", props: { text: text.text.trim(), variant: "primary" }, size: HUG };
+  }
   // One tinted box per page. A callout is already a tinted box saying "read
   // this"; a second one underneath in a different tint reads as two competing
   // boxes rather than as a page with a close, which is what a reviewer sees
@@ -1681,6 +1690,7 @@ function chooseLayout(slide, recent = []) {
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   // An explicit arrangement is the author overriding the choice, not a hint.
   if (slide.arrange === "stack") return "stack";
+  if (slide.arrange === "sequence") return "sequence";
   if (slide.arrange === "row") return exhibits.length === 2 && !slide.points?.length ? "two-up-contrast" : "two-up";
   if (slide.arrange === "grid" || exhibits.length >= 4) return "grid";
   // Two charts on one category set with points beside them stack in the hero
@@ -1864,7 +1874,7 @@ export const SLIDE_KEYS = Object.freeze({
   kind: "statement, takeaways, section, agenda or cover; absent means an analytical page",
   shape: "one of the four heavy-page shapes: findings-matrix, measure-table, model-page, half-and-half",
   layout: "force a layout instead of letting the composer choose one",
-  arrange: "row or stack, when the page carries more than one exhibit",
+  arrange: "row, stack, grid or sequence (a row joined by arrows), when the page carries more than one exhibit",
   density: "this page's density profile, overriding the deck's",
   // the title band
   title: "the action title: the finding, not the subject",
@@ -1878,6 +1888,7 @@ export const SLIDE_KEYS = Object.freeze({
   exhibit: "the page's one exhibit",
   exhibits: "two or more exhibits, arranged by `arrange`",
   rows: "a label-and-text table written at slide level",
+  blocks: "on a labelled-rows page, the rows down the page: each { label, points, metric | exhibit }",
   columns: "the headers for that table",
   photo: "a photograph beside the copy",
   pictures: "one to five photographs, each with its label and line: the picture-led pages",
@@ -1901,7 +1912,7 @@ export const SLIDE_KEYS = Object.freeze({
   insight: "the so-what as a box in the side column",
   insights: "two statements in that column: a plain one above a boxed one",
   callout: "a boxed aside beside the evidence",
-  soWhat: "the page's close, under everything else",
+  soWhat: "the page's close, under everything else; { text, style: \"bar\" } is the filled so-what bar",
   implication: "the gutter mark joining evidence to meaning: \"divider-chevron\", \"chevron\", \"rule\", or false when the words carry it",
   items: "the entries on an agenda or takeaways page",
   active: "which agenda entry the deck is on",
@@ -2120,17 +2131,18 @@ function highlightThePhrase(slide) {
   // later, from the slide, and they set it in the accent too.
   const next = { ...slide };
 
-  if (Array.isArray(slide.points)) {
-    next.points = slide.points.map((point) => {
-      if (typeof point === "string") {
-        const found = inside(point);
-        return found.length ? { text: point, highlight: found } : point;
-      }
-      if (!point || typeof point !== "object" || point.highlight !== undefined) return point;
-      const found = inside(`${point.lead ?? ""} ${point.text ?? ""}`);
-      return found.length ? { ...point, highlight: found } : point;
-    });
-  }
+  const markPoints = (points) => points.map((point) => {
+    if (typeof point === "string") {
+      const found = inside(point);
+      return found.length ? { text: point, highlight: found } : point;
+    }
+    if (!point || typeof point !== "object" || point.highlight !== undefined) return point;
+    const found = inside(`${point.lead ?? ""} ${point.text ?? ""}`);
+    return found.length ? { ...point, highlight: found } : point;
+  });
+  if (Array.isArray(slide.points)) next.points = markPoints(slide.points);
+  // A labelled-rows page says its findings in each row's bullets.
+  if (Array.isArray(slide.blocks)) next.blocks = slide.blocks.map((block) => (Array.isArray(block?.points) ? { ...block, points: markPoints(block.points) } : block));
   // A table says it in a cell: the cell's own `highlight` is the accent phrase,
   // which `exhibitItem` already knows how to read.
   const markTable = (ex) => {
@@ -2270,7 +2282,9 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     // squeezes the page's own conclusion into whatever is left, so a page
     // captions its panels or carries a list, not both.
     if (slide.points?.length) throw new Error(`${id}: panel captions are the commentary; drop the page's points or the captions`);
-    const width = Math.max(160, (BODY_WIDTH - COLUMN_GAP * (exhibits.length - 1)) / exhibits.length);
+    // A sequence gives each gutter to an arrow and its two gaps.
+    const gutters = (exhibits.length - 1) * (layout === "sequence" ? CONNECTOR_WIDTH + 2 * COLUMN_GAP : COLUMN_GAP);
+    const width = Math.max(160, (BODY_WIDTH - gutters) / exhibits.length);
     // Measured by the insight box itself - its face, weight and padding - so the
     // shared height never under-allocates the caption it is for.
     const height = Math.max(...captioned.map((ex) => measureInsight({ x: 0, y: 0, width, height: 1000 }, { text: ex.caption.trim(), variant: "neutral", align: "center" }).height));
@@ -2332,7 +2346,7 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     if (narrow(ex) && String(other?.type).startsWith("chart.")) return { width: { fr: 2 }, height: "fill" };
     return SIZE;
   };
-  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 4).map((sourceEx, i) => {
+  const panels = exhibits.slice(0, 4).map((sourceEx, i) => {
     // A schedule paired with a table shares its evidence top. Preserve an
     // explicitly authored alternative; a standalone schedule stays centred.
     const ex = sourceEx.type === "gantt" && sourceEx.valign === undefined && exhibits.some(peer => peer.type === "table")
@@ -2345,7 +2359,14 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     // push that table's actual header below the chart's reading start.
     return headedPanel(ex, panel, `${id}-exhibit-${i}`,
       !exhibits.some(peer => String(peer.type).startsWith("chart.")));
-  }) });
+  });
+  // `sequence`: the same row read as steps, a block arrow in each gutter
+  // pointing from one exhibit to the next - cause to effect, before to after.
+  // The arrow is the relation; a row of peers without it is a comparison.
+  const row = layout === "sequence"
+    ? panels.flatMap((panel, i) => (i ? [{ id: `${id}-step-${i}`, component: "connector", props: { variant: "arrow" }, size: { width: CONNECTOR_WIDTH, height: "fill" } }, panel] : [panel]))
+    : panels;
+  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: row });
   if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
 }
 
@@ -2427,6 +2448,43 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
     { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}),
       layout: "flow.row", size: HUG, items: columns },
   ] });
+}
+
+
+/**
+ * Labelled row blocks: `labelled-rows`.
+ *
+ * Two to five rows down the page, each a filled label block in the house
+ * colour, its bullets beside it and, where the rows have evidence, a number or
+ * a small exhibit at the right. It is how a strong deck sets out three
+ * challenges, what changed in each area, or a diagnosis: the labels read down
+ * the left edge as the page's outline, and each row is read across. Before it
+ * existed those pages became one exhibit with a text column beside it, or a
+ * table of sentences.
+ *
+ * The rows share the body height equally, so the page fills to its foot and
+ * every label block is the same size - blocks of different heights read as
+ * items of different weight. The label and the right-hand column take fixed
+ * widths so they align from row to row; the bullets take the rest and centre
+ * on their block.
+ */
+const BLOCK_LABEL_WIDTH = 228, BLOCK_SIDE_WIDTH = 300;
+function labelledRows(items, { id, slide, baseDir, fill }) {
+  const blocks = slide.blocks || [];
+  if (blocks.length < 2) throw new Error(`${id}: a labelled-rows page carries two or more \`blocks\`, each { label, points }`);
+  const rows = blocks.map((block, at) => {
+    if (!block?.label || !(block.points || []).length) throw new Error(`${id}: block ${at + 1} needs its \`label\` and \`points\``);
+    const label = { id: `${id}-label-${at}`, component: "side-statement", props: { text: String(block.label).trim(), tone: "primary" },
+      size: { width: BLOCK_LABEL_WIDTH, height: "fill" } };
+    const text = { id: `${id}-text-${at}`, layout: "flow.column", leftover: "center", size: { width: { fr: 1 }, height: "fill" },
+      items: [pointsItem(block.points, `${id}-points-${at}`, "open", fill, false, null)] };
+    const side = block.metric
+      ? { id: `${id}-metric-${at}`, component: "metric", props: { value: String(block.metric.value), label: block.metric.label, ...(block.metric.delta ? { delta: block.metric.delta } : {}) },
+          size: { width: BLOCK_SIDE_WIDTH, height: "fill" } }
+      : block.exhibit ? { ...exhibitItem(block.exhibit, `${id}-exhibit-${at}`, baseDir), size: { width: BLOCK_SIDE_WIDTH, height: "fill" } } : null;
+    return { id: `${id}-block-${at}`, layout: "flow.row", size: SIZE, items: [label, text, side].filter(Boolean) };
+  });
+  items.push({ id: `${id}-blocks`, layout: "flow.column", gap: "space.3", size: SIZE, items: rows });
 }
 
 
@@ -2778,8 +2836,10 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     const panels = exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE }, `${id}-exhibit-${i}`));
     items.push({ id: `${id}-grid`, layout: "flow.column", size: SIZE, items: [{ id: `${id}-row-a`, layout: "flow.row", size: SIZE, items: panels.slice(0, 2) }, { id: `${id}-row-b`, layout: "flow.row", size: SIZE, items: panels.slice(2, 4) }] });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
-  } else if (layout === "two-up" || layout === "two-up-contrast") {
+  } else if (layout === "two-up" || layout === "two-up-contrast" || layout === "sequence") {
     peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle, pictures });
+  } else if (layout === "labelled-rows") {
+    labelledRows(items, { id, slide, baseDir, fill });
   } else if (layout === "picture-pair" || layout === "picture-strip") {
     // Two named things side by side, or three to five across a strip, each with
     // its card underneath. This is the page the reader can tell apart before
