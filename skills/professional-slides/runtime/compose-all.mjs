@@ -24,13 +24,16 @@ function withReadingTasks(result, spec) {
 }
 
 /** `{ deck, decisions }` when every page composes; otherwise throws with `pageErrors` naming every failing page. */
-export function composeAll(spec, baseDir) {
+export function composeAll(spec, baseDir, { partial = false } = {}) {
   const errors = [];
   let working = structuredClone(spec);
   for (let round = 0; round < 6; round += 1) {
     try {
       const result = planDeck(toDeckPlan(structuredClone(working), baseDir));
       if (!errors.length) return withReadingTasks(result, working);
+      // The pages that composed, for a caller that reports the failures and
+      // still checks everything else in the same run.
+      if (partial) return { ...withReadingTasks(result, working), pageErrors: [...new Set(errors)] };
       break;
     } catch (error) {
       const found = error.pageErrors ?? [error.message];

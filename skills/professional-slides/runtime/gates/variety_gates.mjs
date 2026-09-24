@@ -25,6 +25,8 @@ export const VARIETY_CODES = Object.freeze({
   VARIETY_TAKEAWAY: "too many pages close on a takeaway line",
   VARIETY_PANELS: "too few pages set evidence side by side",
   VARIETY_SIGNATURE: "one combination of type, commentary and close repeats across the deck",
+  // Raised by author-deck.mjs: the page failed to compose; the rest of the deck is still checked.
+  PAGE_DOES_NOT_COMPOSE: "a page could not be composed",
   // Advisory, raised by the page-type compiler (page-types.mjs) and listed in the author's summary.
   MAP_COARSE: "a regional map drawn on the built-in 1:110m coastline, which is coarse at that scale",
 });

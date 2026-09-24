@@ -50,7 +50,9 @@ export async function composeForAuthoring(spec, baseDir) {
   await autoFillLogos(copy, baseDir, { hint: copy.playersHint, fetchMissing: false });
   await autoFillPictures(copy, baseDir, { fetchMissing: false });
   await autoFillPlaces(copy, baseDir, { fetchMissing: false });
-  try { return { deck: composeAll(copy, baseDir).deck }; }
+  // Pages that fail to compose are set aside and reported; the rest are still
+  // composed and checked, so one broken page does not hide every other finding.
+  try { const result = composeAll(copy, baseDir, { partial: true }); return { deck: result.deck, pageErrors: result.pageErrors ?? [] }; }
   catch (error) { return { error: `the deck does not compose - ${error.message}`, pageErrors: error.pageErrors }; }
 }
 
@@ -110,12 +112,13 @@ export function sceneGateFindings(deck, python = process.env.RUNTIME_PYTHON || "
     const scene = path.join(dir, "scene.json"), out = path.join(dir, "gates.json");
     writeFileSync(scene, JSON.stringify(deck));
     const run = spawnSync(python, [fileURLToPath(new URL("./gates/page_gates.py", import.meta.url)), scene, "--report", out], { encoding: "utf8" });
-    if (run.error || ![0, 2].includes(run.status)) return { findings: [], ran: false };
+    if (run.error || ![0, 2].includes(run.status)) return { findings: [], advisories: [], ran: false };
     const report = JSON.parse(readFileSync(out, "utf8"));
-    return { ran: true, findings: (report.findings || []).filter((f) => f.severity === "blocker").map((f) => {
-      const slide = f.slide ? deck.slides[f.slide - 1] : null;
-      return { ...f, id: slide ? slide.sourceSlideId ?? slide.id : undefined };
-    }) };
+    const withId = (f) => { const slide = f.slide ? deck.slides[f.slide - 1] : null; return { ...f, id: slide ? slide.sourceSlideId ?? slide.id : undefined }; };
+    // Advisories are listed in the summary: a thin page the build will note
+    // should be seen by the author first.
+    return { ran: true, findings: (report.findings || []).filter((f) => f.severity === "blocker").map(withId),
+      advisories: (report.findings || []).filter((f) => f.severity !== "blocker" && f.slide).map(withId) };
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -124,11 +127,13 @@ export async function authorDeck(doc, { baseDir, insights = null, draft = false 
   const { spec } = compileDeck(doc, { insights, draft });
   const composed = await composeForAuthoring(spec, baseDir);
   if (composed.error) { const error = new Error(composed.error); error.pageErrors = composed.pageErrors ?? [composed.error]; throw error; }
+  const failed = (composed.pageErrors || []).map((message) => ({ code: "PAGE_DOES_NOT_COMPOSE", id: message.match(/^(?:Cannot render )?([^:\s]+):/)?.[1], repair: message }));
+  const failedIds = new Set(failed.map((f) => f.id).filter(Boolean));
   const scene = sceneGateFindings(composed.deck);
   // A draft has no copy yet, so the page gates - words, tables, footers - are
   // reported there, not enforced; the structure rules hold either way.
-  return { spec, deck: composed.deck, findings: [...varietyFindings(spec, { structureOf }), ...(draft ? [] : scene.findings)],
-    pageGateAdvisories: draft ? scene.findings : [], pageGatesRan: scene.ran };
+  return { spec, deck: composed.deck, failedIds, findings: [...failed, ...varietyFindings(spec, { structureOf }), ...(draft ? [] : scene.findings)],
+    pageGateAdvisories: [...(draft ? scene.findings : []), ...scene.advisories], pageGatesRan: scene.ran };
 }
 
 /** The plan record (plan_gates.mjs) implied by the compiled deck. */
@@ -183,9 +188,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   let compiled;
   try { compiled = await authorDeck(doc, { baseDir: dir, insights: await readInsights(dir, stem), draft: args.includes("--draft") }); }
   catch (error) { console.error(error.message); process.exit(2); }
-  const { spec, deck, findings, pageGateAdvisories = [] } = compiled;
+  const { spec, deck, findings, pageGateAdvisories = [], failedIds = new Set() } = compiled;
   const content = deriveContent(spec, deck);
-  const contentReport = runContentGates(content, { required: true });
+  // A page that did not compose has no text to plan; its composition error is its finding.
+  const contentReport = runContentGates({ ...content, pages: content.pages.filter((p) => !failedIds.has(p.id)) }, { required: true });
   // A draft is the title spine with its page types: the pages can still be
   // short of words, and the content plan is written but marked a draft.
   const draft = args.includes("--draft");

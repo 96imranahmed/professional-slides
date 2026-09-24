@@ -1066,7 +1066,8 @@ def gate_thin_page(slide_no, slide, findings):
     body, footer, _band = body_bands(slide)
     if body < floor:
         findings.append(finding(slide_no, "THIN_PAGE", body, floor, thin_remedy()))
-        return
+    # Both are reported in one run: returning here hid a footer-heavy page
+    # until its body was fixed, which cost the author another round.
     # A page that clears the floor on the strength of its notes has padded the
     # wrong band: the reference footer is 19 words against a 128-word body.
     if footer and body and footer > 0.3 * (body + footer):

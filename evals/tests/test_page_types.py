@@ -201,6 +201,23 @@ console.log(JSON.stringify({{ advisories: page.pageType.advisories ?? [] }}));
 ''')
         self.assertTrue(any(a.startswith('MAP_COARSE') for a in result['advisories']))
 
+    def test_a_broken_page_does_not_hide_the_others(self):
+        result = run_node(f'''
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import {{ authorDeck }} from '{AUTHOR}';
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
+const S = {{ kind: 'qualitative', what: 'The operator statement of its plan' }};
+const broken = {{ id: 'b', type: 'lookup', form: 'table', commentary: 'none', takeaway: false, why: 'The measures are looked up here', settles: S,
+  title: 'The measures sit in one table', exhibit: {{ columns: ['A', 'B'], rows: [['x']] }} }};
+const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, why: 'A short argument page for the test', settles: S,
+  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'] }};
+const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [broken, memo] }}, {{ baseDir: dir }});
+console.log(JSON.stringify({{ failed: [...out.failedIds], composed: out.deck.slides.map((s) => s.id), codes: out.findings.map((f) => f.code) }}));
+''')
+        self.assertEqual(result['failed'], ['b'])
+        self.assertIn('m', result['composed'])  # the rest of the deck is still composed and checked
+        self.assertIn('PAGE_DOES_NOT_COMPOSE', result['codes'])
+
 
 if __name__ == '__main__':
     unittest.main()
