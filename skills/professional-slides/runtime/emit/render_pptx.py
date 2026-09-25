@@ -71,6 +71,26 @@ def rasterise(pdf: Path, out_dir: Path, dpi: int) -> None:
         list(pool.map(run, blocks))
 
 
+def page_texts(pdf: Path) -> list:
+    """Each page's text, for the export audit. pdftotext spaces words by where
+    they sit on the page; pypdf joins separate text objects with nothing
+    between them, so a bar's value beside the next bar's label read back as
+    "235777-9" and two dumbbell labels as "1715", and eighteen labels drawn
+    correctly were reported lost. pypdf remains the fallback where poppler is
+    missing. `-raw` keeps the content stream's order and a line-end hyphen as
+    drawn: the default mode rejoins "like-for-" / "like" as "like-forlike"."""
+    if shutil.which("pdftotext"):
+        run = subprocess.run(["pdftotext", "-raw", "-enc", "UTF-8", str(pdf), "-"], capture_output=True, timeout=300)
+        if run.returncode == 0:
+            pages = run.stdout.decode("utf-8", "replace").split("\f")
+            from pypdf import PdfReader
+            count = len(PdfReader(pdf).pages)
+            if len(pages) >= count:
+                return pages[:count]
+    from pypdf import PdfReader
+    return [page.extract_text() or "" for page in PdfReader(pdf).pages]
+
+
 def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as td:
@@ -98,9 +118,8 @@ def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False) -> d
             files.append(str(target))
         files.sort(key=lambda s: int(Path(s).stem.split("-")[1]))
     result = {"pptx": str(pptx), "pdf": str(saved_pdf), "renders": files, "dpi": dpi, "renderer": "libreoffice"}
-    from pypdf import PdfReader
     text_path = out_dir / "page-text.json"
-    text_path.write_text(json.dumps([page.extract_text() or "" for page in PdfReader(saved_pdf).pages], ensure_ascii=False))
+    text_path.write_text(json.dumps(page_texts(saved_pdf), ensure_ascii=False))
     result["pageText"] = str(text_path)
     if montage and files:
         from PIL import Image

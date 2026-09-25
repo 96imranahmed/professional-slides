@@ -149,5 +149,27 @@ console.log(JSON.stringify({ codes: auditTextPlan(content, scene).findings.map((
         self.assertEqual(result['whole'], 5)
 
 
+class ExportReadbackTests(unittest.TestCase):
+    def test_a_label_broken_with_a_hyphen_is_found(self):
+        # "Breakeven load factor 54.4" drawn as "fac-" / "tor 54.4" reads back as
+        # "fac-tor"; it was reported lost and blocked the build.
+        result = run_node('''
+import { auditExportText } from './skills/professional-slides/runtime/text-contract.mjs';
+const scene = { slides: [{ id: 'p', nodes: [{ type: 'text', role: 'action-title', text: 'Breakeven fell' }, { type: 'text', role: 'data-label', text: 'Breakeven load factor 54.4' }] }] };
+const content = { textContract: 'complete', pages: [{ id: 'p', n: 1, kind: 'section', textPlan: [{ id: 't', role: 'title', text: 'Breakeven fell' }, { id: 'e', role: 'exhibit', text: 'Breakeven load factor 54.4' }] }] };
+console.log(JSON.stringify({ codes: auditExportText(content, scene, ['Breakeven fell\\nBreakeven load fac-\\ntor 54.4']).findings.map((f) => f.code) }));
+''')
+        self.assertNotIn('TEXT_EXPORT_LOST', result['codes'])
+
+    def test_page_text_is_read_with_words_spaced_by_position(self):
+        # pypdf joined a bar's value to the next label ("235777-9"); pdftotext
+        # spaces them, and keeps a line-end hyphen as drawn.
+        import shutil
+        if not shutil.which("pdftotext"):
+            self.skipTest("poppler is not installed")
+        source = (Path(ROOT) / "skills/professional-slides/runtime/emit/render_pptx.py").read_text(encoding="utf-8")
+        self.assertIn('["pdftotext", "-raw"', source)
+
+
 if __name__ == '__main__':
     unittest.main()

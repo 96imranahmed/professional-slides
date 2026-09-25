@@ -60,7 +60,9 @@ export function subtractAll(text, blocks, slide, scene) {
     let { at, length } = locate(rest, item.needle);
     if (at < 0 && !item.generated && /\p{L}/u.test(item.needle)) {
       // PDF extraction can split a kerned pair inside a word ("T ony").
-      const loose = new RegExp([...item.needle.replace(/\s+/g, '')].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s?'), 'u').exec(rest);
+      // A label the renderer broke across two lines with a hyphen ("fac-" /
+      // "tor") reads back as "fac-tor": the gap may carry that hyphen too.
+      const loose = new RegExp([...item.needle.replace(/\s+/g, '')].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('-?\\s?'), 'u').exec(rest);
       if (loose) { at = loose.index; length = loose[0].length; }
     }
     if (at >= 0) rest = rest.slice(0, at) + ' ' + rest.slice(at + length);
