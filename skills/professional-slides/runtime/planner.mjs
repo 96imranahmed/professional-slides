@@ -4,6 +4,7 @@ import {
   absolute,
   assertSectionHeadingProps,
   compileDeck,
+  mapAll,
   component as componentNode,
   flow,
   grid,
@@ -274,8 +275,20 @@ function makeComposition(plan, items, { root = false } = {}) {
       // and on into the next. A document page says so; reflowing its columns
       // into one stack is what left report prose in a single narrow band.
       if (plan.textFlow !== "columns" && isProseRow(children) && !parallelProse(children)) {
-        direction = "column";
-        children = children.map((item) => ({ ...item, size: { width: { fr: 1 }, height: "hug" } }));
+        // It reads down - in two columns, not one. Stacked, each paragraph
+        // stopped at the 80-character measure and the list filled the left half
+        // of a full-width band under the exhibit with nothing to its right,
+        // which is most of what made an editorial deck look unfinished. Two
+        // columns reading down and across keep the measure and fill the width.
+        const hug = (item) => ({ ...item, size: { width: { fr: 1 }, height: "hug" } });
+        if (children.length >= 2) {
+          const half = Math.ceil(children.length / 2);
+          children = [children.slice(0, half), children.slice(half)].map((part, k) => ({
+            id: `${plan.id}-reading-${k}`, layout: "flow.column", gap: plan.gap, size: { width: { fr: 1 }, height: "hug" }, items: part.map(hug) }));
+        } else {
+          direction = "column";
+          children = children.map(hug);
+        }
       }
     }
     // A slide body whose blocks all hug their content claims less than the frame.
@@ -391,7 +404,7 @@ export function planSlide(plan, registry = REGISTRY) {
   const titleDecision = titleVariant ?? "house-style";
   const body = makeComposition({...plan, gap: plan.gap ?? (["pre-read","appendix"].includes(content.density.resolved) && ["flow.row","flow.column"].includes(layoutKind(plan,plan.items)) ? "space.3" : undefined)}, plan.items, { root: true });
   return {
-    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.tag ? { tag: plan.tag } : {}), ...(plan.kicker ? { kicker: plan.kicker } : {}), ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), tracker: plan.tracker, source: plan.source, note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
+    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.tag ? { tag: plan.tag } : {}), ...(plan.kicker ? { kicker: plan.kicker } : {}), ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.subtitleRole ? { subtitleRole: plan.subtitleRole } : {}), tracker: plan.tracker, source: plan.source, note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
     decision: {
       titleVariant: titleDecision,
       density: content.density,
@@ -458,7 +471,7 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
   // in a numbered deck and the printed footer ran 45, 46, then nothing, then
   // 49. A divider is the exception a reader expects: a full-bleed navy page
   // with a numeral on it already says where it is.
-  const planned = deckPlan.slides.map((slide, index) => slide.kind === "cover"
+  const planned = mapAll(deckPlan.slides, (slide, index) => slide.kind === "cover"
     ? planCover(slide)
     : slide.kind === "tracker" ? planTracker(slide, registry)
     : slide.kind === "divider" ? planDivider(slide)

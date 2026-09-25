@@ -83,7 +83,7 @@ class DeckVocabularyTests(unittest.TestCase):
 
     def test_the_floor_is_recorded_as_a_vocabulary_floor_not_a_corpus_rate(self):
         rule = page_gates.CONTRACT["plan"]["craft"]["vocabulary"]
-        self.assertIn("cannot be read off a render", rule["$comment"])
+        self.assertIn("A vocabulary floor rather than a rate", rule["$comment"])
         self.assertLessEqual(rule["familiesMin"], len(page_gates.DEVICE_FAMILIES) // 2)
 
 
@@ -100,8 +100,7 @@ class TextFormTests(unittest.TestCase):
                 "adds": None, "highlight": None,
                 "textPlan": [{"id": "t", "role": "title", "text": "A page that proves something"},
                              {"id": "b", "role": "body", "text": body}],
-                "textReference": {"task": "t", "samples": [
-                    {"reference": "r.pdf", "page": 1, "sha256": "x" * 64, "bodyWords": 150, "totalWords": 160}]},
+                "textReference": {"task": "chart-with-commentary"},
             }],
         }
 
@@ -183,7 +182,7 @@ class TableDensityTests(unittest.TestCase):
         """
         rows = [[f"Row {i}", str(i), f"{i * 3}%"] for i in range(1, 12)]
         floor = page_gates.TYPE_RANGES["table-dense"][0]
-        for palette in ("mckinsey", "bcg", "bain", "deloitte", "consulting-toolkit"):
+        for palette in ("midnight", "evergreen", "crimson", "graphite", "toolkit"):
             with self.subTest(palette=palette):
                 self.assertLessEqual(floor, self.densest(rows, palette),
                                      "a table at the last rung of the ladder is refused")
@@ -370,30 +369,28 @@ console.log(JSON.stringify(r.findings.filter(f => f.code === 'PLAN_CHART_MONOTON
 
 
 class ReadingTaskBankTests(unittest.TestCase):
-    """The shipped bank is every judged client page, measured and hashed."""
+    """The runtime ships each reading task's targets as quartiles."""
 
-    BANK = json.loads((RUNTIME / "reading-tasks.json").read_text(encoding="utf-8"))
+    SHIPPED = json.loads((RUNTIME / "reading-tasks.json").read_text(encoding="utf-8"))["tasks"]
 
-    def test_every_sample_is_a_measured_hashed_page(self):
-        for task, samples in self.BANK["tasks"].items():
-            for s in samples:
-                with self.subTest(task=task, reference=s["reference"], page=s["page"]):
-                    self.assertRegex(s["sha256"], r"^[0-9a-f]{64}$")
-                    self.assertGreater(s["bodyWords"], 0, "a raster page is never a zero-word baseline")
-                    self.assertGreaterEqual(s["totalWords"], s["bodyWords"])
+    def test_each_task_carries_ordered_quartiles(self):
+        for task, target in self.SHIPPED.items():
+            with self.subTest(task=task):
+                words = target["bodyWords"]
+                self.assertLessEqual(words["q1"], words["median"])
+                self.assertLessEqual(words["median"], words["q3"])
 
     def test_a_chart_page_without_commentary_is_measured_against_its_own_kind(self):
-        led = sorted(s["bodyWords"] for s in self.BANK["tasks"]["chart-led"])
-        told = sorted(s["bodyWords"] for s in self.BANK["tasks"]["chart-with-commentary"])
-        self.assertLess(led[len(led) // 2], told[len(told) // 2])
+        self.assertLess(self.SHIPPED["chart-led"]["bodyWords"]["median"], self.SHIPPED["chart-with-commentary"]["bodyWords"]["median"])
 
     def test_the_cross_check_knows_every_task_that_has_a_column_or_not(self):
         known = run_node("""
 import {READING_TASKS} from './skills/professional-slides/runtime/text-contract.mjs';
 console.log(JSON.stringify(Object.keys(READING_TASKS)));
 """)
-        for task in self.BANK["commentary"]:
-            self.assertIn(task, known)
+        for task, target in self.SHIPPED.items():
+            if isinstance(target.get("commentary"), bool):
+                self.assertIn(task, known)
 
 
 class FigureRoleVocabularyTests(unittest.TestCase):

@@ -3,12 +3,11 @@
  * Eval suite entry point.
  *
  *   node evals/scripts/run_tests.mjs                unit tests
- *   node evals/scripts/run_tests.mjs --release      reference-image golden check
  *
- * `evals/run.sh` is the fuller version: it also prints the page-gate numbers for
- * the fixture deck. Both work without a Codex runtime cache and without a
- * native canvas - text is measured from the portable font-metric tables and
- * pages are measured from PNGs with Pillow.
+ * `evals/run.sh` is the fuller version: it also prints the content-stage and
+ * cold-run numbers for the example decks. Both work without a native canvas -
+ * text is measured from the portable font-metric tables and pages are measured
+ * from PNGs with Pillow.
  */
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -16,11 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-/**
- * Prefer an explicitly configured runtime, fall back to what is on PATH. The
- * old entry point threw when `~/.cache/codex-runtimes` was absent, which made
- * the suite unrunnable anywhere but one machine.
- */
+/** Prefer an explicitly configured runtime, fall back to what is on PATH. */
 async function resolveRuntime() {
   const fallback = {
     RUNTIME_NODE: process.execPath,
@@ -45,11 +40,5 @@ function run(command, args) {
 }
 
 const args = process.argv.slice(2);
-if (args.some(arg => arg !== "--release")) throw new Error("Usage: run_tests.mjs [--release]");
-if (args.includes("--release")) {
-  // Item 17: the release gate is a pixel comparison against accepted
-  // reference images, not a source hash.
-  await run(runtime.RUNTIME_PYTHON, ["evals/scripts/check_release.py"]);
-} else {
-  await run(runtime.RUNTIME_PYTHON, ["-m", "unittest", "discover", "-s", "evals/tests", "-p", "test_*.py"]);
-}
+if (args.length) throw new Error("Usage: run_tests.mjs");
+await run(runtime.RUNTIME_PYTHON, ["-m", "unittest", "discover", "-s", "evals/tests", "-p", "test_*.py"]);

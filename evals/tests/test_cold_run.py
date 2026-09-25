@@ -162,7 +162,7 @@ class SpecimenTests(unittest.TestCase):
         """A harness only trusted on decks that fail it is not a harness."""
         baseline = self.specimen("example-deck-baseline.json")
         decks = baseline["decks"]
-        self.assertGreaterEqual(len(decks), 4)
+        self.assertGreaterEqual(len(decks), 3)  # one per shipped example deck
         for name, statistics in decks.items():
             with self.subTest(deck=name):
                 self.assertGreater(statistics["contentPages"], 0, name)

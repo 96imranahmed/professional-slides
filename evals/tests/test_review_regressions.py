@@ -18,12 +18,20 @@ for(const direction of ['left','right','up','down']) {
 }
 assert.throws(()=>d.render({id:'bad',frame,props:{text:'Evidence',direction:'diagonal'}}));
 assert.throws(()=>d.render({id:'bad',frame,props:{text:'Evidence',border:'no'}}));
-assert.throws(()=>renderEvidenceAnnotations({id:'cross',plot:{x:0,y:120,width:760,height:300},props:{annotations:[{category:'A',text:'Evidence'}]},pointMap:new Map([['value:A',{x:300,y:350}]]),obstacles:[{role:'chart-mark',frame:{x:280,y:160,width:40,height:100}}]}),/clearance/);
+// A band leader that would cross another mark is a conflict the chart
+// resolves (it used to throw "insufficient clearance"): the box moves beside
+// its point, and neither box nor leader touches the mark in the way.
+const crossed=renderEvidenceAnnotations({id:'cross',plot:{x:0,y:120,width:760,height:300},props:{annotations:[{category:'A',text:'Evidence'}]},pointMap:new Map([['value:A',{x:300,y:350}]]),obstacles:[{role:'chart-mark',frame:{x:280,y:160,width:40,height:100}}]}).placements[0];
+assert.equal(crossed.placement,'beside');
+assert.ok(crossed.frame.y>260&&Math.min(crossed.leader.y1,crossed.leader.y2)>260);
 const chart=REGISTRY.get('chart.column');
 const nodes=chart.render({id:'bars',frame,props:{...chart.sample,dataLabels:false,referenceLines:[],annotations:[{category:'2026',text:'Evidence'}]}}).nodes;
 const mark=nodes.find(n=>n.role==='chart-mark'&&n.data.category==='2026');
 const leader=nodes.find(n=>n.role==='annotation-leader').data;
-assert.ok(Math.abs(leader.x2-mark.frame.x-mark.frame.width)<.001);
+// The leader lands on the column's top-centre. It used to land on the right
+// edge (`leaderX`), which on a row of columns pointed at the gap between two
+// bars; with no value label on the column the dot sits on the top itself.
+assert.ok(Math.abs(leader.x2-mark.frame.x-mark.frame.width/2)<.001);
 assert.ok(Math.abs(leader.y2-mark.frame.y)<.001);
 console.log(JSON.stringify({accepted:true}));
 """)
@@ -110,8 +118,8 @@ assert.match(prompt,/VISUAL REVIEW/);
 assert.match(prompt,/NARROW_REPERTOIRE/);
 assert.ok(prompt.includes('"exhibitVarietyPerTen": 7.5'),'candidate diagnostics reach the reviewer');
 assert.ok(!prompt.includes('"reference"') && !prompt.includes('7.1 to 8.3'),'historical aggregates are not presented as reference targets');
-assert.match(prompt,/Inspect every original page at full size, every spread/);
-assert.match(prompt,/every requested reference deck before scoring/);
+assert.match(prompt,/Read the deck through its spreads/);
+assert.match(prompt,/If the user supplied reference decks/);assert.match(prompt,/never search the machine/);
 assert.match(prompt,/peer status summaries/);
 assert.ok(prompt.includes('references/taste-review.md'));
 // Reviewer subprocesses inherit arbitrary authoring directories; guidance is package-relative.

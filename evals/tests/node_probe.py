@@ -281,3 +281,29 @@ def run_node(source: str) -> dict:
         stderr = "\n".join(part for part in (reply.get("err"), reply.get("stderr")) if part)
         raise AssertionError(f"Node probe exited 1\n{stderr}\n{stdout}")
     return json.loads(stdout)
+
+
+_EXAMPLE_SCENES = {}
+
+
+def example_scene(name="nyc-or-sf"):
+    """A shipped example deck compiled to its scene, cached for the run."""
+    if name not in _EXAMPLE_SCENES:
+        _EXAMPLE_SCENES[name] = run_node(f"""
+import fs from 'node:fs';
+import {{ toDeckPlan }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
+const dir = './skills/professional-slides/examples';
+const spec = JSON.parse(fs.readFileSync(dir + '/{name}.deck.json', 'utf8'));
+console.log(JSON.stringify(planDeck(toDeckPlan(spec, dir)).deck));
+""")
+    return _EXAMPLE_SCENES[name]
+
+
+def example_scene_file(directory, name="nyc-or-sf"):
+    """The same scene written to `directory`, for tools that take a path."""
+    import json as _json
+    from pathlib import Path as _Path
+    path = _Path(directory) / f"{name}.scene.json"
+    path.write_text(_json.dumps(example_scene(name)))
+    return path

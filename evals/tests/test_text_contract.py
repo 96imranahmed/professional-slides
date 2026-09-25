@@ -32,10 +32,10 @@ const missingCover=structuredClone(stages);missingCover.content.pages.shift();
 assert.throws(()=>validateStageContract(spec,missingCover),/missing or has a changed title for cover/);
 assert.equal(normalizeText('net-\ndemand'), 'net-demand');
 assert.notEqual(normalizeText('net demand'), 'net-demand');
-const page={id:'case',n:1,claim:'The first approval releases preparation subject to explicit constraints',settles:{kind:'comparison',what:'Two defined alternatives'},adds:null,highlight:null,textPlan:[{id:'title',role:'title',text:'The first approval releases preparation subject to explicit constraints'},{id:'reason',role:'body',text:'Preparation preserves an option but does not authorize construction.'},{id:'data',role:'exhibit',text:'$31m'},{id:'source',role:'source',text:'Source: Designed fixture'}],textReference:{task:'Decision explanation',samples:[{reference:'ref',page:10,sha256:'a'.repeat(64),bodyWords:10,totalWords:20}]}};
+const page={id:'case',n:1,claim:'The first approval releases preparation subject to explicit constraints',settles:{kind:'comparison',what:'Two defined alternatives'},adds:null,highlight:null,textPlan:[{id:'title',role:'title',text:'The first approval releases preparation subject to explicit constraints'},{id:'reason',role:'body',text:'Preparation preserves an option but does not authorize construction. '+'The retained option keeps the approval path open while the gating permission is sought, '.repeat(3)+'and nothing is committed until then.'},{id:'data',role:'exhibit',text:'$31m'},{id:'source',role:'source',text:'Source: Designed fixture'}],textReference:{task:'chart-led'}};
 const content={textContract:'complete',pages:[page]};
 assert.ok(checkTextPlan(content).accepted);
-assert.equal(checkTextPlan(content).scores[0].textCoverageScore,100);
+assert.equal(checkTextPlan(content).scores[0].textCoverageScore,Math.round(58/55*100)); // 58 body words against the chart-led median of 55
 const thin=structuredClone(content);thin.pages[0].textPlan[1].text='Prepare now.';
 assert.ok(runContentGates(thin).findings.some(f=>f.code==='TEXT_COVERAGE_LOW'&&f.severity==='blocking'));
 thin.pages[0].textReference.rationale='The retained comparison identifies the full commitment and the sole gating permission; the reference also explains an unrelated mechanism.';
@@ -60,7 +60,7 @@ assert.ok(auditExportText(content,scene,['$31m']).findings.some(f=>f.code==='TEX
 assert.deepEqual(auditExportText(content,scene,[page.textPlan.map(b=>b.text).join('\n')]).scores,checkTextPlan(content).scores);
 const duplicate=structuredClone(content);duplicate.pages[0].textPlan.push({id:'again',role:'exhibit',text:'$31m'});
 assert.ok(auditTextPlan(duplicate,scene).findings.some(f=>f.code==='TEXT_PLAN_LOST'));
-// Furniture is excluded only from the density score, never from all-text retention.
+// Planned furniture is retained like any block; unplanned runtime furniture is subtracted.
 const shell=structuredClone(content);
 shell.pages[0].textPlan.push({id:'footer',role:'furniture',text:'Board pre-read'},{id:'page',role:'furniture',text:'01'});
 const withShell=structuredClone(scene);
@@ -68,7 +68,8 @@ withShell.slides[0].nodes.push({type:'text',role:'footer-right',text:'Board pre-
 assert.ok(auditTextPlan(shell,withShell).accepted);
 assert.deepEqual(checkTextPlan(shell).scores,checkTextPlan(content).scores);
 assert.ok(auditTextPlan(shell,scene).findings.some(f=>f.code==='TEXT_PLAN_LOST'));
-assert.ok(auditTextPlan(content,withShell).findings.some(f=>f.code==='TEXT_UNPLANNED'));
+// Runtime-generated furniture (footer, page number) need not be planned; authored text still must.
+assert.ok(auditTextPlan(content,withShell).accepted);
 const exported=shell.pages[0].textPlan.map(b=>b.text).join('\n');
 assert.ok(auditExportText(shell,withShell,[exported]).accepted);
 assert.ok(auditExportText(shell,withShell,[page.textPlan.map(b=>b.text).join('\n')]).findings.some(f=>f.code==='TEXT_EXPORT_LOST'));
@@ -82,7 +83,7 @@ console.log(JSON.stringify({ok:true}));
 import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-const draw = props => compileDeck({palette:'mckinsey',slides:[{id:'table',composition:component({id:'table',component:'table',props})}]},REGISTRY).slides[0].nodes;
+const draw = props => compileDeck({palette:'midnight',slides:[{id:'table',composition:component({id:'table',component:'table',props})}]},REGISTRY).slides[0].nodes;
 const props={treatment:'categories',columns:[{label:'Customer group',type:'category'},'Accounts','Added revenue'],rows:[['Protected','20,000','$0m'],{style:'total',cells:['Total','120,000','$10.8m']}]};
 const nodes=draw(props);
 const band=nodes.find(n=>n.role==='table-row-band'&&n.data.row===1);
@@ -98,3 +99,77 @@ assert.equal(ordinary.find(n=>n.role==='table-row-band'&&n.data.row===1).style.f
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result['ok'])
+
+
+class ContractDefectTests(unittest.TestCase):
+    """Defects a full deck build hit, fixed at their source."""
+
+    def test_structural_pages_generated_pages_and_split_words(self):
+        result = run_node('''
+import { checkTextPlan, auditTextPlan, auditExportText } from './skills/professional-slides/runtime/text-contract.mjs';
+const cover = { id: 'cover', kind: 'cover', textPlan: [{ id: 't', role: 'title', text: 'Riyadh Air' }] };
+const content = { textContract: 'complete', pages: [cover] };
+const scene = { slides: [
+  { id: 'cover', nodes: [{ type: 'text', role: 'cover-title', text: 'Riyadh Air' }, { type: 'text', role: 'page-number', text: '01' }] },
+  { id: 'agenda-1', nodes: [{ type: 'text', role: 'action-title', text: 'Contents' }] } ] };
+console.log(JSON.stringify({
+  coverFloor: checkTextPlan(content).findings.map(f => f.code),
+  plan: auditTextPlan(content, scene).findings.map(f => f.code),
+  split: auditExportText(content, scene, ['Riy adh Air 01', 'Contents']).findings.map(f => f.code) }));
+''')
+        self.assertEqual(result['coverFloor'], [])
+        self.assertEqual(result['plan'], [])
+        self.assertEqual(result['split'], [])
+
+    def test_page_references_in_points_match_their_number(self):
+        result = run_node('''
+import { auditContent } from './skills/professional-slides/runtime/content-audit.mjs';
+const spec = { slides: [{ title: 'A page', points: ['See the scorecard on page {{page:score}}'] }] };
+const scene = { slides: [{ nodes: [{ type: 'text', role: 'action-title', text: 'A page' }, { type: 'text', role: 'list-item', text: 'See the scorecard on page 46' }] }] };
+console.log(JSON.stringify(auditContent(spec, scene).findings.map(f => f.code)));
+''')
+        self.assertEqual(result, [])
+
+
+class ShortBlockTests(unittest.TestCase):
+    def test_a_short_planned_number_does_not_match_inside_generated_text(self):
+        # A data label "4" took the "4" out of the tracker's "04 / The rivals
+        # are real", and the rest of the tracker was reported as unplanned.
+        result = run_node('''
+import { auditTextPlan, locate } from './skills/professional-slides/runtime/text-contract.mjs';
+const scene = { slides: [{ id: 'p', nodes: [
+  { type: 'text', role: 'tracker-compact-label', text: '04 / The rivals are real' },
+  { type: 'text', role: 'action-title', text: 'Four rivals matter' },
+  { type: 'text', role: 'data-label', text: '4' }] }] };
+const content = { textContract: 'complete', pages: [{ id: 'p', textPlan: [{ id: 't', role: 'title', text: 'Four rivals matter' }, { id: 'd', role: 'exhibit', text: '4' }] }] };
+console.log(JSON.stringify({ codes: auditTextPlan(content, scene).findings.map((f) => f.code), inside: locate('x 04 y', '4').at, whole: locate('x 04 4 y', '4').at }));
+''')
+        self.assertNotIn('TEXT_UNPLANNED', result['codes'])
+        self.assertEqual(result['inside'], -1)
+        self.assertEqual(result['whole'], 5)
+
+
+class ExportReadbackTests(unittest.TestCase):
+    def test_a_label_broken_with_a_hyphen_is_found(self):
+        # "Breakeven load factor 54.4" drawn as "fac-" / "tor 54.4" reads back as
+        # "fac-tor"; it was reported lost and blocked the build.
+        result = run_node('''
+import { auditExportText } from './skills/professional-slides/runtime/text-contract.mjs';
+const scene = { slides: [{ id: 'p', nodes: [{ type: 'text', role: 'action-title', text: 'Breakeven fell' }, { type: 'text', role: 'data-label', text: 'Breakeven load factor 54.4' }] }] };
+const content = { textContract: 'complete', pages: [{ id: 'p', n: 1, kind: 'section', textPlan: [{ id: 't', role: 'title', text: 'Breakeven fell' }, { id: 'e', role: 'exhibit', text: 'Breakeven load factor 54.4' }] }] };
+console.log(JSON.stringify({ codes: auditExportText(content, scene, ['Breakeven fell\\nBreakeven load fac-\\ntor 54.4']).findings.map((f) => f.code) }));
+''')
+        self.assertNotIn('TEXT_EXPORT_LOST', result['codes'])
+
+    def test_page_text_is_read_with_words_spaced_by_position(self):
+        # pypdf joined a bar's value to the next label ("235777-9"); pdftotext
+        # spaces them, and keeps a line-end hyphen as drawn.
+        import shutil
+        if not shutil.which("pdftotext"):
+            self.skipTest("poppler is not installed")
+        source = (Path(ROOT) / "skills/professional-slides/runtime/emit/render_pptx.py").read_text(encoding="utf-8")
+        self.assertIn('["pdftotext", "-raw"', source)
+
+
+if __name__ == '__main__':
+    unittest.main()

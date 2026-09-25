@@ -4,7 +4,7 @@
 //
 // {
 //   "schema": "professional-slides.deck/v3",
-//   "id": "nyc-or-sf", "palette": "mckinsey", "density": "executive",
+//   "id": "nyc-or-sf", "palette": "midnight", "density": "executive",
 //   "cover": { "title", "subtitle", "date", "logo", "tone": "dark|light", "image": "assets/cover.jpg" },
 //   "footer": "Document title",          // right footer, beside the page number
 //   "slides": [
@@ -22,13 +22,17 @@
 // }
 // exhibit.type: any registered component id, or the aliases "table", "image", "metrics", "cards",
 // "quadrants", "swot", "compare", "phase-table", "rows".
+import { applyDesign } from "./design-systems.mjs";
+import { mapAll, defaultHighlightStyle } from "./core.mjs";
+import { measureInsight, measureList, measureProse, proseMeasure } from "./registry.mjs";
 import fs from "node:fs";
 import path from "node:path";
-import { measureText, accentRuns } from "./text-layout.mjs";
-import { chartAnnotationBands, evidenceAnnotationTopBandCount, EVIDENCE_CALLOUT_BAND } from "./chart-annotations.mjs";
+import { measureText, accentRuns, hasPhrase } from "./text-layout.mjs";
+import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
+import { defaultFocusIndex } from "./charts.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { measureTable } from "./tables.mjs";
-import { resolveWeight, normalizeWeight, PICTURE_SHARE_MAX } from "./weight.mjs";
+import { resolveWeight, normalizeWeight } from "./weight.mjs";
 import { groupThousands } from "./draw.mjs";
 
 const V3 = "professional-slides.deck/v3";
@@ -74,7 +78,7 @@ function tableAlias(ex) {
     const left = ex.left || {}, right = ex.right || {};
     const l = left.points || (left.text ? [left.text] : []), r = right.points || (right.text ? [right.text] : []);
     const n = Math.max(l.length, r.length);
-    const rows = Array.from({ length: n }, (_, i) => [l[i] ?? "", r[i] ?? ""].map((cell) => (typeof cell === "string" && !cell.trim() ? { type: "text", text: " " } : cell)));
+    const rows = Array.from({ length: n }, (_, i) => [l[i] ?? "", r[i] ?? ""].map((cell) => (typeof cell === "string" && !cell.trim() ? { blank: true } : cell)));
     // The tinted column is the one the page decides for. Before/after pages
     // decide for "after", which is the default; a comparison of two options
     // names its side with `winner` ("left", "right" or a heading), and
@@ -97,7 +101,7 @@ function tableAlias(ex) {
     return { type: "table", treatment: "dimensions", variant: "standard", headerShape: ex.headerShape ?? "chevron", columns: [{ label: "", type: "category", width: labelWidth }, ...phases.map((ph) => ({ label: typeof ph === "string" ? ph : ph.label, type: "text", width: 200 }))], rows, density: ex.density };
   }
   if (ex.type === "rows") {
-    // A row may carry several content columns (`cells`), which is the reference
+    // A row may carry several content columns (`cells`), which is a strong
     // deck's densest page: findings down the left with a numbered disc and an
     // icon, two or three columns across, each cell a short bulleted list under
     // a bold lead. Four hundred words of structured evidence, no chart.
@@ -137,8 +141,8 @@ function tableAlias(ex) {
         rows };
     }
     const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label, ...(row.number ? { sectionNumber: row.number } : {}), ...(row.icon ? { icon: row.icon } : {}) }, Array.isArray(row.points) ? { type: "bullets", items: row.points } : row.text]);
-    // `columns: ["What we found", "What it means"]` heads the two tracks. The
-    // reference pages label them; an unlabelled ledger keeps the blank band.
+    // `columns: ["What we found", "What it means"]` heads the two tracks. A
+    // well-made ledger labels them; an unlabelled ledger keeps the blank band.
     const labels = Array.isArray(ex.columns) ? ex.columns.map((column) => String(typeof column === "string" ? column : column?.label || "")) : [];
     return { type: "table", treatment: "categories", variant: "standard", columns: [{ label: labels[0] || "", type: "category", width: 200 }, { label: labels[1] || "", type: "text", width: 800 }], rows, density: ex.density };
   }
@@ -178,7 +182,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
   // A `compare` whose sides name an `image` sets the two pictures above the two
   // columns, aligned to them. A comparison of two named things - two
   // characters, two cities, two products - is a page the reader should be able
-  // to tell apart before reading a word, and the reference decks lead with the
+  // to tell apart before reading a word, and a strong deck leads with the
   // picture. The images share one height so the columns beneath them start
   // level, and the exhibit is unchanged underneath: this is furniture above a
   // comparison, not a different exhibit.
@@ -194,8 +198,8 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
       exhibitItem(bare, id, baseDir, { width: { fr: 1 }, height: "fill" }),
     ] };
   }
-  // `caption`: the finding under this panel. In a two-up or a grid the
-  // reference captions every panel rather than closing with one shared
+  // `caption`: the finding under this panel. In a two-up or a grid a
+  // well-made page captions every panel rather than closing with one shared
   // so-what, because each panel answers its own question.
   if (exIn && typeof exIn.caption === "string" && exIn.caption.trim()) {
     const { caption, captionHeight, ...rest } = exIn;
@@ -207,8 +211,9 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
       items: [panel, { id: `${id}-caption`, component: "insight", props: { text: caption.trim(), variant: "neutral", align: "center" },
         size: captionHeight ? { width: { fr: 1 }, height: captionHeight } : HUG }] };
   }
+  const typeStep = exIn?._typeStep === true && size.height === "fill";
   const ex = tableAlias(exIn);
-  const { type, layout: _l, ...rest } = ex;
+  const { type, layout: _l, _typeStep: _t, _densityChosen: _d, ...rest } = ex;
   if (type === "image") return { id, component: "image-frame", props: { ...imageProps(ex.path ? ex : ex.image, baseDir), ...(ex.fit ? { fit: ex.fit } : {}) }, size };
   if (type === "cards" || type === "quadrants") {
     const { centre, ...sz } = size;
@@ -246,7 +251,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
   if (type === "swot") return { id, component: "quadrants", props: { quadrants: ["Strengths", "Weaknesses", "Opportunities", "Threats"].map((title, i) => ({ title, points: [rest.strengths, rest.weaknesses, rest.opportunities, rest.threats][i] || [] })) }, size };
   if (type === "table") {
     const styled = styleTable(rest);
-    return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
+    return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(typeStep ? { typeStep: true } : {}), ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
   }
   // The other table renderers reach the page by their component id rather than
   // through the `table` alias, and used to lose the one thing the alias does
@@ -256,7 +261,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
     return { id, component: type, props: { ...rest, fillHeight: size.height === "fill" }, size };
   }
   // A metrics exhibit: one row up to four tiles, a grid of equal rows beyond
-  // (the McKinsey "Impact to date" 3x3 of navy tiles). `tone` sets every tile.
+  // (an "Impact to date" 3x3 of navy tiles, say). `tone` sets every tile.
   if (type === "metrics") {
     const tiles = rest.items.map((m) => (typeof m === "string" ? { value: m } : m));
     const perRow = rest.columns || (tiles.length <= 4 ? tiles.length : tiles.length <= 6 ? 3 : tiles.length <= 8 ? 4 : 3);
@@ -303,7 +308,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
  * heading (chart-title); anything else is wrapped in a headed section.
  */
 const DIAGRAM_TYPES = ["cards", "quadrants", "swot", "metrics", "cycle", "steps", "people", "logos", "framework", "relationship-network", "map", "process", "chevron-process", "timeline", "roadmap", "tree", "organization", "funnel", "matrix", "journey", "image"];
-/** A diagram carries no heading band unless the author gives it one; its side column then centres instead. */
+/** A diagram carries no heading band unless the author gives it one; its side column then starts at the diagram's top. */
 function unheaded(ex) { return DIAGRAM_TYPES.includes(ex.type) && !ex.panelHeading; }
 function headedPanel(ex, item, id, align = true) {
   if (unheaded(ex)) return item;
@@ -418,7 +423,7 @@ function withDefaultScales(ex, rowsIn) {
  * `deriveFrom` names the measure column (default: the first numeric one), and a
  * total row is left out of the arithmetic and carries the totals instead.
  * Ten rows and one derived column is ten more blocks of evidence and a second
- * reading of the same data, which is how a reference measure table gets to six
+ * reading of the same data, which is how a well-made measure table gets to six
  * columns without a second source.
  */
 const DERIVATIONS = ["rank", "share", "change", "index"];
@@ -488,7 +493,7 @@ function deriveColumns(ex) {
 }
 
 // A column of bare four-figure counts reads with a thousands separator, the way
-// every published table prints it. Only whole numbers, only where the whole
+// every well-made table prints it. Only whole numbers, only where the whole
 // column is numeric, so a code or a year is left alone.
 function groupNumericColumns(ex) {
   const rowsIn = ex.rows.map((row) => (Array.isArray(row) ? { cells: row, plain: true } : { ...row }));
@@ -525,7 +530,7 @@ function groupNumericColumns(ex) {
 
 /**
  * `total: true` closes a table of counts with the column sums, which is how a
- * reference measure table ends. Numeric columns sum; a share column sums to 100;
+ * well-made measure table ends. Numeric columns sum; a share column sums to 100;
  * anything the arithmetic cannot reach stays blank rather than guessing.
  */
 /**
@@ -639,10 +644,10 @@ function implicationColumn(ex) {
  * mind does.
  *
  * `heat: true` fills every cell in the column on a sequential scale, which is
- * how the reference benchmark tables let a reader find the leader without
+ * how a well-made benchmarking table lets a reader find the leader without
  * reading a single number. `bubble: true` sets the value in a filled pill, the
  * same device the change annotation uses on a chart, so one column of a flat
- * reference table carries emphasis. `bar: true` draws the in-cell bar chart:
+ * table carries emphasis. `bar: true` draws the in-cell bar chart:
  * the magnitude down the column read at a glance, the figure still beside it.
  *
  * The bar cell has always existed, and nothing used it, because reaching it by
@@ -793,8 +798,8 @@ function inlineChartUnits(items) {
 /**
  * `icons: [...]` on a table, or `icon` on a row: an icon beside each row label.
  *
- * The renderer has always drawn an icon on a `category` cell - it is how the
- * reference findings matrix marks its rows - and the only surface that could
+ * The renderer has always drawn an icon on a `category` cell - it is how a
+ * findings matrix marks its rows - and the only surface that could
  * reach it was the `rows` alias. A plain `columns`/`rows` table had no route to
  * it at all, which is most of why two cold-run decks of 39 tables carried not
  * one icon between them. An authored icon draws wherever it is authored.
@@ -924,9 +929,9 @@ export function styleTable(ex) {
   const extra = { ...(recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {}), ...(ex.scales ? { scales: ex.scales } : {}), ...(ex.columnWidths ? { columnWidths: ex.columnWidths } : {}) };
   if (ex.rowAlignment !== undefined) extra.rowAlignment = ex.rowAlignment;
   // A table that ends the chain with no treatment at all is a plain grid, and a
-  // plain grid past five rows is where a reader loses their place. 89% of
-  // tables in published client decks carry a treatment of some kind
-  // (evals/corpus), and the commonest by far is a banded row - it costs the
+  // plain grid past five rows is where a reader loses their place. About 89% of
+  // tables in strong decks carry a treatment of some kind, and the commonest
+  // by far is a banded row - it costs the
   // page nothing and it is the only device that works on a table of words. So
   // banding is what an untreated table falls back to, rather than nothing.
   if (untreatedGrid(ex, columns, rowsIn, extra)) extra.zebra = true;
@@ -935,7 +940,7 @@ export function styleTable(ex) {
     if (Array.isArray(r) && i === rowsIn.length - 1 && /^total\b/i.test(String(r[0]?.text ?? r[0] ?? ""))) rowsIn[i] = { style: "total", cells: r };
   });
   // `highlightRow`: the subject's row (by first-cell label or index) as a tinted
-  // band, the way the benchmark tables single out the client city or company.
+  // band, the way a benchmarking table singles out the client's own city or company.
   if (ex.highlightRow !== undefined) {
     const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
     const at = Number.isInteger(ex.highlightRow) ? ex.highlightRow : rowsIn.findIndex((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
@@ -1053,11 +1058,31 @@ export function splitTables(slide) {
  * pages marked (1/2), (2/2). Applies to a lone table under an auto layout.
  */
 const MAX_ROWS = 8;
+// Commentary set in columns under a full-width table (`exhibit-top`, or the
+// journal's lean toward it) takes its height from the table's budget: each
+// column as many body lines as its longest point needs, plus its lead and the
+// gap above the row. An estimate, like the rest of the budget - the renderer
+// measures - but a page that leaves it out plans rows it cannot hold.
+function pointsBelowHeight(slide) {
+  const points = Array.isArray(slide.points) ? slide.points : [];
+  const below = slide.layout === "exhibit-top" || (!slide.layout && (LAYOUT.shapeBias?.["exhibit-top"] ?? 0) > 0 && points.length >= 2 && points.length <= 4);
+  if (!below || !points.length) return 0;
+  // In rows as exhibitOverCommentary sets them: three across at most, four two by two.
+  const perRow = points.length <= 3 ? points.length : points.length === 4 ? 2 : 3;
+  const perLine = Math.max(20, Math.floor((BODY_WIDTH - COLUMN_GAP * (perRow - 1)) / perRow / 6.4));
+  const text = (point) => typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`;
+  let height = 22;
+  for (let at = 0; at < points.length; at += perRow) {
+    height += (Math.max(...points.slice(at, at + perRow).map((point) => Math.ceil(text(point).length / perLine))) + 1) * 18;
+  }
+  return height;
+}
+
 export function paginateTable(slide, bodyScale = 1) {
   if (slide.layout && !["auto", "exhibit-full"].includes(slide.layout)) return [slide];
   const ex = slide.exhibit;
   if (!ex || ex.type !== "table" || !Array.isArray(ex.rows) || slide.exhibits) return [slide];
-  // The page holds about 16 body lines of table (compact rows in the firm decks
+  // The page holds about 16 body lines of table (compact rows in a dense deck
   // run to 14–20 one-line rows): a row of short cells counts one line, longer
   // cells wrap, so a ranking table keeps a dozen rows on a page while a text
   // table breaks at eight.
@@ -1088,14 +1113,22 @@ export function paginateTable(slide, bodyScale = 1) {
       return modelled(density);
     }
   };
-  const available = 508 * bodyScale - (slide.callout ? 70 : 0) - (Array.isArray(slide.metrics) && slide.metrics.length ? 112 : 0) - (slide.soWhat ? 44 : 0) - 4;
+  const available = 508 * bodyScale - (slide.callout ? 70 : 0) - (Array.isArray(slide.metrics) && slide.metrics.length ? 112 : 0) - (slide.soWhat ? (LAYOUT.takeaway === "statement" ? 64 : 44) : 0) - 4
+    // The column's gap above each block stacked under the table.
+    - 22 * [slide.callout, slide.soWhat].filter(Boolean).length
+    - pointsBelowHeight(slide)
+    // bodyTop holds a two-line title, not a two-line title and a standfirst:
+    // with both, the rule and the body start a line lower (8px gap, a 20px line).
+    - (slide.subtitle && String(slide.title ?? "").length > 60 ? 28 : 0);
   // The density ladder comes before the split. A twenty-row table set compact is
   // one page of evidence; the same table halved across two pages is two pages of
-  // half an argument, and the reference decks run tables to twenty and thirty
+  // half an argument, and strong decks run tables to twenty and thirty
   // rows rather than splitting them. `density` on the exhibit still wins.
   const ladder = ex.density === undefined ? ["body", "compact", "dense"] : [ex.density];
   const fits = ladder.find((density) => heightAt(density) <= available);
-  if (fits) return [fits === "body" || fits === ex.density ? slide : { ...slide, exhibit: { ...ex, density: fits } }];
+  // `_densityChosen`: the estimate picked this step, not the author, so the
+  // page may still set it a step up if the real frame holds it.
+  if (fits) return [fits === "body" || fits === ex.density ? slide : { ...slide, exhibit: { ...ex, density: fits, _densityChosen: true } }];
   const densest = ladder[ladder.length - 1];
   const perRow = Math.max(20, heightAt(densest) / Math.max(1, ex.rows.length));
   const rowsPerPage = Math.max(3, Math.floor(available / perRow));
@@ -1165,7 +1198,7 @@ const wordsIn = (text) => String(text ?? "").split(/\s+/).filter(Boolean).length
  * Paragraphs were pushed one by one into the page's body column, which spreads
  * leftover height between its items. Two paragraphs came out pinned to the top
  * and the foot of the page with the body empty between them - the single most
- * common page in the corpus, report-style prose, drawn as two stranded lines.
+ * common kind of page, report-style prose, drawn as two stranded lines.
  */
 function documentItem(slide, id, pointCount) {
   const paragraphs = slide.paragraphs || [];
@@ -1174,19 +1207,95 @@ function documentItem(slide, id, pointCount) {
   const asked = slide.textColumns;
   if (asked !== undefined && ![1, 2, 3].includes(asked)) throw new Error(`${id}: textColumns is 1, 2 or 3`);
   const count = Math.min(asked ?? Math.min(3, Math.ceil(total / DOCUMENT_COLUMN_WORDS)), paragraphs.length) || 1;
-  // Balance columns by words, keeping paragraphs whole and in reading order.
-  const columns = Array.from({ length: count }, () => []);
-  let at = 0, filled = 0;
-  for (const text of paragraphs) {
-    if (at < count - 1 && filled >= total * (at + 1) / count) at += 1;
-    columns[at].push(text); filled += wordsIn(text);
-  }
+  const columns = balancedColumns(paragraphs, count);
   const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4",
     size: { width: { fr: 1 }, height: "fill" },
     items: texts.map((text, i) => ({ id: `${id}-doc-${c}-p${i}`, component: "paragraph", props: { text }, size: HUG })) });
   return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6", size: SIZE,
     items: columns.filter((texts) => texts.length).map(column) };
 }
+
+/** Paragraphs into `count` columns balanced by words, whole and in reading order. */
+function balancedColumns(paragraphs, count) {
+  const total = paragraphs.reduce((sum, p) => sum + wordsIn(p), 0);
+  const columns = Array.from({ length: count }, () => []);
+  let at = 0, filled = 0;
+  for (const text of paragraphs) {
+    if (at < count - 1 && filled >= total * (at + 1) / count) at += 1;
+    columns[at].push(text); filled += wordsIn(text);
+  }
+  return columns.filter((texts) => texts.length);
+}
+
+// The depth prose may reach: the body less a line, so a two-line title (a
+// body some 14px shorter) still takes it; and the depth that reads as a full
+// column, some 70px above the foot, well inside the column check's bar. The
+// gaps are the document columns' own (space.4 between paragraphs, space.6
+// between columns).
+const PROSE_DEPTH = 488, PROSE_FULL = 440, PROSE_PARAGRAPH_GAP = 16, PROSE_COLUMN_GAP = 32;
+
+/**
+ * Prose beside a panel, in one column or two, each as narrow as lets the
+ * prose reach the foot of the body and no wider than a paragraph's measure;
+ * the panel beside it takes the rest of the width. `room` is the width the
+ * prose may take at most.
+ *
+ * The prose used to be handed a fixed share of the row. A memo in two equal
+ * columns needed some 500 words to reach the foot, against a text page's
+ * ceiling of 329, so every memo page stopped halfway down; a sidebar's copy in
+ * two thirds of the row stopped at the paragraph's measure, 165px short of its
+ * column's right edge, a strip of nothing the height of the page. Sized to the
+ * text, 150 to 330 words fill the page: one column from the measure's floor
+ * (45 characters) to its cap (80), and two when one at the cap runs past the
+ * foot.
+ */
+function proseBeside(paragraphs, id, room) {
+  const { widest, narrowest } = proseMeasure();
+  const depth = (texts, width) => texts.reduce((sum, text) => sum + measureProse(text, width), 0) + PROSE_PARAGRAPH_GAP * (texts.length - 1);
+  // One column, or two broken where the deeper of them is shallowest at that
+  // width: between paragraphs, or inside one at a sentence, as a column of
+  // type runs on. Balanced by whole paragraphs, 91, 71 and 94 words went left
+  // and 78 right, and the right column stopped a quarter of the page short.
+  const sentences = (text) => text.split(/(?<=[.!?])\s+(?=[A-Z0-9£$€"“])/);
+  const breaks = paragraphs.flatMap((text, at) => {
+    const parts = sentences(text);
+    const whole = at ? [[paragraphs.slice(0, at), paragraphs.slice(at)]] : [];
+    return [...whole, ...parts.slice(1).map((_, cut) => [
+      [...paragraphs.slice(0, at), parts.slice(0, cut + 1).join(" ")],
+      [parts.slice(cut + 1).join(" "), ...paragraphs.slice(at + 1)]])];
+  });
+  const deepest = (columns, width) => Math.max(...columns.map((texts) => depth(texts, width)));
+  const split = (count, width) => count === 1 || !breaks.length ? [paragraphs]
+    : breaks.reduce((best, columns) => (deepest(columns, width) < deepest(best, width) ? columns : best));
+  const most = (count) => Math.min(widest, Math.floor((room - PROSE_COLUMN_GAP * (count - 1)) / count));
+  const counts = breaks.length ? [1, 2] : [1];
+  // Of the widths at which the prose fits, the widest that still reaches
+  // PROSE_FULL: the narrowest that fits put 263 words in a 474px column
+  // beside a panel half as wide again, the prose reading as the aside. Prose
+  // too short to reach it at any width takes the narrowest, its deepest.
+  let chosen = null;
+  for (const count of counts) {
+    const fits = [];
+    for (let width = Math.min(narrowest, most(count)); width <= most(count); width += 8) {
+      const columns = split(count, width), reach = deepest(columns, width);
+      if (reach <= PROSE_DEPTH) fits.push({ columns, width, reach });
+    }
+    chosen = fits.filter((fit) => fit.reach >= PROSE_FULL).at(-1) ?? fits[0] ?? null;
+    if (chosen) break;
+  }
+  // Longer than two columns at the measure hold: the widest, and the overflow
+  // is the layout's to report.
+  if (!chosen) chosen = { columns: split(counts.at(-1), most(counts.at(-1))), width: most(counts.at(-1)) };
+  const { columns, width } = chosen;
+  const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4", size: { width, height: "fill" },
+    items: texts.map((text, i) => ({ id: `${id}-doc-${c}-p${i}`, component: "paragraph", props: { text }, size: HUG })) });
+  return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6",
+    size: { width: columns.length * width + PROSE_COLUMN_GAP * (columns.length - 1), height: "fill" }, items: columns.map(column) };
+}
+
+// The least a panel beside prose keeps: a statement in heading type needs
+// about this much to stay within its eight lines.
+const PANEL_MIN_WIDTH = 300;
 
 /** `photo: { path, alt, credit }` on a content page: a cropped photograph column. */
 function photoStrip(slide, id, baseDir, fr = 1) {
@@ -1254,55 +1363,30 @@ function pictureCards(pictures, id, size) {
   return { id, component: "cards", props: { items, tone: "plain", valign: "middle" }, size };
 }
 
-/**
- * The share of the body a picture page is assumed to hand its photographs, for
- * the plan-time word floor.
- *
- * The rendered gate measures what the page actually drew; this is the estimate
- * before there is a page to measure. It is deliberately the low end - the band
- * takes the leftover height, so the real share is usually larger - which makes
- * the plan-time floor the stricter of the two. That is the right way round: an
- * author who acts on the plan-time message has acted on the rendered one too.
- * `beside` is the older `photo` strip on a page that also carries an exhibit: a
- * quarter of the row, not half the page.
- */
-const PICTURE_BAND = Object.freeze({ pair: 0.46, strip: 0.38, hero: 0.45, beside: 0.25 });
-
-function planPictureShare(slide) {
-  const n = pictureCount(slide);
-  if (n) {
-    if (n === 1) return Math.min(PICTURE_BAND.hero, PICTURE_SHARE_MAX);
-    // Pictures with nothing said about them fill the body: the page is the
-    // photographs, and the floor is capped rather than computed.
-    const described = slide.pictures.some((p) => p && typeof p === "object" && (p.label || p.text));
-    if (!described) return PICTURE_SHARE_MAX;
-    return Math.min(n === 2 ? PICTURE_BAND.pair : PICTURE_BAND.strip, PICTURE_SHARE_MAX);
-  }
-  if (slide.photo) return Math.min(slide.exhibit || slide.exhibits ? PICTURE_BAND.beside : PICTURE_BAND.hero, PICTURE_SHARE_MAX);
-  return 0;
-}
 
 // The body frame a content page lays out into, and the furniture between its
 // columns: used to measure a side column against what it holds before the
 // planner turns fractions into pixels.
 const BODY_WIDTH = 1160, BODY_HEIGHT = 508, CONNECTOR_WIDTH = 44, COLUMN_GAP = 16;
-// A commentary column filling two thirds of its track or less is read across
-// from the exhibit rather than down from the title, so it centres on the
-// exhibit. Above that it has enough body to start at the top and the slack at
-// the foot is not a hole.
-const SIDE_COLUMN_SLACK = 0.66;
+// How deep a commentary column should run down its track: the gates hold a
+// column's trailing band to a fifth of its height (column_void_max), so a
+// column that narrows to reach four fifths clears it with the list's own gaps
+// to spare. A short column narrows toward this, giving the exhibit the width,
+// and stops at SIDE_COLUMN_MIN_WIDTH: below it a line of body type holds too
+// few characters to read as prose (CPL's floor of 35).
+const SIDE_COLUMN_DEPTH = 0.8;
+const SIDE_COLUMN_MIN_WIDTH = 280;
 
 /**
  * The bridge between the evidence and what is read off it, in the gutter.
  *
- * The reference decks carry this relation four or five different ways and draw
- * it in the gutter on very few pages. BCG's NYC media pages set the right-hand
- * heading to say the relation in words ("As a result of piracy and
- * internationalization") and put nothing between the columns. Bain's Syracuse
- * diagnostic runs "KEY FACTS AND DATA" against a bordered "PERSPECTIVES" panel,
- * ten pages running, with no mark in the gutter at all. L.E.K.'s freight
- * comparison leaves plain white space. McKinsey's Purdue pages close the
- * exhibit with a filled band underneath it. The dashed rule with a disc on it
+ * A well-made deck carries this relation four or five different ways and draws
+ * it in the gutter on very few pages. One page sets the right-hand heading to
+ * say the relation in words ("As a result of piracy and internationalization")
+ * and puts nothing between the columns. A diagnostic runs "KEY FACTS AND DATA"
+ * against a bordered "PERSPECTIVES" panel, ten pages running, with no mark in
+ * the gutter at all. A plain comparison leaves white space. Another page closes
+ * the exhibit with a filled band underneath it. The dashed rule with a disc on it
  * is one member of that set, not the house style: a deck that draws it on every
  * page has made the reader stop seeing it, and the pages where the inference is
  * genuinely authored no longer stand out.
@@ -1334,6 +1418,11 @@ function bridgeVariant(slide, id) {
   return BRIDGE_VARIANTS.get(asked);
 }
 const LIST_BODY_PX = 14, LIST_ITEM_GAP = 16, LIST_LEAD_GAP = 4, LIST_MARKER_OFFSET = 22;
+/** A composed points list's height at a width, by the list's own measure. */
+function listDepth(list, width) {
+  try { return measureList({ x: 0, y: 0, width, height: BODY_HEIGHT }, list.props); } catch { return pointsHeight(list.props.items, width); }
+}
+
 /** The height a points list wants at a given column width. */
 function pointsHeight(points, width) {
   const textWidth = Math.max(60, width - LIST_MARKER_OFFSET);
@@ -1352,11 +1441,10 @@ function pointsHeight(points, width) {
 /**
  * The shapes a commentary column can take.
  *
- * Measured over the reference client decks, the numbered disc is one device
- * among six, and it is used for a full-width ledger of one-line items rather
+ * In a well-made deck the numbered disc is one device among six, and it is used for a full-width ledger of one-line items rather
  * than for a three-item side column. A composer with one shape produced five
- * consecutive pages of identical numbered lists; these are the alternatives the
- * corpus actually uses. Markers follow the authored relationship.
+ * consecutive pages of identical numbered lists; these are the alternatives a
+ * strong deck actually uses. Markers follow the authored relationship.
  */
 const POINT_STYLES = {
   // Icon, then the lead running into the sentence in the house accent.
@@ -1370,7 +1458,7 @@ const POINT_STYLES = {
   ruled: { marker: "rule" },
   // A / B / C: options, not steps.
   lettered: { marker: "letter" },
-  // The numbered disc, which the corpus reserves for an ordered ledger.
+  // The numbered disc, which a strong deck reserves for an ordered ledger.
   numbered: { marker: "number" },
   // The plain house bullet.
   bulleted: { marker: "auto" },
@@ -1395,11 +1483,12 @@ function resolvePointsStyle(slide, points) {
   if (entries.some((e) => e.state)) return "numbered";
   if (entries.every((e) => e.number !== undefined)) return "numbered";
   if (!entries.some((e) => e.lead)) return "bulleted";
-  // Parallel findings have no implied order or invented icon.
-  return "prose";
+  // Parallel findings have no implied order or invented icon. A varied deck
+  // marks them one of two unordered ways, the same way on every page.
+  return LAYOUT.variation?.leadPoints ?? "prose";
 }
 
-function pointsItem(points, id, tone, fill, inColumn = false, style = null, centre = true) {
+function pointsItem(points, id, tone, fill, inColumn = false, style = null, centre = false) {
   // The side column is a track, not a shelf: its points spread down it. A list
   // that hugs the top of a 500px column leaves two fifths of it empty, which is
   // how a page carrying real content still reads as thin. A list under a row of
@@ -1408,14 +1497,16 @@ function pointsItem(points, id, tone, fill, inColumn = false, style = null, cent
   // This used to be off on an airy deck, on the reading that white space is the
   // point there. It is, but white space between the points is what "airy"
   // means; all of it pooled under the last one is just an unfinished page. The
-  // gap opens to its cap on every deck now, and the list centres what the cap
-  // leaves over, so an airy column is the same block with more air in it.
+  // gap opens to its cap on every deck now.
   //
-  // `centre` is false where the list does not own its track. Centring the
-  // leftover under a kpi or an insight opens a void between that block and the
-  // first point - the list floats away from the thing it is reading from - and
-  // in a two-column split it lands the two halves on different tops, which is
-  // two lists rather than one. Both were visible on the first cold run.
+  // What the cap leaves over stays at the foot: the list starts at the top of
+  // its track. Centring it was first stopped where the list did not own its
+  // track - under a kpi or an insight the list floated away from the thing it
+  // was reading from, and in a two-column split the halves landed on
+  // different tops - and then everywhere, because a list that owns its track
+  // and centres in it is a band of air above its first point as tall as the
+  // one under its last. `centre: true` is for an author who asked for the
+  // middle (`pointsAlign`).
   const distribute = inColumn && points.length > 1;
   const shape = style && POINT_STYLES[style] ? POINT_STYLES[style] : {};
   if (style === "checklist") points = points.map((p) => {
@@ -1448,25 +1539,45 @@ export function resolveFill(spec = {}) {
  */
 const POINTS_TONES = ["open", "dark", "muted", "tint", "primary"];
 function sideTreatment(slide) {
-  const tone = slide.pointsTone ?? "open";
-  if (!POINTS_TONES.includes(tone)) throw new Error(`Unknown pointsTone: ${tone}; use one of ${POINTS_TONES.join(", ")}`);
-  return tone;
+  const asked = slide.pointsTone ?? "open";
+  if (!POINTS_TONES.includes(asked)) throw new Error(`Unknown pointsTone: ${asked}; use one of ${POINTS_TONES.join(", ")}`);
+  // The design system translates a panel into its own grammar: the editorial
+  // page has no navy column, the journal no coloured one, and the keynote
+  // turns the navy column into its colour field.
+  return LAYOUT.panelTones?.[asked] ?? asked;
 }
 
 /**
  * The page's close, under everything else.
  *
- * One sentence is the tonal band. A list is the reference decks' other closing
+ * One sentence is the tonal band. A list is the other common closing
  * device: two or three square-bulleted lines on a muted surface under a dense
  * table, each carrying its own finding, rather than one long band that says
  * three things in a row.
  */
+// The design system's composition choices for the deck being composed
+// (design-systems.mjs); set by composeDeck, read by the page builders.
+const CONSULTING_LAYOUT = Object.freeze({ name: "consulting", takeaway: "band", commentary: "right", shapeBias: {} });
+let LAYOUT = CONSULTING_LAYOUT;
+const TAKEAWAY_VARIANT = { band: "tonal", rule: "rule", statement: "statement", standfirst: "rule" };
+
 function soWhatItem(text, id, highlight, tinted = true) {
   const accent = highlight === undefined || highlight === null ? {} : { highlight };
+  // `{ text, style: "bar" }`: the so-what bar, a band in the house colour with
+  // the implication in bold white across the foot of the exhibit. It is a
+  // different device from the closing line - the page's commentary lives in
+  // it, not after it - so it is drawn the same way in every design system,
+  // and it stays filled beside a callout: it is the page's one box.
+  if (text && typeof text === "object" && !Array.isArray(text)) {
+    if (text.style !== "bar" || typeof text.text !== "string" || !text.text.trim()) throw new Error("A soWhat object is the so-what bar: { text, style: \"bar\" }");
+    return { id, component: "insight", props: { text: text.text.trim(), variant: "primary" }, size: HUG };
+  }
   // One tinted box per page. A callout is already a tinted box saying "read
   // this"; a second one underneath in a different tint reads as two competing
   // boxes rather than as a page with a close, which is what a reviewer sees
   // first and cannot explain.
+  // A design whose takeaway is not a box closes the page its own way.
+  if (LAYOUT.takeaway !== "band" && !Array.isArray(text)) return { id, component: "insight", props: { text, variant: TAKEAWAY_VARIANT[LAYOUT.takeaway], ...accent }, size: HUG };
   if (!tinted) {
     const plain = Array.isArray(text) ? { items: text } : { text };
     return { id, component: "insight", props: { ...plain, variant: "plain", ...accent }, size: HUG };
@@ -1482,7 +1593,7 @@ function soWhatItem(text, id, highlight, tinted = true) {
 /**
  * The page shapes the composer can build, and what each one wants.
  *
- * Measured against the corpus, a reference client deck runs about five distinct
+ * A well-made deck runs about five distinct
  * page shapes per ten analytical pages and never lets one shape past a quarter
  * of the deck. A deck built on the old chooser ran 1.3 shapes per ten pages with
  * 69% on one of them, because a single branch - one exhibit plus any commentary
@@ -1519,7 +1630,7 @@ const PAGE_SHAPES = {
   // reads the other way.
   "exhibit-right": { fit: () => 0 },
   // The exhibit across the full width with the commentary in columns beneath
-  // it: the commonest reference shape, and the right one when the exhibit is
+  // it: the commonest well-made shape, and the right one when the exhibit is
   // wide (many categories) or the commentary divides into parallel points.
   "exhibit-top": {
     fit: (s, ex) => {
@@ -1538,6 +1649,10 @@ const PAGE_SHAPES = {
       // searching for a clear position - a scatter, a bubble plot - runs out of
       // positions when the plot shortens, so it keeps the taller frame.
       if (["chart.scatter", "chart.bubble", "chart.bubble-grid"].includes(ex[0].type)) return 0;
+      // Each annotation row - period bands, a change marker, events - is taken
+      // out of the plot's height before a bar is drawn; with two of them the
+      // shortened frame leaves no plot to annotate.
+      if ([ex[0].periods?.length, ex[0].change || ex[0].changeAnnotations?.length, ex[0].events?.length].filter(Boolean).length >= 2) return 0;
       // It fits as well as the side column does, never better: a page composed
       // on its own keeps the established shape, and the variety comes from
       // alternating across the deck rather than from a new monoculture.
@@ -1574,7 +1689,7 @@ const PAGE_SHAPES = {
       && s.metricsPosition !== "bottom" && !hasCommentary(s) ? 4 : 0),
   },
   // A long, narrow table cut down the middle and set as two panels side by
-  // side, each with its own header: the reference deck's ranking page. Twelve
+  // side, each with its own header: the classic ranking page. Twelve
   // rows down the centre of a 1160px body leaves half the page empty and makes
   // the reader scan a column three times its natural length.
   "table-halves": { fit: (s, ex) => (ex.length === 1 && !hasCommentary(s) && halvable(ex[0]) ? 3 : 0) },
@@ -1666,14 +1781,21 @@ function chooseLayout(slide, recent = []) {
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   // An explicit arrangement is the author overriding the choice, not a hint.
   if (slide.arrange === "stack") return "stack";
+  if (slide.arrange === "sequence") return "sequence";
   if (slide.arrange === "row") return exhibits.length === 2 && !slide.points?.length ? "two-up-contrast" : "two-up";
   if (slide.arrange === "grid" || exhibits.length >= 4) return "grid";
   // Two charts on one category set with points beside them stack in the hero
   // column rather than shrinking into a three-way row.
   if (exhibits.length === 2 && slide.points?.length && exhibits.every((ex) => String(ex.type).startsWith("chart.")) && JSON.stringify(exhibits[0].categories) === JSON.stringify(exhibits[1].categories)) return "stack";
 
+  // A design system leans toward the shapes its pages are built from: the
+  // journal's full-width exhibit, the keynote's hero number. A bias only moves
+  // a shape that already fits the page.
+  const bias = LAYOUT.shapeBias || {};
   const scored = Object.entries(PAGE_SHAPES)
-    .map(([name, shape]) => [name, shape.fit(slide, exhibits)])
+    // The variation's drawn lean is lighter: it favours a shape, but not on
+    // the page straight after one, so the deck still alternates.
+    .map(([name, shape]) => { const fit = shape.fit(slide, exhibits); const lean = LAYOUT.variation?.lean?.includes(name) && recent[0] !== name ? 1 : 0; return [name, fit > 0 ? fit + (bias[name] || 0) + lean : 0]; })
     .filter(([, score]) => score > 0);
   if (!scored.length) return exhibits.length ? "exhibit-full" : "text";
   const best = Math.max(...scored.map(([, score]) => score));
@@ -1689,7 +1811,9 @@ function chooseLayout(slide, recent = []) {
   const unused = recent.length + 1;
   const staleness = (name) => { const at = recent.indexOf(name); return at === -1 ? unused : at; };
   const score = (name) => scored.find(([n]) => n === name)[1];
-  const declared = (name) => PAGE_SHAPE_NAMES.indexOf(name);
+  // A varied deck breaks the last tie in its own drawn order, not the order the
+  // shapes happen to be declared in.
+  const declared = (name) => LAYOUT.variation ? LAYOUT.variation.order[PAGE_SHAPE_NAMES.indexOf(name)] : PAGE_SHAPE_NAMES.indexOf(name);
   return viable.slice().sort((a, b) =>
     score(b) - score(a) || staleness(b) - staleness(a) || declared(a) - declared(b))[0];
 }
@@ -1710,7 +1834,7 @@ const signed = (n, suffix = "") => `${n >= 0 ? "+" : "−"}${fmtNumber(Math.abs(
 /** `percent: true` on a stacked chart re-expresses each category as shares of its total (100% stack). */
 // A chart whose categories run down the side, not along the bottom. A data
 // table stacked under one of these has columns that align with nothing: a
-// reference deck shipped "Consultants 110 221 112" in a row beneath three
+// deck once shipped "Consultants 110 221 112" in a row beneath three
 // horizontal bars, so each number sat under empty plot. The table is only ever
 // readable under a chart whose category axis is the x axis.
 const SIDEWAYS_CATEGORIES = new Set(["chart.bar", "chart.stacked-bar", "chart.lollipop",
@@ -1763,7 +1887,7 @@ export function changeFromContent(ex, title) {
   // A stack's change is the change in its totals.
   const totals = stacked ? categories.map((_, i) => series.reduce((sum, sr) => sum + sr.values[i], 0)) : series[0].values;
   // `change: "steps"`: the period-to-period change between every adjacent pair,
-  // as a small bracket above each pair (the e-Conomy small-multiple pattern).
+  // as a small bracket above each pair (a familiar small-multiple pattern).
   if (ex.change === "steps" && (series.length === 1 || stacked) && categories.length >= 2 && categories.length <= 8) {
     const annotations = [];
     for (let i = 1; i < categories.length; i += 1) {
@@ -1790,9 +1914,10 @@ export function changeFromContent(ex, title) {
     return text ? { ...out, changeAnnotations: [{ start: from, end: to, style, text }] } : ex;
   }
   if (series.length === 2 && categories.length <= 6 && (ex.change === true || GAP_WORDS.test(String(title || "")))) {
-    // The subject is the focus series when one is named, else the first series;
-    // the bubble reads subject minus comparator.
-    const focus = series.find((sr) => sr.name === ex.focusSeries) || series[0], base = series.find((sr) => sr !== focus);
+    // The subject is the series the chart paints in the primary (the named
+    // focus, else the latest period, else the first); the bubble reads subject
+    // minus comparator, so a "2019 | 2024" pair reads 2024 minus 2019.
+    const focus = series[Math.max(0, defaultFocusIndex(series.map((sr) => sr.name), ex.focusSeries))], base = series.find((sr) => sr !== focus);
     const annotations = categories.map((c, i) => ({ start: { category: c, series: base.name }, end: { category: c, series: focus.name }, style: "bracket", text: percentUnit ? signed(focus.values[i] - base.values[i], " pp") : signed(focus.values[i] - base.values[i]) }));
     return { ...out, changeAnnotations: annotations };
   }
@@ -1802,8 +1927,8 @@ export function changeFromContent(ex, title) {
 /**
  * `paired: true` on a horizontal bar chart with two or three series: one panel
  * per series side by side, each on its own scale and headed by the series
- * name, sharing the left panel's category column (the McKinsey "share of
- * commuters | share of residents" pair). The row is a two-up of peers, so the
+ * name, sharing the left panel's category column (a "share of
+ * commuters | share of residents" pair, say). The row is a two-up of peers, so the
  * plots share one top band and the rows line up.
  */
 function pairedBars(slide) {
@@ -1818,7 +1943,7 @@ function pairedBars(slide) {
 }
 
 /**
- * `footnotes: [{ on, text }]`: the firm page's numbered notes. Each one prints a
+ * `footnotes: [{ on, text }]`: the page's numbered notes. Each one prints a
  * superscript against the first occurrence of `on` — a category, a series name,
  * a column label, a table cell, a point — and its text joins the numbered note
  * line under the page. A footnote with no `on` (or whose `on` is not found) is
@@ -1840,7 +1965,7 @@ export const SLIDE_KEYS = Object.freeze({
   kind: "statement, takeaways, section, agenda or cover; absent means an analytical page",
   shape: "one of the four heavy-page shapes: findings-matrix, measure-table, model-page, half-and-half",
   layout: "force a layout instead of letting the composer choose one",
-  arrange: "row or stack, when the page carries more than one exhibit",
+  arrange: "row, stack, grid or sequence (a row joined by arrows), when the page carries more than one exhibit",
   density: "this page's density profile, overriding the deck's",
   // the title band
   title: "the action title: the finding, not the subject",
@@ -1854,6 +1979,7 @@ export const SLIDE_KEYS = Object.freeze({
   exhibit: "the page's one exhibit",
   exhibits: "two or more exhibits, arranged by `arrange`",
   rows: "a label-and-text table written at slide level",
+  blocks: "on a labelled-rows page, the rows down the page: each { label, points, metric | exhibit }",
   columns: "the headers for that table",
   photo: "a photograph beside the copy",
   pictures: "one to five photographs, each with its label and line: the picture-led pages",
@@ -1877,7 +2003,7 @@ export const SLIDE_KEYS = Object.freeze({
   insight: "the so-what as a box in the side column",
   insights: "two statements in that column: a plain one above a boxed one",
   callout: "a boxed aside beside the evidence",
-  soWhat: "the page's close, under everything else",
+  soWhat: "the page's close, under everything else; { text, style: \"bar\" } is the filled so-what bar",
   implication: "the gutter mark joining evidence to meaning: \"divider-chevron\", \"chevron\", \"rule\", or false when the words carry it",
   items: "the entries on an agenda or takeaways page",
   active: "which agenda entry the deck is on",
@@ -1894,6 +2020,7 @@ export const SLIDE_KEYS = Object.freeze({
   notes: "the speaker notes, which print in the file and never on the page",
   // the rest
   serves: "which ranked criteria this page answers",
+  pageType: "the page type and choices the page was compiled from (author-deck.mjs); the build checks the structure still matches",
   tone: "dark or light, on the fixed-shape pages",
   accent: "an accent phrase inside a statement",
   style: "a per-kind style switch (an agenda in columns, say)",
@@ -2001,7 +2128,7 @@ const KINDS = {
 /**
  * The four heavy-page shapes, named.
  *
- * SKILL.md describes the shapes a reference deck's dense pages take; a `shape`
+ * SKILL.md describes the shapes a strong deck's dense pages take; a `shape`
  * on the slide is the author saying "this is that page", and the preset sets
  * the weight and the defaults that shape needs. Everything a preset sets, the
  * slide can override, because the shape is a starting point and not a mould.
@@ -2032,9 +2159,9 @@ const SHAPES = {
   // page 2 was this page assembled by hand, and nothing said to write it.
   "executive-summary": (slide) => {
     const findings = slide.points || slide.rows;
-    // Up to seven: a client executive summary is the densest text page in the
+    // Up to seven: an executive summary is the densest text page in the
     // deck, four to six developed statements of about sixty words with their
-    // parts as sub-points (L.E.K.'s runs to 245 words a page), not three
+    // parts as sub-points (a strong one runs to 245 words a page), not three
     // bullets and an insight box.
     if (!Array.isArray(findings) || findings.length < 2 || findings.length > 7) {
       throw new Error("An executive summary carries two to seven findings in `points`");
@@ -2075,7 +2202,7 @@ export const SHAPE_NAMES = Object.freeze(Object.keys(SHAPES));
  * highlight per page - "the phrase the reader should see first" - and threw it
  * away: the stage was a checkpoint with no consequence.
  *
- * Client decks emphasise a phrase on half their pages, and on seven pages of
+ * Strong decks emphasise a phrase on half their pages, and on seven pages of
  * type in ten. Ours managed 0.05 to 0.22 (DECK_CRAFT). So a page-level
  * `highlight` is given to every point and every table cell whose text actually
  * contains it, and to none that do not - the phrase is emphasised where it is
@@ -2087,25 +2214,25 @@ function highlightThePhrase(slide) {
   const phrases = (Array.isArray(declared) ? declared : [declared])
     .map((p) => String(p ?? "").trim()).filter(Boolean);
   if (!phrases.length) return slide;
-  const inside = (text) => {
-    const haystack = String(text ?? "").toLowerCase();
-    return phrases.filter((p) => haystack.includes(p.toLowerCase()));
-  };
+  // As whole words (phraseAt): "22" offered to "FY22" would be accepted here
+  // and then lit as half a year.
+  const inside = (text) => phrases.filter((p) => hasPhrase(text, p, { ignoreCase: true }));
   // The phrase stays on the slide: `soWhat` and the insight boxes are built
   // later, from the slide, and they set it in the accent too.
   const next = { ...slide };
 
-  if (Array.isArray(slide.points)) {
-    next.points = slide.points.map((point) => {
-      if (typeof point === "string") {
-        const found = inside(point);
-        return found.length ? { text: point, highlight: found } : point;
-      }
-      if (!point || typeof point !== "object" || point.highlight !== undefined) return point;
-      const found = inside(`${point.lead ?? ""} ${point.text ?? ""}`);
-      return found.length ? { ...point, highlight: found } : point;
-    });
-  }
+  const markPoints = (points) => points.map((point) => {
+    if (typeof point === "string") {
+      const found = inside(point);
+      return found.length ? { text: point, highlight: found } : point;
+    }
+    if (!point || typeof point !== "object" || point.highlight !== undefined) return point;
+    const found = inside(`${point.lead ?? ""} ${point.text ?? ""}`);
+    return found.length ? { ...point, highlight: found } : point;
+  });
+  if (Array.isArray(slide.points)) next.points = markPoints(slide.points);
+  // A labelled-rows page says its findings in each row's bullets.
+  if (Array.isArray(slide.blocks)) next.blocks = slide.blocks.map((block) => (Array.isArray(block?.points) ? { ...block, points: markPoints(block.points) } : block));
   // A table says it in a cell: the cell's own `highlight` is the accent phrase,
   // which `exhibitItem` already knows how to read.
   const markTable = (ex) => {
@@ -2158,7 +2285,7 @@ const SLIDE_PASSES = [
   // `split: true` on a multi-series chart sets it as small multiples: one
   // panel per series, each headed by the series name, sharing one value scale
   // and one category axis. A legend and twelve marks becomes three headings
-  // and twelve labelled marks - the reference's way of showing three cuts of
+  // and twelve labelled marks - the well-made way of showing three cuts of
   // one measure.
   ["split-into-small-multiples", (slide) => {
     if (!(slide.exhibit && slide.exhibit.split === true && !slide.exhibits)) return slide;
@@ -2245,14 +2372,35 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     // squeezes the page's own conclusion into whatever is left, so a page
     // captions its panels or carries a list, not both.
     if (slide.points?.length) throw new Error(`${id}: panel captions are the commentary; drop the page's points or the captions`);
-    const width = Math.max(160, (BODY_WIDTH - COLUMN_GAP * (exhibits.length - 1)) / exhibits.length);
-    const padding = 32;
-    const height = Math.max(...captioned.map((ex) => measureText(ex.caption.trim(), width - padding, { fontFamily: "Arial", fontSize: 14, wrapWidthRatio: 1 }).height)) + padding;
+    // A sequence gives each gutter to an arrow and its two gaps.
+    const gutters = (exhibits.length - 1) * (layout === "sequence" ? CONNECTOR_WIDTH + 2 * COLUMN_GAP : COLUMN_GAP);
+    const width = Math.max(160, (BODY_WIDTH - gutters) / exhibits.length);
+    // Measured by the insight box itself - its face, weight and padding - so the
+    // shared height never under-allocates the caption it is for.
+    const height = Math.max(...captioned.map((ex) => measureInsight({ x: 0, y: 0, width, height: 1000 }, { text: ex.caption.trim(), variant: "neutral", align: "center" }).height));
     for (const ex of captioned) ex.captionHeight = Math.ceil(height);
   }
+  // A two-series line names its series at the line ends, in a 186px column
+  // at the right of the plot. Three ten-year lines in a sequence left each
+  // panel 332px, the names took 186 of it, and the page failed with 90px of
+  // plot; in a panel under twice that column the names go to a legend above
+  // the plot instead. An author's explicit `endLabels` or `directLabels` holds.
+  const panelWidth = (BODY_WIDTH - (exhibits.length - 1) * (layout === "sequence" ? CONNECTOR_WIDTH + 2 * COLUMN_GAP : COLUMN_GAP)) / exhibits.length;
+  for (const ex of exhibits) {
+    if (!["chart.line", "chart.area"].includes(ex.type) || (ex.series || []).length < 2 || panelWidth >= 2 * 186) continue;
+    if (ex.endLabels === undefined && ex.directLabels === undefined) { ex.endLabels = false; ex.legend = ex.legend ?? true; }
+  }
   // Peer charts with one unit share one value scale, or the comparison lies.
+  // The scale is shared within each unit, not only when every panel has the
+  // same one: a row of a passenger column beside two "% y/y" bar panels
+  // skipped the shared domain (the column's unit differed), the bar peers
+  // below were still pinned to a zero minimum, and their -18% bar crashed the
+  // page with "x-axis bounds must contain every plotted value".
   const charts = exhibits.filter((ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.series));
-  if (charts.length >= 2 && charts.every((ex) => ex.unit === charts[0].unit && ex.yMax === undefined)) {
+  const byUnit = new Map();
+  for (const ex of charts) byUnit.set(ex.unit, [...(byUnit.get(ex.unit) || []), ex]);
+  for (const group of byUnit.values()) {
+    if (group.length < 2 || group.some((ex) => ex.yMax !== undefined)) continue;
     // Stacks extend separately above and below zero: netting signed
     // segments or forcing zero as the minimum truncates real evidence.
     const extent = ex => ["chart.stacked-column", "chart.stacked-bar"].includes(ex.type)
@@ -2261,37 +2409,79 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
         ex.series.reduce((sum, se) => sum + Math.max(0, se.values[i] || 0), 0),
       ])
       : ex.series.flatMap(se => se.values);
-    const values = charts.flatMap(ex => [...extent(ex), ...(ex.referenceLines || []).map(reference => reference.value)]);
+    // Every mark the scale has to hold, from every panel: reference lines and
+    // targets too, each with the 15% the chart itself gives a line near the
+    // top so its label has room (charts.mjs withReferenceValues).
+    const marks = group.flatMap(extent);
+    const top = Math.max(0, ...marks);
+    const lines = group.flatMap(ex => [...(ex.referenceLines || []).map(reference => reference.value), ...(ex.targets || [])]).filter(Number.isFinite);
+    const values = [...marks, ...lines, ...lines.filter(v => v > 0 && v >= top * 0.9).map(v => v * 1.15)];
     const min = Math.min(0, ...values), max = Math.max(0, ...values);
     const sharedMin = min < 0 ? -niceCeiling(-min) : 0;
     const sharedMax = max > 0 ? niceCeiling(max) : min < 0 ? 0 : 1;
-    for (const ex of charts) { ex.yMin = ex.yMin ?? sharedMin; ex.yMax = sharedMax; }
+    for (const ex of group) { ex.yMin = ex.yMin ?? sharedMin; ex.yMax = sharedMax; }
   }
   // Equal numerical limits alone do not make equal bar lengths: different
   // category gutters and Office auto-layout change the pixels per unit.
   // Compare horizontal peers in the shared editable scene coordinate system.
   const horizontalPeers = charts.filter(ex => ["chart.bar", "chart.stacked-bar"].includes(ex.type));
   if (horizontalPeers.length >= 2 && !slide.pairedWeights && horizontalPeers.every(ex => ex.unit === horizontalPeers[0].unit)) {
-    const minima = new Set(horizontalPeers.map(ex => ex.yMin ?? 0));
+    // An unset minimum is the lowest bar of any peer, not zero: zero put a
+    // negative bar outside its own axis.
+    const lowest = Math.min(0, ...horizontalPeers.flatMap(ex => ex.series.flatMap(series => series.values)));
+    const floor = lowest < 0 ? -niceCeiling(-lowest) : 0;
+    const minima = new Set(horizontalPeers.map(ex => ex.yMin ?? floor));
     const maxima = new Set(horizontalPeers.map(ex => ex.yMax));
     if (minima.size !== 1 || maxima.size !== 1) throw new Error(`${id}: peer bars with the same unit require matching numeric domains`);
     const comparisonDomain = { categories: horizontalPeers.flatMap(ex => ex.categories), values: horizontalPeers.flatMap(ex => ex.series.flatMap(series => series.values)) };
-    for (const ex of horizontalPeers) { ex.yMin = ex.yMin ?? 0; ex.comparisonDomain = comparisonDomain; ex.native = false; }
+    for (const ex of horizontalPeers) { ex.yMin = ex.yMin ?? floor; ex.comparisonDomain = comparisonDomain; ex.native = false; }
   }
   // One scale needs one plot frame: peers share the row's tallest top band
-  // (legend, growth arrows, callouts), and when one peer must be drawn as
-  // shapes (annotations), all of them are, so their baselines coincide.
+  // (legend, growth arrows), and when one peer must be drawn as shapes
+  // (annotations), all of them are, so their baselines coincide.
+  //
+  // Callout bands are shared only where the plots must be the same height:
+  // columns and lines on one value scale (one pixel per unit needs one plot
+  // height), and bars whose rows read across (the same categories). A row
+  // shared every callout band with every panel, and a passengers column with
+  // one callout left its seat-kilometre neighbour - another unit, another
+  // scale - under a 76px band of air the page gate flagged; the author's only
+  // way out was to annotate every panel or none. Unshared, each panel keeps
+  // its own band and the plots still meet at the baseline. Within one scale
+  // the band stays shared, callout or not: moving the callout beside its mark
+  // was tried, and a pandemic-year note on a short column had no room beside
+  // it (tall neighbours both sides) and failed a page the band had drawn; a
+  // shorter plot beside a taller one on the same scale draws the same value
+  // at two heights, which is the lie the shared scale exists to prevent.
+  // page-types.mjs describeTypes publishes this to the author.
   if (charts.length >= 2) {
-    const decorated = (ex) => (ex.referenceLines || []).length || (ex.annotations || []).length || (ex.changeAnnotations || []).length || (ex.highlights || []).some((h) => h?.style !== "bar");
-    const topBand = (ex) => {
+    const decorated = (ex) => (ex.referenceLines || []).length || (ex.annotations || []).length || (ex.changeAnnotations || []).length || (ex.highlights || []).some((h) => (h?.style ?? defaultHighlightStyle(ex.type, ex)) !== "bar");
+    const baseBand = (ex) => {
       const line = ex.type === "chart.line" || ex.type === "chart.area", multi = (ex.series || []).length > 1;
       const legend = ex.legend === true || (ex.legend !== false && multi && !line);
       // The legend may wrap; the row's inset must cover the tallest one (1160px row, n panels).
       const rows = legend ? legendRowCount((ex.series || []).map((sr) => sr.name), Math.max(120, 1160 / Math.max(1, charts.length) - 70)) : 0;
-      return (rows ? 52 + (rows - 1) * 26 : 28) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top + evidenceAnnotationTopBandCount({ annotations: ex.annotations || [] }) * EVIDENCE_CALLOUT_BAND;
+      return (rows ? 52 + (rows - 1) * 26 : 28) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top;
     };
-    const inset = Math.max(...charts.map(topBand));
-    for (const ex of charts) { ex.plotTopInset = inset; if (charts.some(decorated)) ex.native = false; }
+    // Callouts counted at their compact height: the row's band is the budget,
+    // and a peer whose full 88px bands would overrun it closes them to fit
+    // (charts.mjs chartFrame), so the plots still share one top line.
+    const calloutBand = (ex) => evidenceBandSpan({ annotations: ex.annotations || [] }, { compact: true });
+    // A plot with no value axis - a waffle's dots, a treemap's tiles, a pie -
+    // has no baseline to share. Handed the row's band, a waffle beside an
+    // annotated bar chart drew its dots under a strip of air as tall as its
+    // neighbour's callout.
+    const aligned = charts.filter((ex) => !["chart.waffle", "chart.treemap", "chart.pie", "chart.donut"].includes(ex.type));
+    const base = Math.max(0, ...aligned.map(baseBand));
+    const across = (ex) => ["chart.bar", "chart.stacked-bar"].includes(ex.type);
+    const scaleKey = (ex) => across(ex) ? `rows:${JSON.stringify(ex.categories)}` : ex.yMax === undefined ? null : `scale:${ex.unit}:${ex.yMin}:${ex.yMax}`;
+    const groups = new Map();
+    for (const ex of aligned) { const key = scaleKey(ex); if (key) groups.set(key, [...(groups.get(key) || []), ex]); }
+    for (const ex of aligned) {
+      const key = scaleKey(ex), group = key && groups.get(key)?.length > 1 ? groups.get(key) : [];
+      ex.plotTopInset = base + Math.max(0, ...group.map(calloutBand));
+    }
+    if (charts.some(decorated)) for (const ex of charts) ex.native = false;
   }
   // Chart beside a narrow table (three columns or fewer): the chart takes 3:2.
   const panelSize = (ex, index) => {
@@ -2303,20 +2493,29 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     if (narrow(ex) && String(other?.type).startsWith("chart.")) return { width: { fr: 2 }, height: "fill" };
     return SIZE;
   };
-  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 4).map((sourceEx, i) => {
+  const panels = exhibits.slice(0, 4).map((sourceEx, i) => {
     // A schedule paired with a table shares its evidence top. Preserve an
     // explicitly authored alternative; a standalone schedule stays centred.
     const ex = sourceEx.type === "gantt" && sourceEx.valign === undefined && exhibits.some(peer => peer.type === "table")
       ? { ...sourceEx, valign: "top" } : sourceEx;
+    // A figure with a natural size hugs it at the top of its panel, level
+    // with its peers' first lines, rather than centring in the panel's height.
     const panel = centredFigure(ex)
-      ? { id: `${id}-figure-${i}`, layout: "flow.column", leftover: "center", size: panelSize(ex, i), items: [exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, HUG)] }
+      ? { id: `${id}-figure-${i}`, layout: "flow.column", size: panelSize(ex, i), items: [exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, HUG)] }
       : { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: panelSize(ex, i) };
     // Charts own their heading inside the component. An empty section above
     // an unheaded peer table would add a second, invisible heading band and
     // push that table's actual header below the chart's reading start.
     return headedPanel(ex, panel, `${id}-exhibit-${i}`,
       !exhibits.some(peer => String(peer.type).startsWith("chart.")));
-  }) });
+  });
+  // `sequence`: the same row read as steps, a block arrow in each gutter
+  // pointing from one exhibit to the next - cause to effect, before to after.
+  // The arrow is the relation; a row of peers without it is a comparison.
+  const row = layout === "sequence"
+    ? panels.flatMap((panel, i) => (i ? [{ id: `${id}-step-${i}`, component: "connector", props: { variant: "arrow" }, size: { width: CONNECTOR_WIDTH, height: "fill" } }, panel] : [panel]))
+    : panels;
+  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: row });
   if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
 }
 
@@ -2350,18 +2549,21 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
   // A lone implication takes the exhibit's track: heading at the body's left
   // margin, text reaching the same right edge as the last column above it.
   // The 80-character measure cap is for sustained prose in a column; a close
-  // set under a full-width exhibit is a band, and the reference pages set the
-  // band to the width of the thing it is read off - McKinsey's Purdue pages
-  // end each chart with one, BCG's NYCHA pages run theirs the width of the
-  // page. Hugging its own measure and centring, this sat in the middle of an
+  // set under a full-width exhibit is a band, and a well-made page sets the
+  // band to the width of the thing it is read off - under a chart, the width
+  // of the chart; under a full-width table, the width of the page. Hugging its own measure and centring, this sat in the middle of an
   // empty support region related to the table above it by nothing.
   const loneBand = slide.points.length === 1;
-  const columns = slide.points.map((point, at) => {
-    const entry = typeof point === "string" ? { text: point } : point;
-    const hoist = entry.lead && standsAlone(entry.text);
+  // One style for the row: decided point by point, a sentence that began in
+  // lower case ("flydubai is ...") ran its lead inline while its neighbour's
+  // lead stood as a heading, and one band read as two devices.
+  const entries = slide.points.map((point) => (typeof point === "string" ? { text: point } : point));
+  const hoistAll = entries.every((entry) => entry.lead && standsAlone(entry.text));
+  const columns = entries.map((entry, at) => {
+    const hoist = hoistAll;
     const text = hoist ? entry.text : [entry.lead, entry.text].filter(Boolean).join(" ");
     // A lead that stays in the sentence still leads it: it runs in bold, the
-    // way the reference pages set the phrase that carries the finding.
+    // way a well-made page sets the phrase that carries the finding.
     const runs = !hoist && entry.lead
       ? accentRuns(text, [entry.lead], { bold: true, strict: false })
       : null;
@@ -2375,9 +2577,9 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
     // the table above it by nothing - the table ran the full body and the
     // sentence drawn from it started a third of the way in. Set to the same
     // track, its first word sits under the first column and its last under
-    // the last, which is how the reference pages close an exhibit: McKinsey's
-    // Purdue pages run the finding as a band the width of the chart it is
-    // read off, and BCG's NYCHA pages run it the width of the page.
+    // the last, which is how a well-made page closes an exhibit: the finding
+    // runs as a band the width of the chart it is read off, or the width of
+    // the page.
     return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
       ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
       items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text, ...(runs ? { runs } : {}), ...(loneBand ? { maxMeasure: false } : {}) }, size: HUG }] };
@@ -2390,11 +2592,56 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
   // them in based on earlier pages does not create a new evidence relationship.
   const headBelow = !columns.every((column) => column.heading)
     ? belowHeading : slide.pointsHeading || null;
+  // Four points across the body are four 270px columns, under the measure
+  // prose needs, and the page failed CPL ("the column is too narrow for
+  // prose") for a choice of placement that was sound. Up to three run in one
+  // row; four go two by two and more three across, reading along each row.
+  const perRow = columns.length <= 3 ? columns.length : columns.length === 4 ? 2 : 3;
+  const rows = [];
+  for (let at = 0; at < columns.length; at += perRow) rows.push(columns.slice(at, at + perRow));
   items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
     headedPanel(exhibits[0], item, `${id}-exhibit`, false),
-    { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}),
-      layout: "flow.row", size: HUG, items: columns },
+    { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}), size: HUG,
+      ...(rows.length === 1 ? { layout: "flow.row", items: columns }
+        : { layout: "flow.column", items: rows.map((row, r) => ({ id: `${id}-below-${r}`, layout: "flow.row", size: HUG, items: row })) }) },
   ] });
+}
+
+
+/**
+ * Labelled row blocks: `labelled-rows`.
+ *
+ * Two to five rows down the page, each a filled label block in the house
+ * colour, its bullets beside it and, where the rows have evidence, a number or
+ * a small exhibit at the right. It is how a strong deck sets out three
+ * challenges, what changed in each area, or a diagnosis: the labels read down
+ * the left edge as the page's outline, and each row is read across. Before it
+ * existed those pages became one exhibit with a text column beside it, or a
+ * table of sentences.
+ *
+ * The rows share the body height equally, so the page fills to its foot and
+ * every label block is the same size - blocks of different heights read as
+ * items of different weight. The label and the right-hand column take fixed
+ * widths so they align from row to row; the bullets take the rest and centre
+ * on their block.
+ */
+const BLOCK_LABEL_WIDTH = 228, BLOCK_SIDE_WIDTH = 300;
+function labelledRows(items, { id, slide, baseDir, fill }) {
+  const blocks = slide.blocks || [];
+  if (blocks.length < 2) throw new Error(`${id}: a labelled-rows page carries two or more \`blocks\`, each { label, points }`);
+  const rows = blocks.map((block, at) => {
+    if (!block?.label || !(block.points || []).length) throw new Error(`${id}: block ${at + 1} needs its \`label\` and \`points\``);
+    const label = { id: `${id}-label-${at}`, component: "side-statement", props: { text: String(block.label).trim(), tone: "primary" },
+      size: { width: BLOCK_LABEL_WIDTH, height: "fill" } };
+    const text = { id: `${id}-text-${at}`, layout: "flow.column", leftover: "center", size: { width: { fr: 1 }, height: "fill" },
+      items: [pointsItem(block.points, `${id}-points-${at}`, "open", fill, false, null)] };
+    const side = block.metric
+      ? { id: `${id}-metric-${at}`, component: "metric", props: { value: String(block.metric.value), label: block.metric.label, ...(block.metric.delta ? { delta: block.metric.delta } : {}) },
+          size: { width: BLOCK_SIDE_WIDTH, height: "fill" } }
+      : block.exhibit ? { ...exhibitItem(block.exhibit, `${id}-exhibit-${at}`, baseDir), size: { width: BLOCK_SIDE_WIDTH, height: "fill" } } : null;
+    return { id: `${id}-block-${at}`, layout: "flow.row", size: SIZE, items: [label, text, side].filter(Boolean) };
+  });
+  items.push({ id: `${id}-blocks`, layout: "flow.column", gap: "space.3", size: SIZE, items: rows });
 }
 
 
@@ -2405,7 +2652,7 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
 // A staircase, a cycle and a chevron process are figures with a natural size: a
 // three-step staircase wants about 230px whatever the page offers it, and
 // handed the whole body it spreads into small islands with a hundred pixels of
-// nothing between them. They hug and centre, like the icon cards.
+// nothing between them. They hug their natural size at the top of their region.
 const centredCards = (ex) => ex.type === "cards" && ex.tone !== "header" && ex.tone !== "numbered" && (ex.items || []).every((i) => i.icon && !(i.points || []).length);
 const centredFigure = (ex) => ["steps", "cycle", "chevron-process"].includes(ex?.type)
   || (ex?.type === "roadmap" && ["phase-workstreams", "wave-columns"].includes(ex.variant));
@@ -2436,23 +2683,21 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   // band and the points start level with the plot, not with the heading text.
   // `pointsAlign: "middle"` centres the points on the exhibit instead.
   const tone = sideTreatment(slide);
-  // The list centres its leftover only when it owns the track. Under a kpi or
-  // an insight, centring opens a void between that block and the first point
-  // - the list floats away from the thing it is reading from.
-  const sharesColumn = Boolean(slide.kpi) || Boolean(slide.insight) || Boolean(slide.insights?.length);
-  // Nor when a heading sits above it. Centring the leftover put a hand's
-  // width of blank between "What it means" and the first thing it meant, on
-  // every headed column in the deck: a heading is where the eye starts, so
-  // the first point belongs under its rule and the slack belongs at the foot.
-  const headed = slide.pointsHeading !== false && !sharesColumn;
-  const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle, !sharesColumn && !headed) : null;
+  // The list starts at the top of its track, level with the exhibit, and
+  // spreads its gaps to their cap; what the cap leaves is the column's foot.
+  // It used to centre whenever it owned an unheaded track, and every such
+  // column carried a band of air above its first point as tall as the one
+  // under its last: the gates read by column, and on a fifty-page deck eight
+  // commentary columns were holes top and bottom. The answer to a column that
+  // still ends high is a narrower column (sideFr, below), not a centred one.
+  const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle, false) : null;
   // `kpi: { value, label }`: the one big number the chart proves, in the accent
   // at the top of the side column, above the points.
   const kpiTile = slide.kpi ? { id: `${id}-kpi`, component: "metric", props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } } : null;
   // `insight`: the so-what as a tonal box in the side column, centred on the
   // exhibit when it stands alone, above the points when there are some. The
   // column then carries no heading unless `pointsHeading` names one.
-  // `insights: [a, b]` is the reference pattern of flanking an exhibit with two
+  // `insights: [a, b]` is the familiar pattern of flanking an exhibit with two
   // statements that carry the numbers in words; `insight` is the single box.
   const insightSpecs = (Array.isArray(slide.insights) ? slide.insights : slide.insight !== undefined ? [slide.insight] : []).filter((entry) => entry !== undefined && entry !== null);
   if (insightSpecs.length > 2) throw new Error(`${id}: a side column carries at most two insights`);
@@ -2494,51 +2739,42 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   // The column's width is negotiated with its content, not fixed by the
   // layout: forty words in a 361px track leave two fifths of the column
   // empty, and the exhibit beside it wanted that width anyway. A short column
-  // narrows (its text then wraps to more lines, and the hero grows); a column
-  // that would overrun widens.
+  // narrows until it runs SIDE_COLUMN_DEPTH down its track or reaches
+  // SIDE_COLUMN_MIN_WIDTH (its text wraps to more lines, and the hero grows);
+  // a column that would overrun widens. One step at 0.8 left a three-point
+  // column filling three fifths of its track and the rest of it air.
   const sideColumns = heroFr + baseSideFr + (slide.photo ? 1 : 0);
   const sideTrack = (fr) => Math.max(140, (BODY_WIDTH - CONNECTOR_WIDTH - COLUMN_GAP * sideColumns) * (fr / (heroFr + fr + (slide.photo ? 1 : 0))));
   const sideExtras = (kpiTile ? 126 : 0) + insightBoxes.length * 104 + (heading ? 44 : 0);
   const sideFr = (() => {
     if (fill === "airy" || !list) return baseSideFr;
-    const natural = sideExtras + pointsHeight(slide.points, sideTrack(baseSideFr));
+    const depth = (fr) => (sideExtras + listDepth(list, sideTrack(fr))) / BODY_HEIGHT;
     // A photograph strip takes a quarter of the row, which leaves the
     // commentary a 267px gutter that nothing reads comfortably. The column
     // keeps a floor of 300px; the photograph gives up the width.
     if (slide.photo && sideTrack(baseSideFr) < 300) return baseSideFr * 1.25;
-    if (natural < BODY_HEIGHT * 0.45) return baseSideFr * 0.8;
-    if (natural > BODY_HEIGHT * 0.98) return baseSideFr * 1.2;
-    return baseSideFr;
+    if (depth(baseSideFr) > 0.98) return baseSideFr * 1.2;
+    // The width goes to an exhibit that can use it. A chart's plot scales with
+    // its frame; a table set wider wraps less and ends higher, trading the
+    // column's band for one under the table, so beside a table the column
+    // gives up a fifth at most.
+    const floor = heroFr === 3 ? baseSideFr * 0.8 : 0;
+    let fr = baseSideFr;
+    while (depth(fr) < SIDE_COLUMN_DEPTH && fr * 0.95 >= floor - 1e-9 && sideTrack(fr * 0.95) >= SIDE_COLUMN_MIN_WIDTH) fr *= 0.95;
+    return fr;
   })();
-  // How much of the track the column will actually occupy, at the width it
-  // ended up with. This is what decides whether the column is read down from
-  // the title or across from the exhibit; the point count was only ever a
-  // proxy for it, and it got the answer wrong for one long prose point.
-  const sideFill = (sideExtras + (list ? pointsHeight(slide.points, sideTrack(sideFr)) : 0)) / BODY_HEIGHT;
   // A column of statements and nothing else - one box, or a statement above a
-  // box - is read against the exhibit beside it, so it centres on the exhibit
-  // rather than hugging the top of the track. Anything with a list in it has
-  // something that can spread instead. `pointsAlign` overrides either way.
+  // box - has nothing that can spread down the track.
   const boxesOnly = sideItems.length > 0 && sideItems.every((item) => insightBoxes.includes(item));
-  // A short unheaded column of two or three points is also read against the
-  // exhibit rather than down from the title, so it centres too. Three bullets
-  // hugging the top of a 500px track with the bottom half empty is the page
-  // that reads as unfinished; centred, the two halves balance. A headed
-  // column keeps its top - the heading is what the eye starts from.
-  // Measured, not counted: a column that leaves more than a third of its
-  // track empty is read against the exhibit beside it, so it centres. One
-  // prose point under a headed chart hugged the top and left the bottom half
-  // of the page blank, which is the page that reads as unfinished - and the
-  // old test could not see it, because it asked how many points there were
-  // rather than how much of the column they filled.
-  const shortList = list && !heading && sideItems.length <= 1 && sideFill <= SIDE_COLUMN_SLACK;
-  // A headed column starts under its own heading. Centring the block as well
-  // left a hand's width of blank between the rule and the first line, on a
-  // page whose heading says "What it means" and then appears to mean it two
-  // inches lower.
-  const centre = slide.pointsAlign === "middle" || (slide.pointsAlign === undefined && !heading
-    && (boxesOnly || sideItems.length <= 1)
-    && (unheaded(exhibits[0]) || (insightBox && !list) || tone !== "open" || shortList));
+  // Every column starts at the top of its track, level with the exhibit;
+  // `pointsAlign: "middle"` centres it on the exhibit when the author asks.
+  // A short column used to centre by default - statements alone, an unheaded
+  // list filling two thirds of its track or less, anything beside a diagram
+  // or on a toned panel - on the reading that three points hugging the top of
+  // a 500px track look unfinished. Centred, they were a hole above as well as
+  // below: read by column, the band gates named eight such columns on one
+  // fifty-page deck. A headed column already started under its heading.
+  const centre = slide.pointsAlign === "middle";
   // A toned panel is always a section (it needs a surface); it takes the
   // heading unless the author suppresses it with `pointsHeading: false`.
   // A column of several blocks (a number, a box, the points) spreads them down
@@ -2547,7 +2783,7 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   // Spreading blocks down the track works when one of them can absorb the
   // slack (a points list, which spreads its own items). Statements alone have
   // nothing to absorb it, so distributing would pin them to opposite ends of
-  // an empty track; they sit together, centred, instead.
+  // an empty track; they sit together at the top instead.
   if (centre && list) { list.size = HUG; list.props = { ...list.props, distribute: false }; }
   const spread = !centre && fill !== "airy" && sideItems.length > 1 && !boxesOnly ? "distribute" : null;
   const side = tone === "open" && centre && !heading
@@ -2558,7 +2794,7 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   const chevron = bridge
     ? { id: `${id}-implication`, component: "connector", props: { variant: bridge }, size: { width: 44, height: "fill" } } : null;
   // `photo`: a photograph strip at the right edge, full body height, cropped
-  // to fit (the 2022 McKinsey pattern: chart, commentary, photo).
+  // to fit (a familiar pattern: chart, commentary, photo).
   const photo = photoStrip(slide, `${id}-photo`, baseDir);
   const ordered = layout === "exhibit-left" ? [hero, chevron, side] : [side, chevron, hero];
   items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [...ordered.filter(Boolean), ...(photo ? [photo] : [])] });
@@ -2606,6 +2842,14 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       ...(slide.notes ? { notes: slide.notes } : {}) };
   }
   if (slide.evidenceStatus) slide = { ...slide, subtitle: [slide.evidenceStatus, slide.subtitle].filter(Boolean).join(" · ") };
+  // The journal sets the finding as the standfirst under the title, where a
+  // reader of a data briefing looks for it, instead of closing the page on it.
+  // It is still the page's takeaway, so it keeps a takeaway's role and counts
+  // as body; an authored standfirst (the scope) is title-band furniture.
+  if (LAYOUT.takeaway === "standfirst" && typeof slide.soWhat === "string" && !slide.subtitle && slide.soWhat.length <= 200) {
+    const { soWhat, ...rest } = slide;
+    slide = { ...rest, subtitle: soWhat, _standfirstTakeaway: true };
+  }
   const slideIn = slide;
   for (const [name, run] of SLIDE_PASSES.slice(3)) {
     try {
@@ -2615,12 +2859,22 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     }
   }
   const pictures = normalizePictures(slide, id);
-  const layout = chooseLayout(slide, recent);
-  if (Array.isArray(recent)) recent.unshift(layout);
+  const chosen = chooseLayout(slide, recent);
+  // Editorial pages read commentary first: the mirror, on every page of the
+  // deck, so the reading order is still one the reader can rely on.
+  const layout = chosen === "exhibit-left" && !slide.layout && LAYOUT.commentary === "left" ? "exhibit-right" : chosen;
+  if (Array.isArray(recent)) recent.unshift(chosen);
   const columnPoints = slide.points;
   const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints) : null;
   if (pointsStyle && Array.isArray(recentStyles)) recentStyles.unshift(pointsStyle);
-  const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
+  const exhibits = [...(slide.exhibits || (slide.exhibit ? [slide.exhibit] : []))];
+  // A lone table whose density the composer chose (a findings matrix defaults
+  // to compact, pagination picks the lightest step its estimate fits) may be
+  // set a type step up when its frame holds it (`fillDensity` in tables.mjs).
+  // An author's density is kept, and so are peer tables, which must share one
+  // type size, and the pages of a split table, which must match each other.
+  if (exhibits.length === 1 && ["table", "rows", "compare", "phase-table"].includes(exhibits[0]?.type) && ["exhibit-full", "metrics-over-exhibit", "exhibit-top", "exhibit-left", "exhibit-right"].includes(layout)
+      && (exhibits[0]?.density === undefined || exhibits[0]?._densityChosen === true)) exhibits[0] = { ...exhibits[0], _typeStep: true };
   const items = [];
   // Explicit layouts must preserve their author's commentary too. Side-only
   // fields cannot be silently dropped by a layout that has no side track.
@@ -2645,18 +2899,24 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   // A staircase, a cycle and a chevron process are all figures with a natural
   // size: a three-step staircase wants about 230px whatever the page offers it,
   // and handed the whole body it spreads into small islands with a hundred
-  // pixels of nothing between them. They hug and centre, like the icon cards.
+  // pixels of nothing between them. They hug their natural size at the top of
+  // the body with the points directly under them, and the frame's slack is
+  // its foot: centred in it, the staircase carried as much air above as
+  // below, and the points under the page sat under the lower band.
 
   // `metrics-over-exhibit` is `exhibit-full` with the measures above it: the
   // exhibit still takes the whole width and the height the strip leaves.
   const fullWidth = layout === "exhibit-full" || layout === "metrics-over-exhibit";
+  let pointsPlaced = false;
   if (fullWidth && (centredCards(exhibits[0]) || centredFigure(exhibits[0]))) {
-    // Icon cards with a line each hug their content and sit centred in the
-    // space above the takeaway; header and numbered cards fill the page as columns.
-    items.push(centredFigure(exhibits[0])
-      ? { id: `${id}-figure-frame`, layout: "flow.column", leftover: "center", size: SIZE,
-          items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, HUG)] }
-      : exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { ...SIZE, centre: true }));
+    // Icon cards with a line each hug their content at the top of the body,
+    // like the figures, with the points under them; centred, they carried as
+    // much air above the row as below it. Header and numbered cards fill the
+    // page as columns.
+    const below = layout === "exhibit-full" && slide.points?.length
+      ? [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle)] : [];
+    pointsPlaced = below.length > 0;
+    items.push({ id: `${id}-figure-frame`, layout: "flow.column", size: SIZE, items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, HUG), ...below] });
   } else if (fullWidth) {
     const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
     if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
@@ -2692,8 +2952,11 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     const sideItems = [kpi];
     if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
     const hero = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" });
+    // The number and its points start at the top of the column, level with
+    // the exhibit; centred, the column carried air above the number as tall
+    // as the band under its last point.
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
-      { id: `${id}-side`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, leftover: "center", items: sideItems },
+      { id: `${id}-side`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" }, items: sideItems },
       headedPanel(exhibits[0], hero, `${id}-exhibit`, false),
     ] });
   } else if (layout === "split-tone") {
@@ -2721,7 +2984,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       if (slide.kpi) sideItems.push({ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } });
       const insights = slide.insights || (slide.insight ? [slide.insight] : []);
       for (const [at, insight] of insights.entries()) sideItems.push({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insights.length > 1 && at === 0 ? "plain" : "tonal", ...(slide.highlight === undefined ? {} : { highlight: slide.highlight }), ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG });
-      if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle, sideItems.length === 0));
+      if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle));
       const side = { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: sideTreatment(slide), size: { width: { fr: slide.kpi || insights.length ? 1.5 : 1 }, height: "fill" }, items: sideItems };
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
     } else items.push({ ...stacked, size: SIZE });
@@ -2730,8 +2993,10 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     const panels = exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE }, `${id}-exhibit-${i}`));
     items.push({ id: `${id}-grid`, layout: "flow.column", size: SIZE, items: [{ id: `${id}-row-a`, layout: "flow.row", size: SIZE, items: panels.slice(0, 2) }, { id: `${id}-row-b`, layout: "flow.row", size: SIZE, items: panels.slice(2, 4) }] });
     if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
-  } else if (layout === "two-up" || layout === "two-up-contrast") {
+  } else if (layout === "two-up" || layout === "two-up-contrast" || layout === "sequence") {
     peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle, pictures });
+  } else if (layout === "labelled-rows") {
+    labelledRows(items, { id, slide, baseDir, fill });
   } else if (layout === "picture-pair" || layout === "picture-strip") {
     // Two named things side by side, or three to five across a strip, each with
     // its card underneath. This is the page the reader can tell apart before
@@ -2761,8 +3026,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       ...(slide.kpi ? [{ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } }] : []),
       ...insightSpecs.map((insight, at) => ({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insightSpecs.length > 1 && at === 0 ? "plain" : "tonal", ...(slide.highlight === undefined ? {} : { highlight: slide.highlight }), ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG })),
       ...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })),
-      ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle,
-        !slide.kpi && !insightSpecs.length && !(slide.paragraphs || []).length)] : []),
+      ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle)] : []),
     ];
     const column = { id: `${id}-side`, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: 1.2 }, height: "fill" }, items: copy };
     // The picture's own line sits under it as a statement box, the way a
@@ -2779,8 +3043,8 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       : frame;
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [column, side] });
   } else if (layout === "sidebar") {
-    // A side panel carrying the page's statement, the content beside it: the
-    // corpus sets a question, a claim or a headline figure in a dark panel down
+    // A side panel carrying the page's statement, the content beside it: a
+    // strong deck sets a question, a claim or a headline figure in a dark panel down
     // the left and lets the evidence or the points take the rest. The panel is
     // the reading; what sits beside it is the support.
     const panel = slide.panel;
@@ -2794,11 +3058,18 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     if (slide.points?.length) body.push(pointsItem(slide.points, `${id}-points`, "open", fill, !exhibits.length, pointsStyle));
     for (const [at, text] of (slide.paragraphs || []).entries()) body.push({ id: `${id}-p${at}`, component: "paragraph", props: { text }, size: HUG });
     if (!body.length) throw new Error(`${id}: a sidebar page needs an exhibit, points or paragraphs beside its panel`);
+    // The copy starts level with the panel's top edge. Centred beside a
+    // full-height panel, three paragraphs sat under 125px of air with as much
+    // again below them. Prose alone is sized to reach the foot at a readable
+    // measure (proseBeside) and the panel takes the rest; in two thirds of the
+    // row it stopped at the measure, 165px short of its column's edge.
+    const proseOnly = !exhibits.length && !slide.points?.length;
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [panelBox,
-      { id: `${id}-body`, layout: "flow.column", ...(exhibits.length ? {} : { leftover: "center" }), size: { width: { fr: 2 }, height: "fill" }, items: body }] });
+      proseOnly ? proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH)
+        : { id: `${id}-body`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: body }] });
   } else if (layout === "photo-backdrop") {
     // The exhibit on a card over a full-bleed photograph of what it measures:
-    // the published reports' "numbers over the thing itself". The photo sets
+    // "numbers over the thing itself". The photo sets
     // the subject; the card keeps the chart legible over it.
     if (!slide.photo) throw new Error(`${id}: a photo-backdrop page needs \`photo\`, the picture the card sits on`);
     if (exhibits.length !== 1) throw new Error(`${id}: a photo-backdrop page carries one exhibit on its card`);
@@ -2839,15 +3110,30 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       // the spare height into one internal void. A list followed by authored
       // paragraphs still shares the track and keeps its natural height.
       items.push(pointsItem(points, `${id}-points`, tone, fill,
-        !(slide.paragraphs || []).length, pointsStyle, items.length === 0));
+        !(slide.paragraphs || []).length, pointsStyle));
     }
-    const document = documentItem(slide, id, points.length);
+    // A memo: the prose first at a readable measure, sized to reach the foot
+    // (proseBeside), and its panel - the conclusion or the figures to keep -
+    // down the right in the tint. Without the panel the memo was one to three
+    // equal columns, which a text page's word ceiling could not fill.
+    const memo = slide.panel && (slide.paragraphs || []).length && !points.length;
+    if (memo) {
+      const panel = slide.panel;
+      if (typeof panel.text !== "string" || !panel.text.trim()) throw new Error(`${id}: a memo's \`panel\` carries \`text\`, the conclusion the reader keeps`);
+      const tone = panel.tone ?? "tint";
+      if (!["dark", "primary", "muted", "tint"].includes(tone)) throw new Error(`${id}: panel.tone is dark, primary, muted or tint`);
+      items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
+        proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH),
+        { id: `${id}-panel`, component: "side-statement", props: { text: panel.text.trim(), tone, ...(panel.kicker ? { kicker: panel.kicker } : {}) },
+          size: { width: { fr: 1 }, height: "fill" } }] });
+    }
+    const document = memo ? null : documentItem(slide, id, points.length);
     if (document) items.push(document);
-    else for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
+    else if (!memo) for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
   }
   // These full-width/paired layouts used to discard supplied points. Keep
   // them in a measured track below the evidence, just like the two-up recipe.
-  if (["exhibit-full", "table-halves", "split-tone"].includes(layout) && slide.points?.length) {
+  if (["exhibit-full", "table-halves", "split-tone"].includes(layout) && slide.points?.length && !pointsPlaced) {
     items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
   }
   // Authored prose on a full-width page goes under the evidence, for the same
@@ -2874,13 +3160,13 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   inlineChartUnits(items);
   // Footer: "Source:" and "Note:" lead their lines, as on a consulting page.
   const prefixed = (label, text) => (text && !/^(source|sources|note|notes)\s*:/i.test(text) ? `${label}: ${text}` : text);
-  // `note` takes a list as well as a line: the reference pages carry two to four
+  // `note` takes a list as well as a line: a well-made page carries two to four
   // numbered notes under the page, and a numbered note is what a superscript in
   // a label or a heading ("Revenue¹") points at.
   const noteLine = Array.isArray(slide.note)
     ? (slide.note.length ? `Notes: ${slide.note.map((item, index) => `${index + 1}. ${String(item).trim().replace(/^\d+\.\s*/, "")}`).join("   ")}` : null)
     : prefixed("Note", slide.note);
-  return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
+  return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide._standfirstTakeaway ? { subtitleRole: "takeaway-standfirst" } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }
 
 /**
@@ -2901,7 +3187,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
  *
  * `pills` hug the right of the title row - the right 20% of the band is
  * reserved for exactly this - and the other three are drawn from the left
- * margin, which is the left-anchored tracker the reference decks run down the
+ * margin, which is the left-anchored tracker a strong deck runs down the
  * side of a section. They are the same component: only the construction
  * changes, and each says where you are in a different amount of space.
  */
@@ -2973,8 +3259,37 @@ export function agendaPages(slidesIn, agenda, agendaStyle) {
   return out;
 }
 
+/**
+ * The generated last page crediting the photographs a licence requires the
+ * deck to credit (CC BY, CC BY-SA: `credit` naming a licence other than CC0 or
+ * the public domain). fetch-pictures.mjs writes those credits; a picture the
+ * author cleared some other way carries its own `credit` and is listed the
+ * same. None when no picture needs attribution.
+ */
+export function pictureCredits(spec) {
+  const rows = [];
+  const walk = (value, page) => {
+    if (Array.isArray(value)) { value.forEach((v) => walk(v, page)); return; }
+    if (!value || typeof value !== "object") return;
+    if (typeof value.alt === "string" && (value.path || value.dataUri) && /\bCC[- ]BY\b/i.test(String(value.credit ?? ""))) {
+      rows.push([page, value.alt, String(value.credit).replace(/^Photo:\s*/i, "")]);
+    }
+    for (const child of Object.values(value)) walk(child, page);
+  };
+  if (spec.cover) walk(spec.cover, "Cover");
+  for (const slide of [...(spec.slides || []), ...(spec.appendix || [])]) walk(slide, slide.id ? `{{page:${slide.id}}}` : "");
+  if (!rows.length) return [];
+  return [{ id: "picture-credits", kind: "content", density: "appendix", title: "Picture credits",
+    exhibit: { type: "table", columns: [{ label: "Page", type: "text", width: 60 }, { label: "Picture", type: "text" }, { label: "Author, licence and source", type: "text" }], rows } }];
+}
+
 /** Expand a v3 deck into the deckPlan the planner consumes. */
 export function composeDeck(spec, baseDir = process.cwd()) {
+  LAYOUT = spec.designLayout ?? CONSULTING_LAYOUT;
+  try { return composeDeckWith(spec, baseDir); } finally { LAYOUT = CONSULTING_LAYOUT; }
+}
+
+function composeDeckWith(spec, baseDir) {
   if (!isV3(spec)) throw new Error(`Expected schema ${V3}`);
   if (!spec.id || !Array.isArray(spec.slides)) throw new Error("deck/v3 requires id and slides");
   const slides = [];
@@ -2984,7 +3299,7 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     if (spec.cover.logo || spec.logo) cover.logo = spec.cover.logo || spec.logo;
     // `image` with `layout: "full"` puts the title on a card over a full-bleed
     // photograph; otherwise the photo takes the right half and `tone: "dark"`
-    // paints the title half navy (the McKinsey/BCG 2020 cover).
+    // paints the title half navy (a classic split cover).
     if (spec.cover.image) { cover.variant = spec.cover.layout === "full" ? "full-image" : "half-image"; cover.image = imageProps(spec.cover.image, baseDir); if (spec.cover.tone) cover.tone = spec.cover.tone; }
     else cover.variant = spec.cover.tone === "light" ? "plain" : "dark";
     if (spec.cover.notes) cover.notes = spec.cover.notes;
@@ -3033,19 +3348,23 @@ export function composeDeck(spec, baseDir = process.cwd()) {
   const tabs = spec.sectionTabs ?? (TRACKER_NAMES.includes(trackerMode) && sections >= 2);
   // `appendix: [...]`: the source pages behind the story - the model grid, the
   // full table, the survey instrument - set at `density: "appendix"` behind an
-  // Appendix divider. The corpus keeps its densest pages here, and a page that
+  // Appendix divider. A strong deck keeps its densest pages here, and a page that
   // belongs in the appendix stops crowding the page that carries the argument.
   const appendix = Array.isArray(spec.appendix) && spec.appendix.length
-    ? [{ kind: "section", title: "Appendix", summary: "The workings behind the story" },
+    ? [{ id: "appendix-divider", kind: "section", title: "Appendix", summary: "The workings behind the story" },
        ...spec.appendix.map((page) => ({ density: "appendix", ...page }))]
     : [];
-  const storySlides = appendix.length ? [...spec.slides, ...appendix] : spec.slides;
+  const credits = pictureCredits(spec);
+  const storySlides = [...spec.slides, ...appendix, ...credits];
   // The contents page leads the deck; `repeat-contents` also reprints it in
   // front of every later section, which is the other way a deck tracks.
   const agendaMode = trackerMode === "repeat-contents" ? true : contentsMode === "once" || contentsMode === true ? "once" : false;
   const trackerStyle = TRACKER_NAMES.includes(trackerMode) ? trackerMode : "pills";
   const pages = agendaPages(tabs ? sectionTabs(storySlides, trackerStyle) : storySlides, contentsMode === false ? false : agendaMode, spec.agendaStyle);
-  const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140)) / 508)) : 1;
+  // A tracker above the title drops the body a step (slide-chrome's trackerGap),
+  // which the table budget has to know or it plans rows the page cannot hold.
+  const trackerGap = spec.chrome && tabs ? 11 : 0;
+  const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140) - trackerGap) / 508)) : 1;
   const fill = resolveFill(spec);
   // The weight contract: what a page of this deck is expected to carry. The
   // deck's own `weight` wins, then the house profile a template produced, then
@@ -3071,17 +3390,20 @@ export function composeDeck(spec, baseDir = process.cwd()) {
     if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, resolveReferences(v)]));
     return value;
   };
-  for (const raw of expanded) {
+  // Every page is composed and every failure reported together.
+  mapAll(expanded, (raw) => {
     const { sourceSlideId, ...page } = resolveReferences(raw);
     const composed = composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles);
     if (sourceSlideId) composed.sourceSlideId = sourceSlideId;
     slides.push(composed);
     recent.splice(4);
     recentStyles.splice(9);
-  }
+  }, (raw, index) => raw?.sourceSlideId ?? raw?.id ?? `page-${index + 1}`);
   return {
     id: spec.id,
-    palette: spec.palette || "mckinsey",
+    palette: spec.palette || "midnight",
+    ...(spec.designLayout ? { design: spec.designLayout.name } : {}),
+    ...(spec.designLayout?.variation ? { variation: { seed: spec.designLayout.variation.seed, lean: spec.designLayout.variation.lean, leadPoints: spec.designLayout.variation.leadPoints, tracker: spec.tracker ?? null } } : {}),
     ...(spec.pageTemplate ? { pageTemplate: spec.pageTemplate } : {}),
     ...(spec.typography ? { typography: spec.typography } : {}),
     ...(spec.chrome ? { chrome: spec.chrome } : {}),
@@ -3128,6 +3450,8 @@ export function applyTemplate(spec, baseDir = process.cwd()) {
   delete out.template;
   if (!spec.palette && house.palette) out.palette = house.palette;
   if (!spec.typography && house.typography) out.typography = house.typography;
+  // The importer names the design system nearest the template's own frame.
+  if (!spec.design && house.design) out.design = house.design;
   if (!spec.chrome && house.chrome) out.chrome = house.chrome;
   if (!spec.pageTemplate && house.pageTemplate) out.pageTemplate = house.pageTemplate;
   if (!spec.density && house.density) out.density = house.density;
@@ -3141,118 +3465,9 @@ export function applyTemplate(spec, baseDir = process.cwd()) {
 }
 
 export function toDeckPlan(specIn, baseDir) {
-  const spec = applyTemplate(specIn, baseDir);
+  const spec = applyDesign(applyTemplate(specIn, baseDir));
   if (isV3(spec)) return composeDeck(spec, baseDir);
   if (spec?.deckPlan) return spec.deckPlan;
   throw new Error("Spec must be professional-slides.deck/v3 or carry a deckPlan");
 }
 
-/**
- * The page budget, read from the spec before anything is laid out.
- *
- * A gate that fires on a rendered page tells the author their page is thin; it
- * cannot tell them what to do about it, because by then the data is a scene. At
- * plan time the data is still data, so the budget can name the remedy: this
- * chart carries five of the nine categories you supplied, this table has no
- * derived column, this page carries one evidence element where the deck's
- * weight asks for two.
- *
- * Returns findings in the page-gates shape, so preflight prints them beside the
- * story gates. `THIN_PLAN` is the estimate; `THIN_PAGE` remains the measurement.
- */
-const PLAN_WORD = (value) => (typeof value === "string" ? value.trim().split(/\s+/).filter(Boolean).length : 0);
-
-// The keys that name a thing rather than say something: an id, a type, a file,
-// a colour. Everything else an exhibit holds is words on the page.
-const NOT_PROSE = new Set(["id", "type", "kind", "icon", "path", "image", "src", "component", "variant",
-  "tone", "style", "surface", "palette", "scale", "scales", "colour", "color", "layout", "shape", "fit",
-  "align", "valign", "density", "treatment", "orientation", "position", "placement", "series", "unit"]);
-function deepWords(value, depth = 0) {
-  if (depth > 6 || value == null) return 0;
-  if (typeof value === "string") return PLAN_WORD(value);
-  if (Array.isArray(value)) return value.reduce((sum, entry) => sum + deepWords(entry, depth + 1), 0);
-  if (typeof value !== "object") return 0;
-  let words = 0;
-  for (const [key, entry] of Object.entries(value)) {
-    if (NOT_PROSE.has(key) || /(Style|Color|Colour|Id)$/.test(key)) continue;
-    words += deepWords(entry, depth + 1);
-  }
-  return words;
-}
-
-function planWords(slide) {
-  let words = 0;
-  const text = (value) => { words += PLAN_WORD(value); };
-  const point = (item) => { if (typeof item === "string") text(item); else if (item && typeof item === "object") { text(item.lead); text(item.text); } };
-  (slide.points || []).forEach(point);
-  (Array.isArray(slide.insights) ? slide.insights : slide.insight ? [slide.insight] : []).forEach((entry) => { if (typeof entry === "string") text(entry); else if (entry) { text(entry.heading); text(entry.text); } });
-  text(slide.soWhat);
-  text(slide.subtitle);
-  if (slide.callout) { text(typeof slide.callout === "string" ? slide.callout : `${slide.callout.lead || ""} ${slide.callout.text || ""}`); }
-  if (slide.kpi) { text(slide.kpi.value); text(slide.kpi.label); text(slide.kpi.sublabel); }
-  (slide.metrics || []).forEach((metric) => { text(metric.value); text(metric.label); text(metric.sublabel); text(metric.delta); });
-  const rowsOf = (rows) => (rows || []).forEach((row) => {
-    if (Array.isArray(row)) { row.forEach((cell) => text(typeof cell === "string" ? cell : cell?.text ?? cell?.value)); return; }
-    text(row.label);
-    text(row.text);
-    (row.points || []).forEach(point);
-    (row.cells || []).forEach((cell) => {
-      if (typeof cell === "string") { text(cell); return; }
-      if (Array.isArray(cell)) { cell.forEach(point); return; }
-      if (!cell) return;
-      text(cell.text); text(cell.lead);
-      (cell.points || cell.items || []).forEach(point);
-    });
-  });
-  rowsOf(slide.rows);
-  (slide.pictures || []).forEach((picture) => { if (picture && typeof picture === "object") { text(picture.label); text(picture.text); (picture.points || []).forEach(point); } });
-  (slide.columns || []).forEach((column) => text(typeof column === "string" ? column : column?.label));
-  (slide.paragraphs || []).forEach(text);
-  text(slide.text);
-  // The exhibit is walked rather than enumerated. Enumerating the fields meant
-  // reading `items` and `rows` and nothing else, so a page of quadrants, a
-  // framework of pillars, a compare of two columns and a tree of nodes each
-  // counted as zero words and were reported as thin while carrying a hundred
-  // - which taught an author to distrust the gate rather than the page.
-  for (const exhibit of [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean)) {
-    (exhibit.series || []).forEach((series) => { words += (series.values || []).length; });
-    words += deepWords(exhibit);
-  }
-  return words;
-}
-
-/** Prompts for checking completeness; never instructions to pad a short page. */
-function planRemedies(slide) {
-  const exhibits = [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean);
-  const out = ["check whether the claim has all necessary proof and compare its strongest merger alternative"];
-  if (exhibits.some(ex => String(ex.type || "").startsWith("chart.")))
-    out.push("retain the needed population, period and local comparator once; do not duplicate the plot as a table");
-  if (exhibits.some(ex => ex.type === "table" || ex.type === "rows"))
-    out.push("keep a complete lookup compact; add a row or derived field only when it answers a missing question");
-  if ((slide.points || []).length)
-    out.push("remove restatement and develop only the consequence or mechanism the evidence does not already show");
-  return out;
-}
-
-export function budgetFindings(spec) {
-  if (!isV3(spec) || !Array.isArray(spec.slides)) return [];
-  const weight = resolveWeight(spec, resolveFill(spec));
-  const floor = weight.pageWords || 0;
-  if (floor <= 0) return [];
-  const out = [];
-  spec.slides.forEach((slide, index) => {
-    if (slide.kind && slide.kind !== "content") return;                 // covers, dividers, statements, takeaways
-    if (!slide.title) return;
-    const estimate = planWords(slide);
-    // The picture takes the body the type would have filled, so the floor
-    // follows it here exactly as it does on the rendered page.
-    const pageFloor = Math.round(floor * (1 - planPictureShare(slide)));
-    if (pageFloor <= 0 || estimate >= pageFloor) return;
-    const remedies = planRemedies(slide);
-    out.push({
-      slide: index + 1, code: "THIN_PLAN", severity: "advisory", measured: estimate, threshold: pageFloor,
-      repair: `This page plans ${estimate} body words against a diagnostic reference of ${pageFloor}. Review completeness: ${remedies.slice(0, 3).join("; ")}. A complete short page is valid.`,
-    });
-  });
-  return out;
-}

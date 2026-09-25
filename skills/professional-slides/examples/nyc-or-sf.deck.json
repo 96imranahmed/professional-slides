@@ -1,8 +1,8 @@
 {
  "schema": "professional-slides.deck/v3",
  "id": "nyc-or-sf",
- "palette": "mckinsey",
- "brief": "Help Imran decide where to live and work: NYC or SF and nearby towns within about 45 minutes of work. Another PM role, ideally working with an AI research lab. Move alone within next year; partner within a couple of years; children's schooling relevant in three years. Priorities ranked: quality education for kids and family life, safety, then frequent neighborhood activities and walkability. Housing budget depends on work. Building a business is a possibility in 5-10 years.",
+ "palette": "midnight",
+ "brief": "Help the reader decide where to live and work: NYC or SF and nearby towns within about 45 minutes of work. Another PM role, ideally working with an AI research lab. Move alone within next year; partner within a couple of years; children's schooling relevant in three years. Priorities ranked: quality education for kids and family life, safety, then frequent neighborhood activities and walkability. Housing budget depends on work. Building a business is a possibility in 5-10 years.",
  "answer": "Lead with Park Slope: Anthropic offers the role in NYC, its school evidence is the strongest in the set, and the commute has 17 minutes of slack. Switch to SF only if an offer puts you inside model decisions in a way the NYC role does not. Hoboken is the fallback for a midtown office; Berkeley is out on commute.",
  "cover": {
   "title": "NYC or San Francisco?",

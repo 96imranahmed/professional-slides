@@ -78,7 +78,7 @@ class DeckCraftTests(unittest.TestCase):
         findings = craft([page(i) for i in range(1, 9)])
         self.assertEqual([f["code"] for f in findings], ["DECK_CRAFT"])
         self.assertEqual(findings[0]["measured"]["highlight"], 0.0)
-        self.assertIn("client decks", findings[0]["repair"])
+        self.assertIn("strong decks", findings[0]["repair"])
 
     def test_a_deck_that_works_its_pages_passes(self):
         self.assertEqual(craft([page(i, highlight=True) for i in range(1, 9)]), [])

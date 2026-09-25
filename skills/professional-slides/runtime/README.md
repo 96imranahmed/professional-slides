@@ -18,14 +18,23 @@ emit/emit_pptx.py  scene → editable PPTX (title placeholders, wrap=square, aut
 emit/render_pptx.py  PPTX → PDF (LibreOffice) → PNG per slide + montage
 emit/readback_pptx.py  saved PPTX re-opened with python-pptx and compared to the scene
 gates/page_gates.py  deterministic page gates (ink, dead band, internal void, hero, type range, cpl, words, titles, monotony, ticks)
-reviewer.mjs       one review prompt + schema + artifact binding and full-slide coverage; backends codex | claude | packet
-build-deck.mjs     plan → scene → pptx → render → readback → gates
-deliver-deck.mjs   build → gates must pass → review → <id>-DELIVERED.pptx or REJECTED.md
+reviewer.mjs       one full review prompt + schema + artifact binding; verification rounds scoped to changed/blocked slides; backends codex | claude | packet
+claims.mjs         claim ledger (claims.json) for the author's self-check, and its validation
+build-deck.mjs     assets → plan → scene → claims → pptx → render → readback → gates
+page-types.mjs     the page types: required choices, the structure they compile to, evidence shapes and their breadth, the values each page plots
+author-deck.mjs    pages file (the dot-dash) -> deck, plan and content plan; every finding in one run; --draft, --types, --schema
+compose-all.mjs    composition that reports every failing page in one run, and each page's reading task
+derive-content.mjs the content plan and text plan read off the composed pages
+fetch-logos.mjs    player logos from Wikipedia infoboxes, trimmed to the mark (run by the build)
+fetch-pictures.mjs photographs for `{ alt }` placeholders from Wikimedia Commons, free licences only (run by the build)
+fetch-places.mjs   coordinates for map markers that name a place, cached in assets/places.json (run by the build)
+fetch-series.mjs   public time series (World Bank, Our World in Data) into sources/ as CSV + a chart block
+deliver-deck.mjs   build → gates must pass → self-check must cover claims → review → <id>-DELIVERED.pptx or REJECTED.md
 ```
 
 Component contract: `render({ id, frame, props }) → { nodes }` with frames in canvas px (1280×720); `measureContent({ frame, props })` returns the natural height at a width — components without it fall back to `preferredSize`, and `evals/tests/test_measure_vs_preferred.py` reports the list. Chart components expose `nativeChart` on their instance so the emitter can write a workbook-backed chart; charts with reference lines, annotations or highlights stay as grouped shapes.
 
-Adding a component: register it in `registry.mjs` with `tokens`, `preferredSize`, `sample`, `render` and `measureContent`; the golden gallery (`evals/scripts/golden_reference.py`) and the measurement test pick it up.
+Adding a component: register it in `registry.mjs` with `tokens`, `preferredSize`, `sample`, `render` and `measureContent`; the component and measurement tests pick it up.
 
 `build-deck.mjs --no-render` produces a `built-unrendered` result when planning
 and readback pass (exit 0). It is useful for inspecting the editable file, but
@@ -38,7 +47,8 @@ final titles. A declared executive summary precedes the first section. Revision
 work may carry partial plans. Semantic fields transfer by ID, never position.
 
 Schema, argument completeness, text fit, collisions, clipping and scale checks block delivery.
-Corpus mix, decoration frequency, empty bands and density statistics are advisory; neutral
+Page-family mix, decoration frequency, empty bands and density statistics are advisory; neutral
 exhibits and concise pages can be correct. Independent rendered review decides
 whether those pages communicate well. A review is valid only for its hashed
-scene, editable deck and renders, with every current slide explicitly inspected.
+scene, editable deck and renders, with every current slide explicitly inspected, or, for a
+verification after a recorded review, every changed and previously blocked slide.

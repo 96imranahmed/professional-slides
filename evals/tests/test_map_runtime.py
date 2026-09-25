@@ -57,7 +57,7 @@ assert.ok(southAfrica.data.paths.length>1);
 const highlighted=render('world',{highlightCountries:['USA','Germany','CHN']});
 assert.deepEqual(highlighted.filter(node=>node.data.highlighted).map(node=>node.data.countryId).sort(),['CHN','DEU','USA']);
 assert.ok(highlighted.filter(node=>node.data.highlighted).every(node=>node.style.fill.tokenId==='color.componentPrimary'));
-assert.ok(highlighted.filter(node=>!node.data.highlighted).every(node=>node.style.fill.tokenId==='color.surfaceMuted'));
+assert.ok(highlighted.filter(node=>!node.data.highlighted).every(node=>node.style.fill.tokenId==='color.surfaceTint'));
 assert.throws(()=>render('Europe',{highlightCountries:['USA']}),/outside europe/);
 console.log(JSON.stringify({accepted:true,world:world.length,europe:europe.size,mena:mena.size}));
 """)

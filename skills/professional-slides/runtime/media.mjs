@@ -147,7 +147,7 @@ export function registerMedia(registry) {
   }
   // A section divider with a sourced photograph: the title panel keeps the left
   // 42% (navy or canvas by mode) and the photo fills the rest, cropped to fit;
-  // a numbered divider sets its numeral above the title, Bain-style.
+  // a numbered divider sets its numeral above the title.
   const divider = registry.get("section-divider"), dividerRender = divider.render;
   divider.render = (input) => {
     const { image, ...props } = input.props;
@@ -183,7 +183,7 @@ export function registerMedia(registry) {
     ] };
   };
   // A statement over a photograph: the photo fills the page and the sentence
-  // sits on a navy card in the middle (the Bain keynote page).
+  // sits on a navy card in the middle (a keynote page).
   const statement = registry.get("statement"), statementRender = statement.render;
   statement.render = (input) => {
     const { image, ...props } = input.props;
@@ -236,7 +236,7 @@ export function registerMedia(registry) {
     if (!image) throw new Error("Image cover requires sourced image");
     if (resolved === "full-image") {
       // The 2023–24 cover: a full-bleed photograph with the title on a card in the
-      // lower left (white by default, navy with `tone: "dark"`), as BCG and Bain set
+      // lower left (white by default, navy with `tone: "dark"`), as modern covers set
       // theirs. The card takes half the page each way; the plain cover renders into it.
       const { frame } = input;
       const margin = 48, pad = 40;

@@ -3,16 +3,14 @@
   "version": "0.0.1",
   "description": "Create and revise decision-ready PowerPoint and Google Slides decks with answer-first storylining, extensible templates, and rendered QA.",
   "author": {
-    "name": "Imran Ahmed"
+    "name": "Professional Slides"
   },
-  "homepage": "https://github.com/96imranahmed/professional-slides",
-  "repository": "https://github.com/96imranahmed/professional-slides",
   "skills": "./skills/",
   "interface": {
     "displayName": "Professional Slides",
     "shortDescription": "Build decision-ready executive slide decks.",
     "longDescription": "A complete professional slide workflow for new decks, structural revisions, and bounded slide edits in PowerPoint or Google Slides, with answer-first storylining, reusable deck templates, platform guidance, and rendered artifact QA.",
-    "developerName": "Imran Ahmed",
+    "developerName": "Professional Slides",
     "brandColor": "#183D36",
     "composerIcon": "./assets/icon.png",
     "logo": "./assets/icon.png",

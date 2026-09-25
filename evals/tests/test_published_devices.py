@@ -1,8 +1,4 @@
-"""Devices drawn from the published-report sample (evals/corpus/styles, pages 401-600).
-
-Two hundred pages of the firms' infographic and thought-leadership reports were
-classified against the 85 styles of the first inventory. All but three fitted;
-those three were radial bars, and the pages carried five devices the charts could not set:
+"""Devices a report-style page relies on that the charts once could not set:
 delta pills over columns, icons or logos on a category axis, a growth column at
 the end of a line chart and a discrete assessment scale. Each is checked here
 for what the reader relies on, not for pixels.

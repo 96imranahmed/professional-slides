@@ -3,7 +3,7 @@
 // KPI tile. Each shares the deck's heading band, marker vocabulary and body
 // type; the row rule (every panel in a row shares one header height) holds
 // inside a cards row because the cards are laid out here, together.
-import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive } from "./core.mjs";
+import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, houseStyle, readableOn } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
@@ -13,8 +13,18 @@ const SURFACE = token("color.surface"), MUTED = token("color.surfaceMuted"), RUL
 const FONT = token("font.body"), DISPLAY = token("font.display");
 const v = (id) => tokenValue(token(id));
 const ACCENT_OR_PRIMARY = () => token("color.accent");
+// A card's surface (core.mjs `style.cards`). White cards outlined in a hairline
+// on a cream page are the page colour with a pencil line round them, and a row
+// of four read as an empty page with text on it. Under the reference weight a
+// card is a filled block with no outline - the construction strong decks use
+// for a pillar, a label block or a fact card.
+const FILLED = token("color.surfaceTint");
+const cardFill = () => houseStyle("style.cards") === "tint" ? { fill: FILLED, stroke: "none" } : { fill: SURFACE, stroke: RULE };
+// The muted panels inside a card (a stat card, a big-number copy band) take the
+// same surface, so one card set carries one fill.
+const cardMuted = () => houseStyle("style.cards") === "tint" ? FILLED : MUTED;
 
-export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
+export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.surfaceTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
 const text = (size, color = INK, bold = false, align = "left") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
 const measure = (value, width, size, bold = false) => measureAt(value, width, { size, bold });
@@ -41,7 +51,7 @@ export const CARD_TONES = Object.freeze(["outline", "header", "numbered", "plain
 // The tones whose card carries an icon. The rest set a band, a numeral or a
 // figure in that space and have nowhere to put one.
 export const ICON_CARD_TONES = Object.freeze(["dark", "outline", "plain", "disc"]);
-export function cardsLayout(frame, props) {
+export function cardsLayout(frame, props, rhythm = 0) {
   const items = normalizeCards(props);
   const tone = props.tone ?? (items.some((i) => i.icon) ? "outline" : "numbered");
   if (!CARD_TONES.includes(tone)) throw new Error(`Unknown cards tone: ${tone}; use one of ${CARD_TONES.join(", ")}`);
@@ -63,7 +73,9 @@ export function cardsLayout(frame, props) {
   const inner = width - 2 * pad - (tone === "columns" ? v("space.4") : 0);
   if (inner < 80) throw new Error("Cards are too narrow for their padding; use fewer cards");
   const iconSize = Math.round(markerSize() * (tone === "disc" ? 3.5 : centred ? 2.5 : 1.75)), disc = markerSize();
-  const headGap = v("space.2"), bodyGap = v("space.3");
+  // `rhythm` opens the gaps inside a card that has height to spare (see
+  // `cardsNodes`): the space between the blocks grows before the padding does.
+  const headGap = v("space.2") + rhythm / 2, bodyGap = v("space.3") + rhythm;
   const measured = items.map((item) => {
     const statValueWidth = tone === "stat" && item.value ? Math.ceil(measure(item.value, inner, "type.heading", true).width) + 2 * v("space.3") : 0;
     const titleWidth = tone === "numbered" ? inner - disc - v("space.3") : tone === "stat" ? inner - statValueWidth : inner;
@@ -90,53 +102,74 @@ export function cardsLayout(frame, props) {
   return { items: measured, tone, centred, open, gap, pad, width, inner, iconSize, disc, headGap, bodyGap, headerHeight, height: Math.max(...measured.map((m) => m.height - (m.iconBlock + m.numberBlock + m.bandHeight + m.titleHeight + m.valueHeight) + headerHeight)) };
 }
 
+// The most a boxed card's rhythm opens: the gaps between icon, title, figure
+// and text grow by up to 12px each when the frame has the height.
+const CARD_RHYTHMS = ["space.3", "space.2", "space.1"];
+
+/**
+ * The card set a frame takes: the layout with the most rhythm that fits, so
+ * the box is as tall as its copy and never taller. `cardsNodes` draws it and
+ * the ceiling reports it, so the flow knows where the row ends.
+ */
+function grownCards(frame, props) {
+  const L = cardsLayout(frame, props);
+  if (L.open) return L;
+  for (const rhythm of CARD_RHYTHMS) {
+    const grown = cardsLayout(frame, props, v(rhythm));
+    if (grown.height <= frame.height + 0.01) return grown;
+  }
+  return L;
+}
+
 export function cardsNodes({ id, frame: frameIn, props }) {
   let frame = frameIn;
-  const nodes0 = [];
   // A question panel (the survey deck's "Should companies prioritize investments?")
   // takes the left quarter in dark grey; the cards answer it to the right.
-  if (typeof props.question === "string" && props.question.trim()) {
-    const qw = Math.round(frame.width * 0.24), gap = v("space.4"), pad = v("space.4");
-    const q = measure(props.question, qw - 2 * pad, "type.heading", true);
-    const L0 = cardsLayout({ ...frame, x: frame.x + qw + gap, width: frame.width - qw - gap }, props);
-    const h = props.valign === "middle" ? L0.height : frame.height;
-    const top = props.valign === "middle" && frame.height > h ? frame.y + (frame.height - h) / 2 : frame.y;
-    nodes0.push(rect(stableId(id, "question"), "card-question", { x: frame.x, y: top, width: qw, height: h }, SECONDARY, "none", "radius.none"));
-    nodes0.push(label(stableId(id, "question-text"), "card-question-text", { x: frame.x + pad, y: top + pad, width: qw - 2 * pad }, q, text("type.heading", WHITE, true)));
-    frame = { ...frame, x: frame.x + qw + gap, width: frame.width - qw - gap };
+  const asked = typeof props.question === "string" && props.question.trim();
+  const qw = Math.round(frame.width * 0.24), qgap = v("space.4"), qpad = v("space.4");
+  const q = asked ? measure(props.question, qw - 2 * qpad, "type.heading", true) : null;
+  if (asked) frame = { ...frame, x: frame.x + qw + qgap, width: frame.width - qw - qgap };
+  const natural = cardsLayout(frame, props);
+  if (natural.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(natural.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
+  // Cards are as tall as their copy, at the top of their frame, the copy
+  // starting under the box's top edge. They used to grow to half as much
+  // again as they needed and centre the copy in the box, so four cards
+  // running the page's height carried 80px of air above every icon and as
+  // much under the last line: the short group centred in its region that the
+  // columns check reads as a hole. The room goes to the card's rhythm first -
+  // the gaps between icon, title, figure and text open by up to 12px each -
+  // and what is left is the frame's, below the row, for the flow to give to
+  // what follows (the ceiling reports the row's height). An open column set
+  // keeps its natural height. `valign: "middle"` still centres the row when
+  // the author asks.
+  const L = props.valign === "middle" ? natural : grownCards(frame, props);
+  const cardHeight = L.height;
+  if (props.valign === "middle" && frame.height > L.height) frame = { ...frame, y: frame.y + (frame.height - L.height) / 2 };
+  const nodes = [];
+  if (asked) {
+    const h = Math.max(cardHeight, q.height + 2 * qpad);
+    nodes.push(rect(stableId(id, "question"), "card-question", { x: frameIn.x, y: frame.y, width: qw, height: h }, SECONDARY, "none", "radius.none"));
+    nodes.push(label(stableId(id, "question-text"), "card-question-text", { x: frameIn.x + qpad, y: frame.y + qpad, width: qw - 2 * qpad }, q, text("type.heading", WHITE, true)));
   }
-  const L = cardsLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
-  const nodes = nodes0;
-  // Cards fill their frame so a row reads as one band - but only so far. Given
-  // a body track and three short cards, filling meant three bordered boxes 55%
-  // empty, with the text sitting in the top third of each: a box two lines tall
-  // around one line of text is a defect, and three of them is a page. The band
-  // grows to half as much again as it needs and then centres in what is left.
-  const fill = frame.height >= L.height && props.valign !== "middle";
-  // An open column set is type in two tracks rather than a band of boxes, so
-  // it keeps its natural height and centres; boxed cards grow to half as much
-  // again as they need.
-  const cardHeight = fill ? Math.min(frame.height, L.height * (L.open ? 1 : 1.5)) : L.height;
-  // Icon rows (`valign: "middle"`) keep their natural height and sit centred in the frame.
-  if (props.valign === "middle" && frame.height > L.height) frame = { ...frame, y: frame.y + (frame.height - L.height) / 2, height: L.height };
-  else if (fill && cardHeight < frame.height) frame = { ...frame, y: frame.y + (frame.height - cardHeight) / 2, height: cardHeight };
   L.items.forEach((m, index) => {
     const x = frame.x + index * (L.width + L.gap), cid = stableId(id, "card", index);
-    if (L.tone === "stat") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, MUTED, "none", "radius.none"));
-    else if (!L.open && L.tone !== "dark") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, SURFACE, RULE, "radius.small"));
-    let y = frame.y + L.pad;
+    const top = frame.y;
+    const surface = cardFill();
+    if (L.tone === "stat") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, cardMuted(), "none", "radius.none"));
+    else if (!L.open && L.tone !== "dark") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, surface.fill, surface.stroke, "radius.small"));
+    const onCard = L.open || L.tone === "dark" ? SURFACE : L.tone === "stat" ? cardMuted() : surface.fill;
+    let y = top + L.pad;
     const cx = x + L.pad;
     const align = L.centred ? "center" : "left";
     if (L.tone === "header") {
-      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: frame.y, width: L.width, height: m.bandHeight }, PRIMARY));
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: frame.y + v("space.2"), width: L.inner }, m.title, text("type.heading", WHITE, true)));
-      y = frame.y + m.bandHeight + L.pad;
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, PRIMARY));
+      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: top + v("space.2"), width: L.inner }, m.title, text("type.heading", WHITE, true)));
+      y = top + m.bandHeight + L.pad;
     } else if (L.tone === "dark") {
       // A navy tile carries icon and title in white; the copy sits below it on the page.
-      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: frame.y, width: L.width, height: m.bandHeight }, PRIMARY, "none", "radius.small"));
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, PRIMARY, "none", "radius.small"));
       const block = (m.item.icon ? L.iconSize + L.headGap : 0) + m.title.height;
-      let ty = frame.y + (m.bandHeight - block) / 2;
+      let ty = top + (m.bandHeight - block) / 2;
       if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: cx + (L.inner - L.iconSize) / 2, y: ty, size: L.iconSize, icon: m.item.icon, tone: "filled" })); ty += L.iconSize + L.headGap; }
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: ty, width: L.inner }, m.title, text("type.heading", WHITE, true, "center")));
     } else if (L.tone === "big-number") {
@@ -156,7 +189,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
       // the last line on both sides, dividing nothing.
       if (index) {
         const written = Math.max(...L.items.map((entry) => entry.height));
-        nodes.push(linePrimitive({ id: stableId(cid, "divider"), role: "card-divider", x1: x - L.gap / 2, y1: frame.y, x2: x - L.gap / 2, y2: frame.y + Math.min(cardHeight, written), style: { stroke: RULE, lineWidth: token("line.hairline") } }));
+        nodes.push(linePrimitive({ id: stableId(cid, "divider"), role: "card-divider", x1: x - L.gap / 2, y1: top, x2: x - L.gap / 2, y2: top + Math.min(cardHeight, written), style: { stroke: RULE, lineWidth: token("line.hairline") } }));
       }
       y += m.titleHeight;
     } else if (L.tone === "stat") {
@@ -179,15 +212,15 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     }
     if (m.value) {
       // A headline figure under the title (price, size, share) in the metric role.
-      const vy = frame.y + L.pad + (L.tone === "header" || L.tone === "dark" ? m.bandHeight : m.iconBlock + m.numberBlock + m.titleHeight) + L.bodyGap;
-      nodes.push(label(stableId(cid, "value"), "card-value", { x: cx, y: vy, width: L.inner }, m.value, text("type.metric", PRIMARY, true, align)));
+      const vy = top + L.pad + (L.tone === "header" || L.tone === "dark" ? m.bandHeight : m.iconBlock + m.numberBlock + m.titleHeight) + L.bodyGap;
+      nodes.push(label(stableId(cid, "value"), "card-value", { x: cx, y: vy, width: L.inner }, m.value, text("type.metric", readableOn(PRIMARY, onCard, 3), true, align)));
     }
     // Content starts level across the row (row rule), below the tallest header.
-    y = L.tone === "header" || L.tone === "dark" ? frame.y + L.headerHeight + L.pad : frame.y + L.pad + L.headerHeight;
+    y = L.tone === "header" || L.tone === "dark" ? top + L.headerHeight + L.pad : top + L.pad + L.headerHeight;
     let tx = cx, tw = L.inner;
     if (L.tone === "big-number") {
       // The copy band: muted, from the content line to the card's foot.
-      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: y + L.bodyGap, width: L.width, height: Math.max(0, cardHeight - (y + L.bodyGap - frame.y)) }, MUTED));
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: y + L.bodyGap, width: L.width, height: Math.max(0, cardHeight - (y + L.bodyGap - top)) }, cardMuted()));
       tx = cx + v("space.3"); tw = L.inner - 2 * v("space.3"); y += v("space.3");
     }
     if (m.body) { y += L.bodyGap; nodes.push(label(stableId(cid, "text"), "card-text", { x: tx, y, width: tw }, m.body, text("type.body", INK, false, align))); y += m.body.height; }
@@ -200,7 +233,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     if (m.footer) {
       const fy = frame.y + cardHeight - L.pad - m.footer.height;
       nodes.push(linePrimitive({ id: stableId(cid, "footer-rule"), role: "card-rule", x1: cx, y1: fy - v("space.2"), x2: cx + L.inner, y2: fy - v("space.2"), style: { stroke: RULE, lineWidth: token("line.hairline") } }));
-      nodes.push(label(stableId(cid, "footer"), "card-footer", { x: cx, y: fy, width: L.inner }, m.footer, text("type.compact", PRIMARY, true)));
+      nodes.push(label(stableId(cid, "footer"), "card-footer", { x: cx, y: fy, width: L.inner }, m.footer, text("type.compact", readableOn(PRIMARY, onCard), true)));
     }
   });
   return nodes;
@@ -233,7 +266,7 @@ export function quadrantsNodes({ id, frame, props }) {
   const light = props.tone === "light";
   L.cells.forEach((cell, i) => {
     const x = frame.x + (i % 2) * (L.width + L.gap), y0 = frame.y + Math.floor(i / 2) * (L.height + L.gap), qid = stableId(id, "quadrant", i);
-    nodes.push(rect(stableId(qid, "surface"), "quadrant-surface", { x, y: y0, width: L.width, height: L.height }, MUTED));
+    nodes.push(rect(stableId(qid, "surface"), "quadrant-surface", { x, y: y0, width: L.width, height: L.height }, cardMuted()));
     nodes.push(rect(stableId(qid, "band"), "quadrant-band", { x, y: y0, width: L.width, height: cell.band }, light ? TINT : PRIMARY));
     nodes.push(label(stableId(qid, "title"), "quadrant-title", { x: x + L.pad, y: y0 + v("space.2"), width: L.inner }, cell.title, text("type.heading", light ? INK : WHITE, true)));
     let y = y0 + cell.band + L.pad;
@@ -267,7 +300,7 @@ function ringMetricNodes({ id, frame, props }) {
   for (const candidate of ["type.metric", "type.heading", "type.compact"]) {
     try { value = measureText(String(props.value), hole - 8, { fontFamily: tokenValue(DISPLAY), fontSize: v(candidate), bold: true, wrapWidthRatio: 1 }); valueSize = candidate; if (value.lines.length === 1) break; } catch { value = null; }
   }
-  if (!value) throw new Error("Ring metric is too small for its value");
+  if (!value) throw new Error("Ring metric is too small for its value; give the ring more room or shorten the value");
   nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: circle.x + (size - hole) / 2 + 4, y: circle.y + (size - value.height) / 2, width: hole - 8, height: value.height }, text: value.text, style: { fontFamily: DISPLAY, fontSize: token(valueSize), color: INK, bold: true, align: "center", valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
   if (labelLayout) nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + v("space.2"), y: circle.y + size + gap, width: frame.width - 2 * v("space.2") }, labelLayout, text("type.compact", SECONDARY, false, "center")));
   return nodes;
@@ -276,12 +309,12 @@ function ringMetricNodes({ id, frame, props }) {
 export function metricNodes({ id, frame, props }) {
   if (props.value === undefined || props.value === null || String(props.value).trim() === "") throw new Error("Metric requires a value");
   const METRIC_TONES = ["default", "dark", "tint", "hero", "ink", "rule", "ring"];
-  // "ring": a share drawn as an accent arc around the value (the Deloitte KPI ring).
+  // "ring": a share drawn as an accent arc around the value (a KPI ring).
   if (props.tone === "ring") return ringMetricNodes({ id, frame, props });
   if (props.tone !== undefined && !METRIC_TONES.includes(props.tone)) throw new Error(`Unknown metric tone: ${props.tone}; use one of ${METRIC_TONES.join(", ")}`);
-  // "ink": a black tile with the value in the accent (the Bain keynote stat row);
+  // "ink": a black tile with the value in the accent (a keynote stat row);
   // "rule": no tile, the value in the accent behind a hairline at the left (the
-  // McKinsey "51 | 443 | 39" stat row).
+  // "51 | 443 | 39" stat row).
   const ink_ = props.tone === "ink", ruled = props.tone === "rule";
   const dark = props.tone === "dark" || ink_;
   const pad = props.tone === "hero" ? 0 : v("space.3");
@@ -293,7 +326,7 @@ export function metricNodes({ id, frame, props }) {
   const delta = props.delta ? measure(props.delta, width, "type.label", true) : null;
   const gap = v("space.1");
   const total = value.height + (labelLayout ? gap + labelLayout.height : 0) + (sub ? gap + sub.height : 0) + (delta ? gap + delta.height : 0);
-  if (total > frame.height + 0.01) throw new Error("Metric tile is too short for its value, label and delta");
+  if (total > frame.height + 0.01) throw new Error("Metric tile is too short for its value, label and delta; give the tile more height or drop the delta");
   const nodes = [];
   if (ink_) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, INK, "none", "radius.none"));
   else if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));
@@ -374,7 +407,7 @@ export function agendaNodes({ id, frame, props }) {
 }
 
 /**
- * The 2020 McKinsey contents page: sections as equal columns headed by big
+ * A columned contents page: sections as equal columns headed by big
  * two-digit numerals ("01", "02"), the active section in the accent and bold,
  * the others in grey. Works on the light page and, with `tone: "dark"`, on navy.
  */
@@ -429,6 +462,16 @@ export function registerPanels(registry) {
     resolveVariant: (props = {}) => props.tone ?? (Array.isArray(props.items) && props.items.some((i) => i?.icon) ? "outline" : "numbered"),
     render: (input) => ({ nodes: cardsNodes(input) }),
     measureContent: ({ frame, props }) => cardsLayout(frame, props),
+    // The height the row uses: its copy with the rhythm the frame allows
+    // (grownCards, as `cardsNodes` draws it). Past it the slack goes after the
+    // row, to what follows it. A centred row places itself in any frame.
+    measureCeiling: ({ frame, props }) => {
+      if (props.valign === "middle") return null;
+      if (!(typeof props.question === "string" && props.question.trim())) return grownCards(frame, props).height;
+      const qw = Math.round(frame.width * 0.24), pad = v("space.4");
+      const q = measure(props.question, qw - 2 * pad, "type.heading", true);
+      return Math.max(grownCards({ ...frame, width: frame.width - qw - v("space.4") }, props).height, q.height + 2 * pad);
+    },
     guidance: { useWhen: "three to five parallel pillars, principles, options or initiatives each with a title and a line of description", why: "equal cards make parallel things read as parallel; the row rule keeps their bodies level", actionTitle: "state what the set of pillars achieves together" }
   });
   registry.set("quadrants", {

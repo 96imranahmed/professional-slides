@@ -100,15 +100,54 @@ function normalizeEvidenceAnnotations(props = {}) {
   });
 }
 
+// A callout the chart has already moved beside its mark (or into a right-hand
+// rail) on an earlier pass holds no band above the plot: reserving 88px for a
+// box that is not there left an empty stripe over every such chart.
+const RELEASED_PLACEMENTS = new Set(["beside", "rail"]);
+const holdsBand = (annotation) => (annotation.treatment !== "orthogonal-dot" || annotation.orientation !== "horizontal") && !RELEASED_PLACEMENTS.has(annotation._placement);
+
 export function evidenceAnnotationTopBandCount(props = {}) {
-  return normalizeEvidenceAnnotations(props).filter((annotation) => annotation.treatment !== "orthogonal-dot" || annotation.orientation !== "horizontal").length;
+  return normalizeEvidenceAnnotations(props).filter(holdsBand).length;
 }
 
+// In a compact band each box takes its own measured height plus a small gap,
+// and only the lowest keeps the full foot that clears the value labels riding
+// the tallest marks. It is what the chart falls back to when the full 88px
+// bands would leave the plot under its minimum height.
+const COMPACT_BAND_GAP = 8;
+const BAND_FOOT = EVIDENCE_CALLOUT_BAND - EVIDENCE_BOX_HEIGHT;
+function bandHeights(props, compact) {
+  const banded = normalizeEvidenceAnnotations(props).filter(holdsBand);
+  if (!compact) return banded.map(() => EVIDENCE_CALLOUT_BAND);
+  return banded.map((annotation, index) => evidenceBoxSize(annotation).height + (index === banded.length - 1 ? BAND_FOOT : COMPACT_BAND_GAP));
+}
+
+/** The height the evidence bands take above the plot, full or compact. */
+export function evidenceBandSpan(props = {}, { compact = false } = {}) {
+  return bandHeights(props, compact).reduce((sum, height) => sum + height, 0);
+}
+
+// The top of the box in band `bandIndex`: band 0 is the highest. A shorter box
+// sits on the foot of its band rather than floating at the top of it.
+function bandBoxY(plot, props, bandIndex, height) {
+  const heights = bandHeights(props, plot.evidenceCompact === true);
+  const below = heights.slice(bandIndex + 1).reduce((sum, h) => sum + h, 0);
+  const foot = plot.evidenceCompact === true ? (bandIndex === heights.length - 1 ? BAND_FOOT : COMPACT_BAND_GAP) : BAND_FOOT;
+  return plot.y - below - foot - height;
+}
+
+// A callout with no `series` on a chart of several series (a stacked or
+// grouped chart keys its marks by series) points at the category as a whole:
+// the top of the stack, or the category's largest mark. It used to fail as an
+// unknown category though the category was on the chart.
 function resolveEvidenceAnchor(pointMap, annotation, id) {
-  const target = pointMap.get(`${annotation.series || "value"}:${annotation.category}`);
+  const target = pointMap.get(`${annotation.series || "value"}:${annotation.category}`)
+    ?? (annotation.series ? null : pointMap.get(`category:${annotation.category}`));
   if (!target) {
-    const series = annotation.series ? ` in series ${annotation.series}` : "";
-    throw new Error(`${id} evidence annotation references unknown category ${annotation.category}${series}`);
+    const categories = [...new Set([...pointMap.keys()].map((key) => key.slice(key.indexOf(":") + 1)))];
+    const known = categories.includes(annotation.category);
+    if (annotation.series && known) throw new Error(`${id} evidence annotation names series "${annotation.series}", which has no mark at ${annotation.category}; use one of the chart's series names or omit series to point at the category as a whole`);
+    throw new Error(`${id} evidence annotation references unknown category ${annotation.category}; use one of: ${categories.slice(0, 12).join(", ")}`);
   }
   return target;
 }
@@ -127,8 +166,8 @@ function pointInsideFrame(point, frame, padding = 0) {
     && point.y <= frame.y + frame.height + padding;
 }
 
-function annotationObstacleFrames(obstacles) {
-  return obstacles.filter((node) => COLLISION_ROLES.has(node.role) && node.frame?.width !== undefined && node.frame?.height !== undefined).map(node => {
+function annotationObstacleFrames(obstacles, roles = COLLISION_ROLES) {
+  return obstacles.filter((node) => roles.has(node.role) && node.frame?.width !== undefined && node.frame?.height !== undefined).map(node => {
     if (node.type !== "text") return node;
     // Text allocations often span a whole bar/category. Collision routing uses
     // the measured ink box rather than treating its empty margins as ink.
@@ -139,9 +178,14 @@ function annotationObstacleFrames(obstacles) {
   });
 }
 
+// Two boxes keep the compact band's gap apart, not more: at 10px, two compact
+// boxes that overlapped across - a bridge's staff-cost and other-cost notes,
+// neighbours on the axis, stacked 8px apart by their bands - failed each
+// other by two pixels, and the second went to a rail that squeezed the
+// category labels off the page.
 function clearSurface(frame, obstacles, placements) {
   return obstacles.every((node) => !overlaps(frame, node.frame, 6))
-    && placements.every((placement) => !overlaps(frame, placement.frame, 10));
+    && placements.every((placement) => !overlaps(frame, placement.frame, COMPACT_BAND_GAP));
 }
 
 function clearLeader(x1, y1, x2, y2, target, obstacles) {
@@ -182,10 +226,15 @@ function evidenceBoxSize(annotation) {
 }
 
 function assertEvidenceTextFits(annotation) {
-  if (measureEvidenceText(annotation).height > EVIDENCE_BOX_HEIGHT - EVIDENCE_PAD_Y) throw new Error(`Chart evidence annotation for ${annotation.category} is too long for its body-sized box`);
+  // Three lines at the callout's 260px cap is what a note on a mark can carry
+  // and still read as a note; past that it is a paragraph, and no placement
+  // makes a paragraph legible over a plot.
+  if (measureEvidenceText(annotation).height > EVIDENCE_BOX_HEIGHT - EVIDENCE_PAD_Y) throw new Error(`Chart evidence annotation for ${annotation.category} is too long for its body-sized box; cut it to three short lines (about 90 characters) or move the reasoning into the page's insight`);
 }
 
-function horizontalPlacement({ annotation, index, target, plot, obstacles, placements, id }) {
+const leaderObstacles = (obstacles, placements) => [...obstacles, ...placements.map((placement) => ({ frame: placement.frame }))];
+
+function horizontalPlacement({ annotation, index, target, plot, obstacles, placements }) {
   const { width, height } = evidenceBoxSize(annotation);
   const y = Math.max(plot.y, Math.min(plot.y + plot.height - height, target.y - height / 2));
   const candidates = {
@@ -203,37 +252,155 @@ function horizontalPlacement({ annotation, index, target, plot, obstacles, place
   const order = annotation.side === "auto" ? ["right", "left"] : [annotation.side];
   const selected = order.map((side) => candidates[side]).find((candidate) => frameInside(candidate.frame, plot)
     && clearSurface(candidate.frame, obstacles, placements)
-    && clearLeader(candidate.leader.x1, candidate.leader.y1, candidate.leader.x2, candidate.leader.y2, target, [...obstacles, ...placements.map((placement) => ({ frame: placement.frame }))]));
-  if (!selected) throw new Error(`${id} has insufficient clearance for a horizontal orthogonal-dot annotation at ${annotation.category}; use a vertical or standard takeaway annotation`);
-  return { annotation, index, target, frame: selected.frame, leader: selected.leader, side: selected.side };
+    && clearLeader(candidate.leader.x1, candidate.leader.y1, candidate.leader.x2, candidate.leader.y2, target, leaderObstacles(obstacles, placements)));
+  if (!selected) return null;
+  return { annotation, index, target, frame: selected.frame, leader: selected.leader, side: selected.side, placement: "orthogonal" };
 }
 
-function verticalPlacement({ annotation, index, target, plot, bandIndex, topBandCount, obstacles, placements, id }) {
+function verticalPlacement({ annotation, index, target, plot, props, bandIndex, obstacles, placements }) {
   const { width, height } = evidenceBoxSize(annotation);
-  const frame = {
-    x: target.x - width / 2,
-    // The band reserves `EVIDENCE_BOX_HEIGHT`; a shorter box sits on the foot of
-    // that reservation rather than floating at the top of it, which would just
-    // trade an empty box for a longer leader.
-    y: plot.y - (topBandCount - bandIndex) * EVIDENCE_CALLOUT_BAND + (EVIDENCE_BOX_HEIGHT - height),
-    width,
-    height
-  };
+  const frame = { x: target.x - width / 2, y: bandBoxY(plot, props, bandIndex, height), width, height };
   const leader = { x1: target.x, y1: frame.y + frame.height, x2: target.x, y2: target.y };
-  if (frame.x < plot.x || frame.x + frame.width > plot.x + plot.width || !clearLeader(leader.x1, leader.y1, leader.x2, leader.y2, target, [...obstacles, ...placements.map((placement) => ({ frame: placement.frame }))])) {
-    throw new Error(`${id} has insufficient clearance for a vertical orthogonal-dot annotation at ${annotation.category}; use a horizontal or standard takeaway annotation`);
-  }
-  if (!clearSurface(frame, [], placements)) throw new Error(`${id} orthogonal-dot annotation boxes overlap; widen the exhibit or reduce the annotations`);
-  return { annotation, index, target, frame, leader, side: "above" };
+  if (frame.x < plot.x || frame.x + frame.width > plot.x + plot.width || !clearLeader(leader.x1, leader.y1, leader.x2, leader.y2, target, leaderObstacles(obstacles, placements))) return null;
+  if (!clearSurface(frame, [], placements)) return null;
+  return { annotation, index, target, frame, leader, side: "above", placement: "band" };
 }
 
-function standardPlacement({ annotation, index, target, plot, bandIndex, topBandCount, obstacles, placements, id }) {
-  const targetX = target.leaderX ?? target.x;
-  const targetY = target.leaderY ?? target.y;
+// Roles a box set beside its mark must also stay clear of: a beside box can
+// reach the category column, the value-label gutter and the delta column,
+// which a box in the band above the plot never meets.
+const BESIDE_ROLES = new Set([...COLLISION_ROLES, "category-label", "category-note", "category-icon", "category-logo", "category-logo-placeholder", "chart-delta", "chart-delta-label", "chart-bracket-label", "data-label-leader", "chart-period-label", "chart-event-label", "chart-quadrant-title", "chart-threshold-label", "axis-label"]);
+
+// The mark's own value label, when it prints one next to the point: a box set
+// beside the mark sits beyond that label, and its leader stops at the label's
+// edge instead of striking through the number.
+function ownLabel(target, annotation, obstacles) {
+  const distance = (frame) => Math.hypot(Math.max(0, frame.x - target.x, target.x - frame.x - frame.width), Math.max(0, frame.y - target.y, target.y - frame.y - frame.height));
+  return obstacles
+    .filter((node) => node.role === "data-label" && node.data?.category === annotation.category
+      && (!annotation.series || !node.data?.series || node.data.series === annotation.series)
+      && distance(node.frame) <= 40)
+    .sort((a, b) => distance(a.frame) - distance(b.frame))[0] ?? null;
+}
+
+/**
+ * A box beside its mark, inside the plot (or the right-hand rail the chart
+ * made room for): the fallback when the band above the plot has no clear
+ * corridor to the mark.
+ *
+ * On a horizontal bar chart a callout on any bar but the first drops its
+ * leader from the band through every longer bar above it, and the orthogonal
+ * treatment put its box 28px from the bar end - on top of the value label
+ * printed there. Each treatment's error suggested the other. A designer sets
+ * the note level with its bar, just past the value, and that is the first
+ * candidate here; then the other side, then the same two nudged half a box up
+ * or down, then directly above or below the mark. The leader runs from the
+ * box to the mark's end, stopping short of its value label.
+ */
+function besidePlacement({ annotation, index, target, bounds, obstacles, placements }) {
+  const { width, height } = evidenceBoxSize(annotation);
+  const label = ownLabel(target, annotation, obstacles);
+  const anchor = label
+    ? { x: Math.min(label.frame.x, target.x), y: Math.min(label.frame.y, target.y), width: Math.max(label.frame.x + label.frame.width, target.x) - Math.min(label.frame.x, target.x), height: Math.max(label.frame.y + label.frame.height, target.y) - Math.min(label.frame.y, target.y) }
+    : { x: target.x, y: target.y, width: 0, height: 0 };
+  const reach = ENDPOINT_DIAMETER / 2 + 3;
+  const beyond = { right: label ? anchor.x + anchor.width + reach : target.x, left: label ? anchor.x - reach : target.x };
+  const above = label && label.frame.y + label.frame.height <= target.y + 2 ? anchor.y - reach : target.y;
+  const below = label && label.frame.y >= target.y - 2 ? anchor.y + anchor.height + reach : target.y;
+  const candidates = [];
+  for (const dy of [0, -(height / 2 + 6), height / 2 + 6]) {
+    const y = target.y - height / 2 + dy;
+    const mid = Math.max(y + 4, Math.min(y + height - 4, target.y));
+    candidates.push({ side: "right", frame: { x: beyond.right + ORTHOGONAL_GAP - reach, y, width, height }, leader: { x1: beyond.right + ORTHOGONAL_GAP - reach, y1: mid, x2: beyond.right, y2: target.y } });
+    candidates.push({ side: "left", frame: { x: beyond.left - ORTHOGONAL_GAP + reach - width, y, width, height }, leader: { x1: beyond.left - ORTHOGONAL_GAP + reach, y1: mid, x2: beyond.left, y2: target.y } });
+  }
+  const centred = Math.max(bounds.x, Math.min(bounds.x + bounds.width - width, target.x - width / 2));
+  const leaderX = Math.max(centred + 4, Math.min(centred + width - 4, target.x));
+  candidates.push({ side: "above", frame: { x: centred, y: above - ORTHOGONAL_GAP - height, width, height }, leader: { x1: leaderX, y1: above - ORTHOGONAL_GAP, x2: target.x, y2: above } });
+  candidates.push({ side: "below", frame: { x: centred, y: below + ORTHOGONAL_GAP, width, height }, leader: { x1: leaderX, y1: below + ORTHOGONAL_GAP, x2: target.x, y2: below } });
+  const others = leaderObstacles(obstacles, placements);
+  const selected = candidates.find((candidate) => frameInside(candidate.frame, bounds)
+    && clearSurface(candidate.frame, obstacles, placements)
+    && clearLeader(candidate.leader.x1, candidate.leader.y1, candidate.leader.x2, candidate.leader.y2, { x: candidate.leader.x2, y: candidate.leader.y2 }, others));
+  if (!selected) return null;
+  return { annotation, index, target, frame: selected.frame, leader: selected.leader, side: selected.side, placement: "beside" };
+}
+
+/**
+ * A callout set inside its own bar: the step between beside and the rail. A
+ * long, thick bar has plain area past its start, and a note set there needs no
+ * leader - it is on the thing it describes. Only its own mark (same category
+ * and series), fully inside with a margin, clear of its value label and every
+ * other obstacle; the overlap audit accepts exactly this construction and
+ * nothing looser (overlap-policy.mjs).
+ */
+function insidePlacement({ annotation, index, target, marks, obstacles, placements }) {
+  if (annotation.treatment === "speech") return null; // a speech bubble points with its tail
+  const mark = marks.find((node) => node.data?.category === annotation.category && (annotation.series === undefined || node.data?.series === annotation.series));
+  if (!mark?.frame) return null;
+  const { width, height } = evidenceBoxSize(annotation);
+  const pad = 6, f = mark.frame;
+  const room = { x: f.x + pad, y: f.y + pad, width: f.width - 2 * pad, height: f.height - 2 * pad };
+  const others = obstacles.filter((node) => node.id !== mark.id);
+  for (const at of [{ x: room.x, y: f.y + (f.height - height) / 2 }, { x: f.x + (f.width - width) / 2, y: room.y + room.height - height }]) {
+    const frame = { ...at, width, height };
+    if (frameInside(frame, room) && clearSurface(frame, others, placements))
+      return { annotation, index, target, frame, leader: null, placement: "inside", insideOf: { category: mark.data.category, series: mark.data.series ?? null } };
+  }
+  return null;
+}
+
+/**
+ * Where a callout's leader lands: the mark's centre on the category axis, at
+ * its value end - the top-centre of a column, the end-centre of a bar.
+ *
+ * Column points used to carry `leaderX` at the bar's right edge (and bars
+ * `leaderY` at their top edge), which kept the leader clear of the value label
+ * centred on the column but landed the dot on a corner: on a page of six
+ * columns the reader followed it to the gap between two bars, not to the one
+ * the note is about. The target is the point itself now, and the leader stops
+ * short of the mark's own value label instead - the label sits on the same
+ * centre line directly above the mark, so ending the leader at its top keeps
+ * the dot on the mark's axis without striking through the number. The label is
+ * found by its category, not only by sitting on the mark: a reference line
+ * through a label lifts it clear of the line, and a lifted label is still the
+ * one the leader would strike. A negative
+ * column's value end is its foot, and a leader from the band above would run
+ * down the whole bar to reach it, so it lands on the column's top (the
+ * baseline) instead.
+ */
+function leaderTarget(target, obstacles, annotation) {
+  const x = target.x;
+  const hanging = obstacles.find((node) => node.role === "chart-mark"
+    && x >= node.frame.x && x <= node.frame.x + node.frame.width
+    && Math.abs(node.frame.y + node.frame.height - target.y) <= 1 && node.frame.height > 2);
+  if (hanging) return { x, y: hanging.frame.y };
+  // A range band prints its high value four pixels past its end, level with
+  // the centre, so a dot on the end-centre sat on the number. When the mark's
+  // own label is closer to the end than the dot's radius, the dot steps back
+  // inside the bar by its radius and a gap - still the end of the bar, clear
+  // of the figure. (A bar's label keeps a wider gap and needs no step.)
+  const reach = ENDPOINT_DIAMETER / 2 + 3;
+  const beside = obstacles.find((node) => node.role === "data-label" && node.data?.category === annotation.category
+    && target.y >= node.frame.y && target.y <= node.frame.y + node.frame.height
+    && (Math.abs(node.frame.x - x) <= ENDPOINT_DIAMETER / 2 + 1 || Math.abs(node.frame.x + node.frame.width - x) <= ENDPOINT_DIAMETER / 2 + 1));
+  const stepped = beside && { x: beside.frame.x >= x - 1 ? x - reach : x + reach, y: target.y };
+  if (stepped && obstacles.some((node) => node.role === "chart-mark" && pointInsideFrame(stepped, node.frame))) return stepped;
+  const ownLabel = obstacles
+    .filter((node) => node.role === "data-label"
+      && x >= node.frame.x && x <= node.frame.x + node.frame.width
+      && node.frame.y + node.frame.height <= target.y + 2
+      && (node.data?.category === annotation.category || node.frame.y + node.frame.height >= target.y - 16))
+    .sort((a, b) => a.frame.y - b.frame.y)[0];
+  return { x, y: ownLabel ? ownLabel.frame.y - ENDPOINT_DIAMETER / 2 - 3 : target.y };
+}
+
+function standardPlacement({ annotation, index, target, plot, props, bandIndex, obstacles, placements }) {
+  const { x: targetX, y: targetY } = leaderTarget(target, obstacles, annotation);
   const { width, height } = evidenceBoxSize(annotation);
   const frame = {
     x: Math.max(plot.x - 12, Math.min(plot.x + plot.width + 12 - width, targetX - width / 2)),
-    y: plot.y - (topBandCount - bandIndex) * EVIDENCE_CALLOUT_BAND + (EVIDENCE_BOX_HEIGHT - height),
+    y: bandBoxY(plot, props, bandIndex, height),
     width,
     height
   };
@@ -243,17 +410,8 @@ function standardPlacement({ annotation, index, target, plot, bandIndex, topBand
     x2: targetX,
     y2: targetY
   };
-  if (!clearSurface(frame, obstacles, placements) || !clearLeader(leader.x1, leader.y1, leader.x2, leader.y2, { x: targetX, y: targetY }, [...obstacles, ...placements.map(placement => ({ frame: placement.frame }))])) {
-    throw new Error(`${id} has insufficient clearance for a callout at ${annotation.category}; move the annotation or use an orthogonal-dot treatment`);
-  }
-  return {
-    annotation,
-    index,
-    target,
-    frame,
-    leader,
-    side: "above"
-  };
+  if (!clearSurface(frame, obstacles, placements) || !clearLeader(leader.x1, leader.y1, leader.x2, leader.y2, { x: targetX, y: targetY }, leaderObstacles(obstacles, placements))) return null;
+  return { annotation, index, target, frame, leader, side: "above", placement: "band" };
 }
 
 /**
@@ -320,11 +478,24 @@ function speechNodes(id, placement, data) {
   ];
 }
 
+function evidenceTextNode(id, index, frame, text, data) {
+  const measured = measureText(text, Math.min(EVIDENCE_BOX_WIDTH - EVIDENCE_PAD_X, Math.max(frame.width - 16, 1)), { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+  const width = Math.max(frame.width - 16, Math.ceil(measured.width) + 2);
+  return textPrimitive({
+    id: stableId(id, "annotation-text", index),
+    role: "annotation-text",
+    frame: { x: frame.x + (frame.width - width) / 2, y: frame.y + (frame.height - measured.height) / 2, width, height: measured.height },
+    text: measured.text,
+    style: { ...textStyle(ANNOTATION, INK, true), lineHeight: measured.lineHeight, wrap: false },
+    data: { ...data, textLayout: measured }
+  });
+}
+
 function evidenceNodes(id, placement) {
   const { annotation, index, frame, leader } = placement;
   const callout = annotation.treatment === "callout";
   const dotEnded = annotation.treatment === "orthogonal-dot";
-  // `speech` is the filled bubble the reference decks put on a busy plot, where
+  // `speech` is the filled bubble a strong deck puts on a busy plot, where
   // an outlined surface on a canvas ground disappears into the gridlines. It is
   // the loudest of the three, so it carries one short phrase and no border of
   // its own: the fill is the emphasis.
@@ -335,11 +506,15 @@ function evidenceNodes(id, placement) {
     border: annotation.border !== false,
     orientation: annotation.orientation,
     targetCategory: annotation.category,
-    targetSeries: annotation.series ?? null
+    targetSeries: annotation.series ?? null,
+    ...(placement.placement ? { evidencePlacement: annotation._placement === "rail" ? "rail" : placement.placement, evidenceIndex: index } : {}),
+    ...(placement.released ? { evidenceReleased: true } : {}),
+    ...(placement.insideOf ? { insideMark: true, category: placement.insideOf.category, ...(placement.insideOf.series !== null ? { series: placement.insideOf.series } : {}) } : {})
   };
   if (speech) return speechNodes(id, placement, data);
   const nodes = [
-    linePrimitive({
+    // A callout set inside its own bar has no leader: it sits on its mark.
+    ...(leader ? [linePrimitive({
       id: stableId(id, "annotation-leader", index),
       role: "annotation-leader",
       ...leader,
@@ -349,7 +524,7 @@ function evidenceNodes(id, placement) {
       // the orthogonal treatment already used.
       style: { stroke: callout ? PRIMARY : RULE, lineWidth: callout ? STANDARD : HAIRLINE, dash: "solid" },
       data: { ...data, endArrow: false, endpoint: "dot" }
-    }),
+    })] : []),
     rectPrimitive({
       id: stableId(id, "annotation-box", index),
       role: "annotation-surface",
@@ -357,16 +532,12 @@ function evidenceNodes(id, placement) {
       style: { fill: callout ? SURFACE : PRIMARY_TINT, stroke: annotation.border === false ? "none" : RULE, lineWidth: HAIRLINE, radius: NONE_RADIUS, opacity: 1 },
       data
     }),
-    textPrimitive({
-      id: stableId(id, "annotation-text", index),
-      role: "annotation-text",
-      frame: { x: frame.x + 8, y: frame.y + 6, width: frame.width - 16, height: frame.height - 12 },
-      text: annotation.text,
-      style: textStyle(ANNOTATION, INK, true),
-      data
-    })
+    // The box closes on its measured lines, so the text carries those lines
+    // rather than re-wrapping in a frame exactly its own width, where a
+    // trailing space pushed the last word of a line past the box edge.
+    evidenceTextNode(id, index, frame, annotation.text, data)
   ];
-  nodes.push(ellipsePrimitive({
+  if (leader) nodes.push(ellipsePrimitive({
     id: stableId(id, "annotation-endpoint", index),
     role: "annotation-endpoint",
     frame: { x: leader.x2 - ENDPOINT_DIAMETER / 2, y: leader.y2 - ENDPOINT_DIAMETER / 2, width: ENDPOINT_DIAMETER, height: ENDPOINT_DIAMETER },
@@ -398,9 +569,11 @@ export function renderChartCallout({ id, frame, props }) {
   };
   if (!Object.hasOwn(leaders, direction)) throw new Error(`Unknown callout direction: ${direction}`);
   const measured = measureText(props.text, frame.width - 16, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
-  if (measured.height > frame.height - 14) throw new Error("Chart callout text does not fit its frame");
-  // `variant: "speech"` is the filled bubble with a pointed tail the reference
-  // decks put over a chart - an aside in the deck's voice, rather than a
+  // The box's 7px vertical padding closes to a 4px floor before the note is
+  // refused; past that the frame cannot hold the note at the annotation size.
+  if (measured.height > frame.height - 8) throw new Error(`Chart callout text needs ${Math.ceil(measured.height + 8)}px and its frame has ${Math.floor(frame.height)}px; give the callout more height or shorten the note`);
+  // `variant: "speech"` is the filled bubble with a pointed tail a strong
+  // deck puts over a chart - an aside in the deck's voice, rather than a
   // bordered note with a leader line to a mark.
   if (props.variant === "speech") {
     const leader = leaders[direction];
@@ -432,28 +605,89 @@ export function renderChartCallout({ id, frame, props }) {
   return { nodes: evidenceNodes(id, { index: 0, frame, leader: leaders[direction], annotation: { ...props, treatment: "callout" } }) };
 }
 
+/**
+ * The width a right-hand annotation rail needs for these callouts: the widest
+ * box plus the leader's reach.
+ */
+function railWidth(annotations) {
+  return Math.max(0, ...annotations.map((annotation) => evidenceBoxSize(annotation).width)) + ORTHOGONAL_GAP + 8;
+}
+
+/**
+ * Place every evidence annotation, falling back as a designer would.
+ *
+ * The treatment the author chose is tried first and, where it has a clear
+ * corridor, is what renders - the geometry is unchanged from before. When it
+ * has none the chart tries the other positions in turn rather than failing
+ * with a message that recommends a different treatment (which, on a long bar,
+ * failed in turn and recommended the first): a band callout tries the box
+ * beside its mark; an orthogonal box tries beside, then the band. A callout
+ * that fits nowhere in the plot asks the chart for a right-hand annotation
+ * rail: the error carries `retry`, which the chart's render loop applies and
+ * renders again with the plot narrowed by the rail. Only a note that has no
+ * position even in the rail throws for the author.
+ *
+ * Each placement records where it went (`data.evidencePlacement`) and whether
+ * it gave up a band reserved above the plot, so the chart can render once
+ * more with that band released instead of leaving an empty stripe.
+ */
 export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles = [] }) {
   const annotations = normalizeEvidenceAnnotations(props);
   if (!annotations.length) return { placements: [], nodes: [] };
   annotations.forEach(assertEvidenceTextFits);
   const collisionObstacles = annotationObstacleFrames(obstacles);
-  const topBandCount = evidenceAnnotationTopBandCount(props);
+  const besideObstacles = annotationObstacleFrames(obstacles, BESIDE_ROLES);
+  // A box beside its mark may use the chart's whole frame across (the value
+  // gutter, the rail) but stays within the plot's height.
+  const limits = plot.limits ?? { x: plot.x - 12, y: plot.y, width: plot.width + 24, height: plot.height };
+  const besideBounds = { x: limits.x, y: plot.y, width: limits.width, height: plot.height };
   let bandIndex = 0;
   const placements = [];
   annotations.forEach((annotation, index) => {
     const target = resolveEvidenceAnchor(pointMap, annotation, id);
-    let placement;
-    if (annotation.treatment === "orthogonal-dot" && annotation.orientation === "horizontal") {
-      placement = horizontalPlacement({ annotation, index, target, plot, obstacles: collisionObstacles, placements, id });
-    } else {
-      placement = annotation.treatment === "orthogonal-dot"
-        ? verticalPlacement({ annotation, index, target, plot, bandIndex, topBandCount, obstacles: collisionObstacles, placements, id })
-        : standardPlacement({ annotation, index, target, plot, bandIndex, topBandCount, obstacles: collisionObstacles, placements, id });
-      bandIndex += 1;
+    const banded = holdsBand(annotation);
+    const context = { annotation, index, target, plot, props, bandIndex, obstacles: collisionObstacles, placements };
+    const beside = () => besidePlacement({ ...context, bounds: besideBounds, obstacles: besideObstacles });
+    const inside = () => insidePlacement({ ...context, marks: obstacles.filter((node) => node.role === "chart-mark") });
+    const chain = RELEASED_PLACEMENTS.has(annotation._placement)
+      ? [beside, inside]
+      : annotation.treatment === "orthogonal-dot" && annotation.orientation === "horizontal"
+        ? [() => horizontalPlacement(context), beside, inside]
+        : annotation.treatment === "orthogonal-dot"
+          ? [() => verticalPlacement(context), () => standardPlacement(context), beside, inside]
+          : [() => standardPlacement(context), beside, inside];
+    let placement = null;
+    for (const attempt of chain) if ((placement = attempt())) break;
+    if (banded) bandIndex += 1;
+    if (!placement) {
+      if (annotation._placement !== "rail") {
+        const all = props.annotations;
+        throw Object.assign(new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot; shorten the note, annotate fewer marks, or enlarge the exhibit`), {
+          retry: (current) => ({ ...current, annotations: (current.annotations || all).map((item, at) => at === index || item?._placement === "rail" ? { ...item, _placement: "rail" } : item) })
+        });
+      }
+      throw new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot; shorten the note, annotate fewer marks, or enlarge the exhibit`);
     }
-    placements.push(placement);
+    placements.push({ ...placement, released: banded && placement.placement === "beside" });
   });
   return { placements, nodes: placements.flatMap((placement) => evidenceNodes(id, placement)) };
+}
+
+/** The rail width a chart reserves at its right for callouts placed there. */
+export function evidenceRailWidth(props = {}) {
+  const railed = normalizeEvidenceAnnotations(props).filter((annotation) => annotation._placement === "rail");
+  return railed.length ? railWidth(railed) : 0;
+}
+
+/**
+ * Props with every callout that left its band for a place beside its mark
+ * marked as placed there, so the next render reserves no band for it; null
+ * when no callout moved. The chart renders once more with these props.
+ */
+export function releasedEvidenceProps(nodes, props = {}) {
+  const moved = new Set(nodes.filter((node) => node.role === "annotation-surface" && node.data?.evidenceReleased).map((node) => node.data.evidenceIndex));
+  if (!moved.size || !Array.isArray(props.annotations)) return null;
+  return { ...props, annotations: props.annotations.map((item, index) => moved.has(index) ? { ...item, _placement: "beside" } : item) };
 }
 
 export function normalizeChangeAnnotations(props = {}) {
@@ -673,7 +907,7 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
   if (!annotations.length) return [];
   const nodes = [];
   const labels = [];
-  const evidenceBand = evidenceAnnotationTopBandCount(props) * EVIDENCE_CALLOUT_BAND;
+  const evidenceBand = evidenceBandSpan(props, { compact: plot.evidenceCompact === true });
   // The band the chart frame already held back above the plot for these
   // annotations; an arrow may climb into it rather than overlap the marks.
   const changeBand = chartAnnotationBands(props).top;
@@ -681,13 +915,13 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
   annotations.forEach((annotation, index) => {
     const start = resolveAnchor(pointMap, annotation.start, id);
     const end = resolveAnchor(pointMap, annotation.end, id);
-    if (Math.hypot(end.x - start.x, end.y - start.y) < 20) throw new Error(`${id} change annotation endpoints are too close to show clearly`);
+    if (Math.hypot(end.x - start.x, end.y - start.y) < 20) throw new Error(`${id} change annotation endpoints are too close to show clearly; annotate a longer interval or print the change as a data label`);
 
     if (annotation.style === "interval-label") {
       if (Math.abs(end.x - start.x) < 20) throw new Error("Qualitative interval needs distinct horizontal category positions");
       const width = Math.min(260, plot.width);
       const measured = measureIntervalLabel(annotation, width);
-      if (measured.height > measureIntervalLabel(annotation, 260).height) throw new Error("Qualitative interval label needs the full measured annotation width");
+      if (measured.height > measureIntervalLabel(annotation, 260).height) throw new Error("Qualitative interval label needs the full measured annotation width (260px); widen the chart or shorten the label");
       const bracketY = plot.y - evidenceBand - 24;
       const frame = {x:Math.max(plot.x,Math.min(plot.x+plot.width-width,(start.x+end.x)/2-width/2)),y:bracketY-8-measured.height,width,height:measured.height};
       const data = {annotationStyle:annotation.style,annotationKey:`${id}:${index}:${annotation.style}`,basis:annotation.basis,qualification:annotation.qualification,start:annotation.start,end:annotation.end};
@@ -713,7 +947,18 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
       labels.push({ frame, annotation, index });
       return;
     }
-    if (annotation.style === "arrow") {
+    // An arrow between two marks too close for its bubble becomes a bracket
+    // over them: the same change, read from a label above the pair instead
+    // of from a shaft too short to break around the number.
+    let style = annotation.style;
+    if (style === "arrow") {
+      const probeLift = arrowLift({ start: { ...start }, end: { ...end }, plot, obstacles, text: annotation.text, band: changeBand });
+      const s0 = { x: start.x, y: start.y - probeLift }, e0 = { x: end.x, y: end.y - probeLift };
+      const length = Math.hypot(e0.x - s0.x, e0.y - s0.y), ux = (e0.x - s0.x) / length, uy = (e0.y - s0.y) / length;
+      const probeFrame = labelFrame(annotation.text, (s0.x + e0.x) / 2, (s0.y + e0.y) / 2, plot);
+      if (length <= (Math.abs(ux) * probeFrame.width / 2 + Math.abs(uy) * probeFrame.height / 2 + 5) * 2 + 16) style = "bracket";
+    }
+    if (style === "arrow") {
       // The arrow runs from the first mark to the last and its bubble sits at
       // the midpoint, so on a descending series the bubble lands on whatever
       // the interior categories put there - a bar top, or the value printed
@@ -729,7 +974,6 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
       const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
       const frame = labelFrame(annotation.text, midpoint.x, midpoint.y, plot);
       const gap = Math.abs(ux) * frame.width / 2 + Math.abs(uy) * frame.height / 2 + 5;
-      if (length <= gap * 2 + 16) throw new Error(`${id} change annotation interval is too short for its label`);
       nodes.push(line(id, index, "arrow-start", start.x, start.y, midpoint.x - ux * gap, midpoint.y - uy * gap, false, annotation.style));
       nodes.push(line(id, index, "arrow-end", midpoint.x + ux * gap, midpoint.y + uy * gap, end.x, end.y, true, annotation.style));
       labels.push({ frame, annotation, index });
@@ -746,15 +990,30 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
     const compact = annotation.compact === true;
     const bracketY = evidenceBand ? plot.y - evidenceBand - (compact ? 18 : 34) : Math.max(plot.y - (compact ? 18 : 34), intervalTop - (compact ? 18 : 34));
     const frame = compact ? compactLabelFrame(annotation.text, (leftX + rightX) / 2, bracketY - 10, plot) : labelFrame(annotation.text, (leftX + rightX) / 2, bracketY - 24, plot);
-    nodes.push(line(id, index, "span", leftX, bracketY, rightX, bracketY, false, annotation.style));
-    nodes.push(line(id, index, "start-drop", start.x, bracketY, start.x, start.y, false, annotation.style));
-    nodes.push(line(id, index, "end-drop", end.x, bracketY, end.x, end.y, annotation.style === "construction", annotation.style));
-    labels.push({ frame, annotation, index });
+    nodes.push(line(id, index, "span", leftX, bracketY, rightX, bracketY, false, style));
+    nodes.push(line(id, index, "start-drop", start.x, bracketY, start.x, start.y, false, style));
+    nodes.push(line(id, index, "end-drop", end.x, bracketY, end.x, end.y, style === "construction", style));
+    // A bracket's label may slide along its own span to clear a neighbour's.
+    labels.push({ frame, annotation: style === annotation.style ? annotation : { ...annotation, style }, index, span: [leftX, rightX] });
   });
 
+  // Neighbouring brackets whose labels meet slide them apart along their own
+  // spans (a label stays over the interval it names) rather than failing.
+  const movable = labels.filter(label => label.span).sort((a, b) => a.frame.x - b.frame.x);
+  for (let i = 1; i < movable.length; i += 1) {
+    const previous = movable[i - 1], current = movable[i];
+    // Intervals that overlap draw their brackets through each other; no slide separates those.
+    if (!overlaps(previous.frame, current.frame) || Math.max(previous.span[0], current.span[0]) <= Math.min(previous.span[1], current.span[1]) + 1) continue;
+    const shift = previous.frame.x + previous.frame.width + 7 - current.frame.x;
+    const room = (label, dx) => { const centre = label.frame.x + dx + label.frame.width / 2; return centre >= label.span[0] && centre <= label.span[1] && label.frame.x + dx >= plot.x - 10 && label.frame.x + dx + label.frame.width <= plot.x + plot.width + 10; };
+    const half = shift / 2;
+    if (room(current, half) && room(previous, -half)) { current.frame = { ...current.frame, x: current.frame.x + half }; previous.frame = { ...previous.frame, x: previous.frame.x - half }; }
+    else if (room(current, shift)) current.frame = { ...current.frame, x: current.frame.x + shift };
+    else if (room(previous, -shift)) previous.frame = { ...previous.frame, x: previous.frame.x - shift };
+  }
   for (let index = 0; index < labels.length; index += 1) {
     for (let peer = index + 1; peer < labels.length; peer += 1) {
-      if (overlaps(labels[index].frame, labels[peer].frame)) throw new Error("Chart change annotation labels overlap; widen the exhibit or reduce the annotations");
+      if (overlaps(labels[index].frame, labels[peer].frame)) throw new Error("Chart change annotation labels overlap even after sliding along their brackets (overlapping intervals cannot share the band); widen the exhibit, shorten the labels, or annotate intervals that do not overlap");
     }
   }
   labels.forEach(({ frame, annotation, index, measured, data }) => {
@@ -785,7 +1044,7 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
       wrapWidthRatio: 1
     });
     const width = Math.min(labelSpan - 10, Math.max(52, Math.ceil(measured.width) + 20));
-    if (width < 48 || measured.height > annotationRailLineHeight()) throw new Error(`Annotation rail text for ${item.category} does not fit its category span`);
+    if (width < 48 || measured.height > annotationRailLineHeight()) throw new Error(`Annotation rail text for ${item.category} does not fit its category span; shorten the value or show fewer categories`);
     const frame = { x: center - width / 2, y, width, height: Math.max(30,measured.height+6) };
     nodes.push(ellipsePrimitive({
       id: stableId(railId, "annotation-rail-surface", index),
@@ -815,4 +1074,9 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
   }
   });
   return nodes;
+}
+
+/** Whether an evidence callout's text fits its box: the renderer's own measure, for the page-type compiler. */
+export function calloutFits(text) {
+  return measureEvidenceText({ text: String(text ?? "") }).height <= EVIDENCE_BOX_HEIGHT - EVIDENCE_PAD_Y;
 }

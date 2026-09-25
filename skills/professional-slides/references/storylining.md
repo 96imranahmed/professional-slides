@@ -8,6 +8,23 @@ Above the dot-dash, record the audience, actual choice or learning objective, ba
 
 For authorization, retain one approval unit: workflow, population, exposure/configuration, resources and permission requested. Preparation, offline testing, live exposure and expansion are different commitments. Carry the same unit into the summary, protocol and close. Include cancellation, option and contingent liabilities in the authorized exposure, even when cash is released later. A request for preparatory spending needs its own supported purpose, downside and stop condition; a conditional main programme does not automatically justify its first tranche. Ask only for missing information that would change the argument; existing authorization persists.
 
+## Find the data before the dot-dash
+
+A dot-dash written from what the author already knows produces pages of two numbers each: one company against another on a count. The rich page - a trend with its growth rate, the whole peer set ranked, a share shifting, a network on a map - needs a dataset, and the datasets have to be found before the titles are written, because they decide which titles can be proved.
+
+For a subject with public records, search for and download the data first:
+
+- **Series over time** for the measures the question turns on - revenue, profit, volume, capacity, users, fleet, share - five or more periods, from annual reports, investor presentations, regulators, statistics offices and industry bodies. Country-level series (passengers, GDP, population, tourism, energy) come in one call: `node runtime/fetch-series.mjs worldbank IS.AIR.PSGR SAU,ARE,QAT --from 2010` or `... owid <grapher-slug> "Saudi Arabia,Qatar"` writes the CSV, its source and retrieval date, each series' CAGR and a chart block ready for the exhibit.
+- **The whole peer set** on the same measures and the same basis, not the subject against one rival.
+- **Composition and share**: segments, regions, product lines, and how they have shifted.
+- **Geography**: locations, networks and routes, with coordinates.
+- **Pipeline and commitments**: orders, plans, announcements, each with its status (announced, firm, delivered).
+- **Ratios that remove size**: per unit, per head, per route, per asset.
+
+Save what is downloaded under the task's `sources/` with the URL and the retrieval date, and build each measure's record from it (below). Where a series is not published, say so and use the nearest defensible one; do not fall back to a two-number chart because the search was short. Declare the compared organisations as `players` on the deck - name, and the logo to be sourced - so the deck introduces them before it compares them ([Design](design.md#make-every-exhibit-earn-its-page)).
+
+Then [extract the insights](#extract-the-insights-before-the-titles) from the data before writing a title. Before writing titles, list the deck's candidate exhibits against these forms. A 50-page deck on a competitive question normally carries several trends with their rates, a ranked peer comparison, a share or mix, a players page with logos, a map where the subject has geography, and scorecard tables that judge; if the list is mostly single-period comparisons of two entities, the research is not finished.
+
 ## Prove the governing answer
 
 Build a hypothesis tree for a decision, or a concept/dependency map for explanation. Use stable node IDs. For each terminal branch retain the provisional answer, confirming/disconfirming evidence, consequence, evidence status, dependency and disposition (body, appendix, unresolved or parked). Siblings divide the same parent question. Stop expanding when additional detail cannot change the answer or understanding.
@@ -26,7 +43,72 @@ Challenge adjacent schedules that repeat the same activities under resource and 
 
 For repeated permission or readiness summaries, compare the exact record keys with the option evidence and preparation ledger. Preserve each condition once where it changes an option, and provide consolidated lookup only when it adds the record, boundary and action readers need. A general permissions page does not earn a separate role by repeating those conditions without a new conclusion. Similarly, source lineage, required replacement evidence and reproduction instructions can share a keyed audit record; different headings do not justify repeating the same evidence-state warning. When deletion takes an evaluation below its page minimum, return to evidence breadth: add a genuinely unanswered question supported by the sources, not another recap or a split made to recover the count.
 
-For fixed length, budget cover, summary, sections and appendix first; select evidence breadth that supports the total. Reject a narrow evaluation topic before authoring if it requires padding. Do not invent another case whenever a thin page is found. Alternative decks first differ in question, sequence or evidence relationship, not palette.
+Long decks are legitimate: a diligence pack or a board pre-read can need 60 pages or more. For fixed length, budget cover, summary, sections and appendix first; select evidence breadth that supports the total - more analyses and a wider peer set, never repetition. Reject a narrow evaluation topic before authoring if it requires padding. Do not invent another case whenever a thin page is found. Alternative decks first differ in question, sequence or evidence relationship, not palette.
+
+## Work in parallel with subagents
+
+Research and analysis are the slow part of a deck and they split cleanly, so when the harness can spawn subagents (an agent or task tool), fan them out rather than working through the list alone. The lead agent keeps the question, the answer, the players and the title spine; subagents do bounded work and return files.
+
+| Stage | Fan out by | Each subagent returns |
+| --- | --- | --- |
+| Find the data | Workstream: the subject's own series; each player or group of players; the market and demand; geography and networks; pipeline and commitments; the counter-case | Downloaded files under `sources/<workstream>/`, each with its URL and retrieval date, and a note of what it could not find |
+| Extract the insights | The same workstreams, each working its own datasets | `insights-<workstream>.json` in the insight-log format, every finding with its calculation and sources |
+| Draft the copy | Section, once the title spine is fixed | The section's pages in the content record's format, drawn only from the merged insight log |
+| Critique | A fresh subagent every round, never reused | `storyline-review.json` ([stress-test](#stress-test-the-storyline)) |
+
+Keep research proportionate. Use at most four workstreams, not one per player; give each a budget of about fifteen searches and a clear list of the decisive series to find; tell it to stop when those are found and to record what it could not find rather than keep searching. A second, targeted pass follows only when the storyline critique names a missing analysis that would change the answer.
+
+Brief each subagent completely - it has none of your context: the question and the deck's answer so far, exactly what to find or work, the file formats and folders to write to, the date the evidence is current to, and what to do when something cannot be found (record it; never invent it). Run the workstreams at the same time. When they return, the lead merges the insight fragments into `<id>.insights.json`, removes duplicates, grades them across the deck, and writes the titles; only the lead edits the title spine. A harness with no subagents does the same stages in sequence.
+
+## Extract the insights before the titles
+
+Data is not yet a finding. Before a title is written, work the downloaded data the way an analyst would, and record what it says in `<id>.insights.json`:
+
+```json
+{ "schema": "professional-slides.insights/v1",
+  "insights": [
+    { "id": "i-launch-ramp",
+      "finding": "Riyadh Air opened 14 destinations in its first 16 weeks, faster than Etihad's first year",
+      "shape": "series",
+      "breadth": { "periods": 16, "series": 5 },
+      "calculation": "destinations by month since first scheduled flight, per carrier; Etihad from its 2003-06 launch records",
+      "sources": ["sources/riyadh-air-routes-2026-09.csv", "sources/etihad-destinations-2003-2006.csv"],
+      "soWhat": "the ramp, not the size, is the evidence for 'up and coming'",
+      "strength": "strong",
+      "exhibit": "trend: destinations by month since launch, five carriers, Riyadh Air highlighted" } ] }
+```
+
+Work through each dataset with the questions that turn numbers into findings:
+
+- **Rate:** how fast is it growing, over what span? What CAGR would the target need, against the rate achieved?
+- **Rank:** where does the subject sit in the whole set, and who is nearest?
+- **Share and mix:** what share does it take, and how has the share moved?
+- **Ratio:** what does it look like with size removed (per unit, per head, per route, per asset)?
+- **Gap:** how far is it from the benchmark, the target, or the leader, and is the gap closing?
+- **Break:** where does the series change direction, and what explains it?
+- **Counter:** what in the data argues against the answer?
+
+Keep the insights that are specific, surprising or decisive; a finding the reader could have guessed is not an insight. Grade each `strong`, `supporting` or `context`. Then write the titles from the insights - every analytical page carries at least one, the executive summary is built from the strongest, and the governing answer is the conclusion they add up to. An insight with no page is either cut or missing a page; a page with no insight is either cut or missing its analysis. The storyline critique reads the insight log beside the pages.
+
+## Stress-test the storyline
+
+Before anything is drawn, the storyline goes through a mock problem-solving session with a reader who did not write it. `node runtime/storyline.mjs <id>.deck.json out/` writes a packet - the question, the answer, the players, the data found, and every page's title, what its exhibit shows (with two-number charts marked) and what its commentary says - and a prompt that asks a senior, adversarial reader to:
+
+1. rewrite the answer if it restates the question or is too safe to be wrong;
+2. test whether the pillars are a MECE set of reasons that together prove it, and name each pillar's strongest counter-argument;
+3. flag every page that reports a count or a two-number comparison without an implication, and say what it should show instead;
+4. name the analyses a strong team would have run, with the public data behind them;
+5. list pages to cut or merge;
+6. return `ready` or `revise`, a rating and the fixes that matter most.
+
+Run it as one partner critique and one revision - the critic judges from the packet alone, with no web research:
+
+1. **Spawn a fresh subagent** as the critic - the harness's agent or task tool, or `--run codex` / `--run claude` when that CLI is installed. Give it only the path to `prompt.md` and ask it to return the JSON. It gets none of the author's reasoning, notes or earlier reviews: a critic that knows what the author meant forgives what the page fails to show.
+2. **Save** its JSON as `out/storyline-review.json`.
+3. **Revise at the root.** A missing analysis means more research, not a new sentence: go back to [the data](#find-the-data-before-the-dot-dash), download the series, and rebuild the pages. A two-number chart becomes the whole peer set or the trend; a plain or word-filled table becomes a scorecard with numbers and a treatment in the cells; an obvious page is cut or merged.
+4. **Stop after one round by default.** Revise once, then record an `authorResponse` in `storyline-review.json` saying how each top fix was handled; delivery accepts a `ready` verdict or an answered one. Another critique round runs only when the user asks for it - offer it in the final response.
+
+The bar the critic holds is a deck that feels important: every page carries evidence a reader could not assemble in five minutes, charts compare the whole set or a trend with its rate rather than two categories, and tables are dense with real numbers and judge in their cells. The review is bound to the story's structure (page ids, titles, exhibits and what they plot): rewording a sentence keeps it, changing what a page argues or shows does not, and delivery refuses a deck without a current `ready` critique (`STORYLINE_UNREVIEWED`). Set `targetPages` on the deck when the user asked for a length, so the critic merges duplicates without cutting below it. Do not tell the reviewer the verdict you want.
 
 ## Reconcile evidence before design
 
@@ -85,17 +167,23 @@ Settle evidence before naming components or layouts. For each page record `claim
 }
 ```
 
-`settles.kind` is `count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure` or `qualitative`; its actual evidence, basis and audience question govern the later encoding. `adds: null` means commentary is unnecessary. `highlight` is an exact phrase for emphasis or null; it is not an instruction to infer a chart maximum.
+`settles.kind` is `count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure` or `qualitative`; its actual evidence, basis and audience question govern the later encoding. Choose each page's [page type](page-types.md) here, while the claim is being written, not when the page is drawn: what the page `settles` usually names it (a `rank` is a ranking, a `rate` a trend, a `structure` a mechanism or a composition, several `comparison`s of one question a panels page), and where its explanation lives follows from the evidence. The storyline critique sees the types and judges the sequence's rhythm with the argument. `adds: null` means commentary is unnecessary. `highlight` is an exact phrase for emphasis or null; it is not an instruction to infer a chart maximum.
+
+Every insight records the `shape` of its data - `series`, `peer-set`, `mix`, `measure-pair`, `bridge`, `geography`, `schedule`, `roster`, `fact` or `qualitative` - because the shape decides which [page types](page-types.md#evidence-shapes) it can carry. A title that needs a ranking and has only two numbers is found here, as a dataset still to find.
+
+A shape also records its breadth - `breadth: { periods, series }`, `{ members }`, `{ parts }` or `{ steps }`, or the `data` itself - and the log is refused when a chart-bearing shape is too narrow: a series under six periods (four with the peers or a benchmark beside it), a peer set under six members, a measure pair under eight. Strong decks' chart pages plot about 22 values; a deck researched to the subject and one comparator plots five. Widen the dataset here - the longer window, the peers' series, the whole set - while it is still research, not when a page is refused for plotting too little.
 
 ### Complete visible copy and reference text gate
 
+A deck authored as [page types](page-types.md#the-pages-file-is-the-dot-dash) does not write this file by hand: `author-deck.mjs` derives the content plan - claims, `settles`, `adds`, the complete text plan and each page's reading task - from the pages file and its composition, and runs these gates on it in the same pass. What follows is the contract that derived file meets.
+
 The dot-dash is the full writing draft, not a promise to write later. Set `textContract: "complete"` on the content file. For **every page**, add `textPlan: [{id, role, text}]`, with unique block IDs, final wording and roles `title`, `body`, `exhibit`, `qualification`, `source` or `furniture`. List all headings, developed explanation, table cells, chart categories/legends/formatted values/units, annotations, notes and sources. Include recurring shell text as furniture and plan page-number formatting explicitly (for example, `02`); `{{page:stable-id}}` references resolve at composition. Furniture is excluded from density scores, but its wording must survive the same composition and export checks. Plan copy from the evidence and authoring inputs before rendering; never scrape the finished slide to create a retrospectively passing plan.
 
-Each page also carries `textReference: {task, samples: [{reference, page, sha256, bodyWords, totalWords}]}`. Inspect and measure strong originals with the same reading task across the core references. Record extraction method and original PDF hash in the reference inventory; raster-only pages need OCR or verified transcription, never a zero-word baseline. Body counts include exhibit labels and qualifications; title, footer and any line opening with Source or Note are separate, as the reference pages were counted. Match analytic pages to analytic pages, not covers, and avoid selecting unusually sparse references to lower the comparison.
+Each page also carries `textReference: {task}`: the reading task it performs. The task's word targets ship with the skill as numbers in `runtime/reading-tasks.json` (lower quartile, median, upper quartile); the page is held to them. Body counts include exhibit labels and qualifications; title, footer and any line opening with Source or Note are counted separately.
 
-Name the reading task by the page's structure, because structure sets the floor. Take a page's samples from `runtime/reading-tasks.json`, which holds every client-project page the corpus vision pass judged, keyed by exhibit family and commentary, with each page's hash and measured words. Use all of a task's samples: a hand-picked handful of dense references is how a clean chart page gets refused as thin, and a sparse handful is how a thin one passes.
+Name the reading task by the page's structure, because structure sets the floor, and the composed page is checked against it: a page with a commentary column cannot claim an exhibit-led task.
 
-| Task | The page | Client body words, median |
+| Task | The page | Target body words, median |
 | --- | --- | --- |
 | `chart-led` | A chart with at most a line of takeaway | 55 |
 | `chart-with-commentary` | A chart with developed points beside or below | 150 |
@@ -109,7 +197,7 @@ The build checks the declared task against the composed page (`TEXT_TASK_MISMATC
 The dot-dash gate reports each page's body and total words, matched-reference median and lower quartile, and `textCoverageScore = 100 × planned body words / reference median body words`. This is a relative text-coverage index, **not a taste rating**.
 
 - **Below the floor.** The matched lower quartile is a hard floor (`TEXT_COVERAGE_LOW`): develop the missing reasoning or move the page to the task it actually performs; no rationale releases it.
-- **Above the floor.** The build's density profile compares each rendered page and the whole deck with the client pages (words for the task, blocks per page, words per block, longest block), and the review's density pass judges every page it flags, so a page padded to clear the floor fails there instead.
+- **Above the floor.** The build's density profile compares each rendered page and the whole deck with the targets (words for the task, blocks per page, words per block, longest block), and the review's density pass judges every page it flags, so a page padded to clear the floor fails there instead.
 - **Neither is a quota.** Do not pad or let repeated labels substitute for explanation. Dense reference tables still need a separate check of substantive prose under [Copy](copy.md#body-copy).
 
 The dot-dash CLI and new-deck builds require this contract by default. `--legacy` is only for explicitly auditing historical partial plans; it reports text coverage as unverified and cannot make a new-deck build pass. Revisions carrying the complete contract retain it. Keep the same wording and reference comparison through the layout plan, authored spec, composed scene, saved PPTX and rendered PDF. Deliberate copy changes update the dot-dash first and rerun the same checks. If composition splits a page, reconcile each resulting physical page into its own text plan and reference comparison; a combined parent-page score cannot certify two thinner output pages. `text-coverage.json` reports composition retention; `rendered-text-coverage.json` checks planned fragments in saved PDF text with the same reference scores. PPTX readback checks the saved text independently. Visual review still checks clipping, reading order and missing explanation; successful extraction is not visible readability.

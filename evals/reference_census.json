@@ -1,0 +1,36 @@
+{
+ "schema": "professional-slides.reference-census/v1",
+ "pages": 132,
+ "note": "Sampled pages from strong consulting decks, measured by evals/scripts/reference_census.py. The sample is scanned (no text layer), so word counts are unavailable, and it has no scene, so the structure measures are absent.",
+ "summary": {
+  "ink": {
+   "median": 0.263,
+   "p25": 0.195,
+   "p75": 0.365,
+   "mean": 0.28,
+   "n": 132
+  },
+  "occ": {
+   "median": 0.64,
+   "p25": 0.5,
+   "p75": 0.73,
+   "mean": 0.62,
+   "n": 132
+  },
+  "emptyBand": {
+   "median": 0.05,
+   "p25": 0.02,
+   "p75": 0.08,
+   "mean": 0.06,
+   "n": 132
+  },
+  "emptyBandOver15": {
+   "share": 0.06,
+   "n": 132
+  },
+  "titleRule": {
+   "share": 0.72,
+   "n": 132
+  }
+ }
+}

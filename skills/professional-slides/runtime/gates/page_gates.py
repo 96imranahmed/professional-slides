@@ -9,6 +9,7 @@ before any model is consulted.
 
     page_gates.py scene.json render_dir/ [--report out.json]
                   [--profile executive|pre-read|live-pitch]
+    page_gates.py scene.json --budget [--report budget.json]
 
 Exit 0 when every gate passes, 2 when there are findings, 1 on a crash.
 Each finding is {slide, code, measured, threshold, repair}.
@@ -40,7 +41,7 @@ from typing import NamedTuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nice_ticks import is_nice_tick, nice_axis, parse_number  # noqa: E402
 
-# The weight contract and the corpus it is calibrated against. One file, read
+# The weight contract and the benchmark figures it is set against. One file, read
 # here and by runtime/weight.mjs, so a floor cannot move in the composer
 # without moving in the finding that reports it.
 CONTRACT = json.loads((Path(__file__).resolve().parent.parent / "weight.json").read_text(encoding="utf-8"))
@@ -51,9 +52,11 @@ FOOTER_TOP = 660
 # Reading the renders lives in its own module: it shares none of the gate
 # vocabulary below and is the only part that needs Pillow and numpy.
 from ink import (  # noqa: E402
-    CANVAS_W, CANVAS_H, INK_LUMINANCE, SURFACE_LUMINANCE,
+    CANVAS_W, CANVAS_H, INK_LUMINANCE, SURFACE_LUMINANCE, relative,
     load_ink_matrix, load_ink_rows, render_path,
 )
+# The same measure estimated from the scene, so it runs at authoring.
+from scene_ink import estimate as scene_ink_estimate  # noqa: E402
 
 # --- role vocabulary -------------------------------------------------------
 
@@ -67,7 +70,7 @@ TITLE_ROLES = {"action-title"}
 SOURCE_ROLES = {"source-text", "source", "footnote", "footnote-text"}
 NON_BODY_ROLES = SOURCE_ROLES | CHART_FURNITURE_ROLES | TITLE_ROLES | {
     "page-number", "notes", "tracker-label", "chart-unit",
-    "cover-title", "cover-subtitle", "section-title",
+    "cover-title", "cover-subtitle", "section-title", "action-subtitle", "kicker",
     "tracker-compact-label", "tracker-compact-marker-label", "category-note",
     "chart-heading", "chart-title", "metric-value", "metric-label", "metric-sublabel",
 }
@@ -96,9 +99,11 @@ DATA_COMPONENTS = {
 ARGUMENT_COMPONENTS = {"insight", "callout", "bullet-list", "evidence-note", "status-list"}
 # Pages carried by pictures rather than measurement.
 QUALITATIVE_COMPONENTS = {"image-frame", "logos", "logo-collage", "people", "quote-cluster", "icon-trends"}
+# The picture credits, and its continuation pages when a long list paginates.
+GENERATED_PAGE = re.compile(r"^picture-credits(?:-\d+)?$")
 STRUCTURE_COMPONENTS = {"section-divider", "agenda", "tracker-page", "statement", "takeaways"}
-# A photograph, not an icon, a logo mark or a spot image: the reference pages
-# carry a small image on about half their pages (median 0.5% of the page), and
+# A photograph, not an icon, a logo mark or a spot image: a well-made deck
+# carries a small image on about half their pages (median 0.5% of the page), and
 # those are marks, not decoration. A photograph covers 3% of the canvas and up.
 PHOTO_MIN_AREA = 0.03 * CANVAS_W * CANVAS_H
 # "1939 • Marvel Comics #1": a bullet doing the work of a comma, a bracket or a
@@ -108,7 +113,7 @@ PHOTO_MIN_AREA = 0.03 * CANVAS_W * CANVAS_H
 
 TYPE_RANGES = {
     "body": (10.0, 14.0),
-    # The reference decks run twenty- and thirty-row tables small rather than
+    # A strong deck runs twenty- and thirty-row tables small rather than
     # splitting them, and a cell is a lookup value, not prose. The floor is the
     # densest rung the composer actually has: `compact` sets cells at
     # type.compact, 9 pt, and `dense` at type.label, 8.5. The floor sat at 9.0
@@ -124,16 +129,16 @@ TYPE_RANGES = {
 # How full the deck means to read (`fill` on the spec, carried on the scene).
 # Emptiness is right for a live-pitch deck and wrong for a pre-read, so the
 # three geometric thresholds move with it; nothing else does.
-# Ink is calibrated against the corpus, not against taste: 2,125 rendered pages
-# of published client decks run a median ink share of 0.191, a first quartile of
-# 0.112 and a tenth percentile of 0.077. A document-weight page floors at the
-# quartile, a balanced page at the tenth percentile, an airy page below both.
-# The ladder that ran 0.14 / 0.115 failed 36% and 26% of published pages.
+# Ink is set against a benchmark, not against taste: well-made pages run a
+# median ink share of 0.191, a first quartile of 0.112 and a tenth percentile
+# of 0.077. A document-weight page floors at the quartile, a balanced page at
+# the tenth percentile, an airy page below both.
+# The ladder that ran 0.14 / 0.115 failed 36% and 26% of well-made pages.
 FILL_LEVELS = CONTRACT["geometryByFill"]
-# The reference corpus, measured three ways by evals/corpus/measure_corpus.py.
-# `slides` is the pixel sample: 2,125 pages from 426 published decks rendered
-# onto this same 1280x720 canvas. `corpus` is the wide text sample, 16,334
-# analytical pages. `judged` is a vision pass over 264 pages, one per deck.
+# The benchmark figures, three views of a well-made page. `slides` holds the
+# pixel and band figures on this same 1280x720 canvas, `benchmark` the page-text
+# word counts, and `judged` the rates at which a deck emphasises, sources and
+# annotates.
 REFERENCE_PAGE = CONTRACT["reference"]["slides"]
 REFERENCE_JUDGED = CONTRACT["reference"]["judged"]
 # Ink a page of body type puts on the canvas per word, measured by rendering
@@ -151,34 +156,34 @@ DEFAULT_FILL = CONTRACT["defaultFill"]
 # ceiling — the ceiling on prose is WORDS, and density is only a defect when
 # the content is not.
 WEIGHT_BY_FILL = CONTRACT["byFill"]
-# The wide corpus: 1,832 pages of page text, median 196 words, quartiles 127 and
+# Page text on a well-made analytical page: median 196 words, quartiles 127 and
 # 282. The floors sit below that on purpose.
-REFERENCE_PAGE_WORDS = CONTRACT["reference"]["corpus"]
-# The careful sample, split into the page's three bands: what a reference
-# analytical slide carries where.
-REFERENCE_PAGE_BANDS = dict(REFERENCE_PAGE["bands"], pages=REFERENCE_PAGE["pages"])
+REFERENCE_PAGE_WORDS = CONTRACT["reference"]["benchmark"]
+# The same page split into its three bands: what a well-made analytical slide
+# carries where.
+REFERENCE_PAGE_BANDS = dict(REFERENCE_PAGE["bands"])
 
 # Density profiles change how much prose a page may carry; they never relax a
 # geometric or typographic threshold.
 #
-# Derived from the corpus rather than chosen. These were eight bare numbers -
+# Derived from the benchmark rather than chosen. These were eight bare numbers -
 # 70/100, 100/140, 160/220, 200/280 - in a file where every neighbouring
-# threshold cites what it was measured against, and they sat *below* what the
-# reference decks carry: `executive` capped a text page at 140 words while the
-# 1,832-page corpus runs a median of 196 and the 137-slide sample a median of
-# 185. A ceiling under the median of the work you are imitating is not a
-# ceiling, it is a tax.
+# threshold says what it rests on, and they sat *below* what a strong deck
+# carries: `executive` capped a text page at 140 words while a well-made page
+# runs a median of 196 words of page text (185 on an analytical slide). A
+# ceiling under the median of the work you are imitating is not a ceiling, it
+# is a tax.
 #
 # A page whose evidence is an exhibit spends its area on the exhibit, so its
 # prose ceiling is the measured body band; a page whose evidence *is* its prose
-# may run to the corpus figure for its density.
+# may run to the benchmark figure for its density.
 _BODY_BAND = REFERENCE_PAGE["bands"]["body"]          # 128 words, measured band by band
 PROFILES = {
-    # Read from a stage: the body band cut back, and the corpus's own lower quartile.
+    # Read from a stage: the body band cut back, and the benchmark's lower quartile.
     "live-pitch": {"words_exhibit": round(_BODY_BAND * 0.6), "words_text": REFERENCE_PAGE_WORDS["p25"]},
-    # The default, and the corpus at its middle.
+    # The default, and the benchmark at its middle.
     "executive": {"words_exhibit": _BODY_BAND, "words_text": REFERENCE_PAGE_WORDS["median"]},
-    # Read at a desk: the corpus's upper quartile.
+    # Read at a desk: the benchmark's upper quartile.
     "pre-read": {"words_exhibit": round(_BODY_BAND * 1.4), "words_text": REFERENCE_PAGE_WORDS["p75"]},
     # Source-rich support behind the story, set in the smallest approved type:
     # it carries more words in the same frame, by design.
@@ -188,25 +193,25 @@ DEFAULT_PROFILE = "executive"
 
 # Which stacked row of the page a component sits in, for `page_architecture`.
 # This was a bare `// 120` deciding what counts as the same row - and the
-# thresholds it feeds (`shapes_per_ten_min`, `shape_share_max`) cite the corpus,
-# so a measured bar was sitting on an invented measurement. A page stacks at
+# thresholds it feeds (`shapes_per_ten_min`, `shape_share_max`) rest on a
+# benchmark, so a measured bar was sitting on an invented measurement. A page stacks at
 # most six bands of content between its title and its footer, so the band is the
 # canvas divided by six; the value is unchanged and now says where it comes from.
 ARCH_BAND = CANVAS_H // 6
 WEIGHT = dict(WEIGHT_BY_FILL[DEFAULT_FILL])
 
 THRESHOLDS = {
-    "ink_min": 0.077,  # the corpus's tenth percentile over 2,125 rendered pages; waived when a qualifying hero exhibit carries the page (a line chart is ink-light by nature)
-    "dead_band_max": 0.08,       # fires on 6% of published pages; the corpus p90 is 0.049
-    "internal_void_max": 0.13,   # 94px of nothing between two content blocks; the corpus p90 is 0.069
+    "ink_min": 0.077,  # the benchmark's tenth percentile; waived when a qualifying hero exhibit carries the page (a line chart is ink-light by nature)
+    "dead_band_max": 0.08,       # fires on 6% of well-made pages; their p90 is 0.049
+    "internal_void_max": 0.13,   # 94px of nothing between two content blocks; a well-made page's p90 is 0.069
     "exhibit_ink_min": 0.02,     # a hero frame must carry ink, not just area (a line chart sits near 2-3%, a 12pt table near 5-6%)
     "title_lines_max": 2,
-    "title_words_max": 14,
+    "title_words_max": CONTRACT["plan"]["titleWords"]["max"],  # the compiler refuses past it too (page-types.mjs)
     "cpl_min": 35,
     "cpl_max": 90,
     "hero_area_min": 0.40,
     "monotony_max": 0.35,
-    "column_void_max": 1.0,
+    "column_void_max": 0.2,  # a column's trailing band on its own height (column_bands); a well-made page's right column exceeds it 4.3% of the time
     "image_pages_max": 0.30,   # photographs on more than three pages in ten
     "photo_area_min": 0.03,    # a photograph covers 3% of the page; smaller images are marks (logos, icons, spot art)
     "image_run_max": 2,        # consecutive analytical pages carrying photographs
@@ -215,16 +220,16 @@ THRESHOLDS = {
     "sections_from": 12,       # analytical pages beyond which a deck needs sections and a tracker
     "deck_shape_from": 8,      # analytical pages beyond which a deck needs a heavy page among the light ones
     "shape_variety_from": 10,   # analytical pages beyond which the deck needs more than one page architecture
-    "shapes_per_ten_min": 3.0,  # distinct architectures per ten pages (the reference decks run about five)
-    "shape_share_max": 0.40,    # share of pages on the commonest architecture (the reference median is 0.23)
+    "shapes_per_ten_min": 3.0,  # distinct architectures per ten pages (a strong deck runs about five)
+    "shape_share_max": 0.40,    # share of pages on the commonest architecture (a strong deck's median is 0.23)
     "front_matter_from": 12,    # analytical pages beyond which a deck needs a contents page and an opening summary
-    "column_run_max": 4,        # consecutive pages whose commentary column may share one device    # share of pages on the commonest architecture (the reference median is 0.23)
-    # What the page says. Calibrated on the four example decks, which are the
-    # only corpus in the repository - `--report` prints the measured value
-    # beside the floor so the number can be argued with.
+    "column_run_max": 4,        # consecutive pages whose commentary column may share one device
+    # What the page says. Set on the four example decks in the repository -
+    # `--report` prints the measured value beside the floor so the number can
+    # be argued with.
     # Share of the commentary's own content words already printed in the exhibit
-    # beside it. The corpus runs a median of 0.25-0.36 and a p90 of 0.47; this
-    # sat at 0.55, ABOVE the ninetieth percentile of the work it imitates, so it
+    # beside it. Strong commentary runs a median of 0.25-0.36 and a p90 of 0.47;
+    # this sat at 0.55, ABOVE the ninetieth percentile of the work it imitates, so it
     # could not fire - and until COMMENTARY_ROLES was corrected it could not see
     # a paragraph either. At 0.47 it flags the worst tenth, which is what a gate
     # about a tail is for.
@@ -235,27 +240,26 @@ THRESHOLDS = {
     # in it. The bar is higher than the column's, because a short sentence that
     # names two categories shares their words by naming them - "asset
     # valuations and public debt sit mid-table and moved little" is a reading,
-    # not a restatement, and runs 0.57 on a reference page. Past two thirds
+    # not a restatement, and runs 0.57 on a well-made page. Past two thirds
     # there is nothing left in the sentence that the exhibit did not supply.
     "restatement_block_words_min": 6,
     "restatement_block_max": 0.66,
     # DECK_CRAFT's own floors are not here: they live beside the observations
-    # they were calibrated from, in `weight.json` under `plan.craft`, and are
+    # they rest on, in `weight.json` under `plan.craft`, and are
     # read through CONTRACT. Two of the five already did, and `highlight` was
     # carried in both places at 0.35 - one number, two homes, and nothing
     # checking they agreed. `test_weight_contract` now asserts they cannot
     # diverge again.
-    "caveats_max": 2,           # caveat lines per page; the reference decks run at most two, the deck that failed ran three plus a table row plus a note
+    "caveats_max": 2,           # caveat lines per page; a strong deck runs at most two, the deck that failed ran three plus a table row plus a note
     "schema_repeat_max": 3,     # pages that may open their table with the same column headers (the deck that failed ran fourteen)
-    # What a deck DOES, measured over its own pages against 122 pages of real
-    # client-project work (evals/corpus). These were not measured anywhere:
-    # client decks highlight a phrase on half their pages and ours managed a
-    # fifth.
+    # What a deck DOES, measured over its own pages against the rates a strong
+    # deck keeps. These were not checked anywhere: a strong deck highlights a
+    # phrase on half its pages and ours managed a fifth.
     #
     # A fourth rate was tried and removed: commentary columns per page, capped
-    # at the corpus's 0.33. Our decks run 0.78 to 1.00 and would all have failed
-    # it - but their commentary's own overlap with the exhibit beside it runs a
-    # median of 0.17 to 0.30 against a corpus median of 0.25 to 0.36. They talk
+    # at 0.33. Our decks run 0.78 to 1.00 and would all have failed it - but
+    # their commentary's own overlap with the exhibit beside it runs a median of
+    # 0.17 to 0.30 against a benchmark median of 0.25 to 0.36. They talk
     # on most pages and they are not restating. The cap was measuring the wrong
     # thing: the defect is commentary that says the exhibit again, and
     # RESTATEMENT measures exactly that - so RESTATEMENT is where the threshold
@@ -402,7 +406,7 @@ GATE_CODES = {
     "INK_COVERAGE": "the content area carries too little ink to read as a page",
     "DEAD_BAND": "a trailing band of nothing under the content",
     "INTERNAL_VOID": "a gap between two content blocks the page does nothing with",
-    "COLUMN_VOID": "the right column stops well above the footer",
+    "COLUMN_VOID": "a column of the page leaves a band empty that the page-wide bands cannot see",
     "TITLE_LINES": "an action title over two lines",
     "TITLE_WORDS": "an action title past the word budget",
     "TYPE_RANGE": "type set outside the approved range for its role",
@@ -448,10 +452,18 @@ GATE_CODES = {
     "CAVEAT_HEAVY": "a page spending more of itself on limits than on findings",
     "TABLE_SCHEMA_FLAT": "the same table invented over and over across the deck",
     "CONTRADICTED_SHARE": "a percentage in the prose the page's own counts do not give",
-    "DECK_CRAFT": "the deck emphasises, sources or comments at a rate real client decks do not",
+    "DECK_CRAFT": "the deck emphasises, sources or comments at a rate strong decks do not",
     "DECK_VOCABULARY": "the deck draws a couple of devices and leaves the rest of the vocabulary unused",
     "UNSCALED_FIGURE": "a figure drawn to a scale its own printed numbers contradict",
     "TITLE_COUNT": "the title states a count the page's own exhibit does not show",
+    "DECK_THIN_PAGES": "nearly a third or more of the deck's pages are thin or half empty",
+    # Read off the composed scene, so they run at authoring as well as at the
+    # build: the render's band gates only run once there is a render.
+    "SCENE_VOID": "a band of the page's body, measured on the scene, that nothing crosses",
+    "DECK_SCENE_VOID": "nearly a third or more of the deck's pages leave a band of their body empty",
+    # The page's visual weight, estimated from the scene (scene_ink.py).
+    "SCENE_INK": "a page with an exhibit that will ink too little of its body to read as weighted at a glance",
+    "DECK_INK": "the deck's median analytical page will ink too little of its body",
 }
 
 # Distribution and furniture statistics prompt human review; they do not
@@ -461,12 +473,12 @@ ADVISORY_CODES = {
     "DEAD_BAND", "INTERNAL_VOID", "UNANNOTATED", "LAYOUT_MONOTONY",
     "COLUMN_MONOTONY", "TABLE_SCHEMA_FLAT", "IMAGE_BUDGET", "IMAGE_RUN",
     "THIN_EVIDENCE", "HERO_EXHIBIT", "COLUMN_VOID", "THIN_COLUMN", "NUMBERS_ON_MARKS",
+    "SCENE_VOID", "SCENE_INK", "DECK_INK",
 }
 
 # Findings raised before the page is rendered: the composer's plan-time budget
 # and the deck's coverage check. They are not gates, but they share the shape.
 COMPOSE_CODES = {
-    "THIN_PLAN": "what the page will carry falls under the floor, before it is built",
     "MISSING_EVIDENCE": "a ranked criterion with no comparative exhibit",
     "EVALUATION_TOO_SHORT": "a deck marked as a skill evaluation composes fewer than fifty pages",
 }
@@ -494,32 +506,37 @@ def finding(slide_no, code, measured, threshold, repair):
     }
 
 
-def gate_column_void(slide_no, matrix, findings):
-    """COLUMN_VOID. A page whose deck asks to read full must not leave a column
-    empty below its content: a side column that stops halfway down is the
-    commonest way a page reads empty while the page-wide bands stay inside
-    their thresholds. Runs only for `fill: "full"` decks, and only where
-    numpy is available to slice the render."""
+def gate_column_void(slide_no, slide, matrix, findings):
+    """COLUMN_VOID. INTERNAL_VOID and DEAD_BAND by column (column_bands), on
+    the render. Only asked where the page-wide bands pass: a band across the
+    whole page is already its own finding, and one hole is one finding.
+
+    It used to measure a fixed strip from 60% of the width, only its trailing
+    band, only on `full` decks; the waffle floating in the left half of a
+    two-chart page was in no strip it read. Needs numpy to slice the render."""
     if matrix is None:
         return
-    body_top = 140
-    # The composed side column starts at 62% of the width (a 2:1 chart page) and
-    # at 60% for a 3:2 table page; take the wider of the two so a narrow column
-    # is measured whole.
-    for name, x0 in (("side", int(CANVAS_W * 0.60)),):
-        column = matrix[body_top:FOOTER_TOP, x0:CANVAS_W]
-        rows = column.sum(axis=1)
-        if not rows.any():
-            continue  # a page with nothing in that column is a full-width page
-        last = max(y for y, value in enumerate(rows) if value > 2)
-        band = (len(rows) - 1 - last) / float(CANVAS_H)
-        if band > THRESHOLDS["column_void_max"]:
-            findings.append(finding(
-                slide_no, "COLUMN_VOID", round(band, 4), THRESHOLDS["column_void_max"],
-                "Inspect the right column for balance and a missing consequence. "
-                "A complete sparse group may remain centered; do not add content "
-                "merely to reach the footer.",
-            ))
+    page = void_bands(matrix.sum(axis=1).tolist())
+    if page["internalVoid"] > THRESHOLDS["internal_void_max"] or page["deadBand"] > THRESHOLDS["dead_band_max"]:
+        return
+    column = column_bands(slide, render_column_rows(matrix))
+    if column is None:
+        return
+    findings.append(finding(
+        slide_no, "COLUMN_VOID",
+        {"column": column["name"], "band": round(column["band"], 4), "from": column["from"], "to": column["to"],
+         "internalVoid": round(column["internalVoid"], 4), "deadBand": round(column["deadBand"], 4)},
+        column["threshold"],
+        column_repair(column),
+    ))
+
+
+def column_repair(column):
+    return ("The {} column is empty from y {} to {} while the page beside it is full. Set the group at the top "
+            "of its column and give the height to what can use it - the exhibit at its frame's size, the "
+            "commentary moved under a short exhibit, a table with the rows or treated column it was given the "
+            "height for - or narrow the column. Do not stretch rows or pad text to cover the band.").format(
+                column["name"], column["from"], column["to"])
 
 
 
@@ -530,12 +547,12 @@ def gate_column_void(slide_no, matrix, findings):
 def text_page_ink_floor():
     """The ink a page of type alone must show: what its required words produce.
 
-    `ink_min` is calibrated on pages with an exhibit - the careful sample's ink
-    first quartile is 0.121 over 137 analytical slides, and the balanced floor
+    `ink_min` is set on pages with an exhibit - a well-made analytical slide's
+    ink first quartile is 0.121, and the balanced floor
     of 0.115 sits just under it. A page of body type cannot reach that at any
     honest length: rendering text pages from 93 to 185 words gives a straight
     line at 0.00052 ink per word, so 0.115 would need about 220 words of body
-    against a reference body of 128. The floor was not a high bar for those
+    against a benchmark body of 128. The floor was not a high bar for those
     pages, it was an impossible one.
 
     So a text page is held to the ink its own word floor produces, which makes
@@ -544,6 +561,214 @@ def text_page_ink_floor():
     room; one carrying a third of it still fails here as well as at THIN_PAGE.
     """
     return INK_PER_WORD["value"] * INK_PER_WORD["tolerance"] * (WEIGHT.get("pageWords") or 0)
+
+
+# Where the body starts for INTERNAL_VOID: just under a two-line title. A run
+# that starts here is the air between the title and the first block.
+VOID_TOP = 140
+# A row counts as content once it carries more than a hairline: a column rule
+# or a vertical connector running through an empty band does not fill it.
+ROW_MIN = 3
+
+
+def void_bands(rows, top=VOID_TOP, bottom=FOOTER_TOP, scale=CANVAS_H):
+    """DEAD_BAND and INTERNAL_VOID's one definition, read off `rows[y]`, the
+    occupied pixels on each canvas row. The render's gates pass the rows of the
+    PNG; SCENE_VOID passes the rows the scene will draw (scene_rows), so the
+    author hears at authoring the bands the build will report.
+
+    `deadBand` is the trailing band from the last occupied row to the footer;
+    `internalVoid` the tallest empty run between VOID_TOP and that row - a
+    takeaway pinned to the bottom with nothing above it is as empty as a
+    trailing band, and so is a strip of air under the title. Both are shares
+    of the canvas height; `voidTop`/`voidBottom` place the run.
+
+    A column is measured by the same definition over its own region: `top`
+    and `bottom` bound it, and `scale` is what the shares are taken of
+    (column_bands sets it so a column as tall as the body is held to the
+    page's own bar in pixels)."""
+    last_ink = next((y for y in range(bottom - 1, top - 1, -1) if rows[y] > ROW_MIN), None)
+    dead = (bottom - 1 - (top - 1 if last_ink is None else last_ink)) / float(scale)
+    run, longest, where = 0, 0, (None, None)
+    for y in range(top, (last_ink if last_ink is not None else top) + 1):
+        if rows[y] > ROW_MIN:
+            run = 0
+        else:
+            run += 1
+            if run > longest:
+                longest, where = run, (y + 1 - run, y + 1)
+    return {"deadBand": dead, "internalVoid": longest / float(scale), "lastInk": last_ink,
+            "voidTop": where[0], "voidBottom": where[1]}
+
+
+# A region narrower or shorter than this is a strip - a caption row, a tile's
+# label - not a column a reader sees as half empty.
+COLUMN_MIN_WIDTH = 160
+COLUMN_MIN_HEIGHT = 120
+
+
+def page_columns(slide):
+    """The page's columns, read off the composer's own regions: the frames of
+    its component instances, grouped into rows (frames that share any height)
+    and each row into columns (frames that share any width). A row that splits
+    gives one region per column, from the row's top to its foot; a page with
+    no split gives none, and the page-wide bands are the whole measure.
+
+    The band gates read whole rows of the canvas, so a column was only called
+    empty when its neighbour was too. A waffle floating in a tall plot beside a
+    filled bar chart, and a four-row table stopping halfway down beside a full
+    column of points, both passed: the chart and the points beside them filled
+    every row the empty half left empty."""
+    boxes = []
+    for instance in slide.get("componentInstances", []):
+        if str(instance.get("component") or "") in ("slide-chrome", "section"):
+            continue
+        frame = instance.get("frame") or {}
+        x, y = float(frame.get("x") or 0), float(frame.get("y") or 0)
+        width, height = float(frame.get("width") or 0), float(frame.get("height") or 0)
+        top, bottom = max(y, VOID_TOP), min(y + height, FOOTER_TOP)
+        if width > 0 and bottom > top:
+            boxes.append((x, top, x + width, bottom))
+
+    def spans(items, low, high):
+        # Boxes whose [low, high] extents overlap, merged: [start, end, members].
+        out = []
+        for item in sorted(items, key=lambda b: b[low]):
+            if out and item[low] < out[-1][1] - 1:
+                out[-1][1] = max(out[-1][1], item[high])
+                out[-1][2].append(item)
+            else:
+                out.append([item[low], item[high], [item]])
+        return out
+
+    columns = []
+    for top, bottom, members in spans(boxes, 1, 3):
+        split = spans(members, 0, 2)
+        if bottom - top < COLUMN_MIN_HEIGHT or len(split) < 2:
+            continue
+        names = {2: ("left", "right"), 3: ("left", "middle", "right")}.get(len(split))
+        # Every cell of the row, strips included, so column_bands can ask
+        # whether a neighbour is a block drawn the row's full height.
+        cells = [(int(math.floor(x0)), int(math.ceil(x1))) for x0, x1, _ in split]
+        for index, (x0, x1, _) in enumerate(split):
+            if x1 - x0 >= COLUMN_MIN_WIDTH:
+                columns.append({"name": names[index] if names else f"column {index + 1} of {len(split)}",
+                                "x0": int(math.floor(x0)), "x1": int(math.ceil(x1)),
+                                "top": int(math.floor(top)), "bottom": int(math.ceil(bottom)),
+                                "neighbours": [cell for at, cell in enumerate(cells) if at != index]})
+    return columns
+
+
+# A block is solid when its cell is drawn across this share of its width on
+# this share of its rows: a filled label block, not a chart with a gridline.
+SOLID_WIDTH, SOLID_ROWS = 0.85, 0.95
+
+
+def solid_cell(rows, x0, x1, top, bottom):
+    """Whether the cell between x0 and x1 is a filled block from `top` to
+    `bottom`. `rows` is column_rows(x0, x1)."""
+    need = SOLID_WIDTH * (x1 - x0)
+    full = sum(1 for y in range(top, bottom) if rows[y] >= need)
+    return full >= SOLID_ROWS * (bottom - top)
+
+
+def anchored(rows, top, bottom):
+    """Whether a column's ink sits centred on its row: the air above it and
+    the air below within a quarter of each other (or 12px, the scene's and
+    the render's disagreement on where a glyph starts, with room)."""
+    inked = [y for y in range(top, bottom) if rows[y] > ROW_MIN]
+    if not inked:
+        return False
+    above, below = inked[0] - top, bottom - 1 - inked[-1]
+    return abs(above - below) <= max(12, 0.25 * (above + below))
+
+
+def column_bands(slide, column_rows):
+    """The page's emptiest column by void_bands, or None when every column is
+    within the bars. `column_rows(x0, x1)` gives the occupied pixels on each
+    canvas row between x0 and x1 - the render's matrix or the scene's mask.
+
+    Same definition, relative to the column's height: the share is taken of
+    the column scaled as the body is to the canvas, so a column as tall as the
+    body is held to the page's own bar in pixels and a column in a shorter row
+    to the same share of its own height. A hole inside the column - a waffle
+    floating mid-plot, points centred with air above and below - is held to
+    `internal_void_max`. A column that simply stops short is held to
+    `column_void_max`, the tail of the right-column band on well-made pages:
+    held to the page's dead band, a third of good side columns would fail.
+
+    One cell is read with its row rather than as a region of its own: one
+    centred beside a filled block drawn the row's full height. That is a
+    labelled row - a label block down the left, its bullets and its number
+    centred against it - and the block fills every line of the row, so the
+    row reads full across and the air above and below the centred bullets is
+    the row's margin, not a hole. Measured as its own region, a three-row page
+    (164px rows, two bullets each) failed on every row and only four rows or
+    more passed. So the row's centred cells are measured together - the
+    number beside the bullets reads with the bullets, as the row is read -
+    and held to the page's bars in pixels, not to the row's height: a single
+    line centred in a 400px row still fails."""
+    columns = page_columns(slide)
+    rows_of = {id(column): column_rows(column["x0"], column["x1"]) for column in columns}
+    together = {}
+    for column in columns:
+        top, bottom, rows = column["top"], column["bottom"], rows_of[id(column)]
+        if anchored(rows, top, bottom) and any(solid_cell(column_rows(x0, x1), x0, x1, top, bottom)
+                                               for x0, x1 in column.get("neighbours", [])):
+            together.setdefault((top, bottom), []).append(column)
+    read_with_row = {id(c): [sum(values) for values in zip(*(rows_of[id(m)] for m in members))]
+                     for members in together.values() for c in members}
+    worst = None
+    for column in columns:
+        top, bottom = column["top"], column["bottom"]
+        rows = read_with_row.get(id(column), rows_of[id(column)])
+        scale = CANVAS_H if id(column) in read_with_row else (bottom - top) * CANVAS_H / float(FOOTER_TOP - VOID_TOP)
+        bands = void_bands(rows, top, bottom, scale)
+        if bands["lastInk"] is None:
+            continue  # nothing drawn there at all: an unmeasured frame, not a half-empty one
+        hole = bands["internalVoid"] / THRESHOLDS["internal_void_max"]
+        short = bands["deadBand"] / THRESHOLDS["column_void_max"]
+        over = max(hole, short)
+        if over > 1 and (worst is None or over > worst["over"]):
+            internal = hole >= short
+            worst = {**column, "over": over, "internalVoid": bands["internalVoid"], "deadBand": bands["deadBand"],
+                     "band": bands["internalVoid"] if internal else bands["deadBand"],
+                     "threshold": THRESHOLDS["internal_void_max" if internal else "column_void_max"],
+                     "from": bands["voidTop"] if internal else bands["lastInk"] + 1,
+                     "to": bands["voidBottom"] if internal else bottom}
+    return worst
+
+
+def scene_column_rows(mask):
+    """column_bands' reader for the scene: the mask scene_mask draws."""
+    return lambda x0, x1: [row[x0:x1].count(1) for row in mask]
+
+
+def render_column_rows(matrix):
+    """column_bands' reader for the render: the occupied matrix of the PNG."""
+    return lambda x0, x1: matrix[:, x0:x1].sum(axis=1).tolist()
+
+
+def without_title_rule(rows, slide):
+    """`rows` less the ink the title rule draws. The rule is page furniture:
+    a 1,160px hairline is a tenth of a point of ink share that says nothing
+    about the body, and counting it let a thin page lean on its frame. It
+    still counts where the page is read for holes (the scene's mask draws
+    it too), so a rule never opens a void under the title."""
+    rows = list(rows)
+    for node in slide.get("nodes", []):
+        if node.get("role") != "title-rule":
+            continue
+        data = node.get("data") or {}
+        width = abs(float(data.get("x2", 0)) - float(data.get("x1", 0)))
+        stroke = (node.get("style") or {}).get("lineWidth")
+        stroke = float(stroke.get("value", 1) if isinstance(stroke, dict) else stroke or 1)
+        y = float(data.get("y1", (node.get("frame") or {}).get("y", 0)))
+        # Antialiasing spreads a hairline over the rows either side.
+        for row in range(int(math.floor(y - stroke / 2)) - 1, int(math.ceil(y + stroke / 2)) + 1):
+            if 0 <= row < len(rows):
+                rows[row] = max(0, rows[row] - width)
+    return rows
 
 
 def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=False):
@@ -564,16 +789,8 @@ def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=Fa
             "The page is mostly empty. Give the hero exhibit the leftover height "
             "(leftover: fill) or add the evidence the title claims.",
         ))
-    # A row counts as content once it carries more than a hairline of ink.
-    last_ink = None
-    for y in range(FOOTER_TOP - 1, -1, -1):
-        if content_rows[y] > 3:
-            last_ink = y
-            break
-    if last_ink is None:
-        band = 1.0
-    else:
-        band = (FOOTER_TOP - 1 - last_ink) / float(CANVAS_H)
+    bands = void_bands(content_rows)
+    band, void = bands["deadBand"], bands["internalVoid"]
     if band > THRESHOLDS["dead_band_max"]:
         findings.append(finding(
             slide_no, "DEAD_BAND", round(band, 4), THRESHOLDS["dead_band_max"],
@@ -582,17 +799,6 @@ def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=Fa
             "group when appropriate. Do not stretch rows or add content merely "
             "to occupy the band.",
         ))
-    # INTERNAL_VOID: the largest empty band *between* content rows below the title.
-    # A takeaway pinned to the bottom with nothing above it is as empty as a trailing band.
-    body_top = 140
-    run, longest = 0, 0
-    for y in range(body_top, (last_ink if last_ink is not None else body_top) + 1):
-        if content_rows[y] > 3:
-            run = 0
-        else:
-            run += 1
-            longest = max(longest, run)
-    void = longest / float(CANVAS_H)
     if void > THRESHOLDS["internal_void_max"]:
         findings.append(finding(
             slide_no, "INTERNAL_VOID", round(void, 4), THRESHOLDS["internal_void_max"],
@@ -626,14 +832,14 @@ def gate_title(slide_no, slide, findings):
         if words > THRESHOLDS["title_words_max"]:
             findings.append(finding(
                 slide_no, "TITLE_WORDS", words, THRESHOLDS["title_words_max"],
-                "Rewrite the title as a claim of at most 14 words.",
+                f"Rewrite the title as a claim of at most {THRESHOLDS['title_words_max']} words.",
             ))
 
 
 def gate_type_range(slide_no, slide, findings, profile=DEFAULT_PROFILE):
     """TYPE_RANGE across body, chart furniture, title and source roles. An
-    appendix page is set smaller on purpose - the corpus runs its model grids and
-    source tables at 8 pt - so its table cells and chart furniture floor a point
+    appendix page is set smaller on purpose - a strong deck runs its model grids
+    and source tables at 8 pt - so its table cells and chart furniture floor a point
     lower than a page that sits in the story."""
     relax = 1.0 if profile == "appendix" else 0.0
     for node in text_nodes(slide):
@@ -719,9 +925,35 @@ def gate_takeaway_long(slide_no, slide, findings):
             ))
 
 
+def words_limit(slide, profile):
+    """The WORDS ceiling for one page. A page composed from a page type carries
+    its own (`wordCeiling`: its reading task's outlier fence, on the same body
+    count as its floor - derive-content.mjs wordBudgetOf). Otherwise the exhibit
+    page's prose budget when an exhibit carries it, the benchmark page's when
+    its evidence is its prose. One flat 148 for every task sat under the
+    reference median of a chart page with commentary and one word under a table
+    page's floor."""
+    own = slide.get("wordCeiling")
+    if isinstance(own, (int, float)) and not isinstance(own, bool) and own > 0:
+        return int(own)
+    has_exhibit = any(is_exhibit(c) for c in slide.get("componentInstances", []))
+    return PROFILES[profile]["words_exhibit" if has_exhibit else "words_text"]
+
+
 def gate_words(slide_no, slide, findings, profile):
     """WORDS. COVER_EXEMPT. Body prose only: no source, page number, notes — and no
     table cells, which are structured evidence rather than prose (dense is fine)."""
+    if slide.get("wordCeiling"):
+        # The page's own ceiling is on the page's own count.
+        total = body_words(slide)
+        limit = words_limit(slide, profile)
+        if total > limit:
+            findings.append(finding(
+                slide_no, "WORDS", total, limit,
+                "Above the fence for pages doing this job: cut the page to its "
+                "claim, its evidence and its consequence, or split it in two.",
+            ))
+        return
     total = 0
     for node in text_nodes(slide):
         role = node.get("role")
@@ -730,8 +962,7 @@ def gate_words(slide_no, slide, findings, profile):
         if role in NON_BODY_ROLES or role is None or role.startswith(("table-", "card-", "step-", "gantt-", "network-", "framework-", "quadrant-", "cycle-", "people-", "profile-", "agenda-")):
             continue
         total += word_count(source_text(node))
-    has_exhibit = any(is_exhibit(c) for c in slide.get("componentInstances", []))
-    limit = PROFILES[profile]["words_exhibit" if has_exhibit else "words_text"]
+    limit = words_limit(slide, profile)
     if total > limit:
         findings.append(finding(
             slide_no, "WORDS", total, limit,
@@ -760,8 +991,12 @@ def gate_hero_exhibit(slide_no, slide, findings, image=None):
         if len(inside) >= 2:
             exhibits = [sec] + [e for e in exhibits if e not in inside]
             break
-    if image is not None:
-        big = max(exhibits, key=lambda c: float((c.get("frame") or {}).get("width", 0)) * float((c.get("frame") or {}).get("height", 0)))
+    big = max(exhibits, key=lambda c: float((c.get("frame") or {}).get("width", 0)) * float((c.get("frame") or {}).get("height", 0)))
+    # A photograph fills its frame by being one: occupancy counts pixels darker
+    # than the page, and a light cabin or a sky reads as empty. Every picture
+    # page of two Emirates builds was flagged for it, and the two flags tipped a
+    # deck the scene had passed into DECK_THIN_PAGES at the build.
+    if image is not None and big.get("component") not in ("image-frame", "device-frame"):
         f = big.get("frame") or {}
         try:
             from PIL import Image
@@ -772,7 +1007,7 @@ def gate_hero_exhibit(slide_no, slide, findings, image=None):
             x1, y1 = int(min(CANVAS_W, f["x"] + f["width"])), int(min(CANVAS_H, f["y"] + f["height"]))
             if x1 > x0 and y1 > y0:
                 # Occupancy, not ink: a map's land or a card's tint carries the frame.
-                density = float((a[y0:y1, x0:x1] < SURFACE_LUMINANCE).mean())
+                density = float((a[y0:y1, x0:x1] < relative(np.bincount(a.ravel(), minlength=256).tolist(), SURFACE_LUMINANCE)).mean())
                 if density < THRESHOLDS["exhibit_ink_min"]:
                     findings.append(finding(
                         slide_no, "HERO_EXHIBIT", round(density, 4), THRESHOLDS["exhibit_ink_min"],
@@ -846,14 +1081,13 @@ def gate_nice_ticks(slide_no, slide, findings):
 def page_text_words(slide):
     """Every word printed on the page: title, labels, table cells, footnotes.
     The same thing `pdftotext` counts, so our pages can be compared with the
-    reference decks rather than with our own idea of a page."""
+    benchmark rather than with our own idea of a page."""
     bands = page_bands(slide)
     return bands.body + bands.footer + bands.title_band
 
 
-# The bands of the page. Measured over 137 analytical reference slides, their
-# title band carries 20 words, their body 128 and their footer 19; ours carried
-# 14 / 87 / 33. The gap is the body, and the footer is the one band where we
+# The bands of the page. A well-made analytical slide's title band carries 20
+# words, its body 128 and its footer 19; ours carried 14 / 87 / 33. The gap is the body, and the footer is the one band where we
 # were ahead - which is exactly what a floor counting all page text rewards.
 BODY_TOP = 0.18
 BODY_BOTTOM = 0.88
@@ -873,6 +1107,9 @@ class PageText(NamedTuple):
     body: int
     footer: int
     title_band: int
+
+
+TAKEAWAY_ROLE = re.compile(r"^(insight|takeaway|so-?what|closing)")
 
 
 def page_bands(slide):
@@ -896,6 +1133,12 @@ def page_bands(slide):
         if role in TITLE_ROLES or role in TITLE_BAND_ROLES:
             band += words
             continue
+        # The page's closing takeaway sits low on the page but is its
+        # conclusion, not a note: counted by position it made a short page
+        # with a takeaway line "footer-heavy" and pushed the line off.
+        if TAKEAWAY_ROLE.match(role):
+            body += words
+            continue
         frame = node.get("frame") or {}
         top = float(frame.get("y", 0)) / CANVAS_H if frame.get("height") else None
         if top is None:
@@ -913,6 +1156,26 @@ def body_bands(slide):
     """(body words, footer words, title-band words) for one page."""
     bands = page_bands(slide)
     return bands.body, bands.footer, bands.title_band
+
+
+def body_words(slide):
+    """The page's body words, as the floor reads them: the authoring
+    compiler's count when the scene carries it, this module's own otherwise.
+
+    The text contract counts a page's text plan by block role (body, exhibit
+    and qualification, notes excluded); `page_bands` counts the composed page
+    by node role and position. Both are defensible and they disagree - a
+    footnote is qualification to one and footer to the other, a chart label is
+    exhibit to one and furniture to neither - so a page could clear the floor
+    when it was authored and fall under it at the build, with nothing changed.
+    The compiler now writes its count on the scene slide as `planBodyWords`,
+    and every floor reads that one number. Scenes composed before it did (and
+    the fixtures, which carry no plan) fall back to the band count.
+    """
+    planned = slide.get("planBodyWords")
+    if isinstance(planned, (int, float)) and not isinstance(planned, bool) and planned >= 0:
+        return int(planned)
+    return body_bands(slide)[0]
 
 
 def side_columns(slide):
@@ -942,7 +1205,7 @@ def nodes_inside(slide, frame, predicate=None):
 
 
 def thin_remedy(where="The page"):
-    """Corpus density is diagnostic; the complete-copy contract owns matched coverage."""
+    """Benchmark density is diagnostic; the complete-copy contract owns matched coverage."""
     return (
         f"{where} falls below the deck-wide body-word diagnostic. Compare its "
         "complete text plan with the matched reference reading task and retain "
@@ -985,7 +1248,7 @@ def picture_share(slide):
         # A picture that has not been sourced yet draws as its empty frame, and
         # that frame holds the same body the photograph will. Counting only the
         # ones with a file would make the plan-time floor and the rendered floor
-        # disagree about the same page, which is the disagreement THIN_PLAN
+        # disagree about the same page, which is the disagreement the one counter
         # exists to avoid.
         if node.get("type") != "image" and str(node.get("role") or "") != "image-frame":
             continue
@@ -1024,27 +1287,72 @@ def gate_unsourced_picture(slide_no, slide, findings):
         slide_no, "UNSOURCED_PICTURE", len(empty), 0,
         "This page draws {} picture frame{} with no picture in {}. Writing a picture as `alt` with no "
         "`path` is how a page gets laid out before its photographs are cleared, and it is not how a deck "
-        "is delivered: source the file and give it a `path`, or drop the picture and give the page the "
-        "icons, the exhibit or the width instead.".format(
+        "is delivered. The build fetches logos from Wikipedia and photographs from Wikimedia Commons; "
+        "one still empty found nothing: give it a `search` (or a player's `wikipedia` title) that names it "
+        "better, supply the file as `path`, or drop the picture and give the page the icons, the exhibit "
+        "or the width instead.".format(
             len(empty), "" if len(empty) == 1 else "s", "it" if len(empty) == 1 else "them"),
     ))
 
 
-def gate_thin_page(slide_no, slide, findings):
-    """THIN_PAGE. Advisory body-word diagnostic, alongside matched text coverage."""
-    floor = WEIGHT.get("pageWords") or 0
+READING_TASK_FLOORS = {task: spec["bodyWords"]["q1"] for task, spec in json.loads(
+    (Path(__file__).resolve().parent.parent / "reading-tasks.json").read_text(encoding="utf-8"))["tasks"].items()}
+
+
+def body_floor(slide):
+    """The body-word floor one page is held to: the page's own `wordFloor` when
+    its composition set one (the one the text contract holds it to), else its
+    reading task's lower quartile (the deck's `pageWords` when the page carries
+    no task), cut by the share of the body a photograph holds."""
+    own = slide.get("wordFloor")
+    if isinstance(own, (int, float)) and not isinstance(own, bool) and own >= 0:
+        return int(own)
+    task_floor = READING_TASK_FLOORS.get(slide.get("readingTask") or "")
+    floor = task_floor if task_floor is not None else (WEIGHT.get("pageWords") or 0)
     if floor <= 0:
-        return
-    floor = int(round(floor * (1.0 - picture_share(slide))))
-    if floor <= 0:
-        return
+        return 0
+    return max(0, int(round(floor * (1.0 - picture_share(slide)))))
+
+
+# The footer may carry under a third of the page's text.
+NOTE_HEAVY_SHARE = 0.3
+
+
+def footer_share(slide):
+    """(body, footer, footer / (body + footer)) as NOTE_HEAVY reads them.
+
+    This one stays on the band count, not the plan's: it asks which band of
+    the page the words sit in, and the plan counts a numbered footnote as
+    qualification in the body - measured that way a page could never be
+    footer-heavy on the strength of its footnotes, which is the case the gate
+    is for. The ratio is None on a page with no words in either band."""
     body, footer, _band = body_bands(slide)
+    if not footer and not body:
+        return body, footer, None
+    return body, footer, footer / float(body + footer)
+
+
+def gate_thin_page(slide_no, slide, findings):
+    """THIN_PAGE. Advisory body-word diagnostic, alongside matched text coverage.
+
+    A page composed from a page type carries its reading task, and is held to
+    that task's lower quartile - the same floor the text contract applies. A
+    chart carrying its own callouts reads at 42 words; a table with commentary
+    at 149. One flat 95-word floor for both passed the second and failed the
+    first, and pushed authors off the callout page onto the commentary column.
+    """
+    floor = body_floor(slide)
+    if floor <= 0:
+        return
+    body = body_words(slide)
     if body < floor:
         findings.append(finding(slide_no, "THIN_PAGE", body, floor, thin_remedy()))
-        return
+    # Both are reported in one run: returning here hid a footer-heavy page
+    # until its body was fixed, which cost the author another round.
     # A page that clears the floor on the strength of its notes has padded the
     # wrong band: the reference footer is 19 words against a 128-word body.
-    if footer and body and footer > 0.3 * (body + footer):
+    body, footer, ratio = footer_share(slide)
+    if footer and body and ratio > NOTE_HEAVY_SHARE:
         findings.append(finding(
             slide_no, "NOTE_HEAVY", {"body": body, "footer": footer},
             "a footer under a third of the page's text",
@@ -1052,6 +1360,385 @@ def gate_thin_page(slide_no, slide, findings):
             "number it qualifies with a footnote marker, keep the block to two "
             "to four numbered lines, and give the body the words instead.",
         ))
+
+
+# --- scene coverage ---------------------------------------------------------
+#
+# How full the page's body is, read off the scene rather than off the render
+# (scene_rows, measured by void_bands as the render's rows are). The pixel gates (INK_COVERAGE, DEAD_BAND, INTERNAL_VOID) only run at
+# the build, and the build is the most expensive place to learn that a page is
+# half empty: a three-phase roadmap with its lower half blank, three cards whose
+# boxes are empty below their first paragraph and a four-row matrix with a
+# blank band over its takeaway were all found by eye after the build. The
+# composed scene carries every frame the render will draw, so the question can
+# be asked at authoring, where the answer is still cheap.
+
+# A shape that holds text is a container: a card, a panel, a tile, a table
+# header cell. Its frame is designed space, not content - a card drawn to the
+# height of its row with one short paragraph at the top reads as an empty box,
+# and counting the box as filled is how such a page passed the band gates. So a
+# container's interior is measured by what is inside it. A mark is never a
+# container, whatever sits on it: a column carrying its value label is data.
+SCENE_MARK_ROLE = re.compile(r"^(chart-|map-|table-(bar|bubble|progress|rating|check|trend|implication|status)|"
+                             r"metric-ring|gantt-(bar|milestone)|legend-|spectrum-|fact-gauge|matrix-point)")
+SCENE_SHAPE_TYPES = {"rect", "ellipse", "shape", "wedge"}
+SCENE_THRESHOLDS = {
+    "deck_share": 0.30,     # the share of content pages DECK_THIN_PAGES blocks at
+    "deck_from": 12,        # content pages before the deck-level check applies
+    "deck_pages_min": 5,
+}
+
+
+def _text_box(node):
+    """A text node's ink box: its measured lines, placed by its alignment,
+    rather than the frame the composer allowed it. A one-line paragraph in a
+    frame sized for five is one line of ink."""
+    frame = node.get("frame") or {}
+    x, y = float(frame.get("x") or 0), float(frame.get("y") or 0)
+    width, height = float(frame.get("width") or 0), float(frame.get("height") or 0)
+    layout = layout_of(node)
+    style = node.get("style") or {}
+    ink_w = layout.get("width") if isinstance(layout.get("width"), (int, float)) else None
+    ink_h = layout.get("height") if isinstance(layout.get("height"), (int, float)) else None
+    if ink_h is None and isinstance(layout.get("lines"), list) and isinstance(layout.get("lineHeight"), (int, float)):
+        ink_h = len(layout["lines"]) * layout["lineHeight"]
+    if ink_w is not None and 0 < ink_w < width:
+        align = str(style.get("align") or "left")
+        x += (width - ink_w) / 2 if align == "center" else (width - ink_w) if align == "right" else 0
+        width = ink_w
+    if ink_h is not None and 0 < ink_h < height:
+        valign = str(style.get("valign") or "top")
+        y += (height - ink_h) / 2 if valign in ("mid", "middle", "center") else (height - ink_h) if valign == "bottom" else 0
+        height = ink_h
+    return x, y, width, height
+
+
+def _color(value):
+    """A style colour as #RRGGBB, or None for none, transparent or a gradient."""
+    if isinstance(value, dict):
+        value = value.get("value")
+    if not isinstance(value, str) or not re.match(r"^#[0-9a-fA-F]{6}$", value.strip()):
+        return None
+    return value.strip()
+
+
+def _grey(color):
+    """The luminance Pillow's "L" conversion gives the colour on the render."""
+    r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+    return r * 299 / 1000 + g * 587 / 1000 + b * 114 / 1000
+
+
+# Where a line's ink sits in the face centred on its line: from about the cap
+# height to the descenders. Fitted on 213 rendered pages of five decks, it puts
+# the scene's last row of ink within two pixels of the PNG's on average.
+GLYPH_BAND = (0.15, 0.9)
+
+
+def scene_rows(slide):
+    """The occupied pixels on each canvas row above the footer, drawn from the
+    scene the way the render's void gates read the PNG (scene_mask)."""
+    return [row.count(1) for row in scene_mask(slide)]
+
+
+def scene_mask(slide):
+    """The canvas above the footer as rows of occupied (1) and empty (0)
+    pixels, drawn from the scene the way the render's void gates read the PNG.
+    scene_rows counts it by row; column_bands slices it by column.
+
+    SCENE_VOID measured node boxes in the content frame and missed what the
+    build then flagged: on the Emirates deck it named none of the seven pages
+    the render's band gates did, because a number tile's box was counted where
+    the render sees a value and a label, a staircase's frame where it sees
+    three steps, and the air between the title and a vertically centred block
+    fell in the lenient edge band. So this draws what is drawn: text by its
+    measured lines and each line by its glyph band (GLYPH_BAND of the face
+    centred on its line); a shape by its fill when
+    the fill shows against the canvas and by its outline when only the stroke
+    does; a rule by its stroke. What shows is the render's test,
+    SURFACE_LUMINANCE held at its distance from this page's canvas
+    (ink.relative), so a white card on a cream page is air and a tinted one is
+    surface, as they are in the PNG. Title and tracker are drawn too: the
+    render sees them, and the band under a title is the page's first hole.
+
+    One thing the render cannot read and this does: the inside of a container.
+    A card or tile drawn to the height of its row with one short paragraph at
+    the top shows as surface in the PNG, and counting it filled is how three
+    cards empty below their paragraphs passed. A box that holds text is drawn
+    to the depth its contents reach, plus the padding it keeps above them, and
+    its bottom edge where it is drawn.
+    """
+    tokens = slide.get("tokens") or {}
+    canvas = _color(tokens.get("color.canvas")) or "#FFFFFF"
+    nodes = [n for n in slide.get("nodes", []) if n.get("frame")]
+    # A surface drawn over the whole canvas is the page's background, as the
+    # render's commonest grey would say.
+    for node in nodes:
+        frame = node["frame"]
+        if (node.get("type") in SCENE_SHAPE_TYPES and float(frame.get("width") or 0) >= CANVAS_W
+                and float(frame.get("height") or 0) >= CANVAS_H and _color((node.get("style") or {}).get("fill"))):
+            canvas = _color(node["style"]["fill"])
+    background = _grey(canvas)
+    margin = 255 - SURFACE_LUMINANCE
+    rows = [bytearray(CANVAS_W) for _ in range(FOOTER_TOP)]
+
+    def shows(value, opacity=1.0):
+        color = _color(value)
+        if color is None:
+            return False
+        opacity = opacity if isinstance(opacity, (int, float)) else 1.0
+        grey = background + (_grey(color) - background) * opacity
+        # Darker than the page by the render's margin; on a dark page, where
+        # the render's darker-than test sees nothing, lighter.
+        return grey < background - margin if background >= 128 else grey > background + margin
+
+    def paint(x, y, w, h):
+        x0, x1 = max(0, int(math.floor(x))), min(CANVAS_W, int(math.ceil(x + w)))
+        y0, y1 = max(0, int(math.floor(y))), min(FOOTER_TOP, int(math.ceil(y + h)))
+        if x0 >= x1 or y0 >= y1:
+            return
+        span = b"\x01" * (x1 - x0)
+        for row in rows[y0:y1]:
+            row[x0:x1] = span
+
+    def number(value, default=0.0):
+        if isinstance(value, dict):
+            value = value.get("value")
+        return float(value) if isinstance(value, (int, float)) else default
+
+    def inside(box, outer):
+        bx, by, bw, bh = box
+        x, y, w, h = outer
+        return x - 1 <= bx + bw / 2 <= x + w + 1 and y - 1 <= by + bh / 2 <= y + h + 1 and w * h > bw * bh
+
+    # What each node draws, and where: (node, box, kind) with text by its ink box.
+    drawn = []
+    for node in nodes:
+        kind, style, frame = node.get("type"), node.get("style") or {}, node["frame"]
+        box = (float(frame.get("x") or 0), float(frame.get("y") or 0),
+               float(frame.get("width") or 0), float(frame.get("height") or 0))
+        opacity = style.get("opacity", 1.0)
+        if kind == "text":
+            if word_count(source_text(node)) and shows(style.get("color") or "#000000", opacity):
+                drawn.append((node, _text_box(node), "text"))
+        elif kind == "image":
+            drawn.append((node, box, "image"))
+        elif kind == "line":
+            if shows(style.get("stroke"), opacity):
+                drawn.append((node, box, "line"))
+        elif kind in SCENE_SHAPE_TYPES:
+            if shows(style.get("fill"), opacity):
+                drawn.append((node, box, "fill"))
+            elif style.get("stroke") != "none" and shows(style.get("stroke"), opacity):
+                drawn.append((node, box, "outline"))
+
+    texts = [box for _, box, kind in drawn if kind == "text"]
+    for node, (x, y, w, h), kind in drawn:
+        style = node.get("style") or {}
+        stroke = max(1.0, number(style.get("lineWidth"), 1.0))
+        if kind == "text":
+            layout = layout_of(node)
+            if not isinstance(layout.get("lines"), list):
+                paint(x, y, w, h)  # unmeasured: the frame is all there is to go on
+                continue
+            lines = max(1, len(layout["lines"]))
+            pitch = number(layout.get("lineHeight"), number(style.get("lineHeight"), h / lines))
+            face = min(pitch, (font_size(node) or 12) * 4 / 3)
+            for index in range(lines):
+                top = y + index * pitch + (pitch - face) / 2
+                if top >= y + h:
+                    break
+                paint(x, top + face * GLYPH_BAND[0], w, face * (GLYPH_BAND[1] - GLYPH_BAND[0]))
+        elif kind == "image":
+            paint(x, y, w, h)
+        elif kind == "line":
+            # Row by row a slanted rule crosses width/height pixels plus its
+            # stroke whichever way it leans, so its box is walked a row at a time.
+            if h < 1 or w < 1:
+                paint(x - (stroke / 2 if w < 1 else 0), y - (stroke / 2 if h < 1 else 0), max(w, stroke), max(h, stroke))
+            else:
+                step = w / h
+                for dy in range(int(math.ceil(h))):
+                    paint(x + dy * step, y + dy, step + stroke, 1)
+        else:
+            depth = h
+            # Only a box contains: an arc or a wedge with its labels inside
+            # its bounds (a radial bar's rings) is a mark, drawn whole.
+            if (node.get("type") == "rect" and not SCENE_MARK_ROLE.match(str(node.get("role") or ""))
+                    and any(inside(t, (x, y, w, h)) for t in texts)):
+                held = [b for other, b, _ in drawn if other is not node and inside(b, (x, y, w, h))]
+                top, bottom = min(b[1] for b in held), max(b[1] + b[3] for b in held)
+                depth = min(h, (bottom - y) + max(0.0, top - y))
+            if kind == "fill":
+                paint(x, y, w, depth)
+            else:
+                for edge in ((x, y, w, stroke), (x, y + h - stroke, w, stroke),
+                             (x, y, stroke, depth), (x + w - stroke, y, stroke, depth)):
+                    paint(*edge)
+
+    # A chart whose marks the scene does not carry - labels alone, a sketched
+    # scene - is read by its frame: the render will draw it there.
+    marks = [b for _, b, kind in drawn if kind != "text"]
+    for instance in slide.get("componentInstances", []):
+        frame = instance.get("frame") or {}
+        if not str(instance.get("component") or "").startswith("chart.") or not frame.get("height"):
+            continue
+        box = (float(frame.get("x") or 0), float(frame.get("y") or 0),
+               float(frame.get("width") or 0), float(frame.get("height") or 0))
+        if not any(inside(b, box) for b in marks):
+            paint(*box)
+    return rows
+
+
+def gate_scene_void(slide_no, slide, findings):
+    """SCENE_VOID. Advisory. The render's INTERNAL_VOID and DEAD_BAND, read off
+    the composed scene so the author hears them before the build.
+
+    One definition (void_bands) and one set of thresholds (THRESHOLDS
+    `internal_void_max`, `dead_band_max`) serve both: the pixel gates count the
+    PNG's rows, this counts the rows the scene will draw (scene_rows). It used
+    to measure node boxes against its own looser bars - a seventh of the body
+    inside, a third of the frame at the edges - and on the Emirates deck it
+    named at most one of the seven pages the build then flagged; drawn as the
+    render draws, it names the same seven, and on four more decks the same
+    pages give or take one each way (a dead band a pixel under the bar; the
+    inside of a card, which the render cannot see). Like the render's gates it is a question - a chart that
+    wants air, a sparse group centred on purpose - and across the deck the
+    habit blocks at DECK_SCENE_VOID.
+
+    Where the page's rows pass, its columns are asked the same question
+    (column_bands, the render's COLUMN_VOID): the finding names the column,
+    and it stays one advisory for the page.
+    """
+    mask = scene_mask(slide)
+    bands = void_bands([row.count(1) for row in mask])
+    hole, dead = bands["internalVoid"], bands["deadBand"]
+    if hole > THRESHOLDS["internal_void_max"]:
+        where, measured, threshold = (bands["voidTop"], bands["voidBottom"]), hole, THRESHOLDS["internal_void_max"]
+    elif dead > THRESHOLDS["dead_band_max"]:
+        top = bands["lastInk"] + 1 if bands["lastInk"] is not None else VOID_TOP
+        where, measured, threshold = (top, FOOTER_TOP), dead, THRESHOLDS["dead_band_max"]
+    else:
+        # The page's rows pass; one of its columns may not (column_bands, the
+        # render's COLUMN_VOID). Still one page-level advisory, so the deck
+        # count reads a half-empty column as the half-empty page it is.
+        column = column_bands(slide, scene_column_rows(mask))
+        if column is None:
+            return
+        findings.append(finding(
+            slide_no, "SCENE_VOID",
+            {"band": round(column["band"], 4), "from": column["from"], "to": column["to"],
+             "internalVoid": round(hole, 4), "deadBand": round(dead, 4), "column": column["name"],
+             "columnInternalVoid": round(column["internalVoid"], 4), "columnDeadBand": round(column["deadBand"], 4)},
+            column["threshold"],
+            column_repair(column),
+        ))
+        return
+    findings.append(finding(
+        slide_no, "SCENE_VOID",
+        {"band": round(measured, 4), "from": where[0], "to": where[1],
+         "internalVoid": round(hole, 4), "deadBand": round(dead, 4)},
+        threshold,
+        "A band of the page (y {}-{}) carries nothing. Give the exhibit the height - the phases or rows "
+        "with their detail, the chart at the frame's size - size tiles and cards to what they hold, start "
+        "the body under the title rather than centring it in air, set the commentary beside the exhibit "
+        "rather than under a strip of air, or merge the page with a neighbour. Do not stretch rows or pad "
+        "text to cover the band.".format(*where),
+    ))
+
+
+# DECK_THIN_PAGES's codes that the scene alone can raise: a deck the author's run
+# passes on these is not refused at the build by them.
+SCENE_EMPTY_CODES = {"SCENE_VOID", "THIN_PAGE", "HERO_EXHIBIT"}
+
+
+def gate_deck_scene_void(content_indexes, findings, voids=None):
+    """DECK_SCENE_VOID. The scene's half-empty pages, counted across the deck.
+
+    DECK_THIN_PAGES counts the render's findings, so at authoring - where no
+    render exists - it saw only THIN_PAGE, and a deck of pages carrying their
+    words with a band of their body blank reached the build clean. This is
+    the same count on the scene's own measure, in the same shape: one page
+    with a band of air can be right, three pages in ten is how the deck is
+    being built. It counts the scene's own share of DECK_THIN_PAGES's codes -
+    SCENE_VOID, THIN_PAGE and HERO_EXHIBIT's area test - so the two agree.
+    `voids` is those findings when the run kept them apart (`--only
+    DECK_SCENE_VOID`); otherwise they are read from `findings`."""
+    pages = len(content_indexes)
+    flagged = sorted({f["slide"] for f in (findings if voids is None else voids)
+                      if f.get("code") in SCENE_EMPTY_CODES and f.get("slide")})
+    if (pages < SCENE_THRESHOLDS["deck_from"] or len(flagged) < SCENE_THRESHOLDS["deck_pages_min"]
+            or len(flagged) / pages < SCENE_THRESHOLDS["deck_share"]):
+        return
+    findings.append(finding(
+        None, "DECK_SCENE_VOID", len(flagged),
+        max(SCENE_THRESHOLDS["deck_pages_min"], round(pages * SCENE_THRESHOLDS["deck_share"])),
+        "{} of {} content pages leave a band of their body empty (pages {}). Fix the pattern, not each page: "
+        "size the exhibit to the frame, set commentary beside it rather than under a strip of air, give cards "
+        "and phases the detail their boxes were drawn for, or merge two half pages into one full one.".format(
+            len(flagged), pages, ", ".join(str(n) for n in flagged[:20])),
+    ))
+
+
+# How much of its body a page inks, estimated from the scene (scene_ink.py):
+# the rendered measure strong analytical decks sit at a median of about 0.26
+# on, where a deck drawn as type on the canvas with hairlines sat at 0.18 with
+# the same words. `page_floor` is where a page with an exhibit reads light at
+# a glance: about half the lower quartile of strong pages (0.195), the level
+# of the lightest pages two real decks drew - a lone thin line, a table of text
+# on the page colour, white cards on cream measured 0.06-0.09. `deck_median`
+# is the level under which the deck as a whole reads light. Both advisory: the
+# estimate is fitted (R^2 0.90, mean error 0.017 a page), and the repair is a
+# construction, not a number to hit.
+SCENE_INK_THRESHOLDS = {"page_floor": 0.10, "deck_median": 0.20}
+SCENE_INK_REPAIR = (
+    "Give the exhibit its weight rather than adding words: keep the house surfaces on (a filled table "
+    "header and label column, filled cards, a lone line's markers and area, filled phase blocks - "
+    "style.tableHeader, style.tableLabels, style.cards, style.marks, style.timeline; no `headerBand: false`), "
+    "set loose rows of text as a table or cards, or pair a lone chart with a second exhibit that carries "
+    "its breakdown.")
+
+
+def analytical(slide, index):
+    """A page that argues: it carries a reading task and is neither a cover nor
+    a structural or generated page."""
+    return bool(slide.get("readingTask")) and not is_cover(slide, index) and not GENERATED_PAGE.match(str(slide.get("id") or ""))
+
+
+def gate_scene_ink(slide_no, slide, findings):
+    """SCENE_INK. Advisory. A page with an exhibit whose scene will ink less
+    of its body than SCENE_INK_THRESHOLDS `page_floor` - the rendered measure,
+    estimated before the render (scene_ink.estimate). A page of prose is left
+    to its word floor: its weight is its words, and asking it for ink is
+    asking for padding."""
+    if not any(is_exhibit(c) for c in slide.get("componentInstances", [])):
+        return
+    ink = scene_ink_estimate(slide)
+    if ink >= SCENE_INK_THRESHOLDS["page_floor"]:
+        return
+    findings.append(finding(
+        slide_no, "SCENE_INK", ink, SCENE_INK_THRESHOLDS["page_floor"],
+        "The page will ink about {:.0%} of its body; a page with an exhibit reads light under {:.0%}. {}".format(
+            ink, SCENE_INK_THRESHOLDS["page_floor"], SCENE_INK_REPAIR),
+    ))
+
+
+def gate_deck_ink(slides, content_indexes, findings):
+    """DECK_INK. Advisory. The median analytical page's estimated ink against
+    SCENE_INK_THRESHOLDS `deck_median`: one light page can be right, a light
+    deck is a construction habit. Advisory rather than blocking, because the
+    remedy is a design choice the author makes page by page, and a bar that
+    blocks invites fills drawn to pass it."""
+    inks = [scene_ink_estimate(slides[index]) for index in content_indexes if analytical(slides[index], index)]
+    if len(inks) < SCENE_THRESHOLDS["deck_from"]:
+        return
+    median = sorted(inks)[len(inks) // 2]
+    if median >= SCENE_INK_THRESHOLDS["deck_median"]:
+        return
+    findings.append(finding(
+        None, "DECK_INK", round(median, 3), SCENE_INK_THRESHOLDS["deck_median"],
+        "The median analytical page will ink about {:.0%} of its body; strong decks carry about 26% with the "
+        "same words. Fix the construction across the deck, not the copy: {}".format(median, SCENE_INK_REPAIR),
+    ))
 
 
 def gate_thin_column(slide_no, slide, findings):
@@ -1415,18 +2102,29 @@ def gate_heading_wraps(slide_no, slide, findings):
     """HEADING_WRAPS. The exhibit banner is one line: the measure, the population
     and the period, with the unit inline after it. Two lines means the heading is
     carrying a qualification that belongs in the note, or a unit written as a
-    sentence ("$k, published base-salary band" rather than "$k")."""
+    sentence ("$k, published base-salary band" rather than "$k").
+
+    A short unit that will not fit beside a one-line heading is not reported:
+    the runtime sets it under the heading. The finding carries what was
+    measured - the text, its width on one line and the width the frame gives
+    it - so the author cuts the right words by the right amount."""
     for node in text_nodes(slide):
         data = node.get("data") or {}
-        if not data.get("headingWrapped"):
+        wrapped = data.get("headingWrapped")
+        if not wrapped:
             continue
-        findings.append(finding(
-            slide_no, "HEADING_WRAPS", source_text(node)[:90], "one line",
-            "Shorten the heading to the measure, the population and the period, "
-            "and make the unit a unit: \"Published annual pay for PM roles at AI "
-            "labs\" with unit \"$k\", and the basis (\"published base-salary "
-            "band\") in the note under the page.",
-        ))
+        measure = wrapped if isinstance(wrapped, dict) else {}
+        text = str(measure.get("text") or source_text(node))
+        width, available = measure.get("width"), measure.get("available")
+        fit = (f" is {width}px on one line; this frame gives its heading {available}px, "
+               f"about {int(len(text) * available / width)} characters" if width and available else " wraps")
+        if measure.get("reason") == "unit":
+            repair = (f"\"{text}\"{fit}. The unit is a phrase, so it cannot sit beside the heading: make it a unit "
+                      "(\"$k\", \"% y/y\") and move the basis (\"published base-salary band\") into the note under the page.")
+        else:
+            repair = (f"\"{text}\"{fit}. Shorten the heading to the measure, the population and the period; "
+                      "a qualification belongs in the note. The unit is not the cause - it moves under the heading when it does not fit beside it.")
+        findings.append(finding(slide_no, "HEADING_WRAPS", text[:90], "one line", repair))
 
 
 def gate_thin_evidence(slide_no, slide, findings):
@@ -1517,7 +2215,7 @@ CAVEAT_RE = re.compile(
 # "Education does not decide the city; it decides the neighborhood" is a finding
 # in contrastive form, not a caveat. The negation sets up the positive clause
 # that follows it, and counting it as a hedge punishes the sharpest sentence on
-# the page - which it did, on a reference deck, the first time this gate ran.
+# the page - which it did, on a well-made deck, the first time this gate ran.
 CONTRAST_RE = re.compile(r"(;\s*it\b|,\s*it\b|\bbut\b|\brather,|\binstead\b|\bwhat it does\b|\bit is\b)", re.I)
 # Planning language: the vocabulary of the dot-dash, which belongs in the plan.
 PLANNING_PREFIX_RE = re.compile(
@@ -1891,7 +2589,7 @@ TABLE_COMPONENTS = {"table", "comparison-table", "heatmap", "trend-rows"}
 
 
 def gate_deck_craft(slides, analytical, findings):
-    """DECK_CRAFT. What the deck does, over its own pages, against what client
+    """DECK_CRAFT. What the deck does, over its own pages, against what strong
     decks do over theirs.
 
     Every other deck-level gate here counts shapes - how many families, how many
@@ -1899,17 +2597,17 @@ def gate_deck_craft(slides, analytical, findings):
     four things a reader notices first, and all four are a share of pages rather
     than a property of one:
 
-      highlight   a phrase set in the accent inside a sentence. Client decks do
+      highlight   a phrase set in the accent inside a sentence. Strong decks do
                   this on half their pages and on seven pages of type in ten.
                   Our example decks managed 0.05 to 0.22.
-      source      the line that says where the numbers came from. 0.67 in client
-                  work; a page without one is a page a reader cannot check.
-      marks       drawn primitives that are not type, per page. The corpus runs
-                  a median of 32 and a first quartile of 11.
-      treated     tables carrying a device beyond a plain grid. 32 of 32 in
-                  client work - not one plain grid in 28 decks.
-      annotated   charts carrying a mark that states the finding. 0.80 in client
-                  work. These two had floors in `plan.craft` and the floors ran
+      source      the line that says where the numbers came from. 0.67 in a
+                  strong deck; a page without one is a page a reader cannot check.
+      marks       drawn primitives that are not type, per page. A strong deck
+                  runs a median of 32 and a first quartile of 11.
+      treated     tables carrying a device beyond a plain grid. Every one in a
+                  strong deck - a plain grid is the exception.
+      annotated   charts carrying a mark that states the finding. 0.80 in a
+                  strong deck. These two had floors in `plan.craft` and the floors ran
                   only when a plan file existed, so a deck could ship 33%
                   annotated charts and pass its own build.
 
@@ -1938,8 +2636,8 @@ def gate_deck_craft(slides, analytical, findings):
         return float(frame.get("width") or 0) * float(frame.get("height") or 0)
 
     def carrying(test):
-        """Pages *carried by* this kind of exhibit, which is what the corpus
-        counted. A chart's own values printed as a one-row strip beneath it is
+        """Pages *carried by* this kind of exhibit, which is what the rate
+        counts. A chart's own values printed as a one-row strip beneath it is
         furniture, not a table the page has to treat - so an exhibit counts
         only when it is the biggest one on its page."""
         out = []
@@ -1973,7 +2671,7 @@ def gate_deck_craft(slides, analytical, findings):
 
     # The mark in the gutter between an exhibit and the commentary read off it.
     # Every page that sets those two side by side has to join them, and the
-    # reference decks do it in words far more often than they draw it: a named
+    # strong decks do it in words far more often than they draw it: a named
     # heading ("As a result of..."), a headed panel ("Key facts" against
     # "Perspectives"), a closing band, or nothing at all. Drawing it is the
     # emphatic option and it is spent on the pages where the inference is the
@@ -2009,7 +2707,7 @@ def gate_deck_craft(slides, analytical, findings):
     # pills, harvey balls, in-cell bars - and a deck that uses one of them
     # everywhere has chosen once.
     # Banding is not a choice: a grid past five rows bands itself so the reader
-    # keeps their place, and client work bands nearly everything. What counts
+    # keeps their place, and strong decks band nearly everything. What counts
     # here is the device the author chose - the gutter, the pills, the balls,
     # the bars, the filled category cells.
     chosen = []
@@ -2030,24 +2728,24 @@ def gate_deck_craft(slides, analytical, findings):
             "tablesTreated": craft["tableTreated"]["min"], "chartsAnnotated": craft["chartAnnotated"]["min"],
             "commonestTableDevice": craft["tableDevice"]["shareMax"],
             "drawnBridges": craft["drawnBridge"]["shareMax"]}
-    client = REFERENCE_JUDGED
+    target = REFERENCE_JUDGED
     short = []
     if highlighted < want["highlight"]:
         short.append(
-            f"a phrase is emphasised on {highlighted:.0%} of pages against {client['highlightedPhrase']:.0%} in "
-            "client decks. Review whether the decisive comparison needs emphasis; neutral is valid")
+            f"a phrase is emphasised on {highlighted:.0%} of pages against {target['highlightedPhrase']:.0%} in "
+            "strong decks. Review whether the decisive comparison needs emphasis; neutral is valid")
     if sourced < want["source"]:
         short.append(
-            f"only {sourced:.0%} of pages carry a source against {client['sourceLine']:.0%}. A measured page "
+            f"only {sourced:.0%} of pages carry a source against {target['sourceLine']:.0%}. A measured page "
             "says where the measure came from")
     if treated is not None and treated < want["tablesTreated"]:
         short.append(
-            f"{treated:.0%} of the tables carry a treatment against {craft['tableTreated']['observedClient']:.0%} in "
-            f"client work. Review the {len(tables)} tables by their reading task; do not add treatment for its frequency")
+            f"{treated:.0%} of the tables carry a treatment against {craft['tableTreated']['observed']:.0%} in "
+            f"strong decks. Review the {len(tables)} tables by their reading task; do not add treatment for its frequency")
     if annotated is not None and annotated < want["chartsAnnotated"]:
         short.append(
             f"{annotated:.0%} of the charts carry a mark that states the finding against "
-            f"{craft['chartAnnotated']['observedClient']:.0%} in client work. A bracket between the two series the "
+            f"{craft['chartAnnotated']['observed']:.0%} in strong decks. A bracket between the two series the "
             "title compares may help, as may a reference line at a real target; use neither without a content reason")
     if (commonest is not None and len(tables) >= craft["tableDevice"]["from"]
             and commonest > want["commonestTableDevice"]):
@@ -2059,19 +2757,19 @@ def gate_deck_craft(slides, analytical, findings):
         commonest_bridge = Counter(inferences).most_common(1)[0]
         short.append(
             f"{drawnShare:.0%} of the {len(joined)} pages that set an exhibit against its commentary draw a mark "
-            f"in the gutter, {commonest_bridge[1]} of them the same one ({commonest_bridge[0]}). The reference "
+            f"in the gutter, {commonest_bridge[1]} of them the same one ({commonest_bridge[0]}). Strong "
             "decks carry that relation in the commentary's heading, in a headed panel, in a closing band or in "
             "nothing at all, and draw it on the few pages where the inference is the page's work. Review which "
             "of these pages is actually asserting an inference and let the words join the rest")
     if marks < want["marksPerPage"]:
         short.append(
-            f"{marks:.0f} drawn elements a page against a corpus median of {REFERENCE_PAGE['drawings']}. A page "
+            f"{marks:.0f} drawn elements a page against a benchmark median of {REFERENCE_PAGE['drawings']}. A page "
             "of rules and paragraphs is what a reader feels before reading a word")
     if not short:
         return
     findings.append(finding(
         None, "DECK_CRAFT", measured, want,
-        "Reference-distribution differences for visual review, not decoration targets: " + "; ".join(short) + ".",
+        "Differences from the benchmark rates, for visual review, not decoration targets: " + "; ".join(short) + ".",
     ))
 
 
@@ -2252,8 +2950,8 @@ def gate_deck_front_matter(slides, analytical, findings, fill):
 
 
 def gate_deck_shape(slides, analytical, findings, fill):
-    """DECK_FLAT, deck level. The reference client decks do not carry the same
-    page twice: their page text runs from 104 words at the lower quintile to 278
+    """DECK_FLAT, deck level. A strong deck does not carry the same page
+    twice: its page text runs from 104 words at the lower quintile to 278
     at the upper, and two pages in five carry 200 words or more. A deck whose
     pages all weigh the same has not decided which pages matter - and the way to
     fix it is a page that carries the detail (a findings matrix, a deep measure
@@ -2443,8 +3141,8 @@ def gate_column_monotony(slides, content_indexes, findings):
     """COLUMN_MONOTONY, deck level.
 
     Four or more consecutive analytical pages whose commentary column uses the
-    same device. The reference decks mark a column with icons, an accent lead
-    phrase, a hairline or nothing at all, and reserve the numbered disc for an
+    same device. A strong deck marks a column with icons, an accent lead
+    phrase, a hairline or nothing at all, and reserves the numbered disc for an
     ordered ledger; a deck that reaches for one device every time reads as one
     page repeated even when its exhibits differ.
     """
@@ -2484,10 +3182,10 @@ def gate_column_monotony(slides, content_indexes, findings):
 def gate_page_shape_flat(slides, content_indexes, findings, fill):
     """PAGE_SHAPE_FLAT, deck level.
 
-    Measured over the reference client decks, a deck runs about five distinct
-    page architectures per ten analytical pages and never lets one architecture
-    past a quarter of them. A deck built before the composer scored its shapes
-    ran 1.3 per ten with 69% on one, which no page-level gate could see.
+    A strong deck runs about five distinct page architectures per ten
+    analytical pages and never lets one architecture past a quarter of them. A
+    deck built before the composer scored its shapes ran 1.3 per ten with 69% on
+    one, which no page-level gate could see.
     """
     # A catalogue declares itself airy: every page there exists to show one
     # encoding, so one architecture repeated is the point, not the defect.
@@ -2577,6 +3275,32 @@ def configure(fill=None, declared=None):
     return fill
 
 
+EMPTY_PAGE_CODES = {"THIN_PAGE", "HERO_EXHIBIT", "INK_COVERAGE", "INTERNAL_VOID", "DEAD_BAND", "COLUMN_VOID"}
+
+
+def gate_deck_thin_pages(content_indexes, findings):
+    """DECK_THIN_PAGES. Each empty-page finding is advisory, because on one
+    page it can be the right call: a quiet statement, a chart that wants air.
+    Across the deck it is not. A 50-page deck delivered with sixteen THIN_PAGE
+    advisories, four HERO_EXHIBIT and three INK_COVERAGE - timelines of three
+    dots across an empty band, four-row tables stretched to fill a page, a
+    paragraph list in the left half - and the review, reading the argument,
+    accepted it. When nearly a third of the pages are flagged the deck has a habit,
+    and the habit blocks."""
+    pages = len(content_indexes)
+    flagged = sorted({f["slide"] for f in findings if f.get("code") in EMPTY_PAGE_CODES and f.get("slide")})
+    if pages < 12 or len(flagged) < 5 or len(flagged) / pages < 0.3:
+        return
+    findings.append(finding(
+        None, "DECK_THIN_PAGES", len(flagged), max(5, round(pages * 0.3)),
+        "{} of {} content pages are flagged thin or half empty (pages {}). Fix the pattern, not each page: give the "
+        "exhibit the page (a wider chart with its annotation, a table with a treated column and the numbers the "
+        "commentary quotes), move a figure that only needs a strip to a page that shares it, set commentary beside "
+        "the exhibit rather than in a band under it, or merge two thin pages into one full one.".format(
+            len(flagged), pages, ", ".join(str(n) for n in flagged[:20])),
+    ))
+
+
 def run_gates(scene, render_dir=None, profile=None, gates=None):
     if profile is not None and profile not in PROFILES:
         raise ValueError(f"Unknown density profile: {profile}")
@@ -2589,6 +3313,9 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
     # report names them rather than quietly returning a pass for gates that
     # never ran.
     skipped_pixel_gates = set()
+    # SCENE_VOID's findings, kept for the deck count even when only
+    # DECK_SCENE_VOID was asked for.
+    scene_voids = []
     for index, slide in enumerate(slides):
         slide_no = index + 1
         if render_dir and render_path(render_dir, slide_no) is None:
@@ -2596,6 +3323,10 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         slide_profile = profile or slide.get("density") or DEFAULT_PROFILE
         if slide_profile not in PROFILES:
             raise ValueError(f"Unknown density profile: {slide_profile}")
+        # The picture-credits page is written by the runtime, not argued: it
+        # is a list of attributions and no page gate has anything to say to it.
+        if GENERATED_PAGE.match(str(slide.get("id") or "")):
+            continue
         cover = is_cover(slide, index)
         if cover:
             covers.append(slide_no)
@@ -2623,9 +3354,9 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                     # page shows.
                     text_page = not any(is_exhibit(c) for c in slide.get("componentInstances", []))
                     if rows is not None:
-                        gate_ink_and_dead_band(slide_no, rows, page, occupied, text_page=text_page)
-                    if THRESHOLDS["column_void_max"] < 1.0 and wanted("COLUMN_VOID"):
-                        gate_column_void(slide_no, load_ink_matrix(path, SURFACE_LUMINANCE), page)
+                        gate_ink_and_dead_band(slide_no, without_title_rule(rows, slide), page, occupied, text_page=text_page)
+                    if wanted("COLUMN_VOID"):
+                        gate_column_void(slide_no, slide, load_ink_matrix(path, SURFACE_LUMINANCE), page)
                     # A page carried by a qualifying hero exhibit is not empty,
                     # however thin its marks (a line chart, a map): INK_COVERAGE
                     # then defers to the hero and band gates.
@@ -2650,6 +3381,20 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_missing_argument(slide_no, slide, findings)
             if wanted("THIN_PAGE"):
                 gate_thin_page(slide_no, slide, findings)
+            if wanted("SCENE_VOID") or wanted("DECK_SCENE_VOID"):
+                page = []
+                gate_scene_void(slide_no, slide, page)
+                scene_voids.extend(page)
+                findings.extend(f for f in page if wanted(f["code"]))
+                # The scene's other empty-page flags, which DECK_THIN_PAGES counts
+                # at the build: counted here too, so a deck the author's run
+                # passes is not blocked at the build by the same pages.
+                scene_only = []
+                gate_thin_page(slide_no, slide, scene_only)
+                gate_hero_exhibit(slide_no, slide, scene_only)
+                scene_voids.extend(f for f in scene_only if f["code"] in SCENE_EMPTY_CODES)
+            if wanted("SCENE_INK") and analytical(slide, index):
+                gate_scene_ink(slide_no, slide, findings)
             if wanted("UNSOURCED_PICTURE"):
                 gate_unsourced_picture(slide_no, slide, findings)
             if wanted("UNSCALED_FIGURE"):
@@ -2711,13 +3456,20 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
     if not gates or "TABLE_SCHEMA_FLAT" in gates:
         gate_table_schema_flat(slides, content_indexes, findings)
 
+    if not gates or "DECK_THIN_PAGES" in gates:
+        gate_deck_thin_pages(content_indexes, findings)
+    if not gates or "DECK_SCENE_VOID" in gates:
+        gate_deck_scene_void(content_indexes, findings, scene_voids)
+    if not gates or "DECK_INK" in gates:
+        gate_deck_ink(slides, content_indexes, findings)
+
     # A density report beside the findings: the numbers this review is about, so
     # a regression shows up as a number rather than as a screenshot.
     measured_words, measured_columns, measured_spans, measured_footers = [], [], [], []
     for index in content_indexes:
         slide = slides[index]
-        body_words, footer_words, _band_words = body_bands(slide)
-        measured_words.append(body_words)
+        _body, footer_words, _band_words = body_bands(slide)
+        measured_words.append(body_words(slide))
         measured_footers.append(footer_words)
         for column in side_columns(slide):
             frame = column.get("frame") or {}
@@ -2778,6 +3530,99 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
     }
 
 
+# A body line where a page sets none: 12pt on the 4px baseline grid.
+BODY_LINE = 20
+
+
+def body_line(slide):
+    """The height of one line of the page's body text, read off its prose and
+    bullets, so room is counted in the lines the author writes."""
+    heights = [float((layout_of(n)).get("lineHeight") or 0) for n in text_nodes(slide)
+               if n.get("role") in ("paragraph", "body", "body-text", "list-item", "bullet")]
+    heights = [h for h in heights if h > 0]
+    return int(max(set(heights), key=heights.count)) if heights else BODY_LINE
+
+
+def column_room(slide, mask, line):
+    """The room left at the foot of each of the page's columns (page_columns),
+    measured on the scene: the pixels under the column's last drawn row, and
+    how many lines of body text they hold. A hero number with points beside a
+    table went from a band left empty under its column, to a column over its
+    height, to an empty column the other side, one point at a time; the room
+    in each column, in lines, is what lets one edit land."""
+    rows_of = scene_column_rows(mask)
+    texts = [n["frame"] for n in text_nodes(slide) if n.get("role") in BODY_ROLES and isinstance(n.get("frame"), dict)]
+    out = []
+    for column in page_columns(slide):
+        rows, top, bottom = rows_of(column["x0"], column["x1"]), column["top"], column["bottom"]
+        last = next((y for y in range(bottom - 1, top - 1, -1) if rows[y] > ROW_MIN), None)
+        if last is None:
+            continue
+        free = max(0, bottom - 1 - last)
+        # Lines are a column's to take only where it sets text: a chart's air
+        # is its plot's, not room for a point.
+        writes = any(column["x0"] <= f.get("x", 0) + f.get("width", 0) / 2 <= column["x1"]
+                     and top <= f.get("y", 0) + f.get("height", 0) / 2 <= bottom for f in texts)
+        out.append({"column": column["name"], "free": free, "lines": int(free // line), "text": writes})
+    return out
+
+
+def page_budget(scene, profile=None):
+    """Each content page's word and space budget, for the author to write to.
+
+    The gates say what a page got wrong after it is composed; the author needs
+    the same numbers before, as a budget: the body the page carries against
+    the floor its reading task sets and the ceiling WORDS holds it to, the
+    footer's share of its text, and how much of its body the composed scene
+    fills. Every number is the one the gates read - the unified body count,
+    `body_floor`, `words_limit`, `footer_share`, `void_bands` - so the
+    budget and the findings cannot disagree. Covers, structural and generated
+    pages carry no budget and are left out; `slide` is the page's position in
+    the deck.
+    """
+    if profile is not None and profile not in PROFILES:
+        raise ValueError(f"Unknown density profile: {profile}")
+    configure(scene.get("fill"), scene.get("weight"))
+    out = []
+    for index, slide in enumerate(scene.get("slides", [])):
+        if GENERATED_PAGE.match(str(slide.get("id") or "")) or is_cover(slide, index):
+            continue
+        slide_profile = profile or slide.get("density") or DEFAULT_PROFILE
+        if slide_profile not in PROFILES:
+            raise ValueError(f"Unknown density profile: {slide_profile}")
+        _band_body, footer, ratio = footer_share(slide)
+        mask = scene_mask(slide)
+        bands = void_bands([row.count(1) for row in mask])
+        page_void = bands["internalVoid"] > THRESHOLDS["internal_void_max"] or bands["deadBand"] > THRESHOLDS["dead_band_max"]
+        column = None if page_void else column_bands(slide, scene_column_rows(mask))
+        line = body_line(slide)
+        out.append({
+            "slide": index + 1,
+            "id": slide.get("id"),
+            "readingTask": slide.get("readingTask"),
+            "body": body_words(slide),
+            "floor": body_floor(slide),
+            "ceiling": words_limit(slide, slide_profile),
+            "footer": footer,
+            "footerRatio": round(ratio, 3) if ratio is not None else 0.0,
+            # SCENE_VOID's own measure and bars, so a "!" on the budget line
+            # and the advisory are the same finding.
+            "internalVoid": round(bands["internalVoid"], 3),
+            "deadBand": round(bands["deadBand"], 3),
+            "void": page_void or column is not None,
+            # A column's band the page's rows cannot see (column_bands, which
+            # SCENE_VOID also reads): which column, its share of the column's
+            # own height, and where it runs.
+            "columnVoid": {"column": column["name"], "band": round(column["band"], 3),
+                           "from": column["from"], "to": column["to"]} if column else None,
+            # The room at the foot of each column, and the height of a body
+            # line to count it in (column_room).
+            "line": line,
+            "columns": column_room(slide, mask, line),
+        })
+    return out
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Deterministic page gates")
     parser.add_argument("scene")
@@ -2786,9 +3631,22 @@ def main(argv=None):
     parser.add_argument("--report", default=None)
     parser.add_argument("--profile", default=None, choices=sorted(PROFILES))
     parser.add_argument("--only", default=None, help="Comma-separated gate codes to run")
+    parser.add_argument("--budget", action="store_true",
+                        help="Write each content page's budget (body, floor, ceiling, footer, internalVoid, "
+                             "deadBand, void, and each column's room in lines) instead of the gate report")
     args = parser.parse_args(argv)
 
     scene = load_scene(args.scene)
+    if args.budget:
+        budget = page_budget(scene, args.profile)
+        if args.report:
+            out = Path(args.report)
+            tmp = out.with_suffix(out.suffix + ".tmp")
+            tmp.write_text(json.dumps(budget, indent=1), encoding="utf-8")
+            os.replace(tmp, out)
+        else:
+            print(json.dumps(budget, indent=1))
+        return 0
     gates = {c.strip() for c in args.only.split(",")} if args.only else None
     report = run_gates(scene, args.render_dir, args.profile, gates)
     if args.report:

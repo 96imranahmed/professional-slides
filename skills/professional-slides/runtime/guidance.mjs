@@ -32,35 +32,6 @@ export const SLIDE_TYPE_GUIDANCE = Object.freeze({
   "slide-chrome": entry("assembling an analytical page with the shared title, source and footer system", "consistent page furniture protects hierarchy and provenance across the deck", "state the evidence-backed answer the body of the slide proves")
 });
 
-export const STANDARD_SLIDE_GUIDANCE = Object.freeze({
-  "golden-cover": SLIDE_TYPE_GUIDANCE.cover,
-  "golden-chart-rail": entry("pairing one dominant comparison chart with necessary interpretation", "the rail connects the plotted evidence to a decision without duplicating the data", "state the chart's primary pattern and the consequence developed in the rail"),
-  "golden-stacked-and-narrative": entry("explaining a composition chart with a small set of category definitions or drivers", "the narrative clarifies what the stack represents while the chart proves magnitude and mix", "state the material total or mix change and the category that drives it"),
-  "golden-line-annotations": entry("showing a time trend with a small number of decisive events", "numbered annotations connect visible turning points to concise explanations", "state the trend or inflection demonstrated by the line"),
-  "golden-scatter-rail": entry("showing a two-variable relationship that needs attached interpretation", "the scatter reveals clusters and outliers while the rail explains why they matter", "state the relationship or outlier and its decision consequence"),
-  "golden-structured-rows": entry("comparing several trends, themes or workstreams using the same dimensions", "repeated rows support fast cross-item scanning and preserve developed explanations", "state the common pattern or the most important difference across rows"),
-  "golden-process": entry("showing a sequential method with distinct phases and activities", "the chevrons make order and handoffs explicit", "state how the sequence reaches the intended outcome or resolves the governing constraint"),
-  "golden-organization": entry("showing reporting lines, governance or decision rights", "the hierarchy makes ownership and structural relationships visible", "state the structural finding, accountability gap or change rather than naming the organization chart"),
-  "golden-table": entry("comparing several categories across repeated qualitative and quantitative fields", "a typed table keeps unlike evidence aligned without reducing it to prose", "state the differentiator, trade-off or pattern the comparison establishes"),
-  "golden-rollout": entry("sequencing initiatives or workstreams across a declared time horizon", "the rollout shows timing, overlap and handoffs across parallel rows", "state the pacing, critical dependency or timing consequence visible in the plan"),
-  "golden-divider": SLIDE_TYPE_GUIDANCE["section-divider"],
-  "golden-text": entry("presenting a short argument that does not need a quantitative exhibit", "a text-led page preserves hierarchy when the reasoning itself is the evidence", "state the governing conclusion rather than a topic label"),
-  "golden-matrix": entry("prioritizing items using two explicit decision dimensions", "position makes relative priority and trade-offs visible", "state which items occupy the priority region and why that matters"),
-  "golden-waterfall": CHART_GUIDANCE["chart.waterfall"],
-  "golden-pie": CHART_GUIDANCE["chart.pie"],
-  "golden-donut": CHART_GUIDANCE["chart.donut"],
-  "golden-map": entry("showing geographic distribution, coverage or readiness", "location makes regional concentration and gaps immediately visible", "state the geographic concentration, difference or coverage implication"),
-  "golden-roadmap": entry("showing a programme in waves with activities and deliverables", "the wave structure links timing to concrete outputs and decision gates", "state how the sequence delivers the outcome or where the critical dependency sits"),
-  "golden-executive-summary": entry("summarizing a developed argument for an executive audience", "thematic sections preserve evidence, implication and conditions while one close states the recommendation", "use Executive summary; each internal theme heading should state a substantive conclusion"),
-  "golden-table-insight-category-bullets": entry("comparing developed qualitative evidence and closing with one synthesis", "the table supports row-by-row reasoning while the insight states the governing consequence", "state the cross-row pattern that supports the synthesis"),
-  "golden-table-insight-bar-columns": entry("combining qualitative comparison with in-cell quantitative bars and one synthesis", "the table keeps scale and explanatory evidence in the same scan path", "state the quantitative ranking and the qualification that changes its interpretation"),
-  "golden-tracker-text-agenda-overview": SLIDE_TYPE_GUIDANCE["tracker-page"],
-  "golden-tracker-text-agenda-progress": SLIDE_TYPE_GUIDANCE["tracker-page"],
-  "golden-tracker-sequential-progress": SLIDE_TYPE_GUIDANCE["tracker-page"],
-  "golden-tracker-number-strip-content": entry("using a compact numbered tracker on a page within a tracked section", "the marker preserves orientation without competing with the analytical title", "state the page answer; do not repeat the selected section label"),
-  "golden-tracker-split-progress": SLIDE_TYPE_GUIDANCE["tracker-page"],
-  "golden-tracker-label-content": entry("using a compact breadcrumb on a page within a tracked section", "the breadcrumb preserves hierarchy while leaving the action title to carry the conclusion", "state the page answer independently of the breadcrumb")
-});
 
 export function assertParentheticalTemplateCopy(slides) {
   const findings = [];

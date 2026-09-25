@@ -2,9 +2,28 @@
 
 Every reusable visual value lives in the theme. Components consume named tokens; slides consume components.
 
+## Design systems
+
+A palette changes colour; a design system changes the page. Two decks on unrelated subjects built in one frame - the same cover, chapter panels, title position, commentary rail and takeaway band - read as one deck in two colours, whatever their charts. Set `design` once on the deck; `runtime/design-systems.mjs` owns the values.
+
+| `design` | Reader and occasion | Frame | Page repertoire to plan for |
+| --- | --- | --- | --- |
+| `consulting` (default) | steering committees, boards, diligence | white canvas, sans titles top-left over a thin grey rule margin to margin, commentary rail right, tinted takeaway band, dark cover, numbered chapter panels | exhibit with commentary, tables with treatments, metrics strips, trackers |
+| `editorial` | pre-reads, strategy narratives and essays read alone | warm paper, large regular serif titles over a hairline run edge to edge, wide margins, commentary left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages, panels opened | text pages that carry an argument, a photograph beside prose (`picture-hero`), quotations, fewer and larger exhibits, statement pages between parts |
+| `journal` | evidence-led briefings where the chart is the argument | red tab over short bold sans titles, the finding as a standfirst under the title, tight margins, zebra tables, no tinted boxes, masthead cover | full-width annotated charts with commentary in columns beneath (`exhibit-top`), small multiples (`grid`), metrics over an exhibit, record tables |
+| `keynote` | decks presented to a room, launches, pitches | titles reversed out of a colour block, larger type, the takeaway as a statement with an accent bar, colour-field cover and chapter pages, full-bleed picture covers | one idea a page: hero numbers (`kpi`), metrics over an exhibit, split-tone comparisons, statement and picture pages, sparse text |
+
+The system biases the layout chooser toward its repertoire and translates the author's panel tones into its grammar (an editorial page has no navy column), but it cannot make pages it was not given. Plan the slides for the system: a keynote dot-dash built from forty exhibit-with-commentary pages is a consulting deck in keynote colours. Choose each page's slide type from what it must show *and* from the system's repertoire.
+
+`identity: { primary, accent }` takes the colours from the subject - a franchise's house colours, a brand's, a flag's - onto any system: primary and accent are darkened until they read as text, tints and a chart-series ramp are derived, and the raw accent stays bright as a chart series. A deck about a recognisable subject carries its identity; two decks in one system on different subjects then differ at a glance.
+
+**Variation between runs.** Two runs of one brief should not produce the same deck. `variation` on the deck (any string; a new deck takes a fresh one from `runtime/variation.mjs`) draws reproducibly from what the system leaves open: list markers, table rows, the tracker, the contents page, how lead-in points are marked, two shapes the chooser leans toward and its tie-break order. The same script names two featured page types from the system's repertoire for the plan. Page structure is chosen page by page through [page types](page-types.md); the variation varies the styling those choices leave open.
+
+**Choosing.** Ask the user before planning a new deck: either supply a deck in the house or style they want (import it with `import-template.py`; the profile names the nearest system and why, and its colours, faces and margins override the system's), or pick a system. Show `assets/design-systems.png`, the same pages in all four, when asking. Record the choice and reason in the brief. An explicit palette, chrome or tracker on the deck still overrides the system's default.
+
 ## Palettes
 
-Set `palette` once on the deck specification: `mckinsey` (default), `bcg`, `bain` or `deloitte`. These are brand-inspired role mappings, not official templates. They set colours and registered house treatments, including title weight, rules, heading bands and display face; these treatments can change text wrapping and available exhibit space, so each variation must be rendered. `color.componentPrimary` (`--component-primary`) resolves to `#051C2C` navy for `mckinsey`, `#0E7A5E` green for `bcg`, `#CC0000` red for `bain` and black for `deloitte`. McKinsey's primary tint is `#E6E8EA`; its bright blue stays a chart series rather than a structural primary. `--chart-comparator` (default `#D9DDE0`) is the light-grey background-evidence role for a focal comparison, independent of both the series palette and the secondary text colour. `runtime/palettes.mjs` records provenance and maps each preset onto the canonical token names, and the compiler resolves one fresh token map per deck.
+Set `palette` once on the deck specification: `midnight` (default), `evergreen`, `crimson` or `graphite`. They are named role mappings. They set colours and registered house treatments, including title weight, rules, heading bands and display face; these treatments can change text wrapping and available exhibit space, so each variation must be rendered. `color.componentPrimary` (`--component-primary`) resolves to `#051C2C` navy for `midnight`, `#0E7A5E` green for `evergreen`, `#CC0000` red for `crimson` and black for `graphite`. The `midnight` preset's primary tint is `#E6E8EA`; its bright blue stays a chart series rather than a structural primary. `--chart-comparator` (default `#D9DDE0`) is the light-grey background-evidence role for a focal comparison, independent of both the series palette and the secondary text colour. `runtime/palettes.mjs` maps each preset onto the canonical token names, and the compiler resolves one fresh token map per deck.
 
 Typography is independent of palette. Deck-level `typography` supplies body, display, serif and an explicit semibold native face; `weight.semibold` requests 600 for direct annotations. Resolve the family before measuring text and validate face, size and weight in both adapters.
 
@@ -59,19 +78,56 @@ For a reference-derived theme, inspect the approved reference first and map ever
 
 Resolved values for the exact deck are written to `design-manifest.json`, and per-slide values to `scene.json` under `slides[].tokens`; those generated records are the value reference for that deck.
 
-Slide titles default to an open canvas, without a horizontal rule or a background band. Preserve the measured title-to-body clearance. A separator remains an explicit reference-derived choice; it is not added merely because a palette changes. Analytical chart headings retain their own heading/unit treatment.
+## The title band
+
+A content page's header is, top to bottom: the tracker (or kicker), the action title, an optional standfirst, the rule that closes the band, then the body. Three strong analytical pages in four close the title band with a rule or a band, most with a thin rule margin to margin or edge to edge and some with a short accent bar, so the house draws one by default: `consulting` and the `midnight`, `crimson` and `graphite` palettes a thin rule, `editorial` a hairline across the page, `evergreen` a short accent bar. `journal` keeps its red tab and `keynote` its colour block, which already close the band.
+
+The rule sits at a fixed height, one gap above the body, and the title and its standfirst are set down on it: a one-line title drops to meet the rule instead of leaving it stranded under 50px of air, and the body starts at the same height whether the title took one line or two. Only a band too tall for that - two title lines and a standfirst - pushes the rule and the body down together. The standfirst (`subtitle` on the page) is set in body type and the secondary colour between the title and the rule; see [page types](page-types.md#the-standfirst).
+
+A title that wraps is balanced: it is set at the narrowest width that keeps its line count, so its lines run to about the same length and the last is never one to three stranded words. The PPTX title placeholder takes the same width and a soft line break where the render broke, so PowerPoint's own metrics cannot move a word back; an author's own line break is kept as written. Analytical chart headings retain their own heading/unit treatment.
 
 ## House style tokens
 
-Each palette sets seven `style.*` keyword tokens beyond its colours; components read them through `houseStyle(id)` and a page may still ask for a specific title variant. `style.titleWeight` (`bold` | `regular`), `style.titleRule` (`none` | `rule` under the title | `band` behind it), `style.tagPlacement` (`top-right` small caps | `below-title` accent pill | `above-title` accent label), `style.chartHeading` (`text` | `band`, a filled grey band with white heading), `style.listMarker` (`dot` | `dash`), `style.tableRows` (`rules` | `zebra`), `style.labelWeight`, `style.titleLead` (`accent`: the lead in the accent before the rest; `pipe`: "Topic | statement", the BCG title) (`bold` | `regular` value labels, in the scene and the native chart). The `mckinsey` palette also sets `font.display` to a serif; `examples/house-style.deck.json` shows the same eight pages under any palette.
+Each palette sets its `style.*` keyword tokens beyond its colours; components read them through `houseStyle(id)` and a page may still ask for a specific title variant.
+
+| Token | Values |
+| --- | --- |
+| `style.titleWeight` | `bold` \| `regular` |
+| `style.titleRule` | `none` \| `rule` closing the title band \| `band` behind it \| `block` reversed out of the primary \| `tab` in the accent at the top edge |
+| `style.titleRuleLength` | `content` margin to margin \| `full` page edge to edge \| `short` a 64px bar under the title |
+| `style.titleRuleColor` | `rule` \| `ink` \| `accent` \| `primary`: a palette role, so a subject's identity recolours an accent bar |
+| `line.titleRule`, `layout.titleRuleGap` | the rule's weight in px (1 for a hairline, 3 to 4 for a bar) and the air on either side of it (12px) |
+| `style.tagPlacement` | `top-right` small caps \| `below-title` accent pill \| `above-title` accent label |
+| `style.chartHeading` | `text` \| `band`, a filled grey band with white heading |
+| `style.listMarker`, `style.tableRows` | `dot` \| `dash`; `rules` \| `zebra` |
+| `style.labelWeight` | `bold` \| `regular` value labels, in the scene and the native chart |
+| `style.titleLead` | `accent`: the lead in the accent before the rest; `pipe`: "Topic \| statement", the `evergreen` title |
+
+The `midnight` palette also sets `font.display` to a serif; `examples/house-style.deck.json` shows the same eight pages under any palette.
+
+## Surface treatments
+
+A page drawn as type on the canvas with hairlines reads light at a glance however many words it carries: a table set as text on the page colour, white cards outlined on a cream page, one thin line across an empty plot, roadmap dots on a rail. Five `style.*` tokens set how much of a page's structure is filled surface, and their defaults are the weight of a well-made analytical page:
+
+| Token | Reference (default) | Open |
+| --- | --- | --- |
+| `style.tableHeader` | `band`: the header a filled band in the ink, reversed type | `rule`: bold type over a rule |
+| `style.tableLabels` | `tint`: a row-label column on `color.surfaceTint` | `plain` |
+| `style.cards` | `tint`: cards, quotation boxes and quadrants filled, no outline | `outline`: hairline cards on the canvas |
+| `style.marks` | `reference`: lines at `line.medium` with 12px markers, a light area under a lone line (never under two or more), dumbbell dots a quarter larger on alternate row bands, map land and a cycle's hub on the filled surface | `light` |
+| `style.timeline` | `blocks`: each roadmap stage headed by a filled chevron on a heavier spine | `dots` |
+
+`color.surfaceTint` is the palette's ink mixed 86% toward its canvas (`resolvePalette` derives it unless a palette sets it): about 30 grey levels under a white or cream page, a warm stone on paper and a cool grey under navy. Type on a fill keeps its role colour only where it still reads at 4.5:1 (`readableOn` in `core.mjs`), else it takes the ink.
+
+The two sets are named in `design-systems.mjs`. Every system takes `reference`; the journal keeps its character with plain label columns and outlined cards. `surfaces: "open"` on the deck takes the light set, and a single token in the palette overrides one treatment. A table can opt out alone with `headerBand: false` or `labelColumn: false`. `SCENE_INK` and `DECK_INK` ([evaluation](evaluation/index.md#ink-estimate)) estimate the result at authoring.
 
 ## Template decks and house profiles
 
-`runtime/import-template.py template.pptx [--base mckinsey|bcg|bain|deloitte] [--out house.json]` reads a template deck and writes a house profile:
+`runtime/import-template.py template.pptx [--base midnight|evergreen|crimson|graphite] [--out house.json]` reads a template deck and writes a house profile:
 
 ```json
 { "schema": "professional-slides.house/v1", "source": "template.pptx",
-  "palette": { "base": "bcg", "id": "template", "label": "template",
+  "palette": { "base": "evergreen", "id": "template", "label": "template",
                "colors": { "color.ink": "#575757", "color.componentPrimary": "#03522D", "color.accent": "#29BA74", "color.accentTint": "#E1F5EC", "color.chartSeries1": "#03522D", "…": "…", "style.titleWeight": "regular" } },
   "typography": { "body": "Arial", "display": "Arial", "semibold": { "family": "Arial", "nativeBold": true, "effectiveWeight": 700 } },
   "chrome": { "left": 66, "right": 66, "titleTop": 65, "bodyTop": 220, "footerTop": 667 },
@@ -80,9 +136,9 @@ Each palette sets seven `style.*` keyword tokens beyond its colours; components 
   "stats": { "slides": 16, "medianWordsPerSlide": 113, "medianShapesPerSlide": 21.5, "charts": 4, "tables": 2, "themeColors": {}, "themeFonts": {}, "topFills": [] } }
 ```
 
-How the values are chosen. Ink is the theme's `dk2` when it is a saturated brand dark (a navy, a forest green) and `dk1` otherwise; the primary is `accent1` when it is a brand dark, else the most used dark fill; the accent is the most used bright saturated fill that is not the primary (the bright green, the electric blue), else `accent2`; the chart series are the primary followed by the theme accents, greys appended; tints are the primary and accent mixed 86–88% toward white; the muted surface is `lt2` when light enough. Title weight comes from the master's title style, a title rule or band from a line or filled rectangle on the master under the title. Chrome comes from the slides' own title and body placeholders (medians, scaled to 1280 px), with cover-style titles below 35% of the page height excluded. Density: 90 words or 18 shapes per slide and up is `pre-read`, 35 words or 8 shapes is `executive`, less is `live-pitch`.
+How the values are chosen. Ink is the theme's `dk2` when it is a saturated brand dark (a navy, a forest green) and `dk1` otherwise; the primary is `accent1` when it is a brand dark, else the most used dark fill; the accent is the most used bright saturated fill that is not the primary (the bright green, the electric blue), else `accent2`; the chart series are the primary followed by the theme accents, greys appended; tints are the primary and accent mixed 86–88% toward white; the muted surface is `lt2` when light enough. Title weight comes from the master's title style, a title rule or band from a line or filled rectangle on the master under the title (a line across 95% of the page is a `full` rule, a shorter one `content`); a master with neither sets `style.titleRule: "none"`, so the page stays open as the template draws it. Chrome comes from the slides' own title and body placeholders (medians, scaled to 1280 px), with cover-style titles below 35% of the page height excluded. Density: 90 words or 18 shapes per slide and up is `pre-read`, 35 words or 8 shapes is `executive`, less is `live-pitch`.
 
-A palette may also be written by hand as `{ "base": "mckinsey", "colors": { "color.accent": "#E1251B", "style.titleRule": "none" } }`: colour tokens take `#RRGGBB`, and `style.*` and `font.*` tokens overlay the base's house style. `chrome` on the deck takes `left`, `right`, `titleTop`, `bodyTop`, `footerTop` (and optionally `sourceTop`, `footerRuleY`); the composer scales the table line budget to the body height the chrome leaves, and the page gates read the resulting content frame.
+A palette may also be written by hand as `{ "base": "midnight", "colors": { "color.accent": "#E1251B", "style.titleRule": "none" } }`: colour tokens take `#RRGGBB`, `style.*` and `font.*` tokens overlay the base's house style, and `line.*` and `layout.*` take pixels (`"line.titleRule": 2, "layout.titleRuleGap": 16`). `chrome` on the deck takes `left`, `right`, `titleTop`, `bodyTop`, `footerTop` (and optionally `sourceTop`, `footerRuleY`); the composer scales the table line budget to the body height the chrome leaves, and the page gates read the resulting content frame.
 
 ## Choose the kind of variation
 
@@ -94,11 +150,11 @@ Use cosmetic variations only when the user explicitly wants the same content res
 
 Freeze the approved titles, claims, figures, labels, sources, notes, ordering and stage contracts before making style variations. Change deck-level palette, typography, surfaces and registered component treatments; compare authoring content and rendered text afterward so reflow cannot silently remove evidence. A palette change can change salience: categorical colours must not create an unintended highlighted cohort. When a treemap has an explicit focal item, keep other tiles neutral.
 
-Every variant needs a fresh full-deck taste review and bound delivery record. A passing review of the original does not transfer to a new style. Inspect dense tables, stacked labels, highlighted prose, navigation and the canvas at full size. Foreground contrast is measured against the final displayed fill after focus overrides, not against the nominal series colour. Positive/negative status colouring is limited to short text or compact status icons; chart marks and their legend swatches use chart-series colours, never a status override. Choose preset accents that remain legible both as text on the page and behind white compact labels; use a quieter readable swatch when a bright brand-inspired accent fails that dual role. The BCG-inspired preset uses a darker green accent for this reason.
+Every variant needs a fresh full-deck taste review and bound delivery record. A passing review of the original does not transfer to a new style. Inspect dense tables, stacked labels, highlighted prose, navigation and the canvas at full size. Foreground contrast is measured against the final displayed fill after focus overrides, not against the nominal series colour. Positive/negative status colouring is limited to short text or compact status icons; chart marks and their legend swatches use chart-series colours, never a status override. Choose preset accents that remain legible both as text on the page and behind white compact labels; use a quieter readable swatch when a bright accent fails that dual role. The evergreen preset uses a darker green accent for this reason.
 
 The exported slide background must resolve `color.canvas`; white is not an implicit substitute for a warm or dark family. Saved-file readback verifies it. Repair a failed role or exporter at its shared owner, preserve each candidate, regenerate affected variants and reassess without a score floor.
 
-A font change can leave a single final word on the second title line. Rebalance its text frame within the existing title band while preserving the exact wording, type size, line count and left anchor; do not shorten the argument to accommodate a style.
+A font change can change where a title wraps. The title is rebalanced at build time (the balanced break above) with its wording, type size, line count and left anchor kept; do not shorten the argument to accommodate a style.
 
 When an alternative changes the reader task, rebuild its question, governing answer, ranked criteria and per-slide `serves` mapping before authoring. Preserve source provenance, but do not inherit a previous version’s decision contract unchanged. Verify both the coverage preflight and the rendered gates; a visual pass alone is not a complete build.
 
@@ -106,7 +162,7 @@ All named presets default to plain chart headings with inline units and a rule. 
 
 ## Fill and weight
 
-`fill` is `full`, `balanced` or `airy`; it follows the density when omitted. `weight` overrides individual values, then falls back to an imported house profile and the fill defaults. `runtime/weight.json` is the single numeric contract read by the composer and gates; do not copy its thresholds into a second implementation. The [evaluation reference](evaluation/index.md#corpus-calibration) records its corpus basis.
+`fill` is `full`, `balanced` or `airy`; it follows the density when omitted. `weight` overrides individual values, then falls back to an imported house profile and the fill defaults. `runtime/weight.json` is the single numeric contract read by the composer and gates; do not copy its thresholds into a second implementation. The [evaluation reference](evaluation/index.md#target-calibration) sets out the targets behind it.
 
 | Key | What it measures |
 | --- | --- |

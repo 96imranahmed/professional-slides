@@ -96,6 +96,41 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result['accepted'])
 
+    def test_chart_titles_accept_years_and_dates_but_not_results(self):
+        # "Destinations, today and 2030 goal" was refused as a statistic by the
+        # same message that asked for an explicit period.
+        result = run_node("""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const title=REGISTRY.get('chart-title'),frame={x:60,y:60,width:1000,height:500};
+const accepted=heading=>{try{title.render({id:'t',frame,props:{heading}});return true;}catch(error){if(!/must not contain statistics/.test(error.message))throw error;return false;}};
+const periods=['Destinations, today and 2030 goal','2030 target capacity','Seats, 2024 vs 2030 plan','Capacity 2019 and 2030','Fleet by 2030','Passengers FY26','Revenue 2025-26','Revenue Q3 2025','Balance at 31 March 2026','Balance as of 2026-03-31','Balance on 31/03/2026','Balance at March 31, 2026'];
+const results=['Revenue +12%','Revenue up 3.4x','Revenue up 12x','Revenue fell 20%','Revenue $1.2bn','Revenue 5bn','Share 45%','NYPD: 2025','Homicides fell 2015','Revenue of 2030','Revenue, 2025.5','Revenue versus 2016%','Margin up 40pp'];
+console.log(JSON.stringify({refusedPeriods:periods.filter(h=>!accepted(h)),acceptedResults:results.filter(accepted)}));
+""")
+        self.assertEqual(result, {"refusedPeriods": [], "acceptedResults": []})
+
+    def test_chart_titles_accept_rank_scales_and_set_sizes_and_name_the_result_they_refuse(self):
+        # "rank, 1 = best" and "busiest day 2 August 2026, top 40" describe the
+        # measure and were refused; "the leader's 53.2m" is a value and stays
+        # refused, with the figure named so the author knows what to move.
+        result = run_node("""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const title=REGISTRY.get('chart-title'),frame={x:60,y:60,width:1000,height:500};
+const refusal=props=>{try{title.render({id:'t',frame,props});return null;}catch(error){if(!/must not contain statistics/.test(error.message))throw error;return error.message;}};
+const headings=['Hub connectivity index, busiest day 2 August 2026, top 40',"World's Top 100 airlines, rank (1 = best)",'Largest 20 carriers by seats, Sep 2026'];
+const units=['rank, 1 = best','rank (1 = best)','ranking; 1 = highest'];
+const results=["Passengers: actual and required path to the leader's 53.2m",'Revenue +12%','Revenue up 3.4x','Revenue $1.2bn','Revenue fell 20%','NYPD: 2025','Top 40%','Top 3 grew 40%','Top 10.5'];
+const badUnits=['rank, 1 = best, 3.2','rank, 2 = best'];
+console.log(JSON.stringify({
+  refusedHeadings:headings.filter(heading=>refusal({heading})),
+  refusedUnits:units.filter(unit=>refusal({heading:'Airline ranking',unit})),
+  acceptedResults:results.filter(heading=>!refusal({heading})),
+  acceptedUnits:badUnits.filter(unit=>!refusal({heading:'Airline ranking',unit})),
+  named:refusal({heading:results[0]}).includes('carries "53.2m"'),
+}));
+""")
+        self.assertEqual(result, {"refusedHeadings": [], "refusedUnits": [], "acceptedResults": [], "acceptedUnits": [], "named": True})
+
     def test_growth_bracket_stays_near_small_marks_on_a_shared_scale(self):
         result = run_node("""
 import assert from 'node:assert/strict';
@@ -309,7 +344,7 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const frame={x:60,y:150,width:1000,height:500};
 const bubble=REGISTRY.get('chart.bubble');
 const sizeProps={...bubble.sample,...bubble.examples['size-legend-top-right'].props};
-const sizeSlide=compileDeck({palette:'mckinsey',slides:[{id:'bubble',frame,composition:component({id:'bubble',component:'chart.bubble',frame,props:sizeProps})}]},REGISTRY).slides[0];
+const sizeSlide=compileDeck({palette:'midnight',slides:[{id:'bubble',frame,composition:component({id:'bubble',component:'chart.bubble',frame,props:sizeProps})}]},REGISTRY).slides[0];
 const legendSwatches=sizeSlide.nodes.filter(n=>n.role==='legend-swatch');
 const legendLabels=sizeSlide.nodes.filter(n=>n.role==='legend-label');
 assert.equal(legendSwatches.length,1);
@@ -461,7 +496,13 @@ assert.ok(speech.some(n=>n.geometry==='polygon')||speech.some(n=>n.role==='annot
 assert.throws(()=>line.render({id:'bad-treatment',frame,props:{...base,annotations:[{category:'Q3',text:'Bad',treatment:'shout'}]}}),/Unknown chart evidence annotation treatment/);
 assert.throws(()=>line.render({id:'bad-orientation',frame,props:{...base,annotations:[{category:'Q3',text:'Bad',treatment:'orthogonal-dot',orientation:'diagonal'}]}}),/Unknown orthogonal chart annotation orientation/);
 const cramped={categories:['Q1','Q2'],series:[{name:'Measure',values:[30,40]}],yMax:50,dataLabels:true,legend:false,highlights:[],referenceLines:[],annotations:[{category:'Q1',text:'No corridor',treatment:'orthogonal-dot',orientation:'horizontal',side:'left'}]};
-assert.throws(()=>line.render({id:'cramped',frame:{x:60,y:150,width:390,height:360},props:cramped}),/insufficient clearance for a horizontal orthogonal-dot annotation/);
+// No corridor for the requested side is a layout conflict the chart resolves,
+// not an author error: it used to throw and recommend another treatment. The
+// box now moves beside its mark (here above it) and the leader still ends on it.
+const crampedNodes=line.render({id:'cramped',frame:{x:60,y:150,width:390,height:360},props:cramped}).nodes;
+const crampedBox=crampedNodes.find(n=>n.role==='annotation-surface');
+assert.equal(crampedBox.data.evidencePlacement,'beside');
+assert.ok(crampedBox.frame.x>=60&&crampedBox.frame.x+crampedBox.frame.width<=450);
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
@@ -474,8 +515,8 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
 const frame={x:60,y:160,width:760,height:420};
 const slide=props=>({id:'chart',composition:component({id:'chart',component:'chart.column',frame,props})});
-for(const palette of ['mckinsey','bcg','bain']) {
-  const deck=compileDeck({palette,slides:[slide({categories:['Current','Future'],series:[{name:'Measure',values:[80,150]}]})]},REGISTRY);
+for(const palette of ['midnight','evergreen','crimson']) {
+  const deck=compileDeck({palette,slides:[slide({categories:['Dubai','Doha'],series:[{name:'Measure',values:[80,150]}]})]},REGISTRY);
   const marks=deck.slides[0].nodes.filter(n=>n.role==='chart-mark');
   assert.equal(marks.length,2);
   assert.equal(marks[0].style.fill.tokenId,'color.componentPrimary');
@@ -484,7 +525,7 @@ for(const palette of ['mckinsey','bcg','bain']) {
 }
 const explicit=compileDeck({slides:[slide({categories:['Current','Future'],series:[{name:'Measure',values:[80,150]}],colorIndices:[1]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
 assert.deepEqual(explicit.map(n=>n.style.fill.tokenId),['color.chartSeries2','color.chartSeries2']);
-const focused=compileDeck({palette:'bain',slides:[slide({categories:['A','B','C'],series:[{name:'Measure',values:[40,70,55]}],highlights:[{category:'B',style:'bar'}]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
+const focused=compileDeck({palette:'crimson',slides:[slide({categories:['A','B','C'],series:[{name:'Measure',values:[40,70,55]}],highlights:[{category:'B',style:'bar'}]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
 // Highlight the answer: the named bar takes the accent; the others keep the series colour, never grey.
 assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartSeries1','color.accent','color.chartSeries1']);
 assert.deepEqual(focused.map(n=>n.data.highlighted),[false,true,false]);
@@ -500,8 +541,8 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
 const frame={x:60,y:160,width:900,height:460};
 const base={categories:['A','B'],series:[{name:'Baseline',values:[40,50]},{name:'Actual',values:[55,70]}],focusSeries:'Actual',dataLabels:true};
-const render=(kind,props,palette='mckinsey')=>compileDeck({palette,slides:[{id:'focus',composition:component({id:'focus',component:kind,frame,props})}]},REGISTRY).slides[0].nodes;
-for(const palette of ['mckinsey','bcg','bain']) for(const kind of ['chart.column','chart.bar']) for(const reversed of [false,true]) {
+const render=(kind,props,palette='midnight')=>compileDeck({palette,slides:[{id:'focus',composition:component({id:'focus',component:kind,frame,props})}]},REGISTRY).slides[0].nodes;
+for(const palette of ['midnight','evergreen','crimson']) for(const kind of ['chart.column','chart.bar']) for(const reversed of [false,true]) {
   const props=reversed?{...base,categories:[...base.categories].reverse(),series:[...base.series].reverse().map(s=>({...s,values:[...s.values].reverse()}))}:base;
   const nodes=render(kind,props,palette),marks=nodes.filter(n=>n.role==='chart-mark'),swatches=nodes.filter(n=>n.role==='legend-swatch');
   for(const mark of marks) {
@@ -522,6 +563,50 @@ assert.throws(()=>render('chart.stacked-column',base),/two unstacked series/);
 assert.throws(()=>render('chart.column',{...base,series:[...base.series,{name:'Third',values:[20,30]}]}),/two unstacked series/);
 const explicit=render('chart.column',{...base,focusSeries:undefined,colorIndices:[2,4]}).filter(n=>n.role==='chart-mark');
 assert.deepEqual([...new Set(explicit.map(n=>n.style.fill.tokenId))],['color.chartSeries3','color.chartSeries5']);
+console.log(JSON.stringify({accepted:true}));
+""")
+        self.assertTrue(result["accepted"])
+
+    def test_two_mark_contrast_defaults_to_the_latest_period(self):
+        # A comparison written in time order used to paint the old year in the
+        # primary and the year the title is about grey. With no focusSeries the
+        # latest period is the point; peers keep the first; a named focus wins;
+        # the native chart and the change bracket follow the scene.
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {defaultFocusIndex} from './skills/professional-slides/runtime/charts.mjs';
+import {changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
+const frame={x:60,y:160,width:900,height:460};
+const compiled=(kind,props)=>compileDeck({palette:'crimson',slides:[{id:'f',composition:component({id:'f',component:kind,frame,props})}]},REGISTRY).slides[0];
+const primary=(kind,props,key='series')=>[...new Set(compiled(kind,props).nodes.filter(n=>n.role==='chart-mark'&&n.style.fill.tokenId==='color.componentPrimary').map(n=>n.data[key]))];
+const pair=(a,b)=>({categories:['Revenue','Profit'],series:[{name:a,values:[40,50]},{name:b,values:[55,70]}]});
+for(const kind of ['chart.column','chart.bar']) {
+  for(const [a,b,latest] of [['2019','2024','2024'],['2024','2019','2024'],['FY23','FY24','FY24'],['FY2024-25','FY2025-26','FY2025-26'],
+    ['Before','After','After'],['After','Before','After'],['Pre-COVID','Current','Current'],['2025 estimate','2026 forecast','2026 forecast'],['Q4 2024','Q1 2025','Q1 2025']])
+    assert.deepEqual(primary(kind,pair(a,b)),[latest],`${kind} ${a}|${b}`);
+  assert.deepEqual(primary(kind,pair('Emirates','Qatar')),['Emirates'],'peers keep the first as the subject');
+  assert.deepEqual(primary(kind,{...pair('2019','2024'),focusSeries:'2019'}),['2019'],'a named focus wins');
+  assert.deepEqual(primary(kind,{categories:['FY24','FY25'],series:[{name:'Revenue',values:[80,95]}]},'category'),['FY25']);
+  assert.deepEqual(primary(kind,{categories:['Dubai','Doha'],series:[{name:'Revenue',values:[80,95]}]},'category'),['Dubai']);
+}
+// The comparator stays the grey, and the legend keys the same fills.
+const nodes=compiled('chart.column',pair('2019','2024')).nodes;
+for(const mark of nodes.filter(n=>n.role==='chart-mark')) {
+  assert.equal(mark.style.fill.tokenId,mark.data.series==='2024'?'color.componentPrimary':'color.chartComparator');
+  assert.equal(nodes.find(n=>n.role==='legend-swatch'&&n.data.categoryKey===mark.data.series).style.fill.value,mark.style.fill.value);
+}
+// The native chart paints the peer the scene painted.
+const native=s=>s.componentInstances.find(c=>c.nativeChart)?.nativeChart;
+assert.equal(native(compiled('chart.column',pair('2019','2024'))).focusIndex,1);
+assert.equal(native(compiled('chart.column',pair('Emirates','Qatar'))).focusIndex,0);
+assert.equal(native(compiled('chart.column',{categories:['FY24','FY25'],series:[{name:'Revenue',values:[80,95]}]})).focusIndex,1);
+// The change bracket reads the focus minus the other: latest minus earliest.
+const bracket=changeFromContent({type:'chart.column',change:true,...pair('2019','2024')},'Revenue grew').changeAnnotations[0];
+assert.equal(bracket.end.series,'2024'); assert.equal(bracket.start.series,'2019'); assert.equal(bracket.text,'+15');
+assert.equal(defaultFocusIndex(['Plan','Actual']),1);
+assert.equal(defaultFocusIndex(['Retail','2024']),0,'a name that is not a period keeps the first');
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
@@ -585,8 +670,8 @@ import {compileDeck,component} from './skills/professional-slides/runtime/core.m
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 for(const [values,yMax,expected] of [
  [[13.624,24.768],30,['0','10','20','30']],
- [[.13624,.24768],.3,['0','0.1','0.2','0.3']],
- [[.4,.8],1,['0','0.25','0.5','0.75','1']]
+ [[.13624,.24768],.3,['0.0','0.1','0.2','0.3']],
+ [[.4,.8],1,['0.00','0.25','0.50','0.75','1.00']]
 ]) {
  const deck=compileDeck({slides:[{id:'fractional',composition:component({id:'chart',component:'chart.column',frame:{x:60,y:160,width:1160,height:480},props:{categories:['2025','2026'],series:[{name:'Revenue',values}],yMax,showValueAxis:true}})}]},REGISTRY);
  assert.deepEqual(deck.slides[0].nodes.filter(n=>n.role==='axis-label').map(n=>n.text),expected);

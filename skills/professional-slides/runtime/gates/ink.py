@@ -23,6 +23,24 @@ INK_LUMINANCE = 235
 SURFACE_LUMINANCE = 250
 
 
+def relative(histogram, luminance):
+    """The threshold for this page, measured from its own background.
+
+    The two luminances were absolute: ink below 235, occupied below 250. On a
+    white page that is right. On a warm cream canvas (the editorial design's
+    247) every pixel of the page is below 250, so every row read as occupied
+    and the dead-band and void gates could never fire - a half-empty page
+    passed them. The background is the page's commonest grey; the thresholds
+    keep their distance from it.
+    """
+    background = max(range(256), key=histogram.__getitem__)
+    return luminance - (255 - background)
+
+
+def _threshold(grey, luminance):
+    return relative(grey.histogram(), luminance) if luminance < 255 else luminance
+
+
 def load_ink_matrix(path, luminance=INK_LUMINANCE):
     """The 1280x720 ink mask as a numpy array (rows x columns of booleans), or
     None when numpy or Pillow is not installed. Column-aware gates need the
@@ -37,7 +55,7 @@ def load_ink_matrix(path, luminance=INK_LUMINANCE):
         grey = image.convert("L")
         if grey.size != (CANVAS_W, CANVAS_H):
             grey = grey.resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
-        return np.asarray(grey) < luminance
+        return np.asarray(grey) < _threshold(grey, luminance)
 
 
 def load_ink_rows(path, luminance=INK_LUMINANCE):
@@ -62,6 +80,7 @@ def load_ink_rows(path, luminance=INK_LUMINANCE):
         grey = image.convert("L")
         if grey.size != (CANVAS_W, CANVAS_H):
             grey = grey.resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
+        luminance = _threshold(grey, luminance)
         try:
             import numpy as np
 

@@ -201,6 +201,25 @@ class Emitter:
         runs = layout.get("sourceRuns") or node.get("runs")
         paragraphs = self.paragraphs_of(node)
         first = True
+        if (node.get("data") or {}).get("balanced") and layout.get("lines"):
+            # A balanced title: the engine chose where its lines break so the
+            # last is not a stranded word. A soft break (a:br) at each keeps
+            # that break in PowerPoint, whose metrics differ by a few percent,
+            # and keeps the title one paragraph for Outline view.
+            p = tf.paragraphs[0]
+            p.alignment = align
+            styled = layout.get("runs") if (layout.get("sourceRuns") or node.get("runs")) else [{"text": "\n".join(layout["lines"]), "bold": bold}]
+            for r in styled:
+                accent = rgb(self.colors.get("color.accent") or self.colors.get("color.componentPrimary")) if r.get("accent") else None
+                for i, piece in enumerate(str(r["text"]).split("\n")):
+                    if i:
+                        p.add_line_break()
+                    if piece:
+                        run = p.add_run()
+                        run.text = piece
+                        self._font(run.font, family, size, bold or r.get("bold", False), accent or color)
+            p.line_spacing = 1.0
+            return
         if runs:
             # Runs vary only in bold; rebuild them per paragraph from the source text.
             text_all = "".join(r["text"] for r in runs)
@@ -513,7 +532,11 @@ class Emitter:
                     ser.add_data_point(p.get("x"), p.get("y"))
         else:
             cd = CategoryChartData()
-            cd.categories = spec["categories"]
+            # Categories the scene left unlabelled (a crowded period axis, a
+            # long ranking) are blank here, so the chart prints what the page
+            # planned (core.mjs nativeChartSpec).
+            hidden = set(spec.get("hiddenCategoryIndices") or [])
+            cd.categories = ["" if i in hidden else c for i, c in enumerate(spec["categories"])]
             for s in spec["series"]:
                 cd.add_series(s.get("name") or "Series", s["values"])
         gf = slide.shapes.add_chart(ctype, emu(f["x"]), emu(f["y"]), emu(f["width"]), emu(f["height"]), cd)
@@ -533,6 +556,9 @@ class Emitter:
         fmt = spec.get("valueFormat") or {}
         if isinstance(fmt, dict) and "decimals" in fmt:
             decimals = int(fmt["decimals"])
+        elif isinstance(spec.get("labelDecimals"), int):
+            # The precision the drawn chart printed (core.mjs nativeChartSpec).
+            decimals = spec["labelDecimals"]
         else:
             # No declared format: labels read the way the drawn charts write them
             # (value-format.mjs decimalsFor). A series rounds as one: whole
@@ -546,17 +572,14 @@ class Emitter:
             else:
                 decimals = 1 if fractional and abs(fractional[0]) < 10 else 0
         # Four figures and up read with a thousands separator, the way the drawn
-        # charts write them and every published page prints them.
+        # charts write them and every well-made page prints them.
         values_all = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
         grouped = any(abs(v) >= 1000 for v in values_all)
         base = "#,##0" if grouped else "0"
+        # A fixed format, never "General": every label in the series carries the
+        # one precision, so 12 prints as 12.0 beside 35.8, as the drawn chart
+        # prints it.
         number_format = base if decimals == 0 else base + "." + "0" * decimals
-        # The drawn chart prints a one-decimal series as JavaScript rounds it:
-        # 35.8 beside 12, not 12.0. When every value already has at most one
-        # decimal and no format was declared, "General" prints exactly that.
-        if decimals == 1 and not (isinstance(fmt, dict) and "decimals" in fmt) and values_all \
-                and all(abs(v * 10 - round(v * 10)) < 1e-9 for v in values_all) and not grouped:
-            number_format = "General"
         if kind not in ("pie", "donut", "scatter"):
             # Bar weight follows the category count, as in the drawn charts:
             # few categories take fat bars, many take thinner ones.
@@ -584,6 +607,13 @@ class Emitter:
                     va.maximum_scale = _nice_ceiling(max(vals) * LABEL_HEADROOM)
             if spec.get("yMajorUnit") is not None:
                 va.major_unit = spec["yMajorUnit"]
+                # One precision down the axis, as the drawn axis prints it:
+                # 0.0, 2.5, 5.0 rather than General's 0, 2.5, 5.
+                ticks = [spec.get("yMin") or 0, spec.get("yMax") or 0, spec["yMajorUnit"]]
+                places = max(len(f"{float(t):.12g}".partition(".")[2]) for t in ticks)
+                if places:
+                    va.tick_labels.number_format = ("#,##0" if grouped else "0") + "." + "0" * min(places, 6)
+                    va.tick_labels.number_format_is_linked = False
             ca = chart.category_axis
             ca.tick_labels.font.size = Pt(10)
             if kind not in ("bar", "stacked-bar", "range"):
@@ -613,7 +643,18 @@ class Emitter:
                 # end labels retain their separate right-side placement below.
                 dl.position = XL_LABEL_POSITION.ABOVE
             elif kind in ("pie", "donut"):
-                dl.position = XL_LABEL_POSITION.OUTSIDE_END if kind == "pie" else XL_LABEL_POSITION.CENTER
+                # The scene prints each slice's share ("54%") inside the slice,
+                # measured to fit it (charts.mjs partToWhole). The native chart
+                # printed the raw value outside the rim instead, where
+                # LibreOffice gives an outside label only the sliver between
+                # the pie and the frame edge: "75.8" wrapped one character per
+                # line down the side of a Saudia pie. The native labels now say
+                # what the scene says, where it says it; a scene that had to
+                # set a share outside stays drawn (core.mjs nativeChartSpec).
+                dl.show_value = False
+                dl.show_percentage = True
+                dl.number_format = "0%"
+                dl.position = XL_LABEL_POSITION.CENTER
         # series colours from the palette (comparator series grey when the runtime would)
         idx = spec.get("colorIndices")
         accent = self.colors.get("color.accent") or self.colors.get("color.componentPrimary")
@@ -624,8 +665,14 @@ class Emitter:
         for i, ser in enumerate(plot.series):
             ci = idx[i] if idx and i < len(idx) else i
             color = self.series_colors[ci % len(self.series_colors)] if self.series_colors else None
-            if len(spec["series"]) == 2 and i == 1 and not idx and not is_range and kind not in ("line", "area"):
-                color = self.colors.get("color.chartComparator", color)
+            if len(spec["series"]) == 2 and not idx and not is_range and kind not in ("line", "area"):
+                # The scene decides which peer is the point (focusIndex, from
+                # its painted marks); without one the second is the grey.
+                focus = spec.get("focusIndex")
+                if focus is not None and i == focus:
+                    color = self.colors.get("color.componentPrimary", color)
+                elif i == (1 if focus is None else 1 - focus):
+                    color = self.colors.get("color.chartComparator", color)
             if is_range and i == 0:
                 # invisible base: the bar floats from low to high
                 ser.format.fill.background(); ser.format.line.fill.background()
@@ -691,6 +738,19 @@ class Emitter:
                     sdl.font.color.rgb = rgb(self.colors.get("color.ink", "#000000"))
                     if kind in ("column", "bar"):
                         sdl.position = XL_LABEL_POSITION.OUTSIDE_END
+                    # Values the scene left unprinted (a ranking labelled on
+                    # the rows it names) are deleted point by point, as above.
+                    # A point's dLbl leads the dLbls block (schema order).
+                    for j in spec.get("hiddenLabelIndices") or []:
+                        labels = ser._element.get_or_add_dLbls()
+                        label = etree.Element(qn("c:dLbl"))
+                        etree.SubElement(label, qn("c:idx")).set("val", str(j))
+                        etree.SubElement(label, qn("c:delete")).set("val", "1")
+                        points = labels.findall(qn("c:dLbl"))
+                        if points:
+                            points[-1].addnext(label)
+                        else:
+                            labels.insert(0, label)
                 if kind in ("column", "bar", "stacked-column", "stacked-bar") and single:
                     two_mark_contrast = kind in ("column", "bar") and len(spec["categories"]) == 2 and idx is None and not highlight_indices
                     for j, pt in enumerate(ser.points):
@@ -700,7 +760,7 @@ class Emitter:
                         elif kind in ("column", "bar") and forecast_index is not None and forecast_index >= 0 and j >= forecast_index and forecast:
                             point_color = forecast
                         elif two_mark_contrast:
-                            point_color = self.colors.get("color.componentPrimary" if j == 0 else "color.chartComparator", color)
+                            point_color = self.colors.get("color.componentPrimary" if j == spec.get("focusIndex", 0) else "color.chartComparator", color)
                         if point_color:
                             pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(point_color)
                 if kind == "line" and spec.get("endLabels"):
@@ -711,7 +771,8 @@ class Emitter:
                         lab.position = XL_LABEL_POSITION.RIGHT
                         tf = lab.text_frame
                         value = spec["series"][i]["values"][last]
-                        decimals = (spec.get("valueFormat") or {}).get("decimals", 0)
+                        # The chart's one precision, not a whole-number default
+                        # that rounded 40.8 to "41" beside point labels of 40.8.
                         tf.text = f'{spec["series"][i].get("name") or ""} {value:,.{decimals}f}'
                         for p in tf.paragraphs:
                             for r in p.runs:
@@ -734,6 +795,27 @@ class Emitter:
                     c = self.series_colors[j % len(self.series_colors)]
                     if c:
                         pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(c)
+                    if c and spec.get("dataLabels", True):
+                        # A share sits on its slice: white on a dark fill, ink
+                        # on a light one, as the scene chose. The per-point
+                        # label python-pptx creates shows the value and no
+                        # percentage, so it is set back to the series policy.
+                        lab = pt.data_label
+                        lab.font.size = Pt(11); lab.font.bold = bool(spec.get("labelBold", True))
+                        # The scene's rule (strongest contrast of the two),
+                        # not a luminance cut: a tan slice took white at 2.5:1
+                        # where ink reads at 6:1.
+                        on, ink = self.colors.get("color.onPrimary", "#FFFFFF"), self.colors.get("color.ink", "#000000")
+                        ratio = lambda a, b: (max(_luminance(a), _luminance(b)) + 0.05) / (min(_luminance(a), _luminance(b)) + 0.05)
+                        lab.font.color.rgb = rgb(on if ratio(c, on) >= ratio(c, ink) else ink)
+                        dlbl = lab._dLbl
+                        if dlbl is not None:
+                            if dlbl.find(qn("c:numFmt")) is None:
+                                fmt_el = etree.Element(qn("c:numFmt")); fmt_el.set("formatCode", "0%"); fmt_el.set("sourceLinked", "0")
+                                dlbl.find(qn("c:idx")).addnext(fmt_el)
+                            for tag, val in (("c:showVal", "0"), ("c:showPercent", "1")):
+                                if dlbl.find(qn(tag)) is not None:
+                                    dlbl.find(qn(tag)).set("val", val)
         if kind == "donut" and spec.get("center"):
             # The centre KPI: a text box over the hole (value bold, label under).
             center = spec["center"] if isinstance(spec["center"], dict) else {"value": str(spec["center"])}

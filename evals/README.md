@@ -20,7 +20,7 @@ node evals/cold-run/score.mjs out/deck.plan.json out/
 ## Commands
 
 ```bash
-# everything: unit tests, page-gate numbers for the fixture deck, golden check
+# everything: unit tests, content-stage and cold-run numbers for the example decks
 evals/run.sh
 
 # plus the LibreOffice end-to-end render (~10 s, skipped without soffice)
@@ -29,11 +29,6 @@ evals/run.sh --slow
 # unit tests only
 python3 -m unittest discover -s evals/tests -p 'test_*.py'
 node evals/scripts/run_tests.mjs
-
-# release gate: reference-image comparison (item 17)
-node evals/scripts/run_tests.mjs --release
-python3 evals/scripts/golden_reference.py check <render-dir> [--report out.json]
-python3 evals/scripts/golden_reference.py accept <render-dir> [--only id,id]
 
 # deterministic page gates on any scene + render (item 11)
 python3 skills/professional-slides/runtime/gates/page_gates.py \
@@ -47,6 +42,32 @@ node evals/scripts/compile_scene.mjs spec.json scene.json
 python3 evals/scripts/pptx_scene_probe.py deck.pptx scene.json
 ```
 
+## Reference census
+
+`scripts/reference_census.py` measures a rendered deck page by page — words and
+numeric tokens, body ink, occupied grid cells, empty bands, title rules, and,
+given the scene or pages file, exhibits per page, one-exhibit-plus-column pages,
+plotted values per chart page and one-to-three-word title last lines — and sets
+it beside a reference census. `reference_census.json` holds the numbers for a
+sample of strong consulting pages; the sample stays outside the repository, so
+pass another PDF or census JSON to `--reference` to compare against something
+else.
+
+Every per-page statistic is taken over the deck's analytical pages: the cover,
+section dividers, agendas and generated pages (picture credits) are left out,
+told apart by the scene and the compiled deck spec, or guessed from the render
+without a scene; a scanned reference is measured whole, and the printed notes
+say which applied. Plotted values are the compiler's: given the compiled spec
+(`--deck`, or the `<id>.deck.json` beside `--pages`), the chart pages are those
+with `pageType.chart` - the chart page types and panels carrying a chart - and
+each counts `pageType.values`, the number `author-deck.mjs` prints as `plotted`.
+
+```bash
+python3 evals/scripts/reference_census.py out/rendered/deck.pdf \
+    --scene out/scene.json --pages deck.pages.json \
+    --reference evals/reference_census.json [--out census.json]
+```
+
 ## Page gates
 
 `runtime/gates/page_gates.py` measures the resolved scene and, where the
@@ -54,7 +75,7 @@ question is optical, the rendered PNG. Exit 0 pass, 2 findings. Every finding is
 `{slide, code, measured, threshold, repair}`.
 
 See the [evaluation contract](../skills/professional-slides/references/evaluation/index.md)
-for blocking checks and advisory corpus statistics. Each generated report carries
+for blocking checks and advisory statistics. Each generated report carries
 the thresholds actually used; the [page-gate implementation](../skills/professional-slides/runtime/gates/page_gates.py)
 owns the profile and role-specific rules.
 
@@ -63,31 +84,6 @@ Whether a page needs additional interpretation is an editorial review decision. 
 Content-stage summaries distinguish quantitative evidence kinds from structured
 qualitative kinds. Neither share certifies that a claim is sourced or correct;
 the reviewer must inspect its evidence.
-
-## Fixtures
-
-* `evals/fixtures/scene-nyc.json.gz` — the resolved 21-slide NYC/SF scene the
-  audit was written about (embedded photographs downscaled so the fixture stays
-  under 250 KB). Loaded by `page_gates.load_scene`, which transparently gunzips.
-* `evals/golden/reference/slide-{2,5,6,15}.png` — four accepted 1280×720 pages.
-  They are both the golden references and the render fixture for the ink gates:
-  one deck, one copy in the repository.
-
-## Golden set
-
-`golden_reference.py` compares a candidate render to the accepted PNG at full
-1280×720 on two numbers, both of which must pass:
-
-* mean absolute channel difference ≤ 0.02
-* foreground mismatch ratio ≤ 0.12, over pixels that are ink in either image
-
-A source-hash change does not fail. A pixel regression does. `--accept` (or the
-`accept` action) updates the references.
-
-`npm run check:release` emits the committed scene through the current PowerPoint
-exporter, renders it in LibreOffice, and compares fresh candidates with the four
-accepted references. Runs and comparison reports remain under
-`output/golden/runs/release-*`; references cannot be their own candidates.
 
 Install Node test dependencies with `npm ci`, then install the browser used by
 rendered overlap tests with `npx playwright install chromium`. Use Node 20.9+

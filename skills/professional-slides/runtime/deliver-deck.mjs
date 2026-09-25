@@ -2,7 +2,12 @@
 // Build, gate, review, and hand over — or refuse.
 //
 //   node runtime/deliver-deck.mjs spec.json out/ [--reviewer auto|codex|claude|packet] [--model m]
-//                                              [--review review.json] [--skip-build] [--brief "…"]
+//                                              [--review review.json] [--skip-build] [--brief "…"] [--full-review]
+//
+// Before any review, the author's self-check must cover the claim ledger (claims.json).
+// The first review reads the whole deck; after a rejection, the next review of the
+// rebuilt deck verifies the repairs and the changed pages only (--full-review forces a
+// whole-deck reading again).
 //
 // Exit 0: accepted; the deliverable is out/<id>-DELIVERED.pptx. Exit 2: rejected; no
 // deliverable is written, out/REJECTED.md lists the blockers, and any earlier deliverable
@@ -13,9 +18,11 @@ import { fileURLToPath } from "node:url";
 import { deckStem } from "./artifact-path.mjs";
 import { assertOutputDirectory } from "./output-path.mjs";
 import { buildDeck } from "./build-deck.mjs";
-import { runReview, validateReview, validateReviewBinding, validateDensityReview, reviewOutcome } from "./reviewer.mjs";
+import { runReview, validateReview, validateReviewBinding, validateDensityReview, reviewOutcome, slideHashes, latestReview, verificationScope, withInheritedDensity, recordReview } from "./reviewer.mjs";
+import { writeLedger, validateSelfCheck } from "./claims.mjs";
+import { validateStorylineReview } from "./storyline.mjs";
 
-export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto", model, reviewFile, skipBuild = false, brief, answer } = {}) {
+export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto", model, reviewFile, skipBuild = false, brief, answer, fullReview = false } = {}) {
   const directory = await assertOutputDirectory(outputDirectory);
   const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
   brief = brief ?? spec.brief ?? spec.context?.originalBrief ?? "";
@@ -33,16 +40,39 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   if (build.readback && build.readback.accepted !== true) blockers.push(...(build.readback.findings || []).slice(0, 20).map((f) => ({ slide: f.slide ?? null, code: "BROKEN_GEOMETRY", severity: "blocker", reason: `readback ${f.code} on ${f.shape || ""}`, repair: "Fix the emitter or the scene so the saved file matches the scene" })));
   if (build.gates && build.gates.passed === false) blockers.push(...(build.gates.findings || []).map((f) => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: `gate ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
   if (build.preflight?.passed === false) blockers.push(...(build.preflight.findings || []).map(f => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: f.reason || `preflight ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
+  // The build names what else held it back - text lost from the rendered
+  // pages, most often - rather than leaving "not complete" to be diagnosed.
+  if (build.status !== "built" && !blockers.length) blockers.push(...(build.blockers || []).filter((b) => b.source !== "page gates" && b.source !== "readback").slice(0, 20)
+    .map((b) => ({ slide: b.slide ?? null, code: b.code, severity: "blocker", reason: `${b.source} ${b.code}${b.id ? ` on ${b.id}` : ""}${b.text ? `: "${b.text}"` : ""}`, repair: b.repair || "Fix the page so the saved deck carries every planned text, then rebuild" })));
   if (build.status !== "built" && !blockers.length) blockers.push({slide:null, code:"BROKEN_GEOMETRY", severity:"blocker", reason:`Build is not complete: ${build.status}`, repair:"Complete the build and all gates before delivery"});
   if (blockers.length) return reject(report, directory, rejectedNote, "page gates", blockers);
 
+  // The storyline was stress-tested before it was drawn: an independent
+  // critique of the dot-dash, bound to its structure, said it was ready.
+  report.stage = "storyline";
+  const storyline = await fs.readFile(path.join(directory, "storyline-review.json"), "utf8").then(JSON.parse).catch(() => null);
+  const storyErrors = spec.purpose === "catalogue" ? [] : validateStorylineReview(storyline, spec);
+  if (storyErrors.length) return reject(report, directory, rejectedNote, "storyline", storyErrors.map((reason) => ({ slide: null, code: "STORYLINE_UNREVIEWED", severity: "blocker", reason,
+    repair: "Run node runtime/storyline.mjs on the deck, give prompt.md to an independent reviewer, revise until it returns verdict ready, and save its JSON as out/storyline-review.json" })));
+
+  // The author reproduces every claim before anyone reviews the deck: a review
+  // spent finding a mistyped figure is a round the deck did not need.
+  report.stage = "self-check";
+  const ledger = await fs.readFile(path.join(directory, "claims.json"), "utf8").then(JSON.parse).catch(() => writeLedger(directory));
+  const selfCheck = await fs.readFile(path.join(directory, "self-check.json"), "utf8").then(JSON.parse).catch(() => null);
+  const unchecked = validateSelfCheck(selfCheck, ledger);
+  if (unchecked.length) return reject(report, directory, rejectedNote, "self-check", unchecked.map((reason) => ({ slide: null, code: "SELF_CHECK_INCOMPLETE", severity: "blocker", reason,
+    repair: "Work through out/claims.json against the source records, fix what fails, and record out/self-check.json (references/taste-review.md#self-check)" })));
+
   report.stage = "review";
+  const scope = fullReview ? null : verificationScope(await latestReview(directory), await slideHashes(directory));
+  report.reviewMode = scope ? "verification" : "full";
   let review;
   if (reviewFile) review = JSON.parse(await fs.readFile(reviewFile, "utf8"));
   else {
-    const run = await runReview({ outputDirectory: directory, brief, answer, backend: reviewer, model });
+    const run = await runReview({ outputDirectory: directory, brief, answer, backend: reviewer, model, scope });
     if (run.status === "packet-written") {
-      report.review = { status: "pending", packet: run.packetDir, note: run.note };
+      report.review = { status: "pending", mode: report.reviewMode, pages: scope ? scope.mustInspect.length : slideIdsOf(await fs.readFile(path.join(directory, "scene.json"), "utf8")).length, packet: run.packetDir, note: run.note };
       await fs.writeFile(path.join(directory, "delivery.json"), JSON.stringify(report, null, 2) + "\n");
       return report;
     }
@@ -50,8 +80,10 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   }
   const slideIds = JSON.parse(await fs.readFile(path.join(directory, "scene.json"), "utf8")).slides.map((s) => s.id);
   const profile = await fs.readFile(path.join(directory, "density-profile.json"), "utf8").then(JSON.parse).catch(() => null);
-  const errors = [...validateReview(review, slideIds), ...await validateReviewBinding(review, directory, slideIds), ...validateDensityReview(review, profile)];
+  review = withInheritedDensity(review, scope);
+  const errors = [...validateReview(review, slideIds), ...await validateReviewBinding(review, directory, slideIds, scope), ...validateDensityReview(review, profile)];
   if (errors.length) return reject(report, directory, rejectedNote, "invalid review", errors.map((e) => ({ slide: null, code: "EDITORIAL", severity: "blocker", reason: `review record invalid: ${e}`, repair: "Return a review that matches the schema; this is a transport problem, not a deck defect" })));
+  await recordReview(directory, review);
   const outcome = reviewOutcome(review);
   report.review = { accepted: outcome.accepted, summary: review.summary, findings: review.findings.length, blocking: outcome.blocking.length, file: reviewFile ? path.resolve(reviewFile) : path.join(directory, "review.json") };
   if (!outcome.accepted) return reject(report, directory, rejectedNote, "review", outcome.blocking);
@@ -61,6 +93,8 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   await fs.writeFile(path.join(directory, "delivery.json"), JSON.stringify(report, null, 2) + "\n");
   return report;
 }
+
+const slideIdsOf = (sceneText) => JSON.parse(sceneText).slides.map((s) => s.id);
 
 async function reject(report, directory, notePath, stage, blockers) {
   report.accepted = false; report.rejectedAt = stage; report.blockers = blockers;
@@ -74,9 +108,9 @@ async function reject(report, directory, notePath, stage, blockers) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [spec, out, ...args] = process.argv.slice(2);
   const get = (k) => { const i = args.indexOf("--" + k); return i < 0 ? undefined : args[i + 1]; };
-  if (!spec || !out) { console.error("Usage: deliver-deck.mjs spec.json output-directory [--reviewer auto|codex|claude|packet] [--model m] [--review review.json] [--skip-build] [--brief text]"); process.exit(1); }
+  if (!spec || !out) { console.error("Usage: deliver-deck.mjs spec.json output-directory [--reviewer auto|codex|claude|packet] [--model m] [--review review.json] [--skip-build] [--brief text] [--full-review]"); process.exit(1); }
   try {
-    const report = await deliverDeck(path.resolve(spec), path.resolve(out), { reviewer: get("reviewer") || "auto", model: get("model"), reviewFile: get("review"), skipBuild: args.includes("--skip-build"), brief: get("brief") });
+    const report = await deliverDeck(path.resolve(spec), path.resolve(out), { reviewer: get("reviewer") || "auto", model: get("model"), reviewFile: get("review"), skipBuild: args.includes("--skip-build"), brief: get("brief"), fullReview: args.includes("--full-review") });
     console.log(JSON.stringify(report));
     process.exit(report.accepted ? 0 : report.review?.status === "pending" ? 3 : 2);
   } catch (error) {

@@ -1,15 +1,15 @@
 {
   "schema": "professional-slides.deck/v3",
   "id": "house-style",
-  "palette": "bcg",
+  "palette": "evergreen",
   "weight": {
     "pageWords": 70
   },
   "footer": "Investor pulse, Q4",
   "agenda": "once",
   "cover": {
-    "title": "Investor perspectives, Q4",
-    "subtitle": "Survey of leading investors",
+    "title": "Market pulse, Q4",
+    "subtitle": "Illustrative investor and workforce survey",
     "date": "November 2026",
     "logo": "Professional slides"
   },
@@ -21,7 +21,7 @@
     },
     {
       "title": "Interest rates remain the number one macro risk; geopolitics rose most since June",
-      "tag": "Oct 10\u201313",
+      "tag": "Oct 10–13",
       "exhibit": {
         "type": "chart.bar",
         "heading": "Most important macro factors",
@@ -67,7 +67,7 @@
         "tone": "outline",
         "text": "Geopolitical risk jumped 14 points, the largest move in the series; rates stayed first for the sixth survey running."
       },
-      "source": "Investor pulse, October 10\u201313, 2026; n = 116",
+      "source": "Illustrative investor survey, October 2026; n = 120",
       "note": [
         "n=412 institutional investors; respondents ranked their top three factors",
         "Change is against the June wave of the same panel"
@@ -158,7 +158,7 @@
         }
       ],
       "soWhat": "Half the workforce is one offer away from leaving; retention is a manager problem before it is a pay problem.",
-      "source": "Future of work survey, October 2026; 4,985 deskless workers in four countries",
+      "source": "Illustrative workforce survey, October 2026; 3,000 frontline workers in four countries",
       "callout": {
         "lead": "How to read",
         "text": "Agreement is the top two boxes; the strongly-agree share is the group that leaves first, and it is the one retention work has to reach."
@@ -194,7 +194,7 @@
         "tone": "outline",
         "text": "While investors have consistently supported investing in the business at the expense of EPS, they now also expect companies to fully deliver on guidance and consensus."
       },
-      "source": "Investor pulse, October 10\u201313, 2026",
+      "source": "Illustrative investor survey, October 2026",
       "subtitle": "Investor preference between investing in the business and delivering EPS, 2025",
       "points": [
         "Investors back investment over EPS by a wide margin",

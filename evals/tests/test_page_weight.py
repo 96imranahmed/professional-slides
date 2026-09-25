@@ -26,7 +26,10 @@ const insight={title:'T',exhibit:chart,insight:'Lockers cost half what a post of
 assert.equal(marker(insight).props.variant,'divider-chevron');
 const side=row(insight).items.find(i=>i.id==='s01-side');
 assert.equal(side.heading,undefined,'an insight column carries no filler heading');
-assert.equal(side.leftover,'center');
+// It starts at the top of the track, level with the exhibit: centred, the box
+// had a band of air above it as tall as the one below.
+assert.equal(side.leftover,undefined);
+assert.equal(row({...insight,pointsAlign:'middle'}).items.find(i=>i.id==='s01-side').leftover,'center','the author can still ask for the middle');
 assert.equal(side.items[0].component,'insight');
 assert.equal(side.items[0].props.variant,'tonal');
 // `insight` as an object keeps its heading; `implication: false` drops the marker.

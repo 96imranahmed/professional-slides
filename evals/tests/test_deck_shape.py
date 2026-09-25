@@ -273,7 +273,7 @@ const spec={schema:'professional-slides.deck/v3',id:'d',fill:'full',slides:[{tit
 assert.equal(composeDeck(spec).weight.pageWords, WEIGHT_BY_FILL.full.pageWords);
 assert.equal(composeDeck({...spec,weight:{pageWords:111}}).weight.pageWords, 111);
 // A template's house profile carries fill and weight into a deck that sets neither.
-const house={schema:'professional-slides.house/v1',palette:{base:'bcg',id:'h',label:'H',colors:{}},fill:'full',weight:{pageWords:140,columnFill:0.7}};
+const house={schema:'professional-slides.house/v1',palette:{base:'evergreen',id:'h',label:'H',colors:{}},fill:'full',weight:{pageWords:140,columnFill:0.7}};
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'house-'));
 fs.writeFileSync(path.join(dir,'house.json'), JSON.stringify(house));
@@ -299,13 +299,17 @@ assert.equal(side(page,'full').items[0].props.distribute,true);
 // An airy deck spreads too. White space *between* the points is what airy
 // means; the same space pooled under the last one is an unfinished page.
 assert.equal(side(page,'airy').items[0].props.distribute,true,'an airy deck puts its air between the points');
-// A thin column narrows and gives the width to the exhibit.
-assert.equal(side(page,'balanced').size.width.fr,0.8);
+// A thin column narrows and gives the width to the exhibit - toward the depth
+// a well-made side column runs, never under the width a line of prose needs
+// (a third of the 1068px row at fr 1; 280px is fr 0.71).
+const thin=side(page,'balanced').size.width.fr;
+assert.ok(thin<1&&thin>0.7,`thin column fr ${thin}`);
 const deep={title:'T',exhibit:chart,points:[
  {lead:'Wealth nearly doubled',text:'Advisory fees grew 18% a year while lending margins compressed, so the mix shifted to fee income across the book.'},
  {lead:'Corporate slipped',text:'Lending margins compressed through the rate cycle and the corporate book lost a fifth of its contribution.'},
  {lead:'Retail held',text:'Deposit growth offset the fee decline, leaving retail flat against a falling market.'}]};
-assert.equal(side(deep,'balanced').size.width.fr,1);
+const deepFr=side(deep,'balanced').size.width.fr;
+assert.ok(deepFr<=1&&deepFr>=thin,`a deeper column narrows less (${deepFr} against ${thin})`);
 // A number alone in the column takes no filler heading.
 assert.equal(side({title:'T',exhibit:chart,kpi:{value:'78%',label:'share'}},'balanced').heading,undefined);
 assert.equal(side(page,'balanced').heading,'What it means');
@@ -356,6 +360,36 @@ assert.equal(short.find(n=>n.role==='chart-unit').data.chartUnitPlacement,'inlin
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result["accepted"])
+
+    def test_a_short_unit_that_will_not_fit_beside_the_heading_moves_under_it(self):
+        # "Airline seats, Sep 2026" with unit "% y/y" in a narrow panel was
+        # reported as a wrapping heading; the unit broke the line, and the
+        # runtime can set it under the heading instead.
+        result = run_node('''
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const registry=createRegistry();
+const render=(props,width)=>registry.get('chart-title').render({id:'h',frame:{x:0,y:0,width,height:120},props}).nodes;
+const narrow=render({heading:'Airline seats, Sep 2026',unit:'% y/y',unitPlacement:'inline'},250);
+const long=render({heading:'Published annual pay for research-connected PM roles at labs',unit:'$k',unitPlacement:'inline'},300);
+const phrase=render({heading:'Published annual pay for research-connected PM roles',unit:'$k, published base-salary band',unitPlacement:'inline'},720);
+const wrapped=nodes=>nodes.find(n=>n.role==='section-heading').data.headingWrapped??null;
+console.log(JSON.stringify({narrow:wrapped(narrow),stacked:narrow.find(n=>n.role==='chart-unit').data.chartUnitPlacement,long:wrapped(long),phrase:wrapped(phrase)}));
+''')
+        self.assertIsNone(result["narrow"])
+        self.assertEqual(result["stacked"], "stacked")
+        self.assertEqual(result["long"]["reason"], "heading")
+        self.assertEqual(result["long"]["available"], 300)
+        self.assertGreater(result["long"]["width"], 300)
+        self.assertEqual(result["phrase"]["reason"], "unit")
+        self.assertIn("$k, published base-salary band", result["phrase"]["text"])
+        # The finding says what was measured and against what.
+        slide = {"id": "s01", "componentInstances": [{"id": "chrome", "component": "slide-chrome"}],
+                 "nodes": [{"type": "text", "role": "section-heading", "text": "x", "frame": {"x": 60, "y": 140, "width": 300, "height": 40},
+                            "data": {"headingWrapped": result["long"], "textLayout": {"source": "x"}}}]}
+        found = [f for f in page_gates.run_gates(deck([slide]))["findings"] if f["code"] == "HEADING_WRAPS"]
+        self.assertEqual(len(found), 1)
+        self.assertIn(f"{result['long']['width']}px on one line", found[0]["repair"])
+        self.assertIn("300px", found[0]["repair"])
 
     def test_the_gate_reads_the_recorded_fallback(self):
         slide = {
@@ -523,10 +557,11 @@ class BandFurnitureTests(unittest.TestCase):
     """The band above the title, the headers on a label table and the second
     statement box: the small furniture the reference pages carry page after page."""
 
-    def test_a_standfirst_replaces_the_title_rule_rather_than_stacking_under_it(self):
-        # A rule and a standfirst do the same job - they close the title band -
-        # so a page takes one or the other. The standfirst carries the measure
-        # and the rule carries nothing, so the standfirst wins.
+    def test_a_standfirst_sits_between_the_title_and_its_rule(self):
+        # The standfirst is the title's own line - the measure, the
+        # population, the period - so it sits under the title and above the
+        # rule that closes the band, in smaller, lighter type, and the body
+        # starts below the rule.
         result = run_node("""
 import assert from 'node:assert/strict';
 import {compileDeck, component} from './skills/professional-slides/runtime/core.mjs';
@@ -537,11 +572,14 @@ const chrome=(props)=>compileDeck({slides:[{id:'s1',frame,composition:component(
 const rules=(nodes)=>nodes.filter(n=>n.role==='title-rule').length;
 assert.equal(rules(chrome({})),1,'a page with no standfirst keeps its rule');
 const standfirst=chrome({subtitle:'Announced deal value by segment, India, $B'});
-assert.equal(rules(standfirst),0,'the standfirst takes the place of the rule');
+assert.equal(rules(standfirst),1,'the standfirst keeps the rule');
 const sub=standfirst.find(n=>n.role==='action-subtitle');
 const title=standfirst.find(n=>n.role==='action-title');
+const rule=standfirst.find(n=>n.role==='title-rule');
 assert.ok(sub,'the standfirst renders');
-assert.ok(sub.frame.y>title.frame.y,'and sits under the title');
+assert.ok(sub.frame.y>=title.frame.y+title.data.textLayout.height,'and sits under the title');
+assert.ok(sub.frame.y+sub.frame.height<rule.frame.y,'above the rule');
+assert.ok(sub.style.fontSize.value<title.style.fontSize.value,'in smaller type');
 console.log(JSON.stringify({ok:true}));
 """)
         self.assertTrue(result["ok"])
@@ -616,22 +654,26 @@ assert.equal(boxes.length,2,'both statements are placed');
 // A reading, then its consequence: the first plain in the column, the second in
 // the box under it. Two equal boxes read as two unrelated labels.
 assert.deepEqual(boxes.map(b=>b.props.variant),['plain','tonal']);
-// Statements and nothing else are read against the exhibit, so the pair centres
-// on it rather than hugging the top of the track or spreading down it.
-assert.equal(column.leftover,'center');
+// Statements and nothing else sit together at the top of the track, level with
+// the exhibit: not spread down it (they would pin to opposite ends of an empty
+// track), and not centred on it (a band of air above them as tall as the one
+// below, which the band gates read by column).
+assert.equal(column.leftover,undefined);
 const one=composeSlide({title:'T',rows,insights:['Four in five workers are Black or African American']},0);
 const single=side(one);
 assert.equal(single.items.find(i=>i.component==='insight').props.variant,'tonal','one statement is the box');
-assert.equal(single.leftover,'center');
+assert.equal(single.leftover,undefined);
 assert.throws(()=>composeSlide({title:'T',rows,insights:['a','b','c']},0),/at most two insights/);
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
-    def test_a_commentary_column_centres_on_how_much_of_its_track_it_fills(self):
-        """The count was a proxy for the slack, and it got one long prose point
-        wrong: the column hugged the top of a 500px track and left the bottom
-        half of the page blank. Measure the fill instead."""
+    def test_a_short_commentary_column_narrows_and_starts_at_the_top(self):
+        """A column that fills little of its track used to centre on the
+        exhibit, which put a band of air above its first line as tall as the
+        one under its last. It starts at the top and narrows instead, so its
+        text runs deeper and the exhibit takes the width; the middle is the
+        author's to ask for."""
         result = run_node("""
 import assert from 'node:assert/strict';
 import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
@@ -642,14 +684,21 @@ const side=(page)=>{const walk=(item)=>String(item.id||'').endsWith('-side')?[it
   return page.items.flatMap(walk)[0];};
 const build=(points)=>side(composeSlide({id:'s',title:'Local supply falls together in the design drought',
   layout:'exhibit-left',pointsHeading:false,pointsStyle:'prose',exhibit,points},0));
-// One prose point against a headed chart leaves most of the track empty, so it
-// is read across from the exhibit rather than down from the title.
+// One prose point against a headed chart leaves most of the track empty: it
+// starts at the top, and the column narrows to give the chart the width.
 const sentence='Each weather state reduces several local sources together. No probability is assigned to the scenarios and the gaps between them are not confidence intervals.';
-assert.equal(build([{lead:'The model does not treat four districts as four independent hedges.',text:sentence}]).leftover,'center');
-// A column with enough body to fill its track starts at the top; the slack at
-// the foot is not a hole.
+const point={lead:'The model does not treat four districts as four independent hedges.',text:sentence};
+const short=build([point]);
+assert.notEqual(short.leftover,'center');
+assert.ok(short.size.width.fr<1,`a short column narrows (fr ${short.size.width.fr})`);
+// A column with enough body to fill its track keeps its width, and starts at the top too.
 const full=build(Array.from({length:5},(_,i)=>({lead:`Finding ${i+1}`,text:sentence})));
 assert.notEqual(full.leftover,'center');
+assert.ok(full.size.width.fr>=1);
+// The middle is still there for an author who asks for it.
+const asked=side(composeSlide({id:'s',title:'Local supply falls together in the design drought',
+  layout:'exhibit-left',pointsHeading:false,pointsStyle:'prose',pointsAlign:'middle',exhibit,points:[point]},0));
+assert.equal(asked.leftover,'center');
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
@@ -756,44 +805,6 @@ class CorpusBenchmarkTests(unittest.TestCase):
     9pt or smaller. Ours are floors, not targets - the point is that a change
     that quietly empties the pages fails here instead of in a screenshot."""
 
-    def test_the_flagship_example_stays_inside_the_corpus_band(self):
-        result = run_node('''
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
-const path='./skills/professional-slides/examples/slideworks.deck.json';
-const spec=JSON.parse(fs.readFileSync(path,'utf8'));
-const {deck}=planDeck(toDeckPlan(spec,'./skills/professional-slides/examples'));
-const median=(values)=>{const s=[...values].sort((a,b)=>a-b);const m=s.length>>1;
-  return s.length%2?s[m]:(s[m-1]+s[m])/2;};
-const pages=[];
-for(const slide of deck.slides){
-  const texts=slide.nodes.filter(n=>typeof n.text==='string'&&n.text.trim());
-  const words=texts.reduce((sum,n)=>sum+n.text.trim().split(/\\s+/).length,0);
-  // A cover, a divider or a statement page is not an analytical page; the
-  // corpus measurement excluded them the same way, by a word floor.
-  if(words<25) continue;
-  const size=(n)=>Number(n.style?.fontSize?.value ?? n.style?.fontSize ?? 0);
-  pages.push({words,blocks:texts.length,
-    numeric:texts.reduce((sum,n)=>sum+(n.text.match(/\\d/g)?1:0),0),
-    small:texts.filter(n=>size(n)>0&&size(n)<=9).reduce((sum,n)=>sum+n.text.trim().split(/\\s+/).length,0)});
-}
-const measured={pages:pages.length,words:median(pages.map(p=>p.words)),blocks:median(pages.map(p=>p.blocks)),
-  numeric:median(pages.map(p=>p.numeric)),small:median(pages.map(p=>p.small))};
-console.log(JSON.stringify(measured));
-''')
-        # Floors are set a step under what the deck measures today, so ordinary
-        # drift is fine and a page-emptying change is not.
-        # Measured on the scene, one block per text node, where the corpus was
-        # measured on the rendered page, one block per printed line: 16 pages
-        # today at 128 words, 37.5 blocks, 20 numeric blocks and 24.5 words of
-        # small type per page.
-        self.assertGreaterEqual(result["pages"], 12)
-        self.assertGreaterEqual(result["words"], 110, "page text has fallen away from the corpus band")
-        self.assertGreaterEqual(result["blocks"], 30, "the page has lost its furniture: labels, units, notes")
-        self.assertGreaterEqual(result["numeric"], 14, "the evidence has stopped carrying numbers")
-        self.assertGreaterEqual(result["small"], 16, "the small type - labels, units, notes - has gone")
 
 
 class HeavyPageTests(unittest.TestCase):

@@ -5,13 +5,15 @@
 //
 // Vendor-neutral: node for layout, python-pptx to emit, LibreOffice to render. Writes
 // scene.json, planning.json, deck.pptx, rendered/slide-N.png, montage.png, readback.json,
-// gates.json and build-result.json into out/. Exit 0 when the gates pass, 2 when they
-// report findings (the deck is still written so it can be inspected), 1 on a crash.
+// gates.json and build-result.json into out/. Exit 0 when nothing blocks (`built`, or
+// `built-unrendered` with --no-render; advisories are counted in the result), 2 when a
+// blocker remains (`built-with-blockers`, each listed in `blockers` - the deck is still
+// written so it can be inspected), 1 on a crash.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { planDeck } from "./planner.mjs";
-import { toDeckPlan, coverageFindings, budgetFindings } from "./compose.mjs";
+import { composeAll } from "./compose-all.mjs";
+import { coverageFindings } from "./compose.mjs";
 import { metricsBackend } from "./font-metrics.mjs";
 import { runProcess, lastJson } from "./process.mjs";
 
@@ -20,7 +22,14 @@ import { assertOutputDirectory } from "./output-path.mjs";
 import { auditContent } from "./content-audit.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
 import { runPlanGates } from "./gates/plan_gates.mjs";
+import { craftFindings } from "./gates/craft_gates.mjs";
+import { varietyFindings } from "./gates/variety_gates.mjs";
+import { structureOf } from "./page-types.mjs";
+import { autoFillLogos } from "./fetch-logos.mjs";
+import { autoFillPictures } from "./fetch-pictures.mjs";
+import { autoFillPlaces } from "./fetch-places.mjs";
 import { auditTextPlan, auditExportText } from "./text-contract.mjs";
+import { writeLedger } from "./claims.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -51,11 +60,19 @@ export function validateStageContract(spec, stages) {
     throw new Error("New decks require an opening executive summary before the first section");
 }
 
-export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = process.env.RUNTIME_PYTHON || "python3" } = {}) {
+export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = process.env.RUNTIME_PYTHON || "python3", fetchLogos = true } = {}) {
   const started = Date.now();
   const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
   const stem = deckStem(spec);
   const baseDir = path.dirname(path.resolve(specPath));
+  // The declared players' logos load themselves: reused from assets/logos/,
+  // fetched when missing, left as placeholders only when that fails.
+  const logos = await autoFillLogos(spec, baseDir, { hint: spec.playersHint, fetchMissing: fetchLogos });
+  // Photographs planned as `{ alt }` come the same way, from Wikimedia Commons
+  // under a free licence, credited on a generated last page; map markers that
+  // name a place get its coordinates.
+  const pictures = await autoFillPictures(spec, baseDir, { fetchMissing: fetchLogos });
+  const places = await autoFillPlaces(spec, baseDir, { fetchMissing: fetchLogos });
   const directory = await assertOutputDirectory(outputDirectory);
   await fs.mkdir(directory, { recursive: true });
   // Every report this build is about to write, removed before anything that can
@@ -79,7 +96,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // plan is allowed - not every page of a rebuild needs one - but the build
   // output says so, which is the difference between a stage that was skipped
   // and a stage that does not exist.
-  const result = { status: "planned", outputDirectory: directory, timings: {}, stages: {} };
+  const result = { status: "planned", outputDirectory: directory, timings: {}, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}), ...(pictures.filled || pictures.failed.length ? { pictures } : {}), ...(places.placed || places.failed.length ? { places } : {}) };
   const stages = {};
   for (const [stage, suffix, run] of [["content", ".content.json", runContentGates],
                                       ["plan", ".plan.json", runPlanGates]]) {
@@ -102,6 +119,21 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   }
   validateStageContract(spec, stages);
 
+  // The variety contract, before anything is composed. A deck's structure is
+  // chosen page by page in its pages file (author-deck.mjs); this refuses a long
+  // deck whose pages were never typed, whose compiled structure was edited by
+  // hand, or whose choices add up to one page repeated. It is the same check
+  // the author ran, so a deck that compiled passes it here.
+  const variety = varietyFindings(spec, { structureOf });
+  if (variety.length) {
+    const reportAt = path.join(directory, "variety-gates.json");
+    await fs.writeFile(reportAt, JSON.stringify({ accepted: false, findings: variety }, null, 2) + "\n");
+    result.stages.variety = { state: "rejected", report: reportAt };
+    throw new Error(`The variety contract rejected ${path.basename(specPath)}: ${variety.map((f) => f.code).join(", ")}. `
+      + `${variety[0].repair} See ${reportAt}.`);
+  }
+  result.stages.variety = { state: "accepted" };
+
   // The content stage stops being a checkpoint and becomes an input.
   //
   // It records one highlight per page - "the phrase the reader should see
@@ -121,8 +153,8 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     }
   }
 
-  const deckPlan = toDeckPlan(spec, baseDir);
-  const { deck, decisions } = planDeck(deckPlan);
+  // Every failing page reported in one run (compose-all.mjs).
+  const { deck, decisions } = composeAll(spec, baseDir);
   // An evaluation of the skill is judged on a deck long enough to show its
   // rhythm, repetition and weakest page; a short one is a diagnostic. The rule
   // lived in the skill's prose and nothing held a deck to it, so three
@@ -140,6 +172,8 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   await fs.writeFile(scenePath, JSON.stringify(deck));
   await fs.writeFile(path.join(directory, "planning.json"), JSON.stringify(decisions, null, 2) + "\n");
   Object.assign(result, { scenePath, slides: deck.slides.length, metrics: metricsBackend() });
+  // The claim ledger the author works through before the review (references/taste-review.md#self-check).
+  result.claims = (await writeLedger(directory)).counts;
   result.timings.planMs = Date.now() - started;
 
   // Story gates need only the scene (titles, words, hedges, monotony).
@@ -149,11 +183,14 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   result.preflight = { ...(await readJson(preflightReport)), report: preflightReport, passed: pre.code === 0 };
   const coverage = coverageFindings(spec);
   if (coverage.length) { result.preflight.findings = [...(result.preflight.findings || []), ...coverage]; result.preflight.passed = false; result.preflight.accepted = false; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), MISSING_EVIDENCE: coverage.length }; }
-  // The page budget: what each page plans to carry, and the remedy that page's
-  // own data offers. Advisory - it reads the spec, not the rendered page - so it
-  // reports without failing the preflight.
-  const budget = budgetFindings(spec);
-  if (budget.length) { result.preflight.findings = [...(result.preflight.findings || []), ...budget]; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), THIN_PLAN: budget.length }; }
+  // Deck craft floors, read off the spec and the composed scene. A blocker
+  // fails the preflight, so the deck is built for inspection but never delivered.
+  const craft = craftFindings(spec, deck);
+  if (craft.length) {
+    result.preflight.findings = [...(result.preflight.findings || []), ...craft];
+    for (const f of craft) result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), [f.code]: ((result.preflight.countsByCode || {})[f.code] || 0) + 1 };
+    if (craft.some((f) => f.severity === "blocker")) { result.preflight.passed = false; result.preflight.accepted = false; }
+  }
   await fs.writeFile(preflightReport, JSON.stringify(result.preflight, null, 2) + "\n");
   if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory); }
 
@@ -185,8 +222,8 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     const gated = await runProcess(python, [gates, scenePath, renderDirectory, "--report", gateReport], { timeoutMs, expect: [0, 2] });
     result.gates = { ...(await readJson(gateReport)), report: gateReport, passed: gated.code === 0 };
     result.timings.gatesMs = Date.now() - t4;
-    // The density profile: the rendered pages measured the way the corpus was,
-    // against the client targets. It fails nothing; the review's density pass
+    // The density profile: the rendered pages measured against the skill's
+    // density targets. It fails nothing; the review's density pass
     // reads it and judges every page it flags (references/taste-review.md).
     const profileReport = path.join(directory, "density-profile.json");
     const contentAt = path.join(baseDir, `${stem}.content.json`);
@@ -194,8 +231,8 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     const profiled = await runProcess(python, [path.join(runtime, "gates", "density_profile.py"), result.render.pdf, scenePath, ...withContent, "--report", profileReport], { timeoutMs });
     result.densityProfile = { report: profileReport, ...lastJson(profiled.stdout) };
   }
-  // The deck's budget, in one block: what its pages carry against what the
-  // reference corpus carries, so a regression is a number in the build output
+  // The deck's budget, in one block: what its pages carry against the
+  // reference targets, so a regression is a number in the build output
   // rather than a screenshot somebody notices later.
   const density = result.gates?.density;
   if (density) {
@@ -207,14 +244,45 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       referenceFooterWords: density.footerWords?.referenceMedian ?? null,
       columnFill: density.columnFill?.median ?? null,
       plotSpan: density.plotSpan?.median ?? null,
-      plannedShortfalls: (result.preflight?.countsByCode || {}).THIN_PLAN || 0,
     };
   }
-  const readbackOk = result.readback?.accepted === true && result.textCoverage?.accepted !== false;
-  result.status = result.preflight.passed && readbackOk
-    ? (result.gates?.passed === true ? "built" : render ? "built-with-findings" : "built-unrendered")
-    : "built-with-findings";
+  Object.assign(result, buildOutcome(result, { render }));
   return finish(result, directory);
+}
+
+/**
+ * The build's status, read off its blockers alone. Advisories - a thin page, a
+ * flat mix, an unannotated plot - are the review's to judge: they are counted
+ * beside the status, never in it. The status used to be `built-with-findings`
+ * for any shortfall, and the one line the build prints listed the advisory
+ * counts beside it, so a build held back by eighteen numbers lost from the
+ * rendered text read as a build held back by five advisories. Every blocker
+ * is now listed with its source, and only a blocker makes the build exit 2.
+ */
+export function buildOutcome(result, { render = true } = {}) {
+  const blockers = [], seen = new Set();
+  const add = (source, f) => {
+    const key = `${source}|${f.code}|${f.slide ?? f.id ?? ""}|${JSON.stringify(f.measured ?? f.text ?? f.shape ?? "")}`;
+    if (!seen.has(key)) { seen.add(key); blockers.push({ source, code: f.code, ...(f.slide != null ? { slide: f.slide } : {}), ...(f.id ? { id: f.id } : {}), ...(f.text || f.shape ? { text: f.text ?? f.shape } : {}), ...(f.repair ? { repair: f.repair } : {}) }); }
+  };
+  const blocking = (f) => !["advisory", "info"].includes(f.severity);
+  if (result.preflight && result.preflight.passed === false) for (const f of (result.preflight.findings || []).filter(blocking)) add("page gates", f);
+  if (result.gates && result.gates.passed === false) for (const f of (result.gates.findings || []).filter(blocking)) add("page gates", f);
+  if (result.readback?.accepted !== true) {
+    for (const f of result.readback?.findings || []) add("readback", f);
+    if (!(result.readback?.findings || []).length) add("readback", { code: "READBACK_MISSING" });
+  }
+  if (result.textCoverage?.accepted === false) for (const f of (result.textCoverage.findings || []).filter(blocking)) add("rendered text", f);
+  // A report that failed without naming a finding is still a blocker.
+  if (result.preflight?.passed === false && !blockers.length) add("page gates", { code: "PREFLIGHT_FAILED" });
+  if (render && result.gates && result.gates.passed === false && !blockers.some((b) => b.source === "page gates")) add("page gates", { code: "GATES_FAILED" });
+  // The scene's gates run twice, before the render and after it, so a code
+  // counts as often as either run saw it, not the sum.
+  const counts = (report) => (report?.findings || []).filter((f) => !blocking(f)).reduce((m, f) => ({ ...m, [f.code]: (m[f.code] || 0) + 1 }), {});
+  const before = counts(result.preflight), after = counts(result.gates);
+  const advisories = Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(after)])].sort().map((code) => [code, Math.max(before[code] || 0, after[code] || 0)]));
+  const status = blockers.length ? "built-with-blockers" : render && result.gates ? "built" : "built-unrendered";
+  return { status, blockers, advisories };
 }
 
 async function readJson(file) { try { return JSON.parse(await fs.readFile(file, "utf8")); } catch { return {}; } }
@@ -225,7 +293,7 @@ async function readJson(file) { try { return JSON.parse(await fs.readFile(file, 
 export const BUILD_REPORTS = Object.freeze([
   "scene.json", "planning.json", "preflight-gates.json", "content-audit.json",
   "readback.json", "gates.json", "build-result.json", "text-coverage.json", "rendered-text-coverage.json",
-  "density-profile.json",
+  "density-profile.json", "claims.json",
 ]);
 
 // Skill evaluations are judged on at least this many rendered pages
@@ -244,12 +312,15 @@ async function finish(result, directory) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  if (args.length < 2) { console.error("Usage: build-deck.mjs spec.json output-directory [--preflight] [--no-render]"); process.exit(1); }
+  if (args.length < 2) { console.error("Usage: build-deck.mjs spec.json output-directory [--preflight] [--no-render] [--no-fetch]"); process.exit(1); }
   try {
     const pythonIndex = args.indexOf("--python");
     if (pythonIndex >= 0 && (!args[pythonIndex + 1] || args[pythonIndex + 1].startsWith("--"))) throw new Error("--python requires an executable");
-    const result = await buildDeck(path.resolve(args[0]), path.resolve(args[1]), { preflight: args.includes("--preflight"), render: !args.includes("--no-render"), python: pythonIndex < 0 ? undefined : args[pythonIndex + 1] });
-    console.log(JSON.stringify({ status: result.status, stages: Object.fromEntries(Object.entries(result.stages || {}).map(([k, v]) => [k, v.state])), pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, timings: result.timings }));
+    const result = await buildDeck(path.resolve(args[0]), path.resolve(args[1]), { preflight: args.includes("--preflight"), render: !args.includes("--no-render"), fetchLogos: !args.includes("--no-fetch"), python: pythonIndex < 0 ? undefined : args[pythonIndex + 1] });
+    // Blockers by name, advisories by count: the line says what stops the
+    // build and, separately, what the review will read.
+    const blockers = result.blockers?.length ? { count: result.blockers.length, byCode: result.blockers.reduce((m, b) => ({ ...m, [b.code]: (m[b.code] || 0) + 1 }), {}), first: result.blockers.slice(0, 8).map((b) => `${b.code}${b.id ?? b.slide ? ` [${b.id ?? b.slide}]` : ""} (${b.source})${b.text ? ` "${String(b.text).slice(0, 40)}"` : ""}`) } : undefined;
+    console.log(JSON.stringify({ status: result.status, ...(blockers ? { blockers } : {}), advisories: result.advisories, stages: Object.fromEntries(Object.entries(result.stages || {}).map(([k, v]) => [k, v.state])), pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, textCoverage: result.textCoverage?.accepted, timings: result.timings }));
     process.exit(["built", "built-unrendered", "preflight-passed"].includes(result.status) ? 0 : 2);
   } catch (error) {
     console.error(error.stack || error.message);

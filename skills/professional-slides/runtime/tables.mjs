@@ -1,4 +1,5 @@
 import { mediaNode } from "./media.mjs";
+import { logoFrame } from "./charts.mjs";
 import { formatValue } from "./value-format.mjs";
 import {
   token,
@@ -12,6 +13,7 @@ import {
   shapePrimitive,
   chartAnnotationStyle,
   houseStyle,
+  readableOn,
 } from "./core.mjs";
 import { measureText, measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
@@ -50,9 +52,19 @@ const PHOTO_CELL_HEIGHT = 64;
 // thumbnail so its width is still enough to recognise.
 const PORTRAIT_PHOTO_HEIGHT = 84;
 const isPortrait = (media) => media?.width > 0 && media?.height > media.width * 1.15;
+// A logo cell's height and the ink each logo in it gets. Held to one body line
+// (20px), a wordmark kept its width but a square or upright mark shrank to a
+// 17x20 speck beside it - the Emirates and Saudia marks on a rival table were
+// the smallest things on the page. The cell now takes two lines and every logo
+// the same visual area (`logoFrame`, as chart category logos do), so a wide
+// wordmark runs long and low and a square mark stands to the cell's height.
+const LOGO_CELL_HEIGHT = 40;
+const LOGO_AREA = LOGO_CELL_HEIGHT * LOGO_CELL_HEIGHT * 2;
+// Below this a wordmark squeezed by a narrow column stops being legible.
+const LOGO_MIN_HEIGHT = 12;
 // Cells that may lead with an icon before their label.
 const ICON_LED_CELLS = new Set(["category", "text"]);
-// Outlook cells (the Bain sector tables): an arrow in a ring, green up, grey flat, red down.
+// Outlook cells (as in a sector outlook table): an arrow in a ring, green up, grey flat, red down.
 export const TREND_STATES = Object.freeze({ up: { glyph: "↑", color: "color.positive" }, flat: { glyph: "→", color: "color.textSecondary" }, down: { glyph: "↓", color: "color.negative" } });
 // Status vocabularies. Pill labels are the canonical words; the composer maps
 // free text onto them.
@@ -83,6 +95,7 @@ export const TABLE_TOKENS = [
   "color.onPrimary",
   "color.componentPrimary",
   "color.componentPrimaryTint",
+  "color.surfaceTint",
   "color.accent",
   "color.accentTint",
   "color.surface",
@@ -135,7 +148,7 @@ const textStyle = (
 ) => baseTextStyle({ fontFamily: t("font.body"), fontSize: t(size), color, bold, align, valign: "top", wrap: false });
 const measure = (text, width, bold = false, size = "type.body") => measureAt(text, width, { size, bold });
 // A cell may carry `highlight`: the phrase inside it that reads in the house
-// accent, the way a reference table marks the figure that decides the row.
+// accent, the way a well-made table marks the figure that decides the row.
 const measureRuns = (text, highlight, width, bold = false, size = "type.body") => {
   const runs = accentRuns(String(text), highlight, { bold: true, strict: false });
   if (!runs) return measure(text, width, bold, size);
@@ -227,7 +240,7 @@ function normalize(props) {
     return row.cells.map((value, c) => {
       if (occupied[r][c]) {
         if (value !== null)
-          throw new Error("Table row span collides with a populated cell");
+          throw new Error("Table row span collides with a populated cell; put null in the cells a rowSpan covers");
         return null;
       }
       if (value === null || value === undefined)
@@ -235,16 +248,24 @@ function normalize(props) {
           "Missing table evidence must be explicit, not a blank cell",
         );
       const column = columns[c];
+      // A group row is one label across a grey band; its other cells stay blank.
+      const bandRow = groupRow || (row.style ?? props.rowStyle) === "total";
       const cell = {
         ...column,
         ...(typeof value === "object" && !Array.isArray(value)
           ? value
           : { text: String(value), value }),
       };
-      // A group row is one label across a grey band; its other cells stay blank.
-      const bandRow = groupRow || (row.style ?? props.rowStyle) === "total";
-      const emptyValue = typeof value === "string" && !value.trim();
-      if (emptyValue && (bandRow ? c > 0 : c === 0)) { cell.blank = true; cell.type = "text"; }
+      // A total row's filler is whitespace however it arrives: the composer's
+      // verdict styling wraps the total row's " " in `{ text: " ", type:
+      // "highlight" }`, which is still no evidence, and failed the table as
+      // "Table cell requires nonempty text".
+      const emptyValue = (typeof value === "string" && !value.trim())
+        || (bandRow && value && typeof value === "object" && !Array.isArray(value) && typeof value.text === "string" && !value.text.trim()
+          && ["values", "items", "media", "value", "state", "score", "number"].every((key) => value[key] === undefined));
+      // `{ blank: true }` is an explicit empty cell: the shorter side of a
+      // compare, where a padded " " would read as a missing value.
+      if ((emptyValue && (bandRow ? c > 0 : c === 0)) || (value && typeof value === "object" && value.blank === true)) { cell.blank = true; cell.type = "text"; }
       if (bandRow) cell.bold = true;
       if (!CELL_TYPES.includes(cell.type))
         throw new Error(`Unknown table cell type: ${cell.type}`);
@@ -291,19 +312,38 @@ function resolveWidths(columns, props, width) {
       );
     return props.columnWidths.map((w) => w * width);
   }
+  // A `width` under one is a share of the table, as `columnWidths` are, when
+  // other columns carry weights. The composer weights every column by the
+  // measured width of its text (84 to 444), so an author's `width: 0.6` on a
+  // logo column read as a weight of 0.6 against those and came out at one
+  // pixel: "Table column is narrower than its minimum width". Only beside
+  // such weights (a width of one or more) is a fraction a share; fractions
+  // among themselves, or beside unweighted columns, divide in proportion as
+  // they always have.
+  const share = (c) => typeof c.width === "number" && c.width > 0 && c.width < 1;
+  const shares = columns.some((c) => typeof c.width === "number" && c.width >= 1);
   const fixed = columns.map((c) =>
-    typeof c.width === "object" ? c.width.px : 0,
+    typeof c.width === "object" ? c.width.px : shares && share(c) ? c.width * width : 0,
   );
   if (fixed.some((n) => !Number.isFinite(n) || n < 0) || sum(fixed) >= width)
-    throw new Error("Invalid fixed table column widths");
+    throw new Error(shares && columns.some(share)
+      ? `Table column width fractions (${columns.filter(share).map((c) => c.width).join(", ")}) leave no width for the other columns; a width under one is a share of the table`
+      : "Invalid fixed table column widths");
   const weights = columns.map((c, i) => (fixed[i] ? 0 : (c.width ?? 1)));
   if (weights.some((n) => !Number.isFinite(n) || n < 0))
     throw new Error("Table widths must be positive weights or {px}");
   const widths = columns.map(
     (c, i) => fixed[i] || ((width - sum(fixed)) * weights[i]) / sum(weights),
   );
-  if (widths.some((w, i) => w < (columns[i].minWidth ?? v("space.6"))))
-    throw new Error("Table column is narrower than its minimum width");
+  return widths;
+}
+
+// After widening (widenForWords), a column still under its minimum means the
+// table as a whole is too narrow for its columns.
+function assertMinimumWidths(columns, widths) {
+  const narrow = widths.findIndex((w, i) => w < (columns[i].minWidth ?? v("space.6")) - 0.01);
+  if (narrow >= 0)
+    throw new Error(`Table column ${JSON.stringify(columns[narrow].label ?? narrow)} is narrower than its minimum width (${Math.round(widths[narrow])}px); widen the table, drop a column, or give this column a larger width`);
   return widths;
 }
 
@@ -427,18 +467,20 @@ function contentLayout(cell, width, props, used) {
   const marker =
     cell.type === "binary" || dense ? v("icon.small") : v("icon.medium");
   const inner = width - padding * 2;
-  if (inner <= 0) throw new Error("Table cell is too narrow for padding");
+  if (inner <= 0) throw new Error("Table cell is too narrow for padding; widen the column or use compact density");
   if (["binary", "harvey", "heatmap", "bars"].includes(cell.type))
     cell.scaleRecord = scaleFor(cell, props, used);
   if (cell.type === "logo") {
-    const height = measure("M", inner, false, bodySize(props)).lineHeight;
+    const height = Math.max(LOGO_CELL_HEIGHT, measure("M", inner, false, bodySize(props)).lineHeight);
     const media = cell.media;
-    const node = mediaNode({id:"logo-measure", frame:{x:0,y:0,width:inner,height}, props:media, role:"table-logo"});
-    if (node.frame.height < height - 0.01) throw new Error("Logo column must fit every logo at the shared body-height; widen the column");
-    return {height, padding, mediaWidth:node.frame.width};
+    // mediaNode validates the embedded bitmap; logoFrame sizes it.
+    mediaNode({id:"logo-measure", frame:{x:0,y:0,width:inner,height}, props:media, role:"table-logo"});
+    const logo = logoFrame({ x: 0, y: 0, width: inner, height }, media.width, media.height, { area: LOGO_AREA });
+    if (logo.height < LOGO_MIN_HEIGHT) throw new Error(`Logo column is too narrow for ${media.alt || "a logo"} at a legible size (${Math.round(logo.height)}px tall); widen the column`);
+    return {height, padding, logo};
   }
   if (cell.type === "photo") {
-    // A photograph leading a row: the corpus's component and category tables
+    // A photograph leading a row: component and category tables often
     // set a thumbnail of the thing the row describes, cropped to the column.
     // A logo cell is held to one body line so marks share a height; a photo at
     // that height is a sliver nobody can read, so it takes its own.
@@ -466,7 +508,7 @@ function contentLayout(cell, width, props, used) {
     // 15, which is right for a figure the runtime derived and wrong for one
     // the author typed - a page cannot say 14.8 in its takeaway and 15 in
     // the table it is drawn from.
-    const labels = cell.values.map((n, i) => cell.labels?.[i] ?? formatValue(n, cell.scaleRecord));
+    const labels = cell.values.map((n, i) => cell.labels?.[i] ?? formatValue(n, { ...cell.scaleRecord, values: cell.scaleValues ?? cell.values }));
     const size = bodySize(props);
     const labelWidth = Math.max(
       ...[...labels, ...(cell.scaleRecord.labelTexts || [])].map((s) => measure(s, inner, true, size).width),
@@ -477,7 +519,7 @@ function contentLayout(cell, width, props, used) {
       ...labels.map((s) => measure(s, inner, true, size).height),
     );
     if (inner - labelWidth - gap < v("space.6"))
-      throw new Error("Bar cell leaves no usable plot width");
+      throw new Error("Bar cell leaves no usable plot width; widen the column or shorten its value labels");
     return {
       height: cell.values.length * rowHeight + (cell.values.length - 1) * gap,
       padding,
@@ -504,7 +546,7 @@ function contentLayout(cell, width, props, used) {
   if (cell.type === "lights") {
     if (!LIGHT_STATES[cell.value]) throw new Error("Table lights cells take green, amber or red");
     const dot = v("icon.small");
-    if (inner < 3 * dot + 2 * gap) throw new Error("Table lights cell is too narrow for three lamps");
+    if (inner < 3 * dot + 2 * gap) throw new Error("Table lights cell is too narrow for three lamps; widen the column");
     return { padding, offset: 0, blocks: [], bold, size, marker, numberMarker: 0, numberWidth: 0, blockHeight: 0, lights: { dot, gap }, height: dot };
   }
   if (cell.type === "progress") {
@@ -512,19 +554,19 @@ function contentLayout(cell, width, props, used) {
     if (!(value >= 0 && value <= 100)) throw new Error("Table progress cells take a percentage from 0 to 100");
     const label = measure(cell.text || `${Math.round(value)}%`, inner, true, "type.label");
     const labelWidth = Math.max(label.width, v("space.6"));
-    if (inner - labelWidth - gap < v("space.6")) throw new Error("Table progress cell leaves no bar width");
+    if (inner - labelWidth - gap < v("space.6")) throw new Error("Table progress cell leaves no bar width; widen the column");
     return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, progress: { value, labelWidth, barHeight: v("space.2") }, height: Math.max(label.height, v("space.2")) };
   }
   if (cell.type === "trend") {
     const key = { up: "up", positive: "up", strong: "up", improving: "up", flat: "flat", neutral: "flat", moderate: "flat", stable: "flat", down: "down", negative: "down", weak: "down", declining: "down" }[String(cell.value).toLowerCase()];
     if (!key) throw new Error(`Table trend cells take up, flat or down (got ${cell.value})`);
     const size = v("icon.small") + v("space.2");
-    if (inner < size) throw new Error("Table trend cell is too narrow for its mark");
+    if (inner < size) throw new Error("Table trend cell is too narrow for its mark; widen the column");
     return { padding, offset: 0, blocks: [], bold, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: 0, trend: { size, key }, height: size };
   }
   if (cell.type === "dot" || cell.type === "check") {
     const size = v("icon.small") + (cell.type === "check" ? v("space.2") : 0);
-    if (inner < size) throw new Error("Table mark cell is too narrow for its mark");
+    if (inner < size) throw new Error("Table mark cell is too narrow for its mark; widen the column");
     return { padding, offset: 0, blocks: [], bold, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: 0, mark: { size, on: cell.value === true || cell.value === "yes" || cell.value === "done" }, height: size };
   }
   if (cell.type === "binary") {
@@ -576,12 +618,12 @@ function contentLayout(cell, width, props, used) {
   }
   // A numbered section marker sits at the left of its category cell, on the
   // label's centre line, whatever the surface; the label starts after it.
-  // A row label carries a numbered disc, an icon, or both: the reference matrix
+  // A row label carries a numbered disc, an icon, or both: a well-made matrix
   // numbers its rows and gives each one its own mark, and the label starts after
   // whatever is there.
   // A text cell may lead with an icon too. It was read only on category cells,
   // so `{ text, icon }` in an ordinary row label set the label and dropped the
-  // mark without a word - the icon-led row a reference table uses for drivers,
+  // mark without a word - the icon-led row a well-made table uses for drivers,
   // channels or trends could be authored and never appeared.
   const leadsWithIcon = ICON_LED_CELLS.has(cell.type) && Boolean(cell.icon);
   const inlineSectionMarker = cell.sectionNumber !== undefined || leadsWithIcon;
@@ -593,7 +635,7 @@ function contentLayout(cell, width, props, used) {
   }
   const blocks = texts.map((s) => measureRuns(s, cell.accent, inner - offset, bold, size));
   // A bullets cell may open with a bold lead line: the finding, then the
-  // evidence under it. The reference matrix page sets every cell this way.
+  // evidence under it. A well-made matrix page sets every cell this way.
   const leadText = cell.type === "bullets" && typeof cell.lead === "string" && cell.lead.trim() ? cell.lead.trim() : null;
   const lead = leadText ? measureRuns(leadText, cell.accent, inner, true, size) : null;
   // `sub`: the qualifier under a measure, in the small type - "10,156" over
@@ -699,6 +741,72 @@ function layoutLegend(id, scale, width, size, gap) {
   };
 }
 
+/**
+ * Widen any column narrower than the longest word it must print.
+ *
+ * Text wraps at spaces, so a column narrower than one of its words cannot
+ * print it: "Performance" as a group band over a single narrow score column,
+ * or "Score" in a column weighted to 40px, failed the table with "Unbreakable
+ * text exceeds its width". A designer gives such a column the width of its
+ * longest word and takes it from the columns with room to spare, in
+ * proportion to that room. When the table as a whole is too narrow for its
+ * words the widths are left as they are and the measurement fails, naming the
+ * word.
+ */
+// The inner width a drawn cell cannot go below (the same sums `contentLayout`
+// refuses on), or 0 for a cell of words.
+function minimumDrawnWidth(cell, props = {}) {
+  const gap = v(props.density === "compact" || props.density === "dense" ? "space.1" : "space.2");
+  if (cell.type === "rag") {
+    const state = RAG_STATES[cell.value];
+    return state ? Math.ceil(measure(cell.text || state.label, 100000, true, "type.label").width + 2 * v("space.3")) : 0;
+  }
+  if (cell.type === "lights") return 3 * v("icon.small") + 2 * gap;
+  if (cell.type === "progress") {
+    const value = Number(cell.value);
+    const label = measure(cell.text || `${Math.round(Number.isFinite(value) ? value : 0)}%`, 100000, true, "type.label").width;
+    return Math.ceil(Math.max(label, v("space.6")) + gap + v("space.6"));
+  }
+  if (cell.type === "trend") return v("icon.small") + v("space.2");
+  if (cell.type === "dot" || cell.type === "check") return v("icon.small") + (cell.type === "check" ? v("space.2") : 0);
+  return 0;
+}
+
+function widenForWords(model, widths, props, { padding, textSize, chevronInset }) {
+  const longest = (text, bold, size) => Math.max(0, ...String(text ?? "").split(/\s+/).filter(Boolean).map((word) => measure(word, 100000, bold, size).width));
+  const need = model.columns.map((column, c) => {
+    let word = Math.max(longest(column.label, true, textSize) + 2 * chevronInset, longest(column.unit, false, "type.label"));
+    // A group band over this column alone must fit its label in this column.
+    const group = column.group === undefined || column.group === null ? null : String(column.group);
+    if (group && model.columns[c - 1]?.group !== column.group && model.columns[c + 1]?.group !== column.group) word = Math.max(word, longest(group, true, textSize));
+    for (const row of model.cells) {
+      const cell = row[c];
+      if (!cell || cell.blank) continue;
+      // A drawn cell has a width below which it does not exist: a status pill
+      // is its label plus its own padding, three lamps are three lamps. Only
+      // words were reserved, so a status column weighted by "at-risk" (84px
+      // against 444px sentence columns) came out narrower than "At risk" in a
+      // pill, and the table failed "status pill does not fit its column" the
+      // moment an edit lengthened another column - until the author pinned the
+      // column at 150px. The pill's measured width is now reserved before the
+      // rest is shared, like the longest word.
+      const drawn = minimumDrawnWidth(cell, props);
+      if (drawn) { word = Math.max(word, drawn); continue; }
+      if (!["text", "category", "highlight", "number"].includes(cell.type ?? "text")) continue;
+      word = Math.max(word, longest(cell.text, cell.bold || cell.type === "category", bodySize(props)));
+    }
+    return Math.max(column.minWidth ?? v("space.6"), Math.ceil(word) + 2 * padding + 2);
+  });
+  // A width the author fixed in pixels is theirs: it neither widens nor gives up room.
+  const fixed = model.columns.map((column) => typeof column.width === "object" && column.width !== null);
+  const deficit = widths.reduce((total, width, c) => total + (fixed[c] ? 0 : Math.max(0, need[c] - width)), 0);
+  if (deficit <= 0) return widths;
+  const slack = widths.map((width, c) => fixed[c] ? 0 : Math.max(0, width - need[c]));
+  const room = sum(slack);
+  if (room < deficit) return widths;
+  return widths.map((width, c) => fixed[c] ? width : width < need[c] ? need[c] : width - (slack[c] / room) * deficit);
+}
+
 export function measureTable({ frame, props }) {
   const model = normalize(props),
     density = props.density ?? "body";
@@ -711,13 +819,23 @@ export function measureTable({ frame, props }) {
   if (!["body", "compact", "dense"].includes(density))
     throw new Error("Unknown table density");
   const tableProps = { ...props, density },
-    widths = resolveWidths(model.columns, tableProps, frame.width),
     used = new Map();
+  // The figures beside a scale's bars are read down the column, so they share
+  // one precision; each cell choosing its own printed 15 above 14.9.
+  const scaleValues = new Map();
+  for (const cell of model.cells.flat())
+    if (cell?.type === "bars" && Array.isArray(cell.values))
+      scaleValues.set(cell.scale, [...(scaleValues.get(cell.scale) || []), ...cell.values]);
+  for (const cell of model.cells.flat())
+    if (cell?.type === "bars") cell.scaleValues = scaleValues.get(cell.scale);
   const compact = density !== "body",
     padding = v(
       density === "dense" ? "space.1" : compact ? "space.2" : "space.3",
     ),
     gap = v(compact ? "space.1" : "space.2");
+  const widths = assertMinimumWidths(model.columns, widenForWords(model, resolveWidths(model.columns, tableProps, frame.width), tableProps, {
+    padding, chevronInset: props.headerShape === "chevron" ? v("space.5") : 0,
+    textSize: density === "dense" ? "type.label" : density === "compact" ? "type.compact" : "type.body" }));
   if (props.rowSpacing !== undefined && !["normal", "tight"].includes(props.rowSpacing))
     throw new Error("Table rowSpacing must be normal or tight");
   // Compact line spacing and compact type are separate decisions. A long
@@ -794,7 +912,7 @@ export function measureTable({ frame, props }) {
     }
     const plotWidth = Math.min(...group.flatMap(({ column, entries }) =>
       entries.map(({ layout }) => widths[column] - 2 * padding - layout.labelWidth - gap)));
-    if (plotWidth < v("space.6")) throw new Error("Bar column leaves no usable plot width");
+    if (plotWidth < v("space.6")) throw new Error("Bar column leaves no usable plot width; widen the column or shorten its value labels");
     group.forEach(({ column, entries }) => entries.forEach(({ layout }) => {
       layout.labelWidth = widths[column] - 2 * padding - gap - plotWidth;
     }));
@@ -855,14 +973,17 @@ export function measureTable({ frame, props }) {
     throw new Error(
       `Table content needs ${height.toFixed(1)}px, but only ${frame.height}px is allocated; widen, simplify or split the table`,
     );
-  // A table given more height than it needs spreads the surplus across its rows,
-  // up to 2.5× the natural row height, so a hero table fills its frame the way a
-  // consulting scorecard does instead of leaving a void beneath it.
+  // A table given more height than it needs spreads some of the surplus across
+  // its rows, so a hero table fills its frame the way a consulting scorecard
+  // does. Only some: at 2.5× a four-row table of one-line cells grew 100px rows
+  // with a short phrase floating in each, which reads as an unfinished page, not
+  // a scorecard. Rows grow by at most 60% and 24px each; the page composer, not
+  // the table, owns what is left.
   // Stretched rows read as bands, so every cell's content is then centred on
   // the row rather than hanging from its top edge beside a centred category.
   let stretched = props._sharedRowHeights !== undefined;
   if (props._sharedRowHeights === undefined && props.fillHeight === true && Number.isFinite(frame.height) && frame.height > height + 0.01 && heights.length) {
-    const surplus = Math.min(frame.height - height, heights.reduce((a, b) => a + b, 0) * 1.5);
+    const surplus = Math.min(frame.height - height, heights.reduce((a, b) => a + b, 0) * 0.6, heights.length * 24);
     const per = surplus / heights.length;
     for (let r = 0; r < heights.length; r += 1) heights[r] += per;
     height += surplus;
@@ -894,11 +1015,53 @@ export function measureTable({ frame, props }) {
 // Degradation ladder for tables: body → compact → dense before refusing. A table
 // that loses its band height to a shared heading steps its type down one notch
 // rather than failing the page.
+const DENSITY_LADDER = Object.freeze(["body", "compact", "dense"]);
+
+/**
+ * The density a filling table is set at: one type step lighter than asked
+ * when the frame holds the table at that step.
+ *
+ * A findings matrix defaults to compact type, and on a page with nothing else
+ * to hold it the rows were padded out by the stretch cap and a 50px band still
+ * sat between the table and its takeaway. A designer handed that room sets the
+ * table a size up before padding it. Only when the composer chose the density
+ * (`typeStep`), only one step, and only when the whole table fits at it - an
+ * author's density, peer tables with shared rows and a table that is already
+ * at body type keep what they have.
+ */
+function fillDensity({ frame, props }) {
+  const start = props.density ?? "body";
+  const at = DENSITY_LADDER.indexOf(start);
+  if (at <= 0 || props.typeStep !== true || props.fillHeight !== true || props.rowAlignment || props._sharedRowHeights !== undefined || !Number.isFinite(frame.height)) return start;
+  try {
+    measureTable({ frame, props: { ...props, density: DENSITY_LADDER[at - 1], fillHeight: false } });
+    return DENSITY_LADDER[at - 1];
+  } catch {
+    return start;
+  }
+}
+
+/**
+ * The most height a filling table uses: its natural height at the density it
+ * will be set at, plus the capped row growth. Past that it stops, and the page
+ * keeps the rest as its bottom margin rather than a band under the table.
+ */
+export function tableCeiling({ frame, props }) {
+  if (props.fillHeight !== true || props.rowAlignment || props._sharedRowHeights !== undefined || !Number.isFinite(frame.height)) return null;
+  try {
+    return measureTable({ frame, props: { ...props, density: fillDensity({ frame, props }) } }).height;
+  } catch {
+    return null;
+  }
+}
+
 export function renderTable(input) {
   // Peer rows were measured at the authored density; a local fallback would
   // invalidate their shared geometry and silently change only one table.
   if (input.props.rowAlignment) return renderTableAt(input);
-  const ladder = ["body", "compact", "dense"];
+  const ladder = DENSITY_LADDER;
+  const stepped = fillDensity(input);
+  if (stepped !== (input.props.density ?? "body")) input = { ...input, props: { ...input.props, density: stepped } };
   const start = Math.max(0, ladder.indexOf(input.props.density ?? "body"));
   let lastError = null;
   for (let i = start; i < ladder.length; i += 1) {
@@ -925,6 +1088,10 @@ function renderTableAt({ id, frame, props }) {
   const m = measureTable({ frame, props }),
     nodes = [],
     xs = m.widths.map((_, c) => frame.x + sum(m.widths.slice(0, c)));
+  // Runs of columns between implication gutters: where a split rule starts and ends.
+  const isGutter = (c) => m.columns[c]?.type === "implication";
+  const runStart = (c) => !isGutter(c) && (c === 0 || isGutter(c - 1));
+  const runEndX = (c) => { let e = c; while (e + 1 < m.columns.length && !isGutter(e + 1)) e += 1; return xs[e] + m.widths[e] - m.gap; };
   const ys = m.heights.map(
     (_, r) =>
       frame.y +
@@ -946,6 +1113,23 @@ function renderTableAt({ id, frame, props }) {
   const header = props.treatment ?? "open";
   if (!["open", "standard", "dimensions", "categories"].includes(header))
     throw new Error("Unknown table header treatment");
+  // Surface treatments (core.mjs). An open table was type on the page with a
+  // rule under its header and one between rows: at a glance a block of text,
+  // the lightest page a deck drew. Under the reference weight its header is
+  // the filled band a standard table carries, and a column of row labels sits
+  // on the filled surface, so the table reads as a table before a word of it
+  // is read. `headerBand: false` or `labelColumn: false` keeps one open.
+  // A row matrix is a category table whose categories are plain labels, not
+  // filled boxes: it is drawn open too, and takes the same two surfaces.
+  const plainCategories = header === "categories" && m.cells.every((row) => row.every((cell) => !cell || cell.type !== "category" || categorySurface(cell, props) === "plain"));
+  const bandedOpen = (header === "open" || plainCategories) && props.headerBand !== false && houseStyle("style.tableHeader") === "band";
+  const tint = t("color.surfaceTint");
+  const labelCell = (cell) => !cell || cell.blank
+    || (cell.type === "text" && cell.bold && !cell.highlight)
+    || (cell.type === "category" && categorySurface(cell, props) === "plain" && !cell.highlight);
+  const labelTint = props.labelColumn !== false && houseStyle("style.tableLabels") === "tint"
+    && props.headerShape !== "chevron" && m.columns.length > 1 && m.cells.length > 1
+    && m.cells.every((row) => labelCell(row[0])) && m.cells.some((row) => row[0] && !row[0].blank);
   // The group band: what a run of columns measures, over its own rule. The
   // reference wide table heads four measures with three groups this way, so a
   // reader takes the table in two passes instead of reading six labels.
@@ -982,7 +1166,7 @@ function renderTableAt({ id, frame, props }) {
     // it is drawn from - the opposite of what the gutter is there to say. The
     // band now breaks at the gutter, and the chevron is what crosses it.
     const filledHeader = column.type !== "implication"
-      && (header === "standard" || (header === "dimensions" && column.type !== "category"));
+      && (header === "standard" || bandedOpen || (header === "dimensions" && column.type !== "category"));
     if (filledHeader && props.headerShape === "chevron")
       // Phase tables: each header is a chevron pointing along the sequence.
       nodes.push(
@@ -1000,11 +1184,17 @@ function renderTableAt({ id, frame, props }) {
         rectPrimitive({
           id: stableId(id, "header-cell", c),
           role: "table-header-cell",
+          // Under the group band, not behind it: the group labels are set in
+          // ink above the header, and a band drawn from the frame's top put
+          // them in dark type on the dark fill.
+          // Each cell overlaps the next by a pixel, so abutting fills render as
+          // one band rather than a band with a hairline seam at every column,
+          // and the last stops where the rules do.
           frame: {
             x: xs[c],
-            y: frame.y,
-            width: m.widths[c],
-            height: m.headerHeight,
+            y: frame.y + m.groupHeight,
+            width: m.widths[c] + (c < m.columns.length - 1 ? 1 : -m.gap),
+            height: m.headerHeight - m.groupHeight,
           },
           // The recommended column's header takes the accent so the column
           // reads as the answer from the header down.
@@ -1048,13 +1238,16 @@ function renderTableAt({ id, frame, props }) {
     // One continuous header rule unless a column is an implication arrow or
     // the header sits over a chevron/category run whose slits are by design.
     const continuousHeader = !m.columns.some((col) => col.type === "implication") && props.headerShape !== "chevron" && header !== "categories";
-    if (!(filledHeader && props.headerShape === "chevron") && (continuousHeader ? c === 0 : column.type !== "implication"))
+    // An implication gutter splits the rule in two - evidence, verdict - and
+    // no further: a rule broken at every column read as a damaged table.
+    const gutterSplit = !continuousHeader && props.headerShape !== "chevron" && header !== "categories";
+    if (!(filledHeader && props.headerShape === "chevron") && (continuousHeader ? c === 0 : column.type !== "implication" && (!gutterSplit || runStart(c))))
       nodes.push(
         line(
           stableId(id, "header-rule", c),
           xs[c],
           frame.y + m.headerHeight,
-          continuousHeader ? frame.x + frame.width - m.gap : xs[c] + m.widths[c] - m.gap,
+          continuousHeader ? frame.x + frame.width - m.gap : gutterSplit ? runEndX(c) : xs[c] + m.widths[c] - m.gap,
           frame.y + m.headerHeight,
         ),
       );
@@ -1066,6 +1259,13 @@ function renderTableAt({ id, frame, props }) {
     if (r % 2 === 0 || rowBand(m.rows[r].style ?? props.rowStyle)) return;
     nodes.push(rectPrimitive({ id: stableId(id, "zebra", r), role: "table-zebra-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(t("color.surfaceMuted")), data: { row: r, zebra: true } }));
   });
+  // The row labels on one filled column from the header to the last row, over
+  // the zebra (the labels stay one surface) and under the row bands (a total
+  // stays a total). The rules between rows cross it, so rows still read across.
+  if (labelTint) {
+    const top = frame.y + m.headerHeight + m.gap / 2;
+    nodes.push(rectPrimitive({ id: stableId(id, "label-column"), role: "table-label-column", frame: { x: xs[0], y: top, width: m.widths[0] - m.gap, height: sum(m.heights) - m.gap }, style: box(tint), data: { column: 0, labelColumn: true } }));
+  }
   // The recommended option's column is one tinted band from the header rule
   // to the last row; row bands (total, group) paint over it so a total stays a total.
   if (Number.isInteger(props.highlightColumn) && m.widths[props.highlightColumn] !== undefined) {
@@ -1203,7 +1403,8 @@ function renderTableAt({ id, frame, props }) {
         );
       // `tone: "positive" | "negative"` on a text cell colours a signed change
       // (the "difference to prior year" rows of the financial tables).
-      const color = fill ? foreground(fill) : band ? foreground(band) : cell.tone === "positive" ? t("color.positive") : cell.tone === "negative" ? t("color.negative") : ink;
+      const onLabel = labelTint && c === 0 && !band;
+      const color = fill ? foreground(fill) : band ? foreground(band) : onLabel ? foreground(tint) : cell.tone === "positive" ? t("color.positive") : cell.tone === "negative" ? t("color.negative") : ink;
       const inner = {
         x: area.x + m.padding,
         y: area.y + m.paddingY,
@@ -1253,8 +1454,9 @@ function renderTableAt({ id, frame, props }) {
             l.blocks[0], textStyle(false, t("color.textSecondary"), "center", "type.label"), data);
         }
       } else if (cell.type === "logo") {
-        const logo = mediaNode({id:stableId(cellId,"logo"),frame:{x:inner.x,y:area.y+(height-l.height)/2,width:inner.width,height:l.height},props:cell.media,role:"table-logo"});
-        logo.data = {...logo.data,...data,sharedHeight:l.height};
+        const box = logoFrame({ x: inner.x, y: area.y + (height - l.height) / 2, width: inner.width, height: l.height }, cell.media.width, cell.media.height, { area: LOGO_AREA });
+        const logo = mediaNode({id:stableId(cellId,"logo"),frame:box,props:cell.media,role:"table-logo"});
+        logo.data = {...logo.data,...data,cellHeight:l.height,logoArea:LOGO_AREA};
         nodes.push(logo);
       } else if (cell.type === "implication") {
         // `draw: false` keeps the gutter and leaves the row unmarked: the
@@ -1345,7 +1547,7 @@ function renderTableAt({ id, frame, props }) {
                 data: { ...markData, series: i, value, zeroX, domain: [scale.min, scale.max] },
               }),
             );
-          const label = measure(cell.labels?.[i] ?? formatValue(value, scale), l.labelWidth, true, l.size);
+          const label = measure(cell.labels?.[i] ?? formatValue(value, { ...scale, values: cell.scaleValues ?? cell.values }), l.labelWidth, true, l.size);
           putText(
             stableId(cellId, "value", i),
             "table-cell-text",
@@ -1531,7 +1733,7 @@ function renderTableAt({ id, frame, props }) {
               "table-cell-sub",
               { x: inner.x + l.offset, y: y - m.gap, width: inner.width - l.offset },
               l.sub,
-              textStyle(false, t("color.textSecondary"), cell.align ?? "left", l.size === "type.label" ? "type.label" : "type.label"),
+              textStyle(false, onLabel ? readableOn(t("color.textSecondary"), tint) : t("color.textSecondary"), cell.align ?? "left", l.size === "type.label" ? "type.label" : "type.label"),
               data,
             );
         }
@@ -1563,12 +1765,14 @@ function renderTableAt({ id, frame, props }) {
         // One continuous rule per row unless the row is a run of filled
         // category boxes, whose slits are part of the design.
         const continuous = props.treatment !== "categories" && cell.rowSpan === 1 && !m.columns.some((col) => col.type === "implication");
-        if (zebra && continuous) { /* zebra bands replace the row rules */ } else if (!continuous || c === 0) nodes.push(
+        // Split only at the implication gutter, as the header rule is.
+        const gutterRun = !continuous && props.treatment !== "categories" && cell.rowSpan === 1 && m.cells[r].every((other) => !other || (other.rowSpan ?? 1) === 1);
+        if (zebra && continuous) { /* zebra bands replace the row rules */ } else if (gutterRun ? runStart(c) : (!continuous || c === 0)) nodes.push(
           line(
             stableId(cellId, "rule"),
             area.x,
             area.y + height,
-            continuous ? frame.x + frame.width - m.gap : area.x + area.width - m.gap,
+            continuous ? frame.x + frame.width - m.gap : gutterRun ? runEndX(c) : area.x + area.width - m.gap,
             area.y + height,
             "table-rule",
             { ...data, rule: "row" },

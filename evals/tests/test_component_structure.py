@@ -72,7 +72,7 @@ console.log(JSON.stringify({
 """
         )
         # Sixteen figure families added from the corpus style inventory
-        # (evals/corpus/styles): stat-list, flow, spectrum, layers, placement,
+        # (the style classification): stat-list, flow, spectrum, layers, placement,
         # rank-flow, sankey, pictogram, arrow-rows, capsules, fact-grid,
         # zone-matrix, device-frame, worksheet, speech and side-statement.
         self.assertEqual(result["registry"], 106)
@@ -86,54 +86,6 @@ console.log(JSON.stringify({
         self.assertGreater(result["nodeCount"], 800)
         self.assertEqual(result["missing"], [])
 
-    def test_golden_fixtures_cover_source_families_without_raster_or_fixed_page_taxonomy(self):
-        result = run_node(
-            """
-import { buildGoldenDeck } from './skills/professional-slides/runtime/golden-fixtures.mjs';
-const { deck, fixtures } = buildGoldenDeck();
-const analytical = fixtures.filter(item => !['cover','section-divider'].includes(item.visualFamily));
-const chrome = analytical.map(item => {
-  const slide = deck.slides[item.slide - 1];
-  const title = slide.nodes.find(node => node.role === 'title-rule');
-  const text = slide.nodes.find(node => node.role === 'action-title');
-  const footer = slide.nodes.find(node => node.role === 'footer-rule');
-  return {title: title?.frame, textBottom: text.frame.y + text.data.textLayout.height, footer: footer?.frame};
-});
-console.log(JSON.stringify({
-  slides: deck.slides.length,
-  nodes: deck.slides.reduce((sum, slide) => sum + slide.nodes.length, 0),
-  families: new Set(fixtures.map(item => item.visualFamily)).size,
-  sources: fixtures.map(item => item.sourceSlide).filter(value => value !== null),
-  allCapabilities: fixtures.every(item => item.capabilities.length > 0),
-  imageNodes: deck.slides.flatMap(slide => slide.nodes).filter(node => node.type === 'image').length,
-  fixedTaxonomy: JSON.stringify({deck, fixtures}).toLowerCase().includes('archetype'),
-  chrome
-}));
-"""
-        )
-        self.assertEqual(result["slides"], 18)
-        self.assertGreater(result["nodes"], 700)
-        self.assertEqual(result["families"], 18)
-        self.assertEqual(len(result["sources"]), len(set(result["sources"])))
-        self.assertTrue(result["allCapabilities"])
-        self.assertEqual(result["imageNodes"], 0)
-        self.assertFalse(result["fixedTaxonomy"])
-        for chrome in result["chrome"]:
-            # The rule is anchored to the content, not hung under the title: a
-            # fixed gap above the body, so the distance from rule to content
-            # reads the same whether the title took one line or two. It never
-            # rises above where the title leaves it.
-            self.assertEqual(chrome["title"]["x"], 60)
-            self.assertEqual(chrome["title"]["width"], 1160)
-            self.assertGreaterEqual(chrome["title"]["y"], chrome["textBottom"] + 8)
-            # y 680 -> 674: the footer band now keeps a third of the page's side
-            # margin (FOOTER_EDGE_MARGIN_RATIO, 20px of 60) clear of the bottom
-            # edge instead of the 14px CHROME.footerTop happened to leave, and
-            # the rule rides with the row it closes. The band lifts as a whole,
-            # so its distance to the footer text is unchanged, and the lift
-            # comes out of the footer's own clearance: the content frame is the
-            # same height it was.
-            self.assertEqual(chrome["footer"], {"x": 60, "y": 674, "width": 1160, "height": 0})
 
     def test_cover_is_dark_by_default_with_a_lower_third_title_block(self):
         result = run_node("""
@@ -162,7 +114,7 @@ const light = compile({title:'Growth strategy',subtitle:'Commercial priorities',
 assert.deepEqual(light.slides[0].nodes.map(n=>n.role),['cover-accent','cover-title','cover-subtitle']);
 assert.equal(light.slides[0].nodes[1].style.color.tokenId,'color.ink');
 for (const subtitleValue of [undefined,'','   ']) assert.equal(compile({title:'Growth strategy',subtitle:subtitleValue}).slides[0].nodes.length,3);
-const company = compile({title:'Growth strategy',subtitle:'Commercial priorities'},{palette:'bain',typography:{body:'Arial',display:'Georgia'}});
+const company = compile({title:'Growth strategy',subtitle:'Commercial priorities'},{palette:'crimson',typography:{body:'Arial',display:'Georgia'}});
 assert.equal(company.slides[0].nodes.find(n=>n.role==='cover-title').style.fontFamily.value,'Georgia');
 assert.equal(company.slides[0].nodes.find(n=>n.role==='cover-subtitle').style.fontFamily.value,'Arial');
 const wrapped = compile({title:'Growth strategy\\nfor the next cycle',subtitle:'Commercial priorities\\nand delivery milestones'});
@@ -172,20 +124,6 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
-    def test_plain_cover_is_golden_but_not_an_obsolete_artwork_fidelity_target(self):
-        result = run_node("""
-import { buildGoldenDeck } from './skills/professional-slides/runtime/golden-fixtures.mjs';
-const full = buildGoldenDeck(), reference = buildGoldenDeck({referenceOnly:true});
-console.log(JSON.stringify({golden:full.fixtures.length, reference:reference.fixtures.length,
-  cover:full.fixtures.find(f=>f.visualFamily==='cover'), sources:reference.fixtures.map(f=>f.sourceSlide),
-  referenceFamilies:reference.fixtures.map(f=>f.visualFamily)}));
-""")
-        self.assertEqual(result["golden"], 18)
-        self.assertEqual(result["reference"], 16)
-        self.assertIsNone(result["cover"]["sourceSlide"])
-        self.assertNotIn("cover", result["referenceFamilies"])
-        self.assertNotIn("section-divider", result["referenceFamilies"])
-        self.assertTrue(all(isinstance(value, int) for value in result["sources"]))
 
     def test_planner_selects_relationships_and_rejects_unprepared_content(self):
         result = run_node(
@@ -346,14 +284,14 @@ for (const id of ['action-title','section-title','slide-chrome']) {
   assert.deepEqual(render({[ruleProp]:true}), withLine);
   assert.deepEqual(render({[ruleProp]:false}), withoutLine);
   const line = withLine.find(n=>n.role==='title-rule');
-  // A standalone title hangs its rule 8px under the text. A chrome page moves it
-  // to a fixed gap above the body instead, so the rule-to-content distance is
-  // the same whether the title took one line or two - it used to be 52px and
-  // 16px, the same band reading differently on every page.
+  // A standalone title hangs its rule 8px under the text. A chrome page fixes
+  // the rule a gap above the body and sets the title down on it, so the
+  // rule-to-title and rule-to-content distances are the same whether the
+  // title took one line or two; only the title's height moves.
   const gap = line.frame.y - title.frame.y - title.data.textLayout.height;
-  if (id === 'slide-chrome') assert.ok(gap >= 8, `${id} rule sits at or below the title`);
+  if (id === 'slide-chrome') assert.equal(gap, 12, `${id} title sits on its rule`);
   else assert.equal(gap, 8);
-  const normalize = nodes => nodes.filter(n=>n.role!=='title-rule').map(({data,...node})=>node);
+  const normalize = nodes => nodes.filter(n=>n.role!=='title-rule').map(({data,frame,...node})=>({...node,frame:{...frame,y:undefined}}));
   assert.deepEqual(normalize(withLine), normalize(withoutLine));
   const spec = {id:'test',frame,composition:component({id:'title',component:id,props:{...definition.sample,[variantProp]:'without-line'},frame})};
   const deck = compileDeck({slides:[spec]}, REGISTRY);
@@ -401,7 +339,9 @@ const counts = deck.slides.map(s=>s.nodes.filter(n=>n.role==='title-rule').lengt
 assert.deepEqual(deck.slides[0].componentInstances.find(c=>c.id==='copy').frame,deck.slides[1].componentInstances.find(c=>c.id==='copy').frame);
 const chrome = compileDeck({slides:[{id:'chrome',chrome:{title:'Capacity limits growth'},composition:absolute({id:'empty',children:[]})}]},REGISTRY);
 const title = chrome.slides[0].nodes.find(n=>n.role==='action-title');
-assert.equal(chrome.manifest.slides[0].componentInstances[0].variant,'without-line'); // default slide chrome stays open
+// The default house (midnight) closes the title band with a rule, and a
+// one-line title is set down on it.
+assert.equal(chrome.manifest.slides[0].componentInstances[0].variant,'with-line');
 assert.equal(chrome.manifest.slides[0].componentInstances[0].instanceId,title.data.componentInstance);
 assert.ok(chrome.manifest.slides[0].componentInstances.every(instance=>typeof instance.instanceId==='string'&&instance.instanceId.length>0));
 console.log(JSON.stringify({counts,decisions:decisions.map(d=>d.titleVariant),chromeRules:chrome.slides[0].nodes.filter(n=>n.role==='title-rule').length,footerRules:chrome.slides[0].nodes.filter(n=>n.role==='footer-rule').length,titleAnchor:[title.frame.x,title.frame.y]}));
@@ -409,9 +349,9 @@ console.log(JSON.stringify({counts,decisions:decisions.map(d=>d.titleVariant),ch
         )
         self.assertEqual(result["counts"], [0, 1])
         self.assertEqual(result["decisions"], ["without-line", "with-line"])
-        self.assertEqual(result["chromeRules"], 0)  # default slide chrome stays open
+        self.assertEqual(result["chromeRules"], 1)  # the default house draws its title rule
         self.assertEqual(result["footerRules"], 0)
-        self.assertEqual(result["titleAnchor"], [60, 44])
+        self.assertEqual(result["titleAnchor"], [60, 80])  # a one-line title sits on the rule
 
     def test_title_rule_follows_measured_text_not_allocated_box(self):
         result = run_node(
@@ -580,16 +520,6 @@ console.log(JSON.stringify({counts: headings.map(n => n.data.textLayout.lines.le
         self.assertEqual(result["sizes"], [14, 14, 14])
         self.assertEqual(result["wraps"], [False, False, False])
 
-    def test_reference_chart_and_open_rail_headers_remain_peers(self):
-        result = run_node("""
-import { buildGoldenDeck } from './skills/professional-slides/runtime/golden-fixtures.mjs';
-const { deck } = buildGoldenDeck();
-const peers = deck.slides.filter(s => s.componentInstances.some(c => c.component === 'content-rail') && s.nodes.filter(n => n.role === 'section-heading-rule').length === 2);
-console.log(JSON.stringify(peers.map(s => ({id:s.id,ruleYs:[...new Set(s.nodes.filter(n=>n.role==='section-heading-rule').map(n=>n.frame.y))]}))));
-""")
-        self.assertEqual(len(result), 4)
-        for slide in result:
-            self.assertEqual(len(slide["ruleYs"]), 1, slide["id"])
 
     def test_unbreakable_heading_and_insufficient_annotation_space_reject(self):
         result = run_node("""

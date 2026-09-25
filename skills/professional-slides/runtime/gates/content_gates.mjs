@@ -43,7 +43,7 @@ export const CONTENT_CODES = Object.freeze({
   TEXT_PLAN_INCOMPLETE: "the dot-dash does not list all visible copy",
   TEXT_REFERENCE_MISSING: "per-page reference text comparison is missing",
   TEXT_COVERAGE_LOW: "planned text is below comparable reference coverage",
-  TEXT_BLOCK_TOO_LONG: "one run of prose is longer than client decks ever set",
+  TEXT_BLOCK_TOO_LONG: "one run of prose is longer than a strong deck ever sets",
   // Raised at composition by text-contract.mjs, where the page's structure is
   // known; listed here because it belongs to the same text contract.
   TEXT_TASK_MISMATCH: "the reading task the page is measured against is not the one it composes to",
@@ -124,8 +124,8 @@ const CONDITIONAL = /\b(unless|except|if you|for the|for a|for those|whereas|whi
  */
 function contradictions(answer, pages) {
   if (!RECOMMENDS.test(answer) || CONDITIONAL.test(answer)) return [];
-  const corpus = [answer, ...pages.map((p) => String(p.claim ?? ""))].join(" ");
-  const lowercased = new Set(corpus.match(/\b[a-z][a-z']+\b/g) ?? []);
+  const argument = [answer, ...pages.map((p) => String(p.claim ?? ""))].join(" ");
+  const lowercased = new Set(argument.match(/\b[a-z][a-z']+\b/g) ?? []);
   const names = (text) => new Set((String(text ?? "").match(/\b[A-Z][A-Za-z']{2,}\b/g) ?? [])
     .filter((word) => !STOPWORDS.has(word.toLowerCase()) && !lowercased.has(word.toLowerCase())));
   const answerNames = names(answer);
@@ -266,6 +266,13 @@ export function runContentGates(content, options = {}) {
     const carried = Math.max(0, ...claims.map((c) => overlap(answer, c)));
     if (coverage < CONTENT_THRESHOLDS.answerCoverageMin || carried < CONTENT_THRESHOLDS.answerCarriedMin) {
       const missing = [...answerWords].filter((w) => !union.has(w));
+      // Where to say it, and how close the deck already is: the executive
+      // summary's title (the first analytical page) is where a deck states its
+      // answer. Naming it saved an author three rounds of guessing which title
+      // the rule wanted.
+      const best = pages.map((p) => ({ id: p.id ?? p.n, claim: String(p.claim ?? ""), score: overlap(answer, String(p.claim ?? "")) })).sort((a, b) => b.score - a.score)[0];
+      const opener = pages.find((p) => p.role !== "structural" && !p.kind);
+      const where = ` State it in the title of ${opener ? `\`${opener.id ?? opener.n}\` (the opening page)` : "the opening page"}; the closest title now is ${best ? `\`${best.id}\`: "${best.claim.slice(0, 90)}"` : "none"}.`;
       findings.push(finding(null, "CONTENT_ANSWER_UNCARRIED",
         { coverage: round(coverage), carried: round(carried), unclaimed: missing.slice(0, 8) },
         { coverage: CONTENT_THRESHOLDS.answerCoverageMin, carried: CONTENT_THRESHOLDS.answerCarriedMin },
@@ -273,10 +280,10 @@ export function runContentGates(content, options = {}) {
           ? "The answer promises something no page proves. Either a page has to claim it - "
             + `nothing in this deck claims ${missing.slice(0, 4).map((w) => `"${w}"`).join(", ")} - `
             + "or the answer is wider than the evidence and should be narrowed to what the "
-            + "deck can actually settle."
+            + "deck can actually settle." + where
           : "No single page states the answer. The claims between them cover it, which means "
             + "the reader can assemble it - but a deck leads with its answer rather than "
-            + "leaving it to be inferred from twenty pages. Write the page that says it."));
+            + "leaving it to be inferred from twenty pages. Write the page that says it." + where));
     }
     const against = contradictions(answer, pages);
     if (against.length) {

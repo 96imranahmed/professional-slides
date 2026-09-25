@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
-import { resolvePalette, heatScaleTokens } from "./palettes.mjs";
+import { resolvePalette, heatScaleTokens, contrastRatio } from "./palettes.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
+import { lineBox } from "./text-layout.mjs";
 
 export const DESIGN_SYSTEM_VERSION = "2.0.0";
 export const SCENE_SCHEMA = "professional-slides.scene/v1";
@@ -76,6 +77,12 @@ export const TOKENS = Object.freeze({
   "color.chartUnit": colour("--chart-unit-color", "#757575"),
   "color.componentPrimary": colour("--component-primary", "#00A6E6", "accent1"),
   "color.componentPrimaryTint": colour("--component-primary-tint", "#DCEEF8"),
+  // The filled surface a structure sits on: a table's label column, a card, a
+  // phase block. The ink mixed 86% toward the canvas (resolvePalette derives it
+  // for every palette that does not set it), so it reads as a surface at a
+  // glance - about 30 grey levels under the page - where a 6-12% tint of the
+  // primary vanishes on a projector and in the page's measured weight.
+  "color.surfaceTint": colour("--surface-tint", "#DADEE1"),
   "color.calloutTint": colour("--callout-tint", "#FFF6DC"),
   "color.accent": colour("--accent", "#00A6E6"),
   "color.accentTint": colour("--accent-tint", "#DCF3FD"),
@@ -124,30 +131,63 @@ export const TOKENS = Object.freeze({
   "space.6": length("--space-6", 32),
   "space.8": length("--space-8", 48),
   "layout.titleContentGap": length("--title-content-gap", 56),
+  // The air on either side of the title rule: title (or standfirst) to rule, rule to body.
+  "layout.titleRuleGap": length("--title-rule-gap", 12),
   "icon.small": length("--icon-sm", 16),
   "icon.medium": length("--icon-md", 24),
   "icon.large": length("--icon-lg", 36),
   "line.hairline": length("--line-hairline", 1),
+  "line.titleRule": length("--line-title-rule", 1),
   "line.standard": length("--line-standard", 2),
+  "line.medium": length("--line-medium", 3.5),   // map routes: the middle volume class
+  "line.heavy": length("--line-heavy", 5),       // map routes: the largest volume class
   "radius.none": length("--radius-none", 0),
   "radius.small": length("--radius-small", 4),
   "radius.round": length("--radius-round", 999),
   // Design profile: the house style a palette carries beyond its colours. Each
-  // palette sets these to what the firm's 2020+ decks do; components read them.
+  // palette sets these to what its house style does; components read them.
   "style.titleWeight": keyword("--style-title-weight", "bold"),        // bold | regular
-  "style.titleRule": keyword("--style-title-rule", "none"),            // none | rule (hairline under the title) | band (tinted title band)
+  "style.titleRule": keyword("--style-title-rule", "none"),            // none | rule (a rule closing the title band) | band (tinted title band) | block (primary title block, reversed type) | tab (accent tab at the top edge)
+  // How the house draws its title rule: most well-made pages close the title
+  // band with a thin rule margin to margin or edge to edge, some with a short
+  // accent bar. Colour names a palette role, so a subject's identity recolours it.
+  "style.titleRuleLength": keyword("--style-title-rule-length", "content"), // content (margin to margin) | full (page edge to edge) | short (an accent bar under the title)
+  "style.titleRuleColor": keyword("--style-title-rule-color", "rule"),      // rule | ink | accent | primary
   "style.tagPlacement": keyword("--style-tag-placement", "top-right"), // top-right | below-title (accent pill) | above-title (accent label)
   "style.chartHeading": keyword("--style-chart-heading", "text"),      // text | band (filled grey band)
   // A bullet unless the house explicitly sets a dash: the marker is a dot in
-  // the published decks, and a hyphen reads as a sentence fragment.
+  // a well-made deck, and a hyphen reads as a sentence fragment.
   "style.listMarker": keyword("--style-list-marker", "dot"),           // dot | dash
   "style.tableRows": keyword("--style-table-rows", "rules"),           // rules | zebra
   "style.labelWeight": keyword("--style-label-weight", "bold"),        // bold | regular (chart value labels)
-  "style.titleLead": keyword("--style-title-lead", "accent")           // accent (lead in the accent) | pipe (BCG: "Topic | statement", the statement in the accent)
+  "style.titleLead": keyword("--style-title-lead", "accent"),          // accent (lead in the accent) | pipe ("Topic | statement", the statement in the accent)
+  // The design system's page frame (design-systems.mjs): how the takeaway, the
+  // cover and the chapter pages are built. Each value is a whole construction.
+  "style.takeaway": keyword("--style-takeaway", "band"),               // band (tinted box) | rule (serif close over a hairline) | statement (accent bar, large type)
+  "style.coverLayout": keyword("--style-cover-layout", "block"),       // block | editorial | journal | keynote
+  "style.dividerLayout": keyword("--style-divider-layout", "panel"),    // panel | editorial | journal | keynote
+  // Surface treatments: how much of a page's structure is drawn as filled
+  // surface rather than as type on the canvas with hairlines. The defaults are
+  // the weight of a well-made analytical page; a design system that is light
+  // by character opts out of single treatments (design-systems.mjs SURFACES).
+  "style.tableHeader": keyword("--style-table-header", "band"),        // band (filled header, reversed type) | rule (bold type over a rule)
+  "style.tableLabels": keyword("--style-table-labels", "tint"),        // tint (the row-label column on color.surfaceTint) | plain
+  "style.cards": keyword("--style-cards", "tint"),                    // tint (filled card, no outline) | outline (hairline card on the canvas)
+  "style.marks": keyword("--style-marks", "reference"),               // reference (heavier lines and dots, a lone line's area) | light
+  "style.timeline": keyword("--style-timeline", "blocks")              // blocks (filled phase blocks on a heavy spine) | dots (markers on a rail)
 });
-export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead"]);
+export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.titleRuleLength", "style.titleRuleColor", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead", "style.takeaway", "style.coverLayout", "style.dividerLayout", "style.tableHeader", "style.tableLabels", "style.cards", "style.marks", "style.timeline"]);
 /** The active design profile value for a style token ("style.titleWeight" → "bold"). */
 export function houseStyle(id) { return tokenValue(token(id)); }
+/**
+ * `color` when it reads at `ratio` against `surface`, else the ink. A filled
+ * surface is drawn for weight, and the type on it keeps its role colour only
+ * where the fill leaves it legible: an evergreen secondary grey or a bright
+ * accent that passes on white can fall under 4.5:1 on the tint.
+ */
+export function readableOn(color, surface, ratio = 4.5) {
+  return contrastRatio(tokenValue(color), tokenValue(surface)) >= ratio ? color : token("color.ink");
+}
 
 export const DENSITY_PROFILES = Object.freeze({
   "live-pitch": Object.freeze({ typeScale: 1.15 }),
@@ -543,7 +583,7 @@ function allocateTracks(specs, available, gapTotal, preferredValues = []) {
   const usable = Math.max(0, available - gapTotal);
   const fixed = specs.map((spec, index) => resolveLength(spec, usable, preferredValues[index] || 0));
   const fixedTotal = fixed.reduce((sum, value) => sum + (value ?? 0), 0);
-  if (fixedTotal > usable + 0.01) throw new Error(`Fixed and content-sized tracks require ${fixedTotal}px; only ${usable}px is available`);
+  if (fixedTotal > usable + 0.01) throw Object.assign(new Error(`Fixed and content-sized tracks require ${fixedTotal}px; only ${usable}px is available`), { required: fixedTotal, usable });
   const fractions = specs.map(fraction);
   const fractionTotal = fractions.reduce((sum, value) => sum + value, 0);
   const remainder = Math.max(0, usable - fixedTotal);
@@ -554,12 +594,122 @@ function placement(node, frame) {
   return { node, frame: Object.fromEntries(Object.entries(frame).map(([key, value]) => [key, px(value)])) };
 }
 
-export function resolveLayout(root, frame, registry) {
+/**
+ * The most height a node can use at this width, or null when it can use any.
+ *
+ * A `fill` child took whatever its column left over, and a component with a
+ * natural height - a table, a wave roadmap, a row of cards, a gantt - could not
+ * use it: it drew at its size at the top of the frame and the rest became a
+ * band between the exhibit and the commentary under it (the Emirates roadmap
+ * page had 180px of nothing there), or a card box two-fifths empty. Stretching
+ * the drawing to the frame was worse - table rows at 2.5x. So a component that
+ * knows how far it can grow legibly says so (`measureCeiling`: its natural
+ * height plus the rhythm it can add - row padding, a type step, item spacing),
+ * the column gives it that much, and the slack becomes the page's bottom
+ * margin rather than a gap in the middle of the reading.
+ *
+ * A section or a flow carries a ceiling only when something inside it
+ * declared one. A column of paragraphs is not bounded by this: it already
+ * placed its own leftover (a distributed list, a centred group), and so is
+ * anything that means to use the room - a flow with a leftover policy, a
+ * toned panel whose surface is drawn to its frame.
+ */
+function ceilingSize(node, registry, width, available) {
+  const found = ceilingOf(node, registry, width, available);
+  return found && found.bounded ? found.value : null;
+}
+
+function ceilingOf(node, registry, width, available) {
+  if (!Number.isFinite(width) || !Number.isFinite(available)) return null;
+  if (node.nodeType === "component") {
+    const definition = registry.get(node.component);
+    if (!definition?.measureCeiling) return null;
+    try {
+      const ceiling = definition.measureCeiling({ frame: { x: 0, y: 0, width, height: available }, props: node.props });
+      return Number.isFinite(ceiling) && ceiling > 0 ? { value: ceiling, bounded: true } : null;
+    } catch {
+      return null;
+    }
+  }
+  if (node.nodeType === "section") {
+    if (!node.composition || (node.treatment && node.treatment !== "open")) return null;
+    const padding = normalizeInsets(node.padding);
+    const insets = registry.get("section")?.measureInsets?.({ frame: { x: 0, y: 0, width }, props: node }) ?? padding;
+    const inner = ceilingOf(node.composition, registry, width - insets.left - insets.right, available - insets.top - insets.bottom);
+    return inner && { value: inner.value + insets.top + insets.bottom, bounded: inner.bounded };
+  }
+  if (node.nodeType !== "flow" || !node.children.length || (node.leftover && node.leftover !== "start")) return null;
+  const padding = normalizeInsets(node.padding);
+  const innerWidth = width - padding.left - padding.right, innerHeight = available - padding.top - padding.bottom;
+  const gap = isTokenReference(node.gap) ? tokenValue(node.gap) : Number(node.gap || 0);
+  const vertical = padding.top + padding.bottom;
+  let bounded = false;
+  // A child's height: its fixed or hugged length, else its own ceiling.
+  const childHeight = (child, childWidth) => {
+    const fixed = resolveLength(child.size?.height, innerHeight, preferredSize(child, "height", registry, childWidth));
+    if (fixed !== null) return fixed;
+    const inner = ceilingOf(child, registry, childWidth, innerHeight);
+    if (!inner) return null;
+    bounded ||= inner.bounded;
+    return inner.value;
+  };
+  if (node.direction === "row") {
+    const widths = allocateTracks(node.children.map(child => child.size?.width), innerWidth, Math.max(0, node.children.length - 1) * gap, node.children.map(child => preferredSize(child, "width", registry)));
+    let tallest = 0;
+    for (const [index, child] of node.children.entries()) {
+      const value = childHeight(child, widths[index]);
+      if (value === null) return null;
+      tallest = Math.max(tallest, value);
+    }
+    return { value: tallest + vertical, bounded };
+  }
+  let total = Math.max(0, node.children.length - 1) * gap;
+  for (const child of node.children) {
+    const value = childHeight(child, resolveLength(child.size?.width, innerWidth, preferredSize(child, "width", registry)) ?? innerWidth);
+    if (value === null) return null;
+    total += value;
+  }
+  return { value: total + vertical, bounded };
+}
+
+/**
+ * Hold each fill track of a column to its ceiling. What a held track gives up
+ * goes to the other fill tracks that can still grow, in proportion to their
+ * fractions; what nobody can take is returned as slack for the flow to place.
+ */
+function clampToCeilings(lengths, specs, ceilings) {
+  const out = [...lengths];
+  const held = new Set();
+  let slack = 0;
+  for (let pass = 0; pass <= out.length; pass += 1) {
+    let excess = 0;
+    out.forEach((length, index) => {
+      const ceiling = ceilings[index];
+      if (ceiling === null || held.has(index) || length <= ceiling + 0.01) return;
+      excess += length - ceiling;
+      out[index] = ceiling;
+      held.add(index);
+    });
+    if (excess <= 0.01) break;
+    const open = out.map((_, index) => index).filter(index => !held.has(index) && fraction(specs[index]) > 0 && resolveLength(specs[index], 0) === null);
+    const share = open.reduce((sum, index) => sum + fraction(specs[index]), 0);
+    if (!share) { slack += excess; break; }
+    open.forEach(index => { out[index] += excess * fraction(specs[index]) / share; });
+  }
+  return { lengths: out, slack };
+}
+
+// `inRow`: the composition sits in a row of peers (a two-up, an exhibit beside
+// its commentary). Peers share one height and their bottom blocks one line -
+// the captions under a chart and a table beside it - so a column there keeps
+// every pixel it is given; ceilings apply only to the page's own vertical
+// reading, where the slack can become the bottom margin.
+export function resolveLayout(root, frame, registry, { inRow = false } = {}) {
   const placements = [];
-  const walk = (node, currentFrame) => {
+  const walk = (node, currentFrame, withinRow = inRow) => {
     if (!node || !node.nodeType) throw new Error("Every composition node requires nodeType");
     if (node.nodeType === "component" || node.nodeType === "section") {
-      placements.push(placement(node, currentFrame));
+      placements.push({ ...placement(node, currentFrame), ...(withinRow ? { inRow: true } : {}) });
       return;
     }
     if (node.nodeType === "absolute") {
@@ -573,7 +723,7 @@ export function resolveLayout(root, frame, registry) {
           y: currentFrame.y + child.frame.y,
           width: child.frame.width,
           height: child.frame.height
-        });
+        }, withinRow);
       }
       return;
     }
@@ -591,7 +741,7 @@ export function resolveLayout(root, frame, registry) {
               height: child.frame.height
             }
           : inner;
-        walk(child, childFrame);
+        walk(child, childFrame, withinRow);
       }
       return;
     }
@@ -602,13 +752,31 @@ export function resolveLayout(root, frame, registry) {
       const mainAvailable = row ? inner.width : inner.height;
       const specs = node.children.map((child) => row ? child.size?.width : child.size?.height);
       const preferred = node.children.map((child) => preferredSize(child, row ? "width" : "height", registry, row ? null : resolveLength(child.size?.width, inner.width, preferredSize(child, "width", registry)) ?? inner.width));
-      const lengths = allocateTracks(specs, mainAvailable, Math.max(0, node.children.length - 1) * gap, preferred);
+      let allocated;
+      try { allocated = allocateTracks(specs, mainAvailable, Math.max(0, node.children.length - 1) * gap, preferred); }
+      catch (error) {
+        // A column over its height is the author's to cut, so the message says
+        // which column and by how much, in lines of body text: "tracks require
+        // 502px; only 490px" sent an author adding and removing a point by trial.
+        if (row || !(error.required > error.usable)) throw error;
+        const over = Math.ceil(error.required - error.usable), line = lineBox(activeDesignTokens()?.["type.body"]?.value ?? 12);
+        throw new Error(`${String(node.id).replace(/-flow-(?:column|row)$/, "")}: the column holds ${Math.ceil(error.required)}px of content in ${Math.floor(error.usable)}px - over by ${over}px, about ${Math.ceil(over / line)} line${Math.ceil(over / line) === 1 ? "" : "s"} of body text (${line}px a line); cut that much from its points or labels, or move a point elsewhere`);
+      }
+      // A column's fill tracks stop at their ceilings (see `ceilingSize`).
+      const ceilings = row || withinRow ? [] : node.children.map((child, index) => fraction(specs[index]) > 0 && resolveLength(specs[index], 0) === null
+        ? ceilingSize(child, registry, resolveLength(child.size?.width, inner.width, preferredSize(child, "width", registry)) ?? inner.width, allocated[index])
+        : null);
+      const { lengths, slack } = ceilings.some(ceiling => ceiling !== null) ? clampToCeilings(allocated, specs, ceilings) : { lengths: allocated, slack: 0 };
       // Space no child claimed. Abandoning it is what leaves a dead band below
       // an all-hug body; the policy says where it goes instead.
       const claimed = lengths.reduce((sum, value) => sum + value, 0) + Math.max(0, node.children.length - 1) * gap;
       const leftover = Math.max(0, mainAvailable - claimed);
       const policy = node.leftover || "start";
-      const extraGap = policy === "distribute" && node.children.length > 1 ? leftover / (node.children.length - 1) : 0;
+      // The slack a ceiling returns is the page's bottom margin, never a gap:
+      // distributed, it reopened the band between an exhibit and the takeaway
+      // under it that the ceiling exists to close. Only an all-hug column's own
+      // remainder is spread between its blocks.
+      const extraGap = policy === "distribute" && node.children.length > 1 ? Math.max(0, leftover - slack) / (node.children.length - 1) : 0;
       const leadOffset = policy === "center" ? leftover / 2 : policy === "end" ? leftover : 0;
       let cursor = (row ? inner.x : inner.y) + leadOffset;
       const children = row ? alignPeerHeaders(node.children, lengths, registry) : node.children;
@@ -620,7 +788,7 @@ export function resolveLayout(root, frame, registry) {
         const childFrame = row
           ? { x: cursor, y: inner.y, width: lengths[index], height: cross }
           : { x: inner.x, y: cursor, width: cross, height: lengths[index] };
-        walk(child, childFrame);
+        walk(child, childFrame, withinRow || row);
         cursor += lengths[index] + gap + extraGap;
       });
       return;
@@ -642,7 +810,7 @@ export function resolveLayout(root, frame, registry) {
         if (!widths[column] || !heights[row] || columnSpan < 1 || rowSpan < 1 || column + columnSpan > widths.length || row + rowSpan > heights.length) throw new Error(`Grid child ${child.id} has an invalid cell`);
         const width = widths.slice(column, column + columnSpan).reduce((sum, value) => sum + value, 0) + Math.max(0, columnSpan - 1) * columnGap;
         const height = heights.slice(row, row + rowSpan).reduce((sum, value) => sum + value, 0) + Math.max(0, rowSpan - 1) * rowGap;
-        walk(child, { x: xs[column], y: ys[row], width, height });
+        walk(child, { x: xs[column], y: ys[row], width, height }, true);
       }
       return;
     }
@@ -757,6 +925,21 @@ function seriesValues(props = {}) {
   return [];
 }
 
+/**
+ * How a highlight with no `style` is drawn. On a one-series bar chart it is
+ * the bar itself in the accent: a pale band behind a dark bar left the subject
+ * of a forty-member ranking - and of every column of an aligned-bars page -
+ * hard to find, where the same row painted in the accent is the first thing
+ * seen. Elsewhere (grouped or stacked bars and columns) the band behind the
+ * category stays the default. The drawn chart (charts.mjs), the native chart
+ * spec below and the composer's row rules all read this one rule.
+ */
+export function defaultHighlightStyle(componentId, props = {}) {
+  // Columns follow bars: a year marked by a tint behind a dark column read as
+  // the same colour as its neighbours on the Emirates decks.
+  return ["chart.bar", "chart.column"].includes(componentId) && Array.isArray(props.series) && props.series.length === 1 ? "bar" : "region-tint";
+}
+
 /** Data an emitter needs for a native chart. Types outside NATIVE_CHART_TYPES keep shapes. */
 export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   const type = NATIVE_CHART_TYPES[componentId];
@@ -764,7 +947,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // Reference lines and annotations need the plot scale; PowerPoint does not
   // expose it, so those charts stay as assembled, grouped shapes. A single-bar
   // highlight is a per-point fill and stays native.
-  const highlights = props.highlights || [];
+  const highlights = (props.highlights || []).map((h) => ({ ...h, style: h?.style ?? defaultHighlightStyle(componentId, props) }));
   // A floating range band prints its low value left of the band and its high
   // value right of it, in ink. PowerPoint's stacked-bar stand-in can only put a
   // label inside the band, so the range chart is assembled as shapes.
@@ -775,12 +958,19 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // Labels set outside the wedges with leaders are placed against the drawn
   // circle; PowerPoint cannot reproduce them, so that variant stays drawn.
   if (["pie", "donut"].includes(type) && (props.outsideLabels || props.variant === "outside-labels")) return null;
+  // Likewise a share too wide for its slice, which the scene sets beyond the
+  // rim beside it: PowerPoint's outside-end label is placed and wrapped by the
+  // renderer, and LibreOffice squeezes it into the frame margin.
+  if (["pie", "donut"].includes(type) && renderedNodes?.some(node => node.role === "data-label" && node.data?.placement === "outside")) return null;
   // Explicit numeric x positions and keyed point labels are not a categorical
   // native line. Preserve their spacing and selected labels as editable shapes.
-  if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;
-  // External stack labels and their leaders use measured scene coordinates;
+  if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;  // External stack labels and their leaders use measured scene coordinates;
   // Office repositioning the labels would detach those leaders from the text.
   if (renderedNodes?.some(node => node.role === "data-label" && node.data?.external)) return null;
+  // The forecast key and its dashed boundary are placed against the measured
+  // plot; PowerPoint keeps the per-point tint but has no legend entry for part
+  // of a series and would float the divider, so a keyed forecast stays drawn.
+  if (renderedNodes?.some(node => node.role === "chart-forecast-divider" || (node.role === "legend-swatch" && node.data?.categoryKey === "forecast"))) return null;
   if (Array.isArray(props.categoryNotes) && props.categoryNotes.some((note) => typeof note === "string" && note.trim())) return null;
   // Signed bars need the measured zero baseline and label gutters. Native
   // horizontal axes can move category labels into the bars; native columns
@@ -798,6 +988,20 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   if (props.categoryIcons || props.seriesGrowth) return null;
   if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
   const categories = [...(props.categories || props.labels || [])];
+  // The category labels the scene drew are the ones PowerPoint prints. A
+  // ten-year line the scene labelled FY17, FY20, FY23, FY26 came out of the
+  // native chart with all ten, rotated, and the export audit read six labels
+  // the page never planned. `tickLblSkip` says the same to PowerPoint but
+  // LibreOffice ignores it, so the labels the scene left out are blank in the
+  // chart's categories (emit_pptx.py); the values keep their rows.
+  const drawnCategories = new Set((renderedNodes || []).filter(node => node.role === "category-label").map(node => String(node.data?.category ?? node.text)));
+  const hiddenCategoryIndices = renderedNodes && drawnCategories.size && drawnCategories.size < categories.length
+    ? categories.map((category, index) => drawnCategories.has(String(category)) ? -1 : index).filter(index => index >= 0) : [];
+  // Likewise the values: a forty-row ranking labels the rows it names, and the
+  // native chart printed all forty values over one another.
+  const labelledCategories = new Set((renderedNodes || []).filter(node => node.role === "data-label" && node.data?.category !== undefined).map(node => String(node.data.category)));
+  const hiddenLabelIndices = renderedNodes && labelledCategories.size && labelledCategories.size < categories.length && Array.isArray(props.series) && props.series.length === 1
+    ? categories.map((category, index) => labelledCategories.has(String(category)) ? -1 : index).filter(index => index >= 0) : [];
   const series = type === "range"
     ? [{ name: "low", values: [...(props.low || [])], hidden: true }, { name: "range", values: (props.high || []).map((h, i) => h - (props.low || [])[i]) }]
     : Array.isArray(props.series) ? props.series.map(s => ({ name: s.name, values: [...(s.values || [])] }))
@@ -811,13 +1015,30 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   const showValueAxis = renderedNodes
     ? renderedNodes.some(node => node.role === "axis-label")
     : props.showValueAxis ?? (props.gridlines === true || !dataLabels);
+  // The drawn chart has already chosen one precision for its labels; the
+  // native chart prints the same, rather than re-deriving it and drifting.
+  const drawnLabels = (renderedNodes || []).filter(node => node.role === "data-label" && typeof node.text === "string");
+  const labelDecimals = drawnLabels.length
+    ? Math.max(...drawnLabels.map(node => node.text.match(/\d\.(\d+)/)?.[1].length ?? 0)) : null;
   const ticks = (renderedNodes || []).filter(node => node.role === "axis-label" && Number.isFinite(node.data?.value)).map(node => node.data.value).sort((a,b)=>a-b);
+  // A two-mark contrast paints one peer in the primary and the other grey, and
+  // which one is the scene's decision (charts.mjs defaultFocusIndex: the named
+  // focus, else the latest period, else the first). The emitter used to grey
+  // the second series and colour the first, so a "2019 | 2024" chart drawn
+  // right in the scene came out backwards in PowerPoint. It now paints the mark
+  // the scene painted.
+  const marks = (renderedNodes || []).filter(node => node.role === "chart-mark");
+  const primaryMark = marks.some(node => node.style?.fill?.tokenId === "color.chartComparator") ? marks.find(node => node.style?.fill?.tokenId === "color.componentPrimary") : undefined;
+  const focusIndex = primaryMark ? (series.length === 2 ? series.findIndex(item => item.name === primaryMark.data?.series) : categories.indexOf(primaryMark.data?.category)) : -1;
   return {
+    ...(focusIndex >= 0 ? { focusIndex } : {}),
     labelBold,
     type,
     categories,
     series,
     highlightIndices: highlights.map((h) => categories.indexOf(h.category)).filter((i) => i >= 0),
+    ...(hiddenCategoryIndices.length ? { hiddenCategoryIndices } : {}),
+    ...(hiddenLabelIndices.length ? { hiddenLabelIndices } : {}),
     forecastIndex,
     endLabels: props.directLabels === "end" || props.endLabels === true || (type === "line" && series.length > 1 && props.legend !== true && props.endLabels !== false),
     ...(type === "line" ? { pointDataLabels: renderedNodes
@@ -831,6 +1052,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     yMax: ticks.length ? ticks.at(-1) : props.yMax ?? null,
     ...(ticks.length>1 ? {yMajorUnit:ticks[1]-ticks[0]} : {}),
     dataLabels,
+    ...(labelDecimals !== null ? { labelDecimals } : {}),
     showValueAxis,
     // A pie or donut names its categories in its legend (the drawn chart's
     // "legend-top-right"); without one the native chart shows unlabelled wedges.
@@ -842,6 +1064,30 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     colorIndices: Array.isArray(props.colorIndices) ? [...props.colorIndices] : null,
     frame: { ...frame }
   };
+}
+
+/**
+ * Map every item, collecting every failure rather than stopping at the first.
+ * A deck with six broken pages used to take six builds to learn so; now one
+ * run names them all, each with its page. `label(item, index)` names the page.
+ */
+export function mapAll(items, fn, label = (item, index) => item?.id ?? `slide-${index + 1}`) {
+  const results = [], errors = [];
+  items.forEach((item, index) => {
+    try { results.push(fn(item, index)); }
+    catch (error) {
+      for (const message of error.pageErrors ?? [error.message]) {
+        const name = label(item, index);
+        errors.push(message.startsWith(`${name}:`) || message.includes(`${name}:`) ? message : `${name}: ${message}`);
+      }
+    }
+  });
+  if (errors.length) {
+    const error = new Error(errors.length === 1 ? errors[0] : `${errors.length} pages could not be composed:\n- ${errors.join("\n- ")}`);
+    error.pageErrors = errors;
+    throw error;
+  }
+  return results;
 }
 
 export function compileDeck(deckSpec, registry, {slideCache}={}) {
@@ -867,7 +1113,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   const typography = resolveTypography(deckSpec.typography, designTokens);
   const pageTemplate = registry.get("page-template")?.resolveTemplate(deckSpec.pageTemplate);
   return withDesignTokens(designTokens, () => {
-  const slides = deckSpec.slides.map((slideSpec, slideIndex) => {
+  const slides = mapAll(deckSpec.slides, (slideSpec, slideIndex) => {
     const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate,chrome:CHROME}) : null;
     if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
     const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
@@ -951,7 +1197,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
       }
       return heights;
     };
-    for (const { node, frame, ancestors = [] } of placements) {
+    for (const { node, frame, ancestors = [], inRow: inRowPlacement = false } of placements) {
       if (node.nodeType === "section") {
         const sectionDefinition = registry.get("section");
         if (!sectionDefinition) throw new Error("The component registry must define section");
@@ -985,7 +1231,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
             gap: token("space.3"),
             children: node.children
           });
-          const nestedPlacements = resolveLayout(nestedRoot, rendered.contentFrame, registry);
+          const nestedPlacements = resolveLayout(nestedRoot, rendered.contentFrame, registry, { inRow: inRowPlacement });
           placements.push(...nestedPlacements.map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
         }
         continue;
@@ -1008,6 +1254,12 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
       }
       placements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
       assertDeclaredComponentTokens(definition, rendered.nodes, instanceId);
+      // A chart the emitter writes as a native, workbook-backed chart keeps
+      // its data editable, and that is worth more than a lone line's area
+      // (charts.mjs markWeight), which PowerPoint's line chart cannot carry. The
+      // scene drops the area too, so the scene and the file agree.
+      const native = String(definition.id).startsWith("chart.") ? nativeChartSpec(definition.id, props, frame, rendered.nodes) : null;
+      if (native) rendered.nodes = rendered.nodes.filter((item) => !(item.role === "chart-area" && item.data?.lone));
       rendered.nodes.forEach((item) => {
         item.data.componentInstance = instanceId;
         item.data.componentAncestors = [...ancestors];
@@ -1027,7 +1279,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
         tokens: definition.tokens,
         // Chart data travels with the instance so an emitter can write a native,
         // workbook-backed chart object in this frame instead of loose shapes.
-        ...(String(definition.id).startsWith("chart.") ? { nativeChart: nativeChartSpec(definition.id, props, frame, rendered.nodes) } : {})
+        ...(String(definition.id).startsWith("chart.") ? { nativeChart: native } : {})
       });
     }
     assertUniqueIds(nodes);

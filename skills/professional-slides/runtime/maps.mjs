@@ -1,5 +1,6 @@
 import {
   ellipsePrimitive,
+  houseStyle,
   linePrimitive,
   rectPrimitive,
   shapePrimitive,
@@ -63,9 +64,16 @@ export const MAP_TOKENS = Object.freeze([
   "color.surface",
   "color.rule",
   "color.surfaceMuted",
+  "color.surfaceTint",
   "color.ink",
   "color.textSecondary",
   "color.componentPrimary",
+  "color.componentPrimaryTint",
+  "color.accent",
+  "color.canvas",
+  "line.standard",
+  "line.medium",
+  "line.heavy",
   "font.body",
   "type.label",
   "line.hairline",
@@ -237,13 +245,20 @@ function projection(frame, bounds) {
   return { plot, project, contains: ([longitude, latitude]) => longitude >= minLon && longitude <= maxLon && latitude >= minLat && latitude <= maxLat };
 }
 
-function polygonNode({ id, country, paths, highlighted, quantitative }) {
+function polygonNode({ id, country, paths, highlighted, quantitative, recede = false }) {
   const points = paths.flat();
   const [x,y,maxX,maxY] = points.reduce((b,p)=>[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);
   const width=maxX-x, height=maxY-y;
   if (width < 0.35 || height < 0.35) return null;
   const normalized = paths.map((path) => path.map(([px, py]) => [Number(((px - x) / width).toFixed(6)), Number(((py - y) / height).toFixed(6))]));
-  const fill = quantitative ? quantitativeScaleColor(quantitative.scale,quantitative.value) : highlighted ? PRIMARY : MUTED_SURFACE;
+  // Under markers or routes a highlighted country recedes to the tint: the
+  // points are the subject, and a navy country under a navy dot hides both.
+  // Land in the muted surface sat 8 grey levels off a cream page: the map read
+  // as routes and dots floating on nothing. Under the reference mark weight
+  // (core.mjs `style.marks`) land is the filled surface, the ground the
+  // markers and routes stand on.
+  const land = houseStyle("style.marks") === "light" ? MUTED_SURFACE : token("color.surfaceTint");
+  const fill = quantitative ? quantitativeScaleColor(quantitative.scale,quantitative.value) : highlighted ? (recede ? token("color.componentPrimaryTint") : PRIMARY) : land;
   return shapePrimitive({
     id: stableId(id, "land", country.id),
     role: "map-land",
@@ -272,6 +287,14 @@ function markerCoordinate(marker, geography, projected) {
   }
   if (marker.country) {
     const id = geography.custom ? String(marker.country) : resolveCountryId(marker.country);
+    // A country marker sits on the country's label point. A marker labelled
+    // with a city ("Mumbai" on India) then lands in the middle of the country,
+    // hundreds of kilometres from the place it names; a city needs its own
+    // longitude and latitude.
+    const named = COUNTRY_BY_ID.get(id)?.name;
+    if (!geography.custom && marker.label && named && ![named, id].some((value) => normalizedKey(value) === normalizedKey(marker.label)) && !marker.countryLevel) {
+      throw new Error(`Map marker "${marker.label}" is placed on ${named}'s label point; give a city its longitude and latitude, or set countryLevel: true if the marker stands for the whole country`);
+    }
     const country = geography.countries.find((candidate) => candidate.id === id);
     if (!country) throw new Error(`Map marker country ${id} is outside ${geography.id}`);
     if (!country.label || !projected.contains(country.label)) throw new Error(`Map marker country ${id} has no visible label point`);
@@ -282,6 +305,14 @@ function markerCoordinate(marker, geography, projected) {
 }
 
 function markerNodes({ id, frame, geography, projected, markers, highlighted = new Set() }) {
+  const maxValue = Math.max(0, ...markers.map((marker) => Number.isFinite(marker?.value) ? marker.value : 0));
+  // Every marker's footprint, before any label is placed, so a label never
+  // lands on a marker that comes later in the list.
+  const occupied = markers.map((marker) => {
+    const [x, y] = markerCoordinate(marker, geography, projected);
+    const r = drawnDiameter(marker, maxValue) / 2 + 1;
+    return { x: x - r, y: y - r, width: 2 * r, height: 2 * r };
+  });
   const nodes = [];
   for (const [index, marker] of markers.entries()) {
     if (!marker || typeof marker !== "object" || Array.isArray(marker)) throw new Error("Map marker must be an object");
@@ -305,18 +336,213 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
       }
       continue;
     }
-    const size = marker.size ?? 34;
+    // A location is a dot, not a disc: 10px marks a place on a map of the
+    // world without covering the country around it. A hub is a ring with a dot
+    // in it. A marker carrying a value is sized by area against the largest
+    // value on the map (valueDiameter), so the size legend reads true.
+    const size = drawnDiameter(marker, maxValue);
     const markerFrame = { x: centerX - size / 2, y: centerY - size / 2, width: size, height: size };
-    nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: INK, lineWidth: HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id } }));
-    const fraction = marker.fraction ?? 1;
-    if (fraction >= 0.999) nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: markerFrame, style: { fill: INK, stroke: INK, lineWidth: HAIRLINE, radius: token("radius.round") } }));
+    nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: marker.hub ? PRIMARY : INK, lineWidth: marker.hub ? token("line.standard") : HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, hub: Boolean(marker.hub) } }));
+    if (marker.hub) {
+      const dot = size * 0.45, dotFrame = { x: centerX - dot / 2, y: centerY - dot / 2, width: dot, height: dot };
+      nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: dotFrame, style: { fill: PRIMARY, stroke: PRIMARY, lineWidth: HAIRLINE, radius: token("radius.round") } }));
+    }
+    const fraction = marker.hub ? 0 : (marker.fraction ?? 1);
+    if (fraction >= 0.999) nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: markerFrame, style: { fill: PRIMARY, stroke: SURFACE, lineWidth: HAIRLINE, radius: token("radius.round") } }));
     else if (fraction > 0) nodes.push(wedgePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: markerFrame, startAngle: -90, endAngle: -90 + fraction * 360, style: { fill: INK, stroke: INK, lineWidth: HAIRLINE, radius: token("radius.none") } }));
     if (marker.label) {
-      const width = Math.min(150, Math.max(90, frame.width * 0.18));
-      const placeRight = markerFrame.x + size + 4 + width <= frame.x + frame.width;
-      const labelFrame = { x: placeRight ? markerFrame.x + size + 4 : markerFrame.x - width - 4, y: markerFrame.y - 2, width, height: size + 4 };
-      nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: labelFrame, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: SECONDARY, bold: true, align: placeRight ? "left" : "right", valign: "mid" } }));
+      // The label takes the first side that is clear of every marker and of
+      // the labels already placed - right, left, above, below, then the
+      // diagonals - and sits on a patch of canvas, so a route passing under it
+      // does not strike through the name.
+      const measured = measureText(marker.label, 220, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 });
+      const width = Math.ceil(measured.width) + 4, height = Math.max(14, Math.ceil(measured.height));
+      const gap = 3, half = size / 2;
+      const candidates = [
+        [centerX + half + gap, centerY - height / 2, "left"], [centerX - half - gap - width, centerY - height / 2, "right"],
+        [centerX - width / 2, centerY - half - gap - height, "center"], [centerX - width / 2, centerY + half + gap, "center"],
+        [centerX + half, centerY - half - height, "left"], [centerX + half, centerY + half, "left"],
+        [centerX - half - width, centerY - half - height, "right"], [centerX - half - width, centerY + half, "right"],
+        // A farther ring for a crowded cluster, before any overlap is accepted.
+        [centerX + half + gap, centerY - half - height - 10, "left"], [centerX + half + gap, centerY + half + 10, "left"],
+        [centerX - half - gap - width, centerY - half - height - 10, "right"], [centerX - half - gap - width, centerY + half + 10, "right"],
+        [centerX - width / 2, centerY - half - height - 16, "center"], [centerX - width / 2, centerY + half + 16, "center"],
+      ].map(([x, y, align]) => ({ frame: { x, y, width, height }, align }));
+      const inside = (f) => f.x >= frame.x && f.y >= frame.y && f.x + f.width <= frame.x + frame.width && f.y + f.height <= frame.y + frame.height;
+      const clear = (f) => !occupied.some((o) => f.x < o.x + o.width && o.x < f.x + f.width && f.y < o.y + o.height && o.y < f.y + f.height);
+      let chosen = candidates.find((c) => inside(c.frame) && clear(c.frame));
+      let leader = null;
+      if (!chosen) {
+        // A dense cluster (a regional network's neighbouring towns) takes
+        // every position touching the marker. The label moves further out -
+        // rings of 28, 44 and 64px in eight directions - with a hairline
+        // leader back to its marker, rather than printing over a neighbour.
+        const pathClear = (x1, y1, x2, y2) => { for (let t = 0.1; t < 1; t += 0.1) { const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t; if (occupied.some((o) => x > o.x && x < o.x + o.width && y > o.y && y < o.y + o.height)) return false; } return true; };
+        ring: for (const reach of [28, 44, 64]) for (const degrees of [0, 180, -45, 45, -135, 135, -90, 90]) {
+          const ux = Math.cos(degrees * Math.PI / 180), uy = Math.sin(degrees * Math.PI / 180);
+          const cx = centerX + ux * (half + reach + width / 2 * Math.abs(ux)), cy = centerY + uy * (half + reach + height / 2 * Math.abs(uy));
+          const f = { x: cx - width / 2, y: cy - height / 2, width, height };
+          if (!inside(f) || !clear(f)) continue;
+          const x1 = centerX + ux * (half + 2), y1 = centerY + uy * (half + 2);
+          const x2 = Math.max(f.x - 2, Math.min(f.x + f.width + 2, cx - ux * (width / 2 + 2))), y2 = Math.max(f.y, Math.min(f.y + f.height, cy - uy * (height / 2 + 2)));
+          if (!pathClear(x1, y1, x2, y2)) continue;
+          chosen = { frame: f, align: Math.abs(ux) < 0.3 ? "center" : ux > 0 ? "left" : "right" };
+          leader = { x1, y1, x2, y2 };
+          break ring;
+        }
+      }
+      chosen = chosen ?? candidates.find((c) => inside(c.frame)) ?? candidates[0];
+      occupied.push(chosen.frame);
+      if (leader) nodes.push(linePrimitive({ id: stableId(id, "marker-label-leader", index), role: "map-label-leader", ...leader, style: { stroke: SECONDARY, lineWidth: HAIRLINE }, data: { markerIndex: index } }));
+      nodes.push(rectPrimitive({ id: stableId(id, "marker-label-backing", index), role: "map-label-backing", frame: { x: chosen.frame.x - 1, y: chosen.frame.y + 1, width: chosen.frame.width + 2, height: chosen.frame.height - 2 }, style: { fill: token("color.canvas"), stroke: "none", lineWidth: HAIRLINE, radius: token("radius.small") } }));
+      nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: chosen.frame, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: marker.hub ? INK : SECONDARY, bold: true, align: chosen.align, valign: "mid" }, data: { textLayout: measured } }));
     }
+  }
+  return nodes;
+}
+
+// `crop: "fit"` frames the map on its markers: a network from one hub read on
+// a map of the whole world is a cluster of dots in a tenth of the frame.
+//
+// The crop follows the network's own extent. It used never to narrow below 36
+// degrees of longitude, so a regional network - a UK operator's routes over
+// six degrees - rendered at the scale of Europe: markers on top of each
+// other, labels clipped at the frame and routes too short to draw, silently.
+// Now the span keeps a margin of a sixth of itself (at least half a degree),
+// a single place gets a 6 by 4 degree window around it, and the window then
+// widens on its shorter side to the frame's shape, so the map fills the
+// frame with context rather than letterboxing inside it.
+const FIT_MIN_LON = 1.5, FIT_MIN_LAT = 1, FIT_SINGLE = [6, 4];
+function fitBounds(markers, geography, frame = null) {
+  const points = markers.filter((m) => Number.isFinite(m?.longitude) && Number.isFinite(m?.latitude)).map((m) => [m.longitude, m.latitude]);
+  if (!points.length) throw new Error('crop: "fit" needs at least one marker with longitude and latitude; give the markers coordinates or drop crop');
+  let [minLon, minLat, maxLon, maxLat] = points.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [Infinity, Infinity, -Infinity, -Infinity]);
+  const grow = (lo, hi, min) => { const span = Math.max(hi - lo, min), mid = (lo + hi) / 2; return [mid - span / 2, mid + span / 2]; };
+  const single = points.length === 1 || (maxLon - minLon < 1e-6 && maxLat - minLat < 1e-6);
+  [minLon, maxLon] = grow(minLon, maxLon, single ? FIT_SINGLE[0] : FIT_MIN_LON); [minLat, maxLat] = grow(minLat, maxLat, single ? FIT_SINGLE[1] : FIT_MIN_LAT);
+  const padLon = Math.max(0.5, (maxLon - minLon) / 6), padLat = Math.max(0.5, (maxLat - minLat) / 6);
+  minLon -= padLon; maxLon += padLon; minLat -= padLat; maxLat += padLat;
+  if (frame && frame.width > 0 && frame.height > 0) {
+    const k = Math.max(0.25, Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
+    const target = frame.width / frame.height, shape = ((maxLon - minLon) * k) / (maxLat - minLat);
+    if (shape < target) [minLon, maxLon] = grow(minLon, maxLon, (maxLat - minLat) * target / k);
+    else [minLat, maxLat] = grow(minLat, maxLat, (maxLon - minLon) * k / target);
+  }
+  const [gw, gs, ge, gn] = geography.bounds;
+  return [Math.max(gw, minLon), Math.max(gs, minLat), Math.min(ge, maxLon), Math.min(gn, maxLat)];
+}
+
+// Routes: a curved line from one marker to another, the hub-and-spoke picture
+// a network page is recognised by. Each route is a quadratic curve bowed a
+// fifth of its length to one side, drawn under the markers. `status:
+// "planned"` draws it dashed; the dashes are separate strokes, so every
+// renderer shows them the same way.
+function routeNodes({ id, geography, projected, markers, routes }) {
+  if (!routes.length) return [];
+  const byKey = new Map();
+  markers.forEach((marker, index) => { for (const key of [marker?.id, marker?.label, String(index)]) if (key !== undefined && key !== null) byKey.set(String(key), marker); });
+  const nodes = [];
+  // A route carrying a volume is drawn in one of three width classes against
+  // the largest route on the map (2, 3.5 and 5px, all tokens); without one, 2px.
+  const maxVolume = Math.max(0, ...routes.map((route) => Number.isFinite(route?.value) ? route.value : 0));
+  routes.forEach((route, index) => {
+    const from = byKey.get(String(route?.from)), to = byKey.get(String(route?.to));
+    if (!from || !to) throw new Error(`Map route ${index + 1} must name two markers by id, label or index`);
+    if (route.status !== undefined && !["operating", "planned"].includes(route.status)) throw new Error('Map route status is "operating" or "planned"');
+    const [x1, y1] = markerCoordinate(from, geography, projected), [x2, y2] = markerCoordinate(to, geography, projected);
+    const dx = x2 - x1, dy = y2 - y1, length = Math.hypot(dx, dy);
+    if (length < 4) return;
+    const bow = length * 0.2, cx = (x1 + x2) / 2 - (dy / length) * bow, cy = (y1 + y2) / 2 + (dx / length) * bow * (dx >= 0 ? -1 : 1);
+    const points = Array.from({ length: 25 }, (_, i) => { const t = i / 24, u = 1 - t; return [u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]; });
+    const [minX, minY, maxX, maxY] = points.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [Infinity, Infinity, -Infinity, -Infinity]);
+    const width = Math.max(maxX - minX, 1), height = Math.max(maxY - minY, 1);
+    const unit = (p) => [Number(((p[0] - minX) / width).toFixed(5)), Number(((p[1] - minY) / height).toFixed(5))];
+    const planned = route.status === "planned";
+    const paths = planned
+      ? Array.from({ length: 12 }, (_, i) => ({ points: points.slice(i * 2, i * 2 + 2).map(unit), closed: false })).filter((path) => path.points.length === 2)
+      : [{ points: points.map(unit), closed: false }];
+    nodes.push(shapePrimitive({ id: stableId(id, "route", index), role: "map-route", geometry: "iconPath", frame: { x: minX, y: minY, width, height },
+      style: { fill: "none", stroke: planned ? token("color.accent") : PRIMARY, lineWidth: Number.isFinite(route.value) && maxVolume > 0 ? token(route.value / maxVolume > 2 / 3 ? "line.heavy" : route.value / maxVolume > 1 / 3 ? "line.medium" : "line.standard") : token("line.standard"), lineCap: "round" },
+      data: { paths, from: String(route.from), to: String(route.to), status: route.status ?? "operating", ...(Number.isFinite(route.value) ? { value: route.value } : {}) } }));
+  });
+  return nodes;
+}
+
+// Area, not diameter, carries the value: a city twice as large draws a circle
+// of twice the area. The largest value on the map is 32px across; nothing
+// falls under 5px, so the smallest city stays visible.
+const VALUE_MAX_DIAMETER = 32, VALUE_MIN_DIAMETER = 5;
+/** A marker's drawn diameter: its own size, else by value against the largest, else hub or dot. The label collision map uses the same. */
+function drawnDiameter(marker, maxValue) {
+  const valued = Number.isFinite(marker?.value) && maxValue > 0;
+  return marker?.size ?? (valued ? valueDiameter(marker.value, maxValue) : marker?.hub ? 16 : 10);
+}
+
+export function valueDiameter(value, maxValue) {
+  return Math.max(VALUE_MIN_DIAMETER, VALUE_MAX_DIAMETER * Math.sqrt(Math.max(0, value) / maxValue));
+}
+
+function niceValue(v) {
+  if (!(v > 0)) return 0;
+  const power = 10 ** Math.floor(Math.log10(v));
+  const step = [1, 2, 2.5, 5, 10].find((n) => n * power >= v * 0.999) ?? 10;
+  return step * power;
+}
+const formatLegendValue = (v) => Number.isInteger(v) ? v.toLocaleString("en-US") : String(Math.round(v * 100) / 100);
+
+/**
+ * The size legend: what a circle's area means, for maps whose markers carry a
+ * `value` (city population, passengers, flights). `row` sets reference circles
+ * side by side with their values; `stacked` nests them on one baseline with a
+ * leader from each rim to its value. Reference values default to three nice
+ * numbers under the largest value on the map.
+ */
+function sizeLegendSpec(props, markers) {
+  const valued = markers.filter((m) => Number.isFinite(m?.value));
+  if (!valued.length || props.sizeLegend === false) return null;
+  const options = props.sizeLegend && typeof props.sizeLegend === "object" ? props.sizeLegend : {};
+  const style = options.style ?? "row";
+  if (!["row", "stacked"].includes(style)) throw new Error('Map sizeLegend style is "row" or "stacked"');
+  const maxValue = Math.max(...valued.map((m) => m.value));
+  const values = Array.isArray(options.values) && options.values.length
+    ? options.values.filter((v) => Number.isFinite(v) && v > 0).sort((a, b) => a - b)
+    : [...new Set([niceValue(maxValue * 0.1), niceValue(maxValue * 0.4), niceValue(maxValue)].filter((v) => v > 0))];
+  const label = String(options.label ?? props.valueLabel ?? "").trim();
+  if (!label) throw new Error("A map whose markers carry a value needs sizeLegend.label (or valueLabel) saying what circle size shows, e.g. \"City population, m\"");
+  return { style, values, maxValue, label, height: VALUE_MAX_DIAMETER + (style === "stacked" ? 36 : 22) };
+}
+
+function sizeLegendNodes(id, legend, box) {
+  const nodes = [];
+  const text = (key, x, y, width, value, align = "left", bold = false, color = SECONDARY) => nodes.push(textPrimitive({ id: stableId(id, "size-legend", key), role: "map-size-legend-label", frame: { x, y, width, height: 14 }, text: value, style: { fontFamily: FONT, fontSize: LABEL, color, bold, align, valign: "mid" } }));
+  const circle = (key, cx, cy, d) => nodes.push(ellipsePrimitive({ id: stableId(id, "size-legend", key), role: "map-size-legend-circle", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: { fill: "none", stroke: INK, lineWidth: HAIRLINE, radius: token("radius.round") } }));
+  const measure = (value) => Math.ceil(measureText(value, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 }).width) + 4;
+  const titleWidth = measure(legend.label);
+  text("title", box.x, box.y, titleWidth, legend.label, "left", true, INK);
+  const baseline = box.y + box.height;
+  if (legend.style === "row") {
+    let x = box.x;
+    legend.values.forEach((value, i) => {
+      const d = valueDiameter(value, legend.maxValue), cy = baseline - VALUE_MAX_DIAMETER / 2;
+      circle(`c${i}`, x + d / 2, cy, d);
+      const label = formatLegendValue(value), w = measure(label);
+      text(`v${i}`, x + d + 4, cy - 7, w, label);
+      x += d + 4 + w + 14;
+    });
+  } else {
+    // Nested on one baseline; each value sits on a leader from its circle's
+    // top, pushed up so the labels stay at least 12px apart.
+    const big = valueDiameter(legend.values.at(-1), legend.maxValue), cx = box.x + big / 2;
+    let lastY = Infinity;
+    legend.values.forEach((value, i) => {
+      const d = valueDiameter(value, legend.maxValue), top = baseline - d;
+      const labelY = Math.min(top, lastY - 12);
+      lastY = labelY;
+      circle(`c${i}`, cx, baseline - d / 2, d);
+      nodes.push(linePrimitive({ id: stableId(id, "size-legend", `l${i}`), role: "map-size-legend-leader", x1: cx, y1: top, x2: cx + big / 2 + 10, y2: labelY, style: { stroke: INK, lineWidth: HAIRLINE } }));
+      const label = formatLegendValue(value);
+      text(`v${i}`, cx + big / 2 + 13, labelY - 7, measure(label), label);
+    });
   }
   return nodes;
 }
@@ -329,12 +555,22 @@ export function mapNodes({ id, frame, props = {} }) {
   const highlighted = new Set((props.highlightCountries || []).map(value => geography.custom ? String(value) : resolveCountryId(value)));
   const absentHighlights = [...highlighted].filter((countryId) => !geography.countries.some((country) => country.id === countryId));
   if (absentHighlights.length) throw new Error(`Highlighted countries are outside ${geography.id}: ${absentHighlights.join(", ")}`);
-  const projected = projection(frame, geography.bounds);
+  if (props.routes !== undefined && !Array.isArray(props.routes)) throw new Error("Map routes must be an array of { from, to }");
+  if (props.crop !== undefined && props.crop !== "fit") throw new Error('Map crop must be "fit" (crop to the markers and routes)');
+  // A size legend takes a strip under the map, so it never sits on land.
+  const legend = sizeLegendSpec(props, props.markers || []);
+  const outer = frame;
+  if (legend) frame = { ...frame, height: frame.height - legend.height - 8 };
+  const bounds = props.crop === "fit" ? fitBounds(props.markers || [], geography, frame) : geography.bounds;
+  const projected = projection(frame, bounds);
+  const recede = Boolean((props.markers || []).length || (props.routes || []).length);
   const nodes = geography.countries.map((country) => {
-    const paths = country.polygons.map((ring) => clipRing(ring, geography.bounds)).filter((ring) => ring.length >= 3).map((ring) => ring.map(projected.project));
-    return paths.length ? polygonNode({ id, country, paths, highlighted: highlighted.has(country.id) }) : null;
+    const paths = country.polygons.map((ring) => clipRing(ring, bounds)).filter((ring) => ring.length >= 3).map((ring) => ring.map(projected.project));
+    return paths.length ? polygonNode({ id, country, paths, highlighted: highlighted.has(country.id), recede }) : null;
   }).filter(Boolean);
+  nodes.push(...routeNodes({ id, geography, projected, markers: props.markers || [], routes: props.routes || [] }));
   nodes.push(...markerNodes({ id, frame, geography, projected, markers: props.markers || [], highlighted }));
+  if (legend) nodes.push(...sizeLegendNodes(id, legend, { x: projected.plot.x, y: outer.y + outer.height - legend.height, width: outer.width, height: legend.height }));
   if (!nodes.some((node) => node.role === "map-land")) throw new Error(`Map geography ${geography.id} produced no visible land shapes`);
   return nodes;
 }

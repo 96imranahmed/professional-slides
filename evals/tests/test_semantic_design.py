@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import {composeDeck} from './skills/professional-slides/runtime/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
-for (const palette of ['mckinsey','bcg','bain']) {
+for (const palette of ['midnight','evergreen','crimson']) {
  const spec={schema:'professional-slides.deck/v3',id:'banded-bars',palette,contents:false,slides:[
   {id:'comparison',title:'The total reconciles to both groups',exhibit:{type:'table',columns:['Group',{label:'Gross',unit:'$m',bar:true}],rows:[['Alpha',40],['Beta',60],{style:'total',cells:['Total',100]}]}}
  ]};
@@ -32,7 +32,7 @@ import assert from 'node:assert/strict';
 import {composeDeck} from './skills/professional-slides/runtime/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
-for(const palette of ['mckinsey','bcg','bain']) {
+for(const palette of ['midnight','evergreen','crimson']) {
  const spec={schema:'professional-slides.deck/v3',id:'contrast',palette,contents:false,slides:[
  {id:'status',title:'The two groups have different outcomes',exhibit:{type:'chart.stacked-column',categories:['A','B'],series:[{name:'Cleared',values:[8,4]},{name:'Missed',values:[2,6]}]}},
  {id:'focus',title:'Core contributes half of the total',exhibit:{type:'chart.treemap',items:[{label:'Core',value:50},{label:'Other',value:30},{label:'Remaining',value:20}],highlights:[{category:'Core'}]}},
