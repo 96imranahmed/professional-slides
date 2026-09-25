@@ -1,5 +1,6 @@
 import {
   ellipsePrimitive,
+  houseStyle,
   portraitPrimitive,
   rectPrimitive,
   shapePrimitive,
@@ -24,7 +25,7 @@ const SMALL = token("radius.small");
 const ROUND = token("radius.round");
 
 export const QUOTE_CLUSTER_TOKENS = Object.freeze([
-  "color.canvas", "color.surface", "color.surfaceMuted", "color.ink",
+  "color.canvas", "color.surface", "color.surfaceMuted", "color.surfaceTint", "color.ink",
   "color.textSecondary", "color.componentPrimary", "color.rule",
   "font.body", "font.display", "type.deckTitle", "type.sectionTitle", "type.quoteMark", "type.quoteMarkHero", "type.heading",
   "type.body", "type.compact", "type.label", "type.source", "space.1",
@@ -182,11 +183,17 @@ function calloutCaretCenter(frame, attributionPlacement) {
   return frame.x + Math.max(tokenValue(token("space.6")), Math.min(frame.width * 0.22, 180));
 }
 
+// A quotation's box is a card (core.mjs `style.cards`): under the reference
+// weight it is the filled surface with no outline, as a pillar card is. A
+// muted grey box with a hairline was 15 grey levels off white - four of them
+// made a page that read as empty with type on it.
+const quoteBox = (fill, stroke) => houseStyle("style.cards") === "tint" ? { fill: token("color.surfaceTint"), stroke: "none" } : { fill, stroke };
+
 function surfaceNodes(id, frame, count, treatment, attributionPlacement, data, avatar) {
   const bodyFrame = { ...frame, height: surfaceHeight(frame, treatment, count, avatar) };
   if (treatment === "speech-bubble") return [shapePrimitive({
     id: stableId(id, "surface"), role: "quote-surface", geometry: "snip1Rect", frame: bodyFrame,
-    style: { fill: SURFACE, stroke: RULE, lineWidth: STANDARD, flipV: true }, data
+    style: { ...quoteBox(SURFACE, RULE), lineWidth: STANDARD, flipV: true }, data
   })];
   if (treatment === "callout") {
     const bodyHeight = surfaceHeight(frame, treatment, count);
@@ -196,7 +203,7 @@ function surfaceNodes(id, frame, count, treatment, attributionPlacement, data, a
     return [shapePrimitive({
       id: stableId(id, "surface"), role: "quote-surface", geometry: "quoteCallout",
       frame: { ...frame, height: totalHeight },
-      style: { fill: SURFACE, stroke: RULE, lineWidth: HAIRLINE },
+      style: { ...quoteBox(SURFACE, RULE), lineWidth: HAIRLINE },
       data: {
         ...data,
         bodyRatio: bodyHeight / totalHeight,
@@ -206,7 +213,7 @@ function surfaceNodes(id, frame, count, treatment, attributionPlacement, data, a
       }
     })];
   }
-  return [rectPrimitive({ id: stableId(id, "surface"), role: "quote-surface", frame: bodyFrame, style: { fill: MUTED, stroke: RULE, lineWidth: HAIRLINE, radius: SMALL }, data })];
+  return [rectPrimitive({ id: stableId(id, "surface"), role: "quote-surface", frame: bodyFrame, style: { ...quoteBox(MUTED, RULE), lineWidth: HAIRLINE, radius: SMALL }, data })];
 }
 
 function attributionNodes({ id, frame, item, count, treatment, attributionPlacement, align, avatar, data }) {

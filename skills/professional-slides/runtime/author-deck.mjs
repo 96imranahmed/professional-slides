@@ -136,8 +136,10 @@ export function sceneGateFindings(deck, python = process.env.RUNTIME_PYTHON || "
     const budget = !budgetRun.error && [0, 2].includes(budgetRun.status) ? (() => { try { const b = JSON.parse(readFileSync(budgetOut, "utf8")); return Array.isArray(b) ? b : b.budget ?? b.pages ?? []; } catch { return []; } })() : [];
     // Advisories are listed in the summary: a thin page the build will note
     // should be seen by the author first.
+    // DECK_INK is the one deck-level advisory read here: the deck's weight is
+    // a construction habit, and the author can still change it page by page.
     return { ran: true, budget, findings: (report.findings || []).filter((f) => f.severity === "blocker").map(withId),
-      advisories: (report.findings || []).filter((f) => f.severity !== "blocker" && f.slide).map(withId) };
+      advisories: (report.findings || []).filter((f) => f.severity !== "blocker" && (f.slide || f.code === "DECK_INK")).map(withId) };
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -232,8 +234,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   // footer's share, and any band of the page the render will call empty (the
   // build's INTERNAL_VOID and DEAD_BAND, measured on the scene); "!" marks a
   // line to act on. A bare "fills 22%" with no bar beside it was read past.
+  // A page the scene says will read light (SCENE_INK) carries its estimated
+  // ink on its line, only then: the number is a prompt to give the exhibit its
+  // surfaces, not a target to write toward.
+  const light = new Map(pageGateAdvisories.filter((f) => f.code === "SCENE_INK" && f.id).map((f) => [String(f.id), f]));
   const ledger = budget.filter((b) => b.floor).map((b) => {
-    const flag = b.body < b.floor || (b.ceiling && b.body > b.ceiling) || (b.footerRatio ?? 0) > 0.3 || b.void ? "! " : "  ";
+    const ink = light.get(String(b.id ?? ""));
+    const flag = b.body < b.floor || (b.ceiling && b.body > b.ceiling) || (b.footerRatio ?? 0) > 0.3 || b.void || ink ? "! " : "  ";
     // A column's band is named with its column: the page's rows pass, so a
     // bare "empty band" would send the author looking across the whole page.
     const band = !b.void ? "" : b.columnVoid
@@ -247,7 +254,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const room = written.some((c) => c.lines >= 1)
       ? `, room: ${written.map((c) => `${c.column} ${c.lines >= 1 ? `${c.free}px ≈ ${c.lines} line${c.lines === 1 ? "" : "s"}` : "full"}`).join(", ")}` : "";
     return `${flag}${String(b.id ?? b.slide).padEnd(6)} ${String(b.readingTask ?? "").padEnd(24)} ${b.body} words (floor ${Math.round(b.floor)}${b.ceiling ? `, ceiling ${b.ceiling}` : ""})` +
-      `${b.footer ? `, footer ${Math.round((b.footerRatio ?? 0) * 100)}%` : ""}${band}${room}`;
+      `${b.footer ? `, footer ${Math.round((b.footerRatio ?? 0) * 100)}%` : ""}${band}${room}` +
+      `${ink ? `, light: ink ~${(ink.measured * 100).toFixed(1)}% of the body (floor ${Math.round(ink.threshold * 100)}%) - keep the house surfaces on, set loose text as a table or cards, or pair the lone chart; not more words` : ""}`;
   });
   const content = deriveContent(spec, deck);
   // A page that did not compose has no text to plan; its composition error is its finding.

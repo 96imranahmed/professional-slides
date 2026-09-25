@@ -3,7 +3,7 @@
 // KPI tile. Each shares the deck's heading band, marker vocabulary and body
 // type; the row rule (every panel in a row shares one header height) holds
 // inside a cards row because the cards are laid out here, together.
-import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive } from "./core.mjs";
+import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, houseStyle, readableOn } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
@@ -13,8 +13,18 @@ const SURFACE = token("color.surface"), MUTED = token("color.surfaceMuted"), RUL
 const FONT = token("font.body"), DISPLAY = token("font.display");
 const v = (id) => tokenValue(token(id));
 const ACCENT_OR_PRIMARY = () => token("color.accent");
+// A card's surface (core.mjs `style.cards`). White cards outlined in a hairline
+// on a cream page are the page colour with a pencil line round them, and a row
+// of four read as an empty page with text on it. Under the reference weight a
+// card is a filled block with no outline - the construction strong decks use
+// for a pillar, a label block or a fact card.
+const FILLED = token("color.surfaceTint");
+const cardFill = () => houseStyle("style.cards") === "tint" ? { fill: FILLED, stroke: "none" } : { fill: SURFACE, stroke: RULE };
+// The muted panels inside a card (a stat card, a big-number copy band) take the
+// same surface, so one card set carries one fill.
+const cardMuted = () => houseStyle("style.cards") === "tint" ? FILLED : MUTED;
 
-export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
+export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.surfaceTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
 const text = (size, color = INK, bold = false, align = "left") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
 const measure = (value, width, size, bold = false) => measureAt(value, width, { size, bold });
@@ -144,8 +154,10 @@ export function cardsNodes({ id, frame: frameIn, props }) {
   L.items.forEach((m, index) => {
     const x = frame.x + index * (L.width + L.gap), cid = stableId(id, "card", index);
     const top = frame.y;
-    if (L.tone === "stat") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, MUTED, "none", "radius.none"));
-    else if (!L.open && L.tone !== "dark") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, SURFACE, RULE, "radius.small"));
+    const surface = cardFill();
+    if (L.tone === "stat") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, cardMuted(), "none", "radius.none"));
+    else if (!L.open && L.tone !== "dark") nodes.push(rect(stableId(cid, "surface"), "card-surface", { x, y: frame.y, width: L.width, height: cardHeight }, surface.fill, surface.stroke, "radius.small"));
+    const onCard = L.open || L.tone === "dark" ? SURFACE : L.tone === "stat" ? cardMuted() : surface.fill;
     let y = top + L.pad;
     const cx = x + L.pad;
     const align = L.centred ? "center" : "left";
@@ -201,14 +213,14 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     if (m.value) {
       // A headline figure under the title (price, size, share) in the metric role.
       const vy = top + L.pad + (L.tone === "header" || L.tone === "dark" ? m.bandHeight : m.iconBlock + m.numberBlock + m.titleHeight) + L.bodyGap;
-      nodes.push(label(stableId(cid, "value"), "card-value", { x: cx, y: vy, width: L.inner }, m.value, text("type.metric", PRIMARY, true, align)));
+      nodes.push(label(stableId(cid, "value"), "card-value", { x: cx, y: vy, width: L.inner }, m.value, text("type.metric", readableOn(PRIMARY, onCard, 3), true, align)));
     }
     // Content starts level across the row (row rule), below the tallest header.
     y = L.tone === "header" || L.tone === "dark" ? top + L.headerHeight + L.pad : top + L.pad + L.headerHeight;
     let tx = cx, tw = L.inner;
     if (L.tone === "big-number") {
       // The copy band: muted, from the content line to the card's foot.
-      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: y + L.bodyGap, width: L.width, height: Math.max(0, cardHeight - (y + L.bodyGap - top)) }, MUTED));
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: y + L.bodyGap, width: L.width, height: Math.max(0, cardHeight - (y + L.bodyGap - top)) }, cardMuted()));
       tx = cx + v("space.3"); tw = L.inner - 2 * v("space.3"); y += v("space.3");
     }
     if (m.body) { y += L.bodyGap; nodes.push(label(stableId(cid, "text"), "card-text", { x: tx, y, width: tw }, m.body, text("type.body", INK, false, align))); y += m.body.height; }
@@ -221,7 +233,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     if (m.footer) {
       const fy = frame.y + cardHeight - L.pad - m.footer.height;
       nodes.push(linePrimitive({ id: stableId(cid, "footer-rule"), role: "card-rule", x1: cx, y1: fy - v("space.2"), x2: cx + L.inner, y2: fy - v("space.2"), style: { stroke: RULE, lineWidth: token("line.hairline") } }));
-      nodes.push(label(stableId(cid, "footer"), "card-footer", { x: cx, y: fy, width: L.inner }, m.footer, text("type.compact", PRIMARY, true)));
+      nodes.push(label(stableId(cid, "footer"), "card-footer", { x: cx, y: fy, width: L.inner }, m.footer, text("type.compact", readableOn(PRIMARY, onCard), true)));
     }
   });
   return nodes;
@@ -254,7 +266,7 @@ export function quadrantsNodes({ id, frame, props }) {
   const light = props.tone === "light";
   L.cells.forEach((cell, i) => {
     const x = frame.x + (i % 2) * (L.width + L.gap), y0 = frame.y + Math.floor(i / 2) * (L.height + L.gap), qid = stableId(id, "quadrant", i);
-    nodes.push(rect(stableId(qid, "surface"), "quadrant-surface", { x, y: y0, width: L.width, height: L.height }, MUTED));
+    nodes.push(rect(stableId(qid, "surface"), "quadrant-surface", { x, y: y0, width: L.width, height: L.height }, cardMuted()));
     nodes.push(rect(stableId(qid, "band"), "quadrant-band", { x, y: y0, width: L.width, height: cell.band }, light ? TINT : PRIMARY));
     nodes.push(label(stableId(qid, "title"), "quadrant-title", { x: x + L.pad, y: y0 + v("space.2"), width: L.inner }, cell.title, text("type.heading", light ? INK : WHITE, true)));
     let y = y0 + cell.band + L.pad;

@@ -16,6 +16,7 @@ import {
   shapePrimitive,
   stableId,
   houseStyle,
+  readableOn,
   textPrimitive,
   token,
   tokenValue,
@@ -1056,9 +1057,19 @@ function waveRoadmapLayout(frame, props) {
     if (values !== undefined && !Array.isArray(values)) throw new Error(`Roadmap ${label} must be an array`);
     return values?.length ? `${label}\n${values.map(value => `▪  ${value}`).join("\n")}` : "";
   };
+  // Surface treatment (core.mjs `style.timeline`): five dots on a hairline rail
+  // with small type under them was a page of gaps. Under `blocks` each stage's
+  // heading is set in a filled chevron - the phase block - on a heavier spine,
+  // so the sequence reads as a row of solid phases before any list is read.
+  // The chevron's notch and point take half its height at each end, so the
+  // heading is measured that much narrower.
+  const blocks = houseStyle("style.timeline") === "blocks";
+  const blockPad = blocks ? tokenValue(token("space.2")) : 0;
   const cells = items.map((item, index) => ({
     range: measure(item.range || "", COMPACT, true),
-    heading: measure(item.heading || item.label || `Wave ${index + 1}`, token("type.heading"), true),
+    heading: blocks
+      ? measureText(item.heading || item.label || `Wave ${index + 1}`, width - 2 * (tokenValue(token("space.3")) + blockPad), { fontSize: tokenValue(token("type.heading")), bold: true })
+      : measure(item.heading || item.label || `Wave ${index + 1}`, token("type.heading"), true),
     activities: measure(list("Key activities", item.activities), COMPACT),
     deliverables: measure(list("Main deliverables", item.deliverables), COMPACT)
   }));
@@ -1080,8 +1091,8 @@ function waveRoadmapLayout(frame, props) {
   const growth = Object.values(slots).reduce((sum, value) => sum + value, 0);
   const natural = (spare) => {
     const share = (key) => growth ? slots[key] * spare / growth : 0;
-    const headingTop = rangeHeight ? rangeHeight + tokenValue(token("space.3")) + share("range") : 0;
-    const railY = headingTop + headingHeight + gap + share("heading") + markerSize / 2;
+    const headingTop = (rangeHeight ? rangeHeight + tokenValue(token("space.3")) + share("range") : 0) + blockPad;
+    const railY = headingTop + headingHeight + blockPad + gap + share("heading") + markerSize / 2;
     const activitiesTop = railY + markerSize / 2 + gap + share("activities");
     const deliverablesTop = activitiesTop + activitiesHeight + (activitiesHeight && deliverablesHeight ? gap + share("deliverables") : 0);
     const height = (deliverablesHeight ? deliverablesTop + deliverablesHeight : activitiesHeight ? activitiesTop + activitiesHeight : railY + markerSize / 2) + inset;
@@ -1089,25 +1100,46 @@ function waveRoadmapLayout(frame, props) {
   };
   const base = natural(0);
   const spare = Number.isFinite(frame.height) ? Math.max(0, Math.min(growth, frame.height - base.height)) : 0;
-  return { cells, span, inset, width, markerSize, rangeHeight, headingHeight, ...natural(spare), naturalHeight: base.height, ceiling: base.height + growth };
+  return { cells, span, inset, width, markerSize, rangeHeight, headingHeight, blocks, blockPad, ...natural(spare), naturalHeight: base.height, ceiling: base.height + growth };
 }
 
 function waveRoadmapNodes({ id, frame, props }) {
   const layout = waveRoadmapLayout(frame, props);
   if (layout.height > frame.height + 0.01) throw new Error(`Roadmap ${id} complete activity and deliverable rows need ${layout.height.toFixed(1)}px, but only ${frame.height}px is allocated; widen, regroup or split the stages`);
   const railY = frame.y + layout.railY;
-  const nodes = [openLine(stableId(id, "rail"), frame.x, railY, frame.x + frame.width, railY, "roadmap-rail", RULE, STANDARD, { endArrow: true })];
+  const nodes = [openLine(stableId(id, "rail"), frame.x, railY, frame.x + frame.width, railY, "roadmap-rail", RULE, layout.blocks ? token("line.medium") : STANDARD, { endArrow: true })];
+  // The phase block is the filled surface, not the primary: five chevrons in a
+  // saturated brand colour shouted over the page they head. The colour stays
+  // on the markers; the blocks carry the weight in the neutral surface.
+  const blockFill = token("color.surfaceTint"), chevron = tokenValue(token("space.3")) + layout.blockPad;
   layout.cells.forEach((cell, index) => {
     const x = frame.x + index * layout.span, center = x + layout.span / 2;
+    if (layout.blocks) {
+      // One chevron per stage, abutting the next so the row reads as one
+      // sequence, the heading centred on it.
+      const top = frame.y + layout.headingTop - layout.blockPad;
+      nodes.push(shapePrimitive({ id: stableId(id, "phase", index), role: "roadmap-phase-surface", geometry: "chevron",
+        frame: { x: x + 1, y: top, width: layout.span - 2, height: layout.headingHeight + 2 * layout.blockPad },
+        style: boxStyle(blockFill, "none", HAIRLINE, token("radius.none")), data: { stage: index } }));
+    }
     for (const [key, y, size, color, bold, align] of [
       ["range", layout.rangeHeight - (cell.range?.height ?? 0), COMPACT, SECONDARY, true, "center"],
-      ["heading", layout.headingTop + layout.headingHeight - cell.heading.height, token("type.heading"), INK, true, "center"],
+      ["heading", layout.headingTop + (layout.blocks ? (layout.headingHeight - cell.heading.height) / 2 : layout.headingHeight - cell.heading.height), token("type.heading"), layout.blocks ? readableOn(INK, blockFill) : INK, true, "center"],
       ["activities", layout.activitiesTop, COMPACT, INK, false, "left"],
       ["deliverables", layout.deliverablesTop, COMPACT, INK, false, "left"]
     ]) {
       const text = cell[key];
       if (!text) continue;
-      nodes.push(textPrimitive({ id: stableId(id, key, index), role: `roadmap-${key}`, frame: { x: x + layout.inset, y: frame.y + y, width: layout.width, height: text.height }, text: text.text, style: { ...textStyle(size, color, bold, align, "top"), lineHeight: text.lineHeight, wrap: false }, data: { textLayout: text } }));
+      // A heading on a chevron is set in the width it was measured to, clear
+      // of the notch and the point, and centred in the block's height: the
+      // renderer owns the final wrap, and a heading the metrics wrapped that
+      // the renderer sets on one line would otherwise sit at the block's top.
+      const onBlock = key === "heading" && layout.blocks;
+      const inset = onBlock ? chevron : 0;
+      const box = onBlock
+        ? { x: x + layout.inset + inset, y: frame.y + layout.headingTop - layout.blockPad, width: layout.width - 2 * inset, height: layout.headingHeight + 2 * layout.blockPad }
+        : { x: x + layout.inset, y: frame.y + y, width: layout.width, height: text.height };
+      nodes.push(textPrimitive({ id: stableId(id, key, index), role: `roadmap-${key}`, frame: box, text: text.text, style: { ...textStyle(size, color, bold, align, onBlock ? "mid" : "top"), lineHeight: text.lineHeight, wrap: false }, data: { textLayout: text } }));
     }
     nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: "roadmap-marker", frame: { x: center - layout.markerSize / 2, y: railY - layout.markerSize / 2, width: layout.markerSize, height: layout.markerSize }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }));
   });
@@ -1678,7 +1710,7 @@ function registerCore(registry) {
     } }),
     component({ id: "initiative-rollout", category: "relationship", role: "initiative-rollout", tokens: ["color.ink", "color.componentPrimary", "color.chartSeries2", "color.surfaceMuted", "color.surface", "color.onPrimary", "font.body", "type.heading", "type.compact", "type.label", "line.hairline", "line.standard", "radius.none", "radius.round"], preferredSize: { width: 1160, height: 450 }, sample: { years: ["Year 1", "Year 2", "Year 3"], rows: [{ label: "A", phases: ["(Insert phase 1)", "(Insert phase 2)", "(Insert phase 3)"] }, { label: "B", phases: ["(Insert phase 1)", "(Insert phase 2)", "(Insert phase 3)"] }] }, render: ({ id, frame, props }) => ({ nodes: initiativeRolloutNodes({ id, frame, props }) }) }),
     component({ id: "highlight-strip", category: "relationship", role: "highlight-strip", tokens: ["color.componentPrimary", "color.ink", "color.onPrimary", "font.body", "type.heading", "type.compact", "line.hairline", "radius.round"], preferredSize: { width: 1160, height: 126 }, sample: { items: [{ number: "1", heading: "(Insert highlight)", description: "(Insert description)" }, { number: "2", heading: "(Insert highlight)", description: "(Insert description)" }, { number: "3", heading: "(Insert highlight)", description: "(Insert description)" }] }, render: ({ id, frame, props }) => ({ nodes: highlightStripNodes({ id, frame, props }) }) }),
-    component({ id: "roadmap", category: "relationship", role: "roadmap", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.heading", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round", "radius.small"], preferredSize: { width: 980, height: 360 }, sample: { items: ["(Insert stage 1)", "(Insert stage 2)", "(Insert stage 3)", "(Insert stage 4)"], active: 1 }, render: ({ id, frame, props }) => ({ nodes: props.variant === "wave-columns" ? waveRoadmapNodes({ id, frame, props }) : processNodes({ id, frame, props: { ...props, items: props.items.map((label) => typeof label === "string" ? { label } : label) }, roadmap: true }) }) }),
+    component({ id: "roadmap", category: "relationship", role: "roadmap", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.heading", "type.compact", "type.label", "line.standard", "line.medium", "line.hairline", "radius.round", "radius.small", "radius.none", "color.surfaceTint"], preferredSize: { width: 980, height: 360 }, sample: { items: ["(Insert stage 1)", "(Insert stage 2)", "(Insert stage 3)", "(Insert stage 4)"], active: 1 }, render: ({ id, frame, props }) => ({ nodes: props.variant === "wave-columns" ? waveRoadmapNodes({ id, frame, props }) : processNodes({ id, frame, props: { ...props, items: props.items.map((label) => typeof label === "string" ? { label } : label) }, roadmap: true }) }) }),
     component({ id: "timeline", category: "relationship", role: "timeline", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 920, height: 250 }, sample: { items: ["Q1", "Q2", "Q3", "Q4"], active: 2 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props: { ...props, items: props.items.map((label) => ({ label })) } }) }) }),
     component({ id: "journey", category: "relationship", role: "journey", tokens: ["color.componentPrimary", "color.surface", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "type.label", "line.standard", "line.hairline", "radius.round"], preferredSize: { width: 960, height: 300 }, sample: { items: [{ label: "(Insert stage 1)", touchpoint: "(Insert touchpoint 1)" }, { label: "(Insert stage 2)", touchpoint: "(Insert touchpoint 2)" }, { label: "(Insert stage 3)", touchpoint: "(Insert touchpoint 3)" }, { label: "(Insert stage 4)", touchpoint: "(Insert touchpoint 4)" }], active: 3 }, render: ({ id, frame, props }) => ({ nodes: processNodes({ id, frame, props, journey: true }) }) }),
     component({ id: "tree", category: "relationship", role: "tree", tokens: ["color.componentPrimary", "color.componentPrimaryTint", "color.surface", "color.rule", "color.onPrimary", "color.ink", "color.textSecondary", "font.body", "type.compact", "line.hairline", "line.standard", "radius.small"], preferredSize: { width: 900, height: 360 }, sample: { root: "(Insert root question)", children: ["(Insert branch 1)", "(Insert branch 2)", "(Insert branch 3)", "(Insert branch 4)"] }, render: ({ id, frame, props }) => ({ nodes: treeNodes({ id, frame, props }) }) }),

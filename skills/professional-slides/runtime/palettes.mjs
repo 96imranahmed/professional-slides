@@ -80,12 +80,26 @@ export function resolvePalette(id = "midnight", baseTokens, slots) {
     preset = PALETTES[id];
   }
   const tokens = Object.fromEntries(Object.entries(baseTokens).map(([key, value]) => [key, { ...value, value: preset.colors[key] ?? value.value }]));
+  // The filled surface follows the page it sits on: the palette's own ink mixed
+  // toward its own canvas, so a warm paper page gets a warm stone and a navy
+  // house a cool grey, and a house profile with its own ink needs no new colour.
+  if (tokens["color.surfaceTint"] && !preset.colors["color.surfaceTint"] && tokens["color.ink"] && tokens["color.canvas"])
+    tokens["color.surfaceTint"] = { ...tokens["color.surfaceTint"], value: surfaceTint(tokens["color.ink"].value, tokens["color.canvas"].value) };
   Object.assign(tokens,heatScaleTokens(Object.fromEntries(Object.entries(tokens).map(([key,definition])=>[key,definition.value]))));
   // A colour token may share a theme slot only while its value equals that slot.
   for (const definition of Object.values(tokens)) {
     if (definition.themeSlot && definition.value !== tokens[slots[definition.themeSlot]].value) definition.themeSlot = null;
   }
   return { id, label: preset.label, basis: preset.basis, tokens };
+}
+
+// How far the filled surface sits from the canvas toward the ink. At 86% it is
+// about 30 grey levels under a white or cream page: clearly a surface, still
+// light enough for ink and secondary type at 4.5:1 or better.
+export const SURFACE_TINT_MIX = 0.86;
+export function surfaceTint(ink, canvas, share = SURFACE_TINT_MIX) {
+  const channel = (color, i) => parseInt(color.slice(1 + i * 2, 3 + i * 2), 16);
+  return "#" + [0, 1, 2].map((i) => Math.round(channel(ink, i) * (1 - share) + channel(canvas, i) * share).toString(16).padStart(2, "0")).join("").toUpperCase();
 }
 
 export function contrastRatio(a, b) {
