@@ -129,6 +129,14 @@ The compiler checks what each type implies. A trend runs over four or more perio
 
 Each component's limits are published in `--types` (`holds:` - a donut takes two to five parts, cards two to six, steps three to six, a stat-list value nine characters and a fact-grid value ten) and checked at compile, with the capacities the renderer measures: a chart callout about ten words and a chart three callouts (a fourth note is commentary), a rail about forty words (eight lines at heading size). Every `numbers` form sets its figures against one exhibit - the proof beside a hero number, the tiles of a grid, the chart under a strip.
 
+What the runtime resolves and what it cannot, also printed in `--types` under "Chart limits":
+
+- A highlighted member of a one-series bar chart - a `distribution`, every column of `aligned-bars`, a bar panel - is drawn as its bar in the accent, in PowerPoint's native chart too; columns keep the tint behind the category.
+- A forty-member `distribution` labels every second or third row at full size when the rows are thinner than a line, always the highlighted member; it takes one callout, set beside its bar.
+- A bridge carries three callouts beside a column or rail; over commentary `below` it is a third shorter and carries two.
+- Panels in the same unit share one value scale, computed from every panel's values, negatives, reference lines and targets; they also share the tallest panel's callout band, so their plots stay one height. Panels in different units keep their own bands: annotate one and leave its neighbours plain.
+- In a row of three or four, column panels thin period labels (FY17, 2019, Q1) to every second or third, and two-series lines name their series in a legend. Named columns are never dropped: `--types` prints how many a panel holds in a row of two, three and four. A callout on a bar panel in a row of three or four has no room for a rail - annotate a mark with clear space above it, or say it in the caption.
+
 Each type also has a minimum it needs to be worth a page: a composition shows three or more parts, or the mix across two or more members or periods - a share of one thing is a numbers page; a timeline or roadmap has four or more dated items; a mechanism three or more parts; a relationship five or more members; a bridge a start, two steps and an end - and every chart page the evidence floor below. Small counts are counted, not shared out: fourteen cities as percentages of a pie overstates what the count can say - use form `waffle`, with the parts as `categories` and one series of whole counts.
 
 On a page with commentary points, mark the finding in each point: `highlight` takes a list, with the number or claim from each point the reader should see first, or a point carries its own `highlight`. A single phrase lights one point and leaves the rest grey. A phrase that appears in no point is refused in a draft too, once the points are written.

@@ -883,6 +883,19 @@ function seriesValues(props = {}) {
   return [];
 }
 
+/**
+ * How a highlight with no `style` is drawn. On a one-series bar chart it is
+ * the bar itself in the accent: a pale band behind a dark bar left the subject
+ * of a forty-member ranking - and of every column of an aligned-bars page -
+ * hard to find, where the same row painted in the accent is the first thing
+ * seen. Elsewhere (columns, grouped or stacked bars) the band behind the
+ * category stays the default. The drawn chart (charts.mjs), the native chart
+ * spec below and the composer's row rules all read this one rule.
+ */
+export function defaultHighlightStyle(componentId, props = {}) {
+  return componentId === "chart.bar" && Array.isArray(props.series) && props.series.length === 1 ? "bar" : "region-tint";
+}
+
 /** Data an emitter needs for a native chart. Types outside NATIVE_CHART_TYPES keep shapes. */
 export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   const type = NATIVE_CHART_TYPES[componentId];
@@ -890,7 +903,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // Reference lines and annotations need the plot scale; PowerPoint does not
   // expose it, so those charts stay as assembled, grouped shapes. A single-bar
   // highlight is a per-point fill and stays native.
-  const highlights = props.highlights || [];
+  const highlights = (props.highlights || []).map((h) => ({ ...h, style: h?.style ?? defaultHighlightStyle(componentId, props) }));
   // A floating range band prints its low value left of the band and its high
   // value right of it, in ink. PowerPoint's stacked-bar stand-in can only put a
   // label inside the band, so the range chart is assembled as shapes.
@@ -932,6 +945,20 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   if (props.categoryIcons || props.seriesGrowth) return null;
   if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
   const categories = [...(props.categories || props.labels || [])];
+  // The category labels the scene drew are the ones PowerPoint prints. A
+  // ten-year line the scene labelled FY17, FY20, FY23, FY26 came out of the
+  // native chart with all ten, rotated, and the export audit read six labels
+  // the page never planned. `tickLblSkip` says the same to PowerPoint but
+  // LibreOffice ignores it, so the labels the scene left out are blank in the
+  // chart's categories (emit_pptx.py); the values keep their rows.
+  const drawnCategories = new Set((renderedNodes || []).filter(node => node.role === "category-label").map(node => String(node.data?.category ?? node.text)));
+  const hiddenCategoryIndices = renderedNodes && drawnCategories.size && drawnCategories.size < categories.length
+    ? categories.map((category, index) => drawnCategories.has(String(category)) ? -1 : index).filter(index => index >= 0) : [];
+  // Likewise the values: a forty-row ranking labels the rows it names, and the
+  // native chart printed all forty values over one another.
+  const labelledCategories = new Set((renderedNodes || []).filter(node => node.role === "data-label" && node.data?.category !== undefined).map(node => String(node.data.category)));
+  const hiddenLabelIndices = renderedNodes && labelledCategories.size && labelledCategories.size < categories.length && Array.isArray(props.series) && props.series.length === 1
+    ? categories.map((category, index) => labelledCategories.has(String(category)) ? -1 : index).filter(index => index >= 0) : [];
   const series = type === "range"
     ? [{ name: "low", values: [...(props.low || [])], hidden: true }, { name: "range", values: (props.high || []).map((h, i) => h - (props.low || [])[i]) }]
     : Array.isArray(props.series) ? props.series.map(s => ({ name: s.name, values: [...(s.values || [])] }))
@@ -967,6 +994,8 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     categories,
     series,
     highlightIndices: highlights.map((h) => categories.indexOf(h.category)).filter((i) => i >= 0),
+    ...(hiddenCategoryIndices.length ? { hiddenCategoryIndices } : {}),
+    ...(hiddenLabelIndices.length ? { hiddenLabelIndices } : {}),
     forecastIndex,
     endLabels: props.directLabels === "end" || props.endLabels === true || (type === "line" && series.length > 1 && props.legend !== true && props.endLabels !== false),
     ...(type === "line" ? { pointDataLabels: renderedNodes

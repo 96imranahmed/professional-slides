@@ -178,9 +178,14 @@ function annotationObstacleFrames(obstacles, roles = COLLISION_ROLES) {
   });
 }
 
+// Two boxes keep the compact band's gap apart, not more: at 10px, two compact
+// boxes that overlapped across - a bridge's staff-cost and other-cost notes,
+// neighbours on the axis, stacked 8px apart by their bands - failed each
+// other by two pixels, and the second went to a rail that squeezed the
+// category labels off the page.
 function clearSurface(frame, obstacles, placements) {
   return obstacles.every((node) => !overlaps(frame, node.frame, 6))
-    && placements.every((placement) => !overlaps(frame, placement.frame, 10));
+    && placements.every((placement) => !overlaps(frame, placement.frame, COMPACT_BAND_GAP));
 }
 
 function clearLeader(x1, y1, x2, y2, target, obstacles) {

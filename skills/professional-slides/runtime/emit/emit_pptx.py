@@ -513,7 +513,11 @@ class Emitter:
                     ser.add_data_point(p.get("x"), p.get("y"))
         else:
             cd = CategoryChartData()
-            cd.categories = spec["categories"]
+            # Categories the scene left unlabelled (a crowded period axis, a
+            # long ranking) are blank here, so the chart prints what the page
+            # planned (core.mjs nativeChartSpec).
+            hidden = set(spec.get("hiddenCategoryIndices") or [])
+            cd.categories = ["" if i in hidden else c for i, c in enumerate(spec["categories"])]
             for s in spec["series"]:
                 cd.add_series(s.get("name") or "Series", s["values"])
         gf = slide.shapes.add_chart(ctype, emu(f["x"]), emu(f["y"]), emu(f["width"]), emu(f["height"]), cd)
@@ -715,6 +719,19 @@ class Emitter:
                     sdl.font.color.rgb = rgb(self.colors.get("color.ink", "#000000"))
                     if kind in ("column", "bar"):
                         sdl.position = XL_LABEL_POSITION.OUTSIDE_END
+                    # Values the scene left unprinted (a ranking labelled on
+                    # the rows it names) are deleted point by point, as above.
+                    # A point's dLbl leads the dLbls block (schema order).
+                    for j in spec.get("hiddenLabelIndices") or []:
+                        labels = ser._element.get_or_add_dLbls()
+                        label = etree.Element(qn("c:dLbl"))
+                        etree.SubElement(label, qn("c:idx")).set("val", str(j))
+                        etree.SubElement(label, qn("c:delete")).set("val", "1")
+                        points = labels.findall(qn("c:dLbl"))
+                        if points:
+                            points[-1].addnext(label)
+                        else:
+                            labels.insert(0, label)
                 if kind in ("column", "bar", "stacked-column", "stacked-bar") and single:
                     two_mark_contrast = kind in ("column", "bar") and len(spec["categories"]) == 2 and idx is None and not highlight_indices
                     for j, pt in enumerate(ser.points):

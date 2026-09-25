@@ -92,9 +92,20 @@ assert.ok(boxes.every(b=>b.y>=frame.y),'inside the frame');
 for(const n of nodes.filter(n=>n.role==='data-label')) for(const b of boxes) assert.ok(!meet(b,n.frame));
 // The full 88px bands would have left under 100px; compact bands keep the minimum.
 assert.ok(baseline-Math.min(...boxes.map(b=>b.y+b.height))>=100);
-// A frame too short even for compact bands still fails, naming the height to add.
+// A frame too short for compact bands gives them up, one at a time: the
+// callouts go beside or inside their marks and the plot keeps its minimum,
+// where it used to throw.
+const short=render('chart.column',props,{...frame,height:200});
+const released=short.filter(n=>n.role==='annotation-surface');
+assert.equal(released.length,2);
+for(const b of released) {
+  assert.ok(['beside','inside'].includes(b.data.evidencePlacement),b.data.evidencePlacement);
+  for(const n of short.filter(n=>n.role==='data-label')) assert.ok(!meet(b.frame,ink(n)),'clear of the values');
+  for(const n of short.filter(n=>n.role==='chart-mark')) assert.ok(b.data.evidencePlacement==='inside'?!meet(b.frame,n.frame)||inside(b.frame,n.frame):!meet(b.frame,n.frame),'on its own column or clear of the marks');
+}
+// A frame too short even with no band still fails, naming the height to add.
 let message='';
-try { render('chart.column',props,{...frame,height:200}); } catch (error) { message=error.message; }
+try { render('chart.column',props,{...frame,height:140}); } catch (error) { message=error.message; }
 console.log(JSON.stringify({message}));
 """)
         self.assertIn('insufficient plot height', result['message'])
