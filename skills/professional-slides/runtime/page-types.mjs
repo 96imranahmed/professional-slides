@@ -368,6 +368,7 @@ const limitOf = (type, form, target) => LIMITS[`${type}/${form}`] ?? LIMITS[targ
 // Callouts a chart carries before the plot runs out of clear corridors: past
 // three, the fourth note is commentary and belongs beside the chart.
 export const CALLOUTS_MAX = 3;
+export const WATERFALL_BELOW_CALLOUTS = 2;
 // The rail's panel is a third of the body row; its statement is set at heading
 // size and runs to eight lines, measured here the way the renderer sets it.
 const RAIL_WIDTH = 373;
@@ -456,6 +457,12 @@ function formExhibit(id, page, ex) {
       throw new Error(`${id}: a distribution is sorted - order the members by the value, so the subject's place in the field is where it stands`);
     if (!(ex.highlights || []).some((h) => cats.includes(String(h?.category))))
       throw new Error(`${id}: a distribution marks the subject - \`highlights: [{ category }]\` naming one of its members`);
+    // Forty rows ten pixels apart hold one callout beside its bar - the
+    // subject's, or any one member's - and not a second: every pair tried
+    // on a forty-member field but one left the second box nowhere clear of
+    // its neighbours' bars and values.
+    if ((ex.annotations || []).length > 1)
+      throw new Error(`${id}: a distribution carries one callout (this one has ${ex.annotations.length}) - its rows are too close for a second box; keep the note on the subject and put the rest in the commentary`);
   }
   if (page.type === "ranking" && page.form === "aligned-bars") {
     if (page.commentary === "on-exhibit") throw new Error(`${id}: aligned bars carry no callouts - a callout on one column pushes its bars out of line with the others; choose "beside", "below" or "rail"`);
@@ -676,6 +683,12 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     if (long) throw new Error(`${id}: a ${ex.type} value is a figure of ${limit.valueChars} characters at most ("${long.value}"); put the unit in the label`);
     if (ex.type?.startsWith("chart.") && (ex.annotations || []).length > CALLOUTS_MAX)
       throw new Error(`${id}: a chart carries ${CALLOUTS_MAX} callouts at most (this one has ${ex.annotations.length}); the rest is commentary - choose "beside" or "rail" for it`);
+    // A bridge over a band of points is the page's width and a third short of
+    // its height: three callouts' bands left no room beside the tall totals
+    // for the third, and it had nowhere to go. Two fit; beside a column the
+    // bridge keeps its height and takes three.
+    if (ex.type === "chart.waterfall" && page.commentary === "below" && (ex.annotations || []).length > WATERFALL_BELOW_CALLOUTS)
+      throw new Error(`${id}: a bridge over commentary "below" carries ${WATERFALL_BELOW_CALLOUTS} callouts at most (this one has ${ex.annotations.length}) - the points take a third of its height; choose "rail" or "beside" for three, or move a note into the points`);
   }
   const formLimit = primary && LIMITS[`${page.type}/${page.form}`];
   if (formLimit) {
@@ -944,6 +957,31 @@ export function railCapacity() {
   return n;
 }
 
+/**
+ * How many named columns a chart panel holds in a row of two, three and four,
+ * by the renderer's own measure: a column chart of eight-letter names drawn at
+ * the panel's width until a name no longer fits its column. Period labels
+ * (FY17, 2019, Q1 2025) are not counted - the chart labels every second or
+ * third when they crowd - but a name is never dropped, and a row of three
+ * ten-column panels failed on "FY17" (29px in a 25px column) before periods
+ * thinned. The widths are the composer's (compose.mjs peerExhibitsRow).
+ */
+export function panelColumnCapacity() {
+  const names = ["Northern", "Southern", "Atlantic", "Pacifica", "Midlands", "Highland", "Lowlands", "Eastward", "Westward", "Frontier", "Lakeside", "Seaboard", "Downtown", "Hillside"];
+  const chart = REGISTRY.get("chart.column");
+  return Object.fromEntries([2, 3, 4].map((n) => {
+    const width = (1160 - (n - 1) * 16) / n;
+    let k = 2;
+    while (k < names.length) {
+      const categories = names.slice(0, k + 1);
+      try { chart.render({ id: "capacity", frame: { x: 0, y: 0, width, height: 360 }, props: { categories, series: [{ name: "Value", values: categories.map((_, i) => 40 + i) }], highlights: [], annotations: [], referenceLines: [] } }); }
+      catch { break; }
+      k += 1;
+    }
+    return [n, k];
+  }));
+}
+
 /** The catalogue as the author reads it. */
 export function describeTypes() {
   const lines = ["# Page types", "", "Every analytical page is one of these. Each choice is required; none has a default.", "",
@@ -957,6 +995,8 @@ export function describeTypes() {
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point).", "",
     `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across; two rows or more fill the frame, one row grows by a third) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
     `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - write to ${TEXT_LIMITS.titleTarget}, which sets on one line, since more than a third of titles past it is PLAN_TITLE_LENGTH; a \`subtitle\` one line of ${SUBTITLE_WORDS} words; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines, one or two the norm (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best").`, "",
+    ...(() => { const columns = panelColumnCapacity(); return [
+    `Chart limits the runtime cannot lift: a bridge over commentary \`below\` carries ${WATERFALL_BELOW_CALLOUTS} callouts (beside a column, ${CALLOUTS_MAX}); a \`distribution\` one callout, which sits beside its bar; \`aligned-bars\` none. Panels in a row: a column panel holds about ${columns[2]} named columns (eight-letter names) in a row of two, ${columns[3]} in a row of three and ${columns[4]} in a row of four - period labels (FY17, 2019, Q1) thin to every second or third, so ten or more periods fit any row, but names are never dropped: shorten them or use bars. A callout on a bar panel in a row of three or four has no room for a rail, so annotate a mark with clear space above it or say it in the caption. Panels on one value scale (the same unit) share the tallest panel's callout band so their plots stay one height; panels in different units keep their own bands, so annotate one and leave its neighbours plain freely. Two-series lines in a row of three or four name their series in a legend rather than at the line ends.`, ""]; })(),
     `Evidence: a chart page (trend, ranking, composition, relationship, bridge, panels of charts) plots ${EVIDENCE_FLOOR.chart} or more values - a bridge ${EVIDENCE_FLOOR.bridge}, one whole's parts (pie, donut, treemap, waffle) are not floored - and strong decks' chart pages plot about 22. Deepen with the peer set, a prior period or a benchmark series, or a longer window: forms \`indexed\` (trend), \`distribution\` and \`aligned-bars\` (ranking) are built for many values.`, ""];
   for (const [name, t] of Object.entries(PAGE_TYPES)) {
     const n = Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits;

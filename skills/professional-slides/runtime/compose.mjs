@@ -23,7 +23,7 @@
 // exhibit.type: any registered component id, or the aliases "table", "image", "metrics", "cards",
 // "quadrants", "swot", "compare", "phase-table", "rows".
 import { applyDesign } from "./design-systems.mjs";
-import { mapAll } from "./core.mjs";
+import { mapAll, defaultHighlightStyle } from "./core.mjs";
 import { measureInsight, measureList, measureProse, proseMeasure } from "./registry.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -2380,9 +2380,27 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     const height = Math.max(...captioned.map((ex) => measureInsight({ x: 0, y: 0, width, height: 1000 }, { text: ex.caption.trim(), variant: "neutral", align: "center" }).height));
     for (const ex of captioned) ex.captionHeight = Math.ceil(height);
   }
+  // A two-series line names its series at the line ends, in a 186px column
+  // at the right of the plot. Three ten-year lines in a sequence left each
+  // panel 332px, the names took 186 of it, and the page failed with 90px of
+  // plot; in a panel under twice that column the names go to a legend above
+  // the plot instead. An author's explicit `endLabels` or `directLabels` holds.
+  const panelWidth = (BODY_WIDTH - (exhibits.length - 1) * (layout === "sequence" ? CONNECTOR_WIDTH + 2 * COLUMN_GAP : COLUMN_GAP)) / exhibits.length;
+  for (const ex of exhibits) {
+    if (!["chart.line", "chart.area"].includes(ex.type) || (ex.series || []).length < 2 || panelWidth >= 2 * 186) continue;
+    if (ex.endLabels === undefined && ex.directLabels === undefined) { ex.endLabels = false; ex.legend = ex.legend ?? true; }
+  }
   // Peer charts with one unit share one value scale, or the comparison lies.
+  // The scale is shared within each unit, not only when every panel has the
+  // same one: a row of a passenger column beside two "% y/y" bar panels
+  // skipped the shared domain (the column's unit differed), the bar peers
+  // below were still pinned to a zero minimum, and their -18% bar crashed the
+  // page with "x-axis bounds must contain every plotted value".
   const charts = exhibits.filter((ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.series));
-  if (charts.length >= 2 && charts.every((ex) => ex.unit === charts[0].unit && ex.yMax === undefined)) {
+  const byUnit = new Map();
+  for (const ex of charts) byUnit.set(ex.unit, [...(byUnit.get(ex.unit) || []), ex]);
+  for (const group of byUnit.values()) {
+    if (group.length < 2 || group.some((ex) => ex.yMax !== undefined)) continue;
     // Stacks extend separately above and below zero: netting signed
     // segments or forcing zero as the minimum truncates real evidence.
     const extent = ex => ["chart.stacked-column", "chart.stacked-bar"].includes(ex.type)
@@ -2391,45 +2409,79 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
         ex.series.reduce((sum, se) => sum + Math.max(0, se.values[i] || 0), 0),
       ])
       : ex.series.flatMap(se => se.values);
-    const values = charts.flatMap(ex => [...extent(ex), ...(ex.referenceLines || []).map(reference => reference.value)]);
+    // Every mark the scale has to hold, from every panel: reference lines and
+    // targets too, each with the 15% the chart itself gives a line near the
+    // top so its label has room (charts.mjs withReferenceValues).
+    const marks = group.flatMap(extent);
+    const top = Math.max(0, ...marks);
+    const lines = group.flatMap(ex => [...(ex.referenceLines || []).map(reference => reference.value), ...(ex.targets || [])]).filter(Number.isFinite);
+    const values = [...marks, ...lines, ...lines.filter(v => v > 0 && v >= top * 0.9).map(v => v * 1.15)];
     const min = Math.min(0, ...values), max = Math.max(0, ...values);
     const sharedMin = min < 0 ? -niceCeiling(-min) : 0;
     const sharedMax = max > 0 ? niceCeiling(max) : min < 0 ? 0 : 1;
-    for (const ex of charts) { ex.yMin = ex.yMin ?? sharedMin; ex.yMax = sharedMax; }
+    for (const ex of group) { ex.yMin = ex.yMin ?? sharedMin; ex.yMax = sharedMax; }
   }
   // Equal numerical limits alone do not make equal bar lengths: different
   // category gutters and Office auto-layout change the pixels per unit.
   // Compare horizontal peers in the shared editable scene coordinate system.
   const horizontalPeers = charts.filter(ex => ["chart.bar", "chart.stacked-bar"].includes(ex.type));
   if (horizontalPeers.length >= 2 && !slide.pairedWeights && horizontalPeers.every(ex => ex.unit === horizontalPeers[0].unit)) {
-    const minima = new Set(horizontalPeers.map(ex => ex.yMin ?? 0));
+    // An unset minimum is the lowest bar of any peer, not zero: zero put a
+    // negative bar outside its own axis.
+    const lowest = Math.min(0, ...horizontalPeers.flatMap(ex => ex.series.flatMap(series => series.values)));
+    const floor = lowest < 0 ? -niceCeiling(-lowest) : 0;
+    const minima = new Set(horizontalPeers.map(ex => ex.yMin ?? floor));
     const maxima = new Set(horizontalPeers.map(ex => ex.yMax));
     if (minima.size !== 1 || maxima.size !== 1) throw new Error(`${id}: peer bars with the same unit require matching numeric domains`);
     const comparisonDomain = { categories: horizontalPeers.flatMap(ex => ex.categories), values: horizontalPeers.flatMap(ex => ex.series.flatMap(series => series.values)) };
-    for (const ex of horizontalPeers) { ex.yMin = ex.yMin ?? 0; ex.comparisonDomain = comparisonDomain; ex.native = false; }
+    for (const ex of horizontalPeers) { ex.yMin = ex.yMin ?? floor; ex.comparisonDomain = comparisonDomain; ex.native = false; }
   }
   // One scale needs one plot frame: peers share the row's tallest top band
-  // (legend, growth arrows, callouts), and when one peer must be drawn as
-  // shapes (annotations), all of them are, so their baselines coincide.
+  // (legend, growth arrows), and when one peer must be drawn as shapes
+  // (annotations), all of them are, so their baselines coincide.
+  //
+  // Callout bands are shared only where the plots must be the same height:
+  // columns and lines on one value scale (one pixel per unit needs one plot
+  // height), and bars whose rows read across (the same categories). A row
+  // shared every callout band with every panel, and a passengers column with
+  // one callout left its seat-kilometre neighbour - another unit, another
+  // scale - under a 76px band of air the page gate flagged; the author's only
+  // way out was to annotate every panel or none. Unshared, each panel keeps
+  // its own band and the plots still meet at the baseline. Within one scale
+  // the band stays shared, callout or not: moving the callout beside its mark
+  // was tried, and a pandemic-year note on a short column had no room beside
+  // it (tall neighbours both sides) and failed a page the band had drawn; a
+  // shorter plot beside a taller one on the same scale draws the same value
+  // at two heights, which is the lie the shared scale exists to prevent.
+  // page-types.mjs describeTypes publishes this to the author.
   if (charts.length >= 2) {
-    const decorated = (ex) => (ex.referenceLines || []).length || (ex.annotations || []).length || (ex.changeAnnotations || []).length || (ex.highlights || []).some((h) => h?.style !== "bar");
-    const topBand = (ex) => {
+    const decorated = (ex) => (ex.referenceLines || []).length || (ex.annotations || []).length || (ex.changeAnnotations || []).length || (ex.highlights || []).some((h) => (h?.style ?? defaultHighlightStyle(ex.type, ex)) !== "bar");
+    const baseBand = (ex) => {
       const line = ex.type === "chart.line" || ex.type === "chart.area", multi = (ex.series || []).length > 1;
       const legend = ex.legend === true || (ex.legend !== false && multi && !line);
       // The legend may wrap; the row's inset must cover the tallest one (1160px row, n panels).
       const rows = legend ? legendRowCount((ex.series || []).map((sr) => sr.name), Math.max(120, 1160 / Math.max(1, charts.length) - 70)) : 0;
-      // Callouts counted at their compact height: the row's band is the budget,
-      // and a peer whose full 88px bands would overrun it closes them to fit
-      // (charts.mjs chartFrame), so the plots still share one top line.
-      return (rows ? 52 + (rows - 1) * 26 : 28) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top + evidenceBandSpan({ annotations: ex.annotations || [] }, { compact: true });
+      return (rows ? 52 + (rows - 1) * 26 : 28) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top;
     };
+    // Callouts counted at their compact height: the row's band is the budget,
+    // and a peer whose full 88px bands would overrun it closes them to fit
+    // (charts.mjs chartFrame), so the plots still share one top line.
+    const calloutBand = (ex) => evidenceBandSpan({ annotations: ex.annotations || [] }, { compact: true });
     // A plot with no value axis - a waffle's dots, a treemap's tiles, a pie -
     // has no baseline to share. Handed the row's band, a waffle beside an
     // annotated bar chart drew its dots under a strip of air as tall as its
     // neighbour's callout.
     const aligned = charts.filter((ex) => !["chart.waffle", "chart.treemap", "chart.pie", "chart.donut"].includes(ex.type));
-    const inset = Math.max(0, ...aligned.map(topBand));
-    for (const ex of charts) { if (aligned.includes(ex)) ex.plotTopInset = inset; if (charts.some(decorated)) ex.native = false; }
+    const base = Math.max(0, ...aligned.map(baseBand));
+    const across = (ex) => ["chart.bar", "chart.stacked-bar"].includes(ex.type);
+    const scaleKey = (ex) => across(ex) ? `rows:${JSON.stringify(ex.categories)}` : ex.yMax === undefined ? null : `scale:${ex.unit}:${ex.yMin}:${ex.yMax}`;
+    const groups = new Map();
+    for (const ex of aligned) { const key = scaleKey(ex); if (key) groups.set(key, [...(groups.get(key) || []), ex]); }
+    for (const ex of aligned) {
+      const key = scaleKey(ex), group = key && groups.get(key)?.length > 1 ? groups.get(key) : [];
+      ex.plotTopInset = base + Math.max(0, ...group.map(calloutBand));
+    }
+    if (charts.some(decorated)) for (const ex of charts) ex.native = false;
   }
   // Chart beside a narrow table (three columns or fewer): the chart takes 3:2.
   const panelSize = (ex, index) => {

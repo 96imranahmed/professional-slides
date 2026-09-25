@@ -5,6 +5,7 @@ import {
   houseStyle,
   TOKENS,
   chartAnnotationStyle,
+  defaultHighlightStyle,
   isTokenReference,
   tokenDefinition,
   linePrimitive,
@@ -92,6 +93,17 @@ export function chartFrame(frame, { topLegend = false, annotations = [], changeA
   const shared = Number(topInset) || 0;
   if (shared && top > shared && evidenceAnnotationTopBandCount({ annotations }) && topFor(true) <= shared) { top = topFor(true); compact = true; }
   if (frame.height - bottom - top < MIN_PLOT_HEIGHT && evidenceAnnotationTopBandCount({ annotations })) { top = topFor(true); compact = true; }
+  // Still short with compact bands: the last callout holding a band gives it
+  // up and goes beside its mark, inside it, or into a rail at the plot's right
+  // (renderEvidenceAnnotations), and the chart renders again (renderResolved),
+  // one callout at a time, so the rest keep the band while it fits. Only a
+  // plot that is short with no band at all asks the author for less. Three
+  // callouts on a bridge under a full-width text band failed here with "give
+  // the chart more height", which an author cannot do; releasing all three at
+  // once failed too, the first having no room beside its mark.
+  const released = (annotations || []).findLastIndex((item) => item && !item._placement);
+  if (frame.height - bottom - top < MIN_PLOT_HEIGHT && released >= 0 && evidenceAnnotationTopBandCount({ annotations }) && frame.height - bottom - topFor(true) + evidenceBandSpan({ annotations }, { compact: true }) >= MIN_PLOT_HEIGHT)
+    throw Object.assign(new Error("Chart annotation bands leave insufficient plot height"), { retry: (current) => ({ ...current, annotations: (current.annotations || []).map((item, at) => at === released ? { ...item, _placement: "beside" } : item) }) });
   if (frame.height - bottom - top < MIN_PLOT_HEIGHT) throw new Error(`Chart annotation bands leave insufficient plot height (${Math.max(0, Math.floor(frame.height - bottom - top))}px of the ${MIN_PLOT_HEIGHT}px minimum, even with compact callout bands); give the chart ${Math.ceil(MIN_PLOT_HEIGHT - (frame.height - bottom - top))}px more height, drop an annotation, or split the exhibit`);
   if (frame.width - leftInset - rightInset < 120) throw new Error(`Chart has insufficient plot width (${Math.max(0, Math.floor(frame.width - leftInset - rightInset))}px of the 120px minimum after its labels and gutters); widen the chart, shorten category labels, or split the exhibit`);
   return {
@@ -238,22 +250,39 @@ const withReferenceValues = (values, props) => {
   return [...values, ...references, ...headroom];
 };
 
+/**
+ * Which labels a crowded period axis keeps, given how many slots one label
+ * needs: the first, then every nth, at a step - the one needed, or one more -
+ * that lands on the latest period, so both ends of the series are named and
+ * the gaps are even. Ten years at every second slot are labelled FY17, FY20,
+ * FY23, FY26; every second from the first would leave FY26 bare, and the line
+ * chart's old rule (every second plus the last) set FY25 and FY26 side by
+ * side. Only when neither step reaches the latest does the chart fall back to
+ * its own pattern. The native chart prints the same labels (core.mjs
+ * nativeChartSpec reads the ones the scene drew).
+ */
+export function periodLabelStep(count, needed) {
+  if (needed <= 1) return { every: 1, fromFirst: true };
+  for (const every of [needed, needed + 1]) if ((count - 1) % every === 0) return { every, fromFirst: true };
+  return { every: needed, fromFirst: false };
+}
+
 const HIGHLIGHT_STYLES = Object.freeze(["bar", "region-box", "region-tint"]);
 const REGION_HIGHLIGHT_INLINE_PAD = 12;
 const REGION_HIGHLIGHT_BLOCK_PAD = 12;
 
-function normalizedHighlights(props, { categories = [], series = [], allowBar = false } = {}) {
+function normalizedHighlights(props, { categories = [], series = [], allowBar = false, defaultStyle = "region-tint" } = {}) {
   const highlights = props.highlights || [];
   if (!Array.isArray(highlights)) throw new Error("Chart highlights must be an array");
   // Several marks may express one comparison or set; they share one treatment.
-  if (new Set(highlights.map(h => h.style ?? "region-tint")).size > 1)
+  if (new Set(highlights.map(h => h.style ?? defaultStyle)).size > 1)
     throw new Error("Use one coherent chart highlight treatment for the selected set");
   if (new Set(highlights.map(h => h.category)).size !== highlights.length)
     throw new Error("Chart highlights must name distinct categories");
   const seriesNames = series.map(item => typeof item === "string" ? item : item.name);
   return highlights.map((highlight) => {
     if (!highlight || typeof highlight.category !== "string" || !categories.includes(highlight.category)) throw new Error("Chart highlight references an unknown category");
-    const style = highlight.style ?? "region-tint";
+    const style = highlight.style ?? defaultStyle;
     if (!HIGHLIGHT_STYLES.includes(style)) throw new Error(`Unknown chart highlight style: ${style}`);
     if (style === "bar") {
       if (!allowBar) throw new Error("A single-bar highlight is available only for an unstacked one-series bar or column chart");
@@ -805,8 +834,12 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props);
   const stackLabels = stackLabelPlan(props, categories, series, stacked);
-  const highlights = normalizedHighlights(props, { categories, series, allowBar: !stacked });
-  const barHighlight = highlights.find(highlight => highlight.style === "bar");
+  const highlights = normalizedHighlights(props, { categories, series, allowBar: !stacked,
+    defaultStyle: horizontal && !stacked ? defaultHighlightStyle("chart.bar", { series }) : "region-tint" });
+  // Every highlighted bar takes the accent: a fleet page marking two aircraft
+  // variants lit only the first, since one bar highlight was all the chart kept.
+  const barHighlighted = new Set(highlights.filter(highlight => highlight.style === "bar").map(highlight => highlight.category));
+  const barHighlight = barHighlighted.size > 0;
   const regionHighlight = highlights.find(highlight => highlight.style === "region-box" || highlight.style === "region-tint");
   if (props.focusSeries !== undefined) {
     if (stacked || series.length !== 2) throw new Error("focusSeries requires two unstacked series; preserve distinct colours for multiple peer series");
@@ -911,7 +944,29 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     totalLabelInset: horizontal ? 0 : totalHeight,
     centerPlot: !horizontal && !showValueAxis
   });
-  const categoryLayouts = horizontal ? [] : categories.map(category => measureText(category, plot.width/categories.length-8, {fontFamily:tokenValue(FONT),fontSize:tokenValue(AXIS_LABEL)}));
+  // Periods too many for their slots are labelled every nth, counted back from
+  // the latest so it keeps its label, each label free to use the slots it
+  // skips - as the line chart already does. Three ten-year column panels in a
+  // row left 25px a slot and "FY17" (29px) failed the page as unbreakable text.
+  // Only periods thin: every category carries a digit, so a skipped label is
+  // one the reader counts to. Named categories keep every label, and a name
+  // wider than its slot still fails, for the author to shorten.
+  const axisFont = { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) };
+  const widestWord = horizontal ? 0 : Math.max(...categories.flatMap(category => String(category).split(/\s+/).map(word => measureText(word, 1000, { ...axisFont, wrapWidthRatio: 1 }).width)));
+  const periodic = !horizontal && categories.length > 2 && categories.every(category => /\d/.test(String(category))) && !(props.categoryNotes || []).some(Boolean);
+  const labelStep = periodLabelStep(categories.length, periodic ? Math.max(1, Math.ceil((widestWord + 8) / (plot.width / categories.length))) : 1);
+  const labelEvery = labelStep.every;
+  const labelSpan = plot.width / categories.length * labelEvery - 8;
+  const labelShown = (index) => labelStep.fromFirst ? index % labelEvery === 0 : (categories.length - 1 - index) % labelEvery === 0;
+  const categoryLayouts = horizontal ? [] : categories.map(category => {
+    try { return measureText(category, labelSpan, axisFont); }
+    catch (error) {
+      if (!/Unbreakable text/.test(error.message)) throw error;
+      const word = Math.max(...String(category).split(/\s+/).map(part => measureText(part, 1000, { ...axisFont, wrapWidthRatio: 1 }).width));
+      const fit = Math.max(1, Math.floor(plot.width / (widestWord + 8)));
+      throw new Error(`Column names are wider than their columns: "${String(category)}" needs ${Math.ceil(word)}px and each of ${categories.length} columns has ${Math.floor(labelSpan)}px in this ${Math.round(frame.width)}px chart, which holds about ${fit} columns named this long; shorten the names, use a bar chart, or give the chart a wider panel (author-deck --types lists the columns a panel holds)`);
+    }
+  });
   // One note per category, in category order; `null` or a missing entry leaves
   // that category with its label alone.
   if (props.categoryNotes !== undefined && (!Array.isArray(props.categoryNotes) || props.categoryNotes.length > categories.length)) throw new Error("categoryNotes takes one entry per category, in category order");
@@ -973,7 +1028,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     const accent = token("color.accent"), primary = token("color.componentPrimary"), comparator = token("color.chartComparator");
     // Highlight the answer: the bar the title is about takes the accent; the
     // others keep their series colour (navy), never grey. Forecast periods are lighter.
-    if (barHighlight && categories[categoryIndex] === barHighlight.category) return accent;
+    if (barHighlighted.has(categories[categoryIndex])) return accent;
     if (forecastIndex >= 0 && categoryIndex >= forecastIndex && !stacked && series.length === 1) return token("color.chartSeries6");
     if (barHighlight) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
     if (props.colorIndices !== undefined || stacked) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
@@ -1003,6 +1058,17 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     style: lineStyle(INK)
   }));
   const categorySpan = (horizontal ? plot.height : plot.width) / categories.length;
+  // Forty members down a 420px plot give each row 10px, under the 13px line of
+  // the chart's label face; every name and value was set in a box that tall
+  // and printed at six pixels, the subject's among them. When a row is thinner
+  // than a line, the rows are labelled every nth from the top at full size,
+  // the highlighted member always, and the rows beside it that its label
+  // would touch go unlabelled: the reader finds the subject by its colour and
+  // its name, and reads the field's shape from the bars.
+  const rowLine = measureText("Ag", 1000, { ...axisFont, wrapWidthRatio: 1 }).height;
+  const rowEvery = horizontal && !stacked && categorySpan < rowLine ? Math.ceil(rowLine / categorySpan) : 1;
+  const rowShown = (index) => rowEvery === 1 || barHighlighted.has(categories[index])
+    || (index % rowEvery === 0 && !categories.some((category, at) => barHighlighted.has(category) && Math.abs(at - index) < rowEvery));
   // Bar weight follows the category count. Four categories drawn at the
   // many-category gap read as ribbons with the page showing through; a well-made
   // page sets few, fat bars and many, thinner ones.
@@ -1039,7 +1105,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     let negativeCumulative = 0;
     series.forEach((item, seriesIndex) => {
       const value = item.values[categoryIndex];
-      const selected = barHighlight?.category === category;
+      const selected = barHighlighted.has(category);
       const colorIndex = colorIndexFor(seriesIndex, categoryIndex);
       const markColor = colorFor(seriesIndex, categoryIndex);
       const start = stacked ? (value >= 0 ? positiveCumulative : negativeCumulative) : 0;
@@ -1071,7 +1137,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
       }));
       // A zero segment has no area in a stack. Printing its label inside a
       // one-pixel placeholder both invents a visible segment and fails fit.
-      if (showDataLabels && (!stacked || value !== 0)) {
+      if (showDataLabels && (!stacked || value !== 0) && (!horizontal || rowShown(categoryIndex))) {
         let labelText = attachedLabelText(formatValue(value, props), stackLabels.secondary.get(`${category}:${item.name}`),props);
         const labelMetrics = measureDataLabel(labelText, stacked && !horizontal ? Math.max(1,bar.width-4) : 1000);
         labelText = labelMetrics.text;
@@ -1079,8 +1145,8 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
           ? stacked
             ? { x: bar.x + 2, y: bar.y - 2, width: Math.max(1, bar.width - 4), height: bar.height + 4 }
             : value >= 0
-              ? { x: bar.x + bar.width + barLabelGap, y: bar.y - 2, width: barLabelWidth, height: bar.height + 4 }
-              : { x: bar.x - barLabelGap - barLabelWidth, y: bar.y - 2, width: barLabelWidth, height: bar.height + 4 }
+              ? { x: bar.x + bar.width + barLabelGap, y: Math.min(bar.y - 2, bar.y + bar.height / 2 - rowLine / 2), width: barLabelWidth, height: Math.max(bar.height + 4, rowLine) }
+              : { x: bar.x - barLabelGap - barLabelWidth, y: Math.min(bar.y - 2, bar.y + bar.height / 2 - rowLine / 2), width: barLabelWidth, height: Math.max(bar.height + 4, rowLine) }
           : stacked
             ? { x: bar.x + 2, y: bar.y + (bar.height - labelMetrics.height) / 2, width: bar.width - 4, height: labelMetrics.height }
             : value >= 0
@@ -1245,12 +1311,12 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
         data: { category, textLayout: noteLayout, note: true, ...(noteColumn ? { column: true } : {}) }
       }));
     }
-    if (!hideCategoryLabels) nodes.push(textPrimitive({
+    if (!hideCategoryLabels && (horizontal ? rowShown(categoryIndex) : labelShown(categoryIndex))) nodes.push(textPrimitive({
       id: stableId(id, "category", category),
       role: "category-label",
       frame: horizontal
-        ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: barLabelLayout ? barBlockTop : categoryStart, width: horizontalCategoryLabelWidth - iconSlot, height: barLabelLayout ? barLabelLayout.height : groupSpan }
-        : { x: categoryMap.get(category).labelCenter-(categorySpan-8)/2, y: plot.y + plot.height + (regionHighlight ? 18 : 8) + iconSlot, width: categorySpan-8, height: categoryLayouts[categoryIndex].height },
+        ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: barLabelLayout ? barBlockTop : Math.min(categoryStart, categoryStart + groupSpan / 2 - rowLine / 2), width: horizontalCategoryLabelWidth - iconSlot, height: barLabelLayout ? barLabelLayout.height : Math.max(groupSpan, rowLine) }
+        : { x: categoryMap.get(category).labelCenter-labelSpan/2, y: plot.y + plot.height + (regionHighlight ? 18 : 8) + iconSlot, width: labelSpan, height: categoryLayouts[categoryIndex].height },
       text: horizontal ? (barLabelLayout ? barLabelLayout.text : category) : categoryLayouts[categoryIndex].text,
       style: { ...textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), ...(!horizontal ? {valign:"top",lineHeight:categoryLayouts[categoryIndex].lineHeight,wrap:false} : barLabelLayout ? {valign:"top",lineHeight:barLabelLayout.lineHeight,wrap:false} : {}) },
       data: {category,...(!horizontal ? {textLayout:categoryLayouts[categoryIndex]} : barLabelLayout ? {textLayout:barLabelLayout} : {})}
@@ -1521,14 +1587,14 @@ function lineChart({ id, frame, props, area = false }) {
   // nth point, always keeping the first and last, as a strong deck does.
   const pitch = categories.length > 1 ? (xScale(1) - xScale(0)) : plot.width;
   const widest = Math.max(...categories.map((c) => measureText(String(c), 400, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width));
-  const every = Math.max(1, Math.ceil((widest + 10) / Math.max(1, pitch)));
+  const { every, fromFirst } = periodLabelStep(categories.length, Math.max(1, Math.ceil((widest + 10) / Math.max(1, pitch))));
   categories.forEach((category, index) => {
     const x = xScale(index);
     // Every label is centred on its point; the first and last may reach into
     // the chart's own insets so the spacing stays even.
     const categoryX = Math.max(frame.x, Math.min(frame.x + frame.width - categorySlot, x - categorySlot / 2));
     categoryMap.set(category, { x: categoryX, y: plot.y, width: categorySlot, height: plot.height });
-    const shown = every === 1 || index % every === 0 || index === categories.length - 1;
+    const shown = every === 1 || index % every === 0 || (!fromFirst && index === categories.length - 1);
     if (shown && !(every > 1 && index === categories.length - 1 && (index % every) !== 0 && (categories.length - 1 - Math.floor((categories.length - 1) / every) * every) * pitch < widest + 10)) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
   });
   const pendingEndLabels = [];
@@ -1649,11 +1715,15 @@ function waterfall({ id, frame, props }) {
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
-    centerPlot: !showValueAxis
+    centerPlot: !showValueAxis,
+    // A label row below negative endpoints, above the category labels. It was
+    // taken from the plot after the frame was laid out, so the frame's own
+    // fallbacks - compact callout bands, callouts moved beside their marks -
+    // never saw it: three callouts on a full-width bridge closed their bands
+    // to a 100px plot, lost 30 more here and failed the page with "give the
+    // chart more height", which an author cannot do.
+    bottomInset: 56 + 30
   });
-  // Reserve a label row below negative endpoints, above category labels.
-  plot.height -= 30;
-  if (plot.height < 100) throw new Error("Waterfall needs room for endpoint labels (a plot of at least 100px after a 30px label row); give the chart more height");
   // The category labels are measured against the slot they have and wrap into
   // it. Set unmeasured at the slot's width, a label longer than its slot prints
   // straight over its neighbours - which is how "Superman (2025)", "Other DC
@@ -2662,13 +2732,23 @@ function chartExamples(id) {
  * are the author's to fix and pass through unchanged.
  */
 function renderResolved(render, context) {
-  let props = context.props, first = null;
+  let props = context.props, first = null, railed = null;
   for (let attempt = 0; attempt < 6; attempt += 1) {
     let nodes;
     try { nodes = render({ ...context, props }); }
     catch (error) {
-      if (typeof error.retry === "function" && attempt < 5) { props = error.retry(props); continue; }
+      if (typeof error.retry === "function" && attempt < 5) {
+        if (/no clear position for the callout/.test(error.message)) railed = error;
+        props = error.retry(props); continue;
+      }
       if (first) return first;
+      // The rail a callout asked for narrowed the plot until something else
+      // failed: a bar panel in a row of three reported "insufficient plot
+      // width (0px ...)" and a bridge "Unbreakable text ... Revenue", neither
+      // naming the callout that caused it. Report the callout, and why the
+      // rail could not hold it in this chart.
+      if (railed && /insufficient plot width|Unbreakable text|Column names are wider/.test(error.message))
+        throw new Error(`${railed.message.replace(/; shorten the note.*$/, "")}: a rail beside the plot leaves it too narrow in this ${Math.round(context.frame?.width ?? 0)}px chart (${error.message.replace(/[;:].*$/, "")}). Put the note in the commentary or caption, annotate a mark with clear space above or beside it, or give the chart a wider panel`);
       throw error;
     }
     if (first) return nodes;
