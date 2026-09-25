@@ -361,6 +361,36 @@ console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result["accepted"])
 
+    def test_a_short_unit_that_will_not_fit_beside_the_heading_moves_under_it(self):
+        # "Airline seats, Sep 2026" with unit "% y/y" in a narrow panel was
+        # reported as a wrapping heading; the unit broke the line, and the
+        # runtime can set it under the heading instead.
+        result = run_node('''
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+const registry=createRegistry();
+const render=(props,width)=>registry.get('chart-title').render({id:'h',frame:{x:0,y:0,width,height:120},props}).nodes;
+const narrow=render({heading:'Airline seats, Sep 2026',unit:'% y/y',unitPlacement:'inline'},250);
+const long=render({heading:'Published annual pay for research-connected PM roles at labs',unit:'$k',unitPlacement:'inline'},300);
+const phrase=render({heading:'Published annual pay for research-connected PM roles',unit:'$k, published base-salary band',unitPlacement:'inline'},720);
+const wrapped=nodes=>nodes.find(n=>n.role==='section-heading').data.headingWrapped??null;
+console.log(JSON.stringify({narrow:wrapped(narrow),stacked:narrow.find(n=>n.role==='chart-unit').data.chartUnitPlacement,long:wrapped(long),phrase:wrapped(phrase)}));
+''')
+        self.assertIsNone(result["narrow"])
+        self.assertEqual(result["stacked"], "stacked")
+        self.assertEqual(result["long"]["reason"], "heading")
+        self.assertEqual(result["long"]["available"], 300)
+        self.assertGreater(result["long"]["width"], 300)
+        self.assertEqual(result["phrase"]["reason"], "unit")
+        self.assertIn("$k, published base-salary band", result["phrase"]["text"])
+        # The finding says what was measured and against what.
+        slide = {"id": "s01", "componentInstances": [{"id": "chrome", "component": "slide-chrome"}],
+                 "nodes": [{"type": "text", "role": "section-heading", "text": "x", "frame": {"x": 60, "y": 140, "width": 300, "height": 40},
+                            "data": {"headingWrapped": result["long"], "textLayout": {"source": "x"}}}]}
+        found = [f for f in page_gates.run_gates(deck([slide]))["findings"] if f["code"] == "HEADING_WRAPS"]
+        self.assertEqual(len(found), 1)
+        self.assertIn(f"{result['long']['width']}px on one line", found[0]["repair"])
+        self.assertIn("300px", found[0]["repair"])
+
     def test_the_gate_reads_the_recorded_fallback(self):
         slide = {
             "id": "s01",

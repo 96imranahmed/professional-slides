@@ -111,7 +111,8 @@ const root=flow({id:'long',direction:'column',children:[component({id:'copy',com
 let error=null;try{resolveLayout(root,{x:0,y:0,width:240,height:180},REGISTRY);}catch(e){error=e.message;}
 console.log(JSON.stringify({error}));
 """)
-        self.assertIn("only 180px is available", result["error"])
+        # A column over its height names itself and the overflow in lines.
+        self.assertRegex(result["error"], r"^long: the column holds \d+px of content in 180px - over by \d+px, about \d+ lines of body text")
 
 
 if __name__ == "__main__":

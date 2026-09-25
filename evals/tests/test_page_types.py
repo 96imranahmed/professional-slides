@@ -520,6 +520,34 @@ console.log(JSON.stringify({{ codes: out.findings.map((f) => f.code + ':' + (f.i
         self.assertEqual(result['floor'], 121)  # text-page q1 (120.5), the one floor every check reads
         self.assertGreater(result['ceiling'], result['floor'])
 
+    def test_a_column_page_budget_counts_the_room_in_each_column(self):
+        # A hero number with points beside its exhibit went from a band left
+        # empty, to a column over its height, to an empty column, one point at
+        # a time. The budget gives each column's room in lines, and a column
+        # over its height says by how much.
+        result = run_node(f'''
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import {{ authorDeck }} from '{AUTHOR}';
+const example = JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json', 'utf8'));
+const hero = example.pages.find((p) => p.type === 'numbers' && p.form === 'hero-number');
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
+const long = 'On the low case the path flattens after FY29 and ends at 56.5 million, because the timetable levers still deliver while electrification does not arrive in time.';
+const over = {{ ...hero, id: 'over', points: [...hero.points, long, long, long, long], highlight: hero.highlight }};
+const run = async (page) => authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [page] }}, {{ baseDir: dir }});
+const fits = await run(hero), overflows = await run(over);
+console.log(JSON.stringify({{ budget: fits.budget.find((b) => b.id === hero.id) ?? null,
+  overflow: overflows.findings.filter((f) => f.code === 'PAGE_DOES_NOT_COMPOSE').map((f) => f.repair) }}));
+''')
+        budget = result['budget']
+        self.assertIsNotNone(budget)
+        self.assertGreater(budget['line'], 0)
+        written = [c for c in budget['columns'] if c['text']]
+        self.assertTrue(written, budget['columns'])
+        for column in written:
+            self.assertEqual(column['lines'], column['free'] // budget['line'])
+        self.assertEqual(len(result['overflow']), 1)
+        self.assertRegex(result['overflow'][0], r'-side: the column holds \d+px of content in \d+px - over by \d+px, about \d+ lines? of body text')
+
     def test_every_budget_ceiling_sits_above_its_floor(self):
         result = run_node('''
 import { READING_TASK_BANK } from './skills/professional-slides/runtime/text-contract.mjs';
@@ -696,6 +724,33 @@ console.log(JSON.stringify({{ pageErrors, line: pages[0].exhibit, group: pages[2
         for published in ('distribution 15-40 categories', 'aligned-bars 2-4 series', 'indexed 4-8 series', 'plots 8+ values', 'indexBase'):
             self.assertIn(published, result['catalogue'])
         self.assertIn('aligned-bars', result['schema'])
+
+    def test_title_limits_are_published_and_the_word_limit_is_checked_at_compile(self):
+        # A 15-word title compiled, composed and failed at the scene check;
+        # the limit is the gate's own, refused in the first run.
+        result = run_node(f'''
+import {{ compilePage, describeTypes, TEXT_LIMITS }} from '{KIT}';
+const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
+const page = (title) => ({{ id: 'p1', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim and sits where it happens', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
+  title, exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }});
+const error = (p, draft = false) => {{ try {{ compilePage(p, 0, {{ draft }}); return null; }} catch (e) {{ return e.message; }} }};
+const words = (n) => Array.from({{ length: n }}, (_, i) => 'word' + i).join(' ');
+console.log(JSON.stringify({{ limits: TEXT_LIMITS, fourteen: error(page(words(14))), fifteen: error(page(words(15))), draft: error(page(words(15)), true),
+  continued: error(page(words(14) + ' (2/3)')), catalogue: describeTypes() }}));
+''')
+        import sys
+        sys.path.insert(0, str(RUNTIME / 'gates'))
+        import page_gates
+        self.assertEqual(result['limits']['titleWords'], page_gates.THRESHOLDS['title_words_max'])
+        self.assertEqual(result['limits']['titleLines'], page_gates.THRESHOLDS['title_lines_max'])
+        self.assertEqual(result['limits']['takeawayLines'], page_gates.TAKEAWAY_LINES_MAX)
+        self.assertIsNone(result['fourteen'])
+        self.assertIsNone(result['continued'])
+        self.assertIn('TITLE_WORDS', result['fifteen'])
+        self.assertIn('15 words', result['fifteen'])
+        self.assertIn('TITLE_WORDS', result['draft'])
+        for published in ('title of 14 words at most', 'TITLE_LINES', 'HEADING_WRAPS', 'TAKEAWAY_LONG', 'rank, 1 = best', 'top 40'):
+            self.assertIn(published, result['catalogue'])
 
 
 if __name__ == '__main__':

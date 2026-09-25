@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { resolvePalette, heatScaleTokens } from "./palettes.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
+import { lineBox } from "./text-layout.mjs";
 
 export const DESIGN_SYSTEM_VERSION = "2.0.0";
 export const SCENE_SCHEMA = "professional-slides.scene/v1";
@@ -550,7 +551,7 @@ function allocateTracks(specs, available, gapTotal, preferredValues = []) {
   const usable = Math.max(0, available - gapTotal);
   const fixed = specs.map((spec, index) => resolveLength(spec, usable, preferredValues[index] || 0));
   const fixedTotal = fixed.reduce((sum, value) => sum + (value ?? 0), 0);
-  if (fixedTotal > usable + 0.01) throw new Error(`Fixed and content-sized tracks require ${fixedTotal}px; only ${usable}px is available`);
+  if (fixedTotal > usable + 0.01) throw Object.assign(new Error(`Fixed and content-sized tracks require ${fixedTotal}px; only ${usable}px is available`), { required: fixedTotal, usable });
   const fractions = specs.map(fraction);
   const fractionTotal = fractions.reduce((sum, value) => sum + value, 0);
   const remainder = Math.max(0, usable - fixedTotal);
@@ -719,7 +720,16 @@ export function resolveLayout(root, frame, registry, { inRow = false } = {}) {
       const mainAvailable = row ? inner.width : inner.height;
       const specs = node.children.map((child) => row ? child.size?.width : child.size?.height);
       const preferred = node.children.map((child) => preferredSize(child, row ? "width" : "height", registry, row ? null : resolveLength(child.size?.width, inner.width, preferredSize(child, "width", registry)) ?? inner.width));
-      const allocated = allocateTracks(specs, mainAvailable, Math.max(0, node.children.length - 1) * gap, preferred);
+      let allocated;
+      try { allocated = allocateTracks(specs, mainAvailable, Math.max(0, node.children.length - 1) * gap, preferred); }
+      catch (error) {
+        // A column over its height is the author's to cut, so the message says
+        // which column and by how much, in lines of body text: "tracks require
+        // 502px; only 490px" sent an author adding and removing a point by trial.
+        if (row || !(error.required > error.usable)) throw error;
+        const over = Math.ceil(error.required - error.usable), line = lineBox(activeDesignTokens()?.["type.body"]?.value ?? 12);
+        throw new Error(`${String(node.id).replace(/-flow-(?:column|row)$/, "")}: the column holds ${Math.ceil(error.required)}px of content in ${Math.floor(error.usable)}px - over by ${over}px, about ${Math.ceil(over / line)} line${Math.ceil(over / line) === 1 ? "" : "s"} of body text (${line}px a line); cut that much from its points or labels, or move a point elsewhere`);
+      }
       // A column's fill tracks stop at their ceilings (see `ceilingSize`).
       const ceilings = row || withinRow ? [] : node.children.map((child, index) => fraction(specs[index]) > 0 && resolveLength(specs[index], 0) === null
         ? ceilingSize(child, registry, resolveLength(child.size?.width, inner.width, preferredSize(child, "width", registry)) ?? inner.width, allocated[index])

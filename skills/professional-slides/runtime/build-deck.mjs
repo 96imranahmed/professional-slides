@@ -5,8 +5,10 @@
 //
 // Vendor-neutral: node for layout, python-pptx to emit, LibreOffice to render. Writes
 // scene.json, planning.json, deck.pptx, rendered/slide-N.png, montage.png, readback.json,
-// gates.json and build-result.json into out/. Exit 0 when the gates pass, 2 when they
-// report findings (the deck is still written so it can be inspected), 1 on a crash.
+// gates.json and build-result.json into out/. Exit 0 when nothing blocks (`built`, or
+// `built-unrendered` with --no-render; advisories are counted in the result), 2 when a
+// blocker remains (`built-with-blockers`, each listed in `blockers` - the deck is still
+// written so it can be inspected), 1 on a crash.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -244,11 +246,43 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       plotSpan: density.plotSpan?.median ?? null,
     };
   }
-  const readbackOk = result.readback?.accepted === true && result.textCoverage?.accepted !== false;
-  result.status = result.preflight.passed && readbackOk
-    ? (result.gates?.passed === true ? "built" : render ? "built-with-findings" : "built-unrendered")
-    : "built-with-findings";
+  Object.assign(result, buildOutcome(result, { render }));
   return finish(result, directory);
+}
+
+/**
+ * The build's status, read off its blockers alone. Advisories - a thin page, a
+ * flat mix, an unannotated plot - are the review's to judge: they are counted
+ * beside the status, never in it. The status used to be `built-with-findings`
+ * for any shortfall, and the one line the build prints listed the advisory
+ * counts beside it, so a build held back by eighteen numbers lost from the
+ * rendered text read as a build held back by five advisories. Every blocker
+ * is now listed with its source, and only a blocker makes the build exit 2.
+ */
+export function buildOutcome(result, { render = true } = {}) {
+  const blockers = [], seen = new Set();
+  const add = (source, f) => {
+    const key = `${source}|${f.code}|${f.slide ?? f.id ?? ""}|${JSON.stringify(f.measured ?? f.text ?? f.shape ?? "")}`;
+    if (!seen.has(key)) { seen.add(key); blockers.push({ source, code: f.code, ...(f.slide != null ? { slide: f.slide } : {}), ...(f.id ? { id: f.id } : {}), ...(f.text || f.shape ? { text: f.text ?? f.shape } : {}), ...(f.repair ? { repair: f.repair } : {}) }); }
+  };
+  const blocking = (f) => !["advisory", "info"].includes(f.severity);
+  if (result.preflight && result.preflight.passed === false) for (const f of (result.preflight.findings || []).filter(blocking)) add("page gates", f);
+  if (result.gates && result.gates.passed === false) for (const f of (result.gates.findings || []).filter(blocking)) add("page gates", f);
+  if (result.readback?.accepted !== true) {
+    for (const f of result.readback?.findings || []) add("readback", f);
+    if (!(result.readback?.findings || []).length) add("readback", { code: "READBACK_MISSING" });
+  }
+  if (result.textCoverage?.accepted === false) for (const f of (result.textCoverage.findings || []).filter(blocking)) add("rendered text", f);
+  // A report that failed without naming a finding is still a blocker.
+  if (result.preflight?.passed === false && !blockers.length) add("page gates", { code: "PREFLIGHT_FAILED" });
+  if (render && result.gates && result.gates.passed === false && !blockers.some((b) => b.source === "page gates")) add("page gates", { code: "GATES_FAILED" });
+  // The scene's gates run twice, before the render and after it, so a code
+  // counts as often as either run saw it, not the sum.
+  const counts = (report) => (report?.findings || []).filter((f) => !blocking(f)).reduce((m, f) => ({ ...m, [f.code]: (m[f.code] || 0) + 1 }), {});
+  const before = counts(result.preflight), after = counts(result.gates);
+  const advisories = Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(after)])].sort().map((code) => [code, Math.max(before[code] || 0, after[code] || 0)]));
+  const status = blockers.length ? "built-with-blockers" : render && result.gates ? "built" : "built-unrendered";
+  return { status, blockers, advisories };
 }
 
 async function readJson(file) { try { return JSON.parse(await fs.readFile(file, "utf8")); } catch { return {}; } }
@@ -283,7 +317,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const pythonIndex = args.indexOf("--python");
     if (pythonIndex >= 0 && (!args[pythonIndex + 1] || args[pythonIndex + 1].startsWith("--"))) throw new Error("--python requires an executable");
     const result = await buildDeck(path.resolve(args[0]), path.resolve(args[1]), { preflight: args.includes("--preflight"), render: !args.includes("--no-render"), fetchLogos: !args.includes("--no-fetch"), python: pythonIndex < 0 ? undefined : args[pythonIndex + 1] });
-    console.log(JSON.stringify({ status: result.status, stages: Object.fromEntries(Object.entries(result.stages || {}).map(([k, v]) => [k, v.state])), pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, timings: result.timings }));
+    // Blockers by name, advisories by count: the line says what stops the
+    // build and, separately, what the review will read.
+    const blockers = result.blockers?.length ? { count: result.blockers.length, byCode: result.blockers.reduce((m, b) => ({ ...m, [b.code]: (m[b.code] || 0) + 1 }), {}), first: result.blockers.slice(0, 8).map((b) => `${b.code}${b.id ?? b.slide ? ` [${b.id ?? b.slide}]` : ""} (${b.source})${b.text ? ` "${String(b.text).slice(0, 40)}"` : ""}`) } : undefined;
+    console.log(JSON.stringify({ status: result.status, ...(blockers ? { blockers } : {}), advisories: result.advisories, stages: Object.fromEntries(Object.entries(result.stages || {}).map(([k, v]) => [k, v.state])), pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, textCoverage: result.textCoverage?.accepted, timings: result.timings }));
     process.exit(["built", "built-unrendered", "preflight-passed"].includes(result.status) ? 0 : 2);
   } catch (error) {
     console.error(error.stack || error.message);

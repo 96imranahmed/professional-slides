@@ -204,7 +204,7 @@ THRESHOLDS = {
     "internal_void_max": 0.13,   # 94px of nothing between two content blocks; a well-made page's p90 is 0.069
     "exhibit_ink_min": 0.02,     # a hero frame must carry ink, not just area (a line chart sits near 2-3%, a 12pt table near 5-6%)
     "title_lines_max": 2,
-    "title_words_max": 14,
+    "title_words_max": CONTRACT["plan"]["titleWords"]["max"],  # the compiler refuses past it too (page-types.mjs)
     "cpl_min": 35,
     "cpl_max": 90,
     "hero_area_min": 0.40,
@@ -805,7 +805,7 @@ def gate_title(slide_no, slide, findings):
         if words > THRESHOLDS["title_words_max"]:
             findings.append(finding(
                 slide_no, "TITLE_WORDS", words, THRESHOLDS["title_words_max"],
-                "Rewrite the title as a claim of at most 14 words.",
+                f"Rewrite the title as a claim of at most {THRESHOLDS['title_words_max']} words.",
             ))
 
 
@@ -2013,18 +2013,29 @@ def gate_heading_wraps(slide_no, slide, findings):
     """HEADING_WRAPS. The exhibit banner is one line: the measure, the population
     and the period, with the unit inline after it. Two lines means the heading is
     carrying a qualification that belongs in the note, or a unit written as a
-    sentence ("$k, published base-salary band" rather than "$k")."""
+    sentence ("$k, published base-salary band" rather than "$k").
+
+    A short unit that will not fit beside a one-line heading is not reported:
+    the runtime sets it under the heading. The finding carries what was
+    measured - the text, its width on one line and the width the frame gives
+    it - so the author cuts the right words by the right amount."""
     for node in text_nodes(slide):
         data = node.get("data") or {}
-        if not data.get("headingWrapped"):
+        wrapped = data.get("headingWrapped")
+        if not wrapped:
             continue
-        findings.append(finding(
-            slide_no, "HEADING_WRAPS", source_text(node)[:90], "one line",
-            "Shorten the heading to the measure, the population and the period, "
-            "and make the unit a unit: \"Published annual pay for PM roles at AI "
-            "labs\" with unit \"$k\", and the basis (\"published base-salary "
-            "band\") in the note under the page.",
-        ))
+        measure = wrapped if isinstance(wrapped, dict) else {}
+        text = str(measure.get("text") or source_text(node))
+        width, available = measure.get("width"), measure.get("available")
+        fit = (f" is {width}px on one line; this frame gives its heading {available}px, "
+               f"about {int(len(text) * available / width)} characters" if width and available else " wraps")
+        if measure.get("reason") == "unit":
+            repair = (f"\"{text}\"{fit}. The unit is a phrase, so it cannot sit beside the heading: make it a unit "
+                      "(\"$k\", \"% y/y\") and move the basis (\"published base-salary band\") into the note under the page.")
+        else:
+            repair = (f"\"{text}\"{fit}. Shorten the heading to the measure, the population and the period; "
+                      "a qualification belongs in the note. The unit is not the cause - it moves under the heading when it does not fit beside it.")
+        findings.append(finding(slide_no, "HEADING_WRAPS", text[:90], "one line", repair))
 
 
 def gate_thin_evidence(slide_no, slide, findings):
@@ -3426,6 +3437,43 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
     }
 
 
+# A body line where a page sets none: 12pt on the 4px baseline grid.
+BODY_LINE = 20
+
+
+def body_line(slide):
+    """The height of one line of the page's body text, read off its prose and
+    bullets, so room is counted in the lines the author writes."""
+    heights = [float((layout_of(n)).get("lineHeight") or 0) for n in text_nodes(slide)
+               if n.get("role") in ("paragraph", "body", "body-text", "list-item", "bullet")]
+    heights = [h for h in heights if h > 0]
+    return int(max(set(heights), key=heights.count)) if heights else BODY_LINE
+
+
+def column_room(slide, mask, line):
+    """The room left at the foot of each of the page's columns (page_columns),
+    measured on the scene: the pixels under the column's last drawn row, and
+    how many lines of body text they hold. A hero number with points beside a
+    table went from a band left empty under its column, to a column over its
+    height, to an empty column the other side, one point at a time; the room
+    in each column, in lines, is what lets one edit land."""
+    rows_of = scene_column_rows(mask)
+    texts = [n["frame"] for n in text_nodes(slide) if n.get("role") in BODY_ROLES and isinstance(n.get("frame"), dict)]
+    out = []
+    for column in page_columns(slide):
+        rows, top, bottom = rows_of(column["x0"], column["x1"]), column["top"], column["bottom"]
+        last = next((y for y in range(bottom - 1, top - 1, -1) if rows[y] > ROW_MIN), None)
+        if last is None:
+            continue
+        free = max(0, bottom - 1 - last)
+        # Lines are a column's to take only where it sets text: a chart's air
+        # is its plot's, not room for a point.
+        writes = any(column["x0"] <= f.get("x", 0) + f.get("width", 0) / 2 <= column["x1"]
+                     and top <= f.get("y", 0) + f.get("height", 0) / 2 <= bottom for f in texts)
+        out.append({"column": column["name"], "free": free, "lines": int(free // line), "text": writes})
+    return out
+
+
 def page_budget(scene, profile=None):
     """Each content page's word and space budget, for the author to write to.
 
@@ -3454,6 +3502,7 @@ def page_budget(scene, profile=None):
         bands = void_bands([row.count(1) for row in mask])
         page_void = bands["internalVoid"] > THRESHOLDS["internal_void_max"] or bands["deadBand"] > THRESHOLDS["dead_band_max"]
         column = None if page_void else column_bands(slide, scene_column_rows(mask))
+        line = body_line(slide)
         out.append({
             "slide": index + 1,
             "id": slide.get("id"),
@@ -3473,6 +3522,10 @@ def page_budget(scene, profile=None):
             # own height, and where it runs.
             "columnVoid": {"column": column["name"], "band": round(column["band"], 3),
                            "from": column["from"], "to": column["to"]} if column else None,
+            # The room at the foot of each column, and the height of a body
+            # line to count it in (column_room).
+            "line": line,
+            "columns": column_room(slide, mask, line),
         })
     return out
 
@@ -3487,7 +3540,7 @@ def main(argv=None):
     parser.add_argument("--only", default=None, help="Comma-separated gate codes to run")
     parser.add_argument("--budget", action="store_true",
                         help="Write each content page's budget (body, floor, ceiling, footer, internalVoid, "
-                             "deadBand, void) instead of the gate report")
+                             "deadBand, void, and each column's room in lines) instead of the gate report")
     args = parser.parse_args(argv)
 
     scene = load_scene(args.scene)

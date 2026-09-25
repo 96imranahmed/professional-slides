@@ -53,6 +53,15 @@ sample of strong consulting pages; the sample stays outside the repository, so
 pass another PDF or census JSON to `--reference` to compare against something
 else.
 
+Every per-page statistic is taken over the deck's analytical pages: the cover,
+section dividers, agendas and generated pages (picture credits) are left out,
+told apart by the scene and the compiled deck spec, or guessed from the render
+without a scene; a scanned reference is measured whole, and the printed notes
+say which applied. Plotted values are the compiler's: given the compiled spec
+(`--deck`, or the `<id>.deck.json` beside `--pages`), the chart pages are those
+with `pageType.chart` - the chart page types and panels carrying a chart - and
+each counts `pageType.values`, the number `author-deck.mjs` prints as `plotted`.
+
 ```bash
 python3 evals/scripts/reference_census.py out/rendered/deck.pdf \
     --scene out/scene.json --pages deck.pages.json \

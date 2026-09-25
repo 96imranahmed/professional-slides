@@ -237,10 +237,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     // A column's band is named with its column: the page's rows pass, so a
     // bare "empty band" would send the author looking across the whole page.
     const band = !b.void ? "" : b.columnVoid
-      ? `, empty band in the ${b.columnVoid.column} column ${b.columnVoid.to - b.columnVoid.from}px (y ${b.columnVoid.from}-${b.columnVoid.to})`
-      : `, empty ${b.internalVoid >= b.deadBand ? "band inside the body" : "band under the body"} ${Math.round(Math.max(b.internalVoid, b.deadBand) * 720)}px`;
+      ? `, empty band in the ${b.columnVoid.column} column ${b.columnVoid.to - b.columnVoid.from}px (y ${b.columnVoid.from}-${b.columnVoid.to})${b.line ? ` ≈ ${Math.floor((b.columnVoid.to - b.columnVoid.from) / b.line)} lines` : ""}`
+      : `, empty ${b.internalVoid >= b.deadBand ? "band inside the body" : "band under the body"} ${Math.round(Math.max(b.internalVoid, b.deadBand) * 720)}px` +
+        (b.line ? ` ≈ ${Math.floor(Math.max(b.internalVoid, b.deadBand) * 720 / b.line)} lines` : "");
+    // The room at the foot of each column, in lines of body text: a column
+    // page filled by trial swung from empty to over to empty a point at a
+    // time. Printed when some column has a line to give.
+    const written = (b.columns || []).filter((c) => c.text);
+    const room = written.some((c) => c.lines >= 1)
+      ? `, room: ${written.map((c) => `${c.column} ${c.lines >= 1 ? `${c.free}px ≈ ${c.lines} line${c.lines === 1 ? "" : "s"}` : "full"}`).join(", ")}` : "";
     return `${flag}${String(b.id ?? b.slide).padEnd(6)} ${String(b.readingTask ?? "").padEnd(24)} ${b.body} words (floor ${Math.round(b.floor)}${b.ceiling ? `, ceiling ${b.ceiling}` : ""})` +
-      `${b.footer ? `, footer ${Math.round((b.footerRatio ?? 0) * 100)}%` : ""}${band}`;
+      `${b.footer ? `, footer ${Math.round((b.footerRatio ?? 0) * 100)}%` : ""}${band}${room}`;
   });
   const content = deriveContent(spec, deck);
   // A page that did not compose has no text to plan; its composition error is its finding.

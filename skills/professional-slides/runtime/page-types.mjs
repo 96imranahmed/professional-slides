@@ -30,6 +30,17 @@ import { trivialChart } from "./gates/craft_gates.mjs";
 import { calloutFits } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase } from "./text-layout.mjs";
+import { readFileSync } from "node:fs";
+
+// The limits the page gates hold the page's text to, published in `--types`
+// so an author meets them by reading rather than by failing. The title's word
+// limit is read from the contract the gates read (weight.json) and checked at
+// compile: a 15-word title used to compile, compose and fail at the scene
+// check. The line limits are the gates' own (page_gates.py TITLE_LINES,
+// TAKEAWAY_LONG; the subtitle's and the bar's are refused as they compose).
+const TITLE_WORDS = JSON.parse(readFileSync(new URL("./weight.json", import.meta.url), "utf8")).plan.titleWords;
+export const TEXT_LIMITS = Object.freeze({ titleWords: TITLE_WORDS.max, titleTarget: TITLE_WORDS.target, titleLines: 2, subtitleLines: 2, takeawayLines: 3, barLines: 2 });
+export const titleWords = (title) => String(title ?? "").replace(/\s*\(\d+\/\d+\)\s*$/, "").trim().split(/\s+/).filter(Boolean).length;
 
 // Where the page's explanation lives. Each maps onto what the composer draws.
 export const COMMENTARY = Object.freeze({
@@ -579,6 +590,9 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     throw new Error(`${id}: \`bar\` is the text of a so-what bar - choose commentary "so-what-bar" for it, or drop it`);
   if (typeof page.why !== "string" || page.why.trim().split(/\s+/).length < 4)
     throw new Error(`${id}: say in \`why\` why a ${page.type} page (${type.task}) is the right one for this claim`);
+  const said = titleWords(page.title);
+  if (said > TEXT_LIMITS.titleWords)
+    throw new Error(`${id}: TITLE_WORDS - the title runs to ${said} words and the build refuses past ${TEXT_LIMITS.titleWords}; cut it to the claim, ${TEXT_LIMITS.titleTarget} words or fewer sets on one line`);
 
   // The content decisions, made before the layout ones and checked first:
   // what settles the claim, and what the commentary adds. With an insight log
@@ -919,6 +933,7 @@ export function describeTypes() {
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", "",
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point).", "",
     `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across; two rows or more fill the frame, one row grows by a third) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
+    `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - write to ${TEXT_LIMITS.titleTarget}, which sets on one line, since more than a third of titles past it is PLAN_TITLE_LENGTH; a \`subtitle\` ${TEXT_LIMITS.subtitleLines} lines; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines, one or two the norm (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best").`, "",
     `Evidence: a chart page (trend, ranking, composition, relationship, bridge, panels of charts) plots ${EVIDENCE_FLOOR.chart} or more values - a bridge ${EVIDENCE_FLOOR.bridge}, one whole's parts (pie, donut, treemap, waffle) are not floored - and strong decks' chart pages plot about 22. Deepen with the peer set, a prior period or a benchmark series, or a longer window: forms \`indexed\` (trend), \`distribution\` and \`aligned-bars\` (ranking) are built for many values.`, ""];
   for (const [name, t] of Object.entries(PAGE_TYPES)) {
     const n = Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits;

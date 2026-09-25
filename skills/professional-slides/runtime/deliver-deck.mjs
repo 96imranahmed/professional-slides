@@ -40,6 +40,10 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   if (build.readback && build.readback.accepted !== true) blockers.push(...(build.readback.findings || []).slice(0, 20).map((f) => ({ slide: f.slide ?? null, code: "BROKEN_GEOMETRY", severity: "blocker", reason: `readback ${f.code} on ${f.shape || ""}`, repair: "Fix the emitter or the scene so the saved file matches the scene" })));
   if (build.gates && build.gates.passed === false) blockers.push(...(build.gates.findings || []).map((f) => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: `gate ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
   if (build.preflight?.passed === false) blockers.push(...(build.preflight.findings || []).map(f => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: f.reason || `preflight ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
+  // The build names what else held it back - text lost from the rendered
+  // pages, most often - rather than leaving "not complete" to be diagnosed.
+  if (build.status !== "built" && !blockers.length) blockers.push(...(build.blockers || []).filter((b) => b.source !== "page gates" && b.source !== "readback").slice(0, 20)
+    .map((b) => ({ slide: b.slide ?? null, code: b.code, severity: "blocker", reason: `${b.source} ${b.code}${b.id ? ` on ${b.id}` : ""}${b.text ? `: "${b.text}"` : ""}`, repair: b.repair || "Fix the page so the saved deck carries every planned text, then rebuild" })));
   if (build.status !== "built" && !blockers.length) blockers.push({slide:null, code:"BROKEN_GEOMETRY", severity:"blocker", reason:`Build is not complete: ${build.status}`, repair:"Complete the build and all gates before delivery"});
   if (blockers.length) return reject(report, directory, rejectedNote, "page gates", blockers);
 

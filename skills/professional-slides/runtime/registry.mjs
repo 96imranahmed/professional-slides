@@ -534,11 +534,21 @@ function assertChartTitleCopy(props = {}) {
     // letters and digits too, and is a result, so it is left to reject.
     copy = copy.replace(/\b(?!\d+(?:[xX]|bn|mn|[mkb]|pp|pts?|bps)\b)(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{2,}(?:-[A-Za-z0-9]+)*\b/g, "designation");
     copy = copy.replace(/\b\d{3}(?:-\d{1,2}[A-Za-z]*|\s+MAX(?:\s+\d{1,2})?)\b/g, "designation");
+    // A rank scale says which end is best ("rank, 1 = best"), and a set size
+    // says how many members the chart shows ("top 40", "World's Top 100"):
+    // both describe the measure. A figure after them - "top 40%", "top 3.5x" -
+    // is still a result.
+    copy = copy.replace(/\brank(?:ed|ing)?\b\s*[,;:]?\s*\(?\s*1\s*=\s*(?:best|top|highest|largest|first|lowest|worst)\s*\)?/gi, "rank scale");
+    copy = copy.replace(/\b(?:top|bottom|largest|biggest|busiest|leading|first|last)\s+\d{1,4}\b(?![.,]\d)(?!\s*(?:%|[xX]\b|bn\b|mn\b|[mkb]\b|pp\b|pts?\b|bps\b|percent\b|points?\b|times\b|fold\b))/gi, "member set");
     const numberWords = "(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)";
     // A number word is a result only when it quantifies a change or share ("twenty percent", "one point"),
     // not when it counts things the chart shows ("three monthly budgets").
-    if (/\p{N}/u.test(copy) || /\b(?:doubled|tripled|halved)\b/i.test(copy) || new RegExp(`\\b${numberWords}\\s+(?:percent|per\\s*cent|points?|pts|x|times|fold|percentage)`, "i").test(copy)) {
-      throw new Error(`Chart title ${field} must not contain statistics or chart results: ${JSON.stringify(value)}. Use a descriptive measure/population heading and explicit period; move values and changes to chart labels or annotations.`);
+    // The refusal names the figure it read as a result, so the author knows
+    // which words to move rather than guessing at the heading.
+    const result = copy.match(/[$€£¥₹+\-−]?\p{N}[\p{N}.,/]*\s*(?:%|[xX]\b|bn\b|mn\b|[mkb]\b|pp\b|pts?\b|bps\b)?/u)?.[0]
+      ?? copy.match(/\b(?:doubled|tripled|halved)\b/i)?.[0] ?? copy.match(new RegExp(`\\b${numberWords}\\s+(?:percent|per\\s*cent|points?|pts|x|times|fold|percentage)\\b`, "i"))?.[0];
+    if (result) {
+      throw new Error(`Chart title ${field} must not contain statistics or chart results: ${JSON.stringify(value)} carries "${result.trim()}", which reads as a value the chart shows. Put it on the mark, a label or an annotation, and keep the ${field} to the measure, population and period. A ${field} may name a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("1 = best").`);
     }
   }
 }
@@ -560,9 +570,10 @@ function chartTitleLayout(frame, props) {
   // compact size — when the heading wraps or the pair will not fit on the line.
   const inlineGap = tokenValue(token("space.2"));
   const measureUnit = (size) => props.unit ? measureText(props.unit, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(size), wrapWidthRatio: 1 }) : null;
-  // A ruled heading always takes the unit inline: a second line under the
-  // heading pushes the rule down, and then no two panels in a row share a rule.
-  // The stacked unit line belongs to headings that carry no rule.
+  // A ruled heading takes the unit inline wherever the pair fits: a second
+  // line under the heading pushes the rule down (peers then share the taller
+  // band, below). The stacked unit line otherwise belongs to headings that
+  // carry no rule.
   const underlined = resolveChartTitleVariant(props) === "underlined" && !band;
   const wanted = (props.unitPlacement === "inline" || underlined) && !band && heading.lines.length === 1;
   const inlineHeading = wanted ? measureHeading(`${headingText},`) : null;
@@ -584,10 +595,22 @@ function chartTitleLayout(frame, props) {
   const ruleGap = tokenValue(token("space.1")), contentGap = tokenValue(token("space.3"));
   const height = bandHeight + (ruled ? ruleGap : 0) + contentGap;
   // A hero chart's banner is one line. When the composer asked for the inline
-  // unit and the pair would not fit — a heading that wraps, or a unit carrying
-  // a qualification that belongs in the note — the band silently becomes two
-  // lines, so the fallback is recorded and the page gates report it.
-  const wrapped = !band && (props.unitPlacement === "inline" || underlined) && (heading.lines.length > 1 || (unit && !inline));
+  // unit and the pair will not fit, the band becomes two lines. A real unit
+  // ("% y/y", "$bn") beside a one-line heading is the runtime's to resolve: it
+  // moves under the heading, and peers share the taller band, so their rules
+  // still line up. Reported as HEADING_WRAPS, it cost an author a run on
+  // "Airline seats, Sep 2026" in a narrow panel and named the heading when the
+  // unit was what broke the line. What the runtime cannot resolve is recorded
+  // with its measure: a heading that wraps on its own, or a unit written as a
+  // phrase ("$k, published base-salary band") carrying a qualification that
+  // belongs in the note.
+  const available = frame.width - 2 * padX;
+  const oneLine = (text, bold = !band) => Math.ceil(measureText(text, 1e5, { fontFamily: tokenValue(FONT), fontSize: tokenValue(token("type.heading")), bold, wrapWidthRatio: 1 }).width);
+  const phrase = Boolean(unit) && String(props.unit).split(/\s+/).filter((word) => /[A-Za-z]{3,}/.test(word)).length >= 3;
+  const reason = band || !(props.unitPlacement === "inline" || underlined) ? null
+    : heading.lines.length > 1 ? "heading" : unit && !inline && phrase ? "unit" : null;
+  const wrapped = reason ? { reason, text: reason === "heading" ? headingText : `${headingText}, ${props.unit}`,
+    width: reason === "heading" ? oneLine(headingText) : oneLine(`${headingText},`) + inlineGap + oneLine(props.unit, false), available: Math.floor(available) } : false;
   return { heading, unit, unitSize, unitGap, inline, inlineGap, unitPlacement: unit ? (inline ? "inline" : "stacked") : "none", wrapped, block, bandHeight, ruleGap, contentHeight: bandHeight, ruled, variant, height, band, padX, padY };
 }
 function chartTitleNodes({ id, frame, props }) {
@@ -602,7 +625,7 @@ function chartTitleNodes({ id, frame, props }) {
     frame: { x: frame.x + layout.padX, y: blockTop, width: frame.width - 2 * layout.padX, height: layout.heading.height },
     text: layout.heading.text,
     style: { ...textStyle(token("type.heading"), layout.band ? WHITE : INK, !layout.band, "left", "top"), lineHeight: layout.heading.lineHeight, wrap: false },
-    data: { textLayout: layout.heading, headerTop: frame.y, headerBandHeight: layout.bandHeight, ruleGap: layout.ruleGap, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement, ...(layout.wrapped ? { headingWrapped: true } : {}) }
+    data: { textLayout: layout.heading, headerTop: frame.y, headerBandHeight: layout.bandHeight, ruleGap: layout.ruleGap, chartTitleVariant: layout.variant, chartUnitPlacement: layout.unitPlacement, ...(layout.wrapped ? { headingWrapped: layout.wrapped } : {}) }
   }));
   if (layout.unit) nodes.push(textPrimitive({
     id: stableId(id, "unit"),

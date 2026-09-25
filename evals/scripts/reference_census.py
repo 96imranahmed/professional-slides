@@ -5,7 +5,7 @@ than the decks it is meant to stand beside, and that difference was found by
 laying two PDFs side by side and counting. This makes the count repeatable:
 
     python3 evals/scripts/reference_census.py deck.pdf \
-        [--scene out/scene.json] [--pages deck.pages.json] \
+        [--scene out/scene.json] [--pages deck.pages.json] [--deck deck.deck.json] \
         [--reference other.pdf | --reference census.json] [--out report.json]
 
 From the rendered PDF, every page: words and numeric tokens on the text layer,
@@ -15,6 +15,19 @@ across the body, and whether a rule sits under the title. From the scene
 per content page, the share that are one exhibit beside a text column, pages
 with two or more exhibits, plotted values per chart page, titles whose last
 line is one to three words, and whether pages carry a subtitle or a title rule.
+
+Every per-page statistic is taken over the analytical pages only: the cover,
+section dividers, agendas and the build's generated pages (the picture
+credits) are left out - told apart by the scene and the compiled deck spec,
+or guessed from the render without a scene. A scanned reference cannot be
+told apart and is measured whole; the printed notes say which applied.
+
+Plotted values are the compiler's: with the compiled deck spec (`--deck`, or
+the `<id>.deck.json` beside `--pages`), the chart pages are those whose
+`pageType.chart` is set - the chart page types and panels carrying a chart -
+and each counts `pageType.values`, the number `author-deck.mjs` reports as
+`plotted`. Without it, the pages file's authored series or the scene's marks
+are counted, which can disagree with the compiler.
 
 `--reference` takes another PDF (measured the same way) or a census JSON: this
 script's own `--out`, or a bare list of per-page rows with `words`, `nums`,
@@ -184,10 +197,12 @@ def measure_pdf(path: Path) -> list[dict]:
     has_text = any(WORD.search(text or "") for text in pdf.texts)
     rows = []
     for index in range(pdf.count):
-        words = [w for w in WORD.findall(pdf.texts[index] if index < len(pdf.texts) else "")
-                 if re.search(r"[A-Za-zÀ-ÿ0-9]", w)]
+        text = pdf.texts[index] if index < len(pdf.texts) else ""
+        words = [w for w in WORD.findall(text) if re.search(r"[A-Za-zÀ-ÿ0-9]", w)]
         ink, occ = ink_and_grid(census[index])
         rows.append({
+            # Read by analytical_by_render and dropped before the report.
+            "_credits": bool(re.search(r"\b(?:picture|photo|image) credits\b", text, re.I)),
             "page": index + 1,
             "words": len(words) if has_text else None,
             "nums": sum(1 for w in words if re.search(r"\d", w)) if has_text else None,
@@ -221,7 +236,11 @@ def _is_chart(exhibit) -> bool:
 
 
 def pages_file_values(pages_path: Path) -> dict[str, int]:
-    """Plotted values per chart page, keyed by page id, from a deck pages file."""
+    """Plotted values per chart page, keyed by page id, from a deck pages file.
+
+    The fallback when no compiled deck spec is found: it counts the authored
+    series, which is not the compiler's count (a table's numeric cells, a
+    waffle's parts, a box's five figures) - see compiled_pages."""
     data = json.loads(Path(pages_path).read_text())
     pages = data.get("pages", data.get("slides", [])) if isinstance(data, dict) else data
     out = {}
@@ -233,6 +252,62 @@ def pages_file_values(pages_path: Path) -> dict[str, int]:
     return out
 
 
+STRUCTURAL_KINDS = {"cover", "section", "divider", "agenda"}
+STRUCTURAL_COMPONENTS = {"cover", "section-divider", "agenda", "tracker-page"}
+# The build's generated pages (page_gates.py GENERATED_PAGE): the picture
+# credits it appends are furniture, not a page of the argument.
+GENERATED_PAGE = re.compile(r"^picture-credits(?:-\d+)?$")
+
+
+def compiled_pages(path: Path) -> dict | None:
+    """What the compiler recorded for each page of a compiled deck spec
+    (`<id>.deck.json`, written by author-deck.mjs): the plotted values of its
+    chart pages and the ids of its structural pages.
+
+    The chart pages are the compiler's: every page whose `pageType.chart` is
+    set - the chart types (trend, ranking, composition, relationship, bridge)
+    and panels carrying a chart - with `pageType.values`, the count the author
+    sees as `plotted` and EVIDENCE_DEPTH gates. Counting the scene's marks or
+    the authored series gave 14 on a deck the compiler put at 20; read from
+    here, both report one number. None when the file carries no page types."""
+    data = json.loads(Path(path).read_text())
+    slides = [*(data.get("slides") or []), *(data.get("appendix") or [])] if isinstance(data, dict) else []
+    if not any(isinstance(s, dict) and s.get("pageType") for s in slides):
+        return None
+    values, structural, typed = {}, set(), set()
+    for slide in slides:
+        page_type, sid = slide.get("pageType") or {}, slide.get("id")
+        if page_type.get("chart") and isinstance(page_type.get("values"), (int, float)):
+            values[sid] = page_type["values"]
+        if page_type:
+            typed.add(sid)
+        elif slide.get("kind") in STRUCTURAL_KINDS or slide.get("kind"):
+            structural.add(sid)
+    return {"values": values, "structural": structural, "typed": typed}
+
+
+def find_compiled(pages_path: Path | None, deck_path: Path | None) -> dict | None:
+    """The compiled deck spec: `--deck`, the `--pages` file itself when it is
+    one, or the `<id>.deck.json` author-deck.mjs writes beside the pages file."""
+    for candidate in (deck_path, pages_path,
+                      pages_path and pages_path.with_name(pages_path.name.replace(".pages.json", ".deck.json"))):
+        if candidate and Path(candidate).is_file():
+            found = compiled_pages(Path(candidate))
+            if found is not None:
+                return found
+    return None
+
+
+def analytical_by_render(rows: list[dict]) -> list[bool] | None:
+    """A guess at which rendered pages carry the argument, for a deck with no
+    scene: the first page is the cover, a page naming its picture credits is
+    generated, and a page of under 25 words is a divider. A scan has no text
+    layer, so its pages cannot be told apart: None."""
+    if all(r.get("words") is None for r in rows):
+        return None
+    return [i > 0 and not r.get("_credits") and (r.get("words") or 0) >= 25 for i, r in enumerate(rows)]
+
+
 def _beside(a, b) -> bool:
     """Two frames sit side by side: little horizontal overlap, real vertical overlap."""
     x_overlap = min(a["x"] + a["width"], b["x"] + b["width"]) - max(a["x"], b["x"])
@@ -240,19 +315,31 @@ def _beside(a, b) -> bool:
     return x_overlap < 0.1 * min(a["width"], b["width"]) and y_overlap > 0.3 * min(a["height"], b["height"])
 
 
-def scene_structure(scene_path: Path, plotted_by_id: dict[str, int] | None) -> list[dict]:
+def scene_structure(scene_path: Path, plotted_by_id: dict[str, int] | None, compiled: dict | None = None) -> list[dict]:
     scene = json.loads(Path(scene_path).read_text())
     rows = []
+    structural_ids = (compiled or {}).get("structural", set())
     for slide in scene.get("slides", []):
         instances = slide.get("componentInstances") or []
         nodes = slide.get("nodes") or []
         titles = [n for n in nodes if n.get("role") == "action-title"]
-        row = {"id": slide.get("id"), "content": bool(titles)}
-        if titles:
+        # Only the pages that carry the argument are measured: the cover,
+        # section dividers, agendas and the generated credits page are
+        # furniture, and counted they put a deck's empty-band share at 18%
+        # when its analytical pages ran at 6%.
+        source = slide.get("sourceSlideId") or slide.get("id")
+        structural = (GENERATED_PAGE.match(str(slide.get("id") or "")) is not None
+                      or any(i.get("component") in STRUCTURAL_COMPONENTS for i in instances)
+                      or source in structural_ids)
+        # A typed page is analytical whatever it draws: a takeaways page is a
+        # summary type that sets its title in its own component.
+        typed = compiled is not None and source in compiled["typed"] and not GENERATED_PAGE.match(str(slide.get("id") or ""))
+        row = {"id": slide.get("id"), "content": typed or (bool(titles) and not structural)}
+        if row["content"]:
             exhibits = [i for i in instances if i.get("category") in EXHIBIT_CATEGORIES or i.get("component") in EXHIBIT_COMPONENTS]
             texts = [i for i in instances if i.get("component") in TEXT_COMPONENTS]
             charts = [i for i in exhibits if i.get("category") == "chart"]
-            lines = ((titles[0].get("data") or {}).get("textLayout") or {}).get("lines") or str(titles[0].get("text") or "").split("\n")
+            lines = (((titles[0].get("data") or {}).get("textLayout") or {}).get("lines") or str(titles[0].get("text") or "").split("\n")) if titles else [""]
             chrome = next((i for i in instances if i.get("component") == "slide-chrome"), {})
             row.update({
                 "exhibits": len(exhibits),
@@ -263,7 +350,13 @@ def scene_structure(scene_path: Path, plotted_by_id: dict[str, int] | None) -> l
                 "subtitle": any("subtitle" in str(n.get("role")) and not str(n.get("role")).startswith(("cover", "divider")) for n in nodes),
                 "sceneRule": any(n.get("role") in ("title-rule", "action-title-rule") for n in nodes) or "with-line" in str(chrome.get("variant", "")),
             })
-            if charts:
+            if compiled is not None:
+                # The compiler's chart pages and counts, so the census and
+                # the author's summary agree.
+                row["chart"] = source in compiled["values"]
+                if row["chart"]:
+                    row["plotted"] = compiled["values"][source]
+            elif charts:
                 if plotted_by_id is not None and slide.get("id") in plotted_by_id:
                     row["plotted"] = plotted_by_id[slide["id"]]
                 else:
@@ -279,12 +372,17 @@ def scene_structure(scene_path: Path, plotted_by_id: dict[str, int] | None) -> l
 
 # ------------------------------------------------------------------ summary
 
-def _spread(values):
+def _spread(values, middle="upper"):
+    """Median, quartiles and mean. `middle="mean"` takes an even count's
+    median as the mean of its two middle values, as the compiler does
+    (variety_gates.mjs evidenceDepth), so a compiler count reads the same here."""
     values = sorted(v for v in values if v is not None)
     if not values:
         return None
     n = len(values)
-    return {"median": values[n // 2], "p25": values[n // 4], "p75": values[(3 * n) // 4],
+    median = values[n // 2] if n % 2 or middle == "upper" else (values[n // 2 - 1] + values[n // 2]) / 2
+    median = int(median) if middle == "mean" and isinstance(median, float) and median.is_integer() else median
+    return {"median": median, "p25": values[n // 4], "p75": values[(3 * n) // 4],
             "mean": round(sum(values) / n, 2), "n": n}
 
 
@@ -293,8 +391,12 @@ def _share(flags):
     return {"share": round(sum(flags) / len(flags), 2), "n": len(flags)} if flags else None
 
 
-def summarize(pdf_rows: list[dict] | None, structure: list[dict] | None = None) -> dict:
+def summarize(pdf_rows: list[dict] | None, structure: list[dict] | None = None, compiled: dict | None = None) -> dict:
     summary = {}
+    # Rows marked by the scene or the render heuristic count only when they
+    # carry the argument; unmarked rows (a scan) all count.
+    if pdf_rows and any("analytical" in r for r in pdf_rows):
+        pdf_rows = [r for r in pdf_rows if r.get("analytical", True)]
     if pdf_rows:
         # A scan has no text layer; its word counts are unknown, not zero.
         if all(r.get("words") in (None, 0) for r in pdf_rows) and all(r.get("nums") in (None, 0) for r in pdf_rows):
@@ -314,17 +416,46 @@ def summarize(pdf_rows: list[dict] | None, structure: list[dict] | None = None) 
         summary["shortTitleLastLine"] = _share(r["shortLastLine"] for r in wrapped)
         summary["subtitle"] = _share(r["subtitle"] for r in content)
         summary["sceneTitleRule"] = _share(r["sceneRule"] for r in content)
+    if compiled is not None:
+        # Every chart page the compiler counted, appendix included, as the
+        # author's summary counts them.
+        summary["plottedPerChartPage"] = _spread(compiled["values"].values(), middle="mean")
     return {k: v for k, v in summary.items() if v is not None}
+
+
+def mark_analytical(rows: list[dict], structure: list[dict] | None) -> str:
+    """Mark each rendered page as analytical or not, and say how it was told."""
+    if structure and len(structure) == len(rows):
+        for row, page in zip(rows, structure):
+            row["analytical"] = bool(page.get("content"))
+        return "scene"
+    flags = analytical_by_render(rows)
+    if flags is None:
+        return "none"
+    for row, flag in zip(rows, flags):
+        row["analytical"] = flag
+    return "render"
+
+
+FILTER_NOTES = {
+    "scene": "analytical pages only; the cover, dividers, agendas and generated pages are left out, read from the scene",
+    "render": "analytical pages only, guessed from the render: the first page, pages under 25 words and a credits page are left out",
+    "none": "every page as measured; a scan has no text layer, so structural pages cannot be told apart",
+    "summary": "as measured when the census was taken",
+}
 
 
 def load_reference(path: Path) -> dict:
     if Path(path).suffix.lower() == ".pdf":
-        return summarize(measure_pdf(path))
+        rows = measure_pdf(path)
+        how = mark_analytical(rows, None)
+        return {**summarize(rows), "pagesMeasured": how}
     data = json.loads(Path(path).read_text())
     if isinstance(data, dict) and "summary" in data:
-        return data["summary"]
+        return {**data["summary"], "pagesMeasured": data["summary"].get("pagesMeasured", "summary")}
     if isinstance(data, list):  # bare per-page rows
-        return summarize([{"emptyBand": None, **row} for row in data])
+        rows = [{"emptyBand": None, **row} for row in data]
+        return {**summarize(rows), "pagesMeasured": "none"}
     raise SystemExit("--reference must be a PDF, a census JSON with a summary, or a list of page rows")
 
 
@@ -363,7 +494,11 @@ def table(deck: dict, reference: dict | None) -> str:
             for label, key, field in ROWS if deck.get(key) is not None or (reference or {}).get(key) is not None]
     widths = [max(len(r[i]) for r in [header, *body]) for i in range(len(header))]
     line = lambda r: "  ".join(c.ljust(w) if i == 0 else c.rjust(w) for i, (c, w) in enumerate(zip(r, widths)))  # noqa: E731
-    return "\n".join([line(header), line(["-" * w for w in widths]), *map(line, body)])
+    notes = [f"{name}: {FILTER_NOTES[side['pagesMeasured']]}." for name, side in (("Deck", deck), ("Reference", reference))
+             if side and side.get("pagesMeasured") in FILTER_NOTES]
+    if deck.get("plottedFrom"):
+        notes.append(f"Plotted values: {deck['plottedFrom']}.")
+    return "\n".join([line(header), line(["-" * w for w in widths]), *map(line, body), *([""] + notes if notes else [])])
 
 
 def main(argv=None) -> int:
@@ -371,18 +506,28 @@ def main(argv=None) -> int:
     parser.add_argument("pdf", type=Path)
     parser.add_argument("--scene", type=Path)
     parser.add_argument("--pages", type=Path)
+    parser.add_argument("--deck", type=Path, help="the compiled deck spec (<id>.deck.json); found beside --pages when omitted")
     parser.add_argument("--reference", type=Path)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)
     pdf_rows = measure_pdf(args.pdf)
-    plotted = pages_file_values(args.pages) if args.pages else None
-    structure = scene_structure(args.scene, plotted) if args.scene else None
+    compiled = find_compiled(args.pages, args.deck)
+    plotted = pages_file_values(args.pages) if args.pages and compiled is None else None
+    structure = scene_structure(args.scene, plotted, compiled) if args.scene else None
     if structure and len(structure) == len(pdf_rows):
         for pdf_row, scene_row in zip(pdf_rows, structure):
             pdf_row.update({k: v for k, v in scene_row.items() if k != "content"}, content=scene_row["content"])
-    summary = summarize(pdf_rows, structure)
+    how = mark_analytical(pdf_rows, structure)
+    summary = {**summarize(pdf_rows, structure, compiled), "pagesMeasured": how,
+               "analyticalPages": sum(1 for r in pdf_rows if r.get("analytical", True))}
     if plotted is not None and not structure:
         summary["plottedPerChartPage"] = _spread(plotted.values())
+    summary["plottedFrom"] = ("the compiler's count (pageType.values) on its chart pages" if compiled is not None
+                              else "the authored series in the pages file" if plotted is not None
+                              else "the marks the scene draws" if structure else None)
+    summary = {k: v for k, v in summary.items() if v is not None}
+    for row in pdf_rows:
+        row.pop("_credits", None)
     reference = load_reference(args.reference) if args.reference else None
     report = {"schema": "professional-slides.reference-census/v1", "pages": len(pdf_rows),
               "summary": summary, **({"reference": reference} if reference is not None else {}), "perPage": pdf_rows}

@@ -109,6 +109,58 @@ class ReferenceCensusTests(unittest.TestCase):
         report, _ = self.run_census(pages=pages)
         self.assertEqual(report["summary"]["plottedPerChartPage"]["median"], 8)
 
+    def test_the_compiled_deck_spec_supplies_the_compilers_count(self):
+        # The census counted 14 where the compiler counted 20 on one deck; with
+        # the compiled spec beside the pages file, both read pageType.values.
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            (tmp / "deck.pdf").write_bytes(_pdf(PAGE))
+            (tmp / "scene.json").write_text(json.dumps(SCENE))
+            (tmp / "d.pages.json").write_text(json.dumps({"pages": [{"id": "p1", "exhibit": {"type": "chart.column", "series": [{"values": [1, 2]}]}}]}))
+            (tmp / "d.deck.json").write_text(json.dumps({"slides": [
+                {"id": "p1", "pageType": {"type": "ranking", "chart": True, "values": 20}},
+                {"id": "a1", "pageType": {"type": "trend", "chart": True, "values": 11}},
+                {"id": "t1", "pageType": {"type": "lookup", "values": 40}},
+            ]}))
+            with contextlib.redirect_stdout(io.StringIO()) as printed:
+                self.census.main([str(tmp / "deck.pdf"), "--scene", str(tmp / "scene.json"), "--pages", str(tmp / "d.pages.json"), "--out", str(tmp / "out.json")])
+            report = json.loads((tmp / "out.json").read_text())
+        self.assertEqual(report["perPage"][0]["plotted"], 20)
+        # Every compiler chart page, and only those; an even count takes the mean of its middles as the compiler does.
+        self.assertEqual(report["summary"]["plottedPerChartPage"]["n"], 2)
+        self.assertEqual(report["summary"]["plottedPerChartPage"]["median"], 15.5)
+        self.assertIn("compiler", printed.getvalue())
+
+    def test_structural_and_generated_pages_are_left_out_of_every_page_statistic(self):
+        # Dividers and the credits page put a deck's empty-band share at 18%
+        # when its analytical pages ran at 6%.
+        content = SCENE["slides"][0]
+        scene = {"slides": [
+            {"id": "cover", "componentInstances": [{"component": "cover"}], "nodes": []},
+            content,
+            {"id": "s1", "componentInstances": [{"component": "section-divider"}], "nodes": [{"role": "section-title", "text": "Market"}]},
+            {"id": "picture-credits", "componentInstances": [{"component": "slide-chrome"}], "nodes": [{"role": "action-title", "text": "Picture credits"}]},
+        ]}
+        fresh = lambda: [{"page": i + 1, "words": 40, "nums": 1, "ink": 0.3, "occ": 0.5, "emptyBand": band, "titleRule": False}  # noqa: E731
+                         for i, band in enumerate([0.8, 0.05, 0.6, 0.7])]
+        rows = fresh()
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "scene.json").write_text(json.dumps(scene))
+            structure = self.census.scene_structure(Path(tmp) / "scene.json", None)
+        self.assertEqual([r["content"] for r in structure], [False, True, False, False])
+        self.assertEqual(self.census.mark_analytical(rows, structure), "scene")
+        summary = self.census.summarize(rows, structure)
+        self.assertEqual(summary["emptyBandOver15"], {"share": 0.0, "n": 1})
+        # Without a scene the render decides: the first page, a thin page and a credits page are left out.
+        guessed = fresh()
+        guessed[2]["words"], guessed[3]["_credits"] = 10, True
+        self.assertEqual(self.census.mark_analytical(guessed, None), "render")
+        self.assertEqual([r["analytical"] for r in guessed], [False, True, False, False])
+        # A scan cannot be told apart and is measured whole.
+        scan = [{**r, "words": None, "nums": None} for r in fresh()]
+        self.assertEqual(self.census.mark_analytical(scan, None), "none")
+        self.assertEqual(self.census.summarize(scan)["emptyBandOver15"]["n"], 4)
+
     def test_a_scanned_reference_has_no_word_count_and_prints_beside_the_deck(self):
         rows = [{"page": 1, "words": 0, "nums": 0, "ink": 0.3, "occ": 0.6}, {"page": 2, "words": 0, "nums": 0, "ink": 0.2, "occ": 0.5}]
         report, printed = self.run_census(reference=rows)

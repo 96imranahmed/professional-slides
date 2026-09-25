@@ -116,6 +116,7 @@
       0.92
     ],
     "titleWords": {
+      "max": 14,
       "target": 12,
       "overShareMax": 0.35
     },

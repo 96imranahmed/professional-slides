@@ -121,13 +121,27 @@ Each chart-bearing shape also records its breadth - `breadth: { periods, series 
 
 The summary lists advisories the compiler can see without blocking: `MAP_COARSE` names a place page whose markers span under twenty degrees on the built-in 1:110m coastline, which is coarse at that scale - import a 1:10m or 1:50m geography with `runtime/import-geography.mjs` and pass it as the map's `geography`.
 
-`--check` and `--draft` print each page's budget as it composes - body words against the floor and ceiling for its reading task, the footer's share, how much of the body the page fills - with a `!` on every line to act on, so a fix does not push a page across a line unseen. A page that does not compile is reported with the rest: the pages that do are still composed, gated and budgeted in the same run. Every run is logged beside the pages file; `--log` lists the findings that came back run after run, which are the limits or messages the skill should publish better.
+`--check` and `--draft` print each page's budget as it composes - body words against the floor and ceiling for its reading task, the footer's share, how much of the body the page fills - with a `!` on every line to act on, so a fix does not push a page across a line unseen. On a page split into columns the line also gives the room at the foot of each column that sets text, in lines of the page's body type (`room: left full, right 91px ≈ 4 lines`), and a column over its height is refused with the overflow in pixels and lines, so one edit lands rather than a point added and removed by trial. A page that does not compile is reported with the rest: the pages that do are still composed, gated and budgeted in the same run. Every run is logged beside the pages file; `--log` lists the findings that came back run after run, which are the limits or messages the skill should publish better.
 
 `--types` prints the data each form reads (a pie or donut takes `labels` and `values`, a treemap `items`, a flow `nodes` and `edges`); the compiler names the missing keys, and refuses any page key the composer does not read, on every page at once.
 
 The compiler checks what each type implies. A trend runs over four or more periods; a ranking shows four or more members; trend and ranking charts mark their finding on the plot; a scorecard codes at least one column in its form; `on-exhibit` needs `annotations`; `captions` needs a `caption` on every panel; a text-free placement refuses `points`, because it says the text lives somewhere else. Two or three numbers are a `numbers` page, not a chart, and not a panel either: a panel plotting two numbers is refused. A pie or donut with a part under 5% is refused for a waffle or a stacked bar; a metric strip sits over exactly one exhibit and takes commentary `none`, since its numbers and exhibit fill the page.
 
 Each component's limits are published in `--types` (`holds:` - a donut takes two to five parts, cards two to six, steps three to six, a stat-list value nine characters and a fact-grid value ten) and checked at compile, with the capacities the renderer measures: a chart callout about ten words and a chart three callouts (a fourth note is commentary), a rail about forty words (eight lines at heading size). Every `numbers` form sets its figures against one exhibit - the proof beside a hero number, the tiles of a grid, the chart under a strip.
+
+The text limits the page gates enforce are published in `--types` too, so they are met by reading rather than by failing:
+
+| Text | Limit | Code | Checked |
+| --- | --- | --- | --- |
+| `title` | 14 words; write to 12, which sets on one line | `TITLE_WORDS`; `PLAN_TITLE_LENGTH` when more than a third run past 12 | at compile |
+| `title` | two lines | `TITLE_LINES` | as the page composes |
+| `subtitle` | two lines | refused as it composes | as the page composes |
+| chart or panel `heading` | one line at the frame's width, unit inline | `HEADING_WRAPS` - a short unit moves under the heading on its own; a heading that wraps, or a unit written as a phrase, is reported with its measured width against the frame's | as the page composes |
+| `takeaway` | three lines; one or two is the norm | `TAKEAWAY_LONG` | as the page composes |
+| `bar` | eight words or more, two lines | refused at compile | at compile |
+| prose | 35 to 90 characters a line | `CPL` | as the page composes |
+
+A chart `heading` or `unit` names the measure, the population and the period, never a result. The numbers it may carry describe the measure: a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best"). A refusal names the figure it read as a result ("53.2m"), which belongs on the mark or in an annotation.
 
 Each type also has a minimum it needs to be worth a page: a composition shows three or more parts, or the mix across two or more members or periods - a share of one thing is a numbers page; a timeline or roadmap has four or more dated items; a mechanism three or more parts; a relationship five or more members; a bridge a start, two steps and an end - and every chart page the evidence floor below. Small counts are counted, not shared out: fourteen cities as percentages of a pie overstates what the count can say - use form `waffle`, with the parts as `categories` and one series of whole counts.
 

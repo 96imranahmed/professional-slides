@@ -109,6 +109,28 @@ console.log(JSON.stringify({refusedPeriods:periods.filter(h=>!accepted(h)),accep
 """)
         self.assertEqual(result, {"refusedPeriods": [], "acceptedResults": []})
 
+    def test_chart_titles_accept_rank_scales_and_set_sizes_and_name_the_result_they_refuse(self):
+        # "rank, 1 = best" and "busiest day 2 August 2026, top 40" describe the
+        # measure and were refused; "the leader's 53.2m" is a value and stays
+        # refused, with the figure named so the author knows what to move.
+        result = run_node("""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const title=REGISTRY.get('chart-title'),frame={x:60,y:60,width:1000,height:500};
+const refusal=props=>{try{title.render({id:'t',frame,props});return null;}catch(error){if(!/must not contain statistics/.test(error.message))throw error;return error.message;}};
+const headings=['Hub connectivity index, busiest day 2 August 2026, top 40',"World's Top 100 airlines, rank (1 = best)",'Largest 20 carriers by seats, Sep 2026'];
+const units=['rank, 1 = best','rank (1 = best)','ranking; 1 = highest'];
+const results=["Passengers: actual and required path to the leader's 53.2m",'Revenue +12%','Revenue up 3.4x','Revenue $1.2bn','Revenue fell 20%','NYPD: 2025','Top 40%','Top 3 grew 40%','Top 10.5'];
+const badUnits=['rank, 1 = best, 3.2','rank, 2 = best'];
+console.log(JSON.stringify({
+  refusedHeadings:headings.filter(heading=>refusal({heading})),
+  refusedUnits:units.filter(unit=>refusal({heading:'Airline ranking',unit})),
+  acceptedResults:results.filter(heading=>!refusal({heading})),
+  acceptedUnits:badUnits.filter(unit=>!refusal({heading:'Airline ranking',unit})),
+  named:refusal({heading:results[0]}).includes('carries "53.2m"'),
+}));
+""")
+        self.assertEqual(result, {"refusedHeadings": [], "refusedUnits": [], "acceptedResults": [], "acceptedUnits": [], "named": True})
+
     def test_growth_bracket_stays_near_small_marks_on_a_shared_scale(self):
         result = run_node("""
 import assert from 'node:assert/strict';
