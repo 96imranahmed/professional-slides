@@ -30,7 +30,7 @@ import { registerCharts } from "./charts.mjs";
 import { renderTable, measureTable, tableCeiling, TABLE_TOKENS } from "./tables.mjs";
 import { fitText, textStyle as baseTextStyle, measuredTextNode } from "./text-style.mjs";
 import { TABLE_VARIANTS } from "./table-fixtures.mjs";
-import { measureText, measureTextRuns, accentRuns } from "./text-layout.mjs";
+import { measureText, measureTextRuns, accentRuns, balancedWrap } from "./text-layout.mjs";
 import { routeConnector } from "./routing.mjs";
 import { legendNodes, LEGEND_TOKENS, LEGEND_VARIANTS, LEGEND_PLACEMENTS, QUANTITATIVE_LEGEND_SAMPLE } from "./legends.mjs";
 import { registerChartGroup } from "./chart-group.mjs";
@@ -388,13 +388,15 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
     const retry = measureTitle(long);
     if (retry.lines.length < textLayout.lines.length) { fontSize = long; textLayout = retry; }
   }
-  let titleWidth = baseTextFrame.width;
-  if (chrome && !section && !String(props.text).includes("\n") && textLayout.lines.length === 2 && textLayout.lines[1].trim().split(/\s+/).length === 1) {
-    for (const ratio of [.95, .9, .85, .8, .75, .7, .65, .6]) {
-      const width = baseTextFrame.width * ratio, balanced = measureTitle(fontSize, width);
-      if (balanced.lines.length > 2) break;
-      if (balanced.lines[1].trim().split(/\s+/).length >= 3) { titleWidth = width; textLayout = balanced; break; }
-    }
+  // A title that wraps is balanced: set at the narrowest width that keeps its
+  // line count, so its lines run to about the same length and the last is
+  // never a stranded word or two. The box takes that width, and the PPTX
+  // breaks the lines where the render did (`balanced`), so PowerPoint's own
+  // metrics cannot move a word back. An author's own line break is kept.
+  let titleWidth = baseTextFrame.width, balanced = false;
+  if (chrome && !section && !String(props.text).includes("\n") && textLayout.lines.length > 1) {
+    const wrap = balancedWrap((width) => measureTitle(fontSize, width), baseTextFrame.width);
+    if (wrap.width < baseTextFrame.width) { titleWidth = wrap.width; textLayout = wrap.layout; balanced = true; }
   }
   const textFrame = chrome ? { ...baseTextFrame, width: titleWidth, height: Math.max(baseTextFrame.height, textLayout.height) } : baseTextFrame;
   const ruleY = textFrame.y + textLayout.height + ruleGap;
@@ -406,10 +408,23 @@ function titleNodes({ id, frame, props, section = false, chrome = false }) {
     text: textLayout.text,
     ...(lead ? { runs: textLayout.runs } : {}),
     style: { ...textStyle(fontSize === tokenValue(size) ? size : token("type.actionTitleLong"), INK, titleBold), fontFamily: DISPLAY, valign: "top", lineHeight: textLayout.lineHeight, wrap: false },
-    data: { titleVariant: variant, textLayout, ruleGap, ...(lead ? { lead } : {}) }
+    data: { titleVariant: variant, textLayout, ruleGap, ...(lead ? { lead } : {}), ...(balanced ? { balanced } : {}) }
   })];
   if (TITLE_VARIANTS[variant].rule) nodes.push(openLine(stableId(id, chrome ? "title-rule" : "rule"), textFrame.x, ruleY, textFrame.x + textFrame.width, ruleY, "title-rule", RULE, HAIRLINE, { titleVariant: variant }));
   return nodes;
+}
+
+// The title rule as the house draws it (style.titleRuleLength, .titleRuleColor,
+// line.titleRule): margin to margin, edge to edge, or a short accent bar.
+const TITLE_RULE_COLORS = { rule: "color.rule", ink: "color.ink", accent: "color.accent", primary: "color.componentPrimary" };
+const TITLE_BAR = 64;
+function titleRuleNode(id, frame, y, titleVariant) {
+  const length = houseStyle("style.titleRuleLength"), colour = TITLE_RULE_COLORS[houseStyle("style.titleRuleColor")];
+  if (!["content", "full", "short"].includes(length)) throw new Error(`Unknown title rule length: ${length}; use content, full or short`);
+  if (!colour) throw new Error(`Unknown title rule colour: ${houseStyle("style.titleRuleColor")}; use ${Object.keys(TITLE_RULE_COLORS).join(", ")}`);
+  const x1 = length === "full" ? frame.x : frame.x + CHROME.left;
+  const x2 = length === "full" ? frame.x + frame.width : length === "short" ? x1 + TITLE_BAR : frame.x + frame.width - CHROME.right;
+  return openLine(stableId(id, "title-rule"), x1, y, x2, y, "title-rule", token(colour), token("line.titleRule"), { titleVariant, ruleLength: length });
 }
 
 function headingLayout(frame, props = {}) {
@@ -1172,7 +1187,7 @@ function registerCore(registry) {
     }),
     component({
       id: "slide-chrome", category: "shared", role: "slide-chrome",
-      tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.accent", "color.onPrimary", "color.surfaceMuted", "color.textSecondary", "font.display", "font.body", "type.source", "type.compact", "type.heading", "type.actionTitle", "type.actionTitleLong", "layout.titleContentGap", "space.2", "space.4", "radius.small", "radius.none", ...STYLE_TOKENS, ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
+      tokens: ["color.canvas", "color.ink", "color.componentPrimary", "color.accent", "color.onPrimary", "color.surfaceMuted", "color.textSecondary", "font.display", "font.body", "type.source", "type.compact", "type.heading", "type.actionTitle", "type.actionTitleLong", "layout.titleContentGap", "layout.titleRuleGap", "line.titleRule", "color.rule", "space.2", "space.4", "radius.small", "radius.none", ...STYLE_TOKENS, ...PAGE_TEMPLATE_TOKENS, ...TRACKER_TOKENS],
       preferredSize: { width: SLIDE.width, height: SLIDE.height },
       sample: { title: "(Insert action title)", source: "Source: (Insert source)", footerRight: "(Insert company name)", pageNumber: 7 },
       render: ({ id, frame, props }) => {
@@ -1204,11 +1219,16 @@ function registerCore(registry) {
         // measures, over what population, for what period ("Employment, growth
         // and specialization by subsector"). A well-made title band carries
         // twenty words against our fourteen, and this line is the difference.
+        // It sits between the title and the rule, in body type and the
+        // secondary colour, so it reads as the title's footnote, not a second title.
         const subtitleText = typeof props.subtitle === "string" && props.subtitle.trim() ? props.subtitle.trim() : null;
         const tagPlacement = props.tag ? houseStyle("style.tagPlacement") : "top-right";
         // An above-title tag (a small accent label, as in a country or section spotlight) sits in the title's top margin.
         const titles = titleNodes({ id, frame, props: { text: props.title, lead: props.titleLead, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker || kicker.length ? 58 : CHROME.titleTop }, chrome: true });
         const title = titles.find((node) => node.role === "action-title");
+        // The rule is drawn below, once the band's height is known.
+        const ruled = titles.some((node) => node.role === "title-rule");
+        titles.splice(0, titles.length, ...titles.filter((node) => node.role !== "title-rule"));
         let titleBottom = title.frame.y + title.data.textLayout.height;
         // Page tag: PRELIMINARY, ILLUSTRATIVE, CONFIDENTIAL, Exhibit 3. The house
         // style places it: small caps top-right, an accent pill under the title
@@ -1232,16 +1252,9 @@ function registerCore(registry) {
         if (subtitleText) {
           const measured = measureText(subtitleText, page.titleWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), wrapWidthRatio: 1 });
           if (measured.lines.length > 2) throw new Error("A subtitle runs to at most two lines; it names the measure, not the finding");
-          // A rule and a standfirst do the same job - they close the title band
-          // and separate it from the page - so a page takes one or the other,
-          // never both. The standfirst carries the measure and the rule carries
-          // nothing, so the standfirst wins and the rule is dropped. A page
-          // with no standfirst keeps its house rule.
-          const ruleIndex = titles.findIndex((node) => node.role === "title-rule");
-          if (ruleIndex >= 0) titles.splice(ruleIndex, 1);
           const y = titleBottom + tokenValue(token("space.2"));
           titles.push(textPrimitive({
-            id: stableId(id, "subtitle"), role: "action-subtitle",
+            id: stableId(id, "subtitle"), role: props.subtitleRole === "takeaway-standfirst" ? "takeaway-standfirst" : "action-subtitle",
             frame: { x: frame.x + CHROME.left, y, width: page.titleWidth, height: measured.height },
             text: measured.text,
             style: { ...textStyle(BODY, SECONDARY, false, "left", "top"), lineHeight: measured.lineHeight, wrap: false },
@@ -1289,21 +1302,25 @@ function registerCore(registry) {
         // A tracker above the title (pill tabs, a label) sits in the same band as
         // the title, so the body starts a step lower to keep it off the content.
         const trackerGap = tracker.length || kicker.length ? tokenValue(token("space.3")) : 0;
-        const contentTop = Math.max(CHROME.bodyTop + trackerGap, titleBottom + gap + trackerGap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
+        const floorTop = Math.max(CHROME.bodyTop + trackerGap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
+        let contentTop = Math.max(floorTop, titleBottom + gap + trackerGap);
+        if (ruled) {
+          // The rule closes the title band at a fixed height, the gap above the
+          // body, and the title and its standfirst sit on it: a one-line title
+          // drops to meet the rule rather than leaving the rule stranded 50px
+          // under it, so the rule reads as the title's and the body still
+          // starts where it does on every other page. A band too tall for that
+          // (two lines and a standfirst) pushes the rule and the body down.
+          const ruleGap = tokenValue(token("layout.titleRuleGap"));
+          const ruleY = Math.max(floorTop - ruleGap, titleBottom + ruleGap);
+          const drop = ruleY - ruleGap - titleBottom;
+          const onTitle = (node) => node.frame && (node.role === "action-title" || node.role === "action-subtitle" || node.role === "takeaway-standfirst" || node.role === "page-tag-pill" || (node.role === "page-tag" && tagPlacement !== "top-right"));
+          if (drop > 0) for (const node of titles) if (onTitle(node)) node.frame = { ...node.frame, y: node.frame.y + drop };
+          titles.push(titleRuleNode(id, frame, ruleY, title.data.titleVariant));
+          contentTop = Math.max(floorTop, ruleY + ruleGap);
+        }
         const contentFrame = { ...page.contentFrame, y: contentTop, height: baseBottom - contentTop };
         if (contentFrame.height <= 0) throw new Error("Action title leaves no room for slide content; shorten the title or split the slide");
-        // The rule belongs to the content, not to the title. Hung under the
-        // title it tracked the title's height while the body stayed pinned at
-        // `bodyTop`: a one-line title left 52px of nothing beneath the rule and
-        // a two-line title left 16px, so the same band read differently on
-        // every page. Dropping it to a fixed gap above the content makes that
-        // distance constant and lets the title float in whatever height it
-        // needs. It never rises above where the title leaves it.
-        const ruleGap = tokenValue(token("space.3"));
-        for (const node of titles) {
-          if (node.role !== "title-rule" || !node.frame) continue;
-          node.frame = { ...node.frame, y: Math.max(node.frame.y, contentTop - ruleGap) };
-        }
         // The title band paints first; the tracker sits on it, above the title.
         const band = titles.filter((n) => n.role === "title-band" || n.role === "title-tab"), rest = titles.filter((n) => n.role !== "title-band" && n.role !== "title-tab");
         return { ...page, contentFrame, nodes: [...band, ...tracker, ...kicker, ...rest, ...page.nodes] };

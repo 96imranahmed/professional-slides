@@ -82,6 +82,31 @@ export function measureTextRuns(runs, width, { fontFamily = activeDesignTokens()
   return { source, sourceRuns: merge(runs), text: lines.join('\n'), lines, runs: measuredRuns.length ? measuredRuns : [{text:'',bold:false}], width: Math.max(...lineRuns.map(runWidth)), lineHeight, height: lines.length * lineHeight };
 }
 
+/**
+ * Balanced wrapping, as CSS `text-wrap: balance` does it: the narrowest width
+ * that still sets the text in as many lines as `width` does. Greedy wrapping
+ * fills the first line and leaves the rest to the last, so nine two-line
+ * titles in ten ended on one to three words ("...from 66% to / 54%") - a
+ * widow the eye reads as a mistake. Greedy line count only falls as the width
+ * grows, so a bisection finds the edge. `measure(width)` is the caller's own
+ * measurement (plain text or runs); a width too narrow for its longest word
+ * throws, and counts as too narrow. Returns `{ width, layout }`.
+ */
+export function balancedWrap(measure, width) {
+  const full = measure(width);
+  const count = full.lines.length;
+  if (count < 2) return { width, layout: full };
+  let lo = 0, hi = width;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) / 2;
+    let lines = Infinity;
+    try { lines = measure(mid).lines.length; } catch { /* narrower than a word */ }
+    if (lines <= count) hi = mid; else lo = mid;
+  }
+  const balanced = Math.min(width, Math.ceil(hi));
+  return { width: balanced, layout: measure(balanced) };
+}
+
 // A letter or a digit: what a highlighted phrase must not run into.
 const WORD_CHAR = /[\p{L}\p{N}]/u;
 

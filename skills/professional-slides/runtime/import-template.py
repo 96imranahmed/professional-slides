@@ -49,7 +49,7 @@ NS = {
 }
 PAGE_W, PAGE_H = 1280, 720
 OFFICE_STOCK = {"4472C4", "ED7D31", "A5A5A5", "FFC000", "5B9BD5", "70AD47", "44546A", "E7E6E6"}
-STYLE_KEYS = ["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead"]
+STYLE_KEYS = ["style.titleWeight", "style.titleRule", "style.titleRuleLength", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead"]
 
 
 def hex6(value: str | None) -> str | None:
@@ -421,10 +421,15 @@ def analyse(path: Path, base: str) -> dict:
         style["style.titleWeight"] = "bold" if title_style_bold else "regular"
     title_bottom = (title_frames[0][1] + title_frames[0][3]) if title_frames else None
     if title_bottom is not None:
-        if any(abs(l[1] - title_bottom) < 24 and l[2] > PAGE_W * 0.5 for l in master_lines):
+        rules = [l for l in master_lines if abs(l[1] - title_bottom) < 24 and l[2] > PAGE_W * 0.5]
+        if rules:
             style["style.titleRule"] = "rule"
+            style["style.titleRuleLength"] = "full" if max(l[2] for l in rules) >= PAGE_W * 0.95 else "content"
         elif any(b[0][1] <= 4 and b[0][3] >= title_bottom - 8 and b[0][2] >= PAGE_W * 0.9 for b in master_bands):
             style["style.titleRule"] = "band"
+        else:
+            # The built-in palettes draw a rule; a master that has none keeps its page open.
+            style["style.titleRule"] = "none"
     if display != body:
         observations.append(f"Titles set in {display}, body in {body}")
 

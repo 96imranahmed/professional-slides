@@ -68,7 +68,7 @@ TITLE_ROLES = {"action-title"}
 SOURCE_ROLES = {"source-text", "source", "footnote", "footnote-text"}
 NON_BODY_ROLES = SOURCE_ROLES | CHART_FURNITURE_ROLES | TITLE_ROLES | {
     "page-number", "notes", "tracker-label", "chart-unit",
-    "cover-title", "cover-subtitle", "section-title",
+    "cover-title", "cover-subtitle", "section-title", "action-subtitle", "kicker",
     "tracker-compact-label", "tracker-compact-marker-label", "category-note",
     "chart-heading", "chart-title", "metric-value", "metric-label", "metric-sublabel",
 }
@@ -742,6 +742,28 @@ def scene_column_rows(mask):
 def render_column_rows(matrix):
     """column_bands' reader for the render: the occupied matrix of the PNG."""
     return lambda x0, x1: matrix[:, x0:x1].sum(axis=1).tolist()
+
+
+def without_title_rule(rows, slide):
+    """`rows` less the ink the title rule draws. The rule is page furniture:
+    a 1,160px hairline is a tenth of a point of ink share that says nothing
+    about the body, and counting it let a thin page lean on its frame. It
+    still counts where the page is read for holes (the scene's mask draws
+    it too), so a rule never opens a void under the title."""
+    rows = list(rows)
+    for node in slide.get("nodes", []):
+        if node.get("role") != "title-rule":
+            continue
+        data = node.get("data") or {}
+        width = abs(float(data.get("x2", 0)) - float(data.get("x1", 0)))
+        stroke = (node.get("style") or {}).get("lineWidth")
+        stroke = float(stroke.get("value", 1) if isinstance(stroke, dict) else stroke or 1)
+        y = float(data.get("y1", (node.get("frame") or {}).get("y", 0)))
+        # Antialiasing spreads a hairline over the rows either side.
+        for row in range(int(math.floor(y - stroke / 2)) - 1, int(math.ceil(y + stroke / 2)) + 1):
+            if 0 <= row < len(rows):
+                rows[row] = max(0, rows[row] - width)
+    return rows
 
 
 def gate_ink_and_dead_band(slide_no, rows, findings, occupied=None, text_page=False):
@@ -3254,7 +3276,7 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                     # page shows.
                     text_page = not any(is_exhibit(c) for c in slide.get("componentInstances", []))
                     if rows is not None:
-                        gate_ink_and_dead_band(slide_no, rows, page, occupied, text_page=text_page)
+                        gate_ink_and_dead_band(slide_no, without_title_rule(rows, slide), page, occupied, text_page=text_page)
                     if wanted("COLUMN_VOID"):
                         gate_column_void(slide_no, slide, load_ink_matrix(path, SURFACE_LUMINANCE), page)
                     # A page carried by a qualifying hero exhibit is not empty,

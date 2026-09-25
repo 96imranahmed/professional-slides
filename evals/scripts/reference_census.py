@@ -147,7 +147,12 @@ def title_rule(image) -> bool:
     rows taller than 1.2% of the page is not a rule. And only the title's line:
     an exhibit heading's rule sits lower with the heading between it and the
     title, so everything above the rule must be one block of lines (the title)
-    ending just above it.
+    ending just above it. One line may stand apart at the top of the band: a
+    tracker or kicker sits in its own row over the title, and a one-line title
+    set down on its rule leaves a wider gap under it than the title's own
+    lines do. It is one small line (no taller than 1.5% of the page), so a
+    title cannot pass for it and an exhibit heading under the title is still
+    between the title and the rule.
     """
     mask = _ink(image)
     height, width = mask.shape
@@ -165,6 +170,9 @@ def title_rule(image) -> bool:
         if end - y <= thin:
             above = [r for r in range(top, top + y) if inked[r]]
             gaps = [b - a for a, b in zip(above, above[1:])]
+            wide = [i for i, g in enumerate(gaps) if g > height * 0.03]
+            if wide and above[wide[0]] - above[0] <= height * 0.015:
+                gaps = gaps[wide[0] + 1:]
             return bool(above) and all(g <= height * 0.03 for g in gaps) and top + y - above[-1] <= height * 0.06
         y = end
     return False

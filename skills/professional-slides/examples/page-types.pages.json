@@ -296,6 +296,7 @@
    },
    "adds": "Each caption states what its panel shows that the other does not: no room in one, two-thirds empty in the other",
    "title": "Peak trains run above 90% full on every line; off-peak trains run under half",
+   "subtitle": "Share of seats filled on weekday trains, all five lines, FY26",
    "exhibits": [
     {
      "type": "chart.bar",
@@ -1302,6 +1303,7 @@
    },
    "adds": "The third column turns each finding into a design choice for the timetable or the fares",
    "title": "Passengers name the wait, not the fare, as what keeps them off trains",
+   "subtitle": "What lapsed and occasional riders told the FY26 passenger surveys",
    "columns": [
     "Finding",
     "Survey evidence",
@@ -1513,6 +1515,7 @@
    },
    "adds": "The closing line says what to commit now and what to keep in reserve",
    "title": "Electrifying the Eastern line beats bi-mode trains on cost per journey from year six",
+   "subtitle": "Two ways to replace the Eastern line diesel fleet; 30-year appraisal at 3.5%",
    "exhibit": {
     "left": {
      "heading": "Electrify the Eastern line",

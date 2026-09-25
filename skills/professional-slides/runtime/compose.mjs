@@ -1118,8 +1118,8 @@ export function paginateTable(slide, bodyScale = 1) {
     - 22 * [slide.callout, slide.soWhat].filter(Boolean).length
     - pointsBelowHeight(slide)
     // bodyTop holds a two-line title, not a two-line title and a standfirst:
-    // with both, the body starts a line lower.
-    - (slide.subtitle && String(slide.title ?? "").length > 60 ? 26 : 0);
+    // with both, the rule and the body start a line lower (8px gap, a 20px line).
+    - (slide.subtitle && String(slide.title ?? "").length > 60 ? 28 : 0);
   // The density ladder comes before the split. A twenty-row table set compact is
   // one page of evidence; the same table halved across two pages is two pages of
   // half an argument, and strong decks run tables to twenty and thirty
@@ -2792,9 +2792,11 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   if (slide.evidenceStatus) slide = { ...slide, subtitle: [slide.evidenceStatus, slide.subtitle].filter(Boolean).join(" · ") };
   // The journal sets the finding as the standfirst under the title, where a
   // reader of a data briefing looks for it, instead of closing the page on it.
+  // It is still the page's takeaway, so it keeps a takeaway's role and counts
+  // as body; an authored standfirst (the scope) is title-band furniture.
   if (LAYOUT.takeaway === "standfirst" && typeof slide.soWhat === "string" && !slide.subtitle && slide.soWhat.length <= 200) {
     const { soWhat, ...rest } = slide;
-    slide = { ...rest, subtitle: soWhat };
+    slide = { ...rest, subtitle: soWhat, _standfirstTakeaway: true };
   }
   const slideIn = slide;
   for (const [name, run] of SLIDE_PASSES.slice(3)) {
@@ -3112,7 +3114,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   const noteLine = Array.isArray(slide.note)
     ? (slide.note.length ? `Notes: ${slide.note.map((item, index) => `${index + 1}. ${String(item).trim().replace(/^\d+\.\s*/, "")}`).join("   ")}` : null)
     : prefixed("Note", slide.note);
-  return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
+  return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide._standfirstTakeaway ? { subtitleRole: "takeaway-standfirst" } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }
 
 /**

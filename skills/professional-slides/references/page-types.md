@@ -18,7 +18,7 @@ Strong consulting decks spread the same decisions across the deck. On 123 of the
 | --- | --- | --- |
 | Commonest page type | 23% (single annotated chart), then panels side by side 21% | one skeleton throughout |
 | Where the explanation lives | nowhere beyond the title 27%, in the table 20%, on the chart 16%, under each panel 16%, beside the exhibit 13%, in a band 7%, bullets under the exhibit 2% | bullets under the exhibit on ~95% |
-| Closing takeaway line | 9% (a standfirst under the title on another 15%) | 100% |
+| Closing takeaway line | 9% (a standfirst under the title on another 15%, see [the standfirst](#the-standfirst)) | 100% |
 | Two or more exhibits | 24% | 9% |
 | Chart pages marking something on the plot | 80% | under half |
 
@@ -43,7 +43,19 @@ Every analytical page carries:
 - `why` - one sentence on why this type fits this claim;
 - `settles: { kind, what }` - what settles the claim and what kind of thing it is (`count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure`, `qualitative`). With an insight log, name the insights instead - `evidence: ["i3", "i7"]` - and `settles` is derived from them;
 - `adds` - what the commentary says that the exhibit cannot, or `null`;
-- the content: `title`, `exhibit` or `exhibits`, `points`, `rows`, `kpi`, `metrics`, `pictures`, `source`, `highlight`, `subtitle` and the other slide keys.
+- the content: `title`, `exhibit` or `exhibits`, `points`, `rows`, `kpi`, `metrics`, `pictures`, `source`, `highlight` and the other slide keys;
+- optionally `subtitle` - the standfirst (below).
+
+### The standfirst
+
+`subtitle` is one line under the title, 16 words at most, set small and in the secondary colour above the title rule. A fifth of strong analytical pages carry one. It says what the title leaves out so the title can stay a claim:
+
+- the measure and its unit - "Share of seats filled on weekday trains";
+- the population - "all five lines", "Gulf carriers with 50 or more widebodies";
+- the period - "FY19 to FY26", "year to March 2026";
+- the scope or basis - "30-year appraisal at a 3.5% discount rate", "illustrative, before synergies".
+
+Use it when the page's evidence needs one of these and no exhibit heading already carries it: a page of several exhibits that share a population or period, a table or matrix with no heading of its own, a page whose numbers rest on a stated basis. Leave it off when the chart heading already names the measure, unit and period ([charts](charts.md)); the same scope said twice is noise. It never restates or paraphrases the title (a subtitle that shares most of the title's words is refused), carries no second finding, and runs to one line (a longer one is refused). It counts with the title, not toward the page's body word floor, so it cannot stand in for the commentary. Statement and takeaways pages have no title band and take none.
 
 The compiler owns `layout`, `shape`, `arrange` and `soWhat`, and writes a `pageType` record on each compiled slide: the type, its choices and the structure they produced. Writing those keys by hand is refused. The build recomputes each page's structure and refuses a deck whose compiled structure was edited after compiling (`PAGE_TYPE_EDITED`): change the choice in the pages file and recompile.
 

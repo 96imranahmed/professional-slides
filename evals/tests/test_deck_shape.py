@@ -527,10 +527,11 @@ class BandFurnitureTests(unittest.TestCase):
     """The band above the title, the headers on a label table and the second
     statement box: the small furniture the reference pages carry page after page."""
 
-    def test_a_standfirst_replaces_the_title_rule_rather_than_stacking_under_it(self):
-        # A rule and a standfirst do the same job - they close the title band -
-        # so a page takes one or the other. The standfirst carries the measure
-        # and the rule carries nothing, so the standfirst wins.
+    def test_a_standfirst_sits_between_the_title_and_its_rule(self):
+        # The standfirst is the title's own line - the measure, the
+        # population, the period - so it sits under the title and above the
+        # rule that closes the band, in smaller, lighter type, and the body
+        # starts below the rule.
         result = run_node("""
 import assert from 'node:assert/strict';
 import {compileDeck, component} from './skills/professional-slides/runtime/core.mjs';
@@ -541,11 +542,14 @@ const chrome=(props)=>compileDeck({slides:[{id:'s1',frame,composition:component(
 const rules=(nodes)=>nodes.filter(n=>n.role==='title-rule').length;
 assert.equal(rules(chrome({})),1,'a page with no standfirst keeps its rule');
 const standfirst=chrome({subtitle:'Announced deal value by segment, India, $B'});
-assert.equal(rules(standfirst),0,'the standfirst takes the place of the rule');
+assert.equal(rules(standfirst),1,'the standfirst keeps the rule');
 const sub=standfirst.find(n=>n.role==='action-subtitle');
 const title=standfirst.find(n=>n.role==='action-title');
+const rule=standfirst.find(n=>n.role==='title-rule');
 assert.ok(sub,'the standfirst renders');
-assert.ok(sub.frame.y>title.frame.y,'and sits under the title');
+assert.ok(sub.frame.y>=title.frame.y+title.data.textLayout.height,'and sits under the title');
+assert.ok(sub.frame.y+sub.frame.height<rule.frame.y,'above the rule');
+assert.ok(sub.style.fontSize.value<title.style.fontSize.value,'in smaller type');
 console.log(JSON.stringify({ok:true}));
 """)
         self.assertTrue(result["ok"])

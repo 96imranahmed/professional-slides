@@ -29,7 +29,7 @@ import { REGISTRY, measureInsight } from "./registry.mjs";
 import { trivialChart } from "./gates/craft_gates.mjs";
 import { calloutFits } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
-import { hasPhrase } from "./text-layout.mjs";
+import { hasPhrase, measureText } from "./text-layout.mjs";
 
 // Where the page's explanation lives. Each maps onto what the composer draws.
 export const COMMENTARY = Object.freeze({
@@ -579,6 +579,10 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     throw new Error(`${id}: \`bar\` is the text of a so-what bar - choose commentary "so-what-bar" for it, or drop it`);
   if (typeof page.why !== "string" || page.why.trim().split(/\s+/).length < 4)
     throw new Error(`${id}: say in \`why\` why a ${page.type} page (${type.task}) is the right one for this claim`);
+  if (page.subtitle !== undefined) {
+    const problem = subtitleProblem(String(page.title ?? ""), page.subtitle);
+    if (problem) throw new Error(`${id}: the subtitle ${problem}`);
+  }
 
   // The content decisions, made before the layout ones and checked first:
   // what settles the claim, and what the commentary adds. With an insight log
@@ -853,6 +857,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     slide.layout = layoutFor[page.commentary];
   }
 
+  // A statement or takeaways page has no title band to hang a standfirst in.
+  if (slide.kind && page.subtitle !== undefined) throw new Error(`${id}: a ${page.form} page has no title band, so it takes no \`subtitle\`; put the scope in its text`);
   // Advisories the compiler can see and the author should: they do not block.
   const advisories = [];
   if (page.type === "place" && typeof primary?.geography === "string") {
@@ -872,6 +878,22 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   // What the variety contract counts: the page as drawn, not as declared.
   slide.pageType.skeleton = skeletonOf(slide);
   return slide;
+}
+
+// The standfirst: one line under the title, in body type, above the rule. A
+// fifth of strong analytical pages carry one, and it says what the title
+// leaves out - the measure and unit, the population, the period, the scope -
+// so the title can stay a claim. It is not a second title, so it neither
+// restates the title nor runs past a line.
+export const SUBTITLE_WORDS = 16;
+const SUBTITLE_WIDTH = 1160;
+export function subtitleProblem(title, subtitle) {
+  if (typeof subtitle !== "string" || !subtitle.trim() || subtitle.includes("\n")) return "is one line of text under the title";
+  const n = words(subtitle).length;
+  if (n > SUBTITLE_WORDS) return `runs to ${n} words; keep it to ${SUBTITLE_WORDS} or fewer - the scope, the unit, the population or the period, not a second finding`;
+  if (measureText(subtitle.trim(), SUBTITLE_WIDTH, { fontSize: 12, wrapWidthRatio: 1 }).lines.length > 1) return "runs past one line; cut it to the scope, the unit, the population or the period";
+  if (overlap(title, subtitle) > 0.7) return "repeats the title; say what the title leaves out - the measure, the population, the period";
+  return null;
 }
 
 /** The normalized plan-gate architecture a compiled page type stands for. */
@@ -916,6 +938,7 @@ export function describeTypes() {
     "`bar` - with commentary `so-what-bar`, the implication set in a filled bar across the foot of the exhibit: a sentence of eight words or more that fits two lines. The bar is the page's close, so `takeaway` is `false`, and it counts toward the closing share.", "",
     "Beyond one exhibit and a column: `parallel` form `labelled-rows` sets two to five `blocks` down the page, each a filled label with its bullets and an optional `metric` or small `exhibit` at the right; `panels` form `sequence` joins two or three headed exhibits with arrows (cause to effect, before to after).", "",
     "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log.", "",
+    `\`subtitle\` - optional, on any analytical page: one line under the title (${SUBTITLE_WORDS} words at most) naming what the title leaves out - the measure and unit, the population, the period or the scope. It is set small above the title rule and counts with the title, not the body; it must not restate the title.`, "",
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", "",
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point).", "",
     `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across; two rows or more fill the frame, one row grows by a third) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
@@ -953,6 +976,7 @@ export function pageSchema() {
     required: ["id", "type", "form", "commentary", "takeaway", "why", "title"],
     properties: {
       id: { type: "string" }, type: { const: name }, title: { type: "string" },
+      subtitle: { type: "string", description: `optional standfirst under the title: the measure and unit, the population, the period or the scope, in one line of ${SUBTITLE_WORDS} words or fewer; never a restatement of the title` },
       form: { enum: Object.keys(t.forms) }, commentary: { enum: t.commentary },
       takeaway: { oneOf: [{ const: false }, { type: "string", minLength: 8 }] },
       why: { type: "string", minLength: 20 }, series: { type: "string" }, rail: { type: "string" },
