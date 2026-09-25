@@ -906,12 +906,14 @@ function seriesValues(props = {}) {
  * the bar itself in the accent: a pale band behind a dark bar left the subject
  * of a forty-member ranking - and of every column of an aligned-bars page -
  * hard to find, where the same row painted in the accent is the first thing
- * seen. Elsewhere (columns, grouped or stacked bars) the band behind the
+ * seen. Elsewhere (grouped or stacked bars and columns) the band behind the
  * category stays the default. The drawn chart (charts.mjs), the native chart
  * spec below and the composer's row rules all read this one rule.
  */
 export function defaultHighlightStyle(componentId, props = {}) {
-  return componentId === "chart.bar" && Array.isArray(props.series) && props.series.length === 1 ? "bar" : "region-tint";
+  // Columns follow bars: a year marked by a tint behind a dark column read as
+  // the same colour as its neighbours on the Emirates decks.
+  return ["chart.bar", "chart.column"].includes(componentId) && Array.isArray(props.series) && props.series.length === 1 ? "bar" : "region-tint";
 }
 
 /** Data an emitter needs for a native chart. Types outside NATIVE_CHART_TYPES keep shapes. */
