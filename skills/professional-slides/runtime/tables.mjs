@@ -13,6 +13,7 @@ import {
   shapePrimitive,
   chartAnnotationStyle,
   houseStyle,
+  readableOn,
 } from "./core.mjs";
 import { measureText, measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
@@ -94,6 +95,7 @@ export const TABLE_TOKENS = [
   "color.onPrimary",
   "color.componentPrimary",
   "color.componentPrimaryTint",
+  "color.surfaceTint",
   "color.accent",
   "color.accentTint",
   "color.surface",
@@ -1111,6 +1113,23 @@ function renderTableAt({ id, frame, props }) {
   const header = props.treatment ?? "open";
   if (!["open", "standard", "dimensions", "categories"].includes(header))
     throw new Error("Unknown table header treatment");
+  // Surface treatments (core.mjs). An open table was type on the page with a
+  // rule under its header and one between rows: at a glance a block of text,
+  // the lightest page a deck drew. Under the reference weight its header is
+  // the filled band a standard table carries, and a column of row labels sits
+  // on the filled surface, so the table reads as a table before a word of it
+  // is read. `headerBand: false` or `labelColumn: false` keeps one open.
+  // A row matrix is a category table whose categories are plain labels, not
+  // filled boxes: it is drawn open too, and takes the same two surfaces.
+  const plainCategories = header === "categories" && m.cells.every((row) => row.every((cell) => !cell || cell.type !== "category" || categorySurface(cell, props) === "plain"));
+  const bandedOpen = (header === "open" || plainCategories) && props.headerBand !== false && houseStyle("style.tableHeader") === "band";
+  const tint = t("color.surfaceTint");
+  const labelCell = (cell) => !cell || cell.blank
+    || (cell.type === "text" && cell.bold && !cell.highlight)
+    || (cell.type === "category" && categorySurface(cell, props) === "plain" && !cell.highlight);
+  const labelTint = props.labelColumn !== false && houseStyle("style.tableLabels") === "tint"
+    && props.headerShape !== "chevron" && m.columns.length > 1 && m.cells.length > 1
+    && m.cells.every((row) => labelCell(row[0])) && m.cells.some((row) => row[0] && !row[0].blank);
   // The group band: what a run of columns measures, over its own rule. The
   // reference wide table heads four measures with three groups this way, so a
   // reader takes the table in two passes instead of reading six labels.
@@ -1147,7 +1166,7 @@ function renderTableAt({ id, frame, props }) {
     // it is drawn from - the opposite of what the gutter is there to say. The
     // band now breaks at the gutter, and the chevron is what crosses it.
     const filledHeader = column.type !== "implication"
-      && (header === "standard" || (header === "dimensions" && column.type !== "category"));
+      && (header === "standard" || bandedOpen || (header === "dimensions" && column.type !== "category"));
     if (filledHeader && props.headerShape === "chevron")
       // Phase tables: each header is a chevron pointing along the sequence.
       nodes.push(
@@ -1165,11 +1184,17 @@ function renderTableAt({ id, frame, props }) {
         rectPrimitive({
           id: stableId(id, "header-cell", c),
           role: "table-header-cell",
+          // Under the group band, not behind it: the group labels are set in
+          // ink above the header, and a band drawn from the frame's top put
+          // them in dark type on the dark fill.
+          // Each cell overlaps the next by a pixel, so abutting fills render as
+          // one band rather than a band with a hairline seam at every column,
+          // and the last stops where the rules do.
           frame: {
             x: xs[c],
-            y: frame.y,
-            width: m.widths[c],
-            height: m.headerHeight,
+            y: frame.y + m.groupHeight,
+            width: m.widths[c] + (c < m.columns.length - 1 ? 1 : -m.gap),
+            height: m.headerHeight - m.groupHeight,
           },
           // The recommended column's header takes the accent so the column
           // reads as the answer from the header down.
@@ -1234,6 +1259,13 @@ function renderTableAt({ id, frame, props }) {
     if (r % 2 === 0 || rowBand(m.rows[r].style ?? props.rowStyle)) return;
     nodes.push(rectPrimitive({ id: stableId(id, "zebra", r), role: "table-zebra-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(t("color.surfaceMuted")), data: { row: r, zebra: true } }));
   });
+  // The row labels on one filled column from the header to the last row, over
+  // the zebra (the labels stay one surface) and under the row bands (a total
+  // stays a total). The rules between rows cross it, so rows still read across.
+  if (labelTint) {
+    const top = frame.y + m.headerHeight + m.gap / 2;
+    nodes.push(rectPrimitive({ id: stableId(id, "label-column"), role: "table-label-column", frame: { x: xs[0], y: top, width: m.widths[0] - m.gap, height: sum(m.heights) - m.gap }, style: box(tint), data: { column: 0, labelColumn: true } }));
+  }
   // The recommended option's column is one tinted band from the header rule
   // to the last row; row bands (total, group) paint over it so a total stays a total.
   if (Number.isInteger(props.highlightColumn) && m.widths[props.highlightColumn] !== undefined) {
@@ -1371,7 +1403,8 @@ function renderTableAt({ id, frame, props }) {
         );
       // `tone: "positive" | "negative"` on a text cell colours a signed change
       // (the "difference to prior year" rows of the financial tables).
-      const color = fill ? foreground(fill) : band ? foreground(band) : cell.tone === "positive" ? t("color.positive") : cell.tone === "negative" ? t("color.negative") : ink;
+      const onLabel = labelTint && c === 0 && !band;
+      const color = fill ? foreground(fill) : band ? foreground(band) : onLabel ? foreground(tint) : cell.tone === "positive" ? t("color.positive") : cell.tone === "negative" ? t("color.negative") : ink;
       const inner = {
         x: area.x + m.padding,
         y: area.y + m.paddingY,
@@ -1700,7 +1733,7 @@ function renderTableAt({ id, frame, props }) {
               "table-cell-sub",
               { x: inner.x + l.offset, y: y - m.gap, width: inner.width - l.offset },
               l.sub,
-              textStyle(false, t("color.textSecondary"), cell.align ?? "left", l.size === "type.label" ? "type.label" : "type.label"),
+              textStyle(false, onLabel ? readableOn(t("color.textSecondary"), tint) : t("color.textSecondary"), cell.align ?? "left", l.size === "type.label" ? "type.label" : "type.label"),
               data,
             );
         }

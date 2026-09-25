@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { resolvePalette, heatScaleTokens } from "./palettes.mjs";
+import { resolvePalette, heatScaleTokens, contrastRatio } from "./palettes.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
 
@@ -76,6 +76,12 @@ export const TOKENS = Object.freeze({
   "color.chartUnit": colour("--chart-unit-color", "#757575"),
   "color.componentPrimary": colour("--component-primary", "#00A6E6", "accent1"),
   "color.componentPrimaryTint": colour("--component-primary-tint", "#DCEEF8"),
+  // The filled surface a structure sits on: a table's label column, a card, a
+  // phase block. The ink mixed 86% toward the canvas (resolvePalette derives it
+  // for every palette that does not set it), so it reads as a surface at a
+  // glance - about 30 grey levels under the page - where a 6-12% tint of the
+  // primary vanishes on a projector and in the page's measured weight.
+  "color.surfaceTint": colour("--surface-tint", "#DADEE1"),
   "color.calloutTint": colour("--callout-tint", "#FFF6DC"),
   "color.accent": colour("--accent", "#00A6E6"),
   "color.accentTint": colour("--accent-tint", "#DCF3FD"),
@@ -150,11 +156,29 @@ export const TOKENS = Object.freeze({
   // cover and the chapter pages are built. Each value is a whole construction.
   "style.takeaway": keyword("--style-takeaway", "band"),               // band (tinted box) | rule (serif close over a hairline) | statement (accent bar, large type)
   "style.coverLayout": keyword("--style-cover-layout", "block"),       // block | editorial | journal | keynote
-  "style.dividerLayout": keyword("--style-divider-layout", "panel")     // panel | editorial | journal | keynote
+  "style.dividerLayout": keyword("--style-divider-layout", "panel"),    // panel | editorial | journal | keynote
+  // Surface treatments: how much of a page's structure is drawn as filled
+  // surface rather than as type on the canvas with hairlines. The defaults are
+  // the weight of a well-made analytical page; a design system that is light
+  // by character opts out of single treatments (design-systems.mjs SURFACES).
+  "style.tableHeader": keyword("--style-table-header", "band"),        // band (filled header, reversed type) | rule (bold type over a rule)
+  "style.tableLabels": keyword("--style-table-labels", "tint"),        // tint (the row-label column on color.surfaceTint) | plain
+  "style.cards": keyword("--style-cards", "tint"),                    // tint (filled card, no outline) | outline (hairline card on the canvas)
+  "style.marks": keyword("--style-marks", "reference"),               // reference (heavier lines and dots, a lone line's area) | light
+  "style.timeline": keyword("--style-timeline", "blocks")              // blocks (filled phase blocks on a heavy spine) | dots (markers on a rail)
 });
-export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead", "style.takeaway", "style.coverLayout", "style.dividerLayout"]);
+export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead", "style.takeaway", "style.coverLayout", "style.dividerLayout", "style.tableHeader", "style.tableLabels", "style.cards", "style.marks", "style.timeline"]);
 /** The active design profile value for a style token ("style.titleWeight" → "bold"). */
 export function houseStyle(id) { return tokenValue(token(id)); }
+/**
+ * `color` when it reads at `ratio` against `surface`, else the ink. A filled
+ * surface is drawn for weight, and the type on it keeps its role colour only
+ * where the fill leaves it legible: an evergreen secondary grey or a bright
+ * accent that passes on white can fall under 4.5:1 on the tint.
+ */
+export function readableOn(color, surface, ratio = 4.5) {
+  return contrastRatio(tokenValue(color), tokenValue(surface)) >= ratio ? color : token("color.ink");
+}
 
 export const DENSITY_PROFILES = Object.freeze({
   "live-pitch": Object.freeze({ typeScale: 1.15 }),
@@ -907,8 +931,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   if (["pie", "donut"].includes(type) && renderedNodes?.some(node => node.role === "data-label" && node.data?.placement === "outside")) return null;
   // Explicit numeric x positions and keyed point labels are not a categorical
   // native line. Preserve their spacing and selected labels as editable shapes.
-  if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;
-  // External stack labels and their leaders use measured scene coordinates;
+  if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;  // External stack labels and their leaders use measured scene coordinates;
   // Office repositioning the labels would detach those leaders from the text.
   if (renderedNodes?.some(node => node.role === "data-label" && node.data?.external)) return null;
   // The forecast key and its dashed boundary are placed against the measured
@@ -1182,6 +1205,12 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
       }
       placements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
       assertDeclaredComponentTokens(definition, rendered.nodes, instanceId);
+      // A chart the emitter writes as a native, workbook-backed chart keeps
+      // its data editable, and that is worth more than a lone line's area
+      // (charts.mjs markWeight), which PowerPoint's line chart cannot carry. The
+      // scene drops the area too, so the scene and the file agree.
+      const native = String(definition.id).startsWith("chart.") ? nativeChartSpec(definition.id, props, frame, rendered.nodes) : null;
+      if (native) rendered.nodes = rendered.nodes.filter((item) => !(item.role === "chart-area" && item.data?.lone));
       rendered.nodes.forEach((item) => {
         item.data.componentInstance = instanceId;
         item.data.componentAncestors = [...ancestors];
@@ -1201,7 +1230,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
         tokens: definition.tokens,
         // Chart data travels with the instance so an emitter can write a native,
         // workbook-backed chart object in this frame instead of loose shapes.
-        ...(String(definition.id).startsWith("chart.") ? { nativeChart: nativeChartSpec(definition.id, props, frame, rendered.nodes) } : {})
+        ...(String(definition.id).startsWith("chart.") ? { nativeChart: native } : {})
       });
     }
     assertUniqueIds(nodes);

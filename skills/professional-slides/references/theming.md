@@ -84,6 +84,22 @@ Slide titles default to an open canvas, without a horizontal rule or a backgroun
 
 Each palette sets seven `style.*` keyword tokens beyond its colours; components read them through `houseStyle(id)` and a page may still ask for a specific title variant. `style.titleWeight` (`bold` | `regular`), `style.titleRule` (`none` | `rule` under the title | `band` behind it), `style.tagPlacement` (`top-right` small caps | `below-title` accent pill | `above-title` accent label), `style.chartHeading` (`text` | `band`, a filled grey band with white heading), `style.listMarker` (`dot` | `dash`), `style.tableRows` (`rules` | `zebra`), `style.labelWeight`, `style.titleLead` (`accent`: the lead in the accent before the rest; `pipe`: "Topic | statement", the `evergreen` title) (`bold` | `regular` value labels, in the scene and the native chart). The `midnight` palette also sets `font.display` to a serif; `examples/house-style.deck.json` shows the same eight pages under any palette.
 
+## Surface treatments
+
+A page drawn as type on the canvas with hairlines reads light at a glance however many words it carries: a table set as text on the page colour, white cards outlined on a cream page, one thin line across an empty plot, roadmap dots on a rail. Five `style.*` tokens set how much of a page's structure is filled surface, and their defaults are the weight of a well-made analytical page:
+
+| Token | Reference (default) | Open |
+| --- | --- | --- |
+| `style.tableHeader` | `band`: the header a filled band in the ink, reversed type | `rule`: bold type over a rule |
+| `style.tableLabels` | `tint`: a row-label column on `color.surfaceTint` | `plain` |
+| `style.cards` | `tint`: cards, quotation boxes and quadrants filled, no outline | `outline`: hairline cards on the canvas |
+| `style.marks` | `reference`: lines at `line.medium` with 12px markers, a light area under a lone line (never under two or more), dumbbell dots a quarter larger on alternate row bands, map land and a cycle's hub on the filled surface | `light` |
+| `style.timeline` | `blocks`: each roadmap stage headed by a filled chevron on a heavier spine | `dots` |
+
+`color.surfaceTint` is the palette's ink mixed 86% toward its canvas (`resolvePalette` derives it unless a palette sets it): about 30 grey levels under a white or cream page, a warm stone on paper and a cool grey under navy. Type on a fill keeps its role colour only where it still reads at 4.5:1 (`readableOn` in `core.mjs`), else it takes the ink.
+
+The two sets are named in `design-systems.mjs`. Every system takes `reference`; the journal keeps its character with plain label columns and outlined cards. `surfaces: "open"` on the deck takes the light set, and a single token in the palette overrides one treatment. A table can opt out alone with `headerBand: false` or `labelColumn: false`. `SCENE_INK` and `DECK_INK` ([evaluation](evaluation/index.md#ink-estimate)) estimate the result at authoring.
+
 ## Template decks and house profiles
 
 `runtime/import-template.py template.pptx [--base midnight|evergreen|crimson|graphite] [--out house.json]` reads a template deck and writes a house profile:

@@ -62,6 +62,18 @@ export const SERIES = [
 
 export const MIN_PLOT_HEIGHT = 100;
 
+// Mark weight (core.mjs `style.marks`). One 2px line with 10px dots across a
+// full-width plot was the lightest page a deck drew - 6% of its body inked -
+// where a strong deck's line is about 2.5pt with a marker a reader can find
+// and, when the line is alone, a light fill beneath it that gives the plot a
+// body. `light` keeps the old construction for a house that draws that way.
+export const MARK_WEIGHT_TOKENS = Object.freeze(["line.medium", "color.surfaceTint"]);
+export function markWeight() {
+  return houseStyle("style.marks") === "light"
+    ? { line: token("line.standard"), marker: 10, loneArea: 0, dot: 1, connector: token("line.standard"), bands: false, bars: 0.7 }
+    : { line: token("line.medium"), marker: 12, loneArea: 0.16, dot: 1.25, connector: token("line.medium"), bands: true, bars: 0.76 };
+}
+
 /**
  * The plot rectangle inside a chart's frame, after the bands above it (legend,
  * callouts, change annotations, periods) and the gutters beside it.
@@ -1005,8 +1017,9 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   const categorySpan = (horizontal ? plot.height : plot.width) / categories.length;
   // Bar weight follows the category count. Four categories drawn at the
   // many-category gap read as ribbons with the page showing through; a well-made
-  // page sets few, fat bars and many, thinner ones.
-  const barWeight = categories.length <= 3 ? 0.86 : categories.length <= 6 ? 0.78 : 0.7;
+  // page sets few, fat bars and many, thinner ones - but not ribbons: ten bars
+  // at 0.7 left a gap nearly as wide as each bar (markWeight).
+  const barWeight = categories.length <= 3 ? 0.86 : categories.length <= 6 ? 0.78 : markWeight().bars;
   let groupSpan = categorySpan * barWeight;
   let stackExternalWidth = 0;
   if (stacked && !horizontal && showDataLabels) {
@@ -1532,9 +1545,13 @@ function lineChart({ id, frame, props, area = false }) {
     if (shown && !(every > 1 && index === categories.length - 1 && (index % every) !== 0 && (categories.length - 1 - Math.floor((categories.length - 1) / every) * every) * pitch < widest + 10)) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
   });
   const pendingEndLabels = [];
+  const weight = markWeight();
+  // A line alone on its plot takes a light fill beneath it (markWeight); two
+  // or more lines keep bare strokes, where fills would stack into mud.
+  const lone = !area && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1;
   series.forEach((item, seriesIndex) => {
     const points = item.values.map((value, index) => ({ x: xScale(index), y: yScale(value), value, category: categories[index] }));
-    if (area) {
+    if (area || lone) {
       const baselineValue = bounds.min <= 0 && bounds.max >= 0 ? 0 : bounds.min;
       const baselineY = yScale(baselineValue);
       const polygonPoints = [
@@ -1547,8 +1564,8 @@ function lineChart({ id, frame, props, area = false }) {
         role: "chart-area",
         geometry: "customPolygon",
         frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height },
-        style: { fill: lineColor(seriesIndex), stroke: "none", lineWidth: token("line.hairline"), opacity: 0.18 },
-        data: { paths: [polygonPoints], series: item.name, baselineValue }
+        style: { fill: lineColor(seriesIndex), stroke: "none", lineWidth: token("line.hairline"), opacity: area ? 0.18 : weight.loneArea },
+        data: { paths: [polygonPoints], series: item.name, baselineValue, ...(lone ? { lone: true } : {}) }
       }));
     }
     points.slice(1).forEach((point, index) => nodes.push(linePrimitive({
@@ -1558,14 +1575,15 @@ function lineChart({ id, frame, props, area = false }) {
       y1: points[index].y,
       x2: point.x,
       y2: point.y,
-      style: lineStyle(lineColor(seriesIndex), token("line.standard"))
+      style: lineStyle(lineColor(seriesIndex), weight.line)
     })));
     const labelSides = lineLabelSides(points.map(point => point.value));
+    const radius = weight.marker / 2;
     points.forEach((point) => {
       nodes.push(ellipsePrimitive({
         id: stableId(id, "point", item.name, point.category),
         role: "chart-marker",
-        frame: { x: point.x - 5, y: point.y - 5, width: 10, height: 10 },
+        frame: { x: point.x - radius, y: point.y - radius, width: weight.marker, height: weight.marker },
         style: fillStyle(lineColor(seriesIndex))
       }));
       const mappedPoint = { ...point, changeX: point.x, changeY: point.y - (showDataLabels ? 30 : 16) };
@@ -1582,7 +1600,7 @@ function lineChart({ id, frame, props, area = false }) {
           frame: first
             ? { x: point.x - 68, y: point.y - 12, width: 60, height: 24 }
             : last ? { x: point.x + 8, y: point.y - 12, width: 60, height: 24 }
-            : { x: point.x - 30, y: labelSides[points.indexOf(point)] === "below" ? point.y + 5 : point.y - 27, width: 60, height: 24 },
+            : { x: point.x - 30, y: labelSides[points.indexOf(point)] === "below" ? point.y + radius : point.y - 22 - radius, width: 60, height: 24 },
           text: formatValue(point.value, props),
           data: { series: item.name, category: point.category, value: point.value, labelKind: "point" },
           style: textStyle(CHART_LABEL, INK, labelBold(), first ? "right" : last ? "left" : "center")
@@ -2196,7 +2214,9 @@ function scatter({ id, frame, props, bubble = false }) {
   const minBubble = bubble ? Math.min(...bubbleSizes) : 0;
   const maxBubble = bubble ? Math.max(...bubbleSizes) : 0;
   const bubbleDiameter = value => {
-    if (!bubble) return 12;
+    // A plain point is a line's marker and a little more, so it grows with
+    // the mark weight: 14px under the reference weight, 12px light.
+    if (!bubble) return markWeight().marker + 2;
     if (minBubble === maxBubble) return 34;
     const areaScale = (Math.sqrt(value) - Math.sqrt(minBubble)) / (Math.sqrt(maxBubble) - Math.sqrt(minBubble));
     return 18 + areaScale * 54;
@@ -2692,7 +2712,7 @@ export function registerCharts(registry) {
       "font.bodySemibold", "weight.semibold",
       "color.chartGrid", "color.chartComparator", "color.componentPrimary", "color.componentPrimaryTint", "color.accent", "color.rule",
       "color.canvas", "color.surface", "color.surfaceMuted", "color.onPrimary", "color.negative", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round", "icon.medium",
-      ...SERIES.map((item) => item.tokenId), ...LEGEND_TOKENS, ...(chart.tokens || []), "color.accent", "color.accentTint", "color.positive", "color.negative", "color.negativeTint", "color.surfaceMuted", "color.onPrimary", "type.compact"
+      ...SERIES.map((item) => item.tokenId), ...LEGEND_TOKENS, ...MARK_WEIGHT_TOKENS, ...(chart.tokens || []), "color.accent", "color.accentTint", "color.positive", "color.negative", "color.negativeTint", "color.surfaceMuted", "color.onPrimary", "type.compact"
     ];
     registry.set(chart.id, {
       id: chart.id,

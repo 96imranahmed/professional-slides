@@ -55,6 +55,8 @@ from ink import (  # noqa: E402
     CANVAS_W, CANVAS_H, INK_LUMINANCE, SURFACE_LUMINANCE, relative,
     load_ink_matrix, load_ink_rows, render_path,
 )
+# The same measure estimated from the scene, so it runs at authoring.
+from scene_ink import estimate as scene_ink_estimate  # noqa: E402
 
 # --- role vocabulary -------------------------------------------------------
 
@@ -459,6 +461,9 @@ GATE_CODES = {
     # build: the render's band gates only run once there is a render.
     "SCENE_VOID": "a band of the page's body, measured on the scene, that nothing crosses",
     "DECK_SCENE_VOID": "nearly a third or more of the deck's pages leave a band of their body empty",
+    # The page's visual weight, estimated from the scene (scene_ink.py).
+    "SCENE_INK": "a page with an exhibit that will ink too little of its body to read as weighted at a glance",
+    "DECK_INK": "the deck's median analytical page will ink too little of its body",
 }
 
 # Distribution and furniture statistics prompt human review; they do not
@@ -468,7 +473,7 @@ ADVISORY_CODES = {
     "DEAD_BAND", "INTERNAL_VOID", "UNANNOTATED", "LAYOUT_MONOTONY",
     "COLUMN_MONOTONY", "TABLE_SCHEMA_FLAT", "IMAGE_BUDGET", "IMAGE_RUN",
     "THIN_EVIDENCE", "HERO_EXHIBIT", "COLUMN_VOID", "THIN_COLUMN", "NUMBERS_ON_MARKS",
-    "SCENE_VOID",
+    "SCENE_VOID", "SCENE_INK", "DECK_INK",
 }
 
 # Findings raised before the page is rendered: the composer's plan-time budget
@@ -1649,6 +1654,68 @@ def gate_deck_scene_void(content_indexes, findings, voids=None):
         "size the exhibit to the frame, set commentary beside it rather than under a strip of air, give cards "
         "and phases the detail their boxes were drawn for, or merge two half pages into one full one.".format(
             len(flagged), pages, ", ".join(str(n) for n in flagged[:20])),
+    ))
+
+
+# How much of its body a page inks, estimated from the scene (scene_ink.py):
+# the rendered measure strong analytical decks sit at a median of about 0.26
+# on, where a deck drawn as type on the canvas with hairlines sat at 0.18 with
+# the same words. `page_floor` is where a page with an exhibit reads light at
+# a glance: about half the lower quartile of strong pages (0.195), the level
+# of the lightest pages two real decks drew - a lone thin line, a table of text
+# on the page colour, white cards on cream measured 0.06-0.09. `deck_median`
+# is the level under which the deck as a whole reads light. Both advisory: the
+# estimate is fitted (R^2 0.90, mean error 0.017 a page), and the repair is a
+# construction, not a number to hit.
+SCENE_INK_THRESHOLDS = {"page_floor": 0.10, "deck_median": 0.20}
+SCENE_INK_REPAIR = (
+    "Give the exhibit its weight rather than adding words: keep the house surfaces on (a filled table "
+    "header and label column, filled cards, a lone line's markers and area, filled phase blocks - "
+    "style.tableHeader, style.tableLabels, style.cards, style.marks, style.timeline; no `headerBand: false`), "
+    "set loose rows of text as a table or cards, or pair a lone chart with a second exhibit that carries "
+    "its breakdown.")
+
+
+def analytical(slide, index):
+    """A page that argues: it carries a reading task and is neither a cover nor
+    a structural or generated page."""
+    return bool(slide.get("readingTask")) and not is_cover(slide, index) and not GENERATED_PAGE.match(str(slide.get("id") or ""))
+
+
+def gate_scene_ink(slide_no, slide, findings):
+    """SCENE_INK. Advisory. A page with an exhibit whose scene will ink less
+    of its body than SCENE_INK_THRESHOLDS `page_floor` - the rendered measure,
+    estimated before the render (scene_ink.estimate). A page of prose is left
+    to its word floor: its weight is its words, and asking it for ink is
+    asking for padding."""
+    if not any(is_exhibit(c) for c in slide.get("componentInstances", [])):
+        return
+    ink = scene_ink_estimate(slide)
+    if ink >= SCENE_INK_THRESHOLDS["page_floor"]:
+        return
+    findings.append(finding(
+        slide_no, "SCENE_INK", ink, SCENE_INK_THRESHOLDS["page_floor"],
+        "The page will ink about {:.0%} of its body; a page with an exhibit reads light under {:.0%}. {}".format(
+            ink, SCENE_INK_THRESHOLDS["page_floor"], SCENE_INK_REPAIR),
+    ))
+
+
+def gate_deck_ink(slides, content_indexes, findings):
+    """DECK_INK. Advisory. The median analytical page's estimated ink against
+    SCENE_INK_THRESHOLDS `deck_median`: one light page can be right, a light
+    deck is a construction habit. Advisory rather than blocking, because the
+    remedy is a design choice the author makes page by page, and a bar that
+    blocks invites fills drawn to pass it."""
+    inks = [scene_ink_estimate(slides[index]) for index in content_indexes if analytical(slides[index], index)]
+    if len(inks) < SCENE_THRESHOLDS["deck_from"]:
+        return
+    median = sorted(inks)[len(inks) // 2]
+    if median >= SCENE_INK_THRESHOLDS["deck_median"]:
+        return
+    findings.append(finding(
+        None, "DECK_INK", round(median, 3), SCENE_INK_THRESHOLDS["deck_median"],
+        "The median analytical page will ink about {:.0%} of its body; strong decks carry about 26% with the "
+        "same words. Fix the construction across the deck, not the copy: {}".format(median, SCENE_INK_REPAIR),
     ))
 
 
@@ -3293,6 +3360,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_thin_page(slide_no, slide, scene_only)
                 gate_hero_exhibit(slide_no, slide, scene_only)
                 scene_voids.extend(f for f in scene_only if f["code"] in SCENE_EMPTY_CODES)
+            if wanted("SCENE_INK") and analytical(slide, index):
+                gate_scene_ink(slide_no, slide, findings)
             if wanted("UNSOURCED_PICTURE"):
                 gate_unsourced_picture(slide_no, slide, findings)
             if wanted("UNSCALED_FIGURE"):
@@ -3358,6 +3427,8 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
         gate_deck_thin_pages(content_indexes, findings)
     if not gates or "DECK_SCENE_VOID" in gates:
         gate_deck_scene_void(content_indexes, findings, scene_voids)
+    if not gates or "DECK_INK" in gates:
+        gate_deck_ink(slides, content_indexes, findings)
 
     # A density report beside the findings: the numbers this review is about, so
     # a regression shows up as a number rather than as a screenshot.

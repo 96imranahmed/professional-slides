@@ -79,6 +79,28 @@ export const DESIGN_SYSTEMS = Object.freeze({
 });
 export const DESIGN_NAMES = Object.freeze(Object.keys(DESIGN_SYSTEMS));
 
+// Surface treatments. Pages drawn as type on the canvas with hairlines - a
+// table with an open header and no label column, white cards outlined on a
+// cream page, one thin line across an empty plot, roadmap dots on a rail -
+// carried a median of 0.18 of their body as ink where strong analytical decks
+// carry about 0.26, at the same word count: the gap was surfaces, not words.
+// `reference` is that weight and every system's default; `open` is the light
+// construction, kept for a house whose own pages are drawn that way. A system
+// may still take single treatments from `open` (its `surfaces` overrides).
+export const SURFACES = Object.freeze({
+  reference: Object.freeze({ "style.tableHeader": "band", "style.tableLabels": "tint", "style.cards": "tint", "style.marks": "reference", "style.timeline": "blocks" }),
+  open: Object.freeze({ "style.tableHeader": "rule", "style.tableLabels": "plain", "style.cards": "outline", "style.marks": "light", "style.timeline": "dots" })
+});
+// The journal keeps its character - no tinted boxes, zebra rows carry its
+// tables - and takes the rest of the reference weight.
+const SYSTEM_SURFACES = Object.freeze({
+  journal: { "style.tableLabels": "plain", "style.cards": "outline" }
+});
+export function surfaceTokens(name, set = "reference") {
+  if (!Object.hasOwn(SURFACES, set)) throw new Error(`Unknown surface set: ${set}; use ${Object.keys(SURFACES).map((n) => `"${n}"`).join(", ")}`);
+  return { ...SURFACES[set], ...(set === "reference" ? SYSTEM_SURFACES[name] || {} : {}) };
+}
+
 const hex = (value) => /^#[0-9A-Fa-f]{6}$/.test(String(value));
 const channels = (color) => [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
 export const mix = (a, b, f) => "#" + channels(a).map((c, i) => Math.round(c * (1 - f) + channels(b)[i] * f).toString(16).padStart(2, "0")).join("").toUpperCase();
@@ -166,7 +188,7 @@ export function variationChoices(seed) {
  * is the default frame, not a lock.
  */
 export function applyDesign(spec) {
-  if (!spec || (spec.design === undefined && spec.identity === undefined && spec.variation === undefined)) return spec;
+  if (!spec || (spec.design === undefined && spec.identity === undefined && spec.variation === undefined && spec.surfaces === undefined)) return spec;
   const name = spec.design ?? "consulting";
   if (!Object.hasOwn(DESIGN_SYSTEMS, name)) throw new Error(`Unknown design: ${name}; use ${DESIGN_NAMES.map((n) => `"${n}"`).join(", ")}`);
   const system = DESIGN_SYSTEMS[name];
@@ -178,7 +200,7 @@ export function applyDesign(spec) {
   // A system that fixes a style (the journal's zebra rows, the editorial dash)
   // keeps it; the draw fills only what the system leaves open.
   const varied = drawn ? Object.fromEntries(["style.listMarker", "style.tableRows"].filter((key) => !(key in system.colors)).map((key) => [key, drawn[key]])) : {};
-  const colors = { ...system.colors, ...varied, ...styleTokens, ...identityColors(spec.identity, canvas), ...(own?.colors || {}) };
+  const colors = { ...surfaceTokens(name, spec.surfaces ?? "reference"), ...system.colors, ...varied, ...styleTokens, ...identityColors(spec.identity, canvas), ...(own?.colors || {}) };
   const out = { ...spec, palette: { base, id: own?.id ?? `${name}-${spec.id ?? "deck"}`, label: own?.label ?? `${system.label}${spec.identity ? " (subject identity)" : ""}`, colors } };
   if (system.chrome && !spec.chrome) out.chrome = system.chrome;
   if (spec.tracker === undefined && drawn) out.tracker = drawn.tracker;

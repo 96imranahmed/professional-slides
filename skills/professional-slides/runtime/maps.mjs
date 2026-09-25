@@ -1,5 +1,6 @@
 import {
   ellipsePrimitive,
+  houseStyle,
   linePrimitive,
   rectPrimitive,
   shapePrimitive,
@@ -63,6 +64,7 @@ export const MAP_TOKENS = Object.freeze([
   "color.surface",
   "color.rule",
   "color.surfaceMuted",
+  "color.surfaceTint",
   "color.ink",
   "color.textSecondary",
   "color.componentPrimary",
@@ -251,7 +253,12 @@ function polygonNode({ id, country, paths, highlighted, quantitative, recede = f
   const normalized = paths.map((path) => path.map(([px, py]) => [Number(((px - x) / width).toFixed(6)), Number(((py - y) / height).toFixed(6))]));
   // Under markers or routes a highlighted country recedes to the tint: the
   // points are the subject, and a navy country under a navy dot hides both.
-  const fill = quantitative ? quantitativeScaleColor(quantitative.scale,quantitative.value) : highlighted ? (recede ? token("color.componentPrimaryTint") : PRIMARY) : MUTED_SURFACE;
+  // Land in the muted surface sat 8 grey levels off a cream page: the map read
+  // as routes and dots floating on nothing. Under the reference mark weight
+  // (core.mjs `style.marks`) land is the filled surface, the ground the
+  // markers and routes stand on.
+  const land = houseStyle("style.marks") === "light" ? MUTED_SURFACE : token("color.surfaceTint");
+  const fill = quantitative ? quantitativeScaleColor(quantitative.scale,quantitative.value) : highlighted ? (recede ? token("color.componentPrimaryTint") : PRIMARY) : land;
   return shapePrimitive({
     id: stableId(id, "land", country.id),
     role: "map-land",
