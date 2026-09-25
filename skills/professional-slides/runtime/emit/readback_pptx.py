@@ -101,7 +101,8 @@ def readback(scene: dict, pptx: Path, tol: float = 2.0) -> dict:
                 actual_paras = len(tf.paragraphs)
                 if expected_paras != actual_paras:
                     findings.append({"slide": si, "code": "PARAGRAPH_COUNT", "shape": name, "expected": expected_paras, "actual": actual_paras})
-                if "".join(p.text for p in tf.paragraphs).replace("\n", "") != str(src).replace("\n", ""):
+                # A soft break (a balanced title's line break) stands for the space it replaced.
+                if "".join(p.text.replace("\x0b", " ") for p in tf.paragraphs).replace("\n", "") != str(src).replace("\n", ""):
                     findings.append({"slide": si, "code": "TEXT_MISMATCH", "shape": name})
             if node.get("role") == "action-title" and (title is None or title.name != name):
                 findings.append({"slide": si, "code": "TITLE_NOT_PLACEHOLDER", "shape": name})

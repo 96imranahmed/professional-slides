@@ -96,7 +96,9 @@ def body_words(text: str, header: set[str] | None = None) -> int:
     return max(0, sum(words(l) for l in lines) - sum(words(l) for l in lines if SOURCE_LINE.match(l)))
 
 
-HEADER_ROLES = ("action-title", "tracker-compact-label", "tracker-label", "kicker")
+# The standfirst is the title's own line (planRole in derive-content.mjs), so
+# the rendered count drops it with the title rather than reading it as body.
+HEADER_ROLES = ("action-title", "action-subtitle", "tracker-compact-label", "tracker-label", "kicker")
 
 
 def header_lines(slide: dict) -> set[str]:

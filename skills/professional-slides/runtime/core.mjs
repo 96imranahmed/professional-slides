@@ -125,10 +125,13 @@ export const TOKENS = Object.freeze({
   "space.6": length("--space-6", 32),
   "space.8": length("--space-8", 48),
   "layout.titleContentGap": length("--title-content-gap", 56),
+  // The air on either side of the title rule: title (or standfirst) to rule, rule to body.
+  "layout.titleRuleGap": length("--title-rule-gap", 12),
   "icon.small": length("--icon-sm", 16),
   "icon.medium": length("--icon-md", 24),
   "icon.large": length("--icon-lg", 36),
   "line.hairline": length("--line-hairline", 1),
+  "line.titleRule": length("--line-title-rule", 1),
   "line.standard": length("--line-standard", 2),
   "line.medium": length("--line-medium", 3.5),   // map routes: the middle volume class
   "line.heavy": length("--line-heavy", 5),       // map routes: the largest volume class
@@ -138,7 +141,12 @@ export const TOKENS = Object.freeze({
   // Design profile: the house style a palette carries beyond its colours. Each
   // palette sets these to what its house style does; components read them.
   "style.titleWeight": keyword("--style-title-weight", "bold"),        // bold | regular
-  "style.titleRule": keyword("--style-title-rule", "none"),            // none | rule (hairline under the title) | band (tinted title band) | block (primary title block, reversed type)
+  "style.titleRule": keyword("--style-title-rule", "none"),            // none | rule (a rule closing the title band) | band (tinted title band) | block (primary title block, reversed type) | tab (accent tab at the top edge)
+  // How the house draws its title rule: most well-made pages close the title
+  // band with a thin rule margin to margin or edge to edge, some with a short
+  // accent bar. Colour names a palette role, so a subject's identity recolours it.
+  "style.titleRuleLength": keyword("--style-title-rule-length", "content"), // content (margin to margin) | full (page edge to edge) | short (an accent bar under the title)
+  "style.titleRuleColor": keyword("--style-title-rule-color", "rule"),      // rule | ink | accent | primary
   "style.tagPlacement": keyword("--style-tag-placement", "top-right"), // top-right | below-title (accent pill) | above-title (accent label)
   "style.chartHeading": keyword("--style-chart-heading", "text"),      // text | band (filled grey band)
   // A bullet unless the house explicitly sets a dash: the marker is a dot in
@@ -153,7 +161,7 @@ export const TOKENS = Object.freeze({
   "style.coverLayout": keyword("--style-cover-layout", "block"),       // block | editorial | journal | keynote
   "style.dividerLayout": keyword("--style-divider-layout", "panel")     // panel | editorial | journal | keynote
 });
-export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead", "style.takeaway", "style.coverLayout", "style.dividerLayout"]);
+export const STYLE_TOKENS = Object.freeze(["style.titleWeight", "style.titleRule", "style.titleRuleLength", "style.titleRuleColor", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead", "style.takeaway", "style.coverLayout", "style.dividerLayout"]);
 /** The active design profile value for a style token ("style.titleWeight" → "bold"). */
 export function houseStyle(id) { return tokenValue(token(id)); }
 

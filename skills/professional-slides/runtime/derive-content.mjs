@@ -45,11 +45,15 @@ const COMMENTARY_ROLES = new Set(["list-item", "list-lead", "paragraph"]);
 export function planRole(role) {
   const r = String(role ?? "");
   if (GENERATED_ROLES.test(r)) return null;
-  if (/^(action-title|cover-title|divider-title|takeaways-title|statement-title)$/.test(r)) return "title";
+  // The standfirst under an action title is title-band furniture, counted
+  // with the title: a page cannot reach its body floor by lengthening the
+  // line that says what it measures. The page gates' bands (TITLE_BAND_ROLES)
+  // and the rendered density pass (HEADER_ROLES) read it the same way.
+  if (/^(action-title|action-subtitle|cover-title|divider-title|takeaways-title|statement-title)$/.test(r)) return "title";
   if (/^source/.test(r)) return "source";
   if (/^footnote|^note/.test(r)) return "qualification";
   if (/^(page-tag|cover-logo|cover-date|tracker|agenda-label|agenda-marker|takeaways-numeral|section-tab)/.test(r)) return "furniture";
-  if (/^(paragraph|list-item|list-lead|insight|callout|panel|section-heading|action-subtitle|cover-subtitle|divider-subtitle|statement|takeaways-item|quote)/.test(r)) return "body";
+  if (/^(paragraph|list-item|list-lead|insight|callout|panel|section-heading|cover-subtitle|divider-subtitle|statement|takeaways-item|takeaway-standfirst|quote)/.test(r)) return "body";
   return "exhibit";
 }
 

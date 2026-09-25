@@ -201,6 +201,25 @@ class Emitter:
         runs = layout.get("sourceRuns") or node.get("runs")
         paragraphs = self.paragraphs_of(node)
         first = True
+        if (node.get("data") or {}).get("balanced") and layout.get("lines"):
+            # A balanced title: the engine chose where its lines break so the
+            # last is not a stranded word. A soft break (a:br) at each keeps
+            # that break in PowerPoint, whose metrics differ by a few percent,
+            # and keeps the title one paragraph for Outline view.
+            p = tf.paragraphs[0]
+            p.alignment = align
+            styled = layout.get("runs") if (layout.get("sourceRuns") or node.get("runs")) else [{"text": "\n".join(layout["lines"]), "bold": bold}]
+            for r in styled:
+                accent = rgb(self.colors.get("color.accent") or self.colors.get("color.componentPrimary")) if r.get("accent") else None
+                for i, piece in enumerate(str(r["text"]).split("\n")):
+                    if i:
+                        p.add_line_break()
+                    if piece:
+                        run = p.add_run()
+                        run.text = piece
+                        self._font(run.font, family, size, bold or r.get("bold", False), accent or color)
+            p.line_spacing = 1.0
+            return
         if runs:
             # Runs vary only in bold; rebuild them per paragraph from the source text.
             text_all = "".join(r["text"] for r in runs)

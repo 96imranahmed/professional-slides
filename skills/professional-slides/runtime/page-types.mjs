@@ -29,7 +29,7 @@ import { REGISTRY, measureInsight } from "./registry.mjs";
 import { trivialChart } from "./gates/craft_gates.mjs";
 import { calloutFits } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
-import { hasPhrase } from "./text-layout.mjs";
+import { hasPhrase, measureText } from "./text-layout.mjs";
 import { readFileSync } from "node:fs";
 
 // The limits the page gates hold the page's text to, published in `--types`
@@ -39,7 +39,7 @@ import { readFileSync } from "node:fs";
 // check. The line limits are the gates' own (page_gates.py TITLE_LINES,
 // TAKEAWAY_LONG; the subtitle's and the bar's are refused as they compose).
 const TITLE_WORDS = JSON.parse(readFileSync(new URL("./weight.json", import.meta.url), "utf8")).plan.titleWords;
-export const TEXT_LIMITS = Object.freeze({ titleWords: TITLE_WORDS.max, titleTarget: TITLE_WORDS.target, titleLines: 2, subtitleLines: 2, takeawayLines: 3, barLines: 2 });
+export const TEXT_LIMITS = Object.freeze({ titleWords: TITLE_WORDS.max, titleTarget: TITLE_WORDS.target, titleLines: 2, subtitleLines: 1, takeawayLines: 3, barLines: 2 });
 export const titleWords = (title) => String(title ?? "").replace(/\s*\(\d+\/\d+\)\s*$/, "").trim().split(/\s+/).filter(Boolean).length;
 
 // Where the page's explanation lives. Each maps onto what the composer draws.
@@ -593,6 +593,10 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   const said = titleWords(page.title);
   if (said > TEXT_LIMITS.titleWords)
     throw new Error(`${id}: TITLE_WORDS - the title runs to ${said} words and the build refuses past ${TEXT_LIMITS.titleWords}; cut it to the claim, ${TEXT_LIMITS.titleTarget} words or fewer sets on one line`);
+  if (page.subtitle !== undefined) {
+    const problem = subtitleProblem(String(page.title ?? ""), page.subtitle);
+    if (problem) throw new Error(`${id}: the subtitle ${problem}`);
+  }
 
   // The content decisions, made before the layout ones and checked first:
   // what settles the claim, and what the commentary adds. With an insight log
@@ -867,6 +871,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     slide.layout = layoutFor[page.commentary];
   }
 
+  // A statement or takeaways page has no title band to hang a standfirst in.
+  if (slide.kind && page.subtitle !== undefined) throw new Error(`${id}: a ${page.form} page has no title band, so it takes no \`subtitle\`; put the scope in its text`);
   // Advisories the compiler can see and the author should: they do not block.
   const advisories = [];
   if (page.type === "place" && typeof primary?.geography === "string") {
@@ -886,6 +892,22 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   // What the variety contract counts: the page as drawn, not as declared.
   slide.pageType.skeleton = skeletonOf(slide);
   return slide;
+}
+
+// The standfirst: one line under the title, in body type, above the rule. A
+// fifth of strong analytical pages carry one, and it says what the title
+// leaves out - the measure and unit, the population, the period, the scope -
+// so the title can stay a claim. It is not a second title, so it neither
+// restates the title nor runs past a line.
+export const SUBTITLE_WORDS = 16;
+const SUBTITLE_WIDTH = 1160;
+export function subtitleProblem(title, subtitle) {
+  if (typeof subtitle !== "string" || !subtitle.trim() || subtitle.includes("\n")) return "is one line of text under the title";
+  const n = words(subtitle).length;
+  if (n > SUBTITLE_WORDS) return `runs to ${n} words; keep it to ${SUBTITLE_WORDS} or fewer - the scope, the unit, the population or the period, not a second finding`;
+  if (measureText(subtitle.trim(), SUBTITLE_WIDTH, { fontSize: 12, wrapWidthRatio: 1 }).lines.length > 1) return "runs past one line; cut it to the scope, the unit, the population or the period";
+  if (overlap(title, subtitle) > 0.7) return "repeats the title; say what the title leaves out - the measure, the population, the period";
+  return null;
 }
 
 /** The normalized plan-gate architecture a compiled page type stands for. */
@@ -930,10 +952,11 @@ export function describeTypes() {
     "`bar` - with commentary `so-what-bar`, the implication set in a filled bar across the foot of the exhibit: a sentence of eight words or more that fits two lines. The bar is the page's close, so `takeaway` is `false`, and it counts toward the closing share.", "",
     "Beyond one exhibit and a column: `parallel` form `labelled-rows` sets two to five `blocks` down the page, each a filled label with its bullets and an optional `metric` or small `exhibit` at the right; `panels` form `sequence` joins two or three headed exhibits with arrows (cause to effect, before to after).", "",
     "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log.", "",
+    `\`subtitle\` - optional, on any analytical page: one line under the title (${SUBTITLE_WORDS} words at most) naming what the title leaves out - the measure and unit, the population, the period or the scope. It is set small above the title rule and counts with the title, not the body; it must not restate the title.`, "",
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", "",
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point).", "",
     `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across; two rows or more fill the frame, one row grows by a third) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
-    `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - write to ${TEXT_LIMITS.titleTarget}, which sets on one line, since more than a third of titles past it is PLAN_TITLE_LENGTH; a \`subtitle\` ${TEXT_LIMITS.subtitleLines} lines; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines, one or two the norm (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best").`, "",
+    `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - write to ${TEXT_LIMITS.titleTarget}, which sets on one line, since more than a third of titles past it is PLAN_TITLE_LENGTH; a \`subtitle\` one line of ${SUBTITLE_WORDS} words; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines, one or two the norm (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best").`, "",
     `Evidence: a chart page (trend, ranking, composition, relationship, bridge, panels of charts) plots ${EVIDENCE_FLOOR.chart} or more values - a bridge ${EVIDENCE_FLOOR.bridge}, one whole's parts (pie, donut, treemap, waffle) are not floored - and strong decks' chart pages plot about 22. Deepen with the peer set, a prior period or a benchmark series, or a longer window: forms \`indexed\` (trend), \`distribution\` and \`aligned-bars\` (ranking) are built for many values.`, ""];
   for (const [name, t] of Object.entries(PAGE_TYPES)) {
     const n = Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits;
@@ -968,6 +991,7 @@ export function pageSchema() {
     required: ["id", "type", "form", "commentary", "takeaway", "why", "title"],
     properties: {
       id: { type: "string" }, type: { const: name }, title: { type: "string" },
+      subtitle: { type: "string", description: `optional standfirst under the title: the measure and unit, the population, the period or the scope, in one line of ${SUBTITLE_WORDS} words or fewer; never a restatement of the title` },
       form: { enum: Object.keys(t.forms) }, commentary: { enum: t.commentary },
       takeaway: { oneOf: [{ const: false }, { type: "string", minLength: 8 }] },
       why: { type: "string", minLength: 20 }, series: { type: "string" }, rail: { type: "string" },

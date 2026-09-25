@@ -19,15 +19,17 @@ export const DESIGN_SYSTEMS = Object.freeze({
   consulting: {
     label: "Consulting",
     use: "Steering committees, board papers and diligence, where the reader expects the familiar analytical grammar.",
-    character: "Open white canvas, sans titles top-left, commentary rail on the right, tinted takeaway band, dark cover and numbered chapter panels.",
+    character: "Open white canvas, sans titles top-left over a thin grey rule, commentary rail on the right, tinted takeaway band, dark cover and numbered chapter panels.",
     base: "midnight", colors: {},
-    style: { takeaway: "band", coverLayout: "block", dividerLayout: "panel" },
+    // A thin grey rule margin to margin closes the title band, as it does on
+    // three strong analytical pages in four.
+    style: { takeaway: "band", coverLayout: "block", dividerLayout: "panel", titleRule: "rule", titleRuleLength: "content", titleRuleColor: "rule" },
     commentary: "right", takeaway: "band", tracker: undefined, chrome: undefined, coverImage: "half", shapeBias: {}
   },
   editorial: {
     label: "Editorial",
     use: "Pre-reads, strategy narratives and essays read alone, where the argument is carried by sentences as much as by charts.",
-    character: "Warm paper canvas, large regular-weight serif titles, wide margins, commentary on the left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages with no dark panels.",
+    character: "Warm paper canvas, large regular-weight serif titles over a hairline run edge to edge, wide margins, commentary on the left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages with no dark panels.",
     base: "midnight",
     colors: {
       "color.canvas": "#FAF7F2", "color.surfaceMuted": "#F0EBE3", "color.ink": "#221E1A", "color.textSecondary": "#5E564C",
@@ -35,7 +37,7 @@ export const DESIGN_SYSTEMS = Object.freeze({
       "color.chartSeries1": "#7A2E1E", "color.chartSeries2": "#C07A55", "color.chartSeries3": "#3F5A66", "color.chartSeries4": "#A9B8BE", "color.chartSeries5": "#7D746A", "color.chartSeries6": "#D4CCC0",
       "color.chartComparator": "#DDD5CA", "color.chartGrid": "#E2DBD0", "color.rule": "#A39A8E",
       "font.display": "Georgia", "type.actionTitle": 26, "type.actionTitleLong": 23, "type.deckTitle": 40,
-      "style.titleWeight": "regular", "style.titleRule": "none", "style.tagPlacement": "above-title", "style.listMarker": "dash",
+      "style.titleWeight": "regular", "style.titleRule": "rule", "style.titleRuleLength": "full", "style.titleRuleColor": "rule", "style.tagPlacement": "above-title", "style.listMarker": "dash",
       "style.tableRows": "rules", "style.labelWeight": "regular", "style.chartHeading": "text"
     },
     style: { takeaway: "rule", coverLayout: "editorial", dividerLayout: "editorial" },

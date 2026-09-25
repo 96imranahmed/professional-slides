@@ -8,8 +8,8 @@ A palette changes colour; a design system changes the page. Two decks on unrelat
 
 | `design` | Reader and occasion | Frame | Page repertoire to plan for |
 | --- | --- | --- | --- |
-| `consulting` (default) | steering committees, boards, diligence | white canvas, sans titles top-left, commentary rail right, tinted takeaway band, dark cover, numbered chapter panels | exhibit with commentary, tables with treatments, metrics strips, trackers |
-| `editorial` | pre-reads, strategy narratives and essays read alone | warm paper, large regular serif titles, wide margins, commentary left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages, panels opened | text pages that carry an argument, a photograph beside prose (`picture-hero`), quotations, fewer and larger exhibits, statement pages between parts |
+| `consulting` (default) | steering committees, boards, diligence | white canvas, sans titles top-left over a thin grey rule margin to margin, commentary rail right, tinted takeaway band, dark cover, numbered chapter panels | exhibit with commentary, tables with treatments, metrics strips, trackers |
+| `editorial` | pre-reads, strategy narratives and essays read alone | warm paper, large regular serif titles over a hairline run edge to edge, wide margins, commentary left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages, panels opened | text pages that carry an argument, a photograph beside prose (`picture-hero`), quotations, fewer and larger exhibits, statement pages between parts |
 | `journal` | evidence-led briefings where the chart is the argument | red tab over short bold sans titles, the finding as a standfirst under the title, tight margins, zebra tables, no tinted boxes, masthead cover | full-width annotated charts with commentary in columns beneath (`exhibit-top`), small multiples (`grid`), metrics over an exhibit, record tables |
 | `keynote` | decks presented to a room, launches, pitches | titles reversed out of a colour block, larger type, the takeaway as a statement with an accent bar, colour-field cover and chapter pages, full-bleed picture covers | one idea a page: hero numbers (`kpi`), metrics over an exhibit, split-tone comparisons, statement and picture pages, sparse text |
 
@@ -78,11 +78,32 @@ For a reference-derived theme, inspect the approved reference first and map ever
 
 Resolved values for the exact deck are written to `design-manifest.json`, and per-slide values to `scene.json` under `slides[].tokens`; those generated records are the value reference for that deck.
 
-Slide titles default to an open canvas, without a horizontal rule or a background band. Preserve the measured title-to-body clearance. A separator remains an explicit reference-derived choice; it is not added merely because a palette changes. Analytical chart headings retain their own heading/unit treatment.
+## The title band
+
+A content page's header is, top to bottom: the tracker (or kicker), the action title, an optional standfirst, the rule that closes the band, then the body. Three strong analytical pages in four close the title band with a rule or a band, most with a thin rule margin to margin or edge to edge and some with a short accent bar, so the house draws one by default: `consulting` and the `midnight`, `crimson` and `graphite` palettes a thin rule, `editorial` a hairline across the page, `evergreen` a short accent bar. `journal` keeps its red tab and `keynote` its colour block, which already close the band.
+
+The rule sits at a fixed height, one gap above the body, and the title and its standfirst are set down on it: a one-line title drops to meet the rule instead of leaving it stranded under 50px of air, and the body starts at the same height whether the title took one line or two. Only a band too tall for that - two title lines and a standfirst - pushes the rule and the body down together. The standfirst (`subtitle` on the page) is set in body type and the secondary colour between the title and the rule; see [page types](page-types.md#the-standfirst).
+
+A title that wraps is balanced: it is set at the narrowest width that keeps its line count, so its lines run to about the same length and the last is never one to three stranded words. The PPTX title placeholder takes the same width and a soft line break where the render broke, so PowerPoint's own metrics cannot move a word back; an author's own line break is kept as written. Analytical chart headings retain their own heading/unit treatment.
 
 ## House style tokens
 
-Each palette sets seven `style.*` keyword tokens beyond its colours; components read them through `houseStyle(id)` and a page may still ask for a specific title variant. `style.titleWeight` (`bold` | `regular`), `style.titleRule` (`none` | `rule` under the title | `band` behind it), `style.tagPlacement` (`top-right` small caps | `below-title` accent pill | `above-title` accent label), `style.chartHeading` (`text` | `band`, a filled grey band with white heading), `style.listMarker` (`dot` | `dash`), `style.tableRows` (`rules` | `zebra`), `style.labelWeight`, `style.titleLead` (`accent`: the lead in the accent before the rest; `pipe`: "Topic | statement", the `evergreen` title) (`bold` | `regular` value labels, in the scene and the native chart). The `midnight` palette also sets `font.display` to a serif; `examples/house-style.deck.json` shows the same eight pages under any palette.
+Each palette sets its `style.*` keyword tokens beyond its colours; components read them through `houseStyle(id)` and a page may still ask for a specific title variant.
+
+| Token | Values |
+| --- | --- |
+| `style.titleWeight` | `bold` \| `regular` |
+| `style.titleRule` | `none` \| `rule` closing the title band \| `band` behind it \| `block` reversed out of the primary \| `tab` in the accent at the top edge |
+| `style.titleRuleLength` | `content` margin to margin \| `full` page edge to edge \| `short` a 64px bar under the title |
+| `style.titleRuleColor` | `rule` \| `ink` \| `accent` \| `primary`: a palette role, so a subject's identity recolours an accent bar |
+| `line.titleRule`, `layout.titleRuleGap` | the rule's weight in px (1 for a hairline, 3 to 4 for a bar) and the air on either side of it (12px) |
+| `style.tagPlacement` | `top-right` small caps \| `below-title` accent pill \| `above-title` accent label |
+| `style.chartHeading` | `text` \| `band`, a filled grey band with white heading |
+| `style.listMarker`, `style.tableRows` | `dot` \| `dash`; `rules` \| `zebra` |
+| `style.labelWeight` | `bold` \| `regular` value labels, in the scene and the native chart |
+| `style.titleLead` | `accent`: the lead in the accent before the rest; `pipe`: "Topic \| statement", the `evergreen` title |
+
+The `midnight` palette also sets `font.display` to a serif; `examples/house-style.deck.json` shows the same eight pages under any palette.
 
 ## Template decks and house profiles
 
@@ -99,9 +120,9 @@ Each palette sets seven `style.*` keyword tokens beyond its colours; components 
   "stats": { "slides": 16, "medianWordsPerSlide": 113, "medianShapesPerSlide": 21.5, "charts": 4, "tables": 2, "themeColors": {}, "themeFonts": {}, "topFills": [] } }
 ```
 
-How the values are chosen. Ink is the theme's `dk2` when it is a saturated brand dark (a navy, a forest green) and `dk1` otherwise; the primary is `accent1` when it is a brand dark, else the most used dark fill; the accent is the most used bright saturated fill that is not the primary (the bright green, the electric blue), else `accent2`; the chart series are the primary followed by the theme accents, greys appended; tints are the primary and accent mixed 86–88% toward white; the muted surface is `lt2` when light enough. Title weight comes from the master's title style, a title rule or band from a line or filled rectangle on the master under the title. Chrome comes from the slides' own title and body placeholders (medians, scaled to 1280 px), with cover-style titles below 35% of the page height excluded. Density: 90 words or 18 shapes per slide and up is `pre-read`, 35 words or 8 shapes is `executive`, less is `live-pitch`.
+How the values are chosen. Ink is the theme's `dk2` when it is a saturated brand dark (a navy, a forest green) and `dk1` otherwise; the primary is `accent1` when it is a brand dark, else the most used dark fill; the accent is the most used bright saturated fill that is not the primary (the bright green, the electric blue), else `accent2`; the chart series are the primary followed by the theme accents, greys appended; tints are the primary and accent mixed 86–88% toward white; the muted surface is `lt2` when light enough. Title weight comes from the master's title style, a title rule or band from a line or filled rectangle on the master under the title (a line across 95% of the page is a `full` rule, a shorter one `content`); a master with neither sets `style.titleRule: "none"`, so the page stays open as the template draws it. Chrome comes from the slides' own title and body placeholders (medians, scaled to 1280 px), with cover-style titles below 35% of the page height excluded. Density: 90 words or 18 shapes per slide and up is `pre-read`, 35 words or 8 shapes is `executive`, less is `live-pitch`.
 
-A palette may also be written by hand as `{ "base": "midnight", "colors": { "color.accent": "#E1251B", "style.titleRule": "none" } }`: colour tokens take `#RRGGBB`, and `style.*` and `font.*` tokens overlay the base's house style. `chrome` on the deck takes `left`, `right`, `titleTop`, `bodyTop`, `footerTop` (and optionally `sourceTop`, `footerRuleY`); the composer scales the table line budget to the body height the chrome leaves, and the page gates read the resulting content frame.
+A palette may also be written by hand as `{ "base": "midnight", "colors": { "color.accent": "#E1251B", "style.titleRule": "none" } }`: colour tokens take `#RRGGBB`, `style.*` and `font.*` tokens overlay the base's house style, and `line.*` and `layout.*` take pixels (`"line.titleRule": 2, "layout.titleRuleGap": 16`). `chrome` on the deck takes `left`, `right`, `titleTop`, `bodyTop`, `footerTop` (and optionally `sourceTop`, `footerRuleY`); the composer scales the table line budget to the body height the chrome leaves, and the page gates read the resulting content frame.
 
 ## Choose the kind of variation
 
@@ -117,7 +138,7 @@ Every variant needs a fresh full-deck taste review and bound delivery record. A 
 
 The exported slide background must resolve `color.canvas`; white is not an implicit substitute for a warm or dark family. Saved-file readback verifies it. Repair a failed role or exporter at its shared owner, preserve each candidate, regenerate affected variants and reassess without a score floor.
 
-A font change can leave a single final word on the second title line. Rebalance its text frame within the existing title band while preserving the exact wording, type size, line count and left anchor; do not shorten the argument to accommodate a style.
+A font change can change where a title wraps. The title is rebalanced at build time (the balanced break above) with its wording, type size, line count and left anchor kept; do not shorten the argument to accommodate a style.
 
 When an alternative changes the reader task, rebuild its question, governing answer, ranked criteria and per-slide `serves` mapping before authoring. Preserve source provenance, but do not inherit a previous version’s decision contract unchanged. Verify both the coverage preflight and the rendered gates; a visual pass alone is not a complete build.
 
