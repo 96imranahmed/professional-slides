@@ -13,13 +13,18 @@ from node_probe import run_node
 class StorylineTests(unittest.TestCase):
     def test_binding_follows_structure_not_wording(self):
         result = run_node('''
-import { storylineBinding, validateStorylineReview, checkInsights, describeExhibit } from './skills/professional-slides/runtime/storyline.mjs';
+import { storylineBinding, validateStorylineReview, checkInsights, describeExhibit, STORYLINE_DIMENSIONS } from './skills/professional-slides/runtime/storyline.mjs';
 const spec = { slides: [{ id: 'a', title: 'Riyadh Air opened 14 destinations in 16 weeks', exhibit: { type: 'chart.line', categories: ['M1','M2','M3','M4','M5'], series: [{ name: 'Destinations', values: [1,3,6,10,14] }] }, points: ['A sentence.'] }] };
 const reworded = structuredClone(spec); reworded.slides[0].points = ['A different sentence.'];
 const retitled = structuredClone(spec); retitled.slides[0].title = 'Riyadh Air has 14 destinations';
 const binding = storylineBinding(spec);
-const ready = { verdict: 'ready', binding, rating: 8, summary: 'The answer is sharp and the pillars hold on the evidence shown.', answer: 'Riyadh Air is opening destinations faster than any recent Gulf entrant did.',
-  pillars: [{ pillar: 'Speed', verdict: 'holds', strongestCounter: 'Small base' }], weakPages: [], missingAnalyses: [], cutOrMerge: [], topFixes: ['None material'] };
+const ready = { pass: 1, verifies: null, verdict: 'ready', binding, rating: 8, summary: 'The answer is sharp and the pillars hold on the evidence shown.',
+  spine: 'Read alone, the one title states the finding the whole storyline rests on, with its rate.', answer: 'Riyadh Air is opening destinations faster than any recent Gulf entrant did.',
+  pillars: [{ pillar: 'Speed', pages: ['a'], verdict: 'holds', overlap: 'A single pillar; nothing overlaps.', strongestCounter: 'Small base', reversal: 'The ramp stalls below ten routes a quarter.', answered: true }],
+  pages: [{ page: 'a', verdict: 'ok', claim: 'a rate, not a count', shape: 'a monthly series', sourcing: { status: 'n/a', insights: [], note: 'no insight log in this probe' }, restatement: 'first page', consequence: 'states the pace' }],
+  numbers: 'One figure, printed once; nothing to reconcile.', sectionFlow: 'A single page; there are no sections to order.', execSummary: 'The title is the summary and states the answer.',
+  missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'],
+  completeness: STORYLINE_DIMENSIONS.map((check) => ({ check, result: 'clean', note: `Checked ${check} on this one-page storyline; nothing to raise.` })) };
 const revalued = structuredClone(spec); revalued.slides[0].exhibit.series[0].values = [14, 10, 6, 3, 1];
 console.log(JSON.stringify({
   same: storylineBinding(reworded) === binding, changed: storylineBinding(retitled) !== binding,

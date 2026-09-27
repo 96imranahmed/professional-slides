@@ -54,7 +54,7 @@ Research and analysis are the slow part of a deck and they split cleanly, so whe
 | Find the data | Workstream: the subject's own series; each player or group of players; the market and demand; geography and networks; pipeline and commitments; the counter-case | Downloaded files under `sources/<workstream>/`, each with its URL and retrieval date, and a note of what it could not find |
 | Extract the insights | The same workstreams, each working its own datasets | `insights-<workstream>.json` in the insight-log format, every finding with its calculation and sources |
 | Draft the copy | Section, once the title spine is fixed | The section's pages in the content record's format, drawn only from the merged insight log |
-| Critique | A fresh subagent every round, never reused | `storyline-review.json` ([stress-test](#stress-test-the-storyline)) |
+| Critique | A fresh subagent every pass, never reused; one per section plus a spine critic for a long storyline | `storyline-review.json` ([stress-test](#stress-test-the-storyline)) |
 
 Keep research proportionate. Use at most four workstreams, not one per player; give each a budget of about fifteen searches and a clear list of the decisive series to find; tell it to stop when those are found and to record what it could not find rather than keep searching. A second, targeted pass follows only when the storyline critique names a missing analysis that would change the answer.
 
@@ -92,23 +92,31 @@ Keep the insights that are specific, surprising or decisive; a finding the reade
 
 ## Stress-test the storyline
 
-Before anything is drawn, the storyline goes through a mock problem-solving session with a reader who did not write it. `node runtime/storyline.mjs <id>.deck.json out/` writes a packet - the question, the answer, the players, the data found, and every page's title, what its exhibit shows (with two-number charts marked) and what its commentary says - and a prompt that asks a senior, adversarial reader to:
+Before anything is drawn, the storyline goes through a mock problem-solving session with a reader who did not write it. `node runtime/storyline.mjs <id>.deck.json out/` writes a packet - the question, the answer, the players, the data found, the insight log, and every page's title, what its exhibit shows (with two-number charts marked), what its commentary says and the insights it rests on, each with its calculation and sources - and a prompt for a senior, adversarial reader. The critique has to be complete the first time, because later passes only verify it.
 
-1. rewrite the answer if it restates the question or is too safe to be wrong;
-2. test whether the pillars are a MECE set of reasons that together prove it, and name each pillar's strongest counter-argument;
-3. flag every page that reports a count or a two-number comparison without an implication, and say what it should show instead;
-4. name the analyses a strong team would have run, with the public data behind them;
-5. list pages to cut or merge;
-6. return `ready` or `revise`, a rating and the fixes that matter most.
+**Pass one is exhaustive.** The critic returns (the first-pass schema in `runtime/storyline.mjs`):
 
-Run it as one partner critique and one revision - the critic judges from the packet alone, with no web research:
+- `pages`: one entry for **every** content page - its `verdict` (`ok`, `minor`, `major`, `blocker`, the worst open item naming it) and a note for each page check: `claim` (a finding with an implication, not a count or a fact), `shape` (the evidence has the shape the claim needs - the trend with its rate, the whole ranked peer set, the share, the ratio, the gap, the map, the judging table), `sourcing` (`supported`, `partly`, `unsupported` or `n/a`, with the insight ids it rests on), `restatement` (it moves on from the page before) and `consequence` (it says what follows for the decision);
+- `spine`: the titles read alone - do they tell the story;
+- `answer`: the governing answer as it should read, if it restates the question or is too safe to be wrong;
+- `pillars`: each pillar with its pages, a verdict, its overlaps and gaps (MECE), its strongest counter-argument, the condition that would reverse it, and whether the storyline answers it;
+- `numbers` (the same figure, unit, base and period on every page, totals that reconcile), `sectionFlow`, and `execSummary` (the summary against the body and the close);
+- `missingAnalyses` ({ `analysis`, `why`, `data` }), `cutOrMerge` (the pages, and what the freed pages should carry), `findings` and `topFixes`, every item with an id and a severity;
+- `completeness`: for each check, `findings`, or `clean` with what was checked and why nothing was found.
+
+Validation refuses a critique that misses a page, lists pages by example ("e.g.", "such as", "etc.") or names in its text a page its list leaves out, marks a page unsupported without a major sourcing finding, or says `ready` while a major or blocker item is open. For a spine of more than 30 content pages the packet also splits the page checks into section prompts (`storyline-review/sections/`) and a spine prompt: give each to its own fresh critic at the same time, save the answers in `storyline-review/parts/`, and `node runtime/storyline.mjs merge <id>.deck.json out/` joins them.
+
+Run the loop - the critic judges from the packet alone, with no web research:
 
 1. **Spawn a fresh subagent** as the critic - the harness's agent or task tool, or `--run codex` / `--run claude` when that CLI is installed. Give it only the path to `prompt.md` and ask it to return the JSON. It gets none of the author's reasoning, notes or earlier reviews: a critic that knows what the author meant forgives what the page fails to show.
-2. **Save** its JSON as `out/storyline-review.json`.
+2. **Save** its JSON as `out/storyline-review.json` and run `storyline.mjs` again: it validates the critique against the packet it answered and records it in `out/storyline-history/`.
 3. **Revise at the root.** A missing analysis means more research, not a new sentence: go back to [the data](#find-the-data-before-the-dot-dash), download the series, and rebuild the pages. A two-number chart becomes the whole peer set or the trend; a plain or word-filled table becomes a scorecard with numbers and a treatment in the cells; an obvious page is cut or merged.
-4. **Stop after one round by default.** Revise once, then record an `authorResponse` in `storyline-review.json` saying how each top fix was handled; delivery accepts a `ready` verdict or an answered one. Another critique round runs only when the user asks for it - offer it in the final response.
+4. **Verify.** Run `storyline.mjs` again. With the spine changed it writes a verification packet: the critic gives every open item a status (`fixed`, `partly fixed`, `not fixed`, `regressed`) with its evidence, re-reads the changed pages, and may add an item only if it is major or blocker and additive - on a changed page, introduced by the revision, or a blocker the first pass demonstrably missed, with the reason it was not visible. A new minor point, or a point on an unchanged page, is refused, so the loop converges.
+5. **Stop at `ready`, or at three passes.** `storyline.mjs` prints `ready` when the latest pass says ready, no major or blocker item from any pass is open, and it is bound to the current spine. A storyline still sent back after the third pass goes to the user with its open items; another pass runs only when they ask (`--max-passes`).
 
-The bar the critic holds is a deck that feels important: every page carries evidence a reader could not assemble in five minutes, charts compare the whole set or a trend with its rate rather than two categories, and tables are dense with real numbers and judge in their cells. The review is bound to the story's structure (page ids, titles, exhibits and what they plot): rewording a sentence keeps it, changing what a page argues or shows does not, and delivery refuses a deck without a current `ready` critique (`STORYLINE_UNREVIEWED`). Set `targetPages` on the deck when the user asked for a length, so the critic merges duplicates without cutting below it. Do not tell the reviewer the verdict you want.
+The bar the critic holds is a deck that feels important: every page carries evidence a reader could not assemble in five minutes, charts compare the whole set or a trend with its rate rather than two categories, and tables are dense with real numbers and judge in their cells.
+
+The review is bound to the story's structure (page ids, titles, exhibits and what they plot): rewording a sentence keeps it, changing what a page argues or shows does not. **This gate comes before the copy and before any deck review:** `reviewer.mjs` will not write a deck-review packet and delivery refuses a deck (`STORYLINE_UNREVIEWED`) until `storyline-review.json` is `ready` for the current spine; a spine edited after the critique names its changed pages and asks for the critique to be run again first. Set `targetPages` on the deck when the user asked for a length, so the critic merges duplicates without cutting below it. Do not tell the reviewer the verdict you want.
 
 ## Reconcile evidence before design
 

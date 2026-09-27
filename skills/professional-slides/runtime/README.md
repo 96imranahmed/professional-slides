@@ -18,7 +18,8 @@ emit/emit_pptx.py  scene → editable PPTX (title placeholders, wrap=square, aut
 emit/render_pptx.py  PPTX → PDF (LibreOffice) → PNG per slide + montage
 emit/readback_pptx.py  saved PPTX re-opened with python-pptx and compared to the scene
 gates/page_gates.py  deterministic page gates (ink, dead band, internal void, hero, type range, cpl, words, titles, monotony, ticks)
-reviewer.mjs       one full review prompt + schema + artifact binding; verification rounds scoped to changed/blocked slides; backends codex | claude | packet
+reviewer.mjs       deck review: rubric, exhaustive pass-1 and verification schemas, section split + merge, artifact binding; backends codex | claude | packet
+review-passes.mjs  the loop both reviews share: page-list and sampling checks, statuses, additive new findings, ledger, 3-pass cap
 claims.mjs         claim ledger (claims.json) for the author's self-check, and its validation
 build-deck.mjs     assets → plan → scene → claims → pptx → render → readback → gates
 page-types.mjs     the page types: required choices, the structure they compile to, evidence shapes and their breadth, the values each page plots
@@ -29,7 +30,7 @@ fetch-logos.mjs    player logos from Wikipedia infoboxes, trimmed to the mark (r
 fetch-pictures.mjs photographs for `{ alt }` placeholders from Wikimedia Commons, free licences only (run by the build)
 fetch-places.mjs   coordinates for map markers that name a place, cached in assets/places.json (run by the build)
 fetch-series.mjs   public time series (World Bank, Our World in Data) into sources/ as CSV + a chart block
-deliver-deck.mjs   build → gates must pass → self-check must cover claims → review → <id>-DELIVERED.pptx or REJECTED.md
+deliver-deck.mjs   build → gates must pass → storyline ready for this spine → self-check covers claims → review passes (≤3) → <id>-DELIVERED.pptx or REJECTED.md
 preferences.mjs    the design intake's answers, stored once per user outside any project; show | get | set | clear | deck-keys | apply
 design-options.mjs one labelled contact sheet per intake question, each tile the sample built with that answer (emit/contact_sheet.py lays them out)
 infer-style.py     canvas, colours and title treatment read off a reference deck supplied as a PDF or screenshots
@@ -53,5 +54,7 @@ Schema, argument completeness, text fit, collisions, clipping and scale checks b
 Page-family mix, decoration frequency, empty bands and density statistics are advisory; neutral
 exhibits and concise pages can be correct. Independent rendered review decides
 whether those pages communicate well. A review is valid only for its hashed
-scene, editable deck and renders, with every current slide explicitly inspected, or, for a
-verification after a recorded review, every changed and previously blocked slide.
+scene, editable deck and renders, with every current slide covered on every rubric dimension
+(pass one), or, for a verification pass, every changed and previously blocked slide read and
+every open finding given a status. No deck review is prepared before the storyline critique is
+ready for the current title spine.

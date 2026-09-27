@@ -14,38 +14,42 @@ from node_probe import run_node
 
 FINDINGS = '''
 const findings = [
-  { slide: 'p04', code: 'BROKEN_GEOMETRY', severity: 'major', reason: 'The FY26 callout sits on top of the 48.3 data label.',
+  { id: 'F1', scope: 'page', slides: ['p04'], dimension: 'chart', code: 'BROKEN_GEOMETRY', severity: 'major', reason: 'The FY26 callout sits on top of the 48.3 data label.',
     repair: 'Move the callout above the plot so the value label shows.',
     checkable: { rule: 'A chart callout never overlaps a data label', measure: 'Intersection area of each callout box with each value-label box; any overlap fails' } },
-  { slide: 'p09', code: 'MISSING_ARGUMENT', severity: 'major', reason: 'The page never says why the bridge matters for the plan.',
+  { id: 'F2', scope: 'page', slides: ['p09'], dimension: 'argument', code: 'MISSING_ARGUMENT', severity: 'major', reason: 'The page never says why the bridge matters for the plan.',
     repair: 'Add a closing sentence that states what the bridge implies for the plan.', checkable: null },
-  { slide: 'p11', code: 'EDITORIAL', severity: 'minor', reason: 'The word "loop" is used twice in the title.', repair: '' },
+  { id: 'F3', scope: 'page', slides: ['p11'], dimension: 'text', code: 'EDITORIAL', severity: 'minor', reason: 'The word "loop" is used twice in the title.', repair: 'Cut the second "loop" from the title.' },
 ];
 '''
 
 
 class CheckableSchemaTests(unittest.TestCase):
-    def test_checkable_is_optional_and_accepts_an_object_or_null(self):
+    def test_checkable_is_required_and_accepts_an_object_or_null(self):
         result = run_node(FINDINGS + '''
 import { REVIEW_SCHEMA, validateReview } from './skills/professional-slides/runtime/reviewer.mjs';
 const item = REVIEW_SCHEMA.properties.findings.items;
-const review = { accepted: false, summary: 'The deck argues well but one callout hides a value.', findings };
+const review = { accepted: false, summary: 'The deck argues well but one callout hides a value.', rating: 6, pages: [], findings };
+const findingErrors = (list) => validateReview({ ...review, findings: list }, ['p04', 'p09', 'p11']).filter((e) => e.startsWith('findings'));
 console.log(JSON.stringify({
   required: item.required, type: item.properties.checkable.type, keys: item.properties.checkable.required,
-  errors: validateReview(review, ['p04', 'p09', 'p11']),
+  errors: findingErrors(findings), filled: findingErrors(findings.map((f) => ({ checkable: null, ...f }))),
 }));
 ''')
-        self.assertNotIn('checkable', result['required'])
+        self.assertIn('checkable', result['required'])
         self.assertEqual(sorted(result['type']), ['null', 'object'])
         self.assertEqual(result['keys'], ['rule', 'measure'])
-        # An old review with no `checkable` on a finding (p11) still validates.
-        self.assertEqual(result['errors'], [])
+        # Every finding says whether a check could have caught it: F3 says nothing.
+        self.assertEqual(len(result['errors']), 1)
+        self.assertIn('F3', result['errors'][0])
+        self.assertIn('checkable is required', result['errors'][0])
+        self.assertEqual(result['filled'], [])
 
     def test_a_malformed_checkable_is_refused(self):
         result = run_node('''
 import { validateReview } from './skills/professional-slides/runtime/reviewer.mjs';
-const finding = (checkable) => ({ slide: 'a', code: 'OVERFLOW', severity: 'minor', reason: 'The label runs past its box edge.', repair: '', checkable });
-const errors = (checkable) => validateReview({ accepted: true, summary: 'A finished deck with one minor defect.', findings: [finding(checkable)] }, ['a']);
+const finding = (checkable) => ({ id: 'F1', scope: 'page', slides: ['a'], dimension: 'layout', code: 'OVERFLOW', severity: 'minor', reason: 'The label runs past its box edge.', repair: 'Shorten the label so it fits its box.', checkable });
+const errors = (checkable) => validateReview({ accepted: true, summary: 'A finished deck with one minor defect.', rating: 8, pages: [], findings: [finding(checkable)] }, ['a']);
 console.log(JSON.stringify({ text: errors('a label overlaps'), empty: errors({ rule: 'x', measure: '' }), extra: errors({ rule: 'A label stays inside its box', measure: 'Label width against box width', owner: 'x' }) }));
 ''')
         self.assertTrue(any('checkable' in e for e in result['text']))
@@ -58,7 +62,7 @@ console.log(JSON.stringify({ text: errors('a label overlaps'), empty: errors({ r
 import { reviewPrompt, verificationPrompt, REVIEW_SCHEMA, CODES } from './skills/professional-slides/runtime/reviewer.mjs';
 const packet = { brief: 'b', answer: 'a', titles: ['1. T'], slides: [{ id: 's1', index: 1, title: 'T', gateFindings: [], image: 'x.png' }], codes: CODES,
   schema: REVIEW_SCHEMA, statistics: {}, density: null, craft: [], montage: 'm.png', inspectedSlides: ['s1'], binding: 'f'.repeat(64),
-  scope: { mustInspect: ['s1'], priorBlocking: [], priorRating: 6 } };
+  scope: { pass: 2, verifies: 'e'.repeat(64), maxPasses: 3, changed: ['s1'], mustInspect: ['s1'], open: [], priorBlocking: [], priorRating: 6 } };
 console.log(JSON.stringify({ full: reviewPrompt(packet), verify: verificationPrompt(packet) }));
 ''')
         for prompt in (result['full'], result['verify']):
@@ -95,7 +99,7 @@ const quiet = await recordCheckCandidates(dir, { findings: [findings[1]] }, join
 const wrote = await access(join(dir, 'review-history', CHECK_CANDIDATES)).then(() => true, () => false);
 await recordCheckCandidates(dir, { findings }, join(dir, 'review-history', 'review-2.json'));
 // The same rule raised again on another page, with different capitalisation.
-const again = { ...findings[0], slide: 'p20', checkable: { ...findings[0].checkable, rule: 'A chart callout never overlaps a DATA label' } };
+const again = { ...findings[0], slides: ['p20'], checkable: { ...findings[0].checkable, rule: 'A chart callout never overlaps a DATA label' } };
 await recordCheckCandidates(dir, { findings: [again] }, join(dir, 'review-history', 'review-3.json'));
 const file = JSON.parse(await readFile(join(dir, 'review-history', CHECK_CANDIDATES), 'utf8'));
 console.log(JSON.stringify({ quiet: quiet.file, wrote, file }));
