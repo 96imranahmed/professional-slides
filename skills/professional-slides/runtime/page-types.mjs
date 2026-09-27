@@ -30,6 +30,9 @@ import { trivialChart } from "./gates/craft_gates.mjs";
 import { calloutFits } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
+import { timePositions, describeGaps } from "./time-axis.mjs";
+import { verdictCell } from "./compose.mjs";
+import { REVIEWED } from "./gates/variety_gates.mjs";
 import { readFileSync } from "node:fs";
 
 // The limits the page gates hold the page's text to, published in `--types`
@@ -39,6 +42,7 @@ import { readFileSync } from "node:fs";
 // check. The line limits are the gates' own (page_gates.py TITLE_LINES,
 // TAKEAWAY_LONG; the subtitle's and the bar's are refused as they compose).
 const TITLE_WORDS = JSON.parse(readFileSync(new URL("./weight.json", import.meta.url), "utf8")).plan.titleWords;
+const SUMMARY_WORDS = Math.round(JSON.parse(readFileSync(new URL("./reading-tasks.json", import.meta.url), "utf8")).tasks["text-page"].bodyWords.q3);
 export const TEXT_LIMITS = Object.freeze({ titleWords: TITLE_WORDS.max, titleTarget: TITLE_WORDS.target, titleLines: 2, subtitleLines: 1, takeawayLines: 3, barLines: 2 });
 export const titleWords = (title) => String(title ?? "").replace(/\s*\(\d+\/\d+\)\s*$/, "").trim().split(/\s+/).filter(Boolean).length;
 
@@ -566,6 +570,141 @@ function checkBlocks(page, id, exhibits) {
   if (unheaded) throw new Error(`${id}: a chart in a block carries its \`heading\` - the measure and, with \`unit\`, its unit`);
 }
 
+// Defects a whole-deck review found on a fifty-page deck, refused here where
+// the page is written rather than left for the next review to find again.
+const cellText = (cell) => (cell && typeof cell === "object" ? (cell.blank === true ? "" : String(cell.text ?? cell.value ?? cell.label ?? "")) : String(cell ?? ""));
+const rowCells = (row) => (Array.isArray(row) ? row : Array.isArray(row?.cells) ? row.cells : []);
+const BLANK = /^[\s\-–—]*$/;
+const NUMERIC = /^[\s~≈<>+\-–$£€]*\d[\d.,]*\s*(%|x|pts?|bps|[kmb]n?|bn|tn|m|k)?\s*$/i;
+const TABLE_EXHIBIT = (ex) => TABLE_TYPES.has(String(ex?.type ?? "")) && Array.isArray(ex.rows);
+const COLUMN_CHARTS = new Set(["chart.column", "chart.stacked-column", "chart.combo"]);
+// A heading that says the columns are snapshots, not a series: the gaps are then the point.
+const SNAPSHOTS = /\b(snapshots?|selected (?:years|dates|months|quarters|periods)|observations?|as (?:of|at)\b)/i;
+// A column that judges: who leads, the verdict, how sure, the state.
+const VERDICT_HEADER = /\b(lead|leads|leader|winner|wins|edge|verdict|confidence|status|rating|score|ahead|behind|rag|assessment)\b/i;
+const CODED_COLUMN = new Set(["binary", "harvey", "heatmap", "bars", "rag", "lights", "progress", "dot", "check", "trend", "number", "logo", "photo"]);
+// What makes a page's paragraphs alternatives rather than one argument.
+const ALTERNATIVES = /\b(scenarios?|options|alternatives|futures|outcomes|pathways|paths to|market structures|base case|bull case|bear case|upside case|downside case)\b/i;
+const SCENARIO_WORDS = 60;
+const PROSE_TYPES = new Set(["options", "scorecard", "lookup", "matrix", "summary", "statement"]);
+
+/**
+ * A total row with nothing in it. Four measure tables on one deck closed on a
+ * "Total" label over a blank row: the measure-table preset asked for a total
+ * on tables of text, and the total row left every cell the arithmetic could
+ * not reach empty (compose.mjs totalRow now adds one only where a column sums).
+ * A row the author writes is held to the same: labelled a total, it carries one.
+ */
+function blankTotal(rows, labelled) {
+  for (const row of rows || []) {
+    const cells = rowCells(row), label = cellText(labelled ? row?.label : cells[0]).trim(), results = labelled ? cells : cells.slice(1);
+    if ((row?.style === "total" || /^(?:grand\s+)?(?:totals?|sum|overall)\b/i.test(label)) && results.length && results.every((c) => BLANK.test(cellText(c)))) return { label: label || "total" };
+  }
+  return null;
+}
+
+/** The chart exhibits an exhibit carries: itself, or the charts of a chart group. */
+const chartsIn = (ex) => (ex?.type === "chart-group" ? (ex.charts || []).map((c) => ({ type: c?.component, heading: c?.heading, unit: c?.unit, ...(c?.props || {}) })) : [ex]);
+
+/**
+ * A table's columns as (header, cells) pairs, with a pair joined by " / " in
+ * the header and " | " in its cells split into its parts: a findings matrix
+ * wrote "Current signal / Winner call" over "Model X at 58 | Firm A".
+ */
+function tableColumns(headers, rows, labelled) {
+  const columns = [];
+  headers.forEach((column, c) => {
+    const at = labelled ? c - 1 : c;
+    if (at < 0 || (!labelled && c === 0)) return;
+    const header = typeof column === "string" ? column : String(column?.label ?? "");
+    const cells = (rows || []).map((row) => rowCells(row)[at]);
+    const parts = header.split(/\s+\/\s+/);
+    const split = parts.length > 1 && cells.every((cell) => BLANK.test(cellText(cell)) || cellText(cell).split(" | ").length === parts.length);
+    if (split) parts.forEach((part, i) => columns.push({ column, header: part, cells: cells.map((cell) => cellText(cell).split(" | ")[i] ?? "") }));
+    else columns.push({ column, header, cells });
+  });
+  return columns;
+}
+
+/**
+ * A column of judgements set as words. Four judgement tables on one deck -
+ * lead, winner, confidence, status - set "Firm A", "Medium", "No verdict" in
+ * the same grey text as the evidence beside them, so the page's answer read
+ * as one more fact. A coded column (a type, or words the composer codes on its
+ * own: on track, wins, ✓) passes; numbers are measures, not verdicts.
+ */
+function plainVerdict(headers, rows, labelled) {
+  for (const { column, header, cells } of tableColumns(headers, rows, labelled)) {
+    if (!VERDICT_HEADER.test(header)) continue;
+    if (column && typeof column === "object" && (CODED_COLUMN.has(column.type) || column.heat || column.bar || column.harvey)) continue;
+    const written = cells.filter((cell) => !BLANK.test(cellText(cell)));
+    const plain = written.filter((cell) => !(cell && typeof cell === "object" && cell.type) && typeof verdictCell(cellText(cell), header) === "string"
+      && !NUMERIC.test(cellText(cell)) && words(cellText(cell)).length <= 5);
+    if (plain.length >= 2 && plain.length * 2 >= written.length) return { header, examples: plain.slice(0, 3).map(cellText) };
+  }
+  return null;
+}
+
+/** A page's parallel prose: its paragraphs, points, card texts or row blocks, each as one run with its lead. */
+function proseBlocks(page, exhibits) {
+  const joined = (...parts) => parts.flat().filter(Boolean).map((p) => (typeof p === "string" ? p : `${p?.lead ?? ""} ${p?.text ?? ""}`)).join(" ");
+  if ((page.paragraphs || []).length) return page.paragraphs.map((p) => ({ lead: "", text: String(p) }));
+  if ((page.points || []).length) return page.points.map((p) => ({ lead: typeof p === "object" ? String(p?.lead ?? "") : "", text: joined(p) }));
+  if (page.form === "labelled-rows") return (page.blocks || []).map((b) => ({ lead: String(b?.label ?? ""), text: joined(b?.points || []) }));
+  const items = exhibits.find((ex) => ex?.type === "cards")?.items || [];
+  return items.map((item) => ({ lead: String(item?.title ?? ""), text: joined(item?.text, item?.points || []) }));
+}
+
+/** The first defect a review would find on this page, as the refusal to throw, or null. */
+function reviewedDefect(page, id, exhibits) {
+  const tables = exhibits.filter(TABLE_EXHIBIT);
+  const total = tables.map((ex) => blankTotal(ex.rows, false)).find(Boolean) ?? (page.type === "matrix" ? blankTotal(page.rows, true) : null);
+  if (total) return `${id}: TOTAL_ROW_BLANK - the row "${total.label}" closes the table as a total with no value in any result cell; a total row carries its computed total - or delete it. ` +
+    "Totals belong only where the columns share a basis (counts, amounts); `total: true` on a measure table sums the columns that add up";
+  for (const chart of exhibits.flatMap(chartsIn)) {
+    // Three columns are a comparison of chosen years (FY19, FY22, FY26: before,
+    // trough, now); four or more read as a series, and the eye reads the rhythm.
+    if (!COLUMN_CHARTS.has(chart?.type) || (chart.categories || []).length < 4 || SNAPSHOTS.test(`${chart.heading ?? ""} ${chart.unit ?? ""}`)) continue;
+    if (timePositions(chart.categories)) return `${id}: TIME_AXIS_UNEVEN - the columns ${chart.categories.slice(0, 4).join(", ")}, ... are dated ${describeGaps(chart.categories)} apart but a column chart sets them one slot apart, so the reader sees a rhythm the dates do not have. ` +
+      "Plot the series as a line or an area (the runtime spaces dated points by the time between them), fill in the missing periods, or say in the heading that the columns are snapshots (\"selected years\", \"snapshots\")";
+  }
+  if (["lookup", "options", "matrix"].includes(page.type)) {
+    const plain = page.type === "matrix" ? plainVerdict(page.columns || [], page.rows, true)
+      : tables.map((ex) => plainVerdict(ex.columns || [], ex.rows, false)).find(Boolean);
+    if (plain) return `${id}: VERDICT_TABLE_PLAIN - the "${plain.header}" column judges each row (${plain.examples.map((e) => `"${e}"`).join(", ")}) in plain text, where it reads as one more fact beside the evidence. ` +
+      "Code the judgement: give the column a `type` - \"rag\" (a status pill), \"harvey\" (a rating), \"check\", \"lights\" or \"dot\" - or make the page a `scorecard` (forms harvey, rag, check, lights, dot, heatmap, bars)";
+  }
+  if (!PROSE_TYPES.has(page.type)) {
+    const blocks = proseBlocks(page, exhibits), long = blocks.filter((b) => words(b.text).length >= SCENARIO_WORDS);
+    const about = `${page.title ?? ""} ${page.why ?? ""} ${page.settles?.what ?? ""} ${blocks.map((b) => b.lead).join(" ")}`;
+    if (long.length >= 2 && long.length <= 4 && long.length === blocks.length && (ALTERNATIVES.test(about) || blocks.every((b) => /^(scenario|option|case|path)\b/i.test(b.lead || b.text))))
+      return `${id}: SCENARIO_PROSE - ${long.length} alternatives are set as paragraphs of ${long.map((b) => words(b.text).length).join(", ")} words, which a reader has to hold in mind to compare. ` +
+        "Set them side by side on the same terms: type `options` (form compare or table-halves), `parallel` form `labelled-rows`, or a comparison table whose columns are what each is judged on - the trigger, who captures the value, the test that would show it, the signal against it";
+  }
+  return null;
+}
+
+/**
+ * Shares of one measure set as same-size tiles. A metric strip held 9.6% and
+ * 57% of the same web-visit measure in boxes of one width, and its chart
+ * 2.0% and 78% in bars of one width: equal boxes say the numbers are alike
+ * when the point is that they are not. Advisory - tiles of different measures
+ * are right, and whether two labels name one measure is a reading, not a rule.
+ */
+function sharesInTiles(page, exhibits) {
+  const items = [...(page.metrics || []), ...(page.blocks || []).map((b) => b?.metric),
+    ...exhibits.filter((ex) => ["fact-grid", "stat-list", "cards"].includes(ex?.type)).flatMap((ex) => ex.items || [])].filter((item) => item && typeof item === "object");
+  const shares = items.map((item) => ({ item, pct: /^\s*(\d+(?:\.\d+)?)\s?%\s*$/.exec(String(item.value ?? ""))?.[1], terms: new Set(words(item.label).map((w) => w.toLowerCase().replace(/[^a-z]/g, "")).filter((w) => w.length > 3)) }))
+    .filter((s) => s.pct !== undefined && Number(s.pct) > 0);
+  for (const [i, a] of shares.entries()) for (const b of shares.slice(i + 1)) {
+    const shared = [...a.terms].filter((w) => b.terms.has(w));
+    const [lo, hi] = [Number(a.pct), Number(b.pct)].sort((x, y) => x - y);
+    if (shared.length >= 2 && hi / lo > 5)
+      return `SHARES_IN_TILES: ${a.item.value} and ${b.item.value} are shares of one measure ("${a.item.label}") set in tiles of one size, so a reader sees two alike boxes where one is ${Math.round(hi / lo)} times the other; set the shares on one 0-100% scale - a bar, a dumbbell or a slope - and keep tiles for measures that differ`;
+  }
+  return null;
+}
+
 /**
  * Compile one typed page into a deck-spec slide. Throws with the choice to
  * make when a choice is missing or impossible; structural pages (`kind`
@@ -717,6 +856,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
     const flat = exhibits.filter((ex) => trivialChart(ex));
     if (flat.length) throw new Error(`${id}: ${flat.length} panel${flat.length === 1 ? " plots" : "s plot"} two numbers of one series; two numbers are a metric pair - set them as a numbers page, or give each panel the whole set or the series over time`);
   }
+  const reviewed = reviewedDefect(page, id, [...exhibits, ...(page.blocks || []).map((block) => block?.exhibit).filter(Boolean)]);
+  if (reviewed) throw new Error(reviewed);
 
   // Evidence checks the type makes.
   if (type.marked && !markedChart(primary))
@@ -888,6 +1029,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   if (slide.kind && page.subtitle !== undefined) throw new Error(`${id}: a ${page.form} page has no title band, so it takes no \`subtitle\`; put the scope in its text`);
   // Advisories the compiler can see and the author should: they do not block.
   const advisories = [];
+  const tiles = sharesInTiles(page, exhibits);
+  if (tiles) advisories.push(tiles);
   if (page.type === "place" && typeof primary?.geography === "string") {
     const points = (primary.markers || []).filter((m) => Number.isFinite(m?.longitude) && Number.isFinite(m?.latitude));
     const span = points.length > 1 ? Math.max(...points.map((m) => m.longitude)) - Math.min(...points.map((m) => m.longitude)) : 0;
@@ -993,6 +1136,7 @@ export function describeTypes() {
     `\`subtitle\` - optional, on any analytical page: one line under the title (${SUBTITLE_WORDS} words at most) naming what the title leaves out - the measure and unit, the population, the period or the scope. It is set small above the title rule and counts with the title, not the body; it must not restate the title.`, "",
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", "",
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point).", "",
+    `Refused at compile, because a review found each on a finished deck: a table row labelled Total, Sum or Overall with nothing in its result cells (TOTAL_ROW_BLANK - a measure table adds its own total only where a column sums, and \`total: true\` where none does is refused); a column chart of four or more dates at uneven gaps (TIME_AXIS_UNEVEN - a line or an area spaces dated categories by the time between them, so draw the series as one, or say "snapshots" or "selected years" in the heading); on a lookup, options or matrix page, a column headed lead, winner, edge, verdict, confidence, status, rating, score, ahead, behind or assessment whose cells are words (VERDICT_TABLE_PLAIN - give it a \`type\`: rag, harvey, check, lights, dot, or use a scorecard); two to four alternatives (scenarios, options, paths) as paragraphs of ${SCENARIO_WORDS} words or more each (SCENARIO_PROSE - set them as options, labelled rows or a table of trigger, who captures the value, the test, the counter-signal). Advised: shares of one measure more than five times apart in tiles of one size (SHARES_IN_TILES - one 0-100% scale). Deck-level: more than ${REVIEWED.tableRunMax} of any ${REVIEWED.tableWindow} consecutive analytical pages drawn as one table construction (VARIETY_TABLES); declared \`players\` - or two names in a fifth of the titles - without each one's logo on the cover or the first ${REVIEWED.earlyPages} analytical pages (PLAYERS_UNMARKED); \`profiles\` cards with no logo or picture (PROFILE_UNPICTURED). An executive summary is held to the text page's upper quartile (${SUMMARY_WORDS} body words), not its fence; a point's lead and text are one block for TEXT_BLOCK_TOO_LONG, and so is a card's or a cell's text.`, "",
     `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across; two rows or more fill the frame, one row grows by a third) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
     `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - write to ${TEXT_LIMITS.titleTarget}, which sets on one line, since more than a third of titles past it is PLAN_TITLE_LENGTH; a \`subtitle\` one line of ${SUBTITLE_WORDS} words; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines, one or two the norm (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best").`, "",
     ...(() => { const columns = panelColumnCapacity(); return [

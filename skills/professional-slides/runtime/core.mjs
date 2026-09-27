@@ -3,6 +3,7 @@ import { resolvePalette, heatScaleTokens, contrastRatio } from "./palettes.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
 import { lineBox } from "./text-layout.mjs";
+import { timePositions } from "./time-axis.mjs";
 
 export const DESIGN_SYSTEM_VERSION = "2.0.0";
 export const SCENE_SCHEMA = "professional-slides.scene/v1";
@@ -964,7 +965,12 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   if (["pie", "donut"].includes(type) && renderedNodes?.some(node => node.role === "data-label" && node.data?.placement === "outside")) return null;
   // Explicit numeric x positions and keyed point labels are not a categorical
   // native line. Preserve their spacing and selected labels as editable shapes.
-  if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;  // External stack labels and their leaders use measured scene coordinates;
+  if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;
+  // Dated observations at uneven gaps are drawn where they fall in time
+  // (charts.mjs, time-axis.mjs). PowerPoint's category axis would set them one
+  // slot apart again, so those lines and areas stay drawn, as the sparse line does.
+  if (["line", "area"].includes(type) && timePositions(props.categories)) return null;
+  // External stack labels and their leaders use measured scene coordinates;
   // Office repositioning the labels would detach those leaders from the text.
   if (renderedNodes?.some(node => node.role === "data-label" && node.data?.external)) return null;
   // The forecast key and its dashed boundary are placed against the measured

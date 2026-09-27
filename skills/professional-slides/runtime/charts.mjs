@@ -25,6 +25,7 @@ import { legendRowCount, legendNodes, LEGEND_TOKENS } from "./legends.mjs";
 import { EXTRA_CHARTS } from "./charts-extra.mjs";
 import { contrastRatio } from "./palettes.mjs";
 import { CHART_GUIDANCE } from "./guidance.mjs";
+import { timePositions } from "./time-axis.mjs";
 import {
   HORIZONS_SAMPLE,
   HORIZONS_TOKENS,
@@ -1571,8 +1572,18 @@ function lineChart({ id, frame, props, area = false }) {
   // of a forecast). It rides on the end labels, which name the rows.
   if (props.seriesGrowth && !endLabels) throw new Error("seriesGrowth sits beside the end labels; set directLabels: \"end\"");
   const seriesGrowth = props.seriesGrowth ? growthColumn(props.seriesGrowth, categories, series, "seriesGrowth") : null;
+  // Dated observations at uneven gaps (Jan, Mar, Jun, Aug) sit where they fall
+  // in time: one slot apart, a run-rate line steepened where the observations
+  // bunched rather than where the growth did (time-axis.mjs). Two a month apart
+  // on a year-and-a-half axis sit closer than a value label is wide - the label
+  // of the second landed on the segment climbing into it, and thinned labels
+  // left the first one on the value axis - so such a line is read off its
+  // value axis, with the latest value labelled at its end.
+  const spacing = timePositions(categories);
+  const crowded = Boolean(spacing) && spacing.slice(1).some((v, i) => (v - spacing[i]) * (frame.width - 120) < 64);
+  const labelAt = (index) => !crowded || index === categories.length - 1;
   const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length <= 8);
-  const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
+  const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels && !crowded });
   if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
   const bounds = numericBounds(withReferenceValues(values, props), { min: props.yMin, max: props.yMax, axis: "y", tight: !showValueAxis && props.gridlines !== true });
   const labelWidth = axisLabelWidth(bounds);
@@ -1588,7 +1599,7 @@ function lineChart({ id, frame, props, area = false }) {
     endLabels
   });
   const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
-  const xScale = (index) => plot.x + (categories.length === 1 ? plot.width / 2 : plot.width * index / (categories.length - 1));
+  const xScale = (index) => plot.x + (categories.length === 1 ? plot.width / 2 : spacing ? plot.width * spacing[index] : plot.width * index / (categories.length - 1));
   const nodes = [
     ...(showLegend ? topLegend({ id, frame, items: series.map((item, index) => ({ label: item.name, colorIndex: props.colorIndices?.[index] ?? index })) }) : []),
     ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth })
@@ -1596,19 +1607,28 @@ function lineChart({ id, frame, props, area = false }) {
   const pointMap = new Map();
   const categoryMap = new Map();
   const categorySlot = Math.min(120, Math.max(76, plot.width / Math.max(1, categories.length) * 0.82));
+  const slotX = (index) => Math.max(frame.x, Math.min(frame.x + frame.width - categorySlot, xScale(index) - categorySlot / 2));
+  // On a time-spaced axis every observation keeps its tick (its marker) and the
+  // labels are the ones whose slots clear their neighbours', the last kept over
+  // the one before it: an even step would label a bunch and skip a gap.
+  const spacedLabels = spacing ? categories.reduce((kept, _, index) => {
+    const clear = (a, b) => Math.abs(slotX(a) - slotX(b)) >= categorySlot + 4;
+    if (!kept.length || clear(kept.at(-1), index)) kept.push(index);
+    else if (index === categories.length - 1 && kept.length > 1 && clear(kept.at(-2), index)) kept[kept.length - 1] = index;
+    return kept;
+  }, []) : null;
   // Dense periods (more categories than the plot has label slots) label every
   // nth point, always keeping the first and last, as a strong deck does.
   const pitch = categories.length > 1 ? (xScale(1) - xScale(0)) : plot.width;
   const widest = Math.max(...categories.map((c) => measureText(String(c), 400, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width));
   const { every, fromFirst } = periodLabelStep(categories.length, Math.max(1, Math.ceil((widest + 10) / Math.max(1, pitch))));
   categories.forEach((category, index) => {
-    const x = xScale(index);
     // Every label is centred on its point; the first and last may reach into
     // the chart's own insets so the spacing stays even.
-    const categoryX = Math.max(frame.x, Math.min(frame.x + frame.width - categorySlot, x - categorySlot / 2));
+    const categoryX = slotX(index);
     categoryMap.set(category, { x: categoryX, y: plot.y, width: categorySlot, height: plot.height });
-    const shown = every === 1 || index % every === 0 || (!fromFirst && index === categories.length - 1);
-    if (shown && !(every > 1 && index === categories.length - 1 && (index % every) !== 0 && (categories.length - 1 - Math.floor((categories.length - 1) / every) * every) * pitch < widest + 10)) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
+    const shown = spacedLabels ? spacedLabels.includes(index) : every === 1 || index % every === 0 || (!fromFirst && index === categories.length - 1);
+    if (shown && !(!spacedLabels && every > 1 && index === categories.length - 1 && (index % every) !== 0 && (categories.length - 1 - Math.floor((categories.length - 1) / every) * every) * pitch < widest + 10)) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
   });
   const pendingEndLabels = [];
   const weight = markWeight();
@@ -1657,7 +1677,7 @@ function lineChart({ id, frame, props, area = false }) {
       if (series.length === 1) pointMap.set(`value:${point.category}`, mappedPoint);
       const categoryPoint = pointMap.get(`category:${point.category}`);
       if (!categoryPoint || mappedPoint.y < categoryPoint.y) pointMap.set(`category:${point.category}`, mappedPoint);
-      if (showDataLabels && !(endLabels && point.category === categories.at(-1))) {
+      if (showDataLabels && labelAt(points.indexOf(point)) && !(endLabels && point.category === categories.at(-1))) {
         const first = point.category === categories[0];
         const last = point.category === categories.at(-1);
         nodes.push(textPrimitive({

@@ -37,6 +37,19 @@ export const VARIETY_CODES = Object.freeze({
   PAGE_DOES_NOT_COMPOSE: "a page could not be composed",
   // Advisory, raised by the page-type compiler (page-types.mjs) and listed in the author's summary.
   MAP_COARSE: "a regional map drawn on the built-in 1:110m coastline, which is coarse at that scale",
+  // Found by a whole-deck review and refused where the page is written
+  // (page-types.mjs reviewedDefect, compose.mjs totalRow); the author sees
+  // them as COMPILE or PAGE_DOES_NOT_COMPOSE findings carrying these codes.
+  TOTAL_ROW_BLANK: "a table row labelled as a total with no value in any of its result cells",
+  TIME_AXIS_UNEVEN: "a column chart whose dated categories are unevenly spaced in time but drawn one slot apart",
+  VERDICT_TABLE_PLAIN: "a lookup, options or matrix table whose judgement column (lead, verdict, confidence, status) is plain text",
+  SCENARIO_PROSE: "two to four alternatives written as paragraphs of sixty words or more each",
+  // Advisory, raised by the page-type compiler and listed in the author's summary.
+  SHARES_IN_TILES: "shares of one measure an order of magnitude apart set in tiles of one size",
+  // Deck-level, read here from the compiled pages.
+  VARIETY_TABLES: "one table construction on more than half of ten consecutive analytical pages",
+  PLAYERS_UNMARKED: "the deck compares named players but no early page shows their logos",
+  PROFILE_UNPICTURED: "a page introducing players or products as cards with no logo or picture on any of them",
 });
 
 export const VARIETY = Object.freeze({
@@ -200,5 +213,106 @@ export function varietyFindings(spec, { structureOf } = {}) {
       "sees one layout repeated. Go back to what each has to show and draw the pages that are not one exhibit as what they are: " +
       `${ALTERNATIVES}. A deck's rhythm comes from pages that ask the reader to do different things.`, ids);
   }
+  findings.push(...reviewedDeckFindings(spec, slides));
   return findings;
+}
+
+// Deck-level defects a whole-deck review found, read from the compiled pages.
+export const REVIEWED = Object.freeze({ tableWindow: 10, tableRunMax: 5, earlyPages: 3, titleShare: 0.2, titleNames: 2 });
+const CODED_TABLE = new Set(["binary", "harvey", "heatmap", "bars", "rag", "lights", "progress", "dot", "check", "trend", "logo", "photo"]);
+const tablesOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex?.type === "table");
+
+/**
+ * How a page's table reads before a word of it is read: the first column
+ * filled or open, cells coded or all text, a short grid or a long one, and a
+ * band across its foot or none. A fifty-page deck set sixteen of its pages as
+ * dark first-column text grids closed by a grey strip, eight of them in ten
+ * consecutive pages on its capital structure - funding stages, commitments and
+ * verdicts all in one grammar - and the reviewer read them as one page.
+ */
+export function tableConstruction(slide) {
+  const table = tablesOf(slide)[0];
+  if (!table && slide.shape !== "findings-matrix") return null;
+  const columns = table?.columns || [];
+  const rows = table ? table.rows || [] : slide.rows || [];
+  const first = !table || table.treatment === "categories" || (table.treatment === undefined && columns.some((c) => c?.type === "category"))
+    ? "filled first column" : table.treatment === "standard" ? "filled header" : "open first column";
+  const coded = columns.some((c) => CODED_TABLE.has(c?.type) || c?.heat || c?.bar || c?.harvey)
+    || rows.some((row) => (Array.isArray(row) ? row : row?.cells || []).some((cell) => CODED_TABLE.has(cell?.type)));
+  return [first, coded ? "coded cells" : "text cells", rows.length > 8 ? "long" : "short", slide.soWhat ? "a band at the foot" : "open foot"].join(" · ");
+}
+
+function reviewedDeckFindings(spec, slides) {
+  const findings = [];
+  const block = (code, measured, threshold, repair, pages = null) => findings.push({ slide: pages, code, severity: "blocker", measured, threshold, repair });
+  const analytical = slides.filter((s) => s.pageType && !["statement", "summary"].includes(s.pageType.type));
+  // Table monotony: the worst window of ten analytical pages.
+  let worst = null;
+  for (let at = 0; at + REVIEWED.tableWindow <= Math.max(analytical.length, REVIEWED.tableWindow); at += 1) {
+    const window = analytical.slice(at, at + REVIEWED.tableWindow), tally = new Map();
+    for (const s of window) { const key = tableConstruction(s); if (key) tally.set(key, [...(tally.get(key) || []), s.id ?? null]); }
+    for (const [key, ids] of tally) if (ids.length > REVIEWED.tableRunMax && (!worst || ids.length > worst.ids.length)) worst = { key, ids, from: window[0]?.id ?? null, to: window.at(-1)?.id ?? null };
+  }
+  if (worst) block("VARIETY_TABLES", { construction: worst.key, pages: worst.ids.length, window: [worst.from, worst.to], ids: worst.ids }, REVIEWED.tableRunMax,
+    `${worst.ids.length} of the ${REVIEWED.tableWindow} analytical pages from ${worst.from} to ${worst.to} are the same table - ${worst.key} (${worst.ids.join(", ")}). ` +
+    "A reader stops telling them apart, and the differences in the evidence go with them. Draw each as what its evidence is: funding stages or a " +
+    "cash position as a bridge or a flow (`bridge`, `mechanism` form `flow`), commitments over time as bars aligned on their durations (`schedule` " +
+    "form `gantt`, `ranking` form `aligned-bars`), verdicts as a coded scorecard (`scorecard` forms harvey, rag, check), measures as a chart; keep the table for the look-up.", worst.ids);
+
+  // Identity: the players the deck compares, shown by their marks early.
+  const players = (Array.isArray(spec.players) ? spec.players : []).map((p) => (typeof p === "string" ? p : p?.name)).filter((name) => typeof name === "string" && name.trim());
+  const named = players.length >= 2 ? players : titleNames(analytical);
+  if (named.length >= 2) {
+    const early = [spec.cover, ...analytical.slice(0, REVIEWED.earlyPages)].filter(Boolean);
+    const marks = early.flatMap(logoTexts).join(" \n ").toLowerCase();
+    const unmarked = named.filter((name) => !marks.includes(name.toLowerCase()));
+    if (unmarked.length) block("PLAYERS_UNMARKED", { players: named, unmarked, pages: early.map((p) => p.id ?? "cover") }, 0,
+      `The deck compares ${named.join(", ")}${players.length >= 2 ? "" : " (named in its titles again and again)"}, and neither the cover nor the first ${REVIEWED.earlyPages} pages ` +
+      `shows ${unmarked.length === named.length ? "their logos" : `the logo of ${unmarked.join(", ")}`}. Introduce them by their marks before the evidence starts: a \`profiles\` page ` +
+      "(form `logos`, or `logo-table` with each player's numbers), or a `logo` column in an early table. Write each as `{ alt: \"<Name> logo\" }` - " +
+      `the build fetches it from the player's Wikipedia infobox${players.length >= 2 ? "" : "; declare them in the deck's `players` so it can"}.`,
+      early.map((p) => p.id ?? "cover"));
+  }
+  // A page that introduces players or products as cards is about what they look like as much as what they do.
+  for (const s of slides.filter((slide) => slide.pageType?.type === "profiles" && slide.pageType.form === "cards")) {
+    const items = tablesOf(s).length ? [] : (s.exhibit?.items || []);
+    if (items.length && !items.some((item) => ["logo", "media", "image", "photo", "picture"].some((key) => item?.[key])))
+      block("PROFILE_UNPICTURED", { page: s.id ?? null, cards: items.length }, 1,
+        `${s.id}: ${items.length} cards introduce ${items.map((item) => item?.title ?? item?.name).filter(Boolean).slice(0, 4).join(", ")} with no logo or picture on any of them. ` +
+        "A reader recognises a company by its mark and a product by its look: give each card its `logo` ({ alt: \"<Name> logo\" }, fetched by name) or a credited " +
+        "`image` ({ alt, search }, fetched from Wikimedia Commons), or introduce them as form `logos`.", [s.id ?? null]);
+  }
+  return findings;
+}
+
+/** Every logo a page draws, as the text that names it: `{ alt }` logos, logo cells, logos exhibits. */
+function logoTexts(page) {
+  const found = [];
+  const walk = (value, inLogo) => {
+    if (Array.isArray(value)) return value.forEach((v) => walk(v, inLogo));
+    if (!value || typeof value !== "object") return;
+    for (const [key, v] of Object.entries(value)) {
+      if (key === "alt" && typeof v === "string" && (inLogo || /\blogo\b/i.test(v))) found.push(v);
+      else walk(v, inLogo || key === "logo" || (key === "exhibit" && v?.type === "logos"));
+    }
+    if (value.type === "logos") found.push(...(value.items || []).map((item) => String(item?.name ?? "")));
+  };
+  walk(page, false);
+  return found;
+}
+
+/**
+ * The organisations a deck without `players` keeps naming: capitalised names
+ * in a fifth of its titles or more, never written in lower case. Two or more
+ * of them make a comparison of named players.
+ */
+function titleNames(slides) {
+  const titles = slides.map((s) => String(s.title ?? ""));
+  if (titles.length < 8) return [];
+  const lower = new Set(titles.join(" ").match(/\b[a-z][a-z'’]+\b/g) ?? []);
+  const counts = new Map();
+  for (const title of titles) for (const name of new Set((title.match(/\b[A-Z][A-Za-z0-9]*[A-Z0-9]?[A-Za-z0-9]*\b/g) ?? []).filter((w) => w.length > 2 && !lower.has(w.toLowerCase()))))
+    counts.set(name, (counts.get(name) || 0) + 1);
+  const names = [...counts].filter(([, n]) => n >= Math.max(4, REVIEWED.titleShare * titles.length)).map(([name]) => name);
+  return names.length >= REVIEWED.titleNames ? names : [];
 }

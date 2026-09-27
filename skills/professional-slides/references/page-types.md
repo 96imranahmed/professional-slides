@@ -190,6 +190,23 @@ The refusal names how to deepen: the peer set, a prior period or a benchmark as 
 
 `--check` prints `plotted`: the chart pages, their median, range and the five thinnest.
 
+## What a review found, refused where the page is written
+
+A whole-deck review of a fifty-page deck found these on pages that had passed every gate. Each is now refused, or resolved by the runtime, before anything is drawn, so a review does not have to find it again:
+
+| Code | Where | Rule | What to do instead |
+| --- | --- | --- | --- |
+| `TOTAL_ROW_BLANK` | compile, compose | a table row labelled Total, Sum or Overall (or `style: "total"`) with nothing in its result cells; `total: true` on a table where no column adds up | a total row carries its computed total, or it is deleted. A measure table adds its own total only where a column sums - counts and amounts, not rates, shares, scores or text |
+| `TIME_AXIS_UNEVEN` | compile | a column chart of four or more dated categories at uneven gaps (Jan, Mar, Jun, Aug; 2015, 2018, 2019) | a line or an area: the runtime places dated categories by the time between them, with a marker at every observation and the labels that fit. Or fill the missing periods, or name the columns as snapshots in the heading ("selected years") |
+| `VERDICT_TABLE_PLAIN` | compile | on a `lookup`, `options` or `matrix` page, a column headed lead, winner, edge, verdict, confidence, status, rating, score, ahead, behind or assessment whose cells are short words ("Firm A", "Medium", "No verdict"); a header "A / B" over cells "a \| b" is read as two columns | give the column a `type` - `rag` (a status pill), `harvey` (a rating), `check`, `lights`, `dot` - or make the page a `scorecard`. Words the composer codes on its own (on track, wins, ✓) pass |
+| `SCENARIO_PROSE` | compile | two to four alternatives - scenarios, options, paths, market structures - written as paragraphs, points, cards or row blocks of 60 words or more each | set them side by side on the same terms: `options` (compare, table-halves), `parallel` form `labelled-rows`, or a table whose columns are the trigger, who captures the value, the test that would show it and the signal against it |
+| `SHARES_IN_TILES` | compile, advisory | two shares of one measure (their labels share two words) more than five times apart, set as metrics, fact-grid or stat-list tiles or cards | the shares on one 0-100% scale: a bar, a dumbbell or a slope |
+| `VARIETY_TABLES` | variety contract | more than five of any ten consecutive analytical pages carry one table construction: the first column filled or open, the cells coded or text, a short or long grid, a band at the foot or none | draw each as its evidence: funding stages as a bridge or flow, commitments as bars aligned on their durations, verdicts as a scorecard, measures as a chart |
+| `PLAYERS_UNMARKED` | variety contract | the deck declares two or more `players` - or, without them, two names recur in a fifth of its titles - and the cover and first three analytical pages do not show each one's logo | a `profiles` page (form `logos` or `logo-table`) or a `logo` column early; `{ alt: "<Name> logo" }` is fetched from the player's Wikipedia infobox |
+| `PROFILE_UNPICTURED` | variety contract | a `profiles` page of cards with no logo or picture on any card | each card's `logo` or a credited `image` (`{ alt, search }`) |
+
+Two word rules close the gaps the same review found. An executive summary (`summary` form `executive-summary`) is held to the text page's upper quartile, 204 body words, rather than its outlier fence of 329 (`WORDS`): the summary is read first and in full. And `TEXT_BLOCK_TOO_LONG` reads a block as the reader meets it - a point's bold lead and its text are one run, and a card's text or a table cell is prose too - so a 171-word scenario no longer passes as a 40-word lead and a 131-word point.
+
 ## The variety contract
 
 `author-deck.mjs` refuses to write a deck of twelve or more content pages that breaks these rules. The build refuses it too, because the rules run from the same code (`runtime/gates/variety_gates.mjs`):

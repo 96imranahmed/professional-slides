@@ -948,8 +948,13 @@ def gate_words(slide_no, slide, findings, profile):
         total = body_words(slide)
         limit = words_limit(slide, profile)
         if total > limit:
+            summary = slide.get("role") == "executive-summary"
             findings.append(finding(
                 slide_no, "WORDS", total, limit,
+                "An executive summary is read first and in full, so it is held to "
+                "the upper quartile of text pages: keep each point to its finding "
+                "and the number that proves it, and leave the qualifications to the "
+                "pages that carry the evidence." if summary else
                 "Above the fence for pages doing this job: cut the page to its "
                 "claim, its evidence and its consequence, or split it in two.",
             ))

@@ -97,7 +97,16 @@ export function checkTextPlan(content, {required = false} = {}) {
     // Form, not just volume: the longest single run of prose on the page, and
     // how many runs there are. Exhibit cells and furniture are not prose.
     const prose = blocks.filter(b=>['body','qualification'].includes(b.role)).map(b=>textWords(b.text));
-    const longest = prose.length ? Math.max(...prose) : 0;
+    // The longest run as the reader meets it. A point's bold lead and its text
+    // are two nodes and one block: a 171-word scenario passed as a 40-word lead
+    // and a 131-word point. And a run set inside an exhibit - a card's text, a
+    // table cell - is a wall however it is framed, so it counts here too.
+    const runs = new Map();
+    for (const b of blocks.filter(b=>['body','qualification','exhibit'].includes(b.role) && !NOTE_LINE.test(b.text))) {
+      const key = String(b.id).replace(/:lead:(\d+)$/, ':item:$1');
+      runs.set(key, (runs.get(key) || 0) + textWords(b.text));
+    }
+    const longest = runs.size ? Math.max(...runs.values()) : 0;
     if (longest > TEXT_FORM.longestBlockMax) {
       fail('TEXT_BLOCK_TOO_LONG',
         `One run of ${longest} words; strong decks keep every block under ${TEXT_FORM.longestBlockMax} `
