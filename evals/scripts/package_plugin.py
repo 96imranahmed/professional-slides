@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # the calibration corpus's records and scripts - and never ships.
 ALLOWED_ROOTS = {'skills'}
 ASSET_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.svg'}
-ALLOWED_FILES = {'.codex-plugin/plugin.json', 'README.md', 'package.json'}
+ALLOWED_FILES = {'plugin.json', '.codex-plugin/plugin.json', 'README.md', 'package.json'}
 EXTENSIONS = {'.md', '.mjs', '.py', '.json', '.toml', '.yaml', '.yml', '.svg'}
 EXCLUDED = {'dist', 'output', 'outputs', 'tmp', 'deliverables', 'renders', 'node_modules', '__pycache__', '.git'}
 
@@ -42,8 +42,8 @@ def package(source: Path, destination: Path):
             raise ValueError(f'Symlinks must not enter the distributable: {rel}')
         if p.is_file():
             files.append((p, rel))
-    if not any(str(rel) == '.codex-plugin/plugin.json' for _, rel in files):
-        raise ValueError('Source has no plugin manifest')
+    if not {'plugin.json', '.codex-plugin/plugin.json'}.issubset({rel.as_posix() for _, rel in files}):
+        raise ValueError('Source has no portable or compatibility plugin manifest')
     manifest = {}
     for p, rel in sorted(files):
         dest = destination / rel

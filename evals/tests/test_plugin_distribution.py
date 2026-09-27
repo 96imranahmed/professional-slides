@@ -13,11 +13,20 @@ packager = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(packager)
 
 class PluginDistributionTests(unittest.TestCase):
+    def test_portable_manifest_matches_codex_compatibility_manifest(self):
+        portable = json.loads((ROOT/'plugin.json').read_text())
+        compatibility = json.loads((ROOT/'.codex-plugin/plugin.json').read_text())
+        self.assertEqual(portable['$schema'], 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json')
+        for key in ('name', 'version', 'description', 'author'):
+            self.assertEqual(portable[key], compatibility[key])
+        self.assertEqual(portable['extensions']['com.openai']['interface'], compatibility['interface'])
+
     def test_package_preserves_icon_bytes_and_excludes_non_asset_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             source, dest = Path(tmp)/'source', Path(tmp)/'package'
             (source/'.codex-plugin').mkdir(parents=True)
             (source/'.codex-plugin/plugin.json').write_text('{}')
+            (source/'plugin.json').write_text('{}')
             (source/'assets').mkdir()
             icon = b'\x89PNG\r\n\x1a\nicon-fixture'
             (source/'assets/icon.png').write_bytes(icon)
@@ -35,12 +44,12 @@ class PluginDistributionTests(unittest.TestCase):
     def test_package_excludes_generated_private_and_dependency_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             source, dest = Path(tmp)/'source', Path(tmp)/'package'
-            for name in ['.codex-plugin/plugin.json','skills/demo/SKILL.md','evals/scripts/check.py', 'output/private.pptx','tmp/input.json','deliverables/report.json','.context-engine.toml','node_modules/pkg/package.json','skills/demo/__pycache__/x.py','skills/demo/output/data.json','skills/demo/outputs/data.json','skills/demo/dist/package.json']:
+            for name in ['plugin.json','.codex-plugin/plugin.json','skills/demo/SKILL.md','evals/scripts/check.py', 'output/private.pptx','tmp/input.json','deliverables/report.json','.context-engine.toml','node_modules/pkg/package.json','skills/demo/__pycache__/x.py','skills/demo/output/data.json','skills/demo/outputs/data.json','skills/demo/dist/package.json']:
                 p=source/name; p.parent.mkdir(parents=True,exist_ok=True);p.write_text('{}')
             packager.package(source,dest)
             files=json.loads((dest/'package-manifest.json').read_text())['files']
             # Development tooling under evals/ never ships.
-            self.assertEqual(set(files),{'.codex-plugin/plugin.json','skills/demo/SKILL.md'})
+            self.assertEqual(set(files),{'plugin.json','.codex-plugin/plugin.json','skills/demo/SKILL.md'})
             self.assertFalse((dest/'output').exists())
             packager.package(source,dest)
 
@@ -51,6 +60,7 @@ class PluginDistributionTests(unittest.TestCase):
             (source/'.git').mkdir(parents=True)
             (source/'.codex-plugin').mkdir()
             (source/'.codex-plugin/plugin.json').write_text('{}')
+            (source/'plugin.json').write_text('{}')
             output = source/'output'
             output.mkdir()
             (output/'artifact.json').write_text('{}')
