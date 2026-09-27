@@ -10,6 +10,7 @@ import { formatValue } from "./value-format.mjs";
 import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle, labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend } from "./charts.mjs";
 import { TOKENS } from "./core.mjs";
 import { measureAt } from "./draw.mjs";
+import { timePositions } from "./time-axis.mjs";
 
 const ACCENT = token("color.accent");
 const measure = (text, width, { bold = false, size = CHART_LABEL } = {}) => measureAt(text, width, { size, bold, font: FONT });
@@ -366,7 +367,15 @@ function stackedAreaLayout(frameIn, props) {
 }
 function stackedAreaChart({ id, frame, props }) {
   const { series, categories, bounds, labelWidth, plot } = stackedAreaLayout(frame, props);
-  const xAt = (i) => plot.x + plot.width * i / Math.max(1, categories.length - 1);
+  // Uneven dated observations sit where they fall in time (time-axis.mjs), and
+  // only the labels whose 80px slots clear their neighbours' are set.
+  const spacing = timePositions(categories);
+  const xAt = (i) => plot.x + plot.width * (spacing ? spacing[i] : i / Math.max(1, categories.length - 1));
+  const labelled = categories.reduce((kept, _, i) => {
+    if (!spacing || !kept.length || xAt(i) - xAt(kept.at(-1)) >= 84) kept.push(i);
+    else if (i === categories.length - 1 && kept.length > 1 && xAt(i) - xAt(kept.at(-2)) >= 84) kept[kept.length - 1] = i;
+    return kept;
+  }, []);
   const yAt = (v) => plot.y + plot.height - (v - bounds.min) / bounds.span * plot.height;
   const nodes = [
     ...(props.legend !== false ? topLegend({ id, frame, items: series.map((s, i) => ({ label: s.name, colorIndex: props.colorIndices?.[i] ?? i })) }) : []),
@@ -385,7 +394,7 @@ function stackedAreaChart({ id, frame, props }) {
     const last = categories.length - 1, mid = (upper[last] + lower[last]) / 2;
     if (upper[last] - lower[last] > 0) nodes.push(textPrimitive({ id: stableId(id, "end-label", sr.name), role: "data-label", frame: { x: plot.x + plot.width + 6, y: yAt(mid) - 10, width: 64, height: 20 }, text: formatValue(sr.values[last], props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { series: sr.name } }));
   });
-  categories.forEach((c, i) => nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: xAt(i) - 40, y: plot.y + plot.height + 12, width: 80, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, false, "center") })));
+  categories.forEach((c, i) => labelled.includes(i) && nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: xAt(i) - 40, y: plot.y + plot.height + 12, width: 80, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, false, "center") })));
   return nodes;
 }
 

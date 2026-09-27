@@ -356,7 +356,7 @@ const RAG_WORDS = [
   [/^(loses?|lost)$/i, "lost"],
 ];
 /** Verdict cells: ✓/✗, status words and "45 %" under a progress heading become typed cells. */
-function verdictCell(value, header) {
+export function verdictCell(value, header) {
   // A cell the highlight pass has already claimed arrives as {text, highlight}
   // rather than as a string, and this returned early on anything that was not
   // a string. So a scorecard whose highlight phrase was its own verdict word
@@ -559,7 +559,7 @@ function addsUp(column, values = []) {
 }
 
 function totalRow(ex) {
-  if (ex.total !== true) return ex;
+  if (ex.total !== true && ex.total !== "auto") return ex;
   const rows = ex.rows.map((row) => (Array.isArray(row) ? { cells: row, plain: true } : { ...row }));
   const body = rows.filter((row) => row.style !== "total" && row.style !== "group");
   if (!body.length) return ex;
@@ -583,6 +583,14 @@ function totalRow(ex) {
     return String(Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10);
   });
   const { total: _t, totalLabel: _l, ...rest } = ex;
+  // A total row is its totals. The measure-table preset asked for one on every
+  // table, and four tables of text on one deck closed on a "Total" label over
+  // a blank row; the preset's total ("auto") is now added only where a column
+  // sums, and one the author asks for where none does is refused.
+  if (cells.slice(1).every((cell) => !String(cell).trim())) {
+    if (ex.total === "auto") return rest;
+    throw new Error("TOTAL_ROW_BLANK: `total: true` asks for a total row, but no column of this table adds up (counts and amounts do; rates, shares, scores and text do not), so the row would carry a label and nothing else - a total row carries its computed total, or it is deleted");
+  }
   return { ...rest, rows: [...rows.map((row) => (row.plain ? row.cells : row)), { style: "total", cells }] };
 }
 
@@ -1755,7 +1763,7 @@ function halvable(ex) {
   if (columns.length > 3 || rows.length < 10) return false;
   // Grouped headers, total rows and row styles belong to one table read
   // top to bottom; cutting it in half puts the total in the middle of the page.
-  if (ex.total === true || (ex.derive || []).length) return false;
+  if (ex.total === true || ex.total === "auto" || (ex.derive || []).length) return false;
   if (columns.some((c) => c && typeof c === "object" && (c.group || c.implication || c.bar || c.heat || c.bubble))) return false;
   if (rows.some((row) => !Array.isArray(row) && row?.style)) return false;
   const cells = rows.flatMap((row) => (Array.isArray(row) ? row : row?.cells || []));
@@ -2146,7 +2154,7 @@ const SHAPES = {
     const ex = slide.exhibit;
     if (!ex || !["table", "rows", "compare"].includes(ex.type)) throw new Error("A measure-table page needs a table exhibit");
     return { density: slide.density ?? "pre-read",
-      exhibit: { density: ex.density ?? "compact", total: ex.total ?? true, ...ex } };
+      exhibit: { density: ex.density ?? "compact", total: ex.total ?? "auto", ...ex } };
   },
   // The assumptions grid behind a forecast: the chart over its own numbers.
   "model-page": (slide) => {

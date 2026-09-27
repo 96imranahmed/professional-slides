@@ -83,7 +83,12 @@ export function wordBudgetOf(task, slide) {
   const bank = READING_TASK_BANK[task]?.bodyWords;
   if (!bank) return null;
   const share = slide ? pictureShareOf(slide) : 0;
-  return { floor: Math.round(bank.q1 * (1 - share)), ceiling: Math.round(bank.q3 + 1.5 * (bank.q3 - bank.q1)) };
+  // The executive summary is read before anything else and in full, so it is
+  // held to its task's upper quartile rather than the outlier fence: a fifty-
+  // page deck opened on 313 body words, under the text page's fence of 329 and
+  // half as much again as the 204 a dense summary carries.
+  const ceiling = slide?.role === "executive-summary" ? Math.round(bank.q3) : Math.round(bank.q3 + 1.5 * (bank.q3 - bank.q1));
+  return { floor: Math.round(bank.q1 * (1 - share)), ceiling };
 }
 
 /** The reading task a composed page performs: its exhibit family, and whether it has a commentary column. */

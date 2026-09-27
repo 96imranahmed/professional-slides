@@ -67,6 +67,8 @@ Measured on the rendered page before review. The report records severity. `runti
 
 One more finding shares the shape but fires before the page is rendered, from the composer rather than the gates: `MISSING_EVIDENCE` (a ranked criterion with no comparative exhibit across all options).
 
+Defects a whole-deck review used to find are refused when the page is authored, and each carries its own code (`runtime/gates/variety_gates.mjs` holds the vocabulary; [Page types](../page-types.md#what-a-review-found-refused-where-the-page-is-written) the rules): `TOTAL_ROW_BLANK` (a total row with nothing in it), `TIME_AXIS_UNEVEN` (dated columns at uneven gaps drawn one slot apart; lines and areas are spaced by elapsed time instead), `VERDICT_TABLE_PLAIN` (a judgement column set as words), `SCENARIO_PROSE` (alternatives written as paragraphs), `VARIETY_TABLES` (one table construction on more than half of ten consecutive pages), `PLAYERS_UNMARKED` (named players with no early logos) and `PROFILE_UNPICTURED` block; `SHARES_IN_TILES` (shares of one measure far apart in tiles of one size) advises. An executive summary's `WORDS` ceiling is the text page's upper quartile, 204 body words.
+
 `page_gates.GATE_CODES` is the list this table is checked against — a code cannot be renamed in the gates without this table failing, and a gate cannot emit a code that is not in it.
 
 ## Review codes
