@@ -30,6 +30,9 @@ fetch-pictures.mjs photographs for `{ alt }` placeholders from Wikimedia Commons
 fetch-places.mjs   coordinates for map markers that name a place, cached in assets/places.json (run by the build)
 fetch-series.mjs   public time series (World Bank, Our World in Data) into sources/ as CSV + a chart block
 deliver-deck.mjs   build → gates must pass → self-check must cover claims → review → <id>-DELIVERED.pptx or REJECTED.md
+preferences.mjs    the design intake's answers, stored once per user outside any project; show | get | set | clear | deck-keys | apply
+design-options.mjs one labelled contact sheet per intake question, each tile the sample built with that answer (emit/contact_sheet.py lays them out)
+infer-style.py     canvas, colours and title treatment read off a reference deck supplied as a PDF or screenshots
 ```
 
 Component contract: `render({ id, frame, props }) → { nodes }` with frames in canvas px (1280×720); `measureContent({ frame, props })` returns the natural height at a width — components without it fall back to `preferredSize`, and `evals/tests/test_measure_vs_preferred.py` reports the list. Chart components expose `nativeChart` on their instance so the emitter can write a workbook-backed chart; charts with reference lines, annotations or highlights stay as grouped shapes.

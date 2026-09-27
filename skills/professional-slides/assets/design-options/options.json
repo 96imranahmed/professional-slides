@@ -1,0 +1,289 @@
+{
+  "density": {
+    "live-pitch": "presented to a room: one idea a page, about 40 body words or fewer, the largest type",
+    "executive": "presented or sent: about 95 to 120 body words a page with commentary beside the evidence",
+    "pre-read": "read alone without a presenter: 120 body words a page and up, commentary carrying the argument"
+  },
+  "sheets": [
+    {
+      "sheet": "design-systems.png",
+      "question": "design",
+      "title": "Design system",
+      "options": [
+        {
+          "label": "design: \"consulting\"",
+          "note": "Consulting: Steering committees, board papers and diligence, where the reader expects the familiar analytical grammar.",
+          "answer": "consulting",
+          "deckKeys": {
+            "design": "consulting"
+          }
+        },
+        {
+          "label": "design: \"editorial\"",
+          "note": "Editorial: Pre-reads, strategy narratives and essays read alone, where the argument is carried by sentences as much as by charts.",
+          "answer": "editorial",
+          "deckKeys": {
+            "design": "editorial"
+          }
+        },
+        {
+          "label": "design: \"journal\"",
+          "note": "Data journal: Evidence-led briefings where the charts carry the argument and the reader wants the finding and the proof, fast.",
+          "answer": "journal",
+          "deckKeys": {
+            "design": "journal"
+          }
+        },
+        {
+          "label": "design: \"keynote\"",
+          "note": "Keynote: Decks presented to a room, launches and pitches, where each page has to land at a glance from the back of the room.",
+          "answer": "keynote",
+          "deckKeys": {
+            "design": "keynote"
+          }
+        }
+      ]
+    },
+    {
+      "sheet": "palettes.png",
+      "question": "colours",
+      "title": "Colours (on the consulting system)",
+      "options": [
+        {
+          "label": "palette: \"midnight\"",
+          "note": "the consulting system's own colours. Serif display titles on an open canvas, deep navy with an electric-blue accent, dash bullets, zebra tables",
+          "answer": "midnight",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": "midnight"
+          }
+        },
+        {
+          "label": "palette: \"evergreen\"",
+          "note": "Regular-weight titles on an open canvas, green pill date tags, plain chart headings with inline units, green bar families",
+          "answer": "evergreen",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": "evergreen"
+          }
+        },
+        {
+          "label": "palette: \"crimson\"",
+          "note": "Light regular titles, grey bar families with the answer in red, red KPI call-outs, annotation rails",
+          "answer": "crimson",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": "crimson"
+          }
+        },
+        {
+          "label": "palette: \"graphite\"",
+          "note": "Black ink with a bright green accent, regular titles, green chart families, ring KPIs",
+          "answer": "graphite",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": "graphite"
+          }
+        }
+      ]
+    },
+    {
+      "sheet": "trackers.png",
+      "question": "tracker",
+      "title": "Section tracker",
+      "options": [
+        {
+          "label": "tracker: \"pills\"",
+          "note": "every section as a pill, the current one filled",
+          "answer": "pills",
+          "deckKeys": {
+            "design": "consulting",
+            "tracker": "pills"
+          }
+        },
+        {
+          "label": "tracker: \"label\"",
+          "note": "the current section's name, above the title",
+          "answer": "label",
+          "deckKeys": {
+            "design": "consulting",
+            "tracker": "label"
+          }
+        },
+        {
+          "label": "tracker: \"breadcrumb\"",
+          "note": "the section under its parent",
+          "answer": "breadcrumb",
+          "deckKeys": {
+            "design": "consulting",
+            "tracker": "breadcrumb"
+          }
+        },
+        {
+          "label": "tracker: \"number-strip\"",
+          "note": "section numbers on a rail, the current one filled",
+          "answer": "number-strip",
+          "deckKeys": {
+            "design": "consulting",
+            "tracker": "number-strip"
+          }
+        },
+        {
+          "label": "tracker: false",
+          "note": "no tracker on the pages",
+          "answer": "none",
+          "deckKeys": {
+            "design": "consulting",
+            "tracker": false
+          }
+        }
+      ]
+    },
+    {
+      "sheet": "title-treatments.png",
+      "question": "titleRule",
+      "title": "Title treatment",
+      "options": [
+        {
+          "label": "titleRule: \"system\"",
+          "note": "the consulting system's own",
+          "answer": "system",
+          "deckKeys": {
+            "design": "consulting",
+            "tracker": "label"
+          }
+        },
+        {
+          "label": "titleRule: \"rule\"",
+          "note": "a thin rule, margin to margin",
+          "answer": "rule",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": {
+              "colors": {
+                "style.titleRule": "rule",
+                "style.titleRuleLength": "content",
+                "style.titleRuleColor": "rule"
+              }
+            },
+            "tracker": "label"
+          }
+        },
+        {
+          "label": "titleRule: \"full\"",
+          "note": "a hairline, edge to edge",
+          "answer": "full",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": {
+              "colors": {
+                "style.titleRule": "rule",
+                "style.titleRuleLength": "full",
+                "style.titleRuleColor": "rule"
+              }
+            },
+            "tracker": "label"
+          }
+        },
+        {
+          "label": "titleRule: \"bar\"",
+          "note": "a short accent bar",
+          "answer": "bar",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": {
+              "colors": {
+                "style.titleRule": "rule",
+                "style.titleRuleLength": "short",
+                "style.titleRuleColor": "accent",
+                "line.titleRule": 4
+              }
+            },
+            "tracker": "label"
+          }
+        },
+        {
+          "label": "titleRule: \"band\"",
+          "note": "a tinted band behind the title",
+          "answer": "band",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": {
+              "colors": {
+                "style.titleRule": "band"
+              }
+            },
+            "tracker": "label"
+          }
+        },
+        {
+          "label": "titleRule: \"block\"",
+          "note": "the title reversed out of a colour block",
+          "answer": "block",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": {
+              "colors": {
+                "style.titleRule": "block"
+              }
+            },
+            "tracker": "label"
+          }
+        },
+        {
+          "label": "titleRule: \"tab\"",
+          "note": "an accent tab at the top edge",
+          "answer": "tab",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": {
+              "colors": {
+                "style.titleRule": "tab"
+              }
+            },
+            "tracker": "label"
+          }
+        },
+        {
+          "label": "titleRule: \"none\"",
+          "note": "no rule; the page stays open",
+          "answer": "none",
+          "deckKeys": {
+            "design": "consulting",
+            "palette": {
+              "colors": {
+                "style.titleRule": "none"
+              }
+            },
+            "tracker": "label"
+          }
+        }
+      ]
+    },
+    {
+      "sheet": "surfaces.png",
+      "question": "surfaces",
+      "title": "Surfaces",
+      "options": [
+        {
+          "label": "surfaces: \"reference\"",
+          "note": "filled table headers, a tinted label column, filled cards, heavier marks",
+          "answer": "reference",
+          "deckKeys": {
+            "design": "consulting",
+            "surfaces": "reference"
+          }
+        },
+        {
+          "label": "surfaces: \"open\"",
+          "note": "type on the canvas: ruled headers, plain columns, outlined cards, light marks",
+          "answer": "open",
+          "deckKeys": {
+            "design": "consulting",
+            "surfaces": "open"
+          }
+        }
+      ]
+    }
+  ]
+}

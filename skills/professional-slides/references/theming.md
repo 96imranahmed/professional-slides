@@ -19,7 +19,57 @@ The system biases the layout chooser toward its repertoire and translates the au
 
 **Variation between runs.** Two runs of one brief should not produce the same deck. `variation` on the deck (any string; a new deck takes a fresh one from `runtime/variation.mjs`) draws reproducibly from what the system leaves open: list markers, table rows, the tracker, the contents page, how lead-in points are marked, two shapes the chooser leans toward and its tie-break order. The same script names two featured page types from the system's repertoire for the plan. Page structure is chosen page by page through [page types](page-types.md); the variation varies the styling those choices leave open.
 
-**Choosing.** Ask the user before planning a new deck: either supply a deck in the house or style they want (import it with `import-template.py`; the profile names the nearest system and why, and its colours, faces and margins override the system's), or pick a system. Show `assets/design-systems.png`, the same pages in all four, when asking. Record the choice and reason in the brief. An explicit palette, chrome or tracker on the deck still overrides the system's default.
+**Choosing.** The system is chosen in the [design intake](#design-intake) before a new deck is planned, never by silent default. Record the choice and reason in the brief. An explicit palette, chrome or tracker on the deck still overrides the system's default.
+
+## Design intake
+
+How a user's decks look is a habit, not a property of one deck, so it is asked once per user and stored: `runtime/preferences.mjs` keeps the answers in a file outside any project (`$PROFESSIONAL_SLIDES_HOME/preferences.json`, else `$XDG_CONFIG_HOME/professional-slides/`, else `~/.professional-slides/`), with when and how each was chosen (`asked`, `inferred` from a reference deck, or a `default` accepted) and a reference deck recorded only as a hash of its path.
+
+**1. Read what is stored.** Before planning a new deck run `node runtime/preferences.mjs show`: it prints the stored answers, `missing` (the questions still to ask), the `deckKeys` they set and a `reuse` line. Where the host keeps its own memory of the user (Claude Code's memory files, a Codex memory, a project instruction file), read that too; an answer found only there is stored with `set` before asking anything. Nothing missing: tell the user the `reuse` line - what was reused and that they can change it - and go on. The brief's own instructions still win for this deck ("make it look like our annual report") and are not stored unless the user says to.
+
+**2. Ask only what is missing, in one message.** Ask in this order, at most six questions, each with its recommended default marked and a note that any answer can be changed later. Show each question's sheet from `assets/design-options/` beside it; `options.json` there lists every tile's label, meaning and deck keys.
+
+| # | Question | Options | Default | Show |
+| --- | --- | --- | --- | --- |
+| 1 | Is there a deck or template in the style you want? PPTX or POTX is best; a PDF or screenshots also work. | a file, or no | no | - |
+| 2 | Which look? | `consulting`, `editorial`, `journal`, `keynote` | `consulting`; `keynote` for a deck presented to a room | `design-systems.png` |
+| 3 | Colours: the subject's own, your brand's, or a named palette? | `subject` (each deck takes its subject's identity colours when it has recognisable ones, else the system's), `brand` (give one or two hex colours, and a logo wordmark if wanted), `system`, `midnight`, `evergreen`, `crimson`, `graphite` | `subject` | `palettes.png` |
+| 4 | How should pages show where the reader is? | `pills`, `label`, `breadcrumb`, `number-strip`, `repeat-contents` (the contents page again before each section), `none`, or `auto` (each deck's variation draws label, breadcrumb or number strip) | `auto` | `trackers.png` |
+| 5 | Title treatment, and filled or open surfaces? | title: `system`, `rule`, `full`, `bar`, `band`, `block`, `tab`, `none`; surfaces: `reference`, `open` | `system`; `reference` | `title-treatments.png`, `surfaces.png` |
+| 6 | Who reads it, and how? | `live-pitch`: presented to a room, one idea a page, about 40 body words or fewer; `executive`: presented or sent, about 95 to 120 body words a page with commentary beside the evidence; `pre-read`: read alone, 120 body words a page and up | `executive` | - |
+
+Close the message with one optional line: fonts (only faces installed on the machine), a footer line reused on every deck (a confidentiality marking, the firm's name) and a cover wordmark. A user who answers only some questions takes the defaults for the rest; store those with `--source default`.
+
+**A reference deck answers most of it.** If question 1 gets a file, stop and infer before asking anything else. A PPTX or POTX: `python3 runtime/import-template.py <file> --out house.json`, then `node runtime/preferences.mjs set --from-house house.json --reference <file>`; the house profile's palette, faces, margins, title rule, nearest system and density are stored as `inferred`. A PDF or screenshots: `python3 runtime/infer-style.py <file.pdf | page.png ...>` reads the canvas, the most used colours (suggested as brand primary and accent) and the title treatment off the pixels, and names what it could not read (`notInferred`). Tell the user in two or three lines what was inferred and from what evidence, then ask only the questions still missing (usually the tracker and density), with the same sheets.
+
+**Hosts.** Show the sheet images with the questions: attach or open them where the host can, else give their paths.
+
+- *A structured question tool* (Claude Code's `AskUserQuestion`: up to four questions a call, two to four options each, "Other" always offered): ask question 1 alone first, since its answer removes most of the rest, then the remaining questions in one or two calls. Put the recommended option first, marked as recommended, with the option's meaning and the sheet's path in its description or preview. A question with more options than the tool takes lists the likeliest three beside the default and names the rest in the question text, answerable through "Other".
+- *No such tool* (Codex, a plain chat): one numbered message with the defaults marked and the sheets attached or linked.
+
+Never block on the intake for a one-page fix or an existing-deck revision; those keep the deck's own design.
+
+**Regenerate in the user's frame.** The stored sheets are drawn on the consulting system in its own colours. Once the user has given brand colours or picked a system, `node runtime/design-options.mjs <out-dir> --design <system> --brand '#RRGGBB,#RRGGBB' [--wordmark "Name"] [--only trackers,title-treatments]` rebuilds the sheets through the real pipeline (it needs LibreOffice), so the remaining questions are answered on their own pages.
+
+**3. Store the answers** as soon as the user gives them: `node runtime/preferences.mjs set design=editorial colours=brand 'brand={"primary":"#0B6E4F","accent":"#F2A900"}' tracker=label titleRule=system surfaces=reference density=pre-read` (JSON values, or bare strings). In a host with memory, also save a one-line note that design preferences live in that file, if the host's conventions allow a note of that kind. `get`, `clear [key]` and `path` read, forget and locate them.
+
+**4. Carry them into the deck.** `node runtime/preferences.mjs apply <id>.pages.json` writes the deck keys into the pages file's `deck` (or a deck spec's top level), filling only keys the deck does not already set, and prints the `reuse` line. Each answer sets exactly these deck keys:
+
+| Answer | Deck keys |
+| --- | --- |
+| `design` | `design` |
+| `colours: "brand"` + `brand` | `identity: { primary, accent }` |
+| `colours:` a palette name | `palette: "<name>"` on `consulting`; on another system `palette: { base, colors }` with the palette's `color.*` roles over the system's frame |
+| `colours: "subject"` or `"system"` | nothing; the author sets `identity` per deck when the subject has colours |
+| `titleRule` | `palette.colors`: `style.titleRule`, `style.titleRuleLength`, `style.titleRuleColor` (and `line.titleRule: 4` for `bar`); `system` sets nothing |
+| `tracker` | `tracker` (`none` is `false`; `auto` sets nothing, so the variation draws one) |
+| `surfaces` | `surfaces` |
+| `density` | `density`; the fill follows (`live-pitch` airy, `executive` balanced, `pre-read` full) |
+| `typography` | `typography` (a body face other than Arial takes a bold semibold mapping) |
+| `footer`, `wordmark` | `footer`, `logo` (the cover wordmark) |
+| `house` (inferred) | `design`, `palette`, `typography`, `chrome`, `pageTemplate`, `density`, `fill`, `weight` from the house profile |
+
+The deck file is then the record of the choice: a later change to the preferences does not rewrite a deck already planned.
 
 ## Palettes
 
