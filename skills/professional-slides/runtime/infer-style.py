@@ -55,33 +55,83 @@ def chroma(rgb) -> tuple[float, float]:
     return s, l
 
 
-def title_treatment(page: Image.Image, canvas) -> str | None:
-    """The top quarter of a page: a filled full-width block, a tinted band, a
-    rule across it, a short accent bar under the title, or open.
+def _longest_run(row) -> int:
+    best = run = 0
+    for inked in row:
+        run = run + 1 if inked else 0
+        best = max(best, run)
+    return best
 
-    Each row is read as runs of off-canvas pixels. A rule is one unbroken run
-    over most of the width and at most a few pixels thick - which is what
-    tells it from a table header band or two column headings' underlines
-    side by side. A bar is one short, coloured run that type never makes."""
-    top = page.crop((0, 0, page.width, page.height // 4))
-    rows = []
+
+def title_rule(rows, height: int) -> float | None:
+    """The rule under a page's title, as the share of the width it spans, or
+    None when the page has none. The one detector for a title rule: the
+    evaluation's page census reads a render with it, and title_treatment
+    below reads a reference page with it.
+
+    `rows` is the page from the top as rows of inked (truthy) and empty cells,
+    at least 30% of `height` of them. Only a line counts: a photo or a filled
+    band is thick, so a run of dense rows taller than 1.2% of the page is not
+    a rule. And only the title's line: an exhibit heading's rule sits lower
+    with the heading between it and the title, so everything above the rule
+    must be one block of lines (the title) ending just above it. One line may
+    stand apart at the top of the band: a tracker or kicker sits in its own
+    row over the title, and a one-line title set down on its rule leaves a
+    wider gap under it than the title's own lines do. It is one small line (no
+    taller than 1.5% of the page), so a title cannot pass for it and an
+    exhibit heading under the title is still between the title and the rule.
+    """
+    top, bottom, thin = int(height * 0.05), int(height * 0.30), max(2, int(height * 0.012))
+    width = len(rows[0]) if rows else 0
+    inked = {y: sum(1 for v in rows[y] if v) > 0.002 * width for y in range(top, bottom)}
+    runs = [_longest_run(rows[y]) for y in range(top, bottom)]
+    dense = [run >= 0.4 * width for run in runs]
+    y = 0
+    while y < len(dense):
+        if not dense[y]:
+            y += 1
+            continue
+        end = y
+        while end < len(dense) and dense[end]:
+            end += 1
+        if end - y <= thin:
+            above = [r for r in range(top, top + y) if inked[r]]
+            gaps = [b - a for a, b in zip(above, above[1:])]
+            wide = [i for i, g in enumerate(gaps) if g > height * 0.03]
+            if wide and above[wide[0]] - above[0] <= height * 0.015:
+                gaps = gaps[wide[0] + 1:]
+            under_title = bool(above) and all(g <= height * 0.03 for g in gaps) and top + y - above[-1] <= height * 0.06
+            return max(runs[y:end]) / width if under_title else None
+        y = end
+    return None
+
+
+def title_treatment(page: Image.Image, canvas) -> str | None:
+    """The top of a page: a filled full-width block, a tinted band, a rule
+    under the title across the page or part of it (title_rule), a short
+    accent bar under the title, or open.
+
+    Each row is read as runs of off-canvas pixels. A bar is one short,
+    coloured run that type never makes."""
+    top = page.crop((0, 0, page.width, int(page.height * 0.3) + 1))
+    rows, marks = [], []
     for y in range(top.height):
         row = [top.getpixel((x, y)) for x in range(0, top.width, 2)]
-        off = [i for i, p in enumerate(row) if sum(abs(a - b) for a, b in zip(p, canvas)) > 30]
-        unbroken = bool(off) and off[-1] - off[0] + 1 <= len(off) + 2
-        tone = Counter(quantised(row[i]) for i in off).most_common(1)[0][0] if off else None
-        rows.append((len(off) / len(row), unbroken, tone))
-    filled = [tone for share, _, tone in rows if share > 0.9]
-    if len(filled) > top.height * 0.35:
+        off = [sum(abs(a - b) for a, b in zip(p, canvas)) > 30 for p in row]
+        hits = [i for i, o in enumerate(off) if o]
+        unbroken = bool(hits) and hits[-1] - hits[0] + 1 <= len(hits) + 2
+        tone = Counter(quantised(row[i]) for i in hits).most_common(1)[0][0] if hits else None
+        marks.append(off)
+        rows.append((len(hits) / len(row), unbroken, tone))
+    quarter = rows[:page.height // 4]
+    filled = [tone for share, _, tone in quarter if share > 0.9]
+    if len(filled) > len(quarter) * 0.35:
         return "block" if sum(Counter(filled).most_common(1)[0][0]) < 380 else "band"
-    for y, (share, unbroken, _) in enumerate(rows):
-        thick = 1
-        while y + thick < len(rows) and rows[y + thick][0] > 0.6:
-            thick += 1
-        if share > 0.6 and unbroken and thick <= 3 and (y == 0 or rows[y - 1][0] < 0.5):
-            return "full" if share > 0.95 else "rule"
-    bars = [y for y, (share, unbroken, tone) in enumerate(rows) if 0.02 < share < 0.15 and unbroken and chroma(tone)[0] > 0.3]
-    if len(bars) >= 2 and bars[-1] > top.height * 0.4:
+    rule = title_rule(marks, page.height)
+    if rule is not None:
+        return "full" if rule > 0.95 else "rule"
+    bars = [y for y, (share, unbroken, tone) in enumerate(quarter) if 0.02 < share < 0.15 and unbroken and chroma(tone)[0] > 0.3]
+    if len(bars) >= 2 and bars[-1] > len(quarter) * 0.4:
         return "bar"
     return None
 

@@ -91,7 +91,7 @@ class BeautificationPassTests(unittest.TestCase):
 import assert from 'node:assert/strict';
 import {designStatistics, CODES, reviewPrompt} from './skills/professional-slides/runtime/reviewer.mjs';
 const page=(components,roles)=>({id:'s',nodes:[{role:'action-title',type:'text',text:'A finding'},
-  ...roles.map(r=>({role:r,type:'rect'}))],componentInstances:components.map(c=>({component:c}))});
+  ...roles.map(r=>({role:r,type:'rect'}))],componentInstances:['slide-chrome',...components].map(c=>({component:c}))});
 const scene={slides:[
   page(['table'],['table-rating-track','table-cell']),
   page(['table'],['table-cell']),

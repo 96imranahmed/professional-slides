@@ -29,6 +29,24 @@ from emit_pptx import CHART_PLOT_ROLES, LABEL_ROLES  # noqa: E402
 
 PX = 96 / 914400
 
+# What the saved file can get wrong against its scene. The build lists each as
+# a readback blocker, and delivery refuses on them.
+READBACK_CODES = {
+    "SLIDE_COUNT": "the file has a different number of slides than the scene",
+    "CANVAS_COLOR": "a slide's background is not the scene's canvas colour",
+    "WRAP_NONE": "a text box set not to wrap on a content slide",
+    "MISSING_SHAPE": "a scene text node has no shape in the file",
+    "FRAME_DRIFT": "a shape sits away from its scene frame by more than the tolerance",
+    "NO_TEXT_FRAME": "a text node's shape carries no text frame",
+    "NO_AUTOFIT": "a text box without normAutofit",
+    "PARAGRAPH_COUNT": "a text box's paragraphs differ from the author's",
+    "TEXT_MISMATCH": "a text box's words differ from the scene's",
+    "TITLE_NOT_PLACEHOLDER": "the action title is not a real title placeholder",
+    "MISSING_NATIVE_CHART": "a native chart instance has no chart object in the file",
+    "SERIES_COUNT": "a native chart carries a different number of series than planned",
+    "NATIVE_AXIS_DRIFT": "a native chart's axis settings differ from the scene's",
+}
+
 
 def frame_of(shape):
     return {"x": shape.left * PX, "y": shape.top * PX, "width": shape.width * PX, "height": shape.height * PX}

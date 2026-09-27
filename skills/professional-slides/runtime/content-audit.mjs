@@ -1,5 +1,10 @@
 // Verify explicit content and visual choices survive composition before export.
 // Layout selection must not turn supplied commentary into a silent no-op.
+export const AUDIT_CODES = Object.freeze({
+  MISSING_VISUAL_INTENT: "an explicit visual choice on the page (icons, a highlight, a treatment) did not survive composition",
+  MISSING_AUTHORED_CONTENT: "authored commentary that no composed page carries",
+});
+
 const normalize = (value) => String(value ?? "").normalize("NFKC").replace(/\s+/g, " ").trim();
 
 export function auditContent(spec, scene) {

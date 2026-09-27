@@ -5,10 +5,11 @@
 //
 // Vendor-neutral: node for layout, python-pptx to emit, LibreOffice to render. Writes
 // scene.json, planning.json, deck.pptx, rendered/slide-N.png, montage.png, readback.json,
-// gates.json and build-result.json into out/. Exit 0 when nothing blocks (`built`, or
-// `built-unrendered` with --no-render; advisories are counted in the result), 2 when a
-// blocker remains (`built-with-blockers`, each listed in `blockers` - the deck is still
-// written so it can be inspected), 1 on a crash.
+// gates.json and build-result.json into out/. Exit codes (EXIT in review-passes.mjs):
+// 0 when nothing blocks (`built`, or `built-unrendered` with --no-render; advisories
+// are counted in the result), 2 when a blocker remains (`built-with-blockers`, each
+// listed in `blockers` - the deck is still written so it can be inspected), 1 on a
+// crash. A deck whose storyline gate is not ready builds, with a warning.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +31,8 @@ import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
 import { auditTextPlan, auditExportText } from "./text-contract.mjs";
 import { writeLedger } from "./claims.mjs";
+import { EXIT } from "./review-passes.mjs";
+import { storylineWarning } from "./storyline.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -259,6 +262,13 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
  * rendered text read as a build held back by five advisories. Every blocker
  * is now listed with its source, and only a blocker makes the build exit 2.
  */
+// The blockers the build names when a report failed without a finding of its own.
+export const BUILD_CODES = Object.freeze({
+  READBACK_MISSING: "the saved file was not read back, so nothing says it matches the scene",
+  PREFLIGHT_FAILED: "the scene's gates failed without naming a finding",
+  GATES_FAILED: "the rendered page gates failed without naming a finding",
+});
+
 export function buildOutcome(result, { render = true } = {}) {
   const blockers = [], seen = new Set();
   const add = (source, f) => {
@@ -266,7 +276,11 @@ export function buildOutcome(result, { render = true } = {}) {
     if (!seen.has(key)) { seen.add(key); blockers.push({ source, code: f.code, ...(f.slide != null ? { slide: f.slide } : {}), ...(f.id ? { id: f.id } : {}), ...(f.text || f.shape ? { text: f.text ?? f.shape } : {}), ...(f.repair ? { repair: f.repair } : {}) }); }
   };
   const blocking = (f) => !["advisory", "info"].includes(f.severity);
-  if (result.preflight && result.preflight.passed === false) for (const f of (result.preflight.findings || []).filter(blocking)) add("page gates", f);
+  // The half-empty habit is counted on the render once there is one
+  // (page_gates.py gate_deck_empty_pages): the scene's count before the render
+  // is the same habit, and is not a second blocker beside the render's.
+  const superseded = (f) => render && result.gates && f.code === "DECK_SCENE_VOID";
+  if (result.preflight && result.preflight.passed === false) for (const f of (result.preflight.findings || []).filter(blocking).filter((f) => !superseded(f))) add("page gates", f);
   if (result.gates && result.gates.passed === false) for (const f of (result.gates.findings || []).filter(blocking)) add("page gates", f);
   if (result.readback?.accepted !== true) {
     for (const f of result.readback?.findings || []) add("readback", f);
@@ -274,7 +288,7 @@ export function buildOutcome(result, { render = true } = {}) {
   }
   if (result.textCoverage?.accepted === false) for (const f of (result.textCoverage.findings || []).filter(blocking)) add("rendered text", f);
   // A report that failed without naming a finding is still a blocker.
-  if (result.preflight?.passed === false && !blockers.length) add("page gates", { code: "PREFLIGHT_FAILED" });
+  if (result.preflight?.passed === false && !(result.preflight.findings || []).some(blocking)) add("page gates", { code: "PREFLIGHT_FAILED" });
   if (render && result.gates && result.gates.passed === false && !blockers.some((b) => b.source === "page gates")) add("page gates", { code: "GATES_FAILED" });
   // The scene's gates run twice, before the render and after it, so a code
   // counts as often as either run saw it, not the sum.
@@ -312,7 +326,7 @@ async function finish(result, directory) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  if (args.length < 2) { console.error("Usage: build-deck.mjs spec.json output-directory [--preflight] [--no-render] [--no-fetch]"); process.exit(1); }
+  if (args.length < 2) { console.error("Usage: build-deck.mjs spec.json output-directory [--preflight] [--no-render] [--no-fetch]"); process.exit(EXIT.error); }
   try {
     const pythonIndex = args.indexOf("--python");
     if (pythonIndex >= 0 && (!args[pythonIndex + 1] || args[pythonIndex + 1].startsWith("--"))) throw new Error("--python requires an executable");
@@ -321,9 +335,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     // build and, separately, what the review will read.
     const blockers = result.blockers?.length ? { count: result.blockers.length, byCode: result.blockers.reduce((m, b) => ({ ...m, [b.code]: (m[b.code] || 0) + 1 }), {}), first: result.blockers.slice(0, 8).map((b) => `${b.code}${b.id ?? b.slide ? ` [${b.id ?? b.slide}]` : ""} (${b.source})${b.text ? ` "${String(b.text).slice(0, 40)}"` : ""}`) } : undefined;
     console.log(JSON.stringify({ status: result.status, ...(blockers ? { blockers } : {}), advisories: result.advisories, stages: Object.fromEntries(Object.entries(result.stages || {}).map(([k, v]) => [k, v.state])), pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, textCoverage: result.textCoverage?.accepted, timings: result.timings }));
-    process.exit(["built", "built-unrendered", "preflight-passed"].includes(result.status) ? 0 : 2);
+    // Built, but not yet through the storyline gate: said here, not enforced -
+    // delivery refuses the deck until the gate is ready, and the build is how
+    // the copy gets drafted and checked before then.
+    const story = await storylineWarning(JSON.parse(await fs.readFile(path.resolve(args[0]), "utf8")), path.resolve(args[1]));
+    if (story) console.error(story);
+    process.exit(["built", "built-unrendered", "preflight-passed"].includes(result.status) ? EXIT.ok : EXIT.refused);
   } catch (error) {
     console.error(error.stack || error.message);
-    process.exit(1);
+    process.exit(EXIT.error);
   }
 }

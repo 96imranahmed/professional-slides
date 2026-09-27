@@ -122,6 +122,13 @@ def good_slide():
             text("a1", "axis-label", 10, ["0"], x=60, y=600, width=40, height=14),
             text("a2", "axis-label", 10, ["25"], x=60, y=500, width=40, height=14),
             text("a3", "axis-label", 10, ["50"], x=60, y=400, width=40, height=14),
+            # The chart's marks: a page that argues is held to the ink its
+            # exhibit draws (SCENE_INK), and a chart sketched as a bare frame draws none.
+            *({"type": "rect", "id": f"m{i}", "role": "chart-mark", "frame": {"x": 110 + i * 135, "y": y, "width": 110, "height": 600 - y},
+               "style": {"fill": {"value": "#051C2C"}}, "data": {"componentInstance": "s02:s02-0"}}
+              for i, y in enumerate((215, 265, 325, 385))),
+            *(text(f"d{i}", "data-label", 10, [value], x=145 + i * 135, y=y - 20, width=40, height=14)
+              for i, (value, y) in enumerate((("62", 215), ("55", 265), ("47", 325), ("39", 385)))),
             text("src", "source-text", 8, ["Source: NY State Education Department, 2025."],
                  y=676, width=900, height=20),
             text("pn", "page-number", 8, ["2"], x=1200, y=676, width=40, height=20),

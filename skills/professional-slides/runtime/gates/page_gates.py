@@ -55,8 +55,9 @@ from ink import (  # noqa: E402
     CANVAS_W, CANVAS_H, INK_LUMINANCE, SURFACE_LUMINANCE, relative,
     load_ink_matrix, load_ink_rows, render_path,
 )
-# The same measure estimated from the scene, so it runs at authoring.
-from scene_ink import estimate as scene_ink_estimate  # noqa: E402
+# The same measure estimated from the scene, so it runs at authoring, and the
+# scene's colours read the one way both scene measures read them.
+from scene_ink import estimate as scene_ink_estimate, color_of, grey_of, canvas_of, GLYPH_BAND, SHAPE_TYPES  # noqa: E402
 
 # --- role vocabulary -------------------------------------------------------
 
@@ -101,8 +102,10 @@ ARGUMENT_COMPONENTS = {"insight", "callout", "bullet-list", "evidence-note", "st
 # Pages carried by pictures rather than measurement.
 QUALITATIVE_COMPONENTS = {"image-frame", "logos", "logo-collage", "people", "quote-cluster", "icon-trends"}
 # The picture credits, and its continuation pages when a long list paginates.
-GENERATED_PAGE = re.compile(r"^picture-credits(?:-\d+)?$")
-STRUCTURE_COMPONENTS = {"section-divider", "agenda", "tracker-page", "statement", "takeaways"}
+GENERATED_PAGE = re.compile(CONTRACT["analyticalPage"]["generated"])
+# Navigation, not evidence (weight.json analyticalPage): the cover, dividers,
+# agendas and trackers, and the closing takeaways and statement pages.
+STRUCTURAL_COMPONENTS = set(CONTRACT["analyticalPage"]["structuralComponents"])
 # A photograph, not an icon, a logo mark or a spot image: a well-made deck
 # carries a small image on about half their pages (median 0.5% of the page), and
 # those are marks, not decoration. A photograph covers 3% of the canvas and up.
@@ -383,11 +386,7 @@ def is_cover(slide, index):
     """Structural pages (cover, section divider, agenda/tracker) are exempt from
     the ink and void gates: they are navigation, not evidence."""
     components = {str(c.get("component")) for c in slide.get("componentInstances", [])}
-    if components & {"cover", "section-divider", "agenda", "tracker-page", "takeaways", "statement"}:
-        return True
-    if components & {"slide-chrome", "section-divider"}:
-        return False
-    return index == 0
+    return bool(components & STRUCTURAL_COMPONENTS) or (index == 0 and "slide-chrome" not in components)
 
 
 def content_frame(slide):
@@ -492,7 +491,7 @@ def emitted_codes():
     there that no gate emits, is drift; the eval suite fails on either.
     """
     source = Path(__file__).resolve().read_text(encoding="utf-8")
-    return set(re.findall(r'finding\(\s*\n?\s*\w+,\s*"([A-Z_]+)"', source)) | {"MISSING_RENDER"}
+    return set(re.findall(r'finding\(\s*\n?\s*\w+,\s*"([A-Z_]+)"', source)) | {"MISSING_RENDER"} | {code for code, _ in DECK_EMPTY.values()}
 
 
 def finding(slide_no, code, measured, threshold, repair):
@@ -1405,12 +1404,6 @@ def gate_thin_page(slide_no, slide, findings):
 # container, whatever sits on it: a column carrying its value label is data.
 SCENE_MARK_ROLE = re.compile(r"^(chart-|map-|table-(bar|bubble|progress|rating|check|trend|implication|status)|"
                              r"metric-ring|gantt-(bar|milestone)|legend-|spectrum-|fact-gauge|matrix-point)")
-SCENE_SHAPE_TYPES = {"rect", "ellipse", "shape", "wedge"}
-SCENE_THRESHOLDS = {
-    "deck_share": 0.30,     # the share of content pages DECK_THIN_PAGES blocks at
-    "deck_from": 12,        # content pages before the deck-level check applies
-    "deck_pages_min": 5,
-}
 
 
 def _text_box(node):
@@ -1435,27 +1428,6 @@ def _text_box(node):
         y += (height - ink_h) / 2 if valign in ("mid", "middle", "center") else (height - ink_h) if valign == "bottom" else 0
         height = ink_h
     return x, y, width, height
-
-
-def _color(value):
-    """A style colour as #RRGGBB, or None for none, transparent or a gradient."""
-    if isinstance(value, dict):
-        value = value.get("value")
-    if not isinstance(value, str) or not re.match(r"^#[0-9a-fA-F]{6}$", value.strip()):
-        return None
-    return value.strip()
-
-
-def _grey(color):
-    """The luminance Pillow's "L" conversion gives the colour on the render."""
-    r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
-    return r * 299 / 1000 + g * 587 / 1000 + b * 114 / 1000
-
-
-# Where a line's ink sits in the face centred on its line: from about the cap
-# height to the descenders. Fitted on 213 rendered pages of five decks, it puts
-# the scene's last row of ink within two pixels of the PNG's on average.
-GLYPH_BAND = (0.15, 0.9)
 
 
 def scene_rows(slide):
@@ -1491,26 +1463,17 @@ def scene_mask(slide):
     to the depth its contents reach, plus the padding it keeps above them, and
     its bottom edge where it is drawn.
     """
-    tokens = slide.get("tokens") or {}
-    canvas = _color(tokens.get("color.canvas")) or "#FFFFFF"
     nodes = [n for n in slide.get("nodes", []) if n.get("frame")]
-    # A surface drawn over the whole canvas is the page's background, as the
-    # render's commonest grey would say.
-    for node in nodes:
-        frame = node["frame"]
-        if (node.get("type") in SCENE_SHAPE_TYPES and float(frame.get("width") or 0) >= CANVAS_W
-                and float(frame.get("height") or 0) >= CANVAS_H and _color((node.get("style") or {}).get("fill"))):
-            canvas = _color(node["style"]["fill"])
-    background = _grey(canvas)
+    background = grey_of(canvas_of(slide))
     margin = 255 - SURFACE_LUMINANCE
     rows = [bytearray(CANVAS_W) for _ in range(FOOTER_TOP)]
 
     def shows(value, opacity=1.0):
-        color = _color(value)
+        color = color_of(value)
         if color is None:
             return False
         opacity = opacity if isinstance(opacity, (int, float)) else 1.0
-        grey = background + (_grey(color) - background) * opacity
+        grey = background + (grey_of(color) - background) * opacity
         # Darker than the page by the render's margin; on a dark page, where
         # the render's darker-than test sees nothing, lighter.
         return grey < background - margin if background >= 128 else grey > background + margin
@@ -1549,7 +1512,7 @@ def scene_mask(slide):
         elif kind == "line":
             if shows(style.get("stroke"), opacity):
                 drawn.append((node, box, "line"))
-        elif kind in SCENE_SHAPE_TYPES:
+        elif kind in SHAPE_TYPES:
             if shows(style.get("fill"), opacity):
                 drawn.append((node, box, "fill"))
             elif style.get("stroke") != "none" and shows(style.get("stroke"), opacity):
@@ -1613,6 +1576,28 @@ def scene_mask(slide):
     return rows
 
 
+def scene_void(slide, mask=None):
+    """The band of the page's body the scene leaves empty: (bands, void).
+
+    The one decision SCENE_VOID and the author's budget line (page_budget)
+    both read, so a "!" on the budget and the advisory are the same finding.
+    The page's rows are asked first (void_bands against THRESHOLDS
+    `internal_void_max`, `dead_band_max`); where they pass, its columns
+    (column_bands, the render's COLUMN_VOID). `void` is None, the page's band
+    {band, from, to, threshold}, or the column's (column_bands' record, with
+    `column` its name). `mask` is scene_mask(slide) when the caller has it.
+    """
+    mask = scene_mask(slide) if mask is None else mask
+    bands = void_bands([row.count(1) for row in mask])
+    if bands["internalVoid"] > THRESHOLDS["internal_void_max"]:
+        return bands, {"band": bands["internalVoid"], "from": bands["voidTop"], "to": bands["voidBottom"], "threshold": THRESHOLDS["internal_void_max"]}
+    if bands["deadBand"] > THRESHOLDS["dead_band_max"]:
+        top = bands["lastInk"] + 1 if bands["lastInk"] is not None else VOID_TOP
+        return bands, {"band": bands["deadBand"], "from": top, "to": FOOTER_TOP, "threshold": THRESHOLDS["dead_band_max"]}
+    column = column_bands(slide, scene_column_rows(mask))
+    return bands, ({**column, "column": column["name"]} if column else None)
+
+
 def gate_scene_void(slide_no, slide, findings):
     """SCENE_VOID. Advisory. The render's INTERNAL_VOID and DEAD_BAND, read off
     the composed scene so the author hears them before the build.
@@ -1625,81 +1610,29 @@ def gate_scene_void(slide_no, slide, findings):
     named at most one of the seven pages the build then flagged; drawn as the
     render draws, it names the same seven, and on four more decks the same
     pages give or take one each way (a dead band a pixel under the bar; the
-    inside of a card, which the render cannot see). Like the render's gates it is a question - a chart that
-    wants air, a sparse group centred on purpose - and across the deck the
-    habit blocks at DECK_SCENE_VOID.
+    inside of a card, which the render cannot see). Like the render's gates it
+    is a question - a chart that wants air, a sparse group centred on purpose -
+    and across the deck the habit blocks (gate_deck_empty_pages).
 
-    Where the page's rows pass, its columns are asked the same question
-    (column_bands, the render's COLUMN_VOID): the finding names the column,
-    and it stays one advisory for the page.
+    Where the page's rows pass, its columns are asked the same question: the
+    finding names the column, and it stays one advisory for the page, so the
+    deck count reads a half-empty column as the half-empty page it is.
     """
-    mask = scene_mask(slide)
-    bands = void_bands([row.count(1) for row in mask])
-    hole, dead = bands["internalVoid"], bands["deadBand"]
-    if hole > THRESHOLDS["internal_void_max"]:
-        where, measured, threshold = (bands["voidTop"], bands["voidBottom"]), hole, THRESHOLDS["internal_void_max"]
-    elif dead > THRESHOLDS["dead_band_max"]:
-        top = bands["lastInk"] + 1 if bands["lastInk"] is not None else VOID_TOP
-        where, measured, threshold = (top, FOOTER_TOP), dead, THRESHOLDS["dead_band_max"]
-    else:
-        # The page's rows pass; one of its columns may not (column_bands, the
-        # render's COLUMN_VOID). Still one page-level advisory, so the deck
-        # count reads a half-empty column as the half-empty page it is.
-        column = column_bands(slide, scene_column_rows(mask))
-        if column is None:
-            return
-        findings.append(finding(
-            slide_no, "SCENE_VOID",
-            {"band": round(column["band"], 4), "from": column["from"], "to": column["to"],
-             "internalVoid": round(hole, 4), "deadBand": round(dead, 4), "column": column["name"],
-             "columnInternalVoid": round(column["internalVoid"], 4), "columnDeadBand": round(column["deadBand"], 4)},
-            column["threshold"],
-            column_repair(column),
-        ))
+    bands, void = scene_void(slide)
+    if void is None:
         return
+    measured = {"band": round(void["band"], 4), "from": void["from"], "to": void["to"],
+                "internalVoid": round(bands["internalVoid"], 4), "deadBand": round(bands["deadBand"], 4)}
+    if "column" in void:
+        measured.update(column=void["column"], columnInternalVoid=round(void["internalVoid"], 4), columnDeadBand=round(void["deadBand"], 4))
     findings.append(finding(
-        slide_no, "SCENE_VOID",
-        {"band": round(measured, 4), "from": where[0], "to": where[1],
-         "internalVoid": round(hole, 4), "deadBand": round(dead, 4)},
-        threshold,
+        slide_no, "SCENE_VOID", measured, void["threshold"],
+        column_repair(void) if "column" in void else
         "A band of the page (y {}-{}) carries nothing. Give the exhibit the height - the phases or rows "
         "with their detail, the chart at the frame's size - size tiles and cards to what they hold, start "
         "the body under the title rather than centring it in air, set the commentary beside the exhibit "
         "rather than under a strip of air, or merge the page with a neighbour. Do not stretch rows or pad "
-        "text to cover the band.".format(*where),
-    ))
-
-
-# DECK_THIN_PAGES's codes that the scene alone can raise: a deck the author's run
-# passes on these is not refused at the build by them.
-SCENE_EMPTY_CODES = {"SCENE_VOID", "THIN_PAGE", "HERO_EXHIBIT"}
-
-
-def gate_deck_scene_void(content_indexes, findings, voids=None):
-    """DECK_SCENE_VOID. The scene's half-empty pages, counted across the deck.
-
-    DECK_THIN_PAGES counts the render's findings, so at authoring - where no
-    render exists - it saw only THIN_PAGE, and a deck of pages carrying their
-    words with a band of their body blank reached the build clean. This is
-    the same count on the scene's own measure, in the same shape: one page
-    with a band of air can be right, three pages in ten is how the deck is
-    being built. It counts the scene's own share of DECK_THIN_PAGES's codes -
-    SCENE_VOID, THIN_PAGE and HERO_EXHIBIT's area test - so the two agree.
-    `voids` is those findings when the run kept them apart (`--only
-    DECK_SCENE_VOID`); otherwise they are read from `findings`."""
-    pages = len(content_indexes)
-    flagged = sorted({f["slide"] for f in (findings if voids is None else voids)
-                      if f.get("code") in SCENE_EMPTY_CODES and f.get("slide")})
-    if (pages < SCENE_THRESHOLDS["deck_from"] or len(flagged) < SCENE_THRESHOLDS["deck_pages_min"]
-            or len(flagged) / pages < SCENE_THRESHOLDS["deck_share"]):
-        return
-    findings.append(finding(
-        None, "DECK_SCENE_VOID", len(flagged),
-        max(SCENE_THRESHOLDS["deck_pages_min"], round(pages * SCENE_THRESHOLDS["deck_share"])),
-        "{} of {} content pages leave a band of their body empty (pages {}). Fix the pattern, not each page: "
-        "size the exhibit to the frame, set commentary beside it rather than under a strip of air, give cards "
-        "and phases the detail their boxes were drawn for, or merge two half pages into one full one.".format(
-            len(flagged), pages, ", ".join(str(n) for n in flagged[:20])),
+        "text to cover the band.".format(void["from"], void["to"]),
     ))
 
 
@@ -1723,9 +1656,11 @@ SCENE_INK_REPAIR = (
 
 
 def analytical(slide, index):
-    """A page that argues: it carries a reading task and is neither a cover nor
-    a structural or generated page."""
-    return bool(slide.get("readingTask")) and not is_cover(slide, index) and not GENERATED_PAGE.match(str(slide.get("id") or ""))
+    """A page that argues: it carries an action title or a reading task and is
+    neither a cover nor a structural or generated page. The one definition
+    (weight.json analyticalPage) the census and the review's statistics count too."""
+    argues = bool(slide.get("readingTask")) or any(n.get("role") == "action-title" for n in slide.get("nodes", []))
+    return argues and not is_cover(slide, index) and not GENERATED_PAGE.match(str(slide.get("id") or ""))
 
 
 def gate_scene_ink(slide_no, slide, findings):
@@ -1753,7 +1688,7 @@ def gate_deck_ink(slides, content_indexes, findings):
     remedy is a design choice the author makes page by page, and a bar that
     blocks invites fills drawn to pass it."""
     inks = [scene_ink_estimate(slides[index]) for index in content_indexes if analytical(slides[index], index)]
-    if len(inks) < SCENE_THRESHOLDS["deck_from"]:
+    if len(inks) < DECK_HABIT["from"]:
         return
     median = sorted(inks)[len(inks) // 2]
     if median >= SCENE_INK_THRESHOLDS["deck_median"]:
@@ -3324,29 +3259,41 @@ def configure(fill=None, declared=None):
     return fill
 
 
+# The half-empty page, counted across the deck. Each finding it counts is
+# advisory, because on one page it can be the right call: a quiet statement, a
+# chart that wants air. Across the deck it is not. A 50-page deck delivered
+# with sixteen THIN_PAGE advisories, four HERO_EXHIBIT and three INK_COVERAGE -
+# timelines of three dots across an empty band, four-row tables stretched to
+# fill a page, a paragraph list in the left half - and the review, reading the
+# argument, accepted it. Nearly a third of the pages flagged is a habit, and
+# the habit blocks: at least `pages_min` of `from` or more content pages, a
+# `share` of them.
+DECK_HABIT = {"from": 12, "pages_min": 5, "share": 0.30}
+# What the habit counts: the render's empty-page findings once the renders were
+# measured (DECK_THIN_PAGES), the scene's own before that (DECK_SCENE_VOID, at
+# authoring). One count, on what the run can see: the two used to run side by
+# side on their own copies of the thresholds, and one half-empty habit was
+# refused twice at the build.
 EMPTY_PAGE_CODES = {"THIN_PAGE", "HERO_EXHIBIT", "INK_COVERAGE", "INTERNAL_VOID", "DEAD_BAND", "COLUMN_VOID"}
+SCENE_EMPTY_CODES = {"SCENE_VOID", "THIN_PAGE", "HERO_EXHIBIT"}
+DECK_EMPTY = {True: ("DECK_THIN_PAGES", EMPTY_PAGE_CODES), False: ("DECK_SCENE_VOID", SCENE_EMPTY_CODES)}
 
 
-def gate_deck_thin_pages(content_indexes, findings):
-    """DECK_THIN_PAGES. Each empty-page finding is advisory, because on one
-    page it can be the right call: a quiet statement, a chart that wants air.
-    Across the deck it is not. A 50-page deck delivered with sixteen THIN_PAGE
-    advisories, four HERO_EXHIBIT and three INK_COVERAGE - timelines of three
-    dots across an empty band, four-row tables stretched to fill a page, a
-    paragraph list in the left half - and the review, reading the argument,
-    accepted it. When nearly a third of the pages are flagged the deck has a habit,
-    and the habit blocks."""
+def gate_deck_empty_pages(content_indexes, findings, rendered, counted=None):
+    """DECK_THIN_PAGES (rendered) or DECK_SCENE_VOID (scene only): the pages
+    `counted` (by default `findings`) flags half empty, against DECK_HABIT."""
+    code, codes = DECK_EMPTY[bool(rendered)]
     pages = len(content_indexes)
-    flagged = sorted({f["slide"] for f in findings if f.get("code") in EMPTY_PAGE_CODES and f.get("slide")})
-    if pages < 12 or len(flagged) < 5 or len(flagged) / pages < 0.3:
+    flagged = sorted({f["slide"] for f in (findings if counted is None else counted) if f.get("code") in codes and f.get("slide")})
+    if pages < DECK_HABIT["from"] or len(flagged) < DECK_HABIT["pages_min"] or len(flagged) / pages < DECK_HABIT["share"]:
         return
     findings.append(finding(
-        None, "DECK_THIN_PAGES", len(flagged), max(5, round(pages * 0.3)),
-        "{} of {} content pages are flagged thin or half empty (pages {}). Fix the pattern, not each page: give the "
-        "exhibit the page (a wider chart with its annotation, a table with a treated column and the numbers the "
-        "commentary quotes), move a figure that only needs a strip to a page that shares it, set commentary beside "
-        "the exhibit rather than in a band under it, or merge two thin pages into one full one.".format(
-            len(flagged), pages, ", ".join(str(n) for n in flagged[:20])),
+        None, code, len(flagged), max(DECK_HABIT["pages_min"], round(pages * DECK_HABIT["share"])),
+        "{} of {} content pages are thin or leave a band of their body empty (pages {}). Fix the pattern, not each "
+        "page: give the exhibit the page (a wider chart with its annotation, a table with a treated column and the "
+        "numbers the commentary quotes), give cards and phases the detail their boxes were drawn for, set commentary "
+        "beside the exhibit rather than in a band under it, move a figure that only needs a strip to a page that "
+        "shares it, or merge two half pages into one full one.".format(len(flagged), pages, ", ".join(str(n) for n in flagged[:20])),
     ))
 
 
@@ -3362,9 +3309,15 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
     # report names them rather than quietly returning a pass for gates that
     # never ran.
     skipped_pixel_gates = set()
-    # SCENE_VOID's findings, kept for the deck count even when only
-    # DECK_SCENE_VOID was asked for.
-    scene_voids = []
+    selected = gates or set()
+
+    def wanted(code):
+        return not selected or code in selected
+
+    # Every page's empty-page findings, for the deck count (gate_deck_empty_pages)
+    # whether or not the run reports them: each gate it counts runs once a page.
+    habit = wanted("DECK_THIN_PAGES") or wanted("DECK_SCENE_VOID")
+    empties = []
     for index, slide in enumerate(slides):
         slide_no = index + 1
         if render_dir and render_path(render_dir, slide_no) is None:
@@ -3381,44 +3334,40 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
             covers.append(slide_no)
         else:
             content_indexes.append(index)
-        selected = gates or set()
-
-        def wanted(code):
-            return not selected or code in selected
 
         if not cover:
-            if render_dir and (wanted("INK_COVERAGE") or wanted("DEAD_BAND") or wanted("INTERNAL_VOID") or wanted("COLUMN_VOID")):
-                path = render_path(render_dir, slide_no)
-                if path is not None:
-                    rows = load_ink_rows(path)
-                    occupied = load_ink_rows(path, SURFACE_LUMINANCE)
-                    page = []
-                    # No Pillow, no pixels: the renders cannot be measured, so
-                    # these three gates report nothing and the scene gates below
-                    # still run.
-                    if rows is None:
-                        skipped_pixel_gates.add(slide_no)
+            path = render_path(render_dir, slide_no) if render_dir else None
+            # HERO_EXHIBIT once a page: its own finding, the deck count's, and
+            # INK_COVERAGE's deference to a hero below.
+            empty = []
+            gate_hero_exhibit(slide_no, slide, empty, path)
+            if path is not None and (habit or any(wanted(c) for c in ("INK_COVERAGE", "DEAD_BAND", "INTERNAL_VOID", "COLUMN_VOID"))):
+                rows = load_ink_rows(path)
+                # No Pillow, no pixels: the renders cannot be measured, so the
+                # pixel gates report nothing and the scene gates below still run.
+                if rows is None:
+                    skipped_pixel_gates.add(slide_no)
+                else:
                     # A page with no exhibit is held to the type floor: the ink
                     # its own word floor puts on the canvas, not the ink a chart
                     # page shows.
                     text_page = not any(is_exhibit(c) for c in slide.get("componentInstances", []))
-                    if rows is not None:
-                        gate_ink_and_dead_band(slide_no, without_title_rule(rows, slide), page, occupied, text_page=text_page)
-                    if wanted("COLUMN_VOID"):
-                        gate_column_void(slide_no, slide, load_ink_matrix(path, SURFACE_LUMINANCE), page)
+                    pixels = []
+                    gate_ink_and_dead_band(slide_no, without_title_rule(rows, slide), pixels, load_ink_rows(path, SURFACE_LUMINANCE), text_page=text_page)
+                    gate_column_void(slide_no, slide, load_ink_matrix(path, SURFACE_LUMINANCE), pixels)
                     # A page carried by a qualifying hero exhibit is not empty,
                     # however thin its marks (a line chart, a map): INK_COVERAGE
                     # then defers to the hero and band gates.
-                    hero = []
-                    gate_hero_exhibit(slide_no, slide, hero, path)
-                    has_exhibit = any(is_exhibit(c) for c in slide.get("componentInstances", []))
-                    has_hero = has_exhibit and not hero
-                    findings.extend(f for f in page if wanted(f["code"])
-                                    and not (f["code"] == "INK_COVERAGE" and has_hero))
+                    has_hero = not text_page and not any(f["code"] == "HERO_EXHIBIT" for f in empty)
+                    empty += [f for f in pixels if not (f["code"] == "INK_COVERAGE" and has_hero)]
+            if wanted("THIN_PAGE") or habit:
+                gate_thin_page(slide_no, slide, empty)
+            if wanted("SCENE_VOID") or habit:
+                gate_scene_void(slide_no, slide, empty)
+            empties += empty
+            findings.extend(f for f in empty if wanted(f["code"]))
             if wanted("WORDS"):
                 gate_words(slide_no, slide, findings, slide_profile)
-            if wanted("HERO_EXHIBIT"):
-                gate_hero_exhibit(slide_no, slide, findings, render_path(render_dir, slide_no) if render_dir else None)
             page = []
             gate_title(slide_no, slide, page)
             findings.extend(f for f in page if wanted(f["code"]))
@@ -3428,20 +3377,6 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
                 gate_takeaway_long(slide_no, slide, findings)
             if wanted("MISSING_ARGUMENT"):
                 gate_missing_argument(slide_no, slide, findings)
-            if wanted("THIN_PAGE"):
-                gate_thin_page(slide_no, slide, findings)
-            if wanted("SCENE_VOID") or wanted("DECK_SCENE_VOID"):
-                page = []
-                gate_scene_void(slide_no, slide, page)
-                scene_voids.extend(page)
-                findings.extend(f for f in page if wanted(f["code"]))
-                # The scene's other empty-page flags, which DECK_THIN_PAGES counts
-                # at the build: counted here too, so a deck the author's run
-                # passes is not blocked at the build by the same pages.
-                scene_only = []
-                gate_thin_page(slide_no, slide, scene_only)
-                gate_hero_exhibit(slide_no, slide, scene_only)
-                scene_voids.extend(f for f in scene_only if f["code"] in SCENE_EMPTY_CODES)
             if wanted("SCENE_INK") and analytical(slide, index):
                 gate_scene_ink(slide_no, slide, findings)
             if wanted("UNSOURCED_PICTURE"):
@@ -3505,10 +3440,11 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
     if not gates or "TABLE_SCHEMA_FLAT" in gates:
         gate_table_schema_flat(slides, content_indexes, findings)
 
-    if not gates or "DECK_THIN_PAGES" in gates:
-        gate_deck_thin_pages(content_indexes, findings)
-    if not gates or "DECK_SCENE_VOID" in gates:
-        gate_deck_scene_void(content_indexes, findings, scene_voids)
+    if habit:
+        # Counted on the render once its pixels were measured, on the scene before.
+        deck = []
+        gate_deck_empty_pages(content_indexes, deck, rendered=bool(render_dir) and not skipped_pixel_gates, counted=empties)
+        findings.extend(f for f in deck if wanted(f["code"]))
     if not gates or "DECK_INK" in gates:
         gate_deck_ink(slides, content_indexes, findings)
 
@@ -3641,9 +3577,8 @@ def page_budget(scene, profile=None):
             raise ValueError(f"Unknown density profile: {slide_profile}")
         _band_body, footer, ratio = footer_share(slide)
         mask = scene_mask(slide)
-        bands = void_bands([row.count(1) for row in mask])
-        page_void = bands["internalVoid"] > THRESHOLDS["internal_void_max"] or bands["deadBand"] > THRESHOLDS["dead_band_max"]
-        column = None if page_void else column_bands(slide, scene_column_rows(mask))
+        bands, void = scene_void(slide, mask)
+        column = void if void and "column" in void else None
         line = body_line(slide)
         out.append({
             "slide": index + 1,
@@ -3654,11 +3589,11 @@ def page_budget(scene, profile=None):
             "ceiling": words_limit(slide, slide_profile),
             "footer": footer,
             "footerRatio": round(ratio, 3) if ratio is not None else 0.0,
-            # SCENE_VOID's own measure and bars, so a "!" on the budget line
-            # and the advisory are the same finding.
+            # SCENE_VOID's own decision (scene_void), so a "!" on the budget
+            # line and the advisory are the same finding.
             "internalVoid": round(bands["internalVoid"], 3),
             "deadBand": round(bands["deadBand"], 3),
-            "void": page_void or column is not None,
+            "void": void is not None,
             # A column's band the page's rows cannot see (column_bands, which
             # SCENE_VOID also reads): which column, its share of the column's
             # own height, and where it runs.

@@ -213,10 +213,10 @@ console.log(JSON.stringify({ share: shareAsBars(share), pair: shareAsBars(pair),
         sys.path.insert(0, str(RUNTIME / 'gates'))
         import page_gates
         findings = [page_gates.finding(n, 'THIN_PAGE', 60, 95, 'x') for n in range(2, 8)]
-        page_gates.gate_deck_thin_pages(list(range(20)), findings)
+        page_gates.gate_deck_empty_pages(list(range(20)), findings, rendered=True)
         self.assertEqual(findings[-1]['code'], 'DECK_THIN_PAGES')
         few = [page_gates.finding(n, 'THIN_PAGE', 60, 95, 'x') for n in range(2, 6)]
-        page_gates.gate_deck_thin_pages(list(range(20)), few)
+        page_gates.gate_deck_empty_pages(list(range(20)), few, rendered=True)
         self.assertNotIn('DECK_THIN_PAGES', [f['code'] for f in few])
 
 

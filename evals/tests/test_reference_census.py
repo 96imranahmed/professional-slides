@@ -57,6 +57,7 @@ BT /F1 14 Tf 540 300 Td (Share of 3 markets) Tj ET"""
 SCENE = {"slides": [{
     "id": "p1",
     "componentInstances": [
+        {"component": "slide-chrome", "instanceId": "p1:chrome"},
         {"component": "chart.column", "category": "chart", "instanceId": "p1:c", "frame": {"x": 100, "y": 150, "width": 400, "height": 300}},
         {"component": "bullet-list", "category": "text", "instanceId": "p1:t", "frame": {"x": 540, "y": 150, "width": 300, "height": 300}},
     ],

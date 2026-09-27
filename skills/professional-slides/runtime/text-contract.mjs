@@ -16,6 +16,19 @@ const roles = new Set(['title', 'body', 'exhibit', 'qualification', 'source', 'f
 // than a shorter sentence.
 const CONTRACT = JSON.parse(readFileSync(new URL('./weight.json', import.meta.url), 'utf8'));
 export const TEXT_FORM = CONTRACT.plan.textForm;
+
+// What the audits of the planned text against the composed scene and the
+// saved file can find (auditTextPlan, auditExportText); every one blocks.
+export const TEXT_CONTRACT_CODES = Object.freeze({
+  TEXT_PAGE_UNPLANNED: "a composed page the text plan does not list",
+  TEXT_PAGE_MISSING: "a planned page that no composed page carries",
+  TEXT_PLAN_PAGINATION: "a planned page split across several composed or saved pages",
+  TEXT_PLAN_LOST: "a planned block of text missing from its composed page",
+  TEXT_UNPLANNED: "text on a composed page that the plan never wrote",
+  TEXT_EXPORT_PAGE_COUNT: "the saved file has a different number of pages than the scene",
+  TEXT_EXPORT_LOST: "a planned block of text missing from its saved page",
+  TEXT_EXPORT_UNPLANNED: "text on a saved page that the plan never wrote",
+});
 export const normalizeText = value => String(value ?? '').normalize('NFKC').replace(/[\u00ad\u200b]/g, '').replace(/-\s*\r?\n\s*/g, '-').replace(/\s+/g, ' ').trim();
 // Lines the counting rule excludes, matching how the shipped task targets count.
 const NOTE_LINE = /^\s*(source|sources|note|notes|footnote)\b[:\s]/i;

@@ -16,10 +16,10 @@ per content page, the share that are one exhibit beside a text column, pages
 with two or more exhibits, plotted values per chart page, titles whose last
 line is one to three words, and whether pages carry a subtitle or a title rule.
 
-Every per-page statistic is taken over the analytical pages only: the cover,
-section dividers, agendas and the build's generated pages (the picture
-credits) are left out - told apart by the scene and the compiled deck spec,
-or guessed from the render without a scene. A scanned reference cannot be
+Every per-page statistic is taken over the analytical pages only, as the gates
+define them (page_gates.analytical): the cover, section dividers, agendas,
+closing takeaways and the build's generated pages (the picture credits) are
+left out - told apart by the scene, or guessed from the render without one. A scanned reference cannot be
 told apart and is measured whole; the printed notes say which applied.
 
 Plotted values are the compiler's: with the compiled deck spec (`--deck`, or
@@ -45,6 +45,7 @@ with a census taken before this script existed.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import shutil
@@ -52,6 +53,18 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+# What a page is and what a title rule looks like are the skill's own
+# definitions, read from its runtime rather than kept here as copies that
+# drift: page_gates.analytical (weight.json analyticalPage) says which pages
+# the per-page statistics count, and infer-style.py's title_rule is the
+# detector the style inference reads a reference page with.
+RUNTIME = Path(__file__).resolve().parents[2] / "skills" / "professional-slides" / "runtime"
+sys.path.insert(0, str(RUNTIME / "gates"))
+from page_gates import analytical  # noqa: E402
+_infer = importlib.util.spec_from_file_location("infer_style", RUNTIME / "infer-style.py")
+infer_style = importlib.util.module_from_spec(_infer)
+_infer.loader.exec_module(infer_style)
 
 WORD = re.compile(r"[A-Za-zÀ-ÿ0-9%$£€.,'’\-]+")
 INK_DELTA = 25            # grey levels from the page background that count as ink
@@ -154,49 +167,9 @@ def empty_band(image) -> float:
 
 
 def title_rule(image) -> bool:
-    """A thin rule across at least 40% of the width, directly under the title.
-
-    Only a line counts: a photo or a filled band is thick, so a run of dense
-    rows taller than 1.2% of the page is not a rule. And only the title's line:
-    an exhibit heading's rule sits lower with the heading between it and the
-    title, so everything above the rule must be one block of lines (the title)
-    ending just above it. One line may stand apart at the top of the band: a
-    tracker or kicker sits in its own row over the title, and a one-line title
-    set down on its rule leaves a wider gap under it than the title's own
-    lines do. It is one small line (no taller than 1.5% of the page), so a
-    title cannot pass for it and an exhibit heading under the title is still
-    between the title and the rule.
-    """
-    mask = _ink(image)
-    height, width = mask.shape
-    top, bottom, thin = int(height * 0.05), int(height * 0.30), max(2, int(height * 0.012))
-    inked = mask.mean(1) > 0.002
-    dense = [_longest_run(mask[y]) >= 0.4 * width for y in range(top, bottom)]
-    y = 0
-    while y < len(dense):
-        if not dense[y]:
-            y += 1
-            continue
-        end = y
-        while end < len(dense) and dense[end]:
-            end += 1
-        if end - y <= thin:
-            above = [r for r in range(top, top + y) if inked[r]]
-            gaps = [b - a for a, b in zip(above, above[1:])]
-            wide = [i for i, g in enumerate(gaps) if g > height * 0.03]
-            if wide and above[wide[0]] - above[0] <= height * 0.015:
-                gaps = gaps[wide[0] + 1:]
-            return bool(above) and all(g <= height * 0.03 for g in gaps) and top + y - above[-1] <= height * 0.06
-        y = end
-    return False
-
-
-def _longest_run(row) -> int:
-    best = run = 0
-    for inked in row:
-        run = run + 1 if inked else 0
-        best = max(best, run)
-    return best
+    """A rule under the title on this render: the skill's own detector
+    (infer-style.py title_rule), read on the render's ink."""
+    return infer_style.title_rule(_ink(image).tolist(), image.shape[0]) is not None
 
 
 def measure_pdf(path: Path) -> list[dict]:
@@ -260,17 +233,10 @@ def pages_file_values(pages_path: Path) -> dict[str, int]:
     return out
 
 
-STRUCTURAL_KINDS = {"cover", "section", "divider", "agenda"}
-STRUCTURAL_COMPONENTS = {"cover", "section-divider", "agenda", "tracker-page"}
-# The build's generated pages (page_gates.py GENERATED_PAGE): the picture
-# credits it appends are furniture, not a page of the argument.
-GENERATED_PAGE = re.compile(r"^picture-credits(?:-\d+)?$")
-
-
 def compiled_pages(path: Path) -> dict | None:
     """What the compiler recorded for each page of a compiled deck spec
     (`<id>.deck.json`, written by author-deck.mjs): the plotted values of its
-    chart pages and the ids of its structural pages.
+    chart pages.
 
     The chart pages are the compiler's: every page whose `pageType.chart` is
     set - the chart types (trend, ranking, composition, relationship, bridge)
@@ -282,16 +248,8 @@ def compiled_pages(path: Path) -> dict | None:
     slides = [*(data.get("slides") or []), *(data.get("appendix") or [])] if isinstance(data, dict) else []
     if not any(isinstance(s, dict) and s.get("pageType") for s in slides):
         return None
-    values, structural, typed = {}, set(), set()
-    for slide in slides:
-        page_type, sid = slide.get("pageType") or {}, slide.get("id")
-        if page_type.get("chart") and isinstance(page_type.get("values"), (int, float)):
-            values[sid] = page_type["values"]
-        if page_type:
-            typed.add(sid)
-        elif slide.get("kind") in STRUCTURAL_KINDS or slide.get("kind"):
-            structural.add(sid)
-    return {"values": values, "structural": structural, "typed": typed}
+    return {"values": {slide.get("id"): slide["pageType"]["values"] for slide in slides
+                       if (slide.get("pageType") or {}).get("chart") and isinstance(slide["pageType"].get("values"), (int, float))}}
 
 
 def find_compiled(pages_path: Path | None, deck_path: Path | None) -> dict | None:
@@ -326,23 +284,16 @@ def _beside(a, b) -> bool:
 def scene_structure(scene_path: Path, plotted_by_id: dict[str, int] | None, compiled: dict | None = None) -> list[dict]:
     scene = json.loads(Path(scene_path).read_text())
     rows = []
-    structural_ids = (compiled or {}).get("structural", set())
-    for slide in scene.get("slides", []):
+    for index, slide in enumerate(scene.get("slides", [])):
         instances = slide.get("componentInstances") or []
         nodes = slide.get("nodes") or []
         titles = [n for n in nodes if n.get("role") == "action-title"]
-        # Only the pages that carry the argument are measured: the cover,
-        # section dividers, agendas and the generated credits page are
-        # furniture, and counted they put a deck's empty-band share at 18%
-        # when its analytical pages ran at 6%.
+        # Only the pages that carry the argument are measured - the gates'
+        # analytical pages: the cover, section dividers, agendas, the closing
+        # takeaways and the generated credits page are furniture, and counted
+        # they put a deck's empty-band share at 18% when its analytical pages ran at 6%.
         source = slide.get("sourceSlideId") or slide.get("id")
-        structural = (GENERATED_PAGE.match(str(slide.get("id") or "")) is not None
-                      or any(i.get("component") in STRUCTURAL_COMPONENTS for i in instances)
-                      or source in structural_ids)
-        # A typed page is analytical whatever it draws: a takeaways page is a
-        # summary type that sets its title in its own component.
-        typed = compiled is not None and source in compiled["typed"] and not GENERATED_PAGE.match(str(slide.get("id") or ""))
-        row = {"id": slide.get("id"), "content": typed or (bool(titles) and not structural)}
+        row = {"id": slide.get("id"), "content": analytical(slide, index)}
         if row["content"]:
             exhibits = [i for i in instances if i.get("category") in EXHIBIT_CATEGORIES or i.get("component") in EXHIBIT_COMPONENTS]
             texts = [i for i in instances if i.get("component") in TEXT_COMPONENTS]

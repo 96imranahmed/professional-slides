@@ -52,6 +52,14 @@ const RANGES = CONTRACT.ranges;
  */
 export const PICTURE_SHARE_MAX = CONTRACT.picture.shareMax;
 
+/** The pages every figure here describes (weight.json analyticalPage; page_gates.py `analytical` reads the same). */
+export function isAnalyticalPage(slide, index) {
+  const components = new Set((slide.componentInstances || []).map((c) => String(c.component)));
+  const structural = CONTRACT.analyticalPage.structuralComponents.some((c) => components.has(c)) || (index === 0 && !components.has("slide-chrome"));
+  const argues = Boolean(slide.readingTask) || (slide.nodes || []).some((n) => n.role === "action-title");
+  return argues && !structural && !new RegExp(CONTRACT.analyticalPage.generated).test(String(slide.id ?? ""));
+}
+
 /** Validate and merge an override block (from the spec or a house profile). */
 export function normalizeWeight(weight, where = "weight") {
   if (weight === undefined || weight === null) return {};

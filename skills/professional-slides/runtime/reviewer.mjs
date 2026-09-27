@@ -4,8 +4,12 @@
 //   codex   — `codex exec --image … --output-schema`  (OpenAI Codex CLI)
 //   claude  — `claude -p … --output-format json`       (Claude Code CLI; reads the PNGs itself)
 //   packet  — no model call: writes review-packet/ for the calling agent to review and
-//             answer with `deliver-deck.mjs … --review review.json`. This is the default
-//             inside an agent session, where the agent *is* the reviewer.
+//             answer with `deliver-deck.mjs … --review review.json`. `auto` picks codex,
+//             then claude, and writes a packet only when neither CLI is on the path, so
+//             an agent session that reviews with its own subagents asks for `packet`.
+//
+//   node runtime/reviewer.mjs merge out/ [parts-dir]   joins a split first pass into out/review.json
+//                                                      (exit codes: EXIT in review-passes.mjs)
 //
 // The first pass is exhaustive: a verdict and a note per rubric dimension for
 // every page, every deck-level finding with every page it affects, and a
@@ -18,22 +22,27 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { runProcess } from "./process.mjs";
 import { storylineGate } from "./storyline.mjs";
+import { isAnalyticalPage } from "./weight.mjs";
 import {
-  SEVERITIES, PAGE_VERDICTS, STATUSES, NEW_BASES, MAX_PASSES, SEVERITY_DEFINITIONS, BLOCKING, verdictOf,
-  pageListErrors, advanceLedger, openEntries, openBlocking, expectedVerdicts, verificationErrors, coverageErrors,
-  verdictErrors, completenessErrors, changedPages, uniqueIds, detectBackend,
+  SEVERITIES, PAGE_VERDICTS, STATUSES, NEW_BASES, MAX_PASSES, SEVERITY_DEFINITIONS, BLOCKING, EXIT,
+  pageListErrors, advanceLedger, openEntries, openBlocking, verificationErrors, coverageErrors, verdictErrors, completenessErrors,
+  uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts, callReviewer, reviewParts, readPasses, recordPass,
 } from "./review-passes.mjs";
 
 export { SEVERITIES, MAX_PASSES, detectBackend };
+// The reviewer's own vocabulary. A defect a build check also names keeps that
+// check's code - LAYOUT_MONOTONY (page_gates.py), MISSING_EVIDENCE (the
+// composer) - rather than a second registration of it here, and a code means
+// one thing wherever it is raised: the gate's MISSING_ARGUMENT is a picture or
+// comparison page with no argument drawn on it, so the reviewer's broader
+// judgement is UNCLEAR_ARGUMENT.
 export const CODES = Object.freeze({
   // facts and evidence
   FACTUAL_ERROR: "a stated number, name or date is wrong",
   UNSUPPORTED_CLAIM: "a claim the cited evidence does not support",
   MISLEADING_COMPARISON: "values compared across incompatible bases without saying so",
-  MISSING_EVIDENCE: "a ranked criterion or stated requirement has no comparative evidence",
-  MISSING_ARGUMENT: "the page's purpose or necessary inference is unclear from its title, evidence and commentary together",
+  UNCLEAR_ARGUMENT: "the page's purpose or necessary inference is unclear from its title, evidence and commentary together",
   // legibility and geometry
   UNREADABLE: "text too small, clipped or low-contrast to read",
   OVERFLOW: "content exceeds its box or the slide",
@@ -41,13 +50,11 @@ export const CODES = Object.freeze({
   PROVENANCE: "a number or claim with no traceable source, basis or as-at date",
   // design — these block too
   DEAD_SPACE: "a large empty band the page does nothing with",
-  LAYOUT_MONOTONY: "the same page construction repeated across most of the deck",
   NO_HERO_EXHIBIT: "an analytical page with no dominant exhibit",
   OVERSIZED_TYPE: "body or chart type set larger than a reader expects on a slide",
   WALL_OF_TEXT: "prose doing the work an exhibit should do",
   BURIED_NUMBER: "a decisive number in a sentence instead of on a mark",
   HEDGED_TITLE: "an action title that does not commit to a finding",
-  TITLE_TOO_LONG: "an action title over two lines",
   INCONSISTENT_ENCODING: "the same measure encoded differently across pages",
   // beautification - the pass a threshold cannot make
   NO_VISUAL_ANCHOR: "recognition or visible evidence matters, but the page supplies no useful visual anchor",
@@ -387,30 +394,18 @@ export function validatePart(part, slideIds) {
  * verdicts are recomputed from the joined findings, since a spine finding can
  * raise a page a section reviewer passed.
  */
-export function mergeReviewParts(parts, slideIds, sections = null) {
-  const errors = [];
-  for (const part of parts) errors.push(...validatePart(part, slideIds).map((e) => `${part?.part?.id ?? "part"}: ${e}`));
-  const spine = parts.filter((p) => p?.part?.kind === "spine");
-  const sectionParts = parts.filter((p) => p?.part?.kind === "section");
-  if (spine.length !== 1) errors.push(`a split review needs exactly one spine part; got ${spine.length}`);
-  if (new Set(parts.map((p) => p?.binding)).size > 1) errors.push("the parts are bound to different builds");
-  const covered = sectionParts.flatMap((p) => p.part?.slides || []);
-  const uncovered = slideIds.filter((id) => !covered.includes(id));
-  if (uncovered.length) errors.push(`no section part covers ${uncovered.join(", ")}`);
-  const twice = covered.filter((id, i) => covered.indexOf(id) !== i);
-  if (twice.length) errors.push(`${[...new Set(twice)].join(", ")} covered by two section parts`);
-  for (const section of sections || []) {
-    const part = sectionParts.find((p) => p.part.id === section.id);
-    if (!part) errors.push(`section ${section.id} has no part`);
-  }
+export function mergeReviewParts(parts, slideIds, { sections = null, binding } = {}) {
+  const errors = [...parts.flatMap((part) => validatePart(part, slideIds).map((e) => `${part?.part?.id ?? "part"}: ${e}`)),
+    ...partSetErrors(parts, slideIds, { key: "slides", sections, binding })];
   if (errors.length) return { errors };
 
   const order = new Map(slideIds.map((id, i) => [id, i]));
   const sort = (list) => [...new Set(list)].sort((a, b) => order.get(a) - order.get(b));
   const rename = uniqueIds(parts, (p) => p.findings || []);
+  const [lead] = parts.filter((p) => p.part.kind === "spine");
   const findings = [];
   const byKey = new Map();
-  for (const part of [...spine, ...sectionParts]) for (const f of part.findings) {
+  for (const part of [lead, ...parts.filter((p) => p.part.kind === "section")]) for (const f of part.findings) {
     const finding = { ...f, id: rename(part, f.id), slides: sort(f.slides) };
     const key = `${f.code}\u0000${f.dimension}`;
     const same = f.scope === "deck" ? byKey.get(key) : null;
@@ -420,16 +415,9 @@ export function mergeReviewParts(parts, slideIds, sections = null) {
     if (SEVERITIES.indexOf(finding.severity) > SEVERITIES.indexOf(same.severity)) { same.severity = finding.severity; same.repair = finding.repair; }
     same.checkable = same.checkable ?? finding.checkable ?? null;
   }
-  const expected = expectedVerdicts(advanceLedger([], {}, deckItems({ findings })));
-  const pages = sectionParts.flatMap((p) => p.pages).sort((a, b) => order.get(a.slide) - order.get(b.slide))
-    .map((p) => ({ ...p, verdict: verdictOf(expected.get(p.slide) ?? "none") }));
-  const completeness = DIMENSIONS.map((dimension) => {
-    const notes = parts.flatMap((p) => (p.completeness || []).filter((c) => c.dimension === dimension).map((c) => `${p.part.id}: ${c.note}`));
-    return { dimension, result: findings.some((f) => f.dimension === dimension) ? "findings" : "clean", note: notes.join(" | ") };
-  });
-  const missing = completeness.filter((c) => !c.note).map((c) => c.dimension);
-  if (missing.length) return { errors: [`no part reported what it checked for ${missing.join(", ")}`] };
-  const [lead] = spine;
+  const joined = joinParts(parts, slideIds, advanceLedger([], {}, deckItems({ findings })), { pageKey: "slide", dimensions: DIMENSIONS, dimKey: "dimension" });
+  if (joined.errors.length) return { errors: joined.errors };
+  const { pages, completeness } = joined;
   const densityPages = new Map();
   for (const part of parts) for (const p of part.density?.pages || []) if (!densityPages.has(p.slide)) densityPages.set(p.slide, p);
   const review = {
@@ -442,33 +430,16 @@ export function mergeReviewParts(parts, slideIds, sections = null) {
 }
 
 /**
- * Split a long deck for parallel first-pass reviewers: one section per
- * divider, short sections folded into the one before, long ones cut into even
- * chunks, so each reviewer reads a dozen pages closely instead of fifty
- * pages thinly. A spine reviewer reads the whole sequence alongside them.
+ * Split a long deck for parallel first-pass reviewers (splitSections): a
+ * section per divider, the divider read with its section. A spine reviewer
+ * reads the whole sequence alongside them.
  */
 export const SECTION_REVIEW_THRESHOLD = 24;
-export function reviewSections(scene, { max = 14, min = 5 } = {}) {
+export function reviewSections(scene, { max = 14 } = {}) {
   const isDivider = (s) => !s.nodes?.some((n) => n.role === "action-title" || n.role === "cover-title")
     && ((s.componentInstances || []).some((c) => /section/.test(String(c.component))) || (s.nodes || []).some((n) => /divider|section-title/.test(String(n.role))));
   const titleOf = (s) => (s.nodes || []).find((n) => n.type === "text" && n.text)?.text?.replace(/\n/g, " ") ?? s.id;
-  const groups = [];
-  for (const s of scene.slides) {
-    if (!groups.length || isDivider(s)) groups.push({ title: groups.length ? titleOf(s) : "Opening", slides: [] });
-    groups.at(-1).slides.push(s.id);
-  }
-  const folded = [];
-  for (const g of groups) {
-    const last = folded.at(-1);
-    if (last && (g.slides.length < min || last.slides.length < min) && last.slides.length + g.slides.length <= max) { last.slides.push(...g.slides); last.title = `${last.title}; ${g.title}`; }
-    else folded.push({ ...g, slides: [...g.slides] });
-  }
-  const out = [];
-  for (const g of folded) {
-    const n = Math.ceil(g.slides.length / max), size = Math.ceil(g.slides.length / n);
-    for (let k = 0; k < n; k += 1) out.push({ title: n > 1 ? `${g.title} (${k + 1} of ${n})` : g.title, slides: g.slides.slice(k * size, (k + 1) * size) });
-  }
-  return out.map((g, i) => ({ id: `s${i + 1}`, ...g }));
+  return splitSections(scene.slides.map((s, i) => ({ id: s.id, title: titleOf(s), opens: i > 0 && isDivider(s) })), { max, key: "slides" });
 }
 
 /** Bind a visual review to the exact editable file, scene and rendered pages. */
@@ -553,59 +524,34 @@ export async function recordCheckCandidates(directory, review, reviewFile = null
 
 /** A recorded pass's ledger; a record written before ledgers existed rebuilds it from its review. */
 export const ledgerOf = (record) => record?.ledger ?? (record?.review ? deckLedger([], record.review) : []);
-const passOf = (record) => record?.pass ?? record?.review?.pass ?? 1;
 
 /**
- * Keep a validated review with the slide hashes it was bound to, its pass,
- * the review it verifies and the ledger after it, so the next pass can be
- * scoped and the acceptance rule read across every pass.
+ * Keep a validated review in review-history/ (recordPass) with the slide
+ * hashes it read and the ledger after it, so the next pass can be scoped and
+ * the acceptance rule read across every pass.
  */
 export async function recordReview(directory, review, priorLedger = []) {
-  const dir = path.join(directory, HISTORY);
-  await fs.mkdir(dir, { recursive: true });
-  const n = (await fs.readdir(dir)).filter((f) => /^review-\d+\.json$/.test(f)).length + 1;
-  const file = path.join(dir, `review-${n}.json`);
-  const ledger = deckLedger(review.pass > 1 ? priorLedger : [], review);
-  await fs.writeFile(file, JSON.stringify({ review, binding: review.binding, pass: review.pass ?? 1, verifies: review.verifies ?? null,
-    slideHashes: await slideHashes(directory), ledger, recordedAt: new Date().toISOString() }, null, 2) + "\n");
+  const { file } = await recordPass(path.join(directory, HISTORY), { review, pageHashes: await slideHashes(directory),
+    ledger: deckLedger(review.pass > 1 ? priorLedger : [], review) });
   await recordCheckCandidates(directory, review, file);
   return file;
 }
 
-export async function latestReview(directory) {
-  const dir = path.join(directory, HISTORY);
-  const files = (await fs.readdir(dir).catch(() => [])).filter((f) => /^review-\d+\.json$/.test(f))
-    .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
-  return files.length ? JSON.parse(await fs.readFile(path.join(dir, files.at(-1)), "utf8")) : null;
-}
+export const latestReview = async (directory) => (await readPasses(path.join(directory, HISTORY))).at(-1) ?? null;
 
 /**
- * What the next pass is: its number, the review it verifies, the pages it
- * must read (every page whose scene record or render changed, the neighbours
- * of deleted pages, and every page an open major or blocker names), the open
- * findings it must give a status, and the density verdicts it inherits. The
- * changed pages are also the only ones a new major finding may be raised on.
- * `capped` says the pass would exceed the loop's cap.
+ * The next deck pass (nextPassScope), with what the density pass carries: the
+ * "right" verdicts of pages it need not reread, which it inherits, and every
+ * page an open density finding names, which it must judge again - that page's
+ * finding closes only on a fresh verdict, and a rebuilt page the profile no
+ * longer flags would otherwise never be asked, and never close.
  */
 export function verificationScope(prior, current, { maxPasses = MAX_PASSES } = {}) {
-  if (!prior?.slideHashes || !prior.review) return null;
-  const moved = changedPages(prior.slideHashes, current);
-  if (!moved) return null;
-  const ledger = ledgerOf(prior);
-  const open = openEntries(ledger);
-  const blocking = openBlocking(ledger);
-  const ids = Object.keys(current);
-  const named = new Set(blocking.flatMap((e) => e.pages || []).filter((id) => current[id]));
-  const changed = [...new Set([...moved.changed, ...moved.neighbours])];
-  const mustInspect = ids.filter((id) => changed.includes(id) || named.has(id));
-  const inheritedDensity = (prior.review.density?.pages || []).filter((p) => p.verdict === "right" && !mustInspect.includes(p.slide) && current[p.slide]);
-  const pass = passOf(prior) + 1;
-  return {
-    pass, verifies: prior.binding, basedOn: prior.binding, maxPasses, capped: pass > maxPasses,
-    changed, deleted: moved.deleted, mustInspect, open, ledger,
-    priorBlocking: blocking.map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity, reason: e.reason, repair: e.repair })),
-    inheritedDensity, priorRating: prior.review.rating,
-  };
+  const scope = nextPassScope(prior, current, { ledger: ledgerOf(prior), maxPasses });
+  if (!scope) return null;
+  const inheritedDensity = (prior.review.density?.pages || []).filter((p) => p.verdict === "right" && !scope.mustInspect.includes(p.slide) && current[p.slide]);
+  const rejudge = scope.open.filter(isDensity).filter((e) => current[e.pages[0]]).map((e) => ({ slide: e.pages[0], reason: e.reason }));
+  return { ...scope, inheritedDensity, rejudge };
 }
 
 /** A verification review carries forward the density verdicts of pages it did not need to reread. */
@@ -626,11 +572,14 @@ export async function validateReviewBinding(review, directory) {
 
 /**
  * The density pass is complete: the deck comparison is written and every page
- * the profile flagged has a verdict. A review without it cannot accept a deck
- * whose rendered words were never compared with the skill's density targets.
+ * the profile flagged - and, on a later pass, every page an open density
+ * finding names (scope.rejudge) - has a verdict. A review without it cannot
+ * accept a deck whose rendered words were never compared with the skill's
+ * density targets.
  */
-export function validateDensityReview(review, profile) {
-  if (!profile) return [];
+export function validateDensityReview(review, profile, scope = null) {
+  const required = [...new Set([...(profile?.flaggedPages || []), ...(scope?.rejudge || []).map((p) => p.slide)])];
+  if (!profile && !required.length) return [];
   const errors = [];
   const density = review?.density;
   if (!density || typeof density !== "object") return ["Review must carry the density pass (density.deck and density.pages)"];
@@ -641,8 +590,8 @@ export function validateDensityReview(review, profile) {
     if (typeof entry?.reason !== "string" || entry.reason.trim().length < 20) errors.push(`density.pages[${i}]: give the reason for the verdict`);
   }
   const judged = new Set(pages.map((entry) => entry?.slide));
-  const missing = (profile.flaggedPages || []).filter((id) => !judged.has(id));
-  if (missing.length) errors.push(`density pass must judge every flagged page; missing ${missing.join(", ")}`);
+  const missing = required.filter((id) => !judged.has(id));
+  if (missing.length) errors.push(`density pass must judge every flagged page and every page an open density finding names; missing ${missing.join(", ")}`);
   return errors;
 }
 
@@ -688,7 +637,7 @@ export async function buildReviewPacket({ outputDirectory, spec, brief = "", ans
   const dir = path.resolve(outputDirectory);
   if (!spec || typeof spec !== "object") throw new Error("buildReviewPacket needs the deck spec: the deck review is prepared only once the storyline critique is ready for its spine");
   const gate = await storylineGate(spec, dir);
-  if (gate.length) throw Object.assign(new Error(`The deck review waits for the storyline critique: ${gate.join("; ")}`), { code: "STORYLINE_NOT_READY", reasons: gate });
+  if (gate.length) throw Object.assign(new Error(`The deck review waits for the storyline critique: ${gate.join("; ")}`), { code: "STORYLINE_UNREVIEWED", reasons: gate });
   const scene = JSON.parse(await fs.readFile(path.join(dir, "scene.json"), "utf8"));
   const gates = await fs.readFile(path.join(dir, "gates.json"), "utf8").then(JSON.parse).catch(() => ({ findings: [] }));
   const packetDir = path.join(dir, "review-packet");
@@ -733,12 +682,13 @@ export function designStatistics(scene) {
   // build has to be able to refuse a deck and the build reads that file.
   const TREATMENT = /^table-(bubble|bar|rating-|implication|column-band|row-band|zebra-band|harvey|status-pill|number-circle|lamp|dot|check|progress-|cell-icon|section-marker|section-number)/;
   const ANNOTATION = /^(annotation-|chart-(bracket|delta|event-|highlight|reference|band|callout|change))/;
-  const content = scene.slides.filter((s) => s.nodes.some((n) => n.role === "action-title"));
+  // The analytical pages the gates and the census count (weight.json analyticalPage).
+  const content = scene.slides.filter(isAnalyticalPage);
   const kinds = new Set();
   let tables = 0, treated = 0, charts = 0, annotated = 0, marks = 0, unsourced = 0;
   for (const slide of content) {
     const components = (slide.componentInstances || []).map((c) => String(c.component));
-    for (const c of components) if (!["chrome", "section", "page-template"].includes(c)) kinds.add(c);
+    for (const c of components) if (!["chrome", "slide-chrome", "section", "page-template"].includes(c)) kinds.add(c);
     const roles = slide.nodes.map((n) => String(n.role ?? ""));
     // "Drawings": every primitive that is not type. A well-made
     // analytical page carries 32 (p25 11, p75 88); a page of rules and text
@@ -789,6 +739,10 @@ const FINDING_RULES = `FINDINGS. Give each finding an id (F1, F2, ...), a scope,
 const PAGE_RULES = `PAGE COVERAGE. \`pages\` holds one entry per page: its id, a verdict (ok, minor, major, blocker) and \`checks\`, a short note for each page dimension (${PAGE_DIMENSIONS.join(", ")}) saying what you checked and what you saw - "n/a - no table on this page" where a dimension has nothing to check. A page's verdict is the worst severity of the open findings that name it (ok when none does); validation refuses a verdict that disagrees with the findings.`;
 
 const COMPLETENESS_RULES = (dimensions) => `COMPLETENESS SELF-CHECK. \`completeness\` holds one entry per dimension (${dimensions.join(", ")}): result "findings" when you filed any under it, or "clean" with a note saying what you checked and why nothing was found. A clean dimension with nothing said about it is a gap, not a pass.`;
+
+// The reviewer's codes, and the rule that keeps one code per defect across the reviews and the build's checks.
+const codesPrompt = (packet) => `${Object.entries(packet.codes || CODES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
+A defect a build check already names keeps that check's code: a gate finding's own code, MISSING_EVIDENCE for a ranked criterion with no comparative exhibit, LAYOUT_MONOTONY for one construction across most of the deck.`;
 
 const pageLine = (s) => `- [${s.id}] page ${s.index}: ${s.title || "(no title)"} - ${s.image}${s.exhibits?.length ? `; exhibits: ${s.exhibits.map((e) => e.component).join(", ")}` : ""}${s.absent?.length ? `; n/a: ${s.absent.join(", ")}` : ""}`;
 
@@ -843,7 +797,7 @@ ${FINDING_RULES}
 ${COMPLETENESS_RULES(DIMENSIONS)}
 
 For each slide, decide whether a reader gets the finding from the title and can verify it from the exhibit. A separate soWhat or closing strip is optional: the title and exhibit may already complete the argument. Two distinct insights can share a page when each is supported and clearly placed. Flag redundant propositions or competing summary boxes, not the absence of a footer conclusion. Use these codes where appropriate, or a precise upper-case code for a newly observed defect:
-${Object.entries(packet.codes || CODES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
+${codesPrompt(packet)}
 
 ${checkablePrompt()}
 
@@ -895,7 +849,7 @@ ${FINDING_RULES} A defect recurring on several of your pages is a deck finding l
 ${COMPLETENESS_RULES(PAGE_DIMENSIONS)}
 
 Codes (or a precise upper-case code of your own):
-${Object.entries(packet.codes || CODES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
+${codesPrompt(packet)}
 
 ${checkablePrompt()}
 
@@ -934,7 +888,7 @@ ${FINDING_RULES} Across sections, list every affected page in the deck. Leave \`
 ${COMPLETENESS_RULES(DECK_DIMENSIONS)}
 
 Codes:
-${Object.entries(packet.codes || CODES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
+${codesPrompt(packet)}
 
 ${checkablePrompt()}
 
@@ -957,14 +911,13 @@ export function verificationPrompt(packet) {
   const byId = new Map((packet.slides || []).map((s) => [s.id, s]));
   const pages = (scope.mustInspect || []).map((id) => byId.get(id)).filter(Boolean);
   const changed = new Set(scope.changed || []);
-  const open = scope.open || scope.priorBlocking || [];
-  return `You are verifying repairs to a consulting deck. This is pass ${scope.pass} of at most ${scope.maxPasses ?? MAX_PASSES}; it verifies the review bound to ${scope.verifies ?? scope.basedOn}. It is not a fresh review: the first pass read every page on every dimension, and its verdict stands for every page that has not changed.
+  return `You are verifying repairs to a consulting deck. This is pass ${scope.pass} of at most ${scope.maxPasses ?? MAX_PASSES}; it verifies the review bound to ${scope.verifies}. It is not a fresh review: the first pass read every page on every dimension, and its verdict stands for every page that has not changed.
 
 Read ${guidance(["design", "taste-review"]).join(" and ")} for the standards. BRIEF: ${packet.brief || "(not supplied)"}
 GOVERNING ANSWER: ${packet.answer || "(not supplied)"}
 
-OPEN FINDINGS (give every one a status):
-${open.filter((f) => !String(f.id).startsWith("density:")).map((f) => `- ${f.id ?? "?"} · ${f.code} · ${f.severity} · ${(f.pages || f.slides || [f.slide]).filter(Boolean).join(", ") || "deck"}: ${f.reason}${f.repair ? ` → ${f.repair}` : ""}`).join("\n") || "- none"}
+OPEN FINDINGS (give every one a status; an open density finding takes its status from the density verdict below):
+${(scope.open || []).filter((f) => !isDensity(f)).map((f) => `- ${f.id} · ${f.code} · ${f.severity} · ${(f.pages || []).join(", ") || "deck"}: ${f.reason}${f.repair ? ` → ${f.repair}` : ""}`).join("\n") || "- none"}
 
 PAGES TO READ at full size (${scope.changed?.length ?? 0} changed since that pass or beside a deleted page, the rest named by an open major or blocker):
 ${pages.map((s) => `${pageLine(s)}${changed.has(s.id) ? " [changed]" : ""}`).join("\n") || "- none"}
@@ -986,9 +939,9 @@ ${FINDING_RULES}
 
 ${checkablePrompt()}
 
-${densityPrompt(packet.density, scope.mustInspect)}
+${densityPrompt(packet.density, scope.mustInspect, scope.rejudge)}
 
-Set pass to ${scope.pass} and verifies to "${scope.verifies ?? scope.basedOn}". Bind this review to ${packet.binding}. The earlier rating was ${scope.priorRating ?? "not recorded"}; rate the repaired deck out of ten on what you now see.
+Set pass to ${scope.pass} and verifies to "${scope.verifies}". Bind this review to ${packet.binding}. The earlier rating was ${scope.priorRating ?? "not recorded"}; rate the repaired deck out of ten on what you now see.
 
 Return ONLY JSON matching this schema: ${JSON.stringify(packet.schema)}
 Set accepted=false while any major or blocker finding, earlier or new, is open. The summary is two sentences: which repairs held and what, if anything, must still change.`;
@@ -1000,52 +953,40 @@ export function checkablePrompt() {
 }
 
 
-/** The density pass: the profile's comparison and flags, put to the reviewer as questions. */
-export function densityPrompt(profile, only = null) {
-  if (!profile) return "DENSITY PASS. No density profile was built (the deck was not rendered); set density to {\"deck\": \"No rendered density profile was available for this build.\", \"pages\": []}.";
+/**
+ * The density pass: the profile's comparison and flags, put to the reviewer
+ * as questions, and on a later pass every page an open density finding names
+ * (`rejudge`), flagged or not: its finding closes only on a fresh verdict.
+ */
+export function densityPrompt(profile, only = null, rejudge = []) {
+  const again = rejudge.filter((p) => !(profile?.pages || []).some((q) => q.id === p.slide && q.flags?.length && (!only || only.includes(q.id))));
+  const judgeAgain = again.length ? `\nJudge again, flagged or not, every page an open density finding names; a verdict of right closes it:\n${again.map((p) => `- ${p.slide}: earlier judged ${p.reason}`).join("\n")}` : "";
+  if (!profile) return `DENSITY PASS. No density profile was built (the deck was not rendered); set density.deck to "No rendered density profile was available for this build." and density.pages to one verdict per page listed below, or [] when none is.${judgeAgain}`;
   const deck = profile.deck || {};
   const line = (name, label) => deck[name] ? `- ${label}: ${deck[name].measured} against the target ${deck[name].target} (band ${JSON.stringify(deck[name].band ?? null)}), ${deck[name].position}` : null;
   const flagged = (profile.pages || []).filter((p) => p.flags?.length && (!only || only.includes(p.id)));
   return `DENSITY PASS. The rendered pages were measured by the skill's density rules (pdftotext -layout; title and source lines excluded; a block is a run of lines between blank ones; blocks under three words are labels). Compare the deck with the skill's targets, then open every flagged page and judge whether its density is right for the job it does. A flag is a question, not a verdict: a chart-led page may rightly sit light, and a page that clears its word floor with padding or restatement is too dense or the wrong shape even though it passed. Deck against the targets for pages doing this job (block measures over the ${deck.comparedPages ?? "?"} pages that carry commentary or prose, the population the targets describe; ${deck.exhibitLed?.pages ?? 0} exhibit-led pages sit beside them at ${deck.exhibitLed?.wordsPerBlock ?? "-"} words a block, which are labels):
 ${[line("bodyWordsVsTaskMedian", "body words against each page's task median (1.0 = target median)"), line("blocksPerPage", "text blocks per page"), line("wordsPerBlock", "words per block"), line("longestBlock", "longest block per page"), deck.singleBlockShare ? `- single-block pages: ${deck.singleBlockShare.measured} of pages against at most ${deck.singleBlockShare.target}` : null].filter(Boolean).join("\n")}
 Flagged pages:
-${flagged.map((p) => `- ${p.id} (page ${p.page}, ${p.task ?? "no task"}): ${p.flags.join("; ")}`).join("\n") || "- none"}
-Record density.deck as two or three sentences comparing the deck's medians with the skill's targets and saying what that means for a reader, and density.pages as one verdict per flagged page (right, too thin, too dense or wrong shape) with the reason you saw on the page. Any verdict other than right blocks delivery.`;
+${flagged.map((p) => `- ${p.id} (page ${p.page}, ${p.task ?? "no task"}): ${p.flags.join("; ")}`).join("\n") || "- none"}${judgeAgain}
+Record density.deck as two or three sentences comparing the deck's medians with the skill's targets and saying what that means for a reader, and density.pages as one verdict per listed page (right, too thin, too dense or wrong shape) with the reason you saw on the page. Any verdict other than right blocks delivery.`;
 }
 
-/** A reviewer's JSON answer, from whatever the backend printed around it. */
-function parseAnswer(raw) {
-  const match = String(raw).match(/\{[\s\S]*\}/);
-  return JSON.parse(match ? match[0] : raw);
-}
-
-async function callBackend(which, { prompt, schemaPath, images, outPath, model, timeoutMs }) {
-  if (which === "codex") {
-    const args = ["exec", ...(model ? ["--model", model] : []), "--sandbox", "read-only", "--ephemeral", "--output-schema", schemaPath, "--output-last-message", outPath, ...images.flatMap((image) => ["--image", image]), "-"];
-    await runProcess("codex", args, { input: prompt, timeoutMs });
-    return parseAnswer(await fs.readFile(outPath, "utf8"));
-  }
-  if (which === "claude") {
-    const res = await runProcess("claude", ["-p", "--output-format", "json", "--allowedTools", "Read", ...(model ? ["--model", model] : [])], { input: prompt, timeoutMs });
-    const envelope = JSON.parse(res.stdout);
-    return parseAnswer(typeof envelope.result === "string" ? envelope.result : JSON.stringify(envelope.result ?? envelope));
-  }
-  throw new Error(`Unknown reviewer backend: ${which}`);
-}
-
-/** Merge the saved parts of a split first pass into <out>/review.json. */
+/**
+ * Merge the saved parts of a split first pass into <out>/review.json: the one
+ * merge `reviewer.mjs merge` and `deliver-deck --review <parts-dir>` both run,
+ * held to the packet's sections and binding when a packet was written.
+ */
 export async function mergeReviewDirectory(outputDirectory, partsDirectory = null) {
   const dir = path.resolve(outputDirectory);
-  const from = partsDirectory ? path.resolve(partsDirectory) : path.join(dir, "review-packet", "parts");
-  const files = (await fs.readdir(from).catch(() => [])).filter((f) => f.endsWith(".json")).sort();
-  const parts = await Promise.all(files.map(async (f) => JSON.parse(await fs.readFile(path.join(from, f), "utf8"))));
+  const { files, parts } = await readParts(partsDirectory ? path.resolve(partsDirectory) : path.join(dir, "review-packet", "parts"));
   const slideIds = JSON.parse(await fs.readFile(path.join(dir, "scene.json"), "utf8")).slides.map((s) => s.id);
   const packet = await fs.readFile(path.join(dir, "review-packet", "packet.json"), "utf8").then(JSON.parse).catch(() => null);
-  const { review, errors } = mergeReviewParts(parts, slideIds, packet?.sections ?? null);
+  const { review, errors } = mergeReviewParts(parts, slideIds, { sections: packet?.sections ?? null, binding: packet?.binding });
   if (errors.length) return { status: "invalid", errors, parts: files };
   const reviewPath = path.join(dir, "review.json");
   await fs.writeFile(reviewPath, JSON.stringify(review, null, 2) + "\n");
-  return { status: "merged", reviewPath, parts: files, findings: review.findings.length };
+  return { status: "merged", reviewPath, review, parts: files, findings: review.findings.length };
 }
 
 export async function runReview({ outputDirectory, spec, brief, answer, backend = "auto", model, timeoutMs = 600000, scope = null }) {
@@ -1065,17 +1006,12 @@ export async function runReview({ outputDirectory, spec, brief, answer, backend 
     // fifty-page first pass is only exhaustive when no reader has fifty pages.
     const jobs = [...packet.sections.map((section) => ({ id: section.id, prompt: sectionPrompt(packet, section), images: packet.slides.filter((s) => section.slides.includes(s.id)).map((s) => s.image) })),
       { id: "spine", prompt: spinePrompt(packet), images: [packet.montage, ...packet.spreads] }];
-    const partsDir = path.join(packetDir, "parts");
-    const parts = await Promise.all(jobs.map(async (job) => {
-      const part = await callBackend(which, { prompt: job.prompt, schemaPath: path.join(packetDir, "part-schema.json"), images: job.images, outPath: path.join(partsDir, `${job.id}.last-message.json`), model, timeoutMs });
-      await fs.writeFile(path.join(partsDir, `${job.id}.json`), JSON.stringify(part, null, 2) + "\n");
-      return part;
-    }));
-    const merged = mergeReviewParts(parts, packet.slides.map((s) => s.id), packet.sections);
+    const parts = await reviewParts(which, jobs, { partsDir: path.join(packetDir, "parts"), schemaPath: path.join(packetDir, "part-schema.json"), model, timeoutMs });
+    const merged = mergeReviewParts(parts, packet.slides.map((s) => s.id), { sections: packet.sections, binding: packet.binding });
     if (merged.errors.length) throw new Error(`The section reviews could not be merged:\n- ${merged.errors.join("\n- ")}`);
     review = merged.review;
   } else {
-    review = await callBackend(which, { prompt: await fs.readFile(path.join(packetDir, "prompt.md"), "utf8"), schemaPath: path.join(packetDir, "schema.json"),
+    review = await callReviewer(which, { prompt: await fs.readFile(path.join(packetDir, "prompt.md"), "utf8"), schemaPath: path.join(packetDir, "schema.json"),
       images: [...packet.slides.filter(read).map((s) => s.image), packet.montage], outPath: path.join(packetDir, "codex-last-message.json"), model, timeoutMs });
   }
   review.backend = which; review.model = model || null;
@@ -1085,8 +1021,8 @@ export async function runReview({ outputDirectory, spec, brief, answer, backend 
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [command, out, partsDirectory] = process.argv.slice(2);
-  if (command !== "merge" || !out) { console.error("Usage: reviewer.mjs merge output-directory [parts-directory]"); process.exit(1); }
-  const result = await mergeReviewDirectory(out, partsDirectory);
+  if (command !== "merge" || !out) { console.error("Usage: reviewer.mjs merge output-directory [parts-directory]"); process.exit(EXIT.error); }
+  const { review, ...result } = await mergeReviewDirectory(out, partsDirectory);
   console.log(JSON.stringify(result));
-  process.exit(result.status === "merged" ? 0 : 2);
+  process.exit(result.status === "merged" ? EXIT.ok : EXIT.refused);
 }
