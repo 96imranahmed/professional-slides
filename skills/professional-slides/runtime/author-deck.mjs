@@ -28,10 +28,10 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
-import { compilePage, describeTypes, pageSchema, structureOf, architectureOf, SHAPES, breadthProblem } from "./page-types.mjs";
+import { compilePage, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, SHAPES, breadthProblem } from "./page-types.mjs";
 import { deriveContent } from "./derive-content.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
-import { varietyFindings, evidenceDepth } from "./gates/variety_gates.mjs";
+import { varietyFindings, evidenceDepth, structureMix, VARIETY } from "./gates/variety_gates.mjs";
 import { SLIDE_KEYS } from "./compose.mjs";
 import { composeAll } from "./compose-all.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
@@ -81,7 +81,7 @@ export function compileDeck(doc, { insights = null, draft = false, partial = fal
   const appendix = compile(doc.appendix || [], doc.pages.length).filter(Boolean);
   if (partial) {
     const spec = { ...doc.deck, slides, ...(appendix.length ? { appendix } : {}) };
-    return { spec, findings: varietyFindings(spec, { structureOf }), compileErrors: errors };
+    return { spec, findings: varietyFindings(spec, { structureOf, drawnOf }), compileErrors: errors };
   }
   if (errors.length) {
     const error = new Error(`${errors.length} page${errors.length === 1 ? "" : "s"} could not be compiled:\n- ${errors.join("\n- ")}`);
@@ -89,7 +89,7 @@ export function compileDeck(doc, { insights = null, draft = false, partial = fal
     throw error;
   }
   const spec = { ...doc.deck, slides, ...(appendix.length ? { appendix } : {}) };
-  return { spec, findings: varietyFindings(spec, { structureOf }) };
+  return { spec, findings: varietyFindings(spec, { structureOf, drawnOf }) };
 }
 
 /**
@@ -157,7 +157,7 @@ export async function authorDeck(doc, { baseDir, insights = null, draft = false 
   const scene = sceneGateFindings(composed.deck);
   // A draft has no copy yet, so the page gates - words, tables, footers - are
   // reported there, not enforced; the structure rules hold either way.
-  return { spec, deck: composed.deck, failedIds, compiled: !compileErrors.length, findings: [...failed, ...varietyFindings(spec, { structureOf }), ...(draft ? [] : scene.findings)],
+  return { spec, deck: composed.deck, failedIds, compiled: !compileErrors.length, findings: [...failed, ...varietyFindings(spec, { structureOf, drawnOf }), ...(draft ? [] : scene.findings)],
     pageGateAdvisories: [...(draft ? scene.findings : []), ...scene.advisories], pageGatesRan: scene.ran, budget: scene.budget ?? [] };
 }
 
@@ -276,7 +276,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   // What the chart pages plot, against strong decks' ~22 a page: the numbers
   // behind EVIDENCE_DEPTH, printed on every run so a thin deck is seen before it is gated.
   const depth = evidenceDepth([...spec.slides, ...(spec.appendix || [])]);
+  // The deck as drawn: every skeleton and how often, and the two shares the
+  // contract holds (VARIETY_PANELS, VARIETY_COLUMN), printed on every run so a
+  // deck drifting toward one exhibit and a column is seen before it is gated.
+  const drawn = structureMix([...spec.slides, ...(spec.appendix || [])], { drawnOf });
+  const pct = (x) => `${Math.round(x * 100)}%`;
   const summary = { ...(draft ? { draft: true } : {}), pages: typed.length, types: mix("type"), commentary: mix("commentary"), closes: typed.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length,
+    structure: { twoPlusExhibits: `${drawn.multi.pages} of ${drawn.pages} (${pct(drawn.multi.share)}; floor ${pct(VARIETY.multiShareMin)}, strong decks a quarter to a third)`,
+      exhibitBesideColumn: `${drawn.column.pages} of ${drawn.pages} (${pct(drawn.column.share)}; cap ${pct(VARIETY.columnShareMax)}, strong decks about one in eight)${drawn.column.pages ? `: ${drawn.column.ids.join(", ")}` : ""}`,
+      skeletons: drawn.skeletons },
     plotted: { chartPages: depth.chartPages, median: depth.median, range: [depth.min, depth.max], thinnest: depth.thinnest, strongDecks: "about 22 a chart page, the middle half 10 to 48" },
     advisories: [...(contentReport.findings || []).filter((f) => !["blocker", "blocking"].includes(f.severity) || (draft && WORDS.has(f.code))), ...pageGateAdvisories]
       .map((f) => `${f.code}${f.id ? ` [${f.id}]` : ""}`)

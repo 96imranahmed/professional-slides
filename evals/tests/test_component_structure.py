@@ -526,7 +526,8 @@ console.log(JSON.stringify({counts: headings.map(n => n.data.textLayout.lines.le
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 let heading=false, chart=false;
 try { REGISTRY.get('section-heading').render({id:'heading',frame:{x:0,y:0,width:30,height:52},props:{heading:'Unbreakable'}}); } catch {heading=true;}
-try { REGISTRY.get('chart.column').render({id:'chart',frame:{x:0,y:0,width:500,height:180},props:REGISTRY.get('chart.column').sample}); } catch {chart=true;}
+// The label band under the columns is measured now, so 180px holds the sample's plot; 160px does not.
+try { REGISTRY.get('chart.column').render({id:'chart',frame:{x:0,y:0,width:500,height:160},props:REGISTRY.get('chart.column').sample}); } catch {chart=true;}
 console.log(JSON.stringify({heading,chart}));
 """)
         self.assertEqual(result, {"heading": True, "chart": True})

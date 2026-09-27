@@ -8,7 +8,7 @@
 // primitives every other component uses, so the PowerPoint emitter and the
 // HTML renderer need nothing new, and each measures itself and refuses content
 // it cannot set rather than overflowing.
-import { token, tokenValue, stableId, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive } from "./core.mjs";
+import { token, tokenValue, stableId, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive, houseStyle, readableOn } from "./core.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 import { mediaNode } from "./media.mjs";
@@ -21,7 +21,7 @@ const v = (id) => tokenValue(token(id));
 
 export const FIGURE_TOKENS = Object.freeze([...new Set([...MARK_TOKENS,
   "color.componentPrimary", "color.accent", "color.accentTint", "color.ink", "color.onPrimary", "color.textSecondary",
-  "color.rule", "color.surfaceMuted", "font.body", "font.display", "type.metric", "type.heading", "type.body",
+  "color.rule", "color.surfaceMuted", "color.surfaceTint", "font.body", "font.display", "type.metric", "type.heading", "type.body",
   "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "space.6",
   "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
@@ -725,6 +725,12 @@ export function factGridNodes({ id, frame, props }) {
   const L = factGridLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`The fact grid needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a fact or its line`);
   const dark = props.tone === "dark", out = [];
+  // A tile is a card, drawn on the house's card surface (core.mjs
+  // `style.cards`): on the muted grey a two-by-two grid of facts measured as
+  // an empty page - four tiles, each a number and two lines of copy - where
+  // the same grid on the card tint reads as the four filled boxes it is.
+  const surface = dark ? PRIMARY : houseStyle("style.cards") === "tint" ? token("color.surfaceTint") : MUTED;
+  const valueColor = dark ? WHITE : readableOn(ACCENT, surface, 3), textColor = dark ? WHITE : readableOn(SECONDARY, surface);
   // A grid of two rows or more takes the height its frame gives it: the tiles
   // are the exhibit, and four tiles two by two beside the commentary grew by a
   // third and then sat centred with a band of air above and below the grid.
@@ -739,16 +745,16 @@ export function factGridNodes({ id, frame, props }) {
     const h = L.rowHeights[r] * stretch;
     L.tiles.slice(r * L.columns, (r + 1) * L.columns).forEach((t, c) => {
       const x = frame.x + c * (L.width + L.gap), tid = stableId(id, "fact", r * L.columns + c);
-      out.push(fillRect(stableId(tid, "tile"), "fact-tile", { x, y, width: L.width, height: h }, dark ? PRIMARY : MUTED, { radius: "radius.small" }));
+      out.push(fillRect(stableId(tid, "tile"), "fact-tile", { x, y, width: L.width, height: h }, surface, { radius: "radius.small" }));
       // `t.height` counts the gauge's band, which stays on the foot, so the
       // copy centres in what is above it by the same half of the growth.
       let ty = y + L.pad + Math.max(0, h - t.height) / 2;
       if (t.item.icon) { out.push(...iconMarker({ id: stableId(tid, "icon"), role: "fact-icon", x: x + L.pad, y: ty, size: 28, icon: t.item.icon, tone: dark ? "inverse" : "accent" })); ty += 28 + v("space.2"); }
-      out.push(label(stableId(tid, "value"), "fact-value", { x: x + L.pad, y: ty, width: L.inner }, t.value, style("type.metric", dark ? WHITE : ACCENT, true, "left", DISPLAY)));
+      out.push(label(stableId(tid, "value"), "fact-value", { x: x + L.pad, y: ty, width: L.inner }, t.value, style("type.metric", valueColor, true, "left", DISPLAY)));
       ty += t.value.height + v("space.1");
       out.push(label(stableId(tid, "label"), "fact-label", { x: x + L.pad, y: ty, width: L.inner }, t.label, style("type.body", dark ? WHITE : INK, true)));
       ty += t.label.height;
-      if (t.text) { out.push(label(stableId(tid, "text"), "fact-text", { x: x + L.pad, y: ty + v("space.1"), width: L.inner }, t.text, style("type.compact", dark ? WHITE : SECONDARY))); ty += v("space.1") + t.text.height; }
+      if (t.text) { out.push(label(stableId(tid, "text"), "fact-text", { x: x + L.pad, y: ty + v("space.1"), width: L.inner }, t.text, style("type.compact", textColor))); ty += v("space.1") + t.text.height; }
       if (t.item.gauge !== null) {
         const gy = y + h - L.pad - 6;
         out.push(fillRect(stableId(tid, "gauge-track"), "fact-gauge-track", { x: x + L.pad, y: gy, width: L.inner, height: 6 }, dark ? SECONDARY : RULE, { radius: "radius.round" }));

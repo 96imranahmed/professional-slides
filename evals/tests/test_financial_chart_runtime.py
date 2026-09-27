@@ -2,6 +2,38 @@ import unittest
 from node_probe import run_node
 
 
+class PlotPackingTests(unittest.TestCase):
+    """A plot takes the room its labels leave: the domain is the tightest whole
+    division of the data, and the bands above and below the plot hold what is
+    drawn there and no more."""
+
+    def test_domains_bands_and_headroom(self):
+        result = run_node(r"""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const frame={x:60,y:150,width:1000,height:480};
+const ticks=(nodes)=>nodes.filter(n=>n.role==='axis-label').map(n=>Number(n.text)).sort((a,b)=>a-b);
+const line=REGISTRY.get('chart.line').render({id:'line',frame,props:{categories:['FY17','FY18','FY19','FY20','FY21','FY22','FY23','FY24','FY25','FY26'],series:[{name:'Yield',values:[204,212,219,222,229,256,327,305,307,313]},{name:'Cost',values:[132,138,145,141,177,155,186,168,169,171]}],showValueAxis:true,dataLabels:false}}).nodes;
+const axis=(nodes)=>{const n=nodes.find(n=>n.role==='chart-axis'&&n.id.endsWith('x-axis'));return {y1:n.y1??n.frame.y};};
+const labelsUnder=(nodes)=>Math.min(...nodes.filter(n=>n.role==='category-label').map(n=>n.frame.y))-axis(nodes).y1;
+const bridge=(values)=>REGISTRY.get('chart.waterfall').render({id:'bridge',frame,props:{categories:['FY25','Revenue','Fuel','Staff','Other','FY26'],values,totals:[0,5]}}).nodes;
+const high=bridge([100,20,10,-15,-8,107]), low=bridge([30,20,10,-45,-12,3]);
+const bar=REGISTRY.get('chart.bar').render({id:'bar',frame,props:{categories:['A','B','C','D'],series:[{name:'x',values:[4,3,2,1]}]}}).nodes;
+const firstBar=Math.min(...bar.filter(n=>n.role==='chart-mark').map(n=>n.frame.y));
+const heading=frame.y;
+console.log(JSON.stringify({ticks:ticks(line),lineGap:labelsUnder(line),lineBottom:frame.y+frame.height-axis(line).y1,highGap:labelsUnder(high),lowGap:labelsUnder(low),barTop:firstBar-heading}));
+""")
+        # 132 to 327 in five steps of 50 (100 to 350), not four of 100 (100 to 500).
+        self.assertEqual(result['ticks'], [100, 150, 200, 250, 300, 350])
+        # Period labels sit 16px under a line's axis, and the band ends a theme gap under them.
+        self.assertEqual(round(result['lineGap']), 16)
+        self.assertLess(result['lineBottom'], 56)
+        # A bridge whose falls end well above zero keeps no label row for them; one whose fall reaches the floor does.
+        self.assertEqual(round(result['highGap']), 8)
+        self.assertEqual(round(result['lowGap']), 38)
+        # A horizontal bar prints nothing above its first bar: 12px of headroom, not 28.
+        self.assertLess(result['barTop'], 28)
+
+
 class FinancialChartRuntimeTests(unittest.TestCase):
 
     def test_signed_peer_bars_share_physical_scale_when_only_one_has_losses(self):
@@ -267,7 +299,8 @@ assert.ok(sparse.filter(n=>n.role==='category-label').every(n=>n.style.fontSize.
 const labelled=column.render({id:'labelled',frame,props:{categories:['A','B','C','D'],series:[{name:'Actual',values:[1,2,3,4]},{name:'Plan',values:[2,3,4,5]}],dataLabels:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
 assert.equal(labelled.filter(n=>n.role==='axis-label').length,0);
 const unlabelled=column.render({id:'unlabelled',frame,props:{categories:['A','B','C','D'],series:[{name:'Actual',values:[1,2,3,4]},{name:'Plan',values:[2,3,4,5]}],dataLabels:false,annotations:[],highlights:[],referenceLines:[]}}).nodes;
-assert.equal(unlabelled.filter(n=>n.role==='axis-label').length,5);
+// 1 to 5 divides into five steps of 1 (0 to 5), tighter than four of 2 (0 to 8).
+assert.equal(unlabelled.filter(n=>n.role==='axis-label').length,6);
 assert.ok(unlabelled.filter(n=>n.role==='axis-label').every(n=>n.style.fontSize.tokenId==='type.chartLabel'));
 const forced=column.render({id:'forced',frame,props:{categories:['A','B'],series:[{name:'Value',values:[1,2]}],dataLabels:true,showValueAxis:true,annotations:[],highlights:[],referenceLines:[]}}).nodes;
 assert.equal(forced.filter(n=>n.role==='axis-label').length,5);
@@ -423,7 +456,8 @@ const base={categories:['2022','2023','2024'],series:[{name:'Measure',values:[42
 const clean=column.render({id:'clean',frame,props:base}).nodes;
 const ruled=column.render({id:'ruled',frame,props:{...base,gridlines:true}}).nodes;
 assert.equal(clean.filter(n=>n.role==='chart-gridline').length,0);
-assert.equal(ruled.filter(n=>n.role==='chart-gridline').length,5);
+// 42 to 71 from zero takes three steps of 25 (0 to 75), not four of 20 (0 to 80).
+assert.equal(ruled.filter(n=>n.role==='chart-gridline').length,4);
 const rail=column.render({id:'rail',frame,props:{...base,annotationRail:{items:[{category:'2022',text:'N/A'},{category:'2023',text:'+31%'},{category:'2024',text:'+29%'}]}}}).nodes;
 const categoryLabels=rail.filter(n=>n.role==='category-label');
 const railSurfaces=rail.filter(n=>n.role==='annotation-surface'&&n.data.annotationStyle==='rail');

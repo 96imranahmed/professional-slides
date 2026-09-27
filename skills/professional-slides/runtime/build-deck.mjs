@@ -24,7 +24,7 @@ import { runContentGates } from "./gates/content_gates.mjs";
 import { runPlanGates } from "./gates/plan_gates.mjs";
 import { craftFindings } from "./gates/craft_gates.mjs";
 import { varietyFindings } from "./gates/variety_gates.mjs";
-import { structureOf } from "./page-types.mjs";
+import { structureOf, drawnOf } from "./page-types.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
@@ -124,7 +124,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // deck whose pages were never typed, whose compiled structure was edited by
   // hand, or whose choices add up to one page repeated. It is the same check
   // the author ran, so a deck that compiled passes it here.
-  const variety = varietyFindings(spec, { structureOf });
+  const variety = varietyFindings(spec, { structureOf, drawnOf });
   if (variety.length) {
     const reportAt = path.join(directory, "variety-gates.json");
     await fs.writeFile(reportAt, JSON.stringify({ accepted: false, findings: variety }, null, 2) + "\n");

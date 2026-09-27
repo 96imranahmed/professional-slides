@@ -63,6 +63,19 @@ export const SERIES = [
 
 export const MIN_PLOT_HEIGHT = 100;
 
+// The air a plot keeps above its tallest mark for the value label printed on
+// it: a column's or a point's label sits over the mark. A horizontal bar
+// prints its value at the bar's end, so nothing rides above the first bar and
+// the 28px only pushed the bars away from their heading; it keeps enough for
+// a highlight's box around the first bar.
+export const VALUE_HEADROOM = 28, BAR_HEADROOM = 12;
+export const plotHeadroom = (type) => (["chart.bar", "chart.stacked-bar"].includes(type) ? BAR_HEADROOM : VALUE_HEADROOM);
+// The band under a plot that only its category labels use: the gap to the
+// labels, their measured height and the theme's trailing gap. A fixed 56px
+// left a one-line row of period labels 34px of air above the frame's foot.
+export const LABEL_BAND = 56;
+export const labelBand = (gap, labelHeight) => gap + labelHeight + tokenValue(token("space.3"));
+
 // Mark weight (core.mjs `style.marks`). One 2px line with 10px dots across a
 // full-width plot was the lightest page a deck drew - 6% of its body inked -
 // where a strong deck's line is about 2.5pt with a marker a reader can find
@@ -85,14 +98,14 @@ export function markWeight() {
  * of plot to 88px bands holding one-line notes. Only a plot that is short even
  * with compact bands throws, naming what to change.
  */
-export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, bottomInset = 56, periodBand = 0 } = {}) {
+export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, bottomInset = LABEL_BAND, periodBand = 0, headroom = VALUE_HEADROOM } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
   leftInset = Math.max(leftInset, bands.left);
   // Peer charts in a row pass the row's tallest top band as topInset so their
   // plots start (and end) on the same lines and one value scale means one pixel scale.
   // topLegend may be a row count (a wrapped legend takes 24px per extra row).
   const legendRows = topLegend === true ? 1 : Number(topLegend) || 0;
-  const topFor = (compact) => Math.max(Number(topInset) || 0, (legendRows ? 52 + (legendRows - 1) * 26 : 28) + totalLabelInset + evidenceBandSpan({ annotations }, { compact }) + bands.top + periodBand);
+  const topFor = (compact) => Math.max(Number(topInset) || 0, (legendRows ? 24 + headroom + (legendRows - 1) * 26 : headroom) + totalLabelInset + evidenceBandSpan({ annotations }, { compact }) + bands.top + periodBand);
   // Reserve the actual last metric row plus a trailing theme gap, not another full row band.
   const bottom = bands.bottom ? Math.max(bottomInset, 40 + bands.bottom + tokenValue(token("space.3"))) : bottomInset;
   // Callouts the chart moved into a right-hand rail (see renderEvidenceAnnotations) take their width from the plot.
@@ -123,6 +136,9 @@ export function chartFrame(frame, { topLegend = false, annotations = [], changeA
     y: frame.y + top,
     width: frame.width - leftInset - rightInset,
     height: Math.max(MIN_PLOT_HEIGHT, frame.height - bottom - top),
+    // What the frame kept under the plot, so a chart whose labels need less
+    // than the default band can take the difference back (labelBand).
+    bottomBand: bottom,
     // Where a callout moved beside its mark may reach: the chart's own frame.
     limits: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
     ...(railWidth ? { railWidth } : {}),
@@ -177,7 +193,14 @@ function tightRange(values, includeZero) {
   return { min, max, span: max - min || 1, step: (max - min) / 4 || 1 };
 }
 
-function range(values, includeZero, steps = 4) {
+// A domain may be divided into three to six whole steps. Held to four, a
+// series running 132 to 313 took 100 to 500 - the next four-step ladder past
+// 313 - and its line filled the lower half of the plot; five steps of 50 reach
+// 350 and the line fills three quarters. The tightest division wins, and four
+// wins a tie.
+const TICK_COUNTS = Object.freeze([4, 3, 5, 6]);
+
+function range(values, includeZero) {
   let min = Math.min(...values), max = Math.max(...values);
   if (includeZero) { min = Math.min(0, min); max = Math.max(0, max); }
   if (min === max) {
@@ -188,19 +211,38 @@ function range(values, includeZero, steps = 4) {
   // then is every tick a nice number; rounding the endpoints alone still leaves
   // a span like 50 divided into four parts of 12.5.
   const dataMin = min, dataMax = max;
-  // Smallest ladder step whose `steps` whole increments, anchored at or below the
-  // data minimum, still reach the data maximum. Smallest keeps the plot full.
-  let step = null, niceMin = 0;
-  for (const candidate of stepCandidates((dataMax - dataMin) / steps)) {
-    const start = Math.floor(dataMin / candidate + 1e-9) * candidate;
-    if (start + candidate * steps >= dataMax - 1e-9) { step = candidate; niceMin = start; break; }
+  // For each tick count, the smallest ladder step whose whole increments,
+  // anchored at or below the data minimum, still reach the data maximum.
+  let best = null;
+  for (const steps of TICK_COUNTS) {
+    for (const candidate of stepCandidates((dataMax - dataMin) / steps)) {
+      const start = Math.floor(dataMin / candidate + 1e-9) * candidate;
+      if (start + candidate * steps >= dataMax - 1e-9) {
+        if (!best || candidate * steps < best.step * best.steps - 1e-9) best = { step: candidate, niceMin: start, steps };
+        break;
+      }
+    }
   }
-  if (step === null) { step = (dataMax - dataMin) / steps; niceMin = dataMin; }
+  const { step, niceMin, steps } = best ?? { step: (dataMax - dataMin) / 4, niceMin: dataMin, steps: 4 };
   const decimals = Math.max(0, -Math.floor(Math.log10(step)) + (STEP_LADDER.includes(step / Math.pow(10, Math.floor(Math.log10(step)))) && String(step / Math.pow(10, Math.floor(Math.log10(step)))) === "2.5" ? 1 : 0));
   const round = (value) => Number(value.toFixed(Math.min(10, decimals)));
   min = round(niceMin);
   max = round(niceMin + step * steps);
-  return { min, max, span: max - min || 1, step: round(step) };
+  return { min, max, span: max - min || 1, step: round(step), steps };
+}
+
+/**
+ * How many ticks divide a domain into ladder steps: the preferred count if it
+ * does, else three, five, six or two. An explicit domain keeps a readable
+ * interval (four intervals on 0-6 printed 1.5 steps and failed the tick gate),
+ * and an automatic one is built on one of these counts (range above).
+ */
+export function tickCount(min, max, preferred = 4) {
+  const onLadder = (count) => {
+    const step = (max - min) / count, normalized = step / 10 ** Math.floor(Math.log10(step));
+    return [1, 2, 2.5, 5, 10].some((value) => Math.abs(normalized - value) < 1e-9);
+  };
+  return [preferred, 3, 5, 6, 2].find(onLadder) ?? preferred;
 }
 
 function assertGridlineOption(props) {
@@ -320,17 +362,12 @@ function axisTickText(min, max, index, steps = 4) {
 }
 
 export function axisLabelWidth(bounds) {
-  return Math.max(48, ...Array.from({ length: 5 }, (_, index) => Math.ceil(measureText(axisTickText(bounds.min, bounds.max, index), 1000, { fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width)));
+  const steps = tickCount(bounds.min, bounds.max);
+  return Math.max(48, ...Array.from({ length: steps + 1 }, (_, index) => Math.ceil(measureText(axisTickText(bounds.min, bounds.max, index, steps), 1000, { fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width)));
 }
 
 export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48 } = {}) {
-  // Preserve an explicit domain while selecting a readable tick interval. Four
-  // intervals on 0–6 printed 1.5 steps and failed the same runtime's tick gate.
-  const onLadder = count => {
-    const step = (yMax - yMin) / count, normalized = step / 10 ** Math.floor(Math.log10(step));
-    return [1, 2, 2.5, 5, 10].some(value => Math.abs(normalized - value) < 1e-9);
-  };
-  steps = [steps, 3, 5, 6, 2].find(onLadder) ?? steps;
+  steps = tickCount(yMin, yMax, steps);
   const nodes = [];
   if (showValueAxis) {
     for (let index = 0; index <= steps; index += 1) {
@@ -371,6 +408,7 @@ export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showV
 }
 
 function horizontalAxes(id, plot, xMin, xMax, steps = 4, { gridlines = false, showValueAxis = true } = {}) {
+  steps = tickCount(xMin, xMax, steps);
   const nodes = [];
   if (showValueAxis) {
     for (let index = 0; index <= steps; index += 1) {
@@ -935,11 +973,21 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   const stackBracket = stacked && !horizontal && Array.isArray(props.stackBracket) && props.stackBracket.length ? props.stackBracket : null;
   if (stackBracket && stackBracket.some((name) => !series.some((item) => item.name === name))) throw new Error("stackBracket must name series of the chart");
   if (horizontal && (props.periods || props.events)) throw new Error("periods and events annotate vertical columns and lines, not horizontal bars");
+  // The band under the columns is their labels': estimated at the slot the
+  // plot will give each column, so the frame's own height checks count the
+  // room it leaves, and settled on the measured labels once the plot is laid
+  // out. A grid of small column panels failed its minimum plot height on the
+  // fixed 56px when one-line period labels needed 34.
+  const labelGap = regionHighlight ? 18 : 8;
+  const estimatedSlot = (frame.width - 2 * (showValueAxis ? 54 : 16)) / Math.max(1, categories.length) - 8;
+  const categoryBand = horizontal || (props.categoryNotes || []).some(Boolean) ? LABEL_BAND
+    : labelBand(labelGap, iconSlot + Math.max(...categories.map((c) => { try { return axisText(String(c), Math.max(1, estimatedSlot)).height; } catch { return 28; } })));
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
     // Horizontal categories live to the left; only an exposed value axis
     // needs a bottom label band. The column-chart gutter left bars floating.
-    bottomInset: horizontal ? (showValueAxis ? 32 : 12) : 56,
+    bottomInset: horizontal ? (showValueAxis ? 32 : 12) : categoryBand,
+    headroom: horizontal ? BAR_HEADROOM : VALUE_HEADROOM,
     topLegend: showLegend ? legendRowsFor(forecastKeyed ? forecastLegend : series.map((item) => item.name), frame) : false,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
@@ -988,7 +1036,10 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   });
   if(!horizontal) {
     plot.categoryLabelHeight=iconSlot + Math.max(...categoryLayouts.map(label=>label.height)) + (categoryNotes.some(Boolean) ? Math.max(...categoryLayouts.map(label=>label.lineHeight)) : 0);
-    plot.height-=Math.max(0,plot.categoryLabelHeight-28);
+    // Labels shorter than the default band give the difference to the plot;
+    // taller ones take it from the plot. A band that also holds a change
+    // annotation's rows keeps its old measure.
+    plot.height-=plot.bottomBand===categoryBand ? labelBand(labelGap, plot.categoryLabelHeight)-categoryBand : Math.max(0,plot.categoryLabelHeight-28);
     if(plot.height<100)throw new Error(`Category labels leave insufficient plot height (${Math.floor(plot.height)}px of 100px): they wrap to ${Math.max(...categoryLayouts.map(label=>label.lines?.length??1))} lines in ${Math.floor(plot.width/categories.length-8)}px slots; shorten them, use a bar chart for long names, or give the chart more height`);
   }
   const categoryGroups=props.categoryGroups ?? [];
@@ -1576,6 +1627,11 @@ function lineChart({ id, frame, props, area = false }) {
   if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
   const bounds = numericBounds(withReferenceValues(values, props), { min: props.yMin, max: props.yMax, axis: "y", tight: !showValueAxis && props.gridlines !== true });
   const labelWidth = axisLabelWidth(bounds);
+  const labelHeightAt = (slot) => Math.max(...categories.map((c) => { try { return measureText(String(c), slot, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }).height; } catch { return 28; } }));
+  // The period labels sit 16px under the plot, clear of the markers on its
+  // floor; the band keeps their measured height and no more, estimated at the
+  // narrowest slot a label gets and settled once the plot is laid out.
+  const labelFloor = labelBand(16, labelHeightAt(76));
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
     leftInset: showValueAxis ? Math.max(labelWidth + 8, showDataLabels ? 68 : 0) : showDataLabels ? 68 : 54,
@@ -1585,8 +1641,12 @@ function lineChart({ id, frame, props, area = false }) {
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
     periodBand: periodBandHeight(props, categories),
-    endLabels
+    endLabels,
+    bottomInset: labelFloor
   });
+  const labelSlot = Math.min(120, Math.max(76, plot.width / Math.max(1, categories.length) * 0.82));
+  const labelHeight = labelHeightAt(labelSlot);
+  if (plot.bottomBand === labelFloor) plot.height -= labelBand(16, labelHeight) - labelFloor;
   const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
   const xScale = (index) => plot.x + (categories.length === 1 ? plot.width / 2 : plot.width * index / (categories.length - 1));
   const nodes = [
@@ -1595,7 +1655,7 @@ function lineChart({ id, frame, props, area = false }) {
   ];
   const pointMap = new Map();
   const categoryMap = new Map();
-  const categorySlot = Math.min(120, Math.max(76, plot.width / Math.max(1, categories.length) * 0.82));
+  const categorySlot = labelSlot;
   // Dense periods (more categories than the plot has label slots) label every
   // nth point, always keeping the first and last, as a strong deck does.
   const pitch = categories.length > 1 ? (xScale(1) - xScale(0)) : plot.width;
@@ -1608,7 +1668,7 @@ function lineChart({ id, frame, props, area = false }) {
     const categoryX = Math.max(frame.x, Math.min(frame.x + frame.width - categorySlot, x - categorySlot / 2));
     categoryMap.set(category, { x: categoryX, y: plot.y, width: categorySlot, height: plot.height });
     const shown = every === 1 || index % every === 0 || (!fromFirst && index === categories.length - 1);
-    if (shown && !(every > 1 && index === categories.length - 1 && (index % every) !== 0 && (categories.length - 1 - Math.floor((categories.length - 1) / every) * every) * pitch < widest + 10)) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: 40 }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
+    if (shown && !(every > 1 && index === categories.length - 1 && (index % every) !== 0 && (categories.length - 1 - Math.floor((categories.length - 1) / every) * every) * pitch < widest + 10)) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: Math.min(40, Math.ceil(labelHeight) + 4) }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
   });
   const pendingEndLabels = [];
   const weight = markWeight();
@@ -1728,29 +1788,6 @@ function waterfall({ id, frame, props }) {
   if (!Array.isArray(props.values) || props.values.length !== props.categories.length || props.values.some(value => !Number.isFinite(value))) throw new Error("Waterfall values must contain one finite value per category");
   if (props.totals !== undefined && (!Array.isArray(props.totals) || props.totals.some(index => !Number.isInteger(index) || index < 0 || index >= props.categories.length) || new Set(props.totals).size !== props.totals.length)) throw new Error("Waterfall totals must contain unique valid category indices");
   const showValueAxis = resolveValueAxis(props, { valueCount: props.values.length, dataLabelsVisible: true });
-  const plot = chartFrame(frame, {
-    topInset: props.plotTopInset,
-    annotations: props.annotations,
-    changeAnnotations: props.changeAnnotations,
-    annotationRail: props.annotationRail,
-    centerPlot: !showValueAxis,
-    // A label row below negative endpoints, above the category labels. It was
-    // taken from the plot after the frame was laid out, so the frame's own
-    // fallbacks - compact callout bands, callouts moved beside their marks -
-    // never saw it: three callouts on a full-width bridge closed their bands
-    // to a 100px plot, lost 30 more here and failed the page with "give the
-    // chart more height", which an author cannot do.
-    bottomInset: 56 + 30
-  });
-  // The category labels are measured against the slot they have and wrap into
-  // it. Set unmeasured at the slot's width, a label longer than its slot prints
-  // straight over its neighbours - which is how "Superman (2025)", "Other DC
-  // features" and "All DC features" became one unreadable line - and the band
-  // below the plot has to be as tall as the labels that go in it.
-  const categorySpan = plot.width / props.categories.length;
-  const categoryLayouts = props.categories.map((category) => measureText(String(category), categorySpan - 10, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }));
-  plot.height -= Math.max(0, Math.max(...categoryLayouts.map((layout) => layout.height)) - 28);
-  if (plot.height < 100) throw new Error("Waterfall category labels leave no room for the plot; shorten them or use fewer steps");
   const running = [];
   let total = 0;
   props.values.forEach((value, index) => {
@@ -1759,6 +1796,31 @@ function waterfall({ id, frame, props }) {
     running.push(total);
   });
   const bounds = numericBounds(withReferenceValues([0, ...running], props), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  // A label row below negative endpoints, above the category labels. It was
+  // taken from the plot after the frame was laid out, so the frame's own
+  // fallbacks - compact callout bands, callouts moved beside their marks -
+  // never saw it: three callouts on a full-width bridge closed their bands
+  // to a 100px plot, lost 30 more here and failed the page with "give the
+  // chart more height", which an author cannot do. It is reserved only when a
+  // falling step's label - set under the step's end - would reach past the
+  // baseline; a bridge whose falls all end well above zero left the row as a
+  // 30px stripe of air between its bars and their names.
+  const frameFor = (row) => chartFrame(frame, { topInset: props.plotTopInset, annotations: props.annotations, changeAnnotations: props.changeAnnotations,
+    annotationRail: props.annotationRail, centerPlot: !showValueAxis, bottomInset: LABEL_BAND + row });
+  // The category labels are measured against the slot they have and wrap into
+  // it. Set unmeasured at the slot's width, a label longer than its slot prints
+  // straight over its neighbours - which is how "Superman (2025)", "Other DC
+  // features" and "All DC features" became one unreadable line - and the band
+  // below the plot has to be as tall as the labels that go in it.
+  let plot = frameFor(0), labelRow = 0;
+  const categorySpan = plot.width / props.categories.length;
+  const categoryLayouts = props.categories.map((category) => measureText(String(category), categorySpan - 10, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }));
+  const labelHeight = Math.max(...categoryLayouts.map((layout) => layout.height));
+  const settle = (p, row) => { p.height -= p.bottomBand === LABEL_BAND + row ? labelBand(8 + row, labelHeight) - (LABEL_BAND + row) : Math.max(0, labelHeight - 28); return p; };
+  plot = settle(plot, 0);
+  const NEGATIVE_LABEL = 27;
+  if (props.values.some((value, index) => value < 0 && (running[index] - bounds.min) / bounds.span * plot.height < NEGATIVE_LABEL)) { labelRow = 30; plot = settle(frameFor(labelRow), labelRow); }
+  if (plot.height < 100) throw new Error("Waterfall category labels leave no room for the plot; shorten them or use fewer steps");
   const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
   const nodes = axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis });
   if (bounds.min < 0 && bounds.max > 0) nodes.push(linePrimitive({ id: stableId(id, "zero-baseline"), role: "chart-axis", x1: plot.x, y1: yScale(0), x2: plot.x + plot.width, y2: yScale(0), style: lineStyle(INK) }));
@@ -1783,7 +1845,7 @@ function waterfall({ id, frame, props }) {
     pointMap.set(`category:${category}`, point);
     categoryMap.set(category, { x: bar.x, y: plot.y, width: bar.width, height: plot.height });
     const layout = categoryLayouts[index];
-    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * span + 5, y: plot.y + plot.height + 38, width: span - 10, height: layout.height }, text: layout.text, style: { ...textStyle(AXIS_LABEL, INK, false, "center"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * span + 5, y: plot.y + plot.height + 8 + labelRow, width: span - 10, height: layout.height }, text: layout.text, style: { ...textStyle(AXIS_LABEL, INK, false, "center"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
     previous = end;
   });
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale });
@@ -2194,7 +2256,7 @@ function scatterLegend({ id, frame, props, bubble, seriesNames }) {
 
 function scaleTicks(scale, bounds) {
   const count = Number.isFinite(scale?.step) && scale.step > 0 ? bounds.span / scale.step : NaN;
-  return Number.isInteger(Math.round(count * 1e6) / 1e6) && count >= 2 && count <= 10 ? Math.round(count) : 4;
+  return Number.isInteger(Math.round(count * 1e6) / 1e6) && count >= 2 && count <= 10 ? Math.round(count) : tickCount(bounds.min, bounds.max);
 }
 
 function scatter({ id, frame, props, bubble = false }) {

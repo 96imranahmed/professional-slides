@@ -290,6 +290,59 @@ console.log(JSON.stringify({{ trend: trend.pageType.skeleton, stats: stats.pageT
         self.assertLessEqual(result['caps']['signature'], 0.2)
 
 
+class StructureTests(unittest.TestCase):
+    """How many exhibits a page carries, and whether it is one exhibit beside a
+    column, are read off the page as drawn and held deck-wide.
+
+    A deck passed every other rule drawing 14% of its pages with two or more
+    exhibits and 33% as one exhibit beside a text column, where strong decks
+    draw a quarter to a third and one in eight."""
+
+    def test_drawn_counts_and_the_two_shares(self):
+        result = run_node(f'''
+import {{ compilePage, drawnOf }} from '{KIT}';
+import {{ varietyFindings, structureMix, VARIETY }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
+const S = {{ kind: 'qualitative', what: 'The evidence recorded for this page' }};
+const base = {{ takeaway: false, why: 'The page type fits the claim this page makes', settles: S, title: 'A finding' }};
+const years = ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
+const chart = {{ categories: years, series: [{{ name: 'x', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], highlights: [{{ category: '2020' }}] }};
+const pts = ['Traffic fell to a fifth', 'It recovered by 2022'];
+const drawn = (page) => compilePage({{ ...base, ...page }}).pageType.drawn;
+const out = {{
+  beside: drawn({{ id: 'a', type: 'trend', form: 'line', commentary: 'beside', points: pts, highlight: ['a fifth', 'by 2022'], exhibit: chart }}),
+  rail: drawn({{ id: 'b', type: 'trend', form: 'line', commentary: 'rail', rail: 'Traffic fell to a fifth in 2020 and was back above its old level by 2022', exhibit: chart }}),
+  onExhibit: drawn({{ id: 'c', type: 'trend', form: 'line', commentary: 'on-exhibit', exhibit: {{ ...chart, annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }}),
+  hero: drawn({{ id: 'd', type: 'numbers', form: 'hero-number', commentary: 'beside', kpi: {{ value: '5m', label: 'x' }}, points: pts, highlight: ['a fifth', 'by 2022'], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1']] }} }}),
+  strip: drawn({{ id: 'e', type: 'numbers', form: 'metric-strip', commentary: 'none', metrics: [{{ value: '5m', label: 'x' }}], exhibit: {{ type: 'chart.column', ...chart }} }}),
+  panels: drawn({{ id: 'f', type: 'panels', form: 'row', commentary: 'captions', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A', 'B', 'C', 'D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Hub ' + i + ' added traffic in every year of the run' }})) }}),
+}};
+// Synthetic decks of fifteen pages: multi pages and column pages as given.
+const deck = (multi, column, n = 15) => ({{ slides: Array.from({{ length: n }}, (_, i) => ({{ id: 'p' + i, title: 'Page ' + i,
+  pageType: {{ type: 'trend', commentary: 'none', takeaway: false, skeleton: 'skeleton ' + i, drawn: {{ exhibits: i < multi ? 2 : 1, column: i >= n - column }} }} }})) }});
+const codes = (spec) => varietyFindings(spec).map((f) => f.code).filter((c) => c === 'VARIETY_PANELS' || c === 'VARIETY_COLUMN');
+const column = varietyFindings(deck(3, 4)).find((f) => f.code === 'VARIETY_COLUMN');
+console.log(JSON.stringify({{ ...out, thin: codes(deck(2, 0)), enough: codes(deck(3, 3)), crowded: codes(deck(3, 4)), short: codes(deck(0, 8, 14)),
+  column: {{ ids: column.slide, repair: column.repair }}, mix: structureMix(deck(3, 3).slides), caps: {{ multi: VARIETY.multiShareMin, column: VARIETY.columnShareMax }} }}));
+''')
+        self.assertEqual(result['beside'], {'exhibits': 1, 'column': True})
+        self.assertEqual(result['rail'], {'exhibits': 1, 'column': True})
+        self.assertEqual(result['hero'], {'exhibits': 1, 'column': True})  # a hero number with its points reads as a column
+        self.assertEqual(result['onExhibit'], {'exhibits': 1, 'column': False})
+        self.assertEqual(result['strip'], {'exhibits': 2, 'column': False})  # the strip is a second body of evidence
+        self.assertEqual(result['panels'], {'exhibits': 2, 'column': False})
+        self.assertEqual(result['thin'], ['VARIETY_PANELS'])  # 2 of 15 is under a fifth
+        self.assertEqual(result['enough'], [])  # 3 of 15 carry two exhibits, 3 of 15 are columns
+        self.assertEqual(result['crowded'], ['VARIETY_COLUMN'])
+        self.assertEqual(result['short'], [])  # under fifteen pages the shares are not held
+        self.assertEqual(result['column']['ids'], ['p11', 'p12', 'p13', 'p14'])
+        for alternative in ('metric-strip', 'on-exhibit', 'so-what-bar', 'labelled-rows', 'in-exhibit', 'captions'):
+            self.assertIn(alternative, result['column']['repair'])
+        self.assertEqual(result['mix']['multi'], {'pages': 3, 'share': 0.2})
+        self.assertEqual(result['mix']['column']['pages'], 3)
+        self.assertEqual(len(result['mix']['skeletons']), 15)
+        self.assertEqual(result['caps'], {'multi': 0.2, 'column': 0.2})
+
+
 class SourceChecksTests(unittest.TestCase):
     """What the forward test found only at build time is now refused where it is written."""
 

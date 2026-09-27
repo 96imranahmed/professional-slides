@@ -29,7 +29,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { measureText, accentRuns, hasPhrase } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
-import { defaultFocusIndex } from "./charts.mjs";
+import { defaultFocusIndex, plotHeadroom } from "./charts.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { measureTable } from "./tables.mjs";
 import { resolveWeight, normalizeWeight } from "./weight.mjs";
@@ -2461,7 +2461,7 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
       const legend = ex.legend === true || (ex.legend !== false && multi && !line);
       // The legend may wrap; the row's inset must cover the tallest one (1160px row, n panels).
       const rows = legend ? legendRowCount((ex.series || []).map((sr) => sr.name), Math.max(120, 1160 / Math.max(1, charts.length) - 70)) : 0;
-      return (rows ? 52 + (rows - 1) * 26 : 28) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top;
+      return (rows ? 24 + plotHeadroom(ex.type) + (rows - 1) * 26 : plotHeadroom(ex.type)) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top;
     };
     // Callouts counted at their compact height: the row's band is the budget,
     // and a peer whose full 88px bands would overrun it closes them to fit
