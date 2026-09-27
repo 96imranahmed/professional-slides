@@ -38,5 +38,25 @@ console.log(JSON.stringify({{ words: await run(['$12.5B', 'Duration unclear', '~
         self.assertEqual(result['clean']['pills'], 3)
 
 
+class ShortTableTests(unittest.TestCase):
+    def test_two_row_tables_are_refused_and_twins_merge(self):
+        result = run_node('''
+import { compilePage } from './skills/professional-slides/runtime/page-types.mjs';
+const error = (page) => { try { compilePage(page); return null; } catch (e) { return e.message; } };
+const base = { takeaway: false, why: 'Each product is looked up with its disclosed measures', settles: { kind: 'comparison', what: 'Disclosed coding product measures' } };
+const table = (heading, rows) => ({ type: 'table', heading, columns: ['Measure', 'Value', 'Date'], rows });
+const two = [['Revenue run rate', '>$2.5B', 'Feb 2026'], ['Enterprise share', 'More than half', 'Feb 2026']];
+const three = [...two, ['Weekly users', 'n/a', 'Feb 2026']];
+console.log(JSON.stringify({
+  short: error({ ...base, id: 's', type: 'lookup', form: 'table', commentary: 'none', title: 'Coding metrics cannot be reduced to one share', exhibit: table('Claude Code', two) }),
+  twins: error({ ...base, id: 't', type: 'panels', form: 'stack', commentary: 'none', title: 'Coding metrics cannot be reduced to one share', exhibits: [table('Claude Code', three), table('Codex', three)] }),
+  ok: error({ ...base, id: 'o', type: 'lookup', form: 'table', commentary: 'none', title: 'Coding metrics cannot be reduced to one share', exhibit: { type: 'table', columns: ['Measure', 'Claude Code', 'Codex', 'Date'], rows: [['Revenue run rate', '>$2.5B', 'n/a', 'Feb 2026'], ['Enterprise share', 'More than half', 'n/a', 'Feb 2026'], ['Weekly users', 'n/a', '>5M', 'Jun 2026']] } }),
+}));
+''')
+        self.assertIn('TABLE_TOO_SHORT', result['short'])
+        self.assertIn('TABLE_PANELS_MERGE', result['twins'])
+        self.assertIsNone(result['ok'])
+
+
 if __name__ == '__main__':
     unittest.main()

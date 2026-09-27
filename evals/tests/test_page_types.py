@@ -68,9 +68,9 @@ const kinds = [
   {{ type: 'trend', form: 'line', commentary: 'on-exhibit', exhibit: chart() }},
   {{ type: 'ranking', form: 'bar', commentary: 'beside', points: ['a'], exhibit: {{ categories: ['A','B','C','D','E','F','G','H'], series: [{{ name: 'x', values: [8,7,6,5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }},
   {{ type: 'panels', form: 'row', commentary: 'captions', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A','B','C','D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Segment ' + i + ' grew fastest where capacity was added first' }})) }},
-  {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}]] }} }},
+  {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}], ['B', {{ type: 'harvey', value: 3 }}], ['C', {{ type: 'harvey', value: 1 }}]] }} }},
   {{ type: 'mechanism', form: 'flow', commentary: 'below', points: ['a', 'b'], highlight: ['a', 'b'], exhibit: {{ nodes: [{{ id: 'x' }}, {{ id: 'y' }}, {{ id: 'z' }}], edges: [] }} }},
-  {{ type: 'numbers', form: 'hero-number', commentary: 'beside', kpi: {{ value: '5', label: 'x' }}, points: ['a'], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1']] }} }},
+  {{ type: 'numbers', form: 'hero-number', commentary: 'beside', kpi: {{ value: '5', label: 'x' }}, points: ['a'], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }} }},
   {{ type: 'argument', form: 'memo', commentary: 'none', paragraphs: ['Prose.'], panel: {{ text: 'The conclusion the reader keeps.' }} }},
 ];
 const chosen = Array.from({{ length: 14 }}, (_, i) => ({{ id: 'c' + i, takeaway: i % 7 === 0 ? 'Close' : false, why: 'Chosen for what this page has to show', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, ...structuredClone(kinds[i % kinds.length]) }}));
@@ -312,7 +312,7 @@ const out = {{
   beside: drawn({{ id: 'a', type: 'trend', form: 'line', commentary: 'beside', points: pts, highlight: ['a fifth', 'by 2022'], exhibit: chart }}),
   rail: drawn({{ id: 'b', type: 'trend', form: 'line', commentary: 'rail', rail: 'Traffic fell to a fifth in 2020 and was back above its old level by 2022', exhibit: chart }}),
   onExhibit: drawn({{ id: 'c', type: 'trend', form: 'line', commentary: 'on-exhibit', exhibit: {{ ...chart, annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }}),
-  hero: drawn({{ id: 'd', type: 'numbers', form: 'hero-number', commentary: 'beside', kpi: {{ value: '5m', label: 'x' }}, points: pts, highlight: ['a fifth', 'by 2022'], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1']] }} }}),
+  hero: drawn({{ id: 'd', type: 'numbers', form: 'hero-number', commentary: 'beside', kpi: {{ value: '5m', label: 'x' }}, points: pts, highlight: ['a fifth', 'by 2022'], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }} }}),
   strip: drawn({{ id: 'e', type: 'numbers', form: 'metric-strip', commentary: 'none', metrics: [{{ value: '5m', label: 'x' }}], exhibit: {{ type: 'chart.column', ...chart }} }}),
   panels: drawn({{ id: 'f', type: 'panels', form: 'row', commentary: 'captions', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A', 'B', 'C', 'D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Hub ' + i + ' added traffic in every year of the run' }})) }}),
 }};
@@ -388,7 +388,7 @@ const long = 'Traffic fell to a fifth when the network was grounded and recovere
 const trend = {{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim here', settles: S,
   title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: long }}] }} }};
 const strip = {{ id: 'm', type: 'numbers', form: 'metric-strip', commentary: 'below', points: ['a'], takeaway: false, why: 'Three numbers carry this claim', settles: S,
-  title: 'Three numbers', metrics: [{{ value: '1', label: 'a' }}], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1']] }} }};
+  title: 'Three numbers', metrics: [{{ value: '1', label: 'a' }}], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }} }};
 // A short argument page: its content plan is derived from the composed page and held to the text-page floor.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
 const memo = {{ id: 'm1', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, why: 'A short argument page for the test',
@@ -464,7 +464,7 @@ import {{ authorDeck }} from '{AUTHOR}';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
 const S = {{ kind: 'qualitative', what: 'The operator statement of its plan' }};
 const broken = {{ id: 'b', type: 'lookup', form: 'table', commentary: 'none', takeaway: false, why: 'The measures are looked up here', settles: S,
-  title: 'The measures sit in one table', exhibit: {{ columns: ['A', 'B'], rows: [['x']] }} }};
+  title: 'The measures sit in one table', exhibit: {{ columns: ['A', 'B'], rows: [['x'], ['y', '2'], ['z', '3']] }} }};
 const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, why: 'A short argument page for the test', settles: S,
   title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year.' }} }};
 const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [broken, memo] }}, {{ baseDir: dir }});

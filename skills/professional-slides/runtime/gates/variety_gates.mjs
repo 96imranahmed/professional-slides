@@ -42,6 +42,8 @@ export const VARIETY_CODES = Object.freeze({
   // (page-types.mjs reviewedDefect, compose.mjs totalRow); the author sees
   // them as COMPILE or PAGE_DOES_NOT_COMPOSE findings carrying these codes.
   TOTAL_ROW_BLANK: "a table row labelled as a total with no value in any of its result cells",
+  TABLE_TOO_SHORT: "a table of fewer than three body rows, where two or three figures are a numbers page",
+  TABLE_PANELS_MERGE: "two tables on one page with the same columns, which read as one table split in two",
   TIME_AXIS_UNEVEN: "a column chart whose dated categories are unevenly spaced in time but drawn one slot apart",
   VERDICT_TABLE_PLAIN: "a lookup, options or matrix table whose judgement column (lead, verdict, confidence, status) is plain text",
   SCENARIO_PROSE: "two to four alternatives written as paragraphs of sixty words or more each",

@@ -34,8 +34,8 @@ const table = (rows) => ({{ id: 'p1', type: 'lookup', form: 'table', commentary:
 const body = [['Equity round', '$122B committed', '$65B Series H'], ['Credit line', '$4.7B undrawn', '$15B reported']];
 const matrix = {{ id: 'p2', type: 'matrix', form: 'findings-matrix', commentary: 'in-exhibit', ...base, title: 'The capital call splits between access and structure',
   columns: ['Question', 'Evidence', 'Limit'], rows: [{{ label: 'Largest raise', cells: ['OpenAI, $122B', 'Different schedules'] }}, {{ label: 'Overall', cells: [' ', '-'] }}] }};
-const text = {{ columns: ['Control', 'OpenAI', 'Anthropic'], rows: [['Residency', 'US only', 'Varies'], ['Retention', 'Not eligible', 'Eligible']] }};
-const counts = {{ columns: ['Route', 'Flights', 'Seats'], rows: [['A', '12', '2400'], ['B', '8', '1600']] }};
+const text = {{ columns: ['Control', 'OpenAI', 'Anthropic'], rows: [['Residency', 'US only', 'Varies'], ['Retention', 'Not eligible', 'Eligible'], ['Audit logs', 'Enterprise tier', 'All tiers']] }};
+const counts = {{ columns: ['Route', 'Flights', 'Seats'], rows: [['A', '12', '2400'], ['B', '8', '1600'], ['C', '6', '1200']] }};
 const rows = (ex) => ex.rows.map((row) => (Array.isArray(row) ? row : row.cells).map((c) => String(c?.text ?? c)));
 console.log(JSON.stringify({{
   blank: error(() => compilePage(table([...body, ['Total', '', ' ']]))),
@@ -53,8 +53,8 @@ console.log(JSON.stringify({{
         self.assertIsNone(result["filled"])
         self.assertIn("TOTAL_ROW_BLANK", result["matrix"])
         # The measure-table preset's total is added only where a column sums.
-        self.assertEqual(result["autoText"], 2)
-        self.assertEqual(result["autoCounts"], ["Total", "20", "4,000"])
+        self.assertEqual(result["autoText"], 3)
+        self.assertEqual(result["autoCounts"], ["Total", "26", "5,200"])
         self.assertIn("TOTAL_ROW_BLANK", result["forced"])
 
     def test_a_measure_table_of_text_composes_without_a_total_row(self):
@@ -225,10 +225,10 @@ import {{ compileDeck }} from '{AUTHOR}';
 const years = ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
 const chart = {{ type: 'trend', form: 'line', commentary: 'on-exhibit', exhibit: {{ categories: years, series: [{{ name: 'x', values: [1, 2, 3, 4, 5, 6, 7, 8] }}, {{ name: 'y', values: [2, 3, 4, 5, 6, 7, 8, 9] }}],
   annotations: [{{ category: '2021', text: 'The turn came when grounded capacity returned to the network' }}] }} }};
-const table = {{ type: 'lookup', form: 'table', commentary: 'none', exhibit: {{ columns: [{{ label: 'Item', type: 'category' }}, 'OpenAI', 'Anthropic'], rows: [['A', 'x', 'y'], ['B', 'x', 'y']] }} }};
-const coded = {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}]] }} }};
+const table = {{ type: 'lookup', form: 'table', commentary: 'none', exhibit: {{ columns: [{{ label: 'Item', type: 'category' }}, 'OpenAI', 'Anthropic'], rows: [['A', 'x', 'y'], ['B', 'x', 'y'], ['C', 'x', 'y']] }} }};
+const coded = {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}], ['B', {{ type: 'harvey', value: 3 }}], ['C', {{ type: 'harvey', value: 1 }}]] }} }};
 const logos = {{ type: 'profiles', form: 'logo-table', commentary: 'in-exhibit', exhibit: {{ columns: [{{ label: '', type: 'logo' }}, 'Firm', 'Users'],
-  rows: [[{{ media: {{ alt: 'OpenAI logo' }} }}, 'OpenAI', '1bn'], [{{ media: {{ alt: 'Anthropic logo' }} }}, 'Anthropic', 'n/a']] }} }};
+  rows: [[{{ media: {{ alt: 'OpenAI logo' }} }}, 'OpenAI', '1bn'], [{{ media: {{ alt: 'Anthropic logo' }} }}, 'Anthropic', 'n/a'], [{{ media: {{ alt: 'Google logo' }} }}, 'Google', 'n/a']] }} }};
 const cards = {{ type: 'profiles', form: 'cards', commentary: 'none', exhibit: {{ items: [{{ title: 'ChatGPT', text: 'The consumer assistant' }}, {{ title: 'Claude', text: 'The enterprise assistant' }}] }} }};
 const make = (kinds, titles = []) => kinds.map((k, i) => ({{ id: 'c' + i, ...base, title: titles[i] ?? 'Finding number ' + i + ' of the deck', ...structuredClone(k) }}));
 {extra}
