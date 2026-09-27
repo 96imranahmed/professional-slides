@@ -8,7 +8,7 @@ anything is drawn.
 """
 import unittest
 
-from node_probe import RUNTIME, run_node
+from node_probe import REFERENCES, RUNTIME, run_node
 
 KIT = "./skills/professional-slides/runtime/page-types.mjs"
 AUTHOR = "./skills/professional-slides/runtime/author-deck.mjs"
@@ -70,7 +70,7 @@ const kinds = [
   {{ type: 'panels', form: 'row', commentary: 'captions', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A','B','C','D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Segment ' + i + ' grew fastest where capacity was added first' }})) }},
   {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}], ['B', {{ type: 'harvey', value: 3 }}], ['C', {{ type: 'harvey', value: 1 }}]] }} }},
   {{ type: 'mechanism', form: 'flow', commentary: 'below', points: ['a', 'b'], highlight: ['a', 'b'], exhibit: {{ nodes: [{{ id: 'x' }}, {{ id: 'y' }}, {{ id: 'z' }}], edges: [] }} }},
-  {{ type: 'numbers', form: 'hero-number', commentary: 'beside', kpi: {{ value: '5', label: 'x' }}, points: ['a'], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }} }},
+  {{ type: 'numbers', form: 'hero-number', commentary: 'none', kpi: {{ value: '5', label: 'x' }}, exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }} }},
   {{ type: 'argument', form: 'memo', commentary: 'none', paragraphs: ['Prose.'], panel: {{ text: 'The conclusion the reader keeps.' }} }},
 ];
 const chosen = Array.from({{ length: 14 }}, (_, i) => ({{ id: 'c' + i, takeaway: i % 7 === 0 ? 'Close' : false, why: 'Chosen for what this page has to show', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, ...structuredClone(kinds[i % kinds.length]) }}));
@@ -83,6 +83,8 @@ console.log(JSON.stringify({{ refused, chosen: ok.findings.map((f) => f.code), u
         # Panels counts from 15 pages; fourteen trends of eight values each sit on the page floor, so the deck is thin too.
         self.assertEqual(result['refused'], ['EVIDENCE_DEPTH', 'VARIETY_COMMENTARY', 'VARIETY_SIGNATURE', 'VARIETY_TAKEAWAY',
                                              'VARIETY_TYPE_RANGE', 'VARIETY_TYPE_RUN', 'VARIETY_TYPE_SHARE'])
+        # A hero number with its points beside its proof is drawn as the ranking
+        # beside its points, so the chosen deck's hero numbers stand alone.
         self.assertEqual(result['chosen'], [])
         self.assertEqual(result['untyped'], ['PAGE_TYPE_UNDECLARED'])
         self.assertEqual(result['edited'], ['PAGE_TYPE_EDITED'])
@@ -341,6 +343,38 @@ console.log(JSON.stringify({{ ...out, thin: codes(deck(2, 0)), enough: codes(dec
         self.assertEqual(result['mix']['column']['pages'], 3)
         self.assertEqual(len(result['mix']['skeletons']), 15)
         self.assertEqual(result['caps'], {'multi': 0.2, 'column': 0.2})
+
+
+    def test_the_skeleton_counts_what_the_structure_rules_count(self):
+        # skeletonOf kept its own reading of the column: a rail or a hero
+        # number with its points was a column to VARIETY_COLUMN and not to
+        # VARIETY_SIGNATURE. Every worked page now reads the same to both.
+        result = run_node(f'''
+import fs from 'node:fs';
+import {{ compileDeck }} from '{AUTHOR}';
+const doc = JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json', 'utf8'));
+const slides = compileDeck(doc, {{ partial: true }}).spec.slides.filter((s) => s.pageType);
+console.log(JSON.stringify({{ pages: slides.length, apart: slides.filter(({{ pageType: {{ skeleton, drawn }} }}) =>
+  skeleton.startsWith('exhibit beside a column') !== drawn.column || (drawn.exhibits > 0 && !skeleton.split(' · ')[1].startsWith(drawn.exhibits + ' '))).map((s) => s.id) }}));
+''')
+        self.assertGreater(result['pages'], 20)
+        self.assertEqual(result['apart'], [])
+
+    def test_every_redraw_is_documented_and_offered_where_it_fits(self):
+        result = run_node('''
+import { varietyFindings, REDRAWS } from './skills/professional-slides/runtime/gates/variety_gates.mjs';
+const deck = (multi, column) => ({ slides: Array.from({ length: 15 }, (_, i) => ({ id: 'p' + i, title: 'Page ' + i,
+  pageType: { type: 'trend', commentary: 'none', takeaway: false, skeleton: 'skeleton ' + i, drawn: { exhibits: i < multi ? 2 : 1, column: i >= 15 - column } } })) });
+const repair = (spec, code) => varietyFindings(spec).find((f) => f.code === code).repair;
+console.log(JSON.stringify({ redraws: REDRAWS, column: repair(deck(3, 4), 'VARIETY_COLUMN'), panels: repair(deck(2, 0), 'VARIETY_PANELS') }));
+''')
+        docs = (REFERENCES / 'page-types.md').read_text(encoding='utf-8')
+        for r in result['redraws']:
+            multi = 'yes' if r['multi'] is True else r['multi'] or 'no'
+            self.assertIn(f"| {r['holding']} | {r['draw']} ({r['choice']}) | {multi} |", docs)
+            self.assertIn(r['choice'], result['column'])
+            # The panels repair offers only the pages that carry two exhibits.
+            (self.assertIn if r['multi'] else self.assertNotIn)(r['choice'], result['panels'])
 
 
 class SourceChecksTests(unittest.TestCase):

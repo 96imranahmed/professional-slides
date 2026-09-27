@@ -52,6 +52,33 @@ export function parsePeriod(label) {
   return null;
 }
 
+// A period's qualifier - trailing or leading twelve months, to date, an
+// estimate or a plan - says how the period is measured, not when it is.
+const QUALIFIER = /\((?:[^)]*)\)|\b(?:LTM|TTM|NTM|YTD|QTD|MTD|est(?:imate)?|forecast|budget|plan|target|actual|proj(?:ected)?)\b\.?/gi;
+const SPAN = /^(.+?)\s?(?:[-–/]|\bto\b)\s?(.+)$/i;
+const BARE_PART = /^(?:Q[1-4]|H[12]|[1-4]Q|[12]H)$/i;
+
+/**
+ * Is a label a period a trend can run over? The dates parsePeriod reads, and
+ * the period labels that are not one point in time: a quarter or half within
+ * its year (Q1, 2H), a span (2020-24, FY20-FY24, Jan-Mar, Q1-Q3 2025) and a
+ * period with its qualifier (FY25 LTM, 2024 YTD). These decide whether an
+ * axis is time at all - a trend's, a deck's chart over time - and have no one
+ * place on it, so they are not spaced. The compiler and the craft floor each
+ * kept a looser pattern of their own, which took "H3 2024" and any word
+ * after a month's first three letters for a period.
+ */
+export function isPeriodLabel(label) {
+  const s = String(label ?? "").trim().replace(/\s+/g, " ");
+  if (!s) return false;
+  if (parsePeriod(s) || BARE_PART.test(s)) return true;
+  const bare = s.replace(QUALIFIER, " ").replace(/\s+/g, " ").trim();
+  if (bare && bare !== s) return isPeriodLabel(bare);
+  // A span: both ends periods, or a year and the two digits it runs to.
+  const span = SPAN.exec(s);
+  return Boolean(span) && isPeriodLabel(span[1]) && (/^\d{2}$/.test(span[2]) ? /\d{2}$/.test(span[1]) : isPeriodLabel(span[2]));
+}
+
 /**
  * Where a run of period labels falls in elapsed time: `{ t, gaps, kind }`,
  * with `t` increasing, or null when the labels are not one kind of date read

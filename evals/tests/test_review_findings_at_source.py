@@ -8,9 +8,11 @@ table construction, and shares of one measure in same-size tiles. Each is now a
 compile refusal, a runtime resolution or a deck-level finding at authoring, so
 the next review does not have to find it again.
 """
+import json
+import re
 import unittest
 
-from node_probe import run_node
+from node_probe import REFERENCES, RUNTIME, run_node
 
 KIT = "./skills/professional-slides/runtime/page-types.mjs"
 AUTHOR = "./skills/professional-slides/runtime/author-deck.mjs"
@@ -31,7 +33,8 @@ import {{ styleTable }} from './skills/professional-slides/runtime/compose.mjs';
 {PAGE}
 const table = (rows) => ({{ id: 'p1', type: 'lookup', form: 'table', commentary: 'none', ...base, title: 'The two firms raised capital on different terms',
   exhibit: {{ columns: [{{ label: 'Instrument', type: 'category' }}, 'OpenAI', 'Anthropic'], rows }} }});
-const body = [['Equity round', '$122B committed', '$65B Series H'], ['Credit line', '$4.7B undrawn', '$15B reported']];
+// Three body rows: a table long enough to keep, so its total is what is checked.
+const body = [['Equity round', '$122B committed', '$65B Series H'], ['Credit line', '$4.7B undrawn', '$15B reported'], ['Compute deals', '$300B announced', '$50B announced']];
 const matrix = {{ id: 'p2', type: 'matrix', form: 'findings-matrix', commentary: 'in-exhibit', ...base, title: 'The capital call splits between access and structure',
   columns: ['Question', 'Evidence', 'Limit'], rows: [{{ label: 'Largest raise', cells: ['OpenAI, $122B', 'Different schedules'] }}, {{ label: 'Overall', cells: [' ', '-'] }}] }};
 const text = {{ columns: ['Control', 'OpenAI', 'Anthropic'], rows: [['Residency', 'US only', 'Varies'], ['Retention', 'Not eligible', 'Eligible'], ['Audit logs', 'Enterprise tier', 'All tiers']] }};
@@ -139,6 +142,188 @@ console.log(JSON.stringify({{
         self.assertIn("1-3 years apart", result["uneven"])
         self.assertIsNone(result["snapshots"])
         self.assertIsNone(result["even"])
+
+
+    def test_the_documented_uneven_axes_are_ones_the_check_refuses(self):
+        # The docs gave "2015, 2018, 2019" - three columns, which the check
+        # leaves alone as a comparison of chosen years.
+        row = next(line for line in (REFERENCES / "page-types.md").read_text(encoding="utf-8").splitlines() if line.startswith("| `TIME_AXIS_UNEVEN`"))
+        examples = [part.split(", ") for part in re.search(r"uneven gaps \(([^)]*)\)", row).group(1).split("; ")]
+        result = run_node(f'''
+import {{ timePositions }} from '{TIME}';
+console.log(JSON.stringify({json.dumps(examples)}.map((cats) => ({{ n: cats.length, uneven: timePositions(cats) !== null }}))));
+''')
+        for example in result:
+            self.assertGreaterEqual(example["n"], 4)
+            self.assertTrue(example["uneven"])
+
+    def test_one_period_recogniser_reads_a_trend_axis(self):
+        # The compiler took "H3 2024" for a period; the craft floor kept its own copy of the pattern.
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+import {{ isPeriodLabel }} from '{TIME}';
+import {{ trendChart }} from './skills/professional-slides/runtime/gates/craft_gates.mjs';
+{PAGE}
+const trend = (categories) => ({{ id: 'p1', type: 'trend', form: 'column', commentary: 'on-exhibit', ...base, title: 'Revenue rose in every period of the run',
+  exhibit: {{ heading: 'Revenue, $B', categories, series: [{{ name: 'Rev', values: categories.map((_, i) => i + 1) }}, {{ name: 'Cost', values: categories.map((_, i) => i) }}],
+    annotations: [{{ category: categories[1], text: 'The launch doubled revenue as the new product reached every region' }}] }} }});
+const halves = ['H1 2024', 'H2 2024', 'H3 2024', 'H4 2024'];
+console.log(JSON.stringify({{
+  periods: ['2025', 'FY25', 'FY25 LTM', '2024 YTD', '2020-24', 'FY20-FY24', 'FY2024-25', 'Q1', '2H', 'Q1-Q3 2025', 'Jan-Mar', 'September', 'FY26 (est.)'].filter((c) => !isPeriodLabel(c)),
+  members: ['H3 2024', 'H4', 'Q5', 'Northern', 'Mayor', '10-12', 'Plan', 'Leeds to York'].filter(isPeriodLabel),
+  halves: error(() => compilePage(trend(halves))), quarters: error(() => compilePage(trend(['Q1', 'Q2', 'Q3', 'Q4']))),
+  qualified: error(() => compilePage(trend(['FY22', 'FY23', 'FY24', 'FY25 LTM']))),
+  craft: [trendChart({{ type: 'chart.line', categories: halves }}), trendChart({{ type: 'chart.line', categories: ['2020-21', '2021-22', '2022-23', '2023-24'] }})],
+}}));
+''')
+        self.assertEqual(result["periods"], [])
+        self.assertEqual(result["members"], [])
+        self.assertIn("four or more periods", result["halves"])
+        self.assertIsNone(result["quarters"])
+        self.assertIsNone(result["qualified"])
+        self.assertEqual(result["craft"], [False, True])
+
+
+class TableTests(unittest.TestCase):
+    """One refusal for each table defect, read off the cells as they are drawn."""
+
+    TABLES = '''
+const table = (heading, rows) => ({ type: 'table', heading, columns: ['Measure', 'Value', 'Date'], rows });
+const two = [['Revenue run rate', '>$2.5B', 'Feb 2026'], ['Enterprise share', 'More than half', 'Feb 2026']];
+const three = [...two, ['Weekly users', 'n/a', 'Feb 2026']];
+const stack = (exhibits) => ({ ...base, id: 't', type: 'panels', form: 'stack', commentary: 'none', title: 'Coding metrics cannot be reduced to one share', exhibits });
+const players = [{ name: 'Northwind' }, { name: 'Southgate Labs', short: 'Southgate' }];
+const lookup = (rows, extra = {}) => ({ ...base, id: 'l', type: 'lookup', form: 'table', commentary: 'none', title: 'The two firms split the criteria between them',
+  exhibit: { columns: [{ label: 'Measure', type: 'category' }, 'First', 'Second'], rows }, ...extra });
+const body = [['Consumer reach', 'Northwind', 'Southgate'], ['Enterprise seats', 'Southgate', 'Northwind'], ['Developer use', 'Northwind', 'Southgate']];
+const opts = { players };
+'''
+
+    def test_short_tables_and_twins_are_one_refusal_each(self):
+        # Moved from test_pill_columns. Two tables with the same columns on
+        # different measures fired COMPARISON_MEASURES_DIFFER, TABLE_TOO_SHORT
+        # and TABLE_PANELS_MERGE with one repair; now one TABLE_PANELS_MERGE
+        # names the measures (the expectation for `differ` changed with it).
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+{PAGE}
+{self.TABLES}
+const first = table('First product', [['Revenue run rate', '>$2.5B', 'Feb 2026'], ['Enterprise share', '>50%', 'Feb 2026'], ['Paid seats', 'n/a', 'Feb 2026']]);
+const second = table('Second product', [['Weekly users', '>5M', 'Jun 2026'], ['Knowledge-worker share of use', '~20%', 'Jun 2026'], ['Paid seats', 'n/a', 'Jun 2026']]);
+const bars = (heading, unit) => ({{ type: 'chart.column', heading, unit, categories: ['2021', '2022', '2023', '2024', '2025'], series: [{{ name: 'x', values: [1, 2, 3, 4, 5] }}] }});
+const panels = (a, b) => ({{ ...base, id: 'p', type: 'panels', form: 'row', commentary: 'none', title: 'Both firms grew, measured differently', exhibits: [a, b] }});
+console.log(JSON.stringify({{
+  short: error(() => compilePage({{ ...base, id: 's', type: 'lookup', form: 'table', commentary: 'none', title: 'Coding metrics cannot be reduced to one share', exhibit: table('First product', two) }})),
+  twins: error(() => compilePage(stack([table('First product', three), table('Second product', three)]))),
+  twinsShort: error(() => compilePage(stack([table('First product', two), table('Second product', two)]))),
+  differ: error(() => compilePage(stack([first, second]))),
+  ok: error(() => compilePage({{ ...base, id: 'o', type: 'lookup', form: 'table', commentary: 'none', title: 'Coding metrics cannot be reduced to one share', exhibit: {{ type: 'table', columns: ['Measure', 'First', 'Second', 'Date'], rows: [['Revenue run rate', '>$2.5B', 'n/a', 'Feb 2026'], ['Enterprise share', 'More than half', 'n/a', 'Feb 2026'], ['Weekly users', 'n/a', '>5M', 'Jun 2026']] }} }})),
+  panels: error(() => compilePage(panels(bars('Northwind revenue', '$bn'), bars('Southgate weekly users', 'm users')), 0, opts)),
+  samePanels: error(() => compilePage(panels(bars('Northwind revenue', '$bn'), bars('Southgate revenue', '$bn')), 0, opts)),
+}}));
+''')
+        self.assertIn("TABLE_TOO_SHORT", result["short"])
+        self.assertIn("TABLE_PANELS_MERGE", result["twins"])
+        self.assertNotIn("different measures", result["twins"])
+        self.assertIn("TABLE_PANELS_MERGE", result["twinsShort"])  # merged, a pair of two-row tables is one table
+        self.assertIn("TABLE_PANELS_MERGE", result["differ"])
+        self.assertIn("on different measures", result["differ"])
+        self.assertIn("Weekly users", result["differ"])
+        self.assertIsNone(result["ok"])
+        self.assertIn("COMPARISON_MEASURES_DIFFER", result["panels"])  # a player's short name heads its panel
+        self.assertNotIn("COMPARISON_MEASURES_DIFFER", result["samePanels"] or "")
+
+    def test_tables_one_above_another_are_one_table(self):
+        # Two funding rounds stacked, each "Measure | Disclosed value" on its
+        # own measures, compared nothing; tables of different columns stacked
+        # read no better. Side by side in a row, they are two panels.
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+{PAGE}
+{self.TABLES}
+const round = (heading, rows) => ({{ type: 'table', heading, columns: ['Measure', 'Disclosed value'], rows }});
+const march = round('Northwind March round', [['Committed capital', '$40B'], ['Post-money valuation', '$300B'], ['Undrawn credit', '$4B']]);
+const may = round('Southgate May Series H', [['Round size', '$13B'], ['Post-money valuation', '$183B'], ['Included commitments', '$2B']]);
+const terms = {{ type: 'table', heading: 'Terms', columns: ['Term', 'Northwind', 'Southgate'], rows: [['Lead investor', 'A', 'B'], ['Board seat', 'Yes', 'No'], ['Close', 'March', 'May']] }};
+const chart = {{ type: 'chart.column', heading: 'Capital raised by year', unit: '$B', categories: ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'], series: [{{ name: 'x', values: [1, 2, 3, 5, 8, 13, 21, 40] }}] }};
+const panels = (form, exhibits) => ({{ ...base, id: 'k', type: 'panels', form, commentary: 'none', title: 'The two rounds were raised on different terms', exhibits }});
+console.log(JSON.stringify({{
+  rounds: error(() => compilePage(panels('stack', [march, may]))),
+  stacked: error(() => compilePage(panels('stack', [march, terms]))),
+  grid: error(() => compilePage(panels('grid', [march, chart, terms]))),
+  row: error(() => compilePage(panels('row', [march, terms]))),
+  withChart: error(() => compilePage(panels('row', [terms, chart]))),
+}}));
+''')
+        self.assertIn("TABLE_PANELS_MERGE", result["rounds"])
+        self.assertIn("on different measures", result["rounds"])
+        # every measure either table names, once, and "n/a" where a member discloses none
+        self.assertIn("Committed capital, Post-money valuation, Undrawn credit, Round size, Included commitments", result["rounds"])
+        self.assertIn('"n/a"', result["rounds"])
+        self.assertIn("TABLE_STACK", result["stacked"])
+        self.assertIn("TABLE_STACK", result["grid"])  # a table in each row of the grid
+        self.assertIsNone(result["row"])
+        self.assertIsNone(result["withChart"])
+
+    def test_cells_drawn_as_logos_are_read_as_their_players(self):
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+{PAGE}
+{self.TABLES}
+const roster = (n) => ({{ ...base, id: 'r', type: 'profiles', form: 'logo-table', commentary: 'in-exhibit', title: 'Two carriers set the terms of the market',
+  exhibit: {{ columns: [{{ label: '', type: 'logo' }}, 'Carrier', 'Fleet'], rows: [[{{ media: {{ alt: 'Northwind logo' }} }}, 'Northwind', '260'], [{{ media: {{ alt: 'Southgate logo' }} }}, 'Southgate', '140']].slice(0, n) }} }});
+console.log(JSON.stringify({{
+  logoTotal: error(() => compilePage(lookup([...body, ['Overall', 'Northwind', 'Southgate']]), 0, opts)),
+  blankTotal: error(() => compilePage(lookup([...body, ['Overall', '', '-']]), 0, opts)),
+  logoHighlight: error(() => compilePage(lookup(body, {{ title: 'Southgate leads on seats while Northwind leads on reach', highlight: 'Southgate' }}), 0, opts)),
+  textCell: error(() => compilePage(lookup([[body[0][0], body[0][1], {{ text: 'Southgate', highlight: true }}], ...body.slice(1)], {{ highlight: 'Southgate' }}), 0, opts)),
+  rosterTwo: error(() => compilePage(roster(2))), rosterOne: error(() => compilePage(roster(1))),
+}}));
+''')
+        self.assertIsNone(result["logoTotal"])  # a total row of player marks is not blank
+        self.assertIn("TOTAL_ROW_BLANK", result["blankTotal"])
+        self.assertIn("drawn as Southgate Labs's logo", result["logoHighlight"])
+        self.assertNotIn("only in the title", result["logoHighlight"])
+        self.assertIsNone(result["textCell"])  # a cell with its own highlight stays text, and takes the accent
+        self.assertIsNone(result["rosterTwo"])  # PLAYERS_UNMARKED sends a two-player deck here
+        self.assertIn("TABLE_TOO_SHORT", result["rosterOne"])
+
+    def test_the_shape_is_refused_before_the_cells(self):
+        # Only the first refusal is shown: a blank total fixed on a table too
+        # short to keep, or an icon renamed on a page of the wrong form, is work thrown away.
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+{PAGE}
+{self.TABLES}
+console.log(JSON.stringify({{
+  shortAndBlank: error(() => compilePage(lookup([['Consumer reach', '12', '9'], ['Total', '', '']]))),
+  formAndIcon: error(() => compilePage({{ ...lookup(body), form: 'grid', points: [{{ text: 'Reach is split', icon: 'nosuchicon' }}] }})),
+}}));
+''')
+        self.assertIn("TABLE_TOO_SHORT", result["shortAndBlank"])
+        self.assertIn("choose `form`", result["formAndIcon"])
+
+
+class VocabularyTests(unittest.TestCase):
+    def test_the_catalogue_publishes_every_refusal_the_compiler_raises(self):
+        source = (RUNTIME / "page-types.mjs").read_text(encoding="utf-8")
+        raised = set(re.findall(r"\$\{id\}: ([A-Z][A-Z_]+) - ", source)) | set(re.findall(r"`([A-Z][A-Z_]+): ", source))
+        result = run_node(f'''
+import {{ describeTypes }} from '{KIT}';
+import {{ VARIETY_CODES }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
+import {{ wordBudgetOf }} from './skills/professional-slides/runtime/derive-content.mjs';
+console.log(JSON.stringify({{ types: describeTypes(), codes: Object.keys(VARIETY_CODES), summary: wordBudgetOf('text-page', {{ role: 'executive-summary' }}).ceiling }}));
+''')
+        self.assertTrue({"TOTAL_ROW_BLANK", "TABLE_PANELS_MERGE", "SHARES_IN_TILES", "MAP_COARSE"} <= raised)  # the patterns read the source
+        for code in sorted(raised):
+            self.assertIn(code, result["types"])
+        # Every compile refusal is in the deck's vocabulary but the title's, a page-gate code checked early.
+        self.assertEqual(raised - set(result["codes"]), {"TITLE_WORDS"})
+        docs = (REFERENCES / "page-types.md").read_text(encoding="utf-8")
+        for code in result["codes"]:
+            self.assertIn(f"`{code}`", docs)
+        self.assertIn("leads, leader, winner, wins", result["types"])  # every verdict word the check reads
+        self.assertIn(f"({result['summary']} body words)", result["types"])  # the summary ceiling the budget sets
 
 
 class VerdictTableTests(unittest.TestCase):
@@ -259,6 +444,7 @@ console.log(JSON.stringify({
   titles: codes({}, titled).map((f) => f.measured.players ?? f.code),
   unnamed: codes({}, make(kinds)).length,
   cards: codes({ players }, make([chart, logos, cards, ...kinds.slice(3)])).map((f) => f.code),
+  aliased: codes({ players: [{ name: 'OpenAI Group', short: 'OpenAI' }, { name: 'Anthropic' }] }, make([chart, logos, ...kinds.slice(2)])).map((f) => f.code),
 }));
 ''')
         self.assertEqual(result["declared"], ["PLAYERS_UNMARKED"])
@@ -267,6 +453,7 @@ console.log(JSON.stringify({
         self.assertEqual(sorted(result["titles"][0]), ["Anthropic", "OpenAI"])
         self.assertEqual(result["unnamed"], 0)
         self.assertEqual(result["cards"], ["PROFILE_UNPICTURED"])
+        self.assertEqual(result["aliased"], [])  # a logo under the player's short name introduces it
 
     def test_shares_of_one_measure_in_equal_tiles_are_advised(self):
         result = run_node(f'''

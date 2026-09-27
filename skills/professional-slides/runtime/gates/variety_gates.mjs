@@ -43,8 +43,9 @@ export const VARIETY_CODES = Object.freeze({
   // them as COMPILE or PAGE_DOES_NOT_COMPOSE findings carrying these codes.
   TOTAL_ROW_BLANK: "a table row labelled as a total with no value in any of its result cells",
   TABLE_TOO_SHORT: "a table of fewer than three body rows, where two or three figures are a numbers page",
-  TABLE_PANELS_MERGE: "two tables on one page with the same columns, which read as one table split in two",
-  COMPARISON_MEASURES_DIFFER: "members compared side by side on different measures, so nothing reads across",
+  TABLE_PANELS_MERGE: "two tables on one page with the same columns, which read as one table split in two - on different measures, nothing reads across",
+  TABLE_STACK: "two or more tables set one above another on a page, so the reader holds one grid in mind while reading the next",
+  COMPARISON_MEASURES_DIFFER: "panels headed by different players, each on its own measure, so nothing reads across",
   TIME_AXIS_UNEVEN: "a column chart whose dated categories are unevenly spaced in time but drawn one slot apart",
   VERDICT_TABLE_PLAIN: "a lookup, options or matrix table whose judgement column (lead, verdict, confidence, status) is plain text",
   SCENARIO_PROSE: "two to four alternatives written as paragraphs of sixty words or more each",
@@ -95,13 +96,27 @@ export const VARIETY = Object.freeze({
   evidenceMedianMin: 15,
 });
 
-// The pages a deck of one exhibit and a column is usually hiding, named with
-// their choices in the repairs so the author can reach for them.
-const ALTERNATIVES = "two cuts of the same evidence side by side, each with its finding under it (`panels`, form `row`, commentary `captions`); " +
-  "the exhibit under a strip of the three numbers that carry the claim (`numbers`, form `metric-strip`); the exhibit alone, its explanation " +
-  "written as callouts on the plot (commentary `on-exhibit`) or closed by one implication (commentary `so-what-bar`); labelled row blocks, each " +
-  "with its bullets and a number or small exhibit (`parallel`, form `labelled-rows`); two or three exhibits joined by arrows for cause and " +
-  "effect (`panels`, form `sequence`); a table whose last column is the implication (`lookup` or `scorecard`, commentary `in-exhibit`)";
+// The pages a deck of one exhibit and a column is usually hiding: what the
+// column was holding, the page that draws it, and whether that page carries
+// two or more exhibits (a string says on what condition). Every structure
+// repair is built from this one list, and page-types.md prints it as a table
+// (a test holds the two together): kept as four hand-written lists, the
+// panels repair offered pages the column repair did not, and the docs a third set.
+export const REDRAWS = Object.freeze([
+  { holding: "a second cut of the same evidence - another measure, another member, the other period", draw: "two or more panels, each headed, its finding under it as a `caption`",
+    choice: "`panels`, form `row`, `grid` or `stack`, commentary `captions`", multi: true },
+  { holding: "the three numbers that carry the claim", draw: "the exhibit under a strip of them", choice: "`numbers`, form `metric-strip`, commentary `none`", multi: true },
+  { holding: "notes on particular marks", draw: "callouts on the plot", choice: "commentary `on-exhibit`, three at most, about twelve words each", multi: false },
+  { holding: "one implication", draw: "a so-what bar under the exhibit", choice: "commentary `so-what-bar`", multi: false },
+  { holding: "a point per area, each with its own evidence", draw: "labelled row blocks, a number or a small exhibit at the right of each", choice: "`parallel`, form `labelled-rows`",
+    multi: "with a small `exhibit` on each row" },
+  { holding: "a point per row of a table", draw: "the table's last column, the implication of each row", choice: "`lookup` or `scorecard`, commentary `in-exhibit`", multi: false },
+  { holding: "a cause and its effect", draw: "two or three exhibits joined by arrows", choice: "`panels`, form `sequence`", multi: true },
+  { holding: "the case for each of two options", draw: "the two options side by side, each with its exhibit", choice: "`options`, form `two-up`", multi: true },
+  { holding: "what the subject looks like", draw: "the exhibit on a card over its subject's photograph", choice: "`picture`, form `photo-backdrop`", multi: true },
+]);
+const redraws = (multiOnly = false) => REDRAWS.filter((r) => !multiOnly || r.multi)
+  .map((r) => `${r.draw} (${r.choice}${multiOnly && typeof r.multi === "string" ? `, ${r.multi}` : ""})`).join("; ");
 // What the middle page of a run of one type can become, by the run's type:
 // the forms the same evidence takes as a different page.
 const RUN_ALTERNATIVES = {
@@ -129,6 +144,20 @@ export function evidenceDepth(slides) {
   const median = values.length ? (values.length % 2 ? values[Math.floor(mid)] : (values[mid - 1] + values[mid]) / 2) : 0;
   const thinnest = [...charts].sort((a, b) => a.pageType.values - b.pageType.values).slice(0, 5).map((s) => `${s.id ?? "?"} (${s.pageType.values})`);
   return { chartPages: charts.length, median, min: values[0] ?? 0, max: values.at(-1) ?? 0, thinnest };
+}
+
+/**
+ * The types in page order, a run of one type folded to its ends ("p4-p6
+ * panels x3"): printed in the author's summary and in a run's finding, so the
+ * two read alike. A split into panels made three panels pages in a row, and a
+ * count of types could not show where.
+ */
+export function typeSequence(slides) {
+  return slides.filter((s) => s.pageType).reduce((runs, s) => {
+    const last = runs.at(-1);
+    if (last?.type === s.pageType.type) last.ids.push(s.id ?? "?"); else runs.push({ type: s.pageType.type, ids: [s.id ?? "?"] });
+    return runs;
+  }, []).map(({ type, ids }) => (ids.length === 1 ? `${ids[0]} ${type}` : `${ids[0]}-${ids.at(-1)} ${type} x${ids.length}`)).join(" | ");
 }
 
 /**
@@ -182,7 +211,6 @@ export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
   }
 
   const n = slides.length;
-  const sequence = (from, to) => slides.slice(from, to).map((s) => `${s.id ?? "?"} ${s.pageType.type}`).join(" | ");
   const tally = (key) => { const m = new Map(); for (const s of slides) { const k = key(s); m.set(k, (m.get(k) || 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]); };
 
   const types = tally((s) => s.pageType.type);
@@ -217,7 +245,7 @@ export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
       const swap = slides.map((s, j) => ({ s, j })).filter(({ s, j }) => (j < start - 1 || j > at) && s.pageType.type !== type
         && slides[j - 1]?.pageType.type !== type && slides[j + 1]?.pageType.type !== type)
         .sort((a, b) => Math.abs(a.j - mid) - Math.abs(b.j - mid))[0]?.s;
-      block("VARIETY_TYPE_RUN", { type, run: run.length, pages: ids, sequence: sequence(Math.max(0, start - 1), at + 1) }, VARIETY.runMax,
+      block("VARIETY_TYPE_RUN", { type, run: run.length, pages: ids, sequence: typeSequence(slides.slice(Math.max(0, start - 1), at + 1)) }, VARIETY.runMax,
         `${run.length} ${type} pages in a row (${ids.join(", ")}) read as one page repeated. Change ${middle.id} to another type - ` +
         `${RUN_ALTERNATIVES[type] ?? "the type its evidence actually carries"}` +
         (swap ? `; or, if the storyline allows, trade places with ${swap.id} (${swap.pageType.type})` : "") +
@@ -242,7 +270,7 @@ export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
       "In strong decks the explanation lives in several places: on the chart as callouts, in the table's cells, under each panel, in a " +
       "column beside the exhibit, in a so-what bar under it, or nowhere because the exhibit and its title carry it. Choose the placement " +
       "that puts each sentence where the eye already is for that page" +
-      (top === "beside" || top === "below" ? ` - and ask whether the page is one exhibit at all: ${ALTERNATIVES}.` : "."));
+      (top === "beside" || top === "below" ? ` - and ask whether the page is one exhibit at all: ${redraws()}.` : "."));
   }
   // A so-what bar is a close as much as a closing line is: counted apart, a
   // deck could close every page by moving the line into a bar.
@@ -258,17 +286,14 @@ export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
     block("VARIETY_PANELS", { pages: mix.multi.pages, of: mix.pages, share: mix.multi.share }, VARIETY.multiShareMin,
       `${mix.multi.pages} of ${mix.pages} pages carry two or more exhibits; a deck this long needs ${Math.ceil(VARIETY.multiShareMin * mix.pages)}, and strong decks ` +
       "carry them on a quarter to a third of their pages - the same measure for several members, two measures that together prove the claim, " +
-      "before and after, cause and effect. Find the pages where the reader would otherwise hold one chart in mind while turning to the next, and " +
-      "draw them as `panels` (form `row`, `grid` or `stack`, each panel headed with its finding under it as a `caption`), `panels` form `sequence` " +
-      "(two or three exhibits joined by arrows), `numbers` form `metric-strip` (three numbers over their chart), `parallel` form `labelled-rows` " +
-      "with a small `exhibit` on each row, `options` form `two-up`, or `picture` form `photo-backdrop` (the exhibit on its subject's photograph).",
+      `before and after, cause and effect. Find the pages where the reader would otherwise hold one chart in mind while turning to the next, and draw them as: ${redraws(true)}.`,
       null);
   }
   if (mix.pages >= VARIETY.structureFrom && mix.column.share > VARIETY.columnShareMax) {
     block("VARIETY_COLUMN", { pages: mix.column.pages, of: mix.pages, share: mix.column.share, ids: mix.column.ids }, VARIETY.columnShareMax,
       `${mix.column.pages} of ${mix.pages} pages are one exhibit with a text column beside it - points beside or before it, a rail, or a hero number ` +
       `with its points - where strong decks draw about one page in eight that way; at most ${Math.floor(VARIETY.columnShareMax * mix.pages)} here. ` +
-      `Keep the column where the argument needs a paragraph the exhibit cannot hold, and redraw the rest as what they show: ${ALTERNATIVES}.`,
+      `Keep the column where the argument needs a paragraph the exhibit cannot hold, and redraw the rest as what they show: ${redraws()}.`,
       mix.column.ids);
   }
   const depth = evidenceDepth(slides);
@@ -289,7 +314,7 @@ export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
     block("VARIETY_SIGNATURE", { signature: signature[0][0], pages: signature[0][1], of: n, ids }, VARIETY.signatureShareMax,
       `${signature[0][1]} of ${n} pages are drawn as the same page: ${signature[0][0]}. They may declare different types, but a reader ` +
       "sees one layout repeated. Go back to what each has to show and draw the pages that are not one exhibit as what they are: " +
-      `${ALTERNATIVES}. A deck's rhythm comes from pages that ask the reader to do different things.`, ids);
+      `${redraws()}. A deck's rhythm comes from pages that ask the reader to do different things.`, ids);
   }
   findings.push(...reviewedDeckFindings(spec, slides));
   return findings;
@@ -297,8 +322,38 @@ export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
 
 // Deck-level defects a whole-deck review found, read from the compiled pages.
 export const REVIEWED = Object.freeze({ tableWindow: 10, tableRunMax: 5, earlyPages: 3, titleShare: 0.2, titleNames: 2 });
-const CODED_TABLE = new Set(["binary", "harvey", "heatmap", "bars", "rag", "lights", "progress", "dot", "check", "trend", "logo", "photo"]);
-const tablesOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex?.type === "table");
+
+// The table vocabulary the compiler (page-types.mjs) and these rules both
+// read, kept here because the compiler imports this module and not the other
+// way round. Three definitions of "a table" and two of "a coded cell" had
+// drifted: a number column counted as coded in one and not the other.
+const TABLE_TYPES = new Set(["table", "comparison-table", "heatmap", "trend-rows", "insight-tree-table"]);
+/** Is this exhibit a grid of rows the table checks read? */
+export const isTable = (ex) => TABLE_TYPES.has(String(ex?.type ?? "")) && Array.isArray(ex.rows);
+/** A table row's cells: a row is an array, or `{ cells, label?, style? }`. */
+export const rowCells = (row) => (Array.isArray(row) ? row : Array.isArray(row?.cells) ? row.cells : []);
+/** Column and cell types the composer draws as a code - a mark, a pill, a bar, a number badge, a logo - rather than as text. */
+export const CODED = new Set(["binary", "harvey", "heatmap", "bars", "rag", "lights", "progress", "dot", "check", "trend", "number", "logo", "photo"]);
+const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
+
+/**
+ * The deck's players by every name a page may use for them - the name, its
+ * `short` and its `aliases`, lower-cased - each mapped to the player's name.
+ * A table cell naming a player is drawn as its logo, a panel headed by one is
+ * that player's panel, and an early logo under a short name introduces it:
+ * read three ways, a player declared as "Southgate Labs" with short
+ * "Southgate" was marked in its table cells and still reported unmarked.
+ */
+export function playerNames(players) {
+  const names = new Map();
+  for (const p of Array.isArray(players) ? players : []) {
+    const player = typeof p === "string" ? { name: p } : p;
+    if (typeof player?.name !== "string" || !player.name.trim()) continue;
+    for (const alias of [player.name, player.short, ...(player.aliases || [])])
+      if (typeof alias === "string" && alias.trim()) names.set(alias.trim().toLowerCase(), player.name);
+  }
+  return names;
+}
 
 /**
  * How a page's table reads before a word of it is read: the first column
@@ -309,14 +364,14 @@ const tablesOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((e
  * verdicts all in one grammar - and the reviewer read them as one page.
  */
 export function tableConstruction(slide) {
-  const table = tablesOf(slide)[0];
+  const table = exhibitsOf(slide).find(isTable);
   if (!table && slide.shape !== "findings-matrix") return null;
   const columns = table?.columns || [];
   const rows = table ? table.rows || [] : slide.rows || [];
   const first = !table || table.treatment === "categories" || (table.treatment === undefined && columns.some((c) => c?.type === "category"))
     ? "filled first column" : table.treatment === "standard" ? "filled header" : "open first column";
-  const coded = columns.some((c) => CODED_TABLE.has(c?.type) || c?.heat || c?.bar || c?.harvey)
-    || rows.some((row) => (Array.isArray(row) ? row : row?.cells || []).some((cell) => CODED_TABLE.has(cell?.type)));
+  const coded = columns.some((c) => CODED.has(c?.type) || c?.heat || c?.bar || c?.harvey)
+    || rows.some((row) => rowCells(row).some((cell) => CODED.has(cell?.type)));
   return [first, coded ? "coded cells" : "text cells", rows.length > 8 ? "long" : "short", slide.soWhat ? "a band at the foot" : "open foot"].join(" · ");
 }
 
@@ -338,12 +393,14 @@ function reviewedDeckFindings(spec, slides) {
     "form `gantt`, `ranking` form `aligned-bars`), verdicts as a coded scorecard (`scorecard` forms harvey, rag, check), measures as a chart; keep the table for the look-up.", worst.ids);
 
   // Identity: the players the deck compares, shown by their marks early.
-  const players = (Array.isArray(spec.players) ? spec.players : []).map((p) => (typeof p === "string" ? p : p?.name)).filter((name) => typeof name === "string" && name.trim());
+  const aliases = playerNames(spec.players);
+  const players = [...new Set(aliases.values())];
   const named = players.length >= 2 ? players : titleNames(analytical);
   if (named.length >= 2) {
     const early = [spec.cover, ...analytical.slice(0, REVIEWED.earlyPages)].filter(Boolean);
     const marks = early.flatMap(logoTexts).join(" \n ").toLowerCase();
-    const unmarked = named.filter((name) => !marks.includes(name.toLowerCase()));
+    // A logo under any of the player's names introduces it.
+    const unmarked = named.filter((name) => ![name.toLowerCase(), ...[...aliases].filter(([, n]) => n === name).map(([alias]) => alias)].some((alias) => marks.includes(alias)));
     if (unmarked.length) block("PLAYERS_UNMARKED", { players: named, unmarked, pages: early.map((p) => p.id ?? "cover") }, 0,
       `The deck compares ${named.join(", ")}${players.length >= 2 ? "" : " (named in its titles again and again)"}, and neither the cover nor the first ${REVIEWED.earlyPages} pages ` +
       `shows ${unmarked.length === named.length ? "their logos" : `the logo of ${unmarked.join(", ")}`}. Introduce them by their marks before the evidence starts: a \`profiles\` page ` +
@@ -353,7 +410,7 @@ function reviewedDeckFindings(spec, slides) {
   }
   // A page that introduces players or products as cards is about what they look like as much as what they do.
   for (const s of slides.filter((slide) => slide.pageType?.type === "profiles" && slide.pageType.form === "cards")) {
-    const items = tablesOf(s).length ? [] : (s.exhibit?.items || []);
+    const items = exhibitsOf(s).some(isTable) ? [] : (s.exhibit?.items || []);
     if (items.length && !items.some((item) => ["logo", "media", "image", "photo", "picture"].some((key) => item?.[key])))
       block("PROFILE_UNPICTURED", { page: s.id ?? null, cards: items.length }, 1,
         `${s.id}: ${items.length} cards introduce ${items.map((item) => item?.title ?? item?.name).filter(Boolean).slice(0, 4).join(", ")} with no logo or picture on any of them. ` +

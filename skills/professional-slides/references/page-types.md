@@ -96,23 +96,25 @@ A generated deck drew two pages in five as one exhibit with a text column beside
 | Exhibits joined by arrows - `panels`, form `sequence` | cause and effect, before and after, input to adjustment to result | two or three `exhibits`, each with its `heading`; commentary `captions`, `below`, `so-what-bar` or `none` |
 | So-what bar - commentary `so-what-bar` | an exhibit whose implication goes beyond the title and is one sentence | `bar`: eight words or more, two lines at most; `takeaway: false` |
 
-The variety contract holds the deck to this (`VARIETY_PANELS`, `VARIETY_COLUMN`, below). When a page reaches for a column, these are what it usually is:
+The variety contract holds the deck to this (`VARIETY_PANELS`, `VARIETY_COLUMN`, below). When a page reaches for a column, these are what it usually is. The contract's repairs are built from this list (`runtime/gates/variety_gates.mjs`), so they offer the same pages:
 
-| The column was holding | Draw it as |
-| --- | --- |
-| a second cut of the same evidence - another measure, another member, the other period | two or more panels, each headed, its finding under it as a `caption` (`panels`, form `row`, `grid` or `stack`, commentary `captions`) |
-| the three numbers that carry the claim | the exhibit under a strip of them (`numbers`, form `metric-strip`, commentary `none`) |
-| notes on particular marks | callouts on the plot (commentary `on-exhibit`, three at most, about twelve words each) |
-| one implication | a so-what bar under the exhibit (commentary `so-what-bar`) |
-| a point per area, each with its own evidence | labelled row blocks, a number or a small exhibit at the right of each (`parallel`, form `labelled-rows`) |
-| a point per row of a table | the table's last column, the implication of each row (`lookup` or `scorecard`, commentary `in-exhibit`) |
-| a cause and its effect | two or three exhibits joined by arrows (`panels`, form `sequence`) |
+| The column was holding | Draw it as | Two or more exhibits (`VARIETY_PANELS`) |
+| --- | --- | --- |
+| a second cut of the same evidence - another measure, another member, the other period | two or more panels, each headed, its finding under it as a `caption` (`panels`, form `row`, `grid` or `stack`, commentary `captions`) | yes |
+| the three numbers that carry the claim | the exhibit under a strip of them (`numbers`, form `metric-strip`, commentary `none`) | yes |
+| notes on particular marks | callouts on the plot (commentary `on-exhibit`, three at most, about twelve words each) | no |
+| one implication | a so-what bar under the exhibit (commentary `so-what-bar`) | no |
+| a point per area, each with its own evidence | labelled row blocks, a number or a small exhibit at the right of each (`parallel`, form `labelled-rows`) | with a small `exhibit` on each row |
+| a point per row of a table | the table's last column, the implication of each row (`lookup` or `scorecard`, commentary `in-exhibit`) | no |
+| a cause and its effect | two or three exhibits joined by arrows (`panels`, form `sequence`) | yes |
+| the case for each of two options | the two options side by side, each with its exhibit (`options`, form `two-up`) | yes |
+| what the subject looks like | the exhibit on a card over its subject's photograph (`picture`, form `photo-backdrop`) | yes |
 
 Each row block is a filled label on the house colour - five words at most, read down the left edge as the page's outline - with two to four bullets beside it; the rows share the body height, so the page fills to its foot. The commentary is `in-exhibit`, since the bullets are the explanation, or `so-what-bar` to close the rows on what they add up to. A headed chart at the right of a row keeps its plot only on a page of two blocks; on three or more, give each row a number or a two-row table.
 
 The bar is drawn in the house colour with the implication in bold white, in every design system. It is a close, so it counts toward the closing share with the takeaway line: a deck cannot close every page by moving the line into a bar.
 
-The compiler then composes the deck in memory, as the build will, filling logos, photographs and places from what is already on disk. Every page that fails to compose is reported in the same run, not one per build.
+The compiler then composes the deck in memory, as the build will, filling logos, photographs and places from what is already on disk. Every page that fails to compose is reported in the same run (`PAGE_DOES_NOT_COMPOSE`), not one per build.
 
 ## The pages file is the dot-dash
 
@@ -154,6 +156,8 @@ Each budget line also gives the floor the page would carry with its commentary p
 `--types` prints the data each form reads (a pie or donut takes `labels` and `values`, a treemap `items`, a flow `nodes` and `edges`); the compiler names the missing keys, and refuses any page key the composer does not read, on every page at once.
 
 The compiler checks what each type implies. A trend runs over four or more periods; a ranking shows four or more members; trend and ranking charts mark their finding on the plot; a scorecard codes at least one column in its form; `on-exhibit` needs `annotations`; `captions` needs a `caption` on every panel; a text-free placement refuses `points`, because it says the text lives somewhere else. Two or three numbers are a `numbers` page, not a chart, and not a panel either: a panel plotting two numbers is refused. A pie or donut with a part under 5% is refused for a waffle or a stacked bar; a metric strip sits over exactly one exhibit and takes commentary `none`, since its numbers and exhibit fill the page.
+
+A period is a date (2025, FY25, Q1 2025, Jan 2025), a quarter or half within its year (Q1, H2), a span (2020-24, Jan-Mar) or a period with its qualifier (FY25 LTM, 2024 YTD); a trend's axis and the craft floor's chart over time are read by the same recogniser (`runtime/time-axis.mjs` isPeriodLabel), so "H3 2024" is a member, not a period, to both.
 
 Each component's limits are published in `--types` (`holds:` - a donut takes two to five parts, cards two to six, steps three to six, a stat-list value nine characters and a fact-grid value ten) and checked at compile, with the capacities the renderer measures: a chart callout about ten words and a chart three callouts (a fourth note is commentary), a rail about forty words (eight lines at heading size). Every `numbers` form sets its figures against one exhibit - the proof beside a hero number, the tiles of a grid, the chart under a strip.
 
@@ -216,11 +220,13 @@ A whole-deck review of a fifty-page deck found these on pages that had passed ev
 
 | Code | Where | Rule | What to do instead |
 | --- | --- | --- | --- |
-| `COMPARISON_MEASURES_DIFFER` | compile | per-member tables with the same columns but different measures in their rows; panels headed by different declared players on different units | one table with the measures as rows and the members as columns, "n/a" where one does not publish a measure; or one panel per measure with the members as its bars |
-| `TABLE_TOO_SHORT`, `TABLE_PANELS_MERGE` | compile | a table of fewer than three body rows (a row block's small table is exempt); two tables on one page with the same columns | set two or three figures as a numbers page (fact-grid, stat-list, metric strip); merge twin tables into one with what they compare as columns and "n/a" where a member discloses nothing |
+| `TABLE_PANELS_MERGE` | compile | two tables on one page with the same columns - a measure and its value, one table per member; when their rows name different measures the refusal lists each table's and every measure between them, since then nothing reads across | one table, the members as columns and every measure as a row, "n/a" where a member does not disclose one: each member is compared on the same measures, and the gap is the finding a substitute metric would hide |
+| `TABLE_STACK` | compile | two or more tables with different columns set one above another - `panels` form `stack`, or tables in both rows of a `grid`. Side by side in a row they pass | one table with the members as columns, or one table with the other evidence as a chart or a strip of numbers beside or above it (`panels` form `row` with a chart, `numbers` form `metric-strip` over the table) |
+| `TABLE_TOO_SHORT` | compile | a table of fewer than three body rows; a `profiles` logo table introducing two players, and a row block's small table, are exempt | set two or three figures as a numbers page (fact-grid, stat-list, metric strip), or two members side by side as profile cards or a compare |
+| `COMPARISON_MEASURES_DIFFER` | compile | panels headed by different declared players, each on its own unit | one panel per measure, with the players as its bars or series and "n/a" where one does not publish it |
 | `TOTAL_ROW_BLANK` | compile, compose | a table row labelled Total, Sum or Overall (or `style: "total"`) with nothing in its result cells; `total: true` on a table where no column adds up | a total row carries its computed total, or it is deleted. A measure table adds its own total only where a column sums - counts and amounts, not rates, shares, scores or text |
-| `TIME_AXIS_UNEVEN` | compile | a column chart of four or more dated categories at uneven gaps (Jan, Mar, Jun, Aug; 2015, 2018, 2019) | a line or an area: the runtime places dated categories by the time between them, with a marker at every observation and the labels that fit. Or fill the missing periods, or name the columns as snapshots in the heading ("selected years") |
-| `VERDICT_TABLE_PLAIN` | compile | on a `lookup`, `options` or `matrix` page, a column headed lead, winner, edge, verdict, confidence, status, rating, score, ahead, behind or assessment whose cells are short words ("Firm A", "Medium", "No verdict"); a header "A / B" over cells "a \| b" is read as two columns | give the column a `type` - `rag` (a status pill), `harvey` (a rating), `check`, `lights`, `dot` - or make the page a `scorecard`. Words the composer codes on its own (on track, wins, ✓) pass; where the column names who leads, declare the companies as `players` - a cell naming a player (its `name`, `short` or `aliases`) is drawn as its logo |
+| `TIME_AXIS_UNEVEN` | compile | a column chart of four or more dated categories at uneven gaps (Jan, Mar, Jun, Aug; 2015, 2018, 2019, 2020) | a line or an area: the runtime places dated categories by the time between them, with a marker at every observation and the labels that fit. Or fill the missing periods, or name the columns as snapshots in the heading ("selected years") |
+| `VERDICT_TABLE_PLAIN` | compile | on a `lookup`, `options` or `matrix` page, a column headed lead, leads, leader, winner, wins, edge, verdict, confidence, status, rating, score, ahead, behind, rag or assessment whose cells are short words ("Firm A", "Medium", "No verdict"); a header "A / B" over cells "a \| b" is read as two columns | give the column a `type` - `rag` (a status pill), `harvey` (a rating), `check`, `lights`, `dot` - or make the page a `scorecard`. Words the composer codes on its own (on track, wins, ✓) pass; where the column names who leads, declare the companies as `players` - a cell naming a player (its `name`, `short` or `aliases`) is drawn as its logo |
 | `SCENARIO_PROSE` | compile | two to four alternatives - scenarios, options, paths, market structures - written as paragraphs, points, cards or row blocks of 60 words or more each | set them side by side on the same terms: `options` (compare, table-halves), `parallel` form `labelled-rows`, or a table whose columns are the trigger, who captures the value, the test that would show it and the signal against it |
 | `SHARES_IN_TILES` | compile, advisory | two shares of one measure (their labels share two words) more than five times apart, set as metrics, fact-grid or stat-list tiles or cards | the shares on one 0-100% scale: a bar, a dumbbell or a slope |
 | `VARIETY_TABLES` | variety contract | more than five of any ten consecutive analytical pages carry one table construction: the first column filled or open, the cells coded or text, a short or long grid, a band at the foot or none | draw each as its evidence: funding stages as a bridge or flow, commitments as bars aligned on their durations, verdicts as a scorecard, measures as a chart |

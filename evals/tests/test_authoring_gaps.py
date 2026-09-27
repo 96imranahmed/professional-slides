@@ -282,7 +282,8 @@ console.log(JSON.stringify(run));
         self.assertEqual(result["measured"]["pages"], ["p4", "p5", "p6"])
         self.assertIn("Change p5", result["repair"])
         self.assertIn("trade places with", result["repair"])
-        self.assertIn("p4 panels", result["measured"]["sequence"])
+        # The run and its neighbours, folded as the author's summary folds them.
+        self.assertIn("p3 numbers | p4-p6 panels x3 | p7 trend", result["measured"]["sequence"])
 
 
 class PublishedLimitsTests(unittest.TestCase):

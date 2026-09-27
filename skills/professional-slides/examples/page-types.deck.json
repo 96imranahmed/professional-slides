@@ -334,7 +334,7 @@
      "adds": "The rail says what separates the two operators that recovered fully from the rest"
     },
     "structure": "|sidebar|||||chart.line||rail",
-    "skeleton": "sidebar · 1 chart · rail · open",
+    "skeleton": "exhibit beside a column · 1 exhibit · rail · open",
     "drawn": {
      "exhibits": 1,
      "column": true
@@ -587,7 +587,7 @@
      "adds": "The column explains why intensity trails - hourly off-peak service on full-peak lines - and what the gap is worth"
     },
     "structure": "|exhibit-top|||||chart-group|points|",
-    "skeleton": "exhibit-top · 1 figure · points · open",
+    "skeleton": "exhibit-top · 1 chart · points · open",
     "drawn": {
      "exhibits": 1,
      "column": false
@@ -782,7 +782,7 @@
      "adds": "The points say who fills the morning trains and why the evening leaves them empty"
     },
     "structure": "|photo-backdrop|||||chart.column|points|",
-    "skeleton": "photo-backdrop · 1 chart · points · open",
+    "skeleton": "photo-backdrop · 2 chart · points · open",
     "drawn": {
      "exhibits": 2,
      "column": false
@@ -2605,7 +2605,7 @@
      "adds": "The points say how fast the path climbs and which year it depends on"
     },
     "structure": "|hero-number|||||chart.line|points|",
-    "skeleton": "hero-number · 1 chart · points · open",
+    "skeleton": "exhibit beside a column · 1 exhibit · points · open",
     "drawn": {
      "exhibits": 1,
      "column": true
@@ -2873,7 +2873,7 @@
      "adds": "The rail says which part is uncommitted and what that exposes"
     },
     "structure": "|sidebar|||||chart.donut||rail",
-    "skeleton": "sidebar · 1 chart · rail · open",
+    "skeleton": "exhibit beside a column · 1 exhibit · rail · open",
     "drawn": {
      "exhibits": 1,
      "column": true
@@ -3256,7 +3256,7 @@
      "adds": "Each row says what the dependency waits on and what a slip costs, beside the chart that measures it"
     },
     "structure": "|labelled-rows|||||||",
-    "skeleton": "labelled-rows · open",
+    "skeleton": "labelled-rows · 2 chart · open",
     "drawn": {
      "exhibits": 2,
      "column": false
@@ -3432,7 +3432,7 @@
      "adds": null
     },
     "structure": "|metrics-over-exhibit|||||chart.column||",
-    "skeleton": "metrics-over-exhibit · 1 chart · open",
+    "skeleton": "metrics-over-exhibit · 2 chart · open",
     "drawn": {
      "exhibits": 2,
      "column": false

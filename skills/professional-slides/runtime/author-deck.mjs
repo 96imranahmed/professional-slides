@@ -32,7 +32,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { compilePage, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, SHAPES, breadthProblem } from "./page-types.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
-import { varietyFindings, evidenceDepth, structureMix, VARIETY } from "./gates/variety_gates.mjs";
+import { varietyFindings, evidenceDepth, structureMix, typeSequence, VARIETY } from "./gates/variety_gates.mjs";
 import { SLIDE_KEYS } from "./compose.mjs";
 import { composeAll } from "./compose-all.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
@@ -291,11 +291,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   // What the chart pages plot, against strong decks' ~22 a page: the numbers
   // behind EVIDENCE_DEPTH, printed on every run so a thin deck is seen before it is gated.
   const depth = evidenceDepth([...spec.slides, ...(spec.appendix || [])]);
-  // The types in page order, a run of one type folded to its ends: a split
-  // into panels made three panels pages in a row, and the counts above could
-  // not show where. VARIETY_TYPE_RUN blocks past two.
-  const sequence = typed.reduce((runs, s) => { const last = runs.at(-1); if (last?.type === s.pageType.type) last.ids.push(s.id); else runs.push({ type: s.pageType.type, ids: [s.id] }); return runs; }, [])
-    .map(({ type, ids }) => (ids.length === 1 ? `${ids[0]} ${type}` : `${ids[0]}-${ids.at(-1)} ${type} x${ids.length}`)).join(" | ");
+  // The types in page order (VARIETY_TYPE_RUN blocks past two in a row).
+  const sequence = typeSequence(typed);
   // The deck as drawn: every skeleton and how often, and the two shares the
   // contract holds (VARIETY_PANELS, VARIETY_COLUMN), printed on every run so a
   // deck drifting toward one exhibit and a column is seen before it is gated.

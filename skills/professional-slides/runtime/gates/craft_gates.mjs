@@ -12,6 +12,8 @@
 // They are floors, not targets. A deck well above them can still be flat, and
 // the review judges that; a deck below them has not made the choices at all.
 
+import { isPeriodLabel } from "../time-axis.mjs";
+
 export const CRAFT_CODES = Object.freeze({
   CRAFT_TRIVIAL_CHARTS: "too many charts compare two numbers, which a metric with its delta says better",
   CRAFT_NO_TREND: "a chart-heavy deck with no chart over time",
@@ -33,7 +35,6 @@ export const codedSource = (text) => SOURCE_CODE.test(String(text ?? ""));
 // Decks shorter than this are diagnostics and probes; the floors are about a
 // deck's rhythm, which a handful of pages does not have.
 const FROM_PAGES = 12;
-const PERIOD = /^(?:(?:19|20)\d{2}(?:[EFP]|\s*[EF])?|FY\s?'?\d{2,4}|[QH][1-4]\b.*|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b.*|\d{4}[-–]\d{2,4})$/i;
 const STEP_TYPES = new Set(["steps", "process", "chevron-process", "staircase"]);
 // Zebra striping is house style, not a decision about the evidence, so it does not count.
 const TREATMENT = /^table-(bubble|bar|rating-|implication|column-band|row-band|harvey|status-pill|number-circle|lamp|dot|check|progress-|cell-icon|section-marker|section-number)|^table-logo$|^table-photo$/;
@@ -61,7 +62,7 @@ export function shareAsBars(ex) {
 /** A chart over time: four or more period categories. */
 export function trendChart(ex) {
   const categories = Array.isArray(ex.categories) ? ex.categories.map(String) : [];
-  return isChart(ex) && categories.length >= 4 && categories.filter((c) => PERIOD.test(c.trim())).length >= Math.ceil(categories.length * 0.75);
+  return isChart(ex) && categories.length >= 4 && categories.filter(isPeriodLabel).length >= Math.ceil(categories.length * 0.75);
 }
 
 export function craftFindings(spec, scene) {
