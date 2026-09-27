@@ -445,7 +445,8 @@ import assert from 'node:assert/strict';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const frame={x:60,y:150,width:1000,height:500};
 const line=REGISTRY.get('chart.line');
-const base={categories:['Q1','Q2','Q3','Q4'],series:[{name:'Measure',values:[22,31,48,55]}],yMax:60,dataLabels:false,legend:false,highlights:[],referenceLines:[]};
+// The treatments are drawn in the band above the plot, where the leader drops straight to its mark.
+const base={categories:['Q1','Q2','Q3','Q4'],series:[{name:'Measure',values:[22,31,48,55]}],yMax:60,dataLabels:false,legend:false,highlights:[],referenceLines:[],calloutBand:'band'};
 const takeaway=line.render({id:'takeaway',frame,props:{...base,annotations:[{category:'Q3',text:'Adoption accelerates',treatment:'takeaway-box'}]}}).nodes;
 const takeawaySurface=takeaway.find(n=>n.role==='annotation-surface'&&n.data.annotationTreatment==='callout');
 const takeawayText=takeaway.find(n=>n.role==='annotation-text'&&n.data.annotationTreatment==='callout');
@@ -501,7 +502,13 @@ const cramped={categories:['Q1','Q2'],series:[{name:'Measure',values:[30,40]}],y
 // box now moves beside its mark (here above it) and the leader still ends on it.
 const crampedNodes=line.render({id:'cramped',frame:{x:60,y:150,width:390,height:360},props:cramped}).nodes;
 const crampedBox=crampedNodes.find(n=>n.role==='annotation-surface');
-assert.equal(crampedBox.data.evidencePlacement,'beside');
+// Beside it where that is clear of the line, else in a rail: a box set over the
+// line it annotates hides the data (the line is an obstacle to a callout).
+assert.ok(['beside','rail'].includes(crampedBox.data.evidencePlacement));
+for (const seg of crampedNodes.filter(n=>n.role==='chart-line')) for (let t=0;t<=1;t+=0.05) {
+  const x=seg.data.x1+(seg.data.x2-seg.data.x1)*t, y=seg.data.y1+(seg.data.y2-seg.data.y1)*t, f=crampedBox.frame;
+  assert.ok(!(x>f.x&&x<f.x+f.width&&y>f.y&&y<f.y+f.height),'the box is clear of the line');
+}
 assert.ok(crampedBox.frame.x>=60&&crampedBox.frame.x+crampedBox.frame.width<=450);
 console.log(JSON.stringify({accepted:true}));
 """)

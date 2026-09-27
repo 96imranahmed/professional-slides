@@ -75,6 +75,7 @@ NON_BODY_ROLES = SOURCE_ROLES | CHART_FURNITURE_ROLES | TITLE_ROLES | {
     "chart-heading", "chart-title", "metric-value", "metric-label", "metric-sublabel",
 }
 PROSE_ROLES = {"paragraph", "body", "body-text"}
+LIST_PROSE_ROLES = {"list-item"}
 # Table text is a lookup value, so it may be set one step below body type when
 # the table is dense; prose may not.
 TABLE_TEXT_ROLES = {"table-cell-text", "table-cell", "table-header-text"}
@@ -875,14 +876,28 @@ def gate_type_range(slide_no, slide, findings, profile=DEFAULT_PROFILE):
 
 
 def gate_cpl(slide_no, slide, findings):
-    """CPL. Measure is the longest laid-out line of a prose node."""
+    """CPL. Measure is the longest laid-out line of a prose node.
+
+    A point is prose too, when it is too wide: points below a row of panels
+    ran one list across the body at about 150 characters a line and CPL, reading
+    paragraphs only, passed it. Only the wide end is read for list items - a
+    short bullet in a card is a label, not a narrow column of prose."""
     for node in text_nodes(slide):
-        if node.get("role") not in PROSE_ROLES:
+        role = node.get("role")
+        if role not in PROSE_ROLES and role not in LIST_PROSE_ROLES:
             continue
         lines = lines_of(node)
         if not lines:
             continue
         longest = max(len(line) for line in lines)
+        if role in LIST_PROSE_ROLES:
+            if longest > THRESHOLDS["cpl_max"]:
+                findings.append(finding(
+                    slide_no, "CPL", longest, THRESHOLDS["cpl_max"],
+                    "The points run too wide to track. Set them in columns (points below a row of panels run "
+                    "under each panel, or up to three across) or beside the exhibit.",
+                ))
+            continue
         if longest > THRESHOLDS["cpl_max"]:
             findings.append(finding(
                 slide_no, "CPL", longest, THRESHOLDS["cpl_max"],
@@ -1828,16 +1843,24 @@ def gate_plot_span(slide_no, slide, findings):
                 break
         if peer_annotated:
             continue
+        # The marks are read with their names and values: a bar chart spends
+        # its width on the members' names and its values' gutters, which are
+        # the chart's own content, not air. Read on the bars alone, a change
+        # chart of six regions ("West Asia & Indian Ocean") with a bar below
+        # zero spanned 0.48 of its panel with every value on a tight scale, and
+        # nothing the author could tighten; what the gate is for - a loose
+        # scale, an empty reserved band - still leaves the span short.
         def span_of(instance_frame, horizontal_axis):
             instance_marks = nodes_inside(slide, instance_frame, lambda n: str(n.get("role") or "") == "chart-mark")
             if len(instance_marks) < 2:
                 return None
+            inked = instance_marks + nodes_inside(slide, instance_frame, lambda n: str(n.get("role") or "") in ("data-label", "category-label"))
             if horizontal_axis:
-                lo = min(m["frame"].get("x", 0) for m in instance_marks)
-                hi = max(m["frame"].get("x", 0) + m["frame"].get("width", 0) for m in instance_marks)
+                lo = min(m["frame"].get("x", 0) for m in inked)
+                hi = max(m["frame"].get("x", 0) + m["frame"].get("width", 0) for m in inked)
                 return (hi - lo) / max(1.0, float(instance_frame.get("width") or 1))
-            lo = min(m["frame"].get("y", 0) for m in instance_marks)
-            hi = max(m["frame"].get("y", 0) + m["frame"].get("height", 0) for m in instance_marks)
+            lo = min(m["frame"].get("y", 0) for m in inked)
+            hi = max(m["frame"].get("y", 0) + m["frame"].get("height", 0) for m in inked)
             return (hi - lo) / max(1.0, float(instance_frame.get("height") or 1))
 
         horizontal = component in ("chart.bar", "chart.stacked-bar")
@@ -2256,7 +2279,14 @@ def gate_restatement(slide_no, slide, findings):
     commentary, exhibit = page_voices(slide)
     if not commentary or not exhibit:
         return
-    shown = content_words(" ".join(exhibit))
+    # A chart's member and series names are what the commentary is about, not
+    # what it says: "Africa grew fastest" has to name Africa. Counted as the
+    # exhibit's vocabulary, a six-region chart's names ("Europe", "East Asia",
+    # "Middle East") made a caption naming two regions half restatement, and
+    # the gate only noticed once a callout lifted the chart past its word
+    # minimum - so adding a callout failed a caption nobody had changed.
+    names = content_words(" ".join(source_text(n) for n in text_nodes(slide) if n.get("role") in ("category-label", "legend-label")))
+    shown = content_words(" ".join(exhibit)) - names
     if len(shown) < THRESHOLDS["restatement_words_min"]:
         return
     # Pooled, a column dilutes itself: three sentences of restatement and a
@@ -2264,7 +2294,7 @@ def gate_restatement(slide_no, slide, findings):
     # page ships with a block headed "Six of the twelve are DC" beside a chart
     # whose labels are tagged "(DC)". A commentary block is read on its own, so
     # it is measured on its own, and the page is reported on its worst one.
-    said = content_words(" ".join(commentary))
+    said = content_words(" ".join(commentary)) - names
     share = len(said & shown) / len(said) if said else 0.0
     quoted = " ".join(commentary)[:70]
     pooled = len(said) >= THRESHOLDS["restatement_words_min"] and share > THRESHOLDS["restatement_max"]
@@ -2272,21 +2302,31 @@ def gate_restatement(slide_no, slide, findings):
     # one that reads the table back average out under the threshold, and the
     # page ships with the one block a reader stops at. A block is read on its
     # own, so it is also measured on its own, against a higher bar.
-    blocks = [(block, content_words(block)) for block in commentary]
+    blocks = [(block, content_words(block) - names) for block in commentary]
     measurable = [(block, words) for block, words in blocks
                   if len(words) >= THRESHOLDS["restatement_block_words_min"]]
     worst = max(measurable, key=lambda entry: len(entry[1] & shown) / len(entry[1]), default=None)
     if worst and len(worst[1] & shown) / len(worst[1]) > THRESHOLDS["restatement_block_max"] and not pooled:
-        share, quoted = len(worst[1] & shown) / len(worst[1]), worst[0][:70]
+        share, quoted, said = len(worst[1] & shown) / len(worst[1]), worst[0][:70], worst[1]
     elif not pooled:
         return
+    # A callout's words are the exhibit's (it is fixed to a mark), so a caption
+    # that passed became a restatement the moment a callout said the same
+    # thing, and the author, who had changed only the chart, was told the
+    # caption was at fault. When the callout is what tips it, say so.
+    callouts = [source_text(n) for n in text_nodes(slide) if n.get("role") == "annotation-text" and source_text(n).strip()]
+    unmarked = content_words(" ".join(t for t in exhibit if t not in callouts)) - names
+    by_callout = bool(callouts) and bool(said) and len(said & unmarked) / len(said) <= THRESHOLDS["restatement_max"]
     findings.append(finding(
-        slide_no, "RESTATEMENT", {"share": round(share, 2), "block": quoted}, THRESHOLDS["restatement_max"],
-        "The commentary is built from the exhibit's own words, so the reader learns "
-        "nothing by reading it. Say what the exhibit cannot: what follows from the "
-        "number, what it costs, which option it settles, what would change it. If "
-        "the only honest sentence is the one already in the table, the page does "
-        "not need a commentary column.",
+        slide_no, "RESTATEMENT", {"share": round(share, 2), "block": quoted, **({"callout": callouts[0][:70]} if by_callout else {})}, THRESHOLDS["restatement_max"],
+        (f"The commentary repeats the chart's callout (\"{callouts[0][:60]}\"): the callout is read as part of "
+         "the exhibit, so a caption or point saying the same finding reads it back. Let the callout carry the "
+         "figure and the commentary say what follows from it - or drop the callout." if by_callout else
+         "The commentary is built from the exhibit's own words, so the reader learns "
+         "nothing by reading it. Say what the exhibit cannot: what follows from the "
+         "number, what it costs, which option it settles, what would change it. If "
+         "the only honest sentence is the one already in the table, the page does "
+         "not need a commentary column."),
     ))
 
 

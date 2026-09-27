@@ -51,6 +51,9 @@ export const PRIMARY = token("color.chartSeries1");
 export const CHART_LABEL = token("type.chartLabel");
 const CHART_ANNOTATION = token("type.chartAnnotation");
 export const AXIS_LABEL = token("type.chartLabel");
+// The smallest a crowded row of bars sets its names and values at (8pt)
+// before it labels every nth row instead.
+const ROW_LABEL_MIN = token("type.source");
 const SPARSE_DIRECT_LABEL_LIMIT = 8;
 export const SERIES = [
   token("color.chartSeries1"),
@@ -255,10 +258,14 @@ export function numericBounds(values, { min, max, axis = "y", includeZero = fals
 // last bar reaches - had no room above it for its label or the bars' value
 // labels, and failed with "Reference lines leave no room for value labels".
 // The domain now reaches 15% past such a line, as an author setting yMax would.
-const withReferenceValues = (values, props) => {
+// On a line's own scale, which need not start at zero, the 15% is of the
+// data's span, not of the value: a peak of 2.66m tonnes over a floor of 1.85m
+// took the domain to 3.06, and once the chart's callouts moved into the plot
+// the empty band it left above the line read as a void.
+const withReferenceValues = (values, props, { base = 0 } = {}) => {
   const references = (props.referenceLines || []).map(reference => reference.value).filter(Number.isFinite);
   const top = Math.max(...values.filter(Number.isFinite));
-  const headroom = props.yMax === undefined && props.xMax === undefined ? references.filter(v => v > 0 && v >= top * 0.9).map(v => v * 1.15) : [];
+  const headroom = props.yMax === undefined && props.xMax === undefined ? references.filter(v => v > 0 && v >= base + (top - base) * 0.9).map(v => v + (v - base) * 0.15) : [];
   return [...values, ...references, ...headroom];
 };
 
@@ -1077,10 +1084,21 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   // the highlighted member always, and the rows beside it that its label
   // would touch go unlabelled: the reader finds the subject by its colour and
   // its name, and reads the field's shape from the bars.
-  const rowLine = measureText("Ag", 1000, { ...axisFont, wrapWidthRatio: 1 }).height;
-  const rowEvery = horizontal && !stacked && categorySpan < rowLine ? Math.ceil(rowLine / categorySpan) : 1;
-  const rowShown = (index) => rowEvery === 1 || barHighlighted.has(categories[index])
-    || (index % rowEvery === 0 && !categories.some((category, at) => barHighlighted.has(category) && Math.abs(at - index) < rowEvery));
+  //
+  // Before any name is dropped the rows' labels step down to 8pt, the
+  // smallest the page sets type at, when that line fits the row: 32 members
+  // were labelled every second one at 10pt when every name fitted at 8. And a
+  // member a callout names keeps its label as the subject does: a note on an
+  // unnamed bar says nothing. page-types.mjs describeTypes publishes the rule.
+  const fullLine = measureText("Ag", 1000, { ...axisFont, wrapWidthRatio: 1 }).height;
+  const smallLine = measureText("Ag", 1000, { ...axisFont, fontSize: tokenValue(ROW_LABEL_MIN), wrapWidthRatio: 1 }).height;
+  const crowded = horizontal && !stacked && categorySpan < fullLine;
+  const rowSize = crowded && categorySpan >= smallLine ? ROW_LABEL_MIN : AXIS_LABEL;
+  const rowLine = rowSize === AXIS_LABEL ? fullLine : smallLine;
+  const rowEvery = crowded && categorySpan < rowLine ? Math.ceil(rowLine / categorySpan) : 1;
+  const named = new Set([...barHighlighted, ...(props.annotations || []).map((a) => a?.category).filter(Boolean)]);
+  const rowShown = (index) => rowEvery === 1 || named.has(categories[index])
+    || (index % rowEvery === 0 && !categories.some((category, at) => named.has(category) && Math.abs(at - index) < rowEvery));
   // Bar weight follows the category count. Four categories drawn at the
   // many-category gap read as ribbons with the page showing through; a well-made
   // page sets few, fat bars and many, thinner ones - but not ribbons: ten bars
@@ -1172,7 +1190,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
           role: "data-label",
           frame: labelFrame,
           text: labelText,
-          style: textStyle(CHART_LABEL, labelOnFill && contrastRatio(tokens[markColor.tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[markColor.tokenId].value, tokens["color.ink"].value) ? token("color.onPrimary") : INK, labelBold(), horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
+          style: textStyle(horizontal && !stacked ? rowSize : CHART_LABEL, labelOnFill && contrastRatio(tokens[markColor.tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[markColor.tokenId].value, tokens["color.ink"].value) ? token("color.onPrimary") : INK, labelBold(), horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
           data: { category, series: item.name }
         }));
       }
@@ -1331,7 +1349,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
         ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: barLabelLayout ? barBlockTop : Math.min(categoryStart, categoryStart + groupSpan / 2 - rowLine / 2), width: horizontalCategoryLabelWidth - iconSlot, height: barLabelLayout ? barLabelLayout.height : Math.max(groupSpan, rowLine) }
         : { x: categoryMap.get(category).labelCenter-labelSpan/2, y: plot.y + plot.height + (regionHighlight ? 18 : 8) + iconSlot, width: labelSpan, height: categoryLayouts[categoryIndex].height },
       text: horizontal ? (barLabelLayout ? barLabelLayout.text : category) : categoryLayouts[categoryIndex].text,
-      style: { ...textStyle(AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), ...(!horizontal ? {valign:"top",lineHeight:categoryLayouts[categoryIndex].lineHeight,wrap:false} : barLabelLayout ? {valign:"top",lineHeight:barLabelLayout.lineHeight,wrap:false} : {}) },
+      style: { ...textStyle(horizontal && !barLabelLayout ? rowSize : AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), ...(!horizontal ? {valign:"top",lineHeight:categoryLayouts[categoryIndex].lineHeight,wrap:false} : barLabelLayout ? {valign:"top",lineHeight:barLabelLayout.lineHeight,wrap:false} : {}) },
       data: {category,...(!horizontal ? {textLayout:categoryLayouts[categoryIndex]} : barLabelLayout ? {textLayout:barLabelLayout} : {})}
     }));
     // The category's icon or logo: under the column above its label, or
@@ -1574,7 +1592,7 @@ function lineChart({ id, frame, props, area = false }) {
   const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length <= 8);
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
-  const bounds = numericBounds(withReferenceValues(values, props), { min: props.yMin, max: props.yMax, axis: "y", tight: !showValueAxis && props.gridlines !== true });
+  const bounds = numericBounds(withReferenceValues(values, props, { base: props.yMin ?? Math.min(...values) }), { min: props.yMin, max: props.yMax, axis: "y", tight: !showValueAxis && props.gridlines !== true });
   const labelWidth = axisLabelWidth(bounds);
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
@@ -2022,6 +2040,9 @@ function rangeChart({ id, frame, props }) {
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, xScale, allowAnnotationRail: false, allowBarHighlight: true });
 }
 
+// A combo's line on its own scale drawn under this many pixels of rise: its
+// change is refused, and the two measures sent to two panels.
+const LINE_RISE_MIN = 48;
 function comboChart({ id, frame, props }) {
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props, { seriesCount: 2 });
@@ -2037,18 +2058,26 @@ function comboChart({ id, frame, props }) {
   // with `secondaryAxis`, the line takes its own padded domain (a margin over a revenue).
   const showDataLabels = props.dataLabels !== false;
   const showValueAxis = resolveValueAxis(props, { valueCount: categories.length * 2, dataLabelsVisible: showDataLabels });
-  const secondary = props.secondaryAxis === true;
   const barSeries = series[0];
   const lineSeries = series[1];
+  const lineRange = Math.max(...lineSeries.values) - Math.min(...lineSeries.values);
+  const secondary = props.secondaryAxis === true;
   // Independent units get separate vertical fields on the same categories.
   // Reserve their label clearance before scaling, including when the primary
   // value axis is visible; padding its domain alone allowed the line to cross labels.
-  const barPlot = secondary ? { ...plot, y: plot.y + plot.height * 0.35 + 40, height: plot.height * 0.65 - 40 } : plot;
+  // The line's band is a third of the plot, and half when a third leaves its
+  // change under LINE_RISE_MIN: under two callout bands a fleet age that
+  // doubled (5.2 to 10.8 years) rose 14px, drawn as a flat line over the bars.
+  const lineBounds = secondary ? numericBounds(lineSeries.values, { min: props.y2Min, max: props.y2Max, axis: "y", tight: true }) : null;
+  const riseAt = (share) => lineRange / lineBounds.span * Math.max(0, plot.height * share - 30);
+  const lineShare = !secondary || riseAt(0.35) >= LINE_RISE_MIN ? 0.35 : 0.5;
+  if (secondary && riseAt(lineShare) < LINE_RISE_MIN)
+    throw new Error(`The combo's line (${lineSeries.name}) rises ${Math.round(riseAt(lineShare))}px in the band a second scale leaves it above the bars - under the ${LINE_RISE_MIN}px its change needs to read, so it draws flat. Two measures in different units read as two panels, each on its own scale: type "panels", form "row", a column panel for ${barSeries.name} and a line panel for ${lineSeries.name}${(props.annotations || []).length ? " (or drop a callout, whose band takes the plot's height)" : ""}`);
+  const barPlot = secondary ? { ...plot, y: plot.y + plot.height * lineShare + 40, height: plot.height * (1 - lineShare) - 40 } : plot;
   if (barPlot.height < 40) throw new Error("Combo chart needs more height for separate scales and labels; give it more height or drop secondaryAxis");
   const bounds = numericBounds(withReferenceValues(secondary ? barSeries.values : series.flatMap(item => item.values), props), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
-  const lineBounds = secondary ? numericBounds(lineSeries.values, { min: props.y2Min, max: props.y2Max, axis: "y", tight: true }) : bounds;
   const yScale = (value) => barPlot.y + barPlot.height - (value - bounds.min) / bounds.span * barPlot.height;
-  const lineBand = { top: plot.y + 30, height: Math.max(0, plot.height * 0.35 - 30) };
+  const lineBand = { top: plot.y + 30, height: Math.max(0, plot.height * lineShare - 30) };
   const y2Scale = (value) => lineBand.top + lineBand.height - (value - lineBounds.min) / lineBounds.span * lineBand.height;
   const lineScale = secondary ? y2Scale : yScale;
   const categorySpan = plot.width / categories.length;
@@ -2752,23 +2781,47 @@ function chartExamples(id) {
  * are the author's to fix and pass through unchanged.
  */
 function renderResolved(render, context) {
-  let props = context.props, first = null, railed = null;
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  // A callout tries the plot's own free space first - above a short mark,
+  // beside the line, in an empty corner - and reserves a band above the plot
+  // only when it finds none there (chart-annotations renderEvidenceAnnotations,
+  // `_placement: "plot"`). Each band took 88px off the plot's height: full-width
+  // chart pages with two or three callouts filled about two fifths of the page.
+  // Peers in a row whose band the composer shares (`calloutBand: "shared"`)
+  // keep it, since their plots must stay one height; `calloutBand: "band"`
+  // asks for the band outright.
+  const inPlot = (item) => item && typeof item === "object" && !item._placement && (item.treatment === undefined || item.treatment === "callout" || item.treatment === "takeaway-box");
+  let props = !["shared", "band"].includes(context.props?.calloutBand) && (context.props?.annotations || []).some(inPlot)
+    ? { ...context.props, annotations: context.props.annotations.map((item) => (inPlot(item) ? { ...item, _placement: "plot" } : item)) }
+    : context.props;
+  let first = null, railed = null, narrow = null;
+  const tooNarrow = (error) => /insufficient plot width|Unbreakable text|Column names are wider/.test(error.message);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
     let nodes;
     try { nodes = render({ ...context, props }); }
     catch (error) {
-      if (typeof error.retry === "function" && attempt < 5) {
+      if (typeof error.retry === "function" && attempt < 10) {
         if (/no clear position for the callout/.test(error.message)) railed = error;
         props = error.retry(props); continue;
       }
       if (first) return first;
+      // Too narrow for the rail: the note is set on its own bar instead, in
+      // the annotation face without a box (chart-annotations insidePlacement).
+      // The longest bar of a six-bar panel had no room past its end and no
+      // panel width to spare for a rail, so the bar the page was about was
+      // the one that could not be annotated.
+      if (railed && !narrow && (tooNarrow(error) || /no clear position for the callout/.test(error.message))) {
+        narrow = error;
+        props = { ...props, annotations: (props.annotations || []).map((item) => (item?._placement === "rail" ? { ...item, _placement: "on-bar" } : item)) };
+        continue;
+      }
       // The rail a callout asked for narrowed the plot until something else
       // failed: a bar panel in a row of three reported "insufficient plot
       // width (0px ...)" and a bridge "Unbreakable text ... Revenue", neither
       // naming the callout that caused it. Report the callout, and why the
       // rail could not hold it in this chart.
-      if (railed && /insufficient plot width|Unbreakable text|Column names are wider/.test(error.message))
-        throw new Error(`${railed.message.replace(/; shorten the note.*$/, "")}: a rail beside the plot leaves it too narrow in this ${Math.round(context.frame?.width ?? 0)}px chart (${error.message.replace(/[;:].*$/, "")}). Put the note in the commentary or caption, annotate a mark with clear space above or beside it, or give the chart a wider panel`);
+      const cause = narrow && tooNarrow(narrow) ? narrow : tooNarrow(error) ? error : null;
+      if (railed && cause)
+        throw new Error(`${railed.message.replace(/; shorten the note.*$/, "")}: a rail beside the plot leaves it too narrow in this ${Math.round(context.frame?.width ?? 0)}px chart (${cause.message.replace(/[;:].*$/, "")}), and its bar has no room to carry it. Put the note in the commentary or caption, annotate a mark with clear space above or beside it, or give the chart a wider panel`);
       throw error;
     }
     if (first) return nodes;

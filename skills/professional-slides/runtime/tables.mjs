@@ -267,6 +267,11 @@ function normalize(props) {
       // compare, where a padded " " would read as a missing value.
       if ((emptyValue && (bandRow ? c > 0 : c === 0)) || (value && typeof value === "object" && value.blank === true)) { cell.blank = true; cell.type = "text"; }
       if (bandRow) cell.bold = true;
+      // The page's highlight reaches a cell as `highlight: [phrase]` (the
+      // composer's highlight pass); a cell draws a phrase as `accent`, and
+      // `highlight: true` is the older flag for the whole cell. The phrase was
+      // read as that flag's truthy cousin and drawn plain.
+      if (cell.accent === undefined && (typeof cell.highlight === "string" || Array.isArray(cell.highlight))) { cell.accent = cell.highlight; delete cell.highlight; }
       if (!CELL_TYPES.includes(cell.type))
         throw new Error(`Unknown table cell type: ${cell.type}`);
       if (!["left", "center", "right"].includes(cell.align ?? "left"))

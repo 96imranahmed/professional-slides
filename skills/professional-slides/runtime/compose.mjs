@@ -27,7 +27,7 @@ import { mapAll, defaultHighlightStyle } from "./core.mjs";
 import { measureInsight, measureList, measureProse, proseMeasure } from "./registry.mjs";
 import fs from "node:fs";
 import path from "node:path";
-import { measureText, accentRuns, hasPhrase } from "./text-layout.mjs";
+import { measureText, accentRuns, phraseAt } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
 import { defaultFocusIndex } from "./charts.mjs";
 import { legendRowCount } from "./legends.mjs";
@@ -96,7 +96,9 @@ function tableAlias(ex) {
   }
   if (ex.type === "phase-table") {
     const phases = ex.phases || ex.columns || [];
-    const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label }, ...phases.map((_, i) => { const cell = (row.cells || [])[i]; return Array.isArray(cell) ? { type: "bullets", items: cell } : cell ?? " "; })]);
+    const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label }, ...phases.map((_, i) => { const cell = (row.cells || [])[i]; return Array.isArray(cell) ? { type: "bullets", items: cell }
+      // A bulleted cell the page's highlight marked arrives as { points, highlight }.
+      : cell && typeof cell === "object" && Array.isArray(cell.points) ? { type: "bullets", items: cell.points, ...(cell.highlight ? { accent: cell.highlight } : {}) } : cell ?? " "; })]);
     const labelWidth = Math.max(110, ...(ex.rows || []).map((row) => Math.ceil(measureText(String(row.label || ""), 400, { fontFamily: "Arial", fontSize: 14, bold: true, wrapWidthRatio: 1 }).width) + 32));
     return { type: "table", treatment: "dimensions", variant: "standard", headerShape: ex.headerShape ?? "chevron", columns: [{ label: "", type: "category", width: labelWidth }, ...phases.map((ph) => ({ label: typeof ph === "string" ? ph : ph.label, type: "text", width: 200 }))], rows, density: ex.density };
   }
@@ -202,13 +204,13 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
   // well-made page captions every panel rather than closing with one shared
   // so-what, because each panel answers its own question.
   if (exIn && typeof exIn.caption === "string" && exIn.caption.trim()) {
-    const { caption, captionHeight, ...rest } = exIn;
+    const { caption, captionHeight, captionHighlight, ...rest } = exIn;
     const panel = exhibitItem(rest, id, baseDir, { width: { fr: 1 }, height: "fill" });
     // The caption is the panel's finding, set as a statement box under it - a
     // bare grey line under a plot reads as a stray label. Peers share one box
     // height, so the plots above them keep one baseline.
     return { id: `${id}-captioned`, layout: "flow.column", gap: "space.3", size,
-      items: [panel, { id: `${id}-caption`, component: "insight", props: { text: caption.trim(), variant: "neutral", align: "center" },
+      items: [panel, { id: `${id}-caption`, component: "insight", props: { text: caption.trim(), variant: "neutral", align: "center", ...(captionHighlight ? { highlight: captionHighlight } : {}) },
         size: captionHeight ? { width: { fr: 1 }, height: captionHeight } : HUG }] };
   }
   const typeStep = exIn?._typeStep === true && size.height === "fill";
@@ -1570,7 +1572,7 @@ function soWhatItem(text, id, highlight, tinted = true) {
   // and it stays filled beside a callout: it is the page's one box.
   if (text && typeof text === "object" && !Array.isArray(text)) {
     if (text.style !== "bar" || typeof text.text !== "string" || !text.text.trim()) throw new Error("A soWhat object is the so-what bar: { text, style: \"bar\" }");
-    return { id, component: "insight", props: { text: text.text.trim(), variant: "primary" }, size: HUG };
+    return { id, component: "insight", props: { text: text.text.trim(), variant: "primary", ...accent }, size: HUG };
   }
   // One tinted box per page. A callout is already a tinted box saying "read
   // this"; a second one underneath in a different tint reads as two competing
@@ -2215,8 +2217,11 @@ function highlightThePhrase(slide) {
     .map((p) => String(p ?? "").trim()).filter(Boolean);
   if (!phrases.length) return slide;
   // As whole words (phraseAt): "22" offered to "FY22" would be accepted here
-  // and then lit as half a year.
-  const inside = (text) => phrases.filter((p) => hasPhrase(text, p, { ignoreCase: true }));
+  // and then lit as half a year. Returned as the text writes it: matched
+  // regardless of case here, the phrase was then set by accentRuns, which
+  // matches exactly, so "Only one of five" offered to "the only one of five"
+  // was accepted and drawn plain.
+  const inside = (text) => phrases.map((p) => { const at = phraseAt(text, p, 0, { ignoreCase: true }); return at < 0 ? null : String(text).slice(at, at + p.length); }).filter(Boolean);
   // The phrase stays on the slide: `soWhat` and the insight boxes are built
   // later, from the slide, and they set it in the accent too.
   const next = { ...slide };
@@ -2238,24 +2243,59 @@ function highlightThePhrase(slide) {
   const markTable = (ex) => {
     if (!ex || typeof ex !== "object" || !Array.isArray(ex.rows)) return ex;
     let touched = false;
+    // A list in a cell is a bulleted cell only where the exhibit reads one.
+    const lists = ex.type === "rows" || ex.type === "phase-table";
     const rows = ex.rows.map((row) => {
       const cells = Array.isArray(row) ? row : row?.cells;
       if (!Array.isArray(cells)) return row;
-      const next = cells.map((cell) => {
-        if (cell && typeof cell === "object" && cell.highlight !== undefined) return cell;
-        const text = typeof cell === "string" ? cell : cell?.text;
-        const found = inside(text);
-        if (!found.length) return cell;
-        touched = true;
-        return typeof cell === "string" ? { text: cell, highlight: found }
-                                        : { ...cell, highlight: found };
-      });
+      const next = markCells(cells, lists);
+      if (next === cells) return row;
+      touched = true;
       return Array.isArray(row) ? next : { ...row, cells: next };
     });
     return touched ? { ...ex, rows } : ex;
   };
-  if (next.exhibit) next.exhibit = markTable(next.exhibit);
-  if (Array.isArray(next.exhibits)) next.exhibits = next.exhibits.map(markTable);
+  // Every other place the page's prose is drawn takes the phrase too. Each
+  // compiled and rendered plain: the executive summary's points below its
+  // table, a rail, the two columns of a comparison, the bulleted cells of a
+  // findings matrix and a panel's caption - so the author's phrase, accepted
+  // at compile, never reached the page and the deck's highlight share did not
+  // move however many were written.
+  const markCells = (cells, lists = true) => {
+    let touched = false;
+    const marked = cells.map((cell) => {
+      if ((cell && typeof cell === "object" && !Array.isArray(cell) && cell.highlight !== undefined) || (Array.isArray(cell) && !lists)) return cell;
+      // A bulleted cell is a list of strings; its phrase is found in any of them.
+      const found = Array.isArray(cell) ? cell.flatMap((item) => (typeof item === "string" ? inside(item) : []))
+        : typeof cell === "string" ? inside(cell)
+          : [cell?.lead, cell?.text, ...(Array.isArray(cell?.points) ? cell.points : [])].filter((t) => typeof t === "string").flatMap(inside);
+      if (!found.length) return cell;
+      touched = true;
+      const unique = [...new Set(found)];
+      return Array.isArray(cell) ? { points: cell, highlight: unique } : typeof cell === "string" ? { text: cell, highlight: unique } : { ...cell, highlight: unique };
+    });
+    return touched ? marked : cells;
+  };
+  const markExhibit = (exIn) => {
+    let ex = markTable(exIn);
+    if (!ex || typeof ex !== "object") return ex;
+    if (ex.type === "compare") {
+      const side = (column) => {
+        if (!column || typeof column !== "object") return column;
+        if (Array.isArray(column.points)) { const points = markCells(column.points); return points === column.points ? column : { ...column, points }; }
+        if (typeof column.text === "string") { const [text] = markCells([column.text]); return text === column.text ? column : { ...column, text: undefined, points: [text] }; }
+        return column;
+      };
+      ex = { ...ex, left: side(ex.left), right: side(ex.right) };
+    }
+    if (typeof ex.caption === "string") { const found = inside(ex.caption); if (found.length) ex = { ...ex, captionHighlight: found }; }
+    return ex;
+  };
+  if (next.exhibit) next.exhibit = markExhibit(next.exhibit);
+  if (Array.isArray(next.exhibits)) next.exhibits = next.exhibits.map(markExhibit);
+  // A findings matrix carries its rows on the page, not in an exhibit.
+  if (Array.isArray(next.rows)) next.rows = next.rows.map((row) => (Array.isArray(row?.cells) ? { ...row, cells: markCells(row.cells) } : row));
+  if (next.panel && typeof next.panel.text === "string") { const found = inside(next.panel.text); if (found.length) next.panel = { ...next.panel, highlight: found }; }
   return next;
 }
 
@@ -2479,7 +2519,24 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     for (const ex of aligned) { const key = scaleKey(ex); if (key) groups.set(key, [...(groups.get(key) || []), ex]); }
     for (const ex of aligned) {
       const key = scaleKey(ex), group = key && groups.get(key)?.length > 1 ? groups.get(key) : [];
-      ex.plotTopInset = base + Math.max(0, ...group.map(calloutBand));
+      // Bars whose rows read across, each on its own scale (different units):
+      // a callout goes in its bar's row - beside the bar end, or inside a long
+      // bar - not in a band above the plot. The band had to be shared to keep
+      // the rows level, and over the panel without a callout it stood empty:
+      // any callout on either of two six-bar panels was an "empty band" of
+      // 104px, and with no callout the page was UNANNOTATED. A callout that
+      // finds no place in its row still falls back to a rail at its own
+      // panel's right, which narrows that plot and keeps the rows level.
+      if (across(ex) && group.length > 1 && !ex.comparisonDomain && (ex.annotations || []).length) {
+        ex.annotations = ex.annotations.map((a) => (a && typeof a === "object" && !a._placement ? { ...a, _placement: "beside" } : a));
+        ex.plotTopInset = base;
+        continue;
+      }
+      const shared = group.filter((peer) => !(across(peer) && !peer.comparisonDomain));
+      ex.plotTopInset = base + Math.max(0, ...shared.map(calloutBand));
+      // The band is the row's: a callout here keeps it rather than moving into
+      // the plot (charts.mjs renderResolved), or the plots would part.
+      if (shared.some((peer) => (peer.annotations || []).length)) ex.calloutBand = "shared";
     }
     if (charts.some(decorated)) for (const ex of charts) ex.native = false;
   }
@@ -2516,7 +2573,31 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     ? panels.flatMap((panel, i) => (i ? [{ id: `${id}-step-${i}`, component: "connector", props: { variant: "arrow" }, size: { width: CONNECTOR_WIDTH, height: "fill" } }, panel] : [panel]))
     : panels;
   items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: row });
-  if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
+  if (slide.points?.length) items.push(pointsUnderPanels(slide.points, { id, slide, layout, panels, fill, pointsStyle }));
+}
+
+/**
+ * Points under a row of panels, in columns. Set as one list across the body
+ * they ran about 150 characters a line - past any readable measure - and CPL
+ * did not read list items, so nothing said so. One point to a panel sits under
+ * its panel, at the panel's width; any other count runs up to three across,
+ * four two by two, as the points under a single exhibit do.
+ */
+function pointsUnderPanels(points, { id, slide, layout, panels, fill, pointsStyle }) {
+  const tone = sideTreatment(slide);
+  const column = (list, at, size) => ({ id: `${id}-points-${at}`, layout: "flow.column", size, items: [pointsItem(list, `${id}-points-${at}-list`, tone, fill, false, pointsStyle)] });
+  // One point is a paragraph, at the capped measure paragraphs keep.
+  if (points.length === 1) {
+    const [point] = points, text = typeof point === "string" ? point : [point?.lead, point?.text].filter(Boolean).join(" ");
+    return { id: `${id}-points`, component: "paragraph", props: { text }, size: HUG };
+  }
+  if (points.length === panels.length && layout !== "sequence")
+    return { id: `${id}-points`, layout: "flow.row", size: HUG, items: points.map((point, at) => column([point], at, { width: panels[at].size?.width ?? { fr: 1 }, height: "hug" })) };
+  const perRow = points.length <= 3 ? points.length : points.length === 4 ? 2 : 3;
+  const rows = [];
+  for (let at = 0; at < points.length; at += perRow) rows.push(points.slice(at, at + perRow));
+  const across = (row, r) => ({ id: `${id}-points-row-${r}`, layout: "flow.row", size: HUG, items: row.map((point, at) => column([point], r * perRow + at, { width: { fr: 1 }, height: "hug" })) });
+  return rows.length === 1 ? { ...across(rows[0], 0), id: `${id}-points` } : { id: `${id}-points`, layout: "flow.column", size: HUG, items: rows.map(across) };
 }
 
 
@@ -2564,9 +2645,12 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
     const text = hoist ? entry.text : [entry.lead, entry.text].filter(Boolean).join(" ");
     // A lead that stays in the sentence still leads it: it runs in bold, the
     // way a well-made page sets the phrase that carries the finding.
-    const runs = !hoist && entry.lead
-      ? accentRuns(text, [entry.lead], { bold: true, strict: false })
-      : null;
+    // The page's highlight is set in the accent too: the points below an
+    // executive summary's table carried their phrases here and drew them plain.
+    const highlight = (Array.isArray(entry.highlight) ? entry.highlight : entry.highlight ? [entry.highlight] : []).filter((p) => typeof p === "string");
+    const lead = !hoist && entry.lead ? entry.lead : null;
+    const marked = lead || highlight.length ? accentRuns(text, [...(lead ? [lead] : []), ...highlight], { bold: true, strict: false }) : null;
+    const runs = marked && marked.map((run, at) => (lead && at === 0 && run.text === lead && !highlight.includes(lead) ? { text: run.text, bold: true } : run));
     // `rule: false`: the block above already carries one under "What it
     // means". A hairline under each of three sub-headings as well turns one
     // divided idea into four ruled boxes, and the reader reads the rules
@@ -3051,7 +3135,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     if (!panel || typeof panel.text !== "string" || !panel.text.trim()) throw new Error(`${id}: a sidebar page needs \`panel: { text }\`, the statement the panel carries`);
     const tone = panel.tone ?? "dark";
     if (!["dark", "primary", "muted", "tint"].includes(tone)) throw new Error(`${id}: panel.tone is dark, primary, muted or tint`);
-    const panelBox = { id: `${id}-panel`, component: "side-statement", props: { text: panel.text.trim(), tone, ...(panel.kicker ? { kicker: panel.kicker } : {}) },
+    const panelBox = { id: `${id}-panel`, component: "side-statement", props: { text: panel.text.trim(), tone, ...(panel.kicker ? { kicker: panel.kicker } : {}), ...(panel.highlight ? { highlight: panel.highlight } : {}) },
       size: { width: { fr: 1 }, height: "fill" } };
     const body = [];
     exhibits.forEach((ex, i) => body.push(exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, SIZE)));
@@ -3124,7 +3208,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       if (!["dark", "primary", "muted", "tint"].includes(tone)) throw new Error(`${id}: panel.tone is dark, primary, muted or tint`);
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
         proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH),
-        { id: `${id}-panel`, component: "side-statement", props: { text: panel.text.trim(), tone, ...(panel.kicker ? { kicker: panel.kicker } : {}) },
+        { id: `${id}-panel`, component: "side-statement", props: { text: panel.text.trim(), tone, ...(panel.kicker ? { kicker: panel.kicker } : {}), ...(panel.highlight ? { highlight: panel.highlight } : {}) },
           size: { width: { fr: 1 }, height: "fill" } }] });
     }
     const document = memo ? null : documentItem(slide, id, points.length);
@@ -3166,6 +3250,23 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   const noteLine = Array.isArray(slide.note)
     ? (slide.note.length ? `Notes: ${slide.note.map((item, index) => `${index + 1}. ${String(item).trim().replace(/^\d+\.\s*/, "")}`).join("   ")}` : null)
     : prefixed("Note", slide.note);
+  // A paragraph is built in a dozen places (a memo, a sidebar's prose, a
+  // document column), none of which read the page's highlight, so an argument
+  // page's phrase was accepted and drawn plain. Set here, once, on every
+  // paragraph that says it and carries no emphasis of its own.
+  if (slide.highlight !== undefined && slide.highlight !== null) {
+    const phrases = (Array.isArray(slide.highlight) ? slide.highlight : [slide.highlight]).map((p) => String(p ?? "").trim()).filter(Boolean);
+    const mark = (node) => {
+      if (!node || typeof node !== "object") return;
+      if (node.component === "paragraph" && typeof node.props?.text === "string" && !node.props.runs) {
+        const found = phrases.map((p) => { const at = phraseAt(node.props.text, p, 0, { ignoreCase: true }); return at < 0 ? null : node.props.text.slice(at, at + p.length); }).filter(Boolean);
+        const runs = found.length ? accentRuns(node.props.text, found, { bold: true, strict: false }) : null;
+        if (runs) node.props = { ...node.props, runs };
+      }
+      (node.items || []).forEach(mark);
+    };
+    items.forEach(mark);
+  }
   return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide._standfirstTakeaway ? { subtitleRole: "takeaway-standfirst" } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }
 
