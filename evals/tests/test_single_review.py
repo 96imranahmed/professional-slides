@@ -51,17 +51,21 @@ class VerificationScopeTests(unittest.TestCase):
     def test_second_review_reads_changed_and_blocked_pages_and_inherits_the_rest(self):
         result = run_node('''
 import { verificationScope, withInheritedDensity } from './skills/professional-slides/runtime/reviewer.mjs';
-const prior = { binding: 'b1', slideHashes: { a: '1', b: '2', c: '3', d: '4' }, review: { accepted: false, rating: 6, findings: [
-  { slide: 'b', code: 'FACTUAL_ERROR', severity: 'major', reason: 'x', repair: 'y' },
-  { slide: 'd', code: 'EDITORIAL', severity: 'minor', reason: 'x', repair: '' },
-  { slide: null, code: 'LAYOUT_MONOTONY', severity: 'major', reason: 'x', repair: 'y' }],
+const prior = { binding: 'b1', pass: 1, slideHashes: { a: '1', b: '2', c: '3', d: '4' }, review: { pass: 1, accepted: false, rating: 6, findings: [
+  { id: 'F1', scope: 'page', slides: ['b'], code: 'FACTUAL_ERROR', severity: 'major', reason: 'x', repair: 'y' },
+  { id: 'F2', scope: 'page', slides: ['d'], code: 'EDITORIAL', severity: 'minor', reason: 'x', repair: '' },
+  { id: 'F3', scope: 'deck', slides: ['b', 'd'], code: 'LAYOUT_MONOTONY', severity: 'major', reason: 'x', repair: 'y' }],
   density: { deck: 'd', pages: [{ slide: 'c', verdict: 'right', reason: 'r' }, { slide: 'a', verdict: 'right', reason: 'r' }] } } };
 const scope = verificationScope(prior, { a: 'changed', b: '2', c: '3', d: '4' });
 const review = withInheritedDensity({ density: { deck: 'd', pages: [] } }, scope);
-console.log(JSON.stringify({ must: scope.mustInspect, deck: scope.priorBlocking.filter(f => !f.slide).length, inherited: review.density.pages.map(p => p.slide), none: verificationScope(null, {}) }));
+console.log(JSON.stringify({ must: scope.mustInspect, deck: scope.priorBlocking.filter(f => f.slides.length > 1).length, open: scope.open.map(f => f.id), pass: scope.pass, inherited: review.density.pages.map(p => p.slide), none: verificationScope(null, {}) }));
 ''')
-        self.assertEqual(result['must'], ['a', 'b'])
+        # a changed; b and d are named by open major findings, the deck one on every page it affects.
+        self.assertEqual(result['must'], ['a', 'b', 'd'])
         self.assertEqual(result['deck'], 1)
+        # Every open finding, the minor one too, is put to the next pass for a status.
+        self.assertEqual(result['open'], ['F1', 'F2', 'F3'])
+        self.assertEqual(result['pass'], 2)
         # a changed, so its density is judged again; c's verdict carries over.
         self.assertEqual(result['inherited'], ['c'])
         self.assertIsNone(result['none'])

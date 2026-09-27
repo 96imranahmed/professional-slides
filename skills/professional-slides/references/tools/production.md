@@ -42,7 +42,7 @@ may use partial plans. Content transfers by ID rather than by page position.
 
 ## What delivery refuses
 
-Delivery hands over a deck when blocking page gates pass and the review accepts the exact current PPTX, scene and renders. The review hash and inspected-slide coverage are required; every rebuild invalidates the previous review. When either fails, the findings are the result: `REJECTED.md` and `delivery.json` report the blocking findings and no `*-DELIVERED.pptx` remains. The build artifact is retained for inspection.
+Delivery hands over a deck when blocking page gates pass and the review accepts the exact current PPTX, scene and renders. The review hash and its page coverage are required; every rebuild invalidates the previous review. When either fails, the findings are the result: `REJECTED.md` and `delivery.json` report the blocking findings and no `*-DELIVERED.pptx` remains. The build artifact is retained for inspection.
 
 Blocking findings are factual errors, unsupported claims, misleading comparisons, missing evidence on a ranked criterion, missing argument, unreadable text, overflow, broken geometry, broken dependencies and provenance failures; editorial preferences are advisory. A missing-argument finding names the absent premise and a concrete repair, because blank space or a low word count on its own is a diagnostic.
 

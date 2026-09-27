@@ -93,7 +93,7 @@ Every finding names the exact defect and a repair that a person can act on. `run
 
 ## Reader review
 
-[Taste review](../taste-review.md) is the authoritative procedure for title/original/spread review, adversarial consolidation, independent scoring and literal reference coverage. Schema/mix statistics cannot certify semantic quality. Preserve the exact artifact binding and complete inspected-slide IDs; a rebuild requires a new review.
+[Taste review](../taste-review.md) is the authoritative procedure for title/original/spread review, adversarial consolidation, independent scoring and literal reference coverage. Schema/mix statistics cannot certify semantic quality. Preserve the exact artifact binding and the complete page coverage record; a rebuild requires a new review pass.
 
 `PLAN_STYLE_ENTROPY` and `PAGE_SHAPE_FLAT` remain blocking repetition screens. [Design](../design.md#page-architecture-and-repetition) owns normalized relationships and deliberate comparison series. Advisory counts must not provoke template rotation or invented content.
 
