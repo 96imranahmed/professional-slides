@@ -2257,7 +2257,7 @@
     {
      "type": "chart.column",
      "heading": "Capital spend by year",
-     "unit": "£ million",
+     "unit": "£ million a year",
      "categories": [
       "FY27",
       "FY28",
