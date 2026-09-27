@@ -3170,8 +3170,11 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       : { id: `${id}-backdrop`, component: "image-frame", props: { alt: slide.photo.alt }, size: SIZE };
     const card = { id: `${id}-card`, treatment: "card", layout: "flow.column", gap: "space.3",
       size: { width: Math.round(BODY_WIDTH * 0.58), height: "fill" },
+      // The card is a little over half the page wide, so points set across it
+      // ran 90-odd characters a line; they run in columns under the exhibit, as
+      // they do under a row of panels.
       items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, SIZE),
-              ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, "open", fill, false, pointsStyle)] : [])] };
+              ...(slide.points?.length ? [pointsUnderPanels(slide.points, { id, slide, layout, panels: [], fill, pointsStyle })] : [])] };
     items.push({ id: `${id}-stage`, layout: "overlay", size: SIZE, items: [backdrop,
       { id: `${id}-card-row`, layout: "flow.row", padding: "space.5", leftover: slide.photoSide === "right" ? "start" : "end", size: SIZE, items: [card] }] });
   } else {

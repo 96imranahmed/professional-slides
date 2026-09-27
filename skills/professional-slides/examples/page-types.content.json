@@ -1302,22 +1302,22 @@
      "text": "18:00"
     },
     {
-     "id": "p06b-p06b-points:lead:0",
+     "id": "p06b-p06b-points-0-list:lead:0",
      "role": "body",
      "text": "Walkers fill the morning"
     },
     {
-     "id": "p06b-p06b-points:item:0",
+     "id": "p06b-p06b-points-0-list:item:0",
      "role": "body",
      "text": "Four in five Saturday passengers out of Leeds are leisure trips, bound for the walks beyond Skipton, so the 09:00 to 11:00 trains fill."
     },
     {
-     "id": "p06b-p06b-points:lead:1",
+     "id": "p06b-p06b-points-1-list:lead:0",
      "role": "body",
      "text": "The evening runs light"
     },
     {
-     "id": "p06b-p06b-points:item:1",
+     "id": "p06b-p06b-points-1-list:item:0",
      "role": "body",
      "text": "The last train home leaves Skipton at 18:40, before most walkers finish, so the return trips go by car instead."
     }
