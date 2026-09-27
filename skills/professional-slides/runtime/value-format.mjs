@@ -85,3 +85,22 @@ export function withUnit(text, unit) {
   if (/^[%‰]/.test(trimmed)) return `${text}${trimmed}`;
   return `${text} ${trimmed}`;
 }
+
+/**
+ * One figure standing alone, as a table's pill, a chart's bubble and a measure
+ * cell hold it: a qualifier or sign, a currency, the number (or a score out of
+ * something, closed up: "4.5/5"; spaced, "10.48 / 22" is an expression), a
+ * unit or magnitude and "p.a.". Three places kept their own pattern and
+ * disagreed: the pill check refused "+25bps", "12 pts" and "£38m p.a." as
+ * words mixed with figures while the bubble took two of them, so one figure
+ * passed on a chart and failed in the table beside it.
+ */
+export const SCALAR_FIGURE = /^\s*(?:[~≈<>≤≥]\s*)?[+\-−–]?\s*([$€£¥₹])?\s*[+\-−–]?\s*\d[\d,]*(?:\.\d+)?(\/\d[\d,]*(?:\.\d+)?)?\s*(%|pp|pts?|bps|x|×|bn|tn|mn|[kmbt])?\+?(\s*p\.a\.)?\s*$/i;
+
+/** The unit a lone figure is written in ("$bn", "%", "bps", "/5", "£m p.a.", "" bare), or null when `text` is not one figure. */
+export function figureUnit(text) {
+  const match = SCALAR_FIGURE.exec(String(text ?? ""));
+  if (!match) return null;
+  const [, currency = "", scale = "", unit = "", perYear] = match;
+  return `${currency}${scale}${unit.toLowerCase().replace("×", "x").replace(/^pt$/, "pts")}${perYear ? " p.a." : ""}`;
+}

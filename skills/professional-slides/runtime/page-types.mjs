@@ -30,12 +30,13 @@ import { trivialChart } from "./gates/craft_gates.mjs";
 import { calloutFits } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
+import { SCALAR_FIGURE as NUMERIC } from "./value-format.mjs";
 import { timePositions, describeGaps, isPeriodLabel } from "./time-axis.mjs";
 import { verdictCell } from "./compose.mjs";
 import { REVIEWED, CODED, isTable, rowCells, playerNames } from "./gates/variety_gates.mjs";
 import { readFileSync } from "node:fs";
 import { wordBudgetOf } from "./derive-content.mjs";
-import { iconDefinition, nearestIcons, ICON_NAMES } from "./icons.mjs";
+import { iconDefinition, unknownIcon, ICON_NAMES } from "./icons.mjs";
 
 // The limits the page gates hold the page's text to, published in `--types`
 // so an author meets them by reading rather than by failing. The title's word
@@ -616,7 +617,6 @@ function checkBlocks(page, id, exhibits) {
 // Defects a whole-deck review found on a fifty-page deck, refused here where
 // the page is written rather than left for the next review to find again.
 const BLANK = /^[\s\-–—]*$/;
-const NUMERIC = /^[\s~≈<>+\-–$£€]*\d[\d.,]*\s*(%|x|pts?|bps|[kmb]n?|bn|tn|m|k)?\s*$/i;
 const COLUMN_CHARTS = new Set(["chart.column", "chart.stacked-column", "chart.combo"]);
 // A heading that says the columns are snapshots, not a series: the gaps are then the point.
 const SNAPSHOTS = /\b(snapshots?|selected (?:years|dates|months|quarters|periods)|observations?|as (?:of|at)\b)/i;
@@ -928,11 +928,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   const icons = [];
   const walk = (value) => { if (Array.isArray(value)) value.forEach(walk); else if (value && typeof value === "object") for (const [key, v] of Object.entries(value)) { if (key === "icon" && typeof v === "string") icons.push(v); else walk(v); } };
   walk(page);
-  const unknownIcon = icons.find((name) => !iconDefinition(name));
-  if (unknownIcon) {
-    const near = nearestIcons(unknownIcon);
-    throw new Error(`${id}: no icon is called "${unknownIcon}"${near.length ? ` - the nearest are ${near.join(", ")}` : ""}; \`author-deck.mjs --icons\` lists the ${ICON_NAMES.length} there are`);
-  }
+  const unknown = icons.find((name) => !iconDefinition(name));
+  if (unknown) throw new Error(`${id}: ${unknownIcon(unknown)}`);
 
   // The content decisions, made before the layout ones and checked first:
   // what settles the claim, and what the commentary adds. With an insight log

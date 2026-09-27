@@ -152,19 +152,26 @@ export const hasPhrase = (text, phrase, options) => phraseAt(text, phrase, 0, op
  * as whole words (phraseAt) wherever it appears. Unmatched phrases throw: a
  * highlight that does not occur in the text is a typo, and silently dropping
  * it hides the typo.
+ *
+ * Matched regardless of case, as the compile check matches it (page-types),
+ * and cut from the text as written. Matched exactly, "Only one of five"
+ * offered to "the only one of five" passed compile and was drawn plain, and
+ * every caller that took the page's phrase had to find it again in the text's
+ * own case before it could ask for the runs.
  */
 export function accentRuns(text, phrases, { bold = true, accent = true, strict = true } = {}) {
   const list = (Array.isArray(phrases) ? phrases : phrases === undefined || phrases === null ? [] : [phrases])
     .map((phrase) => String(phrase ?? "").trim()).filter(Boolean);
   const source = String(text ?? "");
   if (!list.length) return null;
+  const found = (phrase, from = 0) => phraseAt(source, phrase, from, { ignoreCase: true });
   // `strict: false` is for a block that is one of several (the items of a table
   // cell): the phrase belongs to one of them, and the caller checks that it
   // matched somewhere rather than in every block.
-  if (!strict && !list.some((phrase) => hasPhrase(source, phrase))) return null;
+  if (!strict && !list.some((phrase) => found(phrase) >= 0)) return null;
   for (const phrase of list) {
-    if (strict && !hasPhrase(source, phrase)) {
-      throw new Error(source.includes(phrase)
+    if (strict && found(phrase) < 0) {
+      throw new Error(source.toLowerCase().includes(phrase.toLowerCase())
         ? `highlight "${phrase}" occurs in "${source}" only inside a longer word or number; highlight the whole word`
         : `highlight "${phrase}" does not occur in "${source}"`);
     }
@@ -174,11 +181,11 @@ export function accentRuns(text, phrases, { bold = true, accent = true, strict =
   const runs = [];
   let from = 0;
   while (from < source.length) {
-    const hits = list.map((phrase) => ({ phrase, at: phraseAt(source, phrase, from) })).filter((hit) => hit.at >= 0).sort((a, b) => a.at - b.at);
+    const hits = list.map((phrase) => ({ phrase, at: found(phrase, from) })).filter((hit) => hit.at >= 0).sort((a, b) => a.at - b.at);
     if (!hits.length) { runs.push({ text: source.slice(from), bold: false }); break; }
     const { phrase, at } = hits[0];
     if (at > from) runs.push({ text: source.slice(from, at), bold: false });
-    runs.push({ text: phrase, bold, ...(accent ? { accent: true } : {}) });
+    runs.push({ text: source.slice(at, at + phrase.length), bold, ...(accent ? { accent: true } : {}) });
     from = at + phrase.length;
   }
   return runs.filter((run) => run.text.length);

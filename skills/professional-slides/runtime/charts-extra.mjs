@@ -3,14 +3,13 @@
 // shapes (never a native chart), shares the plot frame, axes, legend and label
 // helpers of charts.mjs, and answers measureContent from its layout so a hug
 // measurement responds to width.
-import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, tokenValue } from "./core.mjs";
+import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, tokenValue, onFill } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
-import { contrastRatio } from "./palettes.mjs";
 import { formatValue } from "./value-format.mjs";
 import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle, labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend } from "./charts.mjs";
 import { TOKENS } from "./core.mjs";
 import { measureAt } from "./draw.mjs";
-import { timePositions } from "./time-axis.mjs";
+import { timePositions, spacedLabelIndices } from "./time-axis.mjs";
 
 const ACCENT = token("color.accent");
 const measure = (text, width, { bold = false, size = CHART_LABEL } = {}) => measureAt(text, width, { size, bold, font: FONT });
@@ -268,8 +267,7 @@ function treemapChart({ id, frame, props, tokens = TOKENS }) {
     const fill = highlighted(props, item.label) ? ACCENT : hasFocus ? token("color.chartComparator") : colorFor(props, Math.min(index, 5));
     const tile = tileOf(r);
     nodes.push(rectPrimitive({ id: stableId(id, "tile", item.label), role: "chart-mark", frame: tile, style: fillStyle(fill, token("color.surface")), data: { label: item.label, value: item.value, share: item.value / total } }));
-    const white = contrastRatio(tokens[fill.tokenId].value, tokens["color.onPrimary"].value) >= contrastRatio(tokens[fill.tokenId].value, tokens["color.ink"].value);
-    const color = white ? token("color.onPrimary") : INK;
+    const color = onFill(fill);
     const text = tileText(item, tile, total, props);
     if (text) {
       const { label, valueLayout } = text;
@@ -371,11 +369,7 @@ function stackedAreaChart({ id, frame, props }) {
   // only the labels whose 80px slots clear their neighbours' are set.
   const spacing = timePositions(categories);
   const xAt = (i) => plot.x + plot.width * (spacing ? spacing[i] : i / Math.max(1, categories.length - 1));
-  const labelled = categories.reduce((kept, _, i) => {
-    if (!spacing || !kept.length || xAt(i) - xAt(kept.at(-1)) >= 84) kept.push(i);
-    else if (i === categories.length - 1 && kept.length > 1 && xAt(i) - xAt(kept.at(-2)) >= 84) kept[kept.length - 1] = i;
-    return kept;
-  }, []);
+  const labelled = spacing ? spacedLabelIndices(categories.map((_, i) => xAt(i)), 84) : categories.map((_, i) => i);
   const yAt = (v) => plot.y + plot.height - (v - bounds.min) / bounds.span * plot.height;
   const nodes = [
     ...(props.legend !== false ? topLegend({ id, frame, items: series.map((s, i) => ({ label: s.name, colorIndex: props.colorIndices?.[i] ?? i })) }) : []),

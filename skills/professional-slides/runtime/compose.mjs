@@ -27,9 +27,9 @@ import { mapAll, defaultHighlightStyle } from "./core.mjs";
 import { measureInsight, measureList, measureProse, proseMeasure } from "./registry.mjs";
 import fs from "node:fs";
 import path from "node:path";
-import { measureText, accentRuns, phraseAt } from "./text-layout.mjs";
+import { measureText, hasPhrase } from "./text-layout.mjs";
 import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
-import { defaultFocusIndex, plotHeadroom } from "./charts.mjs";
+import { defaultFocusIndex, plotHeadroom, topBand, horizontalChart } from "./charts.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { measureTable } from "./tables.mjs";
 import { resolveWeight, normalizeWeight } from "./weight.mjs";
@@ -38,6 +38,26 @@ import { groupThousands } from "./draw.mjs";
 const V3 = "professional-slides.deck/v3";
 const SIZE = { width: { fr: 1 }, height: "fill" };
 const HUG = { width: { fr: 1 }, height: "hug" };
+// A paragraph of the page's prose. It carries the phrase to set in the
+// accent (the page's highlight, or its point's) and, where a point's lead
+// runs into its sentence, the lead to set in bold; the component cuts the
+// runs itself (registry.mjs paragraphRuns), so every paragraph a page draws
+// takes its emphasis one way, wherever it was built.
+const paragraph = (id, text, highlight, props = {}) => ({ id, component: "paragraph", props: { text, ...(highlight == null ? {} : { highlight }), ...props }, size: HUG });
+/** The page's authored `paragraphs`, each carrying the page's highlight. */
+const proseOf = (slide, id) => (slide.paragraphs || []).map((text, at) => paragraph(`${id}-p${at}`, text, slide.highlight));
+// Points set in columns run up to three across, four two by two and more
+// three across, reading along each row: four across the body are 270px
+// columns, under the measure prose needs, and failed CPL for a placement
+// that was sound. `most` is the row's limit on a narrower track.
+const pointsPerRow = (count, most = 3) => (count <= most ? count : count === 4 ? 2 : most);
+/** Point columns in rows of `pointsPerRow`: one row, or a column of rows `${rowId}-${r}`. */
+function pointColumns(columns, rowId, most) {
+  const perRow = pointsPerRow(columns.length, most), rows = [];
+  for (let at = 0; at < columns.length; at += perRow) rows.push(columns.slice(at, at + perRow));
+  return rows.length === 1 ? { layout: "flow.row", items: columns }
+    : { layout: "flow.column", items: rows.map((row, r) => ({ id: `${rowId}-${r}`, layout: "flow.row", size: HUG, items: row })) };
+}
 
 function isV3(spec) { return spec?.schema === V3; }
 
@@ -97,8 +117,9 @@ function tableAlias(ex) {
   if (ex.type === "phase-table") {
     const phases = ex.phases || ex.columns || [];
     const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label }, ...phases.map((_, i) => { const cell = (row.cells || [])[i]; return Array.isArray(cell) ? { type: "bullets", items: cell }
-      // A bulleted cell the page's highlight marked arrives as { points, highlight }.
-      : cell && typeof cell === "object" && Array.isArray(cell.points) ? { type: "bullets", items: cell.points, ...(cell.highlight ? { accent: cell.highlight } : {}) } : cell ?? " "; })]);
+      // A bulleted cell the page's highlight marked arrives as { points, highlight };
+      // the table reads the phrase as the cell's accent (tables.mjs normalize).
+      : cell && typeof cell === "object" && Array.isArray(cell.points) ? { type: "bullets", items: cell.points, highlight: cell.highlight } : cell ?? " "; })]);
     const labelWidth = Math.max(110, ...(ex.rows || []).map((row) => Math.ceil(measureText(String(row.label || ""), 400, { fontFamily: "Arial", fontSize: 14, bold: true, wrapWidthRatio: 1 }).width) + 32));
     return { type: "table", treatment: "dimensions", variant: "standard", headerShape: ex.headerShape ?? "chevron", columns: [{ label: "", type: "category", width: labelWidth }, ...phases.map((ph) => ({ label: typeof ph === "string" ? ph : ph.label, type: "text", width: 200 }))], rows, density: ex.density };
   }
@@ -120,14 +141,12 @@ function tableAlias(ex) {
         if (value === undefined || value === null) return { type: "text", text: " " };
         if (Array.isArray(value)) return { type: "bullets", items: value };
         if (typeof value === "string") return { type: "text", text: value };
-        const { lead, points, text, highlight, ...rest } = value;
-        // `highlight` names the phrase the cell sets in the accent; the table
-        // calls that `accent`, because a cell's `highlight: true` is the older
-        // flag that marks the whole cell.
-        const accent = highlight === undefined || highlight === null ? {} : { accent: highlight };
-        if (Array.isArray(points) && points.length) return { type: "bullets", items: points, ...(lead ? { lead } : {}), ...accent, ...rest };
-        if (typeof text === "string" && text.trim()) return { type: "text", text: lead ? `${lead}. ${text}` : text, ...accent, ...rest };
-        if (typeof lead === "string" && lead.trim()) return { type: "text", text: lead, bold: true, ...accent, ...rest };
+        // A `highlight` phrase rides along in `rest`: the table reads it as
+        // the cell's accent (tables.mjs normalize).
+        const { lead, points, text, ...rest } = value;
+        if (Array.isArray(points) && points.length) return { type: "bullets", items: points, ...(lead ? { lead } : {}), ...rest };
+        if (typeof text === "string" && text.trim()) return { type: "text", text: lead ? `${lead}. ${text}` : text, ...rest };
+        if (typeof lead === "string" && lead.trim()) return { type: "text", text: lead, bold: true, ...rest };
         throw new Error("A row matrix cell needs text or points");
       };
       const numbered = ex.numbered === true;
@@ -1077,8 +1096,8 @@ function pointsBelowHeight(slide) {
   const points = Array.isArray(slide.points) ? slide.points : [];
   const below = slide.layout === "exhibit-top" || (!slide.layout && (LAYOUT.shapeBias?.["exhibit-top"] ?? 0) > 0 && points.length >= 2 && points.length <= 4);
   if (!below || !points.length) return 0;
-  // In rows as exhibitOverCommentary sets them: three across at most, four two by two.
-  const perRow = points.length <= 3 ? points.length : points.length === 4 ? 2 : 3;
+  // In rows as exhibitOverCommentary sets them (pointColumns).
+  const perRow = pointsPerRow(points.length);
   const perLine = Math.max(20, Math.floor((BODY_WIDTH - COLUMN_GAP * (perRow - 1)) / perRow / 6.4));
   const text = (point) => typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`;
   let height = 22;
@@ -1220,7 +1239,7 @@ function documentItem(slide, id, pointCount) {
   const columns = balancedColumns(paragraphs, count);
   const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4",
     size: { width: { fr: 1 }, height: "fill" },
-    items: texts.map((text, i) => ({ id: `${id}-doc-${c}-p${i}`, component: "paragraph", props: { text }, size: HUG })) });
+    items: texts.map((text, i) => paragraph(`${id}-doc-${c}-p${i}`, text, slide.highlight)) });
   return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6", size: SIZE,
     items: columns.filter((texts) => texts.length).map(column) };
 }
@@ -1259,7 +1278,7 @@ const PROSE_DEPTH = 488, PROSE_FULL = 440, PROSE_PARAGRAPH_GAP = 16, PROSE_COLUM
  * (45 characters) to its cap (80), and two when one at the cap runs past the
  * foot.
  */
-function proseBeside(paragraphs, id, room) {
+function proseBeside(paragraphs, id, room, highlight) {
   const { widest, narrowest } = proseMeasure();
   const depth = (texts, width) => texts.reduce((sum, text) => sum + measureProse(text, width), 0) + PROSE_PARAGRAPH_GAP * (texts.length - 1);
   // One column, or two broken where the deeper of them is shallowest at that
@@ -1298,7 +1317,7 @@ function proseBeside(paragraphs, id, room) {
   if (!chosen) chosen = { columns: split(counts.at(-1), most(counts.at(-1))), width: most(counts.at(-1)) };
   const { columns, width } = chosen;
   const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4", size: { width, height: "fill" },
-    items: texts.map((text, i) => ({ id: `${id}-doc-${c}-p${i}`, component: "paragraph", props: { text }, size: HUG })) });
+    items: texts.map((text, i) => paragraph(`${id}-doc-${c}-p${i}`, text, highlight)) });
   return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6",
     size: { width: columns.length * width + PROSE_COLUMN_GAP * (columns.length - 1), height: "fill" }, items: columns.map(column) };
 }
@@ -2224,12 +2243,9 @@ function highlightThePhrase(slide) {
   const phrases = (Array.isArray(declared) ? declared : [declared])
     .map((p) => String(p ?? "").trim()).filter(Boolean);
   if (!phrases.length) return slide;
-  // As whole words (phraseAt): "22" offered to "FY22" would be accepted here
-  // and then lit as half a year. Returned as the text writes it: matched
-  // regardless of case here, the phrase was then set by accentRuns, which
-  // matches exactly, so "Only one of five" offered to "the only one of five"
-  // was accepted and drawn plain.
-  const inside = (text) => phrases.map((p) => { const at = phraseAt(text, p, 0, { ignoreCase: true }); return at < 0 ? null : String(text).slice(at, at + p.length); }).filter(Boolean);
+  // As whole words and regardless of case, the rule accentRuns sets them by:
+  // "22" offered to "FY22" would be accepted here and lit as half a year.
+  const inside = (text) => phrases.filter((p) => hasPhrase(text, p, { ignoreCase: true }));
   // The phrase stays on the slide: `soWhat` and the insight boxes are built
   // later, from the slide, and they set it in the accent too.
   const next = { ...slide };
@@ -2276,7 +2292,8 @@ function highlightThePhrase(slide) {
       // A bulleted cell is a list of strings; its phrase is found in any of them.
       const found = Array.isArray(cell) ? cell.flatMap((item) => (typeof item === "string" ? inside(item) : []))
         : typeof cell === "string" ? inside(cell)
-          : [cell?.lead, cell?.text, ...(Array.isArray(cell?.points) ? cell.points : [])].filter((t) => typeof t === "string").flatMap(inside);
+          // A table's own bulleted cell lists its lines as `items`.
+          : [cell?.lead, cell?.text, ...[cell?.points, cell?.items].flatMap((list) => (Array.isArray(list) ? list : []))].filter((t) => typeof t === "string").flatMap(inside);
       if (!found.length) return cell;
       touched = true;
       const unique = [...new Set(found)];
@@ -2472,7 +2489,7 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
   // Equal numerical limits alone do not make equal bar lengths: different
   // category gutters and Office auto-layout change the pixels per unit.
   // Compare horizontal peers in the shared editable scene coordinate system.
-  const horizontalPeers = charts.filter(ex => ["chart.bar", "chart.stacked-bar"].includes(ex.type));
+  const horizontalPeers = charts.filter(ex => horizontalChart(ex.type));
   if (horizontalPeers.length >= 2 && !slide.pairedWeights && horizontalPeers.every(ex => ex.unit === horizontalPeers[0].unit)) {
     // An unset minimum is the lowest bar of any peer, not zero: zero put a
     // negative bar outside its own axis.
@@ -2509,7 +2526,7 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
       const legend = ex.legend === true || (ex.legend !== false && multi && !line);
       // The legend may wrap; the row's inset must cover the tallest one (1160px row, n panels).
       const rows = legend ? legendRowCount((ex.series || []).map((sr) => sr.name), Math.max(120, 1160 / Math.max(1, charts.length) - 70)) : 0;
-      return (rows ? 24 + plotHeadroom(ex.type) + (rows - 1) * 26 : plotHeadroom(ex.type)) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top;
+      return topBand(rows, plotHeadroom(ex.type)) + chartAnnotationBands({ changeAnnotations: ex.changeAnnotations || [] }).top;
     };
     // Callouts counted at their compact height: the row's band is the budget,
     // and a peer whose full 88px bands would overrun it closes them to fit
@@ -2521,8 +2538,7 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
     // neighbour's callout.
     const aligned = charts.filter((ex) => !["chart.waffle", "chart.treemap", "chart.pie", "chart.donut"].includes(ex.type));
     const base = Math.max(0, ...aligned.map(baseBand));
-    const across = (ex) => ["chart.bar", "chart.stacked-bar"].includes(ex.type);
-    const scaleKey = (ex) => across(ex) ? `rows:${JSON.stringify(ex.categories)}` : ex.yMax === undefined ? null : `scale:${ex.unit}:${ex.yMin}:${ex.yMax}`;
+    const scaleKey = (ex) => horizontalChart(ex.type) ? `rows:${JSON.stringify(ex.categories)}` : ex.yMax === undefined ? null : `scale:${ex.unit}:${ex.yMin}:${ex.yMax}`;
     const groups = new Map();
     for (const ex of aligned) { const key = scaleKey(ex); if (key) groups.set(key, [...(groups.get(key) || []), ex]); }
     for (const ex of aligned) {
@@ -2535,12 +2551,12 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
       // 104px, and with no callout the page was UNANNOTATED. A callout that
       // finds no place in its row still falls back to a rail at its own
       // panel's right, which narrows that plot and keeps the rows level.
-      if (across(ex) && group.length > 1 && !ex.comparisonDomain && (ex.annotations || []).length) {
+      if (horizontalChart(ex.type) && group.length > 1 && !ex.comparisonDomain && (ex.annotations || []).length) {
         ex.annotations = ex.annotations.map((a) => (a && typeof a === "object" && !a._placement ? { ...a, _placement: "beside" } : a));
         ex.plotTopInset = base;
         continue;
       }
-      const shared = group.filter((peer) => !(across(peer) && !peer.comparisonDomain));
+      const shared = group.filter((peer) => !(horizontalChart(peer.type) && !peer.comparisonDomain));
       ex.plotTopInset = base + Math.max(0, ...shared.map(calloutBand));
       // The band is the row's: a callout here keeps it rather than moving into
       // the plot (charts.mjs renderResolved), or the plots would part.
@@ -2588,24 +2604,22 @@ function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, po
  * Points under a row of panels, in columns. Set as one list across the body
  * they ran about 150 characters a line - past any readable measure - and CPL
  * did not read list items, so nothing said so. One point to a panel sits under
- * its panel, at the panel's width; any other count runs up to three across,
- * four two by two, as the points under a single exhibit do.
+ * its panel, at the panel's width; any other count runs in rows
+ * (pointColumns), as the points under a single exhibit do. On a photograph's
+ * card, a little over half the page wide, `most: 2`: three across were 190px
+ * columns, and the card's points stay open type on the card's own surface.
  */
-function pointsUnderPanels(points, { id, slide, layout, panels, fill, pointsStyle }) {
-  const tone = sideTreatment(slide);
+function pointsUnderPanels(points, { id, slide, layout, panels, fill, pointsStyle, tone = sideTreatment(slide), most }) {
   const column = (list, at, size) => ({ id: `${id}-points-${at}`, layout: "flow.column", size, items: [pointsItem(list, `${id}-points-${at}-list`, tone, fill, false, pointsStyle)] });
-  // One point is a paragraph, at the capped measure paragraphs keep.
+  // One point is a paragraph, at the capped measure paragraphs keep, its lead
+  // running into the sentence in bold and its phrase in the accent.
   if (points.length === 1) {
-    const [point] = points, text = typeof point === "string" ? point : [point?.lead, point?.text].filter(Boolean).join(" ");
-    return { id: `${id}-points`, component: "paragraph", props: { text }, size: HUG };
+    const entry = typeof points[0] === "string" ? { text: points[0] } : points[0] ?? {};
+    return paragraph(`${id}-points`, [entry.lead, entry.text].filter(Boolean).join(" "), entry.highlight, entry.lead ? { lead: entry.lead } : {});
   }
   if (points.length === panels.length && layout !== "sequence")
     return { id: `${id}-points`, layout: "flow.row", size: HUG, items: points.map((point, at) => column([point], at, { width: panels[at].size?.width ?? { fr: 1 }, height: "hug" })) };
-  const perRow = points.length <= 3 ? points.length : points.length === 4 ? 2 : 3;
-  const rows = [];
-  for (let at = 0; at < points.length; at += perRow) rows.push(points.slice(at, at + perRow));
-  const across = (row, r) => ({ id: `${id}-points-row-${r}`, layout: "flow.row", size: HUG, items: row.map((point, at) => column([point], r * perRow + at, { width: { fr: 1 }, height: "hug" })) });
-  return rows.length === 1 ? { ...across(rows[0], 0), id: `${id}-points` } : { id: `${id}-points`, layout: "flow.column", size: HUG, items: rows.map(across) };
+  return { id: `${id}-points`, size: HUG, ...pointColumns(points.map((point, at) => column([point], at, { width: { fr: 1 }, height: "hug" })), `${id}-points-row`, most) };
 }
 
 
@@ -2655,10 +2669,7 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
     // way a well-made page sets the phrase that carries the finding.
     // The page's highlight is set in the accent too: the points below an
     // executive summary's table carried their phrases here and drew them plain.
-    const highlight = (Array.isArray(entry.highlight) ? entry.highlight : entry.highlight ? [entry.highlight] : []).filter((p) => typeof p === "string");
-    const lead = !hoist && entry.lead ? entry.lead : null;
-    const marked = lead || highlight.length ? accentRuns(text, [...(lead ? [lead] : []), ...highlight], { bold: true, strict: false }) : null;
-    const runs = marked && marked.map((run, at) => (lead && at === 0 && run.text === lead && !highlight.includes(lead) ? { text: run.text, bold: true } : run));
+    const lead = !hoist && entry.lead ? { lead: entry.lead } : {};
     // `rule: false`: the block above already carries one under "What it
     // means". A hairline under each of three sub-headings as well turns one
     // divided idea into four ruled boxes, and the reader reads the rules
@@ -2674,7 +2685,7 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
     // the page.
     return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
       ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
-      items: [{ id: `${id}-col-${at}-text`, component: "paragraph", props: { text, ...(runs ? { runs } : {}), ...(loneBand ? { maxMeasure: false } : {}) }, size: HUG }] };
+      items: [paragraph(`${id}-col-${at}-text`, text, entry.highlight, { ...lead, ...(loneBand ? { maxMeasure: false } : {}) })] };
   });
   // The columns share one heading, the way the side column does: without it
   // the page drops straight from the plot into three paragraphs with nothing
@@ -2684,18 +2695,9 @@ function exhibitOverCommentary(items, { id, slide, exhibits, baseDir }) {
   // them in based on earlier pages does not create a new evidence relationship.
   const headBelow = !columns.every((column) => column.heading)
     ? belowHeading : slide.pointsHeading || null;
-  // Four points across the body are four 270px columns, under the measure
-  // prose needs, and the page failed CPL ("the column is too narrow for
-  // prose") for a choice of placement that was sound. Up to three run in one
-  // row; four go two by two and more three across, reading along each row.
-  const perRow = columns.length <= 3 ? columns.length : columns.length === 4 ? 2 : 3;
-  const rows = [];
-  for (let at = 0; at < columns.length; at += perRow) rows.push(columns.slice(at, at + perRow));
   items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
     headedPanel(exhibits[0], item, `${id}-exhibit`, false),
-    { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}), size: HUG,
-      ...(rows.length === 1 ? { layout: "flow.row", items: columns }
-        : { layout: "flow.column", items: rows.map((row, r) => ({ id: `${id}-below-${r}`, layout: "flow.row", size: HUG, items: row })) }) },
+    { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}), size: HUG, ...pointColumns(columns, `${id}-below`) },
   ] });
 }
 
@@ -2809,8 +2811,7 @@ function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, 
   // sentences of commentary next to its chart lost them without a word - and
   // the content audit reported the loss as MISSING_AUTHORED_CONTENT with
   // nothing to point at.
-  const prose = (slide.paragraphs || []).map((text, at) => (
-    { id: `${id}-p${at}`, component: "paragraph", props: { text }, size: HUG }));
+  const prose = proseOf(slide, id);
   const sideItems = [kpiTile, ...insightBoxes, ...prose, list].filter(Boolean);
   // "What it means" above three lines of text is a label on a mostly empty
   // column. The heading earns its line when the column holds a list; a column
@@ -3117,7 +3118,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     const copy = [
       ...(slide.kpi ? [{ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } }] : []),
       ...insightSpecs.map((insight, at) => ({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insightSpecs.length > 1 && at === 0 ? "plain" : "tonal", ...(slide.highlight === undefined ? {} : { highlight: slide.highlight }), ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG })),
-      ...(slide.paragraphs || []).map((p, i) => ({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG })),
+      ...proseOf(slide, id),
       ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle)] : []),
     ];
     const column = { id: `${id}-side`, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: 1.2 }, height: "fill" }, items: copy };
@@ -3148,7 +3149,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     const body = [];
     exhibits.forEach((ex, i) => body.push(exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, SIZE)));
     if (slide.points?.length) body.push(pointsItem(slide.points, `${id}-points`, "open", fill, !exhibits.length, pointsStyle));
-    for (const [at, text] of (slide.paragraphs || []).entries()) body.push({ id: `${id}-p${at}`, component: "paragraph", props: { text }, size: HUG });
+    body.push(...proseOf(slide, id));
     if (!body.length) throw new Error(`${id}: a sidebar page needs an exhibit, points or paragraphs beside its panel`);
     // The copy starts level with the panel's top edge. Centred beside a
     // full-height panel, three paragraphs sat under 125px of air with as much
@@ -3157,7 +3158,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     // row it stopped at the measure, 165px short of its column's edge.
     const proseOnly = !exhibits.length && !slide.points?.length;
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [panelBox,
-      proseOnly ? proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH)
+      proseOnly ? proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH, slide.highlight)
         : { id: `${id}-body`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: body }] });
   } else if (layout === "photo-backdrop") {
     // The exhibit on a card over a full-bleed photograph of what it measures:
@@ -3172,9 +3173,9 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       size: { width: Math.round(BODY_WIDTH * 0.58), height: "fill" },
       // The card is a little over half the page wide, so points set across it
       // ran 90-odd characters a line; they run in columns under the exhibit, as
-      // they do under a row of panels.
+      // they do under a row of panels, two to a row at most.
       items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, SIZE),
-              ...(slide.points?.length ? [pointsUnderPanels(slide.points, { id, slide, layout, panels: [], fill, pointsStyle })] : [])] };
+              ...(slide.points?.length ? [pointsUnderPanels(slide.points, { id, slide, layout, panels: [], fill, pointsStyle, tone: "open", most: 2 })] : [])] };
     items.push({ id: `${id}-stage`, layout: "overlay", size: SIZE, items: [backdrop,
       { id: `${id}-card-row`, layout: "flow.row", padding: "space.5", leftover: slide.photoSide === "right" ? "start" : "end", size: SIZE, items: [card] }] });
   } else {
@@ -3218,13 +3219,13 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       const tone = panel.tone ?? "tint";
       if (!["dark", "primary", "muted", "tint"].includes(tone)) throw new Error(`${id}: panel.tone is dark, primary, muted or tint`);
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
-        proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH),
+        proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH, slide.highlight),
         { id: `${id}-panel`, component: "side-statement", props: { text: panel.text.trim(), tone, ...(panel.kicker ? { kicker: panel.kicker } : {}), ...(panel.highlight ? { highlight: panel.highlight } : {}) },
           size: { width: { fr: 1 }, height: "fill" } }] });
     }
     const document = memo ? null : documentItem(slide, id, points.length);
     if (document) items.push(document);
-    else if (!memo) for (const [i, p] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${i}`, component: "paragraph", props: { text: p }, size: HUG });
+    else if (!memo) items.push(...proseOf(slide, id));
   }
   // These full-width/paired layouts used to discard supplied points. Keep
   // them in a measured track below the evidence, just like the two-up recipe.
@@ -3234,7 +3235,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   // Authored prose on a full-width page goes under the evidence, for the same
   // reason the points do: the page was given the words, so the page prints them.
   if (["exhibit-full", "metrics-over-exhibit", "table-halves", "split-tone", "exhibit-top"].includes(layout)) {
-    for (const [at, text] of (slide.paragraphs || []).entries()) items.push({ id: `${id}-p${at}`, component: "paragraph", props: { text }, size: HUG });
+    items.push(...proseOf(slide, id));
   }
   // A reading note sits at the top of the side column when there is one,
   // otherwise as a full-width band above the content.
@@ -3261,23 +3262,6 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   const noteLine = Array.isArray(slide.note)
     ? (slide.note.length ? `Notes: ${slide.note.map((item, index) => `${index + 1}. ${String(item).trim().replace(/^\d+\.\s*/, "")}`).join("   ")}` : null)
     : prefixed("Note", slide.note);
-  // A paragraph is built in a dozen places (a memo, a sidebar's prose, a
-  // document column), none of which read the page's highlight, so an argument
-  // page's phrase was accepted and drawn plain. Set here, once, on every
-  // paragraph that says it and carries no emphasis of its own.
-  if (slide.highlight !== undefined && slide.highlight !== null) {
-    const phrases = (Array.isArray(slide.highlight) ? slide.highlight : [slide.highlight]).map((p) => String(p ?? "").trim()).filter(Boolean);
-    const mark = (node) => {
-      if (!node || typeof node !== "object") return;
-      if (node.component === "paragraph" && typeof node.props?.text === "string" && !node.props.runs) {
-        const found = phrases.map((p) => { const at = phraseAt(node.props.text, p, 0, { ignoreCase: true }); return at < 0 ? null : node.props.text.slice(at, at + p.length); }).filter(Boolean);
-        const runs = found.length ? accentRuns(node.props.text, found, { bold: true, strict: false }) : null;
-        if (runs) node.props = { ...node.props, runs };
-      }
-      (node.items || []).forEach(mark);
-    };
-    items.forEach(mark);
-  }
   return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide._standfirstTakeaway ? { subtitleRole: "takeaway-standfirst" } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }
 

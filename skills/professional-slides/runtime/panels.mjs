@@ -3,26 +3,16 @@
 // KPI tile. Each shares the deck's heading band, marker vocabulary and body
 // type; the row rule (every panel in a row shares one header height) holds
 // inside a cards row because the cards are laid out here, together.
-import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, houseStyle, readableOn } from "./core.mjs";
+import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, readableOn, cardFill, cardMuted } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 
 const PRIMARY = token("color.componentPrimary"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), ACCENT = token("color.accent");
-const SURFACE = token("color.surface"), MUTED = token("color.surfaceMuted"), RULE = token("color.rule"), TINT = token("color.componentPrimaryTint");
+const SURFACE = token("color.surface"), RULE = token("color.rule"), TINT = token("color.componentPrimaryTint");
 const FONT = token("font.body"), DISPLAY = token("font.display");
 const v = (id) => tokenValue(token(id));
 const ACCENT_OR_PRIMARY = () => token("color.accent");
-// A card's surface (core.mjs `style.cards`). White cards outlined in a hairline
-// on a cream page are the page colour with a pencil line round them, and a row
-// of four read as an empty page with text on it. Under the reference weight a
-// card is a filled block with no outline - the construction strong decks use
-// for a pillar, a label block or a fact card.
-const FILLED = token("color.surfaceTint");
-const cardFill = () => houseStyle("style.cards") === "tint" ? { fill: FILLED, stroke: "none" } : { fill: SURFACE, stroke: RULE };
-// The muted panels inside a card (a stat card, a big-number copy band) take the
-// same surface, so one card set carries one fill.
-const cardMuted = () => houseStyle("style.cards") === "tint" ? FILLED : MUTED;
 
 export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.surfaceTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
