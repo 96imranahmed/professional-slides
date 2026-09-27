@@ -1,7 +1,7 @@
 import { linePrimitive, stableId, token } from "./core.mjs";
 import { legendNodes, LEGEND_TOKENS } from "./legends.mjs";
 import { CHART_GUIDANCE } from "./guidance.mjs";
-import { barLabelColumn } from "./charts.mjs";
+import { barLabelColumn, numericBounds } from "./charts.mjs";
 
 function assertEquivalentComparisons(props) {
   if (!props.comparison) return;
@@ -41,7 +41,7 @@ export function registerChartGroup(registry) {
     ] },
     render({ id, frame, props, tokens }) {
       assertEquivalentComparisons(props);
-      const charts = props.charts;
+      let charts = props.charts;
       // `aligned`: several measures for the same members, one horizontal bar
       // chart per measure on one category axis - the members named once, down
       // the first column, and each measure's bars level with them. A chart
@@ -49,6 +49,18 @@ export function registerChartGroup(registry) {
       // of them get there: four measures for the same twelve members.
       const aligned = props.aligned === true;
       if (aligned) assertAligned(charts);
+      // A common unit on aligned columns means a common physical scale.
+      // Include every peer's labels in the gutter calculation too: sharing
+      // the numerical domain alone does not guarantee pixels per unit.
+      if (aligned) charts = charts.map(chart => {
+        const peers = charts.filter(peer => chart.unit && peer.unit === chart.unit);
+        if (peers.length < 2) return chart;
+        const values = peers.flatMap(peer => peer.props.series.flatMap(series => series.values));
+        const explicit = peers.flatMap(peer => [peer.props.xMin, peer.props.xMax]).filter(Number.isFinite);
+        const bounds = numericBounds([...values, ...explicit], { includeZero: true, tight: true, axis: "x" });
+        return { ...chart, props: { ...chart.props, xMin: bounds.min, xMax: bounds.max,
+          comparisonDomain: { categories: chart.props.categories, values } } };
+      });
       if (!Array.isArray(charts) || charts.length < 2 || charts.length > 4) throw new Error(aligned ? "An aligned chart group needs two to four measures" : "A chart group needs two to four charts");
       if (props.divider !== undefined && typeof props.divider !== "boolean") throw new Error("Chart-group divider must be a boolean");
       if (props.divider && charts.length !== 2) throw new Error("An inter-chart divider is available only for a paired chart group");
