@@ -190,6 +190,34 @@ function barColor(scale, index) {
   return candidates[strongestContrastIndex(candidates.map(tokenValue))];
 }
 
+// A figure as a pill carries it: an optional qualifier, a currency, the
+// number, a unit. "n/a" or a dash says there is none.
+const PILL_FIGURE = /^([~≈<>≤≥+\-−]\s*)?([$€£¥])?\s*(\d[\d,]*(?:\.\d+)?)\s*(%|pp|x|×|bn|tn|mn|[kmbt])?\+?$/i;
+const PILL_NONE = /^(n\/a|na|n\.a\.|–|—|-)$/i;
+
+/**
+ * A column of pills is one kind of thing. A column of figure pills read
+ * "$12.5B" over "Duration unclear": the pill promised a value and delivered a
+ * caveat, and the reader compared a number with a sentence. Every pill in a
+ * column is a figure, in one unit; a row with no figure says "n/a" and is set
+ * as a plain dash, not a pill, and the reason it has none goes in a footnote
+ * or the implication column.
+ */
+function pillColumnsOfOneKind(columns, cells) {
+  const label = (c) => { const col = columns[c]; return typeof col === "string" ? col : col?.label ?? `column ${c + 1}`; };
+  for (let c = 0; c < columns.length; c += 1) {
+    const pills = cells.map((row) => row[c]).filter((cell) => cell && !cell.blank && cell.type === "highlight" && cell.surface === "bubble");
+    if (!pills.length) continue;
+    const text = (cell) => String(cell.text ?? cell.value ?? "").trim();
+    const words = pills.filter((cell) => !PILL_FIGURE.test(text(cell)) && !PILL_NONE.test(text(cell)));
+    if (words.length) throw new Error(`Table pill column "${label(c)}" mixes figures with words ("${text(words[0])}"): every pill in a column is the same kind of thing. Give each row its figure, or "n/a" where there is none (set as a plain dash), and move the qualification to a footnote or the implication column`);
+    const unitOf = (cell) => { const m = PILL_FIGURE.exec(text(cell)); return `${m[2] ?? ""}${(m[4] ?? "").toLowerCase().replace("×", "x")}`; };
+    const units = [...new Set(pills.filter((cell) => PILL_FIGURE.test(text(cell))).map(unitOf))];
+    if (units.length > 1) throw new Error(`Table pill column "${label(c)}" mixes units (${units.map((u) => `"${u || "plain"}"`).join(", ")}): pills in one column are compared at a glance, so they share one unit - convert them, or split the column`);
+    for (const cell of pills) if (PILL_NONE.test(text(cell))) { cell.type = "text"; cell.surface = undefined; cell.text = "–"; }
+  }
+}
+
 function normalize(props) {
   if (
     !Array.isArray(props.columns) ||
@@ -300,6 +328,7 @@ function normalize(props) {
       return { ...cell, row: r, column: c, rowSpan: span };
     });
   });
+  pillColumnsOfOneKind(columns, cells);
   const sectionNumbers = cells
     .flat()
     .filter(Boolean)
