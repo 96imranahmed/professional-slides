@@ -28,7 +28,8 @@ KNOWN_MEASURE_DEFECTS = {
     "bullet-list": "measureContent refuses every variant except body",
     "evidence-note": "definition.resolveVariant is not a function",
     "insight-tree-table": "returns no height at any width",
-    "heatmap": "throws on an unbreakable header at 0.5x",
+    # "heatmap" used to throw on an unbreakable header at 0.5x; a column now
+    # widens to its longest word (tables.mjs widenForWords), so it measures.
 }
 
 # Components whose measured height is legitimately width-independent for the

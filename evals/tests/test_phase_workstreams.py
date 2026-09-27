@@ -3,7 +3,11 @@ from node_probe import run_node
 
 
 class PhaseWorkstreamsTests(unittest.TestCase):
-    def test_standalone_phase_roadmap_centres_its_measured_content(self):
+    def test_standalone_phase_roadmap_starts_under_the_title(self):
+        # A compact roadmap used to centre in the body, which put a band of air
+        # under the title as tall as the one under the roadmap. It hugs its
+        # measured height at the top of the body; what is left is one band at
+        # the foot, which the scene's band gates put to the author.
         run_node("""
 import assert from 'node:assert/strict';
 import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
@@ -14,7 +18,7 @@ const exhibit={type:'roadmap',variant:'phase-workstreams',phases:['Prepare','Ver
 const page=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'t',tracker:false,slides:[{id:'s',title:'The next action waits for its evidence',exhibit,layout:'exhibit-full'}]})).deck.slides[0];
 const nodes=page.nodes.filter(n=>n.role?.startsWith('roadmap-'));
 const top=Math.min(...nodes.map(n=>n.frame.y)),bottom=Math.max(...nodes.map(n=>n.frame.y+n.frame.height));
-assert.ok(top>230,'a compact roadmap should not be pinned beneath the action title');
+assert.ok(top<200,`a compact roadmap starts at the top of the body, not centred in it (top ${top})`);
 assert.ok(bottom<600,'content remains inside the slide body');
 assert.equal(nodes.filter(n=>n.role==='roadmap-activity').length,2);
 console.log('{}');

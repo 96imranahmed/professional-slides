@@ -3,7 +3,7 @@
 // profile cards and a logo wall. Each shares the deck's marker vocabulary, its
 // body and display type, one primary colour and hairline rules; every text node
 // is measured once here and carries its layout with it.
-import { token, tokenValue, stableId, textPrimitive, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive } from "./core.mjs";
+import { token, tokenValue, stableId, textPrimitive, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive, houseStyle, readableOn } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker, markerSize } from "./marks.mjs";
 import { mediaNode } from "./media.mjs";
@@ -14,7 +14,7 @@ const SURFACE = token("color.surface"), RULE = token("color.rule");
 const FONT = token("font.body"), DISPLAY = token("font.display");
 const v = (id) => tokenValue(token(id));
 
-export const EXTRA_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.textSecondary", "color.rule", "font.display", "type.heading", "type.body", "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
+export const EXTRA_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.textSecondary", "color.rule", "font.display", "type.heading", "type.body", "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "line.medium", "color.surfaceTint", "radius.none", "radius.small", "radius.round"])]);
 
 const text = (size, color = INK, bold = false, align = "left", font = FONT) => ({ fontFamily: font, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
 const measure = (value, width, size, bold = false, font = FONT) => measureAt(value, width, { size, bold, font });
@@ -114,7 +114,14 @@ export function cycleNodes({ id, frame, props }) {
   const cx = frame.x + (frame.width - L.bounds.width) / 2 - L.bounds.x, cy = frame.y + (frame.height - L.bounds.height) / 2 - L.bounds.y;
   const nodes = [];
   const n = L.nodes.length, R = L.radius;
-  const stroke = { fill: "none", stroke: RULE, lineWidth: token("line.standard"), lineCap: "round" };
+  // Mark weight (core.mjs `style.marks`): a thin grey ring round an empty
+  // middle read as a diagram outline. Under the reference weight the ring is
+  // drawn at the series weight and the loop's name sits on a filled hub, so
+  // the figure has a centre as well as a circumference.
+  const heavy = houseStyle("style.marks") !== "light";
+  const stroke = { fill: "none", stroke: RULE, lineWidth: token(heavy ? "line.medium" : "line.standard"), lineCap: "round" };
+  const hubFill = token("color.surfaceTint"), hub = heavy && L.centerLayout ? Math.min(R - DISC / 2 - v("space.3"), Math.max(Math.hypot(L.centerLayout.width, L.centerLayout.height) / 2 + v("space.3"), R * 0.55)) : 0;
+  if (hub > 0) nodes.push(ellipsePrimitive({ id: stableId(id, "hub"), role: "cycle-hub", frame: { x: cx - hub, y: cy - hub, width: 2 * hub, height: 2 * hub }, style: { fill: hubFill, stroke: "none", lineWidth: token("line.hairline"), radius: token("radius.round") } }));
   // Arrow arcs first (painted under the discs), then discs, then labels.
   const clearance = Math.asin((DISC / 2 + v("space.2")) / R);
   L.nodes.forEach((p, i) => {
@@ -137,7 +144,7 @@ export function cycleNodes({ id, frame, props }) {
     nodes.push(label(stableId(nid, "label"), "cycle-label", { x: bx, y: by, width: p.width }, p.title, text("type.heading", INK, true, p.align)));
     if (p.body) nodes.push(label(stableId(nid, "text"), "cycle-text", { x: bx, y: by + p.title.height + L.textGap, width: p.width }, p.body, text("type.body", INK, false, p.align)));
   });
-  if (L.centerLayout) nodes.push(label(stableId(id, "center"), "cycle-center", { x: cx - L.centerWidth / 2, y: cy - L.centerLayout.height / 2, width: L.centerWidth }, L.centerLayout, text("type.heading", PRIMARY, true, "center")));
+  if (L.centerLayout) nodes.push(label(stableId(id, "center"), "cycle-center", { x: cx - L.centerWidth / 2, y: cy - L.centerLayout.height / 2, width: L.centerWidth }, L.centerLayout, text("type.heading", hub > 0 ? readableOn(PRIMARY, hubFill, 3) : PRIMARY, true, "center")));
   return nodes;
 }
 

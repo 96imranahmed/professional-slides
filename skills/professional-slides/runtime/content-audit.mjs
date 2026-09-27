@@ -1,5 +1,10 @@
 // Verify explicit content and visual choices survive composition before export.
 // Layout selection must not turn supplied commentary into a silent no-op.
+export const AUDIT_CODES = Object.freeze({
+  MISSING_VISUAL_INTENT: "an explicit visual choice on the page (icons, a highlight, a treatment) did not survive composition",
+  MISSING_AUTHORED_CONTENT: "authored commentary that no composed page carries",
+});
+
 const normalize = (value) => String(value ?? "").normalize("NFKC").replace(/\s+/g, " ").trim();
 
 export function auditContent(spec, scene) {
@@ -66,7 +71,14 @@ export function auditContent(spec, scene) {
     };
     for (const value of [...(slide.points || []), ...(slide.paragraphs || []), ...(slide.insights || []), ...(slide.pictures || [])]) collect(value);
     for (const key of ["insight", "callout", "soWhat"]) collect(slide[key]);
-    for (const text of prose) if (!rendered.includes(normalize(text))) findings.push({ title, text, code: "MISSING_AUTHORED_CONTENT" });
+    // A `{{page:id}}` reference renders as its page number, so it matches any number.
+    const present = (text) => {
+      const t = normalize(text);
+      if (!t.includes("{{page:")) return rendered.includes(t);
+      const pattern = t.split(/\{\{page:[^}]+\}\}/).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\d+(?:[–-]\\d+)?");
+      return new RegExp(pattern).test(rendered);
+    };
+    for (const text of prose) if (!present(text)) findings.push({ title, text, code: "MISSING_AUTHORED_CONTENT" });
   }
   return { accepted: findings.length === 0, findings };
 }

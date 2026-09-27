@@ -39,7 +39,8 @@ class PluginDistributionTests(unittest.TestCase):
                 p=source/name; p.parent.mkdir(parents=True,exist_ok=True);p.write_text('{}')
             packager.package(source,dest)
             files=json.loads((dest/'package-manifest.json').read_text())['files']
-            self.assertEqual(set(files),{'.codex-plugin/plugin.json','skills/demo/SKILL.md','evals/scripts/check.py'})
+            # Development tooling under evals/ never ships.
+            self.assertEqual(set(files),{'.codex-plugin/plugin.json','skills/demo/SKILL.md'})
             self.assertFalse((dest/'output').exists())
             packager.package(source,dest)
 

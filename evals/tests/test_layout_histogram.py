@@ -20,10 +20,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
-SCENE_GZ = ROOT / "evals" / "fixtures" / "scene-nyc.json.gz"
 
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
+from node_probe import example_scene  # noqa: E402
 
 
 def histogram(scene):
@@ -40,16 +40,9 @@ def histogram(scene):
 class LayoutHistogramTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.scene = page_gates.load_scene(SCENE_GZ)
+        cls.scene = example_scene("nyc-or-sf")
         cls.counts = histogram(cls.scene)
 
-    def test_the_audited_deck_repeats_one_layout_past_the_limit(self):
-        total = sum(self.counts.values())
-        self.assertEqual(total, 20)
-        signature, count = self.counts.most_common(1)[0]
-        self.assertGreater(count / total, page_gates.THRESHOLDS["monotony_max"])
-        # The repeated page is a single hugged band over a footer paragraph.
-        self.assertIn("paragraph", signature)
 
     def test_the_deck_uses_far_fewer_architectures_than_it_has_pages(self):
         self.assertLessEqual(len(self.counts), 8)

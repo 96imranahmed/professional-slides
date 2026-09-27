@@ -11,7 +11,7 @@ import { compileDeck, component } from './skills/professional-slides/runtime/cor
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 import { renderSlideHtml } from './skills/professional-slides/runtime/adapters/html.mjs';
 const definition=REGISTRY.get('quote-cluster');
-const deck=compileDeck({palette:'mckinsey',slides:[{id:'quotes',frame:{x:60,y:150,width:1160,height:480},composition:component({id:'cluster',component:'quote-cluster',frame:{x:60,y:150,width:1160,height:480},props:definition.sample})}]},REGISTRY);
+const deck=compileDeck({palette:'midnight',slides:[{id:'quotes',frame:{x:60,y:150,width:1160,height:480},composition:component({id:'cluster',component:'quote-cluster',frame:{x:60,y:150,width:1160,height:480},props:definition.sample})}]},REGISTRY);
 const slide=deck.slides[0],surfaces=slide.nodes.filter(node=>node.role==='quote-surface'),marks=slide.nodes.filter(node=>node.role==='quote-mark'),attributions=slide.nodes.filter(node=>node.role==='quote-attribution');
 assert.equal(surfaces.length,3);
 assert.ok(surfaces.every(node=>node.type==='shape'&&node.data.geometry==='snip1Rect'&&node.style.flipV===true));
@@ -83,7 +83,7 @@ import assert from 'node:assert/strict';
 import { compileDeck, component } from './skills/professional-slides/runtime/core.mjs';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const d=REGISTRY.get('quote-cluster'),frame={x:60,y:150,width:1160,height:480};
-const render=props=>compileDeck({palette:'mckinsey',slides:[{id:'q',frame,composition:component({id:'cluster',component:'quote-cluster',frame,props})}]},REGISTRY).slides[0].nodes;
+const render=props=>compileDeck({palette:'midnight',slides:[{id:'q',frame,composition:component({id:'cluster',component:'quote-cluster',frame,props})}]},REGISTRY).slides[0].nodes;
 const contained=render(d.variants['one-contained-grid-full'].props);
 const surface=contained.find(n=>n.role==='quote-surface'),body=contained.find(n=>n.role==='quote-body'),marks=contained.filter(n=>n.role==='quote-mark');
 assert.equal(surface.frame.width,980);assert.equal(surface.frame.height,440);

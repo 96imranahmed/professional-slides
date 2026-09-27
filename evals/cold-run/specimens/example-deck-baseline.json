@@ -1,6 +1,6 @@
 {
  "schema": "professional-slides.cold-run-baseline/v1",
- "$comment": "What the four example decks measure, scored by the same harness that scores a cold run. These are hand-authored decks that pass every page gate, so they are the closest thing in the tree to a target - and the harness is only trustworthy if it says so. Re-recorded after the floors were re-derived from 670 published decks (evals/corpus): tablesTreated rose everywhere because an untreated table past five rows now bands its own rows, and chartsAnnotated did not move at all. Two of these decks sit under the measured floor of 0.45, and that is a finding about the decks: gallery-acceptance draws thirty charts and marks the finding on ten of them, while published client decks mark 63%.",
+ "$comment": "What the example decks measure, scored by the same harness that scores a cold run. These are hand-authored decks that pass every page gate, so they are the closest thing in the tree to a target - and the harness is only trustworthy if it says so. Where a deck sits under a floor, that is a finding about the deck: gallery-acceptance draws thirty charts and marks the finding on ten of them.",
  "recorded": "2026-09-18",
  "decks": {
   "gallery-acceptance": {
@@ -44,22 +44,6 @@
    "charts": 6,
    "chartsAnnotated": 0.67,
    "drawingsPerPage": 26.78,
-   "reference": {
-    "exhibitVarietyPerTen": "7.1 to 8.3",
-    "tablesTreated": 0.89,
-    "chartsAnnotated": 0.63,
-    "drawingsPerPage": 32
-   }
-  },
-  "slideworks": {
-   "contentPages": 10,
-   "exhibitVarietyPerTen": 14,
-   "distinctExhibits": 14,
-   "tables": 5,
-   "tablesTreated": 0.4,
-   "charts": 6,
-   "chartsAnnotated": 0.33,
-   "drawingsPerPage": 27.3,
    "reference": {
     "exhibitVarietyPerTen": "7.1 to 8.3",
     "tablesTreated": 0.89,

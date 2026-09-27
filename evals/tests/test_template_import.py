@@ -19,16 +19,16 @@ class TemplateImportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = Path(tempfile.mkdtemp())
-        # Build a small BCG deck, then read it back as a template.
+        # Build a small evergreen deck, then read it back as a template.
         # A small probe deck: two pages, deliberately light, so the importer has
         # to measure a sparse house rather than assume ours.
-        spec = {"schema": "professional-slides.deck/v3", "id": "tpl", "palette": "bcg", "footer": "House test", "fill": "airy",
+        spec = {"schema": "professional-slides.deck/v3", "id": "tpl", "palette": "evergreen", "footer": "House test", "fill": "airy",
                 "slides": [{"title": "Revenue grew nine percent while costs held flat across every region", "exhibit": {"type": "chart.column", "heading": "Revenue by year", "unit": "$m", "categories": ["2023", "2024", "2025"], "series": [{"name": "Revenue", "values": [40, 46, 52]}]}, "points": ["Growth came from the core", "Costs held flat", "Margin widened three points"]},
                            {"title": "Three regions carry the growth while two are flat", "points": ["North grew 12%", "South grew 9%", "East grew 8%", "West flat", "Central flat"]}]}
         (cls.tmp / "tpl.deck.json").write_text(json.dumps(spec))
         subprocess.run([NODE, str(RUNTIME / "build-deck.mjs"), str(cls.tmp / "tpl.deck.json"), str(cls.tmp / "out"), "--no-render"], check=True, capture_output=True, cwd=ROOT, timeout=300)
         cls.pptx = cls.tmp / "out" / "tpl.pptx"
-        result = subprocess.run([sys.executable, str(RUNTIME / "import-template.py"), str(cls.pptx), "--base", "mckinsey", "--out", str(cls.tmp / "house.json")], check=True, capture_output=True, text=True, cwd=ROOT, timeout=120)
+        result = subprocess.run([sys.executable, str(RUNTIME / "import-template.py"), str(cls.pptx), "--base", "midnight", "--out", str(cls.tmp / "house.json")], check=True, capture_output=True, text=True, cwd=ROOT, timeout=120)
         cls.summary = json.loads(result.stdout)
         cls.house = json.loads((cls.tmp / "house.json").read_text())
 
@@ -37,7 +37,7 @@ class TemplateImportTests(unittest.TestCase):
         self.assertEqual(self.house["schema"], "professional-slides.house/v1")
         self.assertEqual(colors["color.ink"], "#212427")
         self.assertEqual(colors["color.componentPrimary"], "#0E7A5E")
-        self.assertIn(colors["color.accent"], {"#16814B", "#5FB08F"}, "a BCG green: the theme accent or the most used bright fill")
+        self.assertIn(colors["color.accent"], {"#16814B", "#5FB08F"}, "an evergreen green: the theme accent or the most used bright fill")
         self.assertEqual(colors["color.chartSeries1"], "#0E7A5E")
         self.assertEqual(self.house["typography"]["body"], "Arial")
         chrome = self.house["chrome"]
@@ -73,10 +73,10 @@ fs.writeFileSync(path.join(dir,'house.json'),{json.dumps(house)});
 const spec={{schema:'professional-slides.deck/v3',id:'t',template:'house.json',slides:[{{title:'Revenue grew nine percent while costs held flat',points:['a','b','c']}}]}};
 const applied=applyTemplate(spec,dir);
 assert.equal(applied.template,undefined);
-assert.equal(applied.palette.base,'mckinsey');assert.ok(['#16814B','#5FB08F'].includes(applied.palette.colors['color.accent']));
+assert.equal(applied.palette.base,'midnight');assert.ok(['#16814B','#5FB08F'].includes(applied.palette.colors['color.accent']));
 assert.equal(applied.chrome.left,60);assert.equal(applied.footer,'House test');
 // An explicit palette on the spec wins over the template's.
-assert.equal(applyTemplate({{...spec,palette:'bain'}},dir).palette,'bain');
+assert.equal(applyTemplate({{...spec,palette:'crimson'}},dir).palette,'crimson');
 const plan=toDeckPlan(spec,dir);
 assert.equal(plan.chrome.left,60);assert.equal(plan.palette.colors['color.componentPrimary'],'#0E7A5E');
 // The compiled deck carries the overlay's colours and restores the chrome afterwards.

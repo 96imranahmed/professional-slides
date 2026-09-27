@@ -134,7 +134,8 @@ def probe(path):
                 bucket["frames"].append(frame)
                 if role is None or not getattr(shape, "has_text_frame", False):
                     continue
-                paragraphs = [p.text for p in shape.text_frame.paragraphs]
+                # A soft break (a:br, read as a vertical tab) is a line the writer set.
+                paragraphs = [line for p in shape.text_frame.paragraphs for line in p.text.split("\x0b")]
                 lines = [p for p in paragraphs if p != ""] or paragraphs
                 size = None
                 for paragraph in shape.text_frame.paragraphs:

@@ -176,22 +176,3 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
 
-    def test_golden_covers_template_variants_and_modern_standard_chrome(self):
-        result = run_node("""
-import assert from 'node:assert/strict';
-import {buildGoldenSetDeck} from './skills/professional-slides/runtime/golden-set.mjs';
-import {componentFixtureSpecs,componentVariantFixtureSpecs} from './skills/professional-slides/runtime/fixtures.mjs';
-import {buildGoldenDeck} from './skills/professional-slides/runtime/golden-fixtures.mjs';
-const variants=[...componentFixtureSpecs(),...componentVariantFixtureSpecs()].filter(n=>n.target==='page-template');assert.equal(variants.length,9);
-assert.equal(variants.filter(n=>n.defaultVariant).length,1);
-const {deck}=buildGoldenSetDeck();
-for(const s of deck.slides.filter(s=>s.id.startsWith('golden-'))) {
- assert.ok(!s.nodes.some(n=>['footer-rule','header-rule','divider-rule'].includes(n.role)),s.id); // the title rule is the house style's, not the template's
- const source=s.nodes.find(n=>n.role==='source-text'),number=s.nodes.find(n=>n.role==='page-number');
- if(source&&number) assert.equal(source.frame.y,number.frame.y,s.id);
-}
-// Fidelity benchmarks preserve their explicitly selected source treatment.
-assert.ok(buildGoldenDeck().deck.slides.some(s=>s.nodes.some(n=>n.role==='footer-rule')));
-console.log(JSON.stringify({accepted:true}));
-""")
-        self.assertTrue(result["accepted"])

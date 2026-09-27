@@ -6,11 +6,14 @@ import json
 import shutil
 
 ROOT = Path(__file__).resolve().parents[2]
-ALLOWED_ROOTS = {'skills', 'evals'}
+# The plugin is the skill. evals/ holds development tooling - tests, fixtures,
+# the calibration corpus's records and scripts - and never ships.
+ALLOWED_ROOTS = {'skills'}
 ASSET_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.svg'}
 ALLOWED_FILES = {'.codex-plugin/plugin.json', 'README.md', 'package.json'}
 EXTENSIONS = {'.md', '.mjs', '.py', '.json', '.toml', '.yaml', '.yml', '.svg'}
 EXCLUDED = {'dist', 'output', 'outputs', 'tmp', 'deliverables', 'renders', 'node_modules', '__pycache__', '.git'}
+
 
 
 def package(source: Path, destination: Path):

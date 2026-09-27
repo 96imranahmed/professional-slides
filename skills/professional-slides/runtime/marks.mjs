@@ -4,7 +4,7 @@
 // frame and get primitives back; they never draw a numeral themselves.
 import { rectPrimitive, token, tokenValue, stableId, textPrimitive, ellipsePrimitive, shapePrimitive } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
-import { iconDefinition } from "./icons.mjs";
+import { iconDefinition, unknownIcon } from "./icons.mjs";
 
 export const MARK_TOKENS = Object.freeze(["color.componentPrimary", "color.accent", "color.onPrimary", "color.ink", "color.surface", "color.rule", "color.textSecondary", "font.body", "type.compact", "type.label", "icon.medium", "line.standard", "line.hairline", "radius.round"]);
 
@@ -34,7 +34,7 @@ export function numberMarker({ id, role = "marker", labelRole = `${role}-label`,
  */
 export function iconMarker({ id, role = "icon", x, y, size, icon, tone = "outline", data = {} }) {
   const definition = iconDefinition(icon);
-  if (!definition) throw new Error(`Unknown icon: ${String(icon)}; choose a name from runtime/icons.mjs ICON_NAMES.`);
+  if (!definition) throw new Error(unknownIcon(icon));
   const nodes = [];
   // outline: ring + primary glyph; filled: primary disc + white glyph; plain:
   // primary glyph alone; inverse: white glyph alone (on a filled field);

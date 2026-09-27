@@ -62,7 +62,10 @@ for (const count of [1,2]) {
  const metricEnd=Math.max(...metric.map(n=>n.frame.y+n.frame.height));
  const proseStart=Math.min(...prose.map(n=>n.frame.y));
  assert.ok(proseStart>=metricEnd&&proseStart-metricEnd<120,'explanation stays beside the metric rather than dropping to the slide foot');
- assert.ok(Math.min(...metric.map(n=>n.frame.y))>180,'compact group is centered in its body track');
+ // The group starts at the top of its track, level with the table, rather
+ // than centred in it with a band of air above the number.
+ const table=nodes.filter(n=>n.id.includes('s-exhibit')&&n.frame);
+ assert.ok(Math.abs(Math.min(...metric.map(n=>n.frame.y))-Math.min(...table.map(n=>n.frame.y)))<24,'the number starts level with the exhibit');
 }
 console.log('{}');
 """)
@@ -86,10 +89,11 @@ assert.equal(find(withInsight.items,i=>i.id==='s01-points').props.centre,false);
 // half of it between the heading rule and the first line.
 const headed=composeSlide({title:'T',exhibit,points},0);
 assert.equal(find(headed.items,i=>i.id==='s01-points').props.centre,false);
-// Alone in an unheaded track the list still spreads and centres the leftover.
+// Alone in an unheaded track the list spreads from the top too: centring the
+// leftover put as much air above the first point as under the last.
 const alone=composeSlide({title:'T',exhibit,points,pointsHeading:false},0);
 const list=find(alone.items,i=>i.id==='s01-points');
-assert.equal(list.props.distribute,false); assert.equal(list.size.height,'hug');
+assert.equal(list.props.distribute,true); assert.equal(list.props.centre,false); assert.equal(list.size.height,'fill');
 console.log('{}');
 ''')
 

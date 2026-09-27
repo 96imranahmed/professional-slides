@@ -29,7 +29,7 @@ export function quantitativeLegendNodes({id,frame,props}) {
   const labels=scale.domain.map((v,i)=>`${scale.semantics==='relative-level'?(i?'High ':'Low '):''}${withUnit(v.toFixed(scale.decimals), scale.unit)}`);
   const measurements=labels.map(text=>measureText(text,frame.width,{fontSize:size,wrapWidthRatio:1}));
   const height=Math.max(...measurements.map(m=>m.height));
-  if (measurements.some(m=>m.lines.length!==1)||measurements.reduce((s,m)=>s+m.width,0)+16>frame.width || height+20>frame.height) throw new Error('Quantitative legend does not fit its allocated frame');
+  if (measurements.some(m=>m.lines.length!==1)||measurements.reduce((s,m)=>s+m.width,0)+16>frame.width || height+20>frame.height) throw new Error('Quantitative legend does not fit its allocated frame; widen the legend region or shorten the unit and end labels');
   const data={legendVariant:'quantitative-scale',domain:scale.domain,unit:scale.unit,palette:scale.palette,scaleSemantics:scale.semantics??null,bins:11};
   const nodes=Array.from({length:11},(_,i)=>{
     const low=Math.max(0,(i-.5)/10),high=Math.min(1,(i+.5)/10);

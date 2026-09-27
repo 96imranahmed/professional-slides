@@ -97,6 +97,27 @@ console.log(JSON.stringify({accepted:true}));
             report=page_gates.run_gates({'slides':[slide,{'nodes':[],'componentInstances':[{'component':'cover'}]}]},directory,gates={'WORDS'})
             self.assertEqual(report['countsByCode']['MISSING_RENDER'],2)
 
+    def test_only_blockers_fail_a_build_and_each_is_named(self):
+        # Advisory-only builds are `built`; a build held back by text lost from
+        # the rendered pages says so, rather than showing the advisory counts.
+        result = run_node('''
+import {buildOutcome} from './skills/professional-slides/runtime/build-deck.mjs';
+const advisory = {code:'UNANNOTATED',severity:'advisory',slide:4};
+const passed = {passed:true,findings:[advisory,{code:'DECK_CRAFT',severity:'advisory'}]};
+const clean = buildOutcome({preflight:passed,gates:passed,readback:{accepted:true},textCoverage:{accepted:true,findings:[]}},{render:true});
+const lost = buildOutcome({preflight:passed,gates:passed,readback:{accepted:true},textCoverage:{accepted:false,findings:[{id:'p13',code:'TEXT_EXPORT_LOST',text:'787',severity:'blocking'}]}},{render:true});
+const gated = buildOutcome({preflight:{passed:false,findings:[{code:'TITLE_WORDS',severity:'blocker',slide:3},advisory]},gates:{passed:false,findings:[{code:'TITLE_WORDS',severity:'blocker',slide:3},advisory]},readback:{accepted:true}},{render:true});
+const unrendered = buildOutcome({preflight:passed,readback:{accepted:true}},{render:false});
+console.log(JSON.stringify({clean,lost,gated,unrendered}));
+''')
+        self.assertEqual(result['clean'], {'status': 'built', 'blockers': [], 'advisories': {'DECK_CRAFT': 1, 'UNANNOTATED': 1}})
+        self.assertEqual(result['lost']['status'], 'built-with-blockers')
+        self.assertEqual([(b['source'], b['code'], b['id']) for b in result['lost']['blockers']], [('rendered text', 'TEXT_EXPORT_LOST', 'p13')])
+        self.assertEqual(result['gated']['status'], 'built-with-blockers')
+        self.assertEqual([b['code'] for b in result['gated']['blockers']], ['TITLE_WORDS'])
+        self.assertEqual(result['gated']['advisories'], {'UNANNOTATED': 1})
+        self.assertEqual(result['unrendered']['status'], 'built-unrendered')
+
     def test_coverage_blocks_build_and_delivery_and_python_option_is_used(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);spec=root/'spec.json';out=root/'out'
@@ -109,7 +130,8 @@ console.log(JSON.stringify({accepted:true}));
             self.assertEqual(json.loads(pre.stdout)['status'],'preflight-findings')
             build=subprocess.run(command+['--no-render'],capture_output=True,text=True,env=env)
             self.assertEqual(build.returncode,2,build.stderr)
-            self.assertEqual(json.loads(build.stdout)['status'],'built-with-findings')
+            self.assertEqual(json.loads(build.stdout)['status'],'built-with-blockers')
+            self.assertIn('MISSING_EVIDENCE',json.loads(build.stdout)['blockers']['byCode'])
             report=json.loads((out/'preflight-gates.json').read_text())
             self.assertEqual(report['countsByCode']['MISSING_EVIDENCE'],1)
             review=root/'review.json';review.write_text(json.dumps({'accepted':True,'summary':'Accepted for the purpose of proving gates cannot be bypassed.','findings':[]}))

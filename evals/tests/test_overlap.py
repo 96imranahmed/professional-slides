@@ -50,7 +50,10 @@ const cases = {
   separated:[text('a'),text('b',{frame:{...frame,y:180}})],
   surface_and_own_text:[box('a','panel-surface',{x:90,y:90,width:300,height:200}),text('b')],
   marker_and_cue:[ellipsePrimitive({id:'a',role:'status-marker',frame:{x:100,y:100,width:32,height:32},style:{fill:token('color.componentPrimary'),stroke:'none'}}),text('b',{role:'status-cue',text:'1',frame:{x:108,y:104,width:16,height:24}})],
-  masked_grid:[line('a',113,'chart-gridline'),box('b','chart-mark',{x:90,y:90,width:300,height:100}),text('c',{role:'data-label'})]
+  masked_grid:[line('a',113,'chart-gridline'),box('b','chart-mark',{x:90,y:90,width:300,height:100}),text('c',{role:'data-label'})],
+  callout_inside_own_bar:[{...box('bar','chart-mark',{x:90,y:90,width:300,height:60}),data:{category:'Beta'}},{...box('note','annotation-surface',{x:100,y:100,width:120,height:30}),data:{insideMark:true,category:'Beta'}}],
+  callout_inside_foreign_bar:[{...box('bar','chart-mark',{x:90,y:90,width:300,height:60}),data:{category:'Alpha'}},{...box('note','annotation-surface',{x:100,y:100,width:120,height:30}),data:{insideMark:true,category:'Beta'}}],
+  callout_on_bar_unflagged:[{...box('bar','chart-mark',{x:90,y:90,width:300,height:60}),data:{category:'Beta'}},{...box('note','annotation-surface',{x:100,y:100,width:120,height:30}),data:{category:'Beta'}}]
 };
 const output={};
 for (const [id,nodes] of Object.entries(cases)) {
@@ -63,9 +66,9 @@ for (const [id,nodes] of Object.entries(cases)) {
 await browser.close();
 console.log(JSON.stringify(output));
 ''')
-        for case in ["map_foreign_land", "map_cross_feature_lines", "map_same_feature_cross_without_joint", "map_leader_crosses_text", "text_text", "text_rule", "clipped_text", "shape_shape", "unrelated_container", "container_does_not_excuse_text_collision", "annotation_crossing_label", "unequal_header_gap", "native_backing_hides_text", "foreign_surface", "foreign_tree_endpoint", "stroked_shape", "table_wrong_row", "table_backing_hides_bullet", "roadmap_band_overpaints_label", "roadmap_label_outside_band"]:
+        for case in ["map_foreign_land", "map_cross_feature_lines", "map_same_feature_cross_without_joint", "map_leader_crosses_text", "text_text", "text_rule", "clipped_text", "shape_shape", "unrelated_container", "container_does_not_excuse_text_collision", "annotation_crossing_label", "unequal_header_gap", "native_backing_hides_text", "foreign_surface", "foreign_tree_endpoint", "stroked_shape", "table_wrong_row", "table_backing_hides_bullet", "roadmap_band_overpaints_label", "roadmap_label_outside_band", "callout_inside_foreign_bar", "callout_on_bar_unflagged"]:
             self.assertFalse(results[case]["accepted"], case)
-        for case in ["map_own_land", "map_own_joint", "separated", "surface_and_own_text", "nested_surface", "marker_and_cue", "masked_grid", "table_own_bullet", "own_tree_endpoint", "roadmap_own_label"]:
+        for case in ["map_own_land", "map_own_joint", "separated", "surface_and_own_text", "nested_surface", "marker_and_cue", "masked_grid", "table_own_bullet", "own_tree_endpoint", "roadmap_own_label", "callout_inside_own_bar"]:
             self.assertTrue(results[case]["accepted"], case)
         self.assertGreater(results["clipped_text"]["overflow"], 0)
 

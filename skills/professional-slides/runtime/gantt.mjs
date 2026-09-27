@@ -64,6 +64,57 @@ export function ganttLayout(frame, props) {
   return { groups, rows, hasGroups, groupWidth, labelWidth, left, gridWidth, cell, tierHeight, headerHeight, labels, heights, height: tierHeight + headerHeight + heights.reduce((a, b) => a + b, 0), todayRow, naturalHeight };
 }
 
+// Where a milestone's label sits (the rule `ganttNodes` draws it by): after
+// its diamond when it fits before the grid's edge, otherwise before it.
+function milestoneLabelSpan(L, ms, gridRight) {
+  const mx = L.left + ms.at * L.cell, size = v("space.3");
+  const lm = measure(ms.label, L.cell * 2, "type.label", false);
+  const fits = mx + size / 2 + v("space.1") + lm.width <= gridRight;
+  return fits ? [mx + size / 2 + v("space.1"), mx + size / 2 + v("space.1") + lm.width] : [mx - size / 2 - v("space.1") - lm.width, mx - size / 2 - v("space.1")];
+}
+
+/**
+ * Where a bar's own label goes, measured against everything else on its row.
+ *
+ * The label was set inside the bar whenever it fitted the bar's width, with
+ * nothing looking at what else crossed the bar: on the Emirates 777X plan the
+ * dashed Today line ran through "None in service" so that it read "Now in
+ * service", and a milestone diamond or its label at the bar's end could land
+ * on the text the same way. The row's marks are now obstacles - the Today
+ * line, each milestone diamond and each milestone label - and the label takes
+ * the first place it fits on one line clear of all of them: inside the bar
+ * (white, bold) in the first clear stretch, else after the bar, else before
+ * it (grey). A label with no clear place is still set inside the bar, as it
+ * was, rather than dropped.
+ */
+function barLabelPlacement(L, row, bx, bw, x0, gridRight, props) {
+  const pad = v("space.2"), clear = v("space.1");
+  const obstacles = [];
+  if (Number.isFinite(props.today)) { const tx = x0 + props.today * L.cell; obstacles.push([tx - clear, tx + clear]); }
+  for (const ms of row.milestones) {
+    if (!Number.isFinite(ms.at)) continue;
+    const mx = x0 + ms.at * L.cell, size = v("space.3");
+    obstacles.push([mx - size / 2 - clear, mx + size / 2 + clear]);
+    if (ms.label) { const [a, b] = milestoneLabelSpan(L, ms, gridRight); obstacles.push([a - clear, b + clear]); }
+  }
+  // The clear stretches of [from, to] once the obstacles are cut out of it.
+  const clearOf = (from, to) => {
+    let spans = [[from, to]];
+    for (const [a, b] of obstacles) spans = spans.flatMap(([s, e]) => b <= s || a >= e ? [[s, e]] : [[s, Math.min(e, a)], [Math.max(s, b), e]].filter(([p, q]) => q - p > 0));
+    return spans;
+  };
+  const single = (bold) => measure(row.text, 100000, "type.label", bold).width;
+  const insideWidth = single(true), outsideWidth = single(false);
+  const inside = clearOf(bx + pad, bx + bw - pad).find(([s, e]) => e - s >= insideWidth);
+  if (inside) return { x: inside[0], width: inside[1] - inside[0], layout: measure(row.text, inside[1] - inside[0], "type.label", true), inside: true, align: "left" };
+  const after = clearOf(bx + bw + pad, gridRight)[0];
+  if (after && after[0] <= bx + bw + pad + 0.01 && after[1] - after[0] >= outsideWidth) return { x: after[0], width: after[1] - after[0], layout: measure(row.text, after[1] - after[0], "type.label", false), inside: false, align: "left" };
+  const before = clearOf(x0, bx - pad).at(-1);
+  if (before && before[1] >= bx - pad - 0.01 && before[1] - before[0] >= outsideWidth) return { x: before[0], width: before[1] - before[0], layout: measure(row.text, before[1] - before[0], "type.label", false), inside: false, align: "right" };
+  const fallback = measure(row.text, bw - 2 * pad, "type.label", true);
+  return fallback.lines.length === 1 ? { x: bx + pad, width: bw - 2 * pad, layout: fallback, inside: true, align: "left" } : null;
+}
+
 export function ganttNodes({ id, frame, props }) {
   const L = ganttLayout(frame, props);
   const valign = props.valign ?? "middle";
@@ -116,12 +167,8 @@ export function ganttNodes({ id, frame, props }) {
     const fill = row.tone === "accent" ? ACCENT : row.tone === "secondary" ? SECOND : PRIMARY;
     nodes.push(rect(rid + ":bar", "gantt-bar", { x: bx + 1, y: mid - barH / 2, width: bw - 2, height: barH }, fill, "radius.small", { row: r, from: row.from, to: row.to }));
     if (row.text) {
-      const inside = measure(row.text, bw - 2 * v("space.2"), "type.label", true);
-      if (inside.lines.length === 1) nodes.push(text(rid + ":text", "gantt-bar-label", { x: bx + v("space.2"), y: mid - inside.height / 2, width: bw - 2 * v("space.2") }, inside, style("type.label", WHITE, true, "left"), { row: r }));
-      else {
-        const outside = measure(row.text, gridRight - (bx + bw) - v("space.2"), "type.label", false);
-        if (outside.lines.length === 1) nodes.push(text(rid + ":text", "gantt-bar-label", { x: bx + bw + v("space.2"), y: mid - outside.height / 2, width: gridRight - (bx + bw) - v("space.2") }, outside, style("type.label", GREY, false, "left"), { row: r }));
-      }
+      const placed = barLabelPlacement(L, row, bx, bw, x0, gridRight, props);
+      if (placed) nodes.push(text(rid + ":text", "gantt-bar-label", { x: placed.x, y: mid - placed.layout.height / 2, width: placed.width }, placed.layout, style("type.label", placed.inside ? WHITE : GREY, placed.inside, placed.align), { row: r, placement: placed.inside ? "inside" : placed.align === "right" ? "before" : "after" }));
     }
     // milestones
     row.milestones.forEach((ms, k) => {
@@ -154,6 +201,11 @@ export function registerGantt(registry) {
     sample: { periods: ["M1", "M2", "M3", "M4", "M5", "M6"], groups: [{ name: "Phase 1", rows: [{ label: "(Insert workstream)", from: 0, to: 2, text: "(Insert activity)" }, { label: "(Insert workstream)", from: 1, to: 3 }] }, { name: "Phase 2", rows: [{ label: "(Insert workstream)", from: 3, to: 6, milestones: [{ at: 6, label: "Go-live" }] }] }], today: 2.5 },
     render: (input) => ({ nodes: ganttNodes(input) }),
     measureContent: ({ frame, props }) => ({ height: ganttLayout({ ...frame, height: Number.MAX_SAFE_INTEGER / 4 }, props).naturalHeight }),
+    // Rows grow to twice their natural height and the schedule then centres
+    // in whatever is left, which under a full-width plan put the spare above
+    // and below it - a gap between the plan and its commentary. The column
+    // gives it the grown height and keeps the rest as the page's margin.
+    measureCeiling: ({ frame, props }) => { const L = ganttLayout(frame, props); return L.height + L.todayRow; },
     guidance: { useWhen: "a plan with dated workstreams, phases and milestones on one calendar", why: "bars on one time axis make sequence, overlap and slack visible at a glance", actionTitle: "state the critical path and the date it protects" }
   });
   return registry;

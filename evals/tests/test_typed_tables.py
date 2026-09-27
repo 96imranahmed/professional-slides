@@ -13,8 +13,15 @@ const frame={x:60,y:60,width:1160,height:580};
 const nodes=renderTable({id:'logos',frame,props}).nodes;
 const logos=nodes.filter(n=>n.role==='table-logo');
 assert.equal(logos.length,2);
-assert.equal(logos[0].frame.height,logos[1].frame.height);
+// Logos share a visual area, not a height. Held to one body line (the old
+// equal-height rule) a square or upright mark shrank to a speck beside a
+// wordmark; now each gets the same ink up to the 40px cell, so a wide mark
+// runs long and low and a squarer one stands taller.
+const area=n=>n.frame.width*n.frame.height;
+assert.ok(logos.every(n=>n.frame.height<=n.data.cellHeight+1e-6&&n.data.cellHeight>=40));
+assert.ok(Math.abs(area(logos[0])-area(logos[1]))/Math.max(area(logos[0]),area(logos[1]))<0.1);
 assert.notEqual(logos[0].frame.width,logos[1].frame.width);
+assert.notEqual(logos[0].frame.height,logos[1].frame.height);
 for(const n of logos) assert.ok(Math.abs(n.frame.width/n.frame.height-n.data.width/n.data.height)<1e-3);
 const surfaces=nodes.filter(n=>n.role==='table-cell');
 assert.ok(surfaces.some(n=>n.data.cellType==='category'&&n.style.fill.tokenId==='color.componentPrimary'));
@@ -147,7 +154,7 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {TABLE_VARIANTS} from './skills/professional-slides/runtime/table-fixtures.mjs';
 import {CELL_TYPES} from './skills/professional-slides/runtime/tables.mjs';
 const seen=new Set();
-for(const palette of ['mckinsey','bcg','bain']) for(const [variant,fixture] of Object.entries(TABLE_VARIANTS)) {
+for(const palette of ['midnight','evergreen','crimson']) for(const [variant,fixture] of Object.entries(TABLE_VARIANTS)) {
  const props={...REGISTRY.get('table').sample,...fixture.props,variant};
  const spec={id:'table',palette,typography:{body:'Georgia',display:'Georgia',semibold:{family:'Georgia',nativeBold:true,effectiveWeight:700}},slides:[{id:'page',composition:component({id:'table',component:'table',props,frame:{x:60,y:40,width:1160,height:632}})}]};
  const deck=compileDeck(spec,REGISTRY);assert.deepEqual(compileDeck(spec,REGISTRY),deck);
@@ -155,7 +162,7 @@ for(const palette of ['mckinsey','bcg','bain']) for(const [variant,fixture] of O
   if(node.data.cellType)seen.add(node.data.cellType);
   if(node.role==='table-cell'&&node.data.cellType==='category'){
    assert.equal(node.style.fill.tokenId,'color.componentPrimary');
-   assert.equal(node.style.fill.value,{mckinsey:'#051C2C',bcg:'#0E7A5E',bain:'#CC0000'}[palette]);
+   assert.equal(node.style.fill.value,{midnight:'#051C2C',evergreen:'#0E7A5E',crimson:'#CC0000'}[palette]);
   }
   if(node.type==='text'){assert.equal(node.style.fontFamily.value,'Georgia');assert.ok([9,10,12].includes(node.style.fontSize.value),'status labels sit at the label size');assert.equal(node.style.wrap,false);}
  }
@@ -234,7 +241,7 @@ for(const variant of ['bar-columns','heatmap-1-10','grouped-hypotheses','numbere
 	  assert.equal(arrows.filter(n=>n.type==='ellipse'&&n.data.arrowVariant==='disc-chevron').length,3);
 	  assert.ok(arrows.filter(n=>n.type==='line').every(n=>['color.ink','color.onPrimary'].includes(n.style.stroke.tokenId)));
 	  const rowRules=nodes.filter(n=>n.role==='table-rule'&&n.data.rule==='row');
-	  assert.equal(rowRules.length,6);assert.ok(rowRules.every(n=>n.data.column!==2));
+	  assert.equal(rowRules.length,4);assert.ok(rowRules.every(n=>n.data.column!==2)); // one rule per side of the gutter per row boundary, not one per column
 	  delete props.columns[2].relation;assert.throws(()=>renderTable({id:'bad',frame,props}),/relation: implies/);
  }
 }

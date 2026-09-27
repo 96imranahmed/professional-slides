@@ -70,6 +70,11 @@ export async function auditSlideOverlaps(page, slide) {
         if (surface.role === "tracker-selection" && surface.data.sectionId === child.data.sectionId && child.boxes.every(box => inside(surface.frame, box)) && (surface.data.paintOrder ?? entries.indexOf(surface)) < (child.data.paintOrder ?? entries.indexOf(child))) return "selected tracker item inside its exact row highlight";
         if (surface.role === "table-cell" && policy.containedCellMarks.includes(child.role) && surface.data.row === child.data.row && surface.data.column === child.data.column && inside(surface.frame, child.frame) && (surface.data.paintOrder ?? entries.indexOf(surface)) < (child.data.paintOrder ?? entries.indexOf(child))) return "mark inside its own table cell";
         if (surface.role === "chart-label-surface" && surface.data.forNode === child.id) return "gridline knockout behind its exact data label";
+        // A callout set inside its own bar (chart-annotations insidePlacement):
+        // its own category and series only, wholly inside, painted above it.
+        if (surface.role === "chart-mark" && ["annotation-surface", "annotation-text"].includes(child.role) && child.data?.insideMark === true
+          && child.data.category === surface.data?.category && (child.data.series === undefined || child.data.series === surface.data?.series)
+          && inside(surface.frame, child.frame) && (surface.data.paintOrder ?? entries.indexOf(surface)) < (child.data.paintOrder ?? entries.indexOf(child))) return "callout set inside its own bar";
         if (policy.containedLabels[surface.role] === child.role && child.boxes.every((r) => inside(surface.frame, r)) && rawHit(surface, child.frame.x + child.frame.width / 2, child.frame.y + child.frame.height / 2)) return `label inside its ${surface.role}`;
         if (surface.role === "chart-highlight" && child.role.startsWith("chart-") && child.type !== "text") return "chart category highlight under plot geometry";
         if (surface.role === "chart-highlight" && child.role === "data-label") return "data label over category highlight";

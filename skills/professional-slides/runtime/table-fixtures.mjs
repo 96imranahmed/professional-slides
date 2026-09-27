@@ -25,7 +25,7 @@ const competitorBars={columns:[text('Competitor',.16,'category'),text('Positioni
 ]};
 const logoRecords=JSON.parse(readFileSync(new URL('../assets/simple-icons/treatments.json',import.meta.url),'utf8'));
 const tableLogos=['visa','cisco'].map(name=>{const r=logoRecords.find(r=>r.name===name);return {dataUri:'data:image/png;base64,'+readFileSync(new URL('../assets/simple-icons/'+name+'-grayscale.png',import.meta.url)).toString('base64'),width:r.width,height:r.height,alt:name,authorization:'Simple Icons CC0; editorial identification'};});
-// A photograph leading each row: the component tables in the corpus set a
+// A photograph leading each row: a component table often sets a
 // thumbnail of the thing the row describes.
 const tablePhoto={dataUri:'data:image/png;base64,'+readFileSync(new URL('../assets/pexels/category.png',import.meta.url)).toString('base64'),width:480,height:480,alt:'(Insert what the photograph shows)',authorization:'User-selected Pexels image; assets/pexels/source.json'};
 export const TABLE_VARIANTS={

@@ -11,10 +11,18 @@ import { groupThousands } from "./draw.mjs";
  * values decide it - a decimal while the largest of them is under a hundred
  * and any of them needs one, and whole numbers above that.
  */
-function decimalsFor(props, value) {
+export function decimalsFor(props, value) {
+  // Every figure the chart prints from its data, wherever the chart keeps it:
+  // keyed line points, a range's two ends, a bullet's targets, a treemap's tiles, a sparkline's
+  // closing figure, a box's median. Reading only `series` and `values` left
+  // those charts deciding label by label.
+  const numbers = (list) => (Array.isArray(list) ? list : []);
   const all = [
-    ...((props?.series || []).flatMap((item) => (Array.isArray(item?.values) ? item.values : []))),
-    ...(Array.isArray(props?.values) ? props.values : []),
+    ...numbers(props?.series).flatMap((item) => [...numbers(item?.values), ...numbers(item?.points).map((point) => point?.y)]),
+    ...numbers(props?.values),
+    ...numbers(props?.low), ...numbers(props?.high), ...numbers(props?.targets),
+    ...numbers(props?.items).map((item) => (Array.isArray(item?.values) ? item.values.at(-1) : item?.value)),
+    ...numbers(props?.boxes).map((box) => box?.median),
   ].filter((entry) => Number.isFinite(entry));
   if (all.length > 1) {
     const largest = Math.max(...all.map((entry) => Math.abs(entry)));
@@ -33,11 +41,13 @@ export function formatValue(value, props) {
   // Without a declared format, labels round the way a reader reads them: whole
   // numbers from ten up, one decimal below ten. Marks keep the raw value.
   // Four figures and up read with a thousands separator, the way every
-  // published page prints them: 10,156 rather than 10156.
+  // well-made page prints them: 10,156 rather than 10156.
   const group = groupThousands;
   if (!format) {
-    const rounded = round(value, decimalsFor(props, value));
-    const [whole, fraction] = String(rounded).split(".");
+    // The chart's precision is printed, not only rounded to: String() of a
+    // rounded 32 is "32", which then sat beside "40.8" on the same series.
+    const decimals = decimalsFor(props, value);
+    const [whole, fraction] = round(value, decimals).toFixed(decimals).split(".");
     const sign = whole.startsWith("-") ? "-" : "";
     const digits = sign ? whole.slice(1) : whole;
     return `${sign}${digits.length > 3 ? group(digits) : digits}${fraction ? `.${fraction}` : ""}`;
@@ -62,7 +72,7 @@ export function formatValue(value, props) {
 /**
  * A formatted number with its unit, written the way the unit is written.
  *
- * "$m" after the figure gives "888$m", which no published page prints: a
+ * "$m" after the figure gives "888$m", which no well-made page prints: a
  * currency symbol leads and its magnitude trails, so the same unit gives
  * "$888m". A percent closes up against the number, and everything else takes
  * the space it needs.
@@ -74,4 +84,23 @@ export function withUnit(text, unit) {
   if (currency) return `${currency[1]}${text}${currency[2]}`;
   if (/^[%‰]/.test(trimmed)) return `${text}${trimmed}`;
   return `${text} ${trimmed}`;
+}
+
+/**
+ * One figure standing alone, as a table's pill, a chart's bubble and a measure
+ * cell hold it: a qualifier or sign, a currency, the number (or a score out of
+ * something, closed up: "4.5/5"; spaced, "10.48 / 22" is an expression), a
+ * unit or magnitude and "p.a.". Three places kept their own pattern and
+ * disagreed: the pill check refused "+25bps", "12 pts" and "£38m p.a." as
+ * words mixed with figures while the bubble took two of them, so one figure
+ * passed on a chart and failed in the table beside it.
+ */
+export const SCALAR_FIGURE = /^\s*(?:[~≈<>≤≥]\s*)?[+\-−–]?\s*([$€£¥₹])?\s*[+\-−–]?\s*\d[\d,]*(?:\.\d+)?(\/\d[\d,]*(?:\.\d+)?)?\s*(%|pp|pts?|bps|x|×|bn|tn|mn|[kmbt])?\+?(\s*p\.a\.)?\s*$/i;
+
+/** The unit a lone figure is written in ("$bn", "%", "bps", "/5", "£m p.a.", "" bare), or null when `text` is not one figure. */
+export function figureUnit(text) {
+  const match = SCALAR_FIGURE.exec(String(text ?? ""));
+  if (!match) return null;
+  const [, currency = "", scale = "", unit = "", perYear] = match;
+  return `${currency}${scale}${unit.toLowerCase().replace("×", "x").replace(/^pt$/, "pts")}${perYear ? " p.a." : ""}`;
 }

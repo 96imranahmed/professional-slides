@@ -50,8 +50,10 @@ class FollowupReviewTests(unittest.TestCase):
             self.assertEqual(image.read_bytes(), (ROOT / 'skills/professional-slides/examples/assets/hills.jpg').read_bytes())
             manifest = json.loads((package / 'package-manifest.json').read_text())
             self.assertIn('skills/professional-slides/examples/assets/hills.jpg', manifest['files'])
-            for example in ['slideworks', 'nyc-or-sf']:
-                result = self.cli(package / 'evals/scripts/compile_scene.mjs',
+            # The package is the skill alone; the development scripts stay here.
+            self.assertFalse([f for f in manifest['files'] if f.startswith('evals/')])
+            for example in ['house-style', 'nyc-or-sf']:
+                result = self.cli(ROOT / 'evals/scripts/compile_scene.mjs',
                                   skill / f'examples/{example}.deck.json', root / f'{example}.scene.json')
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertGreater(len(json.loads((root / f'{example}.scene.json').read_text())['slides']), 1)
@@ -119,7 +121,7 @@ console.log(JSON.stringify({ok:true}));
     def test_removed_dependency_route_has_explicit_usage_error(self):
         result = self.cli(ROOT / 'evals/scripts/run_tests.mjs', '--dependencies')
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Usage: run_tests.mjs [--release]', result.stderr)
+        self.assertIn('Usage: run_tests.mjs', result.stderr)
         self.assertNotIn('MODULE_NOT_FOUND', result.stderr)
 
     def test_empty_footer_overrides_house_and_raw_planner_compilation_still_works(self):
@@ -162,7 +164,7 @@ console.log(JSON.stringify({{ok:true}}));
                     shape.top = round(top * sy); shape.height = round(shape_height * sy)
                 prs.slide_width, prs.slide_height = Inches(width), Inches(height)
                 file = Path(tmp) / f'{width}-{height}.pptx'; prs.save(file)
-                profiles.append(importer.analyse(file, 'mckinsey'))
+                profiles.append(importer.analyse(file, 'midnight'))
             for profile in profiles[1:]:
                 self.assertEqual(profile['chrome'], profiles[0]['chrome'])
                 self.assertEqual(profile['stats']['medianBodyCoverage'], profiles[0]['stats']['medianBodyCoverage'])
@@ -197,7 +199,7 @@ import {compileDeck} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const cases=[];
 for (const type of ['column','bar']) for (const labels of [true,false]) for (const axis of [true,false])
- for (const extra of [{},{colorIndices:[2]},{highlights:[{category:'B',style:'bar'}]},{forecastFrom:'B'}])
+ for (const extra of [{},{colorIndices:[2]},{highlights:[{category:'B',style:'bar'}]}])
   cases.push({component:'chart.'+type,props:{categories:['A','B'],series:[{name:'Revenue',values:[20,40]}],dataLabels:labels,showValueAxis:axis,...extra}});
 const slides=cases.map((c,i)=>({id:'s'+i,composition:{nodeType:'component',id:'plot',...c,frame:{x:60,y:160,width:1000,height:460}}}));
 console.log(JSON.stringify(compileDeck({id:'charts',slides},REGISTRY)));
@@ -213,6 +215,21 @@ console.log(JSON.stringify(compileDeck({id:'charts',slides},REGISTRY)));
                 for point, mark in zip(series.points, marks):
                     color = point.format.fill.fore_color.rgb if point.format.fill.type else series.format.fill.fore_color.rgb
                     self.assertEqual(str(color), mark['style']['fill']['value'].lstrip('#').upper())
+
+    def test_a_keyed_forecast_stays_drawn(self):
+        # `forecastFrom` used to be a native case above: PowerPoint kept the
+        # grey per-point tint and nothing said what grey meant. The drawn chart
+        # now keys the forecast (legend entry, dashed boundary), which Office
+        # cannot place against its own plot, so the chart is assembled as shapes.
+        scene = run_node('''
+import {compileDeck} from './skills/professional-slides/runtime/core.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const slides=[{id:'f',composition:{nodeType:'component',id:'plot',component:'chart.column',props:{categories:['A','B','C'],series:[{name:'Revenue',values:[20,40,45]}],forecastFrom:'B'},frame:{x:60,y:160,width:1000,height:460}}}];
+console.log(JSON.stringify(compileDeck({id:'charts',slides},REGISTRY)));
+''')
+        source = scene['slides'][0]
+        self.assertIsNone(source['componentInstances'][0].get('nativeChart'))
+        self.assertTrue(any(n['role'] == 'chart-forecast-divider' for n in source['nodes']))
 
 
 if __name__ == '__main__':

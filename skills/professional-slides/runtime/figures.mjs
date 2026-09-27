@@ -1,18 +1,18 @@
-// Seventeen figure families the reference corpus uses and the skill could not draw.
+// Seventeen figure families that well-made decks use and the skill could not
+// otherwise draw.
 //
-// A 400-page sample of the corpus (evals/corpus/styles) was classified into 85
-// design styles and each probed against the runtime. These are the diagram and
-// statistic styles that had no component: a column of large statistics, a
+// These are diagram and statistic styles that had no component: a column of large statistics, a
 // flowchart, spectrum sliders, a layer stack, items placed into category
 // columns, a rank table across periods, a two-sided flow, an icon array, rows
 // carried by arrows and a row of capsule pillars. Each is drawn from the
 // primitives every other component uses, so the PowerPoint emitter and the
 // HTML renderer need nothing new, and each measures itself and refuses content
 // it cannot set rather than overflowing.
-import { token, tokenValue, stableId, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive } from "./core.mjs";
+import { token, tokenValue, stableId, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive, readableOn, emphasisRuns, cardMuted } from "./core.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 import { mediaNode } from "./media.mjs";
+import { measureTextRuns } from "./text-layout.mjs";
 
 const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink");
 const WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), RULE = token("color.rule");
@@ -22,7 +22,7 @@ const v = (id) => tokenValue(token(id));
 
 export const FIGURE_TOKENS = Object.freeze([...new Set([...MARK_TOKENS,
   "color.componentPrimary", "color.accent", "color.accentTint", "color.ink", "color.onPrimary", "color.textSecondary",
-  "color.rule", "color.surfaceMuted", "font.body", "font.display", "type.metric", "type.heading", "type.body",
+  "color.rule", "color.surfaceMuted", "color.surfaceTint", "font.body", "font.display", "type.metric", "type.heading", "type.body",
   "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "space.6",
   "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
@@ -41,7 +41,7 @@ const line = (id, role, x1, y1, x2, y2, stroke = RULE, width = "line.hairline", 
 /* --------------------------------------------------------------- stat-list */
 
 // A column of large statistics, each with the line that says what it counts.
-// The corpus sets these down a dark side panel or in a two-column grid; the
+// A strong deck sets these down a dark side panel or in a two-column grid; the
 // number is the figure, so it is set in the metric type and the sentence beside
 // it at body size. Rows share the height they are given, capped so a short list
 // does not turn into four islands.
@@ -205,11 +205,11 @@ export function flowNodes({ id, frame, props }) {
 /* ---------------------------------------------------------------- spectrum */
 
 // Sliders between two poles, one per dimension, with a marker where the subject
-// sits. The corpus uses them for mindsets and positioning: "fixed" to "growth",
+// sits. They suit mindsets and positioning: "fixed" to "growth",
 // "reactive" to "creative". The pole names carry the scale, so there are no ticks.
 //
 // `segments: 3–7` turns each track into a row of discrete steps with the one the
-// subject sits on filled: the published reports' assessment scale ("impact on
+// subject sits on filled: the familiar assessment scale ("impact on
 // industry: very low … very high", "time to mainstream: 0–2 … 10+ years"). A
 // judged grade is not a point on a continuum, and a slider drawn at 0.62 claims
 // a precision the judgement does not have. `scale` names the steps once, above
@@ -286,8 +286,8 @@ export function spectrumNodes({ id, frame, props }) {
 
 /* ------------------------------------------------------------------ layers */
 
-// A layer stack: bands one above another, each resting on the one below. The
-// corpus draws architectures, capability stacks and hierarchies of need this
+// A layer stack: bands one above another, each resting on the one below. A
+// well-made deck draws architectures, capability stacks and hierarchies of need this
 // way. The top band takes the accent; the rest step down in tone.
 function normalizeLayers(props) {
   return between(props.layers, 2, 7, "A layer stack").map((layer, i) => {
@@ -485,7 +485,7 @@ export function sankeyLayout(frame, props) {
 
 export function sankeyNodes({ id, frame, props }) {
   const L = sankeyLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`The sankey needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px`);
+  if (L.height > frame.height + 0.01) throw new Error(`The sankey needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a node or give the sankey more height`);
   const out = [], bar = 14, gap = v("space.2");
   const total = L.flows.reduce((s, f) => s + f.value, 0);
   const place = (nodes, key) => {
@@ -527,7 +527,7 @@ export function sankeyNodes({ id, frame, props }) {
 
 // An icon array: ten or twenty figures per row with the share filled in the
 // accent. "Six in ten" reads faster as six filled people than as a bar at 60%,
-// and the corpus uses it for exactly that kind of population share.
+// and it suits exactly that kind of population share.
 function normalizePictogram(props) {
   const of = props.of ?? 10;
   if (![10, 20].includes(of)) throw new Error("A pictogram row counts out of 10 or 20");
@@ -554,7 +554,7 @@ export function pictogramLayout(frame, props) {
 
 export function pictogramNodes({ id, frame, props }) {
   const L = pictogramLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`The pictogram needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px`);
+  if (L.height > frame.height + 0.01) throw new Error(`The pictogram needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a row or give it more height`);
   const out = [], gap = v("space.5") + Math.min(v("space.5"), (frame.height - L.height) / Math.max(1, L.rows.length - 1));
   let y = frame.y + Math.max(0, (frame.height - L.height - (gap - v("space.5")) * (L.rows.length - 1)) / 2);
   L.rows.forEach((r, i) => {
@@ -597,7 +597,7 @@ export function arrowRowsLayout(frame, props) {
 
 export function arrowRowsNodes({ id, frame, props }) {
   const L = arrowRowsLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`The arrow rows need ${Math.ceil(L.height)}px and have ${Math.floor(frame.height)}px`);
+  if (L.height > frame.height + 0.01) throw new Error(`The arrow rows need ${Math.ceil(L.height)}px and have ${Math.floor(frame.height)}px; drop a row or shorten the labels`);
   const out = [], room = frame.height - L.height, gap = L.gap + Math.min(room / Math.max(1, L.rows.length - 1), L.gap * 2);
   const used = L.rows.reduce((s, r) => s + r.height, 0) + gap * (L.rows.length - 1);
   let y = frame.y + Math.max(0, (frame.height - used) / 2);
@@ -663,8 +663,8 @@ export function capsulesNodes({ id, frame, props }) {
 /* ---------------------------------------------------------------- fact-grid */
 
 // The infographic panel: a grid of facts, each a large figure with its label,
-// an optional icon and an optional gauge - the dense "by the numbers" page the
-// published reports run. Every tile is one fact; a tile with two numbers in it
+// an optional icon and an optional gauge - the dense "by the numbers" page a
+// strong report runs. Every tile is one fact; a tile with two numbers in it
 // is two tiles.
 function normalizeFacts(props) {
   return between(props.items, 3, 9, "A fact grid").map((item, i) => {
@@ -676,41 +676,87 @@ function normalizeFacts(props) {
   });
 }
 
+// How far a single row of fact tiles grows past its natural height.
+const FACT_ROW_GROWTH = 1.35;
+
+/** The most height a fact grid uses: a single row stops at FACT_ROW_GROWTH; two rows or more take the frame. */
+export function factGridCeiling(frame, props) {
+  const L = factGridLayout(frame, props);
+  return L.rows > 1 ? null : L.height * FACT_ROW_GROWTH;
+}
+
 export function factGridLayout(frame, props) {
   const items = normalizeFacts(props);
-  const columns = props.columns ?? (items.length <= 4 ? items.length : items.length <= 6 ? 3 : Math.min(4, Math.ceil(items.length / 2)));
-  const rows = Math.ceil(items.length / columns), gap = v("space.4"), pad = v("space.4");
-  const width = (frame.width - gap * (columns - 1)) / columns, inner = width - 2 * pad;
-  if (inner < 110) throw new Error("A fact grid this wide is too narrow per tile; use fewer columns");
-  const tiles = items.map((item) => {
-    const value = measure(item.value, inner, "type.metric", true, DISPLAY);
-    const label = measure(item.label, inner, "type.body", true);
-    const text = item.text ? measure(item.text, inner, "type.compact") : null;
-    const top = item.icon ? 28 + v("space.2") : 0;
-    return { item, value, label, text, height: 2 * pad + top + value.height + v("space.1") + label.height + (text ? v("space.1") + text.height : 0) + (item.gauge !== null ? v("space.2") + 6 : 0) };
-  });
-  const rowHeights = Array.from({ length: rows }, (_, r) => Math.max(...tiles.slice(r * columns, (r + 1) * columns).map((t) => t.height)));
-  return { tiles, columns, rows, width, inner, gap, pad, rowHeights, height: rowHeights.reduce((a, b) => a + b, 0) + gap * (rows - 1) };
+  const gap = v("space.4"), pad = v("space.4");
+  const innerAt = (n) => (frame.width - gap * (n - 1)) / n - 2 * pad;
+  if (props.columns !== undefined && !(Number.isInteger(props.columns) && props.columns >= 1 && props.columns <= Math.min(4, items.length)))
+    throw new Error(`A fact grid's \`columns\` is how many tiles run across: a whole number from 1 to 4, and no more than its ${items.length} facts`);
+  // Four tiles in a row fit the page's width but not a column beside
+  // commentary; there the grid wraps to two rows rather than failing a page
+  // whose choice of placement was sound.
+  let columns = props.columns ?? (items.length <= 4 ? items.length : items.length <= 6 ? 3 : Math.min(4, Math.ceil(items.length / 2)));
+  if (props.columns === undefined) while (columns > 1 && innerAt(columns) < 110) columns = columns === 4 && items.length === 4 ? 2 : columns - 1;
+  const at = (n) => {
+    const rows = Math.ceil(items.length / n);
+    const width = (frame.width - gap * (n - 1)) / n, inner = width - 2 * pad;
+    const tiles = items.map((item) => {
+      const value = measure(item.value, inner, "type.metric", true, DISPLAY);
+      const label = measure(item.label, inner, "type.body", true);
+      const text = item.text ? measure(item.text, inner, "type.compact") : null;
+      const top = item.icon ? 28 + v("space.2") : 0;
+      return { item, value, label, text, height: 2 * pad + top + value.height + v("space.1") + label.height + (text ? v("space.1") + text.height : 0) + (item.gauge !== null ? v("space.2") + 6 : 0) };
+    });
+    const rowHeights = Array.from({ length: rows }, (_, r) => Math.max(...tiles.slice(r * n, (r + 1) * n).map((t) => t.height)));
+    return { tiles, columns: n, rows, width, inner, gap, pad, rowHeights, height: rowHeights.reduce((a, b) => a + b, 0) + gap * (rows - 1) };
+  };
+  let layout = at(columns);
+  // A single row of four or more that would leave more than a fifth of a
+  // given frame empty, even grown, wraps to two rows, which take the frame:
+  // four tiles in one row across a 500px body were a strip at the top with the
+  // rest of the page under it. An author's `columns` is kept.
+  if (props.columns === undefined && layout.rows === 1 && items.length >= 4 && Number.isFinite(frame.height) && layout.height * FACT_ROW_GROWTH < frame.height * 0.8) {
+    const wrapped = at(Math.ceil(items.length / 2));
+    if (wrapped.height <= frame.height) layout = wrapped;
+  }
+  if (layout.inner < 110) throw new Error("A fact grid this wide is too narrow per tile; use fewer columns");
+  return layout;
 }
 
 export function factGridNodes({ id, frame, props }) {
   const L = factGridLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`The fact grid needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a fact or its line`);
   const dark = props.tone === "dark", out = [];
-  const stretch = Math.min(1.35, (frame.height - L.gap * (L.rows - 1)) / (L.height - L.gap * (L.rows - 1)));
-  let y = frame.y + (frame.height - (L.height - L.gap * (L.rows - 1)) * stretch - L.gap * (L.rows - 1)) / 2;
+  // A tile is a card, drawn on the house's card surface (core.mjs
+  // cardMuted): on the muted grey a two-by-two grid of facts measured as an
+  // empty page - four tiles, each a number and two lines of copy - where the
+  // same grid on the card tint reads as the four filled boxes it is.
+  const surface = dark ? PRIMARY : cardMuted();
+  const valueColor = dark ? WHITE : readableOn(ACCENT, surface, 3), textColor = dark ? WHITE : readableOn(SECONDARY, surface);
+  // A grid of two rows or more takes the height its frame gives it: the tiles
+  // are the exhibit, and four tiles two by two beside the commentary grew by a
+  // third and then sat centred with a band of air above and below the grid.
+  // A single row still grows by a third at most - a row of tiles as tall as
+  // the page is a row of empty boxes - and sits at the top of its frame, the
+  // rest going to what follows (measureCeiling). Copy in a tile that grew is
+  // centred in it - a tile holds one fact, where a card's copy starts at its
+  // top to line up with its neighbours' - and a gauge stays on the tile's foot.
+  const fit = (frame.height - L.gap * (L.rows - 1)) / (L.height - L.gap * (L.rows - 1));
+  const stretch = L.rows > 1 ? Math.max(1, fit) : Math.min(FACT_ROW_GROWTH, fit);
+  let y = frame.y;
   for (let r = 0; r < L.rows; r++) {
     const h = L.rowHeights[r] * stretch;
     L.tiles.slice(r * L.columns, (r + 1) * L.columns).forEach((t, c) => {
       const x = frame.x + c * (L.width + L.gap), tid = stableId(id, "fact", r * L.columns + c);
-      out.push(fillRect(stableId(tid, "tile"), "fact-tile", { x, y, width: L.width, height: h }, dark ? PRIMARY : MUTED, { radius: "radius.small" }));
-      let ty = y + L.pad;
+      out.push(fillRect(stableId(tid, "tile"), "fact-tile", { x, y, width: L.width, height: h }, surface, { radius: "radius.small" }));
+      // `t.height` counts the gauge's band, which stays on the foot, so the
+      // copy centres in what is above it by the same half of the growth.
+      let ty = y + L.pad + Math.max(0, h - t.height) / 2;
       if (t.item.icon) { out.push(...iconMarker({ id: stableId(tid, "icon"), role: "fact-icon", x: x + L.pad, y: ty, size: 28, icon: t.item.icon, tone: dark ? "inverse" : "accent" })); ty += 28 + v("space.2"); }
-      out.push(label(stableId(tid, "value"), "fact-value", { x: x + L.pad, y: ty, width: L.inner }, t.value, style("type.metric", dark ? WHITE : ACCENT, true, "left", DISPLAY)));
+      out.push(label(stableId(tid, "value"), "fact-value", { x: x + L.pad, y: ty, width: L.inner }, t.value, style("type.metric", valueColor, true, "left", DISPLAY)));
       ty += t.value.height + v("space.1");
       out.push(label(stableId(tid, "label"), "fact-label", { x: x + L.pad, y: ty, width: L.inner }, t.label, style("type.body", dark ? WHITE : INK, true)));
       ty += t.label.height;
-      if (t.text) { out.push(label(stableId(tid, "text"), "fact-text", { x: x + L.pad, y: ty + v("space.1"), width: L.inner }, t.text, style("type.compact", dark ? WHITE : SECONDARY))); ty += v("space.1") + t.text.height; }
+      if (t.text) { out.push(label(stableId(tid, "text"), "fact-text", { x: x + L.pad, y: ty + v("space.1"), width: L.inner }, t.text, style("type.compact", textColor))); ty += v("space.1") + t.text.height; }
       if (t.item.gauge !== null) {
         const gy = y + h - L.pad - 6;
         out.push(fillRect(stableId(tid, "gauge-track"), "fact-gauge-track", { x: x + L.pad, y: gy, width: L.inner, height: 6 }, dark ? SECONDARY : RULE, { radius: "radius.round" }));
@@ -929,33 +975,47 @@ export function speechNodes({ id, frame, props }) {
 // The panel of a sidebar page: the statement set large in a filled column, a
 // short accent bar above it. A question, a claim or the page's single figure;
 // the evidence sits beside it.
+//
+// The statement keeps a heading's measure, about 45 characters, however wide
+// the panel: beside a short memo the panel takes the width the prose leaves,
+// and a 700px statement ran as two long lines across it.
+const STATEMENT_MEASURE = 440;
+const sideFill = (tone) => (tone === "primary" ? PRIMARY : tone === "muted" ? MUTED : tone === "tint" ? TINT : INK);
+// `highlight`: the page's phrase inside the statement. A rail carried it and
+// drew it plain, so the one claim the page sets large had no emphasis while
+// the points on the page beside it did. The accent where it reads on the panel
+// at large-type contrast (3:1), else by weight (emphasisRuns).
+const statementRuns = (props) => emphasisRuns(props.text.trim(), [props.highlight ?? []].flat().filter((p) => typeof p === "string"), sideFill(props.tone ?? "dark"), 3);
 export function sideStatementLayout(frame, props) {
   if (!clean(props.text)) throw new Error("A side statement needs its text");
-  const inner = frame.width - 2 * v("space.5");
-  const text = measure(props.text, inner, "type.heading", true, DISPLAY);
+  const inner = Math.min(frame.width - 2 * v("space.5"), STATEMENT_MEASURE);
+  const emphasis = statementRuns(props);
+  const text = emphasis ? measureTextRuns(emphasis.runs, inner, { fontFamily: v("font.display"), fontSize: v("type.heading"), wrapWidthRatio: 1 })
+    : measure(props.text, inner, "type.heading", true, DISPLAY);
   if (text.lines.length > 8) throw new Error("A side statement runs to eight lines at most; it is the page's reading, not its argument");
   const kicker = clean(props.kicker) ? measure(props.kicker, inner, "type.label", true) : null;
-  return { inner, text, kicker, height: text.height + (kicker ? kicker.height + v("space.3") : 0) + v("space.4") + 2 * v("space.5") };
+  return { inner, text, kicker, emphasis, height: text.height + (kicker ? kicker.height + v("space.3") : 0) + v("space.4") + 2 * v("space.5") };
 }
 
 export function sideStatementNodes({ id, frame, props }) {
   const L = sideStatementLayout(frame, props);
   const tone = props.tone ?? "dark", light = tone === "muted" || tone === "tint";
-  const fill = tone === "primary" ? PRIMARY : tone === "muted" ? MUTED : tone === "tint" ? TINT : INK;
+  const fill = sideFill(tone);
   const ink = light ? INK : WHITE, out = [fillRect(stableId(id, "panel"), "side-panel", frame, fill)];
   let y = frame.y + Math.max(v("space.5"), (frame.height - L.height) / 2 + v("space.5"));
   const x = frame.x + v("space.5");
   out.push(fillRect(stableId(id, "bar"), "side-panel-bar", { x, y, width: 32, height: 3 }, ACCENT));
   y += v("space.4");
   if (L.kicker) { out.push(label(stableId(id, "kicker"), "side-panel-kicker", { x, y, width: L.inner }, L.kicker, style("type.label", light ? SECONDARY : WHITE, true))); y += L.kicker.height + v("space.3"); }
-  out.push(label(stableId(id, "text"), "side-panel-text", { x, y, width: L.inner }, L.text, style("type.heading", ink, true, "left", DISPLAY)));
+  const text = label(stableId(id, "text"), "side-panel-text", { x, y, width: L.inner }, L.text, style("type.heading", ink, !L.emphasis || L.emphasis.accent, "left", DISPLAY));
+  out.push(L.emphasis ? { ...text, runs: L.text.runs } : text);
   return out;
 }
 
 /* ------------------------------------------------------------- radial-bars */
 
 // Concentric arcs, one per item, each swept in proportion to its value: the
-// published reports' radial bar (three survey shares as rings, a nested set of
+// familiar radial bar (three survey shares as rings, a nested set of
 // half-circles). Each arc runs clockwise from twelve o'clock over at most three
 // quarters of a turn, so the empty quarter holds every ring's figure and label
 // on the ring's own line. The rings are shares of different wholes read side by
@@ -965,11 +1025,15 @@ function normalizeRadial(props) {
   const max = props.max ?? 100;
   if (!(Number.isFinite(max) && max > 0)) throw new Error("A radial bar's max must be a positive number");
   const unit = props.unit ?? (max === 100 ? "%" : "");
-  return between(props.items, 2, 6, "A radial bar").map((item, i) => {
+  const items = between(props.items, 2, 6, "A radial bar");
+  // The rings' figures are read together, so they share one precision: 40.0%
+  // beside 32.5%, not 40% - a decimal for all when any ring needs one.
+  const decimals = items.some((item) => Number(Number(item?.value).toFixed(1)) % 1 !== 0) ? 1 : 0;
+  return items.map((item, i) => {
     if (!clean(item?.label)) throw new Error(`Radial ring ${i + 1} needs a label`);
     const value = Number(item.value);
     if (!(value >= 0 && value <= max)) throw new Error(`Radial ring ${i + 1}: value must be between 0 and ${max}`);
-    return { label: clean(item.label), value, display: clean(item.display) ?? `${Number(value.toFixed(1))}${unit}`, highlight: item.highlight === true };
+    return { label: clean(item.label), value, display: clean(item.display) ?? `${value.toFixed(decimals)}${unit}`, highlight: item.highlight === true };
   });
 }
 
@@ -1008,7 +1072,7 @@ function annulus(size, outer, inner, from, to) {
 
 export function radialBarsNodes({ id, frame, props }) {
   const L = radialBarsLayout(frame, props);
-  if (L.height > frame.height + 0.01 || L.width > frame.width + 0.01) throw new Error("The radial bar does not fit its frame");
+  if (L.height > frame.height + 0.01 || L.width > frame.width + 0.01) throw new Error("The radial bar does not fit its frame; give it a squarer, larger frame or drop a ring");
   const cx = frame.x + (frame.width - L.width) / 2 + L.left, cy = frame.y + (frame.height - L.height) / 2 + L.R;
   const square = { x: cx - L.R, y: cy - L.R, width: 2 * L.R, height: 2 * L.R };
   const size = 2 * L.R, out = [];
@@ -1043,7 +1107,7 @@ const SAMPLES = {
   pictogram: { rows: [{ label: "(Insert population)", value: 6 }, { label: "(Insert comparison)", value: 3 }] },
   "arrow-rows": { items: [{ label: "(Insert scenario 1)", text: "(Insert what follows)" }, { label: "(Insert scenario 2)", text: "(Insert what follows)" }] },
   capsules: { items: [{ title: "(Insert priority 1)", text: "(Insert what it means)" }, { title: "(Insert priority 2)", text: "(Insert what it means)" }, { title: "(Insert priority 3)", text: "(Insert what it means)" }] },
-  "fact-grid": { items: [{ value: "63m", label: "(Insert what it counts)" }, { value: "1,200+", label: "(Insert what it counts)" }, { value: "47", label: "(Insert what it counts)" }] },
+  "fact-grid": { items: [{ value: "63m", label: "(Insert what it counts)" }, { value: "1,200+", label: "(Insert what it counts)" }, { value: "47%", label: "(Insert what share it measures)", gauge: 0.47 }], columns: 3 },
   "zone-matrix": { xAxis: { label: "(Insert axis)" }, yAxis: { label: "(Insert axis)" }, points: [{ label: "(Insert item)", x: 0.3, y: 0.7 }, { label: "(Insert item)", x: 0.8, y: 0.8 }] },
   "device-frame": { device: "laptop", image: { alt: "(Insert what the screenshot shows)" } },
   worksheet: { fields: [{ label: "(Insert field)", prompt: "(Insert the question it answers)", span: 3 }, { label: "(Insert field)", prompt: "(Insert the question)" }, { label: "(Insert field)", prompt: "(Insert the question)" }] },
@@ -1098,6 +1162,7 @@ export function registerFigures(registry) {
   for (const [id, [nodes, layout, preferredSize]] of Object.entries(RENDER)) {
     registry.set(id, { id, version: "1.0.0", category: "diagram", role: id, tokens: [...FIGURE_TOKENS], preferredSize,
       sample: SAMPLES[id], render: (input) => ({ nodes: nodes(input) }), measureContent: ({ frame, props }) => layout(frame, props),
+      ...(id === "fact-grid" ? { measureCeiling: ({ frame, props }) => factGridCeiling(frame, props) } : {}),
       guidance: GUIDANCE[id] });
   }
   return registry;

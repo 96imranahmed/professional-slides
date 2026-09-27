@@ -117,9 +117,10 @@ console.log(JSON.stringify(planDeck(toDeckPlan(spec,'.')).deck));
             subprocess.run([sys.executable, str(RUNTIME / "emit" / "emit_pptx.py"), str(scene_path), str(pptx_path)],
                            check=True, capture_output=True)
             chart = next(s.chart for s in Presentation(pptx_path).slides[-1].shapes if s.has_chart)
-            # One decimal where the scene has one, none where it has none: the
-            # drawn chart writes 47.1 beside 27, so the native chart must too.
-            self.assertEqual(chart.plots[0].data_labels.number_format, "General")
+            # One precision for the whole chart: the drawn chart writes 47.1
+            # beside 27.0, so the native chart prints a fixed one decimal too.
+            self.assertIn("27.0", labels)
+            self.assertEqual(chart.plots[0].data_labels.number_format, "0.0")
 
 
 class ScatterAxisTests(unittest.TestCase):

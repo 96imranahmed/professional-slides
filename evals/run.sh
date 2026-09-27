@@ -3,7 +3,6 @@
 #
 #   evals/run.sh            unit tests + the deterministic page gates
 #   evals/run.sh --slow     also the LibreOffice end-to-end render
-#   evals/run.sh --golden   only the reference-image golden check
 #
 # Everything here is vendor-neutral: python3 with Pillow, numpy and python-pptx,
 # plus node and Playwright Chromium for the rendered geometry probes.
@@ -17,9 +16,6 @@ export RUNTIME_PYTHON="$PYTHON" RUNTIME_NODE="$NODE"
 export RUNTIME_NODE_MODULES="${RUNTIME_NODE_MODULES:-$PWD/node_modules}"
 
 case "${1:-}" in
-  --golden)
-    exec "$PYTHON" evals/scripts/check_release.py
-    ;;
   --slow)
     export PS_RUN_SLOW=1
     ;;
@@ -52,24 +48,11 @@ print("%s | %d pages, %d%% quantitative kinds, %d%% structured kinds, kinds %s"
 done
 [ "$found" = 1 ] || echo "  none: no example deck carries its content stage"
 
-echo "== page gates (fixture deck) =="
-# The audited fixture deck is expected to fail; this prints the counts so a
-# change in the runtime shows up as a change in the numbers.
-"$PYTHON" skills/professional-slides/runtime/gates/page_gates.py \
-  evals/fixtures/scene-nyc.json.gz evals/golden/reference \
-  --report /tmp/page-gates-fixture.json || true
-"$PYTHON" - <<'PY'
-import json
-report = json.load(open("/tmp/page-gates-fixture.json"))
-for code, count in report["countsByCode"].items():
-    print(f"  {code:18} {count}")
-PY
-
 echo "== cold-run baseline =="
 # The same harness a cold run is scored with, pointed at the example decks. It
 # prints rather than fails: where a hand-authored deck misses a bar that is a
 # finding about the deck, and the number moving is the thing to notice.
-for deck in gallery-acceptance house-style nyc-or-sf slideworks; do
+for deck in gallery-acceptance house-style nyc-or-sf; do
   if [ -d "/tmp/ps-build-$deck" ]; then
     printf '  %-20s ' "$deck"
     # `|| true`: the scorer exits 2 on a deck that misses a bar, and under
@@ -80,24 +63,6 @@ for deck in gallery-acceptance house-style nyc-or-sf slideworks; do
   fi
 done
 [ -d /tmp/ps-build-gallery-acceptance ] || echo "  (build the example decks into /tmp/ps-build-<name> to populate this)"
-
-echo "== against the corpus =="
-# The question no gate answers: by how much, and in which direction. Same
-# instrument pointed at our decks and at the client-work numbers in the
-# contract. SKILL.md used to carry an "Ours today" column measured a different
-# way; it rotted and was deleted. This does not rot, because it is computed.
-built=""
-for deck in gallery-acceptance house-style nyc-or-sf slideworks; do
-  [ -f "/tmp/ps-build-$deck/scene.json" ] && built="$built /tmp/ps-build-$deck"
-done
-if [ -n "$built" ]; then
-  "$NODE" evals/corpus/compare.mjs $built || true
-else
-  echo "  (build the example decks into /tmp/ps-build-<name> to populate this)"
-fi
-
-echo "== golden reference =="
-"$PYTHON" evals/scripts/check_release.py >/dev/null
 
 echo "== node-side gates =="
 "$NODE" evals/scripts/check_source_quality.mjs

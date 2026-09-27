@@ -1,11 +1,11 @@
-import { contrastRatio } from "./palettes.mjs";
 import {
   linePrimitive,
   rectPrimitive,
   stableId,
   textPrimitive,
   token,
-  tokenValue
+  tokenValue,
+  onFill
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { textStyle as baseTextStyle, measuredTextNode as baseMeasuredTextNode } from "./text-style.mjs";
@@ -321,7 +321,7 @@ function renderBands({ id, frame, horizons }) {
   horizons.forEach((h, i) => {
     const x = frame.x + i * (width + gap), height = 64 + i * 40;
     const fill = i === 0 ? token("color.surfaceMuted") : i === 1 ? INK : SERIES[2];
-    const color = contrastRatio(tokenValue(fill),tokenValue(INK)) >= 4.5 ? INK : token("color.onPrimary");
+    const color = onFill(fill);
     nodes.push(rectPrimitive({ id: stableId(id,h.id,"band"), role:"horizon-band", frame:{x,y:bottom-height,width,height},style:{fill,stroke:"none",radius:token("radius.none")},data:{horizonId:h.id,order:i+1,conceptual:true} }));
     nodes.push(measuredTextNode({id:stableId(id,h.id,"label"),role:"horizon-label",frame:{x:x+12,y:bottom-height,width:width-24,height},text:h.label,style:textStyle(HEADING,color,true,"center","middle")}));
     nodes.push(measuredTextNode({id:stableId(id,h.id,"title"),role:"horizon-title",frame:{x,y:bottom+20,width,height:48},text:h.title,style:textStyle(HEADING,INK,true)}));

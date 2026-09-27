@@ -21,3 +21,7 @@ Claude outputs/
 /deliverables/
 # Evaluation reports belong with ignored generated output.
 /evals/*-eval.json
+
+# Per-deck authoring logs (author-deck.mjs)
+*.author-log.jsonl
+.claude/worktrees/

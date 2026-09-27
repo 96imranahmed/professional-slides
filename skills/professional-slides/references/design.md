@@ -4,7 +4,7 @@ Design owns the evidence relationship, attention, treatment and visual hierarchy
 
 ## Pick the slide type from what the page says
 
-Decide what the page has to make the reader see, then take the slide type that shows exactly that. A deck built this way is varied because its messages are, not because it rotates templates; one that reaches for a column chart and a table on every page has skipped this step. The catalogue below is the whole range, measured against 600 pages of client and published work (`evals/corpus/styles`): all 86 styles found there compose, covering every one of the 590 content pages.
+Decide what the page has to make the reader see, then take the slide type that shows exactly that. A deck built this way is varied because its messages are, not because it rotates templates; one that reaches for a column chart and a table on every page has skipped this step. The catalogue below is the whole range: 86 styles, all of which compose, enough to cover any content page a deck needs.
 
 | The page has to show | Take | Not |
 | --- | --- | --- |
@@ -24,6 +24,8 @@ Decide what the page has to make the reader see, then take the slide type that s
 | Rank movement across periods | `rank-flow` | A table of ranks |
 | Quantities moving from one set to another | `sankey` | Two tables |
 | Where on a map | `map` (highlight, markers, choropleth) | A list of countries |
+| A network from a hub, or flows between places | `map` with markers at their longitude and latitude, `hub: true`, `routes`, `crop: "fit"` | Countries filled to stand for cities |
+| The players the deck compares | a table with a `logo` column and the numbers the deck will use, or `logos` with a line each | Names in a bullet list |
 | One number that is the whole point | `hero-number` layout with the evidence that produced it | A bullet |
 | Three to six headline numbers | `metrics` strip; `stat-list` when each needs its sentence, dark for a side panel | Numbers buried in prose |
 | Exact values looked up across fields | `table`, with the treatment the cells call for: `bar`, `heat`, `bubble`, harvey, state | A chart that hides the digits |
@@ -54,6 +56,36 @@ Decide what the page has to make the reader see, then take the slide type that s
 
 When two rows fit, the message decides: "China rose from sixth to first" is movement, so `rank-flow`; "China is first" is a level, so a sorted bar. Record the choice and the rejected alternative in the plan `why`. A deck that finds itself using one chart type for most of its charts should go back through this table page by page; `PLAN_CHART_MONOTONY` reports it.
 
+## Make every exhibit earn its page
+
+A chart earns its page by showing a relationship the reader could not get from the numbers in the title. Two bars of one series are a metric pair with a chart drawn round it: set them as metrics with the delta, or widen the evidence until the chart shows something. `CRAFT_TRIVIAL_CHARTS` stops a deck where more than a quarter of the charts are two-number charts. The forms that carry an implication:
+
+- **A trend with its rate.** Five or more periods, the CAGR on an arrow over the span (`change`, `cagr`), eras bracketed (`periods`), the latest periods in the accent. Most strategic questions have a history - revenue, volume, fleet, share, users - and the series is usually public.
+- **The whole set, ranked.** Every peer, sorted, the subject highlighted and the rest neutral, rather than the subject against one rival. The tail or the gap is the finding: bracket it.
+- **Share and mix.** A composition over time with the share of the part that matters marked on each column.
+- **Gap to a benchmark.** A reference line for the target or the average, or a bracket with the gap value between two bars.
+- **A normalised ratio.** Per seat, per head, per route, per aircraft: size removed so the comparison is fair.
+- **A network or flow.** Routes from a hub on a map, widths by volume, planned routes dashed.
+- **Rank movement.** Who moved over four dates, as a rank-flow.
+
+Mark the finding on the plot where the eye already is; the annotation carries the page's claim. Keep one accent series and the rest muted.
+
+**Tables judge as well as list.** Every table that compares, rates or judges shows it in the cells: Harvey balls or ratings in a single accent with a legend, check and cross states, bars growing from a shared baseline with the value at the end, up/flat/down impact arrows, an implication column of a quarter of the width, rows grouped in bands. A plain grid is right for a record lookup and little else. `CRAFT_TABLES_PLAIN` stops a deck where most tables are plain. A table also earns its page with content: every player on every criterion, with the numbers in the cells - fleet, orders, destinations, revenue, growth, share - rather than three rows of phrases a paragraph would say better.
+
+**Introduce the players.** A deck that compares named companies, brands or products opens that comparison with one page that introduces them: each player's logo as the row header, what it is, and the two or three numbers the rest of the deck compares (fleet, revenue, network, founding year), with ratings or a status column where the deck will judge them. Logos are always logo plus evidence, never a bare wall; keep them in colour, evened by optical weight. Declare the set as `players` on the deck; `CRAFT_PLAYERS_UNINTRODUCED` stops a deck that compares them without the page.
+
+Logos load themselves: plan each as `{ alt: "<Name> logo" }` and the build fetches it from the player's Wikipedia infobox into `assets/logos/`, reuses it on later builds, and records its source (`node runtime/fetch-logos.mjs <id>.deck.json` does the same ahead of the build; set a player's `wikipedia` title, or `playersHint` on the deck such as "airline", when a name is ambiguous; `--no-fetch` builds offline). A logo that cannot be fetched stays a placeholder and `UNSOURCED_PICTURE` names it.
+
+**Steps are for procedures.** A staircase or chevron process is a sequence the reader follows step by step. A set of options is a table with ratings; a plan over time is a timeline or gantt; parallel priorities are icon cards; a path with gates is a roadmap; conditions are a checklist. `CRAFT_STEP_OVERUSE` allows two per deck, or one per 25 pages in a longer one.
+
+**Pictures show the subject.** A long deck about recognisable things - aircraft, cabins, hubs, cities, products, people - carries photographs: on the cover, the dividers and the pages about them. Logos identify; they do not count. `CRAFT_NO_PICTURES` stops a 20-page deck with none unless `noPictures` says in a sentence why its subject has nothing to look at.
+
+Photographs load themselves too. Plan each as `{ alt: "what it shows", search: "Riyadh Air Boeing 787-9" }` (the search defaults to the alt): the build takes the first freely licensed Commons photograph - JPEG, at least 1200px, landscape preferred, CC0, CC BY, CC BY-SA or public domain, no maps, diagrams or logos - saves it to `assets/pictures/` with its author and licence in `sources.json`, and lists every attributed picture on a generated **Picture credits** page at the end, which is what CC BY asks of a deck. `node runtime/fetch-pictures.mjs <id>.deck.json --dry-run` names what each placeholder would get before anything is downloaded. Look at what came back: a search can return the right subject in the wrong livery or year, and a better `search` or the client's own file fixes it. Mark `fetch: false` on a picture that must come from the client.
+
+**Icons mark parallel categories.** Three or four parallel items - the pillars of a case, the risks, the levers - read faster with an icon each in one line style and the accent, beside a bold lead and a line or two of text (`pointsStyle: "icon-lead"`), or as icon cards. Never icons alone.
+
+**Maps show places, not countries standing in for them.** Put a city at its longitude and latitude (a country marker labelled with a city is refused), crop to the network (`crop: "fit"`, or a regional preset), keep land a flat grey and fill a country only when the fill means something, with a legend. Dots are small - the default is 10px; a hub is a ring. Routes are curved lines from the hub, their width by volume when the volume is known, planned routes dashed. Label places in small plain type beside the dot; the commentary beside the map says what the network adds up to.
+
 ## Allocate evidence before geometry
 
 Name what each mark, row, panel and arrow represents. Count the actual observations, stages, comparison fields and longest labels. Choose the relationship that makes the title inspectable before choosing a component. Use the [illustrated reference atlas](reference-atlas.md) for candidate structures and counterexamples.
@@ -73,19 +105,19 @@ Prefer one primary chart or table with developed implications when it can carry 
 
 ### How the page carries "therefore"
 
-Every page that sets evidence against what is read off it has to join the two. The reference decks do this five or six different ways and draw it in the gutter on very few pages; a deck that uses one device everywhere has chosen once, and by the fourth page the reader has stopped seeing it. Choose per page from what the relation actually is, and record the choice in the plan `why`.
+Every page that sets evidence against what is read off it has to join the two. Well-made decks do this five or six different ways and draw it in the gutter on very few pages; a deck that uses one device everywhere has chosen once, and by the fourth page the reader has stopped seeing it. Choose per page from what the relation actually is, and record the choice in the plan `why`.
 
-| Bridge | Spec | Use it when | Original |
-| --- | --- | --- | --- |
-| Words alone | `pointsHeading` naming the relation; nothing in the gutter | The commentary's heading can state the consequence - "As a result of piracy and internationalization", "What this costs to hold" | BCG, Media and Entertainment in NYC (2015) p19 |
-| Named panels | `pointsHeading` plus `pointsTone` (`muted`, `tint`, `dark`) | Evidence and interpretation are two standing categories the reader will meet again - "Key facts and data" against a bordered "Perspectives" | Bain, Syracuse diagnostic (2014) pp19-29; McKinsey, Purdue (2017) p22 |
-| Nothing | no heading, no mark, plain gutter | The points are read straight off the marks beside them and need no announcing | L.E.K., Australia freight comparison pp22, 24, 31 |
-| Closing band | `soWhat` | One sentence closes the page under everything on it, at the exhibit's own width | McKinsey, Purdue (2017) p25; BCG, NYCHA (2012) pp20, 30 |
-| Keyed callouts | numbered marks on the exhibit with `pointsStyle: "numbered"` | The commentary speaks to named points in the evidence rather than to the whole of it | Oliver Wyman, customer experience p12; Oliver Wyman, Big Tech venture investment p22 |
-| Quiet rule | `implication: "rule"` | The two columns need separating but no inference is being asserted | BCG, Media and Entertainment in NYC (2015) p19 |
-| Disc chevron | `implication: "chevron"` | A short centred column concludes from the exhibit and the disc has content to sit against | - |
-| Dashed gutter | `implication: "divider-chevron"` (or the legacy `true`) | A full-height column carries a genuinely authored inference and the page should say so | - |
-| Block arrow | `implication: "arrow"` | The page's own conclusion, said loudly - a shape read from across a room rather than punctuation in the gutter | Bain, UC Berkeley diagnostic pp38, 45; BCG, NYCHA (2012) p33; McKinsey, Purdue (2017) pp20-21 |
+| Bridge | Spec | Use it when |
+| --- | --- | --- |
+| Words alone | `pointsHeading` naming the relation; nothing in the gutter | The commentary's heading can state the consequence - "As a result of piracy and internationalization", "What this costs to hold" |
+| Named panels | `pointsHeading` plus `pointsTone` (`muted`, `tint`, `dark`) | Evidence and interpretation are two standing categories the reader will meet again - "Key facts and data" against a bordered "Perspectives" |
+| Nothing | no heading, no mark, plain gutter | The points are read straight off the marks beside them and need no announcing |
+| Closing band | `soWhat` | One sentence closes the page under everything on it, at the exhibit's own width |
+| Keyed callouts | numbered marks on the exhibit with `pointsStyle: "numbered"` | The commentary speaks to named points in the evidence rather than to the whole of it |
+| Quiet rule | `implication: "rule"` | The two columns need separating but no inference is being asserted |
+| Disc chevron | `implication: "chevron"` | A short centred column concludes from the exhibit and the disc has content to sit against |
+| Dashed gutter | `implication: "divider-chevron"` (or the legacy `true`) | A full-height column carries a genuinely authored inference and the page should say so |
+| Block arrow | `implication: "arrow"` | The page's own conclusion, said loudly - a shape read from across a room rather than punctuation in the gutter |
 
 The last three assert an inference. Spend them where the inference is the page's work, not on every chart that happens to have commentary beside it: in a deck of fifty pages that is a handful, not every `exhibit-left`. `implication: false` is the default and is the right answer on most pages, because the heading, the panel or the words have already done the joining.
 
@@ -146,7 +178,7 @@ Use [Charts: category and verdict semantics](charts.md#category-and-verdict-sema
 
 Paired tables can share column widths and row anchors while retaining different semantic treatment. Parent alignment must not erase a child's category or verdict choice. When splitting a comparison, repeat the needed schema, units and common physical scale; do not split simply to change the silhouette.
 
-For a justified chart/table pair, declare the shared heading-rule or evidence-start anchor and allow for the chart's heading and legend before placing the table. Do not independently centre a headed table in the chart's full frame: its header then floats below the neighbouring heading and its rows start arbitrarily. Align shared categories row by row when that is the actual relationship. Reference examples: BCG NYC p19 aligns chart/implication heading rules and attaches a numeric strip to chart categories; Denali p11 aligns peer heading rules; Denali p8 joins amounts, drivers and methodology in one table. These are alignment/reading-order examples, not permission to copy their colors or add headings to every table.
+For a justified chart/table pair, declare the shared heading-rule or evidence-start anchor and allow for the chart's heading and legend before placing the table. Do not independently centre a headed table in the chart's full frame: its header then floats below the neighbouring heading and its rows start arbitrarily. Align shared categories row by row when that is the actual relationship. Examples: a chart and its implication column share one heading rule, with a numeric strip attached to the chart's categories; peer exhibits align their heading rules; one table joins amounts, drivers and methodology. These are alignment and reading-order examples, not permission to add headings to every table.
 
 ## Space, type and boundaries
 
@@ -170,11 +202,11 @@ Inspect repeated diagram geometry too. A central oval with surrounding boxes rem
 
 The existing blocking repetition screens remain: no architecture over 40% of analytical pages; ten-page windows contain at least three meaningful relationships. These are alarms, not a template-rotation recipe. A repeated comparison series needs an actual comparability reason; naming `series` alone is not editorial acceptance. Preserve common scales and geometry when repetition helps comparison. A 50-page minimum does not exempt a repetitive or deletable sequence.
 
-Alternatives must differ with colors and fonts ignored. Use different questions, orders or evidence relationships; retain comparable tasks where appropriate. After composition inspect the actual montage and originals because plan labels cannot certify the pixels.
+Alternatives must differ with colors and fonts ignored. Use different questions, orders or evidence relationships; retain comparable tasks where appropriate. After composition inspect the actual montage and the rendered pages at full size because plan labels cannot certify the pixels.
 
 ## Working from a reference deck
 
-For faithful reference transformation, inspect the whole supplied reference and map consolidations/splits. For benchmarking, select strong comparable originals from every requested deck and state literal page coverage. Extract analytical device, evidence payload, hierarchy, emphasis and readable type size before adopting a structure. Compare at equal viewing size. The [atlas](reference-atlas.md) points to devices, not an exemption from viewing the actual references. Do not copy reference quirks that contradict user preferences.
+For faithful reference transformation, inspect the whole supplied reference and map consolidations/splits. For benchmarking against decks the user supplied, select strong comparable pages from each and state literal page coverage. Only the user's own references count; never search for others. Extract analytical device, evidence payload, hierarchy, emphasis and readable type size before adopting a structure. Compare at equal viewing size. The [atlas](reference-atlas.md) describes devices; it is not a list of documents to find. Do not copy reference quirks that contradict user preferences.
 
 ## Visual review
 

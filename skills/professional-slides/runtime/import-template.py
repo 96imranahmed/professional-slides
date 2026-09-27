@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Infer a house profile from a template deck.
 
-    python3 runtime/import-template.py template.pptx [--out house.json] [--base mckinsey]
+    python3 runtime/import-template.py template.pptx [--out house.json] [--base midnight]
 
 Reads the theme (colour scheme, major and minor fonts), the slide size, the
 master and layout placeholders (title, body, footer, slide number, logo), and
@@ -49,7 +49,7 @@ NS = {
 }
 PAGE_W, PAGE_H = 1280, 720
 OFFICE_STOCK = {"4472C4", "ED7D31", "A5A5A5", "FFC000", "5B9BD5", "70AD47", "44546A", "E7E6E6"}
-STYLE_KEYS = ["style.titleWeight", "style.titleRule", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead"]
+STYLE_KEYS = ["style.titleWeight", "style.titleRule", "style.titleRuleLength", "style.tagPlacement", "style.chartHeading", "style.listMarker", "style.tableRows", "style.labelWeight", "style.titleLead"]
 
 
 def hex6(value: str | None) -> str | None:
@@ -421,10 +421,15 @@ def analyse(path: Path, base: str) -> dict:
         style["style.titleWeight"] = "bold" if title_style_bold else "regular"
     title_bottom = (title_frames[0][1] + title_frames[0][3]) if title_frames else None
     if title_bottom is not None:
-        if any(abs(l[1] - title_bottom) < 24 and l[2] > PAGE_W * 0.5 for l in master_lines):
+        rules = [l for l in master_lines if abs(l[1] - title_bottom) < 24 and l[2] > PAGE_W * 0.5]
+        if rules:
             style["style.titleRule"] = "rule"
+            style["style.titleRuleLength"] = "full" if max(l[2] for l in rules) >= PAGE_W * 0.95 else "content"
         elif any(b[0][1] <= 4 and b[0][3] >= title_bottom - 8 and b[0][2] >= PAGE_W * 0.9 for b in master_bands):
             style["style.titleRule"] = "band"
+        else:
+            # The built-in palettes draw a rule; a master that has none keeps its page open.
+            style["style.titleRule"] = "none"
     if display != body:
         observations.append(f"Titles set in {display}, body in {body}")
 
@@ -466,6 +471,25 @@ def analyse(path: Path, base: str) -> dict:
         f"and a {weight['columnFill']:.0%} column, at fill '{fill}'"
     )
 
+    # --- nearest design system ------------------------------------------------
+    # The house's colours, faces and margins are copied exactly; the design
+    # system supplies what a master cannot show - how the takeaway, the
+    # commentary, the cover and the chapter pages are built. Pick the one whose
+    # frame the template already resembles, and say why.
+    serif = bool(re.search(r"georgia|times|garamond|serif|baskerville|caslon|minion|cambria|palatino", str(display), re.I)) and display != body
+    chart_share = (charts / len(slides)) if slides else 0
+    if style.get("style.titleRule") == "band" and density == "live-pitch":
+        design, why = "keynote", "a full-width title band on a template that carries few words a page"
+    elif density == "live-pitch":
+        design, why = "keynote", f"a presented template: median {median_words:.0f} words a slide"
+    elif serif and style.get("style.titleWeight") == "regular":
+        design, why = "editorial", f"regular-weight serif titles ({display})"
+    elif chart_share >= 0.5 and style.get("style.titleWeight", "bold") == "bold":
+        design, why = "journal", f"chart-led pages ({chart_share:.0%} of slides carry a chart) under bold titles"
+    else:
+        design, why = "consulting", "an analytical house template with sans titles over evidence and commentary"
+    observations.append(f"Nearest design system: {design} ({why}); the house colours, faces and margins override it")
+
     page_template = {}
     if not company and footer_texts:
         text, n = footer_texts.most_common(1)[0]
@@ -481,6 +505,7 @@ def analyse(path: Path, base: str) -> dict:
         "source": str(path.name),
         "palette": {"base": base, "id": re.sub(r"[^a-z0-9]+", "-", path.stem.lower()).strip("-") or "template", "label": path.stem, "colors": {**colors, **style}},
         "typography": typography,
+        "design": design,
         **({"chrome": chrome} if chrome else {}),
         **({"pageTemplate": page_template} if page_template else {}),
         **({"footer": company} if company else {}),
@@ -506,7 +531,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("template", help="the .pptx to read")
     parser.add_argument("--out", help="where to write the house profile (default: <template>.house.json)")
-    parser.add_argument("--base", default="mckinsey", help="the built-in palette the overlay starts from")
+    parser.add_argument("--base", default="midnight", help="the built-in palette the overlay starts from")
     args = parser.parse_args()
     path = Path(args.template)
     if not path.exists():

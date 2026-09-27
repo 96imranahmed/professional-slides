@@ -72,7 +72,13 @@ const nodes=owner.render({id:'waves',frame,props}).nodes;
 const activities=nodes.filter(n=>n.role==='roadmap-activities'),deliverables=nodes.filter(n=>n.role==='roadmap-deliverables');
 assert.equal(activities.length,2);assert.equal(deliverables.length,2);
 assert.ok(deliverables.every(n=>n.frame.y>=Math.max(...activities.map(a=>a.frame.y+a.frame.height))+15.9));
-assert.ok(deliverables.every(n=>n.frame.y+n.frame.height<=frame.y+layout.height));
+// A frame taller than the natural height now opens the roadmap's rhythm
+// (up to its ceiling) rather than drawing it at the top: the rows stay
+// complete and inside the grown height, and a frame at the natural height
+// draws exactly the natural layout.
+assert.ok(deliverables.every(n=>n.frame.y+n.frame.height<=frame.y+Math.min(frame.height,owner.measureCeiling({frame,props}))+0.01));
+const snug=owner.render({id:'snug',frame:{...frame,height:layout.height},props}).nodes.filter(n=>n.role==='roadmap-deliverables');
+assert.ok(snug.every(n=>n.frame.y+n.frame.height<=frame.y+layout.height));
 assert.ok(activities[0].text.includes('each strategy function'));
 assert.throws(()=>owner.render({id:'short',frame:{...frame,height:layout.height-1},props}),/complete activity and deliverable rows need/);
 assert.throws(()=>owner.render({id:'empty',frame,props:{variant:'wave-columns',items:[]}}),/at least one stage/);

@@ -180,7 +180,7 @@ class SeparationTests(unittest.TestCase):
     def test_a_deck_whose_answer_no_claim_carries_is_reported(self):
         """The deck promises something none of its pages proves.
 
-        This is what `slideworks` did: an answer naming a decline concentrated
+        This is what an example deck did: an answer naming a decline concentrated
         in repriced technology and governance deciding a deployment's reach,
         over nine claims that between them said neither word. Coverage 0.13.
         """
