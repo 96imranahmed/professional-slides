@@ -8,12 +8,11 @@
 // primitives every other component uses, so the PowerPoint emitter and the
 // HTML renderer need nothing new, and each measures itself and refuses content
 // it cannot set rather than overflowing.
-import { token, tokenValue, stableId, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive, houseStyle, readableOn } from "./core.mjs";
+import { token, tokenValue, stableId, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive, readableOn, emphasisRuns, cardMuted } from "./core.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 import { mediaNode } from "./media.mjs";
-import { accentRuns, measureTextRuns } from "./text-layout.mjs";
-import { contrastRatio } from "./palettes.mjs";
+import { measureTextRuns } from "./text-layout.mjs";
 
 const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink");
 const WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), RULE = token("color.rule");
@@ -728,10 +727,10 @@ export function factGridNodes({ id, frame, props }) {
   if (L.height > frame.height + 0.01) throw new Error(`The fact grid needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a fact or its line`);
   const dark = props.tone === "dark", out = [];
   // A tile is a card, drawn on the house's card surface (core.mjs
-  // `style.cards`): on the muted grey a two-by-two grid of facts measured as
-  // an empty page - four tiles, each a number and two lines of copy - where
-  // the same grid on the card tint reads as the four filled boxes it is.
-  const surface = dark ? PRIMARY : houseStyle("style.cards") === "tint" ? token("color.surfaceTint") : MUTED;
+  // cardMuted): on the muted grey a two-by-two grid of facts measured as an
+  // empty page - four tiles, each a number and two lines of copy - where the
+  // same grid on the card tint reads as the four filled boxes it is.
+  const surface = dark ? PRIMARY : cardMuted();
   const valueColor = dark ? WHITE : readableOn(ACCENT, surface, 3), textColor = dark ? WHITE : readableOn(SECONDARY, surface);
   // A grid of two rows or more takes the height its frame gives it: the tiles
   // are the exhibit, and four tiles two by two beside the commentary grew by a
@@ -739,7 +738,8 @@ export function factGridNodes({ id, frame, props }) {
   // A single row still grows by a third at most - a row of tiles as tall as
   // the page is a row of empty boxes - and sits at the top of its frame, the
   // rest going to what follows (measureCeiling). Copy in a tile that grew is
-  // centred in it, the way a card's is; a gauge stays on the tile's foot.
+  // centred in it - a tile holds one fact, where a card's copy starts at its
+  // top to line up with its neighbours' - and a gauge stays on the tile's foot.
   const fit = (frame.height - L.gap * (L.rows - 1)) / (L.height - L.gap * (L.rows - 1));
   const stretch = L.rows > 1 ? Math.max(1, fit) : Math.min(FACT_ROW_GROWTH, fit);
   let y = frame.y;
@@ -983,17 +983,9 @@ const STATEMENT_MEASURE = 440;
 const sideFill = (tone) => (tone === "primary" ? PRIMARY : tone === "muted" ? MUTED : tone === "tint" ? TINT : INK);
 // `highlight`: the page's phrase inside the statement. A rail carried it and
 // drew it plain, so the one claim the page sets large had no emphasis while
-// the points on the page beside it did. On a light panel the phrase takes the
-// accent; where the accent does not read on the fill at large-type contrast
-// (3:1) - a red accent on the near-black panel - the statement drops to the
-// regular weight and the phrase stays bold, which reads in reversed type.
-function statementRuns(props) {
-  const phrases = (Array.isArray(props.highlight) ? props.highlight : props.highlight ? [props.highlight] : []).filter((p) => typeof p === "string" && p.trim());
-  const runs = phrases.length ? accentRuns(props.text.trim(), phrases, { bold: true, strict: false }) : null;
-  if (!runs || !runs.some((run) => run.accent)) return null;
-  const accent = contrastRatio(tokenValue(ACCENT), tokenValue(sideFill(props.tone ?? "dark"))) >= 3;
-  return { accent, runs: runs.map((run) => (accent ? { text: run.text, bold: true, ...(run.accent ? { accent: true } : {}) } : { text: run.text, bold: Boolean(run.accent) })) };
-}
+// the points on the page beside it did. The accent where it reads on the panel
+// at large-type contrast (3:1), else by weight (emphasisRuns).
+const statementRuns = (props) => emphasisRuns(props.text.trim(), [props.highlight ?? []].flat().filter((p) => typeof p === "string"), sideFill(props.tone ?? "dark"), 3);
 export function sideStatementLayout(frame, props) {
   if (!clean(props.text)) throw new Error("A side statement needs its text");
   const inner = Math.min(frame.width - 2 * v("space.5"), STATEMENT_MEASURE);

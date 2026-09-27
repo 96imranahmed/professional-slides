@@ -1,4 +1,3 @@
-import { contrastRatio } from "./palettes.mjs";
 import {
   rectPrimitive,
   linePrimitive,
@@ -6,6 +5,7 @@ import {
   stableId,
   token,
   tokenValue,
+  onFill,
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 
@@ -62,7 +62,7 @@ function box(id, frame, fill, role) {
     style: { fill: token(fill), stroke:"none", radius: token("radius.none") },
   });
 }
-const whiteOn = fill => contrastRatio(tokenValue(token(fill)),tokenValue(token("color.ink"))) < 4.5;
+const whiteOn = fill => onFill(token(fill)).tokenId === "color.onPrimary";
 function band(id, frame, heading, items, fill) {
   if (
     !heading ||

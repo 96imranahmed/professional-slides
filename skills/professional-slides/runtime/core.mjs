@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { resolvePalette, heatScaleTokens, contrastRatio } from "./palettes.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
-import { lineBox } from "./text-layout.mjs";
+import { lineBox, accentRuns } from "./text-layout.mjs";
 import { timePositions } from "./time-axis.mjs";
 
 export const DESIGN_SYSTEM_VERSION = "2.0.0";
@@ -189,6 +189,45 @@ export function houseStyle(id) { return tokenValue(token(id)); }
 export function readableOn(color, surface, ratio = 4.5) {
   return contrastRatio(tokenValue(color), tokenValue(surface)) >= ratio ? color : token("color.ink");
 }
+
+/**
+ * The reversed white or the ink, whichever reads better on `fill` (a token or
+ * a "#rrggbb" colour): type set on a mark, a tile or a band. Ten places asked
+ * this with three rules - the stronger of the two, ink unless ink fell under
+ * 4.5:1, white unless white did - so one fill could take white in a chart and
+ * ink in the table beside it.
+ */
+export function onFill(fill) {
+  const value = typeof fill === "string" && fill.startsWith("#") ? fill : tokenValue(fill);
+  const white = token("color.onPrimary"), ink = token("color.ink");
+  return contrastRatio(value, tokenValue(white)) >= contrastRatio(value, tokenValue(ink)) ? white : ink;
+}
+
+/**
+ * `phrases` inside `text` as runs on a filled surface: in the accent where the
+ * accent reads on `fill` at `ratio` (no fill: it always does), else by weight -
+ * the sentence regular and the phrase bold, which is the emphasis reversed
+ * type can carry (a red accent on a red bar dropped the phrase outright).
+ * `accent` says which was chosen; null when no phrase occurs.
+ */
+export function emphasisRuns(text, phrases, fill = null, ratio = 4.5) {
+  const runs = accentRuns(text, phrases, { strict: false });
+  if (!runs?.some((run) => run.accent)) return null;
+  const accent = !fill || contrastRatio(tokenValue(token("color.accent")), tokenValue(fill)) >= ratio;
+  return { accent, runs: runs.map((run) => (accent ? { text: run.text, bold: true, ...(run.accent ? { accent: true } : {}) } : { text: run.text, bold: Boolean(run.accent) })) };
+}
+
+/**
+ * A card's surface (`style.cards`). White cards outlined in a hairline on a
+ * cream page are the page colour with a pencil line round them, and a row of
+ * four read as an empty page with text on it; under the reference weight a
+ * card is a filled block with no outline - a pillar, a label block, a fact
+ * tile, a quotation. `fill` and `stroke` are the open construction's.
+ */
+export const cardFill = (fill = token("color.surface"), stroke = token("color.rule")) =>
+  houseStyle("style.cards") === "tint" ? { fill: token("color.surfaceTint"), stroke: "none" } : { fill, stroke };
+/** The muted panel inside a card (a stat card, a copy band, a fact tile): the same surface, so one card set carries one fill. */
+export const cardMuted = () => cardFill(token("color.surfaceMuted")).fill;
 
 export const DENSITY_PROFILES = Object.freeze({
   "live-pitch": Object.freeze({ typeScale: 1.15 }),
@@ -937,7 +976,7 @@ function seriesValues(props = {}) {
  */
 export function defaultHighlightStyle(componentId, props = {}) {
   // Columns follow bars: a year marked by a tint behind a dark column read as
-  // the same colour as its neighbours on the Emirates decks.
+  // the same colour as its neighbours.
   return ["chart.bar", "chart.column"].includes(componentId) && Array.isArray(props.series) && props.series.length === 1 ? "bar" : "region-tint";
 }
 

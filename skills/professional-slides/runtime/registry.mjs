@@ -20,7 +20,9 @@ import {
   textPrimitive,
   token,
   tokenValue,
-  wedgePrimitive
+  wedgePrimitive,
+  onFill,
+  emphasisRuns
 } from "./core.mjs";
 import { renderPhaseWorkstreams, measurePhaseWorkstreams, PHASE_WORKSTREAM_TOKENS, PHASE_WORKSTREAM_VARIANTS } from "./phase-workstreams.mjs";
 import { renderQualitativeFunnel, measureQualitativeFunnel, renderPhaseHierarchy, measurePhaseHierarchy, QUALITATIVE_TOPOLOGY_TOKENS, QUALITATIVE_FUNNEL_SAMPLE, PHASE_HIERARCHY_SAMPLE } from './qualitative-topology.mjs';
@@ -126,6 +128,21 @@ export const measureProse = (text, width) => measureText(text, paragraphMeasure(
 // have always found it.
 export { fitText };
 
+/**
+ * The runs a paragraph is set in: its own `runs` where it was given them, else
+ * its `lead` in bold and its `highlight` - the page's phrase or its point's -
+ * in the accent, where the text says them. The composer only says which; the
+ * paragraph cuts the runs, so a paragraph built anywhere on a page takes its
+ * emphasis the same way. A lead the page also highlights keeps the accent.
+ */
+function paragraphRuns({ text, runs, lead, highlight }) {
+  if (runs) return runs;
+  const phrases = [highlight ?? []].flat().filter((phrase) => typeof phrase === "string");
+  if (!lead && !phrases.length) return null;
+  const lit = (phrase) => phrases.some((p) => p.toLowerCase() === phrase.toLowerCase());
+  return accentRuns(text, [...(lead ? [lead] : []), ...phrases], { strict: false })
+    ?.map((run, at) => (lead && at === 0 && run.text === lead && !lit(lead) ? { text: run.text, bold: true } : run)) ?? null;
+}
 
 
 function insightLayout(frame, props) {
@@ -281,33 +298,22 @@ function insightNodes({ id, frame, props }) {
     // inside the sentence. Accent only, never bold - an insight body is already
     // semibold, so the emphasis is colour and the measured width is unchanged.
     // On the filled so-what bar the accent often cannot read (a red accent on a
-    // red bar), and the bar's phrase was dropped outright. Where the accent
-    // reads on the fill it is used; otherwise the bar's sentence drops to the
-    // regular weight and the phrase stays bold - weight is the emphasis
-    // reversed type can carry. Narrower than the bold it was measured in, the
-    // sentence cannot overflow its lines.
-    const onBar = variant === "primary";
-    const barAccent = onBar && contrastRatio(tokenValue(token("color.accent")), tokenValue(PRIMARY)) >= 4.5;
-    const byWeight = onBar && !barAccent;
-    const accented = part === "body" && props.highlight
-      // `strict: false`: a page-level highlight is offered to every piece of the
-      // page's prose, and most of them will not contain it. A phrase that is not
-      // there is simply not emphasised - it is not an error.
-      ? accentRuns(measured.text, props.highlight, { bold: false, accent: true, strict: false })
-      : null;
-    // The runs above are cut from the wrapped text, so they carry its line
-    // breaks, and the PowerPoint emitter reads a break inside runs as a new
-    // paragraph: a highlight that fell just after a wrap split the band into two
+    // red bar); there the sentence drops to the regular weight and the phrase
+    // stays bold (emphasisRuns). Narrower than the bold it was measured in, the
+    // sentence cannot overflow its lines. A page-level highlight is offered to
+    // every piece of the page's prose, and one that does not say it is simply
+    // not emphasised.
+    const fill = variant === "primary" ? PRIMARY : null;
+    const emphasis = part === "body" && props.highlight ? emphasisRuns(measured.text, props.highlight, fill) : null;
+    // Those runs are cut from the wrapped text, so they carry its line breaks,
+    // and the PowerPoint emitter reads a break inside runs as a new paragraph:
+    // a highlight that fell just after a wrap split the band into two
     // paragraphs on export. The emitter prefers runs over the unwrapped source,
     // so those travel with the layout.
-    const emphasised = accented && accented.some((run) => run.accent);
-    const style = (run) => (byWeight ? { text: run.text, bold: Boolean(run.accent) } : { ...run, bold: true });
-    const sourceRuns = emphasised && measured.source !== undefined
-      ? accentRuns(measured.source, props.highlight, { bold: false, accent: true, strict: false }).map(style)
-      : null;
+    const sourceRuns = emphasis && measured.source !== undefined ? emphasisRuns(measured.source, props.highlight, fill)?.runs ?? null : null;
     nodes.push(textPrimitive({ id: stableId(id, part), role: `insight-${part}`, frame: { x: textX, y, width: layout.width, height: measured.height }, text: measured.text,
-      ...(emphasised ? { runs: accented.map(style) } : {}),
-      style: { ...textStyle(part === "heading" ? token("type.heading") : layout.bodySize ?? BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, !(emphasised && byWeight), props.align ?? "left", "top"), ...(variant === "rule" && part === "body" ? { fontFamily: DISPLAY } : {}), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: sourceRuns ? { ...measured, sourceRuns } : measured } }));
+      ...(emphasis ? { runs: emphasis.runs } : {}),
+      style: { ...textStyle(part === "heading" ? token("type.heading") : layout.bodySize ?? BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, !emphasis || emphasis.accent, props.align ?? "left", "top"), ...(variant === "rule" && part === "body" ? { fontFamily: DISPLAY } : {}), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: sourceRuns ? { ...measured, sourceRuns } : measured } }));
     y += measured.height + layout.gap;
   }
   return nodes;
@@ -1649,8 +1655,8 @@ function registerCore(registry) {
       // `variant: "caption"` is the line under a panel: compact, secondary, the
       // finding this panel carries. A well-made page captions every panel in a row
       // instead of closing the page with one shared so-what.
-      const caption = props.variant === "caption";
-      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: caption ? "panel-caption" : "paragraph", frame: { ...frame, width }, text: props.text, ...(props.runs?{runs:props.runs}:{}), style: textStyle(caption ? COMPACT : BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") })] };
+      const caption = props.variant === "caption", runs = paragraphRuns(props);
+      return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: caption ? "panel-caption" : "paragraph", frame: { ...frame, width }, text: props.text, ...(runs ? { runs } : {}), style: textStyle(caption ? COMPACT : BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") })] };
     } }),
     component({ id: "bullet-list", category: "text", tokens: ["font.body", "type.compact", "type.label", "color.ink", "color.accent", "color.componentPrimary", "color.onPrimary", "color.rule", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "radius.none", "radius.round"], preferredSize: { width: 540, height: 240 }, sample: { items: ["(Insert supporting point 1)", "(Insert supporting point 2)", "(Insert supporting point 3)"] }, render: ({ id, frame, props }) => ({ nodes: simpleList({ id, frame, items: props.items, numbered: false, marker: "circle" }) }) }),
     component({ id: "insight", category: "section", role: "insight", tokens: ["color.accent", "font.display", "radius.none", "color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted", "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.3", "space.4", "space.5", "space.6", "line.hairline", "line.standard", "radius.small", "radius.round", "icon.medium"], preferredSize: { width: 1160, height: 100 }, sample: { text: "(Insert decision-relevant synthesis)" }, render: input => ({ nodes: insightNodes(input) }) }),
@@ -1662,7 +1668,7 @@ function registerCore(registry) {
       if (seriesColorIndex !== undefined && (!Number.isInteger(seriesColorIndex) || seriesColorIndex < 0 || seriesColorIndex > 5)) throw new Error("Panel seriesColorIndex must be an integer from zero to five");
       const fill = seriesColorIndex !== undefined ? token(`color.chartSeries${seriesColorIndex + 1}`) : tone === "primary" ? PRIMARY : tone === "dark" ? INK : tone === "muted" ? MUTED_SURFACE : SURFACE;
       const foreground = seriesColorIndex !== undefined
-        ? (contrastRatio(tokens[fill.tokenId].value, tokens[WHITE.tokenId].value) >= contrastRatio(tokens[fill.tokenId].value, tokens[INK.tokenId].value) ? WHITE : INK)
+        ? onFill(fill)
         : tone === "primary" || tone === "dark" ? WHITE : INK;
       const data = seriesColorIndex === undefined ? {} : { seriesKey: props.seriesKey ?? props.heading, colorIndex: seriesColorIndex };
       return { nodes: [rectPrimitive({ id: stableId(id, "surface"), role: "panel-surface", frame, style: boxStyle(fill, tone === "open" && seriesColorIndex === undefined ? RULE : fill, HAIRLINE, token("radius.none")), data }), textPrimitive({ id: stableId(id, "heading"), role: "panel-heading", frame: { x: frame.x + 10, y: frame.y + 10, width: frame.width - 20, height: 30 }, text: props.heading, style: textStyle(token("type.heading"), foreground, true), data }), textPrimitive({ id: stableId(id, "body"), role: "panel-body", frame: { x: frame.x + 10, y: frame.y + 44, width: frame.width - 20, height: frame.height - 54 }, text: props.text, style: textStyle(COMPACT, foreground, false, "left", "top"), data })] };
@@ -1970,8 +1976,9 @@ function registerCore(registry) {
       // Geometry-only layout probes have no copy yet; rendering still requires it.
       if (!Object.hasOwn(props ?? {}, "text")) return null;
       if (typeof props.text !== "string" || !props.text.trim()) throw new Error("paragraph requires a non-empty text string for measurement");
-      if(props.runs && props.runs.map(r=>r.text).join("")!==props.text)throw new Error("Paragraph emphasis must preserve exact text");
-      return (props.runs?measureTextRuns:measureText)(props.runs||props.text, paragraphMeasure(frame.width, props), { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false, wrapWidthRatio: 1 });
+      const runs = paragraphRuns(props);
+      if (runs && runs.map((r) => r.text).join("") !== props.text) throw new Error("Paragraph emphasis must preserve exact text");
+      return (runs ? measureTextRuns : measureText)(runs || props.text, paragraphMeasure(frame.width, props), { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false, wrapWidthRatio: 1 });
     };
     if (definition.id === "section") definition.measureInsets = ({ frame, props }) => sectionContentInsets(frame, props);
     if (definition.id === "section-heading") definition.variants.inverse = { backdrop: "primary" };

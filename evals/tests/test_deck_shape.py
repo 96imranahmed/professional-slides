@@ -838,7 +838,8 @@ assert.equal(label.surface,'plain');
 assert.equal(first.type,'bullets');
 assert.equal(first.lead,'Strong base, declining ridership');
 assert.deepEqual(first.items,['34% of workers commute by transit','15% decline in rail ridership']);
-assert.equal(first.accent,'34%');
+// The phrase travels as the cell's highlight; the table sets it as its accent.
+assert.equal(first.highlight,'34%');
 assert.equal(second.type,'bullets');
 // A plain string cell stays text; the second row also remains unordered.
 assert.equal(table.props.rows[1][2].type,'text');

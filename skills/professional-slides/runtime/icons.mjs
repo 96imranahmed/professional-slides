@@ -372,6 +372,12 @@ export function nearestIcons(name, count = 3) {
   return [...best].filter(([, score]) => score <= 0.6).slice(0, count).map(([icon]) => icon);
 }
 
+/** Why `name` is refused, with the nearest names and where the list is: the one message every place that takes an icon throws. */
+export function unknownIcon(name, what = "icon") {
+  const near = nearestIcons(name);
+  return `Unknown ${what}: ${String(name)}; ${near.length ? `the nearest are ${near.join(", ")}; ` : ""}\`author-deck.mjs --icons\` lists all ${ICON_NAMES.length}`;
+}
+
 // SVG path data for an icon mapped into an absolute frame {x, y, width, height}.
 export function iconSvgPaths(name, frame) {
   const def = iconDefinition(name);

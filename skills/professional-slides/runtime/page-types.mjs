@@ -30,6 +30,7 @@ import { trivialChart } from "./gates/craft_gates.mjs";
 import { calloutFits } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
+import { SCALAR_FIGURE as NUMERIC } from "./value-format.mjs";
 import { timePositions, describeGaps } from "./time-axis.mjs";
 import { verdictCell } from "./compose.mjs";
 import { REVIEWED } from "./gates/variety_gates.mjs";
@@ -603,7 +604,6 @@ function checkBlocks(page, id, exhibits) {
 const cellText = (cell) => (cell && typeof cell === "object" ? (cell.blank === true ? "" : String(cell.text ?? cell.value ?? cell.label ?? "")) : String(cell ?? ""));
 const rowCells = (row) => (Array.isArray(row) ? row : Array.isArray(row?.cells) ? row.cells : []);
 const BLANK = /^[\s\-–—]*$/;
-const NUMERIC = /^[\s~≈<>+\-–$£€]*\d[\d.,]*\s*(%|x|pts?|bps|[kmb]n?|bn|tn|m|k)?\s*$/i;
 const TABLE_EXHIBIT = (ex) => TABLE_TYPES.has(String(ex?.type ?? "")) && Array.isArray(ex.rows);
 const COLUMN_CHARTS = new Set(["chart.column", "chart.stacked-column", "chart.combo"]);
 // A heading that says the columns are snapshots, not a series: the gaps are then the point.

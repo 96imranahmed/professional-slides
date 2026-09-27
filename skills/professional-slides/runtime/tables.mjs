@@ -1,6 +1,6 @@
 import { mediaNode } from "./media.mjs";
 import { logoFrame } from "./charts.mjs";
-import { formatValue } from "./value-format.mjs";
+import { formatValue, figureUnit } from "./value-format.mjs";
 import {
   token,
   tokenValue,
@@ -14,6 +14,7 @@ import {
   chartAnnotationStyle,
   houseStyle,
   readableOn,
+  onFill,
 } from "./core.mjs";
 import { measureText, measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { contrastRatio, strongestContrastIndex } from "./palettes.mjs";
@@ -190,9 +191,8 @@ function barColor(scale, index) {
   return candidates[strongestContrastIndex(candidates.map(tokenValue))];
 }
 
-// A figure as a pill carries it: an optional qualifier, a currency, the
-// number, a unit. "n/a" or a dash says there is none.
-const PILL_FIGURE = /^([~≈<>≤≥+\-−]\s*)?([$€£¥])?\s*(\d[\d,]*(?:\.\d+)?)\s*(%|pp|x|×|bn|tn|mn|[kmbt])?\+?$/i;
+// A figure as a pill carries it (value-format.mjs SCALAR_FIGURE). "n/a" or a
+// dash says there is none.
 const PILL_NONE = /^(n\/a|na|n\.a\.|–|—|-)$/i;
 
 /**
@@ -209,10 +209,9 @@ function pillColumnsOfOneKind(columns, cells) {
     const pills = cells.map((row) => row[c]).filter((cell) => cell && !cell.blank && cell.type === "highlight" && cell.surface === "bubble");
     if (!pills.length) continue;
     const text = (cell) => String(cell.text ?? cell.value ?? "").trim();
-    const words = pills.filter((cell) => !PILL_FIGURE.test(text(cell)) && !PILL_NONE.test(text(cell)));
+    const words = pills.filter((cell) => figureUnit(text(cell)) === null && !PILL_NONE.test(text(cell)));
     if (words.length) throw new Error(`Table pill column "${label(c)}" mixes figures with words ("${text(words[0])}"): every pill in a column is the same kind of thing. Give each row its figure, or "n/a" where there is none (set as a plain dash), and move the qualification to a footnote or the implication column`);
-    const unitOf = (cell) => { const m = PILL_FIGURE.exec(text(cell)); return `${m[2] ?? ""}${(m[4] ?? "").toLowerCase().replace("×", "x")}`; };
-    const units = [...new Set(pills.filter((cell) => PILL_FIGURE.test(text(cell))).map(unitOf))];
+    const units = [...new Set(pills.map((cell) => figureUnit(text(cell))).filter((unit) => unit !== null))];
     if (units.length > 1) throw new Error(`Table pill column "${label(c)}" mixes units (${units.map((u) => `"${u || "plain"}"`).join(", ")}): pills in one column are compared at a glance, so they share one unit - convert them, or split the column`);
     for (const cell of pills) if (PILL_NONE.test(text(cell))) { cell.type = "text"; cell.surface = undefined; cell.text = "–"; }
   }
@@ -491,8 +490,7 @@ function heatFill(scale, value) {
     `color.heat.${scale.palette ?? "theme-sequential"}.${Math.round(fraction * 10)}`,
   );
 }
-const foreground = (fill) =>
-  contrastRatio(tokenValue(fill), v("color.ink")) >= 4.5 ? ink : white;
+const foreground = onFill;
 const rowBand = (style) =>
   style === "accented" ? t("color.accentTint") : style === "total" ? primary : style === "group" ? t("color.surfaceMuted") : null;
 const categorySurface = (cell, props) =>
@@ -686,9 +684,10 @@ function contentLayout(cell, width, props, used) {
   // (`highlight: true` is the older flag that marks a whole cell.)
   if (cell.accent !== undefined && cell.accent !== null) {
     const phrases = Array.isArray(cell.accent) ? cell.accent : [cell.accent];
-    const everything = [leadText, ...texts].filter(Boolean).join("\u0000");
+    // In any case, as accentRuns matches it.
+    const everything = [leadText, ...texts].filter(Boolean).join("\u0000").toLowerCase();
     for (const phrase of phrases) {
-      if (!everything.includes(String(phrase))) throw new Error(`Table cell accent "${phrase}" does not occur in the cell`);
+      if (!everything.includes(String(phrase).toLowerCase())) throw new Error(`Table cell accent "${phrase}" does not occur in the cell`);
     }
   }
   const blockHeight = (blocks.length

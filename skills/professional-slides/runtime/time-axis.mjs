@@ -87,6 +87,21 @@ export function timePositions(categories) {
   return t.map((v) => (v - t[0]) / (t.at(-1) - t[0]));
 }
 
+/**
+ * Which labels a time-spaced axis sets, given each label's position `xs` and
+ * the room `minGap` one needs: the first, then each that clears the last one
+ * kept, the latest kept over the one before it when both cannot be. Every
+ * observation keeps its tick; an even step would label a bunch and skip a gap.
+ */
+export function spacedLabelIndices(xs, minGap) {
+  const clear = (a, b) => Math.abs(xs[a] - xs[b]) >= minGap;
+  return xs.reduce((kept, _, index) => {
+    if (!kept.length || clear(kept.at(-1), index)) kept.push(index);
+    else if (index === xs.length - 1 && kept.length > 1 && clear(kept.at(-2), index)) kept[kept.length - 1] = index;
+    return kept;
+  }, []);
+}
+
 /** The gaps as a reader would say them, for a message: "1-3 months", "1-4 years". */
 export function describeGaps(categories) {
   const times = periodTimes(categories);

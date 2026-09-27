@@ -7,14 +7,17 @@ import {
   stableId,
   textPrimitive,
   token,
-  tokenValue
+  tokenValue,
+  onFill
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
+import { SCALAR_FIGURE } from "./value-format.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
-import { contrastRatio } from "./palettes.mjs";
 
 const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label", "end-bubble"]);
 const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot", "speech"]);
+/** A callout's treatment, the retired "takeaway-box" read as the callout it became: one place knows the alias. */
+export const evidenceTreatment = (annotation) => (!annotation?.treatment || annotation.treatment === "takeaway-box" ? "callout" : annotation.treatment);
 // Keep a full label-height gap between the observation box and the plot. The
 // chart reserves this band before calculating marks, so value labels remain
 // readable instead of tucking under the annotation surface.
@@ -51,7 +54,6 @@ const EVIDENCE_PAD_Y = 14;
 const ORTHOGONAL_GAP = 28;
 const ENDPOINT_DIAMETER = 8;
 const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label"]);
-const SCALAR_BUBBLE = /^(?:[~≈]?\s*[+−\-£$€¥]{0,2}\s*\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|pp|bps|x|×|bn|mn|[kKmMbBtT])?(?:\s*p\.a\.)?|N\/A)$/;
 
 // An annotation centres on the mark it points at, and its bold face is the
 // annotation face rather than the body bold. Over the shared builder.
@@ -85,8 +87,7 @@ function normalizeEvidenceAnnotations(props = {}) {
     if (typeof annotation.text !== "string" || !annotation.text.trim()) {
       throw new Error(`Chart evidence annotation ${index + 1} needs concise text`);
     }
-    // Retired takeaway-box inputs resolve to the retained callout construction.
-    const treatment = !annotation.treatment || annotation.treatment === "takeaway-box" ? "callout" : annotation.treatment;
+    const treatment = evidenceTreatment(annotation);
     if (annotation.border !== undefined && typeof annotation.border !== "boolean") throw new Error("Chart annotation border must be a boolean");
     if (!EVIDENCE_ANNOTATION_TREATMENTS.includes(treatment)) throw new Error(`Unknown chart evidence annotation treatment: ${treatment}`);
     if (treatment !== "orthogonal-dot" && (annotation.orientation !== undefined || annotation.side !== undefined)) {
@@ -569,7 +570,7 @@ function evidenceNodes(id, placement) {
   // ink colour reads on the bar's fill.
   if (placement.textOnly) {
     const fill = placement.textOnly.fill, surface = fill && typeof fill === "object" ? tokenValue(fill) : fill;
-    const color = typeof surface === "string" && /^#[0-9a-f]{6}$/i.test(surface) && contrastRatio(tokenValue(ON_PRIMARY), surface) < 4.5 ? INK : ON_PRIMARY;
+    const color = typeof surface === "string" && /^#[0-9a-f]{6}$/i.test(surface) ? onFill(surface) : ON_PRIMARY;
     const layout = placement.textOnly.layout;
     return [textPrimitive({ id: stableId(id, "annotation-text", index), role: "annotation-text", frame, text: layout.text,
       style: { ...textStyle(ANNOTATION, color, true, "right"), lineHeight: layout.lineHeight, wrap: false }, data: { ...data, textLayout: layout } })];
@@ -786,7 +787,7 @@ export function normalizeChangeAnnotations(props = {}) {
       if (typeof annotation.qualification !== "string" || !annotation.qualification.trim()) throw new Error("Qualitative interval needs a qualification");
       if (annotation.showQualification !== undefined && typeof annotation.showQualification !== "boolean") throw new Error("showQualification must be boolean");
       if (annotation.basis === "approximate-source-readings" && !/approximate|estimated|rough|~|≈/i.test(annotation.qualification)) throw new Error("Approximate interval qualification must explicitly identify approximate readings");
-    } else if (!SCALAR_BUBBLE.test(annotation.text.trim()) || annotation.text.trim() === "N/A") throw new Error("Chart change bubbles require one numeric value; put the measure and period outside the bubble");
+    } else if (!SCALAR_FIGURE.test(annotation.text)) throw new Error("Chart change bubbles require one numeric value; put the measure and period outside the bubble");
     return {
       ...annotation,
       style,
@@ -820,7 +821,7 @@ export function normalizeAnnotationRail(props = {}) {
       if (!item || typeof item.category !== "string" || !item.category.trim() || categories.has(item.category)) throw new Error(`Chart annotation rail row ${rowIndex + 1} item ${index + 1} must name a unique category`);
       categories.add(item.category);
       // A bubble carries one scalar, never a metric name or an expression.
-      if (typeof item.text !== "string" || !SCALAR_BUBBLE.test(item.text.trim())) throw new Error("Annotation rail bubbles require one numeric value (or N/A); move metric names to row labels and separate multiple metrics into rows");
+      if (typeof item.text !== "string" || !(SCALAR_FIGURE.test(item.text) || item.text.trim() === "N/A")) throw new Error("Annotation rail bubbles require one numeric value (or N/A); move metric names to row labels and separate multiple metrics into rows");
       return { ...item, text: item.text.trim() };
     });
     return { ...row, labelWidth, items };
