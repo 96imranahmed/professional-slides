@@ -70,7 +70,7 @@ export function compileDeck(doc, { insights = null, draft = false, partial = fal
   const errors = [];
   const compile = (list, offset = 0) => list.map((page, i) => {
     let slide;
-    try { slide = compilePage(page, offset + i, { insights, draft }); } catch (error) { errors.push(error.message); return null; }
+    try { slide = compilePage(page, offset + i, { insights, draft, players: doc.deck.players }); } catch (error) { errors.push(error.message); return null; }
     // Every key checked now, on every page, rather than one at a time by the build.
     const unknown = Object.keys(slide).filter((key) => !(key in SLIDE_KEYS));
     if (!unknown.length) return slide;

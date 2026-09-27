@@ -698,7 +698,7 @@ function reviewedDefect(page, id, exhibits) {
     const plain = page.type === "matrix" ? plainVerdict(page.columns || [], page.rows, true)
       : tables.map((ex) => plainVerdict(ex.columns || [], ex.rows, false)).find(Boolean);
     if (plain) return `${id}: VERDICT_TABLE_PLAIN - the "${plain.header}" column judges each row (${plain.examples.map((e) => `"${e}"`).join(", ")}) in plain text, where it reads as one more fact beside the evidence. ` +
-      "Code the judgement: give the column a `type` - \"rag\" (a status pill), \"harvey\" (a rating), \"check\", \"lights\" or \"dot\" - or make the page a `scorecard` (forms harvey, rag, check, lights, dot, heatmap, bars)";
+      "Code the judgement: give the column a `type` - \"rag\" (a status pill), \"harvey\" (a rating), \"check\", \"lights\" or \"dot\" - or make the page a `scorecard` (forms harvey, rag, check, lights, dot, heatmap, bars). Where the column names who leads, declare the companies in the deck's \`players\`: a cell naming a player is drawn as its logo, which says who without spending a status colour";
   }
   if (!PROSE_TYPES.has(page.type)) {
     const blocks = proseBlocks(page, exhibits), long = blocks.filter((b) => words(b.text).length >= SCENARIO_WORDS);
@@ -736,7 +736,7 @@ function sharesInTiles(page, exhibits) {
  * make when a choice is missing or impossible; structural pages (`kind`
  * cover, section, agenda) pass through unchanged.
  */
-export function compilePage(pageIn, index = 0, { insights = null, draft = false } = {}) {
+export function compilePage(pageIn, index = 0, { insights = null, draft = false, players = null } = {}) {
   if (!pageIn || typeof pageIn !== "object") throw new Error(`page ${index + 1} is not an object`);
   const page = structuredClone(pageIn);
   const id = page.id ?? `page-${index + 1}`;
@@ -832,6 +832,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   if (page.type === "options" && page.form === "compare" && slide.exhibit) setType(slide.exhibit, "compare");
   const untyped = [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object" && !ex.type);
   if (untyped.length) throw new Error(`${id}: ${untyped.length === 1 ? "the exhibit has" : `${untyped.length} exhibits have`} no \`type\`; a ${page.type}/${page.form} page does not set it, so name it (table, chart.bar, map, ...)`);
+  // Cells naming a player become its mark before any check reads the table.
+  if (players) markPlayerCells(slide, players);
   const primary = slide.exhibit ?? slide.exhibits?.[0];
   // The exhibit carries the data its form reads, named before the build has to.
   for (const ex of [slide.exhibit, ...(slide.exhibits || [])].filter(Boolean)) {
@@ -1091,6 +1093,39 @@ export function subtitleProblem(title, subtitle) {
   if (measureText(subtitle.trim(), SUBTITLE_WIDTH, { fontSize: 12, wrapWidthRatio: 1 }).lines.length > 1) return "runs past one line; cut it to the scope, the unit, the population or the period";
   if (overlap(title, subtitle) > 0.7) return "repeats the title; say what the title leaves out - the measure, the population, the period";
   return null;
+}
+
+/**
+ * Table cells that name a declared player, drawn as its logo. A comparison
+ * table whose verdict column read "OpenAI" / "Anthropic" set the names as
+ * green status pills, which reads as good and bad rather than as who; the
+ * mark says who at a glance and leaves colour to mean a state. Only exact
+ * names (or a player's `short`/`aliases`) outside the row-label column are
+ * marked, so a sentence that mentions a player stays prose. The logo itself is
+ * filled from assets/logos/ or fetched by the build (fetch-logos.mjs), as a
+ * players page's are; until then the cell keeps the name.
+ */
+export function markPlayerCells(slide, players) {
+  const names = new Map();
+  for (const p of players || []) {
+    const player = typeof p === "string" ? { name: p } : p;
+    if (!player?.name) continue;
+    for (const alias of [player.name, player.short, ...(player.aliases || [])].filter(Boolean)) names.set(String(alias).trim().toLowerCase(), player.name);
+  }
+  if (!names.size) return 0;
+  let marked = 0;
+  const mark = (value) => {
+    const text = typeof value === "string" ? value : value && typeof value === "object" && !value.type && typeof value.text === "string" && value.highlight === undefined ? value.text : null;
+    const name = text === null ? null : names.get(text.trim().toLowerCase());
+    if (!name) return value;
+    marked += 1;
+    return { type: "logo", player: name, media: { alt: `${name} logo` } };
+  };
+  for (const ex of [slide.exhibit, ...(slide.exhibits || [])].filter((e) => e && typeof e === "object" && e.type === "table")) {
+    ex.rows = (ex.rows || []).map((row) => Array.isArray(row) ? row.map((cell, c) => c === 0 ? cell : mark(cell))
+      : row && Array.isArray(row.cells) ? { ...row, cells: row.cells.map((cell, c) => c === 0 && row.label === undefined ? cell : mark(cell)) } : row);
+  }
+  return marked;
 }
 
 /** The normalized plan-gate architecture a compiled page type stands for. */

@@ -267,6 +267,11 @@ function normalize(props) {
       // compare, where a padded " " would read as a missing value.
       if ((emptyValue && (bandRow ? c > 0 : c === 0)) || (value && typeof value === "object" && value.blank === true)) { cell.blank = true; cell.type = "text"; }
       if (bandRow) cell.bold = true;
+      // A cell naming a declared player is drawn as the player's mark
+      // (page-types.mjs markPlayerCells). Before its logo is on disk - an
+      // offline build, a player with no article - it keeps the name as text
+      // rather than failing the table.
+      if (cell.type === "logo" && cell.player && !cell.media?.dataUri) { cell.type = "text"; cell.text = cell.player; delete cell.media; }
       if (!CELL_TYPES.includes(cell.type))
         throw new Error(`Unknown table cell type: ${cell.type}`);
       if (!["left", "center", "right"].includes(cell.align ?? "left"))
