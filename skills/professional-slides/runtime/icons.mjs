@@ -290,20 +290,86 @@ export const ICONS = Object.freeze({
   "check": { label: "Check", paths: [poly([0.12, 0.52], [0.38, 0.78], [0.88, 0.24])] },
   "cross": { label: "Cross", paths: [line(0.16, 0.16, 0.84, 0.84), line(0.84, 0.16, 0.16, 0.84)] },
   "arrow-right": { label: "Arrow right", paths: [line(0.08, 0.50, 0.90, 0.50), poly([0.60, 0.20], [0.90, 0.50], [0.60, 0.80])] },
-  "plus": { label: "Plus", paths: [line(0.50, 0.10, 0.50, 0.90), line(0.10, 0.50, 0.90, 0.50)] }
+  "plus": { label: "Plus", paths: [line(0.50, 0.10, 0.50, 0.90), line(0.10, 0.50, 0.90, 0.50)] },
+  // Transport, places and sectors: a deck about an airline asked for "plane"
+  // and had only a truck, a globe and a map pin to choose from.
+  "plane": { label: "Plane", paths: [shape([0.50, 0.06], [0.56, 0.14], [0.56, 0.40], [0.92, 0.58], [0.92, 0.66], [0.56, 0.56], [0.56, 0.78],
+    [0.70, 0.88], [0.70, 0.94], [0.50, 0.88], [0.30, 0.94], [0.30, 0.88], [0.44, 0.78], [0.44, 0.56], [0.08, 0.66], [0.08, 0.58], [0.44, 0.40], [0.44, 0.14])] },
+  "ship": { label: "Ship", paths: [
+    shape([0.06, 0.56], [0.94, 0.56], [0.80, 0.80], [0.20, 0.80]),
+    poly([0.24, 0.56], [0.24, 0.36], [0.66, 0.36], [0.66, 0.56]),
+    poly([0.40, 0.36], [0.40, 0.18], [0.52, 0.18], [0.52, 0.36]),
+    line(0.12, 0.90, 0.88, 0.90)
+  ] },
+  "train": { label: "Train", paths: [
+    shape([0.24, 0.08], [0.76, 0.08], [0.84, 0.18], [0.84, 0.74], [0.16, 0.74], [0.16, 0.18]),
+    rect(0.26, 0.22, 0.74, 0.46), dot(0.32, 0.60), dot(0.68, 0.60),
+    line(0.30, 0.74, 0.18, 0.92), line(0.70, 0.74, 0.82, 0.92)
+  ] },
+  "car": { label: "Car", paths: [
+    shape([0.06, 0.66], [0.06, 0.50], [0.20, 0.46], [0.32, 0.28], [0.68, 0.28], [0.80, 0.46], [0.94, 0.50], [0.94, 0.66]),
+    circle(0.26, 0.72, 0.10, 12), circle(0.74, 0.72, 0.10, 12)
+  ] },
+  "cart": { label: "Shopping cart", paths: [
+    poly([0.06, 0.14], [0.20, 0.14], [0.30, 0.62], [0.82, 0.62], [0.92, 0.28], [0.24, 0.28]),
+    circle(0.36, 0.80, 0.07, 10), circle(0.76, 0.80, 0.07, 10)
+  ] },
+  "home": { label: "Home", paths: [
+    poly([0.08, 0.48], [0.50, 0.12], [0.92, 0.48]),
+    poly([0.20, 0.38], [0.20, 0.90], [0.80, 0.90], [0.80, 0.38]),
+    poly([0.42, 0.90], [0.42, 0.64], [0.58, 0.64], [0.58, 0.90])
+  ] },
+  "heart": { label: "Heart", paths: [closed([...arcPoints(0.31, 0.35, 0.19, 135, 360, 10), ...arcPoints(0.69, 0.35, 0.19, 180, 405, 10).slice(1), pt(0.50, 0.88)])] },
+  "education": { label: "Education", paths: [
+    shape([0.50, 0.16], [0.94, 0.36], [0.50, 0.56], [0.06, 0.36]),
+    poly([0.24, 0.46], [0.24, 0.70], [0.50, 0.80], [0.76, 0.70], [0.76, 0.46]),
+    line(0.94, 0.36, 0.94, 0.62)
+  ] }
 });
 
 export const ICON_NAMES = Object.freeze(Object.keys(ICONS).sort());
 
-const ALIASES = Object.freeze({
+export const ICON_ALIASES = Object.freeze({
   team: "people", user: "person", settings: "gear", "bar-chart": "chart-bar", trend: "chart-line",
-  pin: "map-pin", location: "map-pin", idea: "lightbulb", tick: "check", x: "cross"
+  pin: "map-pin", location: "map-pin", idea: "lightbulb", tick: "check", x: "cross",
+  aircraft: "plane", airplane: "plane", aeroplane: "plane", airline: "plane", flight: "plane", aviation: "plane",
+  boat: "ship", vessel: "ship", port: "ship", shipping: "ship", rail: "train", railway: "train",
+  vehicle: "car", automotive: "car", shopping: "cart", retail: "cart", house: "home", housing: "home",
+  health: "heart", healthcare: "heart", school: "education", university: "education", training: "education",
+  office: "building", company: "building", world: "globe", international: "globe", cash: "money", revenue: "money",
+  time: "clock", customers: "people", logistics: "truck", delivery: "truck", manufacturing: "factory", energy: "bolt",
+  sustainability: "leaf", data: "database", security: "shield", risk: "warning", partnership: "handshake",
+  airport: "plane", hospital: "heart",
 });
 
 export function iconDefinition(name) {
   if (typeof name !== "string") return null;
   const key = name.trim().toLowerCase();
-  return ICONS[key] ?? ICONS[ALIASES[key]] ?? null;
+  return ICONS[key] ?? ICONS[ICON_ALIASES[key]] ?? null;
+}
+
+/**
+ * The icon names nearest an unknown one, for the error that refuses it:
+ * "Unknown icon: plane" with nothing else sent the author to read the source
+ * for a list. Matched against names, labels and aliases by edit distance,
+ * a shared stem counting as near.
+ */
+export function nearestIcons(name, count = 3) {
+  const want = String(name ?? "").trim().toLowerCase();
+  const distance = (a, b) => {
+    const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i += 1) {
+      let prev = row[0]; row[0] = i;
+      for (let j = 1; j <= b.length; j += 1) { const next = row[j]; row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = next; }
+    }
+    return row[b.length];
+  };
+  const keys = [...ICON_NAMES.map((n) => [n, n]), ...ICON_NAMES.map((n) => [ICONS[n].label.toLowerCase(), n]), ...Object.entries(ICON_ALIASES)];
+  const stem = (a, b) => b.length >= 3 && (a.startsWith(b) || b.startsWith(a)) ? 0.1 : b.length >= 3 && (a.includes(b) || b.includes(a)) ? 0.3 : null;
+  const scored = keys.map(([key, icon]) => ({ icon, score: key === want ? 0 : stem(want, key) ?? distance(want, key) / Math.max(want.length, key.length) }));
+  const best = new Map();
+  for (const { icon, score } of scored.sort((a, b) => a.score - b.score)) if (!best.has(icon)) best.set(icon, score);
+  return [...best].filter(([, score]) => score <= 0.6).slice(0, count).map(([icon]) => icon);
 }
 
 // SVG path data for an icon mapped into an absolute frame {x, y, width, height}.

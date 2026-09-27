@@ -15,15 +15,21 @@ covers in each cell and the grey it paints: a fill as drawn (a disc, a sector,
 a chevron or a polygon by its outline), a rule or an outline by its stroke
 along its length, a picture whole, and a line of type as a band across the
 glyphs' height and the line's measured width, painted at `TEXT_COVERAGE` of
-its colour - the share of that band glyph strokes cover once the render
-averages them. A cell counts as ink when its grey sits more than `INK_DELTA`
-levels from the page's median grey, as the rendered measure counts it; the
-estimate is the share of body cells that do.
+its colour on average - unevenly across its cells (`GLYPH_SPREAD`), since a
+stroke lands in one cell and misses the next. A cell counts as ink when its
+grey sits more than `INK_DELTA` levels from the page's median grey, as the
+rendered measure counts it; the estimate is the share of body cells that do.
 
-`TEXT_COVERAGE` and `BOLD_WEIGHT` are the only fitted numbers, fitted by grid
-search against the rendered measure on 160 content pages - the worked example
-and a real editorial deck, each built before and after the surface treatments
-(evaluation/index.md#ink-estimate records the fit). Everything else is
+Five numbers are fitted, by grid search against the rendered measure:
+`TEXT_COVERAGE`, `BOLD_WEIGHT`, `GLYPH_SPREAD`, `HAIRLINE_WEIGHT` (a one-pixel
+rule, which the render antialiases to a pale line) and `NATIVE_WEIGHT` (the
+plot of a chart exported as a native chart object, which the renderer draws
+lighter than the scene). The first fit had only the first two and painted
+each line of type evenly, so a band of grey type on a tint flipped whole
+across the threshold: hollow fact tiles estimated 2% against 10% rendered,
+and two native line charts 11% against 8%. Refitted on 227 content pages of
+eight built decks and checked on the worked example, which the fit did not
+see (evaluation/index.md#ink-estimate records both). Everything else is
 geometry the scene already states.
 
 Nothing here needs Pillow or numpy: the grid is 22,600 cells.
@@ -40,8 +46,21 @@ SCALE = GRID_W / CANVAS_W
 BODY = (0.15, 0.92)                         # the body band the rendered measure reads
 INK_DELTA = 25                              # grey levels from the page's median that count
 GLYPH_BAND = (0.15, 0.9)                    # where a line's ink sits in the face on its line
-TEXT_COVERAGE = 0.16                        # fitted: see the module docstring
+TEXT_COVERAGE = 0.29                        # fitted: see the module docstring
 BOLD_WEIGHT = 1.2                           # fitted: a bold stroke against a regular one
+GLYPH_SPREAD = 0.9                          # fitted: how unevenly a line's strokes fall across cells
+HAIRLINE_WEIGHT = 0.5                       # fitted: a one-pixel rule as the render antialiases it
+NATIVE_WEIGHT = 0.8                         # fitted: a native chart's plot as the renderer draws it
+# The roles a native chart object replaces (emit_pptx.py CHART_PLOT_ROLES).
+NATIVE_PLOT_ROLES = {"chart-mark", "data-label", "category-label", "chart-axis", "axis-label", "chart-gridline",
+                     "legend-swatch", "legend-label", "chart-line", "chart-point", "chart-segment", "chart-area",
+                     "chart-wedge", "pie-label", "pie-leader", "chart-baseline", "chart-tick", "chart-marker", "value-label",
+                     "series-label", "end-label", "stack-label", "total-label", "axis-title"}
+# Four cells of a line's band take four shares of its coverage, from one that
+# a stroke fills to one it all but misses, so higher contrast lights more of
+# the band: white type on a dark page reads almost whole, grey type on a tint
+# reads in patches, as the render reads them.
+GLYPH_STEPS = ((1.0, -1 / 3), (1 / 3, -1.0))
 SHAPE_TYPES = {"rect", "ellipse", "shape", "wedge"}
 # A shape with no outline to fill covers part of its box, spread evenly: map
 # land drawn without its paths a little under half (coasts, seas between), an
@@ -72,10 +91,18 @@ class _Grid:
     def __init__(self, background):
         self.cells = [[background] * GRID_W for _ in range(GRID_H)]
 
-    def paint(self, x, y, w, h, grey, alpha=1.0):
+    def paint(self, x, y, w, h, grey, alpha=1.0, spread=0.0):
         """Paint the canvas box (x, y, w, h) in `grey`, each cell by the share of
         it the box covers times `alpha`: a hairline covers a sixth of a cell and
-        barely moves it, as it barely moves the render."""
+        barely moves it, as it barely moves the render.
+
+        A line of type passes `spread`: the cells of each two-by-two block take
+        `alpha` stepped by GLYPH_STEPS times it, so the band averages `alpha`
+        while some of its cells cross the ink threshold and some do not, as the
+        render's cells do where a stroke lands in one and misses the next.
+        Painted evenly, a band flipped whole: grey type on a tint just under the
+        threshold counted none of its cells (a fact grid estimated at 2% that
+        rendered at 10%), and just over it all of them."""
         if w <= 0 or h <= 0 or alpha <= 0:
             return
         gx0, gx1 = x * SCALE, (x + w) * SCALE
@@ -89,7 +116,8 @@ class _Grid:
                 cx = min(gx1, col + 1) - max(gx0, col)
                 if cx <= 0:
                     continue
-                cover = min(1.0, cx * cy * alpha)
+                share = alpha * (1 + GLYPH_STEPS[row % 2][col % 2] * spread) if spread else alpha
+                cover = min(1.0, cx * cy * share)
                 line[col] += (grey - line[col]) * cover
 
     def stroke(self, x1, y1, x2, y2, width, grey, alpha=1.0):
@@ -153,7 +181,7 @@ def _layout(node):
     return ((node.get("data") or {}).get("textLayout") or {})
 
 
-def _text(grid, node, coverage, bold_weight):
+def _text(grid, node, coverage, bold_weight, spread=0.0):
     style, frame = node.get("style") or {}, node.get("frame") or {}
     color = _color(style.get("color")) or "#000000"
     if not str(node.get("text") or _layout(node).get("text") or "").strip():
@@ -184,7 +212,7 @@ def _text(grid, node, coverage, bold_weight):
         line_width = ink_width * len(line) / longest
         left = x + ((width - line_width) / 2 if align == "center" else (width - line_width) if align == "right" else 0)
         top = y + index * pitch + (pitch - face) / 2 + face * GLYPH_BAND[0]
-        grid.paint(left, top, line_width, face * (GLYPH_BAND[1] - GLYPH_BAND[0]), grey, alpha)
+        grid.paint(left, top, line_width, face * (GLYPH_BAND[1] - GLYPH_BAND[0]), grey, alpha, spread)
 
 
 def _polygon_rings(node, x, y, w, h):
@@ -239,7 +267,7 @@ def _shape_share(node):
     return 1.0
 
 
-def estimate(slide, coverage=TEXT_COVERAGE, bold_weight=BOLD_WEIGHT):
+def estimate(slide, coverage=TEXT_COVERAGE, bold_weight=BOLD_WEIGHT, spread=GLYPH_SPREAD, hairline=HAIRLINE_WEIGHT, native=NATIVE_WEIGHT):
     """The share of the page's body the render will read as ink, estimated
     from its scene (see the module docstring)."""
     tokens = slide.get("tokens") or {}
@@ -251,13 +279,19 @@ def estimate(slide, coverage=TEXT_COVERAGE, bold_weight=BOLD_WEIGHT):
                 and _number(frame.get("height")) >= CANVAS_H and _color((node.get("style") or {}).get("fill"))):
             canvas = _color(node["style"]["fill"])
     grid = _Grid(_grey(canvas))
+    # A chart the deck exports as a native chart object is drawn by the
+    # renderer, not from these nodes: its plot keeps the scene's marks and
+    # labels but sets them lighter, and a page of two native line charts read
+    # 0.11 here and 0.08 on the render.
+    natives = {c.get("instanceId") for c in slide.get("componentInstances") or [] if c.get("nativeChart")}
     for node in nodes:
         kind, style, frame = node.get("type"), node.get("style") or {}, node["frame"]
         x, y = _number(frame.get("x")), _number(frame.get("y"))
         w, h = _number(frame.get("width")), _number(frame.get("height"))
-        opacity = _number(style.get("opacity"), 1.0)
+        drawn = native if natives and node.get("role") in NATIVE_PLOT_ROLES and (node.get("data") or {}).get("componentInstance") in natives else 1.0
+        opacity = _number(style.get("opacity"), 1.0) * drawn
         if kind == "text":
-            _text(grid, node, coverage, bold_weight)
+            _text(grid, node, coverage * drawn, bold_weight, spread)
         elif kind == "image":
             # A photograph or a logo differs from the page almost everywhere.
             grid.paint(x, y, w, h, 110.0, opacity)
@@ -269,7 +303,8 @@ def estimate(slide, coverage=TEXT_COVERAGE, bold_weight=BOLD_WEIGHT):
             ends = [data.get(k) for k in ("x1", "y1", "x2", "y2")]
             x1, y1, x2, y2 = ends if all(isinstance(v, (int, float)) for v in ends) else (x, y, x + w, y + h)
             dashed = style.get("dash") not in (None, "none", "solid")
-            grid.stroke(x1, y1, x2, y2, max(0.75, _number(style.get("lineWidth"), 1.0)), _grey(color), opacity * (0.55 if dashed else 1.0))
+            width = max(0.75, _number(style.get("lineWidth"), 1.0))
+            grid.stroke(x1, y1, x2, y2, width, _grey(color), opacity * (0.55 if dashed else 1.0) * (hairline if width <= 1 else 1.0))
         elif kind in SHAPE_TYPES:
             share = _shape_share(node)
             fill, stroke = _color(style.get("fill")), _color(style.get("stroke"))

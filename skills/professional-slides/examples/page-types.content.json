@@ -2543,21 +2543,6 @@
      "text": "Source: illustrative data for a fictional operator; punctuality is arrivals within five minutes"
     },
     {
-     "id": "p10-p10-points:item:0",
-     "role": "body",
-     "text": "Four extra peak trains an hour since FY22 have coincided with a 5.1-point fall in Eastern line punctuality: each added train leaves less recovery time at the two single-track sections east of Selby, so one late train now delays the next three."
-    },
-    {
-     "id": "p10-p10-points:item:1",
-     "role": "body",
-     "text": "Off-peak trains share none of that conflict, because the single-track sections are free for most of the hour between the peaks."
-    },
-    {
-     "id": "p10-p10-points:item:2",
-     "role": "body",
-     "text": "The plan therefore holds the peak timetable where it is and adds all its new service between the peaks, where it costs no punctuality."
-    },
-    {
      "id": "p10-p10-exhibit-0-heading:heading",
      "role": "body",
      "text": "Eastern line peak trains per hour,"
@@ -2746,6 +2731,21 @@
      "id": "p10-p10-exhibit-1:annotation-text:0",
      "role": "exhibit",
      "text": "Lowest on the network, 5.1 points below FY22"
+    },
+    {
+     "id": "p10-p10-points-0-list:item:0",
+     "role": "body",
+     "text": "Four extra peak trains an hour since FY22 have coincided with a 5.1-point fall in Eastern line punctuality: each added train leaves less recovery time at the two single-track sections east of Selby, so one late train now delays the next three."
+    },
+    {
+     "id": "p10-p10-points-1-list:item:0",
+     "role": "body",
+     "text": "Off-peak trains share none of that conflict, because the single-track sections are free for most of the hour between the peaks."
+    },
+    {
+     "id": "p10-p10-points-2-list:item:0",
+     "role": "body",
+     "text": "The plan therefore holds the peak timetable where it is and adds all its new service between the peaks, where it costs no punctuality."
     }
    ]
   },

@@ -615,7 +615,9 @@ class Emitter:
                     va.tick_labels.number_format = ("#,##0" if grouped else "0") + "." + "0" * min(places, 6)
                     va.tick_labels.number_format_is_linked = False
             ca = chart.category_axis
-            ca.tick_labels.font.size = Pt(10)
+            # A crowded row of bars names every member at 8pt in the scene
+            # (charts.mjs ROW_LABEL_MIN); the native chart sets the same size.
+            ca.tick_labels.font.size = Pt(min(10, spec.get("labelPt") or 10))
             if kind not in ("bar", "stacked-bar", "range"):
                 # Keep category labels below the plot when zero crosses signed
                 # data; labels at the zero line collide with near-zero marks.
@@ -631,7 +633,7 @@ class Emitter:
         if spec.get("dataLabels", True) and not is_range:
             plot.has_data_labels = True
             dl = plot.data_labels
-            dl.font.size = Pt(11)   # data labels are the chart's loudest number
+            dl.font.size = Pt(min(11, spec.get("labelPt") or 11))   # data labels are the chart's loudest number
             dl.font.bold = bool(spec.get("labelBold", True))
             dl.number_format = number_format
             dl.number_format_is_linked = False

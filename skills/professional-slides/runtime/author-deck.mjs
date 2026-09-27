@@ -3,6 +3,7 @@
 //
 //   node runtime/author-deck.mjs --types                 the page-type catalogue, as the author reads it
 //   node runtime/author-deck.mjs --schema                the JSON Schema for a pages file
+//   node runtime/author-deck.mjs --icons                 the icon names a page can ask for, with their aliases
 //   node runtime/author-deck.mjs --example <type>        the worked example page(s) of a type
 //   node runtime/author-deck.mjs <id>.pages.json --log   what the author runs so far found, and what recurred
 //   node runtime/author-deck.mjs <id>.pages.json         compile to <id>.deck.json and <id>.plan.json
@@ -29,7 +30,7 @@ import { spawnSync } from "node:child_process";
 import os from "node:os";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { compilePage, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, SHAPES, breadthProblem } from "./page-types.mjs";
-import { deriveContent } from "./derive-content.mjs";
+import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
 import { varietyFindings, evidenceDepth, structureMix, VARIETY } from "./gates/variety_gates.mjs";
 import { SLIDE_KEYS } from "./compose.mjs";
@@ -37,6 +38,7 @@ import { composeAll } from "./compose-all.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
+import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 
 /**
  * The deck composed in memory, as the build will compose it: logos,
@@ -194,6 +196,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const args = process.argv.slice(2);
   if (args.includes("--types")) { console.log(describeTypes()); process.exit(0); }
   if (args.includes("--schema")) { console.log(JSON.stringify(pageSchema(), null, 2)); process.exit(0); }
+  // The icon vocabulary, and the other words each name answers to.
+  if (args.includes("--icons")) {
+    const aliases = Object.entries(ICON_ALIASES).reduce((m, [alias, icon]) => m.set(icon, [...(m.get(icon) || []), alias]), new Map());
+    console.log(ICON_NAMES.map((name) => `${name.padEnd(12)} ${ICONS[name].label}${aliases.has(name) ? ` (also: ${aliases.get(name).join(", ")})` : ""}`).join("\n"));
+    process.exit(0);
+  }
   // The worked example of one type, to copy the shape of rather than learn it from errors.
   if (args.includes("--example")) {
     const type = args[args.indexOf("--example") + 1];
@@ -253,7 +261,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const written = (b.columns || []).filter((c) => c.text);
     const room = written.some((c) => c.lines >= 1)
       ? `, room: ${written.map((c) => `${c.column} ${c.lines >= 1 ? `${c.free}px ≈ ${c.lines} line${c.lines === 1 ? "" : "s"}` : "full"}`).join(", ")}` : "";
-    return `${flag}${String(b.id ?? b.slide).padEnd(6)} ${String(b.readingTask ?? "").padEnd(24)} ${b.body} words (floor ${Math.round(b.floor)}${b.ceiling ? `, ceiling ${b.ceiling}` : ""})` +
+    // The floor the page would carry with its commentary placed the other way:
+    // a rail moved below took a chart page's floor from 42 to 112 words,
+    // because points beside or below make it a page read with its commentary
+    // (derive-content.mjs readingTaskOf). Seen here, before the move is made.
+    const other = String(b.readingTask ?? "").match(/^(.+)-(led|with-commentary)$/);
+    const alt = other && wordBudgetOf(`${other[1]}-${other[2] === "led" ? "with-commentary" : "led"}`);
+    const moved = alt ? `; ${other[2] === "led" ? "with points beside or below" : "with no points (rail, captions, callouts)"} floor ${alt.floor}` : "";
+    return `${flag}${String(b.id ?? b.slide).padEnd(6)} ${String(b.readingTask ?? "").padEnd(24)} ${b.body} words (floor ${Math.round(b.floor)}${b.ceiling ? `, ceiling ${b.ceiling}` : ""}${moved})` +
       `${b.footer ? `, footer ${Math.round((b.footerRatio ?? 0) * 100)}%` : ""}${band}${room}` +
       `${ink ? `, light: ink ~${(ink.measured * 100).toFixed(1)}% of the body (floor ${Math.round(ink.threshold * 100)}%) - keep the house surfaces on, set loose text as a table or cards, or pair the lone chart; not more words` : ""}`;
   });
@@ -276,12 +291,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   // What the chart pages plot, against strong decks' ~22 a page: the numbers
   // behind EVIDENCE_DEPTH, printed on every run so a thin deck is seen before it is gated.
   const depth = evidenceDepth([...spec.slides, ...(spec.appendix || [])]);
+  // The types in page order, a run of one type folded to its ends: a split
+  // into panels made three panels pages in a row, and the counts above could
+  // not show where. VARIETY_TYPE_RUN blocks past two.
+  const sequence = typed.reduce((runs, s) => { const last = runs.at(-1); if (last?.type === s.pageType.type) last.ids.push(s.id); else runs.push({ type: s.pageType.type, ids: [s.id] }); return runs; }, [])
+    .map(({ type, ids }) => (ids.length === 1 ? `${ids[0]} ${type}` : `${ids[0]}-${ids.at(-1)} ${type} x${ids.length}`)).join(" | ");
   // The deck as drawn: every skeleton and how often, and the two shares the
   // contract holds (VARIETY_PANELS, VARIETY_COLUMN), printed on every run so a
   // deck drifting toward one exhibit and a column is seen before it is gated.
   const drawn = structureMix([...spec.slides, ...(spec.appendix || [])], { drawnOf });
   const pct = (x) => `${Math.round(x * 100)}%`;
-  const summary = { ...(draft ? { draft: true } : {}), pages: typed.length, types: mix("type"), commentary: mix("commentary"), closes: typed.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length,
+  const summary = { ...(draft ? { draft: true } : {}), pages: typed.length, types: mix("type"), sequence, commentary: mix("commentary"), closes: typed.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length,
     structure: { twoPlusExhibits: `${drawn.multi.pages} of ${drawn.pages} (${pct(drawn.multi.share)}; floor ${pct(VARIETY.multiShareMin)}, strong decks a quarter to a third)`,
       exhibitBesideColumn: `${drawn.column.pages} of ${drawn.pages} (${pct(drawn.column.share)}; cap ${pct(VARIETY.columnShareMax)}, strong decks about one in eight)${drawn.column.pages ? `: ${drawn.column.ids.join(", ")}` : ""}`,
       skeletons: drawn.skeletons },

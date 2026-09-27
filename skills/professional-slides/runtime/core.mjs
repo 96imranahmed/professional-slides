@@ -1008,6 +1008,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   const labelledCategories = new Set((renderedNodes || []).filter(node => node.role === "data-label" && node.data?.category !== undefined).map(node => String(node.data.category)));
   const hiddenLabelIndices = renderedNodes && labelledCategories.size && labelledCategories.size < categories.length && Array.isArray(props.series) && props.series.length === 1
     ? categories.map((category, index) => labelledCategories.has(String(category)) ? -1 : index).filter(index => index >= 0) : [];
+  // The size the scene set its row names at, when crowding took it under the
+  // chart's 10pt (charts.mjs ROW_LABEL_MIN): the native chart prints the same.
+  const labelPt = Math.min(10, ...(renderedNodes || []).filter(node => node.role === "category-label").map(node => Number(node.style?.fontSize?.value)).filter(Number.isFinite));
   const series = type === "range"
     ? [{ name: "low", values: [...(props.low || [])], hidden: true }, { name: "range", values: (props.high || []).map((h, i) => h - (props.low || [])[i]) }]
     : Array.isArray(props.series) ? props.series.map(s => ({ name: s.name, values: [...(s.values || [])] }))
@@ -1045,6 +1048,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     highlightIndices: highlights.map((h) => categories.indexOf(h.category)).filter((i) => i >= 0),
     ...(hiddenCategoryIndices.length ? { hiddenCategoryIndices } : {}),
     ...(hiddenLabelIndices.length ? { hiddenLabelIndices } : {}),
+    ...(labelPt < 10 ? { labelPt } : {}),
     forecastIndex,
     endLabels: props.directLabels === "end" || props.endLabels === true || (type === "line" && series.length > 1 && props.legend !== true && props.endLabels !== false),
     ...(type === "line" ? { pointDataLabels: renderedNodes

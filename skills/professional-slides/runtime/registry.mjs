@@ -280,7 +280,16 @@ function insightNodes({ id, frame, props }) {
     // `highlight`: the phrase the reader should see first, set in the accent
     // inside the sentence. Accent only, never bold - an insight body is already
     // semibold, so the emphasis is colour and the measured width is unchanged.
-    const accented = part === "body" && props.highlight && variant !== "primary"
+    // On the filled so-what bar the accent often cannot read (a red accent on a
+    // red bar), and the bar's phrase was dropped outright. Where the accent
+    // reads on the fill it is used; otherwise the bar's sentence drops to the
+    // regular weight and the phrase stays bold - weight is the emphasis
+    // reversed type can carry. Narrower than the bold it was measured in, the
+    // sentence cannot overflow its lines.
+    const onBar = variant === "primary";
+    const barAccent = onBar && contrastRatio(tokenValue(token("color.accent")), tokenValue(PRIMARY)) >= 4.5;
+    const byWeight = onBar && !barAccent;
+    const accented = part === "body" && props.highlight
       // `strict: false`: a page-level highlight is offered to every piece of the
       // page's prose, and most of them will not contain it. A phrase that is not
       // there is simply not emphasised - it is not an error.
@@ -292,12 +301,13 @@ function insightNodes({ id, frame, props }) {
     // paragraphs on export. The emitter prefers runs over the unwrapped source,
     // so those travel with the layout.
     const emphasised = accented && accented.some((run) => run.accent);
+    const style = (run) => (byWeight ? { text: run.text, bold: Boolean(run.accent) } : { ...run, bold: true });
     const sourceRuns = emphasised && measured.source !== undefined
-      ? accentRuns(measured.source, props.highlight, { bold: false, accent: true, strict: false }).map((run) => ({ ...run, bold: true }))
+      ? accentRuns(measured.source, props.highlight, { bold: false, accent: true, strict: false }).map(style)
       : null;
     nodes.push(textPrimitive({ id: stableId(id, part), role: `insight-${part}`, frame: { x: textX, y, width: layout.width, height: measured.height }, text: measured.text,
-      ...(emphasised ? { runs: accented.map((run) => ({ ...run, bold: true })) } : {}),
-      style: { ...textStyle(part === "heading" ? token("type.heading") : layout.bodySize ?? BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, true, props.align ?? "left", "top"), ...(variant === "rule" && part === "body" ? { fontFamily: DISPLAY } : {}), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: sourceRuns ? { ...measured, sourceRuns } : measured } }));
+      ...(emphasised ? { runs: accented.map(style) } : {}),
+      style: { ...textStyle(part === "heading" ? token("type.heading") : layout.bodySize ?? BODY, part === "heading" && variant !== "primary" ? PRIMARY : foreground, !(emphasised && byWeight), props.align ?? "left", "top"), ...(variant === "rule" && part === "body" ? { fontFamily: DISPLAY } : {}), lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: sourceRuns ? { ...measured, sourceRuns } : measured } }));
     y += measured.height + layout.gap;
   }
   return nodes;

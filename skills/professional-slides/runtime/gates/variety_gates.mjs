@@ -99,6 +99,21 @@ const ALTERNATIVES = "two cuts of the same evidence side by side, each with its 
   "written as callouts on the plot (commentary `on-exhibit`) or closed by one implication (commentary `so-what-bar`); labelled row blocks, each " +
   "with its bullets and a number or small exhibit (`parallel`, form `labelled-rows`); two or three exhibits joined by arrows for cause and " +
   "effect (`panels`, form `sequence`); a table whose last column is the implication (`lookup` or `scorecard`, commentary `in-exhibit`)";
+// What the middle page of a run of one type can become, by the run's type:
+// the forms the same evidence takes as a different page.
+const RUN_ALTERNATIVES = {
+  panels: "one of its cuts as a `trend` or `ranking` page with the other in a callout or the rail, or a `numbers` metric-strip over one exhibit",
+  trend: "`panels` (the measure beside a second cut), a `numbers` hero-number with the series as its evidence, or a `bridge` if it explains a change",
+  ranking: "`panels` (two cuts of the set side by side), a `scorecard` if the members are rated on several measures, or `numbers`",
+  numbers: "a `trend` or `ranking` page for the series behind the figure, or `panels`",
+  composition: "a `ranking` of the parts, or `panels` setting the mix beside its change",
+  matrix: "a `scorecard` coding the cells, `parallel` labelled rows, or `options` compare",
+  scorecard: "a `matrix` of findings, or a `ranking` of the measure that decides it",
+  lookup: "a `scorecard` coding the cells, or `profiles`",
+  parallel: "`mechanism` if the items connect, or a `matrix` of findings",
+  argument: "`statement`, or a page whose exhibit carries the evidence the prose describes",
+};
+
 /**
  * What the deck's chart pages plot, from the counts the compiler recorded on
  * each page (`pageType.values`): how many chart pages, their median and range,
@@ -164,6 +179,7 @@ export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
   }
 
   const n = slides.length;
+  const sequence = (from, to) => slides.slice(from, to).map((s) => `${s.id ?? "?"} ${s.pageType.type}`).join(" | ");
   const tally = (key) => { const m = new Map(); for (const s of slides) { const k = key(s); m.set(k, (m.get(k) || 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]); };
 
   const types = tally((s) => s.pageType.type);
@@ -181,18 +197,34 @@ export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
       "quotes and statements - roughly in that order of frequency.");
   }
 
-  // Runs: a declared series (one template on purpose) counts once.
-  let run = [];
+  // Runs: a declared series (one template on purpose) counts once. The repair
+  // names the page to change and what to: splitting one page into panels made
+  // three panels pages in a row, and "change the middle page" left the author
+  // to find which one and to guess a type its evidence could carry.
+  let run = [], at = 0;
   const flush = () => {
     if (run.length > VARIETY.runMax && !(run[0].pageType.series && run.every((s) => s.pageType.series === run[0].pageType.series))) {
-      block("VARIETY_TYPE_RUN", { type: run[0].pageType.type, run: run.length, pages: run.map((s) => s.id ?? null) }, VARIETY.runMax,
-        `${run.length} ${run[0].pageType.type} pages in a row read as one page repeated. Reorder, or change the type of the middle page to ` +
-        "the evidence it actually carries; mark a deliberate run of one template with a shared `series`.", run.map((s) => s.id ?? null));
+      const type = run[0].pageType.type, ids = run.map((s) => s.id ?? null);
+      const middle = run[Math.floor(run.length / 2)];
+      const start = at - run.length;
+      // The nearest page of another type the middle page can trade places
+      // with: neither neighbour of its place is of the run's type, so the
+      // trade breaks this run without starting another.
+      const mid = start + Math.floor(run.length / 2);
+      const swap = slides.map((s, j) => ({ s, j })).filter(({ s, j }) => (j < start - 1 || j > at) && s.pageType.type !== type
+        && slides[j - 1]?.pageType.type !== type && slides[j + 1]?.pageType.type !== type)
+        .sort((a, b) => Math.abs(a.j - mid) - Math.abs(b.j - mid))[0]?.s;
+      block("VARIETY_TYPE_RUN", { type, run: run.length, pages: ids, sequence: sequence(Math.max(0, start - 1), at + 1) }, VARIETY.runMax,
+        `${run.length} ${type} pages in a row (${ids.join(", ")}) read as one page repeated. Change ${middle.id} to another type - ` +
+        `${RUN_ALTERNATIVES[type] ?? "the type its evidence actually carries"}` +
+        (swap ? `; or, if the storyline allows, trade places with ${swap.id} (${swap.pageType.type})` : "") +
+        ". Mark a deliberate run of one template with a shared `series`.", ids);
     }
   };
   for (const slide of slides) {
     if (run.length && slide.pageType.type === run[0].pageType.type) run.push(slide);
     else { flush(); run = [slide]; }
+    at += 1;
   }
   flush();
 

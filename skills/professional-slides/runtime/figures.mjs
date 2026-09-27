@@ -12,6 +12,8 @@ import { token, tokenValue, stableId, rectPrimitive, ellipsePrimitive, linePrimi
 import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 import { mediaNode } from "./media.mjs";
+import { accentRuns, measureTextRuns } from "./text-layout.mjs";
+import { contrastRatio } from "./palettes.mjs";
 
 const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink");
 const WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), RULE = token("color.rule");
@@ -978,26 +980,43 @@ export function speechNodes({ id, frame, props }) {
 // the panel: beside a short memo the panel takes the width the prose leaves,
 // and a 700px statement ran as two long lines across it.
 const STATEMENT_MEASURE = 440;
+const sideFill = (tone) => (tone === "primary" ? PRIMARY : tone === "muted" ? MUTED : tone === "tint" ? TINT : INK);
+// `highlight`: the page's phrase inside the statement. A rail carried it and
+// drew it plain, so the one claim the page sets large had no emphasis while
+// the points on the page beside it did. On a light panel the phrase takes the
+// accent; where the accent does not read on the fill at large-type contrast
+// (3:1) - a red accent on the near-black panel - the statement drops to the
+// regular weight and the phrase stays bold, which reads in reversed type.
+function statementRuns(props) {
+  const phrases = (Array.isArray(props.highlight) ? props.highlight : props.highlight ? [props.highlight] : []).filter((p) => typeof p === "string" && p.trim());
+  const runs = phrases.length ? accentRuns(props.text.trim(), phrases, { bold: true, strict: false }) : null;
+  if (!runs || !runs.some((run) => run.accent)) return null;
+  const accent = contrastRatio(tokenValue(ACCENT), tokenValue(sideFill(props.tone ?? "dark"))) >= 3;
+  return { accent, runs: runs.map((run) => (accent ? { text: run.text, bold: true, ...(run.accent ? { accent: true } : {}) } : { text: run.text, bold: Boolean(run.accent) })) };
+}
 export function sideStatementLayout(frame, props) {
   if (!clean(props.text)) throw new Error("A side statement needs its text");
   const inner = Math.min(frame.width - 2 * v("space.5"), STATEMENT_MEASURE);
-  const text = measure(props.text, inner, "type.heading", true, DISPLAY);
+  const emphasis = statementRuns(props);
+  const text = emphasis ? measureTextRuns(emphasis.runs, inner, { fontFamily: v("font.display"), fontSize: v("type.heading"), wrapWidthRatio: 1 })
+    : measure(props.text, inner, "type.heading", true, DISPLAY);
   if (text.lines.length > 8) throw new Error("A side statement runs to eight lines at most; it is the page's reading, not its argument");
   const kicker = clean(props.kicker) ? measure(props.kicker, inner, "type.label", true) : null;
-  return { inner, text, kicker, height: text.height + (kicker ? kicker.height + v("space.3") : 0) + v("space.4") + 2 * v("space.5") };
+  return { inner, text, kicker, emphasis, height: text.height + (kicker ? kicker.height + v("space.3") : 0) + v("space.4") + 2 * v("space.5") };
 }
 
 export function sideStatementNodes({ id, frame, props }) {
   const L = sideStatementLayout(frame, props);
   const tone = props.tone ?? "dark", light = tone === "muted" || tone === "tint";
-  const fill = tone === "primary" ? PRIMARY : tone === "muted" ? MUTED : tone === "tint" ? TINT : INK;
+  const fill = sideFill(tone);
   const ink = light ? INK : WHITE, out = [fillRect(stableId(id, "panel"), "side-panel", frame, fill)];
   let y = frame.y + Math.max(v("space.5"), (frame.height - L.height) / 2 + v("space.5"));
   const x = frame.x + v("space.5");
   out.push(fillRect(stableId(id, "bar"), "side-panel-bar", { x, y, width: 32, height: 3 }, ACCENT));
   y += v("space.4");
   if (L.kicker) { out.push(label(stableId(id, "kicker"), "side-panel-kicker", { x, y, width: L.inner }, L.kicker, style("type.label", light ? SECONDARY : WHITE, true))); y += L.kicker.height + v("space.3"); }
-  out.push(label(stableId(id, "text"), "side-panel-text", { x, y, width: L.inner }, L.text, style("type.heading", ink, true, "left", DISPLAY)));
+  const text = label(stableId(id, "text"), "side-panel-text", { x, y, width: L.inner }, L.text, style("type.heading", ink, !L.emphasis || L.emphasis.accent, "left", DISPLAY));
+  out.push(L.emphasis ? { ...text, runs: L.text.runs } : text);
   return out;
 }
 

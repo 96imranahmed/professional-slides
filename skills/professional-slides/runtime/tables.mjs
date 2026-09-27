@@ -272,6 +272,11 @@ function normalize(props) {
       // offline build, a player with no article - it keeps the name as text
       // rather than failing the table.
       if (cell.type === "logo" && cell.player && !cell.media?.dataUri) { cell.type = "text"; cell.text = cell.player; delete cell.media; }
+      // The page's highlight reaches a cell as `highlight: [phrase]` (the
+      // composer's highlight pass); a cell draws a phrase as `accent`, and
+      // `highlight: true` is the older flag for the whole cell. The phrase was
+      // read as that flag's truthy cousin and drawn plain.
+      if (cell.accent === undefined && (typeof cell.highlight === "string" || Array.isArray(cell.highlight))) { cell.accent = cell.highlight; delete cell.highlight; }
       if (!CELL_TYPES.includes(cell.type))
         throw new Error(`Unknown table cell type: ${cell.type}`);
       if (!["left", "center", "right"].includes(cell.align ?? "left"))

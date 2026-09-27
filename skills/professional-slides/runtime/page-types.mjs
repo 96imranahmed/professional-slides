@@ -34,6 +34,8 @@ import { timePositions, describeGaps } from "./time-axis.mjs";
 import { verdictCell } from "./compose.mjs";
 import { REVIEWED } from "./gates/variety_gates.mjs";
 import { readFileSync } from "node:fs";
+import { wordBudgetOf } from "./derive-content.mjs";
+import { iconDefinition, nearestIcons, ICON_NAMES } from "./icons.mjs";
 
 // The limits the page gates hold the page's text to, published in `--types`
 // so an author meets them by reading rather than by failing. The title's word
@@ -736,6 +738,46 @@ function sharesInTiles(page, exhibits) {
  * make when a choice is missing or impossible; structural pages (`kind`
  * cover, section, agenda) pass through unchanged.
  */
+/**
+ * The page's text that the composer sets a `highlight` in (compose.mjs
+ * highlightThePhrase): the points and row blocks, the rail or a side panel,
+ * the so-what bar and the takeaway, paragraphs, panel captions, and the cells of a table,
+ * a findings matrix or a comparison. The compile check reads the same list, so
+ * a phrase it accepts is a phrase the page draws.
+ */
+export function accentTexts(page) {
+  const texts = [];
+  const add = (value) => { if (typeof value === "string" && value.trim()) texts.push(value); };
+  const point = (p) => { if (typeof p === "string") add(p); else if (p && typeof p === "object") { add(p.lead); add(p.text); (p.points || []).forEach(add); } };
+  const cell = (c) => (Array.isArray(c) ? c.forEach(add) : point(c));
+  (page.points || []).forEach(point);
+  (page.blocks || []).forEach((block) => (block?.points || []).forEach(point));
+  add(page.rail); add(page.bar); add(page.panel?.text);
+  (page.paragraphs || []).forEach(point);
+  if (typeof page.takeaway === "string") add(page.takeaway);
+  (page.rows || []).forEach((row) => (Array.isArray(row?.cells) ? row.cells : []).forEach(cell));
+  for (const ex of exhibitsOf(page)) {
+    if (!ex || typeof ex !== "object") continue;
+    add(ex.caption);
+    // A list in a cell is bulleted, and marked, only where the exhibit reads one.
+    const lists = ex.type === "rows" || ex.type === "phase-table";
+    for (const row of Array.isArray(ex.rows) ? ex.rows : []) (Array.isArray(row) ? row : Array.isArray(row?.cells) ? row.cells : []).forEach((c) => (Array.isArray(c) && !lists ? null : cell(c)));
+    for (const side of [ex.left, ex.right]) if (side && typeof side === "object") { (side.points || []).forEach(point); add(side.text); }
+  }
+  return texts;
+}
+
+/** Where the page says something without drawing an accent, for the message that names it. */
+function unaccentedPlaces(page) {
+  const places = [["title", page.title], ["subtitle", page.subtitle]];
+  for (const ex of exhibitsOf(page)) {
+    if (!ex || typeof ex !== "object") continue;
+    places.push(["exhibit's heading", ex.heading]);
+    for (const a of ex.annotations || []) places.push(["chart's callout", a?.text]);
+  }
+  return places.filter(([, text]) => typeof text === "string");
+}
+
 export function compilePage(pageIn, index = 0, { insights = null, draft = false, players = null } = {}) {
   if (!pageIn || typeof pageIn !== "object") throw new Error(`page ${index + 1} is not an object`);
   const page = structuredClone(pageIn);
@@ -747,6 +789,16 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   const type = PAGE_TYPES[page.type];
   if (!type) throw new Error(`${id}: unknown page type "${page.type}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
   for (const key of OWNED) if (page[key] !== undefined) throw new Error(`${id}: \`${key}\` is set by the page's choices, not written - choose \`commentary\`, \`form\` and \`takeaway\` instead`);
+  // Every icon the page names, checked here with the nearest names: "Unknown
+  // icon: plane" surfaced from the composer with no list to choose from.
+  const icons = [];
+  const walk = (value) => { if (Array.isArray(value)) value.forEach(walk); else if (value && typeof value === "object") for (const [key, v] of Object.entries(value)) { if (key === "icon" && typeof v === "string") icons.push(v); else walk(v); } };
+  walk(page);
+  const unknownIcon = icons.find((name) => !iconDefinition(name));
+  if (unknownIcon) {
+    const near = nearestIcons(unknownIcon);
+    throw new Error(`${id}: no icon is called "${unknownIcon}"${near.length ? ` - the nearest are ${near.join(", ")}` : ""}; \`author-deck.mjs --icons\` lists the ${ICON_NAMES.length} there are`);
+  }
   const forms = Object.keys(type.forms);
   if (!forms.includes(page.form)) throw new Error(choose(id, "form", forms, page.form));
   if (!type.commentary.includes(page.commentary)) throw new Error(choose(id, "commentary", type.commentary, page.commentary));
@@ -766,7 +818,7 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   if (said > TEXT_LIMITS.titleWords)
     throw new Error(`${id}: TITLE_WORDS - the title runs to ${said} words and the build refuses past ${TEXT_LIMITS.titleWords}; cut it to the claim, ${TEXT_LIMITS.titleTarget} words or fewer sets on one line`);
   if (page.subtitle !== undefined) {
-    const problem = subtitleProblem(String(page.title ?? ""), page.subtitle);
+    const problem = subtitleProblem(String(page.title ?? ""), page.subtitle, exhibitsOf(page));
     if (problem) throw new Error(`${id}: the subtitle ${problem}`);
   }
 
@@ -944,25 +996,27 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   // or a point carries its own.
   const phrases = (Array.isArray(page.highlight) ? page.highlight : page.highlight ? [page.highlight] : []).map((p) => String(p).toLowerCase());
   const pointTexts = (page.points || []).map((point) => (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`).toLowerCase());
-  // A phrase that appears in no point marks nothing. Checked in a draft too,
-  // since a draft with its points written would otherwise pass it on to the
-  // full compile to find.
-  // A labelled-rows page writes its points in its blocks, and is held to the same.
-  const blockTexts = page.form === "labelled-rows" ? (page.blocks || []).flatMap((block) => block?.points || [])
-    .map((point) => (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`).toLowerCase()) : [];
+  // A phrase that lands nowhere marks nothing. Checked in a draft too, since
+  // a draft with its copy written would otherwise pass it on to the full
+  // compile to find.
   // Found as whole words, by the rule the accent is set by (phraseAt): "22"
   // passed here on "FY22" and was then drawn as half a year in the accent.
-  const texts = [...pointTexts, ...blockTexts];
-  const stray = points || blockTexts.length ? phrases.filter((p) => p && !texts.some((text) => hasPhrase(text, p))) : [];
+  // Read against every place the page draws an accent (accentTexts), not only
+  // its points: a rail, a matrix cell or a comparison column took a phrase
+  // unchecked, and a phrase that sat in a chart callout or the title - which
+  // draw no accent - compiled and marked nothing.
+  const written = accentTexts(page);
+  const stray = phrases.filter((p) => p && !written.some((text) => hasPhrase(text, p, { ignoreCase: true })));
   if (stray.length) {
-    // Quoted as the point writes it: the texts above are lowercased to match.
-    const written = [...(page.points || []), ...(page.form === "labelled-rows" ? (page.blocks || []).flatMap((block) => block?.points || []) : [])]
-      .map((point) => (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`));
     const partWord = written.find((text) => text.toLowerCase().includes(stray[0]));
     const at = partWord ? partWord.toLowerCase().indexOf(stray[0]) : -1;
+    const elsewhere = !partWord && unaccentedPlaces(page).find(([, text]) => hasPhrase(text, stray[0], { ignoreCase: true }))?.[0];
+    const places = written.length ? "its points, paragraphs, rail, bar, takeaway, captions and table, matrix or comparison cells" : null;
     throw new Error(partWord
-      ? `${id}: \`highlight\` "${stray[0]}" occurs only inside a longer word or number ("${partWord.slice(Math.max(0, at - 12), at + stray[0].length + 12).trim()}"), so it would light half a word; highlight the whole word or figure as the point writes it`
-      : `${id}: \`highlight\` "${stray[0]}" appears in none of the points; use a phrase exactly as a point writes it`);
+      ? `${id}: \`highlight\` "${stray[0]}" occurs only inside a longer word or number ("${partWord.slice(Math.max(0, at - 12), at + stray[0].length + 12).trim()}"), so it would light half a word; highlight the whole word or figure as the page writes it`
+      : elsewhere ? `${id}: \`highlight\` "${stray[0]}" is only in the ${elsewhere}, which is drawn without an accent; highlight a phrase from ${places ?? "the page's commentary"}, or drop it`
+        : places ? `${id}: \`highlight\` "${stray[0]}" appears nowhere the page draws an accent (${places}); use a phrase exactly as the page writes it`
+          : `${id}: \`highlight\` "${stray[0]}" has nowhere to land - this page draws no commentary text to set it in; drop \`highlight\`, or mark the chart with \`highlights\` instead`);
   }
   if (!draft && points >= 2 && ["beside", "beside-left", "below"].includes(page.commentary)) {
     const marked = (page.points || []).filter((point, at) => (point && typeof point === "object" && point.highlight) || phrases.some((p) => p && hasPhrase(pointTexts[at], p))).length;
@@ -1086,12 +1140,22 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
 // restates the title nor runs past a line.
 export const SUBTITLE_WORDS = 16;
 const SUBTITLE_WIDTH = 1160;
-export function subtitleProblem(title, subtitle) {
+export function subtitleProblem(title, subtitle, exhibits = []) {
   if (typeof subtitle !== "string" || !subtitle.trim() || subtitle.includes("\n")) return "is one line of text under the title";
   const n = words(subtitle).length;
   if (n > SUBTITLE_WORDS) return `runs to ${n} words; keep it to ${SUBTITLE_WORDS} or fewer - the scope, the unit, the population or the period, not a second finding`;
   if (measureText(subtitle.trim(), SUBTITLE_WIDTH, { fontSize: 12, wrapWidthRatio: 1 }).lines.length > 1) return "runs past one line; cut it to the scope, the unit, the population or the period";
   if (overlap(title, subtitle) > 0.7) return "repeats the title; say what the title leaves out - the measure, the population, the period";
+  // The chart already names its measure and unit in its heading, so a
+  // subtitle built from the heading says it twice, one line apart; only the
+  // title was compared, and "Revenue by region, FY26 (AED bn)" over a chart
+  // headed "Revenue by region, FY26 · AED bn" passed.
+  const bare = (text) => String(text ?? "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ");
+  for (const ex of exhibits) {
+    const heading = [ex?.heading, ex?.unit].filter((part) => typeof part === "string" && part.trim()).join(" ");
+    if (heading && typeof ex.heading === "string" && overlap(bare(heading), bare(subtitle)) > 0.7)
+      return `repeats the exhibit's heading ("${ex.heading}"${ex.unit ? `, ${ex.unit}` : ""}); the heading names the measure and unit, so the subtitle says what it leaves out - the population, the period basis or the scope - or is dropped`;
+  }
   return null;
 }
 
@@ -1187,6 +1251,30 @@ export function panelColumnCapacity() {
   }));
 }
 
+/**
+ * How many members a distribution names, by the renderer's own measure: a
+ * bar chart of `n` members in a 440px frame beside a rail, grown until its
+ * rows' names step down from 10pt to 8pt, and then until they thin to every
+ * second one. The docs said names were never dropped; at 32 and 40 members
+ * every second one was, and nothing said so.
+ */
+export function distributionLabelCapacity() {
+  const chart = REGISTRY.get("chart.bar");
+  const labelled = (n) => {
+    const categories = Array.from({ length: n }, (_, i) => `Member ${i + 1}`);
+    const nodes = chart.render({ id: "capacity", frame: { x: 0, y: 0, width: 760, height: 440 }, props: { categories, series: [{ name: "Value", values: categories.map((_, i) => 200 - i) }], highlights: [], annotations: [], referenceLines: [] } }).nodes;
+    const labels = nodes.filter((node) => node.role === "category-label");
+    return { all: labels.length === n, small: labels.some((node) => node.style?.fontSize?.value < 10) };
+  };
+  let full = 15, small = null;
+  for (let n = 15; n <= 60; n += 1) {
+    const { all, small: reduced } = labelled(n);
+    if (!all) break;
+    if (reduced) small = n; else full = n;
+  }
+  return { full, small: small ?? full };
+}
+
 /** The catalogue as the author reads it. */
 export function describeTypes() {
   const lines = ["# Page types", "", "Every analytical page is one of these. Each choice is required; none has a default.", "",
@@ -1197,12 +1285,21 @@ export function describeTypes() {
     "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log.", "",
     `\`subtitle\` - optional, on any analytical page: one line under the title (${SUBTITLE_WORDS} words at most) naming what the title leaves out - the measure and unit, the population, the period or the scope. It is set small above the title rule and counts with the title, not the body; it must not restate the title.`, "",
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", "",
-    "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point).", "",
+    "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point). It is set in the accent wherever the page writes it - points, paragraphs, a rail or side panel, the bar or takeaway, captions, and table, matrix and comparison cells; a phrase that is only in the title, a heading or a callout is refused.", "",
     `Refused at compile, because a review found each on a finished deck: a table row labelled Total, Sum or Overall with nothing in its result cells (TOTAL_ROW_BLANK - a measure table adds its own total only where a column sums, and \`total: true\` where none does is refused); a column chart of four or more dates at uneven gaps (TIME_AXIS_UNEVEN - a line or an area spaces dated categories by the time between them, so draw the series as one, or say "snapshots" or "selected years" in the heading); on a lookup, options or matrix page, a column headed lead, winner, edge, verdict, confidence, status, rating, score, ahead, behind or assessment whose cells are words (VERDICT_TABLE_PLAIN - give it a \`type\`: rag, harvey, check, lights, dot, or use a scorecard); two to four alternatives (scenarios, options, paths) as paragraphs of ${SCENARIO_WORDS} words or more each (SCENARIO_PROSE - set them as options, labelled rows or a table of trigger, who captures the value, the test, the counter-signal). Advised: shares of one measure more than five times apart in tiles of one size (SHARES_IN_TILES - one 0-100% scale). Deck-level: more than ${REVIEWED.tableRunMax} of any ${REVIEWED.tableWindow} consecutive analytical pages drawn as one table construction (VARIETY_TABLES); declared \`players\` - or two names in a fifth of the titles - without each one's logo on the cover or the first ${REVIEWED.earlyPages} analytical pages (PLAYERS_UNMARKED); \`profiles\` cards with no logo or picture (PROFILE_UNPICTURED). An executive summary is held to the text page's upper quartile (${SUMMARY_WORDS} body words), not its fence; a point's lead and text are one block for TEXT_BLOCK_TOO_LONG, and so is a card's or a cell's text.`, "",
     `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across; two rows or more fill the frame, one row grows by a third) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
     `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - write to ${TEXT_LIMITS.titleTarget}, which sets on one line, since more than a third of titles past it is PLAN_TITLE_LENGTH; a \`subtitle\` one line of ${SUBTITLE_WORDS} words; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines, one or two the norm (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best").`, "",
+    ...(() => { const names = distributionLabelCapacity(); return [
+    `A \`distribution\` (or any bar chart of many rows) names every member while its rows hold a line: at the chart's 10pt up to about ${names.full} members at full height, at 8pt up to about ${names.small}; past that it names every second member (every nth when the rows are thinner still) and reads the field's shape from the bars. The subject, any highlighted member and any member a callout names are always named, and the rows beside them go unnamed so their labels do not touch. To name them all, give the chart the page's height (commentary "rail" or "none"), or cut the field to the members that matter.`, ""]; })(),
     ...(() => { const columns = panelColumnCapacity(); return [
-    `Chart limits the runtime cannot lift: a bridge over commentary \`below\` carries ${WATERFALL_BELOW_CALLOUTS} callouts (beside a column, ${CALLOUTS_MAX}); a \`distribution\` one callout, which sits beside its bar; \`aligned-bars\` none. Panels in a row: a column panel holds about ${columns[2]} named columns (eight-letter names) in a row of two, ${columns[3]} in a row of three and ${columns[4]} in a row of four - period labels (FY17, 2019, Q1) thin to every second or third, so ten or more periods fit any row, but names are never dropped: shorten them or use bars. A callout on a bar panel in a row of three or four has no room for a rail, so annotate a mark with clear space above it or say it in the caption. Panels on one value scale (the same unit) share the tallest panel's callout band so their plots stay one height; panels in different units keep their own bands, so annotate one and leave its neighbours plain freely. Two-series lines in a row of three or four name their series in a legend rather than at the line ends.`, ""]; })(),
+    `A chart callout takes free space inside the plot first - above a short mark, beside a line, in an empty corner, its leader to the mark - and a band above the plot only when the plot has none, so the plot keeps its height; panels sharing one scale keep their shared band. Chart limits the runtime cannot lift: a bridge over commentary \`below\` carries ${WATERFALL_BELOW_CALLOUTS} callouts (beside a column, ${CALLOUTS_MAX}); a \`distribution\` one callout, which sits beside its bar; \`aligned-bars\` none. Panels in a row: a column panel holds about ${columns[2]} named columns (eight-letter names) in a row of two, ${columns[3]} in a row of three and ${columns[4]} in a row of four - period labels (FY17, 2019, Q1) thin to every second or third, so ten or more periods fit any row, but a column chart never drops a name: shorten them or use bars. On bar panels that read across (the same members) in different units a callout sits in its bar's row - past the bar's end, past the axis for a bar below zero, or set inside a long bar - so bars reading across panels keep their rows level and no band stands empty over the neighbour; where the row has no room it takes a rail, which a panel in a row of three or four cannot spare, so there annotate a shorter bar or say it in the caption. Column and line panels on one value scale (the same unit) share the tallest panel's callout band so their plots stay one height; panels in different units keep their own bands, so annotate one and leave its neighbours plain freely. Two-series lines in a row of three or four name their series in a legend rather than at the line ends.`, ""]; })(),
+    // A placement is also a word floor: points beside or below make the page
+    // one read with its commentary, and moving a rail below took a chart
+    // page's floor from 42 to 112 words, learnt only when the budget line moved.
+    `Word floors follow the reading task, which the commentary placement decides - points \`beside\` or \`below\` (or paragraphs) make a page read with its commentary; a rail, captions, callouts, a so-what bar or none leave it led by its exhibit: ${
+      ["chart", "table", "exhibit", "diagram"].map((family) => `${family} pages ${wordBudgetOf(`${family}-led`).floor} words led, ${wordBudgetOf(`${family}-with-commentary`).floor} with points`).join("; ")
+    }; a text page ${wordBudgetOf("text-page").floor}. \`author-deck --check\` prints each page's floor and the one the other placement would set.`, "",
+    `Icons (a point's, a card's, a row label's \`icon\`): ${ICON_NAMES.join(", ")}. \`author-deck --icons\` lists the other words each answers to (aircraft, airport and flight are \`plane\`).`, "",
     `Evidence: a chart page (trend, ranking, composition, relationship, bridge, panels of charts) plots ${EVIDENCE_FLOOR.chart} or more values - a bridge ${EVIDENCE_FLOOR.bridge}, one whole's parts (pie, donut, treemap, waffle) are not floored - and strong decks' chart pages plot about 22. Deepen with the peer set, a prior period or a benchmark series, or a longer window: forms \`indexed\` (trend), \`distribution\` and \`aligned-bars\` (ranking) are built for many values.`, ""];
   for (const [name, t] of Object.entries(PAGE_TYPES)) {
     const n = Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits;

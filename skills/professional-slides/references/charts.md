@@ -170,7 +170,7 @@ Give each case that will be discussed individually a stable circular `sectionNum
 
 ## Combo
 
-`chart.combo` draws the first series as columns and the second as a line with markers, both labelled. On one scale the line reads against the bars (actual against plan); with `secondaryAxis: true` the line floats in the band above the bars on its own padded scale (a margin over a revenue) and `secondaryUnit` suffixes its labels. The chart heading names both units inline.
+`chart.combo` draws the first series as columns and the second as a line with markers, both labelled. On one scale the line reads against the bars (actual against plan); with `secondaryAxis: true` the line floats in the band above the bars on its own padded scale (a margin over a revenue) and `secondaryUnit` suffixes its labels. The chart heading names both units inline. The band is a third of the plot, half when a third is too short; a line whose change it still draws under 48px (a fleet age that doubled, under two callout bands) is refused for two panels, each measure on its own scale.
 
 ## Pie and donut
 

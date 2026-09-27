@@ -147,6 +147,10 @@ The summary lists advisories the compiler can see without blocking: `MAP_COARSE`
 
 `--check` and `--draft` print each page's budget as it composes - body words against the floor and ceiling for its reading task, the footer's share, how much of the body the page fills - with a `!` on every line to act on, so a fix does not push a page across a line unseen. On a page split into columns the line also gives the room at the foot of each column that sets text, in lines of the page's body type (`room: left full, right 91px ≈ 4 lines`), and a column over its height is refused with the overflow in pixels and lines, so one edit lands rather than a point added and removed by trial. A page that does not compile is reported with the rest: the pages that do are still composed, gated and budgeted in the same run. Every run is logged beside the pages file; `--log` lists the findings that came back run after run, which are the limits or messages the skill should publish better.
 
+Each budget line also gives the floor the page would carry with its commentary placed the other way (`with points beside or below floor 96`, `with no points (rail, captions, callouts) floor 42`): the reading task follows the placement, so moving a rail below can take a chart page's floor from 42 words to 96 or more, and the cost is seen before the move. The summary prints the types in page order (`sequence`), a run of one type folded to its ends.
+
+`--icons` lists the icon names a point, a card or a row label can ask for (plane, ship, train, car, cart, home, heart and education among the business ones), with the other words each answers to - `aircraft`, `airport` and `flight` are `plane`. An unknown name is refused at compile with the nearest names.
+
 `--types` prints the data each form reads (a pie or donut takes `labels` and `values`, a treemap `items`, a flow `nodes` and `edges`); the compiler names the missing keys, and refuses any page key the composer does not read, on every page at once.
 
 The compiler checks what each type implies. A trend runs over four or more periods; a ranking shows four or more members; trend and ranking charts mark their finding on the plot; a scorecard codes at least one column in its form; `on-exhibit` needs `annotations`; `captions` needs a `caption` on every panel; a text-free placement refuses `points`, because it says the text lives somewhere else. Two or three numbers are a `numbers` page, not a chart, and not a panel either: a panel plotting two numbers is refused. A pie or donut with a part under 5% is refused for a waffle or a stacked bar; a metric strip sits over exactly one exhibit and takes commentary `none`, since its numbers and exhibit fill the page.
@@ -159,25 +163,29 @@ The text limits the page gates enforce are published in `--types` too, so they a
 | --- | --- | --- | --- |
 | `title` | 14 words; write to 12, which sets on one line | `TITLE_WORDS`; `PLAN_TITLE_LENGTH` when more than a third run past 12 | at compile |
 | `title` | two lines | `TITLE_LINES` | as the page composes |
-| `subtitle` | one line, 16 words; not the title restated | refused at compile | at compile |
+| `subtitle` | one line, 16 words; not the title or an exhibit's heading restated | refused at compile | at compile |
 | chart or panel `heading` | one line at the frame's width, unit inline | `HEADING_WRAPS` - a short unit moves under the heading on its own; a heading that wraps, or a unit written as a phrase, is reported with its measured width against the frame's | as the page composes |
 | `takeaway` | three lines; one or two is the norm | `TAKEAWAY_LONG` | as the page composes |
 | `bar` | eight words or more, two lines | refused at compile | at compile |
-| prose | 35 to 90 characters a line | `CPL` | as the page composes |
+| prose | 35 to 90 characters a line; points no wider than 90 | `CPL` | as the page composes |
 
 A chart `heading` or `unit` names the measure, the population and the period, never a result. The numbers it may carry describe the measure: a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best"). A refusal names the figure it read as a result ("53.2m"), which belongs on the mark or in an annotation.
 
 What the runtime resolves and what it cannot, also printed in `--types` under "Chart limits":
 
 - A highlighted member of a one-series bar chart - a `distribution`, every column of `aligned-bars`, a bar panel - is drawn as its bar in the accent, in PowerPoint's native chart too; columns keep the tint behind the category.
-- A forty-member `distribution` labels every second or third row at full size when the rows are thinner than a line, always the highlighted member; it takes one callout, set beside its bar.
+- A `distribution` names every member while its rows hold a line - at 10pt, then at 8pt - and past that every second or third row at full size; the highlighted member and any member a callout names are always named. `--types` prints how many members each size holds. It takes one callout, set beside its bar.
 - A bridge carries three callouts beside a column or rail; over commentary `below` it is a third shorter and carries two.
 - Panels in the same unit share one value scale, computed from every panel's values, negatives, reference lines and targets; they also share the tallest panel's callout band, so their plots stay one height. Panels in different units keep their own bands: annotate one and leave its neighbours plain.
-- In a row of three or four, column panels thin period labels (FY17, 2019, Q1) to every second or third, and two-series lines name their series in a legend. Named columns are never dropped: `--types` prints how many a panel holds in a row of two, three and four. A callout on a bar panel in a row of three or four has no room for a rail - annotate a mark with clear space above it, or say it in the caption.
+- In a row of three or four, column panels thin period labels (FY17, 2019, Q1) to every second or third, and two-series lines name their series in a legend. Named columns are never dropped: `--types` prints how many a panel holds in a row of two, three and four.
+- A callout takes free space inside the plot first - above a short mark, beside a line, in an empty corner, with its leader - and reserves a band above the plot only when the plot has none: each band took 88px of the plot's height. If one callout needs the band, they all take it, so their leaders stay clear of each other. Panels sharing one scale keep their shared band.
+- Bar panels that read across (the same members) in different units take a callout in its bar's row - past the bar's end, past the axis for a bar below zero, or set inside a long bar - not in a band above the plot, which stood empty over the neighbour. Where the row has no room it takes a rail at its own panel's right; a panel in a row of three or four cannot spare one, so annotate a shorter bar there or say it in the caption.
+- Points under a row of panels run in columns: one to a panel when they are as many, otherwise up to three across and four two by two. A single point is a paragraph at the prose measure.
+- A combo's line on a second scale is drawn in a band above the bars; when that band leaves its change under 48px (callout bands take the plot's height) the page is refused for two panels, each on its own scale.
 
 Each type also has a minimum it needs to be worth a page: a composition shows three or more parts, or the mix across two or more members or periods - a share of one thing is a numbers page; a timeline or roadmap has four or more dated items; a mechanism three or more parts; a relationship five or more members; a bridge a start, two steps and an end - and every chart page the evidence floor below. Small counts are counted, not shared out: fourteen cities as percentages of a pie overstates what the count can say - use form `waffle`, with the parts as `categories` and one series of whole counts.
 
-On a page with commentary points, mark the finding in each point: `highlight` takes a list, with the number or claim from each point the reader should see first, or a point carries its own `highlight`. A single phrase lights one point and leaves the rest grey. A phrase that appears in no point is refused in a draft too, once the points are written.
+On a page with commentary points, mark the finding in each point: `highlight` takes a list, with the number or claim from each point the reader should see first, or a point carries its own `highlight`. A single phrase lights one point and leaves the rest grey. The page's `highlight` is set wherever the page writes it: points and row blocks, paragraphs, a rail or side panel, the so-what bar and the takeaway, panel captions, and the cells of a table, a findings matrix (bulleted cells too) or a comparison. On a dark or filled panel where the accent does not read, the phrase is set bold in a regular sentence. A phrase that lands nowhere the page draws an accent - only in the title, a heading or a chart's callout - is refused, in a draft too.
 
 Moving the explanation off the page's text column is a choice to write it somewhere else, not to drop it. Callouts on a chart carry ten or more words between them - the mechanism and the qualification, not labels - and each is measured against the chart's callout box, which holds about twelve words; every caption is a sentence of eight words or more that says what its panel shows and does not repeat the title or the panel heading; a rail is a developed claim of ten words or more. An executive summary with no exhibit renders as a list; give it `metrics` or an exhibit when the page would otherwise be half empty.
 
@@ -228,7 +236,7 @@ Two word rules close the gaps the same review found. An executive summary (`summ
 | `PAGE_TYPE_UNDECLARED` | every content page has a page type |
 | `VARIETY_TYPE_SHARE` | no type is more than 25% of the pages |
 | `VARIETY_TYPE_RANGE` | at least one type per five pages, up to eight |
-| `VARIETY_TYPE_RUN` | no three pages of one type in a row, unless they share a `series` (one template on purpose) |
+| `VARIETY_TYPE_RUN` | no three pages of one type in a row, unless they share a `series` (one template on purpose); the finding names the run, the page to change and what its evidence could become, and a page of another type it could trade places with |
 | `VARIETY_COMMENTARY` | no placement is more than 30% of the pages; `beside` and `beside-left` count as one |
 | `VARIETY_TAKEAWAY` | at most 25% of pages close on a takeaway line or a so-what bar |
 | `VARIETY_PANELS` | from fifteen pages, at least 20% carry two or more exhibits, counted on the page as drawn: each panel of a row, grid, stack or sequence, a metric strip over its exhibit, the photograph under a `photo-backdrop` exhibit, the exhibit on each labelled row (aligned bars are one exhibit) |

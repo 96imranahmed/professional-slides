@@ -11,6 +11,7 @@ import {
 } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
+import { contrastRatio } from "./palettes.mjs";
 
 const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label", "end-bubble"]);
 const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot", "speech"]);
@@ -103,7 +104,7 @@ function normalizeEvidenceAnnotations(props = {}) {
 // A callout the chart has already moved beside its mark (or into a right-hand
 // rail) on an earlier pass holds no band above the plot: reserving 88px for a
 // box that is not there left an empty stripe over every such chart.
-const RELEASED_PLACEMENTS = new Set(["beside", "rail"]);
+const RELEASED_PLACEMENTS = new Set(["beside", "rail", "on-bar", "plot"]);
 const holdsBand = (annotation) => (annotation.treatment !== "orthogonal-dot" || annotation.orientation !== "horizontal") && !RELEASED_PLACEMENTS.has(annotation._placement);
 
 export function evidenceAnnotationTopBandCount(props = {}) {
@@ -184,8 +185,19 @@ function annotationObstacleFrames(obstacles, roles = COLLISION_ROLES) {
 // other by two pixels, and the second went to a rail that squeezed the
 // category labels off the page.
 function clearSurface(frame, obstacles, placements) {
-  return obstacles.every((node) => !overlaps(frame, node.frame, 6))
+  return obstacles.every((node) => !meets(node, frame, 6))
     && placements.every((placement) => !overlaps(frame, placement.frame, COMPACT_BAND_GAP));
+}
+
+// A line's segment is read as the segment, not its box: a callout placed in
+// the plot sits above or beside a rising line, inside the box its diagonal
+// spans; read as a box, every such place was refused.
+function meets(node, frame, pad) {
+  const d = node.type === "line" ? node.data : null;
+  if (!d || ![d.x1, d.y1, d.x2, d.y2].every(Number.isFinite)) return overlaps(frame, node.frame, pad);
+  const steps = Math.max(1, Math.ceil(Math.hypot(d.x2 - d.x1, d.y2 - d.y1) / 4));
+  for (let i = 0; i <= steps; i += 1) if (pointInsideFrame({ x: d.x1 + (d.x2 - d.x1) * i / steps, y: d.y1 + (d.y2 - d.y1) * i / steps }, frame, pad)) return true;
+  return false;
 }
 
 function clearLeader(x1, y1, x2, y2, target, obstacles) {
@@ -195,7 +207,7 @@ function clearLeader(x1, y1, x2, y2, target, obstacles) {
     width: Math.abs(x2 - x1) + 6,
     height: Math.abs(y2 - y1) + 6
   };
-  return obstacles.every((node) => pointInsideFrame(target, node.frame, 1) || !overlaps(corridor, node.frame, 1));
+  return obstacles.every((node) => pointInsideFrame(target, node.frame, 1) || !meets(node, corridor, 1));
 }
 
 function measureEvidenceText(annotation) {
@@ -269,7 +281,7 @@ function verticalPlacement({ annotation, index, target, plot, props, bandIndex, 
 // Roles a box set beside its mark must also stay clear of: a beside box can
 // reach the category column, the value-label gutter and the delta column,
 // which a box in the band above the plot never meets.
-const BESIDE_ROLES = new Set([...COLLISION_ROLES, "category-label", "category-note", "category-icon", "category-logo", "category-logo-placeholder", "chart-delta", "chart-delta-label", "chart-bracket-label", "data-label-leader", "chart-period-label", "chart-event-label", "chart-quadrant-title", "chart-threshold-label", "axis-label"]);
+const BESIDE_ROLES = new Set([...COLLISION_ROLES, "chart-line", "category-label", "category-note", "category-icon", "category-logo", "category-logo-placeholder", "chart-delta", "chart-delta-label", "chart-bracket-label", "data-label-leader", "chart-period-label", "chart-event-label", "chart-quadrant-title", "chart-threshold-label", "axis-label"]);
 
 // The mark's own value label, when it prints one next to the point: a box set
 // beside the mark sits beyond that label, and its leader stops at the label's
@@ -314,9 +326,33 @@ function besidePlacement({ annotation, index, target, bounds, obstacles, placeme
     candidates.push({ side: "right", frame: { x: beyond.right + ORTHOGONAL_GAP - reach, y, width, height }, leader: { x1: beyond.right + ORTHOGONAL_GAP - reach, y1: mid, x2: beyond.right, y2: target.y } });
     candidates.push({ side: "left", frame: { x: beyond.left - ORTHOGONAL_GAP + reach - width, y, width, height }, leader: { x1: beyond.left - ORTHOGONAL_GAP + reach, y1: mid, x2: beyond.left, y2: target.y } });
   }
+  // A bar below zero leaves its row empty past the axis: the note goes there,
+  // in the bar's own row, its leader to the bar's foot. Tried beside the
+  // value end only, the box met the bar itself and the "only region that
+  // shrank" could not be pointed at.
+  const bar = obstacles.find((node) => node.role === "chart-mark" && node.data?.category === annotation.category
+    && (!annotation.series || !node.data?.series || node.data.series === annotation.series) && node.frame.width > node.frame.height);
+  if (bar && label && label.frame.x + label.frame.width <= bar.frame.x + 2) {
+    const foot = bar.frame.x + bar.frame.width, y = target.y - height / 2;
+    candidates.push({ side: "right", frame: { x: foot + ORTHOGONAL_GAP, y, width, height }, leader: { x1: foot + ORTHOGONAL_GAP, y1: target.y, x2: foot, y2: target.y } });
+  }
   const centred = Math.max(bounds.x, Math.min(bounds.x + bounds.width - width, target.x - width / 2));
   const leaderX = Math.max(centred + 4, Math.min(centred + width - 4, target.x));
   candidates.push({ side: "above", frame: { x: centred, y: above - ORTHOGONAL_GAP - height, width, height }, leader: { x1: leaderX, y1: above - ORTHOGONAL_GAP, x2: target.x, y2: above } });
+  // Above a short mark among taller ones: the box clears the tallest thing
+  // under its width, the leader drops to the mark. A pandemic-year column
+  // between two tall years had empty plot over it and no place, because the
+  // box set just above the mark met its neighbours.
+  // Slid sideways, over the lowest neighbours, it finds the empty corner
+  // between two tall ones.
+  for (const shift of [0, -0.25, 0.25, -0.5, 0.5, -0.75, 0.75]) {
+    const x = Math.max(bounds.x, Math.min(bounds.x + bounds.width - width, target.x - width / 2 + shift * width));
+    const under = obstacles.filter((node) => node.frame.x < x + width + 6 && node.frame.x + node.frame.width > x - 6 && node.frame.y < above);
+    if (!under.length) continue;
+    const top = Math.min(...under.map((node) => node.frame.y)) - ORTHOGONAL_GAP / 2 - height;
+    const lx = Math.max(x + 4, Math.min(x + width - 4, target.x));
+    candidates.push({ side: "above", frame: { x, y: top, width, height }, leader: { x1: lx, y1: top + height, x2: target.x, y2: above } });
+  }
   candidates.push({ side: "below", frame: { x: centred, y: below + ORTHOGONAL_GAP, width, height }, leader: { x1: leaderX, y1: below + ORTHOGONAL_GAP, x2: target.x, y2: below } });
   const others = leaderObstacles(obstacles, placements);
   const selected = candidates.find((candidate) => frameInside(candidate.frame, bounds)
@@ -346,6 +382,23 @@ function insidePlacement({ annotation, index, target, marks, obstacles, placemen
     const frame = { ...at, width, height };
     if (frameInside(frame, room) && clearSurface(frame, others, placements))
       return { annotation, index, target, frame, leader: null, placement: "inside", insideOf: { category: mark.data.category, series: mark.data.series ?? null } };
+  }
+  // The note alone, reversed out of the bar at its end. The longest bar of a
+  // six-bar panel is about 34px thick and 300px long: too thin for the boxed
+  // note (32px plus its margins), too long to leave room past its end, and a
+  // rail took the panel's plot below its minimum - so the bar the page is
+  // about was the one bar that could not be annotated. A line or two of the
+  // annotation face fits along it, set without a box: it sits on its mark.
+  // It is the last resort, after the rail (`_placement: "on-bar"`, set by the
+  // chart's render loop when the rail left the plot too narrow): a boxed note
+  // reads louder, and a chart with width to spare keeps it. A column's segment
+  // can be wider than tall too; the note must fit its words on the mark.
+  const text = annotation._placement === "on-bar" && f.width > f.height ? (() => { try { return measureText(annotation.text, Math.max(1, f.width - 2 * pad), { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 }); } catch { return null; } })() : null;
+  if (text) {
+    const w = Math.ceil(text.width) + 2, h = text.height;
+    const frame = { x: f.x + f.width - pad - w, y: f.y + (f.height - h) / 2, width: w, height: h };
+    if (h <= f.height - 4 && frame.x >= f.x + pad && clearSurface(frame, others.filter((node) => node.role !== "chart-highlight"), placements))
+      return { annotation, index, target, frame, leader: null, placement: "inside", textOnly: { layout: text, fill: mark.style?.fill }, insideOf: { category: mark.data.category, series: mark.data.series ?? null } };
   }
   return null;
 }
@@ -512,6 +565,15 @@ function evidenceNodes(id, placement) {
     ...(placement.insideOf ? { insideMark: true, category: placement.insideOf.category, ...(placement.insideOf.series !== null ? { series: placement.insideOf.series } : {}) } : {})
   };
   if (speech) return speechNodes(id, placement, data);
+  // Set on its own bar: the text alone, in whichever of the reversed or the
+  // ink colour reads on the bar's fill.
+  if (placement.textOnly) {
+    const fill = placement.textOnly.fill, surface = fill && typeof fill === "object" ? tokenValue(fill) : fill;
+    const color = typeof surface === "string" && /^#[0-9a-f]{6}$/i.test(surface) && contrastRatio(tokenValue(ON_PRIMARY), surface) < 4.5 ? INK : ON_PRIMARY;
+    const layout = placement.textOnly.layout;
+    return [textPrimitive({ id: stableId(id, "annotation-text", index), role: "annotation-text", frame, text: layout.text,
+      style: { ...textStyle(ANNOTATION, color, true, "right"), lineHeight: layout.lineHeight, wrap: false }, data: { ...data, textLayout: layout } })];
+  }
   const nodes = [
     // A callout set inside its own bar has no leader: it sits on its mark.
     ...(leader ? [linePrimitive({
@@ -649,7 +711,11 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
     const context = { annotation, index, target, plot, props, bandIndex, obstacles: collisionObstacles, placements };
     const beside = () => besidePlacement({ ...context, bounds: besideBounds, obstacles: besideObstacles });
     const inside = () => insidePlacement({ ...context, marks: obstacles.filter((node) => node.role === "chart-mark") });
-    const chain = RELEASED_PLACEMENTS.has(annotation._placement)
+    // In the plot's free space a callout sits near its mark with a leader - above
+    // a short mark, beside a line, in an empty corner - never inside a mark
+    // that the band would have left clear.
+    const chain = annotation._placement === "plot" ? [beside]
+      : RELEASED_PLACEMENTS.has(annotation._placement)
       ? [beside, inside]
       : annotation.treatment === "orthogonal-dot" && annotation.orientation === "horizontal"
         ? [() => horizontalPlacement(context), beside, inside]
@@ -660,7 +726,22 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
     for (const attempt of chain) if ((placement = attempt())) break;
     if (banded) bandIndex += 1;
     if (!placement) {
-      if (annotation._placement !== "rail") {
+      // No room in the plot: this callout takes its band above it after all,
+      // and the chart renders again with the plot that much shorter.
+      if (annotation._placement === "plot") {
+        throw Object.assign(new Error(`${id} has no room in the plot for the callout at ${annotation.category}`), {
+          retry: (current) => ({ ...current, annotations: (current.annotations || props.annotations).map((item, at) => { if (at !== index || !item) return item; const { _placement, ...rest } = item; return rest; }) })
+        });
+      }
+      // A banded callout with no way to its mark past a neighbour placed in
+      // the plot: every callout goes back to the band, as before, rather than
+      // one being pushed into a rail by another's in-plot box.
+      if ((props.annotations || []).some((item) => item?._placement === "plot")) {
+        throw Object.assign(new Error(`${id} has no clear position for the callout at ${annotation.category} beside the callouts placed in the plot`), {
+          retry: (current) => ({ ...current, annotations: (current.annotations || props.annotations).map((item) => { if (item?._placement !== "plot") return item; const { _placement, ...rest } = item; return rest; }) })
+        });
+      }
+      if (annotation._placement !== "rail" && annotation._placement !== "on-bar") {
         const all = props.annotations;
         throw Object.assign(new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot; shorten the note, annotate fewer marks, or enlarge the exhibit`), {
           retry: (current) => ({ ...current, annotations: (current.annotations || all).map((item, at) => at === index || item?._placement === "rail" ? { ...item, _placement: "rail" } : item) })
