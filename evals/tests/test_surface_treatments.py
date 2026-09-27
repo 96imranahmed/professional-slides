@@ -219,6 +219,21 @@ class SceneInkTests(unittest.TestCase):
         disc = {"type": "ellipse", "role": "cycle-hub", "frame": {"x": 400, "y": 200, "width": 200, "height": 200}, "style": {"fill": {"value": "#DCDFE1"}}}
         self.assertAlmostEqual(scene_ink.estimate(slide([disc])), 3.1416 * 100 * 100 / body, delta=0.01)
 
+    def test_the_native_plot_is_the_emitters_and_the_colours_are_shared(self):
+        # A copy of the emitter's CHART_PLOT_ROLES kept beside the estimate had
+        # lost eleven of its roles; it is read from the emitter now. And the
+        # void gates' scene mask reads colour, grey and canvas the one way.
+        try:
+            sys.path.insert(0, str(Path(scene_ink.__file__).resolve().parent.parent / "emit"))
+            import emit_pptx
+        except ImportError:
+            self.skipTest("python-pptx is not installed")
+        self.assertEqual(scene_ink.NATIVE_PLOT_ROLES, frozenset(emit_pptx.CHART_PLOT_ROLES))
+        self.assertIs(page_gates.color_of, scene_ink.color_of)
+        self.assertIs(page_gates.canvas_of, scene_ink.canvas_of)
+        cream = slide([rect(0, 0, 1280, 720, "#F5F0E6")])
+        self.assertEqual(scene_ink.canvas_of(cream), "#F5F0E6")
+
     def test_a_light_exhibit_page_is_named_and_a_page_of_prose_is_not(self):
         findings = []
         page_gates.gate_scene_ink(1, slide([text(60, 200, 600, ["Label"] * 2)]), findings)

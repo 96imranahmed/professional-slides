@@ -19,7 +19,8 @@ emit/render_pptx.py  PPTX → PDF (LibreOffice) → PNG per slide + montage
 emit/readback_pptx.py  saved PPTX re-opened with python-pptx and compared to the scene
 gates/page_gates.py  deterministic page gates (ink, dead band, internal void, hero, type range, cpl, words, titles, monotony, ticks)
 reviewer.mjs       deck review: rubric, exhaustive pass-1 and verification schemas, section split + merge, artifact binding; backends codex | claude | packet
-review-passes.mjs  the loop both reviews share: page-list and sampling checks, statuses, additive new findings, ledger, 3-pass cap
+review-passes.mjs  the loop both reviews share: page-list and sampling checks, statuses, additive new findings, ledger, 3-pass cap, next-pass scope, section split and part merge, the reviewer call, pass records, exit codes
+storyline.mjs      storyline critique: checks, schemas, packet, the gate the deck review and delivery wait for (a warning at author-deck and build-deck)
 claims.mjs         claim ledger (claims.json) for the author's self-check, and its validation
 build-deck.mjs     assets → plan → scene → claims → pptx → render → readback → gates
 page-types.mjs     the page types: required choices, the structure they compile to, evidence shapes and their breadth, the values each page plots
@@ -39,6 +40,17 @@ infer-style.py     canvas, colours and title treatment read off a reference deck
 Component contract: `render({ id, frame, props }) → { nodes }` with frames in canvas px (1280×720); `measureContent({ frame, props })` returns the natural height at a width — components without it fall back to `preferredSize`, and `evals/tests/test_measure_vs_preferred.py` reports the list. Chart components expose `nativeChart` on their instance so the emitter can write a workbook-backed chart; charts with reference lines, annotations or highlights stay as grouped shapes.
 
 Adding a component: register it in `registry.mjs` with `tokens`, `preferredSize`, `sample`, `render` and `measureContent`; the component and measurement tests pick it up.
+
+## Exit codes
+
+One scheme for every command a calling agent runs (EXIT in `review-passes.mjs`): `build-deck.mjs`, `deliver-deck.mjs`, `storyline.mjs`, `reviewer.mjs merge`.
+
+| Code | Meaning |
+| --- | --- |
+| 0 | done: built, accepted, the storyline ready, the parts merged |
+| 1 | a crash or bad usage |
+| 2 | refused: blockers, a rejected deck, a critique or review that does not validate, a loop at its pass cap |
+| 3 | waiting on a reviewer: a packet was written for one to answer |
 
 `build-deck.mjs --no-render` produces a `built-unrendered` result when planning
 and readback pass (exit 0). It is useful for inspecting the editable file, but

@@ -25,6 +25,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from node_probe import run_node
+
 ROOT = Path(__file__).resolve().parents[2]
 GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
 
@@ -358,12 +360,33 @@ class DeckSceneVoidTests(unittest.TestCase):
     def test_the_scene_counts_what_the_build_counts(self):
         # Pages the scene calls thin or small-exhibit, with no band of air: the
         # build's DECK_THIN_PAGES blocks on them, so the author's count must too.
+        # One habit, one refusal: with no render the deck count is the scene's,
+        # and the two codes no longer both fire on the same pages.
         thin = [content_page(f"t{i}", [text("paragraph", y, 40, lines=2) for y in range(162, 668, 46)], planBodyWords=10)
                 for i in range(5)]
         report = page_gates.run_gates({"slides": [cover()] + thin + [full_page(f"f{i}") for i in range(9)]})
-        codes = {f["code"] for f in report["findings"]}
+        codes = [f["code"] for f in report["findings"]]
         self.assertNotIn("SCENE_VOID", codes)
-        self.assertLessEqual({"DECK_THIN_PAGES", "DECK_SCENE_VOID"}, codes)
+        self.assertEqual([c for c in codes if c in ("DECK_THIN_PAGES", "DECK_SCENE_VOID")], ["DECK_SCENE_VOID"])
+        # With the renders measured, the same count is the render's alone.
+        rendered = []
+        page_gates.gate_deck_empty_pages(list(range(14)), rendered, rendered=True,
+                                         counted=[f for f in report["findings"] if f["code"] == "THIN_PAGE"])
+        self.assertEqual([f["code"] for f in rendered], ["DECK_THIN_PAGES"])
+
+    def test_the_build_refuses_one_habit_once(self):
+        # The build runs the gates on the scene before the render and again
+        # after it. Both counts blocked, so one half-empty habit was listed
+        # twice; with a render the render's count stands alone.
+        result = run_node('''
+import { buildOutcome } from './skills/professional-slides/runtime/build-deck.mjs';
+const habit = (code) => ({ passed: false, findings: [{ code, severity: 'blocker', slide: null }] });
+const rendered = buildOutcome({ preflight: habit('DECK_SCENE_VOID'), gates: habit('DECK_THIN_PAGES'), readback: { accepted: true } }, { render: true });
+const scene = buildOutcome({ preflight: habit('DECK_SCENE_VOID'), readback: { accepted: true } }, { render: false });
+console.log(JSON.stringify({ rendered: rendered.blockers.map((b) => b.code), scene: scene.blockers.map((b) => b.code) }));
+''')
+        self.assertEqual(result["rendered"], ["DECK_THIN_PAGES"])
+        self.assertEqual(result["scene"], ["DECK_SCENE_VOID"])
 
     def test_a_few_half_empty_pages_do_not(self):
         report = page_gates.run_gates(self.deck(4, 10))

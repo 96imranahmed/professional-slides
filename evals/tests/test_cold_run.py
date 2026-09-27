@@ -31,7 +31,7 @@ import assert from 'node:assert/strict';
 import {scoreBuild} from './evals/cold-run/score.mjs';
 const page=(roles)=>({id:'s',nodes:[{role:'action-title',type:'text'},
   ...roles.map(r=>({role:r,type:'rect',frame:{x:0,y:0,width:400,height:300}})),
-  ...Array(20).fill({role:'m',type:'rect'})],componentInstances:[{component:'image-frame'}]});
+  ...Array(20).fill({role:'m',type:'rect'})],componentInstances:[{component:'slide-chrome'},{component:'image-frame'}]});
 const shipped={slides:[page(['image-frame','image-frame']),page([]),page([]),page([]),page([]),page([])]};
 const s=scoreBuild(shipped);
 assert.equal(s.statistics.unsourcedPictures,2);
@@ -39,7 +39,7 @@ assert.ok(s.findings.some(f=>f.measure==='unsourcedPictures'&&f.ceiling===0));
 assert.equal(s.accepted,false,'two grey boxes is not a deliverable deck');
 const sourced={slides:[{id:'s',nodes:[{role:'action-title',type:'text'},
   {role:'image',type:'image',frame:{x:0,y:0,width:400,height:300}},...Array(20).fill({role:'m',type:'rect'})],
-  componentInstances:[{component:'image-frame'}]}]};
+  componentInstances:[{component:'slide-chrome'},{component:'image-frame'}]}]};
 assert.equal(scoreBuild(sourced).statistics.unsourcedPictures,0);
 console.log(JSON.stringify({ok:true}));
 '''

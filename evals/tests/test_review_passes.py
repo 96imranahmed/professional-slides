@@ -18,6 +18,7 @@ FIXTURES = '''
 import fs from 'node:fs/promises'; import os from 'node:os'; import path from 'node:path';
 import * as R from './skills/professional-slides/runtime/reviewer.mjs';
 import * as S from './skills/professional-slides/runtime/storyline.mjs';
+import * as P from './skills/professional-slides/runtime/review-passes.mjs';
 const IDS = ['p01', 'p02', 'p03', 'p04', 'p05', 'p06'];
 const RANK = ['none', 'minor', 'major', 'blocker'];
 const checks = () => Object.fromEntries(R.PAGE_DIMENSIONS.map((d) => [d, `checked ${d} on the page`]));
@@ -117,8 +118,8 @@ console.log(JSON.stringify({ dims: R.DIMENSIONS.every((d) => prompt.includes(`- 
 
 class VerificationPassTests(unittest.TestCase):
     PRIOR = FIXTURES + '''
-const prior = { binding: 'b'.repeat(64), pass: 1, slideHashes: Object.fromEntries(IDS.map((id) => [id, 'h'])), review: firstPass([finding()]) };
-const scope = R.verificationScope(prior, { ...prior.slideHashes, p04: 'changed' });
+const prior = { binding: 'b'.repeat(64), pass: 1, pageHashes: Object.fromEntries(IDS.map((id) => [id, 'h'])), review: firstPass([finding()]) };
+const scope = R.verificationScope(prior, { ...prior.pageHashes, p04: 'changed' });
 const status = (o = {}) => ({ finding: 'F1', status: 'fixed', evidence: 'The line now sits on a true time axis with the gaps visible.', ...o });
 const verify = (o = {}) => ({ pass: 2, verifies: 'b'.repeat(64), accepted: true, summary: 'The repair held on the chart page.', rating: 8, binding: 'a'.repeat(64),
   pages: [pageEntry('p02'), pageEntry('p04')], statuses: [status()], findings: [], density, ...o });
@@ -165,12 +166,12 @@ console.log(JSON.stringify({
         result = run_node(self.PRIOR + '''
 const notFixed = verify({ accepted: false, pages: [pageEntry('p02', 'major'), pageEntry('p04')], statuses: [status({ status: 'not fixed', evidence: 'The months are still drawn at equal spacing on the axis.' })] });
 const partly = verify({ pages: [pageEntry('p02', 'minor'), pageEntry('p04')], statuses: [status({ status: 'partly fixed', severity: 'minor', evidence: 'The axis is true to time; one gap is still unlabelled.' })] });
-const at = (pass) => R.verificationScope({ ...prior, pass }, { ...prior.slideHashes, p04: 'changed' });
+const at = (pass) => R.verificationScope({ ...prior, pass }, { ...prior.pageHashes, p04: 'changed' });
 console.log(JSON.stringify({
   fixed: R.reviewOutcome(verify(), scope.ledger).accepted,
   notFixed: R.reviewOutcome(notFixed, scope.ledger), notFixedValid: check(notFixed),
   partly: R.reviewOutcome(partly, scope.ledger).accepted, partlyValid: check(partly),
-  third: at(2).capped, fourth: at(3).capped, fourthPass: at(3).pass, custom: R.verificationScope({ ...prior, pass: 3 }, prior.slideHashes, { maxPasses: 4 }).capped,
+  third: at(2).capped, fourth: at(3).capped, fourthPass: at(3).pass, custom: R.verificationScope({ ...prior, pass: 3 }, prior.pageHashes, { maxPasses: 4 }).capped,
 }));
 ''')
         self.assertTrue(result['fixed'])
@@ -185,9 +186,39 @@ console.log(JSON.stringify({
         self.assertFalse(result['custom'])
 
 
-class SectionMergeTests(unittest.TestCase):
-    def test_parallel_section_reviews_merge_into_one_first_pass(self):
+class DensityVerificationTests(unittest.TestCase):
+    def test_an_open_density_finding_is_judged_again_and_can_close(self):
+        # Pass one judged p03 too thin. The rebuild fixed it, so the profile no
+        # longer flags it - and the verification pass, which only asked about
+        # flagged pages, never judged it again: its density finding stayed
+        # open and blocked delivery on every later pass.
         result = run_node(FIXTURES + '''
+const hashes = Object.fromEntries(IDS.map((id) => [id, 'h']));
+const first = firstPass([], { accepted: false, density: { deck: 'The deck sits near its targets apart from one page that is thin for its job.',
+  pages: [{ slide: 'p03', verdict: 'too thin', reason: 'The page states a finding without the reasoning behind it.' }] } });
+const prior = { binding: 'b'.repeat(64), pass: 1, pageHashes: hashes, review: first, ledger: R.deckLedger([], first) };
+const scope = R.verificationScope(prior, { ...hashes, p03: 'rebuilt' });
+const rebuilt = { deck: {}, pages: [{ id: 'p03', page: 3, flags: [] }], flaggedPages: [] };
+const verify = (pages) => ({ pass: 2, verifies: 'b'.repeat(64), accepted: true, summary: 'The rebuilt page now carries its reasoning.', rating: 8, binding: 'a'.repeat(64),
+  pages: [pageEntry('p03')], statuses: [], findings: [], density: { deck: 'The deck now sits on its targets on every measure compared.', pages } });
+const silent = verify([]);
+const judged = verify([{ slide: 'p03', verdict: 'right', reason: 'The page now gives the reasoning behind its finding.' }]);
+const packet = { scope, density: rebuilt, slides: [], titles: [], montage: 'm.png', schema: R.VERIFICATION_SCHEMA, binding: 'a'.repeat(64) };
+console.log(JSON.stringify({ rejudge: scope.rejudge.map((p) => p.slide), must: scope.mustInspect, asked: R.verificationPrompt(packet).includes('- p03: earlier judged too thin'),
+  silent: R.validateDensityReview(silent, rebuilt, scope),
+  judged: [...R.validateReview(judged, IDS, { scope, ledger: scope.ledger }), ...R.validateDensityReview(judged, rebuilt, scope)],
+  accepted: R.reviewOutcome(judged, scope.ledger).accepted }));
+''')
+        self.assertEqual(result['rejudge'], ['p03'])
+        self.assertIn('p03', result['must'])
+        self.assertTrue(result['asked'])
+        self.assertTrue(any('p03' in e for e in result['silent']), result['silent'])
+        self.assertEqual(result['judged'], [])
+        self.assertTrue(result['accepted'])
+
+
+class SectionMergeTests(unittest.TestCase):
+    PARTS = FIXTURES + '''
 const dead = (id, slides) => finding({ id, scope: 'deck', slides, dimension: 'layout', code: 'DEAD_SPACE', reason: `Large empty bands under the exhibit on ${slides.join(', ')}.`, repair: 'Enlarge the exhibit to fill the band on each page.' });
 const section = (id, slides, findings) => ({ part: { kind: 'section', id, slides }, binding: 'a'.repeat(64), accepted: false, summary: 'The section reads well apart from its bands.', rating: 7,
   pages: slides.map((s) => pageEntry(s, worstOn(findings, s) ?? 'ok')), findings,
@@ -198,6 +229,10 @@ const spine = { part: { kind: 'spine', id: 'spine', slides: IDS }, binding: 'a'.
   findings: [finding({ id: 'F1', scope: 'deck', slides: ['p02', 'p05'], dimension: 'consistency', code: 'TABLE_MONOTONY', reason: 'The same dark first-column table carries p02 and p05.', repair: 'Redraw p05 as a ranked bar so the pair reads differently.' })],
   completeness: R.DECK_DIMENSIONS.map((d) => d === 'consistency' ? { dimension: d, result: 'findings', note: 'Filed above.' } : { dimension: d, result: 'clean', note: `Checked ${d} across the whole sequence; nothing to raise.` }),
   assessment: Object.fromEntries(R.ASSESSMENT_KEYS.map((k) => [k, `A sentence about ${k}.`])), density };
+'''
+
+    def test_parallel_section_reviews_merge_into_one_first_pass(self):
+        result = run_node(self.PARTS + '''
 const { review, errors } = R.mergeReviewParts([s1, s2, spine], IDS);
 const gap = R.mergeReviewParts([s1, spine], IDS);
 const short = R.mergeReviewParts([{ ...s1, pages: s1.pages.slice(0, 2) }, s2, spine], IDS);
@@ -222,6 +257,45 @@ console.log(JSON.stringify({ errors, valid: R.validateReview(review, IDS), ids: 
         self.assertTrue(any('p03' in e for e in result['short']))
         self.assertEqual(result['covered'], 40)
         self.assertTrue(all(n <= 14 for n in result['sections']))
+
+    def test_the_merge_reads_the_parts_a_backend_run_saved(self):
+        # A codex run saves each part as <id>.json and its raw output beside it
+        # as <id>.last-message.json. `reviewer.mjs merge` read both, counted
+        # every part twice and refused its own run; one reader now serves the
+        # deck merge, delivery's --review <dir> and the storyline merge.
+        result = run_node(self.PARTS + '''
+const dir = await builtDeck();
+const parts = path.join(dir, 'review-packet', 'parts');
+await fs.mkdir(parts, { recursive: true });
+for (const part of [s1, s2, spine]) for (const name of [`${part.part.id}.json`, `${part.part.id}.last-message.json`]) await fs.writeFile(path.join(parts, name), JSON.stringify(part));
+const merged = await R.mergeReviewDirectory(dir);
+const read = await P.readParts(parts);
+await fs.rm(dir, { recursive: true, force: true });
+console.log(JSON.stringify({ status: merged.status, errors: merged.errors ?? [], files: read.files }));
+''')
+        self.assertEqual(result['errors'], [])
+        self.assertEqual(result['status'], 'merged')
+        self.assertEqual(result['files'], ['s1.json', 's2.json', 'spine.json'])
+
+    def test_both_loops_split_and_join_their_parts_the_same_way(self):
+        # The storyline's splitter never cut a long section, so a forty-page
+        # section went to one critic; its merge never refused a page two
+        # sections both read. Both loops now share one splitter and one check.
+        result = run_node(FIXTURES + '''
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'storyline-split-'));
+const specPath = path.join(dir, 'fixture.deck.json');
+const content = Array.from({ length: 40 }, (_, i) => ({ id: `q${i + 1}`, title: `Title of q${i + 1} states one finding` }));
+await fs.writeFile(specPath, JSON.stringify({ ...specOf([]), slides: [{ id: 'd1', kind: 'section', title: 'The whole market' }, ...content] }));
+const { packet } = await S.buildStorylinePacket(specPath, path.join(dir, 'out'));
+await fs.rm(dir, { recursive: true, force: true });
+const part = (kind, id, pages) => ({ part: { kind, id, pages }, binding: 'x' });
+const twice = S.mergeStorylineParts([part('section', 's1', ['p01', 'p02']), part('section', 's2', ['p02', 'p03']), part('spine', 'spine', [])],
+  { binding: 'x', pages: ['p01', 'p02', 'p03'].map((id) => ({ id, kind: 'content' })), sections: null });
+console.log(JSON.stringify({ sizes: packet.sections.map((s) => s.pages.length), covered: packet.sections.flatMap((s) => s.pages).length, twice: twice.errors }));
+''')
+        self.assertEqual(result['covered'], 40)
+        self.assertTrue(all(n <= 16 for n in result['sizes']), result['sizes'])
+        self.assertTrue(any('p02 covered by two section parts' in e for e in result['twice']))
 
 
 class StorylineBeforeDeckReviewTests(unittest.TestCase):
@@ -257,12 +331,42 @@ console.log(JSON.stringify({ none, revise, ready, prompt, changed, refusedAt: re
         self.assertEqual(result['refusedAt'], 'storyline')
         self.assertIn('re-run the storyline critique first', result['reason'])
 
+    def test_the_gate_accepts_only_a_recorded_pass_or_the_packets_answer(self):
+        # The gate used to fall back to validating a critique that matched no
+        # recorded pass and no packet: a hand-written pass-1 file that said
+        # ready passed, and reset the three-pass cap with it. And with a record
+        # it read the verdict from the editable file rather than the record.
+        result = run_node(FIXTURES + '''
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'storyline-gate-'));
+const specPath = path.join(dir, 'fixture.deck.json'), out = path.join(dir, 'out');
+await fs.mkdir(out);
+const spec = specOf(['p01', 'p02', 'p03']);
+await fs.writeFile(specPath, JSON.stringify(spec));
+const reviewPath = path.join(out, 'storyline-review.json');
+await fs.writeFile(reviewPath, JSON.stringify(storyReady(spec)));
+const handWritten = await S.storylineGate(spec, out);
+await fs.rm(reviewPath);
+await S.prepareStoryline(specPath, out);
+const critique = storyReady(spec, { verdict: 'revise', findings: [{ id: 'F1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', problem: 'The title reports a count without an implication.', fix: 'Rewrite the title as the finding the count supports.' }] });
+critique.pages[1].verdict = 'major'; critique.completeness.find((c) => c.check === 'claim').result = 'findings';
+await fs.writeFile(reviewPath, JSON.stringify(critique));
+const recorded = await S.prepareStoryline(specPath, out);
+await fs.writeFile(reviewPath, JSON.stringify({ ...critique, verdict: 'ready', findings: [] }));
+const edited = await S.storylineGate(spec, out);
+await fs.rm(dir, { recursive: true, force: true });
+console.log(JSON.stringify({ handWritten, recorded: recorded.status, edited }));
+''')
+        self.assertTrue(any('answers no packet' in e for e in result['handWritten']), result['handWritten'])
+        self.assertEqual(result['recorded'], 'revise')
+        self.assertTrue(any('says revise' in e for e in result['edited']), result['edited'])
+
     def test_delivery_enforces_the_pass_cap_and_the_ledger(self):
         result = run_node(FIXTURES + '''
 const dir = await builtDeck();
 const spec = specOf();
 const specPath = path.join(dir, 'fixture.deck.json');
 await fs.writeFile(specPath, JSON.stringify(spec));
+await S.buildStorylinePacket(specPath, dir);
 await fs.writeFile(path.join(dir, 'storyline-review.json'), JSON.stringify(storyReady(spec)));
 const { deliverDeck } = await import('./skills/professional-slides/runtime/deliver-deck.mjs');
 const binding = await R.reviewBinding(dir);
@@ -271,7 +375,7 @@ const first = await deliverDeck(specPath, dir, { skipBuild: true, reviewFile: aw
 const capped = await deliverDeck(specPath, dir, { skipBuild: true, maxPasses: 1, reviewFile: await write('r2.json', {}) });
 const second = await deliverDeck(specPath, dir, { skipBuild: true, reviewFile: await write('r3.json', { pass: 2, verifies: binding, accepted: true, summary: 'The repair held on the chart page.', rating: 8, binding,
   pages: [pageEntry('p02')], statuses: [{ finding: 'F1', status: 'fixed', evidence: 'The line now sits on a true time axis with the gaps visible.' }], findings: [], density }) });
-const history = (await fs.readdir(path.join(dir, 'review-history'))).filter((f) => f.startsWith('review-')).sort();
+const history = (await fs.readdir(path.join(dir, 'review-history'))).filter((f) => f.startsWith('pass-')).sort();
 const last = JSON.parse(await fs.readFile(path.join(dir, 'review-history', history.at(-1)), 'utf8'));
 await fs.rm(dir, { recursive: true, force: true });
 console.log(JSON.stringify({ first: [first.accepted, first.rejectedAt], capped: [capped.rejectedAt, capped.blockers[0].code], second: [second.accepted, second.review.pass],
@@ -329,7 +433,7 @@ await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verif
 const ready = await S.prepareStoryline(specPath, out);
 const gate = await S.storylineGate(revised, out);
 const moved = await S.storylineGate(specOf(ids, { p02: 'The subject added routes twice as fast as its nearest rival', p03: 'A new claim' }), out);
-const capped = S.storylineScope({ pass: 3, binding: 'b'.repeat(64), pageHashes: S.storylinePageHashes(revised), review: critique, ledger: [] }, { ...S.storylinePageHashes(revised), p03: 'x' }, ids);
+const capped = P.nextPassScope({ pass: 3, binding: 'b'.repeat(64), pageHashes: S.storylinePageHashes(revised), review: critique }, { ...S.storylinePageHashes(revised), p03: 'x' }, { ids, ledger: [] });
 await fs.rm(dir, { recursive: true, force: true });
 console.log(JSON.stringify({ one: [one.status, one.pass], revise: revise.status, two: [two.status, two.pass], scope: [packet.scope.changed, packet.scope.mustInspect],
   nit: [nit.status, nit.errors?.some((e) => e.includes('not additive'))], ready: ready.status, gate, moved, capped: capped.capped }));

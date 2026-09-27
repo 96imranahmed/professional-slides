@@ -11,7 +11,18 @@
 // point on an unchanged page is refused, because that is how a loop that should
 // converge keeps finding more to say. The passes are capped; acceptance is read
 // off the ledger of every pass, not off the last reviewer's mood.
+//
+// Everything the two loops do alike lives here, so a fix to one is a fix to
+// both: scoping the next pass, splitting a long first pass across parallel
+// readers and joining their parts, calling a fresh reviewer, and recording each
+// pass. The two copies this replaced had drifted - the storyline never cut a
+// long section, its merge did not refuse a page read twice, its reviewer ran
+// without the deck's flags, and the deck's merge read a backend's raw output
+// as a second copy of a part.
+import fs from "node:fs/promises";
+import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { runProcess } from "./process.mjs";
 
 export const SEVERITIES = Object.freeze(["none", "minor", "major", "blocker"]);
 export const PAGE_VERDICTS = Object.freeze(["ok", "minor", "major", "blocker"]);
@@ -39,8 +50,19 @@ const rank = (severity) => Math.max(0, SEVERITIES.indexOf(severity === "ok" ? "n
 export const worst = (list) => list.reduce((a, b) => (rank(b) > rank(a) ? b : a), "none");
 export const verdictOf = (severity) => (severity === "none" ? "ok" : severity);
 
+// One exit-code scheme for every command of the pipeline (build-deck,
+// deliver-deck, storyline, reviewer merge; runtime/README.md#exit-codes), so a
+// calling agent reads any step's status the same way: 0 done, 1 a crash or a
+// usage error, 2 refused (blockers, a rejection, an invalid answer, a capped
+// loop), 3 waiting on a reviewer - a packet was written for one.
+export const EXIT = Object.freeze({ ok: 0, error: 1, refused: 2, waiting: 3 });
+
 function hasCli(name) { return spawnSync("sh", ["-c", `command -v ${name}`], { stdio: "ignore" }).status === 0; }
 
+// `auto` runs a fresh reviewer through the first CLI on the path (codex, then
+// claude) and writes a packet only when neither is installed. An agent session
+// that reviews with its own fresh subagents asks for `packet` (the flag, or
+// PS_REVIEWER=packet): a CLI being installed does not make it the reviewer.
 export function detectBackend(preferred = "auto") {
   if (preferred !== "auto") return preferred;
   if (process.env.PS_REVIEWER) return process.env.PS_REVIEWER;
@@ -309,4 +331,162 @@ export function uniqueIds(parts, listOf) {
   const count = new Map();
   for (const part of parts) for (const f of listOf(part)) count.set(f.id, (count.get(f.id) ?? 0) + 1);
   return (part, id) => (count.get(id) > 1 ? `${part.part?.id ?? "part"}.${id}` : id);
+}
+
+/**
+ * What the next pass is, or null when the prior record cannot scope one (no
+ * record, or a deletion with no neighbour left): its number, the review it
+ * verifies, the pages it must read - every page whose hash changed, the
+ * neighbours of deleted pages, and every page an open major or blocker names -
+ * and the open findings it must give a status. The changed pages are also the
+ * only ones a new major finding may be raised on. `ids` is the pages a pass
+ * reads (the storyline reads content pages only); `capped` says the pass would
+ * exceed the loop's cap.
+ */
+export function nextPassScope(prior, current, { ledger, ids = Object.keys(current), maxPasses = MAX_PASSES }) {
+  if (!prior?.pageHashes || !prior.review) return null;
+  const moved = changedPages(prior.pageHashes, current);
+  if (!moved) return null;
+  const named = new Set(openBlocking(ledger).flatMap((e) => e.pages || []));
+  const changed = [...new Set([...moved.changed, ...moved.neighbours])];
+  const pass = (prior.pass ?? prior.review.pass ?? 1) + 1;
+  return { pass, verifies: prior.binding, maxPasses, capped: pass > maxPasses, changed, deleted: moved.deleted,
+    mustInspect: ids.filter((id) => changed.includes(id) || named.has(id)), open: openEntries(ledger), ledger, priorRating: prior.review.rating };
+}
+
+/**
+ * Split a long first pass for parallel readers: a section per divider, short
+ * sections folded into the one before, long ones cut into even chunks of at
+ * most `max`, so each reader reads a dozen pages closely instead of fifty
+ * thinly. `pages` is [{ id, title, opens, counted }]: `opens` starts a
+ * section, `counted: false` leaves the page out of it (the storyline's
+ * dividers). The section's page list is written under `key`.
+ */
+export function splitSections(pages, { max, min = 5, key = "pages" }) {
+  const groups = [];
+  for (const p of pages) {
+    if (!groups.length || p.opens) groups.push({ title: p.opens ? p.title : "Opening", ids: [] });
+    if (p.counted !== false) groups.at(-1).ids.push(p.id);
+  }
+  const folded = [];
+  for (const g of groups.filter((x) => x.ids.length)) {
+    const last = folded.at(-1);
+    if (last && (g.ids.length < min || last.ids.length < min) && last.ids.length + g.ids.length <= max) { last.ids.push(...g.ids); last.title = `${last.title}; ${g.title}`; }
+    else folded.push({ ...g, ids: [...g.ids] });
+  }
+  return folded.flatMap((g) => {
+    const n = Math.ceil(g.ids.length / max), size = Math.ceil(g.ids.length / n);
+    return Array.from({ length: n }, (_, k) => ({ title: n > 1 ? `${g.title} (${k + 1} of ${n})` : g.title, ids: g.ids.slice(k * size, (k + 1) * size) }));
+  }).map((g, i) => ({ id: `s${i + 1}`, title: g.title, [key]: g.ids }));
+}
+
+/**
+ * The parts of a split first pass, checked as a set before they are joined:
+ * one spine part, one binding, every page read by exactly one section part,
+ * and a part for every section the packet named. `key` is the parts' page-list
+ * field (`slides` for the deck, `pages` for the storyline).
+ */
+export function partSetErrors(parts, ids, { key, binding = parts[0]?.binding, sections = null }) {
+  const errors = [];
+  const sectionParts = parts.filter((p) => p?.part?.kind === "section");
+  const spines = parts.filter((p) => p?.part?.kind === "spine").length;
+  if (spines !== 1) errors.push(`a split review needs exactly one spine part; got ${spines}`);
+  if (parts.some((p) => p?.binding !== binding)) errors.push("a part is bound to a different build or spine than the packet");
+  const covered = sectionParts.flatMap((p) => p.part?.[key] || []);
+  const uncovered = ids.filter((id) => !covered.includes(id));
+  if (uncovered.length) errors.push(`no section part covers ${uncovered.join(", ")}`);
+  const twice = [...new Set(covered.filter((id, i) => covered.indexOf(id) !== i))];
+  if (twice.length) errors.push(`${twice.join(", ")} covered by two section parts`);
+  for (const section of sections || []) if (!sectionParts.some((p) => p.part.id === section.id)) errors.push(`section ${section.id} has no part`);
+  return errors;
+}
+
+/**
+ * The joined first pass's page entries and completeness. Pages come from the
+ * section parts in deck order, each verdict recomputed from the joined
+ * `ledger`, since a spine finding can raise a page its section reviewer
+ * passed; completeness is one entry per dimension carrying every part's note.
+ * A dimension no part reported on is an error: the join cannot say it was checked.
+ */
+export function joinParts(parts, ids, ledger, { pageKey, dimensions, dimKey }) {
+  const order = new Map(ids.map((id, i) => [id, i]));
+  const expected = expectedVerdicts(ledger);
+  const pages = parts.filter((p) => p.part.kind === "section").flatMap((p) => p.pages).sort((a, b) => order.get(a[pageKey]) - order.get(b[pageKey]))
+    .map((p) => ({ ...p, verdict: verdictOf(expected.get(p[pageKey]) ?? "none") }));
+  const completeness = dimensions.map((d) => ({ [dimKey]: d, result: ledger.some((e) => e.dimension === d) ? "findings" : "clean",
+    note: parts.flatMap((p) => (p.completeness || []).filter((c) => c[dimKey] === d).map((c) => `${p.part.id}: ${c.note}`)).join(" | ") }));
+  const unreported = completeness.filter((c) => !c.note).map((c) => c[dimKey]);
+  return { pages, completeness, errors: unreported.length ? [`no part reported what it checked for ${unreported.join(", ")}`] : [] };
+}
+
+/**
+ * The saved answers of a split first pass: every <id>.json in the parts
+ * folder. A backend's raw output (<id>.last-message.json) is written beside
+ * them and is not a part - read as one, every part counted twice and the
+ * merge refused its own run.
+ */
+export async function readParts(dir) {
+  const files = (await fs.readdir(dir).catch(() => [])).filter((f) => f.endsWith(".json") && !f.endsWith(".last-message.json")).sort();
+  return { files, parts: await Promise.all(files.map(async (f) => JSON.parse(await fs.readFile(path.join(dir, f), "utf8")))) };
+}
+
+/** A reviewer's JSON answer, from whatever the backend printed around it. */
+function parseAnswer(raw) {
+  const match = String(raw).match(/\{[\s\S]*\}/);
+  return JSON.parse(match ? match[0] : raw);
+}
+
+/**
+ * One fresh reviewer, with none of the author's context: codex with the
+ * schema and the page images, or claude reading the images itself. Both loops
+ * call it with the same flags.
+ */
+export async function callReviewer(which, { prompt, schemaPath, images = [], outPath, model, timeoutMs }) {
+  if (which === "codex") {
+    await runProcess("codex", ["exec", ...(model ? ["--model", model] : []), "--sandbox", "read-only", "--ephemeral", "--output-schema", schemaPath,
+      "--output-last-message", outPath, ...images.flatMap((image) => ["--image", image]), "-"], { input: prompt, timeoutMs });
+    return parseAnswer(await fs.readFile(outPath, "utf8"));
+  }
+  if (which === "claude") {
+    const res = await runProcess("claude", ["-p", "--output-format", "json", "--allowedTools", "Read", ...(model ? ["--model", model] : [])], { input: prompt, timeoutMs });
+    const envelope = JSON.parse(res.stdout);
+    return parseAnswer(typeof envelope.result === "string" ? envelope.result : JSON.stringify(envelope.result ?? envelope));
+  }
+  throw new Error(`Unknown reviewer backend: ${which}`);
+}
+
+/**
+ * Every part of a split first pass at once - the readers are independent -
+ * each saved as parts/<id>.json, so a failed merge can be rerun on the saved
+ * answers without calling anyone again.
+ */
+export async function reviewParts(which, jobs, { partsDir, schemaPath, model, timeoutMs }) {
+  await fs.mkdir(partsDir, { recursive: true });
+  return Promise.all(jobs.map(async (job) => {
+    const part = await callReviewer(which, { prompt: job.prompt, schemaPath, images: job.images, outPath: path.join(partsDir, `${job.id}.last-message.json`), model, timeoutMs });
+    await fs.writeFile(path.join(partsDir, `${job.id}.json`), JSON.stringify(part, null, 2) + "\n");
+    return part;
+  }));
+}
+
+const PASS_FILE = /^pass-(\d+)\.json$/;
+
+/** Every recorded pass of a loop's history folder, in order. */
+export async function readPasses(dir) {
+  const files = (await fs.readdir(dir).catch(() => [])).filter((f) => PASS_FILE.test(f)).sort((a, b) => Number(a.match(PASS_FILE)[1]) - Number(b.match(PASS_FILE)[1]));
+  return Promise.all(files.map(async (f) => JSON.parse(await fs.readFile(path.join(dir, f), "utf8"))));
+}
+
+/**
+ * Record a validated pass as <dir>/pass-N.json, in the one format both loops
+ * read: the review, its binding, pass and lineage, the page hashes it read
+ * (what the next pass is scoped against) and the ledger after it (what
+ * acceptance is read off).
+ */
+export async function recordPass(dir, { review, pageHashes, ledger }) {
+  await fs.mkdir(dir, { recursive: true });
+  const file = path.join(dir, `pass-${(await readPasses(dir)).length + 1}.json`);
+  const record = { review, binding: review.binding, pass: review.pass ?? 1, verifies: review.verifies ?? null, pageHashes, ledger, recordedAt: new Date().toISOString() };
+  await fs.writeFile(file, JSON.stringify(record, null, 2) + "\n");
+  return { file, record };
 }

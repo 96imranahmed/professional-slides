@@ -6,7 +6,8 @@
 //   node runtime/author-deck.mjs --icons                 the icon names a page can ask for, with their aliases
 //   node runtime/author-deck.mjs --example <type>        the worked example page(s) of a type
 //   node runtime/author-deck.mjs <id>.pages.json --log   what the author runs so far found, and what recurred
-//   node runtime/author-deck.mjs <id>.pages.json         compile to <id>.deck.json and <id>.plan.json
+//   node runtime/author-deck.mjs <id>.pages.json         compile to <id>.deck.json and <id>.plan.json; warns when
+//                                                        the storyline gate in out/ (or --out <dir>) is not ready
 //   node runtime/author-deck.mjs <id>.pages.json --check compile and gate, write nothing
 //   node runtime/author-deck.mjs <id>.pages.json --draft the title spine and page types only: the content plan's
 //                                                        word floors are reported, not enforced, so the storyline
@@ -38,6 +39,7 @@ import { composeAll } from "./compose-all.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
+import { storylineWarning } from "./storyline.mjs";
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 
 /**
@@ -316,4 +318,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   await fs.writeFile(path.join(dir, `${stem}.plan.json`), JSON.stringify(planOf(spec), null, 1) + "\n");
   await fs.writeFile(path.join(dir, `${stem}.content.json`), JSON.stringify(content, null, 1) + "\n");
   console.log(JSON.stringify({ deck: `${stem}.deck.json`, plan: `${stem}.plan.json`, content: `${stem}.content.json`, ...summary }, null, 1));
+  // The full copy belongs after the storyline gate: said on every full compile
+  // while the gate is not ready (out/ beside the pages file, or --out), never enforced here.
+  if (!draft) {
+    const at = args.indexOf("--out");
+    const story = await storylineWarning(spec, path.resolve(at >= 0 ? args[at + 1] : path.join(dir, "out")));
+    if (story) console.error(story);
+  }
 }

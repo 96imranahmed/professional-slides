@@ -15,19 +15,32 @@
 // accepted when no major or blocker finding from any pass is open. --full-review starts
 // a new lineage with an exhaustive pass, for a repair that changed the argument itself.
 //
-// Exit 0: accepted; the deliverable is out/<id>-DELIVERED.pptx. Exit 2: rejected; no
-// deliverable is written, out/REJECTED.md lists the blockers, and any earlier deliverable
-// copy is removed so a stale file can never be mistaken for an accepted one. Exit 1: crash.
+// Exit codes (EXIT in review-passes.mjs): 0 accepted - the deliverable is
+// out/<id>-DELIVERED.pptx; 2 rejected - no deliverable is written, out/REJECTED.md
+// lists the blockers, and any earlier deliverable copy is removed so a stale file
+// can never be mistaken for an accepted one; 3 a review packet is waiting for its
+// reviewer; 1 a crash or bad usage.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { deckStem } from "./artifact-path.mjs";
 import { assertOutputDirectory } from "./output-path.mjs";
 import { buildDeck } from "./build-deck.mjs";
-import { runReview, validateReview, validateReviewBinding, validateDensityReview, reviewOutcome, slideHashes, latestReview, verificationScope, withInheritedDensity, recordReview, ledgerOf, mergeReviewParts, MAX_PASSES } from "./reviewer.mjs";
-import { capMessage } from "./review-passes.mjs";
+import { runReview, validateReview, validateReviewBinding, validateDensityReview, reviewOutcome, slideHashes, latestReview, verificationScope, withInheritedDensity, recordReview, ledgerOf, mergeReviewDirectory, MAX_PASSES } from "./reviewer.mjs";
+import { capMessage, EXIT } from "./review-passes.mjs";
 import { writeLedger, validateSelfCheck } from "./claims.mjs";
 import { storylineGate } from "./storyline.mjs";
+
+// Delivery's own findings: why a deck was refused around its review, as
+// opposed to a defect a gate or the reviewer found on a page. A review that
+// does not validate is INVALID_REVIEW, not an EDITORIAL blocker: EDITORIAL is
+// the advisory wording code and can never block (reviewer.mjs findingErrors).
+export const DELIVERY_CODES = Object.freeze({
+  MISSING_RENDERED_GATES: "the build carries no passing rendered page gates to deliver on",
+  STORYLINE_UNREVIEWED: "no ready storyline critique for the deck's current title spine",
+  REVIEW_PASS_CAP: "the review loop reached its cap with findings open; only the user asks for another pass",
+  INVALID_REVIEW: "the supplied review does not validate against its schema, its pass or the build: a transport problem, not a deck defect",
+});
 
 export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto", model, reviewFile, skipBuild = false, brief, answer, fullReview = false, maxPasses = MAX_PASSES } = {}) {
   const directory = await assertOutputDirectory(outputDirectory);
@@ -85,11 +98,10 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   const slideIds = slideIdsOf(await fs.readFile(path.join(directory, "scene.json"), "utf8"));
   let review;
   if (reviewFile) {
-    // A directory is the parts of a split first pass, merged as `reviewer.mjs merge` would.
+    // A directory is the parts of a split first pass, merged as `reviewer.mjs merge` merges them.
     if ((await fs.stat(reviewFile)).isDirectory()) {
-      const files = (await fs.readdir(reviewFile)).filter((f) => f.endsWith(".json") && !f.includes("last-message")).sort();
-      const merged = mergeReviewParts(await Promise.all(files.map(async (f) => JSON.parse(await fs.readFile(path.join(reviewFile, f), "utf8")))), slideIds);
-      if (merged.errors.length) return reject(report, directory, rejectedNote, "invalid review", merged.errors.map((e) => ({ slide: null, code: "EDITORIAL", severity: "blocker", reason: `review parts invalid: ${e}`, repair: "Return every section and the spine part to the schema, covering every page" })));
+      const merged = await mergeReviewDirectory(directory, reviewFile);
+      if (merged.errors) return reject(report, directory, rejectedNote, "invalid review", merged.errors.map((e) => ({ slide: null, code: "INVALID_REVIEW", severity: "blocker", reason: `review parts invalid: ${e}`, repair: "Return every section and the spine part to the schema, covering every page" })));
       review = merged.review;
     } else review = JSON.parse(await fs.readFile(reviewFile, "utf8"));
   } else {
@@ -103,8 +115,8 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   }
   const profile = await fs.readFile(path.join(directory, "density-profile.json"), "utf8").then(JSON.parse).catch(() => null);
   review = withInheritedDensity(review, scope);
-  const errors = [...validateReview(review, slideIds, { scope, ledger: priorLedger }), ...await validateReviewBinding(review, directory), ...validateDensityReview(review, profile)];
-  if (errors.length) return reject(report, directory, rejectedNote, "invalid review", errors.map((e) => ({ slide: null, code: "EDITORIAL", severity: "blocker", reason: `review record invalid: ${e}`, repair: "Return a review that matches the schema; this is a transport problem, not a deck defect" })));
+  const errors = [...validateReview(review, slideIds, { scope, ledger: priorLedger }), ...await validateReviewBinding(review, directory), ...validateDensityReview(review, profile, scope)];
+  if (errors.length) return reject(report, directory, rejectedNote, "invalid review", errors.map((e) => ({ slide: null, code: "INVALID_REVIEW", severity: "blocker", reason: `review record invalid: ${e}`, repair: "Return a review that matches the schema; this is a transport problem, not a deck defect" })));
   await recordReview(directory, review, priorLedger);
   const outcome = reviewOutcome(review, priorLedger);
   report.review = { accepted: outcome.accepted, pass: review.pass, maxPasses, verifies: review.verifies ?? null, summary: review.summary, findings: review.findings.length,
@@ -132,13 +144,13 @@ async function reject(report, directory, notePath, stage, blockers) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [spec, out, ...args] = process.argv.slice(2);
   const get = (k) => { const i = args.indexOf("--" + k); return i < 0 ? undefined : args[i + 1]; };
-  if (!spec || !out) { console.error("Usage: deliver-deck.mjs spec.json output-directory [--reviewer auto|codex|claude|packet] [--model m] [--review review.json|parts-dir] [--skip-build] [--brief text] [--full-review] [--max-passes n]"); process.exit(1); }
+  if (!spec || !out) { console.error("Usage: deliver-deck.mjs spec.json output-directory [--reviewer auto|codex|claude|packet] [--model m] [--review review.json|parts-dir] [--skip-build] [--brief text] [--full-review] [--max-passes n]"); process.exit(EXIT.error); }
   try {
     const report = await deliverDeck(path.resolve(spec), path.resolve(out), { reviewer: get("reviewer") || "auto", model: get("model"), reviewFile: get("review"), skipBuild: args.includes("--skip-build"), brief: get("brief"), fullReview: args.includes("--full-review"), maxPasses: get("max-passes") ? Number(get("max-passes")) : MAX_PASSES });
     console.log(JSON.stringify(report));
-    process.exit(report.accepted ? 0 : report.review?.status === "pending" ? 3 : 2);
+    process.exit(report.accepted ? EXIT.ok : report.review?.status === "pending" ? EXIT.waiting : EXIT.refused);
   } catch (error) {
     console.error(error.stack || error.message);
-    process.exit(1);
+    process.exit(EXIT.error);
   }
 }

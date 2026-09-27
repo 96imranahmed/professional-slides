@@ -4,8 +4,13 @@
 //
 //   node runtime/storyline.mjs <id>.deck.json out/                  records a returned critique, then writes the next
 //                                                                   packet (out/storyline-review/) or says the spine is ready
-//   node runtime/storyline.mjs <id>.deck.json out/ --run [codex|claude]   also runs a fresh reviewer for the packet
+//   node runtime/storyline.mjs <id>.deck.json out/ --run [codex|claude] [--model m]
+//                                                                   also runs a fresh reviewer for the packet
 //   node runtime/storyline.mjs merge <id>.deck.json out/            joins parallel section critiques into out/storyline-review.json
+//   ... --max-passes n                                              lifts the cap of three passes, when the user asks for another
+//
+// Exit codes (EXIT in review-passes.mjs): 0 ready, 3 a packet is waiting for
+// a critic, 2 revise, capped or an invalid critique, 1 a crash or bad usage.
 //
 // A deck can pass every gate and still argue nothing: a governing answer that
 // restates the question, pillars that overlap, pages that report counts nobody
@@ -34,16 +39,20 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { trivialChart, trendChart } from "./gates/craft_gates.mjs";
-import { runProcess } from "./process.mjs";
 import {
-  SEVERITIES, PAGE_VERDICTS, STATUSES, NEW_BASES, MAX_PASSES, SEVERITY_DEFINITIONS, BLOCKING, verdictOf,
-  pageListErrors, advanceLedger, openEntries, openBlocking, expectedVerdicts, verificationErrors, coverageErrors,
-  verdictErrors, completenessErrors, changedPages, capMessage, uniqueIds, detectBackend,
+  SEVERITIES, PAGE_VERDICTS, STATUSES, NEW_BASES, MAX_PASSES, SEVERITY_DEFINITIONS, BLOCKING, EXIT,
+  pageListErrors, advanceLedger, openEntries, openBlocking, verificationErrors, coverageErrors, verdictErrors, completenessErrors,
+  changedPages, capMessage, uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts,
+  callReviewer, reviewParts, readPasses, recordPass,
 } from "./review-passes.mjs";
 
 export const STORYLINE_VERDICTS = Object.freeze(["ready", "revise"]);
+// The ledger codes of a critique's items besides its findings, which carry
+// STORY_<CHECK> for the check they fail (storylineItems).
 export const STORYLINE_CODES = Object.freeze({
-  STORYLINE_UNREVIEWED: "delivery has no current ready storyline critique for this dot-dash",
+  MISSING_ANALYSIS: "an analysis a strong team would have run is missing from the storyline",
+  CUT_PAGE: "a page that repeats, previews or pads the argument, to cut",
+  MERGE_PAGES: "pages that make one point between them, to merge",
 });
 
 /**
@@ -243,44 +252,17 @@ async function storyPages(spec, base, stem) {
   return { pages, content, log };
 }
 
-/** Sections of a long spine for parallel critics: one per section divider, short ones folded together. */
+// A spine past this many content pages is critiqued by parallel section
+// critics (splitSections, at most STORYLINE_SECTION_MAX pages each) and one
+// spine critic: a forty-page section read by one critic is the thin reading
+// the split exists to prevent.
 export const STORYLINE_SECTION_THRESHOLD = 30;
-export function storySections(pages, { max = 16, min = 5 } = {}) {
-  const groups = [];
-  for (const p of pages) {
-    if (!groups.length || p.kind === "section") groups.push({ title: p.kind === "section" ? p.title : "Opening", pages: [] });
-    if (isContent(p)) groups.at(-1).pages.push(p.id);
-  }
-  const folded = [];
-  for (const g of groups.filter((x) => x.pages.length)) {
-    const last = folded.at(-1);
-    if (last && (g.pages.length < min || last.pages.length < min) && last.pages.length + g.pages.length <= max) { last.pages.push(...g.pages); last.title = `${last.title}; ${g.title}`; }
-    else folded.push({ ...g, pages: [...g.pages] });
-  }
-  return folded.map((g, i) => ({ id: `s${i + 1}`, ...g }));
-}
+export const STORYLINE_SECTION_MAX = 16;
 
 const HISTORY = "storyline-history";
 const PACKET = "storyline-review";
 
-export async function readStorylineHistory(outputDirectory) {
-  const dir = path.join(outputDirectory, HISTORY);
-  const files = (await fs.readdir(dir).catch(() => [])).filter((f) => /^pass-\d+\.json$/.test(f)).sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
-  return Promise.all(files.map(async (f) => JSON.parse(await fs.readFile(path.join(dir, f), "utf8"))));
-}
-
-/** What the next storyline pass reads and verifies, or null for a first pass. */
-export function storylineScope(prior, currentHashes, contentIds, { maxPasses = MAX_PASSES } = {}) {
-  if (!prior?.pageHashes || !prior.review) return null;
-  const moved = changedPages(prior.pageHashes, currentHashes);
-  if (!moved) return null;
-  const ledger = prior.ledger ?? storylineLedger([], prior.review);
-  const named = new Set(openBlocking(ledger).flatMap((e) => e.pages || []));
-  const changed = [...new Set([...moved.changed, ...moved.neighbours])];
-  const pass = (prior.pass ?? 1) + 1;
-  return { pass, verifies: prior.binding, maxPasses, capped: pass > maxPasses, changed, deleted: moved.deleted,
-    mustInspect: contentIds.filter((id) => changed.includes(id) || named.has(id)), open: openEntries(ledger), ledger, priorRating: prior.review.rating };
-}
+export const readStorylineHistory = (outputDirectory) => readPasses(path.join(outputDirectory, HISTORY));
 
 export async function buildStorylinePacket(specPath, outputDirectory, { scope = null } = {}) {
   const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
@@ -291,7 +273,8 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   const insights = checkInsights(log, sources);
   const contentPages = pages.filter(isContent).length;
   const targetPages = Number.isFinite(spec.targetPages) ? spec.targetPages : spec.purpose === "evaluation" ? 50 : null;
-  const sections = !scope && contentPages > STORYLINE_SECTION_THRESHOLD ? storySections(pages) : null;
+  const sections = !scope && contentPages > STORYLINE_SECTION_THRESHOLD
+    ? splitSections(pages.map((p) => ({ id: p.id, title: p.title, opens: p.kind === "section", counted: isContent(p) })), { max: STORYLINE_SECTION_MAX }) : null;
   const packet = { binding: storylineBinding(spec), pageHashes: storylinePageHashes(spec), pass: scope ? scope.pass : 1, verifies: scope ? scope.verifies : null,
     maxPasses: scope?.maxPasses ?? MAX_PASSES, scope, sections, deck: path.resolve(specPath),
     brief: spec.brief ?? content?.question ?? "", answer: spec.answer ?? content?.answer ?? "",
@@ -564,16 +547,6 @@ export function validateStorylineRecord(review, { ids, contentIds, scope = null,
   return errors;
 }
 
-/** Validate a critique against a spec: its structure, its binding, and that it says ready. */
-export function validateStorylineReview(review, spec, { scope = null, ledger = [], insightIds = null } = {}) {
-  const structure = storyStructure(spec);
-  const errors = validateStorylineRecord(review, { ids: structure.map((p) => p.id), contentIds: structure.filter(isContent).map((p) => p.id), scope, ledger, insightIds });
-  if (!review || typeof review !== "object") return errors;
-  if (review.binding !== storylineBinding(spec)) errors.push("storyline review is for a different storyline: the titles, pages or exhibits changed since it was written; re-run the storyline critique first");
-  if (review.verdict !== "ready") errors.push(`the storyline critique says revise (${review.rating ?? "?"}/10): ${(review.topFixes || []).slice(0, 3).join("; ")}`);
-  return errors;
-}
-
 const readJson = (file) => fs.readFile(file, "utf8").then(JSON.parse).catch(() => null);
 const packetContext = (packet) => ({
   ids: packet.pages.map((p) => p.id), contentIds: packet.pages.filter(isContent).map((p) => p.id), scope: packet.scope ?? null, ledger: packet.scope?.ledger ?? [],
@@ -581,35 +554,64 @@ const packetContext = (packet) => ({
 });
 
 /**
- * The storyline gate the deck review waits for: a critique that validates
- * against the packet it answered, says ready with no major or blocker item
- * open across its passes, and is bound to the spine as it stands now. A spine
- * edited after the critique names its changed pages and sends the author back
- * to the critique before any deck review is prepared or accepted.
+ * The storyline gate's judgement of a critique for a spec: it validates
+ * against where it came from, is bound to the spine as it stands now, and says
+ * ready with no major or blocker item open across its passes. `record` is its
+ * recorded pass in storyline-history/, which was validated when it was
+ * recorded and whose review and ledger - not the editable file - say what it
+ * concluded; `packet` is the packet it answers. With neither, it is checked
+ * as a first pass over the spec (the pure check the tests use; the gate never
+ * passes a critique that has neither).
  */
-export async function storylineGate(spec, directory) {
-  if (spec?.purpose === "catalogue") return [];
-  const review = await readJson(path.join(directory, "storyline-review.json"));
-  if (!review) return ["storyline-review.json is missing: run the storyline critique (node runtime/storyline.mjs <id>.deck.json out/) and bring it to ready before the deck review"];
-  const history = await readStorylineHistory(directory);
-  const packet = await readJson(path.join(directory, PACKET, "packet.json"));
-  const record = history.find((h) => h.binding === review.binding && h.pass === review.pass);
-  const answered = packet && packet.binding === review.binding && packet.pass === review.pass ? packet : null;
+export function validateStorylineReview(review, spec, { record = null, packet = null } = {}) {
+  if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (node runtime/storyline.mjs <id>.deck.json out/) and bring it to ready before the deck review"];
   const structure = storyStructure(spec);
-  const errors = record ? [] : answered ? validateStorylineRecord(review, packetContext(answered))
-    : validateStorylineRecord(review, { ids: structure.map((p) => p.id), contentIds: structure.filter(isContent).map((p) => p.id) });
-  if (review.binding !== storylineBinding(spec)) {
-    const was = record?.pageHashes ?? answered?.pageHashes;
+  const judged = record?.review ?? review;
+  const errors = record ? [] : validateStorylineRecord(review, packet ? packetContext(packet)
+    : { ids: structure.map((p) => p.id), contentIds: structure.filter(isContent).map((p) => p.id) });
+  if (judged.binding !== storylineBinding(spec)) {
+    const was = record?.pageHashes ?? packet?.pageHashes;
     const moved = was ? changedPages(was, storylinePageHashes(spec)) : null;
     const which = moved ? [...moved.changed, ...moved.deleted.map((id) => `${id} deleted`)] : [];
     errors.push(`the title spine changed after the storyline critique${which.length ? ` (${which.join(", ")})` : ""}: re-run the storyline critique first - node runtime/storyline.mjs <id>.deck.json out/ writes the verification pass for the changed pages - and bring it back to ready before the deck review`);
   }
-  if (review.verdict !== "ready") errors.push(`the storyline critique says revise (${review.rating ?? "?"}/10): revise the storyline, re-run the critique and bring it to ready before the deck review${(review.topFixes || []).length ? ` - ${review.topFixes.slice(0, 3).join("; ")}` : ""}`);
+  if (judged.verdict !== "ready") errors.push(`the storyline critique says revise (${judged.rating ?? "?"}/10): revise the storyline, re-run the critique and bring it to ready before the deck review${(judged.topFixes || []).length ? ` - ${judged.topFixes.slice(0, 3).join("; ")}` : ""}`);
   else if (!errors.length) {
-    const open = openBlocking(record?.ledger ?? storylineLedger(answered?.scope?.ledger ?? [], review));
+    const open = openBlocking(record?.ledger ?? storylineLedger(packet?.scope?.ledger ?? [], review));
     if (open.length) errors.push(`the storyline critique says ready but ${open.map((e) => `${e.id} (${e.severity})`).join(", ")} ${open.length === 1 ? "is" : "are"} still open`);
   }
   return errors;
+}
+
+/**
+ * The storyline gate the deck review waits for (validateStorylineReview). A
+ * critique counts only as a recorded pass or as the answer to the packet
+ * storyline.mjs wrote: a storyline-review.json written by hand is neither,
+ * and accepting it would also reset the loop's pass cap. A spine edited after
+ * the critique names its changed pages and sends the author back to the
+ * critique before any deck review is prepared or accepted.
+ */
+export async function storylineGate(spec, directory) {
+  if (spec?.purpose === "catalogue") return [];
+  const review = await readJson(path.join(directory, "storyline-review.json"));
+  if (!review) return validateStorylineReview(null, spec);
+  const record = (await readStorylineHistory(directory)).find((h) => h.binding === review.binding && h.pass === review.pass);
+  const packet = await readJson(path.join(directory, PACKET, "packet.json"));
+  const answered = packet && packet.binding === review.binding && packet.pass === review.pass ? packet : null;
+  if (!record && !answered) return [`storyline-review.json answers no packet in ${path.join(directory, PACKET)} and is in no recorded pass: run node runtime/storyline.mjs <id>.deck.json out/, give its prompt to a fresh critic and save that answer - a critique that did not answer the packet is not a gate`];
+  return validateStorylineReview(review, spec, { record, packet: answered });
+}
+
+/**
+ * The gate as a warning, for the steps before delivery that do not enforce
+ * it - a full compile of the copy (author-deck) and the build: the copy and
+ * the pages can be drafted and checked, but they are written against a spine
+ * the critique has not passed, and delivery refuses the deck until it has.
+ * Null when the gate is ready.
+ */
+export async function storylineWarning(spec, directory) {
+  const errors = await storylineGate(spec, directory);
+  return errors.length ? `Warning: the storyline gate is not ready in ${directory} - ${errors[0]}${errors.length > 1 ? ` (and ${errors.length - 1} more)` : ""}. Copy written now is written against a spine the critique has not passed; delivery refuses the deck until the gate is ready.` : null;
 }
 
 /**
@@ -630,11 +632,7 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
       return { status: "invalid", errors: [`storyline-review.json does not answer the packet in ${path.join(out, PACKET)} (binding or pass differs): give its prompt.md to a fresh critic and save the answer`] };
     const errors = validateStorylineRecord(review, packetContext(packet));
     if (errors.length) return { status: "invalid", errors };
-    const record = { review, binding: review.binding, pass: review.pass, verifies: review.verifies ?? null, pageHashes: packet.pageHashes,
-      ledger: storylineLedger(packet.scope?.ledger ?? [], review), recordedAt: new Date().toISOString() };
-    await fs.mkdir(path.join(out, HISTORY), { recursive: true });
-    await fs.writeFile(path.join(out, HISTORY, `pass-${history.length + 1}.json`), JSON.stringify(record, null, 2) + "\n");
-    history.push(record);
+    history.push((await recordPass(path.join(out, HISTORY), { review, pageHashes: packet.pageHashes, ledger: storylineLedger(packet.scope?.ledger ?? [], review) })).record);
   }
   const binding = storylineBinding(spec);
   const latest = history.at(-1);
@@ -644,8 +642,8 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
     if (latest.review.verdict === "ready" && !open.length) return { status: "ready", pass: latest.pass, binding };
     return { status: "revise", pass: latest.pass, open: open.map(brief), note: "Revise the storyline at the root for the open items, then run this again: it writes the verification pass for the pages you changed" };
   }
-  const contentIds = storyStructure(spec).filter(isContent).map((p) => p.id);
-  const scope = latest ? storylineScope(latest, storylinePageHashes(spec), contentIds, { maxPasses }) : null;
+  const ids = storyStructure(spec).filter(isContent).map((p) => p.id);
+  const scope = latest ? nextPassScope(latest, storylinePageHashes(spec), { ids, ledger: latest.ledger ?? storylineLedger([], latest.review), maxPasses }) : null;
   if (scope?.capped) return { status: "capped", pass: scope.pass, message: capMessage("storyline critique", scope.pass, maxPasses, latest.ledger) };
   const { dir, packet: next } = await buildStorylinePacket(specPath, out, { scope });
   return { status: "packet-written", pass: next.pass, dir, binding: next.binding, sections: next.sections?.length ?? 0,
@@ -671,47 +669,24 @@ function partErrors(part, packet) {
 
 /** Join a long spine's parallel critiques into one first pass, as reviewer.mjs does for the deck. */
 export function mergeStorylineParts(parts, packet) {
-  const errors = parts.flatMap((part) => partErrors(part, packet).map((e) => `${part?.part?.id ?? "part"}: ${e}`));
-  const spine = parts.filter((p) => p?.part?.kind === "spine");
-  const sections = parts.filter((p) => p?.part?.kind === "section");
-  if (spine.length !== 1) errors.push(`a split critique needs exactly one spine part; got ${spine.length}`);
-  if (parts.some((p) => p?.binding !== packet.binding)) errors.push("a part is bound to a different spine than the packet");
   const { contentIds } = packetContext(packet);
-  const covered = sections.flatMap((p) => p.part?.pages || []);
-  const uncovered = contentIds.filter((id) => !covered.includes(id));
-  if (uncovered.length) errors.push(`no section part covers ${uncovered.join(", ")}`);
+  const errors = [...parts.flatMap((part) => partErrors(part, packet).map((e) => `${part?.part?.id ?? "part"}: ${e}`)),
+    ...partSetErrors(parts, contentIds, { key: "pages", binding: packet.binding, sections: packet.sections })];
   if (errors.length) return { errors };
   const rename = uniqueIds(parts, (p) => [...(p.findings || []), ...(p.missingAnalyses || []), ...(p.cutOrMerge || [])]);
   const relabel = (part, list) => (list || []).map((item) => ({ ...item, id: rename(part, item.id) }));
-  const [lead] = spine;
+  const [lead] = parts.filter((p) => p.part.kind === "spine");
   const merged = {
     pass: 1, verifies: null, binding: packet.binding, rating: lead.rating, summary: lead.summary,
     spine: lead.spine, answer: lead.answer, pillars: lead.pillars, numbers: lead.numbers, sectionFlow: lead.sectionFlow, execSummary: lead.execSummary,
     missingAnalyses: relabel(lead, lead.missingAnalyses), cutOrMerge: relabel(lead, lead.cutOrMerge),
     findings: parts.flatMap((p) => relabel(p, p.findings)), topFixes: lead.topFixes, mergedFrom: parts.map((p) => p.part.id),
   };
-  const order = new Map(contentIds.map((id, i) => [id, i]));
-  const expected = expectedVerdicts(storylineLedger([], merged));
-  merged.pages = sections.flatMap((p) => p.pages).sort((a, b) => order.get(a.page) - order.get(b.page)).map((p) => ({ ...p, verdict: verdictOf(expected.get(p.page) ?? "none") }));
-  merged.completeness = STORYLINE_DIMENSIONS.map((check) => ({ check,
-    result: storylineItems(merged).some((f) => f.dimension === check) ? "findings" : "clean",
-    note: parts.flatMap((p) => (p.completeness || []).filter((c) => c.check === check).map((c) => `${p.part.id}: ${c.note}`)).join(" | ") }));
-  merged.verdict = lead.verdict === "ready" && !openBlocking(storylineLedger([], merged)).length ? "ready" : "revise";
+  const ledger = storylineLedger([], merged);
+  const joined = joinParts(parts, contentIds, ledger, { pageKey: "page", dimensions: STORYLINE_DIMENSIONS, dimKey: "check" });
+  if (joined.errors.length) return { errors: joined.errors };
+  Object.assign(merged, { pages: joined.pages, completeness: joined.completeness, verdict: lead.verdict === "ready" && !openBlocking(ledger).length ? "ready" : "revise" });
   return { review: merged, errors: [] };
-}
-
-async function callCritic(which, prompt, schemaPath, lastPath, timeoutMs) {
-  let raw;
-  if (which === "codex") {
-    await runProcess("codex", ["exec", "--sandbox", "read-only", "--ephemeral", "--output-schema", schemaPath, "--output-last-message", lastPath, "-"], { input: prompt, timeoutMs });
-    raw = await fs.readFile(lastPath, "utf8");
-  } else if (which === "claude") {
-    const res = await runProcess("claude", ["-p", "--output-format", "json"], { input: prompt, timeoutMs });
-    const envelope = JSON.parse(res.stdout);
-    raw = typeof envelope.result === "string" ? envelope.result : JSON.stringify(envelope.result ?? envelope);
-  } else throw new Error(`Unknown storyline reviewer: ${which}`);
-  const match = String(raw).match(/\{[\s\S]*\}/);
-  return JSON.parse(match ? match[0] : raw);
 }
 
 /** Merge saved parts into out/storyline-review.json and record it. */
@@ -719,9 +694,7 @@ export async function mergeStorylineDirectory(specPath, outputDirectory) {
   const out = path.resolve(outputDirectory);
   const packet = await readJson(path.join(out, PACKET, "packet.json"));
   if (!packet) return { status: "invalid", errors: ["no storyline packet to merge against: run storyline.mjs first"] };
-  const from = path.join(out, PACKET, "parts");
-  const files = (await fs.readdir(from).catch(() => [])).filter((f) => f.endsWith(".json") && !f.includes("last-message")).sort();
-  const parts = await Promise.all(files.map(async (f) => JSON.parse(await fs.readFile(path.join(from, f), "utf8"))));
+  const { files, parts } = await readParts(path.join(out, PACKET, "parts"));
   const { review, errors } = mergeStorylineParts(parts, packet);
   if (errors.length) return { status: "invalid", errors, parts: files };
   await fs.writeFile(path.join(out, "storyline-review.json"), JSON.stringify(review, null, 2) + "\n");
@@ -729,7 +702,7 @@ export async function mergeStorylineDirectory(specPath, outputDirectory) {
 }
 
 /** Run the critique through fresh CLI sessions: readers with none of the author's context. */
-export async function runStorylineReview(specPath, outputDirectory, backend = "auto", { timeoutMs = 600000, maxPasses = MAX_PASSES } = {}) {
+export async function runStorylineReview(specPath, outputDirectory, backend = "auto", { model, timeoutMs = 600000, maxPasses = MAX_PASSES } = {}) {
   const step = await prepareStoryline(specPath, outputDirectory, { maxPasses });
   if (step.status !== "packet-written") return step;
   const which = detectBackend(backend);
@@ -738,11 +711,12 @@ export async function runStorylineReview(specPath, outputDirectory, backend = "a
   let review;
   if (packet.sections) {
     const jobs = [...packet.sections.map((s) => ({ id: s.id, prompt: storylineSectionPrompt(packet, s) })), { id: "spine", prompt: storylineSpinePrompt(packet) }];
-    const parts = await Promise.all(jobs.map((job) => callCritic(which, job.prompt, path.join(step.dir, "part-schema.json"), path.join(step.dir, "parts", `${job.id}.last-message.json`), timeoutMs)));
+    const parts = await reviewParts(which, jobs, { partsDir: path.join(step.dir, "parts"), schemaPath: path.join(step.dir, "part-schema.json"), model, timeoutMs });
     const merged = mergeStorylineParts(parts, packet);
     if (merged.errors.length) return { status: "invalid", errors: merged.errors };
     review = merged.review;
-  } else review = await callCritic(which, await fs.readFile(path.join(step.dir, "prompt.md"), "utf8"), path.join(step.dir, "schema.json"), path.join(step.dir, "codex-last-message.json"), timeoutMs);
+  } else review = await callReviewer(which, { prompt: await fs.readFile(path.join(step.dir, "prompt.md"), "utf8"), schemaPath: path.join(step.dir, "schema.json"),
+    outPath: path.join(step.dir, "codex-last-message.json"), model, timeoutMs });
   await fs.writeFile(path.join(outputDirectory, "storyline-review.json"), JSON.stringify(review, null, 2) + "\n");
   const next = await prepareStoryline(specPath, outputDirectory, { maxPasses });
   return { ...next, verdict: review.verdict, rating: review.rating, topFixes: review.topFixes };
@@ -752,13 +726,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const args = process.argv.slice(2);
   const merging = args[0] === "merge";
   const [spec, out] = merging ? args.slice(1) : args;
-  if (!spec || !out) { console.error("Usage: storyline.mjs [merge] <id>.deck.json output-directory [--run codex|claude] [--max-passes n]"); process.exit(1); }
-  const cap = args.indexOf("--max-passes");
-  const maxPasses = cap >= 0 ? Number(args[cap + 1]) : MAX_PASSES;
-  const at = args.indexOf("--run");
+  if (!spec || !out) { console.error("Usage: storyline.mjs [merge] <id>.deck.json output-directory [--run codex|claude] [--model m] [--max-passes n]"); process.exit(EXIT.error); }
+  const value = (flag) => { const i = args.indexOf(flag); return i >= 0 && args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : undefined; };
+  const maxPasses = value("--max-passes") ? Number(value("--max-passes")) : MAX_PASSES;
   const result = merging ? await mergeStorylineDirectory(path.resolve(spec), path.resolve(out))
-    : at >= 0 ? await runStorylineReview(path.resolve(spec), path.resolve(out), args[at + 1] && !args[at + 1].startsWith("--") ? args[at + 1] : "auto", { maxPasses })
+    : args.includes("--run") ? await runStorylineReview(path.resolve(spec), path.resolve(out), value("--run") ?? "auto", { maxPasses, model: value("--model") })
     : await prepareStoryline(path.resolve(spec), path.resolve(out), { maxPasses });
   console.log(JSON.stringify(result));
-  process.exit(result.status === "ready" ? 0 : result.status === "packet-written" ? 3 : 2);
+  process.exit(result.status === "ready" ? EXIT.ok : result.status === "packet-written" ? EXIT.waiting : EXIT.refused);
 }
