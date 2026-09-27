@@ -53,7 +53,7 @@ export const STORYLINE_CODES = Object.freeze({
  */
 export const STORYLINE_CHECKS = Object.freeze({
   claim: { scope: "page", checks: "the page's claim is a finding with an implication, not a count, a fact or a two-number comparison" },
-  shape: { scope: "page", checks: "the evidence has the shape the claim needs - the trend with its rate, the whole ranked peer set, the share and its movement, the ratio, the benchmark gap, the map, the judging table - not a two-number chart or a plain grid" },
+  shape: { scope: "page", checks: "the evidence has the shape the claim needs - the trend with its rate, the whole ranked peer set, the share and its movement, the ratio, the benchmark gap, the map, the judging table - not a two-number chart or a plain grid; a comparison sets every member on the same measures, n/a where one is undisclosed, not a different metric per member" },
   sourcing: { scope: "page", checks: "the claim traces to insights in the log, each with its calculation and source files: supported, partly supported or unsupported, naming the insight ids" },
   restatement: { scope: "page", checks: "the page moves the argument on from the page before it; it does not restate it or re-prove another page's proposition" },
   consequence: { scope: "page", checks: "the page says what follows for the decision, not only what is true" },

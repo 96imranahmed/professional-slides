@@ -946,12 +946,30 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   // exempt: there it is the row's evidence, not the page's exhibit.
   const pageTables = exhibits.filter((ex) => ex?.type === "table");
   const bodyRows = (ex) => (ex.rows || []).filter((row) => !(row && !Array.isArray(row) && ["total", "group"].includes(row.style))).length;
+  const headers = (ex) => (ex.columns || []).map((c) => String(typeof c === "string" ? c : c?.label ?? "").trim().toLowerCase()).join("|");
+  const twins = pageTables.filter((ex, at) => pageTables.some((other, k) => k !== at && headers(other) === headers(ex) && headers(ex)));
+  // A comparison sets every member on the same measures. Two products shown
+  // on different metrics - one on revenue and enterprise mix, the other on
+  // weekly users and a share of use - cannot be read across, and the page
+  // compared nothing. A measure one member does not publish stays in the row
+  // as "n/a": the gap is the finding, and a substitute metric hides it.
+  const measuresOf = (ex) => (ex.rows || []).map((row) => String(cellText(Array.isArray(row) ? row[0] : row?.label ?? row?.cells?.[0]) ?? "").trim().toLowerCase()).filter(Boolean).sort().join("|");
+  if (twins.length > 1 && new Set(twins.map(measuresOf)).size > 1)
+    throw new Error(`${id}: COMPARISON_MEASURES_DIFFER - the tables compare their members on different measures (${twins.map((ex) => `${ex.heading ?? "a table"}: ${(ex.rows || []).map((row) => cellText(Array.isArray(row) ? row[0] : row?.label ?? row?.cells?.[0])).join(", ")}`).join("; ")}), so nothing can be read across. ` +
+      "Set every member against the same measures in one table - the measures as rows, the members as columns - with \"n/a\" where a member does not publish one; the gap is the finding, and a different metric in its place hides it");
+  const named = (players || []).flatMap((p) => { const player = typeof p === "string" ? { name: p } : p; return [player?.name, player?.short, ...(player?.aliases || [])].filter(Boolean).map((n) => ({ name: player.name, alias: String(n).toLowerCase() })); });
+  const memberOf = (ex) => named.find((n) => new RegExp(`\\b${n.alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(String(ex?.heading ?? "")))?.name;
+  const memberPanels = exhibits.filter((ex) => ex && memberOf(ex));
+  if (page.type === "panels" && memberPanels.length >= 2 && new Set(memberPanels.map(memberOf)).size === memberPanels.length) {
+    const measure = (ex) => ex.type === "table" ? measuresOf(ex) : String(ex.unit ?? "").trim().toLowerCase();
+    if (new Set(memberPanels.map(measure)).size > 1)
+      throw new Error(`${id}: COMPARISON_MEASURES_DIFFER - the panels set ${memberPanels.map((ex) => `${memberOf(ex)} on "${ex.unit ?? measuresOf(ex)}"`).join(" and ")}: members compared side by side are measured the same way. ` +
+        "Give each member the same measure in each panel (one panel per measure, the members as its bars or series), with \"n/a\" where one does not publish it");
+  }
   const short = pageTables.find((ex) => bodyRows(ex) < 3);
   if (short) throw new Error(`${id}: TABLE_TOO_SHORT - a table of ${bodyRows(short)} row${bodyRows(short) === 1 ? "" : "s"}${short.heading ? ` ("${short.heading}")` : ""} is a form half filled in; a table earns its grid at three rows. ` +
     (pageTables.length > 1 ? "Set the tables as one, with what they compare as columns and \"n/a\" where a member discloses nothing, or set" : "Set") +
     " two or three figures as a numbers page (fact-grid, stat-list, or a metric strip over the exhibit that proves them), or two members side by side as profile cards or a compare");
-  const headers = (ex) => (ex.columns || []).map((c) => String(typeof c === "string" ? c : c?.label ?? "").trim().toLowerCase()).join("|");
-  const twins = pageTables.filter((ex, at) => pageTables.some((other, k) => k !== at && headers(other) === headers(ex) && headers(ex)));
   if (twins.length) throw new Error(`${id}: TABLE_PANELS_MERGE - ${twins.length} tables on the page share the columns "${(twins[0].columns || []).map((c) => (typeof c === "string" ? c : c?.label)).join(" | ")}"; ` +
     "set them as one table with what they compare as columns (or a column per member), so the reader compares across a row rather than between two grids whose columns do not line up");
 

@@ -58,5 +58,28 @@ console.log(JSON.stringify({
         self.assertIsNone(result['ok'])
 
 
+class SameMeasuresTests(unittest.TestCase):
+    def test_members_are_compared_on_the_same_measures(self):
+        result = run_node('''
+import { compilePage } from './skills/professional-slides/runtime/page-types.mjs';
+const error = (page, opts) => { try { compilePage(page, 0, opts); return null; } catch (e) { return e.message; } };
+const base = { takeaway: false, why: 'Each product is set against its disclosed measures', settles: { kind: 'comparison', what: 'Disclosed coding product measures' } };
+const table = (heading, rows) => ({ type: 'table', heading, columns: ['Measure', 'Value', 'Date'], rows });
+const code = table('Claude Code', [['Revenue run rate', '>$2.5B', 'Feb 2026'], ['Enterprise share', '>50%', 'Feb 2026'], ['Paid seats', 'n/a', 'Feb 2026']]);
+const codex = table('Codex', [['Weekly users', '>5M', 'Jun 2026'], ['Knowledge-worker share of use', '~20%', 'Jun 2026'], ['Paid seats', 'n/a', 'Jun 2026']]);
+const bars = (heading, unit) => ({ type: 'chart.column', heading, unit, categories: ['2021', '2022', '2023', '2024', '2025'], series: [{ name: 'x', values: [1, 2, 3, 4, 5] }] });
+const players = [{ name: 'Northwind' }, { name: 'Southgate' }];
+const panels = (a, b) => ({ ...base, id: 'p', type: 'panels', form: 'row', commentary: 'none', title: 'Both firms grew, measured differently', exhibits: [a, b] });
+console.log(JSON.stringify({
+  tables: error({ ...base, id: 't', type: 'panels', form: 'stack', commentary: 'none', title: 'Coding metrics cannot be reduced to one share', exhibits: [code, codex] }),
+  panels: error(panels(bars('Northwind revenue', '$bn'), bars('Southgate weekly users', 'm users')), { players }),
+  samePanels: error(panels(bars('Northwind revenue', '$bn'), bars('Southgate revenue', '$bn')), { players }),
+}));
+''')
+        self.assertIn('COMPARISON_MEASURES_DIFFER', result['tables'])
+        self.assertIn('COMPARISON_MEASURES_DIFFER', result['panels'])
+        self.assertNotIn('COMPARISON_MEASURES_DIFFER', result['samePanels'] or '')
+
+
 if __name__ == '__main__':
     unittest.main()

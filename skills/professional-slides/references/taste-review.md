@@ -40,7 +40,7 @@ Every page is checked on every page dimension, and the deck on the three deck di
 | Dimension | Scope | What is checked |
 | --- | --- | --- |
 | `argument` | page | The title states the finding the page proves, and the exhibit and commentary prove it; the claim goes no further than its evidence; the page's job in the argument is clear. |
-| `evidence` | page | Every number reproduced against its source and the other pages that print it; evidence deep enough for the claim (the whole peer set, the trend with its rate, not two numbers); compatible bases, units and periods. |
+| `evidence` | page | Every number reproduced against its source and the other pages that print it; evidence deep enough for the claim (the whole peer set, the trend with its rate, not two numbers); compatible bases, units and periods; members compared on the same measures, n/a where one does not publish a measure. |
 | `chart` | page | The form fits the comparison (ranking, trend, share, bridge, distribution); honest axes - time spaced by time, bars from a zero baseline, scale and units stated; the subject highlighted and rivals muted; an annotation marking the finding; no two-number chart. |
 | `table` | page | Verdict, score and status cells encoded (Harvey balls, ratings, pills, bars), not plain words; totals defined and filled; units in the headers; numbers right-aligned and rounded alike; meaningful row and column order. |
 | `text` | page | Density right for the reading task; the longest block readable; no sentence restating the title or exhibit; jargon explained; an action title that commits in two lines or fewer; a subtitle that adds scope, not a second title. |
