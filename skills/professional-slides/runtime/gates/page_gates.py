@@ -1094,6 +1094,10 @@ BODY_BOTTOM = 0.88
 FOOTER_ROLES = SOURCE_ROLES | {"page-number", "footer-right", "footer-left", "notes"}
 TITLE_BAND_ROLES = {"kicker", "page-tag", "page-tag-pill", "tracker-label", "tracker-pill-label",
                     "tracker-compact-label", "tracker-compact-marker-label", "action-subtitle"}
+# A chart's own labels are its evidence wherever the plot ends: a chart that
+# takes the body's full height sets its category labels under the 88% line,
+# and counted by position they turned a chart page "footer-heavy".
+CHART_LABEL_ROLES = {"category-label", "category-note", "axis-label", "axis-title", "data-label"}
 
 
 class PageText(NamedTuple):
@@ -1136,7 +1140,7 @@ def page_bands(slide):
         # The page's closing takeaway sits low on the page but is its
         # conclusion, not a note: counted by position it made a short page
         # with a takeaway line "footer-heavy" and pushed the line off.
-        if TAKEAWAY_ROLE.match(role):
+        if TAKEAWAY_ROLE.match(role) or role in CHART_LABEL_ROLES:
             body += words
             continue
         frame = node.get("frame") or {}

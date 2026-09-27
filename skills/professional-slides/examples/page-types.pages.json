@@ -541,6 +541,83 @@
    "source": "Source: illustrative data for a fictional operator; FY26 on-train survey, 11,400 responses"
   },
   {
+   "id": "p06b",
+   "type": "picture",
+   "form": "photo-backdrop",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "The claim is about a place and the people who travel to it, so the evidence sits on the Dales themselves",
+   "settles": {
+    "kind": "rate",
+    "what": "Saturday load factor by departure hour on Dales line trains out of Leeds, FY26"
+   },
+   "adds": "The points say who fills the morning trains and why the evening leaves them empty",
+   "title": "Saturday Dales trains leave Leeds 97% full at 10:00, fuller than the weekday peak",
+   "photo": {
+    "path": "assets/hills.jpg",
+    "alt": "Illustration of layered hills",
+    "credit": "examples/assets"
+   },
+   "exhibit": {
+    "type": "chart.column",
+    "heading": "Saturday Dales departures from Leeds, FY26",
+    "unit": "% of seats filled",
+    "categories": [
+     "07:00",
+     "08:00",
+     "09:00",
+     "10:00",
+     "11:00",
+     "12:00",
+     "13:00",
+     "14:00",
+     "15:00",
+     "16:00",
+     "17:00",
+     "18:00"
+    ],
+    "series": [
+     {
+      "name": "Load factor",
+      "values": [
+       24,
+       51,
+       88,
+       97,
+       90,
+       72,
+       58,
+       44,
+       35,
+       29,
+       24,
+       18
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "10:00"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Walkers fill the morning",
+     "text": "Four in five Saturday passengers out of Leeds are leisure trips, bound for the walks beyond Skipton, so the 09:00 to 11:00 trains fill."
+    },
+    {
+     "lead": "The evening runs light",
+     "text": "The last train home leaves Skipton at 18:40, before most walkers finish, so the return trips go by car instead."
+    }
+   ],
+   "highlight": [
+    "Four in five",
+    "18:40"
+   ],
+   "source": "Source: illustrative data for a fictional operator; automatic passenger counts, Saturdays, FY26"
+  },
+  {
    "id": "p07",
    "type": "relationship",
    "form": "scatter",
@@ -641,6 +718,174 @@
    ],
    "pointsHeading": false,
    "source": "Source: illustrative data for a fictional operator; ticket sales by origin station"
+  },
+  {
+   "id": "p07c",
+   "type": "panels",
+   "form": "row",
+   "commentary": "captions",
+   "takeaway": false,
+   "why": "The same measure for four lines answers one question - where has off-peak travel come back - and the lines differ in one thing, their timetable",
+   "settles": {
+    "kind": "comparison",
+    "what": "off-peak journeys on each of four lines against FY20, FY20 to FY26"
+   },
+   "adds": "Each caption says what its line's timetable did, which the chart alone does not show",
+   "title": "Off-peak journeys passed FY20 on the Dales and Valley lines only",
+   "subtitle": "Off-peak journeys by line, index FY20 = 100, FY20 to FY26",
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "heading": "Dales line",
+     "unit": "index",
+     "categories": [
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        100,
+        28,
+        72,
+        97,
+        106,
+        111,
+        114
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ],
+     "caption": "Half-hourly since 2023, the Dales ended FY26 at 4.1 million journeys, 14% above FY20",
+     "referenceLines": [
+      {
+       "value": 100,
+       "label": "FY20"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Valley line",
+     "unit": "index",
+     "categories": [
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        100,
+        28,
+        73,
+        98,
+        105,
+        110,
+        115
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ],
+     "caption": "The Valley towns reached 4.6 million after the 2023 timetable, 15% above FY20",
+     "referenceLines": [
+      {
+       "value": 100,
+       "label": "FY20"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Eastern line",
+     "unit": "index",
+     "categories": [
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        100,
+        28,
+        72,
+        86,
+        88,
+        88,
+        91
+       ]
+      }
+     ],
+     "caption": "Still hourly between the peaks, the Eastern line stalled 9% below FY20",
+     "referenceLines": [
+      {
+       "value": 100,
+       "label": "FY20"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Coast line",
+     "unit": "index",
+     "categories": [
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        100,
+        28,
+        72,
+        88,
+        88,
+        92,
+        92
+       ]
+      }
+     ],
+     "caption": "The hourly Coast service has added almost nothing since FY23 and sits 8% below FY20",
+     "referenceLines": [
+      {
+       "value": 100,
+       "label": "FY20"
+      }
+     ]
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; ticket sales by line, off-peak and weekend, FY20-FY26"
   },
   {
    "id": "p07b",
@@ -2361,24 +2606,122 @@
    ]
   },
   {
+   "id": "p24b",
+   "type": "parallel",
+   "form": "labelled-rows",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Two dependencies can each delay a lever on their own, and each has a measured cost of delay, so they read down the page with their evidence",
+   "settles": {
+    "kind": "sequence",
+    "what": "journeys at risk from a later energisation date, and depot sidings in use against the extension"
+   },
+   "adds": "Each row says what the dependency waits on and what a slip costs, beside the chart that measures it",
+   "title": "Two dependencies can delay the plan: the grid connection and the Dales depot",
+   "highlight": [
+    "six weeks late",
+    "0.2 million",
+    "94% of its sidings",
+    "December 2027"
+   ],
+   "blocks": [
+    {
+     "label": "The grid connection",
+     "points": [
+      "The power contract and the grid connection both wait on the network operator's capacity study, now six weeks late.",
+      "Each quarter the Eastern line is energised after January 2029 costs about 0.2 million of the 3.8 million electric journeys in FY31."
+     ],
+     "exhibit": {
+      "type": "chart.column",
+      "heading": "Electric journeys, FY31",
+      "unit": "million",
+      "categories": [
+       "Q1 29",
+       "Q2 29",
+       "Q3 29",
+       "Q4 29",
+       "Q1 30",
+       "Q2 30",
+       "Q3 30",
+       "Q4 30"
+      ],
+      "series": [
+       {
+        "name": "Journeys",
+        "values": [
+         3.8,
+         3.6,
+         3.4,
+         3.2,
+         3.0,
+         2.8,
+         2.6,
+         2.4
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "label": "The Dales depot",
+     "points": [
+      "The depot stables trains overnight in 94% of its sidings, so the added off-peak units need the twelve new sidings.",
+      "Planning consent is due in July 2027; a late consent pushes the Dales timetable past December 2027."
+     ],
+     "exhibit": {
+      "type": "chart.column",
+      "heading": "Depot sidings in use",
+      "unit": "sidings",
+      "categories": [
+       "FY22",
+       "FY23",
+       "FY24",
+       "FY25",
+       "FY26",
+       "FY27",
+       "FY28",
+       "FY29"
+      ],
+      "series": [
+       {
+        "name": "Sidings used",
+        "values": [
+         36,
+         38,
+         40,
+         41,
+         42,
+         44,
+         50,
+         53
+        ]
+       }
+      ],
+      "forecastFrom": "FY27",
+      "referenceLines": [
+       {
+        "value": 45,
+        "label": "45 sidings today"
+       }
+      ]
+     }
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; programme board and depot plan, September 2026"
+  },
+  {
    "id": "p25",
    "type": "scorecard",
    "form": "rag",
-   "commentary": "beside",
+   "commentary": "in-exhibit",
    "takeaway": false,
    "why": "Seven milestones are each judged on one criterion - on track or not - and the pattern of the red ones is the finding",
    "settles": {
     "kind": "count",
     "what": "status of the seven 2027 milestones"
    },
-   "adds": "The column says what the at-risk milestones have in common and what would bring them back",
+   "adds": "The last column says what each milestone's status means for the plan, row by row",
    "title": "Two of seven 2027 milestones are at risk, both on the electrification path",
-   "highlight": [
-    "six weeks late",
-    "What recovers them",
-    "5.1 million off-peak journeys",
-    "off the critical path"
-   ],
    "exhibit": {
     "columns": [
      "Milestone",
@@ -2387,72 +2730,61 @@
      {
       "label": "Status",
       "type": "rag"
-     }
+     },
+     "What it means"
     ],
     "rows": [
      [
       "Crew recruitment, Dales",
       "P. Shah",
       "Mar 2027",
-      "complete"
+      "complete",
+      "Crews for the Dales timetable are in post"
      ],
      [
       "Dales timetable bid",
       "P. Shah",
       "Jun 2027",
-      "on-track"
+      "on-track",
+      "Carries the Dales share of 5.1m off-peak journeys"
      ],
      [
       "Depot planning consent",
       "D. Moss",
       "Jul 2027",
-      "on-track"
+      "on-track",
+      "Unlocks the twelve sidings the timetable needs"
      ],
      [
       "Power supply contract award",
       "T. Hardcastle",
       "Aug 2027",
-      "at-risk"
+      "at-risk",
+      "Waits on the network study, now six weeks late"
      ],
      [
       "Grid connection agreement",
       "T. Hardcastle",
       "Sep 2027",
-      "at-risk"
+      "at-risk",
+      "Signing on the draft study recovers four weeks"
      ],
      [
       "Fare reform consultation",
       "A. Karim",
       "Oct 2027",
-      "not-started"
+      "not-started",
+      "Not due until October; off the critical path"
      ],
      [
       "Housing site agreements",
       "D. Moss",
       "Dec 2027",
-      "on-track"
+      "on-track",
+      "Keeps the new-housing journeys in the plan"
      ]
     ]
    },
-   "points": [
-    {
-     "lead": "Both on one path",
-     "text": "The contract award and the grid connection both wait on the distribution network operator's capacity study, which is now due six weeks late."
-    },
-    {
-     "lead": "What recovers them",
-     "text": "Signing the connection agreement on the study's draft findings would recover four of the six weeks, at the risk of a minor redesign of the feeder station."
-    },
-    {
-     "lead": "The timetable is safe",
-     "text": "All three timetable and depot milestones are on track or complete, so the 5.1 million off-peak journeys in the plan do not depend on either red row."
-    },
-    {
-     "lead": "Grey is not red",
-     "text": "The fare reform consultation has not started because it is not due until October; it sits off the critical path and waits on the timetable, not the grid."
-    }
-   ],
-   "pointsHeading": false,
    "source": "Source: illustrative data for a fictional operator; programme board, September 2026"
   },
   {

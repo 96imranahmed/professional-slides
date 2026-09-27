@@ -1143,8 +1143,189 @@
    ]
   },
   {
-   "id": "p07",
+   "id": "p06b",
    "n": 10,
+   "claim": "Saturday Dales trains leave Leeds 97% full at 10:00, fuller than the weekday peak",
+   "settles": {
+    "kind": "rate",
+    "what": "Saturday load factor by departure hour on Dales line trains out of Leeds, FY26"
+   },
+   "adds": "The points say who fills the morning trains and why the evening leaves them empty",
+   "highlight": [
+    "Four in five",
+    "18:40"
+   ],
+   "textReference": {
+    "task": "exhibit-with-commentary",
+    "floor": 45,
+    "ceiling": 282
+   },
+   "textPlan": [
+    {
+     "id": "p06b-chrome:title",
+     "role": "title",
+     "text": "Saturday Dales trains leave Leeds 97% full at 10:00, fuller than the weekday peak"
+    },
+    {
+     "id": "p06b-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for a fictional operator; automatic passenger counts, Saturdays, FY26"
+    },
+    {
+     "id": "p06b-p06b-exhibit-heading:heading",
+     "role": "body",
+     "text": "Saturday Dales departures from Leeds, FY26,"
+    },
+    {
+     "id": "p06b-p06b-exhibit-heading:unit",
+     "role": "exhibit",
+     "text": "% of seats filled"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:07-00",
+     "role": "exhibit",
+     "text": "24"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:07-00",
+     "role": "exhibit",
+     "text": "07:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:08-00",
+     "role": "exhibit",
+     "text": "51"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:08-00",
+     "role": "exhibit",
+     "text": "08:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:09-00",
+     "role": "exhibit",
+     "text": "88"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:09-00",
+     "role": "exhibit",
+     "text": "09:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:10-00",
+     "role": "exhibit",
+     "text": "97"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:10-00",
+     "role": "exhibit",
+     "text": "10:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:11-00",
+     "role": "exhibit",
+     "text": "90"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:11-00",
+     "role": "exhibit",
+     "text": "11:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:12-00",
+     "role": "exhibit",
+     "text": "72"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:12-00",
+     "role": "exhibit",
+     "text": "12:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:13-00",
+     "role": "exhibit",
+     "text": "58"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:13-00",
+     "role": "exhibit",
+     "text": "13:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:14-00",
+     "role": "exhibit",
+     "text": "44"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:14-00",
+     "role": "exhibit",
+     "text": "14:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:15-00",
+     "role": "exhibit",
+     "text": "35"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:15-00",
+     "role": "exhibit",
+     "text": "15:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:16-00",
+     "role": "exhibit",
+     "text": "29"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:16-00",
+     "role": "exhibit",
+     "text": "16:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:17-00",
+     "role": "exhibit",
+     "text": "24"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:17-00",
+     "role": "exhibit",
+     "text": "17:00"
+    },
+    {
+     "id": "p06b-p06b-exhibit:value-label:load-factor:18-00",
+     "role": "exhibit",
+     "text": "18"
+    },
+    {
+     "id": "p06b-p06b-exhibit:category:18-00",
+     "role": "exhibit",
+     "text": "18:00"
+    },
+    {
+     "id": "p06b-p06b-points:lead:0",
+     "role": "body",
+     "text": "Walkers fill the morning"
+    },
+    {
+     "id": "p06b-p06b-points:item:0",
+     "role": "body",
+     "text": "Four in five Saturday passengers out of Leeds are leisure trips, bound for the walks beyond Skipton, so the 09:00 to 11:00 trains fill."
+    },
+    {
+     "id": "p06b-p06b-points:lead:1",
+     "role": "body",
+     "text": "The evening runs light"
+    },
+    {
+     "id": "p06b-p06b-points:item:1",
+     "role": "body",
+     "text": "The last train home leaves Skipton at 18:40, before most walkers finish, so the return trips go by car instead."
+    }
+   ]
+  },
+  {
+   "id": "p07",
+   "n": 11,
    "claim": "Half-hourly off-peak stations grew off-peak journeys 3.7 times as fast as hourly ones",
    "settles": {
     "kind": "comparison",
@@ -1270,8 +1451,341 @@
    ]
   },
   {
+   "id": "p07c",
+   "n": 12,
+   "claim": "Off-peak journeys passed FY20 on the Dales and Valley lines only",
+   "settles": {
+    "kind": "comparison",
+    "what": "off-peak journeys on each of four lines against FY20, FY20 to FY26"
+   },
+   "adds": "Each caption says what its line's timetable did, which the chart alone does not show",
+   "highlight": null,
+   "textReference": {
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
+   },
+   "textPlan": [
+    {
+     "id": "p07c-chrome:title",
+     "role": "title",
+     "text": "Off-peak journeys passed FY20 on the Dales and Valley lines only"
+    },
+    {
+     "id": "p07c-chrome:subtitle",
+     "role": "title",
+     "text": "Off-peak journeys by line, index FY20 = 100, FY20 to FY26"
+    },
+    {
+     "id": "p07c-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for a fictional operator; ticket sales by line, off-peak and weekend, FY20-FY26"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0-heading:heading",
+     "role": "body",
+     "text": "Dales line,"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0-heading:unit",
+     "role": "exhibit",
+     "text": "index"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:value-label:off-peak-journeys:fy20",
+     "role": "exhibit",
+     "text": "100"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:category:fy20",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:value-label:off-peak-journeys:fy21",
+     "role": "exhibit",
+     "text": "28"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:value-label:off-peak-journeys:fy22",
+     "role": "exhibit",
+     "text": "72"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:category:fy22",
+     "role": "exhibit",
+     "text": "FY22"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:value-label:off-peak-journeys:fy23",
+     "role": "exhibit",
+     "text": "97"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:value-label:off-peak-journeys:fy24",
+     "role": "exhibit",
+     "text": "106"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:category:fy24",
+     "role": "exhibit",
+     "text": "FY24"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:value-label:off-peak-journeys:fy25",
+     "role": "exhibit",
+     "text": "111"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:value-label:off-peak-journeys:fy26",
+     "role": "exhibit",
+     "text": "114"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:category:fy26",
+     "role": "exhibit",
+     "text": "FY26"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0:reference-label:0",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-0-caption:body",
+     "role": "body",
+     "text": "Half-hourly since 2023, the Dales ended FY26 at 4.1 million journeys, 14% above FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1-heading:heading",
+     "role": "body",
+     "text": "Valley line,"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1-heading:unit",
+     "role": "exhibit",
+     "text": "index"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:value-label:off-peak-journeys:fy20",
+     "role": "exhibit",
+     "text": "100"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:category:fy20",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:value-label:off-peak-journeys:fy21",
+     "role": "exhibit",
+     "text": "28"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:value-label:off-peak-journeys:fy22",
+     "role": "exhibit",
+     "text": "73"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:category:fy22",
+     "role": "exhibit",
+     "text": "FY22"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:value-label:off-peak-journeys:fy23",
+     "role": "exhibit",
+     "text": "98"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:value-label:off-peak-journeys:fy24",
+     "role": "exhibit",
+     "text": "105"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:category:fy24",
+     "role": "exhibit",
+     "text": "FY24"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:value-label:off-peak-journeys:fy25",
+     "role": "exhibit",
+     "text": "110"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:value-label:off-peak-journeys:fy26",
+     "role": "exhibit",
+     "text": "115"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:category:fy26",
+     "role": "exhibit",
+     "text": "FY26"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1:reference-label:0",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-1-caption:body",
+     "role": "body",
+     "text": "The Valley towns reached 4.6 million after the 2023 timetable, 15% above FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2-heading:heading",
+     "role": "body",
+     "text": "Eastern line,"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2-heading:unit",
+     "role": "exhibit",
+     "text": "index"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:value-label:off-peak-journeys:fy20",
+     "role": "exhibit",
+     "text": "100"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:category:fy20",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:value-label:off-peak-journeys:fy21",
+     "role": "exhibit",
+     "text": "28"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:value-label:off-peak-journeys:fy22",
+     "role": "exhibit",
+     "text": "72"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:category:fy22",
+     "role": "exhibit",
+     "text": "FY22"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:value-label:off-peak-journeys:fy23",
+     "role": "exhibit",
+     "text": "86"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:value-label:off-peak-journeys:fy24",
+     "role": "exhibit",
+     "text": "88"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:category:fy24",
+     "role": "exhibit",
+     "text": "FY24"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:value-label:off-peak-journeys:fy25",
+     "role": "exhibit",
+     "text": "88"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:value-label:off-peak-journeys:fy26",
+     "role": "exhibit",
+     "text": "91"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:category:fy26",
+     "role": "exhibit",
+     "text": "FY26"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2:reference-label:0",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-2-caption:body",
+     "role": "body",
+     "text": "Still hourly between the peaks, the Eastern line stalled 9% below FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3-heading:heading",
+     "role": "body",
+     "text": "Coast line,"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3-heading:unit",
+     "role": "exhibit",
+     "text": "index"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:value-label:off-peak-journeys:fy20",
+     "role": "exhibit",
+     "text": "100"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:category:fy20",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:value-label:off-peak-journeys:fy21",
+     "role": "exhibit",
+     "text": "28"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:value-label:off-peak-journeys:fy22",
+     "role": "exhibit",
+     "text": "72"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:category:fy22",
+     "role": "exhibit",
+     "text": "FY22"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:value-label:off-peak-journeys:fy23",
+     "role": "exhibit",
+     "text": "88"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:value-label:off-peak-journeys:fy24",
+     "role": "exhibit",
+     "text": "88"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:category:fy24",
+     "role": "exhibit",
+     "text": "FY24"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:value-label:off-peak-journeys:fy25",
+     "role": "exhibit",
+     "text": "92"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:value-label:off-peak-journeys:fy26",
+     "role": "exhibit",
+     "text": "92"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:category:fy26",
+     "role": "exhibit",
+     "text": "FY26"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3:reference-label:0",
+     "role": "exhibit",
+     "text": "FY20"
+    },
+    {
+     "id": "p07c-p07c-exhibit-3-caption:body",
+     "role": "body",
+     "text": "The hourly Coast service has added almost nothing since FY23 and sits 8% below FY20"
+    }
+   ]
+  },
+  {
    "id": "p07b",
-   "n": 11,
+   "n": 13,
    "claim": "Northvale's cost per train-km is ninth of twenty, £3.40 above the lowest-cost operator",
    "settles": {
     "kind": "rank",
@@ -1559,7 +2073,7 @@
   },
   {
    "id": "p08",
-   "n": 12,
+   "n": 14,
    "claim": "The Eastern line carries the most journeys at the highest cost per train-km",
    "settles": {
     "kind": "structure",
@@ -1857,7 +2371,7 @@
   },
   {
    "id": "s2",
-   "n": 13,
+   "n": 15,
    "kind": "section",
    "role": "structural",
    "claim": "02 / What holds it back",
@@ -1882,7 +2396,7 @@
   },
   {
    "id": "p09",
-   "n": 14,
+   "n": 16,
    "claim": "Hybrid working cost 7.1 million journeys; housing and timetable changes won back 5.0 million",
    "settles": {
     "kind": "structure",
@@ -2000,7 +2514,7 @@
   },
   {
    "id": "p10",
-   "n": 15,
+   "n": 17,
    "claim": "Each peak train added to the Eastern line has cost a point of punctuality",
    "settles": {
     "kind": "comparison",
@@ -2237,7 +2751,7 @@
   },
   {
    "id": "p10b",
-   "n": 16,
+   "n": 18,
    "claim": "Four constraints hold the peak where it is: fleet, crews, track and depot",
    "settles": {
     "kind": "count",
@@ -2399,7 +2913,7 @@
   },
   {
    "id": "p11",
-   "n": 17,
+   "n": 19,
    "claim": "Frequency drives a loop: shorter waits win leisure trips that fund the next train",
    "settles": {
     "kind": "sequence",
@@ -2541,7 +3055,7 @@
   },
   {
    "id": "p12",
-   "n": 18,
+   "n": 20,
    "claim": "The Dales and Valley lines can grow now; the Coast line cannot",
    "settles": {
     "kind": "comparison",
@@ -2764,7 +3278,7 @@
   },
   {
    "id": "p13",
-   "n": 19,
+   "n": 21,
    "claim": "Passengers name the wait, not the fare, as what keeps them off trains",
    "settles": {
     "kind": "qualitative",
@@ -2912,7 +3426,7 @@
   },
   {
    "id": "p13b",
-   "n": 20,
+   "n": 22,
    "claim": "Northvale gives the smallest off-peak discount of nine operators: 18% against a 35% median",
    "settles": {
     "kind": "rank",
@@ -3050,7 +3564,7 @@
   },
   {
    "id": "p14",
-   "n": 21,
+   "n": 23,
    "claim": "Lapsed riders blame the hourly service, not the fare, for driving instead",
    "settles": {
     "kind": "qualitative",
@@ -3158,7 +3672,7 @@
   },
   {
    "id": "p15",
-   "n": 22,
+   "n": 24,
    "claim": "Three corridors serve three different markets, each needing its own timetable",
    "settles": {
     "kind": "qualitative",
@@ -3221,7 +3735,7 @@
   },
   {
    "id": "s3",
-   "n": 23,
+   "n": 25,
    "kind": "section",
    "role": "structural",
    "claim": "03 / The plan",
@@ -3246,7 +3760,7 @@
   },
   {
    "id": "p16",
-   "n": 24,
+   "n": 26,
    "claim": "Electrifying the Eastern line beats bi-mode trains on cost per journey from year six",
    "settles": {
     "kind": "comparison",
@@ -3344,7 +3858,7 @@
   },
   {
    "id": "p16b",
-   "n": 25,
+   "n": 27,
    "claim": "Electrification cuts 14 minutes from Leeds to Hull, adding 3.8 million journeys",
    "settles": {
     "kind": "sequence",
@@ -3622,7 +4136,7 @@
   },
   {
    "id": "p17",
-   "n": 26,
+   "n": 28,
    "claim": "Four levers add 11.7 million journeys, led by the off-peak timetable",
    "settles": {
     "kind": "count",
@@ -3775,7 +4289,7 @@
   },
   {
    "id": "p18",
-   "n": 27,
+   "n": 29,
    "claim": "London and Manchester send three in five of the visitors from beyond the network",
    "settles": {
     "kind": "share",
@@ -3888,7 +4402,7 @@
   },
   {
    "id": "p19",
-   "n": 28,
+   "n": 30,
    "claim": "The plan adds 11.7 million journeys a year by FY31, mostly after electrification",
    "settles": {
     "kind": "count",
@@ -4025,7 +4539,7 @@
   },
   {
    "id": "p20",
-   "n": 29,
+   "n": 31,
    "claim": "Fare revenue passes its FY20 level in FY29, carried by off-peak travel",
    "settles": {
     "kind": "rate",
@@ -4208,7 +4722,7 @@
   },
   {
    "id": "p21",
-   "n": 30,
+   "n": 32,
    "claim": "The plan costs £640 million, mostly in FY28-FY29, and pays back in eleven years",
    "settles": {
     "kind": "structure",
@@ -4466,7 +4980,7 @@
   },
   {
    "id": "p22",
-   "n": 31,
+   "n": 33,
    "claim": "Grant covers just over half the cost; Northvale must borrow or earn the rest",
    "settles": {
     "kind": "share",
@@ -4549,7 +5063,7 @@
   },
   {
    "id": "p22b",
-   "n": 32,
+   "n": 34,
    "claim": "Northvale should borrow the £160 million gap, not cut the plan to its grant",
    "settles": {
     "kind": "qualitative",
@@ -4607,7 +5121,7 @@
   },
   {
    "id": "s4",
-   "n": 33,
+   "n": 35,
    "kind": "section",
    "role": "structural",
    "claim": "04 / Delivering it",
@@ -4632,7 +5146,7 @@
   },
   {
    "id": "p23",
-   "n": 34,
+   "n": 36,
    "claim": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
    "settles": {
     "kind": "sequence",
@@ -4813,7 +5327,7 @@
   },
   {
    "id": "p24",
-   "n": 35,
+   "n": 37,
    "claim": "Four named owners carry one lever each, reporting monthly to the managing director",
    "settles": {
     "kind": "structure",
@@ -5005,24 +5519,257 @@
    ]
   },
   {
+   "id": "p24b",
+   "n": 38,
+   "claim": "Two dependencies can delay the plan: the grid connection and the Dales depot",
+   "settles": {
+    "kind": "sequence",
+    "what": "journeys at risk from a later energisation date, and depot sidings in use against the extension"
+   },
+   "adds": "Each row says what the dependency waits on and what a slip costs, beside the chart that measures it",
+   "highlight": [
+    "six weeks late",
+    "0.2 million",
+    "94% of its sidings",
+    "December 2027"
+   ],
+   "textReference": {
+    "task": "exhibit-with-commentary",
+    "floor": 112,
+    "ceiling": 282
+   },
+   "textPlan": [
+    {
+     "id": "p24b-chrome:title",
+     "role": "title",
+     "text": "Two dependencies can delay the plan: the grid connection and the Dales depot"
+    },
+    {
+     "id": "p24b-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for a fictional operator; programme board and depot plan, September 2026"
+    },
+    {
+     "id": "p24b-p24b-label-0:text",
+     "role": "exhibit",
+     "text": "The grid connection"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0-heading:heading",
+     "role": "body",
+     "text": "Electric journeys, FY31,"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0-heading:unit",
+     "role": "exhibit",
+     "text": "million"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:value-label:journeys:q1-29",
+     "role": "exhibit",
+     "text": "3.8"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:category:q1-29",
+     "role": "exhibit",
+     "text": "Q1 29"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:value-label:journeys:q2-29",
+     "role": "exhibit",
+     "text": "3.6"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:category:q2-29",
+     "role": "exhibit",
+     "text": "Q2 29"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:value-label:journeys:q3-29",
+     "role": "exhibit",
+     "text": "3.4"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:category:q3-29",
+     "role": "exhibit",
+     "text": "Q3 29"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:value-label:journeys:q4-29",
+     "role": "exhibit",
+     "text": "3.2"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:category:q4-29",
+     "role": "exhibit",
+     "text": "Q4 29"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:value-label:journeys:q1-30",
+     "role": "exhibit",
+     "text": "3.0"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:category:q1-30",
+     "role": "exhibit",
+     "text": "Q1 30"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:value-label:journeys:q2-30",
+     "role": "exhibit",
+     "text": "2.8"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:category:q2-30",
+     "role": "exhibit",
+     "text": "Q2 30"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:value-label:journeys:q3-30",
+     "role": "exhibit",
+     "text": "2.6"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:category:q3-30",
+     "role": "exhibit",
+     "text": "Q3 30"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:value-label:journeys:q4-30",
+     "role": "exhibit",
+     "text": "2.4"
+    },
+    {
+     "id": "p24b-p24b-exhibit-0:category:q4-30",
+     "role": "exhibit",
+     "text": "Q4 30"
+    },
+    {
+     "id": "p24b-p24b-label-1:text",
+     "role": "exhibit",
+     "text": "The Dales depot"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1-heading:heading",
+     "role": "body",
+     "text": "Depot sidings in use,"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1-heading:unit",
+     "role": "exhibit",
+     "text": "sidings"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:label:0",
+     "role": "exhibit",
+     "text": "Actual"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:label:1",
+     "role": "exhibit",
+     "text": "Forecast"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:value-label:sidings-used:fy22",
+     "role": "exhibit",
+     "text": "36"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:value-label:sidings-used:fy23",
+     "role": "exhibit",
+     "text": "38"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:category:fy23",
+     "role": "exhibit",
+     "text": "FY23"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:value-label:sidings-used:fy24",
+     "role": "exhibit",
+     "text": "40"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:value-label:sidings-used:fy25",
+     "role": "exhibit",
+     "text": "41"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:category:fy25",
+     "role": "exhibit",
+     "text": "FY25"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:value-label:sidings-used:fy26",
+     "role": "exhibit",
+     "text": "42"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:value-label:sidings-used:fy27",
+     "role": "exhibit",
+     "text": "44"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:category:fy27",
+     "role": "exhibit",
+     "text": "FY27"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:value-label:sidings-used:fy28",
+     "role": "exhibit",
+     "text": "50"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:value-label:sidings-used:fy29",
+     "role": "exhibit",
+     "text": "53"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:category:fy29",
+     "role": "exhibit",
+     "text": "FY29"
+    },
+    {
+     "id": "p24b-p24b-exhibit-1:reference-label:0",
+     "role": "exhibit",
+     "text": "45 sidings today"
+    },
+    {
+     "id": "p24b-p24b-points-0:item:0",
+     "role": "body",
+     "text": "The power contract and the grid connection both wait on the network operator's capacity study, now six weeks late."
+    },
+    {
+     "id": "p24b-p24b-points-0:item:1",
+     "role": "body",
+     "text": "Each quarter the Eastern line is energised after January 2029 costs about 0.2 million of the 3.8 million electric journeys in FY31."
+    },
+    {
+     "id": "p24b-p24b-points-1:item:0",
+     "role": "body",
+     "text": "The depot stables trains overnight in 94% of its sidings, so the added off-peak units need the twelve new sidings."
+    },
+    {
+     "id": "p24b-p24b-points-1:item:1",
+     "role": "body",
+     "text": "Planning consent is due in July 2027; a late consent pushes the Dales timetable past December 2027."
+    }
+   ]
+  },
+  {
    "id": "p25",
-   "n": 36,
+   "n": 39,
    "claim": "Two of seven 2027 milestones are at risk, both on the electrification path",
    "settles": {
     "kind": "count",
     "what": "status of the seven 2027 milestones"
    },
-   "adds": "The column says what the at-risk milestones have in common and what would bring them back",
-   "highlight": [
-    "six weeks late",
-    "What recovers them",
-    "5.1 million off-peak journeys",
-    "off the critical path"
-   ],
+   "adds": "The last column says what each milestone's status means for the plan, row by row",
+   "highlight": null,
    "textReference": {
-    "task": "table-with-commentary",
-    "floor": 149,
-    "ceiling": 447
+    "task": "table-led",
+    "floor": 100,
+    "ceiling": 483
    },
    "textPlan": [
     {
@@ -5056,6 +5803,11 @@
      "text": "Status"
     },
     {
+     "id": "p25-p25-exhibit:header-text:4",
+     "role": "exhibit",
+     "text": "What it means"
+    },
+    {
      "id": "p25-p25-exhibit:cell-text:0:0:0",
      "role": "exhibit",
      "text": "Crew recruitment, Dales"
@@ -5074,6 +5826,11 @@
      "id": "p25-p25-exhibit-cell-0-3:pill-label",
      "role": "exhibit",
      "text": "complete"
+    },
+    {
+     "id": "p25-p25-exhibit:cell-text:0:4:0",
+     "role": "exhibit",
+     "text": "Crews for the Dales timetable are in post"
     },
     {
      "id": "p25-p25-exhibit:cell-text:1:0:0",
@@ -5096,6 +5853,11 @@
      "text": "on-track"
     },
     {
+     "id": "p25-p25-exhibit:cell-text:1:4:0",
+     "role": "exhibit",
+     "text": "Carries the Dales share of 5.1m off-peak journeys"
+    },
+    {
      "id": "p25-p25-exhibit:cell-text:2:0:0",
      "role": "exhibit",
      "text": "Depot planning consent"
@@ -5114,6 +5876,11 @@
      "id": "p25-p25-exhibit-cell-2-3:pill-label",
      "role": "exhibit",
      "text": "on-track"
+    },
+    {
+     "id": "p25-p25-exhibit:cell-text:2:4:0",
+     "role": "exhibit",
+     "text": "Unlocks the twelve sidings the timetable needs"
     },
     {
      "id": "p25-p25-exhibit:cell-text:3:0:0",
@@ -5136,6 +5903,11 @@
      "text": "at-risk"
     },
     {
+     "id": "p25-p25-exhibit:cell-text:3:4:0",
+     "role": "exhibit",
+     "text": "Waits on the network study, now six weeks late"
+    },
+    {
      "id": "p25-p25-exhibit:cell-text:4:0:0",
      "role": "exhibit",
      "text": "Grid connection agreement"
@@ -5154,6 +5926,11 @@
      "id": "p25-p25-exhibit-cell-4-3:pill-label",
      "role": "exhibit",
      "text": "at-risk"
+    },
+    {
+     "id": "p25-p25-exhibit:cell-text:4:4:0",
+     "role": "exhibit",
+     "text": "Signing on the draft study recovers four weeks"
     },
     {
      "id": "p25-p25-exhibit:cell-text:5:0:0",
@@ -5176,6 +5953,11 @@
      "text": "not-started"
     },
     {
+     "id": "p25-p25-exhibit:cell-text:5:4:0",
+     "role": "exhibit",
+     "text": "Not due until October; off the critical path"
+    },
+    {
      "id": "p25-p25-exhibit:cell-text:6:0:0",
      "role": "exhibit",
      "text": "Housing site agreements"
@@ -5196,50 +5978,15 @@
      "text": "on-track"
     },
     {
-     "id": "p25-p25-points:lead:0",
-     "role": "body",
-     "text": "Both on one path"
-    },
-    {
-     "id": "p25-p25-points:item:0",
-     "role": "body",
-     "text": "The contract award and the grid connection both wait on the distribution network operator's capacity study, which is now due six weeks late."
-    },
-    {
-     "id": "p25-p25-points:lead:1",
-     "role": "body",
-     "text": "What recovers them"
-    },
-    {
-     "id": "p25-p25-points:item:1",
-     "role": "body",
-     "text": "Signing the connection agreement on the study's draft findings would recover four of the six weeks, at the risk of a minor redesign of the feeder station."
-    },
-    {
-     "id": "p25-p25-points:lead:2",
-     "role": "body",
-     "text": "The timetable is safe"
-    },
-    {
-     "id": "p25-p25-points:item:2",
-     "role": "body",
-     "text": "All three timetable and depot milestones are on track or complete, so the 5.1 million off-peak journeys in the plan do not depend on either red row."
-    },
-    {
-     "id": "p25-p25-points:lead:3",
-     "role": "body",
-     "text": "Grey is not red"
-    },
-    {
-     "id": "p25-p25-points:item:3",
-     "role": "body",
-     "text": "The fare reform consultation has not started because it is not due until October; it sits off the critical path and waits on the timetable, not the grid."
+     "id": "p25-p25-exhibit:cell-text:6:4:0",
+     "role": "exhibit",
+     "text": "Keeps the new-housing journeys in the plan"
     }
    ]
   },
   {
    "id": "p26",
-   "n": 37,
+   "n": 40,
    "claim": "Service grows by a fifth while punctuality holds at 90% and unit cost falls",
    "settles": {
     "kind": "comparison",
@@ -5402,7 +6149,7 @@
   },
   {
    "id": "p27",
-   "n": 38,
+   "n": 41,
    "claim": "Fare reform should follow the new timetable, not lead it",
    "settles": {
     "kind": "qualitative",
@@ -5460,7 +6207,7 @@
   },
   {
    "id": "p28",
-   "n": 39,
+   "n": 42,
    "kind": "takeaways",
    "claim": "Five decisions put Northvale on the path to 60 million journeys",
    "settles": {

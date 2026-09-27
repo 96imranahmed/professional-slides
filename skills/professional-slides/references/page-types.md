@@ -96,6 +96,18 @@ A generated deck drew two pages in five as one exhibit with a text column beside
 | Exhibits joined by arrows - `panels`, form `sequence` | cause and effect, before and after, input to adjustment to result | two or three `exhibits`, each with its `heading`; commentary `captions`, `below`, `so-what-bar` or `none` |
 | So-what bar - commentary `so-what-bar` | an exhibit whose implication goes beyond the title and is one sentence | `bar`: eight words or more, two lines at most; `takeaway: false` |
 
+The variety contract holds the deck to this (`VARIETY_PANELS`, `VARIETY_COLUMN`, below). When a page reaches for a column, these are what it usually is:
+
+| The column was holding | Draw it as |
+| --- | --- |
+| a second cut of the same evidence - another measure, another member, the other period | two or more panels, each headed, its finding under it as a `caption` (`panels`, form `row`, `grid` or `stack`, commentary `captions`) |
+| the three numbers that carry the claim | the exhibit under a strip of them (`numbers`, form `metric-strip`, commentary `none`) |
+| notes on particular marks | callouts on the plot (commentary `on-exhibit`, three at most, about twelve words each) |
+| one implication | a so-what bar under the exhibit (commentary `so-what-bar`) |
+| a point per area, each with its own evidence | labelled row blocks, a number or a small exhibit at the right of each (`parallel`, form `labelled-rows`) |
+| a point per row of a table | the table's last column, the implication of each row (`lookup` or `scorecard`, commentary `in-exhibit`) |
+| a cause and its effect | two or three exhibits joined by arrows (`panels`, form `sequence`) |
+
 Each row block is a filled label on the house colour - five words at most, read down the left edge as the page's outline - with two to four bullets beside it; the rows share the body height, so the page fills to its foot. The commentary is `in-exhibit`, since the bullets are the explanation, or `so-what-bar` to close the rows on what they add up to. A headed chart at the right of a row keeps its plot only on a page of two blocks; on three or more, give each row a number or a two-row table.
 
 The bar is drawn in the house colour with the implication in bold white, in every design system. It is a close, so it counts toward the closing share with the takeaway line: a deck cannot close every page by moving the line into a bar.
@@ -202,12 +214,17 @@ The refusal names how to deepen: the peer set, a prior period or a benchmark as 
 | `VARIETY_TYPE_RUN` | no three pages of one type in a row, unless they share a `series` (one template on purpose) |
 | `VARIETY_COMMENTARY` | no placement is more than 30% of the pages; `beside` and `beside-left` count as one |
 | `VARIETY_TAKEAWAY` | at most 25% of pages close on a takeaway line or a so-what bar |
-| `VARIETY_PANELS` | from fifteen pages, at least 12% set two or more exhibits side by side |
+| `VARIETY_PANELS` | from fifteen pages, at least 20% carry two or more exhibits, counted on the page as drawn: each panel of a row, grid, stack or sequence, a metric strip over its exhibit, the photograph under a `photo-backdrop` exhibit, the exhibit on each labelled row (aligned bars are one exhibit) |
+| `VARIETY_COLUMN` | from fifteen pages, at most 20% are one exhibit with a text column beside it - points beside or before it (`beside`, `beside-left`), a `rail`, or a hero number with its points beside its proof |
 | `VARIETY_SIGNATURE` | no one drawn page - its layout, how many exhibits of which family, a text column or points, a rail, its close - is more than 20% of the pages |
 | `EVIDENCE_DEPTH` | from eight chart pages, the median chart page plots 15 values or more |
 
-The limits sit outside what strong decks measure, so a deck that chose each page for its claim passes them with room. Placement and repetition are counted on the page as drawn, not as declared: a column on the left and one on the right are one placement to a reader, and a trend beside its points and a stat list beside its points are one page. The compiler records each page's drawn skeleton in its `pageType`, and `VARIETY_SIGNATURE` names the pages that share the commonest. Do not rotate choices to meet them: a deck that breaks one has pages whose type was not chosen from the claim, and the fix is to ask of each such page what it has to show.
+The limits sit outside what strong decks measure, so a deck that chose each page for its claim passes them with room. Placement and repetition are counted on the page as drawn, not as declared: a column on the left and one on the right are one placement to a reader, and a trend beside its points and a stat list beside its points are one page. The compiler records each page's drawn skeleton in its `pageType` (`skeleton`, and `drawn`: how many exhibits and whether it is an exhibit beside a column), and `VARIETY_SIGNATURE` names the pages that share the commonest.
+
+Strong decks carry two or more exhibits on a quarter to a third of their pages and draw one exhibit beside a column on about one in eight; the floor sits under the first so a deck that chose its pages passes with room, and the cap sits half as high again as the second. `author-deck.mjs` prints the deck as drawn on every run - `structure`: the share on two or more exhibits, the share beside a column with the pages named, and every skeleton with its count - so a deck drifting toward one exhibit and a column is seen before it is refused. Do not rotate choices to meet them: a deck that breaks one has pages whose type was not chosen from the claim, and the fix is to ask of each such page what it has to show.
 
 ## Worked examples
 
-`examples/page-types.pages.json` is a complete pages file - a fictional regional rail operator's growth plan, with illustrative numbers - that uses every page type at least once, with its `form`, `commentary`, `takeaway`, `why`, `settles` and `adds` filled in and each page's explanation written where its commentary says it lives. Before writing a page, find the example page of the type you are writing, copy its shape, and replace the content: the keys, the data shape its form reads and the length of its callouts, captions and points are the ones that compile and build. Page `p10b` is labelled row blocks with a number on each row, `p13b` a ranking closed by a so-what bar, and `p16b` three exhibits joined by arrows.
+`examples/page-types.pages.json` is a complete pages file - a fictional regional rail operator's growth plan, with illustrative numbers - that uses every page type at least once, with its `form`, `commentary`, `takeaway`, `why`, `settles` and `adds` filled in and each page's explanation written where its commentary says it lives. Before writing a page, find the example page of the type you are writing, copy its shape, and replace the content: the keys, the data shape its form reads and the length of its callouts, captions and points are the ones that compile and build.
+
+Page `p10b` is labelled row blocks with a number on each row and `p24b` the same with a headed chart on each of two rows, `p13b` a ranking closed by a so-what bar, `p16b` three exhibits joined by arrows, `p07c` four panels of one indexed measure with a caption under each, `p06b` a chart on a card over the photograph of its subject (`photo-backdrop`), and `p25` a scorecard whose last column is each row's implication.

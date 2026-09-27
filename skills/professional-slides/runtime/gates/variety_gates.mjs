@@ -30,7 +30,8 @@ export const VARIETY_CODES = Object.freeze({
   VARIETY_TYPE_RUN: "the same page type repeats down consecutive pages",
   VARIETY_COMMENTARY: "one commentary placement carries too much of the deck",
   VARIETY_TAKEAWAY: "too many pages close on a takeaway line",
-  VARIETY_PANELS: "too few pages set evidence side by side",
+  VARIETY_PANELS: "too few pages carry two or more exhibits",
+  VARIETY_COLUMN: "too many pages are one exhibit with a text column beside it",
   VARIETY_SIGNATURE: "one drawn page - layout, exhibits, text column and close - repeats across the deck",
   EVIDENCE_DEPTH: "the deck's chart pages plot too few values: the median chart page is thinner than strong decks'",
   // Raised by author-deck.mjs: the page failed to compose; the rest of the deck is still checked.
@@ -47,7 +48,20 @@ export const VARIETY = Object.freeze({
   // exhibit; the worked example's commonest placement is under a quarter.
   commentaryShareMax: 0.3,
   takeawayShareMax: 0.25,   // strong decks: 9% of pages close on a line or band; a so-what bar is a close
-  panelsShareMin: 0.12,     // strong decks: 24% of pages carry two or more exhibits
+  // Structure, counted on the page as drawn (page-types.mjs drawnOf), from
+  // fifteen pages. Strong decks carry two or more exhibits on a quarter to a
+  // third of their pages and draw one exhibit beside a text column on about
+  // one in eight; a generated deck that passed every other rule drew them at
+  // 14% and 33%. The floor sits under strong decks' lowest share, so a deck
+  // that chose its pages passes with room, and it counts every way a page
+  // carries two bodies of evidence - panels, a sequence, a metric strip over
+  // its chart, row blocks with an exhibit each, a photograph under an exhibit.
+  // The cap sits half as high again as strong decks' share: the column is a
+  // good page, and a deck that reaches for it on one page in three has
+  // stopped asking what each page has to show.
+  structureFrom: 15,
+  multiShareMin: 0.2,
+  columnShareMax: 0.2,
   // Keyed on the drawn skeleton, not the declared type. The commonest skeleton
   // in strong decks is a full-width chart carrying its own callouts, about 16%
   // of pages (declared, their commonest combination was 10%, under the old
@@ -65,11 +79,13 @@ export const VARIETY = Object.freeze({
   evidenceMedianMin: 15,
 });
 
-// The pages a deck of one exhibit and a column is usually hiding, named in the
-// repairs so the author can reach for them.
-const ALTERNATIVES = "labelled row blocks for three challenges or what changed in each area (`parallel`, form `labelled-rows`), " +
-  "two or three exhibits joined by arrows for cause and effect or before and after (`panels`, form `sequence`), " +
-  "panels side by side, a scorecard or findings matrix, or the exhibit alone closed by a so-what bar (commentary `so-what-bar`)";
+// The pages a deck of one exhibit and a column is usually hiding, named with
+// their choices in the repairs so the author can reach for them.
+const ALTERNATIVES = "two cuts of the same evidence side by side, each with its finding under it (`panels`, form `row`, commentary `captions`); " +
+  "the exhibit under a strip of the three numbers that carry the claim (`numbers`, form `metric-strip`); the exhibit alone, its explanation " +
+  "written as callouts on the plot (commentary `on-exhibit`) or closed by one implication (commentary `so-what-bar`); labelled row blocks, each " +
+  "with its bullets and a number or small exhibit (`parallel`, form `labelled-rows`); two or three exhibits joined by arrows for cause and " +
+  "effect (`panels`, form `sequence`); a table whose last column is the implication (`lookup` or `scorecard`, commentary `in-exhibit`)";
 /**
  * What the deck's chart pages plot, from the counts the compiler recorded on
  * each page (`pageType.values`): how many chart pages, their median and range,
@@ -84,6 +100,22 @@ export function evidenceDepth(slides) {
   return { chartPages: charts.length, median, min: values[0] ?? 0, max: values.at(-1) ?? 0, thinnest };
 }
 
+/**
+ * The deck's structure as drawn: the skeletons and how often each is drawn,
+ * and the two shares the contract holds - pages carrying two or more exhibits,
+ * and pages that are one exhibit beside a text column. Read from what the
+ * compiler recorded on each page (`pageType.drawn`), or from `drawnOf` for a
+ * deck compiled before it was recorded; pages with neither are left out.
+ */
+export function structureMix(slides, { drawnOf } = {}) {
+  const known = slides.filter(isContent).map((s) => ({ s, d: s.pageType?.drawn ?? (drawnOf && s.pageType ? drawnOf(s) : null) })).filter((x) => x.d);
+  const pick = (test) => { const hit = known.filter(test); return { pages: hit.length, share: known.length ? share(hit.length, known.length) : 0, ids: hit.map((x) => x.s.id ?? null) }; };
+  const skeletons = {};
+  for (const s of slides.filter(isContent)) if (s.pageType?.skeleton) skeletons[s.pageType.skeleton] = (skeletons[s.pageType.skeleton] || 0) + 1;
+  const multi = pick((x) => x.d.exhibits >= 2);
+  return { pages: known.length, multi: { pages: multi.pages, share: multi.share }, column: pick((x) => x.d.column), skeletons: Object.fromEntries(Object.entries(skeletons).sort((a, b) => b[1] - a[1])) };
+}
+
 const isContent = (slide) => (!slide.kind || slide.kind === "content" || slide.kind === "statement" || slide.kind === "takeaways") && slide.title !== undefined;
 const share = (n, of) => Math.round((n / of) * 100) / 100;
 
@@ -94,7 +126,7 @@ const share = (n, of) => Math.round((n / of) * 100) / 100;
 // Words are not this file's business: the text contract holds every page to
 // the floor for its reading task, on the text of the composed page
 // (derive-content.mjs), and the rendered deck's empty space is DECK_THIN_PAGES.
-export function varietyFindings(spec, { structureOf } = {}) {
+export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
   if (spec.purpose === "catalogue") return [];
   const slides = [...(spec.slides || []), ...(spec.appendix || [])].filter(isContent);
   const findings = [];
@@ -173,12 +205,23 @@ export function varietyFindings(spec, { structureOf } = {}) {
       "is a template, and strong decks use one on about one page in ten - where the implication goes beyond the title. Keep it there, " +
       "and let the rest end on their evidence.");
   }
-  const panels = slides.filter((s) => ["panels", "options"].includes(s.pageType.type) || (s.exhibits || []).length >= 2).length;
-  if (n >= 15 && panels / n < VARIETY.panelsShareMin) {
-    block("VARIETY_PANELS", { pages: panels, of: n, share: share(panels, n) }, VARIETY.panelsShareMin,
-      `${panels} of ${n} pages set evidence side by side. A quarter of a strong deck's pages carry two to four exhibits - the same ` +
-      "measure for several members, two measures that together prove the claim, before and after - each with its own heading and a " +
-      "caption under it. Find the pages where the reader would otherwise have to hold one chart in mind while turning to the next.");
+  const mix = structureMix(slides, { drawnOf });
+  if (mix.pages >= VARIETY.structureFrom && mix.multi.share < VARIETY.multiShareMin) {
+    block("VARIETY_PANELS", { pages: mix.multi.pages, of: mix.pages, share: mix.multi.share }, VARIETY.multiShareMin,
+      `${mix.multi.pages} of ${mix.pages} pages carry two or more exhibits; a deck this long needs ${Math.ceil(VARIETY.multiShareMin * mix.pages)}, and strong decks ` +
+      "carry them on a quarter to a third of their pages - the same measure for several members, two measures that together prove the claim, " +
+      "before and after, cause and effect. Find the pages where the reader would otherwise hold one chart in mind while turning to the next, and " +
+      "draw them as `panels` (form `row`, `grid` or `stack`, each panel headed with its finding under it as a `caption`), `panels` form `sequence` " +
+      "(two or three exhibits joined by arrows), `numbers` form `metric-strip` (three numbers over their chart), `parallel` form `labelled-rows` " +
+      "with a small `exhibit` on each row, `options` form `two-up`, or `picture` form `photo-backdrop` (the exhibit on its subject's photograph).",
+      null);
+  }
+  if (mix.pages >= VARIETY.structureFrom && mix.column.share > VARIETY.columnShareMax) {
+    block("VARIETY_COLUMN", { pages: mix.column.pages, of: mix.pages, share: mix.column.share, ids: mix.column.ids }, VARIETY.columnShareMax,
+      `${mix.column.pages} of ${mix.pages} pages are one exhibit with a text column beside it - points beside or before it, a rail, or a hero number ` +
+      `with its points - where strong decks draw about one page in eight that way; at most ${Math.floor(VARIETY.columnShareMax * mix.pages)} here. ` +
+      `Keep the column where the argument needs a paragraph the exhibit cannot hold, and redraw the rest as what they show: ${ALTERNATIVES}.`,
+      mix.column.ids);
   }
   const depth = evidenceDepth(slides);
   if (depth.chartPages >= VARIETY.evidenceFrom && depth.median < VARIETY.evidenceMedianMin) {

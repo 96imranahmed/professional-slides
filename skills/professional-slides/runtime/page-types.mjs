@@ -529,6 +529,32 @@ export function skeletonOf(slide) {
 }
 
 /**
+ * The two counts the variety contract holds a deck's structure to, read off
+ * the page as drawn: how many exhibits the reader meets, and whether the page
+ * is one exhibit with a text column beside it.
+ *
+ * An exhibit is a body of evidence with its own frame: each panel, a strip of
+ * measured numbers over its chart, the photograph a backdrop page sets its
+ * exhibit on, the small exhibit at the right of each row block. Aligned bars
+ * are one exhibit - one category axis read across - whatever their columns.
+ *
+ * The column is the page strong decks draw about one time in eight and a
+ * generated deck drew one time in three: a column of points or a rail beside
+ * a single exhibit, on either side, and a hero number with its points in the
+ * column beside its proof, which reads the same way.
+ */
+export function drawnOf(slide) {
+  const exhibits = exhibitsOf(slide);
+  const count = exhibits.reduce((n, ex) => n + (ex.type === "chart-group" && !ex.aligned ? Math.max(1, (ex.charts || []).length) : 1), 0)
+    + (slide.blocks || []).filter((block) => block?.exhibit).length
+    + (slide.layout === "metrics-over-exhibit" && (slide.metrics || []).length ? 1 : 0)
+    + (slide.layout === "photo-backdrop" && slide.photo ? 1 : 0);
+  const column = count === 1 && (["exhibit-left", "exhibit-right"].includes(slide.layout) || (slide.layout === "sidebar" && exhibits.length === 1)
+    || (slide.layout === "hero-number" && (slide.points || []).length > 0));
+  return { exhibits: count, column };
+}
+
+/**
  * A labelled-rows page's blocks: each a short label, two to four bullets, and
  * - on every row or on none, so the right-hand column lines up - a number or
  * a small exhibit that is the row's evidence.
@@ -904,6 +930,7 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false 
   slide.pageType.structure = structureOf(slide);
   // What the variety contract counts: the page as drawn, not as declared.
   slide.pageType.skeleton = skeletonOf(slide);
+  slide.pageType.drawn = drawnOf(slide);
   return slide;
 }
 

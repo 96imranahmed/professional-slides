@@ -89,7 +89,11 @@
      "adds": "Each point carries the condition under which its lever delivers, which the table does not show"
     },
     "structure": "|||executive-summary|||table|points|",
-    "skeleton": "executive-summary · 1 table · points · open"
+    "skeleton": "executive-summary · 1 table · points · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -115,7 +119,11 @@
      "adds": null
     },
     "structure": "statement||||||||",
-    "skeleton": "statement · open"
+    "skeleton": "statement · open",
+    "drawn": {
+     "exhibits": 0,
+     "column": false
+    }
    }
   },
   {
@@ -197,7 +205,11 @@
      "adds": "The callouts say why the series broke and why it has stalled, which the line alone cannot"
     },
     "structure": "|exhibit-full|||||chart.line||",
-    "skeleton": "exhibit-full · 1 chart · open"
+    "skeleton": "exhibit-full · 1 chart · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -322,7 +334,11 @@
      "adds": "The rail says what separates the two operators that recovered fully from the rest"
     },
     "structure": "|sidebar|||||chart.line||rail",
-    "skeleton": "sidebar · 1 chart · rail · open"
+    "skeleton": "sidebar · 1 chart · rail · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": true
+    }
    }
   },
   {
@@ -407,7 +423,11 @@
      "adds": "Each caption states what its panel shows that the other does not: no room in one, two-thirds empty in the other"
     },
     "structure": "||||row||chart.bar+chart.bar||",
-    "skeleton": "row of exhibits · 2 chart · open"
+    "skeleton": "row of exhibits · 2 chart · open",
+    "drawn": {
+     "exhibits": 2,
+     "column": false
+    }
    }
   },
   {
@@ -567,7 +587,11 @@
      "adds": "The column explains why intensity trails - hourly off-peak service on full-peak lines - and what the gap is worth"
     },
     "structure": "|exhibit-top|||||chart-group|points|",
-    "skeleton": "exhibit-top · 1 figure · points · open"
+    "skeleton": "exhibit-top · 1 figure · points · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -667,7 +691,102 @@
      "adds": "The column draws the consequence: off-peak growth is a leisure product, sold on frequency and reach, not on commuter fares"
     },
     "structure": "|exhibit-right|||||chart.stacked-column|points|",
-    "skeleton": "exhibit beside a column · 1 exhibit · points · open"
+    "skeleton": "exhibit beside a column · 1 exhibit · points · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": true
+    }
+   }
+  },
+  {
+   "id": "p06b",
+   "title": "Saturday Dales trains leave Leeds 97% full at 10:00, fuller than the weekday peak",
+   "photo": {
+    "path": "assets/hills.jpg",
+    "alt": "Illustration of layered hills",
+    "credit": "examples/assets"
+   },
+   "exhibit": {
+    "type": "chart.column",
+    "heading": "Saturday Dales departures from Leeds, FY26",
+    "unit": "% of seats filled",
+    "categories": [
+     "07:00",
+     "08:00",
+     "09:00",
+     "10:00",
+     "11:00",
+     "12:00",
+     "13:00",
+     "14:00",
+     "15:00",
+     "16:00",
+     "17:00",
+     "18:00"
+    ],
+    "series": [
+     {
+      "name": "Load factor",
+      "values": [
+       24,
+       51,
+       88,
+       97,
+       90,
+       72,
+       58,
+       44,
+       35,
+       29,
+       24,
+       18
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "10:00"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Walkers fill the morning",
+     "text": "Four in five Saturday passengers out of Leeds are leisure trips, bound for the walks beyond Skipton, so the 09:00 to 11:00 trains fill."
+    },
+    {
+     "lead": "The evening runs light",
+     "text": "The last train home leaves Skipton at 18:40, before most walkers finish, so the return trips go by car instead."
+    }
+   ],
+   "highlight": [
+    "Four in five",
+    "18:40"
+   ],
+   "source": "Source: illustrative data for a fictional operator; automatic passenger counts, Saturdays, FY26",
+   "layout": "photo-backdrop",
+   "pageType": {
+    "type": "picture",
+    "form": "photo-backdrop",
+    "commentary": "below",
+    "takeaway": false,
+    "why": "The claim is about a place and the people who travel to it, so the evidence sits on the Dales themselves",
+    "family": "exhibit",
+    "values": 12,
+    "content": {
+     "claim": "Saturday Dales trains leave Leeds 97% full at 10:00, fuller than the weekday peak",
+     "settles": {
+      "kind": "rate",
+      "what": "Saturday load factor by departure hour on Dales line trains out of Leeds, FY26"
+     },
+     "adds": "The points say who fills the morning trains and why the evening leaves them empty"
+    },
+    "structure": "|photo-backdrop|||||chart.column|points|",
+    "skeleton": "photo-backdrop · 1 chart · points · open",
+    "drawn": {
+     "exhibits": 2,
+     "column": false
+    }
    }
   },
   {
@@ -781,7 +900,194 @@
      "adds": "The points quantify the gap between half-hourly and hourly stations and rule out the obvious alternative explanation, population growth"
     },
     "structure": "|exhibit-top|||||chart.scatter|points|",
-    "skeleton": "exhibit-top · 1 chart · points · open"
+    "skeleton": "exhibit-top · 1 chart · points · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
+   }
+  },
+  {
+   "id": "p07c",
+   "title": "Off-peak journeys passed FY20 on the Dales and Valley lines only",
+   "subtitle": "Off-peak journeys by line, index FY20 = 100, FY20 to FY26",
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "heading": "Dales line",
+     "unit": "index",
+     "categories": [
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        100,
+        28,
+        72,
+        97,
+        106,
+        111,
+        114
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ],
+     "caption": "Half-hourly since 2023, the Dales ended FY26 at 4.1 million journeys, 14% above FY20",
+     "referenceLines": [
+      {
+       "value": 100,
+       "label": "FY20"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Valley line",
+     "unit": "index",
+     "categories": [
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        100,
+        28,
+        73,
+        98,
+        105,
+        110,
+        115
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ],
+     "caption": "The Valley towns reached 4.6 million after the 2023 timetable, 15% above FY20",
+     "referenceLines": [
+      {
+       "value": 100,
+       "label": "FY20"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Eastern line",
+     "unit": "index",
+     "categories": [
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        100,
+        28,
+        72,
+        86,
+        88,
+        88,
+        91
+       ]
+      }
+     ],
+     "caption": "Still hourly between the peaks, the Eastern line stalled 9% below FY20",
+     "referenceLines": [
+      {
+       "value": 100,
+       "label": "FY20"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Coast line",
+     "unit": "index",
+     "categories": [
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        100,
+        28,
+        72,
+        88,
+        88,
+        92,
+        92
+       ]
+      }
+     ],
+     "caption": "The hourly Coast service has added almost nothing since FY23 and sits 8% below FY20",
+     "referenceLines": [
+      {
+       "value": 100,
+       "label": "FY20"
+      }
+     ]
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; ticket sales by line, off-peak and weekend, FY20-FY26",
+   "arrange": "row",
+   "pageType": {
+    "type": "panels",
+    "form": "row",
+    "commentary": "captions",
+    "takeaway": false,
+    "why": "The same measure for four lines answers one question - where has off-peak travel come back - and the lines differ in one thing, their timetable",
+    "family": "exhibit",
+    "values": 28,
+    "chart": true,
+    "content": {
+     "claim": "Off-peak journeys passed FY20 on the Dales and Valley lines only",
+     "settles": {
+      "kind": "comparison",
+      "what": "off-peak journeys on each of four lines against FY20, FY20 to FY26"
+     },
+     "adds": "Each caption says what its line's timetable did, which the chart alone does not show"
+    },
+    "structure": "||||row||chart.column+chart.column+chart.column+chart.column||",
+    "skeleton": "row of exhibits · 4 chart · open",
+    "drawn": {
+     "exhibits": 4,
+     "column": false
+    }
    }
   },
   {
@@ -900,7 +1206,11 @@
      "adds": "The points say what separates the low-cost operators from Northvale and how much of the gap the plan closes"
     },
     "structure": "|exhibit-left|||||chart.bar|points|",
-    "skeleton": "exhibit beside a column · 1 exhibit · points · open"
+    "skeleton": "exhibit beside a column · 1 exhibit · points · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": true
+    }
    }
   },
   {
@@ -1016,7 +1326,11 @@
      "adds": "The implication column says what each line's row means for the plan"
     },
     "structure": "||measure-table||||table||",
-    "skeleton": "measure-table · 1 table · open"
+    "skeleton": "measure-table · 1 table · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -1085,7 +1399,11 @@
      "adds": "The callouts give the mechanism behind the largest loss and the largest gain"
     },
     "structure": "|exhibit-full|||||chart.waterfall||",
-    "skeleton": "exhibit-full · 1 chart · open"
+    "skeleton": "exhibit-full · 1 chart · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -1195,7 +1513,11 @@
      "adds": "The points give the mechanism - dwell time at single-track sections - and why the off-peak does not share it"
     },
     "structure": "||||row||chart.column+chart.line|points|",
-    "skeleton": "row of exhibits · 2 chart · points · open"
+    "skeleton": "row of exhibits · 2 chart · points · open",
+    "drawn": {
+     "exhibits": 2,
+     "column": false
+    }
    }
   },
   {
@@ -1280,7 +1602,11 @@
      "adds": "Each row says what binds, where it binds and what lifting it would take, beyond the number at its right"
     },
     "structure": "|labelled-rows|||||||",
-    "skeleton": "labelled-rows · open"
+    "skeleton": "labelled-rows · open",
+    "drawn": {
+     "exhibits": 0,
+     "column": false
+    }
    }
   },
   {
@@ -1351,7 +1677,11 @@
      "adds": "The column puts a measured number on each link of the loop, and says where it breaks"
     },
     "structure": "|exhibit-left|||||cycle|points|",
-    "skeleton": "exhibit beside a column · 1 exhibit · points · open"
+    "skeleton": "exhibit beside a column · 1 exhibit · points · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": true
+    }
    }
   },
   {
@@ -1507,7 +1837,11 @@
      "adds": "The implication column turns each row of scores into a sequencing decision"
     },
     "structure": "|exhibit-full||||close|table||",
-    "skeleton": "exhibit-full · 1 table · closing line"
+    "skeleton": "exhibit-full · 1 table · closing line",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -1589,7 +1923,11 @@
      "adds": "The third column turns each finding into a design choice for the timetable or the fares"
     },
     "structure": "||findings-matrix||||||",
-    "skeleton": "findings-matrix · open"
+    "skeleton": "findings-matrix · open",
+    "drawn": {
+     "exhibits": 0,
+     "column": false
+    }
    }
   },
   {
@@ -1662,7 +2000,11 @@
      "adds": "The bar says what the ranking means for the order of the plan: the fare change waits for the timetable"
     },
     "structure": "|exhibit-full||||close|chart.bar||",
-    "skeleton": "exhibit-full · 1 chart · so-what bar"
+    "skeleton": "exhibit-full · 1 chart · so-what bar",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -1709,7 +2051,11 @@
      "adds": null
     },
     "structure": "||||||quote-cluster||",
-    "skeleton": "exhibit-full · 1 figure · open"
+    "skeleton": "exhibit-full · 1 figure · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -1757,7 +2103,11 @@
      "adds": "Each caption names the market the corridor serves; the closing line says why one timetable pattern cannot serve all three"
     },
     "structure": "|picture-strip||||close|||",
-    "skeleton": "picture-strip · closing line"
+    "skeleton": "picture-strip · closing line",
+    "drawn": {
+     "exhibits": 0,
+     "column": false
+    }
    }
   },
   {
@@ -1813,7 +2163,11 @@
      "adds": "The closing line says what to commit now and what to keep in reserve"
     },
     "structure": "|||||close|compare||",
-    "skeleton": "exhibit-full · 1 table · closing line"
+    "skeleton": "exhibit-full · 1 table · closing line",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -1938,7 +2292,11 @@
      "adds": "Each caption states the link its panel proves, so the chain can be checked one step at a time"
     },
     "structure": "||||sequence||chart.bar+chart.stacked-bar+chart.column||",
-    "skeleton": "sequence of exhibits · 3 chart · open"
+    "skeleton": "sequence of exhibits · 3 chart · open",
+    "drawn": {
+     "exhibits": 3,
+     "column": false
+    }
    }
   },
   {
@@ -2017,7 +2375,11 @@
      "adds": "Each card says how its lever works and what it depends on, beyond the number"
     },
     "structure": "|exhibit-full||||close|cards||",
-    "skeleton": "exhibit-full · 1 figure · so-what bar"
+    "skeleton": "exhibit-full · 1 figure · so-what bar",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -2165,7 +2527,11 @@
      "adds": "The column says why Leeds is the connection that matters and what timing the connection is worth"
     },
     "structure": "|exhibit-left|||||map|points|",
-    "skeleton": "exhibit beside a column · 1 exhibit · points · open"
+    "skeleton": "exhibit beside a column · 1 exhibit · points · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": true
+    }
    }
   },
   {
@@ -2239,7 +2605,11 @@
      "adds": "The points say how fast the path climbs and which year it depends on"
     },
     "structure": "|hero-number|||||chart.line|points|",
-    "skeleton": "hero-number · 1 chart · points · open"
+    "skeleton": "hero-number · 1 chart · points · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": true
+    }
    }
   },
   {
@@ -2327,7 +2697,11 @@
      "adds": "The callouts name the crossing year and the source of the growth"
     },
     "structure": "|exhibit-full|||||chart.stacked-column||",
-    "skeleton": "exhibit-full · 1 chart · open"
+    "skeleton": "exhibit-full · 1 chart · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -2449,7 +2823,11 @@
      "adds": "Each caption carries the finding of its own panel so the page reads without the title"
     },
     "structure": "||||row||chart.column+chart.column+table||",
-    "skeleton": "row of exhibits · 3 chart+table · open"
+    "skeleton": "row of exhibits · 3 chart+table · open",
+    "drawn": {
+     "exhibits": 3,
+     "column": false
+    }
    }
   },
   {
@@ -2495,7 +2873,11 @@
      "adds": "The rail says which part is uncommitted and what that exposes"
     },
     "structure": "|sidebar|||||chart.donut||rail",
-    "skeleton": "sidebar · 1 chart · rail · open"
+    "skeleton": "sidebar · 1 chart · rail · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": true
+    }
    }
   },
   {
@@ -2529,7 +2911,11 @@
      "adds": null
     },
     "structure": "|text|||||||rail",
-    "skeleton": "text · rail · open"
+    "skeleton": "text · rail · open",
+    "drawn": {
+     "exhibits": 0,
+     "column": false
+    }
    }
   },
   {
@@ -2659,7 +3045,11 @@
      "adds": "The points name the critical path and the one date that moves the target"
     },
     "structure": "|exhibit-top||||close|gantt|points|",
-    "skeleton": "exhibit-top · 1 figure · points · closing line"
+    "skeleton": "exhibit-top · 1 figure · points · closing line",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -2749,18 +3139,133 @@
      "adds": "The cards state each owner's measures and deadlines; the points say how the owners are held to them"
     },
     "structure": "|exhibit-top|||||people|points|",
-    "skeleton": "exhibit-top · 1 figure · points · open"
+    "skeleton": "exhibit-top · 1 figure · points · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
+   }
+  },
+  {
+   "id": "p24b",
+   "title": "Two dependencies can delay the plan: the grid connection and the Dales depot",
+   "highlight": [
+    "six weeks late",
+    "0.2 million",
+    "94% of its sidings",
+    "December 2027"
+   ],
+   "blocks": [
+    {
+     "label": "The grid connection",
+     "points": [
+      "The power contract and the grid connection both wait on the network operator's capacity study, now six weeks late.",
+      "Each quarter the Eastern line is energised after January 2029 costs about 0.2 million of the 3.8 million electric journeys in FY31."
+     ],
+     "exhibit": {
+      "type": "chart.column",
+      "heading": "Electric journeys, FY31",
+      "unit": "million",
+      "categories": [
+       "Q1 29",
+       "Q2 29",
+       "Q3 29",
+       "Q4 29",
+       "Q1 30",
+       "Q2 30",
+       "Q3 30",
+       "Q4 30"
+      ],
+      "series": [
+       {
+        "name": "Journeys",
+        "values": [
+         3.8,
+         3.6,
+         3.4,
+         3.2,
+         3,
+         2.8,
+         2.6,
+         2.4
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "label": "The Dales depot",
+     "points": [
+      "The depot stables trains overnight in 94% of its sidings, so the added off-peak units need the twelve new sidings.",
+      "Planning consent is due in July 2027; a late consent pushes the Dales timetable past December 2027."
+     ],
+     "exhibit": {
+      "type": "chart.column",
+      "heading": "Depot sidings in use",
+      "unit": "sidings",
+      "categories": [
+       "FY22",
+       "FY23",
+       "FY24",
+       "FY25",
+       "FY26",
+       "FY27",
+       "FY28",
+       "FY29"
+      ],
+      "series": [
+       {
+        "name": "Sidings used",
+        "values": [
+         36,
+         38,
+         40,
+         41,
+         42,
+         44,
+         50,
+         53
+        ]
+       }
+      ],
+      "forecastFrom": "FY27",
+      "referenceLines": [
+       {
+        "value": 45,
+        "label": "45 sidings today"
+       }
+      ]
+     }
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; programme board and depot plan, September 2026",
+   "layout": "labelled-rows",
+   "pageType": {
+    "type": "parallel",
+    "form": "labelled-rows",
+    "commentary": "in-exhibit",
+    "takeaway": false,
+    "why": "Two dependencies can each delay a lever on their own, and each has a measured cost of delay, so they read down the page with their evidence",
+    "family": "exhibit",
+    "content": {
+     "claim": "Two dependencies can delay the plan: the grid connection and the Dales depot",
+     "settles": {
+      "kind": "sequence",
+      "what": "journeys at risk from a later energisation date, and depot sidings in use against the extension"
+     },
+     "adds": "Each row says what the dependency waits on and what a slip costs, beside the chart that measures it"
+    },
+    "structure": "|labelled-rows|||||||",
+    "skeleton": "labelled-rows · open",
+    "drawn": {
+     "exhibits": 2,
+     "column": false
+    }
    }
   },
   {
    "id": "p25",
    "title": "Two of seven 2027 milestones are at risk, both on the electrification path",
-   "highlight": [
-    "six weeks late",
-    "What recovers them",
-    "5.1 million off-peak journeys",
-    "off the critical path"
-   ],
    "exhibit": {
     "columns": [
      "Milestone",
@@ -2769,93 +3274,86 @@
      {
       "label": "Status",
       "type": "rag"
-     }
+     },
+     "What it means"
     ],
     "rows": [
      [
       "Crew recruitment, Dales",
       "P. Shah",
       "Mar 2027",
-      "complete"
+      "complete",
+      "Crews for the Dales timetable are in post"
      ],
      [
       "Dales timetable bid",
       "P. Shah",
       "Jun 2027",
-      "on-track"
+      "on-track",
+      "Carries the Dales share of 5.1m off-peak journeys"
      ],
      [
       "Depot planning consent",
       "D. Moss",
       "Jul 2027",
-      "on-track"
+      "on-track",
+      "Unlocks the twelve sidings the timetable needs"
      ],
      [
       "Power supply contract award",
       "T. Hardcastle",
       "Aug 2027",
-      "at-risk"
+      "at-risk",
+      "Waits on the network study, now six weeks late"
      ],
      [
       "Grid connection agreement",
       "T. Hardcastle",
       "Sep 2027",
-      "at-risk"
+      "at-risk",
+      "Signing on the draft study recovers four weeks"
      ],
      [
       "Fare reform consultation",
       "A. Karim",
       "Oct 2027",
-      "not-started"
+      "not-started",
+      "Not due until October; off the critical path"
      ],
      [
       "Housing site agreements",
       "D. Moss",
       "Dec 2027",
-      "on-track"
+      "on-track",
+      "Keeps the new-housing journeys in the plan"
      ]
     ],
     "type": "table"
    },
-   "points": [
-    {
-     "lead": "Both on one path",
-     "text": "The contract award and the grid connection both wait on the distribution network operator's capacity study, which is now due six weeks late."
-    },
-    {
-     "lead": "What recovers them",
-     "text": "Signing the connection agreement on the study's draft findings would recover four of the six weeks, at the risk of a minor redesign of the feeder station."
-    },
-    {
-     "lead": "The timetable is safe",
-     "text": "All three timetable and depot milestones are on track or complete, so the 5.1 million off-peak journeys in the plan do not depend on either red row."
-    },
-    {
-     "lead": "Grey is not red",
-     "text": "The fare reform consultation has not started because it is not due until October; it sits off the critical path and waits on the timetable, not the grid."
-    }
-   ],
-   "pointsHeading": false,
    "source": "Source: illustrative data for a fictional operator; programme board, September 2026",
-   "layout": "exhibit-left",
+   "layout": "exhibit-full",
    "pageType": {
     "type": "scorecard",
     "form": "rag",
-    "commentary": "beside",
+    "commentary": "in-exhibit",
     "takeaway": false,
     "why": "Seven milestones are each judged on one criterion - on track or not - and the pattern of the red ones is the finding",
     "family": "table",
-    "values": 7,
+    "values": 8,
     "content": {
      "claim": "Two of seven 2027 milestones are at risk, both on the electrification path",
      "settles": {
       "kind": "count",
       "what": "status of the seven 2027 milestones"
      },
-     "adds": "The column says what the at-risk milestones have in common and what would bring them back"
+     "adds": "The last column says what each milestone's status means for the plan, row by row"
     },
-    "structure": "|exhibit-left|||||table|points|",
-    "skeleton": "exhibit beside a column · 1 exhibit · points · open"
+    "structure": "|exhibit-full|||||table||",
+    "skeleton": "exhibit-full · 1 table · open",
+    "drawn": {
+     "exhibits": 1,
+     "column": false
+    }
    }
   },
   {
@@ -2934,7 +3432,11 @@
      "adds": null
     },
     "structure": "|metrics-over-exhibit|||||chart.column||",
-    "skeleton": "metrics-over-exhibit · 1 chart · open"
+    "skeleton": "metrics-over-exhibit · 1 chart · open",
+    "drawn": {
+     "exhibits": 2,
+     "column": false
+    }
    }
   },
   {
@@ -2969,7 +3471,11 @@
      "adds": null
     },
     "structure": "|sidebar|||||||rail",
-    "skeleton": "sidebar · rail · open"
+    "skeleton": "sidebar · rail · open",
+    "drawn": {
+     "exhibits": 0,
+     "column": false
+    }
    }
   },
   {
@@ -2999,7 +3505,11 @@
      "adds": null
     },
     "structure": "takeaways||||||||",
-    "skeleton": "takeaways · open"
+    "skeleton": "takeaways · open",
+    "drawn": {
+     "exhibits": 0,
+     "column": false
+    }
    }
   }
  ]
