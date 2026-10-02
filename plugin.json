@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "professional-slides",
   "version": "0.0.1",
-  "description": "Create and revise decision-ready PowerPoint and Google Slides decks with answer-first storylining, extensible templates, and rendered QA.",
+  "description": "Plan and build decision-ready, editable PowerPoint decks with answer-first storylining, templates, and rendered QA.",
   "author": {
     "name": "Professional Slides"
   },
@@ -21,12 +21,17 @@
         "capabilities": [
           "New deck creation",
           "Existing deck and individual slide revision",
-          "PowerPoint and Google Slides authoring guidance",
+          "Editable PowerPoint authoring; Google Slides import verified separately",
           "Answer-first storylining and approval gates",
           "Extensible validated deck templates",
           "Rendered artifact and editability QA"
         ],
-        "defaultPrompt": "Use $professional-slides to create or revise a decision-ready executive deck and verify the final editable artifact."
+        "defaultPrompt": "Use $professional-slides to create or revise a decision-ready executive deck and verify the final editable artifact.",
+        "websiteURL": "https://github.com/96imranahmed/professional-slides",
+        "supportURL": "https://github.com/96imranahmed/professional-slides/issues"
+      },
+      "publication": {
+        "release_notes": "Added source-controlled skills-only submission metadata and a standalone upload-package generator, synchronized compatibility manifests, and documented publication readiness gaps. No MCP server or connected app is included."
       }
     }
   }
