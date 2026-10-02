@@ -511,7 +511,6 @@
       {
        "label": "Rent",
        "unit": "$ a month",
-       "type": "text",
        "align": "right"
       }
      ],

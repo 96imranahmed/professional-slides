@@ -35,9 +35,9 @@ import { isMain } from "../../skills/professional-slides/runtime/cli.mjs";
 // the same bars rather than a copy of them.
 export { BUILD_BARS, BUILD_CEILINGS, scoreBuild };
 
-export function scoreRun({ plan = null, scene = null }) {
+export function scoreRun({ plan = null, scene = null, purpose = null }) {
   const planReport = plan ? runPlanGates(plan) : null;
-  const buildReport = scene ? scoreBuild(scene) : null;
+  const buildReport = scene ? scoreBuild(scene, { purpose }) : null;
   return {
     schema: "professional-slides.cold-run/v1",
     plan: planReport && {
@@ -46,11 +46,31 @@ export function scoreRun({ plan = null, scene = null }) {
       statistics: planReport.statistics,
       findings: planReport.findings.map((f) => ({ code: f.code, page: f.page, measured: f.measured })),
     },
-    build: buildReport,
+    build: buildReport && { ...buildReport, ...(purpose ? { purpose } : {}) },
     // Deliberately not one number. A plan that passes and a build that does not
     // is a different problem from the reverse, and averaging them hides which.
     accepted: (planReport?.accepted ?? true) && (buildReport?.accepted ?? true),
   };
+}
+
+const readSpec = (file) => existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
+
+/**
+ * The deck's `purpose`, which the bars read - a catalogue is held to the
+ * ceilings only (build-bars.mjs scoreBuild). Neither a plan nor a scene is
+ * guaranteed to carry it, so it is read from the first that does: the plan,
+ * the deck spec beside the plan (`<id>.plan.json` -> `<id>.deck.json`), the
+ * scene, then the deck spec beside the build directory (`<dir>/out` ->
+ * `<dir>/<id>.deck.json`). Null when none says.
+ */
+export function purposeOf({ planPath = null, plan = null, scene = null, buildPath = null } = {}) {
+  if (plan?.purpose) return plan.purpose;
+  const beside = planPath && /\.plan\.json$/.test(planPath) ? readSpec(planPath.replace(/\.plan\.json$/, ".deck.json")) : null;
+  if (beside?.purpose) return beside.purpose;
+  if (scene?.purpose) return scene.purpose;
+  const id = scene?.id ?? plan?.id;
+  const built = buildPath && id ? readSpec(path.join(path.dirname(path.resolve(buildPath)), `${id}.deck.json`)) : null;
+  return built?.purpose ?? null;
 }
 
 function readScene(directory) {
@@ -59,10 +79,10 @@ function readScene(directory) {
   return JSON.parse(readFileSync(file, "utf8"));
 }
 
-function line(label, value, floor, reference) {
+function line(label, value, floor, reference, applied = true) {
   const ok = value === null || value === undefined || value >= floor;
   const shown = value === null || value === undefined ? "n/a" : String(value);
-  return `  ${ok ? "pass" : "FAIL"}  ${label.padEnd(22)} ${shown.padStart(7)}   floor ${String(floor).padStart(5)}   reference ${reference}`;
+  return `  ${!applied ? "  - " : ok ? "pass" : "FAIL"}  ${label.padEnd(22)} ${shown.padStart(7)}   floor ${String(floor).padStart(5)}   reference ${reference}`;
 }
 
 export function report(result) {
@@ -76,8 +96,10 @@ export function report(result) {
   }
   if (result.build) {
     const s = result.build.statistics;
-    out.push("BUILD");
-    for (const [key, bar] of Object.entries(BUILD_BARS)) out.push(line(key, s[key], bar.min, bar.reference));
+    // A catalogue's floors are measured and printed, not applied.
+    const floors = result.build.purpose !== "catalogue";
+    out.push(floors ? "BUILD" : "BUILD (catalogue: held to the ceilings only)");
+    for (const [key, bar] of Object.entries(BUILD_BARS)) out.push(line(key, s[key], bar.min, bar.reference, floors));
     for (const [key, bar] of Object.entries(BUILD_CEILINGS)) out.push(`  ${s[key] <= bar.max ? "pass" : "FAIL"}  ${key.padEnd(22)} ${String(s[key]).padStart(7)}   ceiling ${String(bar.max).padStart(3)}`);
     out.push(`        ${s.contentPages} content pages, ${s.distinctExhibits} distinct exhibits, ${s.tables} tables, ${s.charts} charts`);
   }
@@ -97,7 +119,7 @@ if (isMain(import.meta.url)) {
     const plan = planPath && planPath.endsWith(".json") ? JSON.parse(readFileSync(planPath, "utf8")) : null;
     const scene = buildPath ? readScene(buildPath) : null;
     if (!plan && !scene) throw new Error("Nothing to score: pass a plan.json, a build directory, or both");
-    const result = scoreRun({ plan, scene });
+    const result = scoreRun({ plan, scene, purpose: purposeOf({ planPath, plan, scene, buildPath }) });
     console.log(asJson ? JSON.stringify(result, null, 2) : report(result));
     process.exit(result.accepted ? 0 : 2);
   } catch (error) {

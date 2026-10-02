@@ -477,18 +477,46 @@ console.log(JSON.stringify({ok:true}));
 """)
         self.assertTrue(result["ok"])
 
-    def test_inferred_bars_give_way_to_figures_in_a_narrow_panel(self):
+    def test_inferred_bars_give_way_to_heat_in_a_narrow_panel(self):
+        # Where the bars do not fit, the column keeps its figures and takes the
+        # treatment that needs no width - heat, keyless because every cell
+        # prints its figure - rather than going back to a plain column.
         result = run_node(r"""
 import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const props=styleTable({columns:['Line','Revenue, $','Basis of the estimate and its period'],rows:[['A','1,250,000.50','Company filing for the year to March, audited'],['B','980,250.25','Press report of the private metric, unaudited'],['C','1,105,750.75','Analyst estimate from the round memo, unaudited']]});
 const nodes=(width)=>REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width,height:400},props}).nodes;
-console.log(JSON.stringify({wide:nodes(900).some(n=>n.role==='table-bar'),narrow:nodes(320).some(n=>n.role==='table-bar'),
-  figures:nodes(320).filter(n=>n.role==='table-cell-text'&&n.data?.column===1).map(n=>n.text)}));
+const narrow=nodes(320);
+console.log(JSON.stringify({wide:nodes(900).some(n=>n.role==='table-bar'),narrow:narrow.some(n=>n.role==='table-bar'),
+  heat:narrow.filter(n=>n.role==='table-cell'&&n.data?.cellType==='heatmap').length,key:narrow.some(n=>/^table-legend/.test(n.role)),
+  figures:narrow.filter(n=>n.role==='table-cell-text'&&n.data?.column===1).map(n=>n.text)}));
 """)
         self.assertTrue(result["wide"])
         self.assertFalse(result["narrow"])
+        self.assertEqual(result["heat"], 3)
+        self.assertFalse(result["key"])
         self.assertEqual(result["figures"], ["1,250,000.50", "980,250.25", "1,105,750.75"])
+
+    def test_a_range_the_bars_cannot_hold_marks_the_row_the_title_ranks(self):
+        # The rent table of a half-width panel: its bars are too cramped, and a
+        # shade cannot state "$4,500-5,600". The title says "cheapest", and one
+        # row's figure is the least whatever the range, so that row is accented;
+        # a title that ranks nothing leaves the figures as written.
+        result = run_node(r"""
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const table={type:'table',panelHeading:'Two-bedroom asks',columns:[{label:'Listing',type:'text'},{label:'Size',unit:'bath / sq ft',type:'text'},{label:'Rent',unit:'$ a month',align:'right'}],
+  rows:[['332 Jefferson #415','1 bath / 1,000 sq ft','$3,600'],['300 Newark #4F','2 bath / 1,150 sq ft','$4,400'],['Park Slope range','900-1,000 sq ft','$4,500-5,600']]};
+const chart={type:'chart.column',heading:'Share meeting NJ standards',unit:'%',categories:['ELA','Math'],series:[{name:'Connors',values:[73,65]},{name:'District',values:[75,67]}]};
+const page=(title)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',slides:[{id:'s',title,exhibits:[chart,JSON.parse(JSON.stringify(table))]}]})).deck.slides[0].nodes;
+const accented=(nodes)=>nodes.filter(n=>n.role==='table-row-band'&&n.data?.rowStyle==='accented').map(n=>n.data.row);
+const ranked=page('Hoboken is the midtown fallback: cheapest and safest, with a weaker school');
+const plain=page('Hoboken is the midtown fallback, with a weaker school');
+console.log(JSON.stringify({ranked:accented(ranked),bars:ranked.some(n=>n.role.startsWith('table-bar')),plain:accented(plain)}));
+""")
+        self.assertEqual(result["ranked"], [0])
+        self.assertFalse(result["bars"])
+        self.assertEqual(result["plain"], [])
 
     def test_inferred_bars_give_way_where_their_width_would_overflow_the_frame(self):
         # A row block's table has a fixed height: the width the bars take made
@@ -497,11 +525,12 @@ console.log(JSON.stringify({wide:nodes(900).some(n=>n.role==='table-bar'),narrow
 import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const props=styleTable({columns:[{label:'Lab',type:'category'},'Post-money, $B'],rows:[['OpenAI, March round','852'],['Anthropic, May round','965']]});
-const at=(width,height)=>{ try { return REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width,height},props}).nodes.some(n=>n.role==='table-bar'); } catch (e) { return e.message.slice(0,40); } };
-console.log(JSON.stringify({roomy:at(240,160),tight:at(240,100)}));
+const at=(width,height)=>{ try { const nodes=REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width,height},props}).nodes;
+  return nodes.some(n=>n.role==='table-bar') ? 'bars' : nodes.some(n=>n.data?.cellType==='heatmap') ? 'heat' : 'plain'; } catch (e) { return e.message.slice(0,40); } };
+console.log(JSON.stringify({roomy:at(300,160),tight:at(300,100)}));
 """)
-        self.assertTrue(result["roomy"])
-        self.assertIs(result["tight"], False, "the figures stay as text rather than the page refusing")
+        self.assertEqual(result["roomy"], "bars")
+        self.assertEqual(result["tight"], "heat", "the figures keep a treatment rather than the page refusing")
 
     def test_cards_wrap_into_a_grid(self):
         run_node(r'''
@@ -581,9 +610,30 @@ const scales={h:{type:'heatmap',label:'Score',min:1,max:5,anchors:{1:'Low',5:'Hi
 const gap=renderTable({id:'g',frame:{x:0,y:0,width:900,height:400},props:styleTable({scales,columns:['Firm','Score'],rows:[['A',{type:'heatmap',value:2,scale:'h'}],['B',{type:'heatmap',value:'missing',scale:'h'}],['C',{type:'heatmap',value:5,scale:'h'}]]})}).nodes.filter(n=>n.role==='table-legend').map(n=>n.text).join(' ');
 console.log(JSON.stringify({full,gap}));
 """)
-        self.assertIn("1 = 10.4", result["full"])
+        self.assertEqual(result["full"], "10.4% 25.6%", "a ramp from the least figure to the greatest, in their units")
         self.assertNotIn("Missing", result["full"], "no cell is missing, so the key does not define the state")
         self.assertIn("Missing = Not available", result["gap"])
+
+    def test_a_heat_key_reads_in_the_figures_units_and_may_be_dropped(self):
+        # "$305k, $385k, $460k (%): 1 = 10.4; 5 = 25.6" over swatches numbered
+        # one to five read as a second scale the table does not have. The key
+        # is a ramp from the least figure to the greatest, in their units; and
+        # since every cell prints its figure, the author may drop it.
+        result = run_node(r"""
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
+const table={columns:['Monthly rent',{label:'$305k',unit:'%'},{label:'$385k',unit:'%'},{label:'$460k',unit:'%'}],rows:[['$4,000','15.7','12.5','10.4'],['$5,500','21.6','17.1','14.3'],['$6,500','25.6','20.3','17.0']]};
+const draw=(extra)=>renderTable({id:'t',frame:{x:0,y:0,width:560,height:400},props:styleTable({...table,...extra})}).nodes;
+const keyed=draw({}), dropped=draw({legend:false});
+const ramp=keyed.filter(n=>n.role==='table-legend-swatch'&&n.data?.heatStep!==undefined).map(n=>n.data.heatStep);
+console.log(JSON.stringify({texts:keyed.filter(n=>n.role==='table-legend').map(n=>n.text),ramp,numbered:keyed.some(n=>n.role==='table-cell-text'&&/^[1-5]$/.test(n.text)),
+  dropped:dropped.filter(n=>/^table-legend/.test(n.role)).length,heat:dropped.filter(n=>n.data?.cellType==='heatmap'&&n.role==='table-cell').length}));
+""")
+        self.assertEqual(result["texts"], ["10.4%", "25.6%"])
+        self.assertEqual(result["ramp"], [1, 2, 3, 4, 5])
+        self.assertFalse(result["numbered"], "no swatch carries a step number")
+        self.assertEqual(result["dropped"], 0)
+        self.assertEqual(result["heat"], 9, "the cells keep their shades without the key")
 
 
 class CardLogoTests(unittest.TestCase):

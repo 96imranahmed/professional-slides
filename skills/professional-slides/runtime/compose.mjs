@@ -25,7 +25,7 @@
 import { applyDesign } from "./design-systems.mjs";
 import { mapAll, defaultHighlightStyle, resolveDensityTokens, TOKENS } from "./core.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
-import { measureInsight, measureList, measureProse, measureCaption, proseMeasure } from "./registry.mjs";
+import { REGISTRY, measureInsight, measureList, measureProse, measureCaption, proseMeasure } from "./registry.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { ENGINE_RESERVE, measureText, hasPhrase } from "./text-layout.mjs";
@@ -35,7 +35,7 @@ import { legendRowCount } from "./legends.mjs";
 import { measureTable, renderTable, withoutInferredBars } from "./tables.mjs";
 import { resolveWeight, normalizeWeight } from "./weight.mjs";
 import { groupThousands } from "./draw.mjs";
-import { figuresWithDecimals, formatValue } from "./value-format.mjs";
+import { figureUnit, figuresWithDecimals, formatValue, withUnit } from "./value-format.mjs";
 import { factGridLayout } from "./figures.mjs";
 import { metricHeight } from "./panels.mjs";
 import { stepsLayout } from "./extras.mjs";
@@ -900,8 +900,13 @@ export function inferredTreatments(ex) {
     const all = matrix.flatMap((f) => f.values), lo = Math.min(...all), hi = Math.max(...all);
     const printed = (value) => cellText(body.flatMap((row) => matrix.map((f) => rowCellsOf(row)[f.i])).find((cell) => figure(cell)?.value === value));
     const id = `${barScaleId(matrix[0].unit).replace(/-bar$/, "")}-heat`;
+    // Keyed as a ramp from the lowest figure to the highest in their own
+    // units (tables.mjs layoutRamp); every cell prints its figure, so the
+    // author may drop the key (`legend: false` on the table).
+    const inUnits = (text) => (figureUnit(text) ? text : withUnit(text, matrix[0].unit));
     scales[id] = { type: "heatmap", label: `${matrix.map((f) => columnLabel(columns[f.i])).join(", ")} (${matrix[0].unit})`, min: 1, max: 5,
-      anchors: { 1: printed(lo), 5: printed(hi) }, palette: "theme-sequential" };
+      anchors: { 1: printed(lo), 5: printed(hi) }, ramp: { low: inUnits(printed(lo)), high: inUnits(printed(hi)) },
+      ...(ex.legend === false ? { legend: false } : {}), palette: "theme-sequential" };
     const at = new Set(matrix.map((f) => f.i));
     next.rows = next.rows.map((row) => (isBodyRow(row) ? mapTableCells(row, (cells) => cells.map((cell, c) => (at.has(c)
       ? { type: "heatmap", value: 1 + Math.round(((figure(cell).value - lo) / (hi - lo)) * 4), figure: cellText(cell), scale: id } : cell))) : row));
@@ -916,7 +921,16 @@ export function inferredTreatments(ex) {
         next.rows = next.rows.map((row) => mapTableCells(row, (cells) => cells.map((cell, c) => (c === measure.i && quantity(cell)
           ? cellText(cell).replace(/\d[\d,]*(?:\.\d+)?/g, (digits) => { const [integer, fraction] = digits.replaceAll(",", "").split("."); return groupThousands(integer) + (fraction === undefined ? "" : `.${fraction}`); })
           : cell))));
-      next.columns[measure.i] = { ...(typeof column === "string" ? { label: column } : column), bar: true, unit: measure.unit, inferred: true, width: columnWeight(ex, measure.i) * 2 };
+      // The row the title ranks (decisiveFromTitle), when its figure is the
+      // least or the greatest whatever its bounds: what the column marks
+      // instead where its bars do not fit and a shade cannot state a bound or
+      // a range (tables.mjs withoutInferredBars).
+      const extent = (row) => { const q = barQuantity(rowCellsOf(row)[measure.i]); return !q ? null : q.bound === "range" ? [q.low, q.value] : q.bound === "lower" ? [q.value, Infinity] : q.bound === "upper" ? [-Infinity, q.value] : [q.value, q.value]; };
+      const spans = next.rows.map((row) => (isBodyRow(row) ? extent(row) : null));
+      const decisive = ex.decisive === "least" || ex.decisive === "most" ? spans.findIndex((span, r) => span && spans.every((other, o) => o === r || !other
+        || (ex.decisive === "least" ? span[1] < other[0] : span[0] > other[1]))) : -1;
+      next.columns[measure.i] = { ...(typeof column === "string" ? { label: column } : column), bar: true, unit: measure.unit, inferred: true, width: columnWeight(ex, measure.i) * 2,
+        ...(decisive >= 0 ? { fallbackRow: decisive } : {}) };
     }
   }
   return Object.keys(scales).length ? { ...next, scales } : next;
@@ -1481,6 +1495,48 @@ function metricsStrip(metrics, id, tone) {
   const tiles = metrics.map((m) => (typeof m === "string" ? { value: m } : m));
   const prominent = tone === "ink" || tone === "rule";
   return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...(tiles.length > 1 ? { valign: "top" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
+}
+
+/**
+ * Whether the measures over an exhibit stand beside it instead. A strip over
+ * an exhibit that keeps its own height - rows that do not grow with their
+ * frame (a dumbbell, a lollipop, a short table), and few of them - is two thin
+ * bands across the page: the numbers spread over the full width, the rows over
+ * a plot their marks cannot fill. Up to four measures then stand in a column
+ * beside the exhibit, which takes the rest of the row (metricsColumn). An
+ * exhibit that grows into the height the strip leaves (bars, columns, lines)
+ * keeps the strip over it, and so does one with more rows than a strip-high
+ * band holds, or measures in a tone that draws no tile (metricsColumn needs one).
+ */
+const BESIDE_ROWS_MAX = 4;
+const TILED_TONES = new Set([undefined, "tint", "dark", "ink"]);
+function metricsBesideExhibit(slide, exhibits, layout) {
+  // An implication marker drawn across, between the measures and the exhibit,
+  // is the author asking for the strip over it.
+  if (layout !== "metrics-over-exhibit" || exhibits.length !== 1 || slide.metricsPosition === "bottom" || BRIDGE_VARIANTS.get(slide.implication) !== null) return false;
+  if (!TILED_TONES.has(slide.metricsTone)) return false;
+  const count = Array.isArray(slide.metrics) ? slide.metrics.length : 0;
+  if (count < 2 || count > BESIDE_ROWS_MAX) return false;
+  const ex = exhibits[0], type = String(ex?.type ?? "");
+  const rows = type === "table" || type === "rows" ? (ex.rows || []).filter((row) => Array.isArray(row) || !["total", "group"].includes(row?.style)).length
+    : SIDEWAYS_CATEGORIES.has(type) ? (ex.categories || []).length : Infinity;
+  const component = REGISTRY.get(type === "rows" ? "table" : type);
+  return rows <= BESIDE_ROWS_MAX && typeof component?.measureContent === "function";
+}
+
+/**
+ * The measures in a column beside the exhibit, the tiles dividing the
+ * column's height between them, each a filled tile (the light tint unless the
+ * page names a tone) with its figure centred. The exhibit keeps its own
+ * height, so its column may stop short; the tiles carry this one to the foot.
+ * Unfilled, three figures centred in thirds of a 500px column left 110px of
+ * air between each (COLUMN_VOID), and drawn as a compact group they stopped
+ * where the exhibit did, and the page's foot stood empty (DEAD_BAND).
+ */
+function metricsColumn(metrics, id, tone) {
+  const strip = metricsStrip(metrics, id, tone ?? "tint");
+  return { id, layout: "flow.column", gap: "space.4", size: { width: { fr: 1 }, height: "fill" },
+    items: strip.items.map((tile) => ({ ...tile, props: { variant: "prominent", ...tile.props, valign: "middle" }, size: { width: { fr: 1 }, height: { fr: 1 } } })) };
 }
 
 // Words of prose one column carries before a document page opens a second.
@@ -2161,6 +2217,8 @@ const signed = (n, suffix = "") => `${n >= 0 ? "+" : "−"}${fmtNumber(Math.abs(
 // of "Consultants 110 221 112" beneath three horizontal bars sets each number
 // under empty plot. The table is only ever readable under a chart whose
 // category axis is the x axis.
+// Charts that set their categories over a data table's columns (charts.mjs tableSpan).
+const TABLE_ALIGNED = new Set(["chart.column", "chart.stacked-column", "chart.line", "chart.area", "chart.combo", "chart.waffle"]);
 const SIDEWAYS_CATEGORIES = new Set(["chart.bar", "chart.stacked-bar", "chart.lollipop",
   "chart.dumbbell", "chart.bullet", "chart.range"]);
 
@@ -2254,6 +2312,17 @@ export function focusFromTitle(ex, title) {
     if (named) return { ...ex, highlights: [{ category: named, style: "bar" }] };
   }
   return ex;
+}
+
+// A title that ranks one row with a superlative ("cheapest and safest", "the
+// highest margin") says which row a table of figures turns on: its least or
+// its greatest figure. A title with both directions, or neither, names none.
+const LEAST_WORDS = /\b(cheapest|lowest|least|smallest|fewest|shortest|slowest|weakest)\b/i;
+const MOST_WORDS = /\b(highest|largest|biggest|greatest|longest|fastest|strongest|priciest|costliest|dearest)\b/i;
+function decisiveFromTitle(ex, title) {
+  if (ex?.type !== "table" || ex.highlightRow !== undefined || ex.decisive !== undefined || !title) return ex;
+  const least = LEAST_WORDS.test(String(title)), most = MOST_WORDS.test(String(title));
+  return least === most ? ex : { ...ex, decisive: least ? "least" : "most" };
 }
 
 export function changeFromContent(ex, title) {
@@ -2721,7 +2790,7 @@ const SLIDE_PASSES = [
 
   // Normalize an authored percent stack or explicitly requested change annotation.
   ["read-the-data", (slide) => {
-    const derive = (ex) => focusFromTitle(changeFromContent(percentStack(ex), slide.title), slide.title);
+    const derive = (ex) => decisiveFromTitle(focusFromTitle(changeFromContent(percentStack(ex), slide.title), slide.title), slide.title);
     if (slide.exhibit) return { ...slide, exhibit: derive(slide.exhibit) };
     if (slide.exhibits) return { ...slide, exhibits: slide.exhibits.map(derive) };
     return slide;
@@ -2762,6 +2831,13 @@ const SLIDE_PASSES = [
   }],
 
   // The chart stacks over a compact table whose columns are its categories.
+  // A chart that can set its categories over those columns (TABLE_ALIGNED;
+  // charts.mjs tableSpan) does: the label column is measured from the row
+  // names and fixed, the value columns share the rest equally, and the plot is
+  // inset to match, so each figure sits under its own bar or point. The table
+  // then carries the values, so the chart prints none of its own - the same
+  // figure on the bar and again under it - and needs no value axis to read
+  // them off. An author who asks for both (`dataLabels: true`) is refused.
   ["stack-the-data-table", (slide) => {
     if (!(slide.exhibit && Array.isArray(slide.exhibit.dataTable) && slide.exhibit.dataTable.length && !slide.exhibits)) return slide;
     if (SIDEWAYS_CATEGORIES.has(String(slide.exhibit.type))) {
@@ -2769,10 +2845,24 @@ const SLIDE_PASSES = [
       return { ...slide, exhibit };
     }
     const chart = { ...slide.exhibit }; const rowsIn = chart.dataTable; delete chart.dataTable;
+    const aligned = TABLE_ALIGNED.has(String(chart.type));
+    if (aligned && chart.dataLabels === true)
+      throw new Error(`${slide.id ?? "A chart"}: the data table under the chart prints every value, and \`dataLabels: true\` prints each one again on its mark - drop \`dataLabels\` (the table carries the figures) or drop the table`);
+    // The label column holds the longest row name in the table's bold label type.
+    const label = aligned ? Math.max(96, ...rowsIn.map((r) => Math.ceil(measureText(String(r.label ?? ""), 4000, { fontFamily: "Arial", fontSize: 12, bold: true }).width) + 32)) : 0;
+    if (aligned) Object.assign(chart, { categoryColumns: { label },
+      // Stack totals are the stack's own figure, which the table does not print.
+      ...(chart.stackTotals || chart.secondaryLabels ? {} : { dataLabels: false }),
+      ...(chart.showValueAxis === undefined && chart.gridlines !== true && chart.type !== "chart.waffle" ? { showValueAxis: false } : {}),
+      // Lines keep their names in a legend: the table's columns run to the
+      // plot's edge, leaving no gutter for names at the line ends.
+      ...(["chart.line", "chart.area"].includes(chart.type) && chart.endLabels === undefined && chart.directLabels === undefined ? { endLabels: false } : {}) });
     // `chartData`: the table is the chart's own figures, printed under it -
     // part of the chart, which the treated-table share does not count
     // (build-bars.mjs chartDataTable).
-    const table = { type: "table", chartData: true, density: "compact", treatment: "open", variant: "plain", columns: [{ label: "", type: "text", bold: true, width: 120 }, ...(chart.categories || []).map(() => ({ label: "", type: "text", align: "center", width: 80 }))], rows: rowsIn.map((r) => [r.label, ...(r.values || []).map(String)]) };
+    const table = { type: "table", chartData: true, density: "compact", treatment: "open", variant: "plain",
+      columns: [{ label: "", type: "text", bold: true, width: aligned ? { px: label } : 120 }, ...(chart.categories || []).map(() => ({ label: "", type: "text", align: "center", width: aligned ? 1 : 80 }))],
+      rows: rowsIn.map((r) => [r.label, ...(r.values || []).map(String)]) };
     return { ...slide, exhibit: undefined, exhibits: [chart, table], arrange: "stack", stackWeights: [4, 1] };
   }],
 
@@ -3462,7 +3552,8 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
     throw new Error(`${id}: ${layout} cannot place insight/insights/kpi; choose an exhibit-left or exhibit-right layout`);
   }
   const metricsBelow = slide.metricsPosition === "bottom";
-  if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow) {
+  const metricsBeside = metricsBesideExhibit(slide, exhibits, layout);
+  if (Array.isArray(slide.metrics) && slide.metrics.length && !metricsBelow && !metricsBeside) {
     items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
     // `implication` draws the marker across the page, between the measures and
     // what follows from them: the same mark the gutter carries between an
@@ -3500,7 +3591,10 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   } else if (fullWidth) {
     const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
     if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
-    items.push(item);
+    // The measures in a column at the left, the exhibit the other two thirds.
+    if (metricsBeside) items.push({ id: `${id}-row`, layout: "flow.row", gap: "space.6", size: SIZE, items: [
+      metricsColumn(slide.metrics, `${id}-metrics`, slide.metricsTone), { ...item, size: { width: { fr: 2 }, height: "fill" } }] });
+    else items.push(item);
   } else if (layout === "table-halves") {
     // One table, two panels. The rows split in reading order - the first half
     // down the left, the second down the right - so the ranking still reads 1

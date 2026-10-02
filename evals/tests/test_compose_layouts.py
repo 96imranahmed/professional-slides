@@ -134,6 +134,35 @@ if __name__ == '__main__':
     unittest.main()
 
 
+class MetricStripTests(unittest.TestCase):
+    def test_measures_stand_beside_an_exhibit_of_a_few_rows_that_keep_their_height(self):
+        # Three measures in a strip over a four-row dumbbell made two thin
+        # bands across the page: the numbers spread over 1160px, four rows of
+        # dots under them. Rows that keep their own height (a dumbbell, a
+        # lollipop, a short table) and few of them take the measures in a
+        # column beside them; bars, which grow into the height, and a longer
+        # set of rows keep the strip over the exhibit.
+        result = run_node('''
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const metrics=[{value:'5.9x',label:'ChatGPT visits per Claude visit'},{value:'+7.6pp',label:'Claude visit share gained in a year'},{value:'-21pp',label:'ChatGPT visit share lost in a year'}];
+const rows=(n)=>Array.from({length:n},(_,i)=>'Row '+(i+1));
+const dumbbell=(n)=>({type:'chart.dumbbell',heading:'Web visits and cross-use',unit:'%',categories:rows(n),series:[{name:'2025',values:rows(n).map((_,i)=>2+i*9)},{name:'2026',values:rows(n).map((_,i)=>9+i*11)}],xMin:0,xMax:100});
+const bar={type:'chart.bar',heading:'Retained at six months',unit:'%',categories:rows(3),series:[{name:'Retained',values:[25.8,45,59]}]};
+const place=(exhibit)=>{
+  const slide=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',slides:[{id:'s',title:'Claude gained web share, but ChatGPT still drew six times its visits',layout:'metrics-over-exhibit',metrics,exhibit}]})).deck.slides[0];
+  const tiles=slide.componentInstances.filter(c=>c.component==='metric').map(c=>c.frame);
+  const chart=slide.componentInstances.find(c=>c.component.startsWith('chart.')).frame;
+  return {column:new Set(tiles.map(t=>Math.round(t.x))).size===1&&new Set(tiles.map(t=>Math.round(t.y))).size===3,
+    beside:tiles.every(t=>t.x+t.width<=chart.x),over:tiles.every(t=>t.y+t.height<=chart.y)};
+};
+console.log(JSON.stringify({four:place(dumbbell(4)),six:place(dumbbell(6)),bar:place(bar)}));
+''')
+        self.assertEqual(result["four"], {"column": True, "beside": True, "over": False})
+        self.assertEqual(result["six"], {"column": False, "beside": False, "over": True})
+        self.assertEqual(result["bar"], {"column": False, "beside": False, "over": True})
+
+
 class ChartRuleTests(unittest.TestCase):
     def test_the_title_names_the_mark_it_is_about(self):
         result = run_node(r'''

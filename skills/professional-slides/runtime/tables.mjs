@@ -477,6 +477,8 @@ function scaleFor(cell, props, used) {
       (scale.midpoint !== (min + max) / 2 || !anchors[scale.midpoint])
     )
       throw new Error("Diverging heatmap requires a named neutral midpoint");
+    if (cell.type === "heatmap" && scale.ramp !== undefined && (typeof scale.ramp?.low !== "string" || !scale.ramp.low.trim() || typeof scale.ramp?.high !== "string" || !scale.ramp.high.trim()))
+      throw new Error("A heat ramp names its lowest and highest figures in their units (`ramp: { low, high }`)");
   } else if (cell.type === "bars") {
     if (
       !Number.isFinite(scale.min) ||
@@ -794,7 +796,23 @@ function legendText(scale, absent = false) {
     .join("; ")}.${absent ? " Missing = Not available; N/A = not applicable." : ""}`;
 }
 
+// A heat scale over figures (`ramp`, which the composer sets when every cell
+// prints the figure its shade stands for) is keyed as a ramp from the lowest
+// figure to the highest in the figures' own units - "10.4%" to "25.6%" - with
+// no line of text: swatches numbered one to five under "1 = 10.4; 5 = 25.6"
+// read as a second scale the table does not have.
+function layoutRamp(id, scale, width, size, gap) {
+  const low = measure(scale.ramp.low, width, true, size), high = measure(scale.ramp.high, width, true, size);
+  // The shades take what the two figures leave, up to a column's width each
+  // and down to an icon's, as the numbered key's swatches did.
+  const count = scale.max - scale.min + 1, slot = Math.min(v("space.6"), (width - low.width - high.width - 4 * gap) / count);
+  if (slot < v("icon.medium"))
+    throw new Error(`The heat key (${scale.ramp.low} to ${scale.ramp.high}) does not fit under its table; widen the table or set \`legend: false\` - every cell prints its figure`);
+  return { id, scale, ramp: { low, high, slot, count }, entries: [], height: Math.max(v("icon.medium"), low.height, high.height) + gap };
+}
+
 function layoutLegend(id, scale, width, size, gap, absent = false) {
+  if (scale.type === "heatmap" && scale.ramp && !absent) return layoutRamp(id, scale, width, size, gap);
   const text = legendText(scale, absent),
     layout = measure(text, width, false, size);
   const entries = [];
@@ -885,6 +903,9 @@ function widenForWords(model, widths, props, { padding, textSize, chevronInset }
       // narrower than "At risk" in a pill.
       const drawn = minimumDrawnWidth(cell, props);
       if (drawn) { word = Math.max(word, drawn); continue; }
+      // A heat cell prints the figure its shade stands for, and that figure
+      // breaks no more than a text cell's does.
+      if (cell.type === "heatmap" && typeof cell.figure === "string") { word = Math.max(word, longest(cell.figure, false, bodySize(props))); continue; }
       if (!["text", "category", "highlight", "number"].includes(cell.type ?? "text")) continue;
       word = Math.max(word, longest(cell.text, cell.bold || cell.type === "category", bodySize(props)));
     }
@@ -900,13 +921,47 @@ function widenForWords(model, widths, props, { padding, textSize, chevronInset }
   return widths.map((width, c) => fixed[c] ? width : width < need[c] ? need[c] : width - (slack[c] / room) * deficit);
 }
 
-/** `props` with every bar column the composer inferred set back as the figures it was written as. */
+/**
+ * `props` with every bar column the composer inferred given the treatment that
+ * needs no width, where its bars do not fit - too narrow a panel, or columns
+ * beside it wrapping past the frame. Every figure stays as its author wrote it,
+ * and the table is never left plain while an honest treatment exists:
+ *
+ *   - Heat, when every figure in the column is a point (or an approximation of
+ *     one): each cell shaded at its step of the column's range, with no key -
+ *     every cell prints its figure (measureTable omits a heat key on those
+ *     terms), and the panel that could not hold the bars has no row to spare.
+ *   - The row the page's title ranks (`fallbackRow`, compose.mjs: "cheapest"
+ *     over a column whose least figure is one row's), tinted as an accented
+ *     row, when a figure is a bound or a range: one shade cannot state "500+"
+ *     or "$4,500-5,600", but the row the argument turns on can still be found.
+ *   - Otherwise the figures alone.
+ */
 export function withoutInferredBars(props) {
-  const at = new Set((props.columns || []).flatMap((c, i) => (c?.inferred === true && c.type === "bars" ? [i] : [])));
-  const cellOf = (cell, i) => (at.has(i) && cell?.type === "bars" ? { type: "text", text: String(cell.labels?.[0] ?? "") } : cell);
-  return { ...props,
-    columns: props.columns.map((c, i) => (at.has(i) ? { ...c, type: "text", width: typeof c.width === "number" ? c.width / 2 : c.width } : c)),
-    rows: props.rows.map((row) => (Array.isArray(row) ? row.map(cellOf) : { ...row, cells: (row.cells || []).map(cellOf) })) };
+  const at = (props.columns || []).flatMap((c, i) => (c?.inferred === true && c.type === "bars" ? [i] : []));
+  const cellsOf = (row) => (Array.isArray(row) ? row : row.cells || []);
+  const columns = [...props.columns];
+  let rows = props.rows.map((row) => (Array.isArray(row) ? [...row] : { ...row, cells: [...(row.cells || [])] }));
+  const scales = { ...(props.scales || {}) };
+  for (const i of at) {
+    const bars = rows.map((row) => cellsOf(row)[i]).filter((cell) => cell?.type === "bars");
+    const values = bars.map((cell) => cell.values[0]), lo = Math.min(...values), hi = Math.max(...values);
+    const heat = bars.length >= 2 && hi > lo && bars.every((cell) => !cell.bound || cell.bound === "approx");
+    const id = `${bars[0]?.scale ?? i}-heat`;
+    if (heat) scales[id] = { type: "heatmap", label: String(columns[i].label ?? ""), min: 1, max: 5, legend: false, palette: "theme-sequential",
+      anchors: { 1: String(bars[values.indexOf(lo)].labels?.[0] ?? lo), 5: String(bars[values.indexOf(hi)].labels?.[0] ?? hi) } };
+    const cellOf = (cell) => (cell?.type !== "bars" ? cell : heat
+      ? { type: "heatmap", value: 1 + Math.round(((cell.values[0] - lo) / (hi - lo)) * 4), figure: String(cell.labels?.[0] ?? ""), scale: id }
+      : { type: "text", text: String(cell.labels?.[0] ?? "") });
+    const { fallbackRow, ...column } = columns[i];
+    columns[i] = { ...column, type: heat ? "heatmap" : "text", width: typeof column.width === "number" ? column.width / 2 : column.width };
+    rows = rows.map((row, r) => {
+      const cells = cellsOf(row).map((cell, c) => (c === i ? cellOf(cell) : cell));
+      const accent = !heat && r === fallbackRow && (Array.isArray(row) || (row.style ?? props.rowStyle ?? "plain") === "plain");
+      return Array.isArray(row) ? (accent ? { style: "accented", cells } : cells) : { ...row, cells, ...(accent ? { style: "accented" } : {}) };
+    });
+  }
+  return { ...props, columns, rows, ...(Object.keys(scales).length ? { scales } : {}) };
 }
 
 // A header that already ends on its unit ("Committed round, $B", "Rent (£)")
@@ -947,23 +1002,17 @@ export function measureTable({ frame, props }) {
     textSize: density === "dense" ? "type.label" : density === "compact" ? "type.compact" : "type.body" });
   let widths = resolve();
   // Bars the composer inferred (compose.mjs inferredTreatments) are drawn only
-  // where the column leaves them a plot: in a narrow panel the column keeps its
-  // figures as text, as its author wrote them, rather than refusing the page.
-  let fellBack = false;
-  model.columns.forEach((column, c) => {
-    if (column.inferred !== true || column.type !== "bars") return;
+  // where the column leaves them a plot: three times the narrowest column. A
+  // bar shorter than that shows a tenth's difference as a few pixels and
+  // squeezes its neighbours into wrapping. Where they do not fit, the table is
+  // measured again with the treatment that needs no width (withoutInferredBars).
+  const cramped = model.columns.some((column, c) => {
+    if (column.inferred !== true || column.type !== "bars") return false;
     const cells = model.cells.map((row) => row[c]).filter((cell) => cell?.type === "bars");
     const label = Math.max(v("space.6"), ...cells.map((cell) => measure(String(cell.labels?.[0] ?? ""), 4000, true, bodySize(tableProps)).width));
-    if (widths[c] - 2 * padding - label - gap >= v("space.6")) return;
-    column.type = "text";
-    for (const cell of cells) {
-      const text = String(cell.labels?.[0] ?? "");
-      for (const key of ["values", "labels", "scale", "scaleRecord", "scaleValues", "bound", "low"]) delete cell[key];
-      Object.assign(cell, { type: "text", text, value: text });
-    }
-    fellBack = true;
+    return widths[c] - 2 * padding - label - gap < 3 * v("space.6");
   });
-  if (fellBack) widths = resolve();
+  if (cramped) return measureTable({ frame, props: withoutInferredBars(props) });
   widths = assertMinimumWidths(model.columns, widths);
   if (props.rowSpacing !== undefined && !["normal", "tight"].includes(props.rowSpacing))
     throw new Error("Table rowSpacing must be normal or tight");
@@ -1089,8 +1138,12 @@ export function measureTable({ frame, props }) {
     // Yes; No; Not assessed." - defines its own term with itself under a table
     // that says neither "requirement" nor "option".
     if (scale.type === "binary" && columns.length && columns.every(column => /\?\s*$/.test(String(column.label ?? "").trim()))) continue;
+    // A heat cell that prints its figure says what its shade stands for; the
+    // key would only add that darker is more.
+    const cells = model.cells.flat().filter((cell) => cell?.scale === id);
+    if (scale.type === "heatmap" && cells.length && cells.every((cell) => typeof cell.figure === "string" && cell.figure.trim())) continue;
     if (scale.type !== "bars" || scale.series.length !== 1 || columns.some(column => !column.label.includes(scale.unit) && String(column.unit ?? "").trim() !== scale.unit))
-      throw new Error("Only single-series bar legends may be omitted, with their unit visible in every using column header or its unit line, or a binary scale whose every column header asks a question");
+      throw new Error("Only single-series bar legends may be omitted, with their unit visible in every using column header or its unit line, a binary scale whose every column header asks a question, or a heat scale whose every cell prints its figure");
   }
   const absent = new Set(model.cells.flat().filter((cell) => cell && ["missing", "na"].includes(cell.value)).map((cell) => cell.scale));
   const legends = [...used.entries()].filter(([, scale]) => scale.legend !== false).map(([id, scale]) =>
@@ -1971,8 +2024,27 @@ function renderTableAt({ id, frame, props }) {
   let y =
     frame.y + m.headerHeight + sum(m.heights) + v("space.4");
   m.legends.forEach(
-    ({ id: scaleId, scale, layout, entries, height: legendHeight }) => {
+    ({ id: scaleId, scale, layout, entries, ramp, height: legendHeight }) => {
       const legendTop = y;
+      if (ramp) {
+        // Lowest figure, the shades in order, highest figure: one row.
+        const row = Math.max(v("icon.medium"), ramp.low.height, ramp.high.height);
+        putText(stableId(id, "legend-low", scaleId), "table-legend", { x: frame.x, y: y + (row - ramp.low.height) / 2, width: ramp.low.width + 1 }, ramp.low, textStyle(true, ink, "left", m.textSize));
+        const x0 = frame.x + ramp.low.width + 1 + m.gap;
+        for (let value = scale.min; value <= scale.max; value++) {
+          nodes.push(rectPrimitive({ id: stableId(id, "legend-swatch", scaleId, value), role: "table-legend-swatch",
+            frame: { x: x0 + (value - scale.min) * ramp.slot, y: y + (row - v("icon.medium")) / 2, width: ramp.slot, height: v("icon.medium") },
+            style: box(heatFill(scale, value)), data: { heatStep: value } }));
+        }
+        // A hairline round the ramp: its lightest step is the page's own
+        // white, and unframed it reads as a gap before the shades begin.
+        nodes.push(rectPrimitive({ id: stableId(id, "legend-ramp", scaleId), role: "table-legend-swatch",
+          frame: { x: x0, y: y + (row - v("icon.medium")) / 2, width: ramp.count * ramp.slot, height: v("icon.medium") },
+          style: { fill: "none", stroke: t("color.rule"), lineWidth: t("line.hairline"), radius: t("radius.none") }, data: { heatRamp: true } }));
+        putText(stableId(id, "legend-high", scaleId), "table-legend", { x: x0 + ramp.count * ramp.slot + m.gap, y: y + (row - ramp.high.height) / 2, width: ramp.high.width + 1 }, ramp.high, textStyle(true, ink, "left", m.textSize));
+        y = legendTop + legendHeight;
+        return;
+      }
       putText(
         stableId(id, "legend", scaleId),
         "table-legend",

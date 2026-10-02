@@ -119,6 +119,31 @@ console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])
 
+    def test_the_command_line_reads_the_deck_s_purpose(self):
+        # scoreBuild knew a catalogue; the command line never told it, so
+        # `score.mjs` flagged the gallery's floors that delivery and the craft
+        # floor hold it free of. It reads the purpose from the deck spec beside
+        # the plan, or beside the build directory, as the build lays them out.
+        import tempfile
+        page = {"id": "s", "nodes": [{"role": "action-title", "type": "text"}] + [{"role": "m", "type": "rect"}] * 20,
+                "componentInstances": [{"component": "table"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "out").mkdir()
+            (root / "out" / "scene.json").write_text(json.dumps({"id": "cat", "slides": [page] * 20}), encoding="utf-8")
+            (root / "cat.plan.json").write_text(json.dumps({"id": "cat"}), encoding="utf-8")
+            argues, code = score("-", str(root / "out"))
+            self.assertFalse(argues["build"]["accepted"], "with no spec beside it the floors apply")
+            self.assertEqual(code, 2)
+            (root / "cat.deck.json").write_text(json.dumps({"id": "cat", "purpose": "catalogue"}), encoding="utf-8")
+            alone, code = score("-", str(root / "out"))
+            self.assertTrue(alone["build"]["accepted"])
+            self.assertEqual(alone["build"]["purpose"], "catalogue")
+            self.assertEqual(code, 0)
+            (root / "out" / "scene.json").write_text(json.dumps({"id": "other", "slides": [page] * 20}), encoding="utf-8")
+            planned, _ = score(str(root / "cat.plan.json"), str(root / "out"))
+            self.assertTrue(planned["build"]["accepted"], "read from the spec beside the plan")
+
     def test_a_deck_that_ships_empty_frames_is_not_accepted(self):
         """Found by running the harness, which is the point of the harness.
 

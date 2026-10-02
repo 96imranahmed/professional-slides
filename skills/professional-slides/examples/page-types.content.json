@@ -5031,29 +5031,9 @@
      "text": "Low"
     },
     {
-     "id": "p20b-p20b-exhibit-0:value-label:central:fy26",
-     "role": "exhibit",
-     "text": "48.3"
-    },
-    {
-     "id": "p20b-p20b-exhibit-0:value-label:low:fy26",
-     "role": "exhibit",
-     "text": "48.3"
-    },
-    {
      "id": "p20b-p20b-exhibit-0:category:fy26",
      "role": "exhibit",
      "text": "FY26"
-    },
-    {
-     "id": "p20b-p20b-exhibit-0:value-label:central:fy27",
-     "role": "exhibit",
-     "text": "49.6"
-    },
-    {
-     "id": "p20b-p20b-exhibit-0:value-label:low:fy27",
-     "role": "exhibit",
-     "text": "49.4"
     },
     {
      "id": "p20b-p20b-exhibit-0:category:fy27",
@@ -5061,29 +5041,9 @@
      "text": "FY27"
     },
     {
-     "id": "p20b-p20b-exhibit-0:value-label:central:fy28",
-     "role": "exhibit",
-     "text": "51.8"
-    },
-    {
-     "id": "p20b-p20b-exhibit-0:value-label:low:fy28",
-     "role": "exhibit",
-     "text": "51.1"
-    },
-    {
      "id": "p20b-p20b-exhibit-0:category:fy28",
      "role": "exhibit",
      "text": "FY28"
-    },
-    {
-     "id": "p20b-p20b-exhibit-0:value-label:central:fy29",
-     "role": "exhibit",
-     "text": "54.4"
-    },
-    {
-     "id": "p20b-p20b-exhibit-0:value-label:low:fy29",
-     "role": "exhibit",
-     "text": "53.2"
     },
     {
      "id": "p20b-p20b-exhibit-0:category:fy29",
@@ -5091,29 +5051,9 @@
      "text": "FY29"
     },
     {
-     "id": "p20b-p20b-exhibit-0:value-label:central:fy30",
-     "role": "exhibit",
-     "text": "57.3"
-    },
-    {
-     "id": "p20b-p20b-exhibit-0:value-label:low:fy30",
-     "role": "exhibit",
-     "text": "55.0"
-    },
-    {
      "id": "p20b-p20b-exhibit-0:category:fy30",
      "role": "exhibit",
      "text": "FY30"
-    },
-    {
-     "id": "p20b-p20b-exhibit-0:value-label:central:fy31",
-     "role": "exhibit",
-     "text": "60.0"
-    },
-    {
-     "id": "p20b-p20b-exhibit-0:value-label:low:fy31",
-     "role": "exhibit",
-     "text": "56.5"
     },
     {
      "id": "p20b-p20b-exhibit-0:category:fy31",
@@ -5128,7 +5068,7 @@
     {
      "id": "p20b-p20b-exhibit-0:annotation-text:1",
      "role": "exhibit",
-     "text": "A year's slip leaves 3.5m short"
+     "text": "A year's slip in electric trains leaves the low case 3.5m short of 60m"
     },
     {
      "id": "p20b-p20b-exhibit-1:cell-text:0:0:0",
@@ -5650,7 +5590,7 @@
     {
      "id": "p22b-p22b-panel:text",
      "role": "exhibit",
-     "text": "Borrow the £160 million in tranches against the electrification milestones; cutting to the grant gives up 3.8 million journeys a year."
+     "text": "Borrow the £160 million in tranches against the electrification milestones. Fares repay it within the overhead line's 30-year life even on the low case; cutting to the grant gives up 3.8 million journeys a year."
     },
     {
      "id": "p22b-p22b-doc-0-p0:text",
@@ -6965,7 +6905,7 @@
     {
      "id": "p27-p27-panel:text",
      "role": "exhibit",
-     "text": "Introduced first, fare reform costs £6 million a year for 0.4 million journeys; introduced second, it adds 1.6 million journeys for the same cost."
+     "text": "Introduced first, fare reform costs £6 million a year for 0.4 million journeys; introduced second, after a year of the new timetables, it adds 1.6 million journeys for the same cost."
     },
     {
      "id": "p27-p27-doc-0-p0:text",

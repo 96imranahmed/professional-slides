@@ -3042,7 +3042,7 @@
      {
       "category": "FY31",
       "series": "Low",
-      "text": "A year's slip leaves 3.5m short"
+      "text": "A year's slip in electric trains leaves the low case 3.5m short of 60m"
      }
     ]
    },
@@ -3323,7 +3323,7 @@
    "source": "Source: illustrative data for a fictional operator; funding plan and demand model central case",
    "panel": {
     "kicker": "The recommendation",
-    "text": "Borrow the £160 million in tranches against the electrification milestones; cutting to the grant gives up 3.8 million journeys a year."
+    "text": "Borrow the £160 million in tranches against the electrification milestones. Fares repay it within the overhead line's 30-year life even on the low case; cutting to the grant gives up 3.8 million journeys a year."
    },
    "layout": "text",
    "pageType": {
@@ -4051,7 +4051,7 @@
    "source": "Source: illustrative data for a fictional operator; fare elasticity from the demand model",
    "panel": {
     "kicker": "The order matters",
-    "text": "Introduced first, fare reform costs £6 million a year for 0.4 million journeys; introduced second, it adds 1.6 million journeys for the same cost."
+    "text": "Introduced first, fare reform costs £6 million a year for 0.4 million journeys; introduced second, after a year of the new timetables, it adds 1.6 million journeys for the same cost."
    },
    "layout": "sidebar",
    "pageType": {

@@ -48,6 +48,29 @@ console.log(JSON.stringify({column:pick(column,'E Asia'),bar:pick(bar,'Europe')}
         self.assertAlmostEqual(bar['leader']['y2'], bar['mark']['y'] + bar['mark']['height'] / 2, places=3)
 
 
+    def test_a_leader_onto_a_crossing_point_shares_its_band(self):
+        # Two callouts over different months met nowhere across the plot, yet
+        # sat in two stacked bands: packed into one, the taller plot set the
+        # May point a point and a half above its rival's, and the leader's
+        # corridor - run three pixels past its own mark - caught the rival's
+        # marker and refused the shared band. The leader ends under its dot.
+        result = run_node("""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const props={heading:'Share of Ramp businesses purchasing each vendor',unit:'% of panel firms',
+  categories:['Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'],
+  series:[{name:'Anthropic',values:[16.2,16.6,17.2,17.9,18.4,21.7,27.5,34.1,38.6,41,42.4,43.4,43.8]},{name:'OpenAI',values:[41,41.2,40.9,41.4,41.2,41.1,41.2,40.3,39.6,39.5,39.5,39.7,39.8]}],
+  yMin:0,yMax:50,endLabels:true,dataLabels:false,
+  annotations:[{category:'May 26',series:'Anthropic',text:'First monthly crossover in May, after a climb from 16.2%'},{category:'Jan 26',series:'OpenAI',text:'OpenAI holds near 40% of panel firms all year'}]};
+const nodes=REGISTRY.get('chart.line').render({id:'c',frame:{x:60,y:182,width:1160,height:486},props}).nodes;
+const boxes=nodes.filter(n=>n.role==='annotation-surface').map(n=>n.frame);
+const leaders=nodes.filter(n=>n.role==='annotation-leader').map(n=>n.data);
+const may=nodes.find(n=>n.role==='chart-marker'&&n.data?.series==='Anthropic'&&n.data?.category==='May 26')?.frame;
+console.log(JSON.stringify({tops:boxes.map(b=>b.y),leaders,may}));
+""")
+        self.assertEqual(len(set(result["tops"])), 1, "both callouts in one band")
+        self.assertEqual(len(result["tops"]), 2)
+
+
 class PieLabelTests(unittest.TestCase):
     def test_labels_take_their_measured_width_and_a_thin_slice_goes_outside(self):
         result = run_node("""

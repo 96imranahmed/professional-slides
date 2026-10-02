@@ -512,7 +512,11 @@ def gate_numbers_on_marks(slide_no, slide, findings):
     charts = [c for c in slide.get("componentInstances", []) if str(c.get("component") or "").startswith("chart.")]
     if not charts:
         return
-    labels = [n for n in text_nodes(slide) if str(n.get("role") or "") == "data-label"]
+    # A chart over its own data table (the model page) prints its figures in
+    # the table, one under each category, and leaves its marks unlabelled so
+    # each figure is printed once: the table's figures are the chart's.
+    labels = [n for n in text_nodes(slide) if str(n.get("role") or "") == "data-label"
+              or (str(n.get("role") or "") == "table-cell-text" and (n.get("data") or {}).get("chartData") is True)]
     numeric = [n for n in labels if re.search(r"\d", source_text(n))]
     marks = [n for n in slide.get("nodes", []) if str(n.get("role") or "") == "chart-mark"]
     # While the marks are countable, every one of them carries its value: ten

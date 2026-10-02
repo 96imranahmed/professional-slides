@@ -63,6 +63,9 @@ export const COMMENTARY = Object.freeze({
 });
 
 const CHART = (name) => `chart.${name}`;
+// The fewest words a panel beside prose alone holds before it reads as an
+// empty column (compilePage, argument pages).
+const PANEL_WORDS_MIN = 25;
 // The series charts a model page may draw over its data table.
 const MODEL_CHARTS = ["chart.column", "chart.line", "chart.area", "chart.stacked-column", "chart.combo"];
 // The so-what bar closes whatever the page drew, so it joins every placement
@@ -387,7 +390,7 @@ const CONSTRUCTION_DATA = {
 };
 // Forms that read more than their component's sample says.
 const FORM_DATA = {
-  "argument/memo": ["paragraphs (150 to 330 words)", "panel ({ text, kicker }: the conclusion or the figures to keep, down the right)"],
+  "argument/memo": ["paragraphs (150 to 330 words)", `panel ({ text, kicker }: the conclusion or the figures to keep, down the right; ${PANEL_WORDS_MIN} words or more)`],
   "trend/indexed": ["categories", "series (raw values, the subject and three or more peers)", "indexBase (the period set to 100)", "subject (the series in colour)"],
   "ranking/distribution": ["categories (15 to 40 members, sorted by the value)", "series (one measure)", "highlights (the subject)"],
   "ranking/boxplot": ["categories (4 to 12 members)", "boxes (one { min, q1, median, q3, max } per member)", "highlights (the subject)"],
@@ -1564,6 +1567,16 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     // the foot, and the page stops halfway down.
     if (page.form === "memo" && (page.paragraphs || []).length && !page.panel)
       throw new Error(`${id}: a memo sets its prose at a readable measure with a \`panel\` beside it - { text, kicker } carrying the conclusion or the figures the reader keeps - which takes the width the prose leaves`);
+    // That width is over half the page: prose that reaches the foot does so
+    // at a reading measure (compose.mjs proseBeside), whatever the panel
+    // holds. A sentence of a statement set in it is a column of tint that is
+    // mostly empty, so under PANEL_WORDS_MIN the panel is refused here, where
+    // its words are cheap to change - not widened, nor the prose thinned to
+    // fill it. A sidebar beside an exhibit or points keeps a third of the row.
+    const proseBeside = page.form === "memo" || (!(page.exhibit || (page.exhibits || []).length) && !points);
+    const panelWords = textWords(page.panel?.text ?? "");
+    if (page.panel && proseBeside && (page.paragraphs || []).length && panelWords < PANEL_WORDS_MIN)
+      throw new Error(`${id}: the panel takes the width the prose leaves - over half the page - and ${panelWords} words set a column of tint that is mostly empty. Give it what the reader keeps beside the reasoning - the figures, the conditions, the decision and its cost, as the argument states them - in ${PANEL_WORDS_MIN} words or more; or, with no more to hold, set the page as a sidebar beside its evidence (an exhibit or points), where the panel keeps a third of the row`);
   } else if (page.type === "statement") {
     if (page.form === "statement") { slide.kind = "statement"; if (!page.text) throw new Error(`${id}: a statement page carries its \`text\``); }
     else { if (!primary) throw new Error(`${id}: a quotes page carries a quote-cluster exhibit`); setType(primary, "quote-cluster"); }

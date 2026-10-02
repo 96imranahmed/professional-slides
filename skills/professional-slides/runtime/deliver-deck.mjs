@@ -133,7 +133,7 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
   // the reviewer is shown the waiver and must confirm it.
   report.stage = "build bars";
   const scene = await readJson(path.join(directory, "scene.json"));
-  const bars = barOutcome(scene, spec.waivers || []);
+  const bars = barOutcome(scene, spec.waivers || [], { purpose: spec.purpose ?? null });
   report.bars = { statistics: bars.statistics, misses: bars.misses.map((f) => f.code), waived: bars.waived.map((f) => f.code) };
   if (bars.unwaived.length) return refuse("build bars", bars.unwaived.map((f) => ({ slide: null, code: f.code, severity: "blocker",
     reason: `${f.measure} measured ${f.measured} against ${f.floor !== undefined ? `a floor of ${f.floor}` : `a ceiling of ${f.ceiling}`} (strong decks: ${JSON.stringify(f.reference ?? null)})`,

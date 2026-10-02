@@ -219,10 +219,11 @@ export function waiverErrors(waivers) {
 /**
  * The bars against a deck's waivers: every miss, the misses a waiver covers
  * (each shown to the reviewer, whose confirmation delivery requires) and the
- * misses nothing covers, which block delivery.
+ * misses nothing covers, which block delivery. `purpose` is the spec's: a
+ * catalogue is held to the ceilings only, here as in scoreBuild.
  */
-export function barOutcome(scene, waivers = []) {
-  const { statistics, findings } = scoreBuild(scene);
+export function barOutcome(scene, waivers = [], { purpose = null } = {}) {
+  const { statistics, findings } = scoreBuild(scene, { purpose });
   const byCode = new Map((waivers || []).map((w) => [w.code, w]));
   const waived = findings.filter((f) => byCode.has(f.code)).map((f) => ({ ...f, reason: byCode.get(f.code).reason }));
   return { statistics, misses: findings, waived, unwaived: findings.filter((f) => !byCode.has(f.code)) };

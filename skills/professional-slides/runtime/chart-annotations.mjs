@@ -222,12 +222,20 @@ function meets(node, frame, pad) {
   return false;
 }
 
+// A leader's last few pixels lie under its endpoint dot, on the mark it
+// names, so its corridor stops at the dot's edge. Run on past the mark's
+// centre, it caught a neighbouring series' point that overlaps the mark - two
+// lines a point and a half apart where they cross - and the callout lost the
+// band it could share with another, the chart giving up 88px of plot to a
+// second band (packedEvidenceProps).
 function clearLeader(x1, y1, x2, y2, target, obstacles) {
+  const length = Math.hypot(x2 - x1, y2 - y1), trim = length ? Math.min(length, ENDPOINT_DIAMETER / 2) / length : 0;
+  const ex = x2 - (x2 - x1) * trim, ey = y2 - (y2 - y1) * trim;
   const corridor = {
-    x: Math.min(x1, x2) - 3,
-    y: Math.min(y1, y2) - 3,
-    width: Math.abs(x2 - x1) + 6,
-    height: Math.abs(y2 - y1) + 6
+    x: Math.min(x1, ex) - 3,
+    y: Math.min(y1, ey) - 3,
+    width: Math.abs(ex - x1) + 6,
+    height: Math.abs(ey - y1) + 6
   };
   return obstacles.every((node) => pointInsideFrame(target, node.frame, 1) || !meets(node, corridor, 1));
 }

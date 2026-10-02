@@ -12,8 +12,8 @@
    "tables": 14,
    "tablesTreated": 0.57,
    "charts": 38,
-   "chartsAnnotated": 0.24,
-   "drawingsPerPage": 19.23,
+   "chartsAnnotated": 0.29,
+   "drawingsPerPage": 19.29,
    "accepted": true,
    "misses": []
   },
@@ -34,10 +34,10 @@
    "exhibitVarietyPerTen": 8.89,
    "distinctExhibits": 8,
    "tables": 5,
-   "tablesTreated": 0.8,
+   "tablesTreated": 1,
    "charts": 6,
    "chartsAnnotated": 0.83,
-   "drawingsPerPage": 24.78,
+   "drawingsPerPage": 25,
    "accepted": true,
    "misses": []
   },

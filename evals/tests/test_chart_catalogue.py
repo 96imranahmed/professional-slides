@@ -83,5 +83,89 @@ console.log(JSON.stringify({ok:true}));
         self.assertTrue(result["ok"])
 
 
+class DecorationTests(unittest.TestCase):
+    """Nothing an author asks a chart to mark is dropped unseen.
+
+    A callout on a stacked area, a marimekko or a slope chart passed every
+    check and drew nothing: the shared decorations (charts.mjs withDecorations)
+    were wired into some charts and not others, and a chart that ignored a prop
+    rendered exactly as if it had not been written. Every chart now declares the
+    marks it draws (CHART_DECORATIONS); this walks the registry and asks each
+    chart for each mark. An authored mark must change the render or be refused -
+    a render identical to the plain chart is the silent drop.
+    """
+
+    def test_every_chart_draws_or_refuses_every_authored_mark(self):
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+import {CHART_IDS, CHART_DECORATIONS} from './skills/professional-slides/runtime/charts.mjs';
+const registry=createRegistry();
+const MARKS=Object.keys(CHART_DECORATIONS);
+// Candidate marks built from a chart's own sample, naming its own members:
+// a category or point or tile, a series, a value inside the data's range.
+function candidates(sample){
+  const members=[...(sample.categories||[]),...(sample.points||[]).map(p=>p.name),...(sample.labels||[]),...(sample.items||[]).map(i=>i.label),...(sample.rows||[])].map(String);
+  const series=(sample.series||[]).map(s=>s.name);
+  const values=[...(sample.series||[]).flatMap(s=>s.values),...(sample.values||[]).flat(),...(sample.low||[]),...(sample.high||[])].filter(Number.isFinite);
+  const mid=values.length?Math.round((Math.min(...values)+Math.max(...values))/2):1;
+  const first=members[0], last=members.at(-1), second=members[1]??first;
+  const names=[second,...series];
+  return {
+    annotations:[[{category:last,text:'A note on this mark'}],...series.map(s=>[{category:last,series:s,text:'A note on this mark'}])],
+    referenceLines:[[{value:mid,label:'Target'}]],
+    highlights:names.map(n=>[{category:n}]),
+    focus:names.map(n=>[n]),
+    focusSeries:(series.length?series:[second]).filter(s=>s!==undefined),
+    changeAnnotations:[[{start:first,end:last,style:'arrow',text:'+10%'}]],
+    annotationRail:[[{category:first,text:'+4'}]],
+    periods:[[{from:first,to:second,label:'Phase one'}]],
+    events:[[{at:second,label:'Launch'}]],
+    pointHighlights:[[{category:first}]],
+  };
+}
+const MARK_KEYS=['annotations','highlights','referenceLines','focusSeries','focus','changeAnnotations','pointHighlights','periods','events','annotationRail'];
+const report=[];
+for(const id of CHART_IDS){
+  const def=registry.get(id);
+  assert.ok(def.decorations,`${id} declares the marks it draws`);
+  const {draws,refuses}=def.decorations;
+  assert.ok([...draws,...refuses].every(k=>MARKS.includes(k)),`${id} declares known marks`);
+  const frame={x:0,y:0,...def.preferredSize};
+  const base={...def.sample};for(const k of MARK_KEYS)delete base[k];
+  const plain=JSON.stringify(def.render({id:'c',frame,props:base}).nodes);
+  const tries=candidates(def.sample);
+  for(const key of MARKS){
+    let drawn=0;
+    for(const value of tries[key]){
+      let nodes=null;
+      try{nodes=JSON.stringify(def.render({id:'c',frame,props:{...base,[key]:value}}).nodes);}catch(error){continue;}
+      assert.notEqual(nodes,plain,`${id}: ${key} ${JSON.stringify(value)} was accepted and drew nothing`);
+      drawn+=1;
+    }
+    // A mark a chart draws can still be refused for what it names (a single
+    // series has no subject series); one it does not draw is always refused.
+    if(!draws.includes(key))assert.equal(drawn,0,`${id} draws ${key} without declaring it`);
+    report.push(`${id}:${key}:${drawn?'drawn':'refused'}`);
+  }
+}
+// The three charts that dropped callouts now draw them, as boxes on the plot.
+for(const id of ['chart.slope','chart.stacked-area','chart.marimekko']){
+  const def=registry.get(id),frame={x:0,y:0,...def.preferredSize};
+  const series=def.sample.series.at(-1).name,category=def.sample.categories.at(-1);
+  const nodes=def.render({id:'c',frame,props:{...def.sample,annotations:[{category,series,text:'A note on this mark'}]}}).nodes;
+  assert.ok(nodes.some(n=>n.role==='annotation-text'&&n.text.includes('A note')),`${id} draws its callout`);
+}
+const slope=registry.get('chart.slope');
+assert.ok(slope.render({id:'c',frame:{x:0,y:0,width:760,height:420},props:{...slope.sample,referenceLines:[{value:25,label:'Average'}]}}).nodes.some(n=>n.role==='chart-reference-line'),'a slope draws its reference line');
+// A mark a chart does not draw is refused naming the charts that do.
+assert.throws(()=>registry.get('chart.pie').render({id:'c',frame:{x:0,y:0,width:760,height:420},props:{...registry.get('chart.pie').sample,annotations:[{category:'Direct',text:'Most of it'}]}}),
+  /a pie chart does not draw callouts .`annotations`..*dropped unseen.*column/);
+assert.throws(()=>registry.get('chart.stacked-area').render({id:'c',frame:{x:0,y:0,width:760,height:420},props:{...registry.get('chart.stacked-area').sample,referenceLines:[{value:3000,label:'Plan'}]}}),/hide a reference line/);
+console.log(JSON.stringify({ok:true,report}));
+''')
+        self.assertTrue(result["ok"])
+
+
 if __name__ == "__main__":
     unittest.main()

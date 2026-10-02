@@ -365,7 +365,7 @@ class ProseTests(unittest.TestCase):
 import {{ compilePage }} from '{KIT}';
 {PAGE}
 const words = (n, seed) => Array.from({{ length: n }}, (_, i) => ['buyers', 'retain', 'both', 'models', 'while', 'serving', 'costs', 'fall', 'faster', 'than', 'prices'][(i + seed) % 11]).join(' ') + '.';
-const memo = (title, paragraphs) => ({{ id: 'p1', type: 'argument', form: 'sidebar', commentary: 'none', ...base, title, paragraphs, panel: {{ text: 'The base case is split leadership with a contested middle.' }} }});
+const memo = (title, paragraphs) => ({{ id: 'p1', type: 'argument', form: 'sidebar', commentary: 'none', ...base, title, paragraphs, panel: {{ text: 'The base case is split leadership with a contested middle: models consolidate, applications fragment, and the clouds take the margin that neither of the other two keeps.' }} }});
 const cards = {{ id: 'p2', type: 'parallel', form: 'cards', commentary: 'in-exhibit', ...base, title: 'Three market structures divide the value differently',
   exhibit: {{ items: [0, 1, 2].map((i) => ({{ title: 'Scenario ' + (i + 1), text: words(64, i) }})) }} }};
 console.log(JSON.stringify({{
@@ -381,6 +381,33 @@ console.log(JSON.stringify({{
         self.assertIsNone(result["argument"])
         self.assertIsNone(result["short"])
         self.assertIn("SCENARIO_PROSE", result["cards"])
+
+    def test_a_panel_beside_prose_alone_holds_more_than_a_sentence(self):
+        # A memo's panel takes the width the prose leaves - over half the page,
+        # since prose that reaches the foot does so at a reading measure - and
+        # a twenty-word statement set a 700px column of tint that was mostly
+        # empty. It is refused at compile, its repair naming what to put there
+        # rather than how many words to add; beside an exhibit or points the
+        # panel keeps a third of the row and a sentence fills it.
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+{PAGE}
+const prose = ['Today the two labs lead different things, and neither signal yet ranks overall task economics for a buyer.', 'A lasting lead needs retained paid tasks at positive contribution and cash coverage of compute obligations.'];
+const short = 'One lab leads overall only when it clears the task and cash tests and leads both direct and enterprise demand.';
+const kept = 'One lab leads overall only when it clears the task and cash tests - paid tasks retained at positive contribution, and cash covering compute obligations - and leads both direct and enterprise demand.';
+const page = (form, panel, extra = {{}}) => ({{ id: 'p1', type: 'argument', form, commentary: 'none', ...base, title: 'Retained paid tasks and margin, not current leads, decide the long run', paragraphs: prose, panel: {{ kicker: 'The reversal test', text: panel }}, ...extra }});
+console.log(JSON.stringify({{
+  memo: error(() => compilePage(page('memo', short))),
+  sidebar: error(() => compilePage(page('sidebar', short))),
+  kept: error(() => compilePage(page('memo', kept))),
+  beside: error(() => compilePage(page('sidebar', short, {{ points: ['OpenAI leads direct reach with a billion weekly users', 'Anthropic leads the Ramp paid panel, 43.8% to 39.8%'] }}))),
+}}));
+''')
+        self.assertIn("20 words set a column of tint that is mostly empty", result["memo"])
+        self.assertIn("the figures, the conditions, the decision and its cost", result["memo"])
+        self.assertIn("mostly empty", result["sidebar"])
+        self.assertIsNone(result["kept"])
+        self.assertNotIn("mostly empty", result["beside"] or "")
 
     def test_the_summary_ceiling_and_the_block_a_reader_meets(self):
         result = run_node('''

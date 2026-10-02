@@ -105,6 +105,23 @@ export function markWeight() {
 }
 
 /**
+ * The plot's insets for a chart set over its own data table
+ * (`categoryColumns: { label }`, which the composer sets): the table's label
+ * column, `label` px wide, then one equal column per category across the rest
+ * of the shared width. Bars and columns centre each category in its slot, so
+ * the plot spans the value columns exactly; points (`points`) sit at the
+ * plot's edges first and last, so the plot runs from the first column's
+ * centre to the last's. Null for a chart with no table under it.
+ */
+function tableSpan(props, frame, count, { points = false } = {}) {
+  const columns = props.categoryColumns;
+  if (columns === undefined || columns === null) return null;
+  if (!Number.isFinite(columns.label) || columns.label < 0 || columns.label >= frame.width) throw new Error("categoryColumns gives the width in px of the data table's label column (`label`)");
+  const column = (frame.width - columns.label) / Math.max(1, count);
+  return points ? { left: columns.label + column / 2, right: column / 2 } : { left: columns.label, right: 0 };
+}
+
+/**
  * The plot rectangle inside a chart's frame, after the bands above it (legend,
  * callouts, change annotations, periods) and the gutters beside it.
  *
@@ -120,10 +137,13 @@ export function markWeight() {
  * labels give the difference back to the plot, taller ones take it. A band
  * a change annotation's rows widened keeps its measure and gives up only what
  * the labels need past one line.
+ *
+ * `span: { left, right }` (tableSpan): the insets of a chart set over its own
+ * data table, taken exactly.
  */
-export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, bottomInset = LABEL_BAND, periodBand = 0, headroom = VALUE_HEADROOM, labels = null } = {}) {
+export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, bottomInset = LABEL_BAND, periodBand = 0, headroom = VALUE_HEADROOM, labels = null, span = null } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
-  leftInset = Math.max(leftInset, bands.left);
+  leftInset = span ? span.left : Math.max(leftInset, bands.left);
   // Peer charts in a row pass the row's tallest top band as topInset so their
   // plots start (and end) on the same lines and one value scale means one pixel scale.
   // topLegend may be a row count (a wrapped legend takes 24px per extra row).
@@ -133,7 +153,15 @@ export function chartFrame(frame, { topLegend = false, annotations = [], changeA
   const bottom = bands.bottom ? Math.max(bottomInset, 40 + bands.bottom + tokenValue(token("space.3"))) : bottomInset;
   // Callouts the chart moved into a right-hand rail (see renderEvidenceAnnotations) take their width from the plot.
   const railWidth = evidenceRailWidth({ annotations });
-  const rightInset = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16) + railWidth;
+  // A chart over its own data table (`span`, tableSpan) keeps its plot over
+  // the table's value columns. A gutter it would take beside the plot - a
+  // callout rail, end labels, an outside reference label, a rail of values -
+  // would pull its categories off their columns, so it is refused instead.
+  if (span) {
+    const wanted = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : 0) + railWidth;
+    if (bands.left > span.left + 0.5 || wanted > span.right + 0.5) throw new Error(`A chart over its own data table keeps its categories over the table's columns, and has no room beside its plot for ${railWidth ? "a callout moved into a rail - shorten the note or annotate a mark with room above it" : endLabels ? "end labels - the table names the series" : "labels in a gutter - put them in the callouts or the table"}`);
+  }
+  const rightInset = span ? span.right : Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16) + railWidth;
   let top = topFor(false), compact = false;
   // A peer in a row is given the row's top band; when its full bands would
   // overrun that budget and compact ones fit it, it closes them and keeps the
@@ -305,7 +333,7 @@ export function numericBounds(values, { min, max, axis = "y", includeZero = fals
 // A line's domain fitted to its data (`padded`: no value axis) already runs a
 // quarter of its span past the top, which holds the label; the 15% added again
 // on top of it left a quarter of the plot empty over a peak line.
-const withReferenceValues = (values, props, { base = 0, padded = false } = {}) => {
+export const withReferenceValues = (values, props, { base = 0, padded = false } = {}) => {
   const references = (props.referenceLines || []).map(reference => reference.value).filter(Number.isFinite);
   const top = Math.max(...values.filter(Number.isFinite));
   const headroom = props.yMax === undefined && props.xMax === undefined && !padded ? references.filter(v => v > 0 && v >= base + (top - base) * 0.9).map(v => v + (v - base) * 0.15) : [];
@@ -906,6 +934,7 @@ function categoricalChart(context) {
 
 function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = false, tokens = TOKENS }) {
   assertGridlineOption(props);
+  if (horizontal && props.categoryColumns) throw new Error(`${id}: a data table's columns run across the page, and a bar chart's categories run down it - set the table beside the bars as a column, or draw columns`);
   const { categories, series } = normalizedCategoricalData(props);
   const stackLabels = stackLabelPlan(props, categories, series, stacked);
   const highlights = normalizedHighlights(props, { categories, series, allowBar: !stacked,
@@ -1061,7 +1090,8 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : showValueAxis ? 54 : 16,
     valueLabelInset: (horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter) + deltaWidth + noteColumnWidth,
     totalLabelInset: horizontal ? 0 : totalHeight,
-    centerPlot: !horizontal && !showValueAxis
+    centerPlot: !horizontal && !showValueAxis,
+    span: horizontal ? null : tableSpan(props, frame, categories.length)
   });
   const { labelStep, labelSpan, layouts: categoryLayouts, height: categoryLabelHeight } = horizontal ? { layouts: [] } : columnLabels(plot.width);
   const labelEvery = labelStep?.every;
@@ -1671,6 +1701,9 @@ function lineChart({ id, frame, props, area = false }) {
   // leave the first one on the value axis - so such a line is read off its
   // value axis, with the latest value labelled at its end.
   const spacing = timePositions(categories);
+  // A table's columns are even; points on an uneven time axis would drift
+  // off them, the further the more uneven the gaps.
+  if (spacing && props.categoryColumns) throw new Error(`${id}: a data table sets its periods in even columns, and these dates are unevenly spaced (${categories[0]} to ${categories.at(-1)}) - their points cannot sit over the columns; drop the table and label the points, or plot evenly spaced periods`);
   const crowded = Boolean(spacing) && spacing.slice(1).some((v, i) => (v - spacing[i]) * (frame.width - 120) < 64);
   const labelAt = (index) => !crowded || index === categories.length - 1;
   const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length <= 8);
@@ -1695,7 +1728,8 @@ function lineChart({ id, frame, props, area = false }) {
     periodBand: periodBandHeight(props, categories),
     endLabels,
     bottomInset: labelBand(16, labelHeightAt(76)),
-    labels: { gap: 16, height: (width) => labelHeightAt(labelSlotAt(width)) }
+    labels: { gap: 16, height: (width) => labelHeightAt(labelSlotAt(width)) },
+    span: tableSpan(props, frame, categories.length, { points: true })
   });
   const labelSlot = labelSlotAt(plot.width);
   const labelHeight = labelHeightAt(labelSlot);
@@ -1914,16 +1948,23 @@ function waterfall({ id, frame, props }) {
  */
 /**
  * The category a chart was told to pick out, for the plot types that draw their
- * own marks and cannot host a callout.
+ * own marks (a waffle, a bubble grid, a marimekko): one member of `members`, or
+ * null.
  *
  * A recoloured category is the commonest mark in a strong deck and the only
  * one that costs a plot no layout, so it is the one these types get.
  */
-function highlightedCategory(props) {
-  const first = (props.highlights || [])[0];
+function highlightedCategory(props, members, id) {
+  const highlights = props.highlights || [];
+  // One member recoloured: a second would be dropped unseen, and a name the
+  // chart does not draw would light nothing.
+  if (highlights.length > 1) throw new Error(`${id}: this chart picks out one member in the accent; highlights names ${highlights.length} - keep the one the page is about and say the rest in the commentary`);
+  const first = highlights[0];
   if (first === undefined || first === null) return null;
   const name = typeof first === "string" ? first : first.category;
-  return name === undefined || name === null ? null : String(name);
+  if (name === undefined || name === null) return null;
+  if (!members.map(String).includes(String(name))) throw new Error(`${id}: highlights names "${name}", which this chart does not draw; name one of ${members.slice(0, 8).map((m) => `"${m}"`).join(", ")}`);
+  return String(name);
 }
 
 // A unit dot grows to about three lines of label type; past that it stops
@@ -1940,7 +1981,7 @@ function waffleLayout(frameIn, props) {
   if (values.some((v) => !(Number.isInteger(v) && v >= 0))) throw new Error("Unit chart counts are non-negative integers");
   const percent = props.percent === true;
   if (percent && values.some((v) => v > 100)) throw new Error("Unit chart percent values run 0–100");
-  const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: 0, valueLabelInset: 0, centerPlot: false });
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: 0, valueLabelInset: 0, centerPlot: false, span: tableSpan(props, frame, categories.length) });
   const slot = plot.width / categories.length;
   const gapRatio = 0.45;
   const categoryLayouts = categories.map((c) => measureText(String(c), slot - 12, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }));
@@ -1970,7 +2011,7 @@ function waffleChart({ id, frame, props }) {
   const { categories, values, percent, plot, slot, columns, categoryLayouts, labelBand, categoryBand, cell, pitch, blockWidth, blockHeight } = waffleLayout(frame, props);
   const nodes = [];
   const fill = props.color ? token(props.color) : PRIMARY, empty = GRID;
-  const picked = highlightedCategory(props);
+  const picked = highlightedCategory(props, categories, id);
   categories.forEach((category, index) => {
     const lit = picked !== null && String(category) === picked;
     const dotFill = lit ? token("color.accent") : fill;
@@ -1988,7 +2029,8 @@ function waffleChart({ id, frame, props }) {
       const on = !percent || i < count;
       nodes.push(ellipsePrimitive({ id: stableId(id, "dot", category, i), role: on ? "chart-mark" : "chart-unit-empty", frame: { x: x0 + c * pitch, y, width: cell, height: cell }, style: fillStyle(on ? dotFill : empty), data: { category, index: i, on, ...(lit && on ? { highlighted: true, highlightStyle: "bar" } : {}) } }));
     }
-    nodes.push(textPrimitive({ id: stableId(id, "value", category), role: "data-label", frame: { x: plot.x + index * slot, y: y0 - labelBand + 2, width: slot, height: 24 }, text: percent ? `${count}%` : formatValue(count, props), style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
+    // `dataLabels: false`: the counts are printed elsewhere (a data table under the block).
+    if (props.dataLabels !== false) nodes.push(textPrimitive({ id: stableId(id, "value", category), role: "data-label", frame: { x: plot.x + index * slot, y: y0 - labelBand + 2, width: slot, height: 24 }, text: percent ? `${count}%` : formatValue(count, props), style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
     const layout = categoryLayouts[index];
     nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * slot + 6, y: y0 + blockHeight + 12, width: slot - 12, height: layout.height }, text: layout.text, style: { ...textStyle(AXIS_LABEL, SECONDARY, false, "center"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
   });
@@ -2020,6 +2062,7 @@ function bubbleGrid({ id, frame, props, tokens = TOKENS }) {
   const L = bubbleGridLayout(frame, props);
   const nodes = [];
   const fill = PRIMARY;
+  const picked = highlightedCategory(props, L.rows, id);
   // Values inside the bubbles read in white on a dark fill, ink on a light one.
   const insideColor = onFill(fill);
   L.rows.forEach((row, r) => {
@@ -2030,7 +2073,7 @@ function bubbleGrid({ id, frame, props, tokens = TOKENS }) {
       const value = L.values[r][c];
       const cx = L.plot.x + c * L.cellW + L.cellW / 2;
       const d = value > 0 ? Math.max(14, L.maxDiameter * Math.sqrt(value / L.max)) : 0;
-      const lit = highlightedCategory(props) !== null && String(row) === highlightedCategory(props);
+      const lit = picked !== null && String(row) === picked;
       if (d) nodes.push(ellipsePrimitive({ id: stableId(id, "bubble", row, column), role: "chart-mark", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: fillStyle(lit ? token("color.accent") : fill), data: { row, column, value, ...(lit ? { highlighted: true, highlightStyle: "bar" } : {}) } }));
       const inside = d >= 24;
       nodes.push(textPrimitive({ id: stableId(id, "value", row, column), role: "data-label", frame: inside || !d ? { x: cx - Math.max(d, 48) / 2, y: cy - 10, width: Math.max(d, 48), height: 20 } : { x: cx - 24, y: cy - d / 2 - 22, width: 48, height: 20 }, text: formatValue(value, props), style: textStyle(CHART_LABEL, inside ? insideColor : INK, labelBold(), "center") }));
@@ -2056,7 +2099,8 @@ function marimekkoLayout(frameIn, props) {
   const widths = Array.isArray(props.widths) ? props.widths : totals;
   if (widths.length !== categories.length || widths.some((w) => !(Number.isFinite(w) && w > 0))) throw new Error("Marimekko widths must be positive, one per category; give every category a positive total");
   const showLegend = props.legend !== false && series.length > 1;
-  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: showLegend ? legendRowsFor(series.map((sr) => sr.name), frame) : false, leftInset: 8, valueLabelInset: 8, totalLabelInset: 26, centerPlot: false });
+  // Callouts take their bands above the column totals, as on any chart.
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: showLegend ? legendRowsFor(series.map((sr) => sr.name), frame) : false, leftInset: 8, valueLabelInset: 8, totalLabelInset: 26, centerPlot: false, annotations: props.annotations });
   const categoryLayouts = categories.map((c, i) => measureText(String(c), Math.max(72, plot.width * widths[i] / widths.reduce((a, b) => a + b, 0) - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }));
   const footBand = Math.max(...categoryLayouts.map((l) => l.height)) + 12;
   return { categories, series, totals, widths, plot, showLegend, categoryLayouts, footBand, height: (plot.y - frame.y) + plot.height + footBand };
@@ -2068,6 +2112,10 @@ function marimekko({ id, frame, props, tokens = TOKENS }) {
   const usable = plot.width - gap * (categories.length - 1);
   const bodyH = plot.height - L.footBand;
   const nodes = [...(L.showLegend ? topLegend({ id, frame, items: series.map((sr, i) => ({ label: sr.name, colorIndex: props.colorIndices?.[i] ?? i })) }) : [])];
+  const picked = highlightedCategory(props, categories, id);
+  // A callout names a column and, for one segment, its series: it points at
+  // that segment's middle, or without a series at the column's top.
+  const pointMap = new Map();
   let x = plot.x;
   categories.forEach((category, ci) => {
     const w = usable * widths[ci] / sumW;
@@ -2078,7 +2126,8 @@ function marimekko({ id, frame, props, tokens = TOKENS }) {
       const h = bodyH * v / total;
       if (h <= 0) return;
       const colorIndex = props.colorIndices?.[si] ?? si % SERIES.length;
-      const lit = highlightedCategory(props) !== null && String(category) === highlightedCategory(props);
+      const lit = picked !== null && String(category) === picked;
+      pointMap.set(`${sr.name}:${category}`, { x: x + w / 2, y: y + h / 2 });
       nodes.push(rectPrimitive({ id: stableId(id, "segment", category, sr.name), role: "chart-mark", frame: { x, y, width: w, height: h }, style: fillStyle(SERIES[colorIndex], lit ? token("color.accent") : token("color.surface")), data: { category, series: sr.name, value: v, share: v / total, colorIndex, ...(lit ? { highlighted: true, highlightStyle: "column" } : {}) } }));
       const text = props.percentLabels === false ? formatValue(v, props) : `${Math.round(100 * v / total)}%`;
       const label = measureText(text, Math.max(20, w - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: labelBold() });
@@ -2087,6 +2136,7 @@ function marimekko({ id, frame, props, tokens = TOKENS }) {
       }
       y += h;
     });
+    pointMap.set(`value:${category}`, { x: x + w / 2, y: plot.y });
     // Column total above, category (and its width when widths are given) below.
     nodes.push(textPrimitive({ id: stableId(id, "total", category), role: "data-label", frame: { x: x - 10, y: plot.y - 24, width: w + 20, height: 20 }, text: formatValue(Array.isArray(props.widths) ? widths[ci] : totals[ci], props), style: textStyle(CHART_LABEL, INK, true, "center"), data: { category, total: true } }));
     const layout = L.categoryLayouts[ci];
@@ -2095,7 +2145,8 @@ function marimekko({ id, frame, props, tokens = TOKENS }) {
     x += w + gap;
   });
   nodes.push(linePrimitive({ id: stableId(id, "baseline"), role: "chart-axis", x1: plot.x, y1: plot.y + bodyH, x2: plot.x + plot.width, y2: plot.y + bodyH, style: lineStyle(INK, token("line.hairline")) }));
-  return nodes;
+  // The picked column is recoloured above, so highlights are not drawn twice.
+  return withDecorations(nodes, { id, plot, props: { ...props, highlights: [] }, pointMap, allowAnnotationRail: false });
 }
 
 function rangeChart({ id, frame, props }) {
@@ -2143,7 +2194,8 @@ function comboChart({ id, frame, props }) {
     topLegend: true,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
-    annotationRail: props.annotationRail
+    annotationRail: props.annotationRail,
+    span: tableSpan(props, frame, categories.length)
   });
   // Labelled marks need no value axis; the bars take a zero-anchored domain and,
   // with `secondaryAxis`, the line takes its own padded domain (a margin over a revenue).
@@ -2765,78 +2817,104 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
   return nodes;
 }
 
+/**
+ * The marks an author asks a chart to set over its data, by prop. Every chart
+ * says which of them it draws (`draws`) and which its renderer refuses in its
+ * own words (`refuses`); one authored on a chart that does neither is refused
+ * when the chart renders - at compile, where it is cheap to change - naming
+ * the charts that draw it. Nothing an author asks a chart to mark is dropped
+ * unseen. (`focus` on a column, bar, line, area or lollipop chart is read by
+ * the composer into `focusSeries` or `highlights` before the chart sees it.)
+ */
+export const CHART_DECORATIONS = Object.freeze({
+  annotations: "callouts (`annotations`)",
+  referenceLines: "reference lines (`referenceLines`)",
+  highlights: "highlights (`highlights`)",
+  focus: "a subject (`focus`)",
+  focusSeries: "a subject series (`focusSeries`)",
+  changeAnnotations: "change annotations (`changeAnnotations`)",
+  annotationRail: "an annotation rail (`annotationRail`)",
+  periods: "periods (`periods`)",
+  events: "events (`events`)",
+  pointHighlights: "point highlights (`pointHighlights`)",
+});
+const authoredDecoration = (value) => Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== false;
+// What a chart on a vertical category axis draws through the shared decorations.
+const CATEGORY_DECORATIONS = ["annotations", "referenceLines", "highlights", "changeAnnotations", "annotationRail", "periods", "events"];
+
 const chartDefinitions = [
   {
-    id: "chart.column", render: (context) => categoricalChart(context),
+    id: "chart.column", render: (context) => categoricalChart(context), draws: [...CATEGORY_DECORATIONS, "focusSeries"],
     sample: { categories: ["2023", "2024", "2025", "2026"], series: [{ name: "value", values: [32, 46, 61, 74] }], highlights: [{ category: "2026" }], annotations: [], referenceLines: [{ value: 60, label: "Target" }] }
   },
   {
-    id: "chart.bar", render: (context) => categoricalChart({ ...context, horizontal: true }),
+    id: "chart.bar", render: (context) => categoricalChart({ ...context, horizontal: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focusSeries"], refuses: ["periods", "events", "annotationRail"],
     sample: { categories: ["North", "West", "South", "East"], series: [{ name: "value", values: [74, 62, 48, 35] }], highlights: [{ category: "North" }], annotations: [{ category: "North", text: "Scale leader" }] }
   },
   {
-    id: "chart.stacked-column", render: (context) => categoricalChart({ ...context, stacked: true }),
+    id: "chart.stacked-column", render: (context) => categoricalChart({ ...context, stacked: true }), draws: CATEGORY_DECORATIONS, refuses: ["focusSeries"],
     sample: { categories: ["2024", "2025", "2026"], series: [{ name: "Core", values: [30, 32, 35] }, { name: "Growth", values: [12, 20, 30] }, { name: "New", values: [5, 9, 14] }], annotations: [{ series: "New", category: "2026", text: "New scales" }] }
   },
   {
-    id: "chart.stacked-bar", render: (context) => categoricalChart({ ...context, horizontal: true, stacked: true }),
+    id: "chart.stacked-bar", render: (context) => categoricalChart({ ...context, horizontal: true, stacked: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations"], refuses: ["focusSeries", "periods", "events", "annotationRail"],
     sample: { categories: ["Segment A", "Segment B", "Segment C"], series: [{ name: "Core", values: [45, 35, 25] }, { name: "Growth", values: [35, 40, 45] }, { name: "New", values: [20, 25, 30] }] }
   },
   {
-    id: "chart.line", render: (context) => lineChart(context),
+    id: "chart.line", render: (context) => lineChart(context), draws: [...CATEGORY_DECORATIONS, "focusSeries", "pointHighlights"],
     sample: { categories: ["Q1", "Q2", "Q3", "Q4"], series: [{ name: "Actual", values: [22, 31, 43, 55] }, { name: "Plan", values: [25, 34, 42, 48] }], highlights: [{ category: "Q4" }], annotations: [{ series: "Actual", category: "Q4", text: "Ahead of plan" }] }
   },
   {
-    id: "chart.area", render: (context) => lineChart({ ...context, area: true }),
+    id: "chart.area", render: (context) => lineChart({ ...context, area: true }), draws: [...CATEGORY_DECORATIONS, "focusSeries", "pointHighlights"],
     sample: { categories: ["Jan", "Feb", "Mar", "Apr", "May"], series: [{ name: "value", values: [18, 28, 34, 47, 59] }], annotations: [{ category: "May", text: "Demand builds" }] }
   },
   {
-    id: "chart.waterfall", render: waterfall,
+    id: "chart.waterfall", render: waterfall, draws: CATEGORY_DECORATIONS,
     sample: { categories: ["Start", "Price", "Volume", "Cost", "End"], values: [80, 18, 12, -9, 101], totals: [0, 4], annotations: [{ category: "End", text: "+21 net" }] }
   },
   {
-    id: "chart.scatter", render: (context) => scatter(context),
+    id: "chart.scatter", render: (context) => scatter(context), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus"], refuses: ["annotationRail"],
     sample: { points: [{ name: "A", x: 20, y: 36 }, { name: "B", x: 42, y: 58 }, { name: "C", x: 68, y: 74 }, { name: "D", x: 82, y: 44 }], annotations: [{ category: "C", text: "Best position" }] }
   },
   {
-    id: "chart.bubble", render: (context) => scatter({ ...context, bubble: true }),
+    id: "chart.bubble", render: (context) => scatter({ ...context, bubble: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus"], refuses: ["annotationRail"],
     sample: { points: [{ name: "A", x: 18, y: 38, size: 12 }, { name: "B", x: 43, y: 66, size: 36 }, { name: "C", x: 72, y: 76, size: 58 }, { name: "D", x: 84, y: 42, size: 20 }] }
   },
   {
-    id: "chart.pie", render: (context) => partToWhole(context),
+    id: "chart.pie", render: (context) => partToWhole(context), draws: [], refuses: ["changeAnnotations", "annotationRail"],
     sample: { labels: ["Direct", "Partner", "Digital", "Other"], values: [42, 28, 18, 12] }
   },
   {
-    id: "chart.donut", render: (context) => partToWhole({ ...context, donut: true }),
+    id: "chart.donut", render: (context) => partToWhole({ ...context, donut: true }), draws: [], refuses: ["changeAnnotations", "annotationRail"],
     sample: { labels: ["Core", "Growth", "New"], values: [52, 31, 17] }
   },
   {
-    id: "chart.marimekko", render: marimekko,
+    id: "chart.marimekko", render: marimekko, draws: ["annotations", "highlights"],
     sample: { heading: "(Insert measure and population)", categories: ["Retail", "Corporate", "Wealth", "Markets"], series: [{ name: "Domestic", values: [42, 30, 12, 8] }, { name: "International", values: [18, 25, 10, 22] }], unit: "$B" }
   },
   {
-    id: "chart.bubble-grid", render: bubbleGrid,
+    id: "chart.bubble-grid", render: bubbleGrid, draws: ["highlights"],
     sample: { heading: "(Insert measure and population)", rows: ["Mega banks", "Super regionals", "Core regionals", "Other"], columns: ["Ideation", "Concept", "Pilot", "Deployed"], values: [[30, 9, 9, 4], [15, 12, 9, 6], [54, 13, 13, 6], [8, 9, 9, 0]], unit: "Number of use cases" }
   },
   {
-    id: "chart.waffle", render: waffleChart,
+    id: "chart.waffle", render: waffleChart, draws: ["highlights"],
     sample: { heading: "(Insert measure and population)", categories: ["Underwriting", "Credit applications", "Portfolio monitoring", "Controls and reporting"], series: [{ name: "Respondents", values: [38, 42, 58, 42] }], unit: "Number of respondents" }
   },
   {
-    id: "chart.range", render: rangeChart,
+    id: "chart.range", render: rangeChart, draws: ["annotations", "referenceLines", "highlights", "changeAnnotations"], refuses: ["annotationRail"],
     sample: { heading: "(Insert measure and population)", categories: ["Research", "Labs", "Core Models", "API Agents"], low: [305, 385, 347, 300], high: [385, 460, 490, 400], unit: "$k", highlights: [{ category: "Core Models", style: "bar" }] }
   },
   {
-    id: "chart.combo", render: comboChart,
+    id: "chart.combo", render: comboChart, draws: CATEGORY_DECORATIONS,
     sample: { categories: ["2023", "2024", "2025", "2026"], series: [{ name: "Revenue", values: [42, 55, 68, 82] }, { name: "Plan", values: [45, 58, 70, 85] }], annotations: [{ series: "Revenue", category: "2026", text: "Revenue reaches $82m" }] }
   },
   {
     id: "chart.horizons",
     render: renderHorizons,
+    draws: [],
     sample: HORIZONS_SAMPLE,
     tokens: HORIZONS_TOKENS
   },
-  ...EXTRA_CHARTS.map(({ id, render, sample }) => ({ id, render, sample }))
+  ...EXTRA_CHARTS.map(({ id, render, sample, draws, refuses }) => ({ id, render, sample, draws, refuses }))
 ];
 
 function chartExamples(id) {
@@ -2990,6 +3068,18 @@ function renderResolved(render, context) {
   return first;
 }
 
+// An authored mark the chart neither draws nor refuses in its own words:
+// refused before anything is laid out, naming the charts that draw it.
+function refuseUndrawn(chart, props, id) {
+  const handled = new Set([...chart.draws, ...(chart.refuses || [])]);
+  for (const key of Object.keys(CHART_DECORATIONS)) {
+    if (handled.has(key) || !authoredDecoration(props[key])) continue;
+    const drawers = chartDefinitions.filter((other) => other.draws.includes(key)).map((other) => other.id.replace("chart.", ""));
+    const name = chart.id.replace("chart.", "");
+    throw new Error(`${id}: ${/^[aeiou]/.test(name) ? "an" : "a"} ${name} chart does not draw ${CHART_DECORATIONS[key]}, and set here it would be dropped unseen - remove it and say it in the commentary or a caption${drawers.length ? `, or show the evidence as a chart that draws it (${drawers.join(", ")})` : ""}`);
+  }
+}
+
 export function registerCharts(registry) {
   const headingProps = props => ({ heading: props.heading, unit: props.unit, variant: props.titleVariant,
     ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}),
@@ -3009,6 +3099,9 @@ export function registerCharts(registry) {
       version: "2.6.0",
       category: "chart",
       role: "chart",
+      // The marks it draws over its data and the ones its renderer refuses
+      // itself (CHART_DECORATIONS); any other is refused at render.
+      decorations: Object.freeze({ draws: Object.freeze([...chart.draws]), refuses: Object.freeze([...(chart.refuses || [])]) }),
       tokens: [...new Set([...tokens, ...registry.get("chart-title").tokens])].sort(),
       preferredSize: chart.id === "chart.horizons" ? { width: 1160, height: 460 } : { width: 760, height: 420 },
       sample: chart.sample,
@@ -3046,6 +3139,7 @@ export function registerCharts(registry) {
         return { top: frame.y, ruled: layout.ruled, height: layout.height };
       },
       render: ({ id, frame, props = {}, tokens }) => {
+        refuseUndrawn(chart, props, id);
         if (Array.isArray(props.series) && props.series.some(item => item.tone !== undefined)) throw new Error("Chart series cannot use status tone; positive/negative colours belong to short text labels or check/cross icons. Use chart palette series colours for marks.");
         if (!String(props.heading ?? "").trim()) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
