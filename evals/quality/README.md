@@ -11,7 +11,7 @@ node evals/quality/run.mjs --set dev --runs 3                 # the development 
 node evals/quality/run.mjs --set heldout --runs 3             # the held-out briefs
 node evals/quality/run.mjs --set all --runs 3 --agent claude --judge claude
 node evals/quality/run.mjs --set dev --runs 1 --dry-run       # print the commands, run nothing
-node evals/quality/run.mjs --report                           # the summary for this skill version
+node evals/quality/run.mjs --report                           # the summary for this skill version, one block per treatment
 ```
 
 A run costs real model time: an agent run builds a whole deck, and every
@@ -30,8 +30,12 @@ called.
    design preferences cannot make two runs differ.
 2. **Collect.** The build directory (the one holding `scene.json`, preferring a
    delivered one), its renders and review sheets, `delivery.json`, and the
-   pages, plan and deck files are kept under `runs/<skill>/<brief>/…`
-   (git-ignored). Review and storyline histories (`.reviews/`) are never
+   pages, plan and deck files are kept under
+   `runs/<skill>/<brief>/<agent>-<prompt>-<judge>-run<n>/` (git-ignored). The
+   authoring files are the scored deck's own - its id, in its spec's
+   directory - never the newest file on disk, which may be another attempt's;
+   one that cannot be told to be that deck's is not guessed but recorded in
+   the result row's `deck.missing` with the reason. Review and storyline histories (`.reviews/`) are never
    collected. A run that leaves no rendered deck is recorded as `no-deck` or
    `agent-failed`; that is a result, not a gap. Delivery ends with a
    confirmation read of the accepted deck; a run that stops before it (a review
@@ -51,8 +55,9 @@ called.
    labelled old or new. The preference is mapped back to `current`,
    `previous` or `tie`.
 6. **Record.** One line in `results.jsonl`, keyed by skill version, judge
-   model, brief and run. A key already recorded is refused, never doubled; new
-   runs continue the run count.
+   model, agent, prompt, brief and run. A key already recorded is refused
+   before the agent runs, so nothing is paid for twice and nothing doubled;
+   new runs continue the run count.
 
 The skill version is the git tree hash of `skills/` at HEAD, with
 `+dirty.<digest>` of any uncommitted change to it, so two different working
@@ -60,7 +65,8 @@ trees never share a key.
 
 ## The report
 
-Per brief: runs, mean rating, standard deviation, min and max, decks not
+One block per treatment - an agent and prompt pair - since runs under another
+agent or prompt measure something else. Per brief: runs, mean rating, standard deviation, min and max, decks not
 produced, how many cleared the build bars and the plan gates, and the pairwise
 record (won-tied-lost) with its win rate, where a tie counts a half. Overall:
 the pairwise win rate against the previous version. Three runs is the least

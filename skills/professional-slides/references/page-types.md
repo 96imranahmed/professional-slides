@@ -155,7 +155,7 @@ The spine rules and every other code the compiler raises, each with its repair, 
 
 ### Rebuilding an existing deck
 
-`$RUNTIME_PYTHON runtime/import-deck.py deck.pptx <work>/` writes the inventory and a starter pages file whose pages carry stable ids, `sourceSlide` and the old copy as `draft` (`workflow: "existing_deck_revision"`, `inventory` on `deck`). Map each slide to a page type in place; the compiled plan records the inventory and each page's `sourceSlide`. The procedure is in [Storylining](storylining.md#revising-an-existing-deck).
+`$RUNTIME_PYTHON runtime/import-deck.py deck.pptx <work>/` writes the inventory and a starter pages file whose pages carry stable ids, `sourceSlide` and the old copy as `draft` (`workflow: "existing_deck_revision"`, `inventory` on `deck`). Map each slide to a page type in place; the compiled plan records the inventory and each page's `sourceSlide`. A hidden slide's page carries `hidden: true` beside its `draft`, which mapping keeps ([hidden slides](composition.md#page-and-deck-keys)). The procedure is in [Storylining](storylining.md#revising-an-existing-deck).
 
 There is one authored record of the deck. `author-deck.mjs` writes the other three from it: the deck spec, the plan, and the content plan (`<id>.content.json`). The content plan's claim is each page's title; its `settles` and `adds` come from the page; its text plan is the page's copy as composed, so chart labels, formatted values and cells no longer have to be listed by hand; its reading task is the page type's exhibit family (chart, table, diagram, exhibit, text) and whether the composed page has a commentary column.
 
@@ -180,7 +180,11 @@ Each insight in `<id>.insights.json` records the `shape` of the data behind it, 
 
 With an insight log beside the pages file, every data-bearing page names its insights in `evidence`, and a ranking whose insights hold no peer set is refused: the missing data is a research task, found before the page is written rather than by the storyline critic or the review.
 
-Each chart-bearing shape also records its breadth - `breadth: { periods, series }` for a series, `{ members }` for a peer set or measure pair, `{ parts }` for a mix, `{ steps }` for a bridge - or the `data` itself, from which the counts are read. The log is refused when a shape is narrower than the table above says (a four-year series of one measure, a peer set of four), naming every such insight at once with what to find: the longer window, the peers' series, the rest of the set. An insight with no breadth recorded is refused with the keys to add; `fact`, `qualitative`, `roster`, `schedule` and `geography` need none.
+Each chart-bearing shape also records its breadth - `breadth: { periods, series }` for a series, `{ members }` for a peer set or measure pair, `{ parts }` for a mix, `{ steps }` for a bridge - or the `data` itself, from which the counts are read. A recorded `breadth` wins over the count read from `data`.
+
+A mix's parts are what its chart splits the whole into. With one series, or none, each category, label, item or row is a part: a donut, pie, waffle, treemap, pictogram or one-series stacked bar over A, B and C is three parts. Where two or more series stack over the categories (stacked bar or column, marimekko), each category is a whole and the series are its parts. Where neither reading fits the data, record `breadth: { parts }`.
+
+The log is refused when a shape is narrower than the table above says (a four-year series of one measure, a peer set of four), naming every such insight at once with what to find: the longer window, the peers' series, the rest of the set. An insight with no breadth recorded is refused with the keys to add; `fact`, `qualitative`, `roster`, `schedule` and `geography` need none.
 
 `--check` and `--draft` print each page's budget as it composes - body words against the floor and ceiling for its reading task, the footer's share, how much of the body the page fills - with a `!` on every line to act on, so a fix does not push a page across a line unseen.
 

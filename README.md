@@ -38,7 +38,7 @@ The three manifests carry the same name, version, description and author. Codex 
 Use Node 20.9 or newer and install development dependencies with `npm ci`. `node skills/professional-slides/runtime/doctor.mjs` checks the rest and prints the install lines this machine needs: a Python with python-pptx, lxml, Pillow, numpy and pypdf (`python3 -m pip install -r requirements.txt`), and `soffice`, `pdftoppm` and `pdftotext` for rendering. Set `RUNTIME_PYTHON` if the Python packages live in another environment.
 
 ```bash
-npm run check                                  # source checks and the unit suite
+npm run check                                  # source checks (syntax, probes, dead exports) and the unit suite
 node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow]
 evals/run.sh [--slow]                          # the suite plus example decks, specimens and gate validity
 node evals/quality/run.mjs --set dev --runs 3  # headless agent runs, judged blind against the previous version

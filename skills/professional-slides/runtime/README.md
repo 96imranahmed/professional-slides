@@ -20,9 +20,17 @@ node runtime/reviewer.mjs merge <id>.deck.json out/ [parts-dir]
 
 `deliver-deck.mjs --brief` was removed: both reviews read the deck's verbatim `request`, set in the pages file.
 
+Every Node command reads its command line the same way (`cli.mjs`, on `util.parseArgs`):
+
+- an option's value is never another option: `--reason --user-approved` is a usage error, not a reason;
+- an option a command does not know is ignored, except by `doctor.mjs` and `preferences.mjs`, which refuse it;
+- a refusal prints `Refused (CODE): <message>` with no stack and exits 2; delivery also writes it to `REJECTED.md`;
+- a JSON file that does not parse is an error naming the file;
+- every JSON file the runtime writes is indented two spaces, with a trailing newline.
+
 ## Exit codes
 
-One scheme for every command above (EXIT in `review-passes.mjs`):
+One scheme for every command above (EXIT in `errors.mjs`):
 
 | Code | Meaning |
 | --- | --- |
@@ -37,7 +45,7 @@ One scheme for every command above (EXIT in `review-passes.mjs`):
 
 ```
 doctor.mjs         step 0: Node, a Python that imports the emitter's packages (RUNTIME_PYTHON), soffice, pdftoppm, pdftotext; an install line per missing piece
-import-deck.py     an existing PPTX, read and never written -> <id>.inventory.json, a starter <id>.pages.json (workflow "existing_deck_revision", stable ids, old copy as `draft`) and assets/<id>/
+import-deck.py     an existing PPTX, read and never written -> <id>.inventory.json (each slide as it shows: hidden flag, paragraphs in displayed order, pictures with their displayed box, rotation and mirroring), a starter <id>.pages.json (workflow "existing_deck_revision", stable ids, old copy as `draft`, `hidden: true` on a hidden slide) and assets/<id>/
 preferences.mjs    the design intake's answers, stored once per user outside any project
 design-options.mjs one labelled contact sheet per intake question, each tile built with that answer (emit/contact_sheet.py lays them out)
 import-template.py a template deck -> house profile (palette, faces, chrome, density); infer-style.py the same from a PDF or screenshots
@@ -59,7 +67,12 @@ fetch-places.mjs   coordinates for map markers that name a place, cached in the 
 fetch-series.mjs   public time series (World Bank, Our World in Data) into sources/ as CSV plus a chart block
 build-deck.mjs     assets -> plan -> scene -> claims -> pptx -> render -> readback -> page gates -> density profile; refusals are REFUSAL_CODES
 validate-overlap.mjs  scene design checks author-deck and the build run (OVERLAP_CODES: text on a line, text on a box edge, a descender on a rule, an unkeyed scatter); the rendered-DOM overlap audit the tests run
-errors.mjs         RefusalError: a repairable input, printed without a stack, exit 2
+errors.mjs         EXIT (the exit codes), RefusalError (a repairable input, exit 2), UsageError (a command line it cannot read, exit 1) and registered() (a finding's code, checked against its module's code table)
+cli.mjs            the plumbing every command shares: isMain, parseCli on util.parseArgs, runCli (exit codes and refusal printing), pythonBin, readJson and writeJson
+color.mjs          colour arithmetic on #RRGGBB: mix, relative luminance, WCAG contrast (emit/color.py ports it)
+nice-numbers.mjs   the values an axis, a shared scale or a size legend may land on (gates/nice_ticks.py ports it)
+evidence.mjs       the evidence a page rests on, without the layout engine: SHAPES and breadth, the table vocabulary, plottedValues - so storyline.mjs and reviewer.mjs load about a dozen modules rather than fifty-five
+table-variants.mjs the table variants a deck may name, in the component gallery's order
 claims.mjs         the claim ledger (claims.json) for the author's self-check, and its validation
 gates/page_gates.py     the page gates' command and facade: runs every gate on the scene and the render; `--thresholds-markdown` prints the threshold table
 gates/gate_config.py    the thresholds, the weight floors, the code tables (GATE_CODES, ADVISORY_CODES, COMPOSE_CODES), severity rules and the scene readers every gate shares
@@ -77,7 +90,7 @@ review-passes.mjs  the loop both reviews share: page lists, statuses, ledger, pa
 deliver-deck.mjs   build -> gates -> request and waivers -> storyline ready -> build bars -> self-check -> review passes -> confirmation read -> <id>-DELIVERED.pptx or REJECTED.md
 emit/emit_pptx.py      scene -> editable PPTX (placeholders, native charts with workbooks, preset autoshapes and freeforms, palette -> theme)
 emit/render_pptx.py    PPTX -> PDF (LibreOffice) -> PNG per slide + montage
-emit/readback_pptx.py  the saved PPTX re-opened with python-pptx and compared to the scene
+emit/readback_pptx.py  the saved PPTX re-opened with python-pptx and compared to the scene; lists the hidden slides (`readback.hidden`) and reports HIDDEN_STATE when the file and the scene disagree
 emit/color.py          WCAG luminance and contrast, as palettes.mjs and core.mjs compute them, for the emitter and the template importer
 weight.json, weight.mjs  the numeric contract the composer and gates read: floors by fill, targets, deck lengths, rule versions
 ```

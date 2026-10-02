@@ -184,7 +184,15 @@ Cell types: `text`; `bullets`; `category` (primary fill with contrasting text, o
 | otherwise, the first column of exact figures with a unit (in a table of five columns or fewer) | in-cell bars on a zero-based scale, the figure beside each; where the column is too narrow for a bar, or the bars would push the table past its frame, the figures stay plain |
 | a closing row whose figures add up the rows above (more than three rows) | the total band, set bold |
 
-A table that should stay plain - a record lookup - declares its columns' `type`. A table counts as treated for `CRAFT_TABLES_PLAIN` and `BAR_TABLES_TREATED` when any cell or column carries a treatment, when a row or column is banded, and when a cell or header carries a logo or a photograph.
+A table that should stay plain - a record lookup - declares its columns' `type`.
+
+**What counts as a treated table.** This is the one definition, kept in `runtime/gates/table-treatments.json` and read by the build bar (`BAR_TABLES_TREATED`), the craft floor (`CRAFT_TABLES_PLAIN`) and the deck screen (`DECK_CRAFT`). A table is treated when it draws at least one device that says something about its data:
+
+| Treatments | Not treatments |
+| --- | --- |
+| heat cells; Harvey balls and dots; in-cell bars and progress bars; state pills and marks (status pills, lamps, checks, binary marks); logos in a cell or header; cell icons; trend arrows; a highlighted column; an accented row; a bold total band | zebra banding, group rows and the implication gutter, which keep the reader's place or structure the grid; value pills, number circles and section markers; photographs |
+
+Every table on an analytical page is counted, except a row block's small table of fewer than three body rows, which is the row's evidence and exempt from `TABLE_TOO_SHORT` too.
 
 `implicationStyle` is `per-row` or `single`; the default follows the row count, `per-row` at four rows or fewer. `single` is not one chevron on the middle row - that reads as a verdict on that row - but a dashed rule down the gutter carrying one disc centred on the rows it spans, which stops above a total: a total is the same evidence added up, not another line of it.
 

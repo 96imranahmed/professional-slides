@@ -71,6 +71,13 @@ evals/run.sh --slow
 node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--pattern GLOB] [--verbose]
 python3 -m unittest discover -s evals/tests -p 'test_*.py'
 
+# source checks (npm run check:syntax): syntax, the embedded probes, and dead
+# exports - an export no runtime module, eval script, test probe or code example
+# in the docs imports; it fails on any, unless evals/scripts/dead_exports.mjs
+# names it in PUBLIC_API with the reason it is kept
+node evals/scripts/check_source_quality.mjs
+node evals/scripts/dead_exports.mjs
+
 # deterministic page gates on any scene + render
 python3 skills/professional-slides/runtime/gates/page_gates.py \
     scene.json render_dir/ [--report out.json] \

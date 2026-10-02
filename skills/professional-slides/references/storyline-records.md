@@ -61,7 +61,7 @@ The build checks the declared task against the composed page (`TEXT_TASK_MISMATC
 - **Above the floor.** The build's density profile compares each rendered page with the targets, and the review's density pass judges every page it flags, so a page padded to clear the floor fails there instead.
 - **Neither is a quota.** Do not pad or let repeated labels stand in for explanation.
 
-`textCoverageScore = 100 × planned body words / reference median body words` is a relative index, not a taste rating. The same wording and reference comparison hold through the plan, the spec, the composed scene, the saved PPTX and the rendered PDF. If composition splits a page, each resulting page is reconciled into its own text plan. `text-coverage.json` reports composition retention; `rendered-text-coverage.json` checks the planned fragments in the saved PDF's text. `--legacy` audits historical partial plans only and cannot make a new-deck build pass.
+`textCoverageScore = 100 × planned body words / reference median body words` is a relative index, not a taste rating. The same wording and reference comparison hold through the plan, the spec, the composed scene, the saved PPTX and the rendered PDF. If composition splits a page, each resulting page is reconciled into its own text plan. `text-coverage.json` reports composition retention; `rendered-text-coverage.json` checks the planned fragments in the saved PDF's text.
 
 ## The plan file
 
@@ -96,5 +96,8 @@ Choose an evidence relationship before a component ([Design](design.md), [refere
 | `rows`, `items` | Actual evidence size for capacity planning |
 | `series` | A deliberately comparable repeated task, with its rationale |
 | `workflow`, `inventory`, `sourceSlide` | A revision's workflow, the inventory it was imported from, and each page's slide in the source deck |
+| `shape`, `pageType`, `commentary` | The evidence shape, the page type record and the commentary placement the compile wrote |
+
+A page field the plan does not have is refused (`PLAN_SCHEMA`), with the fields it named: nothing reads it. Six older names are read once, as the plan is read, into the field they mean - `layout` as `architecture`, `points` as `items`, `dataShape` as `shape`, `exhibitVariant` as `variant`, and `reason` and `exhibitReason` as `why` - and a page that gives a field under both names keeps its own (`readPlanPages` in `runtime/gates/plan_gates.mjs`).
 
 `node runtime/gates/plan_gates.mjs <id>.plan.json` and `node runtime/gates/content_gates.mjs <id>.content.json` run the gates on a hand-written record; the build runs the sidecars it finds. Mix, icon, treatment and density statistics are advisory, never decoration quotas. Classify every component in a composite, not only the dominant exhibit; [Composition](composition.md) owns allocation and peer anchors.

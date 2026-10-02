@@ -15,7 +15,7 @@ The pipeline, in order, with each step's stop condition, is in [SKILL.md](../../
 - `out/self-check.json` covers the build's claim ledger (`SELF_CHECK_INCOMPLETE`);
 - the review loop accepts, and confirms each waiver ([Taste review](../taste-review.md#acceptance-confirmation-and-build-bars) owns the passes, the confirmation read, the caps and the lineage).
 
-A rejection writes `out/REJECTED.md` and `delivery.json` with the blockers and removes any earlier deliverable. A packet waiting for a reader leaves `delivery.json` with `review.status: "pending"`, the staged packet's path and a `note` saying which prompt to give and where to save the answer.
+An acceptance writes `out/<id>-DELIVERED.pptx` and `delivery.json`, which records the `binding` of the build it accepted. Rerunning delivery on that approved build exits 0 again with the same deliverable and the same `delivery.json`, and starts no further read. A rejection (exit 2) writes `out/REJECTED.md` and `delivery.json` with the blockers, and a packet waiting for a reader (exit 3) leaves `delivery.json` with `review.status: "pending"`, the staged packet's path and a `note` saying which prompt to give and where to save the answer; both remove any earlier deliverable, so a stale file is never taken for an accepted one. A crash or a usage error (exit 1) reaches no outcome and leaves the last one's files as they were.
 
 ## Environment
 
@@ -34,6 +34,8 @@ Set `RUNTIME_PYTHON` when the packages live in an environment of their own. No C
 The build renders with LibreOffice headless by default: exported PPTX to PNG per slide, plus a python-pptx readback that recovers each shape's frame, text and line count from the saved file.
 
 The exported file is the candidate of record. Keep meaning-bearing content native and separately addressable: one paragraph per real paragraph, `wrap="square"`, autofit on the body, title and body placeholders on a real layout set, native charts with embedded workbooks, and grouped diagram geometry. Then a reader can edit the deck, Reset Slide works, and a template swap keeps the content.
+
+The saved PPTX is a function of its content: every date in the package - `docProps/core.xml`'s created and modified, the chart workbooks', the zip entries' - is set to the SOURCE_DATE_EPOCH environment variable when it is set, else to 1 January 1980. A zip entry can only record a time from 1980 to 2107, so an epoch outside that range (the common `0` is 1970) stamps the entries at the nearer end, while the XML dates keep the epoch itself.
 
 Inspect every rendered slide for title wrapping, overflow, font substitution, chart labels and number formats, image crops, master furniture and source notes, connector routing, tracker states and page numbers. After a structural repair, render the whole deck again.
 
