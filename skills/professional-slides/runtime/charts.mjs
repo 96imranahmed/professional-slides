@@ -41,6 +41,7 @@ import {
   evidenceRailWidth,
   evidenceTreatment,
   releasedEvidenceProps,
+  packedEvidenceProps,
   renderAnnotationRail,
   renderChangeAnnotations,
   renderEvidenceAnnotations
@@ -301,10 +302,13 @@ export function numericBounds(values, { min, max, axis = "y", includeZero = fals
 // yMax would. On a line's own scale, which need not start at zero, the 15% is
 // of the data's span, not of the value: 15% of a 2.66m-tonne peak over a floor
 // of 1.85m would take the domain to 3.06 and leave a void above the line.
-const withReferenceValues = (values, props, { base = 0 } = {}) => {
+// A line's domain fitted to its data (`padded`: no value axis) already runs a
+// quarter of its span past the top, which holds the label; the 15% added again
+// on top of it left a quarter of the plot empty over a peak line.
+const withReferenceValues = (values, props, { base = 0, padded = false } = {}) => {
   const references = (props.referenceLines || []).map(reference => reference.value).filter(Number.isFinite);
   const top = Math.max(...values.filter(Number.isFinite));
-  const headroom = props.yMax === undefined && props.xMax === undefined ? references.filter(v => v > 0 && v >= base + (top - base) * 0.9).map(v => v + (v - base) * 0.15) : [];
+  const headroom = props.yMax === undefined && props.xMax === undefined && !padded ? references.filter(v => v > 0 && v >= base + (top - base) * 0.9).map(v => v + (v - base) * 0.15) : [];
   return [...values, ...references, ...headroom];
 };
 
@@ -674,7 +678,10 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
   return { underlay, overlay };
 }
 
-function withDecorations(nodes, options) {
+// Exported for the wider catalogue (charts-extra.mjs): a chart there that sets
+// its marks by category and series takes callouts, highlights and reference
+// lines from here rather than dropping them.
+export function withDecorations(nodes, options) {
   const { underlay, overlay } = decorations({ ...options, obstacles: nodes });
   const backings = [];
   for (const label of nodes.filter((node) => node.role === "data-label")) {
@@ -1669,7 +1676,8 @@ function lineChart({ id, frame, props, area = false }) {
   const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length <= 8);
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels && !crowded });
   if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
-  const bounds = numericBounds(withReferenceValues(values, props, { base: props.yMin ?? Math.min(...values) }), { min: props.yMin, max: props.yMax, axis: "y", tight: !showValueAxis && props.gridlines !== true });
+  const tight = !showValueAxis && props.gridlines !== true;
+  const bounds = numericBounds(withReferenceValues(values, props, { base: props.yMin ?? Math.min(...values), padded: tight }), { min: props.yMin, max: props.yMax, axis: "y", tight });
   const labelWidth = axisLabelWidth(bounds);
   const labelHeightAt = (slot) => Math.max(...categories.map((c) => { try { return measureText(String(c), slot, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }).height; } catch { return 28; } }));
   // The period labels sit 16px under the plot, clear of the markers on its
@@ -2969,11 +2977,15 @@ function renderResolved(render, context) {
         throw new Error(`${railed.message.replace(/; shorten the note.*$/, "")}: a rail beside the plot leaves it too narrow in this ${Math.round(context.frame?.width ?? 0)}px chart (${cause.message.replace(/[;:].*$/, "")}), and its bar has no room to carry it. Put the note in the commentary or caption, annotate a mark with clear space above or beside it, or give the chart a wider panel`);
       throw error;
     }
-    if (first) return nodes;
-    const released = releasedEvidenceProps(nodes, props);
-    if (!released) return nodes;
-    first = nodes;
-    props = released;
+    const released = first ? null : releasedEvidenceProps(nodes, props);
+    if (released) { first = nodes; props = released; continue; }
+    // The callouts still in bands share them where their boxes do not meet
+    // across (packedEvidenceProps), and the plot takes back the height of every
+    // band that frees. Tried once; a packed layout that does not render keeps
+    // this one.
+    const packed = packedEvidenceProps(nodes, props);
+    if (!packed) return nodes;
+    try { return render({ ...context, props: packed }); } catch { return nodes; }
   }
   return first;
 }

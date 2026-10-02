@@ -114,11 +114,20 @@ def row_block_small_table(slide, instance):
     return 0 < body < ROW_BLOCK_TABLE_ROWS
 
 
+def chart_data_table(slide, instance):
+    """A chart's data table, the chart's own figures printed under it: part of
+    the chart, not counted (build-bars.mjs chartDataTable)."""
+    key = instance.get("instanceId") or instance.get("id")
+    return any((n.get("data") or {}).get("componentInstance") == key and (n.get("data") or {}).get("chartData") is True
+               for n in slide.get("nodes", []))
+
+
 def counted_tables(slide):
     """The page's tables a treated share counts: every one but a row block's
-    small table (build-bars.mjs countedTables)."""
+    small table and a chart's data table (build-bars.mjs countedTables)."""
     return [c for c in slide.get("componentInstances", [])
-            if str(c.get("component") or "") in TABLE_COMPONENTS and not row_block_small_table(slide, c)]
+            if str(c.get("component") or "") in TABLE_COMPONENTS
+            and not row_block_small_table(slide, c) and not chart_data_table(slide, c)]
 
 
 def table_nodes(slide, instance):

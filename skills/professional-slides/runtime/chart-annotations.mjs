@@ -110,20 +110,40 @@ function normalizeEvidenceAnnotations(props = {}) {
 const RELEASED_PLACEMENTS = new Set(["beside", "rail", "on-bar", "plot"]);
 const holdsBand = (annotation) => (annotation.treatment !== "orthogonal-dot" || annotation.orientation !== "horizontal") && !RELEASED_PLACEMENTS.has(annotation._placement);
 
+// The bands the callouts above the plot sit in, as lanes: lane 0 is the band
+// on the plot, each lane above it the next band up. A callout holds its own
+// lane, in order - the first callout highest - until a render has placed them
+// (`_lane`, set by packedEvidenceProps): callouts whose boxes do not meet across
+// the plot then share a lane, and the plot keeps the height a stacked band
+// would have taken. Each entry is { annotation, index, lane }, `index` its place
+// in the chart's annotations.
+function bandLanes(props) {
+  const banded = normalizeEvidenceAnnotations(props).map((annotation, index) => ({ annotation, index })).filter((entry) => holdsBand(entry.annotation));
+  const packed = banded.length && banded.every((entry) => Number.isInteger(entry.annotation._lane) && entry.annotation._lane >= 0);
+  return banded.map((entry, order) => ({ ...entry, lane: packed ? entry.annotation._lane : banded.length - 1 - order }));
+}
+const laneCount = (lanes) => (lanes.length ? Math.max(...lanes.map((entry) => entry.lane)) + 1 : 0);
+
 export function evidenceAnnotationTopBandCount(props = {}) {
-  return normalizeEvidenceAnnotations(props).filter(holdsBand).length;
+  return laneCount(bandLanes(props));
 }
 
 // In a compact band each box takes its own measured height plus a small gap,
 // and only the lowest keeps the full foot that clears the value labels riding
 // the tallest marks. It is what the chart falls back to when the full 88px
-// bands would leave the plot under its minimum height.
+// bands would leave the plot under its minimum height. A shared band is as tall
+// as its tallest box.
 const COMPACT_BAND_GAP = 8;
 const BAND_FOOT = EVIDENCE_CALLOUT_BAND - EVIDENCE_BOX_HEIGHT;
 function bandHeights(props, compact) {
-  const banded = normalizeEvidenceAnnotations(props).filter(holdsBand);
-  if (!compact) return banded.map(() => EVIDENCE_CALLOUT_BAND);
-  return banded.map((annotation, index) => evidenceBoxSize(annotation).height + (index === banded.length - 1 ? BAND_FOOT : COMPACT_BAND_GAP));
+  const lanes = bandLanes(props), count = laneCount(lanes);
+  // Indexed as the bands stack, band 0 the highest: band b holds lane count-1-b.
+  return Array.from({ length: count }, (_, band) => {
+    if (!compact) return EVIDENCE_CALLOUT_BAND;
+    const lane = count - 1 - band;
+    const tallest = Math.max(...lanes.filter((entry) => entry.lane === lane).map((entry) => evidenceBoxSize(entry.annotation).height), EVIDENCE_BOX_MIN_HEIGHT);
+    return tallest + (lane === 0 ? BAND_FOOT : COMPACT_BAND_GAP);
+  });
 }
 
 /** The height the evidence bands take above the plot, full or compact. */
@@ -702,11 +722,14 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
   // gutter, the rail) but stays within the plot's height.
   const limits = plot.limits ?? { x: plot.x - 12, y: plot.y, width: plot.width + 24, height: plot.height };
   const besideBounds = { x: limits.x, y: plot.y, width: limits.width, height: plot.height };
-  let bandIndex = 0;
+  // Each banded callout's band, highest first, from its lane.
+  const lanes = bandLanes(props), count = laneCount(lanes);
+  const bandOf = new Map(lanes.map((entry) => [entry.index, count - 1 - entry.lane]));
   const placements = [];
   annotations.forEach((annotation, index) => {
     const target = resolveEvidenceAnchor(pointMap, annotation, id);
     const banded = holdsBand(annotation);
+    const bandIndex = bandOf.get(index) ?? 0;
     const context = { annotation, index, target, plot, props, bandIndex, obstacles: collisionObstacles, placements };
     const beside = () => besidePlacement({ ...context, bounds: besideBounds, obstacles: besideObstacles });
     const inside = () => insidePlacement({ ...context, marks: obstacles.filter((node) => node.role === "chart-mark") });
@@ -723,7 +746,6 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
           : [() => standardPlacement(context), beside, inside];
     let placement = null;
     for (const attempt of chain) if ((placement = attempt())) break;
-    if (banded) bandIndex += 1;
     if (!placement) {
       // No room in the plot: this callout takes its band above it after all,
       // and the chart renders again with the plot that much shorter.
@@ -768,6 +790,42 @@ export function releasedEvidenceProps(nodes, props = {}) {
   const moved = new Set(nodes.filter((node) => node.role === "annotation-surface" && node.data?.evidenceReleased).map((node) => node.data.evidenceIndex));
   if (!moved.size || !Array.isArray(props.annotations)) return null;
   return { ...props, annotations: props.annotations.map((item, index) => moved.has(index) ? { ...item, _placement: "beside" } : item) };
+}
+
+/**
+ * Props with the callouts that stayed in bands above the plot packed into as
+ * few bands as their boxes allow; null when they already are. Two boxes share a
+ * band when they do not meet across the plot (a box's position across depends
+ * on its mark, not on the plot's height, so the next render keeps it); a box
+ * that meets one set lower stays above it, as it was. Stacked one band per
+ * callout, two notes over different years took 176px of the plot where one band
+ * of 88 held both. The chart renders once more with these props.
+ */
+export function packedEvidenceProps(nodes, props = {}) {
+  if (!Array.isArray(props.annotations)) return null;
+  const lanes = bandLanes(props);
+  if (lanes.length < 2) return null;
+  const boxes = new Map();
+  for (const node of nodes) {
+    const data = node.data || {};
+    if (data.evidencePlacement !== "band" || !Number.isInteger(data.evidenceIndex) || !node.frame) continue;
+    const box = boxes.get(data.evidenceIndex);
+    const left = Math.min(node.frame.x, box?.left ?? Infinity), right = Math.max(node.frame.x + node.frame.width, box?.right ?? -Infinity);
+    boxes.set(data.evidenceIndex, { left, right });
+  }
+  // Every banded callout must be in its band: one placed elsewhere is
+  // released first (releasedEvidenceProps).
+  if (lanes.some((entry) => !boxes.has(entry.index))) return null;
+  const meets = (a, b) => a.left < b.right + COMPACT_BAND_GAP && b.left < a.right + COMPACT_BAND_GAP;
+  const placed = [];
+  for (const entry of [...lanes].sort((a, b) => a.lane - b.lane)) {
+    const box = boxes.get(entry.index);
+    const below = placed.filter((other) => meets(box, other.box));
+    placed.push({ index: entry.index, box, lane: below.length ? Math.max(...below.map((other) => other.lane)) + 1 : 0 });
+  }
+  if (laneCount(placed) >= laneCount(lanes)) return null;
+  const laneAt = new Map(placed.map((entry) => [entry.index, entry.lane]));
+  return { ...props, annotations: props.annotations.map((item, index) => (laneAt.has(index) ? { ...item, _lane: laneAt.get(index) } : item)) };
 }
 
 export function normalizeChangeAnnotations(props = {}) {

@@ -23,19 +23,23 @@ import { isMain } from "../../skills/professional-slides/runtime/cli.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXAMPLES = path.resolve(HERE, "../../skills/professional-slides/examples");
-export const BASELINE_DECKS = Object.freeze(["gallery-acceptance", "house-style", "nyc-or-sf"]);
+export const BASELINE_DECKS = Object.freeze(["gallery-acceptance", "house-style", "nyc-or-sf", "page-types"]);
 export const BASELINE_FILE = path.join(SPECIMENS, "example-deck-baseline.json");
 
+const exampleSpec = (name) => JSON.parse(readFileSync(path.join(EXAMPLES, `${name}.deck.json`), "utf8"));
 export function exampleScene(name) {
-  const spec = JSON.parse(readFileSync(path.join(EXAMPLES, `${name}.deck.json`), "utf8"));
-  return planDeck(toDeckPlan(spec, EXAMPLES)).deck;
+  return planDeck(toDeckPlan(exampleSpec(name), EXAMPLES)).deck;
 }
 
+// A catalogue (the gallery) is held to the ceilings only, as delivery and the
+// craft floor hold it: its statistics are printed, its floors not applied.
 export function measureBaseline(names = BASELINE_DECKS) {
   return Object.fromEntries(names.map((name) => {
-    const scored = scoreBuild(exampleScene(name));
+    const purpose = exampleSpec(name).purpose ?? null;
+    const scored = scoreBuild(exampleScene(name), { purpose });
     const s = scored.statistics;
     return [name, {
+      ...(purpose ? { purpose } : {}),
       contentPages: s.contentPages, exhibitVarietyPerTen: s.exhibitVarietyPerTen, distinctExhibits: s.distinctExhibits,
       tables: s.tables, tablesTreated: s.tablesTreated, charts: s.charts, chartsAnnotated: s.chartsAnnotated,
       drawingsPerPage: s.drawingsPerPage, accepted: scored.accepted,

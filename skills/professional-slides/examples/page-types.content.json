@@ -3418,7 +3418,7 @@
     {
      "id": "p12-p12-exhibit:legend:rating",
      "role": "exhibit",
-     "text": "Rating: 0 = None; 1 = Weak; 2 = Partial; 3 = Strong; 4 = Full. Missing = Not available; N/A = not applicable."
+     "text": "Rating: 0 = None; 1 = Weak; 2 = Partial; 3 = Strong; 4 = Full."
     },
     {
      "id": "p12-p12-sowhat:body",
@@ -5367,11 +5367,6 @@
      "id": "p21-p21-exhibit-2:header-text:2",
      "role": "exhibit",
      "text": "NPV"
-    },
-    {
-     "id": "p21-p21-exhibit-2:header-unit:2",
-     "role": "exhibit",
-     "text": "£M"
     },
     {
      "id": "p21-p21-exhibit-2:header-text:3",

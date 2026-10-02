@@ -1669,15 +1669,27 @@ export function markPlayerCells(slide, players) {
   // A column headed by a player ("Firm A", "Firm B result") carries the
   // player's mark beside its label.
   const headed = (label) => { const said = String(label ?? "").trim(); for (const [alias, name] of names) if (new RegExp(`(^|\\W)${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\W|$)`, "i").test(said)) return name; return null; };
-  if (names.size) for (const ex of exhibitsOf(slide).filter(isTable)) {
+  // Every header from `first` on that names a player; the columns before it
+  // head the row labels.
+  const markHeaders = (columns, first) => columns.map((column, c) => {
+    const label = typeof column === "string" ? column : column?.label;
+    const player = c >= first && !(column && typeof column === "object" && (column.logo || column.type === "logo")) ? headed(label) : null;
+    if (!player) return column;
+    return { ...(typeof column === "string" ? { label: column } : column), logo: { alt: `${player} logo` } };
+  });
+  if (!names.size) return;
+  for (const ex of exhibitsOf(slide).filter(isTable)) {
     ex.rows = ex.rows.map((row) => Array.isArray(row) ? row.map((cell, c) => c === 0 ? cell : mark(cell))
       : row && Array.isArray(row.cells) ? { ...row, cells: row.cells.map((cell, c) => c === 0 && row.label === undefined ? cell : mark(cell)) } : row);
-    if (Array.isArray(ex.columns)) ex.columns = ex.columns.map((column, c) => {
-      const label = typeof column === "string" ? column : column?.label;
-      const player = c > 0 && !(column && typeof column === "object" && (column.logo || column.type === "logo")) ? headed(label) : null;
-      if (!player) return column;
-      return { ...(typeof column === "string" ? { label: column } : column), logo: { alt: `${player} logo` } };
-    });
+    if (Array.isArray(ex.columns)) ex.columns = markHeaders(ex.columns, 1);
+  }
+  // A findings matrix heads its columns at the page's level ("Anthropic",
+  // "OpenAI route"): a column headed by a player carries the mark as a
+  // table's does. Its first header heads the row labels when it heads one
+  // more column than the rows carry (compose.mjs reads it the same way).
+  if (Array.isArray(slide.columns) && Array.isArray(slide.rows) && slide.rows.some((row) => Array.isArray(row?.cells))) {
+    const count = Math.max(...slide.rows.map((row) => (Array.isArray(row?.cells) ? row.cells.length : 0)));
+    slide.columns = markHeaders(slide.columns, slide.columns.length > count ? 1 : 0);
   }
 }
 

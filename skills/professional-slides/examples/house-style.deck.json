@@ -239,8 +239,7 @@
           "",
           "",
           "part year"
-        ],
-        "dataTable": true
+        ]
       },
       "kpi": {
         "value": "80%",
@@ -294,8 +293,8 @@
             "group": "Largest disclosed round",
             "label": "Deal size",
             "unit": "$m",
-            "type": "text",
-            "align": "right"
+            "align": "right",
+            "bar": true
           },
           {
             "group": "Largest disclosed round",

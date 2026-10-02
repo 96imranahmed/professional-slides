@@ -134,6 +134,8 @@ export const TABLE_TOKENS = [
   "line.hairline",
   "line.standard",
   "radius.none",
+  // The white chip a header logo sits on over a filled header.
+  "radius.small",
   "radius.round",
 ];
 const t = token,
@@ -203,6 +205,10 @@ function barColor(scale, index) {
   );
   return candidates[strongestContrastIndex(candidates.map(tokenValue))];
 }
+
+// How a bar cell's figure was written, when not as an exact figure: an
+// approximation, a lower or upper bound, or a range.
+const BAR_BOUNDS = Object.freeze(["approx", "lower", "upper", "range"]);
 
 // A figure as a pill carries it (value-format.mjs SCALAR_FIGURE). "n/a" or a
 // dash says there is none.
@@ -489,6 +495,12 @@ function scaleFor(cell, props, used) {
       throw new Error("Bar markFocus must be boolean");
     if (cell.markFocus && scale.series.length !== 1)
       throw new Error("Bar markFocus requires one series; preserve multi-series identity with a local annotation");
+    // A bound or a range is one figure written as more than a point
+    // (compose.mjs quantity): a range's `low` is its bottom end, on the scale.
+    if (cell.bound !== undefined && (!BAR_BOUNDS.includes(cell.bound) || scale.series.length !== 1))
+      throw new Error(`Bar bound must be one of ${BAR_BOUNDS.join(", ")}, on a single-series bar`);
+    if (cell.bound === "range" && (!Number.isFinite(cell.low) || cell.low < scale.min || !(cell.low < cell.values?.[0])))
+      throw new Error("A range bar needs a low end on its scale, below its high end");
     if (
       !Array.isArray(cell.values) ||
       cell.values.length !== scale.series.length ||
@@ -770,18 +782,20 @@ function contentLayout(cell, width, props, used) {
   };
 }
 
-function legendText(scale) {
+// A key names the missing and not-applicable states only where a cell on its
+// scale is one: under a table with none it defines marks nobody can find.
+function legendText(scale, absent = false) {
   if (scale.type === "binary")
     return `${scale.label}: ${scale.test}. ${scale.states.yes}; ${scale.states.no}; ${scale.states.missing}.`;
   if (scale.type === "bars")
     return `${scale.label} (${scale.unit}, common scale ${scale.min} to ${scale.max})`;
   return `${scale.label}: ${Object.entries(scale.anchors)
     .map(([n, label]) => `${n} = ${label}`)
-    .join("; ")}. Missing = Not available; N/A = not applicable.`;
+    .join("; ")}.${absent ? " Missing = Not available; N/A = not applicable." : ""}`;
 }
 
-function layoutLegend(id, scale, width, size, gap) {
-  const text = legendText(scale),
+function layoutLegend(id, scale, width, size, gap, absent = false) {
+  const text = legendText(scale, absent),
     layout = measure(text, width, false, size);
   const entries = [];
   let extraHeight = scale.type === "heatmap" ? v("icon.medium") + gap : 0;
@@ -944,7 +958,7 @@ export function measureTable({ frame, props }) {
     column.type = "text";
     for (const cell of cells) {
       const text = String(cell.labels?.[0] ?? "");
-      for (const key of ["values", "labels", "scale", "scaleRecord", "scaleValues"]) delete cell[key];
+      for (const key of ["values", "labels", "scale", "scaleRecord", "scaleValues", "bound", "low"]) delete cell[key];
       Object.assign(cell, { type: "text", text, value: text });
     }
     fellBack = true;
@@ -1078,8 +1092,9 @@ export function measureTable({ frame, props }) {
     if (scale.type !== "bars" || scale.series.length !== 1 || columns.some(column => !column.label.includes(scale.unit) && String(column.unit ?? "").trim() !== scale.unit))
       throw new Error("Only single-series bar legends may be omitted, with their unit visible in every using column header or its unit line, or a binary scale whose every column header asks a question");
   }
+  const absent = new Set(model.cells.flat().filter((cell) => cell && ["missing", "na"].includes(cell.value)).map((cell) => cell.scale));
   const legends = [...used.entries()].filter(([, scale]) => scale.legend !== false).map(([id, scale]) =>
-    layoutLegend(id, scale, frame.width, textSize, gap),
+    layoutLegend(id, scale, frame.width, textSize, gap, absent.has(id)),
   );
   // Reserve visible scale bars/swatches and labels together. Never infer row-local scales.
   const legendHeight = sum(legends.map((l) => l.height));
@@ -1178,10 +1193,18 @@ export function tableCeiling({ frame, props }) {
   }
 }
 
+// A chart's data table (`chartData`, set by the composer under a chart that
+// prints its figures) marks every node it draws, so the gates can tell the
+// chart's own figures from a table the page is built on.
+const chartData = (result, props) => {
+  if (props.chartData === true) for (const node of result.nodes) node.data = { ...node.data, chartData: true };
+  return result;
+};
+
 export function renderTable(input) {
   // Peer rows were measured at the authored density; a local fallback would
   // invalidate their shared geometry and silently change only one table.
-  if (input.props.rowAlignment) return renderTableAt(input);
+  if (input.props.rowAlignment) return chartData(renderTableAt(input), input.props);
   const ladder = DENSITY_LADDER;
   const stepped = fillDensity(input);
   if (stepped !== (input.props.density ?? "body")) input = { ...input, props: { ...input.props, density: stepped } };
@@ -1191,7 +1214,7 @@ export function renderTable(input) {
     try {
       const result = renderTableAt({ ...input, props: { ...input.props, density: ladder[i] } });
       if (i > start) for (const node of result.nodes) node.data = { ...node.data, fitStep: ladder[i] };
-      return result;
+      return chartData(result, input.props);
     } catch (error) {
       if (!/only \d+(?:\.\d+)?px is allocated/.test(error.message)) throw error;
       lastError = error;
@@ -1671,23 +1694,46 @@ function renderTableAt({ id, frame, props }) {
               ? contrastRatio(tokenValue(t("color.accent")), tokenValue(focusSurface)) >= 4.5 ? t("color.accent") : foreground(focusSurface)
               : color,
             markData = { ...data, ...(cell.markFocus ? { markFocus: true } : {}) };
-          if (value !== 0)
+          // A range or an upper bound claims no point inside its span, so the
+          // span is drawn as a tint between its ends, outlined in the bar's
+          // colour. A lower bound is the bar to the bound, left open past it
+          // by an arrow: the true value lies further along.
+          const spans = cell.bound === "range" || cell.bound === "upper",
+            from = cell.bound === "range" ? cell.low : 0,
+            barY = y + (l.rowHeight - barHeight) / 2,
+            bound = cell.bound ? { bound: cell.bound, ...(spans ? { low: from } : {}) } : {};
+          if (value !== 0 || spans)
             nodes.push(
               rectPrimitive({
                 id: stableId(cellId, "bar", i),
-                role: "table-bar",
+                role: spans ? "table-bar-range" : "table-bar",
                 frame: {
-                  x: Math.min(zeroX, xScale(value)),
-                  y: y + (l.rowHeight - barHeight) / 2,
-                  width: Math.abs(xScale(value) - zeroX),
+                  x: Math.min(xScale(from), xScale(value)),
+                  y: barY,
+                  width: Math.abs(xScale(value) - xScale(from)),
                   height: barHeight,
                 },
-                style: {
+                style: spans
+                  ? { ...box(t("color.componentPrimaryTint")), stroke: markColor, lineWidth: t("line.hairline") }
+                  : {
                   ...box(markColor),
                   ...((cell.markFocus || fill || band) && contrastRatio(tokenValue(markColor), tokenValue(cell.markFocus ? focusSurface : fill || band)) < 3
                     ? { stroke: foreground(cell.markFocus ? focusSurface : fill || band), lineWidth: t("line.hairline") } : {}),
                 },
-                data: { ...markData, series: i, value, zeroX, domain: [scale.min, scale.max] },
+                data: { ...markData, series: i, value, zeroX, domain: [scale.min, scale.max], ...bound },
+              }),
+            );
+          if (cell.bound === "lower")
+            nodes.push(
+              linePrimitive({
+                id: stableId(cellId, "open", i),
+                role: "table-bar-open",
+                x1: xScale(value),
+                y1: barY + barHeight / 2,
+                x2: Math.min(xScale(value) + v("space.4"), inner.x + plot),
+                y2: barY + barHeight / 2,
+                style: { stroke: markColor, lineWidth: t("line.standard") },
+                data: { ...markData, series: i, value, ...bound, endArrow: true, endArrowType: "triangle" },
               }),
             );
           const label = measure(cell.labels?.[i] ?? formatValue(value, { ...scale, values: cell.scaleValues ?? cell.values }), l.labelWidth, true, l.size);

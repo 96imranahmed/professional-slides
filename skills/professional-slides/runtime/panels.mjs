@@ -7,6 +7,7 @@ import { token, tokenValue, stableId, textPrimitive, linePrimitive, wedgePrimiti
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
+import { mediaNode } from "./media.mjs";
 
 const PRIMARY = token("color.componentPrimary"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), ACCENT = token("color.accent");
 const SURFACE = token("color.surface"), RULE = token("color.rule"), TINT = token("color.componentPrimaryTint");
@@ -31,8 +32,30 @@ function normalizeCards(props) {
   return props.items.map((item, index) => {
     if (!item || typeof item.title !== "string" || !item.title.trim()) throw new Error(`Card ${index + 1} requires a title`);
     const points = Array.isArray(item.points) ? item.points.map((p) => (typeof p === "string" ? p : p?.text)).filter((p) => typeof p === "string" && p.trim()) : [];
-    return { title: item.title.trim(), text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : null, points, icon: item.icon ?? null, number: item.number ?? index + 1, footer: typeof item.footer === "string" && item.footer.trim() ? item.footer.trim() : null, value: item.value !== undefined && item.value !== null && String(item.value).trim() ? String(item.value).trim() : null };
+    // A card about a recognisable subject (a product, a company) carries its
+    // mark: an embedded `logo` takes the icon's place. One with no file yet
+    // keeps the icon until the build fills it (fetch-logos.mjs).
+    const logo = item.logo && typeof item.logo === "object" && item.logo.dataUri ? item.logo : null;
+    return { title: item.title.trim(), text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : null, points, icon: item.icon ?? null, logo, number: item.number ?? index + 1, footer: typeof item.footer === "string" && item.footer.trim() ? item.footer.trim() : null, value: item.value !== undefined && item.value !== null && String(item.value).trim() ? String(item.value).trim() : null };
   });
+}
+
+// A card's mark in the icon's slot, its proportions kept. Every mark gets one
+// visual area (as chart and table logos do), so a long wordmark and a squat
+// one read at one weight across a row; none is taller than the slot or wider
+// than three times it. On a dark card it sits on a white chip, since a mark
+// drawn for a white page can vanish on the fill.
+function cardLogo(cid, logo, slot, centred, onDark) {
+  const aspect = logo.width > 0 && logo.height > 0 ? logo.width / logo.height : 1;
+  const area = slot.height * slot.height * 2;
+  const shrink = Math.min(1, slot.height / Math.sqrt(area / aspect), Math.min(slot.width, slot.height * 3) / Math.sqrt(area * aspect));
+  const width = Math.sqrt(area * aspect) * shrink, height = Math.sqrt(area / aspect) * shrink;
+  const frame = { x: centred ? slot.x + (slot.width - width) / 2 : slot.x, y: slot.y + (slot.height - height) / 2, width, height };
+  const pad = v("space.1");
+  return [
+    ...(onDark ? [rect(stableId(cid, "logo-chip"), "card-logo-chip", { x: frame.x - pad, y: frame.y - pad, width: width + 2 * pad, height: height + 2 * pad }, SURFACE, "none", "radius.small")] : []),
+    mediaNode({ id: stableId(cid, "logo"), frame, props: logo, role: "card-logo" }),
+  ];
 }
 
 /**
@@ -46,18 +69,18 @@ export const CARD_TONES = Object.freeze(["outline", "header", "numbered", "plain
 export const ICON_CARD_TONES = Object.freeze(["dark", "outline", "plain", "disc"]);
 export function cardsLayout(frame, props, rhythm = 0) {
   const items = normalizeCards(props);
-  const tone = props.tone ?? (items.some((i) => i.icon) ? "outline" : "numbered");
+  const tone = props.tone ?? (items.some((i) => i.icon || i.logo) ? "outline" : "numbered");
   if (!CARD_TONES.includes(tone)) throw new Error(`Unknown cards tone: ${tone}; use one of ${CARD_TONES.join(", ")}`);
   // Only the tones below draw one. An icon a tone cannot draw is refused here
   // rather than dropped: a page that loses its icons silently looks finished
   // with the authored intent gone.
-  if (!ICON_CARD_TONES.includes(tone) && items.some((item) => item.icon)) {
+  if (!ICON_CARD_TONES.includes(tone) && items.some((item) => item.icon || item.logo)) {
     throw new Error(
       `cards tone "${tone}" does not draw icons; use ${ICON_CARD_TONES.join(" or ")} for an icon per card, `
       + "or drop the icon. A tone that cannot show one should not be handed one.");
   }
   // Icon cards with a line of text each read centred (the "three principles" page).
-  const centred = props.align === "center" || (props.align === undefined && ((tone === "outline" || tone === "plain") && items.every((i) => i.icon && !i.points.length) || tone === "disc" || tone === "dark"));
+  const centred = props.align === "center" || (props.align === undefined && ((tone === "outline" || tone === "plain") && items.every((i) => (i.icon || i.logo) && !i.points.length) || tone === "disc" || tone === "dark"));
   const open = ["plain", "disc", "big-number", "columns"].includes(tone);
   if (tone === "stat" && items.some((i) => !i.value)) throw new Error("Stat cards need a value on every card (the figure before the statement)");
   const gap = tone === "big-number" ? v("space.5") + v("space.4") : v("space.4"), pad = open ? 0 : v("space.4");
@@ -81,9 +104,9 @@ export function cardsLayout(frame, props, rhythm = 0) {
     // Header zone: icon (outline/plain/disc), filled band (header), disc + title
     // (numbered), big numeral + title (big-number), dark tile (dark) or a ruled
     // column heading (columns).
-    const iconBlock = ["outline", "plain", "disc"].includes(tone) && item.icon ? iconSize + headGap : 0;
+    const iconBlock = ["outline", "plain", "disc"].includes(tone) && (item.icon || item.logo) ? iconSize + headGap : 0;
     const numberBlock = number ? number.height + headGap : 0;
-    const bandHeight = tone === "header" ? title.height + 2 * v("space.2") : tone === "dark" ? Math.max(150, (item.icon ? iconSize + headGap : 0) + title.height + 2 * v("space.4")) : 0;
+    const bandHeight = tone === "header" ? title.height + 2 * v("space.2") : tone === "dark" ? Math.max(150, (item.icon || item.logo ? iconSize + headGap : 0) + title.height + 2 * v("space.4")) : 0;
     const titleHeight = tone === "header" || tone === "dark" ? 0 : title.height + (tone === "columns" ? v("space.2") + v("space.1") : 0);
     const valueHeight = value ? bodyGap + value.height : 0;
     const bodyHeight = (tone === "big-number" ? v("space.3") : 0) + (body ? bodyGap + body.height : 0) + points.reduce((sum, p) => sum + v("space.1") + p.height, points.length ? bodyGap - v("space.1") : 0) + (tone === "big-number" ? v("space.3") : 0);
@@ -158,9 +181,10 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     } else if (L.tone === "dark") {
       // A navy tile carries icon and title in white; the copy sits below it on the page.
       nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, PRIMARY, "none", "radius.small"));
-      const block = (m.item.icon ? L.iconSize + L.headGap : 0) + m.title.height;
+      const block = (m.item.icon || m.item.logo ? L.iconSize + L.headGap : 0) + m.title.height;
       let ty = top + (m.bandHeight - block) / 2;
-      if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: cx + (L.inner - L.iconSize) / 2, y: ty, size: L.iconSize, icon: m.item.icon, tone: "filled" })); ty += L.iconSize + L.headGap; }
+      if (m.item.logo) { nodes.push(...cardLogo(cid, m.item.logo, { x: cx, y: ty, width: L.inner, height: L.iconSize }, true, true)); ty += L.iconSize + L.headGap; }
+      else if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: cx + (L.inner - L.iconSize) / 2, y: ty, size: L.iconSize, icon: m.item.icon, tone: "filled" })); ty += L.iconSize + L.headGap; }
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: ty, width: L.inner }, m.title, text("type.heading", WHITE, true, "center")));
     } else if (L.tone === "big-number") {
       // "01 / 02 / 03": the numeral in display type, the title beside the next
@@ -195,7 +219,8 @@ export function cardsNodes({ id, frame: frameIn, props }) {
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx + L.disc + v("space.3"), y, width: L.inner - L.disc - v("space.3") }, m.title, text("type.heading", INK, true)));
       y += m.title.height;
     } else {
-      if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: L.centred ? cx + (L.inner - L.iconSize) / 2 : cx, y, size: L.iconSize, icon: m.item.icon, tone: L.tone === "disc" ? "filled" : "outline" })); }
+      if (m.item.logo) nodes.push(...cardLogo(cid, m.item.logo, { x: cx, y, width: L.inner, height: L.iconSize }, L.centred, false));
+      else if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: L.centred ? cx + (L.inner - L.iconSize) / 2 : cx, y, size: L.iconSize, icon: m.item.icon, tone: L.tone === "disc" ? "filled" : "outline" })); }
       y += m.iconBlock;
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, text("type.heading", INK, true, align)));
       y += m.title.height;

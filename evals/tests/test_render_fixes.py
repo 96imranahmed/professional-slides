@@ -129,11 +129,14 @@ console.log(JSON.stringify({{plain:summary(render({{}})),named:summary(render({{
 
 class ReferenceLabelFallbackTests(unittest.TestCase):
     def test_a_crowded_reference_label_moves_outside_instead_of_throwing(self):
+        # The two callouts sit on neighbouring years, so their boxes meet across
+        # and stack in two bands (callouts that do not meet share one band and
+        # leave the label room inside): the plot is short and the label crowded.
         result = run_node(f"""
 import {{REGISTRY}} from './skills/professional-slides/runtime/registry.mjs';
 const frame={{x:72,y:162,width:1136,height:431}};
 const props={{...{QATAR},referenceLines:[{{value:53.2,label:'Emirates FY26: 53.2m'}}],
-  annotations:[{{category:'FY26',text:'The latest year fell about 3%, well below the required path'}},{{category:'FY28',text:'Illustrative path: about 8.4% a year'}}]}};
+  annotations:[{{category:'FY26',text:'The latest year fell about 3%, well below the required path'}},{{category:'FY27',text:'Illustrative path: about 8.4% a year'}}]}};
 const nodes=REGISTRY.get('chart.column').render({{id:'c',frame,props}}).nodes;
 const label=nodes.find(n=>n.role==='chart-reference-label').frame;
 const right=Math.max(...nodes.filter(n=>n.role==='chart-mark').map(n=>n.frame.x+n.frame.width));
@@ -148,6 +151,28 @@ console.log(JSON.stringify({{label,right,lineEnd:line.x2,explicit}}));
         # An author who asked for inside keeps the error, now naming the way out.
         self.assertIn('No collision-free reference-line label position', result['explicit'])
         self.assertIn('outside-end', result['explicit'])
+
+
+class ReferenceHeadroomTests(unittest.TestCase):
+    def test_a_fitted_line_domain_does_not_stack_headroom_over_a_peak_line(self):
+        # A line with no value axis is fitted to its data, a quarter of its span
+        # past the top: room for a reference line's label. The 15% the tick
+        # ladder needs, added on top of it, left a quarter of the plot empty
+        # above the peak line (the worked example's journeys page).
+        result = run_node(f"""
+import {{REGISTRY}} from './skills/professional-slides/runtime/registry.mjs';
+const frame={{x:60,y:152,width:1160,height:516}};
+const props={{categories:['FY17','FY18','FY19','FY20','FY21','FY22','FY23','FY24','FY25','FY26'],
+  series:[{{name:'Journeys',values:[47.2,49,51.8,52.4,14.9,31.6,42.8,46.1,47.5,48.3]}}],referenceLines:[{{value:52.4,label:'FY20 peak 52.4m'}}],dataLabels:true}};
+const nodes=REGISTRY.get('chart.line').render({{id:'c',frame,props}}).nodes;
+const line=nodes.find(n=>n.role==='chart-reference-line');
+const label=nodes.find(n=>n.role==='chart-reference-label');
+const lows=nodes.filter(n=>n.role==='chart-marker'||n.role==='chart-mark').map(n=>n.frame.y+n.frame.height);
+console.log(JSON.stringify({{line:line.frame.y,label:label.frame,top:frame.y,floor:Math.max(...lows)}}));
+""")
+        span = result["floor"] - result["top"]
+        self.assertLess(result["line"] - result["top"], 0.3 * span, "the peak line sits near the top of the plot")
+        self.assertGreater(result["label"]["y"], result["top"], "its label still has room above it")
 
 
 class TableLogoTests(unittest.TestCase):

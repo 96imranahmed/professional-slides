@@ -179,6 +179,13 @@
         77
        ]
       }
+     ],
+     "annotations": [
+      {
+       "category": "P.S. 87 English",
+       "series": "School",
+       "text": "Twelve points above its peer group, the widest gap"
+      }
      ]
     },
     {
@@ -381,6 +388,18 @@
       "Hoboken",
       "Park Slope",
       "Noe Valley"
+     ],
+     "changeAnnotations": [
+      {
+       "start": {
+        "category": "$4,000"
+       },
+       "end": {
+        "category": "$5,500"
+       },
+       "style": "arrow",
+       "text": "+$18k"
+      }
      ]
     },
     {
@@ -395,21 +414,18 @@
        "group": "Share of gross salary",
        "label": "$305k",
        "unit": "%",
-       "type": "text",
        "align": "right"
       },
       {
        "group": "Share of gross salary",
        "label": "$385k",
        "unit": "%",
-       "type": "text",
        "align": "right"
       },
       {
        "group": "Share of gross salary",
        "label": "$460k",
        "unit": "%",
-       "type": "text",
        "align": "right"
       }
      ],
@@ -710,7 +726,8 @@
        "Connors placement; timed PATH journey to the real office",
        "Fallback for a midtown office"
       ]
-     ]
+     ],
+     "highlightRow": "NYC (Park Slope)"
     }
    ],
    "soWhat": "Require the family fit first; among the locations that pass, take the role with the closest researcher collaboration.",

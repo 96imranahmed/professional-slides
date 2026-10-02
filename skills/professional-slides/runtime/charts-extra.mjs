@@ -5,7 +5,7 @@
 // measurement responds to width.
 import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, onFill } from "./core.mjs";
 import { formatValue } from "./value-format.mjs";
-import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle, labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend } from "./charts.mjs";
+import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle, labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend, withDecorations } from "./charts.mjs";
 import { TOKENS } from "./core.mjs";
 import { measureAt } from "./draw.mjs";
 import { timePositions, spacedLabelIndices } from "./time-axis.mjs";
@@ -90,8 +90,12 @@ function lollipopChart({ id, frame, props }) {
   const xAt = (v) => plot.x + (v - bounds.min) / bounds.span * plot.width;
   const zero = xAt(Math.max(bounds.min, Math.min(0, bounds.max)));
   const nodes = [linePrimitive({ id: stableId(id, "axis"), role: "chart-axis", x1: zero, y1: plot.y, x2: zero, y2: plot.y + rowHeight * categories.length, style: lineStyle(INK, token("line.hairline")) })];
+  const pointMap = new Map(), categoryMap = new Map();
   categories.forEach((c, i) => {
     const v = series[0].values[i], y = plot.y + i * rowHeight + rowHeight / 2;
+    pointMap.set(`value:${c}`, { x: xAt(v), y });
+    pointMap.set(`${series[0].name}:${c}`, { x: xAt(v), y });
+    categoryMap.set(c, { x: plot.x, y: y - rowHeight / 2, width: plot.width, height: rowHeight });
     const focus = highlighted(props, c);
     const color = focus ? ACCENT : PRIMARY;
     nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: plot.x - labelWidth - 8, y: y - 10, width: labelWidth, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, focus, "right") }));
@@ -99,7 +103,9 @@ function lollipopChart({ id, frame, props }) {
     nodes.push(ellipsePrimitive({ id: stableId(id, "dot", c), role: "chart-mark", frame: { x: xAt(v) - 7, y: y - 7, width: 14, height: 14 }, style: fillStyle(color), data: { category: c, value: v, highlighted: focus } }));
     nodes.push(textPrimitive({ id: stableId(id, "value", c), role: "data-label", frame: { x: xAt(v) + 12, y: y - 10, width: Math.max(20, frame.x + frame.width - xAt(v) - 12), height: 20 }, text: formatValue(v, props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { category: c } }));
   });
-  return nodes;
+  // Callouts and reference lines are the shared chart decorations; the subject
+  // is already drawn in the accent above, so highlights are not drawn twice.
+  return withDecorations(nodes, { id, plot, props: { ...props, highlights: [] }, pointMap, categoryMap, xScale: xAt, allowAnnotationRail: false });
 }
 
 /* ---------------------------------------------------------- dumbbell */
@@ -126,21 +132,34 @@ export function dumbbellChart({ id, frame, props }) {
   // of two ranks still shows as a bar; alternate rows on a muted band carry
   // the eye from a label across the empty half of the plot to its dots.
   const weight = markWeight(), dot = Math.round(14 * weight.dot), r = dot / 2;
+  const pointMap = new Map(), categoryMap = new Map();
   categories.forEach((c, i) => {
     const y = plot.y + i * rowHeight + rowHeight / 2, a = series[0].values[i], b = series[1].values[i];
+    // A callout names a state by its series; naming the category alone, it
+    // points at the later state, where the change arrives.
+    pointMap.set(`${series[0].name}:${c}`, { x: xAt(a), y });
+    pointMap.set(`${series[1].name}:${c}`, { x: xAt(b), y });
+    pointMap.set(`value:${c}`, { x: xAt(b), y });
+    categoryMap.set(c, { x: plot.x, y: y - rowHeight / 2, width: plot.width, height: rowHeight });
     if (weight.bands && i % 2 === 0) {
       const left = plot.x - labelWidth - 8 - valueGutter, band = Math.min(rowHeight - 2, Math.max(dot + 8, rowHeight * 0.8));
       nodes.push(rectPrimitive({ id: stableId(id, "row-band", c), role: "chart-row-band", frame: { x: left, y: y - band / 2, width: plot.x + plot.width + valueGutter - left, height: band }, style: fillStyle(token("color.surfaceMuted")), data: { category: c } }));
     }
-    nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: plot.x - labelWidth - 8 - valueGutter, y: y - 10, width: labelWidth, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, false, "right") }));
-    nodes.push(linePrimitive({ id: stableId(id, "bar", c), role: "chart-line", x1: xAt(a), y1: y, x2: xAt(b), y2: y, style: lineStyle(weight.bands ? token("color.rule") : GRID, weight.connector), data: { category: c } }));
+    // The subject's row (`highlights: [{ category }]`): its name set bold and
+    // the change between its states drawn in the accent.
+    const focus = (props.highlights || []).some((h) => h?.category === c || h === c);
+    nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: plot.x - labelWidth - 8 - valueGutter, y: y - 10, width: labelWidth, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, focus, "right"), data: { category: c } }));
+    nodes.push(linePrimitive({ id: stableId(id, "bar", c), role: "chart-line", x1: xAt(a), y1: y, x2: xAt(b), y2: y, style: lineStyle(focus ? ACCENT : weight.bands ? token("color.rule") : GRID, weight.connector), data: { category: c, ...(focus ? { highlighted: true } : {}) } }));
     [a, b].forEach((v, si) => {
-      nodes.push(ellipsePrimitive({ id: stableId(id, "dot", c, series[si].name), role: "chart-mark", frame: { x: xAt(v) - r, y: y - r, width: dot, height: dot }, style: fillStyle(colorFor(props, si)), data: { category: c, series: series[si].name, value: v } }));
+      nodes.push(ellipsePrimitive({ id: stableId(id, "dot", c, series[si].name), role: "chart-mark", frame: { x: xAt(v) - r, y: y - r, width: dot, height: dot }, style: fillStyle(colorFor(props, si)), data: { category: c, series: series[si].name, value: v, ...(focus ? { highlighted: true } : {}) } }));
       const leftMost = si === (a <= b ? 0 : 1);
       nodes.push(textPrimitive({ id: stableId(id, "value", c, series[si].name), role: "data-label", frame: { x: leftMost ? xAt(v) - r - 5 - valueWidth : xAt(v) + r + 5, y: y - 10, width: valueWidth, height: 20 }, text: formatValue(v, props), style: textStyle(CHART_LABEL, INK, labelBold(), leftMost ? "right" : "left"), data: { category: c, series: series[si].name } }));
     });
   });
-  return nodes;
+  // Callouts and reference lines are the shared chart decorations (charts.mjs):
+  // authored on a dumbbell they were dropped unseen. The subject's row is drawn
+  // above, so highlights are not drawn twice.
+  return withDecorations(nodes, { id, plot, props: { ...props, highlights: [] }, pointMap, categoryMap, xScale: xAt, allowAnnotationRail: false });
 }
 
 /* ------------------------------------------------------------ bullet */

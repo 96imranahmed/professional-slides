@@ -156,10 +156,14 @@ function tableAlias(ex) {
       const count = Math.max(...rowsIn.map((row) => (row.cells || []).length));
       if (!(count >= 1 && count <= 3)) throw new Error("A row matrix carries one to three content columns per row");
       const labels = (Array.isArray(ex.columns) ? ex.columns : []).map((column) => String(typeof column === "string" ? column : column?.label || ""));
+      // A header naming a declared player carries its mark (page-types.mjs
+      // markPlayerCells), drawn beside the label as a table's is.
+      const marks = (Array.isArray(ex.columns) ? ex.columns : []).map((column) => (column && typeof column === "object" ? column.logo : undefined));
       // `columns` heads the label column first, then the content columns; a
       // list as long as the content columns heads those alone.
       const headLabel = labels.length > count ? labels[0] : "";
       const headContent = labels.length > count ? labels.slice(1) : labels;
+      const headMarks = labels.length > count ? marks.slice(1) : marks;
       const cellOf = (value) => {
         if (value === undefined || value === null) return { type: "text", text: " " };
         if (Array.isArray(value)) return { type: "bullets", items: value };
@@ -173,15 +177,23 @@ function tableAlias(ex) {
         throw new Error("A row matrix cell needs text or points");
       };
       const numbered = ex.numbered === true;
-      const rows = rowsIn.map((row, index) => [
-        { type: "category", text: String(row.label ?? ""), surface: "plain",
-          ...(numbered || row.number !== undefined ? { sectionNumber: row.number ?? index + 1 } : {}),
-          ...(row.icon ? { icon: row.icon } : {}) },
-        ...Array.from({ length: count }, (_, at) => cellOf((row.cells || [])[at]))
-      ]);
+      // `style: "accented"` on a row is the finding the argument turns on -
+      // today's position among the outcomes, the subject among its peers -
+      // banded in the accent tint as a table's `highlightRow` is.
+      if (rowsIn.some((row) => row.style !== undefined && row.style !== "accented"))
+        throw new Error("A row matrix row's `style` is \"accented\", the row the argument turns on");
+      const rows = rowsIn.map((row, index) => {
+        const cells = [
+          { type: "category", text: String(row.label ?? ""), surface: "plain",
+            ...(numbered || row.number !== undefined ? { sectionNumber: row.number ?? index + 1 } : {}),
+            ...(row.icon ? { icon: row.icon } : {}) },
+          ...Array.from({ length: count }, (_, at) => cellOf((row.cells || [])[at]))
+        ];
+        return row.style === "accented" ? { style: "accented", cells } : cells;
+      });
       return { type: "table", treatment: "categories", variant: "plain", density: ex.density || "compact",
         columns: [{ label: headLabel, type: "category", width: 220 },
-                  ...Array.from({ length: count }, (_, at) => ({ label: headContent[at] || "", type: "text", width: 420 }))],
+                  ...Array.from({ length: count }, (_, at) => ({ label: headContent[at] || "", type: "text", width: 420, ...(headMarks[at] ? { logo: headMarks[at] } : {}) }))],
         rows };
     }
     const rows = (ex.rows || []).map((row) => [{ type: "category", text: row.label, ...(row.number ? { sectionNumber: row.number } : {}), ...(row.icon ? { icon: row.icon } : {}) }, Array.isArray(row.points) ? { type: "bullets", items: row.points } : row.text]);
@@ -294,7 +306,7 @@ function exhibitItem(exIn, id, baseDir, size = SIZE) {
   if (type === "swot") return { id, component: "quadrants", props: { quadrants: ["Strengths", "Weaknesses", "Opportunities", "Threats"].map((title, i) => ({ title, points: [rest.strengths, rest.weaknesses, rest.opportunities, rest.threats][i] || [] })) }, size };
   if (type === "table") {
     const styled = styleTable(rest);
-    return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(typeStep ? { typeStep: true } : {}), ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
+    return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(rest.chartData ? { chartData: true } : {}), ...(typeStep ? { typeStep: true } : {}), ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
   }
   // The other table renderers reach the page by their component id rather than
   // through the `table` alias, and keep the one thing the alias does for
@@ -480,6 +492,10 @@ function withDefaultScales(ex, rowsIn) {
 const DERIVATIONS = ["rank", "share", "change", "index"];
 const cellText = (cell) => String((cell && typeof cell === "object" ? cell.text ?? cell.value : cell) ?? "").trim();
 const numberOf = (cell) => {
+  // A bar cell carries its figure as the bar's value: the treatment runs before
+  // the derivation, and read as text it was empty and every row ranked first.
+  // A bound or a range is not a figure to rank or share.
+  if (cell && typeof cell === "object" && cell.type === "bars") return cell.values?.length === 1 && Number.isFinite(cell.values[0]) && [undefined, "approx"].includes(cell.bound) ? cell.values[0] : null;
   const text = cellText(cell).replace(/[,\s]/g, "").replace(/[$£€]/g, "").replace(/%$/, "");
   if (!/^-?\d*\.?\d+$/.test(text)) return null;
   return Number(text);
@@ -720,17 +736,21 @@ function implicationColumn(ex) {
  *                a filled or empty dot
  *   a matrix     three or more columns of exact figures in one unit - one heat
  *                scale across them, each cell keeping its figure
- *   a measure    otherwise the first column of exact figures with a unit - bars
- *                in the cells on a zero-based scale, the figure beside each;
- *                a table of two figures and their names (a row block's two
- *                members side by side) is enough here, where the other
- *                treatments want three rows
+ *   a measure    otherwise the first column of figures with a unit - bars in
+ *                the cells on a zero-based scale, the figure beside each, as
+ *                written; a table of two figures and their names (a row
+ *                block's two members side by side) is enough here, where the
+ *                other treatments want three rows
  *   a total      a closing row whose figures add up the rows above it - the
  *                total band, set bold
  *
- * Nothing is inferred on a table that carries a treatment already, and a
- * bound, a range or an approximation ("~5", ">$1B", "3-5") is not a figure a
- * bar or a heat cell can stand for, so its column stays as written.
+ * Nothing is inferred on a table that carries a treatment already
+ * (gates/table-treatments.json: an implication gutter, banding or a value
+ * pill is not one). A bar column's figure may be an approximation, a bound or
+ * a range ("~$24B", ">$1B", "500+", "<5%", "3-5"), each drawn for what it says
+ * (`quantity`), and a cell that says the figure is missing ("n/a", "not
+ * disclosed") keeps its words with no bar; a heat cell and a total read exact
+ * figures only.
  */
 const INFERRED_ROWS_MIN = 3;
 const RATING_SCALES = [
@@ -747,6 +767,42 @@ function figure(cell) {
   const value = Number(`${match[2] === "-" || match[2] === "−" ? "-" : ""}${match[3].replace(/,/g, "")}${match[4] ?? ""}`);
   return Number.isFinite(value) ? { value, mark: `${match[1] ?? ""}|${(match[5] ?? "").toLowerCase()}` } : null;
 }
+// A quantity a bar can stand for: an exact figure, or one written as an
+// approximation ("~$24B", "c. 40%"), a bound (">$40B", "500+", "<5%") or a
+// range ("$4,500-5,600", "3-5%"). Each is drawn for what it says (tables.mjs):
+// an approximation as its bar, the "~" in the label beside it; a lower bound
+// as a bar left open at its end, since the true value lies past it; an upper
+// bound or a range as a range mark that claims no point inside it. `value` is
+// the bar's far end: the bound, or the range's top.
+const APPROXIMATE = /^(?:~|≈|c\.\s*|ca\.\s*|circa\s+|about\s+|around\s+|roughly\s+|approx(?:\.|imately)?\s+)/i;
+const AT_LEAST = /^(?:>=?|≥|over\s+|more than\s+|at least\s+|above\s+)/i;
+const AT_MOST = /^(?:<=?|≤|under\s+|less than\s+|below\s+|up to\s+|at most\s+)/i;
+const SPAN = /^(.*\d)\s*(?:-|–|—|\bto\b)\s*([$£€]?\s*\d.*)$/i;
+// A cell saying the figure does not exist or was not published: printed as
+// written in a bar column, with no bar, never read as zero.
+export const MISSING_FIGURE = /^(?:n\/?a|n\.a\.|–|—|-|undisclosed|unpublished|unreported|not (?:disclosed|published|reported|available)|no data)$/i;
+export function quantity(cell) {
+  if (cell && typeof cell === "object" && (cell.type !== undefined && cell.type !== "text")) return null;
+  const text = cellText(cell);
+  const exact = figure(text);
+  if (exact) return { ...exact, bound: null };
+  for (const [prefix, bound] of [[APPROXIMATE, "approx"], [AT_LEAST, "lower"], [AT_MOST, "upper"]]) {
+    const match = prefix.exec(text);
+    if (!match) continue;
+    const found = figure(text.slice(match[0].length));
+    return found ? { ...found, bound } : null;
+  }
+  const plus = /^(.*\d.*?)\s*\+$/.exec(text);
+  if (plus) { const found = figure(plus[1]); return found ? { ...found, bound: "lower" } : null; }
+  const span = SPAN.exec(text);
+  const low = span && figure(span[1]), high = span && figure(span[2]);
+  if (!low || !high) return null;
+  // "$4,500-5,600" and "3-5%" write the sign or the suffix once: the end that
+  // omits it takes the other's, and two that disagree are not one range.
+  const [lowSign, lowSuffix] = low.mark.split("|"), [highSign, highSuffix] = high.mark.split("|");
+  if ((lowSign && highSign && lowSign !== highSign) || (lowSuffix && highSuffix && lowSuffix !== highSuffix) || !(low.value < high.value)) return null;
+  return { value: high.value, low: low.value, mark: `${lowSign || highSign}|${highSuffix || lowSuffix}`, bound: "range" };
+}
 const isBodyRow = (row) => Array.isArray(row) || !["total", "group"].includes(row?.style);
 const rowCellsOf = (row) => (Array.isArray(row) ? row : row?.cells || []);
 function columnUnit(column, mark) {
@@ -759,13 +815,21 @@ function columnUnit(column, mark) {
   const scale = { bn: "B", b: "B", m: "M", k: "K" }[suffix];
   return sign ? `${sign}${scale ?? ""}` : null;
 }
-// A filled label column styles the rows' names, not their data, so it leaves
-// the figures beside it free to take their treatment.
-const DATA_TREATED = (type) => TREATED_CELL.has(String(type ?? "")) && type !== "category";
+// The cell types and column flags that draw a treatment as
+// gates/table-treatments.json defines one - heat, ratings, dots, bars, state
+// marks, logos, icons, trend arrows - which is what the treated share counts.
+// A table carrying one already says what its data shows, and nothing is added.
+// Banding, a value pill, the implication gutter, a highlighted phrase and a
+// filled label column keep the reader's place or structure the grid; they say
+// nothing about the figures, which stay free to take the device their shape
+// implies.
+const TREATMENT_CELLS = new Set(["heatmap", "bars", "harvey", "rating", "dot", "progress", "rag", "status", "lights", "lamp", "check", "binary", "trend", "logo"]);
+const TREATMENT_COLUMNS = ["heat", "bar", "harvey", "logo", "icon"];
+const treatmentCell = (cell) => cell && typeof cell === "object" && (TREATMENT_CELLS.has(String(cell.type ?? "")) || Boolean(cell.icon));
 function tableTreated(ex) {
-  if (ex.zebra !== undefined || ex.bubbleColumn !== undefined || ex.highlightColumn !== undefined || ex.highlightRow !== undefined || ex.recommended !== undefined) return true;
-  if ((ex.columns || []).some((c) => c && typeof c === "object" && (TREATED_COLUMN.some((key) => c[key]) || DATA_TREATED(c.type)))) return true;
-  return (ex.rows || []).some((row) => rowCellsOf(row).some((cell) => cell && typeof cell === "object" && DATA_TREATED(cell.type)));
+  if (ex.highlightColumn !== undefined || ex.highlightRow !== undefined || ex.recommended !== undefined || Array.isArray(ex.icons)) return true;
+  if ((ex.columns || []).some((c) => c && typeof c === "object" && (TREATMENT_COLUMNS.some((key) => c[key]) || TREATMENT_CELLS.has(String(c.type ?? ""))))) return true;
+  return (ex.rows || []).some((row) => (!Array.isArray(row) && (row?.icon || row?.style === "accented")) || rowCellsOf(row).some(treatmentCell));
 }
 export function inferredTreatments(ex) {
   const columns = ex.columns || [], rows = ex.rows || [];
@@ -818,15 +882,18 @@ export function inferredTreatments(ex) {
       next.rows = next.rows.map((row) => (isBodyRow(row) ? mapTableCells(row, (cells) => cells.map((cell, c) => (c === i ? { type: "dot", value: word(cell) === "yes" } : cell))) : row));
       continue;
     }
-    // Figures: every cell exact, one sign and suffix, not all alike, not an ordinal.
-    const parsed = cellsAt(i).map(figure);
-    if (parsed.some((v) => !v) || new Set(parsed.map((v) => v.mark)).size !== 1 || new Set(parsed.map((v) => v.value)).size < 2) continue;
-    if (ORDINAL.test(label.trim()) || parsed.every((v) => Number.isInteger(v.value) && v.value >= 1800 && v.value <= 2200)) continue;
-    figures.push({ i, unit: columnUnit(column, parsed[0].mark), values: parsed.map((v) => v.value) });
+    // Figures: every cell a quantity or a figure marked missing, enough of
+    // them to compare, one sign and suffix, not all alike, not an ordinal.
+    const cells = cellsAt(i), parsed = cells.map(quantity), known = parsed.filter(Boolean);
+    if (cells.some((cell, r) => !parsed[r] && !MISSING_FIGURE.test(cellText(cell)))) continue;
+    if (known.length < Math.min(cells.length, INFERRED_ROWS_MIN) || new Set(known.map((v) => v.mark)).size !== 1 || new Set(known.map((v) => v.value)).size < 2) continue;
+    if (ORDINAL.test(label.trim()) || known.every((v) => Number.isInteger(v.value) && v.value >= 1800 && v.value <= 2200)) continue;
+    figures.push({ i, unit: columnUnit(column, known[0].mark), values: known.map((v) => v.value), exact: parsed.every((v) => v?.bound === null) });
   }
   const byUnit = new Map();
   for (const f of figures) if (f.unit) byUnit.set(f.unit, [...(byUnit.get(f.unit) || []), f]);
-  const matrix = few ? null : [...byUnit.values()].find((group) => group.length >= 3);
+  // A heat cell is coloured at its figure, so a heat matrix is of exact figures.
+  const matrix = few ? null : [...byUnit.values()].map((group) => group.filter((f) => f.exact)).find((group) => group.length >= 3);
   if (matrix) {
     // One heat scale across the matrix, in five equal steps of its range; each
     // cell keeps the figure the author wrote.
@@ -846,8 +913,8 @@ export function inferredTreatments(ex) {
       // The figure beside each bar is printed as a table prints it: a column
       // with a four-figure value takes thousands separators on every value.
       if (measure.values.some((v) => Math.abs(v) >= 1000))
-        next.rows = next.rows.map((row) => mapTableCells(row, (cells) => cells.map((cell, c) => (c === measure.i && figure(cell)
-          ? cellText(cell).replace(/\d[\d,]*(?:\.\d+)?/, (digits) => { const [integer, fraction] = digits.replaceAll(",", "").split("."); return groupThousands(integer) + (fraction === undefined ? "" : `.${fraction}`); })
+        next.rows = next.rows.map((row) => mapTableCells(row, (cells) => cells.map((cell, c) => (c === measure.i && quantity(cell)
+          ? cellText(cell).replace(/\d[\d,]*(?:\.\d+)?/g, (digits) => { const [integer, fraction] = digits.replaceAll(",", "").split("."); return groupThousands(integer) + (fraction === undefined ? "" : `.${fraction}`); })
           : cell))));
       next.columns[measure.i] = { ...(typeof column === "string" ? { label: column } : column), bar: true, unit: measure.unit, inferred: true, width: columnWeight(ex, measure.i) * 2 };
     }
@@ -881,6 +948,23 @@ function barNumber(cell) {
   const value = Number(raw);
   return Number.isFinite(value) ? value : null;
 }
+// A bar cell's quantity: what `quantity` reads, or else the number in the cell
+// ("12 days") as written, keeping a bound or approximation its words declare.
+// A range it cannot read is no number: stripped of its dash, "4,500-5,600"
+// would read as 45,005,600.
+function barQuantity(cell) {
+  const found = quantity(cell);
+  if (found || (cell && typeof cell === "object" && cell.text === undefined)) return found;
+  const text = cellText(cell);
+  if (/\d\s*(?:-|–|—|\bto\b)\s*[$£€]?\s*\d/i.test(text)) return null;
+  const value = barNumber(cell);
+  if (value === null) return null;
+  return { value, bound: APPROXIMATE.test(text) ? "approx" : AT_LEAST.test(text) || /\+\s*$/.test(text) ? "lower" : AT_MOST.test(text) ? "upper" : null };
+}
+// A lower bound's bar is left open past its end, so its scale keeps a tenth
+// more room than the bound for the opening.
+const OPEN_END = 1.1;
+const barExtent = (found) => (found ? (found.bound === "lower" ? found.value * OPEN_END : found.value) : null);
 const sharedBarScale = (column) => (column && typeof column === "object" && typeof column.barScale === "string" && column.barScale.trim() ? column.barScale.trim() : null);
 const barScaleId = (label) => `${String(label).replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-bar`;
 /** Zero (or below zero) to a round number above the largest value, so the bars
@@ -917,7 +1001,7 @@ export function barScales(ex) {
     const members = group ? (ex.columns || []).map((c, i) => [c, i]).filter(([c]) => c && sharedBarScale(c) === group).map(([, i]) => i) : [index];
     const values = members.flatMap((i) => (ex.rows || [])
       .map((row) => (Array.isArray(row) ? row : row.cells || [])[i])
-      .map(barNumber).filter((n) => Number.isFinite(n)));
+      .map((cell) => barExtent(barQuantity(cell))).filter((n) => Number.isFinite(n)));
     if (values.length) scales[barScaleId(group ?? label)] = { ...barScaleRecord(group ?? label, unit, values), legend: false,
       labelTexts: (ex.rows || []).map(row => {
         const cell = (Array.isArray(row) ? row : row.cells || [])[index];
@@ -978,11 +1062,16 @@ function columnTreatments(ex) {
       }
       if (marks[i].bar) {
         const text = String(cell?.text ?? cell ?? "").trim();
-        const value = asNumber(cell);
-        if (value === null) throw new Error(`A bar column needs numeric cells; "${String(cell?.text ?? cell)}" is not one`);
-        // The bar is drawn from the number; the label beside it is the figure
-        // the author wrote, to the precision they wrote it in.
-        return { type: "bars", values: [value], labels: [text], scale: barScales[i].id,
+        const found = barQuantity(cell);
+        // A figure marked missing keeps its words and draws no bar: it is not
+        // zero. It stands where the figures stand, at the column's right.
+        if (!found && MISSING_FIGURE.test(text)) return { type: "text", text, align: "right" };
+        if (!found) throw new Error(`A bar column needs numeric cells; "${String(cell?.text ?? cell)}" is not one`);
+        // The bar is drawn from the number, for what it is - a bound left
+        // open, a range as its span; the label beside it is the figure the
+        // author wrote, to the precision they wrote it in.
+        return { type: "bars", values: [found.value], labels: [text], scale: barScales[i].id,
+          ...(found.bound ? { bound: found.bound } : {}), ...(found.bound === "range" ? { low: found.low } : {}),
           ...(cell?.markFocus !== undefined ? { markFocus: cell.markFocus } : {}) };
       }
       return cell;
@@ -996,7 +1085,7 @@ function columnTreatments(ex) {
   const scales = { ...(ex.scales || {}) };
   for (const [index, record] of Object.entries(barScales)) {
     const members = Object.entries(barScales).filter(([, other]) => other.id === record.id).map(([i]) => Number(i));
-    const values = members.flatMap((i) => nextRows.map((row) => (Array.isArray(row) ? row : row.cells)[i]).map((cell) => cell?.values?.[0]).filter((n) => Number.isFinite(n)));
+    const values = members.flatMap((i) => nextRows.map((row) => (Array.isArray(row) ? row : row.cells)[i]).map((cell) => (cell?.type === "bars" ? barExtent({ value: cell.values[0], bound: cell.bound }) : null)).filter((n) => Number.isFinite(n)));
     if (!values.length) throw new Error(`The "${record.label}" bar column has no numbers to scale`);
     // The column header already prints the unit, so a legend line repeating it
     // with "common scale 0 to N" is template text under the table.
@@ -2680,7 +2769,10 @@ const SLIDE_PASSES = [
       return { ...slide, exhibit };
     }
     const chart = { ...slide.exhibit }; const rowsIn = chart.dataTable; delete chart.dataTable;
-    const table = { type: "table", density: "compact", treatment: "open", variant: "plain", columns: [{ label: "", type: "text", bold: true, width: 120 }, ...(chart.categories || []).map(() => ({ label: "", type: "text", align: "center", width: 80 }))], rows: rowsIn.map((r) => [r.label, ...(r.values || []).map(String)]) };
+    // `chartData`: the table is the chart's own figures, printed under it -
+    // part of the chart, which the treated-table share does not count
+    // (build-bars.mjs chartDataTable).
+    const table = { type: "table", chartData: true, density: "compact", treatment: "open", variant: "plain", columns: [{ label: "", type: "text", bold: true, width: 120 }, ...(chart.categories || []).map(() => ({ label: "", type: "text", align: "center", width: 80 }))], rows: rowsIn.map((r) => [r.label, ...(r.values || []).map(String)]) };
     return { ...slide, exhibit: undefined, exhibits: [chart, table], arrange: "stack", stackWeights: [4, 1] };
   }],
 

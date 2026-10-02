@@ -1,33 +1,31 @@
 {
  "schema": "professional-slides.cold-run-baseline/v1",
  "$comment": "What the example decks measure, scored by the same harness that scores a cold run and compiled from examples/*.deck.json by baseline.mjs, so nothing has to be built first. These are hand-authored decks, so the harness is only trustworthy if it says where they stand: where one sits under a floor (`misses`), that is a finding about the deck rather than a reason to move the bar. test_cold_run.py measures them again live; `node evals/cold-run/baseline.mjs --stamp` rewrites this record with the weight.json it was taken under.",
- "recorded": "2026-09-29",
+ "recorded": "2026-10-02",
  "weightSha256": "163bed8f23b6ec9effe931046609323ec7ce0caa57fefe940804d35f28f09979",
  "decks": {
   "gallery-acceptance": {
+   "purpose": "catalogue",
    "contentPages": 95,
    "exhibitVarietyPerTen": 7.58,
    "distinctExhibits": 72,
-   "tables": 15,
-   "tablesTreated": 0.53,
+   "tables": 14,
+   "tablesTreated": 0.57,
    "charts": 38,
    "chartsAnnotated": 0.24,
    "drawingsPerPage": 19.23,
-   "accepted": false,
-   "misses": [
-    "tablesTreated",
-    "chartsAnnotated"
-   ]
+   "accepted": true,
+   "misses": []
   },
   "house-style": {
    "contentPages": 6,
    "exhibitVarietyPerTen": 16.67,
    "distinctExhibits": 10,
-   "tables": 2,
-   "tablesTreated": 0,
+   "tables": 1,
+   "tablesTreated": 1,
    "charts": 4,
    "chartsAnnotated": 0.75,
-   "drawingsPerPage": 24.33,
+   "drawingsPerPage": 26,
    "accepted": true,
    "misses": []
   },
@@ -36,10 +34,22 @@
    "exhibitVarietyPerTen": 8.89,
    "distinctExhibits": 8,
    "tables": 5,
-   "tablesTreated": 0.4,
+   "tablesTreated": 0.8,
    "charts": 6,
-   "chartsAnnotated": 0.5,
-   "drawingsPerPage": 22.44,
+   "chartsAnnotated": 0.83,
+   "drawingsPerPage": 24.78,
+   "accepted": true,
+   "misses": []
+  },
+  "page-types": {
+   "contentPages": 42,
+   "exhibitVarietyPerTen": 6.67,
+   "distinctExhibits": 28,
+   "tables": 7,
+   "tablesTreated": 1,
+   "charts": 24,
+   "chartsAnnotated": 0.67,
+   "drawingsPerPage": 26.88,
    "accepted": true,
    "misses": []
   }

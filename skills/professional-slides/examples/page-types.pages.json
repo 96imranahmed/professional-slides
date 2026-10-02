@@ -1722,6 +1722,7 @@
    "rows": [
     {
      "label": "The wait deters more than the fare",
+     "icon": "clock",
      "cells": [
       [
        "41% of lapsed leisure riders cite the wait for the next train",
@@ -1732,6 +1733,7 @@
     },
     {
      "label": "Weekend trips are planned, weekday trips are not",
+     "icon": "calendar",
      "cells": [
       [
        "72% of Saturday riders decided the day before",
@@ -1742,6 +1744,7 @@
     },
     {
      "label": "Reach matters as much as speed",
+     "icon": "map-pin",
      "cells": [
       [
        "Destinations beyond the network end were the top request",
@@ -1752,6 +1755,7 @@
     },
     {
      "label": "Evenings are the gap nobody measures",
+     "icon": "eye",
      "cells": [
       [
        "Journeys after 19:00 fell 31% since FY20",
@@ -1762,6 +1766,7 @@
     },
     {
      "label": "Visitors are lost at Leeds",
+     "icon": "train",
      "cells": [
       [
        "Visitors from beyond the network wait 31 minutes at Leeds on average",
@@ -2638,6 +2643,7 @@
        "15 years"
       ]
      ],
+     "highlightRow": "Central",
      "treatment": "dimensions",
      "caption": "Even the low case repays within the 30-year asset life, and a one-year slip costs a year of payback"
     }

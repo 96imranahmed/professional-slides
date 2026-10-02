@@ -167,6 +167,29 @@ class DefinitionTests(unittest.TestCase):
         self.assertIn("tableStatistics", (GATES / "craft_gates.mjs").read_text(encoding="utf-8"))
 
 
+class ChartDataTableTests(unittest.TestCase):
+    def test_a_charts_data_table_is_part_of_the_chart_and_not_counted(self):
+        # A model page prints its chart's figures under the chart: the chart's
+        # own data, not a table the page is built on. Both counts leave it out,
+        # and a table of the same rows on its own page is still counted.
+        result = run_node("""
+import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
+import { countedTables, chartDataTable } from './skills/professional-slides/runtime/build-bars.mjs';
+const chart = { type: 'chart.column', heading: 'Journeys by case', unit: 'million', categories: ['FY26', 'FY27', 'FY28', 'FY29'],
+  series: [{ name: 'Central', values: [48.3, 49.6, 51.8, 54.4] }, { name: 'Low', values: [48.3, 49.4, 51.1, 53.2] }], dataTable: true };
+const deck = planDeck(toDeckPlan({ schema: 'professional-slides.deck/v3', id: 'd', slides: [
+  { id: 'm', title: 'The central case reaches 54 million journeys by FY29', exhibit: chart },
+  { id: 't', title: 'The central case reaches 54 million journeys by FY29', exhibit: { type: 'table', columns: ['Case', 'FY26', 'FY27', 'FY28', 'FY29'],
+    rows: [['Central', '48.3', '49.6', '51.8', '54.4'], ['Low', '48.3', '49.4', '51.1', '53.2']] } },
+] })).deck;
+console.log(JSON.stringify({ scene: deck, js: deck.slides.map((s) => ({ tables: (s.componentInstances || []).filter((c) => c.component === 'table').length,
+  counted: countedTables(s).length, data: (s.componentInstances || []).filter((c) => chartDataTable(s, c)).length })) }));
+""")
+        self.assertEqual(result["js"], [{"tables": 1, "counted": 0, "data": 1}, {"tables": 1, "counted": 1, "data": 0}])
+        self.assertEqual([len(deck_gates.counted_tables(s)) for s in result["scene"]["slides"]], [0, 1])
+
+
 class RowBlockTests(unittest.TestCase):
     def test_the_threshold_is_the_one_table_too_short_holds_a_table_to(self):
         result = run_node("""

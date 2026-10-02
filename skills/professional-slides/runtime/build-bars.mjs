@@ -90,9 +90,17 @@ export function rowBlockSmallTable(slide, instance) {
   const body = new Set(nodes.map((n) => n.data?.row).filter((row) => Number.isInteger(row) && !banded.has(row))).size;
   return body > 0 && body < ROW_BLOCK_TABLE_ROWS;
 }
-/** The page's tables the treated share counts: every table but a row block's small one. */
+// A chart's data table prints the chart's own figures under its categories
+// (`dataTable`, the model page): it is part of the chart, not a table the page
+// is built on, and the treated share does not count it. Its nodes carry
+// `chartData` (tables.mjs). deck_gates.py chart_data_table is the same test.
+export function chartDataTable(slide, instance) {
+  const key = instance.instanceId ?? instance.id;
+  return (slide.nodes || []).some((n) => n.data?.componentInstance === key && n.data?.chartData === true);
+}
+/** The page's tables the treated share counts: every table but a row block's small one and a chart's data table. */
 export const countedTables = (slide) => (slide.componentInstances || [])
-  .filter((c) => TABLE.test(String(c.component)) && !rowBlockSmallTable(slide, c));
+  .filter((c) => TABLE.test(String(c.component)) && !rowBlockSmallTable(slide, c) && !chartDataTable(slide, c));
 /** The nodes a table draws: those naming it as their instance; a node naming none belongs to every table on its page. */
 const tableNodes = (slide, instance) => (slide.nodes || [])
   .filter((n) => !n.data?.componentInstance || n.data.componentInstance === instance.instanceId || n.data.componentInstance === instance.id);
@@ -168,12 +176,15 @@ export function designStatistics(scene) {
  * missed ({ code, measure, measured, floor | ceiling, reference }) and whether
  * the deck clears them all. A deck with no tables cannot fail a bar about
  * tables, and a deck shorter than BARS_FROM analytical pages is held to the
- * ceilings only.
+ * ceilings only. So is a catalogue (the spec's `purpose: "catalogue"`): it
+ * shows each component in its plain form so it can be copied and makes no
+ * argument, and the floors are rates of a deck that does - as the craft floor
+ * and the variety contract read it (craft_gates.mjs, variety_gates.mjs).
  */
-export function scoreBuild(scene) {
+export function scoreBuild(scene, { purpose = null } = {}) {
   const statistics = designStatistics(scene);
   const findings = [];
-  if (statistics.contentPages >= BARS_FROM) for (const [key, bar] of Object.entries(BUILD_BARS)) {
+  if (statistics.contentPages >= BARS_FROM && purpose !== "catalogue") for (const [key, bar] of Object.entries(BUILD_BARS)) {
     const measured = statistics[key];
     if (measured === null || measured === undefined) continue;
     if (measured < bar.min) findings.push({ code: bar.code, measure: key, measured, floor: bar.min, reference: bar.reference });

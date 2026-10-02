@@ -99,6 +99,26 @@ console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])
 
+    def test_a_catalogue_is_held_to_the_ceilings_only(self):
+        # A catalogue shows each component plain so it can be copied; the floors
+        # are rates of a deck that argues (the craft floor reads it the same way).
+        # An empty frame is still an empty frame.
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {scoreBuild} from './evals/cold-run/score.mjs';
+const page=(roles=[])=>({id:'s',nodes:[{role:'action-title',type:'text'},...roles.map(r=>({role:r,type:'rect'})),...Array(20).fill({role:'m',type:'rect'})],
+  componentInstances:[{component:'table'}]});
+const slides=Array.from({length:20},()=>page());
+assert.equal(scoreBuild({slides}).accepted,false);
+const catalogue=scoreBuild({slides},{purpose:'catalogue'});
+assert.deepEqual(catalogue.findings,[]);
+assert.equal(catalogue.statistics.tables,19,'the statistics are still measured (the first page is the cover)');
+const framed=scoreBuild({slides:[slides[0],page(['image-frame']),...slides.slice(2)]},{purpose:'catalogue'});
+assert.deepEqual(framed.findings.map(f=>f.measure),['unsourcedPictures']);
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result["ok"])
+
     def test_a_deck_that_ships_empty_frames_is_not_accepted(self):
         """Found by running the harness, which is the point of the harness.
 
@@ -170,7 +190,7 @@ class SpecimenTests(unittest.TestCase):
 import {measureBaseline} from './evals/cold-run/baseline.mjs';
 console.log(JSON.stringify(measureBaseline()));
 ''')
-        self.assertEqual(sorted(live), ["gallery-acceptance", "house-style", "nyc-or-sf"])
+        self.assertEqual(sorted(live), ["gallery-acceptance", "house-style", "nyc-or-sf", "page-types"])
         for name, statistics in live.items():
             with self.subTest(deck=name):
                 self.assertGreater(statistics["contentPages"], 0, name)
@@ -179,6 +199,11 @@ console.log(JSON.stringify(measureBaseline()));
                 self.assertGreaterEqual(statistics["exhibitVarietyPerTen"],
                                         CONTRACT["plan"]["craft"]["exhibitVarietyPerTen"]["min"], name)
                 self.assertEqual(statistics["accepted"], not statistics["misses"])
+        # The catalogue is held to the ceilings only; every deck that makes an
+        # argument clears its floors.
+        self.assertEqual(live["gallery-acceptance"].get("purpose"), "catalogue")
+        for name in ("house-style", "nyc-or-sf", "page-types"):
+            self.assertEqual(live[name]["misses"], [], name)
         record = self.specimen("example-deck-baseline.json")
         self.assertRegex(record["weightSha256"], r"^[0-9a-f]{64}$")
         self.assertEqual(sorted(record["decks"]), sorted(live))
