@@ -19,6 +19,7 @@ const reworded = structuredClone(spec); reworded.slides[0].points = ['A differen
 const retitled = structuredClone(spec); retitled.slides[0].title = 'Riyadh Air has 14 destinations';
 const binding = storylineBinding(spec);
 const ready = { pass: 1, verifies: null, verdict: 'ready', binding, rating: 8, summary: 'The answer is sharp and the pillars hold on the evidence shown.',
+  compliance: { verdict: 'complete', note: 'Nothing the evidence in scope allows is left undone.' }, sufficiency: { verdict: 'sufficient', note: 'The evidence supports the answer as it is stated.' },
   spine: 'Read alone, the one title states the finding the whole storyline rests on, with its rate.', answer: 'Riyadh Air is opening destinations faster than any recent Gulf entrant did.',
   answerParts: [{ part: 'Is Riyadh Air up and coming', verdict: 'answered', missingEvidence: '' }],
   pillars: [{ pillar: 'Speed', pages: ['a'], verdict: 'holds', overlap: 'A single pillar; nothing overlaps.', strongestCounter: 'Small base', reversal: 'The ramp stalls below ten routes a quarter.', answered: true }],
@@ -140,11 +141,12 @@ const hash = async (dir) => JSON.parse(await fs.readFile(path.join(dir, 'packet.
 const one = await S.prepareStoryline(specPath, out);
 const clean = (check) => ({ check, result: check === 'missing' ? 'findings' : 'clean', note: check === 'missing' ? 'Filed M1 for cohort retention.' : `Checked ${check} across the spine and found nothing.` });
 const first = { pass: 1, verifies: null, verdict: 'revise', rating: 6, binding: S.storylineBinding(spec('The subject grew fastest')), summary: 'The growth call stands but retention would change it; run it.',
+  compliance: { verdict: 'incomplete', note: 'An open item is still within reach of the team.' }, sufficiency: { verdict: 'insufficient', note: 'The answer outruns its evidence while the item is open.' },
   provenance: { backend: 'subagent', model: 'fixture', promptHash: await hash(one.dir) }, spine: 'The titles read as a growth story and build to the answer in order.',
   answer: 'The subject is winning on growth and must show retention to be winning overall.', answerParts: [{ part: 'Is the subject winning', verdict: 'answered', missingEvidence: '' }],
   pillars: [{ pillar: 'Growth', pages: ['p01', 'p02'], verdict: 'holds', overlap: 'A single pillar here.', strongestCounter: 'Growth bought with discounts.', reversal: 'Retention below peers.', answered: false }],
   numbers: 'The two pages print no shared figure.', sectionFlow: 'One section opens and closes in the order a reader follows.', execSummary: 'No summary page in this probe; the title carries the answer.',
-  missingAnalyses: [{ id: 'M1', analysis: 'Cohort retention by vintage', why: 'Retention decides whether growth is winning.', data: 'Company filings cohort tables', public: 'known', severity: 'major' }],
+  missingAnalyses: [{ id: 'M1', analysis: 'Cohort retention by vintage', why: 'Retention decides whether growth is winning.', data: 'Company filings cohort tables', public: 'known', remedy: 'retrieval', severity: 'major' }],
   cutOrMerge: [], findings: [], topFixes: ['Run cohort retention'], completeness: S.STORYLINE_DIMENSIONS.map(clean) };
 await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(first));
 await S.prepareStoryline(specPath, out);
@@ -153,6 +155,7 @@ await fs.mkdir(path.join(dir, 'sources'), { recursive: true });
 await fs.writeFile(path.join(dir, 'sources', 'search-retention.md'), 'Searched filings, investor decks and press for cohort retention: none published.');
 const two = await S.prepareStoryline(specPath, out);
 const verify = (status) => ({ pass: 2, verifies: first.binding, verdict: 'ready', rating: 8, binding: S.storylineBinding(spec('The subject grew fastest of five carriers')), summary: 'The retention analysis was searched for and is not published anywhere.',
+  compliance: { verdict: 'complete', note: 'Nothing the evidence in scope allows is left undone.' }, sufficiency: { verdict: 'sufficient', note: 'The evidence supports the answer as it is stated.' },
   provenance: { backend: 'subagent', model: 'fixture', promptHash: '' }, statuses: [{ finding: 'M1', evidence: 'The search log lists filings, decks and press with no cohort data.', ...status }], findings: [], topFixes: [] });
 const answer = async (status) => { const review = verify(status); review.provenance.promptHash = await hash(two.dir); await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(review)); return S.prepareStoryline(specPath, out); };
 const noLog = await answer({ status: 'unavailable' });

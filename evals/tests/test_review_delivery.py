@@ -70,6 +70,7 @@ async function storylineReady({ out, specPath, spec }) {
   const pages = spec.slides.filter((s) => !s.kind).map((s) => s.id);
   await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify({ pass: 1, verifies: null, verdict: 'ready', rating: 8, binding: S.storylineBinding(spec),
     summary: 'The answer is sharp and the pillars hold on the evidence shown.', provenance: { backend: 'subagent', model: 'fixture-critic', promptHash: hash },
+    compliance: { verdict: 'complete', note: 'Nothing the evidence in scope allows is left undone.' }, sufficiency: { verdict: 'sufficient', note: 'The evidence supports the answer as it is stated.' },
     spine: 'Read alone, the titles build from the market to the answer without a gap or a repeated step.', answer: 'The subject leads on both horizons, on the evidence shown.',
     answerParts: [{ part: 'short run', verdict: 'answered', missingEvidence: '' }, { part: 'long run', verdict: 'answered', missingEvidence: '' }],
     pillars: [{ pillar: 'Lead', pages, verdict: 'holds', overlap: 'A single pillar; nothing overlaps.', strongestCounter: 'The base is small.', reversal: 'Growth below peers for two years.', answered: true }],
@@ -497,6 +498,7 @@ const step = await S.prepareStoryline(moved.specPath, moved.out);
 const spinePrompt = await fs.readFile(path.join(step.dir, 'prompt.md'), 'utf8');
 const packet = JSON.parse(await fs.readFile(path.join(step.dir, 'packet.json'), 'utf8'));
 const critique = (findings) => ({ pass: 1, verifies: null, verdict: 'revise', rating: 7, binding: packet.binding, summary: 'The retitled page now overclaims what its evidence can carry.',
+  compliance: { verdict: 'incomplete', note: 'An open item is still within reach of the team.' }, sufficiency: { verdict: 'insufficient', note: 'The answer outruns its evidence while the item is open.' },
   provenance: { backend: 'subagent', model: 'fixture', promptHash: packet.promptHash }, spine: 'The titles read in order and build to the answer, with one overreach.',
   answer: 'The subject leads on both horizons, on the evidence shown.', answerParts: [{ part: 'short run', verdict: 'answered', missingEvidence: '' }],
   pillars: [{ pillar: 'Lead', pages: ['p01', 'p02', 'p03'], verdict: 'weak', overlap: 'A single pillar; nothing overlaps.', strongestCounter: 'The base is small.', reversal: 'Growth below peers.', answered: true }],

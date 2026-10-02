@@ -13,7 +13,7 @@
 //   ... --reason "<why>" [--user-approved]                          switching between --full and the spine critique
 //                                                                   (--spine) starts a new lineage; a second restart needs the user
 //
-// Exit codes (EXIT in errors.mjs): 0 ready, 3 a packet is waiting for
+// Exit codes (EXIT in errors.mjs): 0 ready (or provisional: the answer is offered as provisional and every open item needs evidence the scope forbids), 3 a packet is waiting for
 // a critic, 2 revise, capped, refused or an invalid critique, 1 a crash or bad usage.
 //
 // A deck can pass every gate and still argue nothing: a governing answer that
@@ -51,14 +51,43 @@ import {
   changedPages, capMessage, uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts,
   callReviewer, reviewParts, readPasses, recordPass,
   PROVENANCE_SCHEMA, provenanceLine, provenanceErrors, sha256, requestOf, requestHash, requestErrors, stageReview, lineageStore, restartLineage, isAuthFailure,
-  readInventory, revisionChanges, locateDeck,
+  readInventory, revisionChanges, locateDeck, REQUEST_PROVENANCES, requestProvenanceOf, evidenceScopeOf, answerStatusOf,
 } from "./review-passes.mjs";
+import { alternativesOf, analysisInsights, analysisLine, readAnalysis } from "./analysis.mjs";
+import { dependencyNotes } from "./gates/dependency_gates.mjs";
 
-export const STORYLINE_VERDICTS = Object.freeze(["ready", "revise"]);
+// `provisional` is a storyline whose team has done everything the evidence in
+// scope allows and whose answer is offered as provisional: the decisive gaps
+// that remain need evidence the team may not fetch, and they stay open.
+export const STORYLINE_VERDICTS = Object.freeze(["ready", "provisional", "revise"]);
 export const STORYLINE_MODES = Object.freeze(["spine", "full"]);
 // A missing analysis searched for and not found closes as `unavailable`, with
 // the search log under the deck's sources/ to show it.
-export const STORYLINE_STATUSES = Object.freeze([...STATUSES, "unavailable"]);
+// `narrowed` closes an item the answer no longer needs, because it now claims
+// less; `scope-limited` keeps open, at its severity, a missing analysis whose
+// data the team may not fetch - a limit recorded, never a defect excused.
+export const STORYLINE_STATUSES = Object.freeze([...STATUSES, "unavailable", "narrowed", "scope-limited"]);
+/** How a missing analysis could be supplied: what the team is asked to do about it. */
+export const REMEDIES = Object.freeze({
+  computable: "the measures in the packet can compute it",
+  assumption: "an input is unrecorded and a stated assumption can stand in, as a labelled scenario",
+  retrieval: "it needs data the packet does not hold",
+});
+// Two judgements, kept apart. Compliance: has the team done everything the
+// evidence in scope allows. Sufficiency: does that evidence support the answer
+// as it is stated. A deck can comply and still not be sufficient.
+export const COMPLIANCE_VERDICTS = Object.freeze(["complete", "incomplete"]);
+export const SUFFICIENCY_VERDICTS = Object.freeze(["sufficient", "provisional", "insufficient"]);
+// What a rating means, so that two passes and two critics use one scale; and
+// the most a storyline with an open item can be rated.
+export const RATING_ANCHORS = Object.freeze({
+  "9-10": "ready as it stands; nothing a top team would add is missing",
+  "7-8": "the argument holds; only minor items remain",
+  "5-7": "a major item is open",
+  "3-5": "a blocker is open",
+  "0-2": "no argument: the question restated, or facts without an answer",
+});
+export const RATING_CAPS = Object.freeze({ blocker: 5, major: 7 });
 // The spine critique returns the items that most change whether the deck
 // answers the request, not everything a reader could say.
 export const SPINE_ITEM_MAX = 10;
@@ -127,23 +156,26 @@ const PILLAR = { type: "object", additionalProperties: false, required: ["pillar
     overlap: STR(10), strongestCounter: STR(10), reversal: STR(10), answered: { type: "boolean" } } };
 // `public`: "known" when the critic can name the public source that publishes
 // the data; "speculative" otherwise, and a speculative analysis is never major.
-const MISSING = { type: "object", additionalProperties: false, required: ["id", "analysis", "why", "data", "public", "severity"],
-  properties: { id: ITEM_PROPERTIES.id, analysis: STR(10), why: STR(10), data: STR(10), public: { type: "string", enum: ["known", "speculative"] }, severity: ITEM_PROPERTIES.severity } };
+const MISSING = { type: "object", additionalProperties: false, required: ["id", "analysis", "why", "data", "public", "remedy", "severity"],
+  properties: { id: ITEM_PROPERTIES.id, analysis: STR(10), why: STR(10), data: STR(10), public: { type: "string", enum: ["known", "speculative"] },
+    remedy: { type: "string", enum: Object.keys(REMEDIES) }, severity: ITEM_PROPERTIES.severity } };
 const CUT = { type: "object", additionalProperties: false, required: ["id", "pages", "action", "freedUse", "severity"],
   properties: { id: ITEM_PROPERTIES.id, pages: ITEM_PROPERTIES.pages, action: { type: "string", enum: ["cut", "merge"] }, freedUse: STR(10), severity: ITEM_PROPERTIES.severity } };
 const STATUS = { type: "object", additionalProperties: false, required: ["finding", "status", "evidence"],
   properties: { finding: { type: "string" }, status: { type: "string", enum: STORYLINE_STATUSES }, evidence: STR(20), severity: { type: "string", enum: SEVERITIES },
-    pages: { type: "array", items: { type: "string" } }, searchLog: { type: "string" } } };
+    pages: { type: "array", items: { type: "string" } }, searchLog: { type: "string" }, artifact: { type: "string" } } };
 const COMPLETENESS = { type: "array", items: { type: "object", additionalProperties: false, required: ["check", "result", "note"],
   properties: { check: { type: "string", enum: STORYLINE_DIMENSIONS }, result: { type: "string", enum: ["findings", "clean"] }, note: { type: "string" } } } };
 const ANSWER_PARTS = { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["part", "verdict", "missingEvidence"],
   properties: { part: STR(3), verdict: { type: "string", enum: ANSWER_VERDICTS }, missingEvidence: { type: "string" } } } };
-const COMMON = { verdict: { type: "string", enum: STORYLINE_VERDICTS }, rating: { type: "number", minimum: 0, maximum: 10 }, binding: HASH, summary: STR(40), provenance: PROVENANCE_SCHEMA };
+const JUDGEMENT = (verdicts) => ({ type: "object", additionalProperties: false, required: ["verdict", "note"], properties: { verdict: { type: "string", enum: verdicts }, note: STR(10) } });
+const COMMON = { verdict: { type: "string", enum: STORYLINE_VERDICTS }, rating: { type: "number", minimum: 0, maximum: 10 }, binding: HASH, summary: STR(40), provenance: PROVENANCE_SCHEMA,
+  compliance: JUDGEMENT(COMPLIANCE_VERDICTS), sufficiency: JUDGEMENT(SUFFICIENCY_VERDICTS) };
 
 /** Pass one of the page-level critique (--full): every page of the spine, every spine-level section, and what found nothing. */
 export const STORYLINE_SCHEMA = {
   type: "object", additionalProperties: false,
-  required: ["pass", "verifies", "verdict", "rating", "binding", "summary", "spine", "answer", "answerParts", "pillars", "pages", "numbers", "sectionFlow", "execSummary", "missingAnalyses", "cutOrMerge", "findings", "topFixes", "completeness"],
+  required: ["pass", "verifies", "verdict", "rating", "binding", "summary", "compliance", "sufficiency", "spine", "answer", "answerParts", "pillars", "pages", "numbers", "sectionFlow", "execSummary", "missingAnalyses", "cutOrMerge", "findings", "topFixes", "completeness"],
   properties: {
     pass: { type: "integer", enum: [1] }, verifies: { type: "null" }, ...COMMON,
     spine: STR(60), answer: STR(40), answerParts: ANSWER_PARTS,
@@ -167,7 +199,7 @@ delete STORYLINE_SPINE_SCHEMA.properties.mergedFrom;
 /** Pass two and after: a status for every open item, new items only if serious and additive. */
 export const STORYLINE_VERIFICATION_SCHEMA = {
   type: "object", additionalProperties: false,
-  required: ["pass", "verifies", "verdict", "rating", "binding", "summary", "pages", "statuses", "findings", "topFixes"],
+  required: ["pass", "verifies", "verdict", "rating", "binding", "summary", "compliance", "sufficiency", "pages", "statuses", "findings", "topFixes"],
   properties: {
     pass: { type: "integer", minimum: 2 }, verifies: HASH, ...COMMON,
     pages: { type: "array", items: PAGE_ENTRY },
@@ -254,13 +286,16 @@ export function storyStructure(spec) {
     id: s.id ?? `p${i + 1}`, kind: s.kind ?? "content", title: String(s.title ?? s.text ?? ""),
     claim: s.pageType?.content?.claim ?? s.claim ?? null, settles: s.pageType?.content?.settles ?? s.settles ?? null,
     type: s.pageType ? `${s.pageType.type ?? ""}/${s.pageType.form ?? ""}` : null,
-    exhibits: exhibitsOf(s).map((ex) => ({ type: ex.type ?? null, values: plottedNumbers(ex) })),
+    // What each exhibit says it plots and why it is on the page: an exhibit
+    // moved onto another claim is a different argument, whatever its numbers.
+    exhibits: exhibitsOf(s).map((ex, at) => ({ type: ex.type ?? null, values: plottedNumbers(ex), ...(s.pageType?.dependencies?.exhibits?.[at] ? { basis: s.pageType.dependencies.exhibits[at] } : {}) })),
   }));
 }
 
 /** The critique's binding: the spine, the governing answer and the user's request. */
 export function storylineBinding(spec) {
-  return sha256(JSON.stringify({ request: requestHash(spec), answer: spec.answer ?? null, pages: storyStructure(spec) }));
+  const offered = answerStatusOf(spec);
+  return sha256(JSON.stringify({ request: requestHash(spec), answer: spec.answer ?? null, ...(offered.status === "provisional" ? { answerStatus: offered } : {}), pages: storyStructure(spec) }));
 }
 
 /** One hash per page of the spine: what a verification pass compares. */
@@ -299,7 +334,11 @@ function keyNumbers(exhibits) {
 async function storyPages(spec, base, stem) {
   const content = await readJson(path.join(base, `${stem}.content.json`), { optional: true });
   const byId = new Map((content?.pages || []).map((p) => [p.id, p]));
-  const log = await readJson(path.join(base, `${stem}.insights.json`), { optional: true });
+  const recorded = await readJson(path.join(base, `${stem}.insights.json`), { optional: true });
+  // The analyses the runtime computed from the log's measures stand beside
+  // its insights: a page rests on either by id.
+  const analysis = recorded ? await readAnalysis(base, stem, recorded, { alternatives: alternativesOf(spec) }) : { plan: null, results: [], problems: [] };
+  const log = recorded ? { ...recorded, insights: [...(recorded.insights || []), ...analysisInsights(analysis.results)] } : null;
   const insights = new Map((log?.insights || []).map((i) => [i.id, i]));
   let section = null;
   const pages = [...(spec.slides || []), ...(spec.appendix || [])].map((s, i) => {
@@ -310,10 +349,12 @@ async function storyPages(spec, base, stem) {
     const exhibits = exhibitsOf(s);
     return { n: i + 1, id: s.id ?? `p${i + 1}`, kind: s.kind ?? "content", section, title: s.title ?? s.text ?? "", claim: planned.claim ?? s.pageType?.content?.claim ?? null,
       settles: planned.settles ?? s.pageType?.content?.settles ?? null, exhibits: exhibits.map(describeExhibit), keyNumbers: keyNumbers(exhibits), commentary: body.slice(0, 6), source: s.source ?? null,
+      // The context exhibits and the relation the claim asserts, for the critic to judge: declared by the author, never inferred.
+      declared: dependencyNotes({ exhibits: exhibits.map((ex, at) => ({ ...ex, basis: s.pageType?.dependencies?.exhibits?.[at] })), settles: s.pageType?.content?.settles }),
       evidence: evidence.map((id) => { const item = insights.get(id); return item ? { id, finding: item.finding, calculation: item.calculation ?? null, sources: item.sources ?? [], strength: item.strength ?? null } : { id, missing: true }; }),
       ...(s.pageType ? { type: `${s.pageType.type}/${s.pageType.form}`, page: `${s.pageType.type}/${s.pageType.form}, explanation ${s.pageType.commentary}${s.pageType.takeaway ? ", closes on a line" : ""}` } : {}) };
   });
-  return { pages, content, log };
+  return { pages, content, log, analysis };
 }
 
 // A spine past this many content pages is critiqued page by page (--full) by
@@ -347,7 +388,7 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   const spec = await readJson(specPath);
   const base = path.dirname(specPath), stem = path.basename(specPath).replace(/\.deck\.json$/, "");
   const store = await lineageStore(spec, outputDirectory, specPath);
-  const { pages, content, log } = await storyPages(spec, base, stem);
+  const { pages, content, log, analysis } = await storyPages(spec, base, stem);
   // Sources sit in workstream folders (sources/<workstream>/...), so list them all.
   const sources = await fs.readdir(path.join(base, "sources"), { recursive: true }).then((all) => all.filter((f) => /\.[a-z0-9]+$/i.test(f))).catch(() => []);
   const insights = checkInsights(log, sources, pages.map((p) => ({ kind: p.kind === "section" ? "section" : isContent(p) && p.type ? "content" : "other", title: p.title, evidence: (p.evidence || []).map((e) => e.id) })));
@@ -358,7 +399,11 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   const answer = spec.answer ?? content?.answer ?? "";
   const packet = { mode, binding: storylineBinding(spec), pageHashes: storylinePageHashes(spec), pass: scope ? scope.pass : 1, verifies: scope ? scope.verifies : null,
     maxPasses: scope?.maxPasses ?? MAX_PASSES, scope, sections, deck: path.resolve(specPath), revision: !scope && revision ? { changed: revision.spine, dropped: revision.dropped } : null,
-    request: requestOf(spec), question: spec.question ?? content?.question ?? null, answer, declines: declinesIn(answer),
+    request: requestOf(spec), requestProvenance: requestProvenanceOf(spec), evidenceScope: evidenceScopeOf(spec), answerStatus: answerStatusOf(spec),
+    // What the runtime computed before the outline, and what it could not: a missing analysis closes on one of these, not on a qualification.
+    analyses: analysis.results.map((r) => ({ id: r.id, op: r.op, status: r.status, line: analysisLine(r), missing: r.missing ?? [], assumptions: (r.assumptions || []).length })),
+    analysisProblems: analysis.problems,
+    question: spec.question ?? content?.question ?? null, answer, declines: declinesIn(answer),
     players: spec.players ?? [], sources, insights, targetPages, totalPages: pages.length, contentPages, pages };
   const schema = schemaFor(mode, scope);
   const previous = await readJson(path.join(store, PACKET_RECORD), { optional: true });
@@ -439,17 +484,21 @@ export function checkInsights(log, sources = [], pages = null) {
 }
 
 const spineLine = (p) => isContent(p)
-  ? `${p.n}. [${p.id}] ${p.title}${p.page ? `\n     page: ${p.page}` : ""}\n     shows: ${p.exhibits.join(" + ") || "text only"}${p.commentary.length ? `\n     says: ${p.commentary.join(" / ").slice(0, 400)}` : ""}${p.evidence?.length ? `\n     rests on: ${p.evidence.map((e) => e.missing ? `${e.id} (NOT IN THE LOG)` : `${e.id} "${e.finding}" (calc: ${e.calculation ?? "none"}; sources: ${e.sources.join(", ") || "none"})`).join("; ")}` : "\n     rests on: no insight named"}`
+  ? `${p.n}. [${p.id}] ${p.title}${p.page ? `\n     page: ${p.page}` : ""}\n     shows: ${p.exhibits.join(" + ") || "text only"}${(p.declared || []).length ? `\n     declared: ${p.declared.join(" / ")}` : ""}${p.commentary.length ? `\n     says: ${p.commentary.join(" / ").slice(0, 400)}` : ""}${p.evidence?.length ? `\n     rests on: ${p.evidence.map((e) => e.missing ? `${e.id} (NOT IN THE LOG)` : `${e.id} "${e.finding}" (calc: ${e.calculation ?? "none"}; sources: ${e.sources.join(", ") || "none"})`).join("; ")}` : "\n     rests on: no insight named"}`
   : `${p.n}. -- ${p.kind}: ${p.title}`;
 
 // One line per page for the spine critique: title, claim where it differs,
 // page type, the numbers it turns on and the insight ids it rests on.
 const compactLine = (p) => isContent(p)
-  ? `${p.n}. [${p.id}] ${p.title}${p.claim && p.claim !== p.title ? ` | claim: ${p.claim}` : ""}${p.type ? ` | ${p.type}` : ""}${p.keyNumbers ? ` | ${p.keyNumbers}` : ""} | rests on: ${(p.evidence || []).map((e) => `${e.id}${e.missing ? " (NOT IN THE LOG)" : ""}`).join(", ") || "none"}`
+  ? `${p.n}. [${p.id}] ${p.title}${p.claim && p.claim !== p.title ? ` | claim: ${p.claim}` : ""}${p.type ? ` | ${p.type}` : ""}${p.keyNumbers ? ` | ${p.keyNumbers}` : ""} | rests on: ${(p.evidence || []).map((e) => `${e.id}${e.missing ? " (NOT IN THE LOG)" : ""}`).join(", ") || "none"}${(p.declared || []).length ? ` | declared: ${p.declared.join(" / ")}` : ""}`
   : `${p.n}. -- ${p.kind}: ${p.title}`;
 
 // The text of a page as the packet shows it: what a missed item's quoted evidence is checked against.
 const packetPageText = (packet) => Object.fromEntries(packet.pages.map((p) => [p.id, [p.title, p.claim, p.type, p.keyNumbers, ...(p.exhibits || []), ...(p.commentary || []), ...(p.evidence || []).map((e) => `${e.id} ${e.finding ?? ""}`)].filter(Boolean).join("\n")]));
+
+// What the runtime computed from the insight log's measures before the outline was written.
+const analysesLines = (packet) => `COMPUTED ANALYSES (run by the runtime over the log's measures; a page rests on one by its id):
+${(packet.analyses || []).map((a) => `- ${a.line}`).join("\n") || "- none"}${(packet.analysisProblems || []).length ? `\nANALYSIS PLAN PROBLEMS: ${packet.analysisProblems.join("; ")}` : ""}`;
 
 function checksPrompt() {
   return `THE CHECKS. The page checks are made on every content page; the spine checks on the storyline as a whole.
@@ -465,13 +514,17 @@ export const CRITIC_STANDARDS = `THE STANDARD. You need no other file: this is t
 - The pillars are a MECE set of reasons that together prove the answer; each has its strongest counter-argument and the condition that would reverse it.
 - Every analytical page carries a finding with an implication, drawn from the insight log: not a count, a fact or a two-number comparison. Its evidence has the shape the claim needs: the trend with its rate, the whole ranked peer set, the share and its movement, the ratio, the gap to a benchmark, the map, the judging table. A comparison sets every member on the same measures, n/a where one is undisclosed.
 - Each page moves the argument on: none restates, previews or re-proves another. The summary states what the body proves, with its numbers, and the close agrees with it.
-- A missing analysis names why it would change the answer and the public data behind it. Mark it \`public: "known"\` only when you can name the public source that publishes that data; otherwise it is "speculative", and a speculative analysis is never major. You are not searching the web: say what you know is published.
+- A missing analysis names why it would change the answer, the data behind it and its \`remedy\`: ${Object.entries(REMEDIES).map(([key, about]) => `"${key}" (${about})`).join(", ")}. Ask first whether the packet's own measures would settle it. Mark \`public: "known"\` only when you can name the public source that publishes the data; otherwise "speculative", and a speculative retrieval is never major. You are not searching the web: say what you know is published. An analysis is met by the analysis, never by a caveat saying what the evidence does not establish.
 - The requested length counts the appendix: recommend cutting weak or repetitive body pages freely, and move surplus pages that still earn a lookup to the appendix, which keeps the total at the requested length; give the freed body pages to a missing analysis.
 - Judge the argument, not the wording: the copy is written later.`;
 
 const ITEM_RULES = `ITEMS. Every problem is an item with an id (F1, F2, ...; M1... for missing analyses; C1... for cuts), a severity and, for findings, the check it belongs to, the problem and the fix. A page finding names its one page; a spine finding lists EVERY page it concerns (for the answer, the summary and closing pages) - never a sample, never "e.g.", "such as" or "etc.". Validation refuses a sampled page list and a finding whose text names a page its list leaves out.`;
 
 const PAGE_RULES = `PAGE VERDICTS. \`pages\` holds one entry for every content page: its verdict (ok, minor, major, blocker - the worst open item naming the page), a note for claim, shape, restatement and consequence, and \`sourcing\` { status: supported | partly | unsupported | n/a, insights: the ids it rests on, note }. An unsupported page carries a major or blocker sourcing finding; a partly supported one a sourcing finding at any severity.`;
+
+// The two judgements a critique returns beside its verdict, and the scale its rating is on.
+const JUDGEMENT_RULES = `TWO JUDGEMENTS, KEPT APART. \`compliance\`: has the team done everything the evidence in scope allows? "complete" only when no major or blocker item it could still act on is open. \`sufficiency\`: does the evidence support the answer as stated? "sufficient" only when no major or blocker item is open at all; "provisional" when the only ones open need evidence the team may not fetch and the answer is offered as provisional; else "insufficient". A severity is never lowered because the scope forbids the remedy.
+RATING SCALE: ${Object.entries(RATING_ANCHORS).map(([band, means]) => `${band} ${means}`).join("; ")}. With a blocker open the rating is ${RATING_CAPS.blocker} or less; with a major open, ${RATING_CAPS.major} or less.`;
 
 const ANSWER_RULES = `THE ANSWER, PART BY PART. In \`answerParts\` list each part of the user's request (each question it asks, each choice it wants made) with how the governing answer meets it: "answered", "cannot rank" (with \`missingEvidence\` naming the decisive evidence that is missing, and why it decides the part) or "declined" (anything else that does not answer it). "cannot rank" is allowed once; a second, or any part declined, fails the answer check: the verdict is revise and a major or blocker \`answer\` finding says what the answer must commit to. \`missingEvidence\` is "" for an answered part.`;
 
@@ -484,10 +537,19 @@ const marked = (packet, line, p) => `${line}${packet.revision?.changed?.includes
 
 /** The request and the answer, as the critic reads them. */
 function requestLines(packet) {
+  const provenance = packet.requestProvenance ?? "verbatim";
+  const label = provenance === "verbatim" ? "verbatim - the yardstick; judge the storyline against it, not against the team's framing"
+    : `${provenance}: ${REQUEST_PROVENANCES[provenance]} - not the user's own words. It is the yardstick as far as it goes: judge the storyline against what it asks, do not hold the team to its exact wording or to an answer its phrasing presumes, and say in the summary where it leaves the request open`;
   const request = packet.request
-    ? `THE USER'S REQUEST (verbatim - the yardstick; judge the storyline against it, not against the team's framing):\n"""\n${packet.request}\n"""`
+    ? `THE USER'S REQUEST (${label}):\n"""\n${packet.request}\n"""`
     : `THE USER'S REQUEST: not recorded. Judge against the team's question and say so in the summary. THE TEAM'S QUESTION: ${packet.question || "(not stated)"}`;
-  return `${request}\nTHE TEAM'S ANSWER: ${packet.answer || "(not stated)"}${packet.declines?.length ? `\nTHE ANSWER DECLINES ${packet.declines.length} TIME${packet.declines.length === 1 ? "" : "S"}: ${packet.declines.map((d) => `"${d}"`).join(", ")} - check each against the parts of the request.` : ""}`;
+  const scope = packet.evidenceScope?.retrieval === "closed"
+    ? `\nEVIDENCE SCOPE: closed - the team may use only the evidence supplied${packet.evidenceScope.note ? ` (${packet.evidenceScope.note})` : ""}. An analysis that needs other data has remedy "retrieval": the team cannot run it. It keeps its severity - a decisive gap is still decisive - and is met only by an answer that claims less, or stays open under a provisional answer.`
+    : "";
+  const offered = packet.answerStatus?.status === "provisional"
+    ? `\nTHE ANSWER IS OFFERED AS PROVISIONAL. It says it leaves open: ${packet.answerStatus.limits.map((limit) => `"${limit}"`).join("; ")}. Judge whether those are the decisive gaps, and whether everything else the evidence allows has been done.`
+    : "";
+  return `${request}${scope}\nTHE TEAM'S ANSWER: ${packet.answer || "(not stated)"}${offered}${packet.declines?.length ? `\nTHE ANSWER DECLINES ${packet.declines.length} TIME${packet.declines.length === 1 ? "" : "S"}: ${packet.declines.map((d) => `"${d}"`).join(", ")} - check each against the parts of the request.` : ""}`;
 }
 
 const sectionsLine = (packet) => {
@@ -510,6 +572,7 @@ PLAYERS DECLARED: ${JSON.stringify((packet.players || []).map((p) => p?.name ?? 
 REQUESTED LENGTH: ${packet.targetPages ? `${packet.targetPages}+ pages (the storyline has ${packet.totalPages}, ${packet.contentPages} of them content pages)` : `not fixed (the storyline has ${packet.totalPages} pages)`}
 INSIGHT LOG: ${packet.insights?.present ? `${packet.insights.items.length} insights` : "none recorded"}${packet.insights?.problems?.length ? `; ${packet.insights.problems.length} problems: ${packet.insights.problems.slice(0, 8).join("; ")}${packet.insights.problems.length > 8 ? "; ..." : ""}` : ""}
 DATA FOUND: ${packet.sources.length} files under sources/${packet.sources.length ? ` (${packet.sources.slice(0, 40).join(", ")}${packet.sources.length > 40 ? ", ..." : ""})` : ""}
+${analysesLines(packet)}
 
 SECTIONS (the pillars as drawn):
 ${sectionsLine(packet)}
@@ -529,7 +592,9 @@ Work through it in this order.
 5. \`numbers\`, \`sectionFlow\` and \`execSummary\`, in a sentence or two each.
 6. Missing analyses, each with \`public\` known or speculative; cut or merge.
 7. Completeness: one entry per check in \`completeness\` - "findings" when you filed any under it, "clean" with what you checked when you did not.
-8. Verdict: "ready" only if no major or blocker item is open and the answer check passes. Rate the storyline out of ten against what a top team would bring; rank the top fixes.
+8. Verdict: "ready" only if no major or blocker item is open and the answer check passes. Rate the storyline on the scale below; rank the top fixes.
+
+${JUDGEMENT_RULES}
 
 ${ANSWER_RULES}
 
@@ -553,6 +618,7 @@ DATA THEY FOUND (files under sources/): ${packet.sources.length ? packet.sources
 REQUESTED LENGTH: ${packet.targetPages ? `${packet.targetPages}+ pages (the storyline has ${packet.totalPages}, ${packet.contentPages} of them content pages)` : `not fixed (the storyline has ${packet.totalPages} pages)`}
 INSIGHT LOG (what the team extracted from the data before writing titles):
 ${packet.insights?.present ? packet.insights.items.map((i) => `- [${i.id}] (${i.strength ?? "ungraded"}) ${i.finding} — calc: ${i.calculation ?? "none"}; sources: ${i.sources.join(", ") || "none"}`).join("\n") || "- empty" : "- none recorded"}${packet.insights?.problems?.length ? `\nINSIGHT LOG PROBLEMS: ${packet.insights.problems.join("; ")}` : ""}
+${analysesLines(packet)}
 
 THE STORYLINE (title, what each page shows, what it says, the insights it rests on):
 ${packet.pages.map((p) => marked(packet, spineLine(p), p)).join("\n")}
@@ -572,9 +638,11 @@ Work through it in this order.
 7. Missing analyses: what a strong team would have run, why it matters to the answer, the public data behind it, and whether that data is \`public\` known or speculative.
 8. Cut or merge: pages that repeat, preview or exist to reach a count, and what the freed pages should carry. Cut body pages where the argument is better without them; a surplus or weak page that still earns a lookup moves to the appendix, which counts toward the requested length.
 9. Completeness: one entry per check in \`completeness\` - "findings" when you filed any under it, "clean" with what you checked when you did not.
-10. Verdict. "ready" only if no major or blocker item is open and the answer check passes: the answer is sharp, the pillars hold, the decisive pages are analytical and sourced, and no missing analysis would change the answer. Otherwise "revise". Rate the storyline out of ten against what a top team would bring. Rank the top fixes.
+10. Verdict. "ready" only if no major or blocker item is open and the answer check passes: the answer is sharp, the pillars hold, the decisive pages are analytical and sourced, and no missing analysis would change the answer. Otherwise "revise". Rate the storyline on the scale below. Rank the top fixes.
 
 ${PAGE_RULES}
+
+${JUDGEMENT_RULES}
 
 ${ANSWER_RULES}
 
@@ -616,6 +684,8 @@ ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify((packet.players || []).map((p) => p?.name ?? p))}
 REQUESTED LENGTH: ${packet.targetPages ? `${packet.targetPages}+ pages (the storyline has ${packet.totalPages}, ${packet.contentPages} of them content pages)` : `not fixed (the storyline has ${packet.totalPages} pages)`}
 
+${analysesLines(packet)}
+
 SECTIONS:
 ${sectionsLine(packet)}
 
@@ -626,7 +696,9 @@ ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
 
-You write the spine sections - \`spine\`, \`answer\`, \`answerParts\`, \`pillars\`, \`numbers\`, \`sectionFlow\`, \`execSummary\`, \`missingAnalyses\`, \`cutOrMerge\`, \`topFixes\` - and file spine findings listing every page they concern. Leave \`pages\` empty. \`completeness\` covers ${SPINE_CHECKS.join(", ")}. Your verdict, rating and summary become the critique's.
+You write the spine sections - \`spine\`, \`answer\`, \`answerParts\`, \`pillars\`, \`numbers\`, \`sectionFlow\`, \`execSummary\`, \`missingAnalyses\`, \`cutOrMerge\`, \`topFixes\`, \`compliance\`, \`sufficiency\` - and file spine findings listing every page they concern. Leave \`pages\` empty. \`completeness\` covers ${SPINE_CHECKS.join(", ")}. Your verdict, rating and summary become the critique's.
+
+${JUDGEMENT_RULES}
 
 ${ANSWER_RULES}
 
@@ -655,23 +727,31 @@ PAGES TO READ (changed since that pass, or named by an open major or blocker):
 ${read.map(spineLine).join("\n") || "- none"}` : `THE SPINE NOW ([changed] marks a page changed since that pass):
 ${packet.pages.map((p) => `${compactLine(p)}${changed.has(p.id) ? "  [changed]" : ""}`).join("\n")}`}
 DATA FOUND: ${packet.sources.length} files under sources/${packet.sources.length ? ` (${packet.sources.slice(0, 60).join(", ")}${packet.sources.length > 60 ? ", ..." : ""})` : ""}
+${analysesLines(packet)}
+THE ANSWER ${scope.answerChanged ? "HAS CHANGED" : "HAS NOT CHANGED"} since the pass this verifies.
 
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
 
 Do three things.
-1. STATUSES: for every open item, fixed, partly fixed, not fixed, regressed or - for a missing analysis only - unavailable, with the evidence in the packet. A partly fixed item keeps its severity. "unavailable" closes a missing analysis the team searched for and could not find, and needs \`searchLog\`: the path of the search log under sources/ (listed above) that shows the search.
+1. STATUSES: for every open item, fixed, partly fixed, not fixed, regressed, narrowed, or - for a missing analysis only - unavailable or scope-limited, with the evidence in the packet. A partly fixed item keeps its severity.
+   - A missing analysis is "fixed" only on its artifact: set \`artifact\` to the id of the computed analysis (listed above) or the insight that supplies it, which a page must rest on. A qualification on the page is not the analysis: where the page only says what the evidence does not establish, the item is not fixed.
+   - "narrowed" closes an item the answer no longer needs because the answer now claims less; it is allowed only where the answer has changed, and its evidence quotes the narrower answer.
+   - "unavailable" closes a missing analysis the team searched for and could not find, and needs \`searchLog\`: the path of the search log under sources/ (listed above) that shows the search. It is not available where the evidence scope is closed: nothing could be searched.
+   - "scope-limited" is for a missing analysis whose remedy is retrieval while the evidence scope is closed: the team may not fetch the data. The item stays open at its severity. It does not count against compliance; it does count against sufficiency.
 2. ${full ? "PAGES: a full page entry for every page listed above, as the first pass wrote them." : "THE ANSWER: if the answer or the request changed, judge it again in `answerParts`."}
 3. NEW ITEMS, only if additive: major or blocker, with \`basis\` ${Object.entries(NEW_BASES).map(([k, v]) => `${k} (${v})`).join("; ")}. A new minor item, an item on an unchanged page unless it is a missed major or blocker whose \`evidence\` quotes the packet's line for that page exactly (and a justification of why the first pass could not see it), and a repeat of an open item are refused. New ids must be new; \`evidence\` is "" except for basis missed. Then stop: the storyline is not re-critiqued.
 
 ${full ? PAGE_RULES : ""}
 
+${JUDGEMENT_RULES}
+
 ${ANSWER_RULES}
 
 ${ITEM_RULES}
 
-"ready" only when no major or blocker item, earlier or new, is open. Set pass to ${scope.pass} and verifies to "${scope.verifies}". Bind to ${packet.binding}.
+"ready" only when no major or blocker item, earlier or new, is open. "provisional" only when every major or blocker item still open is scope-limited, compliance is complete and the answer is offered as provisional; otherwise "revise". Set pass to ${scope.pass} and verifies to "${scope.verifies}". Bind to ${packet.binding}.
 Return ONLY JSON matching this schema: ${JSON.stringify(schemaFor(packet.mode, scope))}`;
 }
 
@@ -714,7 +794,7 @@ export function storylineItems(review) {
   for (const f of review?.findings || []) items.push({ id: f.id, code: `STORY_${String(f.check ?? "").toUpperCase()}`, dimension: f.check, scope: f.scope, severity: f.severity,
     pages: f.pages || [], reason: f.problem, repair: f.fix, ...(f.basis ? { basis: f.basis, justification: f.justification, evidence: f.evidence } : {}) });
   for (const m of review?.missingAnalyses || []) items.push({ id: m.id, code: registered(STORYLINE_CODES, "MISSING_ANALYSIS"), dimension: "missing", scope: "spine", severity: m.severity, pages: [],
-    reason: `${m.analysis}: ${m.why}`, repair: `Run it on ${m.data}`, public: m.public ?? null });
+    reason: `${m.analysis}: ${m.why}`, repair: `Run it on ${m.data}`, public: m.public ?? null, remedy: m.remedy ?? null });
   for (const c of review?.cutOrMerge || []) items.push({ id: c.id, code: registered(STORYLINE_CODES, c.action === "cut" ? "CUT_PAGE" : "MERGE_PAGES"), dimension: "cuts", scope: "spine", severity: c.severity,
     pages: c.pages || [], reason: `${c.action} ${(c.pages || []).join(", ")}`, repair: c.freedUse });
   return items;
@@ -734,7 +814,9 @@ function itemErrors(review, ids, own = null, { cap = null } = {}) {
     if (name === "cutOrMerge") errors.push(...pageListErrors(at, { scope: "spine", pages: item.pages, text: item.freedUse, ids, deckScope: "spine" }));
     // Only data the critic knows to be published can carry a major: a guess at
     // what might exist is a research question, not a defect of the storyline.
-    if (name === "missingAnalyses" && item.public !== "known" && BLOCKING.has(item.severity)) errors.push(`${at}: only an analysis on data known to be public can be ${item.severity}; name the public source and mark it known, or lower it to minor`);
+    // An analysis the team can run from the packet's own measures, or under a
+    // stated assumption, needs no public source to matter.
+    if (name === "missingAnalyses" && item.remedy === "retrieval" && item.public !== "known" && BLOCKING.has(item.severity)) errors.push(`${at}: only a retrieval on data known to be public can be ${item.severity}; name the public source and mark it known, lower it to minor, or - where the packet's own measures would settle it - mark its remedy computable`);
     if (own && name !== "missingAnalyses") {
       const outside = (item.pages || []).filter((id) => !own.includes(id));
       if (outside.length) errors.push(`${at}: names ${outside.join(", ")}, outside this section`);
@@ -773,10 +855,80 @@ function answerErrors(review, ledger) {
     errors.push(`answerParts[${i}]: "cannot rank" names the decisive missing evidence in missingEvidence, and why it decides "${part.part}"`);
   const unranked = parts.filter((p) => p?.verdict === "cannot rank").length;
   const declined = parts.filter((p) => p?.verdict === "declined").length;
-  if (unranked > 1 || declined) {
+  // A provisional answer does not pretend to rank what its evidence cannot: the
+  // parts it leaves unranked are its declared limits, not a refusal.
+  if ((unranked > 1 && review.verdict !== "provisional") || declined) {
     const why = `${declined ? `${declined} part${declined === 1 ? "" : "s"} of the request declined` : ""}${declined && unranked > 1 ? " and " : ""}${unranked > 1 ? `${unranked} parts left unranked (once is allowed)` : ""}`;
     if (review.verdict === "ready") errors.push(`verdict is ready while the answer check fails: ${why}`);
     if (!openBlocking(ledger).some((e) => e.dimension === "answer")) errors.push(`the answer check fails (${why}): file a major or blocker \`answer\` finding saying what the answer must commit to`);
+  }
+  return errors;
+}
+
+/**
+ * How an item closes, checked against what the packet holds. A missing
+ * analysis is fixed on its artifact - a computed analysis or an insight a page
+ * rests on - never on a qualification; `narrowed` needs an answer that changed;
+ * `scope-limited` is a retrieval the closed scope forbids, and stays open.
+ */
+function closureErrors(review, ledger, { analyses = [], insightIds = null, rested = new Set(), evidenceScope = null, answerChanged = false } = {}) {
+  const errors = [];
+  const computed = new Map((analyses || []).map((a) => [a.id, a]));
+  for (const [i, s] of (review.statuses || []).entries()) {
+    const entry = (ledger || []).find((e) => e.id === s?.finding);
+    if (!entry) continue;
+    const at = `statuses[${i}] (${s.finding})`;
+    if (s.status === "fixed" && entry.code === "MISSING_ANALYSIS" && entry.remedy) {
+      const artifact = typeof s.artifact === "string" ? s.artifact.trim() : "";
+      const run = computed.get(artifact);
+      if (!artifact) errors.push(`${at}: a missing analysis is fixed on its artifact - set \`artifact\` to the id of the computed analysis or the insight that supplies it. A qualification on the page is not the analysis`);
+      else if (["computable", "assumption"].includes(entry.remedy) && !run) errors.push(`${at}: ${artifact} is not among the packet's computed analyses; a ${entry.remedy} analysis closes on the runtime's result, not on an insight written by hand`);
+      else if (run && run.status === "unavailable") errors.push(`${at}: ${artifact} could not be run (${(run.missing || []).join(", ") || "an input is missing"}): the analysis is still missing`);
+      else if (!run && insightIds && !insightIds.has(artifact)) errors.push(`${at}: ${artifact} is neither a computed analysis nor an insight in the packet`);
+      else if (!rested.has(artifact)) errors.push(`${at}: no page rests on ${artifact}; an analysis that reaches no page has not changed the storyline`);
+    }
+    if (s.status === "narrowed" && !answerChanged) errors.push(`${at}: narrowed closes an item the answer no longer needs because it now claims less; the answer has not changed since the pass this verifies`);
+    if (s.status === "scope-limited") {
+      if (entry.code !== "MISSING_ANALYSIS" || entry.remedy !== "retrieval") errors.push(`${at}: scope-limited is for a missing analysis whose remedy is retrieval; ${s.finding} is ${entry.code}${entry.remedy ? ` with remedy ${entry.remedy}` : ""} - the team can still act on it`);
+      else if (evidenceScope?.retrieval !== "closed") errors.push(`${at}: the deck's evidence scope is open, so the data can be fetched: report the item as not fixed, or unavailable with its search log`);
+    }
+    if (s.status === "unavailable" && evidenceScope?.retrieval === "closed") errors.push(`${at}: the evidence scope is closed, so nothing was searched: a retrieval the scope forbids is scope-limited, and stays open`);
+  }
+  return errors;
+}
+
+// An open item the team cannot act on: a missing analysis whose data must be
+// fetched, on a deck whose evidence scope is closed. It keeps its severity.
+const limitedBy = (evidenceScope) => (entry) => entry.code === "MISSING_ANALYSIS" && entry.remedy === "retrieval" && evidenceScope?.retrieval === "closed";
+
+/**
+ * The verdict, the two judgements and the rating, held to the ledger they
+ * summarise: compliance is complete exactly when nothing the team can still
+ * act on is open; sufficiency is sufficient exactly when nothing is open;
+ * provisional needs a complete, scope-limited ledger and a deck that offers
+ * its answer as provisional; and the rating sits under the cap its worst open
+ * item sets.
+ */
+function judgementErrors(review, ledger, { answerStatus = null, evidenceScope = null } = {}) {
+  const errors = [];
+  const scopeLimited = limitedBy(evidenceScope);
+  const open = openBlocking(ledger), limited = open.filter(scopeLimited), doable = open.filter((e) => !scopeLimited(e));
+  const provisional = answerStatus?.status === "provisional";
+  const names = (list) => list.map((e) => `${e.id} (${e.severity})`).join(", ");
+  if (review.verdict === "provisional") {
+    if (doable.length) errors.push(`verdict is provisional while ${names(doable)} ${doable.length === 1 ? "is" : "are"} open and within the team's reach; provisional is for a storyline whose only open items the evidence scope forbids`);
+    if (!limited.length) errors.push("verdict is provisional with no scope-limited item open: say ready, or revise");
+    if (!provisional) errors.push("verdict is provisional but the deck offers its answer as final: the deck sets `answerStatus: \"provisional\"` with its `answerLimits`, or narrows the answer until the open items no longer bear on it");
+  }
+  const compliance = review.compliance?.verdict, sufficiency = review.sufficiency?.verdict;
+  if (compliance === "complete" && doable.length) errors.push(`compliance is complete while ${names(doable)} ${doable.length === 1 ? "is" : "are"} open and within the team's reach`);
+  if (compliance === "incomplete" && !doable.length) errors.push("compliance is incomplete with no major or blocker item open that the team can act on: file the item, or say complete");
+  if (sufficiency === "sufficient" && open.length) errors.push(`sufficiency is sufficient while ${names(open)} ${open.length === 1 ? "is" : "are"} open: an item the scope forbids still leaves the answer short of its evidence`);
+  if (sufficiency !== "sufficient" && compliance !== undefined && !open.length) errors.push("sufficiency is not sufficient with no major or blocker item open: file what the answer still lacks, or say sufficient");
+  if (sufficiency === "provisional" && (doable.length || !provisional)) errors.push(`sufficiency is provisional ${doable.length ? `while ${names(doable)} can still be acted on` : "but the deck offers its answer as final"}: it is insufficient`);
+  if (typeof review.rating === "number") {
+    const worstOpen = open.some((e) => e.severity === "blocker") ? "blocker" : open.length ? "major" : null;
+    if (worstOpen && review.rating > RATING_CAPS[worstOpen]) errors.push(`rating ${review.rating} with a ${worstOpen} open (${names(open.filter((e) => e.severity === worstOpen))}): on the rating scale a storyline with a ${worstOpen} open is ${RATING_CAPS[worstOpen]} or less`);
   }
   return errors;
 }
@@ -808,7 +960,8 @@ function unavailableErrors(review, ledger, sources) {
  * the deck's sources/, `pageText` what a missed item's quote is checked
  * against and `promptHash` the packet's (its provenance is checked when given).
  */
-export function validateStorylineRecord(review, { ids, contentIds, scope = null, ledger = [], insightIds = null, mode = "full", sources = [], pageText = null, promptHash, revision = null } = {}) {
+export function validateStorylineRecord(review, { ids, contentIds, scope = null, ledger = [], insightIds = null, mode = "full", sources = [], pageText = null, promptHash, revision = null,
+  analyses = [], rested = new Set(), evidenceScope = null, answerStatus = null } = {}) {
   if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (references/storylining.md#stress-test-the-storyline)"];
   // The whole record, not just the verdict: a truncated or hand-written
   // `{ verdict: "ready", binding }` is not a critique.
@@ -820,6 +973,7 @@ export function validateStorylineRecord(review, { ids, contentIds, scope = null,
   if (scope) {
     errors.push(...verificationErrors(review, { scope: mode === "full" ? scope : { ...scope, mustInspect: [] }, ledger, items, ids, pageKey: "page", deckScope: "spine", statuses: STORYLINE_STATUSES, pageText }));
     errors.push(...unavailableErrors(review, ledger, sources));
+    errors.push(...closureErrors(review, ledger, { analyses, insightIds, rested, evidenceScope, answerChanged: Boolean(scope.answerChanged) }));
   } else {
     if (mode === "full") errors.push(...coverageErrors(review.pages, revision ? revision.changed : contentIds, "page"));
     if (revision) errors.push(...revisionItemErrors(items, revision.changed));
@@ -832,6 +986,7 @@ export function validateStorylineRecord(review, { ids, contentIds, scope = null,
   const after = storylineLedger(scope ? ledger : [], review);
   if (mode === "full") errors.push(...verdictErrors(review.pages, after, "page"), ...sourcingErrors(review.pages, after, insightIds));
   errors.push(...answerErrors(review, after));
+  errors.push(...judgementErrors(review, after, { answerStatus, evidenceScope }));
   const open = openBlocking(after);
   if (review.verdict === "ready" && open.length) errors.push(`verdict is ready while ${open.map((e) => `${e.id} (${e.severity})`).join(", ")} ${open.length === 1 ? "is" : "are"} open; ready means no major or blocker item remains`);
   return errors;
@@ -850,6 +1005,8 @@ const packetContext = (packet) => ({
   ids: packet.pages.map((p) => p.id), contentIds: packet.pages.filter(isContent).map((p) => p.id), scope: packet.scope ?? null, ledger: packet.scope?.ledger ?? [],
   insightIds: packet.insights?.present ? new Set(packet.insights.items.map((i) => i.id)) : null, mode: packet.mode ?? "full", sources: packet.sources ?? [],
   pageText: packetPageText(packet), promptHash: packet.promptHash ?? null, revision: packet.revision ?? null,
+  analyses: packet.analyses ?? [], rested: new Set(packet.pages.flatMap((p) => (p.evidence || []).filter((e) => !e.missing).map((e) => e.id))),
+  evidenceScope: packet.evidenceScope ?? null, answerStatus: packet.answerStatus ?? null,
 });
 
 /**
@@ -874,7 +1031,14 @@ export function validateStorylineReview(review, spec, { record = null, packet = 
     const which = moved ? [...moved.changed, ...moved.deleted.map((id) => `${id} deleted`)] : [];
     errors.push(`the spine changed after the storyline critique${which.length ? ` (${which.join(", ")})` : " (the answer or the request)"}: re-run the storyline critique first - node runtime/storyline.mjs <id>.deck.json out/ writes the verification pass for what changed - and bring it back to ready before the deck review`);
   }
-  if (judged.verdict !== "ready") errors.push(`the storyline critique says revise (${judged.rating ?? "?"}/10): revise the storyline, re-run the critique and bring it to ready before the deck review${(judged.topFixes || []).length ? ` - ${judged.topFixes.slice(0, 3).join("; ")}` : ""}`);
+  if (judged.verdict === "provisional") {
+    // A provisional storyline passes the gate as provisional, never as ready:
+    // every open item is one the evidence scope forbids, and the deck says so.
+    const ledger = record?.ledger ?? storylineLedger(packet?.scope?.ledger ?? [], review);
+    const doable = openBlocking(ledger).filter((e) => !limitedBy(evidenceScopeOf(spec))(e));
+    if (doable.length) errors.push(`the storyline critique says provisional but ${doable.map((e) => `${e.id} (${e.severity})`).join(", ")} ${doable.length === 1 ? "is" : "are"} still open and within reach`);
+    if (answerStatusOf(spec).status !== "provisional") errors.push("the storyline critique says provisional but the deck offers its answer as final: set `answerStatus: \"provisional\"` with its `answerLimits`");
+  } else if (judged.verdict !== "ready") errors.push(`the storyline critique says revise (${judged.rating ?? "?"}/10): revise the storyline, re-run the critique and bring it to ready before the deck review${(judged.topFixes || []).length ? ` - ${judged.topFixes.slice(0, 3).join("; ")}` : ""}`);
   else if (!errors.length) {
     const open = openBlocking(record?.ledger ?? storylineLedger(packet?.scope?.ledger ?? [], review));
     if (open.length) errors.push(`the storyline critique says ready but ${open.map((e) => `${e.id} (${e.severity})`).join(", ")} ${open.length === 1 ? "is" : "are"} still open`);
@@ -957,7 +1121,7 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
       return { status: "invalid", errors: [`storyline-review.json does not answer the latest packet (binding or pass differs): give ${packet?.staging ? path.join(packet.staging, "prompt.md") : "the packet's prompt.md"} to a fresh critic and save the answer`] };
     const errors = validateStorylineRecord(review, packetContext(packet));
     if (errors.length) return { status: "invalid", errors };
-    history.push((await recordPass(historyDir, { review, pageHashes: packet.pageHashes, ledger: storylineLedger(packet.scope?.ledger ?? [], review), mode: packet.mode ?? "full" })).record);
+    history.push((await recordPass(historyDir, { review, pageHashes: packet.pageHashes, ledger: storylineLedger(packet.scope?.ledger ?? [], review), mode: packet.mode ?? "full", answerHash: sha256(packet.answer ?? "") })).record);
   }
   const lineageMode = history.at(-1)?.mode ?? (history.length ? "full" : null);
   const wanted = mode ?? lineageMode ?? "spine";
@@ -974,11 +1138,17 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
   if (latest && latest.binding === binding) {
     const open = openBlocking(latest.ledger);
     if (latest.review.verdict === "ready" && !open.length) return { status: "ready", pass: latest.pass, mode: wanted, binding };
+    // Provisional: the team has done what the evidence in scope allows, the
+    // answer is offered as provisional, and what stays open is recorded with it.
+    if (latest.review.verdict === "provisional" && open.length && open.every(limitedBy(evidenceScopeOf(spec))) && answerStatusOf(spec).status === "provisional")
+      return { status: "provisional", pass: latest.pass, mode: wanted, binding, limits: open.map(brief), note: "The storyline is provisional, not ready: every open item needs evidence the scope forbids. The deck review may start; delivery records the deck as provisional with these limits" };
     return { status: "revise", pass: latest.pass, mode: wanted, open: open.map(brief), note: "Revise the storyline at the root for the open items, then run this again: it writes the verification pass for what you changed" };
   }
   const ids = storyStructure(spec).filter(isContent).map((p) => p.id);
   const scope = latest ? nextPassScope(latest, storylinePageHashes(spec), { ids, ledger: latest.ledger ?? storylineLedger([], latest.review), maxPasses }) : null;
   if (scope && wanted === "spine") scope.mustInspect = [];
+  // Whether the answer moved since the pass being verified: what `narrowed` rests on.
+  if (scope) scope.answerChanged = typeof latest.answerHash === "string" && latest.answerHash !== sha256(spec.answer ?? "");
   if (scope?.capped) return { status: "capped", pass: scope.pass, message: capMessage("storyline critique", scope.pass, maxPasses, latest.ledger) };
   const { dir, packet: next } = await buildStorylinePacket(specPath, out, { scope, mode: wanted, revision: changes });
   return { status: "packet-written", pass: next.pass, mode: wanted, dir, binding: next.binding, sections: next.sections?.length ?? 0,
@@ -989,7 +1159,7 @@ function partErrors(part, packet) {
   const meta = part?.part;
   if (!meta || !["section", "spine"].includes(meta.kind)) return ["part must say { kind: section|spine, id, pages }"];
   const structure = schemaErrors(part, { ...STORYLINE_PART_SCHEMA, required: ["part", "binding", "verdict", "rating", "summary", "pages", "findings", "completeness",
-    ...(meta.kind === "spine" ? ["spine", "answer", "answerParts", "pillars", "numbers", "sectionFlow", "execSummary", "missingAnalyses", "cutOrMerge", "topFixes"] : [])] }, meta.id);
+    ...(meta.kind === "spine" ? ["spine", "answer", "answerParts", "pillars", "numbers", "sectionFlow", "execSummary", "missingAnalyses", "cutOrMerge", "topFixes", "compliance", "sufficiency"] : [])] }, meta.id);
   if (structure.length) return structure;
   const { ids, insightIds, promptHash } = packetContext(packet);
   const errors = [...itemErrors(part, ids, meta.kind === "section" ? meta.pages : null), ...(promptHash ? provenanceErrors(part, promptHash) : [])];
@@ -1012,7 +1182,7 @@ export function mergeStorylineParts(parts, packet) {
   const relabel = (part, list) => (list || []).map((item) => ({ ...item, id: rename(part, item.id) }));
   const [lead] = parts.filter((p) => p.part.kind === "spine");
   const merged = {
-    pass: 1, verifies: null, binding: packet.binding, rating: lead.rating, summary: lead.summary, ...(lead.provenance ? { provenance: lead.provenance } : {}),
+    pass: 1, verifies: null, binding: packet.binding, rating: lead.rating, summary: lead.summary, compliance: lead.compliance, sufficiency: lead.sufficiency, ...(lead.provenance ? { provenance: lead.provenance } : {}),
     spine: lead.spine, answer: lead.answer, answerParts: lead.answerParts, pillars: lead.pillars, numbers: lead.numbers, sectionFlow: lead.sectionFlow, execSummary: lead.execSummary,
     missingAnalyses: relabel(lead, lead.missingAnalyses), cutOrMerge: relabel(lead, lead.cutOrMerge),
     findings: parts.flatMap((p) => relabel(p, p.findings)), topFixes: lead.topFixes, mergedFrom: parts.map((p) => p.part.id),
@@ -1020,7 +1190,11 @@ export function mergeStorylineParts(parts, packet) {
   const ledger = storylineLedger([], merged);
   const joined = joinParts(parts, contentIds, ledger, { pageKey: "page", dimensions: STORYLINE_DIMENSIONS, dimKey: "check" });
   if (joined.errors.length) return { errors: joined.errors };
-  Object.assign(merged, { pages: joined.pages, completeness: joined.completeness, verdict: lead.verdict === "ready" && !openBlocking(ledger).length ? "ready" : "revise" });
+  // The section critics' items can reopen what the spine critic judged closed.
+  const reopened = openBlocking(ledger).length > 0;
+  const within = openBlocking(ledger).filter((e) => !limitedBy(packet.evidenceScope)(e)).length > 0;
+  Object.assign(merged, { pages: joined.pages, completeness: joined.completeness, verdict: lead.verdict === "ready" && !reopened ? "ready" : lead.verdict === "provisional" && !within ? "provisional" : "revise",
+    ...(within && lead.verdict !== "revise" ? { compliance: { ...lead.compliance, verdict: "incomplete" }, sufficiency: { ...lead.sufficiency, verdict: "insufficient" }, rating: Math.min(lead.rating, RATING_CAPS[openBlocking(ledger).some((e) => e.severity === "blocker") ? "blocker" : "major"]) } : {}) });
   return { review: merged, errors: [] };
 }
 
@@ -1085,7 +1259,7 @@ async function main(argv) {
     : values.run !== undefined ? await runStorylineReview(path.resolve(spec), path.resolve(out), values.run, { ...options, model: values.model })
     : await prepareStoryline(path.resolve(spec), path.resolve(out), options);
   console.log(JSON.stringify(result));
-  return result.status === "ready" ? EXIT.ok : result.status === "packet-written" ? EXIT.waiting : EXIT.refused;
+  return ["ready", "provisional"].includes(result.status) ? EXIT.ok : result.status === "packet-written" ? EXIT.waiting : EXIT.refused;
 }
 
 if (isMain(import.meta.url)) runCli(main);

@@ -137,7 +137,8 @@ console.log(JSON.stringify({
 
     def test_a_pillar_rests_on_a_strong_insight(self):
         result = run_node(PAGES + """
-const shape = (id, strength) => ({ id, shape: 'series', breadth: { periods: 8 }, finding: 'x', strength, soWhat: 'It decides the order of the plan' });
+const shape = (id, strength) => ({ id, shape: 'series', breadth: { periods: 8 }, finding: 'x', strength, soWhat: 'It decides the order of the plan',
+  measures: { level: { unit: 'routes', population: 'the operator', periods: ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'], values: [1, 2, 3, 4, 5, 6, 7, 8] } } });
 const pages = [{ kind: 'section', id: 's1', title: 'Demand' }, { ...trend({ id: 'a' }), evidence: ['i1'] }, { kind: 'section', id: 's2', title: 'Supply' }, { ...trend({ id: 'b' }), evidence: ['i2'] }];
 const codes = (insights) => compileDeck({ deck: { id: 'd' }, pages }, { insights, draft: true, partial: true }).spineFindings;
 const weak = codes(new Map([['i1', shape('i1', 'strong')], ['i2', shape('i2', 'context')]]));

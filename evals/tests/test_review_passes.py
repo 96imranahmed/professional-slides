@@ -48,7 +48,9 @@ function storyReady(spec, o = {}) {
     pillars: [{ pillar: 'Growth', pages: ids, verdict: 'holds', overlap: 'No overlap with any other pillar.', strongestCounter: 'The base is still small.', reversal: 'Growth below the peer median for two years.', answered: true }],
     numbers: 'Every figure matches across the pages that print it.', sectionFlow: 'The sections open, develop and close in order.',
     execSummary: 'The summary states the answer the body proves.', missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'],
-    completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: 'clean', note: `Checked ${check} across the spine and found nothing to raise.` })), ...o };
+    completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: 'clean', note: `Checked ${check} across the spine and found nothing to raise.` })),
+    // The two judgements and the rating follow the verdict, as a critic's would.
+    ...(o.verdict === 'revise' ? { rating: 6, compliance: { verdict: 'incomplete', note: 'An open item is still within reach of the team.' }, sufficiency: { verdict: 'insufficient', note: 'The answer outruns its evidence while the item is open.' } } : { compliance: { verdict: 'complete', note: 'Nothing the evidence in scope allows is left undone.' }, sufficiency: { verdict: 'sufficient', note: 'The evidence supports the answer as it is stated.' } }), ...o };
 }
 const storyFull = (spec, o = {}) => storyReady(spec, { pages: spec.slides.map((s) => ({ page: s.id, verdict: 'ok', claim: 'a finding', shape: 'trend with its rate', sourcing: { status: 'n/a', insights: [], note: 'no log' }, restatement: 'moves on', consequence: 'states it' })), ...o });
 const specOf = (ids = IDS, titles = {}) => ({ schema: 'professional-slides.deck/v3', id: 'fixture', request: 'Which company is winning this market, and why?', answer: 'The subject is.',
@@ -486,7 +488,7 @@ const flagged = storyReady(spec, { verdict: 'revise', answerParts: twoUnranked.a
 flagged.completeness.find((c) => c.check === 'answer').result = 'findings';
 const oneUnranked = storyReady(spec, { answerParts: parts([['short run', 'answered'], ['long run', 'cannot rank', 'No audited retention or margin series exists for either company.']]) });
 const unnamed = storyReady(spec, { answerParts: parts([['long run', 'cannot rank']]) });
-const missing = (pub) => storyReady(spec, { verdict: 'revise', missingAnalyses: [{ id: 'M1', analysis: 'Cohort retention by vintage', why: 'Retention decides the long-run call.', data: 'Company S-1 cohort tables', public: pub, severity: 'major' }] });
+const missing = (pub) => storyReady(spec, { verdict: 'revise', missingAnalyses: [{ id: 'M1', analysis: 'Cohort retention by vintage', why: 'Retention decides the long-run call.', data: 'Company S-1 cohort tables', public: pub, remedy: 'retrieval', severity: 'major' }] });
 const m = (r) => { r.completeness.find((c) => c.check === 'missing').result = 'findings'; return r; };
 console.log(JSON.stringify({ eleven: S.validateStorylineReview(eleven, spec), twoUnranked: S.validateStorylineReview(twoUnranked, spec), flagged: S.validateStorylineReview(flagged, spec),
   oneUnranked: S.validateStorylineReview(oneUnranked, spec), unnamed: S.validateStorylineReview(unnamed, spec),
@@ -521,6 +523,7 @@ await fs.writeFile(specPath, JSON.stringify(revised));
 const two = await S.prepareStoryline(specPath, out);
 const packet = JSON.parse(await fs.readFile(path.join(two.dir, 'packet.json'), 'utf8'));
 const verification = (o = {}) => ({ pass: 2, verifies: critique.binding, verdict: 'ready', rating: 8, binding: S.storylineBinding(revised), summary: 'The rewritten title now states the finding the count supports.',
+  compliance: { verdict: 'complete', note: 'Nothing the evidence in scope allows is left undone.' }, sufficiency: { verdict: 'sufficient', note: 'The evidence supports the answer as it is stated.' },
   provenance: prov(packet.promptHash), statuses: [{ finding: 'F1', status: 'fixed', evidence: 'The title now states the rate against the nearest rival.' }], findings: [], topFixes: [], ...o });
 await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ findings: [{ id: 'F2', scope: 'page', pages: ['p04'], check: 'consequence', severity: 'minor', problem: 'The page could say more about what follows.', fix: 'Add the consequence for the decision in one line.', basis: 'changed', justification: '', evidence: '' }] })));
 const nit = await S.prepareStoryline(specPath, out);

@@ -176,7 +176,8 @@ console.log(JSON.stringify({ v1: sev(deck(1)), v2: sev(deck(2)), v3: sev(deck(3)
         self.assertEqual(result["v3"], ["blocker", "blocker", "blocking", "blocking", "blocker"])
         self.assertEqual(result["fresh"], result["v3"])
         self.assertEqual(result["none"], result["v3"])
-        self.assertEqual(result["waived"], sorted(CONTRACT["rules"]["introduced"]["3"]))
+        # A deck recorded under version 2 predates every rule a later version introduced.
+        self.assertEqual(result["waived"], sorted(rule for version, rules in CONTRACT["rules"]["introduced"].items() if int(version) > 2 for rule in rules))
         self.assertEqual(result["mark"], {"rulesVersion": 1, "introducedIn": 2})
         self.assertEqual(result["old"], 1)
         # The Python gates read the same map.

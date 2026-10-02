@@ -271,11 +271,42 @@ A blocking code stops `author-deck.mjs` at exit 2 and nothing is written; an adv
 | `TITLE_GAP_SHARE` | titles stating what the evidence lacks, cannot settle or leaves undisclosed on more than 15% of the analytical pages | draft and full | lead with the way the evidence leans; the gap goes in the `subtitle` ([Answer under uncertainty](storylining.md#answer-under-uncertainty)) |
 | `GENERATOR_SIGNATURE` | one non-trivial value of `why`, `settles`, `adds`, `takeaway`, `subtitle`, `rail` or `bar` on more than 60% of the pages | draft and full | write the field page by page, or leave an optional one out |
 | `PILLAR_UNSUPPORTED` | a section whose pages rest on no `strong` insight | draft and full, with an insight log | find the evidence the pillar needs, or merge the pillar into one that has it |
+| `MEASURES_MISSING` | an insight whose evidence is numbers (`series`, `peer-set`, `mix`, `measure-pair`, `bridge`, `fact`) records them only as a sentence | draft and full, with an insight log | give the insight its `measures`: the unit, the population, the periods or members, and the values ([Measures](storylining.md#extract-the-insights-before-the-titles)) |
+| `ANALYSIS_REQUIRED` | the deck declares two or more `players` and no computed `compare` sets them all on common measures | draft and full, with an insight log | write `<id>.analysis.json` and run `node runtime/analysis.mjs <id>.pages.json` ([Run the analyses before the outline](storylining.md#run-the-analyses-before-the-outline)) |
+| `ANALYSIS_UNRESTED` | a computed analysis no page names in `evidence` | advised | give the result its page, or cut the analysis |
 | `WAIVERS_INVALID` | `waivers` on `deck` is a list of `{ code, reason }` naming a `BAR_*` code once each, each reason a sentence the reviewer can check | draft and full | fix the list, or drop the waiver and clear the bar |
 | `REVISION_UNMAPPED` | a revision's imported slide still carrying only its `draft` copy | reported in a draft, refused in the full compile | give the slide a `type` and its choices, or delete it from `pages` |
 | `REVISION_INVENTORY_MISSING` | a revision's `inventory` is not beside the pages file | draft and full | keep `<id>.inventory.json` where `import-deck.py` wrote it, beside the pages file |
 | `TITLE_COUNT_ONLY` | a title that states a count with no comparator or consequence | advised | add what the count is against: a peer, a target, a prior period, or what follows from it |
 | `POINT_UNMARKED` | a commentary point with no figure to mark and no `highlight` | advised | name the phrase the reader should see first in `highlight` |
+
+### The evidence contract
+
+Where the insight log records `measures`, every page with numbers on it says what its claim and its exhibits rest on, and the compile holds each to it (`runtime/gates/dependency_gates.mjs`). The rules read declared fields and numbers; no title is parsed. They block in the full compile and are reported in a draft, whose exhibits are not yet written.
+
+```json
+"settles": { "kind": "comparison", "what": "...", "measures": ["i-results/ocf", "i-results/pat"], "relation": { "kind": "gap" } },
+"exhibit": { "type": "chart.line", "unit": "AED bn", "categories": ["FY24", "FY25", "FY26"], "series": [{ "name": "Operating cash flow", "values": [38.1, 40.8, 32.0] }],
+             "basis": { "measures": ["i-results/ocf"], "role": "proof" } },
+"metrics": [{ "value": "-21.6%", "label": "Operating cash flow", "basis": { "measures": ["A-ocf/percent"] } }]
+```
+
+`settles.measures` are the measures the claim is about. `basis` on an exhibit, a block's exhibit or a metric names the measures it plots and its `role`: `"proof"` of the claim (the default), or `"context"` beside it with the `relevance` a reviewer judges. A measure is named `<insight id>/<measure>`, or `<analysis id>/<measure>` for a result the runtime computed. `settles.relation` says what the reader reads between two of the claim's measures: `gap`, `ratio`, `levels`, `index`, or `separate` with its `reason`. A page that writes no `source` takes its citation from the `cite` keys of the insights it plots.
+
+| Code | Rule | Repair |
+| --- | --- | --- |
+| `CLAIM_MEASURES_MISSING` | a page with a plotted exhibit does not say which measures its claim is about | name them in `settles.measures` |
+| `BASIS_MISSING` | an exhibit that plots numbers names no measure | give it `basis: { measures, role }` |
+| `BASIS_UNKNOWN` | a `basis` or `settles.measures` names a measure the log does not hold, or one from an insight the page does not name in `evidence` | name a recorded measure, and rest the page on the insight it comes from |
+| `BASIS_UNIT` | the exhibit's `unit` is not the unit of any measure it names | plot the measure it names, or name the measure it plots |
+| `BASIS_AXIS` | the exhibit's `categories` are not periods or members the measure runs over | plot the measure's own periods or members |
+| `BASIS_VALUES` | a plotted series is not the values of any measure the exhibit names, at the precision the page prints | plot the recorded values; a number nobody recorded is an analysis to run or an assumption to state |
+| `PROOF_OFF_CLAIM` | a `proof` exhibit plots no measure of the claim, nor one computed from it or it is computed from | plot the claim's measure, move the exhibit to the page it proves, or mark it `context` with its `relevance` |
+| `PROOF_MISSING` | every exhibit is context and no metric names a measure of the claim | plot the claim's measure, or give the metrics that state it their `basis` |
+| `CONTEXT_UNEXPLAINED` | a `context` exhibit with no `relevance` of six words or more | say what it tells the reader about this claim; the reviewer judges that sentence |
+| `SOURCE_UNCITED` | `source` leaves out a `cite` key of an insight the page plots, or is typed text where the insights carry their citation | leave `source` out, or list the registry keys |
+| `RELATION_UNDECLARED` | two measures of the claim, in one unit over the same periods or members, are drawn in separate exhibits and no `settles.relation` says what is read between them | declare the relation and draw it |
+| `RELATION_SPLIT` | the claim asserts a `gap`, `levels`, `ratio` or `index` and each measure sits in its own exhibit; or `separate` gives no `reason` | set them on one scale or plot the computed result (`author-deck.mjs <pages> --repair-relation <page-id>` prints the merged exhibit), or declare `separate` with its reason |
 
 ### The content plan
 

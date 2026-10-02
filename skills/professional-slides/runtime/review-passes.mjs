@@ -37,9 +37,10 @@ import { waiverErrors } from "./build-bars.mjs";
 export const SEVERITIES = Object.freeze(["none", "minor", "major", "blocker"]);
 export const PAGE_VERDICTS = Object.freeze(["ok", "minor", "major", "blocker"]);
 export const STATUSES = Object.freeze(["fixed", "partly fixed", "not fixed", "regressed"]);
-// A status that closes an entry. `unavailable` is the storyline's: a missing
-// analysis searched for and not found, with the search log to show it.
-export const CLOSED = Object.freeze(["fixed", "unavailable"]);
+// A status that closes an entry. `unavailable` and `narrowed` are the
+// storyline's: a missing analysis searched for and not found, with the search
+// log to show it, and a finding met by an answer that now claims less.
+export const CLOSED = Object.freeze(["fixed", "unavailable", "narrowed"]);
 export const MAX_PASSES = 3;
 // The rating a deck review must give for the deck to be accepted: 7 is "useful,
 // with substantial work still needed" (references/taste-review.md#benchmark-and-score).
@@ -116,7 +117,32 @@ export const sha256 = (text) => createHash("sha256").update(String(text)).digest
  * question and brief are the author's paraphrase and never stand in for it.
  */
 export const requestOf = (spec) => (typeof spec?.request === "string" && textWords(spec.request) >= 3 ? spec.request : null);
-export const requestHash = (spec) => (requestOf(spec) ? sha256(requestOf(spec)) : null);
+
+// What the deck says about the request and the evidence, which both reviews
+// are told and judge by. A request reconstructed from a brief is not the
+// user's words, and a critic told it is "verbatim" holds the deck to wording
+// nobody chose. An author confined to the records supplied cannot run an
+// analysis that needs other data, and a critic not told so asks for it pass
+// after pass. An answer the evidence cannot finish is said to be provisional,
+// with what it leaves open, rather than dressed as final.
+export const REQUEST_PROVENANCES = Object.freeze({
+  verbatim: "the user's own words, unchanged",
+  reconstructed: "rebuilt from a brief, a ticket or an earlier deck because the user's own words are not on record",
+  paraphrased: "the author's restatement of what the user asked",
+});
+/** How the deck's `request` came to be: verbatim unless the deck says otherwise. */
+export const requestProvenanceOf = (spec) => (Object.hasOwn(REQUEST_PROVENANCES, spec?.requestProvenance) ? spec.requestProvenance : "verbatim");
+/** Whether the author may fetch evidence beyond what was supplied: `{ retrieval: "open" | "closed", note }`. */
+export const evidenceScopeOf = (spec) => ({ retrieval: spec?.evidenceScope?.retrieval === "closed" ? "closed" : "open", note: typeof spec?.evidenceScope?.note === "string" ? spec.evidenceScope.note.trim() : "" });
+/** Whether the deck offers its answer as final or as provisional, and what a provisional one leaves open. */
+export const answerStatusOf = (spec) => ({ status: spec?.answerStatus === "provisional" ? "provisional" : "final", limits: Array.isArray(spec?.answerLimits) ? spec.answerLimits.filter((limit) => typeof limit === "string" && limit.trim()) : [] });
+// The request's hash covers what the reviews are told about it: a deck that
+// says nothing of provenance or scope keeps the hash of its words alone.
+export const requestHash = (spec) => {
+  if (!requestOf(spec)) return null;
+  const provenance = requestProvenanceOf(spec), scope = evidenceScopeOf(spec);
+  return sha256(provenance === "verbatim" && scope.retrieval === "open" ? requestOf(spec) : JSON.stringify([requestOf(spec), provenance, scope]));
+};
 
 // The deck's own statements both reviews rest on: the user's request, word for
 // word, and the build bars it says it is right to miss. Checked where the deck
@@ -125,6 +151,7 @@ export const requestHash = (spec) => (requestOf(spec) ? sha256(requestOf(spec)) 
 export const DECK_STATEMENT_CODES = Object.freeze({
   REQUEST_MISSING: "a new deck carries no verbatim `request`, so the reviews would judge it against the author's paraphrase",
   WAIVERS_INVALID: "a build-bar waiver that names no build bar, names one twice, or gives no reason the reviewer can check",
+  STATEMENT_INVALID: "what the deck says of its request, its evidence scope or its answer's status is not in the form the reviews read",
 });
 export function deckStatementFindings(deck) {
   const out = [];
@@ -132,10 +159,21 @@ export function deckStatementFindings(deck) {
     repair: "A new deck records the user's request verbatim as `request` on `deck`: the storyline critic and the reviewers judge the deck against what was asked, not against the author's restatement of it" });
   const waivers = waiverErrors(deck?.waivers);
   if (waivers.length) out.push({ code: registered(DECK_STATEMENT_CODES, "WAIVERS_INVALID"), severity: "blocker", repair: waivers.join("; ") });
+  const statements = [];
+  if (deck?.requestProvenance !== undefined && !Object.hasOwn(REQUEST_PROVENANCES, deck.requestProvenance))
+    statements.push(`\`requestProvenance\` is one of ${Object.entries(REQUEST_PROVENANCES).map(([key, about]) => `${key} (${about})`).join("; ")}`);
+  const scope = deck?.evidenceScope;
+  if (scope !== undefined && (!scope || typeof scope !== "object" || !["open", "closed"].includes(scope.retrieval) || (scope.retrieval === "closed" && textWords(scope.note) < 4)))
+    statements.push("`evidenceScope` is { retrieval: \"open\" | \"closed\", note }: closed when the author may use only the evidence supplied, with a `note` saying what was supplied and who set the limit");
+  if (deck?.answerStatus !== undefined && !["final", "provisional"].includes(deck.answerStatus)) statements.push("`answerStatus` is \"final\" or \"provisional\"");
+  if (deck?.answerStatus === "provisional" && !answerStatusOf(deck).limits.some((limit) => textWords(limit) >= 4))
+    statements.push("a provisional answer says what it leaves open in `answerLimits` - a sentence for each decisive thing the evidence in scope cannot settle");
+  if (statements.length) out.push({ code: registered(DECK_STATEMENT_CODES, "STATEMENT_INVALID"), severity: "blocker", repair: statements.join("; ") });
   return out;
 }
-/** Why a deck cannot be reviewed without its request: a new deck must carry it. */
-export const requestErrors = (spec) => deckStatementFindings({ workflow: spec?.workflow, request: spec?.request }).map((f) => f.repair);
+/** Why a deck cannot be reviewed without its request: a new deck must carry it, and what it says of it must be in form. */
+export const requestErrors = (spec) => deckStatementFindings({ workflow: spec?.workflow, request: spec?.request, requestProvenance: spec?.requestProvenance, evidenceScope: spec?.evidenceScope,
+  answerStatus: spec?.answerStatus, answerLimits: spec?.answerLimits }).map((f) => f.repair);
 
 export const REVISION = "existing_deck_revision";
 /** A revision's inventory of the deck it was imported from (runtime/import-deck.py), beside the deck file; null for new work. */

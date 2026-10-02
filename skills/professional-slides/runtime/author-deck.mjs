@@ -12,6 +12,9 @@
 //   node runtime/author-deck.mjs <id>.pages.json         compile to <id>.deck.json and <id>.plan.json; warns when
 //                                                        the storyline gate in out/ (or --out <dir>) is not ready
 //   node runtime/author-deck.mjs <id>.pages.json --check compile and gate, write nothing
+//   node runtime/author-deck.mjs <id>.pages.json --repair-relation <page-id>
+//                                                        the one exhibit that sets a page's split measures on one
+//                                                        scale, built from the page's own exhibits, to paste in
 //   node runtime/author-deck.mjs <id>.pages.json --draft the spine only - titles, claims, page types, the insights
 //                                                        each page rests on, the request - for the storyline
 //                                                        critique; exhibit data, copy, word floors and the variety
@@ -57,6 +60,9 @@ import { deckStatementFindings } from "./review-passes.mjs";
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import * as WEIGHT from "./weight.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
+import { hasMeasures, measureProblems, measureRegistry, unmeasuredInsights } from "./measures.mjs";
+import { alternativesOf, analysisInsights, analysisLine, readAnalysis, ANALYSIS_OPS } from "./analysis.mjs";
+import { dependencyFindings, relationRepair, requiredCitations } from "./gates/dependency_gates.mjs";
 
 export const REVISION = "existing_deck_revision";
 
@@ -67,6 +73,9 @@ export const AUTHORING_CODES = Object.freeze({
   PILLAR_UNSUPPORTED: "a section whose pages rest on no strong insight",
   REVISION_UNMAPPED: "an imported slide still carrying only its old copy, not yet given a page type",
   REVISION_INVENTORY_MISSING: "a revision's source inventory is not beside its pages file",
+  MEASURES_MISSING: "an insight whose evidence is numbers records no `measures`, so nothing can be computed from it or checked against it",
+  ANALYSIS_REQUIRED: "a deck that compares declared players has no computed comparison of them on common measures",
+  ANALYSIS_UNRESTED: "a computed analysis that no page rests on",
   // Advisories, raised by the page-type compiler (page-types.mjs) and listed in the author's summary.
   TITLE_COUNT_ONLY: "a title that states a count with no comparator or consequence",
   POINT_UNMARKED: "a commentary point with no figure to mark and no highlighted phrase",
@@ -132,6 +141,7 @@ export function compileDeck(doc, { insights = null, draft = false, partial = fal
   doc = { ...doc, deck: { ...doc.deck, ...deckKeys } };
   const revision = doc.deck.workflow === REVISION;
   const errors = [], waiting = [];
+  const measured = measureRegistry(insights);
   const compile = (list, offset = 0) => list.map((page, i) => {
     if (unmapped(page)) {
       if (revision) { waiting.push(page.id ?? `page ${offset + i + 1}`); return null; }
@@ -139,7 +149,12 @@ export function compileDeck(doc, { insights = null, draft = false, partial = fal
       return null;
     }
     let slide;
-    try { slide = compilePage(page, offset + i, { insights, draft, spine: draft, players: doc.deck.players, sources: doc.sources, rules: doc.deck }); } catch (error) { errors.push(error.message); return null; }
+    const { page: authored, dependencies } = withoutDependencies(page, measured);
+    try { slide = compilePage(authored, offset + i, { insights, draft, spine: draft, players: doc.deck.players, sources: doc.sources, rules: doc.deck }); } catch (error) { errors.push(error.message); return null; }
+    if (dependencies && slide.pageType) {
+      slide.pageType.dependencies = dependencies.declared;
+      if (dependencies.claim && slide.pageType.content?.settles) slide.pageType.content.settles = { ...slide.pageType.content.settles, ...dependencies.claim };
+    }
     // Every key checked now, on every page, rather than one at a time by the build.
     const unknown = Object.keys(slide).filter((key) => !(key in SLIDE_KEYS));
     if (!unknown.length) return slide;
@@ -162,6 +177,29 @@ export function compileDeck(doc, { insights = null, draft = false, partial = fal
     throw error;
   }
   return { spec, findings: varietyFindings(spec, { structureOf, drawnOf }), spineFindings, unmapped: waiting };
+}
+
+/**
+ * A page as the compiler reads it, with its dependency declarations set
+ * aside: each exhibit's and metric's `basis` (gates/dependency_gates.mjs) is
+ * the author's statement about the evidence, not a prop the composer draws.
+ * `declared` is what the page's record keeps - the storyline critique is
+ * bound to it - and `claim` the measures and relation of a `settles` written
+ * without its kind, which the insights then supply. A page that cites no
+ * source takes its citation from the measures it plots, where they carry one.
+ */
+export function withoutDependencies(pageIn, registry = new Map()) {
+  if (!pageIn || typeof pageIn !== "object" || !pageIn.type) return { page: pageIn, dependencies: null };
+  const page = structuredClone(pageIn);
+  const take = (item) => { if (!item || typeof item !== "object" || item.basis === undefined) return null; const { basis } = item; delete item.basis; return basis; };
+  const declared = { exhibits: [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : [])].filter((ex) => ex && typeof ex === "object").map(take),
+    blocks: (Array.isArray(page.blocks) ? page.blocks : []).map((block) => take(block?.exhibit)),
+    metrics: [...(Array.isArray(page.metrics) ? page.metrics : []), ...(page.kpi && typeof page.kpi === "object" ? [page.kpi] : [])].map(take) };
+  let claim = null;
+  if (page.settles && typeof page.settles === "object" && page.settles.kind === undefined && page.settles.what === undefined && (page.settles.measures || page.settles.relation)) { claim = page.settles; delete page.settles; }
+  const any = claim || Object.values(declared).some((list) => list.some(Boolean));
+  if (page.source === undefined && registry.size) { const keys = requiredCitations(pageIn, registry); if (keys.length) page.source = keys; }
+  return { page, dependencies: any ? { declared: Object.fromEntries(Object.entries(declared).filter(([, list]) => list.some(Boolean))), claim } : null };
 }
 
 // Metadata written the same on most pages is stamped by a loop, not chosen by
@@ -207,6 +245,22 @@ export function deckSpineFindings(doc, insights = null) {
       repair: `${stamped.join("; ")}. A value written the same on most pages was stamped, not chosen, and says nothing true about any one page: write each page's own, or leave the field out where it is optional (\`takeaway\`, \`adds\` on a page without commentary, \`settles\` where \`evidence\` derives it)` });
   }
   if (insights) {
+    // A number-bearing insight records its measures: the runtime computes from
+    // them (analysis.mjs) and holds each exhibit to them (dependency_gates.mjs).
+    const unmeasured = unmeasuredInsights(insights);
+    if (unmeasured.length) out.push({ code: "MEASURES_MISSING", severity: "blocker", pages: unmeasured,
+      repair: `${unmeasured.length} insight${unmeasured.length === 1 ? " records" : "s record"} numbers only as a sentence (${unmeasured.join(", ")}): give each its \`measures\` - { name: { unit, population, periods | members | period, values | value } } - the numbers its \`calculation\` describes, as data. A sentence cannot be joined to another record, subtracted from one, or checked against the chart drawn from it (references/storylining.md#extract-the-insights-before-the-titles)` });
+    const alternatives = alternativesOf(deck);
+    const results = insights.analysis?.results ?? [];
+    if (alternatives.length >= 2 && hasMeasures(insights)) {
+      const covers = (r) => r.op === "compare" && r.status !== "unavailable" && alternatives.every((name) => r.table.members.includes(name));
+      if (!results.some(covers)) out.push({ code: "ANALYSIS_REQUIRED", severity: "blocker", measured: { players: alternatives, compared: results.filter((r) => r.op === "compare").map((r) => r.id) },
+        repair: `The deck declares ${alternatives.length} players to compare (${alternatives.join(", ")}) and no computed analysis sets them all on common measures. Before the outline, write \`<id>.analysis.json\` with a \`compare\` over the measures the answer turns on - ${ANALYSIS_OPS.compare.does} - and run \`node runtime/analysis.mjs <id>.pages.json\`: a player with no record takes its row with n/a, which is a finding, and the result says who leads under each priority. Pages then rest on the result by its id (references/storylining.md#run-the-analyses-before-the-outline)` });
+    }
+    const named = new Set([...doc.pages, ...(doc.appendix || [])].flatMap((p) => (Array.isArray(p?.evidence) ? p.evidence : [])));
+    const unrested = results.filter((r) => r.status !== "unavailable" && !named.has(r.id)).map((r) => r.id);
+    if (unrested.length) out.push({ code: "ANALYSIS_UNRESTED", severity: "advisory", pages: unrested,
+      repair: `${unrested.join(", ")} ${unrested.length === 1 ? "was" : "were"} computed and no page names ${unrested.length === 1 ? "it" : "them"} in \`evidence\`: an analysis with no page is either cut or missing its page` });
     const entry = (page, appendix = false) => ({ kind: page?.kind === "section" ? "section" : page?.type ? "content" : "other", appendix,
       title: String(page?.title ?? page?.id ?? "section"), evidence: Array.isArray(page?.evidence) ? page.evidence : [] });
     const weak = unsupportedPillars([...doc.pages.map((p) => entry(p)), ...(doc.appendix || []).map((p) => entry(p, true))], insights);
@@ -224,10 +278,12 @@ export function deckSpineFindings(doc, insights = null) {
  * `strength` (strong, supporting or context) and its `soWhat` - what follows
  * for the decision - which is what makes a measurement a finding.
  */
-export async function readInsights(baseDir, stem) {
+export async function readInsights(baseDir, stem, { alternatives = [] } = {}) {
   const log = await readJson(path.join(baseDir, `${stem}.insights.json`), { optional: true });
   if (log === null) return null;
   const items = log.insights || [];
+  const measured = items.flatMap(measureProblems);
+  if (measured.length) throw new Error(`The insight log's measures are not valid:\n- ${measured.join("\n- ")}`);
   const unshaped = items.filter((item) => !SHAPES[item.shape]).map((item) => item.id ?? "?");
   if (unshaped.length) throw new Error(`The insight log records no data shape for ${unshaped.join(", ")}: give each insight a \`shape\` - one of ${Object.keys(SHAPES).join(", ")} - so the pages can be checked against the evidence they rest on`);
   const graded = items.flatMap(insightGradeProblems);
@@ -237,7 +293,17 @@ export async function readInsights(baseDir, stem) {
   // Every narrow insight is named at once, before a page rests on it.
   const narrow = items.map(breadthProblem).filter(Boolean);
   if (narrow.length) throw new Error(`The insight log's data is too narrow for ${narrow.length} insight${narrow.length === 1 ? "" : "s"}:\n- ${narrow.join("\n- ")}`);
-  return new Map(items.map((item) => [item.id, item]));
+  // The analyses the author asked for, run now over the log's measures: their
+  // results join the log as derived insights a page can rest on, and are kept
+  // on the map (`analysis`) for the spine rules and the summary.
+  const analysis = await readAnalysis(baseDir, stem, log, { alternatives });
+  if (analysis.problems.length) throw new Error(`The analysis plan (${stem}.analysis.json) is not valid:\n- ${analysis.problems.join("\n- ")}`);
+  const derived = analysisInsights(analysis.results);
+  const clash = derived.filter((d) => items.some((item) => item.id === d.id)).map((d) => d.id);
+  if (clash.length) throw new Error(`The analysis plan reuses insight ids (${clash.join(", ")}): give each analysis an id of its own`);
+  const map = new Map([...items, ...derived].map((item) => [item.id, item]));
+  map.analysis = { plan: analysis.plan, results: analysis.results };
+  return map;
 }
 
 /** For each insight, the page types its data shape can carry. */
@@ -310,10 +376,15 @@ export async function authorDeck(doc, { baseDir, insights = null, draft = false 
   const contract = varietyFindings(spec, { structureOf, drawnOf });
   const variety = contract.filter((f) => f.severity === "blocker"), varietyAdvisories = contract.filter((f) => f.severity !== "blocker");
   const spine = spineFindings.filter((f) => f.severity !== "advisory");
+  // What each claim and exhibit rests on, held to the measures it names
+  // (gates/dependency_gates.mjs): enforced with the copy, since a draft's
+  // exhibits are not yet written.
+  const depends = insights ? WEIGHT.applyRulesVersion(dependencyFindings(doc, insights), spec) : [];
+  const dependencies = depends.filter((f) => f.severity === "blocker"), dependencyAdvisories = depends.filter((f) => f.severity !== "blocker");
   return { spec, deck: composed.deck ?? { slides: [] }, failedIds, compiled: !compileErrors.length, unmapped: waiting,
-    findings: [...compiled, ...spine, ...inventory, ...(draft ? [] : [...composing, ...variety, ...scene.findings])],
+    findings: [...compiled, ...spine, ...inventory, ...(draft ? [] : [...dependencies, ...composing, ...variety, ...scene.findings])],
     // A draft has no copy yet: what the copy settles is reported, not enforced.
-    pageGateAdvisories: [...(draft ? [...composing, ...variety, ...scene.findings] : []), ...varietyAdvisories, ...spineFindings.filter((f) => f.severity === "advisory"), ...scene.advisories],
+    pageGateAdvisories: [...(draft ? [...dependencies, ...composing, ...variety, ...scene.findings] : []), ...dependencyAdvisories, ...varietyAdvisories, ...spineFindings.filter((f) => f.severity === "advisory"), ...scene.advisories],
     pageGatesRan: scene.ran, pageGatesError: scene.ran ? null : scene.reason, budget: scene.budget ?? [] };
 }
 
@@ -384,13 +455,13 @@ export function scaffoldPage(type, { id = "p00", insight = null, example = readJ
 
 const report = (findings) => findings.map((f) => `  ${f.code}${f.id || f.page ? ` [${f.id ?? f.page}]` : ""}${f.measured !== undefined ? `  ${JSON.stringify(f.measured)}` : ""}\n    ${f.repair ?? f.reason ?? ""}`).join("\n");
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check | --draft | --log] | --types | --schema [type] | --example <type> | --scaffold <type> [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check | --draft | --log | --repair-relation <page-id>] | --types | --schema [type] | --example <type> | --scaffold <type> [--evidence <insight-id>]";
 
 /** The CLI. Returns the exit code. */
 async function main(argv) {
   const { values, positionals: [file] } = parseCli(argv, { types: { type: "boolean" }, schema: { type: "string", bare: "" }, icons: { type: "boolean" },
     example: { type: "string", bare: "" }, scaffold: { type: "string" }, evidence: { type: "string" }, id: { type: "string" }, out: { type: "string" },
-    log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" } }, { usage: USAGE });
+    log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   if (values.types) { say(describeTypes()); return 0; }
   if (values.schema !== undefined) {
@@ -443,6 +514,16 @@ async function main(argv) {
   // skill as a published budget or a better check (taste-review.md).
   const logPath = path.join(dir, `${stem}.author-log.jsonl`);
   const runs = (await fs.readFile(logPath, "utf8").catch(() => "")).split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  // The one exhibit that shows a page's split measures on one basis, built
+  // from the page's own exhibits and checked to keep every number they plot.
+  if (values["repair-relation"] !== undefined) {
+    const page = [...doc.pages, ...(doc.appendix || [])].find((p) => p?.id === values["repair-relation"]);
+    if (!page) { console.error(`No page "${values["repair-relation"]}" in ${path.basename(file)}`); return 1; }
+    const repair = relationRepair(page, await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }));
+    if (!repair) { console.error(`${page.id}: no two measures of its claim, in one unit, are drawn in separate exhibits whose series this can merge`); return 2; }
+    say(JSON.stringify(repair, null, 1));
+    return 0;
+  }
   if (values.log) {
     const seen = new Map();
     for (const run of runs) for (const f of run.findings) { const key = `${f.code}${f.id ? ` [${f.id}]` : ""}`; seen.set(key, (seen.get(key) || 0) + 1); }
@@ -455,7 +536,7 @@ async function main(argv) {
   // then every rule of the variety contract and of the content plan the deck
   // breaks. The author fixes them together and runs it again.
   let compiled, insights = null;
-  try { insights = await readInsights(dir, stem); compiled = await authorDeck(doc, { baseDir: dir, insights, draft }); }
+  try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); compiled = await authorDeck(doc, { baseDir: dir, insights, draft }); }
   catch (error) {
     await log({ ok: false, findings: (error.pageErrors ?? [error.message]).map((message) => ({ code: "COMPILE", id: message.split(":")[0], message })) });
     console.error(error.message); return 2;
@@ -531,6 +612,8 @@ async function main(argv) {
     plotted: { chartPages: depth.chartPages, median: depth.median, range: [depth.min, depth.max], thinnest: depth.thinnest, strongDecks: "about 22 a chart page, the middle half 10 to 48" },
     // Which types each insight's data can carry: chosen here, before a page is written against the wrong shape.
     ...(insights && (draft || values.check) ? { insightTypes: insightTypes(insights) } : {}),
+    // What the runtime computed from the log's measures, and what it could not: each line a result a page can rest on by its id.
+    ...(insights?.analysis?.results?.length ? { analyses: insights.analysis.results.map(analysisLine) } : {}),
     ...(pageGatesRan ? {} : { pageGates: `did not run: ${pageGatesError || "no reason given"}` }),
     advisories: [...(contentReport.findings || []).filter((f) => !held(f)), ...pageGateAdvisories]
       .map((f) => `${f.code}${f.id ? ` [${f.id}]` : ""}`)
@@ -541,6 +624,7 @@ async function main(argv) {
   await writeJson(path.join(dir, `${stem}.deck.json`), spec);
   await writeJson(path.join(dir, `${stem}.plan.json`), planOf(spec));
   await writeJson(path.join(dir, `${stem}.content.json`), content);
+  if (insights?.analysis?.plan) await writeJson(path.join(dir, `${stem}.analysis-results.json`), { schema: "professional-slides.analysis-results/v1", id: stem, results: insights.analysis.results });
   say(JSON.stringify({ deck: `${stem}.deck.json`, plan: `${stem}.plan.json`, content: `${stem}.content.json`, ...summary }, null, 1));
   // The full copy belongs after the storyline gate: said on every full compile
   // while the gate is not ready (out/ beside the pages file, or --out), never enforced here.
